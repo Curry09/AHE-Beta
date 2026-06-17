@@ -1,0 +1,48 @@
+id: T2
+title: Harness 对话接口
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/harness/interface.py
+  - tests/harness/test_interface.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  把「被使用的 harness」抽象成一个多轮对话协议，让用户侧不绑定具体 agent 实现。
+motivation: |-
+  CLAUDE.md 要求 harness 兼容 nexau / claude code / codex。用户侧只应依赖一个稳定的对话协议，
+  具体后端可替换；否则每换一个 agent 都要改用户侧。这也是「被进化对象」与「评测脚手架」解耦的边界。
+scope: |-
+  定义 HarnessInterface 协议：多轮对话(send(message)->reply、reset、close)；提供一个 FakeHarness 测试后端与一个薄 nexau 适配器骨架（真实 nexau 接入留后续 harness spec）。
+design: |-
+  HarnessInterface 用 typing.Protocol 定义，三个方法：
+  - send(message: str) -> str：发一条用户消息，返回 harness 这一轮的完整回复。
+  - reset() -> None：清空会话状态，开新一局。
+  - close() -> None：释放后端资源。
+
+  本组提供两个实现：
+  - FakeHarness：可注入「回复脚本」或回调，供 T3/T4 单测在无真实模型下跑通多轮。
+  - NexauHarness（骨架）：构造可成功、记录配置；send 暂抛 NotImplementedError，真实接入留后续 harness spec。
+
+  用户侧只 import HarnessInterface，不 import 具体后端——后端在 runner 入口注入。
+interface: |-
+  HarnessInterface(Protocol): send/reset/close。FakeHarness(script|callback)。NexauHarness(config)。
+tradeoffs: |-
+  方法面故意只留 send/reset/close 三件套（奥卡姆）：流式、工具调用、token 统计等先不进协议，
+  等真实 nexau 接入暴露需求再扩，避免过早抽象。
+  备选：直接复用 harbor 的 episode 接口——但那是为 rollout 设计的批式接口，套到「逐轮真人对话」上别扭，故另立轻协议。
+acceptance: |-
+  FakeHarness 可多轮收发并被 mock；HarnessInterface 协议有类型标注；nexau 适配器骨架可实例化但真实调用标 NotImplemented。
+tests: ''
+references: ''
+open-questions: ''

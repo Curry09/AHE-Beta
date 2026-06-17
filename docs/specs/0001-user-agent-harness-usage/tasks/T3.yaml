@@ -1,0 +1,61 @@
+id: T3
+title: 用户 agent 驱动器
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+  - T2
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/user_side/user_agent.py
+  - tests/user_side/test_user_agent.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  扮演真人用户：戴上 persona、按种子场景与 harness 多轮对话，自己决定何时收手，会话末打一个体感分。
+motivation: |-
+  这是训练信号的产生点。信号「真不真」取决于这个驱动器扮演得「像不像真人」——
+  会追问、会绕路、会卡住、会受够了放弃，而不是机械跑满固定轮数。
+scope: |-
+  实现 persona 驱动的多轮对话：给定 Persona+SeedScenario，逐轮生成用户消息、读 harness 回复、由 agent 自判会话结束；结束时产出 FeelingScore(1-4+理由)。issue 产出留最小桩(github 风格 draft)，机制 TBD。
+design: |-
+  UserAgent 由一个 LLM 后端驱动（注入，不在本组实现具体模型客户端）。一局循环：
+
+  ```
+  loop:
+    user_msg = llm(persona, scenario, transcript)        # 生成这一轮用户话
+    若 user_msg 标记结束 → break                          # 自判：达成/放弃/受够
+    reply = harness.send(user_msg); 记进 transcript
+  结束后:
+    feeling = llm 给 1-4 + reason                          # 会话末总分
+    issues  = llm 产出 0..n 条 IssueDraft（机制待定，见 open-questions）
+  ```
+
+  「自判结束」靠提示词让 LLM 在话里带一个结束信号（如特定标记/字段），驱动器解析到即停；
+  另设硬上限 max_turns 兜底防不收敛。体感与 issue 都在会话**结束后**一次性产出（符合「会话末一个总分」的决定）。
+interface: |-
+  UserAgent(llm, persona, max_turns).run(scenario, harness) -> (Transcript, FeelingScore, list[IssueDraft])
+tradeoffs: |-
+  体感与 issue 都放会话末、不逐轮：信号更干净、实现更简单（采纳的决定），代价是丢失「第几轮开始变差」的细粒度，
+  后续若需要再开 spec 升级为逐轮。
+  自判结束 vs 固定轮数：选自判（更像真人），用 max_turns 兜底防跑飞。
+acceptance: |-
+  用 FakeHarness 跑通一局多轮对话；自判结束生效(达成/放弃/受够);末尾产出合法 FeelingScore;单测以 mock LLM 固定输出验证流程。
+tests: |-
+  mock LLM 返回固定脚本：① 三轮后发结束信号→会话恰好三轮；② 永不结束→max_turns 截断；
+  ③ 体感分落在 1-4；④ FakeHarness 收到的消息序列与 transcript 一致。
+references: |-
+  CLAUDE.md 用户侧(a)：体感评分 + issue。会话末总分的决定见本 spec 需求澄清。
+open-questions: |-
+  issue 产出机制待定（用户已确认「类似往 github 提 issue，具体 TBD」）。候选：
+  (a) UserAgent 直接 in-character 产出 IssueDraft；
+  (b) 单独分析器读完 transcript 再归纳；
+  (c) 两步：标摩擦点 + 归纳。
+  本组先实现 (a) 的最小桩（LLM 末尾产 0..n 条 draft），不锁死，待后续 dev_side spec 对接需求时定。

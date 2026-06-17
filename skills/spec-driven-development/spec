@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Launcher for the vendored `spec` CLI (from OpenAgents spec-driven-development).
+# Resolves the project venv + vendored `openagents.spec` package.
+set -euo pipefail
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
+PY="$REPO_ROOT/.venv/bin/python"
+[ -x "$PY" ] || PY="$(command -v python3)"
+export PYTHONPATH="$SKILL_DIR/vendor${PYTHONPATH:+:$PYTHONPATH}"
+exec "$PY" -m openagents.spec.cli "$@"
