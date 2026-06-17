@@ -19,7 +19,7 @@ import argparse
 from pathlib import Path
 
 from openagents.spec import mutate
-from openagents.spec.render import write_overview
+from openagents.spec.render import write_group_summaries, write_overview
 from openagents.spec.schema import PRIORITY_VALUES, STATUS_VALUES
 from openagents.spec.validate import validate
 
@@ -147,9 +147,11 @@ def _cmd_add_task(*, specs_root: Path, args: argparse.Namespace) -> int:
 
 
 def _cmd_render(*, specs_root: Path) -> int:
-    """render 子命令：写 OVERVIEW.md 并打印路径。"""
+    """render 子命令：写全局 OVERVIEW.md 与各组 summary.md，并打印路径。"""
     path = write_overview(specs_root=specs_root)
     print(f"✓ 已生成 {path}")
+    for summary_path in write_group_summaries(specs_root=specs_root):
+        print(f"✓ 已生成 {summary_path}")
     return 0
 
 

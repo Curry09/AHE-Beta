@@ -1,0 +1,47 @@
+id: T6
+title: 本地 SessionStore
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/user_side/session_store.py
+  - tests/user_side/test_session_store.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  将一局 Session 持久化到本地：全量文件 + 一个总索引。索引承载体感曲线与回归基线所需的最小信息
+  （session_id、体感分、时间），无需打开全量文件即可统计。
+motivation: |-
+  体感是训练信号，必须可追溯、可统计。Session 全量留作证据，索引供 loop/metrics 画 issue/体感曲线、
+  供 dev_side 取回归基线。
+scope: |-
+  把 Session 落地：全量写 data/sessions/<session_id>.json，并维护 data/sessions/index.json(session_id+体感分+时间)供体感曲线与回归基线统计。
+design: |-
+  SessionStore(root) 提供：
+  - save(session) -> None：写 root/<session_id>.json（全量），并向 root/index.json 追加一条
+    {session_id, score, created_at, n_issues}。
+  - load(session_id) -> Session：按 id 读回全量。
+  - index() -> list[dict]：读总索引，供统计。
+
+  写索引用「读-改-写」单文件，MVP 单进程足够；并发留后续。
+interface: |-
+  SessionStore(root): save(session) / load(session_id) -> Session / index() -> list[dict]。
+tradeoffs: |-
+  一文件一局 + 单总索引（奥卡姆），不引数据库；统计走索引、证据走全量文件。
+  并发写索引的竞态留到 loop 层并行时再解决，本任务不处理。
+acceptance: |-
+  save(session) 写全量文件并更新 index；可按 id 读回；index 条目含体感分与时间戳；单测覆盖写/读/索引。
+tests: |-
+  单测：save 后全量文件与 index 均出现该局；load 还原等价 Session；index() 含体感分与时间戳。
+references: |-
+  CLAUDE.md 架构「状态去向：体感 + session → 本地」；下游 loop/metrics 曲线。
+open-questions: ''

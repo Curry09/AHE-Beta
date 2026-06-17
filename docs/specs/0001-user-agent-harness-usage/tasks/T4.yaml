@@ -7,6 +7,8 @@ depends-on:
   - T1
   - T2
   - T3
+  - T5
+  - T6
 relates-to: []
 parallel: false
 files:
@@ -20,7 +22,9 @@ split-from:
 merged-from: []
 derived-from: []
 summary: |-
-  用户侧的最小可用入口：一个函数把 persona、场景、harness、user agent 串成一局，吐出结构化 Session。
+  用户侧的最小可用入口：单一无状态函数将 Persona、SeedScenario、HarnessInterface 与 UserAgent
+  编排为一局会话，收集 Transcript、FeelingScore 与 IssueDraft，返回结构化的 Session。所有依赖由参数注入，
+  runner 自身不构造任何后端，便于测试替换与上层（loop 编排、metrics 统计）复用。
 motivation: |-
   闭环编排（loop/）和统计（metrics/）都需要一个稳定的「跑一局」入口。把组装逻辑收在 runner，
   上层只管喂输入、收 Session，不关心内部怎么对话。
@@ -30,25 +34,29 @@ design: |-
   单一入口函数，无状态：
 
   ```
-  run_session(persona, scenario, harness, user_agent) -> Session:
+  run_session(persona, scenario, harness, user_agent, tracker, store) -> Session:
       harness.reset()
-      transcript, feeling, issues = user_agent.run(scenario, harness)
+      transcript, feeling, drafts = user_agent.run(scenario, harness)
       harness.close()
-      return Session(persona, scenario, transcript, feeling, issues)
+      issue_refs = [tracker.create_issue(d) for d in drafts]   # 提交至 Gitea
+      session = Session(persona, scenario, transcript, feeling, issue_refs)
+      store.save(session)                                       # 体感+session 落本地
+      return session
   ```
 
-  依赖全部从参数注入（harness 后端、user_agent 的 llm 都由调用方给），runner 自身不 new 任何后端——
-  便于测试用 Fake、便于上层换真实 nexau。Session 可序列化落盘到 data/issues 供曲线统计。
+  依赖全部从参数注入（harness 后端、user_agent 的 llm、tracker、store 均由调用方给），runner 自身不构造任何后端——
+  便于测试用 Fake(FakeHarness + FakeTracker + 临时目录 store)，便于上层注入真实 Gitea。
 interface: |-
-  run_session(persona, scenario, harness, user_agent) -> Session
+  run_session(persona, scenario, harness, user_agent, tracker, store) -> Session
 tradeoffs: |-
   做成纯函数 + 依赖注入而非 SessionRunner 类：本组无需跨会话共享状态，函数最省（奥卡姆）；
   若将来要做并发/批量跑多局，再在 loop/ 层包装，不污染本入口。
 acceptance: |-
-  run_session(persona, scenario, harness) 端到端返回完整 Session;用 Fake 后端可跑;transcript/体感/issue 三者齐全;单测覆盖正常结束与提前放弃。
+  端到端返回完整 Session;用 Fake(harness/tracker/store) 可跑;transcript/体感齐全、每条 draft 经 tracker 得到 IssueRef、session 已落盘;单测覆盖正常结束与提前放弃。
 tests: |-
-  集成测：用 FakeHarness + mock LLM 跑 run_session，断言 ① 返回 Session 三件套齐全；
-  ② harness.reset/close 各被调一次；③ 提前放弃场景下 transcript 轮数 < max_turns 且体感分合法。
+  集成测：FakeHarness + mock LLM + FakeTracker + 临时目录 store 跑 run_session，断言
+  ① Session 含 transcript/feeling/issue_refs；② harness.reset/close 各调一次；
+  ③ 每条 draft 经 tracker 得到带号 IssueRef；④ store 已写盘；⑤ 提前放弃时轮数 < max_turns。
 references: |-
   CLAUDE.md 用户侧(a)。下游：loop/ 编排 a→b→c、metrics/ 统计 issue 曲线。
 open-questions: ''

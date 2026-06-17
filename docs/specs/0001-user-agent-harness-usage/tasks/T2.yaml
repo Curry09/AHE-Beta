@@ -18,31 +18,36 @@ split-from:
 merged-from: []
 derived-from: []
 summary: |-
-  把「被使用的 harness」抽象成一个多轮对话协议，让用户侧不绑定具体 agent 实现。
+  将被使用的 harness 抽象为统一的多轮对话协议（HarnessInterface），使用户侧与具体 agent 实现解耦。
+  该协议是「被进化对象」（harness）与「评测脚手架」（用户侧）之间的稳定边界：用户侧仅依赖协议，
+  具体后端是一个「可启动程序」（内部可为单或多 nexau，由其入口脚本编排），通过 launcher 接入（见 spec-0003）。
+  本任务只定义协议并提供测试后端 FakeHarness。
 motivation: |-
   CLAUDE.md 要求 harness 兼容 nexau / claude code / codex。用户侧只应依赖一个稳定的对话协议，
   具体后端可替换；否则每换一个 agent 都要改用户侧。这也是「被进化对象」与「评测脚手架」解耦的边界。
 scope: |-
-  定义 HarnessInterface 协议：多轮对话(send(message)->reply、reset、close)；提供一个 FakeHarness 测试后端与一个薄 nexau 适配器骨架（真实 nexau 接入留后续 harness spec）。
+  定义 HarnessInterface 协议：多轮对话(send(message)->reply、reset、close)；提供 FakeHarness 测试后端。真实后端（launcher 启动 harness 程序并接成本协议）归 spec-0003。
 design: |-
   HarnessInterface 用 typing.Protocol 定义，三个方法：
   - send(message: str) -> str：发一条用户消息，返回 harness 这一轮的完整回复。
   - reset() -> None：清空会话状态，开新一局。
   - close() -> None：释放后端资源。
 
-  本组提供两个实现：
-  - FakeHarness：可注入「回复脚本」或回调，供 T3/T4 单测在无真实模型下跑通多轮。
-  - NexauHarness（骨架）：构造可成功、记录配置；send 暂抛 NotImplementedError，真实接入留后续 harness spec。
+  本组只提供 FakeHarness：可注入「回复脚本」或回调，供 T3/T4 单测在无真实模型下跑通多轮。
+  真实后端是一个可启动程序（内部 1 或 N 个 nexau），由 spec-0003 的 launcher 启动并适配成本协议——
+  HarnessInterface 对其为黑盒，不感知内部 agent 数量与编排。
 
   用户侧只 import HarnessInterface，不 import 具体后端——后端在 runner 入口注入。
 interface: |-
-  HarnessInterface(Protocol): send/reset/close。FakeHarness(script|callback)。NexauHarness(config)。
+  HarnessInterface(Protocol): send/reset/close。FakeHarness(script|callback)。真实后端 launcher 见 spec-0003。
 tradeoffs: |-
   方法面故意只留 send/reset/close 三件套（奥卡姆）：流式、工具调用、token 统计等先不进协议，
   等真实 nexau 接入暴露需求再扩，避免过早抽象。
   备选：直接复用 harbor 的 episode 接口——但那是为 rollout 设计的批式接口，套到「逐轮真人对话」上别扭，故另立轻协议。
 acceptance: |-
-  FakeHarness 可多轮收发并被 mock；HarnessInterface 协议有类型标注；nexau 适配器骨架可实例化但真实调用标 NotImplemented。
-tests: ''
-references: ''
+  HarnessInterface 协议有类型标注；FakeHarness 可多轮收发并被 mock（按脚本/回调返回）；reset 后状态清空。
+tests: |-
+  单测：FakeHarness 按注入脚本逐轮返回；reset 后重置；send 调用顺序与内部记录一致。
+references: |-
+  CLAUDE.md 架构「被进化对象：harness 作为可启动程序」。真实后端 launcher：spec-0003。
 open-questions: ''

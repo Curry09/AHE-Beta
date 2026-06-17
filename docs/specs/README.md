@@ -3,7 +3,8 @@
 本目录是 auto-designer 的设计活快照，由 `spec-driven-development` skill 管理。
 
 - 每个 `<NNNN-slug>/` 是一个 spec 组，基本单位是 Task（`tasks/T*.yaml`）。
-- `OVERVIEW.md` 由 `spec render` 自动生成，**勿手改**。
+- `OVERVIEW.md`（全局看板）与各组 `<NNNN-slug>/summary.md`（人读方案）均由 `spec render` 自动生成，**勿手改**。
+- prose 字段（尤其 `summary`，会原样进 `summary.md`）用**精简、精确、学术化**的语言，不堆比喻。
 - 只驱动 CLI，不手写/手改 YAML 树：
 
   ```bash

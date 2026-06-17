@@ -17,15 +17,20 @@ split-from:
 merged-from: []
 derived-from: []
 summary: |-
-  用户侧最小链路的公共数据结构，被 T2/T3/T4 共用。本组只覆盖闭环的「用户侧」：
-  Persona × SeedScenario（给定输入）→ 多轮对话 → 一局 Session（含体感与 issue 草稿）。
+  定义用户侧最小链路的公共数据结构，被 T2/T3/T4 共用。本组仅覆盖进化闭环的「用户侧」：
+  以 Persona 与 SeedScenario 为给定输入，经多轮对话产出一局 Session（含体感评分与 issue 草稿）。
+  给定输入：Persona（用户画像）、SeedScenario（种子场景）。产出结构：Transcript（对话记录）、
+  FeelingScore（1–4 体感评分及理由）、IssueDraft（用户 agent 产出的问题草稿 title/body/labels）、
+  IssueRef（issue 提交至 Gitea 后的回执 number/url/state）、Session（一局的完整封装）。本任务只定义
+  结构本身，要求纯数据、可双向序列化；对话与评分逻辑分别由 T2/T3/T4 实现。
 motivation: |-
   整条进化闭环的训练信号来自「模拟真实使用」。要让信号可复现、可统计、可喂给开发者侧，
   必须先把一局使用会话的输入与产出固化成稳定结构，再谈驱动与编排。
 scope: |-
   定义用户侧核心数据结构：Persona、SeedScenario（均为给定输入）、Session/Transcript、FeelingScore(1-4+理由)、IssueDraft(github 风格 title/body/labels)。
 design: |-
-  全部用 dataclass，纯数据、无行为，可双向 dict/yaml 序列化以便落盘到 data/issues 与统计曲线。
+  全部用 dataclass，纯数据、无行为，可双向 dict/json 序列化。体感与 Session 落本地 data/sessions/；
+  issue 不落本地，由 IssueDraft 经 IssueTracker 提交至 Gitea，回执为 IssueRef。
 
   数据流（本组覆盖范围）：
 
@@ -34,27 +39,30 @@ design: |-
            ├─► UserAgent ⇄ HarnessInterface ─► Transcript
   SeedScenario ─┘                │
                                  ├─► FeelingScore (1-4 + reason)
-                                 └─► IssueDraft (github 风格, 可 0..n 条)
-            run_session 收集三者 ─► Session
+                                 └─► IssueDraft (0..n) ─[IssueTracker]→ Gitea ─► IssueRef
+            run_session 收集 ─► Session(含 transcript/feeling/issue_refs)
   ```
 
   字段约定：
   - Persona：身份、水平、领域、目标、说话风格（给定输入，来源归后续 distill spec）。
-  - SeedScenario：点燃会话的初始诉求/任务描述（给定输入，非测试用例）。
-  - Transcript：有序的 (role, content) 轮次列表，role ∈ {user, harness}。
+  - SeedScenario：初始诉求/任务描述（给定输入，非测试用例）。
+  - Transcript：有序 (role, content) 轮次列表，role ∈ {user, harness}。
   - FeelingScore：score:int(1..4) + reason:str，一局一个（会话末产出）。
-  - IssueDraft：title/body/labels，github 风格；一局可产出 0..n 条。
+  - IssueDraft：title/body/labels，用户 agent 产出，一局 0..n 条。
+  - IssueRef：number/url/state，Gitea 建 issue 后的回执。
+  - Session：session_id/created_at/persona/scenario/transcript/feeling/issue_refs。
 interface: |-
-  models.py 仅暴露 5 个 dataclass 及其 to_dict/from_dict；不依赖 user_side 其它模块，处于依赖图最底层。
+  models.py 暴露上述 dataclass 及其 to_dict/from_dict；不依赖其它模块，处于依赖图最底层。
 tradeoffs: |-
   选 dataclass 而非 pydantic：奥卡姆，零额外依赖，校验逻辑（如 score∈1..4）放构造后的轻量断言即可。
   代价是没有运行时强校验，靠单测兜底。
 acceptance: |-
-  5 个 dataclass 可构造、可序列化为 dict/yaml；FeelingScore 限定 1-4；单测覆盖序列化与边界。
+  各 dataclass 可构造、可序列化为 dict/json；FeelingScore 限定 1-4；单测覆盖序列化与边界。
 tests: |-
   单测：每个 dataclass round-trip(to_dict/from_dict) 一致；FeelingScore 越界(0/5)断言失败；
   IssueDraft labels 缺省为空列表。
 references: |-
   CLAUDE.md「方法：模拟用户使用→开发者迭代」用户侧(a)。
 open-questions: |-
-  IssueDraft 的最终字段形态取决于 issue 产出机制（见 T3 open-questions），此处先取 github 最小三元组。
+  IssueDraft 的产出机制（谁/何时生成）见 T3 open-questions；其字段形态对齐 Gitea 建 issue 入参
+  (title/body/labels)，本任务取此三元组。

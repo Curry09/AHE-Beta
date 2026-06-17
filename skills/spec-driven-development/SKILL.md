@@ -15,7 +15,7 @@ description: >
 > - `spec` CLI 未作为 console_script 安装；在本仓用启动器调用：`./skills/spec-driven-development/spec <子命令>`。
 > - CLI 源码 vendored 在 `skills/spec-driven-development/vendor/openagents/spec/`，依赖装在仓库 `.venv`（ruamel.yaml + jsonschema）。
 > - specs 根用 CLI 原生默认 `docs/specs/`（`--specs-root` 仅部分子命令生效，勿依赖）。
-> - 本仓暂无 CI drift-check；`spec render` 后请手动确认 `OVERVIEW.md` 已更新再提交。
+> - 本仓暂无 CI drift-check；`spec render` 后请手动确认 `OVERVIEW.md` 与各组 `summary.md` 已更新再提交。
 > - 下文提到的 `openagents/spec` 包路径、CLAUDE.md「设计理念 5–6」「多 worktree」等为 OpenAgents 语境，本仓按需对照，不强求一致。
 
 # Spec-Driven Development
@@ -32,10 +32,17 @@ This skill's instructions are in English for model comprehension. Spec prose fie
 (summary/design/…) are written in Chinese (read by the team). Code comments may be English
 or Chinese — clarity first (see `references/code-comment-conventions.md`).
 
+**Prose style — 精简、精确、学术化.** Spec prose fields (especially `summary`, which is
+surfaced verbatim in the human-facing `summary.md`) MUST use concise, precise, academic
+language. Define terms with their canonical names; describe mechanisms and contracts
+directly. Do NOT pad with metaphors, analogies, hand-holding, or colloquial phrasing —
+readability comes from precision and structure, not from dumbing concepts down. One idea
+per clause; no filler. This applies to every prose field, not just `summary`.
+
 ## Core Principles
 
 1. **Spec is a living snapshot, the single source of truth** — `docs/specs/` is always a snapshot of the repo. Every Task in the snapshot maps to currently-live code, so the snapshot never contains legacy. Done Tasks stay in the snapshot (`status: done`); only a refactored Task's *old version* or an *abandoned* Task leaves the snapshot into `history/`. The Task DAG lives in the spec so any agent session can read it.
-2. **Source data vs generated view are separated** — `docs/specs/<group>/` holds only structured YAML source (`metadata.yaml`, `tasks/T*.yaml`, `history/T*.yaml`). The single human-readable view `docs/specs/OVERVIEW.md` is a pure derivative produced by `spec render` (committed for GitHub visibility; CI drift-checks it). Never hand-edit OVERVIEW.md.
+2. **Source data vs generated view are separated** — `docs/specs/<group>/` holds only structured YAML source (`metadata.yaml`, `tasks/T*.yaml`, `history/T*.yaml`). `spec render` produces two derivative human views: the global board `docs/specs/OVERVIEW.md` (cross-group dashboard) and a per-group plan `docs/specs/<group>/summary.md` (that group's Tasks rendered as a readable scheme — aggregates each Task's prose + the DAG). Both are committed for GitHub visibility and CI drift-checks them. Never hand-edit OVERVIEW.md or any summary.md — edit the Task YAML and re-render.
 3. **Drive the `spec` CLI, never hand-write the tree** — use `spec new` / `spec add-task` / `spec amend` / `spec abandon`. They keep canonical key order, append history, and auto-render. Hand-editing risks schema/drift failures.
 4. **Spec id as code index** — new code references `# Spec-NNNN/T*` in comments so other agents can trace code to design. Existing `# RFC-NNNN` comments are grandfathered (spec group NNNN ≡ old RFC NNNN). See `references/code-comment-conventions.md`.
 5. **Human-in-the-loop at phase gates** — humans approve phase transitions; agents execute within phases.
@@ -77,10 +84,11 @@ A group with more than 6 Tasks is too large — split into multiple focused grou
 
 ```
 docs/specs/
-├── OVERVIEW.md            # ONLY human view (spec render output; never hand-edit)
+├── OVERVIEW.md            # global board view (spec render output; never hand-edit)
 ├── README.md              # specs dir doc + numbering rules (hand-written, static)
 └── <NNNN-slug>/
     ├── metadata.yaml      # group meta: title / issue / slug
+    ├── summary.md         # per-group human plan (spec render output; never hand-edit)
     ├── tasks/T*.yaml      # current-version Task snapshot (one-to-one with live code)
     └── history/T*.yaml    # append-only old versions (only legacy lives here)
 ```
@@ -125,8 +133,10 @@ The spec group is the core artifact. Author it via the CLI — never hand-write 
 6. **Validate & render:**
    ```
    spec validate          # must be error-free
-   spec render            # regenerates OVERVIEW.md
+   spec render            # regenerates OVERVIEW.md + each group's summary.md
    ```
+   Review the group's `summary.md` as the human-readable plan; if it reads poorly, fix the
+   underlying Task prose (keep it 精简/精确/学术化, see Language Convention) and re-render.
 7. Present the group (Tasks + DAG + file lists, via OVERVIEW.md) to the user for review. Collect ALL feedback at once; apply in one pass. Repeat until approved.
 
 **Quality bar:**

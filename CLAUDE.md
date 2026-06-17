@@ -34,9 +34,52 @@
 记录 issue 数量随时间的曲线，用于判断新 issue 的产生和已有 issue 的解决是否平衡：issue 长期不下降说明 harness 在退化；issue 过早归零说明 persona 多样性不足、探索停止。
 
 ### 待定项
-1. 分支合并策略。
-2. 体感 1-4 的评分细则。
-3. 真实数据盘点（确认蒸馏模块的输入）。
+1. 体感 1-4 的评分细则（评分维度与归一）。
+2. 真实数据盘点（确认蒸馏模块的输入）。
+3. 体感门禁的最小样本量 N 与回归判定方式（单点比较 vs 分布比较）。
+
+## 架构（MVP）
+
+### 单一运行时：nexau
+MVP 仅接入 nexau 一种 agent 运行时；claude code / codex 兼容留待后续。所有角色均为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」，固定角色定义置于 `agent_defs/`：
+- **用户 agent**：扮演用户，多轮使用 harness，产出体感与 issue。
+- **开发者 agent**：领取 issue，修改 harness 制品。
+- **测试 agent**：用候选 harness 跑用户会话，做体感回归。
+
+### 被进化对象：harness 作为可启动程序
+harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对话契约」：启动后接收用户消息、返回回复；内部为 1 个或 N 个 nexau、如何编排，由其自身入口脚本决定（支持多 agent harness）。
+- 用户侧仅通过 `HarnessInterface`(send/reset/close) 与之交互，不感知内部结构。
+- harness 自带入口 `entry`，自行依赖 nexau，不复用本仓 `nexau_runtime`，保持独立（后续可替换为 CC/codex）。
+- harness 源码为**独立 git 仓，托管于 Gitea**：`release` + `feature` 分支，tag 即发布版本；开发者 agent 走真实分支与合并。`seed_harness/` 为 v0 种子，用于初始化该仓。
+
+### 状态去向
+- **issue → Gitea**：用户 agent 经 `IssueTracker` 接口提交，由 Gitea 负责发号/状态/标签/comment；标签（bug/feature）驱动开发者侧分流。
+- **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
+
+### 闭环
+`loop/orchestrator` 串联 a（用户会话产 issue+体感）→ b（开发者改 harness 分支、测试 agent 体感门禁、合并发版）→ c（新版 harness 回到 a）；`loop/metrics` 记录 issue 数量随时间的曲线。
+
+### 目录结构
+```
+src/auto_designer/
+  models.py            # 共享数据结构（两侧共用）
+  nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
+  harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
+  user_side/           # user_agent.py + session.py(run_session) + session_store.py
+  tracker/             # base.py(IssueTracker接口) + gitea.py + fake.py
+  dev_side/            # developer_agent.py + test_agent.py + release.py
+  loop/                # orchestrator.py + metrics.py
+agent_defs/            # 固定角色 nexau 定义：user_agent/ developer_agent/ test_agent/
+seed_harness/          # v0 harness 种子：entry.py + agents/ + tools/ + params.yaml
+seeds/                 # 给定输入（先手写，后续由 distill 产出）：personas/ scenarios/
+infra/gitea/           # docker-compose.yml(Gitea+sqlite)
+data/                  # 运行产物(.gitignore)：sessions/ harness_runs/
+```
+
+### spec 路线
+- **spec-0001 用户侧**：models、HarnessInterface+Fake、UserAgent、IssueTracker 接口+Fake、本地 SessionStore、run_session。可独立测（不依赖真 Gitea/harness）。
+- **spec-0002 Gitea 接入与基建**：docker(sqlite)+token+标签方案、GiteaTracker、harness 仓初始化。
+- **spec-0003 开发者侧与闭环**：harness launcher、developer_agent、test_agent（体感门禁）、release（合并+tag）、orchestrator+metrics。
 
 ## 设计理念
 1. **奥卡姆剃刀**：如无必要，勿增实体。保证代码和架构的最小化、最简洁，先搭最小可用版本（MVP）再迭代。
@@ -44,6 +87,7 @@
 3. **结构化管理**：文件分文件夹管理，展示出良好的层次结构。
 4. **证据驱动**：一切提到的概念、数据、结论都要有真实可查的来源，需实际查看来源内容并在对应位置给出引用，不臆造。
 5. **以成果为中心**：面向交付成果测试与验收，而非停留在代码细节。
+6. **以用户为中心**：在设计阶段，如果用户的需求有任何不明确的部分，都要向用户确认
 
 ## 技术栈
 - Python

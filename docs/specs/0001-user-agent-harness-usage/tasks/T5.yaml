@@ -1,0 +1,47 @@
+id: T5
+title: IssueTracker 接口与 FakeTracker
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/tracker/base.py
+  - src/auto_designer/tracker/fake.py
+  - tests/tracker/test_fake.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  将 issue 的提交去向抽象为 IssueTracker 接口，使用户侧不绑定具体 tracker 后端。本任务定义接口并提供
+  内存实现 FakeTracker，使 run_session 在无 Gitea 环境下可端到端测试；真实 GiteaTracker 实现归 spec-0002。
+motivation: |-
+  issue 最终提交至 Gitea，但用户侧逻辑与单测不应依赖一个运行中的服务。以接口隔离后端：
+  测试用 FakeTracker，运行时注入 GiteaTracker，二者对 run_session 等价。
+scope: |-
+  定义 IssueTracker 接口(ensure_labels/create_issue/add_comment/set_state，create_issue 返回 IssueRef)；提供 FakeTracker 内存实现，供单测与无 Gitea 环境跑通。GiteaTracker 实现归 spec-0002。
+design: |-
+  IssueTracker 用 typing.Protocol 定义：
+  - ensure_labels(names) -> None：确保标签存在（Gitea 后端需先建标签拿 id）。
+  - create_issue(draft: IssueDraft) -> IssueRef：建 issue，返回带号回执。
+  - add_comment(number, body) -> None：追加评论。
+  - set_state(number, state, reason) -> None：改状态(open/closed + reason)。
+
+  FakeTracker 用内存 dict 维护自增 number 计数器与 issue 表，语义对齐 Gitea（每实例递增发号）。
+interface: |-
+  IssueTracker(Protocol): ensure_labels/create_issue/add_comment/set_state。FakeTracker() 内存实现。
+tradeoffs: |-
+  接口方法只取 issue 闭环所需四项，不照搬 Gitea 全量 API（奥卡姆）；后续 dev_side 需要更多再扩。
+acceptance: |-
+  接口含类型标注；FakeTracker 可建 issue 返回带号 IssueRef、追加 comment、改 state；单测覆盖建/查/改。
+tests: |-
+  单测：create_issue 发号递增并回 IssueRef；add_comment/set_state 生效；ensure_labels 幂等。
+references: |-
+  CLAUDE.md 架构「状态去向：issue → Gitea」。GiteaTracker 实现：spec-0002。
+open-questions: ''

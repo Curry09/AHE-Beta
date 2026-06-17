@@ -9,5 +9,8 @@ __pycache__/
 .venv/
 venv/
 
+# Runtime artifacts (sessions, harness checkouts)
+data/
+
 # OS
 .DS_Store

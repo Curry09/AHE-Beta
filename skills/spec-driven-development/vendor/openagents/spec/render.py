@@ -62,6 +62,100 @@ def write_overview(*, specs_root: Path) -> Path:
     return path
 
 
+# ── 每组人读方案 summary.md（给人看的「总的方案」）──
+# OVERVIEW.md 是全局看板（表 + Mermaid），偏机器/索引视角；summary.md 是单个组的
+# 可读方案，把该组 metadata + 各 Task 的 prose（summary/motivation/design…）顺成一页
+# 给人通读。同为派生视图：纯函数、幂等、勿手改。源仍是 tasks/T*.yaml。
+
+# prose 字段在 summary.md 中的人读小标题与渲染顺序（结构化的 files 单列）。
+_SUMMARY_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("summary", "做什么"),
+    ("motivation", "为什么"),
+    ("scope", "范围"),
+    ("design", "整体设计"),
+    ("interface", "接口"),
+    ("tradeoffs", "取舍"),
+    ("acceptance", "验收标准"),
+    ("tests", "测试"),
+    ("references", "参考"),
+    ("open_questions", "待解问题"),
+)
+
+
+def render_group_summary(*, group: Group) -> str:
+    """Render one group's human-readable plan (summary.md) from its YAML (pure, idempotent).
+
+    把组标题/issue + 组内 DAG + 每个当前版 Task 的 prose 顺成一页可读方案。空字段跳过，
+    无 Task 给占位。不含时间戳等非确定量，保证两次 render 字节级一致。
+    """
+    title = group.metadata.title or group.metadata.slug
+    blocks = [
+        f"# {group.number} {title}",
+        (
+            "> 本文件由 `spec render` 自动生成，请勿手工编辑。\n"
+            f"> 内容来源：本组 `metadata.yaml` 与 `tasks/T*.yaml`（关联 issue #{group.metadata.issue}）。"
+        ),
+        _summary_orchestration(group=group),
+    ]
+    if group.tasks:
+        blocks.append("## 各任务方案")
+        for task in group.tasks:
+            blocks.append(_summary_task(task=task))
+    return "\n\n".join(blocks).rstrip("\n") + "\n"
+
+
+def write_group_summaries(*, specs_root: Path) -> list[Path]:
+    """Render and write each group's summary.md, returning the written paths (sorted).
+
+    summary.md 落在各组目录内（`<NNNN-slug>/summary.md`），与该组源数据同处一处。
+    组目录名按规范为 `<number>-<slug>`（由 `spec new` 建立）。
+    """
+    written: list[Path] = []
+    for group in model.load_all(specs_root=specs_root):
+        group_dir = specs_root / f"{group.number}-{group.metadata.slug}"
+        if not group_dir.is_dir():
+            # slug 与目录名不一致（异常态）则跳过，不去猜目录。
+            continue
+        path = group_dir / "summary.md"
+        path.write_text(render_group_summary(group=group), encoding="utf-8")
+        written.append(path)
+    return written
+
+
+def _summary_orchestration(*, group: Group) -> str:
+    """summary.md「任务编排」段：组内依赖 DAG + 一个轻量任务表。"""
+    lines = ["## 任务编排", "", _render_group_dag(group=group), ""]
+    if not group.tasks:
+        lines.append("（本组暂无任务）")
+        return "\n".join(lines).rstrip("\n")
+    lines.extend(["| 任务 | 标题 | 优先级 | 状态 | 依赖 |", "|----|----|----|----|----|"])
+    for task in group.tasks:
+        deps = ", ".join(task.depends_on) or "—"
+        lines.append(
+            f"| {task.id} | {_cell(task.title)} | {task.priority} | {task.status} | {deps} |"
+        )
+    return "\n".join(lines)
+
+
+def _summary_task(*, task: Task) -> str:
+    """summary.md 单个 Task 段：标题行 + 涉及文件 + 各 prose 小节（空的跳过）。"""
+    lines = [f"### {task.id} · {_cell(task.title)}（{task.priority} / {task.status}）"]
+    if task.files:
+        lines.append("")
+        lines.append("**涉及文件**")
+        lines.append("")
+        lines.extend(f"- `{path}`" for path in task.files)
+    for attr, heading in _SUMMARY_SECTIONS:
+        text = getattr(task, attr).strip()
+        if not text:
+            continue
+        lines.append("")
+        lines.append(f"**{heading}**")
+        lines.append("")
+        lines.append(text)
+    return "\n".join(lines)
+
+
 def _render_board(*, groups: list[Group]) -> str:
     """块 1：全局看板表，每行一个当前版 Task。"""
     lines = [
@@ -141,6 +235,9 @@ def _render_features(*, groups: list[Group]) -> str:
         title = group.metadata.title or group.metadata.slug
         lines.append("")
         lines.append(f"### {group.number} {title}（issue #{group.metadata.issue}）")
+        lines.append("")
+        lines.append(f"> 人读方案见 [`{group.number}-{group.metadata.slug}/summary.md`]"
+                     f"(./{group.number}-{group.metadata.slug}/summary.md)。")
         lines.append("")
         lines.append(_render_group_dag(group=group))
         lines.append("")
