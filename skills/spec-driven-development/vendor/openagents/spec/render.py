@@ -60,7 +60,7 @@ def render(*, specs_root: Path) -> str:
     blocks = [
         "# Spec 总览（OVERVIEW）",
         "> 本文件由 `spec render` 自动生成，请勿手工编辑（Spec-0014/T3）。",
-        _render_synopsis(groups=groups),
+        _render_synopsis(groups=groups, specs_root=specs_root),
         _HOWTO,
         _render_glossary(specs_root=specs_root),
         _render_board(groups=groups),
@@ -182,28 +182,72 @@ def _summary_task(*, task: Task) -> str:
     return "\n".join(lines)
 
 
-def _render_synopsis(*, groups: list[Group]) -> str:
-    """块 0：脉络总览——开篇用一行点题 + 逐组「编号 标题 — 导语首句」，
+def _render_synopsis(*, groups: list[Group], specs_root: Path) -> str:
+    """块 0：脉络总览——项目级开篇（手维护 synopsis.md，缺省回退模板）+ 逐组「编号 标题 — 整段导语」。
 
-    让读者在看板/关系图之前先抓住整条故事线：每组按编号递进，导语首句已点明各自定位，
-    串起来即一条可读脉络。内容全部派生自各组 metadata（标题 + overview 首句），不在通用渲染器里
-    硬编码任何项目剧情，随 spec 演化自动保持正确。
+    开篇先讲清「这是什么 / 为什么 / 闭环」，来自 specs_root/synopsis.md——OVERVIEW 中第二个可手工维护的源
+    （与 glossary.yaml 并列）；缺省则回退到通用模板，不报错。逐组那段取各组 metadata.overview 的全部散文
+    段落（剔除 ASCII 图，图留给各 feature 详情/summary），随 spec 演化自动正确，不在渲染器里硬编码项目剧情。
     """
     lines = [_SYNOPSIS_HEADING, ""]
     if not groups:
         lines.append("（暂无 spec 组）")
         return "\n".join(lines)
+    opening = _read_synopsis(specs_root=specs_root)
+    lines.append(opening if opening else "本仓需求按**组（feature）**拆分、按编号递进。")
+    lines.append("")
     lines.append(
-        "本仓需求按**组（feature）**拆分、按编号递进。下面一句话给出每组定位，串起整条脉络；"
+        "下面按编号递进给出每组定位，串起整条脉络；"
+        "依赖与衔接见后续「跨 feature 关系图」，单组完整方案见各组 `summary.md`。"
     )
-    lines.append("依赖与衔接见后续「跨 feature 关系图」，单组完整方案见各组 `summary.md`。")
     lines.append("")
     for group in groups:
         title = group.metadata.title or group.metadata.slug
-        gist = _one_line(text=group.metadata.overview)
-        tail = f" — {gist}" if gist else ""
+        paras = _prose_paragraphs(text=group.metadata.overview)
+        head = paras[0] if paras else ""
+        tail = f" — {head}" if head else ""
         lines.append(f"- **{group.number} {_cell(title)}**{tail}")
+        # 余下段落作缩进续行，挂在该组 bullet 下，保持「整段叙事（除图）」。
+        for para in paras[1:]:
+            lines.append("")
+            lines.append(f"  {para}")
     return "\n".join(lines)
+
+
+def _read_synopsis(*, specs_root: Path) -> str:
+    """读 specs_root/synopsis.md（项目级开篇，手维护），缺省返回空串。"""
+    path = specs_root / "synopsis.md"
+    if not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8").strip()
+
+
+def _prose_paragraphs(*, text: str) -> list[str]:
+    """取 prose 的散文段落，剔除 ```fenced``` 代码块（ASCII 图），每段压成单行。
+
+    总览逐组导语要展示完整叙事但不搬运数据流图（图属深读信息，留给各 feature 详情/summary）。
+    段落以空行分隔、保持源顺序；段内空白压成单空格，避免续行里出现断句的半行。
+    以冒号结尾的段落是被剥掉的图的「图注」（如「数据流脊柱…：」），一并丢弃，免得留下悬空冒号句。
+    """
+    body: list[str] = []
+    in_fence = False
+    for raw in text.splitlines():
+        if raw.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            body.append(raw)
+    paras: list[str] = []
+    buf: list[str] = []
+    for line in body:
+        if line.strip():
+            buf.append(line)
+        elif buf:
+            paras.append(" ".join(" ".join(buf).split()))
+            buf = []
+    if buf:
+        paras.append(" ".join(" ".join(buf).split()))
+    return [p for p in paras if p and not p.rstrip().endswith(("：", ":"))]
 
 
 def _render_glossary(*, specs_root: Path) -> str:
