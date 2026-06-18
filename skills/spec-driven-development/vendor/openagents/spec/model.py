@@ -184,6 +184,16 @@ def load_group(*, group_dir: Path) -> Group:
     return Group(number=number, metadata=metadata, tasks=tasks, history=history)
 
 
+def load_yaml(*, path: Path) -> object:
+    """Load an arbitrary YAML file with the canonical round-trip instance (None if absent).
+
+    供 render 读非 Task 的辅助源（如 glossary.yaml）复用同一 YAML 实例，避免重复构造。
+    """
+    if not path.is_file():
+        return None
+    return _yaml.load(path)
+
+
 def load_all(*, specs_root: Path) -> list[Group]:
     """Load every spec group under specs_root (sorted by number).
 

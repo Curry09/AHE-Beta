@@ -26,25 +26,66 @@ motivation: |-
   issue 要变成 harness 的真实改动。label(bug/feature) 驱动分支策略——bug 走 release 快修、feature 走
   独立分支孵化——正是 CLAUDE.md 用「分支模型」化解「增量打补丁 vs 结构性改动」张力的落点。
 scope: |-
-  开发者 agent：从 Gitea 取一条 open issue(按 label 分流：bug→release 快修分支、feature→feature 分支)→ checkout harness 仓建分支 → 用 nexau 改 harness bundle → commit/push。MVP 单 agent 串行处理。
+  做什么：
+  - 实现 DeveloperAgent：从 IssueTracker 取一条 open issue，按 label 分流到分支策略，checkout harness 仓建分支，用 nexau（developer_agent 定义）改 harness bundle，commit/push，并在 issue 上 comment 关联分支。
+  - 落地 agent_defs/developer_agent/prompt.md（读 issue + harness bundle、产出修改的角色定义）。
+  - MVP 单 agent、一次处理一条 issue、串行。
+  不做什么：
+  - 不负责候选合并与发版（归 T5），不负责体感判定/门禁（归 T4）。
+  - 不做并发多 agent、不做分支冲突自动解决。
+  - 不决定一轮处理几条 issue（编排归 T6），work_one 只处理一条。
+  - 不实现 issue 的产生（归用户侧 spec-0001）。
 design: |-
-  一次处理一条 issue：
-  ① 经 IssueTracker(GiteaTracker) 取一条 open issue；
-  ② 按 label 定分支：bug → 从 release 切快修分支；feature → 切 feature 分支；
-  ③ checkout harness 仓该分支到工作目录；
-  ④ nexau(developer_agent 定义) 读 issue + harness bundle，产出修改；
-  ⑤ commit/push 到该分支，并在 issue 上 comment 关联分支。
-  不负责合并/发版（归 T5），不负责判定好坏（归 T4）。
+  一次处理一条 issue 的时序：
+  ① 经 IssueTracker（运行时为 spec-0002/T2 GiteaTracker）取一条 open issue（含 number/title/body/labels）；无 open issue → work_one 返回空结果、不建分支。
+  ② 按 label 定分支策略：含 `bug` 标签 → 从 release 分支切快修分支；含 `feature` 标签 → 切 feature 分支；二者皆无或冲突 → 走默认策略（按 bug 处理，记录于 design 决策）。
+  ③ checkout harness 仓到工作目录，基于策略基线建并切到新分支（分支名含 issue number 以可追溯）。
+  ④ nexau(developer_agent 定义).run 读 issue + harness bundle 内容，产出对 bundle 的修改。
+  ⑤ commit（信息引用 issue number）/push 到该分支；经 tracker.add_comment 在 issue 上留关联分支名的 comment。
+
+  分支命名与基线契约：
+  - bug 快修分支基线 = release 分支（HEAD），命名如 `fix/issue-<number>`。
+  - feature 分支基线 = release 分支（HEAD），命名如 `feat/issue-<number>`。
+  - 两类均从 release 切出，差异在于 T5 的合并节奏（bug 快修、feature 孵化后合）与命名前缀，便于人工与编排区分。
+
+  接口（类型层面）：
+  - `DeveloperAgent(tracker: IssueTracker, harness_repo: str, nexau_agent: Agent)`。
+  - `work_one() -> DevResult`：DevResult 含所处理 issue number、所建 branch、commit sha（或在无 issue/未改动时为空）。
+
+  边界与错误处理：
+  - 无 open issue → 返回空 DevResult，不建分支、不报错。
+  - nexau 未产出任何文件改动 → 不空提交；在 issue 上 comment 说明未改动，DevResult 标记无 commit。
+  - label 既无 bug 也无 feature → 默认按 bug 路径（最快反馈），并在 comment 注明分流为默认。
+  - push 失败 / checkout 失败 → 抛错，附 issue number 与分支名。
+
+  关键决策及理由：
+  - label 驱动分支分流，正是 CLAUDE.md 用「分支模型」化解「增量打补丁 vs 结构性改动」张力的落点：bug 走 release 快迭代、feature 走独立分支孵化。
+  - 两类分支都从 release 切出（而非 feature 从某长期 dev 分支切）：MVP 保持单一基线、避免多基线合并复杂度；合并策略集中由 T5 决定。
+  - work_one 只处理一条且无 issue 时返回空：把「处理几条/何时停」的编排决策上移到 T6，本 agent 职责单一、可被反复调用。
 interface: |-
-  DeveloperAgent(tracker, harness_repo, nexau_agent).work_one() -> 处理一条 issue，返回所建分支与提交。
+  类型契约：
+  - `DeveloperAgent(tracker: IssueTracker, harness_repo: str, nexau_agent: Agent)`。
+  - `DeveloperAgent.work_one() -> DevResult`（DevResult: issue_number? / branch? / commit? / changed: bool）。
+  - 依赖：IssueTracker（spec-0001/T5 接口，spec-0002/T2 实现）、Agent（T2 nexau_runtime）。
 tradeoffs: |-
-  单 agent 串行（MVP）：并发多 agent 与分支冲突解决留后续（奥卡姆）。
-  分流只认 bug/feature 两标签，够驱动两条分支路径；更细的优先级/类型后续再加。
+  - 并发度：单 agent 串行 vs 并发多 agent。选串行（奥卡姆）——并发引入分支冲突解决与 issue 抢占，MVP 不需要；规模化后再加。
+  - 分流粒度：bug/feature 两标签 vs 含优先级/类型的多维分流。选两标签——恰好驱动两条分支路径，够用；更细分类后续按需加。
+  - feature 分支基线：从 release 切 vs 从长期 dev 分支切。选从 release 切——单一基线、合并语义简单；长期 dev 分支会引入二级合并，MVP 不必要。
+  - 无改动处理：comment 说明 + 不空提交 vs 强制空提交占位。选前者——空提交污染历史且无信息量，comment 已能追溯。
 acceptance: |-
-  给定一条 issue,能在 harness 仓建对应分支并产出一次修改提交;bug/feature 分流正确;单测用 mock(nexau+Gitea+临时 git)覆盖取 issue→建分支→提交流程。
+  - 给定一条 bug issue，在 harness 仓从 release 切出快修分支并产出一次修改提交；给定 feature issue，切出 feature 分支并提交；分流正确。
+  - 无 open issue 时 work_one 返回空结果、不建分支、不报错。
+  - nexau 未产出改动时不空提交、在 issue 上 comment 说明。
+  - 提交后在对应 issue 上留有关联分支名的 comment。
 tests: |-
-  单测(mock nexau + FakeTracker/Gitea + 临时 git)：bug→release 派生分支、feature→feature 分支；
-  产出一次提交并推送；issue 上留关联 comment。
+  单测（mock nexau + FakeTracker/GiteaTracker + 临时 git 仓）：
+  - bug issue → 从 release 派生 `fix/issue-<n>` 分支、产出一次提交并 push。
+  - feature issue → 切 `feat/issue-<n>` 分支、产出提交。
+  - 无 open issue → work_one 返回空、临时仓无新分支。
+  - nexau 返回无文件改动 → 不产生 commit，issue 上有「未改动」comment。
+  - 处理后 issue 上出现关联分支名的 comment（断言 tracker.add_comment 入参）。
+  - label 既无 bug 也无 feature → 走默认（bug 路径），comment 注明默认分流。
 references: |-
-  nexau_runtime：T2。IssueTracker：spec-0001/T5、GiteaTracker spec-0002/T2。harness 仓：spec-0002/T3。
+  nexau_runtime/Agent：T2。IssueTracker 接口：spec-0001/T5；GiteaTracker 实现：spec-0002/T2。
+  harness 仓与 release 分支：spec-0002/T3。CLAUDE.md 方法 b「bug → release 分支，大 feature → feature 分支」。
 open-questions: ''

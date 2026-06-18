@@ -15,7 +15,57 @@
 
 本文件是所有 spec 的**全局看板**，由各组 `tasks/T*.yaml` 自动汇总，偏索引视角。想读某一组的完整方案，请点进该组的 `summary.md`（每个 feature 段开头有链接）。
 
-阅读顺序建议：先看下方**全局看板**掌握全部任务与状态 → 看**跨 feature 关系图**了解依赖 → 在**各 feature 详情**里逐组读导语与任务一览。
+阅读顺序建议：不熟术语先看**名词解释** → 看**全局看板**掌握全部任务与状态 → 看**跨 feature 关系图**了解依赖 → 看**设计文件结构**掌握落盘布局与文件归属 → 在**各 feature 详情**里逐组读导语与任务一览。
+
+## 名词解释
+
+> 本仓共享术语表，英文优先；本块来源 `glossary.yaml`（手工维护），改名词解释改该文件后 re-render。
+
+### 底座与运行时
+
+- **harbor** — rollout 底座，承载整条自进化闭环的运行。
+- **nexau** — agent 运行时实现，MVP 唯一接入的运行时；三角色（user/developer/test）均为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」。
+- **harness** — 被进化对象，建模为「可启动程序 + 黑盒对话契约」而非单个 agent；内部 1 个或 N 个 nexau 的编排由其自带 entry 决定，源码为独立 git 仓托管于 Gitea。
+- **benchmark** — held-out 测试集，全程不参与训练、不进发版门禁，仅事后验证体感驱动的进化是否带来真实能力提升。
+
+### 三角色（agent 定义）
+
+- **user agent** — 扮演真实用户，按 Persona + SeedScenario 多轮使用 harness，产出体感评分（训练信号）与 issue。
+- **developer agent** — 从 Gitea 领取 open issue，按 label 分流到对应分支策略，用 nexau 修改 harness bundle 并提交。
+- **test agent** — 用候选 harness ref 跑固定集的 N 局用户会话，算平均体感与 release 基线比较，做体感回归门禁。
+
+### 用户侧数据结构（spec-0001/T1）
+
+- **Persona** — 用户画像（身份/水平/领域/目标/说话风格），蒸馏自真实数据，不依据 benchmark 或轨迹构造。
+- **SeedScenario** — 种子场景，一局会话的初始诉求/任务描述（给定输入，非测试用例）。
+- **Transcript** — 有序 (role, content) 多轮对话记录，role ∈ {user, harness}。
+- **FeelingScore** — 1–4 体感评分 + 理由，一局一个、会话末产出，作为训练信号。
+- **IssueDraft** — 用户 agent 产出的问题草稿（title/body/labels），一局 0..n 条。
+- **IssueRef** — issue 提交至 Gitea 后的回执（number/url/state）；本地只持回执，权威源在 Gitea。
+- **Session** — 一局会话的完整封装，聚合 persona/scenario/transcript/feeling/issue_refs。
+
+### 接口与组件
+
+- **HarnessInterface** — 用户侧与 harness 的黑盒多轮对话契约（send/reset/close），使用户侧不感知 harness 内部结构。
+- **IssueTracker** — issue 提交去向的抽象接口，使用户侧不绑定具体 tracker 后端。
+- **FakeTracker** — IssueTracker 的内存桩实现，供用户侧独立测试（不依赖真 Gitea）。
+- **GiteaTracker** — IssueTracker 的 Gitea 真后端，一个打 Gitea /api/v1 的薄 REST 客户端。
+- **run_session** — 用户侧唯一入口，单一无状态函数把 Persona/SeedScenario/HarnessInterface/UserAgent 编排为一局 Session。
+- **SessionStore** — 把一局 Session 持久化到本地 data/sessions/（全量文件 + 总索引），作为体感曲线与回归基线的数据源。
+- **launcher** — 按 git ref 取出某版 harness、启动其自带 entry、按黑盒逐轮协议适配为 HarnessInterface 的粘合层。
+- **nexau_runtime** — 单一 nexau 适配层，把一份角色定义（prompt+工具）加载成可调用的 agent，供三角色共用。
+- **orchestrator** — 把用户侧(a)、开发者侧(b)、回灌(c) 串成可重复进化轮次的闭环编排。
+- **metrics** — 从 Gitea 与本地 session 统计 issue 数量随时间的曲线与体感趋势的观测组件。
+
+### 基建与流程
+
+- **Gitea** — 自托管 git 服务（docker + sqlite），issue 与 harness 仓的家；负责发号/状态/标签/comment。
+- **release 分支** — harness 仓的稳定分支，bug 修复走此分支快速迭代；体感门禁通过的候选合入于此。
+- **feature 分支** — harness 仓的特性分支，大 feature 在此完成后再合入 release。
+- **tag** — harness 仓的发布版本标记，即用户侧下一轮 pin 的 harness 版本。
+- **体感门禁** — 唯一发版门禁，只检查体感是否回归（benchmark 不参与）；候选与 release 基线比较，不退化则放行。
+- **distill（蒸馏模块）** — 从真实使用数据（CC/codex/nexau 日志、issue tracker、社区反馈）蒸馏出 persona 库与种子场景库。
+- **seed_harness** — v0 harness 种子（entry + agents + params），用于初始化 Gitea 上的 harness 独立仓。
 
 ## 全局看板
 
@@ -95,6 +145,75 @@ graph LR
 
 无跨组文件冲突。
 
+## 设计文件结构
+
+> 下列结构由各 Task 的 `files` 声明并集自动汇总；`←` 后为归属 Task（多占即冲突）。
+
+```text
+agent_defs/
+  developer_agent/
+    prompt.md                ← 0003/T3
+  test_agent/
+    prompt.md                ← 0003/T4
+  user_agent/
+    prompt.md                ← 0003/T2
+infra/
+  gitea/
+    README.md                ← 0002/T1
+    bootstrap.sh             ← 0002/T1
+    docker-compose.yml       ← 0002/T1
+scripts/
+  bootstrap_harness.py       ← 0002/T3
+seed_harness/
+  agents/
+    main.md                  ← 0003/T1
+  entry.py                   ← 0003/T1
+  params.yaml                ← 0003/T1
+src/
+  auto_designer/
+    dev/
+      developer_agent.py     ← 0003/T3
+      release.py             ← 0003/T5
+      test_agent.py          ← 0003/T4
+    harness/
+      interface.py           ← 0001/T2
+      launcher.py            ← 0003/T1
+    loop/
+      metrics.py             ← 0003/T6
+      orchestrator.py        ← 0003/T6
+    tracker/
+      base.py                ← 0001/T5
+      fake.py                ← 0001/T5
+      gitea.py               ← 0002/T2
+    user/
+      session.py             ← 0001/T4
+      session_store.py       ← 0001/T6
+      user_agent.py          ← 0001/T3
+    models.py                ← 0001/T1
+    nexau_runtime.py         ← 0003/T2
+tests/
+  dev/
+    test_developer_agent.py  ← 0003/T3
+    test_release.py          ← 0003/T5
+    test_test_agent.py       ← 0003/T4
+  harness/
+    test_interface.py        ← 0001/T2
+    test_launcher.py         ← 0003/T1
+  loop/
+    test_metrics.py          ← 0003/T6
+    test_orchestrator.py     ← 0003/T6
+  tracker/
+    test_fake.py             ← 0001/T5
+    test_gitea.py            ← 0002/T2
+  user/
+    test_session.py          ← 0001/T4
+    test_session_store.py    ← 0001/T6
+    test_user_agent.py       ← 0001/T3
+  test_bootstrap_harness.py  ← 0002/T3
+  test_models.py             ← 0001/T1
+  test_nexau_runtime.py      ← 0003/T2
+```
+
 ## 各 feature 详情
 
 ### 0001 用户 agent 使用 harness 的最小链路（issue #0）
@@ -165,7 +284,7 @@ graph LR
 **任务一览**
 
 - **T1 Gitea 本地基建与标签方案**（pending） — 提供本地 Gitea 服务的基建与一键初始化：docker-compose(Gitea + sqlite) 起服务，bootstrap 脚本建 admin、生成 access token、建工作仓与标签方案。
-- **T2 GiteaTracker**（pending） — GiteaTracker 是 spec-0001 IssueTracker 接口的真实后端：一个打 Gitea /api/v1 的薄 REST 客户端。
+- **T2 GiteaTracker**（pending） — GiteaTracker 是 spec-0001/T5 IssueTracker 接口的真实后端：一个打 Gitea /api/v1 的薄 REST 客户端。
 - **T3 harness 仓初始化**（pending） — 把 seed_harness/ 作为 v0 推送到 Gitea，建立 harness 独立仓，供 dev 侧开发者 agent 走真实分支与合并。
 
 ```mermaid

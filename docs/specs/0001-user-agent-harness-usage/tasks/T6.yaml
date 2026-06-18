@@ -24,24 +24,58 @@ motivation: |-
   体感是训练信号，必须可追溯、可统计。Session 全量留作证据，索引供 loop/metrics 画 issue/体感曲线、
   供 dev 侧取回归基线。
 scope: |-
-  把 Session 落地：全量写 data/sessions/<session_id>.json，并维护 data/sessions/index.json(session_id+体感分+时间)供体感曲线与回归基线统计。
+  做什么：
+  - 将一局 Session 全量持久化为 root/<session_id>.json（证据文件）。
+  - 维护单一总索引 root/index.json，每局追加一条最小统计记录 {session_id, score, created_at, n_issues}。
+  - 提供按 id 读回全量、读总索引的能力，供 loop/metrics 画体感与 issue 曲线、供 dev 侧取回归基线。
+  不做什么：
+  - 不做数据库/外部存储；不做查询引擎（按字段过滤/聚合归 metrics 层消费索引）。
+  - 不处理并发写索引的竞态（单进程 MVP，并发归 loop 层并行时再解决）。
+  - 不负责 Session 的产生（归 T4）与序列化契约本身（归 T1 的 to_dict/from_dict）。
 design: |-
-  SessionStore(root) 提供：
-  - save(session) -> None：写 root/<session_id>.json（全量），并向 root/index.json 追加一条
-    {session_id, score, created_at, n_issues}。
-  - load(session_id) -> Session：按 id 读回全量。
-  - index() -> list[dict]：读总索引，供统计。
+  SessionStore(root: str | Path) 提供：
+  - save(session: Session) -> None：写 root/<session_id>.json（经 Session.to_dict 全量序列化），并向 root/index.json 追加一条 {session_id, score, created_at, n_issues}。root 不存在时自动创建。
+  - load(session_id: str) -> Session：读 root/<session_id>.json 经 Session.from_dict 还原全量。文件不存在抛 FileNotFoundError。
+  - index() -> list[dict]：读 root/index.json 全部条目；索引不存在时返回空列表。
 
-  写索引用「读-改-写」单文件，MVP 单进程足够；并发留后续。
+  索引派生语义：
+  - score 取自 session.feeling.score；created_at 取自 session.created_at（ISO-8601 字符串）；n_issues 取 len(session.issue_refs)。索引条目是全量文件的派生投影，全量文件为唯一权威，索引可由全量重建。
+
+  写入边界与时序：
+  - 写全量文件与追加索引为两步；约定「先写全量文件、后追加索引」（新决策，奥卡姆）：若中途失败，至多出现「有全量文件但索引缺该条」，可由全量重建索引；反之「有索引无证据」不可恢复，故避免。
+  - 索引追加用「读-改-写」单文件：load 现有 index → append 新条 → 整体写回。MVP 单进程足够。
+  - 同一 session_id 重复 save 覆盖全量文件，但索引会追加重复条目（新决策：save 不做索引去重，去重责任归调用方/metrics 消费侧；保持 save 简单且与 T4「不重复调用」约定一致）。
+
+  错误处理：
+  - load 不存在的 id 抛 FileNotFoundError（标准异常，不自定义）。
+  - index() 在索引文件缺失时返回空列表而非抛错（首次运行无索引为合法初始态）。
 interface: |-
-  SessionStore(root): save(session) / load(session_id) -> Session / index() -> list[dict]。
+  SessionStore(root: str | Path)
+  - save(session: Session) -> None
+  - load(session_id: str) -> Session
+  - index() -> list[dict]
+  root 不存在时由 save 自动创建；load 不存在 id 抛 FileNotFoundError；index 缺失时返回空列表。
 tradeoffs: |-
-  一文件一局 + 单总索引（奥卡姆），不引数据库；统计走索引、证据走全量文件。
-  并发写索引的竞态留到 loop 层并行时再解决，本任务不处理。
+  - 一文件一局 + 单总索引 vs 数据库（sqlite 等）：选文件（奥卡姆）。规模小、写少读少，文件零依赖且全量即证据；规模增大或需复杂查询时再迁移。
+  - 单 index.json 全量「读-改-写」vs 追加式 JSONL 索引：选单 JSON 文件，便于 index() 一次性读回为 list[dict]；代价是每次 save 重写整文件，规模小可接受。若局数膨胀至重写成本显著，再切 JSONL 追加。
+  - 索引派生自全量、全量为权威 vs 索引为权威：选全量权威。索引可由全量重建，避免双权威漂移；这也决定了「先写全量后追加索引」的顺序。
+  - save 索引去重 vs 不去重：选不去重（奥卡姆）。去重需先扫索引，增加每次 save 成本；重复 save 由 T4「不重复调用」约定规避，去重归消费侧。
+  - 并发安全（文件锁）vs 不处理：本任务不处理，单进程 MVP；并发由 loop 层并行编排时统一解决，避免在存储层过早引入锁复杂度。
 acceptance: |-
-  save(session) 写全量文件并更新 index；可按 id 读回；index 条目含体感分与时间戳；单测覆盖写/读/索引。
+  - save(session) 写出 root/<session_id>.json 全量文件，并在 root/index.json 追加一条含 {session_id, score, created_at, n_issues}。
+  - root 目录不存在时 save 自动创建。
+  - load(session_id) 还原与原 Session 字段级等价（依赖 T1 round-trip）。
+  - index() 返回的条目 score 等于 session.feeling.score、created_at 为 ISO-8601、n_issues 等于 issue_refs 长度。
+  - load 不存在 id 抛 FileNotFoundError；首次 index()（无索引文件）返回空列表。
+  - 同一 session 两次 save：全量文件被覆盖，索引出现两条（不去重）。
 tests: |-
-  单测：save 后全量文件与 index 均出现该局；load 还原等价 Session；index() 含体感分与时间戳。
+  单测：
+  - save 后全量文件与 index 均出现该局；index 条目字段（session_id/score/created_at/n_issues）正确。
+  - load 还原等价 Session（字段级一致，含 transcript/feeling/issue_refs）。
+  - root 不存在时 save 自动建目录后成功写入。
+  - index() 在无索引文件时返回空列表；多局 save 后 index() 按写入顺序返回多条。
+  - n_issues 与 issue_refs 长度一致（0 条 issue 时 n_issues=0）。
+  - 边界/失败：load 不存在 id 抛 FileNotFoundError；同一 session 两次 save 后全量被覆盖、索引含两条。
 references: |-
-  CLAUDE.md 架构「状态去向：体感 + session → 本地」；下游 loop/metrics 曲线。
+  CLAUDE.md 架构「状态去向：体感 + session → 本地」；观测指标「issue 数量随时间曲线」。下游 loop/metrics 消费索引。Session 序列化契约：T1。
 open-questions: ''

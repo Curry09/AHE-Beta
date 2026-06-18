@@ -25,20 +25,69 @@ motivation: |-
   闭环要有「定版」动作把候选变成可被用户侧使用的稳定版本。tag 提供可 pin、可回溯的版本标识；
   release 分支是用户侧默认运行的线。
 scope: |-
-  发版：体感门禁通过后,把候选分支合入 harness 仓 release 分支并打 tag(版本号),作为用户侧下一轮 pin 的版本;否决则不合并。
+  做什么：
+  - 实现 release：体感门禁 Verdict 通过时，把候选分支合入 harness 仓 release 分支并打 tag（单调递增版本号），关联 issue 置 closed；返回 ReleaseResult。
+  - Verdict 否决时不动 release、不打 tag，可在关联 issue 上 comment 否决原因。
+  不做什么：
+  - 不含评测/门禁逻辑（归 T4，本任务消费其 Verdict）。
+  - 不决定何时调用、跑几轮（编排归 T6）。
+  - 不引入语义化版本/发版说明生成/版本管理框架。
+  - 不负责候选分支的产生（归 T3）。
 design: |-
-  release(candidate_branch, verdict) ：
-  - verdict.pass：在 harness 仓把 candidate_branch 合入 release 分支，打 tag(递增版本号)，关联 issue 置 closed。
-  - 否则：不合并、不打 tag；可在 issue 上 comment 否决原因。
-  版本号单调递增；tag 名即版本。仅操作 harness 仓 git，不含评测逻辑(归 T4)。
+  发版时序 `release(harness_repo, candidate_branch, verdict, tracker?, issue_number?) -> ReleaseResult`：
+  - verdict.pass 为真：
+    ① 在 harness 仓把 candidate_branch 合入 release 分支（fast-forward 或 merge commit，见决策）。
+    ② 打 tag：版本号 = 现有最大版本 + 1，tag 名即版本（如 v3）。
+    ③ 若给定 tracker 与 issue_number，将关联 issue 置 closed（tracker.set_state）。
+    ④ 返回 ReleaseResult(released=True, tag=<新 tag>, ref=<新 release HEAD 或 tag>)。
+  - verdict.pass 为假：
+    ① 不合并、不打 tag、不动 release 分支。
+    ② 若给定 tracker 与 issue_number，在 issue 上 comment 否决原因（取自 Verdict 的 mean/baseline）。
+    ③ 返回 ReleaseResult(released=False, tag=None)。
+
+  版本号契约：
+  - 单调递增整数计数，tag 名由其派生；新版本号 = 扫描 harness 仓现有 tag 取最大值 +1（无 tag 则从 v1 起）。
+  - tag 即用户侧下一轮 pin 的版本标识（T6 把 ReleaseResult.ref/tag 作为下一轮 launch 的 ref）。
+
+  接口（类型层面）：
+  - `release(harness_repo: str, candidate_branch: str, verdict: Verdict, tracker: IssueTracker | None, issue_number: int | None) -> ReleaseResult`。
+  - ReleaseResult: released: bool / tag: str | None / ref: str | None。
+
+  边界与错误处理：
+  - candidate_branch 不存在 → 抛错。
+  - 合并冲突（candidate 与 release 分叉冲突）：MVP 不自动解冲突 → 抛错、release 分支保持原状、返回失败信息；自动解冲突列为后续。
+  - tracker/issue_number 缺省（None）→ 跳过 issue 状态/comment 操作，仅做 git 合并 + tag。
+  - 重复对同一已合入候选调用 → 合并为 no-op（幂等），版本号仍递增打新 tag 还是复用，按「无实际差异不打新 tag」处理避免空版本。
+
+  关键决策及理由：
+  - 发版 = 合并 + tag 的轻动作，不引版本管理框架：奥卡姆，发版语义就是「定一个可 pin 的稳定点」。
+  - 版本号用单调计数而非语义化版本：MVP 无 major/minor/patch 语义需求；可比较、可排序、可回溯即足。
+  - issue 关闭/comment 走 tracker 且可选：发版与 issue 跟踪解耦，git 操作不强依赖 Gitea 可达，便于单测只验 git。
+  - 合并策略默认 merge commit（保留候选分支历史），与 spec-0002/T3「走真实分支/合并」一致；冲突不自动解、显式失败，避免静默错误合并。
 interface: |-
-  release(harness_repo, candidate_branch, verdict) -> ReleaseResult(released: bool, tag?)。
+  类型契约：
+  - `release(harness_repo: str, candidate_branch: str, verdict: Verdict, tracker: IssueTracker | None, issue_number: int | None) -> ReleaseResult`。
+  - ReleaseResult: released: bool / tag: str | None / ref: str | None。
+  - 依赖：Verdict（T4）、IssueTracker（spec-0001/T5 接口）、harness 仓（spec-0002/T3）。
 tradeoffs: |-
-  发版=合并+tag 的轻动作，不引版本管理框架（奥卡姆）；版本号用单调计数，语义化版本后续再说。
+  - 版本标识：单调计数 tag vs 语义化版本（semver）vs commit sha。选单调计数（奥卡姆）——可排序可 pin、无需 major/minor 语义；semver 需变更分级规则，过早；sha 不可读、不表达版本顺序。
+  - 合并方式：merge commit vs fast-forward vs squash。选 merge commit——保留候选分支历史、契合「走真实分支/合并」；ff 要求线性、squash 丢历史。
+  - 冲突处理：显式抛错 vs 自动解冲突 vs 强制覆盖。选抛错（MVP）——自动解冲突复杂且易错，强制覆盖会丢 release 既有改动；显式失败交由上层/人工处理。
+  - issue 联动：可选 tracker 参数 vs 强制 tracker。选可选——发版核心是 git 动作，issue 跟踪为旁路，解耦便于测试与离线运行。
 acceptance: |-
-  通过的候选被合入 release 并打出 tag;否决的不动 release;单测用临时 git 仓覆盖合并+打 tag 与否决两路径。
+  - verdict.pass 的候选被合入 release 分支并打出新 tag（版本号 = 旧最大 +1）；返回 released=True 且带 tag/ref。
+  - verdict.pass=False 时 release 分支与 tag 不变；返回 released=False。
+  - 给定 tracker+issue_number 时：通过则 issue 置 closed，否决则 issue 留否决 comment；缺省时跳过且不报错。
+  - candidate_branch 不存在或合并冲突时抛错、release 分支保持原状。
 tests: |-
-  单测(临时 git 仓)：pass→candidate 合入 release 且出现新 tag；fail→release 与 tag 不变。
+  单测（临时 git 仓 + FakeTracker）：
+  - pass → candidate 合入 release，出现新 tag（版本号递增），ReleaseResult.released=True。
+  - fail → release HEAD 与 tag 集合不变，ReleaseResult.released=False。
+  - pass 且给 tracker → issue 被 set_state 为 closed；fail 且给 tracker → issue 上有否决 comment。
+  - tracker=None → 仅做 git 合并 + tag、不调用 tracker、不报错。
+  - candidate_branch 不存在 → 抛错；制造合并冲突 → 抛错且 release 分支不变。
+  - 无任何现有 tag 时首次发版从 v1 起。
 references: |-
-  门禁 Verdict：T4。harness 仓：spec-0002/T3。CLAUDE.md 方法 b「合并和发版」。
+  门禁 Verdict：T4。IssueTracker.set_state/add_comment：spec-0001/T5、spec-0002/T2。
+  harness 仓与 release 分支：spec-0002/T3。CLAUDE.md 方法 b「合并和发版前由测试 agent 内测」「过门禁则合入 release 分支 + 打 tag」。
 open-questions: ''

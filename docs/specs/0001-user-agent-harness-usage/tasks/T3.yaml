@@ -27,33 +27,78 @@ motivation: |-
   这是训练信号的产生点。信号「真不真」取决于这个驱动器扮演得「像不像真人」——
   会追问、会绕路、会卡住、会受够了放弃，而不是机械跑满固定轮数。
 scope: |-
-  实现 persona 驱动的多轮对话：给定 Persona+SeedScenario，逐轮生成用户消息、读 harness 回复、由 agent 自判会话结束；结束时产出 FeelingScore(1-4+理由)。issue 产出留最小桩(github 风格 draft)，机制 TBD。
+  做什么：
+  - 实现 persona 驱动的多轮对话循环：给定 Persona+SeedScenario，逐轮经 LLM 生成用户消息、调 harness.send 读回复、写入 Transcript。
+  - 实现「用户自判终止」：解析 LLM 输出中的结束信号即停，并以 max_turns 硬上限兜底。
+  - 会话结束后经 LLM 产出一条合法 FeelingScore（1–4 + reason）。
+  - issue 产出实现最小桩：会话末由 LLM 产 0..n 条 IssueDraft（方案 a，见 open-questions），不锁死机制。
+  不做什么：
+  - 不实现具体 LLM 客户端（模型后端由调用方注入），不定义提示词工程细节之外的模型路由/重试。
+  - 不提交 issue（提交归 T5/T4），不落盘（归 T6/T4），不构造 harness 后端（归 T2/T4）。
+  - 不做逐轮体感打分（决定见 tradeoffs：会话末一次性产出）。
 design: |-
-  UserAgent 由一个 LLM 后端驱动（注入，不在本组实现具体模型客户端）。一局循环：
+  UserAgent 由注入的 LLM 后端驱动（本组不实现具体模型客户端）。LLM 后端抽象为一个可调用对象，
+  接收结构化对话上下文、返回文本，UserAgent 负责把 Persona/SeedScenario/Transcript 组织成提示并解析输出。
+
+  一局主循环（伪流程，非实现代码）：
 
   ```
+  reset 由编排层(T4)负责；UserAgent 仅消费已就绪的 harness
+  turn = 0
   loop:
-    user_msg = llm(persona, scenario, transcript)        # 生成这一轮用户话
-    若 user_msg 标记结束 → break                          # 自判：达成/放弃/受够
-    reply = harness.send(user_msg); 记进 transcript
+    user_msg, end_flag = parse(llm(persona, scenario, transcript))   # 生成本轮用户话 + 是否结束
+    若 end_flag → break                                              # 自判：达成 / 放弃 / 受够
+    reply = harness.send(user_msg)
+    transcript.append(user 轮); transcript.append(harness 轮)
+    turn += 1
+    若 turn >= max_turns → break                                     # 兜底防不收敛
   结束后:
-    feeling = llm 给 1-4 + reason                          # 会话末总分
-    issues  = llm 产出 0..n 条 IssueDraft（机制待定，见 open-questions）
+    feeling = parse_feeling(llm(...))        # 1..4 + reason，会话末一次
+    drafts  = parse_drafts(llm(...))         # 0..n 条 IssueDraft（最小桩，方案 a）
+  return (transcript, feeling, drafts)
   ```
 
-  「自判结束」靠提示词让 LLM 在话里带一个结束信号（如特定标记/字段），驱动器解析到即停；
-  另设硬上限 max_turns 兜底防不收敛。体感与 issue 都在会话**结束后**一次性产出（符合「会话末一个总分」的决定）。
+  接口契约（类型层面）：
+  - LLM 后端约定为 Callable，输入为已组织的上下文（persona/scenario/transcript 摘要），输出为文本；
+    UserAgent 内部以三类解析器消费同一后端：消息生成解析（取 user_msg + end_flag）、体感解析（取 score:int + reason:str）、issue 解析（取 list[IssueDraft]）。
+  - 终止信号编码（新决策，奥卡姆）：约定 LLM 在消息输出中携带一个显式结束标记（如末行固定 sentinel 或约定字段），解析到即置 end_flag。沿用约定字符串而非引入函数调用/JSON schema 强约束，避免对模型后端形态过度假设；解析失败时按「未结束」处理并由 max_turns 收口。
+  - max_turns 计入「user 轮」数；达到上限时即便 LLM 未发结束信号也强制结束，保证可终止性。
+
+  边界与错误处理：
+  - max_turns <= 0 在构造期断言失败（无意义配置）。
+  - 体感解析越界（不在 1..4）依赖 FeelingScore.__post_init__（T1）在构造期失败；UserAgent 不重复校验，单一校验点。
+  - issue 解析得 0 条为合法（多数会话无 issue），返回空列表。
+  - harness.send 抛异常时不在本层吞掉，向上传播交 T4 决定（与 T2 协议约定一致）。
+
+  时序约束：
+  - 体感与 issue 均在循环**结束后**产出，符合「会话末一个总分」的需求决定；不在循环内逐轮打分。
 interface: |-
-  UserAgent(llm, persona, max_turns).run(scenario, harness) -> (Transcript, FeelingScore, list[IssueDraft])
+  UserAgent(llm: Callable[..., str], persona: Persona, max_turns: int)
+  - run(scenario: SeedScenario, harness: HarnessInterface) -> tuple[Transcript, FeelingScore, list[IssueDraft]]
+  max_turns > 0 由构造期断言保证；run 不调用 harness.reset/close（生命周期归编排层 T4）。
 tradeoffs: |-
-  体感与 issue 都放会话末、不逐轮：信号更干净、实现更简单（采纳的决定），代价是丢失「第几轮开始变差」的细粒度，
-  后续若需要再开 spec 升级为逐轮。
-  自判结束 vs 固定轮数：选自判（更像真人），用 max_turns 兜底防跑飞。
+  - 体感/issue 会话末一次产出 vs 逐轮产出：选会话末（采纳决定）。信号更干净、实现更简，且对齐「一局一个总分」的 FeelingScore 形态；代价是丢失「第几轮开始变差」的细粒度，后续若需要再开 spec 升级为逐轮。
+  - 自判终止 vs 固定轮数：选自判 + max_turns 兜底。固定轮数无法表达「达成即停 / 受够放弃」的真实行为，使训练信号失真；纯自判则有不收敛风险，故以 max_turns 收口。
+  - 终止信号用约定 sentinel/字段 vs 强制 JSON/工具调用 schema：选约定文本（奥卡姆）。后者对模型后端形态做强假设，与「兼容多种 agent/模型」相悖；解析失败安全降级为「未结束」。
+  - issue 产出方案 a（in-character 末尾产出）vs b（独立分析器读 transcript 归纳）vs c（两步：标摩擦点+归纳）：本组选 a 的最小桩，不锁死。a 实现最省且足以打通链路；b/c 更准但引入额外组件，待 dev 侧 spec 对接需求时再定。
+  - LLM 后端注入为通用 Callable vs 绑定具体客户端类：选注入 Callable，使单测可用 mock 固定脚本、运行时换真实模型，符合依赖倒置。
 acceptance: |-
-  用 FakeHarness 跑通一局多轮对话；自判结束生效(达成/放弃/受够);末尾产出合法 FeelingScore;单测以 mock LLM 固定输出验证流程。
+  - 用 FakeHarness + mock LLM 可跑通一局多轮对话，Transcript 轮次与 harness 收发序列一致。
+  - 自判终止生效：mock LLM 在第 k 轮发结束信号时，会话恰好进行 k 轮。
+  - max_turns 兜底生效：mock LLM 永不发结束信号时，user 轮数恰为 max_turns。
+  - 会话末产出合法 FeelingScore（score ∈ 1..4，含 reason）；越界分数在构造期失败。
+  - issue 桩产出 0..n 条 IssueDraft，0 条时返回空列表。
+  - max_turns <= 0 构造期断言失败。
+  - run 全程不调用 harness.reset/close。
 tests: |-
-  mock LLM 返回固定脚本：① 三轮后发结束信号→会话恰好三轮；② 永不结束→max_turns 截断；
-  ③ 体感分落在 1-4；④ FakeHarness 收到的消息序列与 transcript 一致。
+  单测（mock LLM 返回固定脚本）：
+  - 三轮后发结束信号 → 会话恰好三轮，Transcript 含 3 个 user 轮 + 3 个 harness 轮。
+  - 永不结束 → user 轮数恰为 max_turns（截断生效）。
+  - 体感解析：score 落在 1..4 且携带 reason；构造合法 FeelingScore。
+  - FakeHarness 收到的 message 序列与 Transcript 的 user 轮内容逐条一致。
+  - issue 桩：mock 产 0 条 → 返回空列表；产 2 条 → 返回 2 条 IssueDraft 且字段完整。
+  - 边界/失败：max_turns <= 0 构造期断言失败；体感解析得 5（越界）经 FeelingScore 构造期失败；结束信号缺失时按未结束处理并由 max_turns 收口。
+  - harness.send 抛异常时 run 不吞异常，向上传播。
 references: |-
   CLAUDE.md 用户侧(a)：体感评分 + issue。会话末总分的决定见本 spec 需求澄清。
 open-questions: |-
