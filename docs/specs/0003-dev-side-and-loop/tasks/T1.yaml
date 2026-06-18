@@ -1,5 +1,5 @@
 id: T1
-title: harness launcher 与 seed_harness
+title: harness launcher 与 harness_template
 status: pending
 priority: P1
 tags: []
@@ -9,9 +9,9 @@ relates-to: []
 parallel: false
 files:
   - src/auto_designer/harness/launcher.py
-  - seed_harness/entry.py
-  - seed_harness/params.yaml
-  - seed_harness/agents/main.md
+  - harness_template/entry.py
+  - harness_template/params.yaml
+  - harness_template/agents/main.md
   - tests/harness/test_launcher.py
 version: 1
 updated: '2026-06-17'
@@ -22,15 +22,15 @@ merged-from: []
 derived-from: []
 summary: |-
   把「被进化的 harness」接成 spec-0001 的 HarnessInterface：launcher 按 git ref 取出某版 harness、
-  启动其自带 entry、按黑盒逐轮协议适配为 send/reset/close。seed_harness 给出 v0（单 nexau）作为起点。
+  启动其自带 entry、按黑盒逐轮协议适配为 send/reset/close。harness_template 给出 v0（单 nexau）作为起点。
 motivation: |-
   harness 是独立可启动程序（可单/多 agent），用户侧只认 HarnessInterface。launcher 是二者的粘合层；
-  seed_harness 提供进化的 v0 起点。二者一起定义了「harness 程序」的启动与 I/O 契约。
+  harness_template 提供进化的 v0 起点。二者一起定义了「harness 程序」的启动与 I/O 契约。
 scope: |-
   做什么：
   - 定义「harness 可启动程序」契约：entry 启动方式（由 params.yaml 声明）与逐轮 stdio JSONL 收发协议。
   - 实现 HarnessLauncher：按 git ref 把 harness 仓 checkout 到 data/harness_runs/<ref>/，起子进程跑 entry，适配成 spec-0001/T2 的 HarnessInterface（send/reset/close）。
-  - 提供 v0 种子 seed_harness：entry.py（起单个 nexau）、params.yaml（声明启动命令）、agents/main.md（单 agent 定义）。
+  - 提供 v0 种子 harness_template：entry.py（起单个 nexau）、params.yaml（声明启动命令）、agents/main.md（单 agent 定义）。
   不做什么：
   - 不实现 harness 内部的多 agent 编排——entry 内部如何组织 1 或 N 个 nexau 由 harness 仓自身决定，launcher 视其为黑盒。
   - 不负责 harness 仓的建仓与推送（归 spec-0002/T3），不负责取哪个 ref 的决策（归 T4/T6）。
@@ -65,13 +65,13 @@ design: |-
   关键决策及理由：
   - 子进程 + stdio JSONL（而非 import 或 HTTP）：把 harness 当黑盒外部程序，launcher 不依赖其语言/依赖/内部结构，支持任意内部编排与将来换 CC/codex。
   - checkout 到 data/harness_runs/<ref>/ 而非临时目录：同 ref 可复用、可人工查验，且与 SessionStore/metrics 的本地 data/ 布局一致。
-  - reset 用重启子进程实现：seed_harness entry 无需实现复位指令，把复位语义收在 launcher 一侧，最简。
+  - reset 用重启子进程实现：harness_template entry 无需实现复位指令，把复位语义收在 launcher 一侧，最简。
 interface: |-
   类型契约：
   - `HarnessLauncher(harness_repo: str)`。
   - `HarnessLauncher.launch(ref: str) -> HarnessInterface`（HarnessInterface 见 spec-0001/T2：send(str)->str / reset()->None / close()->None）。
   - 启动契约：params.yaml 声明 entry argv；子进程逐轮 stdin `{"message": str}` → stdout `{"reply": str}`（JSONL）。
-  - seed_harness 文件面：entry.py、params.yaml、agents/main.md。
+  - harness_template 文件面：entry.py、params.yaml、agents/main.md。
 tradeoffs: |-
   - 进程接入方式：子进程 + stdio JSONL vs Python import vs 本地 HTTP 服务。选子进程 + JSONL——对 harness 内部实现零假设、最大解耦、契合「兼容 CC/codex」；代价是进程启动与序列化开销，自用规模可接受。import 方式要求 harness 是 Python 包且共享依赖，违背黑盒原则；HTTP 引入端口管理与服务生命周期，过重。
   - reset 实现：重启子进程 vs 协议加 reset 指令 vs 每局新 launch。选重启子进程——seed entry 不必实现复位、语义集中在 launcher；协议加指令会增加 harness 侧契约负担；每局新 launch 则要重复 checkout、浪费。
@@ -82,7 +82,7 @@ acceptance: |-
   - checkout 写到 data/harness_runs/<ref>/，同 ref 重复 launch 复用该目录。
   - 子进程启动失败、ref 不存在、stdout 非法 JSON 或缺 reply 键、子进程提前退出 EOF，均显式抛错。
   - close 幂等；close 后再 send 抛错。
-  - seed_harness 是合法 v0：params.yaml 声明的 entry 可启动，单 nexau 按协议逐轮收发。
+  - harness_template 是合法 v0：params.yaml 声明的 entry 可启动，单 nexau 按协议逐轮收发。
 tests: |-
   单测（用最小假 entry，回显或脚本式回复，不依赖真 nexau）：
   - launch → 连续多轮 send，断言每轮 reply 与假 entry 脚本一致、一读一写配对。

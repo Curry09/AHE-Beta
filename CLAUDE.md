@@ -50,7 +50,7 @@ MVP 仅接入 nexau 一种 agent 运行时；claude code / codex 兼容留待后
 harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对话契约」：启动后接收用户消息、返回回复；内部为 1 个或 N 个 nexau、如何编排，由其自身入口脚本决定（支持多 agent harness）。
 - 用户侧仅通过 `HarnessInterface`(send/reset/close) 与之交互，不感知内部结构。
 - harness 自带入口 `entry`，自行依赖 nexau，不复用本仓 `nexau_runtime`，保持独立（后续可替换为 CC/codex）。
-- harness 源码为**独立 git 仓，托管于 Gitea**：`release` + `feature` 分支，tag 即发布版本；开发者 agent 走真实分支与合并。`seed_harness/` 为 v0 种子，用于初始化该仓。
+- harness 源码为**独立 git 仓，托管于 Gitea**：`release` + `feature` 分支，tag 即发布版本；开发者 agent 走真实分支与合并。`harness_template/` 为 v0 种子，用于初始化该仓。
 
 ### 状态去向
 - **issue → Gitea**：用户 agent 经 `IssueTracker` 接口提交，由 Gitea 负责发号/状态/标签/comment；标签（bug/feature）驱动开发者侧分流。
@@ -70,7 +70,7 @@ src/auto_designer/
   dev/                 # developer_agent.py + test_agent.py + release.py
   loop/                # orchestrator.py + metrics.py
 agent_defs/            # 固定角色 nexau 定义：user_agent/ developer_agent/ test_agent/
-seed_harness/          # v0 harness 种子：entry.py + agents/ + tools/ + params.yaml
+harness_template/      # v0 harness 种子：entry.py + agents/ + tools/ + params.yaml
 seeds/                 # 给定输入（先手写，后续由 distill 产出）：personas/ scenarios/
 infra/gitea/           # docker-compose.yml(Gitea+sqlite)
 data/                  # 运行产物(.gitignore)：sessions/ harness_runs/

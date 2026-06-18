@@ -19,13 +19,13 @@ b       ├ developer_agent(T3)  取 issue → 按 label 分流 → 改 harness 
 c  orchestrator(T6) 把新 tag 作为下一轮 a 的 harness，循环；metrics(T6) 记 issue 数~时间曲线
 ```
 
-支撑件：**T1** launcher 把「某版 harness 程序」接成 0001 的 `HarnessInterface`（粘合层），并给出 v0 种子 `seed_harness`；**T2** 是 user/developer/test 三角色共用的 nexau 适配层。本组核心约束：**门禁只用体感，benchmark 全程 held-out**（只事后观测、不参与发版判定）。
+支撑件：**T1** launcher 把「某版 harness 程序」接成 0001 的 `HarnessInterface`（粘合层），并给出 v0 种子 `harness_template`；**T2** 是 user/developer/test 三角色共用的 nexau 适配层。本组核心约束：**门禁只用体感，benchmark 全程 held-out**（只事后观测、不参与发版判定）。
 
 ## 任务编排
 
 ```mermaid
 graph LR
-    nT1["T1 harness launcher 与 seed_harness"]
+    nT1["T1 harness launcher 与 harness_template"]
     nT2["T2 nexau_runtime 与角色定义"]
     nT3["T3 developer_agent"]
     nT4["T4 test_agent 体感门禁"]
@@ -42,7 +42,7 @@ graph LR
 
 | 任务 | 标题 | 优先级 | 状态 | 依赖 |
 |----|----|----|----|----|
-| T1 | harness launcher 与 seed_harness | P1 | pending | 0001/T2 |
+| T1 | harness launcher 与 harness_template | P1 | pending | 0001/T2 |
 | T2 | nexau_runtime 与角色定义 | P1 | pending | — |
 | T3 | developer_agent | P1 | pending | T2, 0002/T2 |
 | T4 | test_agent 体感门禁 | P1 | pending | T1, T2, 0001/T4 |
@@ -51,32 +51,32 @@ graph LR
 
 ## 各任务方案
 
-### T1 · harness launcher 与 seed_harness（P1 / pending）
+### T1 · harness launcher 与 harness_template（P1 / pending）
 
 **涉及文件**
 
 - `src/auto_designer/harness/launcher.py`
-- `seed_harness/entry.py`
-- `seed_harness/params.yaml`
-- `seed_harness/agents/main.md`
+- `harness_template/entry.py`
+- `harness_template/params.yaml`
+- `harness_template/agents/main.md`
 - `tests/harness/test_launcher.py`
 
 **做什么**
 
 把「被进化的 harness」接成 spec-0001 的 HarnessInterface：launcher 按 git ref 取出某版 harness、
-启动其自带 entry、按黑盒逐轮协议适配为 send/reset/close。seed_harness 给出 v0（单 nexau）作为起点。
+启动其自带 entry、按黑盒逐轮协议适配为 send/reset/close。harness_template 给出 v0（单 nexau）作为起点。
 
 **为什么**
 
 harness 是独立可启动程序（可单/多 agent），用户侧只认 HarnessInterface。launcher 是二者的粘合层；
-seed_harness 提供进化的 v0 起点。二者一起定义了「harness 程序」的启动与 I/O 契约。
+harness_template 提供进化的 v0 起点。二者一起定义了「harness 程序」的启动与 I/O 契约。
 
 **范围**
 
 做什么：
 - 定义「harness 可启动程序」契约：entry 启动方式（由 params.yaml 声明）与逐轮 stdio JSONL 收发协议。
 - 实现 HarnessLauncher：按 git ref 把 harness 仓 checkout 到 data/harness_runs/<ref>/，起子进程跑 entry，适配成 spec-0001/T2 的 HarnessInterface（send/reset/close）。
-- 提供 v0 种子 seed_harness：entry.py（起单个 nexau）、params.yaml（声明启动命令）、agents/main.md（单 agent 定义）。
+- 提供 v0 种子 harness_template：entry.py（起单个 nexau）、params.yaml（声明启动命令）、agents/main.md（单 agent 定义）。
 不做什么：
 - 不实现 harness 内部的多 agent 编排——entry 内部如何组织 1 或 N 个 nexau 由 harness 仓自身决定，launcher 视其为黑盒。
 - 不负责 harness 仓的建仓与推送（归 spec-0002/T3），不负责取哪个 ref 的决策（归 T4/T6）。
@@ -113,7 +113,7 @@ HarnessLauncher 接口（类型层面）：
 关键决策及理由：
 - 子进程 + stdio JSONL（而非 import 或 HTTP）：把 harness 当黑盒外部程序，launcher 不依赖其语言/依赖/内部结构，支持任意内部编排与将来换 CC/codex。
 - checkout 到 data/harness_runs/<ref>/ 而非临时目录：同 ref 可复用、可人工查验，且与 SessionStore/metrics 的本地 data/ 布局一致。
-- reset 用重启子进程实现：seed_harness entry 无需实现复位指令，把复位语义收在 launcher 一侧，最简。
+- reset 用重启子进程实现：harness_template entry 无需实现复位指令，把复位语义收在 launcher 一侧，最简。
 
 **接口**
 
@@ -121,7 +121,7 @@ HarnessLauncher 接口（类型层面）：
 - `HarnessLauncher(harness_repo: str)`。
 - `HarnessLauncher.launch(ref: str) -> HarnessInterface`（HarnessInterface 见 spec-0001/T2：send(str)->str / reset()->None / close()->None）。
 - 启动契约：params.yaml 声明 entry argv；子进程逐轮 stdin `{"message": str}` → stdout `{"reply": str}`（JSONL）。
-- seed_harness 文件面：entry.py、params.yaml、agents/main.md。
+- harness_template 文件面：entry.py、params.yaml、agents/main.md。
 
 **取舍**
 
@@ -136,7 +136,7 @@ HarnessLauncher 接口（类型层面）：
 - checkout 写到 data/harness_runs/<ref>/，同 ref 重复 launch 复用该目录。
 - 子进程启动失败、ref 不存在、stdout 非法 JSON 或缺 reply 键、子进程提前退出 EOF，均显式抛错。
 - close 幂等；close 后再 send 抛错。
-- seed_harness 是合法 v0：params.yaml 声明的 entry 可启动，单 nexau 按协议逐轮收发。
+- harness_template 是合法 v0：params.yaml 声明的 entry 可启动，单 nexau 按协议逐轮收发。
 
 **测试**
 

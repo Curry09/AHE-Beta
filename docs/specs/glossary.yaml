@@ -97,6 +97,6 @@ terms:
   - term: distill（蒸馏模块）
     category: 基建与流程
     def: 从真实使用数据（CC/codex/nexau 日志、issue tracker、社区反馈）蒸馏出 persona 库与种子场景库。
-  - term: seed_harness
+  - term: harness_template
     category: 基建与流程
     def: v0 harness 种子（entry + agents + params），用于初始化 Gitea 上的 harness 独立仓。

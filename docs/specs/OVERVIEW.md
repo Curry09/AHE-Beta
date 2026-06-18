@@ -65,7 +65,7 @@
 - **tag** — harness 仓的发布版本标记，即用户侧下一轮 pin 的 harness 版本。
 - **体感门禁** — 唯一发版门禁，只检查体感是否回归（benchmark 不参与）；候选与 release 基线比较，不退化则放行。
 - **distill（蒸馏模块）** — 从真实使用数据（CC/codex/nexau 日志、issue tracker、社区反馈）蒸馏出 persona 库与种子场景库。
-- **seed_harness** — v0 harness 种子（entry + agents + params），用于初始化 Gitea 上的 harness 独立仓。
+- **harness_template** — v0 harness 种子（entry + agents + params），用于初始化 Gitea 上的 harness 独立仓。
 
 ## 全局看板
 
@@ -80,7 +80,7 @@
 | 0002 | 0002/T1 | Gitea 本地基建与标签方案 | pending | — |
 | 0002 | 0002/T2 | GiteaTracker | pending | T1 |
 | 0002 | 0002/T3 | harness 仓初始化 | pending | T1 |
-| 0003 | 0003/T1 | harness launcher 与 seed_harness | pending | 0001/T2 |
+| 0003 | 0003/T1 | harness launcher 与 harness_template | pending | 0001/T2 |
 | 0003 | 0003/T2 | nexau_runtime 与角色定义 | pending | — |
 | 0003 | 0003/T3 | developer_agent | pending | T2, 0002/T2 |
 | 0003 | 0003/T4 | test_agent 体感门禁 | pending | T1, T2, 0001/T4 |
@@ -107,7 +107,7 @@ graph LR
         n0002_T3["T3 harness 仓初始化"]
     end
     subgraph G0003[0003 dev-side-and-loop]
-        n0003_T1["T1 harness launcher 与 seed_harness"]
+        n0003_T1["T1 harness launcher 与 harness_template"]
         n0003_T2["T2 nexau_runtime 与角色定义"]
         n0003_T3["T3 developer_agent"]
         n0003_T4["T4 test_agent 体感门禁"]
@@ -164,7 +164,7 @@ infra/
     docker-compose.yml       ← 0002/T1
 scripts/
   bootstrap_harness.py       ← 0002/T3
-seed_harness/
+harness_template/
   agents/
     main.md                  ← 0003/T1
   entry.py                   ← 0003/T1
@@ -276,7 +276,7 @@ graph LR
         └─► 0002/T2 GiteaTracker（真后端，运行时注入 run_session）
 0002/T1 本地 Gitea（docker + sqlite，bootstrap 产出 URL/owner/repo/token）
         ├─► T2 GiteaTracker 读连接信息，打 /api/v1
-        └─► T3 把 seed_harness 推成独立 harness 仓（供 0003 开发者 agent 走真实分支/合并）
+        └─► T3 把 harness_template 推成独立 harness 仓（供 0003 开发者 agent 走真实分支/合并）
 ```
 
 **T1** 是一切前置（没有 Gitea 就没有 issue 去向、也没有 harness 仓）；**T2** 让用户 agent 产的 issue 真正进 Gitea；**T3** 把 v0 种子变成可演化的 harness 仓。本组完成后，a 段即可脱离 Fake 真跑。
@@ -285,7 +285,7 @@ graph LR
 
 - **T1 Gitea 本地基建与标签方案**（pending） — 提供本地 Gitea 服务的基建与一键初始化：docker-compose(Gitea + sqlite) 起服务，bootstrap 脚本建 admin、生成 access token、建工作仓与标签方案。
 - **T2 GiteaTracker**（pending） — GiteaTracker 是 spec-0001/T5 IssueTracker 接口的真实后端：一个打 Gitea /api/v1 的薄 REST 客户端。
-- **T3 harness 仓初始化**（pending） — 把 seed_harness/ 作为 v0 推送到 Gitea，建立 harness 独立仓，供 dev 侧开发者 agent 走真实分支与合并。
+- **T3 harness 仓初始化**（pending） — 把 harness_template/ 作为 v0 推送到 Gitea，建立 harness 独立仓，供 dev 侧开发者 agent 走真实分支与合并。
 
 ```mermaid
 graph LR
@@ -314,11 +314,11 @@ b       ├ developer_agent(T3)  取 issue → 按 label 分流 → 改 harness 
 c  orchestrator(T6) 把新 tag 作为下一轮 a 的 harness，循环；metrics(T6) 记 issue 数~时间曲线
 ```
 
-支撑件：**T1** launcher 把「某版 harness 程序」接成 0001 的 `HarnessInterface`（粘合层），并给出 v0 种子 `seed_harness`；**T2** 是 user/developer/test 三角色共用的 nexau 适配层。本组核心约束：**门禁只用体感，benchmark 全程 held-out**（只事后观测、不参与发版判定）。
+支撑件：**T1** launcher 把「某版 harness 程序」接成 0001 的 `HarnessInterface`（粘合层），并给出 v0 种子 `harness_template`；**T2** 是 user/developer/test 三角色共用的 nexau 适配层。本组核心约束：**门禁只用体感，benchmark 全程 held-out**（只事后观测、不参与发版判定）。
 
 **任务一览**
 
-- **T1 harness launcher 与 seed_harness**（pending） — 把「被进化的 harness」接成 spec-0001 的 HarnessInterface：launcher 按 git ref 取出某版 harness、 启动其自带 entry、按黑盒逐轮协议适配为 send/reset/close。
+- **T1 harness launcher 与 harness_template**（pending） — 把「被进化的 harness」接成 spec-0001 的 HarnessInterface：launcher 按 git ref 取出某版 harness、 启动其自带 entry、按黑盒逐轮协议适配为 send/reset/close。
 - **T2 nexau_runtime 与角色定义**（pending） — 单一 nexau 适配层：把一份角色定义(prompt+工具)加载成可调用的 agent，供 user/developer/test 三角色共用。
 - **T3 developer_agent**（pending） — 开发者 agent：从 Gitea 取一条 open issue，按 label 分流到对应分支策略，用 nexau 修改 harness bundle 并提交。
 - **T4 test_agent 体感门禁**（pending） — 测试 agent：用候选 harness ref 跑固定集的 N 局用户会话，算平均体感并与当前 release 基线比较， 不退化则放行。
@@ -327,7 +327,7 @@ c  orchestrator(T6) 把新 tag 作为下一轮 a 的 harness，循环；metrics(
 
 ```mermaid
 graph LR
-    nT1["T1 harness launcher 与 seed_harness"]
+    nT1["T1 harness launcher 与 harness_template"]
     nT2["T2 nexau_runtime 与角色定义"]
     nT3["T3 developer_agent"]
     nT4["T4 test_agent 体感门禁"]
