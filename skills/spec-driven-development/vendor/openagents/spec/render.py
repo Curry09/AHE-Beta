@@ -32,6 +32,18 @@ _RELATION_HEADING = "## 跨 feature 关系图"
 _CONFLICT_HEADING = "## 文件冲突报告"
 _FEATURE_HEADING = "## 各 feature 详情"
 
+# 顶部「如何读」导语：先给只看 OVERVIEW 的读者一个入口与主线，再进入看板/图，
+# 避免一上来就是宽表 + Mermaid 的机器视角。静态文本，保持 render 确定性。
+_HOWTO = (
+    "## 如何读这份文档\n"
+    "\n"
+    "本文件是所有 spec 的**全局看板**，由各组 `tasks/T*.yaml` 自动汇总，偏索引视角。"
+    "想读某一组的完整方案，请点进该组的 `summary.md`（每个 feature 段开头有链接）。\n"
+    "\n"
+    "阅读顺序建议：先看下方**全局看板**掌握全部任务与状态 → 看**跨 feature 关系图**"
+    "了解依赖 → 在**各 feature 详情**里逐组读导语与任务一览。"
+)
+
 
 def render(*, specs_root: Path) -> str:
     """Render the full OVERVIEW.md text from a specs tree (pure, idempotent).
@@ -42,6 +54,7 @@ def render(*, specs_root: Path) -> str:
     blocks = [
         "# Spec 总览（OVERVIEW）",
         "> 本文件由 `spec render` 自动生成，请勿手工编辑（Spec-0014/T3）。",
+        _HOWTO,
         _render_board(groups=groups),
         _render_relations(groups=groups),
         _render_conflicts(groups=groups),
@@ -161,27 +174,38 @@ def _summary_task(*, task: Task) -> str:
 
 
 def _render_board(*, groups: list[Group]) -> str:
-    """块 1：全局看板表，每行一个当前版 Task。"""
+    """块 1：全局看板表，每行一个当前版 Task。
+
+    只保留「组/任务/标题/状态/依赖」五列以便横向扫读；涉及文件清单会把单元格撑得过宽，
+    属于深读信息，留给各组 summary.md 的「涉及文件」段，不进全局看板。
+    """
     lines = [
         _BOARD_HEADING,
         "",
-        "| 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |",
-        "|----|----|----|----|----|----|",
+        "| 组 | 任务 | 标题 | 状态 | 依赖 |",
+        "|----|----|----|----|----|",
     ]
     for group in groups:
         for task in group.tasks:
             qid = model.qualified_id(group=group.number, task_id=task.id)
             deps = ", ".join(task.depends_on) or "—"
-            files = "<br>".join(task.files) or "—"
             lines.append(
-                f"| {group.number} | {qid} | {_cell(task.title)} | {task.status} | {deps} | {files} |"
+                f"| {group.number} | {qid} | {_cell(task.title)} | {task.status} | {deps} |"
             )
     return "\n".join(lines)
 
 
 def _render_relations(*, groups: list[Group]) -> str:
     """块 2：跨 feature 关系图（Mermaid，subgraph/feature；depends-on 实线、relates-to 虚线）。"""
-    lines = [_RELATION_HEADING, "", "```mermaid", "graph LR"]
+    # 图例置于图前，帮不熟 Mermaid 的读者理解连线：实线=依赖，虚线=关联（标关联类型）。
+    lines = [
+        _RELATION_HEADING,
+        "",
+        "> 图例：实线箭头 `A --> B` 表示 A **依赖** B；虚线箭头 `A -.type.-> B` 表示 A 与 B **关联**（type 为关联类型）。",
+        "",
+        "```mermaid",
+        "graph LR",
+    ]
     current_ids = {
         model.qualified_id(group=g.number, task_id=t.id) for g in groups for t in g.tasks
     }
@@ -261,9 +285,22 @@ def _render_features(*, groups: list[Group]) -> str:
                 lines.append(f"- **{task.id} {_cell(task.title)}**（{task.status}）{tail}")
         lines.append("")
         lines.append(_render_group_dag(group=group))
-        lines.append("")
-        lines.append(_render_evolution(group=group))
+        # 演化图只在「确有版本演化」时才画：否则每个节点都是 Tx v1、全 pending、零血缘，
+        # 是一段对人零信息的噪音。等出现历史版本或血缘（split/merge/supersede/derive）时自动出现。
+        if _has_evolution(group=group):
+            lines.append("")
+            lines.append(_render_evolution(group=group))
     return "\n".join(lines)
+
+
+def _has_evolution(*, group: Group) -> bool:
+    """组内是否存在真实演化：有历史版本，或当前版 Task 带任一血缘字段。"""
+    if any(group.history.values()):
+        return True
+    return any(
+        task.split_from or task.merged_from or task.supersedes or task.derived_from
+        for task in group.tasks
+    )
 
 
 def _render_group_dag(*, group: Group) -> str:
