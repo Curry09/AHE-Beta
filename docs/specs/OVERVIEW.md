@@ -157,6 +157,11 @@ agent_defs/
     prompt.md                ← 0003/T4
   user_agent/
     prompt.md                ← 0003/T2
+harness_template/
+  agents/
+    main.md                  ← 0003/T1
+  entry.py                   ← 0003/T1
+  params.yaml                ← 0003/T1
 infra/
   gitea/
     README.md                ← 0002/T1
@@ -164,11 +169,6 @@ infra/
     docker-compose.yml       ← 0002/T1
 scripts/
   bootstrap_harness.py       ← 0002/T3
-harness_template/
-  agents/
-    main.md                  ← 0003/T1
-  entry.py                   ← 0003/T1
-  params.yaml                ← 0003/T1
 src/
   auto_designer/
     dev/
