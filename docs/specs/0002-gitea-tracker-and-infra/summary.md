@@ -3,6 +3,22 @@
 > 本文件由 `spec render` 自动生成，请勿手工编辑。
 > 内容来源：本组 `metadata.yaml` 与 `tasks/T*.yaml`（关联 issue #0）。
 
+## 总览
+
+本组补齐 **a 段的真实后端与基建**：0001 用 Fake 把接口立了起来，本组把「桩」换成「真」——起一个本地 Gitea（issue 与 harness 仓的家），并实现 0001/T5 `IssueTracker` 接口的真后端 `GiteaTracker`。
+
+与 0001 的接力关系：
+
+```
+0001：IssueTracker 接口 + FakeTracker（桩，仅供测试）
+        └─► 0002/T2 GiteaTracker（真后端，运行时注入 run_session）
+0002/T1 本地 Gitea（docker + sqlite，bootstrap 产出 URL/owner/repo/token）
+        ├─► T2 GiteaTracker 读连接信息，打 /api/v1
+        └─► T3 把 seed_harness 推成独立 harness 仓（供 0003 开发者 agent 走真实分支/合并）
+```
+
+**T1** 是一切前置（没有 Gitea 就没有 issue 去向、也没有 harness 仓）；**T2** 让用户 agent 产的 issue 真正进 Gitea；**T3** 把 v0 种子变成可演化的 harness 仓。本组完成后，a 段即可脱离 Fake 真跑。
+
 ## 任务编排
 
 ```mermaid

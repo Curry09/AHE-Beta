@@ -70,7 +70,7 @@ TASK_SCHEMA: dict = {
     "additionalProperties": False,
 }
 
-# Spec-0014/T1：组元数据 schema。
+# Spec-0014/T1：组元数据 schema。overview 为组级导语（可选 prose），渲染在 summary.md 开篇。
 METADATA_SCHEMA: dict = {
     "$schema": _DRAFT,
     "type": "object",
@@ -78,6 +78,7 @@ METADATA_SCHEMA: dict = {
         "title": {"type": "string"},
         "issue": {"type": "integer"},
         "slug": {"type": "string"},
+        "overview": {"type": "string"},
     },
     "required": ["title", "issue", "slug"],
     "additionalProperties": False,

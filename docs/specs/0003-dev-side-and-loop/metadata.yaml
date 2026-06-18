@@ -1,3 +1,19 @@
 title: 开发者侧与闭环
 issue: 0
 slug: dev-side-and-loop
+overview: |-
+  本组实现 **b｜开发者侧** 与 **c｜闭环回灌**，把前两组的零件总装成可重复的进化轮次。一轮 = a（用户产 issue + 体感）→ b（开发者改 harness、测试体感门禁、发版）→ c（新版 harness 回到 a）。
+
+  一轮闭环（节点后标负责任务）：
+
+  ```
+  a  用户会话(0001 run_session, harness=launch(release)) ─产→ issue(Gitea) + 体感(SessionStore)
+          │
+  b       ├ developer_agent(T3)  取 issue → 按 label 分流 → 改 harness 分支
+          ├ test_agent(T4)       候选 ref 跑 N 局算平均体感，与 release 基线比 → 体感门禁
+          └ release(T5)          过门禁则合入 release 分支 + 打 tag（= 新版本）
+          │
+  c  orchestrator(T6) 把新 tag 作为下一轮 a 的 harness，循环；metrics(T6) 记 issue 数~时间曲线
+  ```
+
+  支撑件：**T1** launcher 把「某版 harness 程序」接成 0001 的 `HarnessInterface`（粘合层），并给出 v0 种子 `seed_harness`；**T2** 是 user/developer/test 三角色共用的 nexau 适配层。本组核心约束：**门禁只用体感，benchmark 全程 held-out**（只事后观测、不参与发版判定）。

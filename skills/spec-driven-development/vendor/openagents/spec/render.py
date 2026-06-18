@@ -95,8 +95,12 @@ def render_group_summary(*, group: Group) -> str:
             "> 本文件由 `spec render` 自动生成，请勿手工编辑。\n"
             f"> 内容来源：本组 `metadata.yaml` 与 `tasks/T*.yaml`（关联 issue #{group.metadata.issue}）。"
         ),
-        _summary_orchestration(group=group),
     ]
+    # 组级导语（overview）置于任务编排之前：先讲清本组在闭环中的位置、交付什么、数据流脊柱，
+    # 再进入逐任务细节，避免读者一上来就陷进 T1…Tn 的依赖图（修复「summary 云里雾里」）。
+    if group.metadata.overview.strip():
+        blocks.append("## 总览\n\n" + group.metadata.overview.strip())
+    blocks.append(_summary_orchestration(group=group))
     if group.tasks:
         blocks.append("## 各任务方案")
         for task in group.tasks:
@@ -236,8 +240,25 @@ def _render_features(*, groups: list[Group]) -> str:
         lines.append("")
         lines.append(f"### {group.number} {title}（issue #{group.metadata.issue}）")
         lines.append("")
-        lines.append(f"> 人读方案见 [`{group.number}-{group.metadata.slug}/summary.md`]"
-                     f"(./{group.number}-{group.metadata.slug}/summary.md)。")
+        lines.append(
+            f"> 人读方案见 [`{group.number}-{group.metadata.slug}/summary.md`]"
+            f"(./{group.number}-{group.metadata.slug}/summary.md)。"
+        )
+        # 组级导语也进 OVERVIEW：把各 feature 段从「只有链接 + DAG」升级为带叙事，
+        # 让看板页本身能把三组串成一条故事线，而非纯节点图索引。
+        if group.metadata.overview.strip():
+            lines.append("")
+            lines.append(group.metadata.overview.strip())
+        # 任务一览：每个当前版 Task 一行（标题 + 状态 + 一句话摘要），让只看 OVERVIEW 的读者
+        # 不点进 summary.md 也能掌握每个任务在做什么（修复「总览太薄」）。
+        if group.tasks:
+            lines.append("")
+            lines.append("**任务一览**")
+            lines.append("")
+            for task in group.tasks:
+                gist = _one_line(text=task.summary)
+                tail = f" — {gist}" if gist else ""
+                lines.append(f"- **{task.id} {_cell(task.title)}**（{task.status}）{tail}")
         lines.append("")
         lines.append(_render_group_dag(group=group))
         lines.append("")
@@ -357,3 +378,15 @@ def _safe(text: str) -> str:
 def _cell(text: str) -> str:
     """表格 / 节点 label 单元：压成单行、转义竖线。"""
     return text.replace("\n", " ").replace("|", "\\|").replace('"', "'")
+
+
+def _one_line(*, text: str) -> str:
+    """取 prose 首句（到第一个句号止），压成单行——用于 OVERVIEW 任务一览的一句话摘要。
+
+    先把换行/多空白压成单空格，再截到第一个「。」（含），避免一览里出现断句的半行。
+    """
+    flat = " ".join(text.split())
+    if not flat:
+        return ""
+    head, sep, _rest = flat.partition("。")
+    return _cell(head + sep)

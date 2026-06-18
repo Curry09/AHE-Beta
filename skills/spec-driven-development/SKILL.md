@@ -87,7 +87,7 @@ docs/specs/
 ├── OVERVIEW.md            # global board view (spec render output; never hand-edit)
 ├── README.md              # specs dir doc + numbering rules (hand-written, static)
 └── <NNNN-slug>/
-    ├── metadata.yaml      # group meta: title / issue / slug
+    ├── metadata.yaml      # group meta: title / issue / slug / overview (group-level lead prose)
     ├── summary.md         # per-group human plan (spec render output; never hand-edit)
     ├── tasks/T*.yaml      # current-version Task snapshot (one-to-one with live code)
     └── history/T*.yaml    # append-only old versions (only legacy lives here)
@@ -129,6 +129,11 @@ The spec group is the core artifact. Author it via the CLI — never hand-write 
    - `depends-on` declares the DAG (cross-group refs use qualified ids like `0012/T2`). Tasks with no mutual dependency run in parallel.
    - New Tasks start `status: pending`.
 4. **Fill design prose** on the relevant Tasks by editing the `tasks/T*.yaml` prose fields (`summary`/`motivation`/`design`/`interface`/`tradeoffs`/`tests`/`references`/`open-questions`) — block scalars carrying Markdown (mermaid allowed in `design`). Keep it architectural: **what & why, NOT implementation code**. After editing prose by hand, run `spec validate` then `spec render`.
+   - **Write a group-level `overview`** so the rendered `summary.md` opens with narrative, not a raw Task DAG. It is the lead a human reads first: where this group sits in the bigger picture, what it delivers, and the data-flow spine that threads T1…Tn (a small ascii/mermaid diagram mapping each box to a Task works well). It also renders into OVERVIEW's per-feature section, threading the groups into one story. Set it via CLI (prose with diagrams → `--file`):
+     ```
+     spec set-overview <NNNN> --file overview.md   # or --text "<short lead>"
+     ```
+     `spec new` also accepts `--overview`. Without an overview, summary.md jumps straight into the DAG and reads as foggy.
 5. **Confirm open questions with the user** before writing any `open-questions` prose — only questions the user chooses to keep are recorded.
 6. **Validate & render:**
    ```
