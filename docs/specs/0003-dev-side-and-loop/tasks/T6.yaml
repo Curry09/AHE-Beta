@@ -1,0 +1,54 @@
+id: T6
+title: 闭环编排与曲线
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T3
+  - T4
+  - T5
+  - 0001/T4
+  - 0001/T6
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/loop/orchestrator.py
+  - src/auto_designer/loop/metrics.py
+  - tests/loop/test_orchestrator.py
+  - tests/loop/test_metrics.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  orchestrator 把用户侧(a)、开发者侧(b)、回灌(c) 串成可重复的进化轮次；metrics 从 Gitea 与本地 session
+  统计 issue 数量随时间的曲线与体感趋势。这是整个系统的总装与观测。
+motivation: |-
+  前面各部件都是零件，orchestrator 是总装：定义一轮 a→b→c 怎么跑、跑几轮。metrics 落实 CLAUDE.md 要求的
+  「issue 数量~时间曲线」，用于判断探索(新 issue)与收敛(解决)是否平衡。
+scope: |-
+  orchestrator 串 a(用户会话产 issue+体感)→b(开发者改、测试门禁、发版)→c(新版回到 a);metrics 从 Gitea+本地 session 统计 issue 数量随时间的曲线与体感趋势。
+design: |-
+  orchestrator.run_round(release_ref)：
+  a) 对固定/采样 (persona, scenario) 跑 run_session（harness=launch(release_ref)），产 issue 入 Gitea、体感入 SessionStore；
+  b) developer_agent.work_one() 改 harness 分支 → test_agent.evaluate(candidate) → release(...) 得新 release_ref；
+  c) 返回新 release_ref，供下一轮 a 使用。
+  各部件经依赖注入，便于 mock 跑通一轮。
+  metrics：从 Gitea 拉 issue 的 created/closed 时间 → issue 数~时间(开/关/净未解)序列；从 SessionStore 索引取体感趋势。
+interface: |-
+  orchestrator.run_round(release_ref) -> new_release_ref；run(n_rounds)。metrics.issue_curve()/feeling_trend()。
+tradeoffs: |-
+  顺序单轮编排(MVP)：a 全跑完再 b，不做流水线/并发（奥卡姆）；规模化后再优化。
+  metrics 只读已有数据源(Gitea + SessionStore)，不自建存储。
+acceptance: |-
+  orchestrator 能跑通一轮 a→b→c(各部件可 mock);metrics 产出 issue 数~时间序列与体感趋势;单测覆盖一轮编排与曲线统计。
+tests: |-
+  单测：注入 mock 部件跑 run_round，断言 a→b→c 调用次序与新 ref 回灌；metrics 对构造数据产出正确
+  issue 数~时间序列与体感趋势。
+references: |-
+  run_session：spec-0001/T4。SessionStore：spec-0001/T6。developer/test/release：T3/T4/T5。
+  CLAUDE.md「闭环」「观测指标」。
+open-questions: ''

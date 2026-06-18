@@ -8,8 +8,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/user_side/session_store.py
-  - tests/user_side/test_session_store.py
+  - src/auto_designer/user/session_store.py
+  - tests/user/test_session_store.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''
@@ -22,7 +22,7 @@ summary: |-
   （session_id、体感分、时间），无需打开全量文件即可统计。
 motivation: |-
   体感是训练信号，必须可追溯、可统计。Session 全量留作证据，索引供 loop/metrics 画 issue/体感曲线、
-  供 dev_side 取回归基线。
+  供 dev 侧取回归基线。
 scope: |-
   把 Session 落地：全量写 data/sessions/<session_id>.json，并维护 data/sessions/index.json(session_id+体感分+时间)供体感曲线与回归基线统计。
 design: |-

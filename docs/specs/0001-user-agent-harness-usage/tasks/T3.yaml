@@ -9,8 +9,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/user_side/user_agent.py
-  - tests/user_side/test_user_agent.py
+  - src/auto_designer/user/user_agent.py
+  - tests/user/test_user_agent.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''
@@ -61,4 +61,4 @@ open-questions: |-
   (a) UserAgent 直接 in-character 产出 IssueDraft；
   (b) 单独分析器读完 transcript 再归纳；
   (c) 两步：标摩擦点 + 归纳。
-  本组先实现 (a) 的最小桩（LLM 末尾产 0..n 条 draft），不锁死，待后续 dev_side spec 对接需求时定。
+  本组先实现 (a) 的最小桩（LLM 末尾产 0..n 条 draft），不锁死，待后续 dev 侧 spec 对接需求时定。

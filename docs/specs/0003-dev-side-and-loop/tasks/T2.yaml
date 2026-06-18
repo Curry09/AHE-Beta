@@ -1,0 +1,42 @@
+id: T2
+title: nexau_runtime 与角色定义
+status: pending
+priority: P1
+tags: []
+depends-on: []
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/nexau_runtime.py
+  - agent_defs/user_agent/prompt.md
+  - tests/test_nexau_runtime.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  单一 nexau 适配层：把一份角色定义(prompt+工具)加载成可调用的 agent，供 user/developer/test 三角色共用。
+  本任务并落地 user_agent 角色定义作为首个消费者，验证适配可跑。
+motivation: |-
+  MVP 只接 nexau 一种运行时，三角色仅 prompt/工具不同。把「加载定义并运行」收敛成一处，
+  避免每个角色各写一套；user_agent 定义补上 spec-0001 中被抽象为「注入 LLM」的那一块。
+scope: |-
+  单一 nexau 适配：加载一份 agent 定义(prompt+工具)并运行，供 user/developer/test 三角色共用；先落 user_agent 角色定义作为首个消费者，验证适配可跑。
+design: |-
+  nexau_runtime 提供 load(agent_def_dir) -> Agent，Agent.run(input) -> output（对 nexau 的薄封装）。
+  角色定义是 agent_defs/<role>/ 下的 prompt(+工具配置)。user_agent/prompt.md 给出「扮用户」的角色定义，
+  对接 spec-0001 UserAgent 所需的 LLM 后端。developer/test 角色定义分别在 T3/T4 落地。
+interface: |-
+  nexau_runtime.load(agent_def_dir) -> Agent；Agent.run(input) -> output。
+tradeoffs: |-
+  薄封装不抽象多运行时（YAGNI）：CC/codex 接入是后续目标，现在只服务 nexau。
+acceptance: |-
+  nexau_runtime 可加载一份定义并执行一次调用(可 mock nexau)；user_agent 定义合法；单测覆盖加载与调用。
+tests: |-
+  单测(mock nexau)：load 读取角色定义；Agent.run 透传输入/返回输出；user_agent 定义可被 load。
+references: |-
+  角色与运行时：CLAUDE.md 架构「单一运行时：nexau」。UserAgent 消费方：spec-0001/T3。
+open-questions: ''

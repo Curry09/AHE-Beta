@@ -1,0 +1,46 @@
+id: T3
+title: harness 仓初始化
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+relates-to: []
+parallel: false
+files:
+  - scripts/bootstrap_harness.py
+  - tests/test_bootstrap_harness.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  把 seed_harness/ 作为 v0 推送到 Gitea，建立 harness 独立仓，供 dev 侧开发者 agent 走真实分支与合并。
+  harness 的演化历史从此存在该仓，不污染 auto-designer 本仓。
+motivation: |-
+  CLAUDE.md 定 harness 为独立 git 仓、托管于 Gitea、走真实分支/合并。本任务负责「从种子到可用仓」的
+  一次性初始化，是 dev 侧(spec-0003) launcher 与 developer_agent 的前置。
+scope: |-
+  把 seed_harness/ 作为 v0 推到 Gitea 成独立仓：建仓 → 提交 seed_harness 内容 → 建 release 分支。为 dev 侧(spec-0003)的开发者 agent 提供可走真实分支/合并的 harness 仓。
+design: |-
+  bootstrap_harness.py：读 T1 产出的连接信息(.env) →
+  ① 经 Gitea API 建 harness 仓（缺则建，幂等）；
+  ② 用 git 把本仓 seed_harness/ 内容作为初始提交推到该仓 main；
+  ③ 建 release 分支（指向 main）。feature 分支由开发者 agent 按需创建。
+  仅初始化，不含演化逻辑（那归 spec-0003）。
+interface: |-
+  python scripts/bootstrap_harness.py  → 在 Gitea 建出含 seed 内容、带 release 分支的 harness 仓。
+tradeoffs: |-
+  seed 内容用 git 推送而非 API 逐文件上传：保留真实 git 历史，契合「走真实分支/合并」。
+  与 T2 共享 T1 的连接信息，不重复造配置。
+acceptance: |-
+  脚本在 Gitea 建出 harness 仓、含 seed_harness 内容、有 release 分支；可幂等重跑；单测以 mock Gitea API 覆盖建仓/推送调用。
+tests: |-
+  单测(mock Gitea API + 临时 git)：建仓调用正确；seed_harness 内容进初始提交；release 分支建出；
+  重跑不报错（幂等）。
+references: |-
+  CLAUDE.md 架构「被进化对象：harness 作为可启动程序」。seed_harness 布局与 launcher：spec-0003。
+open-questions: ''

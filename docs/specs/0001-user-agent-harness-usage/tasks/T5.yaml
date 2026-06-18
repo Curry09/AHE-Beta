@@ -37,7 +37,7 @@ design: |-
 interface: |-
   IssueTracker(Protocol): ensure_labels/create_issue/add_comment/set_state。FakeTracker() 内存实现。
 tradeoffs: |-
-  接口方法只取 issue 闭环所需四项，不照搬 Gitea 全量 API（奥卡姆）；后续 dev_side 需要更多再扩。
+  接口方法只取 issue 闭环所需四项，不照搬 Gitea 全量 API（奥卡姆）；后续 dev 侧需要更多再扩。
 acceptance: |-
   接口含类型标注；FakeTracker 可建 issue 返回带号 IssueRef、追加 comment、改 state；单测覆盖建/查/改。
 tests: |-

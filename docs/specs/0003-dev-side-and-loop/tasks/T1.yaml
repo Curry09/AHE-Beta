@@ -1,0 +1,49 @@
+id: T1
+title: harness launcher 与 seed_harness
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - 0001/T2
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/harness/launcher.py
+  - seed_harness/entry.py
+  - seed_harness/params.yaml
+  - seed_harness/agents/main.md
+  - tests/harness/test_launcher.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  把「被进化的 harness」接成 spec-0001 的 HarnessInterface：launcher 按 git ref 取出某版 harness、
+  启动其自带 entry、按黑盒逐轮协议适配为 send/reset/close。seed_harness 给出 v0（单 nexau）作为起点。
+motivation: |-
+  harness 是独立可启动程序（可单/多 agent），用户侧只认 HarnessInterface。launcher 是二者的粘合层；
+  seed_harness 提供进化的 v0 起点。二者一起定义了「harness 程序」的启动与 I/O 契约。
+scope: |-
+  定义 harness 可启动程序契约并提供 v0 种子：launcher 按 git ref 把 harness 仓 checkout 到 data/harness_runs/<ref>/，启动其 entry，按黑盒协议(逐轮收发)适配成 HarnessInterface；seed_harness 给出 entry.py + params.yaml + 单 agent 定义作为 v0。
+design: |-
+  启动契约：harness 程序经 entry 启动后，从 stdin 逐行读 JSON {message}，向 stdout 逐行写 JSON {reply}；
+  内部 1 或 N 个 nexau 如何编排由 entry 自定。launcher：
+  - checkout(ref)：git 把 harness 仓某 ref 取到 data/harness_runs/<ref>/。
+  - 起子进程跑 entry（命令由 params.yaml 声明）；send 写一行/读一行；reset 重启子进程；close 终止。
+  seed_harness/v0：entry.py 起单个 nexau，按上述协议收发；params.yaml 声明启动命令；agents/main.md 为该 agent 定义。
+interface: |-
+  HarnessLauncher(harness_repo).launch(ref) -> HarnessInterface。启动契约：JSONL over stdio({message}/{reply})。
+tradeoffs: |-
+  子进程 + JSONL over stdio（而非 import/HTTP）：把 harness 当黑盒外部程序，最大解耦，支持任意内部编排与
+  将来换 CC/codex；代价是进程/序列化开销，自用规模可接受。
+acceptance: |-
+  launcher 能取某 ref 启动 entry 并经 HarnessInterface 多轮收发、可 reset/close；seed_harness 是合法 v0(单 nexau)；单测用一个最小假 entry 验证启动与 I/O 协议。
+tests: |-
+  单测：用一个最小假 entry(回显/脚本) 验证 launch→send/reply 逐轮、reset 重启、close 终止；
+  checkout 写到 data/harness_runs/<ref>/。
+references: |-
+  HarnessInterface：spec-0001/T2。harness 仓来源：spec-0002/T3。CLAUDE.md 架构「harness 作为可启动程序」。
+open-questions: ''

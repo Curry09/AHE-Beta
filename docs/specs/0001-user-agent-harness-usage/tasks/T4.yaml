@@ -12,8 +12,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/user_side/session.py
-  - tests/user_side/test_session.py
+  - src/auto_designer/user/session.py
+  - tests/user/test_session.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''
@@ -29,7 +29,7 @@ motivation: |-
   闭环编排（loop/）和统计（metrics/）都需要一个稳定的「跑一局」入口。把组装逻辑收在 runner，
   上层只管喂输入、收 Session，不关心内部怎么对话。
 scope: |-
-  编排一局会话：加载 Persona+SeedScenario → 用 UserAgent 驱动 HarnessInterface → 收集 Transcript+FeelingScore+IssueDraft → 返回结构化 Session。这是 user_side 最小可用入口。
+  编排一局会话：加载 Persona+SeedScenario → 用 UserAgent 驱动 HarnessInterface → 收集 Transcript+FeelingScore+IssueDraft → 返回结构化 Session。这是 user 侧最小可用入口。
 design: |-
   单一入口函数，无状态：
 

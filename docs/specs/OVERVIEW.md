@@ -6,12 +6,21 @@
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
 |----|----|----|----|----|----|
-| 0001 | 0001/T1 | 用户侧数据模型 | pending | — | src/auto_designer/user_side/models.py<br>tests/user_side/test_models.py |
+| 0001 | 0001/T1 | 用户侧数据模型 | pending | — | src/auto_designer/models.py<br>tests/test_models.py |
 | 0001 | 0001/T2 | Harness 对话接口 | pending | T1 | src/auto_designer/harness/interface.py<br>tests/harness/test_interface.py |
-| 0001 | 0001/T3 | 用户 agent 驱动器 | pending | T1, T2 | src/auto_designer/user_side/user_agent.py<br>tests/user_side/test_user_agent.py |
-| 0001 | 0001/T4 | 会话编排 runner | pending | T1, T2, T3, T5, T6 | src/auto_designer/user_side/session.py<br>tests/user_side/test_session.py |
+| 0001 | 0001/T3 | 用户 agent 驱动器 | pending | T1, T2 | src/auto_designer/user/user_agent.py<br>tests/user/test_user_agent.py |
+| 0001 | 0001/T4 | 会话编排 runner | pending | T1, T2, T3, T5, T6 | src/auto_designer/user/session.py<br>tests/user/test_session.py |
 | 0001 | 0001/T5 | IssueTracker 接口与 FakeTracker | pending | T1 | src/auto_designer/tracker/base.py<br>src/auto_designer/tracker/fake.py<br>tests/tracker/test_fake.py |
-| 0001 | 0001/T6 | 本地 SessionStore | pending | T1 | src/auto_designer/user_side/session_store.py<br>tests/user_side/test_session_store.py |
+| 0001 | 0001/T6 | 本地 SessionStore | pending | T1 | src/auto_designer/user/session_store.py<br>tests/user/test_session_store.py |
+| 0002 | 0002/T1 | Gitea 本地基建与标签方案 | pending | — | infra/gitea/docker-compose.yml<br>infra/gitea/README.md<br>infra/gitea/bootstrap.sh |
+| 0002 | 0002/T2 | GiteaTracker | pending | T1 | src/auto_designer/tracker/gitea.py<br>tests/tracker/test_gitea.py |
+| 0002 | 0002/T3 | harness 仓初始化 | pending | T1 | scripts/bootstrap_harness.py<br>tests/test_bootstrap_harness.py |
+| 0003 | 0003/T1 | harness launcher 与 seed_harness | pending | 0001/T2 | src/auto_designer/harness/launcher.py<br>seed_harness/entry.py<br>seed_harness/params.yaml<br>seed_harness/agents/main.md<br>tests/harness/test_launcher.py |
+| 0003 | 0003/T2 | nexau_runtime 与角色定义 | pending | — | src/auto_designer/nexau_runtime.py<br>agent_defs/user_agent/prompt.md<br>tests/test_nexau_runtime.py |
+| 0003 | 0003/T3 | developer_agent | pending | T2, 0002/T2 | src/auto_designer/dev/developer_agent.py<br>agent_defs/developer_agent/prompt.md<br>tests/dev/test_developer_agent.py |
+| 0003 | 0003/T4 | test_agent 体感门禁 | pending | T1, T2, 0001/T4 | src/auto_designer/dev/test_agent.py<br>agent_defs/test_agent/prompt.md<br>tests/dev/test_test_agent.py |
+| 0003 | 0003/T5 | release 发版 | pending | T4, 0002/T3 | src/auto_designer/dev/release.py<br>tests/dev/test_release.py |
+| 0003 | 0003/T6 | 闭环编排与曲线 | pending | T3, T4, T5, 0001/T4, 0001/T6 | src/auto_designer/loop/orchestrator.py<br>src/auto_designer/loop/metrics.py<br>tests/loop/test_orchestrator.py<br>tests/loop/test_metrics.py |
 
 ## 跨 feature 关系图
 
@@ -25,6 +34,19 @@ graph LR
         n0001_T5["T5 IssueTracker 接口与 FakeTracker"]
         n0001_T6["T6 本地 SessionStore"]
     end
+    subgraph G0002[0002 gitea-tracker-and-infra]
+        n0002_T1["T1 Gitea 本地基建与标签方案"]
+        n0002_T2["T2 GiteaTracker"]
+        n0002_T3["T3 harness 仓初始化"]
+    end
+    subgraph G0003[0003 dev-side-and-loop]
+        n0003_T1["T1 harness launcher 与 seed_harness"]
+        n0003_T2["T2 nexau_runtime 与角色定义"]
+        n0003_T3["T3 developer_agent"]
+        n0003_T4["T4 test_agent 体感门禁"]
+        n0003_T5["T5 release 发版"]
+        n0003_T6["T6 闭环编排与曲线"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -35,6 +57,21 @@ graph LR
     n0001_T4 --> n0001_T6
     n0001_T5 --> n0001_T1
     n0001_T6 --> n0001_T1
+    n0002_T2 --> n0002_T1
+    n0002_T3 --> n0002_T1
+    n0003_T1 --> n0001_T2
+    n0003_T3 --> n0003_T2
+    n0003_T3 --> n0002_T2
+    n0003_T4 --> n0003_T1
+    n0003_T4 --> n0003_T2
+    n0003_T4 --> n0001_T4
+    n0003_T5 --> n0003_T4
+    n0003_T5 --> n0002_T3
+    n0003_T6 --> n0003_T3
+    n0003_T6 --> n0003_T4
+    n0003_T6 --> n0003_T5
+    n0003_T6 --> n0001_T4
+    n0003_T6 --> n0001_T6
 ```
 
 ## 文件冲突报告
@@ -65,6 +102,72 @@ graph LR
     nT6 --> nT4
     nT1 --> nT5
     nT1 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_pending;
+```
+
+### 0002 Gitea 接入与基建（issue #0）
+
+> 人读方案见 [`0002-gitea-tracker-and-infra/summary.md`](./0002-gitea-tracker-and-infra/summary.md)。
+
+```mermaid
+graph LR
+    nT1["T1 Gitea 本地基建与标签方案"]
+    nT2["T2 GiteaTracker"]
+    nT3["T3 harness 仓初始化"]
+    nT1 --> nT2
+    nT1 --> nT3
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+```
+
+### 0003 开发者侧与闭环（issue #0）
+
+> 人读方案见 [`0003-dev-side-and-loop/summary.md`](./0003-dev-side-and-loop/summary.md)。
+
+```mermaid
+graph LR
+    nT1["T1 harness launcher 与 seed_harness"]
+    nT2["T2 nexau_runtime 与角色定义"]
+    nT3["T3 developer_agent"]
+    nT4["T4 test_agent 体感门禁"]
+    nT5["T5 release 发版"]
+    nT6["T6 闭环编排与曲线"]
+    nT2 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT4 --> nT5
+    nT3 --> nT6
+    nT4 --> nT6
+    nT5 --> nT6
 ```
 
 演化图：

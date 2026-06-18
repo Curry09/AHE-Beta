@@ -40,8 +40,8 @@ graph LR
 
 **涉及文件**
 
-- `src/auto_designer/user_side/models.py`
-- `tests/user_side/test_models.py`
+- `src/auto_designer/models.py`
+- `tests/test_models.py`
 
 **做什么**
 
@@ -175,8 +175,8 @@ CLAUDE.md 架构「被进化对象：harness 作为可启动程序」。真实�
 
 **涉及文件**
 
-- `src/auto_designer/user_side/user_agent.py`
-- `tests/user_side/test_user_agent.py`
+- `src/auto_designer/user/user_agent.py`
+- `tests/user/test_user_agent.py`
 
 **做什么**
 
@@ -240,14 +240,14 @@ issue 产出机制待定（用户已确认「类似往 github 提 issue，具体
 (a) UserAgent 直接 in-character 产出 IssueDraft；
 (b) 单独分析器读完 transcript 再归纳；
 (c) 两步：标摩擦点 + 归纳。
-本组先实现 (a) 的最小桩（LLM 末尾产 0..n 条 draft），不锁死，待后续 dev_side spec 对接需求时定。
+本组先实现 (a) 的最小桩（LLM 末尾产 0..n 条 draft），不锁死，待后续 dev 侧 spec 对接需求时定。
 
 ### T4 · 会话编排 runner（P1 / pending）
 
 **涉及文件**
 
-- `src/auto_designer/user_side/session.py`
-- `tests/user_side/test_session.py`
+- `src/auto_designer/user/session.py`
+- `tests/user/test_session.py`
 
 **做什么**
 
@@ -262,7 +262,7 @@ runner 自身不构造任何后端，便于测试替换与上层（loop 编排�
 
 **范围**
 
-编排一局会话：加载 Persona+SeedScenario → 用 UserAgent 驱动 HarnessInterface → 收集 Transcript+FeelingScore+IssueDraft → 返回结构化 Session。这是 user_side 最小可用入口。
+编排一局会话：加载 Persona+SeedScenario → 用 UserAgent 驱动 HarnessInterface → 收集 Transcript+FeelingScore+IssueDraft → 返回结构化 Session。这是 user 侧最小可用入口。
 
 **整体设计**
 
@@ -343,7 +343,7 @@ IssueTracker(Protocol): ensure_labels/create_issue/add_comment/set_state。FakeT
 
 **取舍**
 
-接口方法只取 issue 闭环所需四项，不照搬 Gitea 全量 API（奥卡姆）；后续 dev_side 需要更多再扩。
+接口方法只取 issue 闭环所需四项，不照搬 Gitea 全量 API（奥卡姆）；后续 dev 侧需要更多再扩。
 
 **验收标准**
 
@@ -361,8 +361,8 @@ CLAUDE.md 架构「状态去向：issue → Gitea」。GiteaTracker 实现：spe
 
 **涉及文件**
 
-- `src/auto_designer/user_side/session_store.py`
-- `tests/user_side/test_session_store.py`
+- `src/auto_designer/user/session_store.py`
+- `tests/user/test_session_store.py`
 
 **做什么**
 
@@ -372,7 +372,7 @@ CLAUDE.md 架构「状态去向：issue → Gitea」。GiteaTracker 实现：spe
 **为什么**
 
 体感是训练信号，必须可追溯、可统计。Session 全量留作证据，索引供 loop/metrics 画 issue/体感曲线、
-供 dev_side 取回归基线。
+供 dev 侧取回归基线。
 
 **范围**
 

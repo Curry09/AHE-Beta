@@ -1,0 +1,44 @@
+id: T5
+title: release 发版
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T4
+  - 0002/T3
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/dev/release.py
+  - tests/dev/test_release.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  发版：体感门禁通过的候选分支合入 harness 仓 release 分支并打 tag；tag 即用户侧下一轮 pin 的版本。
+  否决则不动 release。
+motivation: |-
+  闭环要有「定版」动作把候选变成可被用户侧使用的稳定版本。tag 提供可 pin、可回溯的版本标识；
+  release 分支是用户侧默认运行的线。
+scope: |-
+  发版：体感门禁通过后,把候选分支合入 harness 仓 release 分支并打 tag(版本号),作为用户侧下一轮 pin 的版本;否决则不合并。
+design: |-
+  release(candidate_branch, verdict) ：
+  - verdict.pass：在 harness 仓把 candidate_branch 合入 release 分支，打 tag(递增版本号)，关联 issue 置 closed。
+  - 否则：不合并、不打 tag；可在 issue 上 comment 否决原因。
+  版本号单调递增；tag 名即版本。仅操作 harness 仓 git，不含评测逻辑(归 T4)。
+interface: |-
+  release(harness_repo, candidate_branch, verdict) -> ReleaseResult(released: bool, tag?)。
+tradeoffs: |-
+  发版=合并+tag 的轻动作，不引版本管理框架（奥卡姆）；版本号用单调计数，语义化版本后续再说。
+acceptance: |-
+  通过的候选被合入 release 并打出 tag;否决的不动 release;单测用临时 git 仓覆盖合并+打 tag 与否决两路径。
+tests: |-
+  单测(临时 git 仓)：pass→candidate 合入 release 且出现新 tag；fail→release 与 tag 不变。
+references: |-
+  门禁 Verdict：T4。harness 仓：spec-0002/T3。CLAUDE.md 方法 b「合并和发版」。
+open-questions: ''

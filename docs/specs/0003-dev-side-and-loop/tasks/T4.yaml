@@ -1,0 +1,50 @@
+id: T4
+title: test_agent 体感门禁
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+  - T2
+  - 0001/T4
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/dev/test_agent.py
+  - agent_defs/test_agent/prompt.md
+  - tests/dev/test_test_agent.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  测试 agent：用候选 harness ref 跑固定集的 N 局用户会话，算平均体感并与当前 release 基线比较，
+  不退化则放行。这是发版门禁，且只用体感——benchmark 不参与判定。
+motivation: |-
+  发版要有客观闸门，且必须守住 train/test 分离：门禁只看体感回归，benchmark 全程 held-out。
+  测试 agent 复用用户侧 run_session——「评一个 harness」就是「让用户 agent 用它跑几局看体感」。
+scope: |-
+  测试 agent：对候选 harness ref 用 launcher 起服务、跑 run_session×N(固定 persona+场景集)算平均体感,与当前 release 基线比,不退化则放行。N 与判定方式(单点 vs 分布)为待定项,先取均值不低于基线。
+design: |-
+  evaluate(candidate_ref) -> Verdict：
+  ① launcher.launch(candidate_ref) 得 HarnessInterface；
+  ② 对固定 (persona, scenario) 集跑 run_session×N(每个场景 N 局)，收集体感分；
+  ③ 取均值与 release 基线均值比较：不低于基线(容差内)→放行，否则否决。
+  基线来自 release 版同一固定集的历史体感（经 SessionStore 索引取）。N 与判定方式(单点均值 vs 分布检验)
+  列为 spec 待定项，MVP 先用均值。
+interface: |-
+  TestAgent(launcher, fixed_set, baseline, n).evaluate(candidate_ref) -> Verdict(pass: bool, mean, baseline)。
+tradeoffs: |-
+  体感是噪声信号：单局方差大，故跑 N 局取均值；N 与是否用分布检验留待定项，先简单均值不低于基线。
+  只用体感门禁(不掺 benchmark)：守住 held-out，代价是门禁可能放过 benchmark 上变差的改动——这正是设计
+  接受的：benchmark 只事后观测、不投票。
+acceptance: |-
+  对一个候选 ref 跑 N 局得平均体感并与基线比较,返回放行/否决;N 可配;单测用 FakeHarness+mock LLM 覆盖通过与退化两种判定。
+tests: |-
+  单测(FakeHarness + mock LLM)：候选均值≥基线→pass；<基线→fail；N 可配；基线缺失时的处理明确。
+references: |-
+  run_session：spec-0001/T4。基线数据：spec-0001/T6。launcher：T1。CLAUDE.md 约束「发版门禁只用体感」。
+open-questions: ''

@@ -1,0 +1,50 @@
+id: T3
+title: developer_agent
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T2
+  - 0002/T2
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/dev/developer_agent.py
+  - agent_defs/developer_agent/prompt.md
+  - tests/dev/test_developer_agent.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  开发者 agent：从 Gitea 取一条 open issue，按 label 分流到对应分支策略，用 nexau 修改 harness bundle 并提交。
+  MVP 单 agent 串行，是闭环 b 段的核心。
+motivation: |-
+  issue 要变成 harness 的真实改动。label(bug/feature) 驱动分支策略——bug 走 release 快修、feature 走
+  独立分支孵化——正是 CLAUDE.md 用「分支模型」化解「增量打补丁 vs 结构性改动」张力的落点。
+scope: |-
+  开发者 agent：从 Gitea 取一条 open issue(按 label 分流：bug→release 快修分支、feature→feature 分支)→ checkout harness 仓建分支 → 用 nexau 改 harness bundle → commit/push。MVP 单 agent 串行处理。
+design: |-
+  一次处理一条 issue：
+  ① 经 IssueTracker(GiteaTracker) 取一条 open issue；
+  ② 按 label 定分支：bug → 从 release 切快修分支；feature → 切 feature 分支；
+  ③ checkout harness 仓该分支到工作目录；
+  ④ nexau(developer_agent 定义) 读 issue + harness bundle，产出修改；
+  ⑤ commit/push 到该分支，并在 issue 上 comment 关联分支。
+  不负责合并/发版（归 T5），不负责判定好坏（归 T4）。
+interface: |-
+  DeveloperAgent(tracker, harness_repo, nexau_agent).work_one() -> 处理一条 issue，返回所建分支与提交。
+tradeoffs: |-
+  单 agent 串行（MVP）：并发多 agent 与分支冲突解决留后续（奥卡姆）。
+  分流只认 bug/feature 两标签，够驱动两条分支路径；更细的优先级/类型后续再加。
+acceptance: |-
+  给定一条 issue,能在 harness 仓建对应分支并产出一次修改提交;bug/feature 分流正确;单测用 mock(nexau+Gitea+临时 git)覆盖取 issue→建分支→提交流程。
+tests: |-
+  单测(mock nexau + FakeTracker/Gitea + 临时 git)：bug→release 派生分支、feature→feature 分支；
+  产出一次提交并推送；issue 上留关联 comment。
+references: |-
+  nexau_runtime：T2。IssueTracker：spec-0001/T5、GiteaTracker spec-0002/T2。harness 仓：spec-0002/T3。
+open-questions: ''

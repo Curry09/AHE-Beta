@@ -1,0 +1,47 @@
+id: T1
+title: Gitea 本地基建与标签方案
+status: pending
+priority: P1
+tags: []
+depends-on: []
+relates-to: []
+parallel: false
+files:
+  - infra/gitea/docker-compose.yml
+  - infra/gitea/README.md
+  - infra/gitea/bootstrap.sh
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  提供本地 Gitea 服务的基建与一键初始化：docker-compose(Gitea + sqlite) 起服务，bootstrap 脚本建
+  admin、生成 access token、建工作仓与标签方案。这是 GiteaTracker(T2) 与 harness 仓初始化(T3) 的前置。
+motivation: |-
+  issue 与 harness 仓都落在 Gitea。需要一个可复现、低运维的本地实例（sqlite 单文件、单二进制），
+  以及一条把「空服务」变成「可用工作区(有 token、有仓、有标签)」的幂等初始化路径。
+scope: |-
+  提供本地 Gitea(docker + sqlite) 的 docker-compose 与一键 bootstrap：起服务、建 admin、生成 write:issue+write:repository 的 access token、建工作仓与标签(bug/feature)。bootstrap 产出连接信息(URL/owner/repo/token)供 GiteaTracker 读取。
+design: |-
+  - docker-compose.yml：单 gitea 服务，`GITEA__database__DB_TYPE=sqlite3`，数据挂本地卷，暴露 HTTP 端口。
+  - bootstrap.sh：① 等服务就绪；② `gitea admin user create` 建 admin（幂等）；
+    ③ `gitea admin user generate-access-token --scopes write:issue,write:repository --raw` 拿 token；
+    ④ 经 API 建工作仓；⑤ ensure 标签 bug/feature。产出写 `infra/gitea/.env`(URL/owner/repo/token，gitignore)。
+  - 标签方案：bug、feature 为驱动 dev 侧分流的最小集（bug→release 快修，feature→feature 分支）。
+interface: |-
+  产物契约：`infra/gitea/.env` 含 GITEA_URL/OWNER/REPO/TOKEN，被 GiteaTracker(T2) 与 bootstrap_harness(T3) 读取。
+tradeoffs: |-
+  sqlite 而非 postgres：单实例自用足够、零额外服务（奥卡姆）；高并发写再换。
+  token 走 CLI 生成而非 UI 手点：可脚本化、可幂等。
+acceptance: |-
+  docker compose up 后 Gitea 可访问；bootstrap.sh 幂等产出 token 与标签；README 写明启动/拿 token 步骤；标签含 bug、feature。
+tests: |-
+  本任务以 README 记录的手动验证为主：compose up → bootstrap → 用产出 token curl 建一条 issue 成功。
+  （脚本逻辑的自动化测试随 T2/T3 的 mock 覆盖。）
+references: |-
+  Gitea Docker 安装 https://docs.gitea.com/installation/install-with-docker ；
+  CLI https://docs.gitea.com/administration/command-line 。CLAUDE.md 架构「状态去向」。
+open-questions: ''

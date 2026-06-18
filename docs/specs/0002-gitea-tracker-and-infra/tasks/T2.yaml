@@ -1,0 +1,48 @@
+id: T2
+title: GiteaTracker
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/tracker/gitea.py
+  - tests/tracker/test_gitea.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  GiteaTracker 是 spec-0001 IssueTracker 接口的真实后端：一个打 Gitea /api/v1 的薄 REST 客户端。
+  运行时注入到 run_session，使用户 agent 的 issue 草稿真正提交到 Gitea。
+motivation: |-
+  用户侧已用 IssueTracker 接口与 FakeTracker 解耦；本任务补上真实后端，且只做薄封装——
+  Gitea 已负责发号/状态/comment，客户端只翻译接口调用为 HTTP 请求。
+scope: |-
+  实现 spec-0001 的 IssueTracker 接口：薄 REST 客户端(requests)打 /api/v1，含 ensure_labels(建/查 label 拿 id)、create_issue(POST issues, 回 IssueRef)、add_comment、set_state。配置(URL/owner/repo/token)由构造注入。
+design: |-
+  GiteaTracker(base_url, owner, repo, token)，鉴权头 `Authorization: token <token>`。映射：
+  - ensure_labels(names)：GET labels 拿现有 → 缺的 POST 建 → 缓存 name→id。
+  - create_issue(draft)：POST `/repos/{owner}/{repo}/issues`，body={title, body, labels:[id...]}；
+    解析响应 number/html_url/state → 返回 IssueRef。
+  - add_comment(number, body)：POST `/repos/{owner}/{repo}/issues/{number}/comments`。
+  - set_state(number, state, reason)：PATCH `/repos/{owner}/{repo}/issues/{number}`，body={state, ...}。
+  配置由构造注入（来自 T1 的 .env），客户端不读环境、不起服务。
+interface: |-
+  GiteaTracker(base_url, owner, repo, token) 实现 IssueTracker(ensure_labels/create_issue/add_comment/set_state)。
+tradeoffs: |-
+  薄 requests 客户端而非 py-gitea SDK：只需 4 个端点，零额外重依赖（奥卡姆），请求形状可控。
+  labels 需先转 id（Gitea 建 issue 收 label id 而非名），故 ensure_labels 维护 name→id 缓存。
+acceptance: |-
+  对照接口实现四方法；create_issue 真打 Gitea 回带号 IssueRef；labels 经 id 映射；单测用 mock HTTP（responses/respx）覆盖请求构造与解析，不依赖真服务。
+tests: |-
+  单测(mock HTTP)：create_issue 发对 URL/头/body 并解析出 IssueRef；ensure_labels 缺则建、有则复用；
+  add_comment/set_state 打对端点；token 进 Authorization 头。
+references: |-
+  Gitea API https://docs.gitea.com/api/ 。接口定义：spec-0001/T5。
+open-questions: ''

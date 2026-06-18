@@ -65,9 +65,9 @@ src/auto_designer/
   models.py            # 共享数据结构（两侧共用）
   nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
   harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
-  user_side/           # user_agent.py + session.py(run_session) + session_store.py
+  user/                # user_agent.py + session.py(run_session) + session_store.py
   tracker/             # base.py(IssueTracker接口) + gitea.py + fake.py
-  dev_side/            # developer_agent.py + test_agent.py + release.py
+  dev/                 # developer_agent.py + test_agent.py + release.py
   loop/                # orchestrator.py + metrics.py
 agent_defs/            # 固定角色 nexau 定义：user_agent/ developer_agent/ test_agent/
 seed_harness/          # v0 harness 种子：entry.py + agents/ + tools/ + params.yaml
