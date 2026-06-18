@@ -1,0 +1,4 @@
+# Conventional Commits（CLAUDE.md 代码规范）
+# 类型：feat / fix / refactor / chore / docs / test / ci / style / perf / build
+extends:
+  - '@commitlint/config-conventional'
