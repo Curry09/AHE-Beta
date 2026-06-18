@@ -98,6 +98,7 @@ data/                  # 运行产物(.gitignore)：sessions/ harness_runs/
 - **代码检查**：Ruff（行宽 100）
 - **Git 钩子**：lefthook —— pre-commit（lint）+ commit-msg（commitlint）
 - **Git 推送**：首次推送分支用 `git push -u origin <branch>` 设置 upstream tracking
+- **自动提交**：每完成一处改动即 `git add` + `git commit` + `git push`，无需征求确认（用户已长期授权）。
 - **CI**：CI 不过就反复修复重推直到全绿。
 - **代码注释**：中英文皆可，不强制区分，以清晰表达为先。
 - **Python 函数参数**：禁止位置参数（`/` 语法）；private 函数（`_` 开头，不含 dunder）参数禁止默认值，调用方必须显式传参。
