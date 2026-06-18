@@ -2,3 +2,7 @@
 # 类型：feat / fix / refactor / chore / docs / test / ci / style / perf / build
 extends:
   - '@commitlint/config-conventional'
+rules:
+  # 本仓提交 subject 为中文，且常以专有名词起头（OVERVIEW / CLAUDE.md / Gitea），
+  # config-conventional 的 subject-case（禁 upper/pascal/start-case）对此场景误报，关闭之。
+  subject-case: [0]
