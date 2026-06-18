@@ -27,6 +27,7 @@ _STATUS_FILL = {
 }
 
 # Spec-0014/T3：固定标题，便于断言「四块齐全」。
+_SYNOPSIS_HEADING = "## 总览"
 _BOARD_HEADING = "## 全局看板"
 _RELATION_HEADING = "## 跨 feature 关系图"
 _CONFLICT_HEADING = "## 文件冲突报告"
@@ -54,6 +55,7 @@ def render(*, specs_root: Path) -> str:
     blocks = [
         "# Spec 总览（OVERVIEW）",
         "> 本文件由 `spec render` 自动生成，请勿手工编辑（Spec-0014/T3）。",
+        _render_synopsis(groups=groups),
         _HOWTO,
         _render_board(groups=groups),
         _render_relations(groups=groups),
@@ -170,6 +172,28 @@ def _summary_task(*, task: Task) -> str:
         lines.append(f"**{heading}**")
         lines.append("")
         lines.append(text)
+    return "\n".join(lines)
+
+
+def _render_synopsis(*, groups: list[Group]) -> str:
+    """块 0：脉络总览——开篇用一行点题 + 逐组「编号 标题 — 导语首句」，
+
+    让读者在看板/关系图之前先抓住整条故事线：每组按编号递进，导语首句已点明各自定位，
+    串起来即一条可读脉络。内容全部派生自各组 metadata（标题 + overview 首句），不在通用渲染器里
+    硬编码任何项目剧情，随 spec 演化自动保持正确。
+    """
+    lines = [_SYNOPSIS_HEADING, ""]
+    if not groups:
+        lines.append("（暂无 spec 组）")
+        return "\n".join(lines)
+    lines.append("本仓需求按**组（feature）**拆分、按编号递进。下面一句话给出每组定位，串起整条脉络；")
+    lines.append("依赖与衔接见后续「跨 feature 关系图」，单组完整方案见各组 `summary.md`。")
+    lines.append("")
+    for group in groups:
+        title = group.metadata.title or group.metadata.slug
+        gist = _one_line(text=group.metadata.overview)
+        tail = f" — {gist}" if gist else ""
+        lines.append(f"- **{group.number} {_cell(title)}**{tail}")
     return "\n".join(lines)
 
 
