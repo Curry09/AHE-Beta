@@ -44,8 +44,9 @@ class _Test:
         return self._verdict
 
 
-def _orch(events, dev_result, verdict=None, release_result=None, fixed_k=1, initial="v1",
-          release_fn=None):
+def _orch(
+    events, dev_result, verdict=None, release_result=None, fixed_k=1, initial="v1", release_fn=None
+):
     def default_release_fn(branch, verdict_, issue_number):
         events.append(("release", branch))
         return release_result
@@ -139,8 +140,10 @@ def test_b_phase_error_propagates() -> None:
     orch = Orchestrator(
         launcher=_Launcher(events),
         fixed_set=[(_persona(), SeedScenario(description="s"))],
-        tracker=None, store=None,
-        developer_agent=_BoomDev(), test_agent=None,
+        tracker=None,
+        store=None,
+        developer_agent=_BoomDev(),
+        test_agent=None,
         release_fn=lambda *a: None,
         run_session_fn=lambda p, s, h: None,
         initial_ref="v1",

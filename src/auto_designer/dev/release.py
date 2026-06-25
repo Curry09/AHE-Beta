@@ -48,10 +48,22 @@ def release(
         return ReleaseResult(released=False, ref=_git(harness_repo, ["rev-parse", "HEAD"]).strip())
 
     merge = subprocess.run(
-        ["git", "-C", harness_repo, "-c", "user.email=rel@auto-designer",
-         "-c", "user.name=release", "merge", "--no-ff", candidate_branch,
-         "-m", f"release: merge {candidate_branch}"],
-        capture_output=True, text=True,
+        [
+            "git",
+            "-C",
+            harness_repo,
+            "-c",
+            "user.email=rel@auto-designer",
+            "-c",
+            "user.name=release",
+            "merge",
+            "--no-ff",
+            candidate_branch,
+            "-m",
+            f"release: merge {candidate_branch}",
+        ],
+        capture_output=True,
+        text=True,
     )
     if merge.returncode != 0:  # 冲突等 → abort 保持 release 原状后抛错
         subprocess.run(["git", "-C", harness_repo, "merge", "--abort"], capture_output=True)

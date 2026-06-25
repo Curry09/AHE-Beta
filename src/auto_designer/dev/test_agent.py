@@ -34,8 +34,6 @@ class TestAgent:
 
     __test__ = False  # 名字以 Test 开头但不是 pytest 测试类，避免被收集
 
-
-
     def __init__(
         self,
         launcher: HarnessLauncher,
@@ -71,11 +69,21 @@ class TestAgent:
         mean = sum(scores) / len(scores)
         if self._baseline is None:  # 基线缺失（首轮）→ 放行，本版定为基线
             return Verdict(
-                passed=True, mean=mean, baseline=None, n=self._n,
-                per_session=scores, baseline_available=False, failures=failures,
+                passed=True,
+                mean=mean,
+                baseline=None,
+                n=self._n,
+                per_session=scores,
+                baseline_available=False,
+                failures=failures,
             )
         passed = mean >= self._baseline - self._tol  # 持平即过，只挡退化
         return Verdict(
-            passed=passed, mean=mean, baseline=self._baseline, n=self._n,
-            per_session=scores, baseline_available=True, failures=failures,
+            passed=passed,
+            mean=mean,
+            baseline=self._baseline,
+            n=self._n,
+            per_session=scores,
+            baseline_available=True,
+            failures=failures,
         )

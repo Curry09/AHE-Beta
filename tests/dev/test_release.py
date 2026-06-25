@@ -16,7 +16,9 @@ from auto_designer.tracker.fake import FakeTracker
 def _git(repo: str, *args: str) -> str:
     return subprocess.run(
         ["git", "-C", repo, "-c", "user.email=t@t", "-c", "user.name=t", *args],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout
 
 

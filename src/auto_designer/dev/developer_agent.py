@@ -53,7 +53,10 @@ class DeveloperAgent:
         if not new.strip() or new == old:  # 无改动 → 不空提交
             self._tracker.add_comment(issue.number, f"本轮未产出改动（#{issue.number}）")
             return DevResult(
-                issue_number=issue.number, branch=branch, changed=False, default_routed=default_routed
+                issue_number=issue.number,
+                branch=branch,
+                changed=False,
+                default_routed=default_routed,
             )
 
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -63,9 +66,14 @@ class DeveloperAgent:
         commit = self._run_git(["rev-parse", "HEAD"]).strip()
         self._push(branch)
         note = "（label 无 bug/feature，默认按 bug 分流）" if default_routed else ""
-        self._tracker.add_comment(issue.number, f"已在分支 {branch} 处理 issue #{issue.number}{note}")
+        self._tracker.add_comment(
+            issue.number, f"已在分支 {branch} 处理 issue #{issue.number}{note}"
+        )
         return DevResult(
-            issue_number=issue.number, branch=branch, commit=commit, changed=True,
+            issue_number=issue.number,
+            branch=branch,
+            commit=commit,
+            changed=True,
             default_routed=default_routed,
         )
 
@@ -85,8 +93,15 @@ class DeveloperAgent:
 
     def _commit(self, message: str) -> None:
         self._run_git(
-            ["-c", "user.email=dev@auto-designer", "-c", "user.name=developer-agent",
-             "commit", "-m", message]
+            [
+                "-c",
+                "user.email=dev@auto-designer",
+                "-c",
+                "user.name=developer-agent",
+                "commit",
+                "-m",
+                message,
+            ]
         )
 
     def _push(self, branch: str) -> None:

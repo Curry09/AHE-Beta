@@ -38,7 +38,9 @@ def _make_harness_repo(tmp_path: Path) -> str:
 def _branches(repo: str) -> list[str]:
     out = subprocess.run(
         ["git", "-C", repo, "branch", "--format=%(refname:short)"],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout
     return out.split()
 

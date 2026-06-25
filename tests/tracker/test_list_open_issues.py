@@ -28,8 +28,13 @@ def test_gitea_parses_open_issues() -> None:
         return _Resp(
             200,
             [
-                {"number": 3, "title": "t3", "body": "b3", "state": "open",
-                 "labels": [{"name": "bug"}]},
+                {
+                    "number": 3,
+                    "title": "t3",
+                    "body": "b3",
+                    "state": "open",
+                    "labels": [{"name": "bug"}],
+                },
                 {"number": 5, "title": "t5", "body": None, "state": "open", "labels": []},
             ],
         )

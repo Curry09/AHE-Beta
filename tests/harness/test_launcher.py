@@ -23,9 +23,11 @@ for line in sys.stdin:
     sys.stdout.write(json.dumps({"reply": f"{count}:{msg}"}) + "\\n")
     sys.stdout.flush()
 """
-_BAD_JSON_ENTRY = 'import sys\nfor _ in sys.stdin:\n    sys.stdout.write("garbage\\n"); sys.stdout.flush()\n'
+_BAD_JSON_ENTRY = (
+    'import sys\nfor _ in sys.stdin:\n    sys.stdout.write("garbage\\n"); sys.stdout.flush()\n'
+)
 _NO_REPLY_ENTRY = (
-    'import json, sys\nfor _ in sys.stdin:\n'
+    "import json, sys\nfor _ in sys.stdin:\n"
     '    sys.stdout.write(json.dumps({"x": 1}) + "\\n"); sys.stdout.flush()\n'
 )
 _EARLY_EXIT_ENTRY = "import sys\nsys.exit(0)\n"
@@ -41,12 +43,16 @@ def _make_repo(tmp_path: Path, entry_src: str, entry_argv: list[str]) -> str:
     subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "seed"],
-        cwd=repo, check=True, capture_output=True,
+        cwd=repo,
+        check=True,
+        capture_output=True,
     )
     return str(repo)
 
 
-def _launcher(tmp_path: Path, entry_src: str, entry_argv: list[str] | None = None) -> HarnessLauncher:
+def _launcher(
+    tmp_path: Path, entry_src: str, entry_argv: list[str] | None = None
+) -> HarnessLauncher:
     argv = entry_argv if entry_argv is not None else [sys.executable, "fake_entry.py"]
     repo = _make_repo(tmp_path, entry_src, argv)
     return HarnessLauncher(harness_repo=repo, runs_root=tmp_path / "runs")

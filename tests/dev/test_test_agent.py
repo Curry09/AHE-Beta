@@ -87,7 +87,11 @@ def test_below_baseline_minus_tol_fails() -> None:
 def test_n_controls_session_count() -> None:
     runner = _ScriptRunner([4, 4, 4, 4])
     agent = TestAgent(
-        launcher=_FakeLauncher(), fixed_set=_fixed_set(2), baseline=1.0, n=2, tol=0.0,
+        launcher=_FakeLauncher(),
+        fixed_set=_fixed_set(2),
+        baseline=1.0,
+        n=2,
+        tol=0.0,
         run_session_fn=runner,
     )
     v = agent.evaluate("cand")
