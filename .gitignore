@@ -17,3 +17,6 @@ data/
 
 # Gitea 连接信息（含 token，不入库）
 backend/deploy/gitea/.env
+
+# 本地 LLM 凭证（复用 ljh，勿入库）
+backend/.env
