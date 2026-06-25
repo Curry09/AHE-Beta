@@ -128,6 +128,9 @@ class Metadata:
     title: str
     issue: int
     slug: str
+    # 组级导语（prose, Markdown，可含 mermaid）：一句话讲清本组在闭环中的位置、
+    # 交付什么、数据流脊柱。渲染在 summary.md 开篇与 OVERVIEW 各 feature 段。可选，缺省空。
+    overview: str = ""
 
 
 @dataclass(frozen=True)
@@ -181,6 +184,16 @@ def load_group(*, group_dir: Path) -> Group:
     return Group(number=number, metadata=metadata, tasks=tasks, history=history)
 
 
+def load_yaml(*, path: Path) -> object:
+    """Load an arbitrary YAML file with the canonical round-trip instance (None if absent).
+
+    供 render 读非 Task 的辅助源（如 glossary.yaml）复用同一 YAML 实例，避免重复构造。
+    """
+    if not path.is_file():
+        return None
+    return _yaml.load(path)
+
+
 def load_all(*, specs_root: Path) -> list[Group]:
     """Load every spec group under specs_root (sorted by number).
 
@@ -226,6 +239,9 @@ def dump_metadata(*, metadata: Metadata, path: Path) -> None:
     payload = CommentedMap(
         [("title", metadata.title), ("issue", metadata.issue), ("slug", metadata.slug)]
     )
+    # overview 仅在非空时写入，并强制块标量 `|`（与 prose 字段一致）；空组 metadata 保持三行精简。
+    if metadata.overview:
+        payload["overview"] = _as_block_scalar(text=metadata.overview)
     with path.open("w", encoding="utf-8") as handle:
         _yaml.dump(payload, handle)
 
@@ -314,6 +330,7 @@ def _load_metadata(*, path: Path) -> Metadata:
         title=str(raw.get("title", "")),
         issue=int(raw.get("issue", 0)),
         slug=str(raw.get("slug", "")),
+        overview=_text(value=raw.get("overview")),
     )
 
 

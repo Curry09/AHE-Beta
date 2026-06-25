@@ -2,11 +2,13 @@
 
 Spec-0014/T3: spec render → OVERVIEW.md
 
-纯函数、幂等（决策 D3/D9）：同一份源数据两次 render 字节级一致。生成四块：
-  1. 全局看板表（组 | NNNN/T* | 标题 | 状态 | 依赖 | 涉及文件）
-  2. 跨 feature 关系图（Mermaid，按 feature 分 subgraph；depends-on 实线、relates-to 虚线标 type）
-  3. 文件冲突报告（跨组 files 重叠，协作信号）
-  4. 每 feature 段（组内看板 + 依赖 DAG + 演化图：节点=Task 版本、按 status 着色、血缘连边）
+纯函数、幂等（决策 D3/D9）：同一份源数据两次 render 字节级一致。生成六块：
+  1. 名词解释（读 specs_root/glossary.yaml；缺省则跳过——OVERVIEW 唯一可手工维护的源）
+  2. 全局看板表（组 | NNNN/T* | 标题 | 状态 | 依赖 | 涉及文件）
+  3. 跨 feature 关系图（Mermaid，按 feature 分 subgraph；depends-on 实线、relates-to 虚线标 type）
+  4. 文件冲突报告（跨组 files 重叠，协作信号）
+  5. 设计文件结构（所有 Task 的 files 并集铺成目录树，每个文件标注归属 Task）
+  6. 每 feature 段（组内看板 + 依赖 DAG + 演化图：节点=Task 版本、按 status 着色、血缘连边）
 
 不感知 git / GitHub（理念 10 解耦）。
 """
@@ -27,10 +29,26 @@ _STATUS_FILL = {
 }
 
 # Spec-0014/T3：固定标题，便于断言「四块齐全」。
+_SYNOPSIS_HEADING = "## 总览"
 _BOARD_HEADING = "## 全局看板"
 _RELATION_HEADING = "## 跨 feature 关系图"
 _CONFLICT_HEADING = "## 文件冲突报告"
+_TREE_HEADING = "## 设计文件结构"
+_GLOSSARY_HEADING = "## 名词解释"
 _FEATURE_HEADING = "## 各 feature 详情"
+
+# 顶部「如何读」导语：先给只看 OVERVIEW 的读者一个入口与主线，再进入看板/图，
+# 避免一上来就是宽表 + Mermaid 的机器视角。静态文本，保持 render 确定性。
+_HOWTO = (
+    "## 如何读这份文档\n"
+    "\n"
+    "本文件是所有 spec 的**全局看板**，由各组 `tasks/T*.yaml` 自动汇总，偏索引视角。"
+    "想读某一组的完整方案，请点进该组的 `summary.md`（每个 feature 段开头有链接）。\n"
+    "\n"
+    "阅读顺序建议：不熟术语先看**名词解释** → 看**全局看板**掌握全部任务与状态 → 看"
+    "**跨 feature 关系图**了解依赖 → 看**设计文件结构**掌握落盘布局与文件归属 → 在"
+    "**各 feature 详情**里逐组读导语与任务一览。"
+)
 
 
 def render(*, specs_root: Path) -> str:
@@ -42,9 +60,13 @@ def render(*, specs_root: Path) -> str:
     blocks = [
         "# Spec 总览（OVERVIEW）",
         "> 本文件由 `spec render` 自动生成，请勿手工编辑（Spec-0014/T3）。",
+        _render_synopsis(groups=groups, specs_root=specs_root),
+        _HOWTO,
+        _render_glossary(specs_root=specs_root),
         _render_board(groups=groups),
         _render_relations(groups=groups),
         _render_conflicts(groups=groups),
+        _render_file_tree(groups=groups),
         _render_features(groups=groups),
     ]
     # 统一以单个换行连接、整体以换行结尾，保证确定性。
@@ -95,8 +117,12 @@ def render_group_summary(*, group: Group) -> str:
             "> 本文件由 `spec render` 自动生成，请勿手工编辑。\n"
             f"> 内容来源：本组 `metadata.yaml` 与 `tasks/T*.yaml`（关联 issue #{group.metadata.issue}）。"
         ),
-        _summary_orchestration(group=group),
     ]
+    # 组级导语（overview）置于任务编排之前：先讲清本组在闭环中的位置、交付什么、数据流脊柱，
+    # 再进入逐任务细节，避免读者一上来就陷进 T1…Tn 的依赖图（修复「summary 云里雾里」）。
+    if group.metadata.overview.strip():
+        blocks.append("## 总览\n\n" + group.metadata.overview.strip())
+    blocks.append(_summary_orchestration(group=group))
     if group.tasks:
         blocks.append("## 各任务方案")
         for task in group.tasks:
@@ -156,28 +182,151 @@ def _summary_task(*, task: Task) -> str:
     return "\n".join(lines)
 
 
+def _render_synopsis(*, groups: list[Group], specs_root: Path) -> str:
+    """块 0：脉络总览——项目级开篇（手维护 synopsis.md，缺省回退模板）+ 逐组「编号 标题 — 整段导语」。
+
+    开篇先讲清「这是什么 / 为什么 / 闭环」，来自 specs_root/synopsis.md——OVERVIEW 中第二个可手工维护的源
+    （与 glossary.yaml 并列）；缺省则回退到通用模板，不报错。逐组那段取各组 metadata.overview 的全部散文
+    段落（剔除 ASCII 图，图留给各 feature 详情/summary），随 spec 演化自动正确，不在渲染器里硬编码项目剧情。
+    """
+    lines = [_SYNOPSIS_HEADING, ""]
+    if not groups:
+        lines.append("（暂无 spec 组）")
+        return "\n".join(lines)
+    opening = _read_synopsis(specs_root=specs_root)
+    lines.append(opening if opening else "本仓需求按**组（feature）**拆分、按编号递进。")
+    lines.append("")
+    lines.append(
+        "下面按编号递进给出每组定位，串起整条脉络；"
+        "依赖与衔接见后续「跨 feature 关系图」，单组完整方案见各组 `summary.md`。"
+    )
+    lines.append("")
+    for group in groups:
+        title = group.metadata.title or group.metadata.slug
+        paras = _prose_paragraphs(text=group.metadata.overview)
+        head = paras[0] if paras else ""
+        tail = f" — {head}" if head else ""
+        lines.append(f"- **{group.number} {_cell(title)}**{tail}")
+        # 余下段落作缩进续行，挂在该组 bullet 下，保持「整段叙事（除图）」。
+        for para in paras[1:]:
+            lines.append("")
+            lines.append(f"  {para}")
+    return "\n".join(lines)
+
+
+def _read_synopsis(*, specs_root: Path) -> str:
+    """读 specs_root/synopsis.md（项目级开篇，手维护），缺省返回空串。"""
+    path = specs_root / "synopsis.md"
+    if not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8").strip()
+
+
+def _prose_paragraphs(*, text: str) -> list[str]:
+    """取 prose 的散文段落，剔除 ```fenced``` 代码块（ASCII 图），每段压成单行。
+
+    总览逐组导语要展示完整叙事但不搬运数据流图（图属深读信息，留给各 feature 详情/summary）。
+    段落以空行分隔、保持源顺序；段内空白压成单空格，避免续行里出现断句的半行。
+    以冒号结尾的段落是被剥掉的图的「图注」（如「数据流脊柱…：」），一并丢弃，免得留下悬空冒号句。
+    """
+    body: list[str] = []
+    in_fence = False
+    for raw in text.splitlines():
+        if raw.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            body.append(raw)
+    paras: list[str] = []
+    buf: list[str] = []
+    for line in body:
+        if line.strip():
+            buf.append(line)
+        elif buf:
+            paras.append(" ".join(" ".join(buf).split()))
+            buf = []
+    if buf:
+        paras.append(" ".join(" ".join(buf).split()))
+    return [p for p in paras if p and not p.rstrip().endswith(("：", ":"))]
+
+
+def _render_glossary(*, specs_root: Path) -> str:
+    """块 0：名词解释——读 specs_root/glossary.yaml，按 category 分段列术语与解释。
+
+    glossary.yaml 是 OVERVIEW 中唯一可手工维护的源（其余块均派生自 Task）；文件缺省即跳过本块，
+    不报错。category 按首次出现顺序成段；段内术语保持源顺序，便于逻辑聚类（非字典序）。
+    """
+    path = specs_root / "glossary.yaml"
+    if not path.is_file():
+        return _GLOSSARY_HEADING + "\n\n（暂无名词表 `glossary.yaml`）"
+    data = model.load_yaml(path=path) or {}
+    terms = data.get("terms") or []
+
+    lines = [_GLOSSARY_HEADING, ""]
+    if not terms:
+        lines.append("（`glossary.yaml` 暂无 terms）")
+        return "\n".join(lines)
+    lines.append(
+        "> 本仓共享术语表，英文优先；本块来源 `glossary.yaml`（手工维护），改名词解释改该文件后 re-render。"
+    )
+
+    # category 按首次出现顺序成段；段内保持源顺序。
+    order: list[str] = []
+    grouped: dict[str, list[tuple[str, str]]] = {}
+    for entry in terms:
+        term = str(entry.get("term", "")).strip()
+        if not term:
+            continue
+        category = str(entry.get("category", "")).strip()
+        definition = str(entry.get("def", "")).strip()
+        if category not in grouped:
+            order.append(category)
+            grouped[category] = []
+        grouped[category].append((term, definition))
+    for category in order:
+        lines.append("")
+        if category:
+            lines.append(f"### {category}")
+            lines.append("")
+        for term, definition in grouped[category]:
+            tail = f" — {_cell(definition)}" if definition else ""
+            lines.append(f"- **{_cell(term)}**{tail}")
+    return "\n".join(lines)
+
+
 def _render_board(*, groups: list[Group]) -> str:
-    """块 1：全局看板表，每行一个当前版 Task。"""
+    """块 1：全局看板表，每行一个当前版 Task。
+
+    只保留「组/任务/标题/状态/依赖」五列以便横向扫读；涉及文件清单会把单元格撑得过宽，
+    属于深读信息，留给各组 summary.md 的「涉及文件」段，不进全局看板。
+    """
     lines = [
         _BOARD_HEADING,
         "",
-        "| 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |",
-        "|----|----|----|----|----|----|",
+        "| 组 | 任务 | 标题 | 状态 | 依赖 |",
+        "|----|----|----|----|----|",
     ]
     for group in groups:
         for task in group.tasks:
             qid = model.qualified_id(group=group.number, task_id=task.id)
             deps = ", ".join(task.depends_on) or "—"
-            files = "<br>".join(task.files) or "—"
             lines.append(
-                f"| {group.number} | {qid} | {_cell(task.title)} | {task.status} | {deps} | {files} |"
+                f"| {group.number} | {qid} | {_cell(task.title)} | {task.status} | {deps} |"
             )
     return "\n".join(lines)
 
 
 def _render_relations(*, groups: list[Group]) -> str:
     """块 2：跨 feature 关系图（Mermaid，subgraph/feature；depends-on 实线、relates-to 虚线）。"""
-    lines = [_RELATION_HEADING, "", "```mermaid", "graph LR"]
+    # 图例置于图前，帮不熟 Mermaid 的读者理解连线：实线=依赖，虚线=关联（标关联类型）。
+    lines = [
+        _RELATION_HEADING,
+        "",
+        "> 图例：实线箭头 `A --> B` 表示 A **依赖** B；虚线箭头 `A -.type.-> B` 表示 A 与 B **关联**（type 为关联类型）。",
+        "",
+        "```mermaid",
+        "graph LR",
+    ]
     current_ids = {
         model.qualified_id(group=g.number, task_id=t.id) for g in groups for t in g.tasks
     }
@@ -228,6 +377,74 @@ def _render_conflicts(*, groups: list[Group]) -> str:
     return "\n".join(lines)
 
 
+def _render_file_tree(*, groups: list[Group]) -> str:
+    """块 4：设计文件结构——所有组所有 Task 的 files 并集铺成目录树，每个文件标注归属 Task。
+
+    数据全部派生自各 Task 的 `files` 声明（单一真相源），随 spec 演化自动更新，无需手工维护；
+    一个文件被多个 Task 占用时并列标注其归属（与「文件冲突报告」呼应）。
+    """
+    # path -> 占用它的限定 Task id 集合（如 0001/T1）。
+    owners: dict[str, set[str]] = {}
+    for group in groups:
+        for task in group.tasks:
+            qid = model.qualified_id(group=group.number, task_id=task.id)
+            for path in task.files:
+                owners.setdefault(path, set()).add(qid)
+
+    lines = [_TREE_HEADING, ""]
+    if not owners:
+        lines.append("（暂无 Task 声明文件）")
+        return "\n".join(lines)
+    lines.append(
+        "> 下列结构由各 Task 的 `files` 声明并集自动汇总；`←` 后为归属 Task（多占即冲突）。"
+    )
+    lines.append("")
+
+    # 1. 构建嵌套树：目录段为 dict，文件叶子为 None。
+    tree: dict = {}
+    for path in owners:
+        node = tree
+        parts = path.split("/")
+        for index, part in enumerate(parts):
+            if index == len(parts) - 1:
+                node.setdefault(part, None)  # 文件叶子（已是目录则保留目录）
+            else:
+                child = node.get(part)
+                if not isinstance(child, dict):
+                    child = {}
+                    node[part] = child
+                node = child
+
+    # 2. DFS 收集有序行（目录在前、文件在后，各自字典序），记录深度与归属。
+    entries: list[tuple[int, str, str | None]] = []  # (depth, name, owner|None)
+
+    def _walk(*, node: dict, depth: int, prefix: str) -> None:
+        dirs = sorted(k for k, v in node.items() if isinstance(v, dict))
+        files = sorted(k for k, v in node.items() if not isinstance(v, dict))
+        for name in dirs:
+            entries.append((depth, name + "/", None))
+            _walk(node=node[name], depth=depth + 1, prefix=prefix + name + "/")
+        for name in files:
+            owner = ", ".join(sorted(owners.get(prefix + name, set())))
+            entries.append((depth, name, owner))
+
+    _walk(node=tree, depth=0, prefix="")
+
+    # 3. 归属列对齐：以最宽的「缩进 + 文件名」为基准右侧补空格，箭头列对齐。
+    indent = "  "
+    widths = [len(indent * d) + len(name) for d, name, owner in entries if owner is not None]
+    col = max(widths) if widths else 0
+    lines.append("```text")
+    for depth, name, owner in entries:
+        left = indent * depth + name
+        if owner is None:
+            lines.append(left)
+        else:
+            lines.append(f"{left}{' ' * (col - len(left))}  ← {owner}")
+    lines.append("```")
+    return "\n".join(lines)
+
+
 def _render_features(*, groups: list[Group]) -> str:
     """块 4：每 feature 段——组内看板 + 依赖 DAG + 演化图。"""
     lines = [_FEATURE_HEADING]
@@ -236,13 +453,43 @@ def _render_features(*, groups: list[Group]) -> str:
         lines.append("")
         lines.append(f"### {group.number} {title}（issue #{group.metadata.issue}）")
         lines.append("")
-        lines.append(f"> 人读方案见 [`{group.number}-{group.metadata.slug}/summary.md`]"
-                     f"(./{group.number}-{group.metadata.slug}/summary.md)。")
+        lines.append(
+            f"> 人读方案见 [`{group.number}-{group.metadata.slug}/summary.md`]"
+            f"(./{group.number}-{group.metadata.slug}/summary.md)。"
+        )
+        # 组级导语也进 OVERVIEW：把各 feature 段从「只有链接 + DAG」升级为带叙事，
+        # 让看板页本身能把三组串成一条故事线，而非纯节点图索引。
+        if group.metadata.overview.strip():
+            lines.append("")
+            lines.append(group.metadata.overview.strip())
+        # 任务一览：每个当前版 Task 一行（标题 + 状态 + 一句话摘要），让只看 OVERVIEW 的读者
+        # 不点进 summary.md 也能掌握每个任务在做什么（修复「总览太薄」）。
+        if group.tasks:
+            lines.append("")
+            lines.append("**任务一览**")
+            lines.append("")
+            for task in group.tasks:
+                gist = _one_line(text=task.summary)
+                tail = f" — {gist}" if gist else ""
+                lines.append(f"- **{task.id} {_cell(task.title)}**（{task.status}）{tail}")
         lines.append("")
         lines.append(_render_group_dag(group=group))
-        lines.append("")
-        lines.append(_render_evolution(group=group))
+        # 演化图只在「确有版本演化」时才画：否则每个节点都是 Tx v1、全 pending、零血缘，
+        # 是一段对人零信息的噪音。等出现历史版本或血缘（split/merge/supersede/derive）时自动出现。
+        if _has_evolution(group=group):
+            lines.append("")
+            lines.append(_render_evolution(group=group))
     return "\n".join(lines)
+
+
+def _has_evolution(*, group: Group) -> bool:
+    """组内是否存在真实演化：有历史版本，或当前版 Task 带任一血缘字段。"""
+    if any(group.history.values()):
+        return True
+    return any(
+        task.split_from or task.merged_from or task.supersedes or task.derived_from
+        for task in group.tasks
+    )
 
 
 def _render_group_dag(*, group: Group) -> str:
@@ -357,3 +604,15 @@ def _safe(text: str) -> str:
 def _cell(text: str) -> str:
     """表格 / 节点 label 单元：压成单行、转义竖线。"""
     return text.replace("\n", " ").replace("|", "\\|").replace('"', "'")
+
+
+def _one_line(*, text: str) -> str:
+    """取 prose 首句（到第一个句号止），压成单行——用于 OVERVIEW 任务一览的一句话摘要。
+
+    先把换行/多空白压成单空格，再截到第一个「。」（含），避免一览里出现断句的半行。
+    """
+    flat = " ".join(text.split())
+    if not flat:
+        return ""
+    head, sep, _rest = flat.partition("。")
+    return _cell(head + sep)

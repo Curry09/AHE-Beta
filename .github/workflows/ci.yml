@@ -1,0 +1,126 @@
+# CI 流水线（参考 OpenAgents 裁剪）。
+# 仅 "CI Gate" 作为分支保护的必需状态检查；其余 job 是它的前置。
+# 适配点：spec CLI 在本仓为 vendored（skills/spec-driven-development/vendor），
+# 通过 PYTHONPATH + `python -m openagents.spec.cli` 调用，而非 `uv run spec`。
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SPEC_PYTHONPATH: skills/spec-driven-development/vendor
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Ruff check + format
+        run: |
+          uv venv
+          uv pip install ruff
+          .venv/bin/ruff check .
+          .venv/bin/ruff format --check .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Pytest
+        run: |
+          uv venv
+          uv pip install pytest requests ruamel.yaml jsonschema
+          if [ -d tests ] && [ -n "$(find tests -name 'test_*.py' -print -quit)" ]; then
+            .venv/bin/pytest tests/ -v
+          else
+            echo "尚无测试，跳过"
+          fi
+
+  commitlint:
+    name: Commit Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+
+  spec-validate:
+    name: Spec Validate & Drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Validate specs
+        run: |
+          uv venv
+          uv pip install ruamel.yaml jsonschema
+          PYTHONPATH=$SPEC_PYTHONPATH .venv/bin/python -m openagents.spec.cli validate
+      - name: Render drift check
+        run: |
+          PYTHONPATH=$SPEC_PYTHONPATH .venv/bin/python -m openagents.spec.cli render
+          git diff --exit-code docs/specs
+
+  spec-conflicts:
+    name: Spec Number Conflicts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check spec number conflicts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/check-spec-number-conflicts.py \
+            --open-prs \
+            --current-pr "${{ github.event.pull_request.number }}"
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs: [lint, test, commitlint, spec-validate, spec-conflicts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        run: |
+          echo "lint:           ${{ needs.lint.result }}"
+          echo "test:           ${{ needs.test.result }}"
+          echo "commitlint:     ${{ needs.commitlint.result }}"
+          echo "spec-validate:  ${{ needs.spec-validate.result }}"
+          echo "spec-conflicts: ${{ needs.spec-conflicts.result }}"
+          results=(
+            "${{ needs.lint.result }}"
+            "${{ needs.test.result }}"
+            "${{ needs.commitlint.result }}"
+            "${{ needs.spec-validate.result }}"
+            "${{ needs.spec-conflicts.result }}"
+          )
+          for r in "${results[@]}"; do
+            if [[ "$r" != "success" && "$r" != "skipped" ]]; then
+              echo "::error::CI failed — job result: $r"
+              exit 1
+            fi
+          done
+          echo "✓ All jobs passed or were correctly skipped"

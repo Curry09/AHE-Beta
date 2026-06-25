@@ -1,0 +1,39 @@
+[project]
+name = "auto-designer"
+version = "0.0.0"
+description = "自进化 harness：模拟用户→开发者闭环，体感驱动、benchmark held-out"
+requires-python = ">=3.12"
+dependencies = [
+    # spec CLI（vendored 在 skills/spec-driven-development/vendor）所需
+    "ruamel.yaml>=0.18",
+    "jsonschema>=4",
+    # GiteaTracker（spec-0002）所需的薄 REST 客户端
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.0",
+    "pytest>=8.0.0",
+]
+
+# 本仓暂不作为可安装包（src/auto_designer 尚未落地）；uv 只装依赖。
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+# 让测试无需构建即可 import 顶层 auto_designer 包（src 布局通过 pythonpath 暴露）
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+# Ruff lint/format（CLAUDE.md 代码检查：行宽 100）
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# vendored 的 spec CLI 是外来代码，不纳入本仓 lint
+extend-exclude = ["skills/spec-driven-development/vendor"]
+
+[tool.ruff.lint]
+# E/F: pyflakes+pycodestyle，I: import 排序，UP: pyupgrade，B: bugbear，ASYNC: 异步阻塞防护
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+ignore = ["E501"]  # 行宽由 formatter 负责

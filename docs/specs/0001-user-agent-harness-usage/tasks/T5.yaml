@@ -25,23 +25,63 @@ motivation: |-
   issue 最终提交至 Gitea，但用户侧逻辑与单测不应依赖一个运行中的服务。以接口隔离后端：
   测试用 FakeTracker，运行时注入 GiteaTracker，二者对 run_session 等价。
 scope: |-
-  定义 IssueTracker 接口(ensure_labels/create_issue/add_comment/set_state，create_issue 返回 IssueRef)；提供 FakeTracker 内存实现，供单测与无 Gitea 环境跑通。GiteaTracker 实现归 spec-0002。
+  做什么：
+  - 定义 IssueTracker 协议（typing.Protocol），方法集为 ensure_labels / create_issue / add_comment / set_state。
+  - 明确各方法的类型契约、发号与状态语义，使其与 Gitea 后端语义对齐（FakeTracker 与 GiteaTracker 对 run_session 等价）。
+  - 提供内存实现 FakeTracker：自增发号、维护 issue 表与标签集，供单测与无 Gitea 环境端到端跑通。
+  不做什么：
+  - 不实现真实 GiteaTracker（HTTP 客户端、鉴权、重试）——归 spec-0002。
+  - 不照搬 Gitea 全量 API（里程碑、指派、搜索、分页等不纳入）。
+  - 不负责何时产 IssueDraft（归 T3）、何时调用提交（归 T4）。
 design: |-
-  IssueTracker 用 typing.Protocol 定义：
-  - ensure_labels(names) -> None：确保标签存在（Gitea 后端需先建标签拿 id）。
-  - create_issue(draft: IssueDraft) -> IssueRef：建 issue，返回带号回执。
-  - add_comment(number, body) -> None：追加评论。
-  - set_state(number, state, reason) -> None：改状态(open/closed + reason)。
+  协议契约（类型层面）：IssueTracker 用 typing.Protocol（structural typing）定义：
+  - ensure_labels(names: list[str]) -> None：确保给定标签均存在。幂等：已存在的标签不重复创建；Gitea 后端在此先建标签并解析 id，FakeTracker 仅维护名称集合。
+  - create_issue(draft: IssueDraft) -> IssueRef：依据 draft.title/body/labels 建 issue，返回带号回执 IssueRef(number, url, state)。新建 issue 初始 state 为 "open"。
+  - add_comment(number: int, body: str) -> None：向指定 issue 追加评论。number 不存在时抛 KeyError（FakeTracker 约定），Gitea 后端对应 404。
+  - set_state(number: int, state: str, reason: str) -> None：改状态。state ∈ {"open", "closed"}，reason 记录变更原因（对齐 Gitea state_reason 语义）。number 不存在时抛 KeyError。
 
-  FakeTracker 用内存 dict 维护自增 number 计数器与 issue 表，语义对齐 Gitea（每实例递增发号）。
+  发号与一致性语义：
+  - number 由后端单调递增发放，从 1 起，每实例独立计数（FakeTracker 语义对齐 Gitea 的实例内自增）。
+  - IssueRef.url 由后端按其 number 合成（FakeTracker 用占位前缀 + number 拼出确定性 url，供断言）。
+  - create_issue 不去重：相同 draft 多次提交得到不同 number（与 Gitea 行为一致，去重责任在调用方）。
+
+  边界与错误处理：
+  - 对不存在的 number 调用 add_comment/set_state 抛 KeyError（新决策，奥卡姆：以标准异常表达「未找到」，不自定义异常类型）。
+  - set_state 传入非法 state（不在 {open,closed}）抛 ValueError。
+  - ensure_labels 传入空列表为合法 no-op。
+
+  FakeTracker 实现：
+  - 内存结构：_counter: int（发号游标）、_issues: dict[int, dict]（number → {title, body, labels, state, reason, comments}）、_labels: set[str]。
+  - create_issue 递增 _counter、写入 _issues、返回 IssueRef；语义对齐 Gitea 但无网络/持久化。
+  - 暴露只读查询（如按 number 取 issue 快照）供单测断言 comment/state 生效。
 interface: |-
-  IssueTracker(Protocol): ensure_labels/create_issue/add_comment/set_state。FakeTracker() 内存实现。
+  IssueTracker(Protocol):
+  - ensure_labels(names: list[str]) -> None
+  - create_issue(draft: IssueDraft) -> IssueRef
+  - add_comment(number: int, body: str) -> None
+  - set_state(number: int, state: str, reason: str) -> None
+  FakeTracker()：内存实现，发号自 1 起单调递增；暴露按 number 读取 issue 快照的只读查询供断言。
 tradeoffs: |-
-  接口方法只取 issue 闭环所需四项，不照搬 Gitea 全量 API（奥卡姆）；后续 dev_side 需要更多再扩。
+  - 协议方法只取四项（建/评论/改状态/建标签）vs 照搬 Gitea 全量 API：选四项（奥卡姆）。这是 issue 闭环的最小充分集；里程碑/指派/搜索等无当前消费方，待 dev 侧需要再扩。
+  - typing.Protocol（结构化）vs ABC 抽象基类（名义继承）：选 Protocol。FakeTracker 与 GiteaTracker 无需显式继承即满足契约，降低耦合，便于测试替身。
+  - 「未找到」用标准 KeyError vs 自定义 TrackerNotFound 异常：选 KeyError（奥卡姆）。当前无需区分错误类别，标准异常足够；若后续需统一错误码再引入异常层级。
+  - FakeTracker 每实例独立发号 vs 全局发号：选每实例独立。与 Gitea「按仓库实例计数」语义一致，且使单测互不串号、可独立断言。
+  - create_issue 去重 vs 不去重：选不去重，与 Gitea 一致，去重责任归调用方，避免在接口层引入隐式幂等假设。
 acceptance: |-
-  接口含类型标注；FakeTracker 可建 issue 返回带号 IssueRef、追加 comment、改 state；单测覆盖建/查/改。
+  - IssueTracker 四方法均有完整类型标注，FakeTracker 结构匹配满足该 Protocol。
+  - create_issue 返回 IssueRef，number 从 1 起单调递增，初始 state 为 "open"，url 由 number 确定性合成。
+  - add_comment 后该 issue 评论列表含该 body；set_state 后 state/reason 被更新。
+  - ensure_labels 幂等：重复传入同名标签不重复创建；空列表为 no-op。
+  - 对不存在 number 调用 add_comment/set_state 抛 KeyError；set_state 非法 state 抛 ValueError。
+  - 同一 draft 两次 create_issue 得到两个不同 number（不去重）。
 tests: |-
-  单测：create_issue 发号递增并回 IssueRef；add_comment/set_state 生效；ensure_labels 幂等。
+  单测：
+  - create_issue 连续两次发号 1、2，返回 IssueRef 字段（number/url/state="open"）正确。
+  - add_comment：提交后按 number 读快照，评论列表含该 body。
+  - set_state：closed + reason 后快照状态更新；再 set_state open 可还原。
+  - ensure_labels 幂等：同名标签两次调用后标签集无重复；空列表 no-op。
+  - 边界/失败：不存在 number 调 add_comment/set_state 抛 KeyError；set_state 传非法 state 抛 ValueError。
+  - 不去重：相同 draft 两次 create_issue 得到不同 number。
 references: |-
-  CLAUDE.md 架构「状态去向：issue → Gitea」。GiteaTracker 实现：spec-0002。
+  CLAUDE.md 架构「状态去向：issue → Gitea」。GiteaTracker 实现：spec-0002。IssueDraft/IssueRef 结构：T1。typing.Protocol（PEP 544）。
 open-questions: ''

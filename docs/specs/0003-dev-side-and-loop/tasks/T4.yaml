@@ -1,0 +1,97 @@
+id: T4
+title: test_agent 体感门禁
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+  - T2
+  - 0001/T4
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/dev/test_agent.py
+  - agent_defs/test_agent/prompt.md
+  - tests/dev/test_test_agent.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  测试 agent：用候选 harness ref 跑固定集的 N 局用户会话，算平均体感并与当前 release 基线比较，
+  不退化则放行。这是发版门禁，且只用体感——benchmark 不参与判定。
+motivation: |-
+  发版要有客观闸门，且必须守住 train/test 分离：门禁只看体感回归，benchmark 全程 held-out。
+  测试 agent 复用用户侧 run_session——「评一个 harness」就是「让用户 agent 用它跑几局看体感」。
+scope: |-
+  做什么：
+  - 实现 TestAgent：对候选 harness ref 用 T1 launcher 起服务，对固定 (persona, scenario) 集跑 run_session×N，算平均体感，与当前 release 基线均值比较，不退化（容差内）则放行。
+  - 定义门禁判定语义：均值不低于基线减容差 → pass，否则 fail。
+  - 落地 agent_defs/test_agent/prompt.md（若评测复用 user_agent 跑会话，本任务负责测试侧角色定义/配置）。
+  不做什么：
+  - 不引入 benchmark 参与判定——benchmark 全程 held-out，只在 metrics（T6）事后观测、不投票。
+  - 不负责合并/发版（归 T5），不负责产生候选分支（归 T3）。
+  - 不实现固定集的来源构造（persona/scenario 集由用户侧/distill 提供，本任务消费）。
+  - 不实现基线的写入（基线是 release 版历史体感，写入归用户侧 run_session/SessionStore）。
+design: |-
+  评测时序 `evaluate(candidate_ref) -> Verdict`：
+  ① launcher.launch(candidate_ref) 得 HarnessInterface（候选 harness）。
+  ② 对固定 (persona, scenario) 集，每个场景跑 run_session×N（共 |集|×N 局），收集每局 FeelingScore.score。
+  ③ 算候选均值 mean_candidate（所有局体感分的算术平均）。
+  ④ 取 release 基线均值 baseline（同一固定集在 release 版的历史体感均值，经 SessionStore 索引聚合）。
+  ⑤ 判定：mean_candidate >= baseline - tol → pass，否则 fail。
+
+  门禁阈值语义：
+  - tol 为容差（默认小正数），吸收体感噪声；判据是「候选不显著低于基线」，等号放行（持平即过）。
+  - N 为每场景局数，跑多局取均值以压低单局方差。
+  - N 与判定方式（单点均值 vs 分布检验，如 Welch t / 单边区间）列为 spec 待定项，MVP 用均值 + 容差。
+
+  held-out 保证（关键约束的落地）：
+  - evaluate 的输入只有 (candidate_ref, 固定 persona/scenario 集, 基线体感)；签名与实现不接收任何 benchmark 数据源。
+  - 体感分来自 run_session 的 FeelingScore，与 benchmark 评分无关联路径。benchmark 仅由 T6 metrics 旁路观测，不进入 Verdict。
+
+  接口（类型层面）：
+  - `TestAgent(launcher: HarnessLauncher, fixed_set: list[(Persona, SeedScenario)], baseline: float, n: int, tol: float)`。
+  - `evaluate(candidate_ref: str) -> Verdict`，Verdict 含 pass: bool / mean: float / baseline: float / n: int / per_session: list[int]。
+
+  边界与错误处理：
+  - 基线缺失（首轮无 release 历史体感）：无可比基线 → MVP 约定放行（pass）并在 Verdict 标记 baseline 不可用，把首版定为基线；该约定显式记录。
+  - 固定集为空 / N<=0：配置非法 → 抛错。
+  - 某局 run_session 失败（harness 崩溃）：该局计为最低体感分（1）而非丢弃，避免崩溃局被无声忽略抬高均值；记录失败局数。
+  - 候选 launch 失败 → evaluate 抛错（无法评测）。
+
+  关键决策及理由：
+  - 评测即「让用户 agent 用候选 harness 跑几局看体感」，复用 spec-0001 run_session：评测与训练信号同源，门禁度量与优化目标一致。
+  - 跑 N 局取均值：体感是噪声信号、单局方差大，均值是最简的方差压低手段。
+  - 持平放行（>= baseline - tol）：进化允许平台期，门禁只挡「退化」不挡「未提升」，避免卡死探索。
+  - 失败局计 1 分而非丢弃：防止「崩溃即跳过」让不稳定候选反而更易过门禁。
+interface: |-
+  类型契约：
+  - `TestAgent(launcher: HarnessLauncher, fixed_set: list[tuple[Persona, SeedScenario]], baseline: float, n: int, tol: float)`。
+  - `TestAgent.evaluate(candidate_ref: str) -> Verdict`（Verdict: pass: bool / mean: float / baseline: float / n: int / per_session: list[int]）。
+  - 依赖：HarnessLauncher（T1）、run_session（spec-0001/T4）、SessionStore 索引（spec-0001/T6，取基线）。
+tradeoffs: |-
+  - 判定方式：均值 + 容差 vs 分布检验（t 检验/区间）vs 单局比较。选均值 + 容差（MVP）——最简且对小 N 稳健；分布检验更严谨但需先定显著性水平与样本量，列为待定项；单局比较方差过大不可用。
+  - 门禁信号：只用体感 vs 体感 + benchmark 混合。选只用体感——守住 train/test 分离与 held-out；代价是可能放过 benchmark 上变差的改动，而这正是设计接受的（benchmark 只观测不投票）。
+  - 失败局处理：计最低分 vs 丢弃 vs 整体判失败。选计最低分——既不被无声忽略、又不让单局偶发崩溃一票否决整次评测。
+  - 基线缺失：首版放行设为基线 vs 阻塞等待人工基线。选前者——闭环需自启动，首版天然是后续基线；阻塞会卡住第一轮。
+acceptance: |-
+  - 对一个候选 ref 跑 |集|×N 局得平均体感，与基线按 mean >= baseline - tol 判定，返回 Verdict(pass/mean/baseline)。
+  - N、tol 可配；候选均值持平基线时放行。
+  - 基线缺失时按约定放行并在 Verdict 标记 baseline 不可用。
+  - evaluate 不接收任何 benchmark 输入（held-out 在签名层即成立）。
+  - 固定集为空或 N<=0 时抛错；某局失败计为最低分并记录失败局数。
+tests: |-
+  单测（FakeHarness + mock LLM 注入体感分，不依赖真模型/真 launcher）：
+  - 候选均值 > 基线 → pass；候选均值 == baseline - tol 边界 → pass；< baseline - tol → fail。
+  - N 可配：改 N 改变跑的局数与 per_session 长度（断言 run_session 调用次数 = |集|×N）。
+  - 基线缺失 → pass 且 Verdict 标记 baseline 不可用。
+  - 某局 run_session 抛错 → 该局计体感 1 分、记入失败局数、不中断整次评测。
+  - 固定集为空或 N<=0 → 抛错。
+references: |-
+  run_session：spec-0001/T4。基线（历史体感索引）：spec-0001/T6（SessionStore）。launcher：T1。
+  CLAUDE.md 约束「发版门禁只用体感；benchmark 只用于观测」「benchmark 全程 held-out」。
+open-questions: ''

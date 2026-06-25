@@ -42,7 +42,7 @@ per clause; no filler. This applies to every prose field, not just `summary`.
 ## Core Principles
 
 1. **Spec is a living snapshot, the single source of truth** — `docs/specs/` is always a snapshot of the repo. Every Task in the snapshot maps to currently-live code, so the snapshot never contains legacy. Done Tasks stay in the snapshot (`status: done`); only a refactored Task's *old version* or an *abandoned* Task leaves the snapshot into `history/`. The Task DAG lives in the spec so any agent session can read it.
-2. **Source data vs generated view are separated** — `docs/specs/<group>/` holds only structured YAML source (`metadata.yaml`, `tasks/T*.yaml`, `history/T*.yaml`). `spec render` produces two derivative human views: the global board `docs/specs/OVERVIEW.md` (cross-group dashboard) and a per-group plan `docs/specs/<group>/summary.md` (that group's Tasks rendered as a readable scheme — aggregates each Task's prose + the DAG). Both are committed for GitHub visibility and CI drift-checks them. Never hand-edit OVERVIEW.md or any summary.md — edit the Task YAML and re-render.
+2. **Source data vs generated view are separated** — `docs/specs/<group>/` holds only structured YAML source (`metadata.yaml`, `tasks/T*.yaml`, `history/T*.yaml`). `spec render` produces two derivative human views: the global board `docs/specs/OVERVIEW.md` (cross-group dashboard) and a per-group plan `docs/specs/<group>/summary.md` (that group's Tasks rendered as a readable scheme — aggregates each Task's prose + the DAG). OVERVIEW.md contains, in order: 名词解释 (glossary) · 全局看板 · 跨 feature 关系图 · 文件冲突报告 · **设计文件结构** (the designed file tree, union of all Tasks' `files`, each annotated with its owner Task) · 各 feature 详情. The file tree is fully derived from Task `files` — to change it, change a Task's `files` and re-render. The **only** hand-maintained source feeding OVERVIEW is the repo-level **`docs/specs/glossary.yaml`** (term/category/def list; rendered into the 名词解释 block, skipped if absent). Both rendered views are committed for GitHub visibility and CI drift-checks them. Never hand-edit OVERVIEW.md or any summary.md — edit the Task YAML (or glossary.yaml) and re-render.
 3. **Drive the `spec` CLI, never hand-write the tree** — use `spec new` / `spec add-task` / `spec amend` / `spec abandon`. They keep canonical key order, append history, and auto-render. Hand-editing risks schema/drift failures.
 4. **Spec id as code index** — new code references `# Spec-NNNN/T*` in comments so other agents can trace code to design. Existing `# RFC-NNNN` comments are grandfathered (spec group NNNN ≡ old RFC NNNN). See `references/code-comment-conventions.md`.
 5. **Human-in-the-loop at phase gates** — humans approve phase transitions; agents execute within phases.
@@ -85,9 +85,10 @@ A group with more than 6 Tasks is too large — split into multiple focused grou
 ```
 docs/specs/
 ├── OVERVIEW.md            # global board view (spec render output; never hand-edit)
+├── glossary.yaml          # repo-level term glossary (hand-maintained; rendered into OVERVIEW 名词解释)
 ├── README.md              # specs dir doc + numbering rules (hand-written, static)
 └── <NNNN-slug>/
-    ├── metadata.yaml      # group meta: title / issue / slug
+    ├── metadata.yaml      # group meta: title / issue / slug / overview (group-level lead prose)
     ├── summary.md         # per-group human plan (spec render output; never hand-edit)
     ├── tasks/T*.yaml      # current-version Task snapshot (one-to-one with live code)
     └── history/T*.yaml    # append-only old versions (only legacy lives here)
@@ -129,6 +130,11 @@ The spec group is the core artifact. Author it via the CLI — never hand-write 
    - `depends-on` declares the DAG (cross-group refs use qualified ids like `0012/T2`). Tasks with no mutual dependency run in parallel.
    - New Tasks start `status: pending`.
 4. **Fill design prose** on the relevant Tasks by editing the `tasks/T*.yaml` prose fields (`summary`/`motivation`/`design`/`interface`/`tradeoffs`/`tests`/`references`/`open-questions`) — block scalars carrying Markdown (mermaid allowed in `design`). Keep it architectural: **what & why, NOT implementation code**. After editing prose by hand, run `spec validate` then `spec render`.
+   - **Write a group-level `overview`** so the rendered `summary.md` opens with narrative, not a raw Task DAG. It is the lead a human reads first: where this group sits in the bigger picture, what it delivers, and the data-flow spine that threads T1…Tn (a small ascii/mermaid diagram mapping each box to a Task works well). It also renders into OVERVIEW's per-feature section, threading the groups into one story. Set it via CLI (prose with diagrams → `--file`):
+     ```
+     spec set-overview <NNNN> --file overview.md   # or --text "<short lead>"
+     ```
+     `spec new` also accepts `--overview`. Without an overview, summary.md jumps straight into the DAG and reads as foggy.
 5. **Confirm open questions with the user** before writing any `open-questions` prose — only questions the user chooses to keep are recorded.
 6. **Validate & render:**
    ```

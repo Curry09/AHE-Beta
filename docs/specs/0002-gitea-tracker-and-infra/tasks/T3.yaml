@@ -1,0 +1,100 @@
+id: T3
+title: harness 仓初始化
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+relates-to: []
+parallel: false
+files:
+  - scripts/bootstrap_harness.py
+  - tests/test_bootstrap_harness.py
+version: 1
+updated: '2026-06-17'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  把 harness_template/ 作为 v0 推送到 Gitea，建立 harness 独立仓，供 dev 侧开发者 agent 走真实分支与合并。
+  harness 的演化历史从此存在该仓，不污染 auto-designer 本仓。脚本一次性初始化、可幂等重跑。
+motivation: |-
+  CLAUDE.md 定 harness 为独立 git 仓、托管于 Gitea、走真实分支/合并。本任务负责「从种子到可用仓」的
+  一次性初始化，是 dev 侧(spec-0003) launcher 与 developer_agent 的前置。把初始化脚本化保证可复现，
+  幂等保证重跑（CI、重置后重建）安全。
+scope: |-
+  做什么：
+  - 读 T1 产出的 `infra/gitea/.env` 连接信息。
+  - 经 Gitea API 建 harness 仓（仓名独立于工作仓，缺则建，幂等）。
+  - 用 git 把本仓 `harness_template/` 内容作为初始提交推到该仓默认分支(main)。
+  - 建 release 分支指向 main。
+  不做什么：
+  - 不创建 feature 分支（由开发者 agent 按需创建，归 spec-0003）。
+  - 不含任何 harness 演化逻辑、不跑 harness、不接 developer_agent（归 spec-0003）。
+  - 不定义 harness_template 内容/布局本身（归 spec-0003，本任务只搬运）。
+  - 不管理 Gitea 服务生命周期、不生成 token（归 T1）。
+design: |-
+  入口与配置
+  - `scripts/bootstrap_harness.py`，读 `infra/gitea/.env` 的 {GITEA_URL, OWNER, TOKEN}；harness 仓名为固定常量
+    （独立于 T1 工作仓，避免 issue 仓与 harness 仓混用）。
+
+  初始化时序（每步幂等）
+  ① 建仓：`POST /api/v1/user/repos`(name=harness, auto_init=false, private 可选)；仓已存在(409)视为成功。
+  ② 推种子：在临时工作目录初始化 git 仓 → 复制本仓 `harness_template/` 全部内容 → `git add` + 单条初始提交 →
+     以 `https://{token}@{host}/{owner}/{repo}.git` 为 remote `git push` 到 main。
+  ③ 建 release 分支：经 API `POST /repos/{owner}/{repo}/branches`(new_branch_name=release, old_branch_name=main)
+     或 push 一条 release ref；分支已存在视为成功。
+
+  数据/协议契约
+  - 输入：本仓 `harness_template/` 目录树（内容定义在 spec-0003）+ T1 的 .env 四键中的 {GITEA_URL,OWNER,TOKEN}。
+  - 输出：Gitea 上一个含 seed 内容、默认分支 main、附 release 分支的 harness 仓。
+  - 推送鉴权：token 经 remote URL 注入，不写入 harness 仓内容、不落临时文件外的盘。
+
+  边界与错误处理
+  - Gitea 不可达 / token 失效：建仓 API 抛 4xx/连接异常，脚本非零退出并打印端点与状态码，不进行后续 push。
+  - 仓已存在但内容已演化：默认不强推覆盖——②若远端 main 已有提交，push 非 fast-forward 时不 `--force`，脚本报告
+    「仓已初始化」并跳过推种子，仅确保 release 分支存在（保护开发者 agent 已产生的演化历史）。
+  - 重复运行（幂等）：建仓 409、push 已是最新、release 已存在三种情况均视为成功退出码 0。
+  - harness_template 缺失/为空：前置校验本仓 `harness_template/` 存在且非空，否则非零退出，避免推空仓。
+
+  关键决策
+  - git push 而非 API 逐文件上传：保留真实 git 历史与单条初始提交，契合「走真实分支/合并」。
+  - 默认不强推：一旦 harness 仓进入演化，重跑 bootstrap 不得回退历史；幂等以「存在即跳过」实现而非覆盖。
+  - 复用 T1 连接信息：不重复造配置，OWNER/TOKEN 单一来源。
+interface: |-
+  `python scripts/bootstrap_harness.py`：
+  - 输入：`infra/gitea/.env`(GITEA_URL/OWNER/TOKEN) + 本仓 `harness_template/` 目录。
+  - 行为：在 Gitea 建出 harness 仓，默认分支 main 含 harness_template 内容，附 release 分支。
+  - 退出码：成功(含幂等重跑)为 0；连接/鉴权失败、harness_template 缺失为非 0。
+  - 副作用边界：仅写 Gitea 远端与临时工作目录；不修改本仓、不修改 .env。
+tradeoffs: |-
+  - seed 推送 git push vs API 逐文件上传 vs tar 上传：选 git push —— 保留真实 git 历史与提交对象，
+    契合开发者 agent「走真实分支/合并」；逐文件上传无统一提交、丢历史语义，tar 上传 Gitea 无对应原子接口。
+  - 重跑策略「存在即跳过」vs 强推覆盖 vs 报错退出：选存在即跳过 —— 保护演化历史、保证幂等；强推会丢开发者 agent 产出，
+    报错退出会让 CI/重置流程脆弱。
+  - harness 仓独立 vs 与 issue 工作仓同仓：选独立仓 —— issue 与 harness 演化关注点分离、权限与历史互不干扰；
+    同仓会让 issue 流与代码演化混杂。
+  - 配置复用 T1 .env vs 脚本自带参数 vs 独立配置：选复用 .env —— OWNER/TOKEN 单一来源、与 T2 一致，不重复造配置面。
+acceptance: |-
+  - 脚本在 Gitea 建出独立 harness 仓，默认分支 main 含 harness_template 全部内容（单条初始提交）。
+  - 仓附 release 分支，指向初始 main。
+  - 幂等：连跑两次退出码均 0，第二次不重复建仓、不强推覆盖、不报错。
+  - 仓已存在且 main 已演化时，第二次运行不回退历史，仅确保 release 分支存在。
+  - harness_template 缺失/为空时非零退出，不推空仓。
+  - token 经 remote URL 注入，不落入 harness 仓内容。
+  - 单测以 mock Gitea API + 临时 git 覆盖建仓/推送/建分支调用，不依赖真服务。
+tests: |-
+  单测(mock Gitea API + 临时 git)，逐条：
+  - 建仓调用命中 `POST /user/repos`、参数含 harness 仓名；harness_template 内容进单条初始提交并 push 到 main。
+  - release 分支经 API/ref 建出，指向初始 main。
+  - 幂等：建仓 mock 返回 409、push 已最新、release 已存在三种情况下脚本退出码 0、不重复建。
+  - 保护历史：mock 远端 main 已有额外提交（非 fast-forward）时，脚本不 `--force`，报告已初始化并仅确保 release 分支。
+  - 失败路径：mock 建仓返回 401（token 失效）/连接异常（Gitea 不可达）时脚本非零退出、不进行 push。
+  - 前置校验：本仓 harness_template 缺失/为空时脚本非零退出，不发起任何远端写。
+references: |-
+  CLAUDE.md 架构「被进化对象：harness 作为可启动程序」、「dev 侧走真实分支/合并」。
+  harness_template 布局、launcher 与开发者 agent：spec-0003。连接信息来源：本组 T1 的 `infra/gitea/.env`。
+  Gitea API（repos/branches 端点）https://docs.gitea.com/api/ 。
+open-questions: ''

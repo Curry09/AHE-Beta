@@ -50,6 +50,11 @@ def main(*, argv: list[str] | None = None) -> int:
             title=args.title,
             issue=args.issue,
             number=args.number,
+            overview=args.overview,
+        )
+    if args.command == "set-overview":
+        return _cmd_set_overview(
+            specs_root=specs_root, group=args.group, text=args.text, file=args.file
         )
     if args.command == "add-task":
         return _cmd_add_task(specs_root=specs_root, args=args)
@@ -91,6 +96,17 @@ def _build_parser() -> argparse.ArgumentParser:
     new.add_argument("--issue", type=int, required=True, help="关联 issue 编号")
     new.add_argument("--title", required=True, help="组标题")
     new.add_argument("--number", default=None, help="组编号 NNNN（缺省取本地下一号）")
+    new.add_argument(
+        "--overview", default="", help="组级导语（Markdown，可后续用 set-overview 补）"
+    )
+
+    setov = sub.add_parser(
+        "set-overview", help="设置组级导语（渲染进 summary.md 开篇与 OVERVIEW）", parents=[common]
+    )
+    setov.add_argument("group", help="组编号 NNNN 或目录名")
+    src = setov.add_mutually_exclusive_group(required=True)
+    src.add_argument("--text", default=None, help="导语正文（短文本；多行 mermaid 建议用 --file）")
+    src.add_argument("--file", type=Path, default=None, help="从文件读导语正文（Markdown）")
 
     add = sub.add_parser("add-task", help="往 spec 组加一个子任务", parents=[common])
     add.add_argument("group", help="组编号 NNNN 或目录名")
@@ -119,12 +135,22 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _cmd_new(*, specs_root: Path, slug: str, title: str, issue: int, number: str | None) -> int:
+def _cmd_new(
+    *, specs_root: Path, slug: str, title: str, issue: int, number: str | None, overview: str
+) -> int:
     """new 子命令：转发 mutate.create_group，打印新建组目录。"""
     group_dir = mutate.create_group(
-        specs_root=specs_root, slug=slug, title=title, issue=issue, number=number
+        specs_root=specs_root, slug=slug, title=title, issue=issue, number=number, overview=overview
     )
     print(f"✓ 已新建 spec 组 {group_dir.name}（{group_dir}）")
+    return 0
+
+
+def _cmd_set_overview(*, specs_root: Path, group: str, text: str | None, file: Path | None) -> int:
+    """set-overview 子命令：从 --text 或 --file 读导语，转发 mutate.set_overview。"""
+    overview = file.read_text(encoding="utf-8") if file is not None else (text or "")
+    path = mutate.set_overview(specs_root=specs_root, group=group, overview=overview.strip())
+    print(f"✓ 已更新组级导语 {path}")
     return 0
 
 

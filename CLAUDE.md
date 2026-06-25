@@ -4,6 +4,9 @@
 1. `harbor` 作为 rollout 底座。
 2. `nexau` 作为 agent 实现，同时兼容 claude code / codex 接入。
 
+### 项目文档
+飞书文档：https://sxddhcrtbqu.feishu.cn/wiki/P3dEw0vmhix6IXk7KpJc4O85nfc?from=from_copylink
+
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
 
@@ -50,7 +53,7 @@ MVP 仅接入 nexau 一种 agent 运行时；claude code / codex 兼容留待后
 harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对话契约」：启动后接收用户消息、返回回复；内部为 1 个或 N 个 nexau、如何编排，由其自身入口脚本决定（支持多 agent harness）。
 - 用户侧仅通过 `HarnessInterface`(send/reset/close) 与之交互，不感知内部结构。
 - harness 自带入口 `entry`，自行依赖 nexau，不复用本仓 `nexau_runtime`，保持独立（后续可替换为 CC/codex）。
-- harness 源码为**独立 git 仓，托管于 Gitea**：`release` + `feature` 分支，tag 即发布版本；开发者 agent 走真实分支与合并。`seed_harness/` 为 v0 种子，用于初始化该仓。
+- harness 源码为**独立 git 仓，托管于 Gitea**：`release` + `feature` 分支，tag 即发布版本；开发者 agent 走真实分支与合并。`harness_template/` 为 v0 种子，用于初始化该仓。
 
 ### 状态去向
 - **issue → Gitea**：用户 agent 经 `IssueTracker` 接口提交，由 Gitea 负责发号/状态/标签/comment；标签（bug/feature）驱动开发者侧分流。
@@ -65,12 +68,12 @@ src/auto_designer/
   models.py            # 共享数据结构（两侧共用）
   nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
   harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
-  user_side/           # user_agent.py + session.py(run_session) + session_store.py
+  user/                # user_agent.py + session.py(run_session) + session_store.py
   tracker/             # base.py(IssueTracker接口) + gitea.py + fake.py
-  dev_side/            # developer_agent.py + test_agent.py + release.py
+  dev/                 # developer_agent.py + test_agent.py + release.py
   loop/                # orchestrator.py + metrics.py
 agent_defs/            # 固定角色 nexau 定义：user_agent/ developer_agent/ test_agent/
-seed_harness/          # v0 harness 种子：entry.py + agents/ + tools/ + params.yaml
+harness_template/      # v0 harness 种子：entry.py + agents/ + tools/ + params.yaml
 seeds/                 # 给定输入（先手写，后续由 distill 产出）：personas/ scenarios/
 infra/gitea/           # docker-compose.yml(Gitea+sqlite)
 data/                  # 运行产物(.gitignore)：sessions/ harness_runs/
@@ -80,6 +83,7 @@ data/                  # 运行产物(.gitignore)：sessions/ harness_runs/
 - **spec-0001 用户侧**：models、HarnessInterface+Fake、UserAgent、IssueTracker 接口+Fake、本地 SessionStore、run_session。可独立测（不依赖真 Gitea/harness）。
 - **spec-0002 Gitea 接入与基建**：docker(sqlite)+token+标签方案、GiteaTracker、harness 仓初始化。
 - **spec-0003 开发者侧与闭环**：harness launcher、developer_agent、test_agent（体感门禁）、release（合并+tag）、orchestrator+metrics。
+- **spec-0004 Harbor 运行与可恢复 checkpoint**：所有 agent 在单沙盒一波跑（方案 A，整条 run = 1 个 harbor task），每轮边界吐增量 checkpoint artifact、喂回即从断点幂等续跑；checkpoint 维护用户侧/开发者侧/编排中间态。harbor 只包外层 rollout 生命周期，逐轮真人对话仍走 spec-0001 自立协议。
 
 ## 设计理念
 1. **奥卡姆剃刀**：如无必要，勿增实体。保证代码和架构的最小化、最简洁，先搭最小可用版本（MVP）再迭代。
@@ -98,6 +102,7 @@ data/                  # 运行产物(.gitignore)：sessions/ harness_runs/
 - **代码检查**：Ruff（行宽 100）
 - **Git 钩子**：lefthook —— pre-commit（lint）+ commit-msg（commitlint）
 - **Git 推送**：首次推送分支用 `git push -u origin <branch>` 设置 upstream tracking
+- **自动提交**：每完成一处改动即 `git add` + `git commit` + `git push`，无需征求确认（用户已长期授权）。
 - **CI**：CI 不过就反复修复重推直到全绿。
 - **代码注释**：中英文皆可，不强制区分，以清晰表达为先。
 - **Python 函数参数**：禁止位置参数（`/` 语法）；private 函数（`_` 开头，不含 dunder）参数禁止默认值，调用方必须显式传参。

@@ -18,16 +18,17 @@ from pathlib import Path
 
 from openagents.spec import model
 from openagents.spec.model import Metadata, Task
-from openagents.spec.render import write_overview
+from openagents.spec.render import write_group_summaries, write_overview
 
 
 def create_group(
-    *, specs_root: Path, slug: str, title: str, issue: int, number: str | None
+    *, specs_root: Path, slug: str, title: str, issue: int, number: str | None, overview: str
 ) -> Path:
     """Scaffold a new spec group dir (metadata.yaml + empty tasks/), return its path.
 
     issue #53：新 issue 起草 spec 的入口（取代旧 RFC 流程「在 docs/rfcs 建 NNNN-slug.md」）。
     number 缺省取本地下一号（model.next_number）；目录已存在则抛 FileExistsError，不动磁盘。
+    overview 为组级导语（可空，后续可用 set_overview 补）。
     """
     group_number = number or model.next_number(specs_root=specs_root)
     group_dir = specs_root / f"{group_number}-{slug}"
@@ -35,11 +36,31 @@ def create_group(
         raise FileExistsError(f"spec 组目录已存在：{group_dir}")
     (group_dir / "tasks").mkdir(parents=True)
     model.dump_metadata(
-        metadata=Metadata(title=title, issue=issue, slug=slug),
+        metadata=Metadata(title=title, issue=issue, slug=slug, overview=overview),
         path=group_dir / "metadata.yaml",
     )
     write_overview(specs_root=specs_root)  # 决策 D3/D9：OVERVIEW 永不过期。
     return group_dir
+
+
+def set_overview(*, specs_root: Path, group: str, overview: str) -> Path:
+    """Set (or replace) a group's overview prose in metadata.yaml; auto-render.
+
+    组级导语是 metadata 的 prose 字段，渲染进 summary.md 开篇与 OVERVIEW。改 metadata 而非
+    手改派生的 summary.md（决策 D3/D9：派生视图勿手改）。组不存在抛 FileNotFoundError。
+    """
+    group_dir = _group_dir(specs_root=specs_root, group=group)
+    meta_path = group_dir / "metadata.yaml"
+    current = model._load_metadata(path=meta_path)
+    model.dump_metadata(
+        metadata=Metadata(
+            title=current.title, issue=current.issue, slug=current.slug, overview=overview
+        ),
+        path=meta_path,
+    )
+    write_overview(specs_root=specs_root)
+    write_group_summaries(specs_root=specs_root)
+    return meta_path
 
 
 def add_task(

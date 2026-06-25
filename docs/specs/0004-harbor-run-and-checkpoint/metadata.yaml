@@ -1,0 +1,18 @@
+title: Harbor 运行与可恢复 checkpoint
+issue: 0
+slug: harbor-run-and-checkpoint
+overview: |-
+  本组给闭环加上**可恢复运行时**：所有 agent 在**单沙盒一波跑**（方案 A，整条 run = 1 个 harbor task），用 harbor 的 task→artifact 通道把 checkpoint 吐出沙盒、再喂回实现恢复。它横跨 a/b/c：checkpoint 在**单元边界**维护用户侧状态（已完成 session / 体感）、开发者侧状态（issue 分派、候选分支）与其他编排中间态（轮次 / 阶段 / release_ref / 待合并）。
+
+  分层是本组关键，且与 spec-0001/T2「逐轮对话另立协议」一致：harbor 只包**外层 rollout 生命周期**；**内层**用户↔harness 的逐轮真人对话仍走 spec-0001 自立协议，不碰 harbor 批式 episode 接口。
+
+  ```
+  harbor task（方案A：整条 run = 1 task）────────────────────────
+   输入: pinned harness 版本 + persona/场景集 + 上次 checkpoint artifact
+   沙盒内: restore(checkpoint) → orchestrator 逐轮(0003/T6)
+           每轮末 save_checkpoint → 经 harbor artifact 吐出沙盒
+   输出: 每轮增量 checkpoint artifact（最新者供下次恢复）
+   内层 user↔harness 逐轮对话: spec-0001 自立协议（非 harbor 批接口）
+  ```
+
+  支撑件：**T1** 定义 checkpoint 存取与自包含 STATE_DIR（gitea + sessions + metrics + run_state）；**T2** 可恢复 harbor runner，在 orchestrator 外层加恢复与每轮 checkpoint。本组约束：**恢复按单元边界幂等重跑**（整会话重跑、开发者从分支 head 续作、release 见 tag 跳过），不快照 agent 进程内存。
