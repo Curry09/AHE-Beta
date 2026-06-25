@@ -50,7 +50,11 @@ class FakeTracker:
     def issue(self, number: int) -> dict[str, Any]:
         """只读：返回该 issue 的快照副本，供单测断言 comment/state 生效。"""
         snapshot = self._require(number)
-        return {**snapshot, "labels": list(snapshot["labels"]), "comments": list(snapshot["comments"])}
+        return {
+            **snapshot,
+            "labels": list(snapshot["labels"]),
+            "comments": list(snapshot["comments"]),
+        }
 
     def labels(self) -> set[str]:
         """只读：当前标签集副本。"""

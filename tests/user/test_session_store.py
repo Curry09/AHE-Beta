@@ -18,9 +18,7 @@ from auto_designer.user.session_store import SessionStore
 
 def _session(n_issues: int = 1) -> Session:
     return Session(
-        persona=Persona(
-            identity="i", level="l", domain="d", goal="g", speaking_style="s"
-        ),
+        persona=Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s"),
         scenario=SeedScenario(description="x"),
         transcript=Transcript(turns=[Turn("user", "a"), Turn("harness", "b")]),
         feeling=FeelingScore(score=3, reason="还行"),

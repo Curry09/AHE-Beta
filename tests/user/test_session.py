@@ -69,7 +69,9 @@ def test_lifecycle_reset_run_close_order(tmp_path) -> None:
     assert harness.events[0] == "reset"
     assert harness.events[-1] == "close"
     assert harness.events.count("reset") == 1 and harness.events.count("close") == 1
-    assert harness.events.index("reset") < harness.events.index("send") < harness.events.index("close")
+    assert (
+        harness.events.index("reset") < harness.events.index("send") < harness.events.index("close")
+    )
 
 
 def test_drafts_submitted_in_order(tmp_path) -> None:
