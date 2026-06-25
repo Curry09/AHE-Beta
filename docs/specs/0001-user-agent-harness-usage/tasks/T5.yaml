@@ -8,8 +8,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/tracker/base.py
-  - src/auto_designer/tracker/fake.py
+  - auto_designer/tracker/base.py
+  - auto_designer/tracker/fake.py
   - tests/tracker/test_fake.py
 version: 1
 updated: '2026-06-17'

@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "自进化 harness：模拟用户→开发者闭环，体感驱动、benchmark held-out"
 requires-python = ">=3.12"
 dependencies = [
-    # spec CLI（vendored 在 skills/spec-driven-development/vendor）所需
+    # spec CLI（vendored 在 tools/spec-driven-development/vendor）所需
     "ruamel.yaml>=0.18",
     "jsonschema>=4",
     # GiteaTracker（spec-0002）所需的薄 REST 客户端
@@ -17,14 +17,14 @@ dev = [
     "pytest>=8.0.0",
 ]
 
-# 本仓暂不作为可安装包（src/auto_designer 尚未落地）；uv 只装依赖。
+# 本仓暂不作为可安装包；uv 只装依赖。
 [tool.uv]
 package = false
 
 [tool.pytest.ini_options]
-# 让测试无需构建即可 import 顶层 auto_designer 包（src 布局通过 pythonpath 暴露）
+# 包 auto_designer 直接在仓库根（扁平布局），故 pythonpath 暴露根目录 "."
 # scripts 同样暴露，便于测试 import bootstrap_harness 等脚本
-pythonpath = ["src", "scripts"]
+pythonpath = [".", "scripts"]
 testpaths = ["tests"]
 
 # Ruff lint/format（CLAUDE.md 代码检查：行宽 100）
@@ -32,7 +32,7 @@ testpaths = ["tests"]
 line-length = 100
 target-version = "py312"
 # vendored 的 spec CLI 是外来代码，不纳入本仓 lint
-extend-exclude = ["skills/spec-driven-development/vendor"]
+extend-exclude = ["tools/spec-driven-development/vendor"]
 
 [tool.ruff.lint]
 # E/F: pyflakes+pycodestyle，I: import 排序，UP: pyupgrade，B: bugbear，ASYNC: 异步阻塞防护

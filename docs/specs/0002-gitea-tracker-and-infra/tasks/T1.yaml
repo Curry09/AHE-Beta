@@ -7,9 +7,9 @@ depends-on: []
 relates-to: []
 parallel: false
 files:
-  - infra/gitea/docker-compose.yml
-  - infra/gitea/README.md
-  - infra/gitea/bootstrap.sh
+  - deploy/gitea/docker-compose.yml
+  - deploy/gitea/README.md
+  - deploy/gitea/bootstrap.sh
 version: 1
 updated: '2026-06-17'
 change-reason: ''
@@ -20,7 +20,7 @@ derived-from: []
 summary: |-
   提供本地 Gitea 服务的基建与一键初始化：docker-compose(Gitea + sqlite) 起服务，bootstrap 脚本建
   admin、生成 access token、建工作仓与标签方案。这是 GiteaTracker(T2) 与 harness 仓初始化(T3) 的前置。
-  最终产物是一份连接信息文件 `infra/gitea/.env`(URL/owner/repo/token)，作为 T2/T3 的唯一配置入口。
+  最终产物是一份连接信息文件 `deploy/gitea/.env`(URL/owner/repo/token)，作为 T2/T3 的唯一配置入口。
 motivation: |-
   issue 与 harness 仓都落在 Gitea。需要一个可复现、低运维的本地实例（sqlite 单文件、单二进制），
   以及一条把「空服务」变成「可用工作区(有 token、有仓、有标签)」的幂等初始化路径。把初始化固化为脚本，
@@ -29,7 +29,7 @@ scope: |-
   做什么：
   - 提供 `docker-compose.yml`：单 Gitea 服务、sqlite 后端、数据挂命名卷、暴露固定 HTTP 端口。
   - 提供 `bootstrap.sh`：等待就绪 → 建 admin → 生成带 `write:issue,write:repository` scope 的 access token → 建工作仓 → ensure 标签集 {bug, feature}。
-  - 产出 `infra/gitea/.env`(GITEA_URL/OWNER/REPO/TOKEN)，gitignore，作为 T2/T3 的配置契约。
+  - 产出 `deploy/gitea/.env`(GITEA_URL/OWNER/REPO/TOKEN)，gitignore，作为 T2/T3 的配置契约。
   - 提供 `README.md`：启动、拿 token、重置数据卷的步骤。
   不做什么：
   - 不做生产化部署（无 TLS、无外部 DB、无反向代理、无高可用）。
@@ -51,7 +51,7 @@ design: |-
   ⑤ ensure 标签：`GET /repos/{owner}/{repo}/labels` 取现有 → 缺失项 `POST` 建之，标签集 {bug, feature}，含固定颜色。
 
   连接信息契约（产出文件）
-  - 文件：`infra/gitea/.env`，KEY=VALUE 行格式，键集固定为 {GITEA_URL, OWNER, REPO, TOKEN}。
+  - 文件：`deploy/gitea/.env`，KEY=VALUE 行格式，键集固定为 {GITEA_URL, OWNER, REPO, TOKEN}。
   - GITEA_URL 不含尾斜杠、不含 `/api/v1` 后缀（API 路径前缀由 T2 客户端拼接）。
   - 该文件是 T1 与 T2/T3 之间的唯一契约面；键名、语义不得在未同步 T2/T3 的情况下变更。
 
@@ -66,13 +66,13 @@ design: |-
   - 固定端口而非随机：T2/T3 依赖稳定 URL，随机端口会破坏连接信息契约。
   - 标签集 {bug, feature} 为驱动 dev 侧分流的最小集（bug→release 快修，feature→feature 分支），不预置更多标签。
 interface: |-
-  产出文件契约 `infra/gitea/.env`：
+  产出文件契约 `deploy/gitea/.env`：
   - GITEA_URL：Gitea 根 URL，无尾斜杠、无 /api/v1 后缀（如 http://localhost:3000）。
   - OWNER：工作仓 owner（admin 用户名）。
   - REPO：工作仓名。
   - TOKEN：带 write:issue,write:repository scope 的 access token。
   消费方：GiteaTracker(T2) 与 bootstrap_harness(T3) 读取此四键，本组其它任务不得依赖未列入的键。
-  脚本入口：`bash infra/gitea/bootstrap.sh`（幂等）；`docker compose -f infra/gitea/docker-compose.yml up -d` 起服务。
+  脚本入口：`bash deploy/gitea/bootstrap.sh`（幂等）；`docker compose -f deploy/gitea/docker-compose.yml up -d` 起服务。
 tradeoffs: |-
   - 数据库 sqlite vs postgres vs mysql：选 sqlite —— 单文件、随 Gitea 进程零额外服务，运维面最小（奥卡姆）；
     代价是并发写能力弱、不利横向扩展，自用单实例场景可接受，高并发写再换 postgres。
@@ -83,7 +83,7 @@ tradeoffs: |-
     零依赖；纯环境变量在多进程/多次启动间不持久，配置中心对单实例是过度设计。
 acceptance: |-
   - `docker compose up -d` 后 Gitea 在固定端口可访问，`GET /api/v1/version` 返回 200。
-  - `bootstrap.sh` 首次运行产出 `infra/gitea/.env`，含 GITEA_URL/OWNER/REPO/TOKEN 四键且值非空。
+  - `bootstrap.sh` 首次运行产出 `deploy/gitea/.env`，含 GITEA_URL/OWNER/REPO/TOKEN 四键且值非空。
   - `bootstrap.sh` 二次运行不报错、不重复建 admin/仓/标签（幂等），TOKEN 维持有效。
   - 工作仓存在，标签集含且仅初始含 {bug, feature}。
   - 用产出 TOKEN `curl` 调 `POST /repos/{OWNER}/{REPO}/issues` 建一条 issue 返回 201。

@@ -55,7 +55,7 @@ graph LR
 
 **涉及文件**
 
-- `src/auto_designer/harness/launcher.py`
+- `auto_designer/harness/launcher.py`
 - `harness_template/entry.py`
 - `harness_template/params.yaml`
 - `harness_template/agents/main.md`
@@ -156,7 +156,7 @@ CLAUDE.md 架构「被进化对象：harness 作为可启动程序」「兼容 c
 
 **涉及文件**
 
-- `src/auto_designer/nexau_runtime.py`
+- `auto_designer/nexau_runtime.py`
 - `agent_defs/user_agent/prompt.md`
 - `tests/test_nexau_runtime.py`
 
@@ -243,7 +243,7 @@ user_agent 消费方：spec-0001/T3（UserAgent）。多轮编排入口：spec-0
 
 **涉及文件**
 
-- `src/auto_designer/dev/developer_agent.py`
+- `auto_designer/dev/developer_agent.py`
 - `agent_defs/developer_agent/prompt.md`
 - `tests/dev/test_developer_agent.py`
 
@@ -338,7 +338,7 @@ harness 仓与 release 分支：spec-0002/T3。CLAUDE.md 方法 b「bug → rele
 
 **涉及文件**
 
-- `src/auto_designer/dev/test_agent.py`
+- `auto_designer/dev/test_agent.py`
 - `agent_defs/test_agent/prompt.md`
 - `tests/dev/test_test_agent.py`
 
@@ -438,7 +438,7 @@ CLAUDE.md 约束「发版门禁只用体感；benchmark 只用于观测」「ben
 
 **涉及文件**
 
-- `src/auto_designer/dev/release.py`
+- `auto_designer/dev/release.py`
 - `tests/dev/test_release.py`
 
 **做什么**
@@ -535,8 +535,8 @@ harness 仓与 release 分支：spec-0002/T3。CLAUDE.md 方法 b「合并和发
 
 **涉及文件**
 
-- `src/auto_designer/loop/orchestrator.py`
-- `src/auto_designer/loop/metrics.py`
+- `auto_designer/loop/orchestrator.py`
+- `auto_designer/loop/metrics.py`
 - `tests/loop/test_orchestrator.py`
 - `tests/loop/test_metrics.py`
 

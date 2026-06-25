@@ -8,7 +8,7 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/user/session_store.py
+  - auto_designer/user/session_store.py
   - tests/user/test_session_store.py
 version: 1
 updated: '2026-06-17'

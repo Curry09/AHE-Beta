@@ -12,8 +12,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/loop/orchestrator.py
-  - src/auto_designer/loop/metrics.py
+  - auto_designer/loop/orchestrator.py
+  - auto_designer/loop/metrics.py
   - tests/loop/test_orchestrator.py
   - tests/loop/test_metrics.py
 version: 2

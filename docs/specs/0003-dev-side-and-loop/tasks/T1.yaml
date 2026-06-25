@@ -8,7 +8,7 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/harness/launcher.py
+  - auto_designer/harness/launcher.py
   - harness_template/entry.py
   - harness_template/params.yaml
   - harness_template/agents/main.md

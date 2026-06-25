@@ -1,6 +1,6 @@
 """harness 仓初始化（spec-0002/T3）：把 harness_template/ 作为 v0 推到 Gitea，建独立 harness 仓。
 
-读 infra/gitea/.env 的 {GITEA_URL, OWNER, TOKEN} → 建仓（缺则建，幂等）→ git push 种子到 main →
+读 deploy/gitea/.env 的 {GITEA_URL, OWNER, TOKEN} → 建仓（缺则建，幂等）→ git push 种子到 main →
 建 release 分支。幂等且保护演化历史：仓已存在则不强推覆盖，仅确保 release 分支存在。
 核心逻辑 bootstrap_harness 经依赖注入（session / run_git），便于 mock Gitea + 临时 git 单测。
 """
@@ -128,7 +128,7 @@ def _real_git_run(args: list[str], cwd: str) -> None:
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
-    env = _read_env(repo_root / "infra" / "gitea" / ".env")
+    env = _read_env(repo_root / "deploy" / "gitea" / ".env")
     session = requests.Session()
     session.headers.update(
         {"Authorization": f"token {env['TOKEN']}", "Content-Type": "application/json"}

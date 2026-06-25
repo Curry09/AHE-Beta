@@ -10,11 +10,11 @@
 - 只驱动 CLI，不手写/手改 YAML 树：
 
   ```bash
-  ./skills/spec-driven-development/spec new <slug> --issue <N> --title "<标题>"
-  ./skills/spec-driven-development/spec set-overview <NNNN> --file overview.md   # 组级导语（多行/含 mermaid 用 --file）
-  ./skills/spec-driven-development/spec add-task <NNNN> --id T1 --title ... --files ... --scope ... --acceptance ...
-  ./skills/spec-driven-development/spec validate
-  ./skills/spec-driven-development/spec render
+  ./tools/spec-driven-development/spec new <slug> --issue <N> --title "<标题>"
+  ./tools/spec-driven-development/spec set-overview <NNNN> --file overview.md   # 组级导语（多行/含 mermaid 用 --file）
+  ./tools/spec-driven-development/spec add-task <NNNN> --id T1 --title ... --files ... --scope ... --acceptance ...
+  ./tools/spec-driven-development/spec validate
+  ./tools/spec-driven-development/spec render
   ```
 
 ## 编号规则

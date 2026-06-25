@@ -9,7 +9,7 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/user/user_agent.py
+  - auto_designer/user/user_agent.py
   - tests/user/test_user_agent.py
 version: 1
 updated: '2026-06-17'
