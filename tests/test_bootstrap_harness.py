@@ -16,7 +16,9 @@ class _Resp:
 class _FakeSession:
     """按 url 路由返回固定状态码；可设连接异常。记录 POST 调用供断言。"""
 
-    def __init__(self, repo_status: int, branch_status: int, raise_exc: Exception | None = None) -> None:
+    def __init__(
+        self, repo_status: int, branch_status: int, raise_exc: Exception | None = None
+    ) -> None:
         self._repo_status = repo_status
         self._branch_status = branch_status
         self._raise = raise_exc

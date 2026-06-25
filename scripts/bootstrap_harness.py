@@ -56,8 +56,15 @@ def _push_seed(template_dir: Path, remote: str, run_git: GitRun) -> None:
                 shutil.copy2(item, dest)
         run_git(["add", "."], tmp)
         run_git(
-            ["-c", "user.email=bot@auto-designer", "-c", "user.name=auto-designer",
-             "commit", "-m", _SEED_COMMIT_MSG],
+            [
+                "-c",
+                "user.email=bot@auto-designer",
+                "-c",
+                "user.name=auto-designer",
+                "commit",
+                "-m",
+                _SEED_COMMIT_MSG,
+            ],
             tmp,
         )
         run_git(["remote", "add", "origin", remote], tmp)
