@@ -51,9 +51,7 @@ class HarborRunner:
         else:
             start_round = 0
             ref = initial_release_ref
-            write_run_state(
-                self._state_dir, RunState(round=0, phase="a", current_release_ref=ref)
-            )
+            write_run_state(self._state_dir, RunState(round=0, phase="a", current_release_ref=ref))
 
         latest: Path | None = Path(checkpoint_artifact) if checkpoint_artifact is not None else None
         for r in range(start_round, n_rounds):
