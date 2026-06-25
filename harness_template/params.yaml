@@ -1,0 +1,8 @@
+# harness 启动声明（spec-0003/T1）：launcher 据此起子进程，不硬编码解释器/路径。
+# entry 为启动命令的 argv 列表；可选 cwd（相对 checkout 根）、env（追加环境变量）。
+entry:
+  - python3
+  - entry.py
+# cwd: .
+# env:
+#   NEXAU_MODEL: claude-opus-4-8

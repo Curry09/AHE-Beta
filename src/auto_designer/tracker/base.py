@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from auto_designer.models import IssueDraft, IssueRef
+from auto_designer.models import IssueDraft, IssueRef, OpenIssue
 
 
 @runtime_checkable
@@ -20,6 +20,10 @@ class IssueTracker(Protocol):
 
     def create_issue(self, draft: IssueDraft) -> IssueRef:
         """按 draft 建 issue，返回带号回执 IssueRef（初始 state="open"）。不去重。"""
+        ...
+
+    def list_open_issues(self) -> list[OpenIssue]:
+        """读路径：列出当前 open 的 issue（供开发者侧 spec-0003/T3 领取）。无则空列表。"""
         ...
 
     def add_comment(self, number: int, body: str) -> None:

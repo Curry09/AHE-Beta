@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from auto_designer.models import ISSUE_STATES, IssueDraft, IssueRef
+from auto_designer.models import ISSUE_STATES, IssueDraft, IssueRef, OpenIssue
 
 # FakeTracker 合成 url 的占位前缀。
 _URL_PREFIX = "fake://issues/"
@@ -36,6 +36,19 @@ class FakeTracker:
             "comments": [],
         }
         return IssueRef(number=number, url=f"{_URL_PREFIX}{number}", state="open")
+
+    def list_open_issues(self) -> list[OpenIssue]:
+        return [
+            OpenIssue(
+                number=n,
+                title=i["title"],
+                body=i["body"],
+                labels=list(i["labels"]),
+                state=i["state"],
+            )
+            for n, i in sorted(self._issues.items())
+            if i["state"] == "open"
+        ]
 
     def add_comment(self, number: int, body: str) -> None:
         self._require(number)["comments"].append(body)
