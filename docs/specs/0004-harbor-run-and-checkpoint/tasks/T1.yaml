@@ -8,10 +8,10 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - auto_designer/loop/checkpoint.py
-  - auto_designer/loop/run_state.py
-  - tests/loop/test_checkpoint.py
-  - tests/loop/test_run_state.py
+  - backend/auto_designer/loop/checkpoint.py
+  - backend/auto_designer/loop/run_state.py
+  - backend/tests/loop/test_checkpoint.py
+  - backend/tests/loop/test_run_state.py
 version: 1
 updated: '2026-06-25'
 change-reason: ''

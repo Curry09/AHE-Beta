@@ -10,9 +10,9 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - auto_designer/dev/test_agent.py
-  - agent_defs/test_agent/prompt.md
-  - tests/dev/test_test_agent.py
+  - backend/auto_designer/dev/test_agent.py
+  - backend/agent_defs/test_agent/prompt.md
+  - backend/tests/dev/test_test_agent.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''
@@ -30,7 +30,7 @@ scope: |-
   做什么：
   - 实现 TestAgent：对候选 harness ref 用 T1 launcher 起服务，对固定 (persona, scenario) 集跑 run_session×N，算平均体感，与当前 release 基线均值比较，不退化（容差内）则放行。
   - 定义门禁判定语义：均值不低于基线减容差 → pass，否则 fail。
-  - 落地 agent_defs/test_agent/prompt.md（若评测复用 user_agent 跑会话，本任务负责测试侧角色定义/配置）。
+  - 落地 backend/agent_defs/test_agent/prompt.md（若评测复用 user_agent 跑会话，本任务负责测试侧角色定义/配置）。
   不做什么：
   - 不引入 benchmark 参与判定——benchmark 全程 held-out，只在 metrics（T6）事后观测、不投票。
   - 不负责合并/发版（归 T5），不负责产生候选分支（归 T3）。

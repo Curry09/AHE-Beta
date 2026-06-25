@@ -9,8 +9,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - auto_designer/user/user_agent.py
-  - tests/user/test_user_agent.py
+  - backend/auto_designer/user/user_agent.py
+  - backend/tests/user/test_user_agent.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''

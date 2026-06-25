@@ -16,4 +16,4 @@ data/
 .DS_Store
 
 # Gitea 连接信息（含 token，不入库）
-deploy/gitea/.env
+backend/deploy/gitea/.env

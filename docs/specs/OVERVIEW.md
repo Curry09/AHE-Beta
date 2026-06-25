@@ -182,73 +182,74 @@ graph LR
 > 下列结构由各 Task 的 `files` 声明并集自动汇总；`←` 后为归属 Task（多占即冲突）。
 
 ```text
-agent_defs/
-  developer_agent/
-    prompt.md                ← 0003/T3
-  test_agent/
-    prompt.md                ← 0003/T4
-  user_agent/
-    prompt.md                ← 0003/T2
-auto_designer/
-  dev/
-    developer_agent.py       ← 0003/T3
-    release.py               ← 0003/T5
-    test_agent.py            ← 0003/T4
-  harness/
-    interface.py             ← 0001/T2
-    launcher.py              ← 0003/T1
-  loop/
-    checkpoint.py            ← 0004/T1
-    metrics.py               ← 0003/T6
-    orchestrator.py          ← 0003/T6
-    run_state.py             ← 0004/T1
-    runner.py                ← 0004/T2
-  tracker/
-    base.py                  ← 0001/T5
-    fake.py                  ← 0001/T5
-    gitea.py                 ← 0002/T2
-  user/
-    session.py               ← 0001/T4
-    session_store.py         ← 0001/T6
-    user_agent.py            ← 0001/T3
-  models.py                  ← 0001/T1
-  nexau_runtime.py           ← 0003/T2
-deploy/
-  gitea/
-    README.md                ← 0002/T1
-    bootstrap.sh             ← 0002/T1
-    docker-compose.yml       ← 0002/T1
-harness_template/
-  agents/
-    main.md                  ← 0003/T1
-  entry.py                   ← 0003/T1
-  params.yaml                ← 0003/T1
-scripts/
-  bootstrap_harness.py       ← 0002/T3
-tests/
-  dev/
-    test_developer_agent.py  ← 0003/T3
-    test_release.py          ← 0003/T5
-    test_test_agent.py       ← 0003/T4
-  harness/
-    test_interface.py        ← 0001/T2
-    test_launcher.py         ← 0003/T1
-  loop/
-    test_checkpoint.py       ← 0004/T1
-    test_metrics.py          ← 0003/T6
-    test_orchestrator.py     ← 0003/T6
-    test_run_state.py        ← 0004/T1
-    test_runner.py           ← 0004/T2
-  tracker/
-    test_fake.py             ← 0001/T5
-    test_gitea.py            ← 0002/T2
-  user/
-    test_session.py          ← 0001/T4
-    test_session_store.py    ← 0001/T6
-    test_user_agent.py       ← 0001/T3
-  test_bootstrap_harness.py  ← 0002/T3
-  test_models.py             ← 0001/T1
-  test_nexau_runtime.py      ← 0003/T2
+backend/
+  agent_defs/
+    developer_agent/
+      prompt.md                ← 0003/T3
+    test_agent/
+      prompt.md                ← 0003/T4
+    user_agent/
+      prompt.md                ← 0003/T2
+  auto_designer/
+    dev/
+      developer_agent.py       ← 0003/T3
+      release.py               ← 0003/T5
+      test_agent.py            ← 0003/T4
+    harness/
+      interface.py             ← 0001/T2
+      launcher.py              ← 0003/T1
+    loop/
+      checkpoint.py            ← 0004/T1
+      metrics.py               ← 0003/T6
+      orchestrator.py          ← 0003/T6
+      run_state.py             ← 0004/T1
+      runner.py                ← 0004/T2
+    tracker/
+      base.py                  ← 0001/T5
+      fake.py                  ← 0001/T5
+      gitea.py                 ← 0002/T2
+    user/
+      session.py               ← 0001/T4
+      session_store.py         ← 0001/T6
+      user_agent.py            ← 0001/T3
+    models.py                  ← 0001/T1
+    nexau_runtime.py           ← 0003/T2
+  deploy/
+    gitea/
+      README.md                ← 0002/T1
+      bootstrap.sh             ← 0002/T1
+      docker-compose.yml       ← 0002/T1
+  harness_template/
+    agents/
+      main.md                  ← 0003/T1
+    entry.py                   ← 0003/T1
+    params.yaml                ← 0003/T1
+  scripts/
+    bootstrap_harness.py       ← 0002/T3
+  tests/
+    dev/
+      test_developer_agent.py  ← 0003/T3
+      test_release.py          ← 0003/T5
+      test_test_agent.py       ← 0003/T4
+    harness/
+      test_interface.py        ← 0001/T2
+      test_launcher.py         ← 0003/T1
+    loop/
+      test_checkpoint.py       ← 0004/T1
+      test_metrics.py          ← 0003/T6
+      test_orchestrator.py     ← 0003/T6
+      test_run_state.py        ← 0004/T1
+      test_runner.py           ← 0004/T2
+    tracker/
+      test_fake.py             ← 0001/T5
+      test_gitea.py            ← 0002/T2
+    user/
+      test_session.py          ← 0001/T4
+      test_session_store.py    ← 0001/T6
+      test_user_agent.py       ← 0001/T3
+    test_bootstrap_harness.py  ← 0002/T3
+    test_models.py             ← 0001/T1
+    test_nexau_runtime.py      ← 0003/T2
 ```
 
 ## 各 feature 详情
@@ -322,7 +323,7 @@ graph LR
 
 - **T1 Gitea 本地基建与标签方案**（pending） — 提供本地 Gitea 服务的基建与一键初始化：docker-compose(Gitea + sqlite) 起服务，bootstrap 脚本建 admin、生成 access token、建工作仓与标签方案。
 - **T2 GiteaTracker**（pending） — GiteaTracker 是 spec-0001/T5 IssueTracker 接口的真实后端：一个打 Gitea /api/v1 的薄 REST 客户端。
-- **T3 harness 仓初始化**（pending） — 把 harness_template/ 作为 v0 推送到 Gitea，建立 harness 独立仓，供 dev 侧开发者 agent 走真实分支与合并。
+- **T3 harness 仓初始化**（pending） — 把 backend/harness_template/ 作为 v0 推送到 Gitea，建立 harness 独立仓，供 dev 侧开发者 agent 走真实分支与合并。
 
 ```mermaid
 graph LR

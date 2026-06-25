@@ -48,8 +48,8 @@ jobs:
         run: |
           uv venv
           uv pip install pytest requests ruamel.yaml jsonschema
-          if [ -d tests ] && [ -n "$(find tests -name 'test_*.py' -print -quit)" ]; then
-            .venv/bin/pytest tests/ -v
+          if [ -d backend/tests ] && [ -n "$(find backend/tests -name 'test_*.py' -print -quit)" ]; then
+            .venv/bin/pytest backend/tests/ -v
           else
             echo "尚无测试，跳过"
           fi
@@ -93,7 +93,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python scripts/check-spec-number-conflicts.py \
+          python backend/scripts/check-spec-number-conflicts.py \
             --open-prs \
             --current-pr "${{ github.event.pull_request.number }}"
 

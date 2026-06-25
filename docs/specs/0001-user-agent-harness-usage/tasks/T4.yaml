@@ -12,8 +12,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - auto_designer/user/session.py
-  - tests/user/test_session.py
+  - backend/auto_designer/user/session.py
+  - backend/tests/user/test_session.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''

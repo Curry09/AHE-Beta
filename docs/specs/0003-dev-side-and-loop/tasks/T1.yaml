@@ -8,11 +8,11 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - auto_designer/harness/launcher.py
-  - harness_template/entry.py
-  - harness_template/params.yaml
-  - harness_template/agents/main.md
-  - tests/harness/test_launcher.py
+  - backend/auto_designer/harness/launcher.py
+  - backend/harness_template/entry.py
+  - backend/harness_template/params.yaml
+  - backend/harness_template/agents/main.md
+  - backend/tests/harness/test_launcher.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''

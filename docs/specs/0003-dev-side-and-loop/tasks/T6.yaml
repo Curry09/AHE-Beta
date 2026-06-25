@@ -12,10 +12,10 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - auto_designer/loop/orchestrator.py
-  - auto_designer/loop/metrics.py
-  - tests/loop/test_orchestrator.py
-  - tests/loop/test_metrics.py
+  - backend/auto_designer/loop/orchestrator.py
+  - backend/auto_designer/loop/metrics.py
+  - backend/tests/loop/test_orchestrator.py
+  - backend/tests/loop/test_metrics.py
 version: 2
 updated: '2026-06-25'
 change-reason: 标注可恢复 harbor 运行入口与 checkpoint 移至 spec-0004；run() 为纯非恢复编排、供单测与被 0004/T2 runner 在外层包裹

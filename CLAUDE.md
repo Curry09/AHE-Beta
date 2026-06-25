@@ -63,25 +63,28 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 `loop/orchestrator` 串联 a（用户会话产 issue+体感）→ b（开发者改 harness 分支、测试 agent 体感门禁、合并发版）→ c（新版 harness 回到 a）；`loop/metrics` 记录 issue 数量随时间的曲线。
 
 ### 目录结构
-扁平布局（参考 MiroFish）：包直接在仓库根，资产/基建/工具各为顶层语义目录，配置留根目录。
+前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 占位待建，项目级文档/工具与配置留根。
 ```
-auto_designer/         # 包（编排框架本体）
-  models.py            # 共享数据结构（两侧共用）
-  nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
-  harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
-  user/                # user_agent.py + session.py(run_session) + session_store.py
-  tracker/             # base.py(IssueTracker接口) + gitea.py + fake.py
-  dev/                 # developer_agent.py + test_agent.py + release.py
-  loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
-tests/                 # 测试（与包平级，pytest 跑装好的包）
-agent_defs/            # 角色 nexau 定义（数据）：user_agent/ developer_agent/ test_agent/
-harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml
-deploy/gitea/          # 基建：docker-compose.yml(Gitea+sqlite) + bootstrap.sh
-scripts/               # bootstrap_harness.py + check-spec-number-conflicts.py
-docs/specs/            # 设计 specs（spec-driven-development 源）
-tools/                 # vendored spec CLI（外来工具，不纳入 lint）
-data/                  # 运行产物(.gitignore)：sessions/ harness_runs/
+backend/                 # 后端（编排框架）
+  auto_designer/         # 包（编排框架本体）
+    models.py            # 共享数据结构（两侧共用）
+    nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
+    harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
+    user/                # user_agent.py + session.py(run_session) + session_store.py
+    tracker/             # base.py(IssueTracker接口) + gitea.py + fake.py
+    dev/                 # developer_agent.py + test_agent.py + release.py
+    loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
+  tests/                 # 测试（pytest testpaths=backend/tests）
+  agent_defs/            # 角色 nexau 定义（数据）：user_agent/ developer_agent/ test_agent/
+  harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml
+  deploy/gitea/          # 基建：docker-compose.yml(Gitea+sqlite) + bootstrap.sh
+  scripts/               # bootstrap_harness.py + check-spec-number-conflicts.py
+frontend/                # 前端（占位，暂无内容）
+docs/specs/              # 设计 specs（spec-driven-development 源，项目级）
+tools/                   # vendored spec CLI（外来工具，不纳入 lint）
+backend/data/            # 运行产物(.gitignore)：sessions/ harness_runs/
 ```
+根目录配置：`pyproject.toml`（管 backend 子树）、`.github/`、`.gitignore`、`.commitlintrc.yml`、`CLAUDE.md`。
 
 ### spec 路线
 - **spec-0001 用户侧**：models、HarnessInterface+Fake、UserAgent、IssueTracker 接口+Fake、本地 SessionStore、run_session。可独立测（不依赖真 Gitea/harness）。
