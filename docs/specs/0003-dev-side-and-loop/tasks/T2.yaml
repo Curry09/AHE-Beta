@@ -7,7 +7,7 @@ depends-on: []
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/nexau_runtime.py
+  - auto_designer/nexau_runtime.py
   - agent_defs/user_agent/prompt.md
   - tests/test_nexau_runtime.py
 version: 1

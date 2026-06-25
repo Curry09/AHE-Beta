@@ -56,7 +56,7 @@ graph LR
 
 **涉及文件**
 
-- `src/auto_designer/models.py`
+- `auto_designer/models.py`
 - `tests/test_models.py`
 
 **做什么**
@@ -158,7 +158,7 @@ IssueDraft 的产出机制（谁/何时生成）见 T3 open-questions；其字�
 
 **涉及文件**
 
-- `src/auto_designer/harness/interface.py`
+- `auto_designer/harness/interface.py`
 - `tests/harness/test_interface.py`
 
 **做什么**
@@ -253,7 +253,7 @@ CLAUDE.md 架构「被进化对象：harness 作为可启动程序」与「兼�
 
 **涉及文件**
 
-- `src/auto_designer/user/user_agent.py`
+- `auto_designer/user/user_agent.py`
 - `tests/user/test_user_agent.py`
 
 **做什么**
@@ -369,7 +369,7 @@ issue 产出机制待定（用户已确认「类似往 github 提 issue，具体
 
 **涉及文件**
 
-- `src/auto_designer/user/session.py`
+- `auto_designer/user/session.py`
 - `tests/user/test_session.py`
 
 **做什么**
@@ -467,8 +467,8 @@ CLAUDE.md 用户侧(a)。下游：loop/ 编排 a→b→c、metrics/ 统计 issue
 
 **涉及文件**
 
-- `src/auto_designer/tracker/base.py`
-- `src/auto_designer/tracker/fake.py`
+- `auto_designer/tracker/base.py`
+- `auto_designer/tracker/fake.py`
 - `tests/tracker/test_fake.py`
 
 **做什么**
@@ -559,7 +559,7 @@ CLAUDE.md 架构「状态去向：issue → Gitea」。GiteaTracker 实现：spe
 
 **涉及文件**
 
-- `src/auto_designer/user/session_store.py`
+- `auto_designer/user/session_store.py`
 - `tests/user/test_session_store.py`
 
 **做什么**

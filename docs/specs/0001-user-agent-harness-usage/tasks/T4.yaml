@@ -12,7 +12,7 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/user/session.py
+  - auto_designer/user/session.py
   - tests/user/test_session.py
 version: 1
 updated: '2026-06-17'

@@ -26,7 +26,7 @@ motivation: |-
   幂等保证重跑（CI、重置后重建）安全。
 scope: |-
   做什么：
-  - 读 T1 产出的 `infra/gitea/.env` 连接信息。
+  - 读 T1 产出的 `deploy/gitea/.env` 连接信息。
   - 经 Gitea API 建 harness 仓（仓名独立于工作仓，缺则建，幂等）。
   - 用 git 把本仓 `harness_template/` 内容作为初始提交推到该仓默认分支(main)。
   - 建 release 分支指向 main。
@@ -37,7 +37,7 @@ scope: |-
   - 不管理 Gitea 服务生命周期、不生成 token（归 T1）。
 design: |-
   入口与配置
-  - `scripts/bootstrap_harness.py`，读 `infra/gitea/.env` 的 {GITEA_URL, OWNER, TOKEN}；harness 仓名为固定常量
+  - `scripts/bootstrap_harness.py`，读 `deploy/gitea/.env` 的 {GITEA_URL, OWNER, TOKEN}；harness 仓名为固定常量
     （独立于 T1 工作仓，避免 issue 仓与 harness 仓混用）。
 
   初始化时序（每步幂等）
@@ -65,7 +65,7 @@ design: |-
   - 复用 T1 连接信息：不重复造配置，OWNER/TOKEN 单一来源。
 interface: |-
   `python scripts/bootstrap_harness.py`：
-  - 输入：`infra/gitea/.env`(GITEA_URL/OWNER/TOKEN) + 本仓 `harness_template/` 目录。
+  - 输入：`deploy/gitea/.env`(GITEA_URL/OWNER/TOKEN) + 本仓 `harness_template/` 目录。
   - 行为：在 Gitea 建出 harness 仓，默认分支 main 含 harness_template 内容，附 release 分支。
   - 退出码：成功(含幂等重跑)为 0；连接/鉴权失败、harness_template 缺失为非 0。
   - 副作用边界：仅写 Gitea 远端与临时工作目录；不修改本仓、不修改 .env。
@@ -95,6 +95,6 @@ tests: |-
   - 前置校验：本仓 harness_template 缺失/为空时脚本非零退出，不发起任何远端写。
 references: |-
   CLAUDE.md 架构「被进化对象：harness 作为可启动程序」、「dev 侧走真实分支/合并」。
-  harness_template 布局、launcher 与开发者 agent：spec-0003。连接信息来源：本组 T1 的 `infra/gitea/.env`。
+  harness_template 布局、launcher 与开发者 agent：spec-0003。连接信息来源：本组 T1 的 `deploy/gitea/.env`。
   Gitea API（repos/branches 端点）https://docs.gitea.com/api/ 。
 open-questions: ''

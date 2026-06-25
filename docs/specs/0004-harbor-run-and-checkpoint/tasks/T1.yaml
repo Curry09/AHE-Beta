@@ -8,8 +8,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/loop/checkpoint.py
-  - src/auto_designer/loop/run_state.py
+  - auto_designer/loop/checkpoint.py
+  - auto_designer/loop/run_state.py
   - tests/loop/test_checkpoint.py
   - tests/loop/test_run_state.py
 version: 1

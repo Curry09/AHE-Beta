@@ -12,8 +12,8 @@ description: >
 ---
 
 > **auto-designer 适配说明（vendored from OpenAgents）**
-> - `spec` CLI 未作为 console_script 安装；在本仓用启动器调用：`./skills/spec-driven-development/spec <子命令>`。
-> - CLI 源码 vendored 在 `skills/spec-driven-development/vendor/openagents/spec/`，依赖装在仓库 `.venv`（ruamel.yaml + jsonschema）。
+> - `spec` CLI 未作为 console_script 安装；在本仓用启动器调用：`./tools/spec-driven-development/spec <子命令>`。
+> - CLI 源码 vendored 在 `tools/spec-driven-development/vendor/openagents/spec/`，依赖装在仓库 `.venv`（ruamel.yaml + jsonschema）。
 > - specs 根用 CLI 原生默认 `docs/specs/`（`--specs-root` 仅部分子命令生效，勿依赖）。
 > - 本仓暂无 CI drift-check；`spec render` 后请手动确认 `OVERVIEW.md` 与各组 `summary.md` 已更新再提交。
 > - 下文提到的 `openagents/spec` 包路径、CLAUDE.md「设计理念 5–6」「多 worktree」等为 OpenAgents 语境，本仓按需对照，不强求一致。

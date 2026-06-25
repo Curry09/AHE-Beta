@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Gitea 一键初始化（spec-0002/T1）：等待就绪 → 建 admin → 生成 token → 建工作仓 → ensure 标签。
-# 每步幂等，可重跑。产出 infra/gitea/.env（GITEA_URL/OWNER/REPO/TOKEN），作为 T2/T3 唯一配置入口。
+# 每步幂等，可重跑。产出 deploy/gitea/.env（GITEA_URL/OWNER/REPO/TOKEN），作为 T2/T3 唯一配置入口。
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

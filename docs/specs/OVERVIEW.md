@@ -189,43 +189,42 @@ agent_defs/
     prompt.md                ← 0003/T4
   user_agent/
     prompt.md                ← 0003/T2
+auto_designer/
+  dev/
+    developer_agent.py       ← 0003/T3
+    release.py               ← 0003/T5
+    test_agent.py            ← 0003/T4
+  harness/
+    interface.py             ← 0001/T2
+    launcher.py              ← 0003/T1
+  loop/
+    checkpoint.py            ← 0004/T1
+    metrics.py               ← 0003/T6
+    orchestrator.py          ← 0003/T6
+    run_state.py             ← 0004/T1
+    runner.py                ← 0004/T2
+  tracker/
+    base.py                  ← 0001/T5
+    fake.py                  ← 0001/T5
+    gitea.py                 ← 0002/T2
+  user/
+    session.py               ← 0001/T4
+    session_store.py         ← 0001/T6
+    user_agent.py            ← 0001/T3
+  models.py                  ← 0001/T1
+  nexau_runtime.py           ← 0003/T2
+deploy/
+  gitea/
+    README.md                ← 0002/T1
+    bootstrap.sh             ← 0002/T1
+    docker-compose.yml       ← 0002/T1
 harness_template/
   agents/
     main.md                  ← 0003/T1
   entry.py                   ← 0003/T1
   params.yaml                ← 0003/T1
-infra/
-  gitea/
-    README.md                ← 0002/T1
-    bootstrap.sh             ← 0002/T1
-    docker-compose.yml       ← 0002/T1
 scripts/
   bootstrap_harness.py       ← 0002/T3
-src/
-  auto_designer/
-    dev/
-      developer_agent.py     ← 0003/T3
-      release.py             ← 0003/T5
-      test_agent.py          ← 0003/T4
-    harness/
-      interface.py           ← 0001/T2
-      launcher.py            ← 0003/T1
-    loop/
-      checkpoint.py          ← 0004/T1
-      metrics.py             ← 0003/T6
-      orchestrator.py        ← 0003/T6
-      run_state.py           ← 0004/T1
-      runner.py              ← 0004/T2
-    tracker/
-      base.py                ← 0001/T5
-      fake.py                ← 0001/T5
-      gitea.py               ← 0002/T2
-    user/
-      session.py             ← 0001/T4
-      session_store.py       ← 0001/T6
-      user_agent.py          ← 0001/T3
-    models.py                ← 0001/T1
-    nexau_runtime.py         ← 0003/T2
 tests/
   dev/
     test_developer_agent.py  ← 0003/T3

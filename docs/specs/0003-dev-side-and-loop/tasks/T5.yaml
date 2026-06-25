@@ -9,7 +9,7 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/dev/release.py
+  - auto_designer/dev/release.py
   - tests/dev/test_release.py
 version: 1
 updated: '2026-06-17'

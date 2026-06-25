@@ -9,7 +9,7 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/loop/runner.py
+  - auto_designer/loop/runner.py
   - tests/loop/test_runner.py
 version: 1
 updated: '2026-06-25'

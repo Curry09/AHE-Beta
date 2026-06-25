@@ -10,7 +10,7 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - src/auto_designer/dev/test_agent.py
+  - auto_designer/dev/test_agent.py
   - agent_defs/test_agent/prompt.md
   - tests/dev/test_test_agent.py
 version: 1
