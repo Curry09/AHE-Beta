@@ -23,7 +23,8 @@ package = false
 
 [tool.pytest.ini_options]
 # 让测试无需构建即可 import 顶层 auto_designer 包（src 布局通过 pythonpath 暴露）
-pythonpath = ["src"]
+# scripts 同样暴露，便于测试 import bootstrap_harness 等脚本
+pythonpath = ["src", "scripts"]
 testpaths = ["tests"]
 
 # Ruff lint/format（CLAUDE.md 代码检查：行宽 100）
