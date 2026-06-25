@@ -3,34 +3,68 @@
 被进化对象。launcher 把它当黑盒可启动程序：从 stdin 逐行读 {"message": str}，
 向 stdout 逐行写 {"reply": str}（JSONL，一读一写严格配对）。内部如何编排（这里是单 nexau，
 将来可演化为多 nexau）对 launcher 不可见——开发者 agent 后续就是在改本仓内容。
+
+真实运行：用本目录 agents/main.md 作系统提示 + 环境里的 LLM_* 构造一个 nexau Agent，
+单实例维护多轮 history。需要 nexau 可 import 且 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY 已注入。
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
+import time
 from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+_RUN_RETRIES = 4
 
 
 def _build_agent():
-    """加载本目录 agents/main.md 作为系统提示，构造单个 nexau agent。"""
-    import nexau  # 运行时依赖：harness 自带，不复用本仓 nexau_runtime（保持独立）
+    """以 agents/main.md 为系统提示，按环境 LLM_* 构造单个 nexau Agent。"""
+    from nexau import Agent
 
-    system = (Path(__file__).parent / "agents" / "main.md").read_text(encoding="utf-8")
-    return nexau.Client(), system
+    cfg_dir = Path(tempfile.mkdtemp(prefix="harness_agent_"))
+    (cfg_dir / "prompt.md").write_text(
+        (_HERE / "agents" / "main.md").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (cfg_dir / "agent.yaml").write_text(
+        "type: agent\n"
+        "name: harness\n"
+        "system_prompt: ./prompt.md\n"
+        "system_prompt_type: string\n"
+        "llm_config:\n"
+        f"  model: {os.environ['LLM_MODEL']}\n"
+        f"  base_url: {os.environ['LLM_BASE_URL']}\n"
+        f"  api_key: {os.environ['LLM_API_KEY']}\n"
+        "  max_tokens: 4096\n"
+        "  api_type: openai_chat_completion\n",
+        encoding="utf-8",
+    )
+    return Agent.from_yaml(cfg_dir / "agent.yaml")
+
+
+def _reply(agent, message: str) -> str:
+    last = None
+    for attempt in range(_RUN_RETRIES):
+        try:
+            out = agent.run(message=message)
+            return out if isinstance(out, str) else out[0]
+        except Exception as exc:  # 网关 502 抽风 → 退避重试
+            last = exc
+            time.sleep(1.5 * (attempt + 1))
+    return f"[harness error] {last}"
 
 
 def main() -> None:
-    client, system = _build_agent()
-    history: list[dict[str, str]] = []
+    agent = _build_agent()  # 单实例，history 由 nexau 自身跨轮维护
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
         message = json.loads(line)["message"]
-        history.append({"role": "user", "content": message})
-        reply = client.run(system=system, messages=history)
-        history.append({"role": "assistant", "content": reply})
+        reply = _reply(agent, message)
         sys.stdout.write(json.dumps({"reply": reply}, ensure_ascii=False) + "\n")
         sys.stdout.flush()
 

@@ -11,6 +11,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 import tarfile
 from pathlib import Path
 from typing import Any
@@ -98,9 +99,12 @@ class HarnessLauncher:
         entry = params["entry"]
         if not isinstance(entry, list) or not entry:
             raise ValueError(f"params.yaml 的 entry 须为非空 argv 列表：{entry!r}")
+        argv = [str(a) for a in entry]
+        if argv[0] in ("python", "python3"):
+            argv[0] = sys.executable  # 用 launcher 的解释器跑 harness（其 venv 才有 nexau 等依赖）
         cwd = dest / params["cwd"] if params.get("cwd") else dest
         env = {str(k): str(v) for k, v in (params.get("env") or {}).items()}
-        return _HarnessHandle(entry=[str(a) for a in entry], cwd=cwd, env=env)
+        return _HarnessHandle(entry=argv, cwd=cwd, env=env)
 
     def _checkout(self, ref: str) -> Path:
         dest = self._runs_root / ref

@@ -6,25 +6,57 @@ nexau 调用返回输出文本，薄封装、无状态记忆（多轮编排归�
 
 from __future__ import annotations
 
+import os
+import tempfile
+import time
 from collections.abc import Callable
 from pathlib import Path
 
 # 角色定义目录下系统提示文件名（必需）。
 _PROMPT_FILE = "prompt.md"
+# 网关偶发 502，整次 agent.run 兜底重试次数。
+_RUN_RETRIES = 4
 
 # nexau 后端：(system_prompt, input) -> output_text。注入便于测试替身。
 Backend = Callable[[str, str], str]
 
 
 def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
-    """真实 nexau 后端：以角色定义为系统侧上下文，对 input 执行一次调用。
+    """真实 nexau 后端：用 system_prompt + 环境里的 LLM_* 构造一个无工具 nexau Agent 跑一次。
 
-    懒加载 nexau（仅运行时需要）；未安装则在此显式失败，而非 import 期拖垮整个包。
+    每次调用建一个全新的瞬态 Agent（无状态：上下文由调用方在 user_input 里拼好），避免历史串味。
+    懒加载 nexau；未装在此显式失败。整次 run 包一层重试，扛网关 502 抽风。
     """
-    import nexau  # noqa: PLC0415  运行时依赖，懒加载
+    from nexau import Agent  # noqa: PLC0415  运行时依赖，懒加载
 
-    client = nexau.Client()
-    return client.run(system=system_prompt, input=user_input)
+    model = os.environ["LLM_MODEL"]
+    base_url = os.environ["LLM_BASE_URL"]
+    api_key = os.environ["LLM_API_KEY"]
+
+    last_err: Exception | None = None
+    for attempt in range(_RUN_RETRIES):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "prompt.md").write_text(system_prompt, encoding="utf-8")
+            (Path(tmp) / "agent.yaml").write_text(
+                "type: agent\n"
+                "name: role\n"
+                "system_prompt: ./prompt.md\n"
+                "system_prompt_type: string\n"
+                "llm_config:\n"
+                f"  model: {model}\n"
+                f"  base_url: {base_url}\n"
+                f"  api_key: {api_key}\n"
+                "  max_tokens: 4096\n"
+                "  api_type: openai_chat_completion\n",
+                encoding="utf-8",
+            )
+            try:
+                out = Agent.from_yaml(Path(tmp) / "agent.yaml").run(message=user_input)
+                return out if isinstance(out, str) else out[0]
+            except Exception as exc:  # 多为网关 502，退避后重试
+                last_err = exc
+                time.sleep(1.5 * (attempt + 1))
+    raise RuntimeError(f"nexau 调用重试 {_RUN_RETRIES} 次仍失败：{last_err}") from last_err
 
 
 class Agent:

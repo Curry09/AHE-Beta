@@ -1,0 +1,166 @@
+"""真实端到端跑一轮闭环（a→b→c）。
+
+接线：真 nexau（user/developer/harness agent，模型走 backend/.env 的 LLM_*）
+     + 真 Gitea（issue，走 backend/deploy/gitea/.env）+ 本地 git 仓承载 harness 代码。
+为可观测，跑最小规模：1 persona × 1 scenario，max_turns=2，test n=1，1 轮。
+
+前置：
+  1) backend/.env 有 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY
+  2) Gitea 已起并 bootstrap，backend/deploy/gitea/.env 有 GITEA_URL/OWNER/REPO/TOKEN
+运行：PYTHONPATH=backend .venv/bin/python backend/run.py
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent  # backend/
+DATA = ROOT / "data"
+HARNESS_REPO = DATA / "harness_repo"
+
+
+def _load_env(path: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, _, v = line.partition("=")
+            out[k.strip()] = v.strip().strip('"')
+    return out
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.email=seed@x", "-c", "user.name=seed", *args],
+        check=True,
+        capture_output=True,
+    )
+
+
+def _seed_harness_repo() -> Path:
+    """从 harness_template 种一个本地 git 仓：main 初始提交 + release 分支。"""
+    if HARNESS_REPO.exists():
+        shutil.rmtree(HARNESS_REPO)
+    HARNESS_REPO.mkdir(parents=True)
+    template = ROOT / "harness_template"
+    for item in template.iterdir():
+        dest = HARNESS_REPO / item.name
+        if item.is_dir():
+            shutil.copytree(item, dest)
+        else:
+            shutil.copy2(item, dest)
+    subprocess.run(
+        ["git", "init", "-b", "main", str(HARNESS_REPO)], check=True, capture_output=True
+    )
+    _git(HARNESS_REPO, "add", ".")
+    _git(HARNESS_REPO, "commit", "-m", "seed: harness v0")
+    _git(HARNESS_REPO, "branch", "release")
+    return HARNESS_REPO
+
+
+def main() -> int:
+    import os
+
+    # 环境里有 HTTP(S)_PROXY，会把本地 Gitea(localhost) 也走代理 → 502；放行本地
+    os.environ.setdefault("NO_PROXY", "localhost,127.0.0.1")
+    os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
+    os.environ.update(_load_env(ROOT / ".env"))  # LLM_*
+    gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
+
+    from auto_designer import nexau_runtime
+    from auto_designer.dev.developer_agent import DeveloperAgent
+    from auto_designer.dev.release import release
+    from auto_designer.dev.test_agent import TestAgent
+    from auto_designer.harness.launcher import HarnessLauncher
+    from auto_designer.loop.metrics import Metrics
+    from auto_designer.loop.orchestrator import Orchestrator
+    from auto_designer.models import Persona, SeedScenario
+    from auto_designer.tracker.gitea import GiteaTracker
+    from auto_designer.user.session import run_session
+    from auto_designer.user.session_store import SessionStore
+    from auto_designer.user.user_agent import UserAgent
+
+    print("① 种 harness 本地仓 ...")
+    repo = _seed_harness_repo()
+
+    print("② 接 Gitea + 本地存储 + launcher ...")
+    tracker = GiteaTracker(
+        base_url=gitea["GITEA_URL"], owner=gitea["OWNER"], repo=gitea["REPO"], token=gitea["TOKEN"]
+    )
+    tracker.ensure_labels(["bug", "feature"])
+    store = SessionStore(DATA / "sessions")
+    launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
+
+    print("③ 装配真 nexau 角色 ...")
+    user_nexau = nexau_runtime.load(str(ROOT / "agent_defs" / "user_agent"))
+    dev_nexau = nexau_runtime.load(str(ROOT / "agent_defs" / "developer_agent"))
+
+    personas = [
+        Persona(
+            identity="独立开发者",
+            level="中级",
+            domain="Python 后端",
+            goal="让一段慢 SQL 查询快起来",
+            speaking_style="口语、偏急",
+        )
+    ]
+    scenarios = [
+        SeedScenario(
+            description="我有个 Django 接口很慢，怀疑是 ORM 查询，帮我看看怎么排查和优化。"
+        )
+    ]
+    fixed_set = list(zip(personas, scenarios, strict=True))
+
+    def user_llm(*, kind: str, prompt: str) -> str:
+        return user_nexau.run(prompt)
+
+    def run_session_fn(persona, scenario, harness):
+        ua = UserAgent(llm=user_llm, persona=persona, max_turns=2)
+        return run_session(persona, scenario, harness, ua, tracker, store)
+
+    developer = DeveloperAgent(tracker, str(repo), dev_nexau)
+    tester = TestAgent(
+        launcher=launcher,
+        fixed_set=fixed_set,
+        baseline=None,
+        n=1,
+        tol=0.5,
+        run_session_fn=run_session_fn,
+    )
+
+    def release_fn(branch, verdict, issue_number):
+        return release(str(repo), branch, verdict, tracker, issue_number)
+
+    orch = Orchestrator(
+        launcher=launcher,
+        fixed_set=fixed_set,
+        tracker=tracker,
+        store=store,
+        developer_agent=developer,
+        test_agent=tester,
+        release_fn=release_fn,
+        run_session_fn=run_session_fn,
+        initial_ref="release",
+    )
+
+    print("④ 跑 1 轮闭环（真模型，较慢，请稍候）...")
+    refs = orch.run(1)
+
+    print("\n=== 结果 ===")
+    print("release_ref 链:", refs)
+    m = Metrics(tracker, store)
+    print("当前 open issue 数:", m.open_issue_count())
+    print("体感趋势:", m.feeling_trend())
+    print("issue 曲线 (t, opened, net_open):", m.issue_curve())
+    print("本地仓分支:", end=" ")
+    subprocess.run(["git", "-C", str(repo), "branch", "--format=%(refname:short)"])
+    print("tags:", end=" ")
+    subprocess.run(["git", "-C", str(repo), "tag"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
