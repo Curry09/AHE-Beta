@@ -40,10 +40,10 @@ graph LR
 
 **涉及文件**
 
-- `auto_designer/loop/checkpoint.py`
-- `auto_designer/loop/run_state.py`
-- `tests/loop/test_checkpoint.py`
-- `tests/loop/test_run_state.py`
+- `backend/auto_designer/loop/checkpoint.py`
+- `backend/auto_designer/loop/run_state.py`
+- `backend/tests/loop/test_checkpoint.py`
+- `backend/tests/loop/test_run_state.py`
 
 **做什么**
 
@@ -137,8 +137,8 @@ checkpoint artifact 与 harbor artifact 通道的具体绑定（对象格式 / �
 
 **涉及文件**
 
-- `auto_designer/loop/runner.py`
-- `tests/loop/test_runner.py`
+- `backend/auto_designer/loop/runner.py`
+- `backend/tests/loop/test_runner.py`
 
 **做什么**
 

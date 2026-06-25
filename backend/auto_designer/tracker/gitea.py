@@ -2,7 +2,7 @@
 
 一个打 Gitea /api/v1 的薄 REST 客户端：把接口调用翻译为 HTTP，状态权威留在 Gitea，
 客户端除 label id 缓存外无状态。非 2xx 一律转为带状态码与端点的 GiteaError，不静默返回空回执。
-配置（base_url/owner/repo/token）由构造注入，来源是 spec-0002/T1 的 deploy/gitea/.env。
+配置（base_url/owner/repo/token）由构造注入，来源是 spec-0002/T1 的 backend/deploy/gitea/.env。
 """
 
 from __future__ import annotations

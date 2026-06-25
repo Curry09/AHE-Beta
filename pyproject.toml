@@ -22,15 +22,17 @@ dev = [
 package = false
 
 [tool.pytest.ini_options]
-# 包 auto_designer 直接在仓库根（扁平布局），故 pythonpath 暴露根目录 "."
-# scripts 同样暴露，便于测试 import bootstrap_harness 等脚本
-pythonpath = [".", "scripts"]
-testpaths = ["tests"]
+# 后端在 backend/（前后端分目录）：暴露 backend 让测试 import auto_designer，
+# backend/scripts 暴露以便测试 import bootstrap_harness 等脚本
+pythonpath = ["backend", "backend/scripts"]
+testpaths = ["backend/tests"]
 
 # Ruff lint/format（CLAUDE.md 代码检查：行宽 100）
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# 首方包根：后端在 backend/，使 import 排序把 auto_designer / bootstrap_harness / 同目录测试模块识别为 first-party
+src = ["backend", "backend/scripts", "backend/tests"]
 # vendored 的 spec CLI 是外来代码，不纳入本仓 lint
 extend-exclude = ["tools/spec-driven-development/vendor"]
 

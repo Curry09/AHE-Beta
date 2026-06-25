@@ -8,8 +8,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - auto_designer/harness/interface.py
-  - tests/harness/test_interface.py
+  - backend/auto_designer/harness/interface.py
+  - backend/tests/harness/test_interface.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''

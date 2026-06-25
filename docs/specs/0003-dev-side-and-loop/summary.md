@@ -55,11 +55,11 @@ graph LR
 
 **涉及文件**
 
-- `auto_designer/harness/launcher.py`
-- `harness_template/entry.py`
-- `harness_template/params.yaml`
-- `harness_template/agents/main.md`
-- `tests/harness/test_launcher.py`
+- `backend/auto_designer/harness/launcher.py`
+- `backend/harness_template/entry.py`
+- `backend/harness_template/params.yaml`
+- `backend/harness_template/agents/main.md`
+- `backend/tests/harness/test_launcher.py`
 
 **做什么**
 
@@ -156,9 +156,9 @@ CLAUDE.md 架构「被进化对象：harness 作为可启动程序」「兼容 c
 
 **涉及文件**
 
-- `auto_designer/nexau_runtime.py`
-- `agent_defs/user_agent/prompt.md`
-- `tests/test_nexau_runtime.py`
+- `backend/auto_designer/nexau_runtime.py`
+- `backend/agent_defs/user_agent/prompt.md`
+- `backend/tests/test_nexau_runtime.py`
 
 **做什么**
 
@@ -173,9 +173,9 @@ MVP 只接 nexau 一种运行时，三角色仅 prompt/工具不同。把「加�
 **范围**
 
 做什么：
-- 定义角色定义的目录布局契约：agent_defs/<role>/ 下含 prompt.md（必需）与可选工具配置（如 tools.yaml）。
+- 定义角色定义的目录布局契约：backend/agent_defs/<role>/ 下含 prompt.md（必需）与可选工具配置（如 tools.yaml）。
 - 实现 nexau_runtime：load(agent_def_dir) 读取一份定义、构造对 nexau 的薄封装 Agent；Agent.run(input) 执行一次调用并返回输出。
-- 落地 user_agent 角色定义（agent_defs/user_agent/prompt.md）作为首个消费者，对接 spec-0001 UserAgent 所需的 LLM 后端。
+- 落地 user_agent 角色定义（backend/agent_defs/user_agent/prompt.md）作为首个消费者，对接 spec-0001 UserAgent 所需的 LLM 后端。
 不做什么：
 - 不抽象多运行时（CC/codex 接入为后续目标，本任务只服务 nexau）。
 - 不实现 developer/test 角色定义（分属 T3/T4）。
@@ -185,7 +185,7 @@ MVP 只接 nexau 一种运行时，三角色仅 prompt/工具不同。把「加�
 **整体设计**
 
 目录与加载契约：
-- 角色定义位于 agent_defs/<role>/：prompt.md 为系统提示/角色定义（必需）；可选工具配置声明该角色可用的工具。
+- 角色定义位于 backend/agent_defs/<role>/：prompt.md 为系统提示/角色定义（必需）；可选工具配置声明该角色可用的工具。
 - `load(agent_def_dir: str) -> Agent`：读取目录、解析 prompt 与工具配置，构造 Agent。目录缺失或缺 prompt.md → 抛错。
 
 Agent 契约（类型层面）：
@@ -209,8 +209,8 @@ Agent 契约（类型层面）：
 类型契约：
 - `nexau_runtime.load(agent_def_dir: str) -> Agent`。
 - `Agent.run(input: str) -> str`。
-- 角色定义布局：agent_defs/<role>/prompt.md（必需）+ 可选工具配置。
-- 本任务产出 agent_defs/user_agent/prompt.md。
+- 角色定义布局：backend/agent_defs/<role>/prompt.md（必需）+ 可选工具配置。
+- 本任务产出 backend/agent_defs/user_agent/prompt.md。
 
 **取舍**
 
@@ -222,7 +222,7 @@ Agent 契约（类型层面）：
 
 - load 能读取一份角色定义目录并构造 Agent；目录缺失或缺 prompt.md 时抛错。
 - Agent.run 透传输入到 nexau、返回输出（可 mock nexau 验证）。
-- agent_defs/user_agent/prompt.md 合法、可被 load。
+- backend/agent_defs/user_agent/prompt.md 合法、可被 load。
 - 无工具配置时 Agent 为纯文本角色可正常 run。
 
 **测试**
@@ -231,7 +231,7 @@ Agent 契约（类型层面）：
 - load 读取角色定义目录、解析 prompt，构造出 Agent。
 - Agent.run 把 input 透传给底层 nexau 并返回其输出（mock 断言入参与返回）。
 - load 指向不存在目录或缺 prompt.md 的目录 → 抛错。
-- agent_defs/user_agent/ 可被 load 且 run 一次成功（mock 后端）。
+- backend/agent_defs/user_agent/ 可被 load 且 run 一次成功（mock 后端）。
 - 底层 nexau 调用抛错时 run 透传该错误、不吞掉。
 
 **参考**
@@ -243,9 +243,9 @@ user_agent 消费方：spec-0001/T3（UserAgent）。多轮编排入口：spec-0
 
 **涉及文件**
 
-- `auto_designer/dev/developer_agent.py`
-- `agent_defs/developer_agent/prompt.md`
-- `tests/dev/test_developer_agent.py`
+- `backend/auto_designer/dev/developer_agent.py`
+- `backend/agent_defs/developer_agent/prompt.md`
+- `backend/tests/dev/test_developer_agent.py`
 
 **做什么**
 
@@ -261,7 +261,7 @@ issue 要变成 harness 的真实改动。label(bug/feature) 驱动分支策略�
 
 做什么：
 - 实现 DeveloperAgent：从 IssueTracker 取一条 open issue，按 label 分流到分支策略，checkout harness 仓建分支，用 nexau（developer_agent 定义）改 harness bundle，commit/push，并在 issue 上 comment 关联分支。
-- 落地 agent_defs/developer_agent/prompt.md（读 issue + harness bundle、产出修改的角色定义）。
+- 落地 backend/agent_defs/developer_agent/prompt.md（读 issue + harness bundle、产出修改的角色定义）。
 - MVP 单 agent、一次处理一条 issue、串行。
 不做什么：
 - 不负责候选合并与发版（归 T5），不负责体感判定/门禁（归 T4）。
@@ -338,9 +338,9 @@ harness 仓与 release 分支：spec-0002/T3。CLAUDE.md 方法 b「bug → rele
 
 **涉及文件**
 
-- `auto_designer/dev/test_agent.py`
-- `agent_defs/test_agent/prompt.md`
-- `tests/dev/test_test_agent.py`
+- `backend/auto_designer/dev/test_agent.py`
+- `backend/agent_defs/test_agent/prompt.md`
+- `backend/tests/dev/test_test_agent.py`
 
 **做什么**
 
@@ -357,7 +357,7 @@ harness 仓与 release 分支：spec-0002/T3。CLAUDE.md 方法 b「bug → rele
 做什么：
 - 实现 TestAgent：对候选 harness ref 用 T1 launcher 起服务，对固定 (persona, scenario) 集跑 run_session×N，算平均体感，与当前 release 基线均值比较，不退化（容差内）则放行。
 - 定义门禁判定语义：均值不低于基线减容差 → pass，否则 fail。
-- 落地 agent_defs/test_agent/prompt.md（若评测复用 user_agent 跑会话，本任务负责测试侧角色定义/配置）。
+- 落地 backend/agent_defs/test_agent/prompt.md（若评测复用 user_agent 跑会话，本任务负责测试侧角色定义/配置）。
 不做什么：
 - 不引入 benchmark 参与判定——benchmark 全程 held-out，只在 metrics（T6）事后观测、不投票。
 - 不负责合并/发版（归 T5），不负责产生候选分支（归 T3）。
@@ -438,8 +438,8 @@ CLAUDE.md 约束「发版门禁只用体感；benchmark 只用于观测」「ben
 
 **涉及文件**
 
-- `auto_designer/dev/release.py`
-- `tests/dev/test_release.py`
+- `backend/auto_designer/dev/release.py`
+- `backend/tests/dev/test_release.py`
 
 **做什么**
 
@@ -535,10 +535,10 @@ harness 仓与 release 分支：spec-0002/T3。CLAUDE.md 方法 b「合并和发
 
 **涉及文件**
 
-- `auto_designer/loop/orchestrator.py`
-- `auto_designer/loop/metrics.py`
-- `tests/loop/test_orchestrator.py`
-- `tests/loop/test_metrics.py`
+- `backend/auto_designer/loop/orchestrator.py`
+- `backend/auto_designer/loop/metrics.py`
+- `backend/tests/loop/test_orchestrator.py`
+- `backend/tests/loop/test_metrics.py`
 
 **做什么**
 

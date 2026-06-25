@@ -5,7 +5,7 @@ issue 与 harness 仓的家。单服务 + sqlite，最小运维面；非生产�
 ## 启动
 
 ```bash
-docker compose -f deploy/gitea/docker-compose.yml up -d
+docker compose -f backend/deploy/gitea/docker-compose.yml up -d
 ```
 
 Gitea 在固定端口 `http://localhost:3000`（`GET /api/v1/version` 返回 200 即就绪）。
@@ -13,10 +13,10 @@ Gitea 在固定端口 `http://localhost:3000`（`GET /api/v1/version` 返回 200
 ## 一键初始化 / 拿 token
 
 ```bash
-bash deploy/gitea/bootstrap.sh
+bash backend/deploy/gitea/bootstrap.sh
 ```
 
-幂等，可重跑。完成后产出 `deploy/gitea/.env`（已 gitignore，不入库）：
+幂等，可重跑。完成后产出 `backend/deploy/gitea/.env`（已 gitignore，不入库）：
 
 ```
 GITEA_URL=http://localhost:3000   # 无尾斜杠、无 /api/v1 后缀
@@ -32,7 +32,7 @@ TOKEN=<write:issue,write:repository scope 的 access token>
 ## 验证（建一条 issue）
 
 ```bash
-source deploy/gitea/.env
+source backend/deploy/gitea/.env
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: token $TOKEN" \
   -X POST "$GITEA_URL/api/v1/repos/$OWNER/$REPO/issues" \
   -H 'Content-Type: application/json' -d '{"title":"smoke","body":"hello"}'
@@ -42,6 +42,6 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: token $TOKEN" \
 ## 重置数据卷（清空所有 issue / 仓 / 用户）
 
 ```bash
-docker compose -f deploy/gitea/docker-compose.yml down -v
-rm -f deploy/gitea/.env
+docker compose -f backend/deploy/gitea/docker-compose.yml down -v
+rm -f backend/deploy/gitea/.env
 ```

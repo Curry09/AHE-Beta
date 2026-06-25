@@ -7,9 +7,9 @@ depends-on: []
 relates-to: []
 parallel: false
 files:
-  - auto_designer/nexau_runtime.py
-  - agent_defs/user_agent/prompt.md
-  - tests/test_nexau_runtime.py
+  - backend/auto_designer/nexau_runtime.py
+  - backend/agent_defs/user_agent/prompt.md
+  - backend/tests/test_nexau_runtime.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''
@@ -25,9 +25,9 @@ motivation: |-
   避免每个角色各写一套；user_agent 定义补上 spec-0001 中被抽象为「注入 LLM」的那一块。
 scope: |-
   做什么：
-  - 定义角色定义的目录布局契约：agent_defs/<role>/ 下含 prompt.md（必需）与可选工具配置（如 tools.yaml）。
+  - 定义角色定义的目录布局契约：backend/agent_defs/<role>/ 下含 prompt.md（必需）与可选工具配置（如 tools.yaml）。
   - 实现 nexau_runtime：load(agent_def_dir) 读取一份定义、构造对 nexau 的薄封装 Agent；Agent.run(input) 执行一次调用并返回输出。
-  - 落地 user_agent 角色定义（agent_defs/user_agent/prompt.md）作为首个消费者，对接 spec-0001 UserAgent 所需的 LLM 后端。
+  - 落地 user_agent 角色定义（backend/agent_defs/user_agent/prompt.md）作为首个消费者，对接 spec-0001 UserAgent 所需的 LLM 后端。
   不做什么：
   - 不抽象多运行时（CC/codex 接入为后续目标，本任务只服务 nexau）。
   - 不实现 developer/test 角色定义（分属 T3/T4）。
@@ -35,7 +35,7 @@ scope: |-
   - 不实现会话级状态管理、多轮记忆——run 是一次调用，多轮编排由消费方（UserAgent/run_session）负责。
 design: |-
   目录与加载契约：
-  - 角色定义位于 agent_defs/<role>/：prompt.md 为系统提示/角色定义（必需）；可选工具配置声明该角色可用的工具。
+  - 角色定义位于 backend/agent_defs/<role>/：prompt.md 为系统提示/角色定义（必需）；可选工具配置声明该角色可用的工具。
   - `load(agent_def_dir: str) -> Agent`：读取目录、解析 prompt 与工具配置，构造 Agent。目录缺失或缺 prompt.md → 抛错。
 
   Agent 契约（类型层面）：
@@ -57,8 +57,8 @@ interface: |-
   类型契约：
   - `nexau_runtime.load(agent_def_dir: str) -> Agent`。
   - `Agent.run(input: str) -> str`。
-  - 角色定义布局：agent_defs/<role>/prompt.md（必需）+ 可选工具配置。
-  - 本任务产出 agent_defs/user_agent/prompt.md。
+  - 角色定义布局：backend/agent_defs/<role>/prompt.md（必需）+ 可选工具配置。
+  - 本任务产出 backend/agent_defs/user_agent/prompt.md。
 tradeoffs: |-
   - 运行时抽象：薄封装单一 nexau vs 预留多运行时抽象层。选薄封装（YAGNI/奥卡姆）——CC/codex 是后续目标，现在多一层抽象只增复杂度；接入时再在 load 内分发。
   - 定义格式：目录 + prompt.md(+可选工具配置) vs 单一 YAML 清单 vs 代码内常量。选目录布局——prompt 用 markdown 便于人写人读、工具配置可选挂载、三角色同构；单 YAML 把长 prompt 塞进字段不便编辑；代码内常量不可被非工程改。
@@ -66,14 +66,14 @@ tradeoffs: |-
 acceptance: |-
   - load 能读取一份角色定义目录并构造 Agent；目录缺失或缺 prompt.md 时抛错。
   - Agent.run 透传输入到 nexau、返回输出（可 mock nexau 验证）。
-  - agent_defs/user_agent/prompt.md 合法、可被 load。
+  - backend/agent_defs/user_agent/prompt.md 合法、可被 load。
   - 无工具配置时 Agent 为纯文本角色可正常 run。
 tests: |-
   单测（mock nexau）：
   - load 读取角色定义目录、解析 prompt，构造出 Agent。
   - Agent.run 把 input 透传给底层 nexau 并返回其输出（mock 断言入参与返回）。
   - load 指向不存在目录或缺 prompt.md 的目录 → 抛错。
-  - agent_defs/user_agent/ 可被 load 且 run 一次成功（mock 后端）。
+  - backend/agent_defs/user_agent/ 可被 load 且 run 一次成功（mock 后端）。
   - 底层 nexau 调用抛错时 run 透传该错误、不吞掉。
 references: |-
   运行时与角色：CLAUDE.md 架构「nexau 作为 agent 实现，兼容 claude code / codex 接入」。

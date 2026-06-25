@@ -8,8 +8,8 @@ depends-on:
 relates-to: []
 parallel: false
 files:
-  - auto_designer/tracker/gitea.py
-  - tests/tracker/test_gitea.py
+  - backend/auto_designer/tracker/gitea.py
+  - backend/tests/tracker/test_gitea.py
 version: 1
 updated: '2026-06-17'
 change-reason: ''
@@ -100,5 +100,5 @@ tests: |-
 references: |-
   Gitea API（issues / labels / comments 端点）https://docs.gitea.com/api/ 。
   接口与数据结构定义：spec-0001/T5（IssueTracker/FakeTracker）、spec-0001/T1（IssueDraft/IssueRef）。
-  连接信息来源：本组 T1 的 `deploy/gitea/.env`。
+  连接信息来源：本组 T1 的 `backend/deploy/gitea/.env`。
 open-questions: ''
