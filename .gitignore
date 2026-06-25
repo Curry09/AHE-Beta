@@ -14,3 +14,6 @@ data/
 
 # OS
 .DS_Store
+
+# Gitea 连接信息（含 token，不入库）
+infra/gitea/.env

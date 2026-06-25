@@ -1,0 +1,24 @@
+# 本地 Gitea（spec-0002/T1）：单服务 + sqlite，最小运维面。
+# 固定端口（T2/T3 依赖稳定 URL，禁止随机端口）。数据挂命名卷持久化。
+services:
+  gitea:
+    image: gitea/gitea:1.22
+    container_name: auto-designer-gitea
+    restart: unless-stopped
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=sqlite3
+      - GITEA__server__ROOT_URL=http://localhost:3000/
+      - GITEA__server__HTTP_PORT=3000
+      # 自用单实例：关注册、关邮箱验证，降低初始化摩擦。
+      - GITEA__service__DISABLE_REGISTRATION=true
+      - GITEA__service__REQUIRE_SIGNIN_VIEW=false
+    volumes:
+      - gitea_data:/data
+    ports:
+      - "3000:3000"   # HTTP（固定）
+      - "2222:22"     # SSH（可选）
+
+volumes:
+  gitea_data:
