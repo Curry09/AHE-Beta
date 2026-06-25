@@ -21,6 +21,11 @@
 - **0003 开发者侧与闭环** — 本组实现 **b｜开发者侧** 与 **c｜闭环回灌**，把前两组的零件总装成可重复的进化轮次。一轮 = a（用户产 issue + 体感）→ b（开发者改 harness、测试体感门禁、发版）→ c（新版 harness 回到 a）。
 
   支撑件：**T1** launcher 把「某版 harness 程序」接成 0001 的 `HarnessInterface`（粘合层），并给出 v0 种子 `harness_template`；**T2** 是 user/developer/test 三角色共用的 nexau 适配层。本组核心约束：**门禁只用体感，benchmark 全程 held-out**（只事后观测、不参与发版判定）。
+- **0004 Harbor 运行与可恢复 checkpoint** — 本组给闭环加上**可恢复运行时**：所有 agent 在**单沙盒一波跑**（方案 A，整条 run = 1 个 harbor task），用 harbor 的 task→artifact 通道把 checkpoint 吐出沙盒、再喂回实现恢复。它横跨 a/b/c：checkpoint 在**单元边界**维护用户侧状态（已完成 session / 体感）、开发者侧状态（issue 分派、候选分支）与其他编排中间态（轮次 / 阶段 / release_ref / 待合并）。
+
+  分层是本组关键，且与 spec-0001/T2「逐轮对话另立协议」一致：harbor 只包**外层 rollout 生命周期**；**内层**用户↔harness 的逐轮真人对话仍走 spec-0001 自立协议，不碰 harbor 批式 episode 接口。
+
+  支撑件：**T1** 定义 checkpoint 存取与自包含 STATE_DIR（gitea + sessions + metrics + run_state）；**T2** 可恢复 harbor runner，在 orchestrator 外层加恢复与每轮 checkpoint。本组约束：**恢复按单元边界幂等重跑**（整会话重跑、开发者从分支 head 续作、release 见 tag 跳过），不快照 agent 进程内存。
 
 ## 如何读这份文档
 
@@ -78,6 +83,13 @@
 - **distill（蒸馏模块）** — 从真实使用数据（CC/codex/nexau 日志、issue tracker、社区反馈）蒸馏出 persona 库与种子场景库。
 - **harness_template** — v0 harness 种子（entry + agents + params），用于初始化 Gitea 上的 harness 独立仓。
 
+### 运行时与恢复（spec-0004）
+
+- **harbor runner** — orchestrator 外层的可恢复运行入口，作为一个 harbor task（方案 A，整条 run = 1 task）在单沙盒内驱动逐轮编排，每轮 save_checkpoint 并经 harbor artifact 通道吐出沙盒；逐轮真人对话仍走 spec-0001 自立协议，harbor 只包外层 rollout 生命周期。
+- **checkpoint** — harbor task 每轮边界吐出的自包含状态快照（STATE_DIR 的打包 artifact），供沙盒易失后恢复；是 Gitea/SessionStore 等权威源的整体快照，非第二权威。
+- **STATE_DIR** — 收敛全部可恢复状态的单一自包含目录（Gitea data + sessions/ + metrics.jsonl + run_state.json），checkpoint 的打包对象。
+- **run_state** — 编排游标（轮次/阶段/current_release_ref）与三侧中间态标记（用户侧已完成 session、开发者侧 issue 分派与候选分支、待合并/发版）；能从产物推断的优先推断，run_state 兜底。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 |
@@ -97,6 +109,8 @@
 | 0003 | 0003/T4 | test_agent 体感门禁 | pending | T1, T2, 0001/T4 |
 | 0003 | 0003/T5 | release 发版 | pending | T4, 0002/T3 |
 | 0003 | 0003/T6 | 闭环编排与曲线 | pending | T3, T4, T5, 0001/T4, 0001/T6 |
+| 0004 | 0004/T1 | checkpoint 存取（STATE_DIR ↔ artifact） | pending | 0001/T6 |
+| 0004 | 0004/T2 | 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复） | pending | T1, 0003/T6 |
 
 ## 跨 feature 关系图
 
@@ -125,6 +139,10 @@ graph LR
         n0003_T5["T5 release 发版"]
         n0003_T6["T6 闭环编排与曲线"]
     end
+    subgraph G0004[0004 harbor-run-and-checkpoint]
+        n0004_T1["T1 checkpoint 存取（STATE_DIR ↔ artifact）"]
+        n0004_T2["T2 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复）"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -150,6 +168,9 @@ graph LR
     n0003_T6 --> n0003_T5
     n0003_T6 --> n0001_T4
     n0003_T6 --> n0001_T6
+    n0004_T1 --> n0001_T6
+    n0004_T2 --> n0004_T1
+    n0004_T2 --> n0003_T6
 ```
 
 ## 文件冲突报告
@@ -190,8 +211,11 @@ src/
       interface.py           ← 0001/T2
       launcher.py            ← 0003/T1
     loop/
+      checkpoint.py          ← 0004/T1
       metrics.py             ← 0003/T6
       orchestrator.py        ← 0003/T6
+      run_state.py           ← 0004/T1
+      runner.py              ← 0004/T2
     tracker/
       base.py                ← 0001/T5
       fake.py                ← 0001/T5
@@ -211,8 +235,11 @@ tests/
     test_interface.py        ← 0001/T2
     test_launcher.py         ← 0003/T1
   loop/
+    test_checkpoint.py       ← 0004/T1
     test_metrics.py          ← 0003/T6
     test_orchestrator.py     ← 0003/T6
+    test_run_state.py        ← 0004/T1
+    test_runner.py           ← 0004/T2
   tracker/
     test_fake.py             ← 0001/T5
     test_gitea.py            ← 0002/T2
@@ -351,4 +378,57 @@ graph LR
     nT3 --> nT6
     nT4 --> nT6
     nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    v_T6_2["T6 v2"]
+    v_T6_1 -->|redefined| v_T6_2
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_pending;
+    class v_T6_2 st_pending;
+```
+
+### 0004 Harbor 运行与可恢复 checkpoint（issue #0）
+
+> 人读方案见 [`0004-harbor-run-and-checkpoint/summary.md`](./0004-harbor-run-and-checkpoint/summary.md)。
+
+本组给闭环加上**可恢复运行时**：所有 agent 在**单沙盒一波跑**（方案 A，整条 run = 1 个 harbor task），用 harbor 的 task→artifact 通道把 checkpoint 吐出沙盒、再喂回实现恢复。它横跨 a/b/c：checkpoint 在**单元边界**维护用户侧状态（已完成 session / 体感）、开发者侧状态（issue 分派、候选分支）与其他编排中间态（轮次 / 阶段 / release_ref / 待合并）。
+
+分层是本组关键，且与 spec-0001/T2「逐轮对话另立协议」一致：harbor 只包**外层 rollout 生命周期**；**内层**用户↔harness 的逐轮真人对话仍走 spec-0001 自立协议，不碰 harbor 批式 episode 接口。
+
+```
+harbor task（方案A：整条 run = 1 task）────────────────────────
+ 输入: pinned harness 版本 + persona/场景集 + 上次 checkpoint artifact
+ 沙盒内: restore(checkpoint) → orchestrator 逐轮(0003/T6)
+         每轮末 save_checkpoint → 经 harbor artifact 吐出沙盒
+ 输出: 每轮增量 checkpoint artifact（最新者供下次恢复）
+ 内层 user↔harness 逐轮对话: spec-0001 自立协议（非 harbor 批接口）
+```
+
+支撑件：**T1** 定义 checkpoint 存取与自包含 STATE_DIR（gitea + sessions + metrics + run_state）；**T2** 可恢复 harbor runner，在 orchestrator 外层加恢复与每轮 checkpoint。本组约束：**恢复按单元边界幂等重跑**（整会话重跑、开发者从分支 head 续作、release 见 tag 跳过），不快照 agent 进程内存。
+
+**任务一览**
+
+- **T1 checkpoint 存取（STATE_DIR ↔ artifact）**（pending） — 把一轮闭环所需的全部可恢复状态收敛为单一自包含 STATE_DIR，连同 run_state 游标一起 dump/load，作为 harbor task 的 checkpoint artifact 内容。
+- **T2 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复）**（pending） — 可恢复的 harbor 运行入口：作为一个 harbor task（方案 A，整条 run = 1 task）在沙盒内驱动 orchestrator 逐轮跑； 每轮边界吐一个增量 checkpoint artifact；新 task 喂最新 checkpoint 即从断点幂等续跑。
+
+```mermaid
+graph LR
+    nT1["T1 checkpoint 存取（STATE_DIR ↔ artifact）"]
+    nT2["T2 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复）"]
+    nT1 --> nT2
 ```

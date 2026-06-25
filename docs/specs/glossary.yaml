@@ -100,3 +100,16 @@ terms:
   - term: harness_template
     category: 基建与流程
     def: v0 harness 种子（entry + agents + params），用于初始化 Gitea 上的 harness 独立仓。
+
+  - term: harbor runner
+    category: 运行时与恢复（spec-0004）
+    def: orchestrator 外层的可恢复运行入口，作为一个 harbor task（方案 A，整条 run = 1 task）在单沙盒内驱动逐轮编排，每轮 save_checkpoint 并经 harbor artifact 通道吐出沙盒；逐轮真人对话仍走 spec-0001 自立协议，harbor 只包外层 rollout 生命周期。
+  - term: checkpoint
+    category: 运行时与恢复（spec-0004）
+    def: harbor task 每轮边界吐出的自包含状态快照（STATE_DIR 的打包 artifact），供沙盒易失后恢复；是 Gitea/SessionStore 等权威源的整体快照，非第二权威。
+  - term: STATE_DIR
+    category: 运行时与恢复（spec-0004）
+    def: 收敛全部可恢复状态的单一自包含目录（Gitea data + sessions/ + metrics.jsonl + run_state.json），checkpoint 的打包对象。
+  - term: run_state
+    category: 运行时与恢复（spec-0004）
+    def: 编排游标（轮次/阶段/current_release_ref）与三侧中间态标记（用户侧已完成 session、开发者侧 issue 分派与候选分支、待合并/发版）；能从产物推断的优先推断，run_state 兜底。

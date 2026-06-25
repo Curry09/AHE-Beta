@@ -1,0 +1,89 @@
+id: T1
+title: checkpoint 存取（STATE_DIR ↔ artifact）
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - 0001/T6
+relates-to: []
+parallel: false
+files:
+  - src/auto_designer/loop/checkpoint.py
+  - src/auto_designer/loop/run_state.py
+  - tests/loop/test_checkpoint.py
+  - tests/loop/test_run_state.py
+version: 1
+updated: '2026-06-25'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  把一轮闭环所需的全部可恢复状态收敛为单一自包含 STATE_DIR，连同 run_state 游标一起 dump/load，作为 harbor
+  task 的 checkpoint artifact 内容。是 Gitea/SessionStore 等权威源的整体快照，不另立第二权威。
+motivation: |-
+  全程在单沙盒一波跑、沙盒易失，恢复依赖把状态吐出沙盒。需要一个明确「什么进 checkpoint、怎么自包含、怎么原子写」
+  的契约，否则恢复不可靠、与权威源漂移。
+scope: |-
+  做什么：
+  - 定义 STATE_DIR 布局：聚合 Gitea data(sqlite+repos)、data/sessions/、data/metrics.jsonl、run_state.json 于单一目录，自包含、可整体打包。
+  - 实现 checkpoint 存：原子打包 STATE_DIR → checkpoint artifact（可下载出沙盒）。
+  - 实现 checkpoint 取：从 artifact 还原 STATE_DIR。
+  - 定义并读写 run_state：编排游标 + 三侧中间态标记，作为「无法从产物直接观测」之外的兜底。
+  不做什么：
+  - 不驱动轮次循环、不调 orchestrator（属 0004/T2 runner）。
+  - 不实现 harbor 任务调度与 artifact 通道（harbor 底座职责）。
+  - 不快照 agent 进程内存 / 会话中途态（恢复按单元边界重跑，见 T2）。
+  - 不与 Gitea/SessionStore 双写权威：checkpoint 是这些权威源的整体快照，不引入第二权威。
+design: |-
+  STATE_DIR 布局（单一自包含目录）：
+  - gitea/        — Gitea data 目录（sqlite + harness 仓），issue 与 harness 版本的权威源。
+  - sessions/     — spec-0001 SessionStore 落地（体感 + transcript + issue 回执），体感曲线与回归基线。
+  - metrics.jsonl — append-only：issue 数~时间与体感趋势观测。
+  - run_state.json— 编排游标 + 三类「中间态」标记（见下）。
+
+  run_state 内容（维护「整个过程的状态」）：
+  - 编排游标：round（轮次）、phase（a/b/c）、current_release_ref。
+  - 用户侧状态：本轮 fixed_set 中已完成的 (persona, scenario) session key 集合（对应 sessions/ 中已落地的 Session）。
+  - 开发者侧状态：已分派 issue → 候选分支 ref 的映射、候选是否已过门禁、是否已合并/打 tag。
+  - 其他中间态：本轮 test verdict、待合并队列等编排内瞬态。
+  注：用户/开发者 agent 的「状态」指其在**单元边界上的持久进度**（已完成 session、候选分支 commit），非 nexau
+  进程内存或会话中途态——后者不入 checkpoint，恢复时整单元重跑（见 T2）。
+
+  存取契约：
+  - save：原子打包（tmp + rename / 先写后置位），产出自包含 artifact；部分写不得污染上一个可用 checkpoint。
+  - load：还原 STATE_DIR 到指定根；校验自包含（四类齐全）后才置为可用。
+  - run_state 读写：JSON、原子写；空 STATE_DIR 读 → 初始 run_state(round=0)。
+
+  关键决策及理由：
+  - 单一 STATE_DIR 自包含：checkpoint = 一次整体快照，避免多源分别导出导致的不一致；与「从沙盒下载 checkpoint 即可」一致。
+  - checkpoint 是权威源的快照而非第二权威：Gitea/SessionStore 仍是 issue/体感的唯一权威，不引入双写漂移。
+  - run_state 只记「不可观测」的游标与分派：能从产物（session 文件存在、分支 head、tag 存在）推断的进度优先推断，run_state 兜底，降低游标过期风险。
+  - 原子写：沙盒可能在写 checkpoint 中途死，必须保证上一个 checkpoint 始终可用。
+interface: |-
+  类型契约：
+  - save_checkpoint(state_dir: Path, dest: Path) -> Path（artifact 路径）。
+  - load_checkpoint(artifact: Path, state_dir: Path) -> None。
+  - RunState 数据结构：round:int、phase:str、current_release_ref:str、done_session_keys:set[str]、issue_assignments:dict[int,str]、pending:list。
+  - read_run_state(state_dir: Path) -> RunState；write_run_state(state_dir: Path, run_state: RunState) -> None。
+tradeoffs: |-
+  - 单 STATE_DIR 整体打包 vs 分源增量导出：选整体（奥卡姆、自包含、易恢复）；代价是 checkpoint 体积大，靠每轮一次、版本即用即清缓解。
+  - run_state 记游标 vs 纯从产物推断：选「优先推断 + run_state 兜底」——纯推断最鲁棒但有些编排瞬态（待合并、本轮 verdict）无产物，纯游标又易过期，故折中。
+  - checkpoint 落点：本组只定义存取契约与 artifact 形态，落点（harbor artifact 通道）由 0004/T2 与 harbor 决定，不在此绑定。
+acceptance: |-
+  - save_checkpoint 产出自包含 artifact，含 gitea/、sessions/、metrics.jsonl、run_state.json 四者。
+  - load_checkpoint 还原后 STATE_DIR 与保存前等价（round-trip）。
+  - save 原子：中途失败不破坏既有可用 checkpoint。
+  - run_state round-trip：写后读回相等，含 done_session_keys 与 issue_assignments；空 STATE_DIR 读 → round=0 不抛错。
+tests: |-
+  - save→load round-trip：构造 STATE_DIR（四类齐全）→ save → 新目录 load → 结构与内容等价。
+  - 自包含校验：缺任一类时 load 报错、不静默置为可用。
+  - 原子性：模拟 save 中途中断，既有 checkpoint 仍可 load。
+  - run_state read/write round-trip：含集合/映射字段；空 STATE_DIR 读 → 初始 run_state(round=0)。
+references: |-
+  SessionStore（sessions/ 落地）：spec-0001/T6。Gitea（issue 与 harness 仓权威源）：spec-0002。
+  metrics：spec-0003/T6。runner 消费方：0004/T2。
+  CLAUDE.md「体感 + session → 本地 data/sessions/」「issue → Gitea」。
+open-questions: |-
+  checkpoint artifact 与 harbor artifact 通道的具体绑定（对象格式 / 大小上限）在 0004/T2 与 harbor 接入时定。

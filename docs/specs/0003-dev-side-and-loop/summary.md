@@ -595,6 +595,7 @@ metrics 契约：
 - 顺序单轮（a 全跑完再 b）：奥卡姆，MVP 不做流水线；编排逻辑可读、可单测。
 - 无发版轮次沿用旧 ref：闭环不因某轮未通过门禁而中断，保证可持续多轮、与「issue 曲线长期观测」一致。
 - metrics 只读 Gitea + SessionStore：不自建存储、不与权威源双写，issue 权威在 Gitea、体感权威在 SessionStore。
+- 可恢复运行与 checkpoint 不在本任务：run_round/run 保持纯编排（无隐藏状态、可单测）；沙盒易失下的恢复由 spec-0004 的 harbor runner 在外层包裹——逐轮调 run_round、每轮 save_checkpoint，run() 自身不做 checkpoint。
 
 **接口**
 
@@ -633,5 +634,5 @@ metrics 契约：
 **参考**
 
 run_session：spec-0001/T4。SessionStore（体感索引）：spec-0001/T6。IssueTracker：spec-0001/T5。
-launcher：T1。developer/test/release：T3/T4/T5。
+launcher：T1。developer/test/release：T3/T4/T5。可恢复 harbor 运行入口与 checkpoint：spec-0004。
 CLAUDE.md「c｜闭环：发版后的新 harness 回到用户侧，循环」「观测指标：记录 issue 数量随时间的曲线」「benchmark 全程 held-out」。

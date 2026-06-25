@@ -4,6 +4,9 @@
 1. `harbor` 作为 rollout 底座。
 2. `nexau` 作为 agent 实现，同时兼容 claude code / codex 接入。
 
+### 项目文档
+飞书文档：https://sxddhcrtbqu.feishu.cn/wiki/P3dEw0vmhix6IXk7KpJc4O85nfc?from=from_copylink
+
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
 
@@ -80,6 +83,7 @@ data/                  # 运行产物(.gitignore)：sessions/ harness_runs/
 - **spec-0001 用户侧**：models、HarnessInterface+Fake、UserAgent、IssueTracker 接口+Fake、本地 SessionStore、run_session。可独立测（不依赖真 Gitea/harness）。
 - **spec-0002 Gitea 接入与基建**：docker(sqlite)+token+标签方案、GiteaTracker、harness 仓初始化。
 - **spec-0003 开发者侧与闭环**：harness launcher、developer_agent、test_agent（体感门禁）、release（合并+tag）、orchestrator+metrics。
+- **spec-0004 Harbor 运行与可恢复 checkpoint**：所有 agent 在单沙盒一波跑（方案 A，整条 run = 1 个 harbor task），每轮边界吐增量 checkpoint artifact、喂回即从断点幂等续跑；checkpoint 维护用户侧/开发者侧/编排中间态。harbor 只包外层 rollout 生命周期，逐轮真人对话仍走 spec-0001 自立协议。
 
 ## 设计理念
 1. **奥卡姆剃刀**：如无必要，勿增实体。保证代码和架构的最小化、最简洁，先搭最小可用版本（MVP）再迭代。
