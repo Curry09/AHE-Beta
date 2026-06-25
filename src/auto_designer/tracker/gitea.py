@@ -11,7 +11,7 @@ from typing import Any
 
 import requests
 
-from auto_designer.models import ISSUE_STATES, IssueDraft, IssueRef
+from auto_designer.models import ISSUE_STATES, IssueDraft, IssueRef, OpenIssue
 
 # 新建 label 的默认颜色（标签语义集 {bug,feature} 由 T1 预置；此处仅兜底建缺失项）。
 _DEFAULT_LABEL_COLOR = "#ededed"
@@ -60,6 +60,21 @@ class GiteaTracker:
             {"title": draft.title, "body": draft.body, "labels": label_ids},
         )
         return self._parse_issue_ref(data)
+
+    def list_open_issues(self) -> list[OpenIssue]:
+        data = self._request(
+            "GET", f"/repos/{self._owner}/{self._repo}/issues?state=open&type=issues", None
+        )
+        return [
+            OpenIssue(
+                number=item["number"],
+                title=item.get("title", ""),
+                body=item.get("body") or "",
+                labels=[lbl["name"] for lbl in item.get("labels", [])],
+                state=item.get("state", "open"),
+            )
+            for item in (data or [])
+        ]
 
     def add_comment(self, number: int, body: str) -> None:
         self._request(

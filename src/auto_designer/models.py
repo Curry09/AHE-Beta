@@ -133,6 +133,39 @@ class IssueDraft:
 
 
 @dataclass
+class OpenIssue:
+    """从 tracker 读回的一条 issue（number/title/body/labels/state）。
+
+    用于开发者侧领取 issue（spec-0003/T3）：IssueTracker 的写路径产 IssueRef，读路径(list_open_issues)产 OpenIssue。
+    """
+
+    number: int
+    title: str
+    body: str
+    labels: list[str] = field(default_factory=list)
+    state: str = "open"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "number": self.number,
+            "title": self.title,
+            "body": self.body,
+            "labels": list(self.labels),
+            "state": self.state,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> OpenIssue:
+        return cls(
+            number=data["number"],
+            title=data["title"],
+            body=data["body"],
+            labels=list(data.get("labels", [])),
+            state=data.get("state", "open"),
+        )
+
+
+@dataclass
 class IssueRef:
     """issue 提交至 Gitea 后的回执（number/url/state）；本地只持回执，权威源在 Gitea。"""
 
