@@ -9,6 +9,9 @@ dependencies = [
     "jsonschema>=4",
     # GiteaTracker（spec-0002）所需的薄 REST 客户端
     "requests>=2.31",
+    # 前端观测看板的只读 HTTP 层
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
 ]
 
 [project.optional-dependencies]
