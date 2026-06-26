@@ -63,12 +63,22 @@ def _seed_harness_repo() -> Path:
 
 def main() -> int:
     import os
+    from urllib.parse import urlparse
 
-    # 环境里有 HTTP(S)_PROXY，会把本地 Gitea(localhost) 也走代理 → 502；放行本地
-    os.environ.setdefault("NO_PROXY", "localhost,127.0.0.1")
-    os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
-    os.environ.update(_load_env(ROOT / ".env"))  # LLM_*
+    llm_env = _load_env(ROOT / ".env")  # LLM_*
+    os.environ.update(llm_env)
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
+
+    # 环境里的 HTTP(S)_PROXY 抽风（实测代理连不上，直连网关稳定 200）：放行本地 Gitea + 模型网关，
+    # 让 nexau/openai 调用绕过烂代理直连，根除偶发 APIConnectionError。
+    bypass = ["localhost", "127.0.0.1"]
+    for url in (llm_env.get("LLM_BASE_URL"), gitea.get("GITEA_URL")):
+        host = urlparse(url).hostname if url else None
+        if host and host not in bypass:
+            bypass.append(host)
+    no_proxy = ",".join(bypass)
+    os.environ["NO_PROXY"] = no_proxy
+    os.environ["no_proxy"] = no_proxy
 
     from auto_designer import nexau_runtime
     from auto_designer.dev.developer_agent import DeveloperAgent
