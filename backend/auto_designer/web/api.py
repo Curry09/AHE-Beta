@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from auto_designer.loop.live import read_live
 from auto_designer.loop.metrics import Metrics
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
@@ -96,6 +97,11 @@ def create_app(
     @app.get("/api/issues")
     def issues() -> dict[str, object]:
         return _list_issues(tracker=tracker, board_url=board_url)
+
+    @app.get("/api/live")
+    def live() -> dict[str, object]:
+        # live 快照写在 data/live（与 data/sessions 同级），跑闭环时逐轮更新。
+        return read_live(data_dir=store.root.parent)
 
     @app.get("/api/sessions")
     def sessions() -> list[dict[str, object]]:

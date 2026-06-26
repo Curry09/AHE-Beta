@@ -75,11 +75,23 @@ def _parse_issues(raw: str) -> list[IssueDraft]:
 class UserAgent:
     """persona 驱动的多轮对话驱动器。run 不触碰 harness.reset/close（生命周期归 T4）。"""
 
-    def __init__(self, llm: Callable[..., str], persona: Persona, max_turns: int) -> None:
+    def __init__(
+        self,
+        llm: Callable[..., str],
+        persona: Persona,
+        max_turns: int,
+        on_progress: Callable[[Transcript], None] | None = None,
+    ) -> None:
         assert max_turns > 0, f"max_turns 须为正：{max_turns}"
         self._llm = llm
         self._persona = persona
         self._max_turns = max_turns
+        # 流式观测钩子：每当 transcript 增量变化即回调（含用户已发、harness 待回复的中间态）。
+        self._on_progress = on_progress
+
+    def _emit_progress(self, transcript: Transcript) -> None:
+        if self._on_progress is not None:
+            self._on_progress(transcript)
 
     def run(
         self, scenario: SeedScenario, harness: HarnessInterface
@@ -92,9 +104,11 @@ class UserAgent:
             )
             if end:  # 自判终止：达成 / 放弃 / 受够
                 break
-            reply = harness.send(user_msg)  # 异常不在本层吞，向上传播交 T4
             transcript.turns.append(Turn("user", user_msg))
+            self._emit_progress(transcript)  # 用户已发、harness 待回复（末轮为 user → 回复中）
+            reply = harness.send(user_msg)  # 异常不在本层吞，向上传播交 T4
             transcript.turns.append(Turn("harness", reply))
+            self._emit_progress(transcript)  # harness 回复已到
             turns += 1
             if turns >= self._max_turns:  # 兜底防不收敛
                 break

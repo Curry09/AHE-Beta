@@ -127,9 +127,22 @@ def main() -> int:
     def user_llm(*, kind: str, prompt: str) -> str:
         return user_nexau.run(prompt)
 
+    from auto_designer.loop.live import clear_live, write_live
+
     def run_session_fn(persona, scenario, harness):
-        ua = UserAgent(llm=user_llm, persona=persona, max_turns=2)
-        return run_session(persona, scenario, harness, ua, tracker, store)
+        def on_progress(transcript):  # 逐轮写 live 快照供看板流式渲染
+            write_live(
+                data_dir=DATA,
+                persona_identity=persona.identity,
+                scenario=scenario.description,
+                turns=[t.to_dict() for t in transcript.turns],
+            )
+
+        ua = UserAgent(llm=user_llm, persona=persona, max_turns=2, on_progress=on_progress)
+        try:
+            return run_session(persona, scenario, harness, ua, tracker, store)
+        finally:
+            clear_live(data_dir=DATA)  # 一局结束清 live，完整会话转入正式列表
 
     developer = DeveloperAgent(tracker, str(repo), dev_nexau)
     tester = TestAgent(

@@ -35,6 +35,14 @@ export interface IssuesResponse {
   issues: Issue[];
 }
 
+export interface LiveSession {
+  active: boolean;
+  persona_identity?: string;
+  scenario?: string;
+  turns?: Turn[];
+  updated_at?: string;
+}
+
 export interface IssueRef {
   number: number;
   url: string;

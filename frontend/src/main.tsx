@@ -6,6 +6,7 @@ import Overview from "./pages/Overview";
 import Sessions from "./pages/Sessions";
 import SessionDetail from "./pages/SessionDetail";
 import Issues from "./pages/Issues";
+import { LiveSessionCard } from "./components/LiveSessionCard";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -15,7 +16,10 @@ function Shell({ children }: { children: React.ReactNode }) {
         <Link to="/sessions">会话</Link>
         <Link to="/issues">Gitea 看板</Link>
       </nav>
-      <div className="container">{children}</div>
+      <div className="container">
+        <LiveSessionCard />
+        {children}
+      </div>
     </>
   );
 }

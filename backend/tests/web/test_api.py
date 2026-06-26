@@ -161,6 +161,25 @@ def test_issues_connected(tmp_path: Path) -> None:
     assert issue["state"] == "open"
 
 
+def test_live_inactive_then_active(tmp_path: Path) -> None:
+    from auto_designer.loop.live import write_live
+
+    store = SessionStore(tmp_path / "sessions")
+    client = TestClient(create_app(store=store, tracker=FakeTracker()))
+
+    assert client.get("/api/live").json() == {"active": False}
+
+    write_live(
+        data_dir=tmp_path,  # store.root.parent == tmp_path
+        persona_identity="独立开发者",
+        scenario="慢查询",
+        turns=[{"role": "user", "content": "在吗"}],
+    )
+    body = client.get("/api/live").json()
+    assert body["active"] is True
+    assert body["turns"][0]["content"] == "在吗"
+
+
 def test_issues_no_tracker(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=None)
     body = client.get("/api/issues").json()

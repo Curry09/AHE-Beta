@@ -20,6 +20,11 @@ class SessionStore:
     def __init__(self, root: str | Path) -> None:
         self._root = Path(root)
 
+    @property
+    def root(self) -> Path:
+        """会话落盘根目录；live 通道据此定位同级 data/live。"""
+        return self._root
+
     def save(self, session: Session) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
         # 先写全量文件（唯一权威），后追加索引：中途失败至多「有全量缺索引」，可重建。

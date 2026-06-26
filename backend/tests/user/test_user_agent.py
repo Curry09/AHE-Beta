@@ -111,6 +111,29 @@ def test_parse_feeling_tolerates_fence_and_prefix() -> None:
     assert fs.score == 4 and fs.reason == "非常顺手"
 
 
+def test_on_progress_streams_each_turn() -> None:
+    # 流式：每轮回调两次（用户已发→harness 待回复；harness 回复到）。
+    snapshots: list[list[tuple[str, str]]] = []
+
+    def on_progress(transcript) -> None:
+        snapshots.append([(t.role, t.content) for t in transcript.turns])
+
+    llm = FakeLLM(["问题1", f"done {END_SENTINEL}"], "3 ok", "[]")  # 一轮真对话后结束
+    agent = UserAgent(llm=llm, persona=_persona(), max_turns=3, on_progress=on_progress)
+    agent.run(SeedScenario(description="x"), FakeHarness(script=["答复1"]))
+
+    # 第一次回调：仅用户已发（末轮为 user → 回复中）；第二次：harness 回复已到。
+    assert snapshots[0] == [("user", "问题1")]
+    assert snapshots[1] == [("user", "问题1"), ("harness", "答复1")]
+
+
+def test_no_on_progress_is_optional() -> None:
+    llm = FakeLLM([f"hi {END_SENTINEL}"], "3 ok", "[]")
+    UserAgent(llm=llm, persona=_persona(), max_turns=3).run(
+        SeedScenario(description="x"), FakeHarness()
+    )  # 不传 on_progress 不应报错
+
+
 def test_max_turns_must_be_positive() -> None:
     with pytest.raises(AssertionError):
         UserAgent(llm=FakeLLM([], "3 ok", "[]"), persona=_persona(), max_turns=0)
