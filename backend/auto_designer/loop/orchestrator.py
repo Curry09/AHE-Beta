@@ -30,7 +30,7 @@ class Orchestrator:
         fixed_set: list[tuple[Persona, SeedScenario]],
         tracker: IssueTracker,
         store: SessionStore,
-        developer_agent: DeveloperAgent,
+        developer_agents: list[DeveloperAgent],
         test_agent: TestAgent,
         release_fn: ReleaseFn,
         run_session_fn: SessionRunner,
@@ -40,7 +40,7 @@ class Orchestrator:
         self._fixed_set = fixed_set
         self._tracker = tracker
         self._store = store
-        self._developer = developer_agent
+        self._developers = developer_agents
         self._test = test_agent
         self._release = release_fn
         self._run_session = run_session_fn
@@ -52,17 +52,23 @@ class Orchestrator:
             harness = self._launcher.launch(release_ref)
             self._run_session(persona, scenario, harness)
 
-        # b：开发者取一条 issue 改 harness；无 issue/无改动 → 本轮无候选、不发版。
-        dev = self._developer.work_one()
-        if dev.issue_number is None or not dev.changed or dev.branch is None:
-            return release_ref
-        verdict = self._test.evaluate(dev.branch)
-        result = self._release(dev.branch, verdict, dev.issue_number)
+        # b：多个开发者依次各领一条不同 issue 改 harness。每个候选过门禁后即发版、release 前进，
+        #    下一个开发者从已前进的 release 切分支（避免两分支同改 main.md 合并冲突）。
+        ref = release_ref
+        attempted: set[int] = set()
+        for developer in self._developers:
+            dev = developer.work_one(attempted)
+            if dev.issue_number is not None:
+                attempted.add(dev.issue_number)  # 占位，后续 dev 不再领这条
+            if dev.issue_number is None or not dev.changed or dev.branch is None:
+                continue  # 无可领 issue / 无改动 → 该 dev 本轮无候选
+            verdict = self._test.evaluate(dev.branch)
+            result = self._release(dev.branch, verdict, dev.issue_number)
+            if result.released and result.tag:
+                ref = result.tag  # 过门禁则回灌新 tag，链式推进
 
-        # c：发版则回灌新 tag，否则沿用旧 ref（闭环不因单轮未过门禁而中断）。
-        if result.released and result.tag:
-            return result.tag
-        return release_ref
+        # c：返回本轮最终 release_ref（无发版则沿用旧 ref，闭环不中断）。
+        return ref
 
     def run(self, n_rounds: int) -> list[str]:
         if n_rounds <= 0:

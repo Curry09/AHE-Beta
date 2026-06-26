@@ -75,6 +75,16 @@ def test_no_open_issue_returns_empty(tmp_path) -> None:
     assert not any(b.startswith(("fix/", "feat/")) for b in _branches(repo))
 
 
+def test_skip_picks_next_issue(tmp_path) -> None:
+    # 同轮多 dev：传入 skip 跳过已认领 issue，领下一条。
+    repo = _make_harness_repo(tmp_path)
+    tracker = FakeTracker()
+    tracker.create_issue(IssueDraft(title="第一条", body="a", labels=["bug"]))
+    tracker.create_issue(IssueDraft(title="第二条", body="b", labels=["bug"]))
+    result = DeveloperAgent(tracker, repo, _FakeAgent("改了\n")).work_one(skip={1})
+    assert result.issue_number == 2 and result.branch == "fix/issue-2"
+
+
 def test_no_change_no_commit(tmp_path) -> None:
     repo = _make_harness_repo(tmp_path)
     tracker = FakeTracker()

@@ -36,10 +36,11 @@ class DeveloperAgent:
         self._repo = Path(harness_repo)
         self._agent = nexau_agent
 
-    def work_one(self) -> DevResult:
-        issues = self._tracker.list_open_issues()
+    def work_one(self, skip: set[int] | None = None) -> DevResult:
+        skip = skip or set()  # 同轮多 dev 时跳过已被别的 dev 认领的 issue
+        issues = [i for i in self._tracker.list_open_issues() if i.number not in skip]
         if not issues:
-            return DevResult()  # 无 open issue → 不建分支、不报错
+            return DevResult()  # 无（可领）open issue → 不建分支、不报错
         issue = issues[0]
 
         prefix, default_routed = self._route(issue.labels)

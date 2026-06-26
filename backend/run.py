@@ -2,7 +2,7 @@
 
 接线：真 nexau（user/developer/harness agent，模型走 backend/.env 的 LLM_*）
      + 真 Gitea（issue，走 backend/deploy/gitea/.env）+ 本地 git 仓承载 harness 代码。
-为可观测，跑最小规模：1 persona × 1 scenario，max_turns=2，test n=1，1 轮。
+本地多轮规模：2 persona（2 user agent）× 2 dev agent，max_turns=2，体感门禁 n=1 抽样，跑 2 轮。
 
 前置：
   1) backend/.env 有 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY
@@ -115,14 +115,24 @@ def main() -> int:
             domain="Python 后端",
             goal="让一段慢 SQL 查询快起来",
             speaking_style="口语、偏急",
-        )
+        ),
+        Persona(
+            identity="创业公司全栈",
+            level="高级",
+            domain="Node.js/TypeScript",
+            goal="把一个 Express API 的 p99 延迟降下来",
+            speaking_style="简洁、爱追问细节",
+        ),
     ]
     scenarios = [
         SeedScenario(
             description="我有个 Django 接口很慢，怀疑是 ORM 查询，帮我看看怎么排查和优化。"
-        )
+        ),
+        SeedScenario(
+            description="我的 Express 接口 p99 到 800ms，想定位是中间件、DB 还是序列化的问题，给排查思路。"
+        ),
     ]
-    fixed_set = list(zip(personas, scenarios, strict=True))
+    fixed_set = list(zip(personas, scenarios, strict=True))  # 2 user agent
 
     def user_llm(*, kind: str, prompt: str) -> str:
         return user_nexau.run(prompt)
@@ -144,10 +154,13 @@ def main() -> int:
         finally:
             clear_live(data_dir=DATA)  # 一局结束清 live，完整会话转入正式列表
 
-    developer = DeveloperAgent(tracker, str(repo), dev_nexau)
+    developers = [  # 2 dev agent：共用同一 nexau 定义，同轮各领一条不同 issue
+        DeveloperAgent(tracker, str(repo), dev_nexau),
+        DeveloperAgent(tracker, str(repo), dev_nexau),
+    ]
     tester = TestAgent(
         launcher=launcher,
-        fixed_set=fixed_set,
+        fixed_set=fixed_set[:1],  # 体感门禁取 1 个 persona 抽样，控制每次评测成本
         baseline=None,
         n=1,
         tol=0.5,
@@ -162,15 +175,15 @@ def main() -> int:
         fixed_set=fixed_set,
         tracker=tracker,
         store=store,
-        developer_agent=developer,
+        developer_agents=developers,
         test_agent=tester,
         release_fn=release_fn,
         run_session_fn=run_session_fn,
         initial_ref="release",
     )
 
-    print("④ 跑 1 轮闭环（真模型，较慢，请稍候）...")
-    refs = orch.run(1)
+    print("④ 跑 2 轮闭环（2 user agent × 2 dev agent，真模型，较慢，请稍候）...")
+    refs = orch.run(2)
 
     print("\n=== 结果 ===")
     print("release_ref 链:", refs)

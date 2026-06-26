@@ -25,12 +25,13 @@ class _Launcher:
 
 
 class _Dev:
-    def __init__(self, events: list, result: DevResult) -> None:
+    def __init__(self, events: list, result: DevResult, label: str = "work_one") -> None:
         self._events = events
         self._result = result
+        self._label = label
 
-    def work_one(self) -> DevResult:
-        self._events.append("work_one")
+    def work_one(self, skip: set[int] | None = None) -> DevResult:
+        self._events.append(self._label)
         return self._result
 
 
@@ -59,7 +60,7 @@ def _orch(
         fixed_set=[(_persona(), SeedScenario(description=f"s{i}")) for i in range(fixed_k)],
         tracker=None,
         store=None,
-        developer_agent=_Dev(events, dev_result),
+        developer_agents=[_Dev(events, dev_result)],
         test_agent=_Test(events, verdict) if verdict else None,
         release_fn=release_fn or default_release_fn,
         run_session_fn=run_session_fn,
@@ -134,7 +135,7 @@ def test_b_phase_error_propagates() -> None:
     events: list = []
 
     class _BoomDev:
-        def work_one(self):
+        def work_one(self, skip: set[int] | None = None):
             raise RuntimeError("dev 崩了")
 
     orch = Orchestrator(
@@ -142,7 +143,7 @@ def test_b_phase_error_propagates() -> None:
         fixed_set=[(_persona(), SeedScenario(description="s"))],
         tracker=None,
         store=None,
-        developer_agent=_BoomDev(),
+        developer_agents=[_BoomDev()],
         test_agent=None,
         release_fn=lambda *a: None,
         run_session_fn=lambda p, s, h: None,
@@ -150,3 +151,32 @@ def test_b_phase_error_propagates() -> None:
     )
     with pytest.raises(RuntimeError):
         orch.run_round("v1")
+
+
+def test_two_developers_two_releases_chain_ref() -> None:
+    # 同轮 2 个 dev 各领一条 issue，各自过门禁发版，ref 链式推进 v1→v2→v3。
+    events: list = []
+    counter = {"v": 1}
+
+    def release_fn(branch, verdict_, issue_number):
+        events.append(("release", branch))
+        counter["v"] += 1
+        return ReleaseResult(released=True, tag=f"v{counter['v']}", ref=f"v{counter['v']}")
+
+    dev1 = _Dev(events, DevResult(issue_number=1, branch="fix/issue-1", changed=True), label="dev1")
+    dev2 = _Dev(events, DevResult(issue_number=2, branch="fix/issue-2", changed=True), label="dev2")
+    orch = Orchestrator(
+        launcher=_Launcher(events),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        tracker=None,
+        store=None,
+        developer_agents=[dev1, dev2],
+        test_agent=_Test(events, Verdict(passed=True, mean=3.0, baseline=2.0, n=1)),
+        release_fn=release_fn,
+        run_session_fn=lambda p, s, h: events.append(("session", h[1])),
+        initial_ref="v1",
+    )
+    assert orch.run_round("v1") == "v3"  # 两次发版后的最新 tag
+    assert events.count(("release", "fix/issue-1")) == 1
+    assert events.count(("release", "fix/issue-2")) == 1
+    assert events.index("dev1") < events.index("dev2")  # 依次跑
