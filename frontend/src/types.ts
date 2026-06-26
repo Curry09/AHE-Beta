@@ -21,6 +21,20 @@ export interface Turn {
   content: string;
 }
 
+export interface Issue {
+  number: number;
+  title: string;
+  labels: string[];
+  state: string;
+  url: string;
+}
+
+export interface IssuesResponse {
+  connected: boolean;
+  board_url: string | null;
+  issues: Issue[];
+}
+
 export interface IssueRef {
   number: number;
   url: string;

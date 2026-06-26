@@ -1,4 +1,4 @@
-import type { Overview, SessionSummary, SessionDetail } from "./types";
+import type { Overview, SessionSummary, SessionDetail, IssuesResponse } from "./types";
 
 async function get<T>(path: string): Promise<T> {
   const resp = await fetch(path);
@@ -9,3 +9,4 @@ async function get<T>(path: string): Promise<T> {
 export const getOverview = () => get<Overview>("/api/overview");
 export const getSessions = () => get<SessionSummary[]>("/api/sessions");
 export const getSession = (id: string) => get<SessionDetail>(`/api/sessions/${id}`);
+export const getIssues = () => get<IssuesResponse>("/api/issues");

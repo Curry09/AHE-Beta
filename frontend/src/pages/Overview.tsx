@@ -1,18 +1,11 @@
-import { useEffect, useState } from "react";
 import { getOverview } from "../api";
-import type { Overview as OverviewData } from "../types";
+import { useLiveData } from "../hooks/useLiveData";
 import { KpiCard } from "../components/KpiCard";
 import { LineChartPanel } from "../components/LineChartPanel";
+import { LiveIndicator } from "../components/LiveIndicator";
 
 export default function Overview() {
-  const [data, setData] = useState<OverviewData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getOverview()
-      .then(setData)
-      .catch((e) => setError(String(e)));
-  }, []);
+  const { data, error, updatedAt } = useLiveData(getOverview);
 
   if (error) return <p className="muted">加载失败：{error}</p>;
   if (!data) return <p className="muted">加载中…</p>;
@@ -22,7 +15,10 @@ export default function Overview() {
 
   return (
     <div>
-      <h2>概览</h2>
+      <div className="head">
+        <h2>概览</h2>
+        <LiveIndicator updatedAt={updatedAt} />
+      </div>
       <div className="cards">
         <KpiCard label="当前 open issue" value={data.open_issue_count ?? "—"} />
         <KpiCard label="会话总数" value={data.session_count} />

@@ -5,6 +5,7 @@ import "./index.css";
 import Overview from "./pages/Overview";
 import Sessions from "./pages/Sessions";
 import SessionDetail from "./pages/SessionDetail";
+import Issues from "./pages/Issues";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -12,6 +13,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <nav>
         <Link to="/">概览</Link>
         <Link to="/sessions">会话</Link>
+        <Link to="/issues">Gitea 看板</Link>
       </nav>
       <div className="container">{children}</div>
     </>
@@ -26,6 +28,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/" element={<Overview />} />
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/sessions/:id" element={<SessionDetail />} />
+          <Route path="/issues" element={<Issues />} />
         </Routes>
       </Shell>
     </BrowserRouter>
