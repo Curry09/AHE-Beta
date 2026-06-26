@@ -6,7 +6,12 @@ import pytest
 
 from auto_designer.harness.interface import FakeHarness
 from auto_designer.models import Persona, SeedScenario
-from auto_designer.user.user_agent import END_SENTINEL, UserAgent
+from auto_designer.user.user_agent import (
+    END_SENTINEL,
+    UserAgent,
+    _parse_feeling,
+    _parse_issues,
+)
 
 
 def _persona() -> Persona:
@@ -76,6 +81,34 @@ def test_issue_stub_zero_and_two() -> None:
         SeedScenario(description="x"), FakeHarness()
     )
     assert drafts0 == []
+
+
+def test_parse_issues_strips_code_fence() -> None:
+    raw = '```json\n[{"title": "t", "body": "b", "labels": []}]\n```'
+    out = _parse_issues(raw)
+    assert len(out) == 1 and out[0].title == "t"
+
+
+def test_parse_issues_with_surrounding_text() -> None:
+    raw = '好的，归纳如下：[{"title": "t", "body": "b", "labels": ["bug"]}] 以上。'
+    out = _parse_issues(raw)
+    assert len(out) == 1 and out[0].labels == ["bug"]
+
+
+def test_parse_issues_truncated_degrades_to_empty() -> None:
+    # 真实崩溃复现：max_tokens 截断导致未闭合字符串，不得炸整轮，降级为 0 条。
+    raw = '[{"title": "t", "body": "很长的描述被截断'
+    assert _parse_issues(raw) == []
+
+
+def test_parse_issues_non_list_degrades_to_empty() -> None:
+    assert _parse_issues('{"title": "t"}') == []
+
+
+def test_parse_feeling_tolerates_fence_and_prefix() -> None:
+    assert _parse_feeling("```\n3 还行\n```").score == 3
+    fs = _parse_feeling("评分 4：非常顺手")
+    assert fs.score == 4 and fs.reason == "非常顺手"
 
 
 def test_max_turns_must_be_positive() -> None:

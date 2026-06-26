@@ -8,6 +8,7 @@ issue 为最小桩（方案 a，见 spec open-questions）。harness 生命周�
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 
 from auto_designer.harness.interface import HarnessInterface
@@ -31,20 +32,44 @@ def _parse_message(raw: str) -> tuple[str, bool]:
     return user_msg, end
 
 
+def _strip_code_fence(text: str) -> str:
+    """去掉 LLM 常加的 ```json … ``` / ``` … ``` 围栏，返回内层；无围栏原样返回。"""
+    if not text.startswith("```"):
+        return text
+    lines = text.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
 def _parse_feeling(raw: str) -> FeelingScore:
-    """解析体感输出 '<score> <reason>'：首 token 为 1..4 分，余下为理由。越界由 FeelingScore 构造期收口。"""
-    parts = raw.strip().split(maxsplit=1)
-    score = int(parts[0])
-    reason = parts[1] if len(parts) > 1 else ""
+    """解析体感输出：容忍围栏/前缀文字，取首个整数为分，余下为理由。越界由 FeelingScore 构造期收口。"""
+    text = _strip_code_fence(raw.strip())
+    match = re.search(r"-?\d+", text)
+    if match is None:
+        raise ValueError(f"体感输出无法解析出分数：{raw!r}")
+    score = int(match.group())
+    reason = text[match.end() :].lstrip(" :：-，,。.").strip()
     return FeelingScore(score=score, reason=reason)
 
 
 def _parse_issues(raw: str) -> list[IssueDraft]:
-    """解析 issue 输出为 0..n 条 IssueDraft。空/[]→0 条；否则按 JSON 列表解析。"""
-    text = raw.strip()
+    """解析 issue 输出为 0..n 条 IssueDraft。容忍围栏/夹杂文字；空或坏 JSON（截断等）降级为 0 条，不炸整轮。"""
+    text = _strip_code_fence(raw.strip())
     if not text or text == "[]":
         return []
-    return [IssueDraft.from_dict(item) for item in json.loads(text)]
+    start, end = text.find("["), text.rfind("]")  # 截出 JSON 数组，容忍前后解释文字
+    if start != -1 and end > start:
+        text = text[start : end + 1]
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return []  # 截断/坏 JSON：issue 为尽力而为，降级为 0 条而非中止会话
+    if not isinstance(data, list):
+        return []
+    return [IssueDraft.from_dict(item) for item in data]
 
 
 class UserAgent:
