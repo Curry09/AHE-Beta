@@ -40,6 +40,8 @@ def _build_agent():
         f"  api_key: {os.environ['LLM_API_KEY']}\n"
         # Nex-N2-Pro 是推理模型：reasoning_content 先吃 token，4096 会被推理吃光致 content=null。
         "  max_tokens: 32768\n"
+        # per-call 超时：不设则 openai 客户端无限挂起（网关偶发卡死整轮）；超时即触发 _reply 重试。
+        "  timeout: 300\n"
         "  api_type: openai_chat_completion\n",
         encoding="utf-8",
     )
