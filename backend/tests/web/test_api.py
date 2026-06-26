@@ -140,3 +140,37 @@ def test_session_detail_ok(tmp_path: Path) -> None:
 def test_session_detail_404(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=FakeTracker())
     assert client.get("/api/sessions/nope").status_code == 404
+
+
+def test_issues_connected(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    tracker.create_issue(IssueDraft(title="慢查询排查", body="b", labels=["bug"]))
+    store = SessionStore(tmp_path / "sessions")
+    client = TestClient(
+        create_app(store=store, tracker=tracker, board_url="http://gitea/o/r/issues")
+    )
+
+    body = client.get("/api/issues").json()
+    assert body["connected"] is True
+    assert body["board_url"] == "http://gitea/o/r/issues"
+    assert len(body["issues"]) == 1
+    issue = body["issues"][0]
+    assert issue["title"] == "慢查询排查"
+    assert issue["url"] == "http://gitea/o/r/issues/1"
+    assert "bug" in issue["labels"]
+    assert issue["state"] == "open"
+
+
+def test_issues_no_tracker(tmp_path: Path) -> None:
+    client = _client(tmp_path, tracker=None)
+    body = client.get("/api/issues").json()
+    assert body["connected"] is False
+    assert body["issues"] == []
+
+
+def test_issues_tracker_error(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions")
+    client = TestClient(create_app(store=store, tracker=_BrokenTracker()))
+    body = client.get("/api/issues").json()
+    assert body["connected"] is False
+    assert body["issues"] == []

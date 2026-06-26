@@ -43,7 +43,33 @@ def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
     }
 
 
-def create_app(*, store: SessionStore, tracker: IssueTracker | None) -> FastAPI:
+def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict[str, object]:
+    """Gitea 看板整合：列 open issue + 看板链接；无 tracker 或读取失败时 connected=False。"""
+    if tracker is None:
+        return {"connected": False, "board_url": board_url, "issues": []}
+    try:
+        open_issues = tracker.list_open_issues()
+    except Exception:
+        return {"connected": False, "board_url": board_url, "issues": []}
+    return {
+        "connected": True,
+        "board_url": board_url,
+        "issues": [
+            {
+                "number": i.number,
+                "title": i.title,
+                "labels": list(i.labels),
+                "state": i.state,
+                "url": f"{board_url}/{i.number}" if board_url else "",
+            }
+            for i in open_issues
+        ],
+    }
+
+
+def create_app(
+    *, store: SessionStore, tracker: IssueTracker | None, board_url: str | None = None
+) -> FastAPI:
     app = FastAPI(title="auto-designer observation dashboard", version="0.1.0")
 
     app.add_middleware(
@@ -66,6 +92,10 @@ def create_app(*, store: SessionStore, tracker: IssueTracker | None) -> FastAPI:
             "feeling_trend": metrics.feeling_trend(),
             "issue_curve": metrics.issue_curve(),
         }
+
+    @app.get("/api/issues")
+    def issues() -> dict[str, object]:
+        return _list_issues(tracker=tracker, board_url=board_url)
 
     @app.get("/api/sessions")
     def sessions() -> list[dict[str, object]]:
@@ -107,4 +137,14 @@ def _default_tracker() -> IssueTracker | None:
     return GiteaTracker(base_url=base_url, owner=owner, repo=repo, token=token)
 
 
-app = create_app(store=_default_store(), tracker=_default_tracker())
+def _default_board_url() -> str | None:
+    """Gitea 看板地址：{GITEA_URL}/{OWNER}/{REPO}/issues，环境不全则 None。"""
+    base_url = os.environ.get("GITEA_URL")
+    owner = os.environ.get("OWNER")
+    repo = os.environ.get("REPO")
+    if not (base_url and owner and repo):
+        return None
+    return f"{base_url.rstrip('/')}/{owner}/{repo}/issues"
+
+
+app = create_app(store=_default_store(), tracker=_default_tracker(), board_url=_default_board_url())

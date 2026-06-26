@@ -50,9 +50,13 @@ def _reply(agent, message: str) -> str:
     for attempt in range(_RUN_RETRIES):
         try:
             out = agent.run(message=message)
-            return out if isinstance(out, str) else out[0]
+            text = out if isinstance(out, str) else out[0]
+            if text and text.strip():  # 非空才算成功
+                return text
+            last = "empty reply"  # 空回复（网关 200+空内容不抛异常）视为失败，不得静默返回
         except Exception as exc:  # 网关 502 抽风 → 退避重试
             last = exc
+        if attempt < _RUN_RETRIES - 1:  # 末次不再睡
             time.sleep(1.5 * (attempt + 1))
     return f"[harness error] {last}"
 
