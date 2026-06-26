@@ -74,12 +74,13 @@ backend/                 # 后端（编排框架）
     tracker/             # base.py(IssueTracker接口) + gitea.py + fake.py
     dev/                 # developer_agent.py + test_agent.py + release.py
     loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
+    web/                 # 只读观测看板 FastAPI（/api/overview /api/sessions /api/sessions/{id}）
   tests/                 # 测试（pytest testpaths=backend/tests）
   agent_defs/            # 角色 nexau 定义（数据）：user_agent/ developer_agent/ test_agent/
   harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml
   deploy/gitea/          # 基建：docker-compose.yml(Gitea+sqlite) + bootstrap.sh
   scripts/               # bootstrap_harness.py + check-spec-number-conflicts.py
-frontend/                # 前端（占位，暂无内容）
+frontend/                # 前端：React+Vite+TS 只读观测看板（消费 backend web API）
 docs/specs/              # 设计 specs（spec-driven-development 源，项目级）
 tools/                   # vendored spec CLI（外来工具，不纳入 lint）
 backend/data/            # 运行产物(.gitignore)：sessions/ harness_runs/
