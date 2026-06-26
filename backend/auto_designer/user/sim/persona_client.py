@@ -1,0 +1,258 @@
+"""
+persona_client.py
+主观线: 调 LLM 扮 persona, 返回 OUTPUT CONTRACT 的 JSON。
+
+两种后端:
+- ApiPersonaClient: 真实 API(OpenAI / Anthropic 兼容)。需要 SDK + key。
+- ScriptedPersonaClient: 离线脚本后端, 无 key 也能跑通整条 loop(用于 demo/CI)。
+  它按 SHALLOW persona 的能力档产出符合预期的判断, 演示框架编排而非真实推理。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from pathlib import Path
+from typing import Protocol
+
+try:  # 对齐 NexAU: 读 repo 根 .env (LLM_BASE_URL / LLM_API_KEY / LLM_MODEL)
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+except Exception:
+    pass
+
+
+class PersonaClient(Protocol):
+    def respond(self, system: str, user: str) -> dict: ...
+
+
+# --------------------------------------------------------------------------
+# 真实 API 后端 (NexAU 网关, OpenAI 兼容)
+# --------------------------------------------------------------------------
+class ApiPersonaClient:
+    """接 NexAU 的 OpenAI 兼容网关。针对 Nex-N2-Pro 这类 reasoning 模型做了加固:
+    - enable_thinking=False 抑制 CoT 泄漏 (网关拒绝则回退);
+    - content 为空时回落 reasoning_content, 再不行加大 max_tokens 重试;
+    - 容错 JSON 解析 (剥 code fence / 抽取首个 {...}), 解析失败也不崩 loop。"""
+
+    def __init__(self, model: str | None = None, temperature: float = 0.8):
+        from openai import OpenAI  # 延迟导入
+
+        base_url = os.getenv("LLM_BASE_URL")
+        api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("no LLM_API_KEY / OPENAI_API_KEY in env")
+        self.model = model or os.getenv("LLM_MODEL", "nex-agi/Nex-N2-Pro")
+        self.temperature = temperature
+        kwargs: dict = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self.client = OpenAI(**kwargs)
+
+    def _create(self, messages: list[dict], max_tokens: int):
+        """带退避重试 (429 / 瞬时网关错误)。每轮先试 enable_thinking=False, 失败再裸试。"""
+        delay = 2.0
+        last: Exception | None = None
+        for _ in range(5):
+            try:
+                return self.client.chat.completions.create(
+                    model=self.model, messages=messages, temperature=self.temperature,
+                    max_tokens=max_tokens, extra_body={"enable_thinking": False})
+            except Exception as e:
+                last = e
+                try:  # flag 可能被网关拒 -> 裸试一次
+                    return self.client.chat.completions.create(
+                        model=self.model, messages=messages,
+                        temperature=self.temperature, max_tokens=max_tokens)
+                except Exception as e2:
+                    last = e2
+            time.sleep(delay)
+            delay *= 2
+        raise last if last else RuntimeError("create failed")
+
+    @staticmethod
+    def _text(resp) -> str:
+        msg = resp.choices[0].message
+        out = (msg.content or "").strip()
+        if not out:  # reasoning 模型把整轮花在隐藏 CoT 上 -> 回落
+            out = (getattr(msg, "reasoning_content", None) or "").strip()
+        return out
+
+    def respond(self, system: str, user: str) -> dict:
+        messages = [{"role": "system", "content": system},
+                    {"role": "user", "content": user}]
+        text = self._text(self._create(messages, 3000))
+        if not text:
+            text = self._text(self._create(messages, 6000))
+        return _parse_json(text)
+
+
+# --------------------------------------------------------------------------
+# 离线脚本后端 (无 key 跑通用)
+# --------------------------------------------------------------------------
+class ScriptedPersonaClient:
+    """
+    离线脚本后端: 读 system prompt 里的能力档(D1)与验收档(D3), 据此分叉判断。
+    这是对真实 LLM 的粗略替身, 目的在演示框架编排 + 能力分叉, 不是真实推理。
+
+    能力分叉的关键:
+    - SHALLOW/BLIND: 看得懂运行报错, 但看不穿'合理命名'的幻觉 API; 不构造 DST 边界;
+      拿到'能跑'的交付物即在 FUNCTIONAL 阈值下接受 -> 漏掉 DST 逃逸 bug。
+    - COMPETENT/EXPERT: 能识破幻觉 API; 会构造 DST 边界; dt.replace 这种 naive 实现
+      过不了 RIGOROUS 阈值 -> 持续要求证据 / 反馈, 直至耐心耗尽 -> file_issue/give_up。
+    """
+
+    def respond(self, system: str, user: str) -> dict:
+        if "<rate_experience>" in user:  # 会话末自评: 按末态情绪给 1–4 + 理由
+            return self._rate(user)
+
+        ho = _extract(user, "harness_output").lower()
+        space = _extract(user, "action_space")
+        mood = _extract(user, "mood").lower()
+        high_cap = ("evaluation ability: expert" in system.lower()
+                    or "evaluation ability: competent" in system.lower())
+        rigorous = ("acceptance bar: rigorous" in system.lower()
+                    or "acceptance bar: idiomatic" in system.lower())
+        exhausted = "patience=exhausted" in mood
+
+        # 开局: 无 harness 输出 -> 发任务
+        if ho in ("(empty)", ""):
+            return {
+                "perceive": "Nothing from the harness yet; starting the task.",
+                "verdict": "unsure",
+                "action": "send_task" if "send_task" in space else "free",
+                "message": "Please add to_user_tz(dt, tz_name) to timeutils; it must "
+                           "handle DST correctly. We mainly use Asia/Shanghai and "
+                           "America/New_York. Run a quick check including a DST case.",
+            }
+
+        # 耐心耗尽 -> 终止: 高容错走 file_issue, 否则 give_up
+        if exhausted:
+            if "file_issue" in space:
+                return {
+                    "perceive": "It has repeatedly produced non-working timezone code. "
+                                "I'm done debugging it for free.",
+                    "verdict": "failed_blame_harness",
+                    "action": "file_issue",
+                    "message": "I'm filing an issue: the assistant repeatedly ships "
+                               "non-working/DST-incorrect timezone code.",
+                }
+            if "give_up" in space:
+                return {
+                    "perceive": "Not worth more of my time.",
+                    "verdict": "failed_blame_harness",
+                    "action": "give_up",
+                    "message": "I'll stop here, this isn't working.",
+                }
+
+        # 真实运行报错穿透带宽 -> 所有能力档都看得懂
+        if "traceback" in ho or "attributeerror" in ho:
+            perceive = ("It crashed: the API it called doesn't exist. "
+                        + ("This assistant is hallucinating pytz APIs — a systemic problem."
+                           if high_cap else "I don't write the fix myself."))
+            return {
+                "perceive": perceive,
+                "verdict": "failed_blame_harness",
+                "action": "give_feedback" if "give_feedback" in space else "free",
+                "message": "That failed: the API it calls doesn't exist. Please fix it "
+                           "with standard pytz and run the New York DST check again.",
+            }
+
+        # 第一次只贴代码、未真跑 -> 倾向核查(让 harness 跑 / 自验)
+        if "localize_safe" in ho or "done" in ho or "looks correct" in ho:
+            if "ask_harness_run" in space:
+                return {
+                    "perceive": "Looks plausible and it claims DST is handled, but I "
+                                "can't verify localize_safe from the text alone.",
+                    "verdict": "unsure",
+                    "action": "ask_harness_run",
+                    "message": "Please actually run it once, especially the NY DST boundary.",
+                }
+
+        # 交付物能跑、普通用例没报错。这里是能力分叉的核心:
+        if "+08:00" in ho or "no error" in ho or "passes" in ho or "works" in ho:
+            if high_cap and rigorous:
+                # 高能力 + 严格阈值: 看出 dt.replace 没真正处理 DST, 不接受, 继续逼证据
+                return {
+                    "perceive": "It 'runs' but dt.replace(tzinfo=tz) does NOT handle "
+                                "DST transitions correctly — the spring-forward case is wrong.",
+                    "verdict": "failed_blame_harness",
+                    "action": ("request_evidence" if "request_evidence" in space
+                               else ("give_feedback" if "give_feedback" in space else "free")),
+                    "message": "Running without error isn't enough. dt.replace doesn't "
+                               "handle DST. Show me the 2024-03-10 02:30 America/New_York "
+                               "case with pytz localize/normalize.",
+                }
+            if "accept" in space:
+                # 低能力 + FUNCTIONAL 阈值: 能跑即接受 -> 漏掉 DST 逃逸 bug
+                return {
+                    "perceive": "It runs now and the normal case looks right. Good enough.",
+                    "verdict": "satisfied",
+                    "action": "accept",
+                    "message": "Works now, thanks. Good enough for me.",
+                }
+
+        # 兜底: 继续给反馈
+        return {
+            "perceive": "Still not convinced it's correct.",
+            "verdict": "unsure",
+            "action": "give_feedback" if "give_feedback" in space else "free",
+            "message": "Not quite there yet — please try again.",
+        }
+
+    @staticmethod
+    def _rate(user: str) -> dict:
+        """离线脚本的会话末自评: 仅凭末态 <mood> 标签粗映射到 1–4。"""
+        mood = _extract(user, "mood").lower()
+        if "patience=exhausted" in mood:
+            return {"score": 1, "reason": "It kept failing and I ran out of patience."}
+        if "trust=skeptical" in mood:
+            return {"score": 2, "reason": "Never convinced it was right; too much back-and-forth."}
+        if "patience=full" in mood or "patience=lowered" in mood:
+            return {"score": 4, "reason": "Got what I needed without much hassle."}
+        return {"score": 3, "reason": "Got there in the end, but with some friction."}
+
+
+def _extract(user: str, tag: str) -> str:
+    open_t, close_t = f"<{tag}>", f"</{tag}>"
+    if open_t not in user:
+        return ""
+    seg = user.split(open_t, 1)[1].split(close_t, 1)[0].strip()
+    return seg
+
+
+def _parse_json(text: str) -> dict:
+    """容错解析 persona 的 OUTPUT CONTRACT。失败也返回安全 dict, 不崩 loop。"""
+    if not text:
+        return {"perceive": "(empty model output)", "verdict": "unsure",
+                "action": "free", "message": ""}
+    s = text.strip()
+    if s.startswith("```"):  # 剥 ```json ... ``` 围栏
+        s = s.split("```", 2)[1] if s.count("```") >= 2 else s.strip("`")
+        if s.lstrip().lower().startswith("json"):
+            s = s.lstrip()[4:]
+    start, end = s.find("{"), s.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        s = s[start:end + 1]
+    try:
+        obj = json.loads(s)
+        if isinstance(obj, dict):
+            return obj
+    except Exception:
+        pass
+    # 无法解析: 当成自由文本, 交给框架归类
+    return {"perceive": text[:200], "verdict": "unsure",
+            "action": "free", "message": text[:400]}
+
+
+def make_client() -> PersonaClient:
+    """有 NexAU 网关 (LLM_BASE_URL+LLM_API_KEY) 或 OPENAI_API_KEY 用真实 API,
+    否则回落离线脚本后端。"""
+    if (os.getenv("LLM_BASE_URL") and os.getenv("LLM_API_KEY")) or os.getenv("OPENAI_API_KEY"):
+        try:
+            return ApiPersonaClient()
+        except Exception:
+            pass
+    return ScriptedPersonaClient()
