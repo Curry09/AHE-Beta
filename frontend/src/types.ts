@@ -43,6 +43,7 @@ export interface Agent {
   status: string;
   turns: Turn[];
   detail: string | null;
+  started_at: string;
   updated_at: string;
 }
 

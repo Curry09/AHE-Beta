@@ -45,6 +45,19 @@ def test_update_same_id_overwrites_in_place(tmp_path: Path) -> None:
     assert len(agents) == 1 and agents[0]["running"] is False and agents[0]["status"] == "完"
 
 
+def test_started_at_preserved_while_running_reset_on_new_activity(tmp_path: Path) -> None:
+    update_agent(data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="1")
+    start1 = read_agents(data_dir=tmp_path)[0]["started_at"]
+    update_agent(data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="2")
+    assert read_agents(data_dir=tmp_path)[0]["started_at"] == start1  # 持续中沿用
+    update_agent(
+        data_dir=tmp_path, agent_id="u", role="user", label="l", running=False, status="完"
+    )
+    assert read_agents(data_dir=tmp_path)[0]["started_at"] == start1  # 收尾仍沿用，供算总时长
+    update_agent(data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="3")
+    assert read_agents(data_dir=tmp_path)[0]["started_at"] >= start1  # 新一段活动重置
+
+
 def test_clear_removes_all(tmp_path: Path) -> None:
     update_agent(data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="x")
     clear_agents(data_dir=tmp_path)

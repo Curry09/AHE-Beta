@@ -46,6 +46,11 @@ def update_agent(
     path = _agents_file(data_dir=data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     registry = _read_raw(path=path)
+    prev = registry.get(agent_id, {})
+    now = datetime.now().isoformat()
+    # started_at = 本段活动起始：刚由空闲转为 running（或新 agent）时重置，否则沿用，供前端算运行时长。
+    became_running = running and not prev.get("running", False)
+    started_at = now if became_running or not prev.get("started_at") else prev["started_at"]
     registry[agent_id] = {
         "agent_id": agent_id,
         "role": role,
@@ -54,7 +59,8 @@ def update_agent(
         "status": status,
         "turns": turns or [],
         "detail": detail,
-        "updated_at": datetime.now().isoformat(),
+        "started_at": started_at,
+        "updated_at": now,
     }
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
