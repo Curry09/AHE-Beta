@@ -38,7 +38,8 @@ def _build_agent():
         f"  model: {os.environ['LLM_MODEL']}\n"
         f"  base_url: {os.environ['LLM_BASE_URL']}\n"
         f"  api_key: {os.environ['LLM_API_KEY']}\n"
-        "  max_tokens: 4096\n"
+        # Nex-N2-Pro 是推理模型：reasoning_content 先吃 token，4096 会被推理吃光致 content=null。
+        "  max_tokens: 32768\n"
         "  api_type: openai_chat_completion\n",
         encoding="utf-8",
     )

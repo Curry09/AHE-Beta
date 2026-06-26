@@ -46,7 +46,8 @@ def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
                 f"  model: {model}\n"
                 f"  base_url: {base_url}\n"
                 f"  api_key: {api_key}\n"
-                "  max_tokens: 4096\n"
+                # Nex-N2-Pro 是推理模型：reasoning_content 先吃 token，4096 易被推理吃光致 content=null。
+                "  max_tokens: 32768\n"
                 "  api_type: openai_chat_completion\n",
                 encoding="utf-8",
             )
