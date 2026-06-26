@@ -1,0 +1,25 @@
+title: Persona 管线：采集（蒸馏）与注入 sim
+issue: 0
+slug: persona-pipeline
+overview: |-
+  本组实现 persona 管线：把「从真实数据采集 persona」与「把 persona 注入控制信封 sim」串成一条链，
+  为 0005 的用户侧重型实现供给真实画像。对应 CLAUDE.md「蒸馏模块」，落实约束「persona 来自真实数据、
+  不依据 benchmark 或轨迹构造」。
+
+  数据流脊柱：
+
+  ```
+  真实使用数据(CC/codex/nexau 日志 · issue · 反馈)
+          │  采集/归纳（T1，蒸馏 skill + persona 库 schema）
+          ▼
+     persona 库（真实画像原貌）
+          │  注入（T2，库记录 → sim 9 维 dimensions.Persona）
+          ▼
+     spec-0005/T5 run_session 跑一局 ─► 体感 + issue
+  ```
+
+  读图即读任务：**T1** 定「采集什么、产物长什么样」（skill + 库 schema），守住 persona 不被 benchmark/轨迹
+  污染；**T2** 定「采集到的 persona 如何变成 sim 能跑的 Persona」（唯一桥接层，经 0005/T1 finalize_persona 填齐派生）。
+
+  与 0005 的关系：本组是 0005（控制信封用户模拟器）的上游供给。两组的 Persona 表示是否最终并轨（库 schema ↔
+  sim 9 维 ↔ spec-0001 models.Persona）记在各 Task open-questions，待真实数据与下游需求收敛后定。

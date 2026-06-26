@@ -1,0 +1,62 @@
+id: T2
+title: Persona 注入 sim
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+  - 0005/T1
+relates-to:
+  - ref: 0005/T1
+    type: extends
+  - ref: 0005/T5
+    type: note
+parallel: false
+files:
+  - backend/auto_designer/user/sim/persona_io.py
+  - backend/tests/user/sim/test_persona_io.py
+version: 1
+updated: '2026-06-26'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  把采集到的 persona（0006/T1 库格式）注入控制信封 sim：load_persona 将一条库记录映射为 sim 的
+  dimensions.Persona（填好 9 维自由采样维度后经 finalize_persona 派生 d3/trust/d6），产物直接交
+  spec-0005/T5 run_session 使用。是「采集」与「sim 引擎」之间的唯一桥接层。
+motivation: |-
+  采集产出的是「真实画像原貌」，sim 消费的是「9 维结构化系数」，两者格式不一。需要一层显式、可测的
+  映射把库记录翻译成 sim 可跑的 Persona，否则采集与引擎无法对接。把映射单列，既隔离两侧的演化，又让
+  「真实画像 → 可执行 persona」这一步可验证。
+scope: |-
+  把采集到的 persona（0006/T1 库格式）注入控制信封 sim：load_persona 将库记录映射为 sim 的 dimensions.Persona（9 维自由采样维度 + finalize_persona 填齐派生），交 0005/T5 run_session 使用。处理库格式↔9 维的字段对齐、缺省与校验；不改库格式（归 T1）、不改 sim 维度模型（归 0005/T1）。
+design: |-
+  - load_persona(record: dict) -> dimensions.Persona：按字段映射把库记录翻成 sim 的自由采样维度
+    （d1/d2/d41/d42/d43/d5 + persona_id），再调 0005/T1 finalize_persona 填齐派生维度（d3/trust/d6）。
+  - 映射策略：库画像字段（身份/水平/领域/目标/说话风格…）→ 9 维枚举。无法直译的字段走显式映射表 +
+    安全缺省；非法/缺失枚举值显式报错（不静默兜底），把"采集质量问题"暴露在注入边界。
+  - 批量入口 load_personas(library) 把整库映射为 list[Persona]，供 0005/T5 逐一跑会话。
+  - 仅做映射：不改库 schema（0006/T1）、不改 sim 维度模型（0005/T1）、不构造 harness/client（0005/T6）。
+interface: |-
+  load_persona(record: dict) -> Persona              # 单条库记录 → sim dimensions.Persona（已 finalize）
+  load_personas(library: PersonaLibrary) -> list[Persona]
+tradeoffs: |-
+  - 显式映射表 vs 库与 sim 直接同构（免映射）：选显式映射。库保留真实画像原貌、sim 用受控枚举，两者
+    职责不同；映射层吸收差异，代价是需维护一张对照表。
+  - 非法值报错 vs 安全缺省：选报错（缺省会把劣质采集悄悄变成"看似合法"的 persona，污染信号）；可缺省的
+    仅限语义上确有默认的维度。
+acceptance: |-
+  load_persona 对合法库记录产出完整不可变 dimensions.Persona（派生维度经 finalize_persona 填齐）；缺字段/非法枚举值显式报错；注入结果可直接喂 0005/T5 run_session 跑通一局；round-trip（库→Persona）字段对齐无丢失。
+tests: |-
+  单测：
+  - load_persona：合法库记录 → 完整不可变 Persona，派生 d3/trust/d6 经 finalize_persona 正确填齐。
+  - 非法/缺失枚举值 → 显式报错（不静默兜底）；可缺省维度走安全默认。
+  - 端到端：注入产物喂 0005/T5 run_session（离线 ScriptedPersonaClient + 脚本化 harness）跑通一局。
+  - 批量：load_personas 把多条库记录映射为等长 Persona 列表。
+references: |-
+  spec-0005/T1 dimensions.Persona 与 finalize_persona；spec-0005/T5 run_session 入口；0006/T1 库 schema。
+open-questions: |-
+  库画像字段 → 9 维枚举的映射表细则待定（依赖 0006/T1 最终 schema）。若后续库 schema 与 sim 维度并轨
+  （共用一套 Persona），本注入层可退化为薄校验或被移除。

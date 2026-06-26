@@ -1,0 +1,63 @@
+id: T6
+title: harness 桩与运行入口
+status: pending
+priority: P2
+tags: []
+depends-on:
+  - T5
+relates-to: []
+parallel: false
+files:
+  - backend/auto_designer/user/sim/harness_adapter.py
+  - backend/auto_designer/user/sim/scenarios.py
+  - backend/auto_designer/user/sim/demo.py
+  - backend/auto_designer/user/sim/run_live.py
+  - backend/tests/user/sim/test_harness_adapter.py
+version: 1
+updated: '2026-06-26'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  脚本化 harness 桩与运行入口。harness_adapter.ScriptedHarness / scenarios.SplitBillHarness：
+  respond(user_message) -> str，按预设轨迹复刻能力分叉场景（timeutils DST / split_bill 丢分钱），
+  bug 体现在回复文本里（如 sum=99.99），由 persona 凭能力自行识别——本轮不回 gold/exit_code（无客观线）。
+  demo（离线脚本后端、无 key 可跑）与 run_live（真实 NexAU 网关）两个入口，并排打印两路体感分与行为信号。
+motivation: |-
+  要离线、确定性地验证整条控制信封 loop（CI/demo 无 key 可跑），并演示同一 harness 轨迹下能力分叉如何产生
+  不同体感——这是把引擎讲清楚、可回归的最小载体。生产中此适配层替换为真实 CLI harness。
+scope: |-
+  脚本化 harness（ScriptedHarness/SplitBillHarness：respond→str）按预设轨迹演示能力分叉场景，bug 仅以
+  回复文本体现（不回 gold/exit_code，对齐本轮无客观线、harness 只输出 text）；demo（离线脚本后端，无 key 可跑）
+  与 run_live（真实 NexAU 网关）两个运行入口，并排打印两路体感分与行为信号。生产中此适配层替换为真实 CLI
+  harness（对齐 0003/T1 launcher 的 HarnessInterface）。
+design: |-
+  - harness 桩：按预设步骤回应，仅消费 message 是否「要求运行 / 探不可整除边界」分叉轨迹；respond 返回纯
+    文本（str）。bug 体现在文本中（如 split_bill(100,3) -> sum=99.99），高能力 persona 读文本即可识别，
+    低能力 persona 看常规用例（sum=100）即接受——分叉完全由 persona 能力 + 文本感知驱动，无需 gold。
+  - demo：make_client（无 key → ScriptedPersonaClient），两 persona（SHALLOW+FEEDBACK / EXPERT+FILE_ISSUE）
+    各跑全新 harness 轨迹，print_result 并排打印 turns / 两路体感 / 行为信号 / issue artifact。
+  - run_live：固定 ApiPersonaClient（走 repo .env 网关）对真实 user-agent 跑 SplitBillHarness。
+interface: |-
+  ScriptedHarness().respond(user_message: str) -> str
+  SplitBillHarness().respond(user_message: str) -> str
+  demo.main() / run_live.main()   # 两个 __main__ 运行入口
+tradeoffs: |-
+  - 脚本化 harness vs 真实 CLI harness：本组用脚本化（确定性、可回归、无外部依赖）；真实接入归 0003/T1 launcher
+    （适配为 HarnessInterface send/reset/close），见 open-questions。
+  - respond 回 str vs 回三元组(含 exit_code/gold)：选 str。本轮不实现客观线，无 gold/exit_code 消费方；
+    与 spec-0001/T2 send->str 一致。bug 改由文本暴露 + persona 能力识别，不依赖 oracle。
+acceptance: |-
+  demo 无 key 用 ScriptedPersonaClient 跑通两 persona 并打印 llm-rated/derived 两路体感；run_live 在配好网关时可对真实 user-agent 跑；harness 桩对'要求运行/探边界'分支产出预期文本轨迹。
+tests: |-
+  单测/烟测：
+  - harness 桩：首轮贴代码未跑；要求运行 → 回显常规用例(无报错)；探不可整除边界 → 文本暴露丢分钱/DST 错误；respond 返回 str。
+  - demo 无 key 跑通两 persona，输出含 llm-rated 与 derived 两路体感分；断言能力分叉（浅层 accept / 专家 file_issue）。
+references: |-
+  spec-0001/T2 FakeHarness（send->str）、spec-0003/T1 harness launcher（真实接入）。
+  参考实现见本组 prototype（harness_adapter / scenarios / demo / run_live.py）。
+open-questions: |-
+  真实 harness 接入由 0003/T1 launcher 适配为 HarnessInterface（send/reset/close）。控制平面（进程 exit_code）
+  与客观真值线是否后续补回，归后续观测 spec，本轮不涉及。

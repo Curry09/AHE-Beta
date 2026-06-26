@@ -1,0 +1,63 @@
+id: T2
+title: 动作模型、动作空间与状态机
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+relates-to: []
+parallel: false
+files:
+  - backend/auto_designer/user/sim/actions.py
+  - backend/auto_designer/user/sim/action_space.py
+  - backend/auto_designer/user/sim/state.py
+  - backend/tests/user/sim/test_action_space.py
+  - backend/tests/user/sim/test_state.py
+version: 1
+updated: '2026-06-26'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  控制信封的确定性机制层：动作目录（每个动作钉死 executor×channel×effect 三轴 + 终止原因）、动作空间
+  派生（局面 ∩ 能力掩码D1 ∩ 授权D6 ∪ 耐心门解锁的终止动作 ∪ accept）、自由产出归类与越权投影与
+  channel↔message 强校验、以及 patience/trust 状态机（只吃主观 verdict）。本轮纯主观，不含客观真值线。
+motivation: |-
+  把「用户这一轮能做什么、做完情绪怎么变」从 LLM 自由发挥收敛为可控、可复现的纯代码机制：能力掩码
+  保证低能力 persona 不会越级核查（G1 不偷看真值），耐心/信任状态机把情绪积分成可终止的轨迹。
+scope: |-
+  动作目录（executor×channel×effect 五属性钉死）+ 动作空间派生（phase ∩ 能力掩码D1 ∩ 授权D6 ∪ 耐心门终止 ∪ accept）+ 自由产出归类/越权投影/channel 校验 + patience/trust 状态机（只吃主观 verdict）。本轮不实现客观真值线（objective/gold/GAP/control-plane），状态只由主观 verdict 驱动。
+design: |-
+  - 动作目录(actions)：send_task/refine_request/give_feedback/verify_self/ask_harness_run/
+    request_evidence/grant_autorun/accept/give_up/file_issue，各钉死 executor∈{PERSONA_LOCAL,HARNESS,
+    FRAMEWORK}、channel∈{EMIT,SILENT}、effect∈{ADVANCE,VERIFY,TERMINATE}；channel↔message 一致性强校验。
+  - 动作空间(action_space)：LEGAL_BY_PHASE ∩ cap_mask(D1) ∩ authz(D6)，耐心<=0 解锁 D4.3 选定的终止动作，
+    有可接受产物加 accept；resolve_action 把 LLM 的 free/越权产出归类并投影回合法集。
+  - 状态机(state)：apply_verdict 仅按主观 verdict 改 patience/trust（satisfied↑信任、failed_blame_harness↓
+    耐心↓信任…）；persona 派生系数(make_coef) 决定演化速率。客观真值不参与状态演化（本轮不实现客观线）。
+interface: |-
+  derive_action_space(phase, persona, state, has_artifact) -> list[str]
+  resolve_action(ret: dict, space: list[str], persona) -> tuple[action_id, message]
+  apply_verdict(state, verdict, coef) -> State
+tradeoffs: |-
+  - executor×channel 双轴钉死 vs 单一 run_once 动作：选双轴，根除「自己跑 vs 让 harness 跑」的归属歧义。
+  - 能力掩码 gate 动作 + 感知输入 vs 只 gate 动作：选都 gate，防强模型「心算」源码越过低能力档（G1）。
+  - 本轮纯主观（不实现客观线）vs 含 gold/GAP：选纯主观。训练信号只取用户体感，客观真值线（GAP/
+    ESCAPED_BUG/control-plane）整体推迟，避免过早引入 oracle 依赖；后续如需观测再开 spec。
+acceptance: |-
+  派生动作空间随 phase/D1/D6/patience 正确增删；resolve_action 保证结果在空间内且 channel↔message 一致；apply_verdict 仅按主观 verdict 改 patience/trust；状态演化全程不读任何客观真值。
+tests: |-
+  单测：
+  - derive_action_space：OPENING 只含 send_task；ACTIVE 随 D1 能力掩码增删 verify_self/request_evidence；
+    READ_ONLY/WRITE_NO_RUN 授权剔除 ask_harness_run/grant_autorun；patience<=0 解锁对应终止动作；有产物加 accept。
+  - resolve_action：free → 归类到合法动作；越权 → 同 effect 投影；SILENT 清空 message、EMIT 空则兜底；最终 assert_channel 通过。
+  - apply_verdict：satisfied/ failed_blame_harness/ failed_blame_self/ unsure 对 patience/trust 的增减符合系数。
+  - 纯主观：状态机仅依赖 verdict，构造不含任何客观字段的输入即可驱动全部分支。
+references: |-
+  spec-0001/T2 黑盒对话协议（channel 语义对齐）。CLAUDE.md benchmark held-out。
+  参考实现见本组 prototype（actions/action_space/state.py）。
+open-questions: |-
+  客观真值线（objective/gold/GAP/control-plane）本轮不实现，整体推迟到后续观测 spec；届时按「只走旁路、
+  不写 state/persona、不进体感」的 held-out 约束补回。

@@ -1,0 +1,64 @@
+id: T1
+title: Persona 采集（蒸馏，skill 形式）
+status: pending
+priority: P1
+tags: []
+depends-on: []
+relates-to:
+  - ref: 0005/T1
+    type: note
+parallel: false
+files:
+  - tools/persona-distill/SKILL.md
+  - backend/auto_designer/distill/library.py
+  - backend/tests/distill/test_library.py
+version: 1
+updated: '2026-06-26'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  CLAUDE.md「蒸馏模块」：从真实使用数据（CC/codex/nexau 真实日志、issue tracker、社区反馈）蒸馏出
+  persona 库。persona 来自真实数据、不依据 benchmark 或轨迹构造，以保证体感信号真实、避免训练目标与
+  测试目标互污染。交付物：① persona-distill skill（指导如何从原始数据归纳 persona 画像，可能以 skill 形式
+  随仓提供）；② persona 库的稳定 schema 与读写（library.py），一条记录承载一个画像，供 0006/T2 注入消费。
+motivation: |-
+  整条进化的训练信号取自「模拟真实使用」分布上的用户体感；该分布的真实性根植于 persona 是否来自真实
+  数据。把采集独立成模块/skill，既固化「persona 不依据 benchmark 构造」这条约束的落点，又把"如何归纳
+  画像"沉淀为可复用的方法（skill），与下游 sim 的消费解耦。
+scope: |-
+  从真实使用数据（CC/codex/nexau 真实日志、issue tracker、社区反馈）蒸馏出 persona 库（CLAUDE.md「蒸馏模块」）。persona 来自真实数据、不依据 benchmark 或轨迹构造，以保证体感信号真实、避免训练/测试目标互污染。交付物：① 一份 persona-distill skill（指导如何从原始数据归纳 persona 画像）；② persona 库的稳定 schema 与读写（library.py）：一条记录承载画像字段，可被 0006/T2 注入层消费。本任务定义采集产物与库格式，不绑定具体数据源接入。
+design: |-
+  - persona-distill skill：一份 SKILL.md，描述采集来源（真实日志/issue/反馈）、归纳流程（从使用片段抽取
+    身份/水平/领域/目标/说话风格等画像维度）、与「不引入 benchmark/轨迹特征」的硬约束。skill 产出喂 library。
+  - persona 库 schema（library.py）：一个库文件承载多条 persona 记录；每条为画像字段的纯数据，可双向
+    序列化、对未知键前向兼容（演化友好）。提供读全库 / 按 id 取 / 追加的最小读写。
+  - 库格式与 sim 9 维 Persona 解耦：库是「采集到的原始画像」，到 sim 维度的映射归 0006/T2（注入层）。
+interface: |-
+  PersonaLibrary(root|path)
+  - load() -> list[dict]            # 读全库
+  - get(persona_id: str) -> dict    # 按 id 取一条
+  - add(record: dict) -> None       # 追加一条采集结果
+  库记录字段与 schema 由本任务定义（见 open-questions：是否对齐 spec-0001 Persona 五元组）。
+tradeoffs: |-
+  - skill 形式 vs 纯代码自动管线：采集涉及对真实数据的判断与归纳，难以纯规则化；先以 skill 沉淀方法
+    （人/agent 据此产出），代码侧只固化库 schema 与读写。后续可加自动抽取器，不锁死。
+  - 库为独立 schema vs 直接复用 spec-0001 models.Persona：先独立（采集关注「真实画像」原貌，可能比
+    五元组更丰富），与 sim 维度的对齐交 T2；是否最终并轨见 open-questions。
+acceptance: |-
+  persona 库 schema 可双向序列化、对未知键前向兼容；library 读写一个多条 persona 库文件、可按 id 取；skill 描述清楚采集来源与归纳产物；产物不含任何 benchmark/轨迹派生字段。
+tests: |-
+  单测：
+  - PersonaLibrary 读写：add 后 load 含该条、get(id) 取回等价记录；空库 load 返回空列表。
+  - schema round-trip：记录 to/from dict 字段级一致；遇未知键忽略不报错（前向兼容）。
+  - 约束校验：库记录不含 benchmark/轨迹派生字段（按字段白名单断言）。
+references: |-
+  CLAUDE.md「蒸馏模块」「persona 来自真实数据、不依据 benchmark 或轨迹构造」；spec-0001/T1 Persona
+  字段约定（来源标注归后续 distill spec —— 即本组）。
+open-questions: |-
+  - 采集最终是 skill（人/agent 据此归纳）还是含自动抽取器的代码管线？本组先 skill + 库 schema，自动化待定。
+  - persona 库 schema 是否对齐/扩展 spec-0001 models.Persona 五元组，还是更丰富的原貌格式？与 0006/T2 注入
+    的映射方式一并定。
+  - 是否同时蒸馏「种子场景库」(SeedScenario)？CLAUDE.md 蒸馏模块含场景库，本组先聚焦 persona，场景库另议。

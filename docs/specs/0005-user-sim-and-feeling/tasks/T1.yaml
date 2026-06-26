@@ -1,0 +1,59 @@
+id: T1
+title: Persona 维度模型与文案
+status: pending
+priority: P1
+tags: []
+depends-on: []
+relates-to:
+  - ref: 0001/T1
+    type: extends
+parallel: false
+files:
+  - backend/auto_designer/user/sim/dimensions.py
+  - backend/auto_designer/user/sim/clauses.py
+  - backend/tests/user/sim/test_dimensions.py
+version: 1
+updated: '2026-06-26'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  控制信封的 persona 模型：9 维（D1 评估能力 / D2 领域深度 / D3 验收阈值 / D4.1-4.3 委派·监督·纠偏 /
+  D5 自主性 / D6 授权 + 派生 trust），以及维度→英文注入文案的确定性查表（clauses）。persona 为会话级
+  静态系数，会话开始定死、循环中不变。是 spec-0001/T1 自由文本 Persona 的结构化重型版。
+motivation: |-
+  训练信号「真不真」取决于 persona 扮得「像不像真人」。自由文本 Persona 难以稳定驱动能力分叉
+  （同一 harness 轨迹下浅层用户接受、专家识破）。结构化维度 + 确定性派生使 persona 可复现、可采样、
+  可 codegen，并把「能感知什么」与「验收到什么程度」量化为可被动作空间与状态机消费的系数。
+scope: |-
+  定义 9 维结构化 persona（D1 评估能力/D2 领域深度/D3 验收阈值/D4.1-4.3 交互/D5 自主性/D6 授权 + trust）及其确定性派生（derive_d3/derive_trust/derive_d6/finalize_persona），与维度→英文注入文案的查表（clauses）。persona 为会话级静态系数，不在循环中变化。
+design: |-
+  维度分五层：A 能力底座(D1,D2)、B 验收(D3 派生 D1×D2)、C 交互(D4.1/4.2/4.3)、D 会话配置(D5,D6 半派生)、
+  E 派生(trust = f(D1,D2))。自由采样维度由调用方给定；派生维度由 finalize_persona 确定性填齐：
+  - derive_d3：D1 定基线档，D2.depth 资深+1/新手-1（枚举序内 clamp）。
+  - derive_trust：BLIND→blind、EXPERT→skeptical、其余 balanced。
+  - derive_d6：D5 定基线，task_risk 高收紧一档、collaborative+低风险放开可跑。
+  clauses 为每个维度取值给一句英文注入文案，compile_block_p 拼成 BLOCK-P（喂 persona LLM，不掺状态数值）。
+interface: |-
+  Persona(persona_id, d1, d2, d41, d42, d43, d5, d3=, d6=, trust=)   # frozen dataclass
+  finalize_persona(p: Persona, task_risk: str = "low") -> Persona      # 填齐派生维度
+  compile_block_p(p: Persona) -> str                                   # 维度 → BLOCK-P 文案
+tradeoffs: |-
+  - 9 维结构化 vs spec-0001/T1 自由文本五元组：选结构化（驱动能力分叉、可复现/可采样），代价是建模成本；
+    与 models.Persona 的并轨留待接入闭环（见 open-questions）。
+  - 派生维度确定性查表 vs LLM 推断：选确定性，保证可复现与可 codegen，杜绝采样噪声进入静态系数。
+acceptance: |-
+  finalize_persona 对任意自由采样维度产出完整不可变 persona；派生映射确定性可复现；compile_block_p 对每个维度取值产出对应文案，无缺漏键。
+tests: |-
+  单测：
+  - finalize_persona：对各档 D1/D2/D5 组合，派生 d3/trust/d6 与查表一致、可复现。
+  - derive_d3：senior 抬一档、novice 降一档且在枚举序内 clamp（不越界）。
+  - compile_block_p：每个维度取值都命中文案、无 KeyError；frozen persona 不可变。
+references: |-
+  spec-0001/T1 Persona 字段约定。CLAUDE.md：persona 来自真实数据、不依据 benchmark 构造。
+  参考实现见本组 prototype（dimensions.py / clauses.py）。
+open-questions: |-
+  接入闭环时 9 维 Persona 与 spec-0001 models.Persona（五元组）如何并轨：扩展 models.Persona、
+  还是加 9 维↔五元组转换层？本组先自包含，留待 dev 侧对接时定。
