@@ -35,12 +35,19 @@ export interface IssuesResponse {
   issues: Issue[];
 }
 
-export interface LiveSession {
-  active: boolean;
-  persona_identity?: string;
-  scenario?: string;
-  turns?: Turn[];
-  updated_at?: string;
+export interface Agent {
+  agent_id: string;
+  role: "user" | "developer";
+  label: string;
+  running: boolean;
+  status: string;
+  turns: Turn[];
+  detail: string | null;
+  updated_at: string;
+}
+
+export interface AgentsResponse {
+  agents: Agent[];
 }
 
 export interface IssueRef {

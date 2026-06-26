@@ -7,11 +7,15 @@ MVP 单 agent、一次一条、串行。改动落在 harness 仓的 agents/main.
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from auto_designer.nexau_runtime import Agent
 from auto_designer.tracker.base import IssueTracker
+
+# 开发者活动回调：(running, status, issue_number, branch, detail) → None。注入便于看板流式观测。
+StatusFn = Callable[..., None]
 
 # 开发者 agent 修改的目标（v0 harness 的主 agent 定义）。
 _TARGET = Path("agents") / "main.md"
@@ -31,28 +35,58 @@ class DevResult:
 class DeveloperAgent:
     """从 tracker 取一条 open issue 改 harness。一次处理一条；编排（几条/何时停）归 T6。"""
 
-    def __init__(self, tracker: IssueTracker, harness_repo: str, nexau_agent: Agent) -> None:
+    def __init__(
+        self,
+        tracker: IssueTracker,
+        harness_repo: str,
+        nexau_agent: Agent,
+        on_status: StatusFn | None = None,
+    ) -> None:
         self._tracker = tracker
         self._repo = Path(harness_repo)
         self._agent = nexau_agent
+        self._on_status = on_status  # 流式观测钩子；None 则不发
+
+    def _emit(self, *, running: bool, status: str, **kw: object) -> None:
+        if self._on_status is not None:
+            self._on_status(running=running, status=status, **kw)
 
     def work_one(self, skip: set[int] | None = None) -> DevResult:
         skip = skip or set()  # 同轮多 dev 时跳过已被别的 dev 认领的 issue
         issues = [i for i in self._tracker.list_open_issues() if i.number not in skip]
         if not issues:
+            self._emit(running=False, status="无可领 open issue")
             return DevResult()  # 无（可领）open issue → 不建分支、不报错
         issue = issues[0]
 
         prefix, default_routed = self._route(issue.labels)
         branch = f"{prefix}/issue-{issue.number}"
+        self._emit(
+            running=True,
+            status=f"领取 issue #{issue.number}：{issue.title}",
+            issue_number=issue.number,
+            branch=branch,
+        )
         self._run_git(["checkout", "-B", branch, "release"])  # 从 release 切出（基线单一）
 
         target = self._repo / _TARGET
         old = target.read_text(encoding="utf-8") if target.is_file() else ""
+        self._emit(
+            running=True,
+            status=f"改写 agents/main.md 中…（issue #{issue.number}）",
+            issue_number=issue.number,
+            branch=branch,
+        )
         new = self._agent.run(self._build_prompt(issue.number, issue.title, issue.body, old))
 
         if not new.strip() or new == old:  # 无改动 → 不空提交
             self._tracker.add_comment(issue.number, f"本轮未产出改动（#{issue.number}）")
+            self._emit(
+                running=False,
+                status=f"本轮无改动（issue #{issue.number}）",
+                issue_number=issue.number,
+                branch=branch,
+            )
             return DevResult(
                 issue_number=issue.number,
                 branch=branch,
@@ -69,6 +103,13 @@ class DeveloperAgent:
         note = "（label 无 bug/feature，默认按 bug 分流）" if default_routed else ""
         self._tracker.add_comment(
             issue.number, f"已在分支 {branch} 处理 issue #{issue.number}{note}"
+        )
+        self._emit(
+            running=False,
+            status=f"已提交 {branch}",
+            issue_number=issue.number,
+            branch=branch,
+            detail=f"issue #{issue.number}：{issue.title}\n分支 {branch}\n\n改写后 agents/main.md：\n{new[:800]}",
         )
         return DevResult(
             issue_number=issue.number,

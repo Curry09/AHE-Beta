@@ -137,26 +137,66 @@ def main() -> int:
     def user_llm(*, kind: str, prompt: str) -> str:
         return user_nexau.run(prompt)
 
-    from auto_designer.loop.live import clear_live, write_live
+    from auto_designer.loop.live import clear_agents, update_agent
 
-    def run_session_fn(persona, scenario, harness):
-        def on_progress(transcript):  # 逐轮写 live 快照供看板流式渲染
-            write_live(
+    clear_agents(data_dir=DATA)  # 一轮 run 开始清空 agent 活动注册表
+
+    def _session_with_emit(persona, scenario, harness, agent_id, role, label, prefix):
+        """跑一局会话，逐轮把 transcript 写进该 agent 的活动槽（流式），收尾标 running=False。"""
+
+        def on_progress(transcript):
+            turns = [t.to_dict() for t in transcript.turns]
+            waiting = bool(turns) and turns[-1]["role"] == "user"
+            update_agent(
                 data_dir=DATA,
-                persona_identity=persona.identity,
-                scenario=scenario.description,
-                turns=[t.to_dict() for t in transcript.turns],
+                agent_id=agent_id,
+                role=role,
+                label=label,
+                running=True,
+                status=f"{prefix}harness 回复中…" if waiting else f"{prefix}对话中…",
+                turns=turns,
             )
 
         ua = UserAgent(llm=user_llm, persona=persona, max_turns=2, on_progress=on_progress)
-        try:
-            return run_session(persona, scenario, harness, ua, tracker, store)
-        finally:
-            clear_live(data_dir=DATA)  # 一局结束清 live，完整会话转入正式列表
+        session = run_session(persona, scenario, harness, ua, tracker, store)
+        update_agent(
+            data_dir=DATA,
+            agent_id=agent_id,
+            role=role,
+            label=label,
+            running=False,
+            status=f"{prefix}已完成 · 体感 {session.feeling.score}",
+            turns=[t.to_dict() for t in session.transcript.turns],
+        )
+        return session
+
+    def user_run_session_fn(persona, scenario, harness):  # a 段：用户 agent
+        return _session_with_emit(
+            persona, scenario, harness, f"user-{persona.identity}", "user", persona.identity, ""
+        )
+
+    def test_run_session_fn(persona, scenario, harness):  # 体感门禁：测试 agent（归开发者侧）
+        return _session_with_emit(
+            persona, scenario, harness, "test", "developer", "测试 agent", "门禁会话 · "
+        )
+
+    def make_dev_status(agent_id, label):  # 开发者 agent 活动回调
+        def cb(*, running, status, issue_number=None, branch=None, detail=None):
+            update_agent(
+                data_dir=DATA,
+                agent_id=agent_id,
+                role="developer",
+                label=label,
+                running=running,
+                status=status,
+                detail=detail,
+            )
+
+        return cb
 
     developers = [  # 2 dev agent：共用同一 nexau 定义，同轮各领一条不同 issue
-        DeveloperAgent(tracker, str(repo), dev_nexau),
-        DeveloperAgent(tracker, str(repo), dev_nexau),
+        DeveloperAgent(tracker, str(repo), dev_nexau, on_status=make_dev_status("dev-0", "dev#1")),
+        DeveloperAgent(tracker, str(repo), dev_nexau, on_status=make_dev_status("dev-1", "dev#2")),
     ]
     tester = TestAgent(
         launcher=launcher,
@@ -164,7 +204,7 @@ def main() -> int:
         baseline=None,
         n=1,
         tol=0.5,
-        run_session_fn=run_session_fn,
+        run_session_fn=test_run_session_fn,
     )
 
     def release_fn(branch, verdict, issue_number):
@@ -178,7 +218,7 @@ def main() -> int:
         developer_agents=developers,
         test_agent=tester,
         release_fn=release_fn,
-        run_session_fn=run_session_fn,
+        run_session_fn=user_run_session_fn,
         initial_ref="release",
     )
 

@@ -75,6 +75,21 @@ def test_no_open_issue_returns_empty(tmp_path) -> None:
     assert not any(b.startswith(("fix/", "feat/")) for b in _branches(repo))
 
 
+def test_on_status_emits_claim_and_commit(tmp_path) -> None:
+    repo = _make_harness_repo(tmp_path)
+    tracker = FakeTracker()
+    tracker.create_issue(IssueDraft(title="崩了", body="详情", labels=["bug"]))
+    events: list = []
+
+    def on_status(*, running, status, issue_number=None, branch=None, detail=None):
+        events.append((running, status, branch))
+
+    DeveloperAgent(tracker, repo, _FakeAgent("修复后的内容\n"), on_status=on_status).work_one()
+    # 至少有「领取」和「已提交」两个状态，且收尾 running=False
+    assert any("领取 issue #1" in s for _, s, _ in events)
+    assert any(not r and "已提交 fix/issue-1" in s for r, s, _ in events)
+
+
 def test_skip_picks_next_issue(tmp_path) -> None:
     # 同轮多 dev：传入 skip 跳过已认领 issue，领下一条。
     repo = _make_harness_repo(tmp_path)
