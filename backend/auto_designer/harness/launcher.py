@@ -94,7 +94,7 @@ class HarnessLauncher:
         self._runs_root = Path(runs_root)
 
     def launch(self, ref: str) -> HarnessInterface:
-        dest = self._checkout(ref)
+        dest = self._checkout(ref=ref)
         params = self._read_params(dest)
         entry = params["entry"]
         if not isinstance(entry, list) or not entry:
@@ -106,17 +106,32 @@ class HarnessLauncher:
         env = {str(k): str(v) for k, v in (params.get("env") or {}).items()}
         return _HarnessHandle(entry=argv, cwd=cwd, env=env)
 
-    def _checkout(self, ref: str) -> Path:
-        dest = self._runs_root / ref
-        if dest.is_dir() and any(dest.iterdir()):
-            return dest  # 同 ref 已取出 → 复用（幂等）
+    def _resolve_sha(self, *, ref: str) -> str:
+        """把 ref（分支/tag/SHA）解析成确定的 commit SHA；非法 ref 抛 RuntimeError。"""
         result = subprocess.run(
-            ["git", "-C", self._harness_repo, "archive", "--format=tar", ref],
+            ["git", "-C", self._harness_repo, "rev-parse", "--verify", f"{ref}^{{commit}}"],
             capture_output=True,
         )
         if result.returncode != 0:
             raise RuntimeError(
-                f"checkout ref {ref!r} 失败：{result.stderr.decode(errors='replace')[:200]}"
+                f"解析 ref {ref!r} 失败：{result.stderr.decode(errors='replace')[:200]}"
+            )
+        return result.stdout.decode().strip()
+
+    def _checkout(self, *, ref: str) -> Path:
+        # 按 commit SHA 而非 ref 名缓存：release 这类会变的分支，内容一变就落到新目录，
+        # 绝不复用陈旧 checkout（曾导致跑的是旧 entry.py、harness 静默空回复）。
+        sha = self._resolve_sha(ref=ref)
+        dest = self._runs_root / f"{ref.replace('/', '_')}-{sha[:12]}"
+        if dest.is_dir() and any(dest.iterdir()):
+            return dest  # 同 ref 同 SHA（内容一致）→ 安全复用
+        result = subprocess.run(
+            ["git", "-C", self._harness_repo, "archive", "--format=tar", sha],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"checkout {ref!r}@{sha[:12]} 失败：{result.stderr.decode(errors='replace')[:200]}"
             )
         dest.mkdir(parents=True, exist_ok=True)
         with tarfile.open(fileobj=io.BytesIO(result.stdout)) as tf:
