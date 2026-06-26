@@ -1,6 +1,21 @@
-# frontend（占位）
+# frontend — 观测看板（React + Vite + TS）
 
-前端目录,暂为占位 —— 后续在此放观测看板 / 控制台等。
+只读看板：消费 `backend/auto_designer/web/api.py` 的 `/api/*`，可视化体感曲线、issue 曲线与会话明细。
 
-后端在 `../backend/`(auto_designer 包 + tests + agent_defs + harness_template + deploy + scripts)。
-前端真正开工时,会先约定它消费后端哪些 API(目前后端是纯编排库,尚无 HTTP 层)。
+## 开发
+```bash
+cd frontend && npm install
+# 另一终端起后端：PYTHONPATH=backend .venv/bin/uvicorn auto_designer.web.api:app --port 8000
+npm run dev   # http://localhost:5173 ，/api 代理到 8000
+```
+
+## 构建
+```bash
+npm run build   # tsc --noEmit + vite build → dist/，由 FastAPI 托管
+```
+
+## 结构
+- `src/types.ts` — 镜像后端 DTO（字段名是契约）
+- `src/api.ts` — 类型化 fetch 客户端
+- `src/pages/` — Overview（KPI+曲线）/ Sessions（列表）/ SessionDetail（transcript+体感+issue）
+- `src/components/` — KpiCard / LineChartPanel（Recharts）/ TranscriptThread
