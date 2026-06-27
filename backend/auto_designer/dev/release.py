@@ -71,9 +71,20 @@ def release(
 
     tag = f"v{_next_version(harness_repo)}"
     _git(harness_repo, ["tag", tag])
+    _push_origin(harness_repo, "release")  # 有 origin(Gitea)则把发版后的 release 分支+tag 推上去
+    _push_origin(harness_repo, tag)
     if tracker is not None and issue_number is not None:
         tracker.set_state(issue_number, "closed", f"发版 {tag}")
     return ReleaseResult(released=True, tag=tag, ref=tag)
+
+
+def _push_origin(repo: str, ref: str) -> None:
+    """有 origin 远程则 push 该 ref（分支/tag）；无 origin（离线单测）则 no-op。"""
+    remotes = subprocess.run(
+        ["git", "-C", repo, "remote"], capture_output=True, text=True
+    ).stdout.split()
+    if "origin" in remotes:
+        subprocess.run(["git", "-C", repo, "push", "origin", ref], capture_output=True)
 
 
 def _branch_exists(repo: str, branch: str) -> bool:

@@ -40,6 +40,29 @@ def _git(repo: Path, *args: str) -> None:
     )
 
 
+def _gitea_remote_url(gitea: dict[str, str]) -> str:
+    """构造带 token 的 Gitea git 远程地址：http://OWNER:TOKEN@host/OWNER/REPO.git。"""
+    from urllib.parse import urlparse, urlunparse
+
+    u = urlparse(gitea["GITEA_URL"])
+    netloc = f"{gitea['OWNER']}:{gitea['TOKEN']}@{u.netloc}"
+    return urlunparse((u.scheme, netloc, f"/{gitea['OWNER']}/{gitea['REPO']}.git", "", "", ""))
+
+
+def _wire_gitea_origin(repo: Path, gitea: dict[str, str]) -> None:
+    """给本地 harness 仓接 Gitea origin 并初始 force-push main+release（Gitea 既有 bootstrap 历史被覆盖）。"""
+    url = _gitea_remote_url(gitea)
+    remotes = subprocess.run(
+        ["git", "-C", str(repo), "remote"], capture_output=True, text=True
+    ).stdout.split()
+    if "origin" in remotes:
+        _git(repo, "remote", "set-url", "origin", url)
+    else:
+        _git(repo, "remote", "add", "origin", url)
+    _git(repo, "push", "-f", "origin", "main")
+    _git(repo, "push", "-f", "origin", "release")
+
+
 def _seed_harness_repo() -> Path:
     """从 harness_template 种一个本地 git 仓：main 初始提交 + release 分支。"""
     if HARNESS_REPO.exists():
@@ -101,6 +124,9 @@ def main() -> int:
         base_url=gitea["GITEA_URL"], owner=gitea["OWNER"], repo=gitea["REPO"], token=gitea["TOKEN"]
     )
     tracker.ensure_labels(["bug", "feature"])
+    _wire_gitea_origin(
+        repo, gitea
+    )  # 把 harness 源码仓托管到 Gitea（dev 分支/release/tag 随后自动推上）
     store = SessionStore(DATA / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
