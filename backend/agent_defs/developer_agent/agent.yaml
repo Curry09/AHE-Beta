@@ -1,0 +1,42 @@
+type: agent
+name: developer_agent
+max_context_tokens: 128000
+system_prompt: ./systemprompt.md
+system_prompt_type: string
+# xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
+tool_call_mode: structured
+max_iterations: 40
+
+llm_config:
+  model: ${env.LLM_MODEL}
+  base_url: ${env.LLM_BASE_URL}
+  api_key: ${env.LLM_API_KEY}
+  max_tokens: 32768
+  timeout: 300
+  api_type: openai_chat_completion
+
+# 本地 sandbox：run_shell_command 在 work_dir 执行；work_dir 取环境变量 SANDBOX_WORK_DIR（运行时指向 harness 仓）。
+sandbox_config:
+  type: local
+
+tools:
+  - name: run_shell_command
+    yaml_path: ./tools/run_shell_command.tool.yaml
+    binding: nexau.archs.tool.builtin.shell_tools:run_shell_command
+  - name: read_file
+    yaml_path: ./tools/read_file.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:read_file
+  - name: write_file
+    yaml_path: ./tools/write_file.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:write_file
+  - name: replace
+    yaml_path: ./tools/replace.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:replace
+  - name: list_directory
+    yaml_path: ./tools/list_directory.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:list_directory
+  - name: complete_task
+    yaml_path: ./tools/complete_task.tool.yaml
+    binding: nexau.archs.tool.builtin.session_tools:complete_task
+
+stop_tools: [complete_task]
