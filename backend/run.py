@@ -49,8 +49,8 @@ def _gitea_remote_url(gitea: dict[str, str]) -> str:
     return urlunparse((u.scheme, netloc, f"/{gitea['OWNER']}/{gitea['REPO']}.git", "", "", ""))
 
 
-def _wire_gitea_origin(repo: Path, gitea: dict[str, str]) -> None:
-    """给本地 harness 仓接 Gitea origin 并初始 force-push main+release（Gitea 既有 bootstrap 历史被覆盖）。"""
+def _set_gitea_remote(repo: Path, gitea: dict[str, str]) -> None:
+    """仅给本地 harness 仓配好 Gitea origin（带 token）。推送由开发者 agent 用 git 工具自己做，不在此 push。"""
     url = _gitea_remote_url(gitea)
     remotes = subprocess.run(
         ["git", "-C", str(repo), "remote"], capture_output=True, text=True
@@ -59,8 +59,6 @@ def _wire_gitea_origin(repo: Path, gitea: dict[str, str]) -> None:
         _git(repo, "remote", "set-url", "origin", url)
     else:
         _git(repo, "remote", "add", "origin", url)
-    _git(repo, "push", "-f", "origin", "main")
-    _git(repo, "push", "-f", "origin", "release")
 
 
 def _seed_harness_repo() -> Path:
@@ -104,9 +102,7 @@ def main() -> int:
     os.environ["no_proxy"] = no_proxy
 
     from auto_designer import nexau_runtime
-    from auto_designer.dev.developer_agent import DeveloperAgent
-    from auto_designer.dev.release import release
-    from auto_designer.dev.test_agent import TestAgent
+    from auto_designer.dev.agentic_developer import AgenticDeveloper
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.metrics import Metrics
     from auto_designer.loop.orchestrator import Orchestrator
@@ -124,15 +120,13 @@ def main() -> int:
         base_url=gitea["GITEA_URL"], owner=gitea["OWNER"], repo=gitea["REPO"], token=gitea["TOKEN"]
     )
     tracker.ensure_labels(["bug", "feature"])
-    _wire_gitea_origin(
-        repo, gitea
-    )  # 把 harness 源码仓托管到 Gitea（dev 分支/release/tag 随后自动推上）
+    _set_gitea_remote(repo, gitea)  # 配 origin；推送由开发者 agent 用 git 工具自己做
     store = SessionStore(DATA / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
     print("③ 装配真 nexau 角色 ...")
     user_nexau = nexau_runtime.load(str(ROOT / "agent_defs" / "user_agent"))
-    dev_nexau = nexau_runtime.load(str(ROOT / "agent_defs" / "developer_agent"))
+    dev_agent_def = str(ROOT / "agent_defs" / "developer_agent")  # 工具型 dev agent 定义目录
 
     personas = [
         Persona(
@@ -201,11 +195,6 @@ def main() -> int:
             persona, scenario, harness, f"user-{persona.identity}", "user", persona.identity, ""
         )
 
-    def test_run_session_fn(persona, scenario, harness):  # 体感门禁：测试 agent（归开发者侧）
-        return _session_with_emit(
-            persona, scenario, harness, "test", "developer", "测试 agent", "门禁会话 · "
-        )
-
     def make_dev_status(agent_id, label):  # 开发者 agent 活动回调
         def cb(*, running, status, issue_number=None, branch=None, detail=None):
             update_agent(
@@ -220,35 +209,24 @@ def main() -> int:
 
         return cb
 
-    developers = [  # 2 dev agent：共用同一 nexau 定义，同轮各领一条不同 issue
-        DeveloperAgent(tracker, str(repo), dev_nexau, on_status=make_dev_status("dev-0", "dev#1")),
-        DeveloperAgent(tracker, str(repo), dev_nexau, on_status=make_dev_status("dev-1", "dev#2")),
+    developers = [  # 2 个工具型 dev agent：同轮各领一条不同 issue，自主改 harness + git 发版
+        AgenticDeveloper(
+            tracker, str(repo), dev_agent_def, on_status=make_dev_status("dev-0", "dev#1")
+        ),
+        AgenticDeveloper(
+            tracker, str(repo), dev_agent_def, on_status=make_dev_status("dev-1", "dev#2")
+        ),
     ]
-    tester = TestAgent(
-        launcher=launcher,
-        fixed_set=fixed_set[:1],  # 体感门禁取 1 个 persona 抽样，控制每次评测成本
-        baseline=None,
-        n=1,
-        tol=0.5,
-        run_session_fn=test_run_session_fn,
-    )
-
-    def release_fn(branch, verdict, issue_number):
-        return release(str(repo), branch, verdict, tracker, issue_number)
 
     orch = Orchestrator(
         launcher=launcher,
         fixed_set=fixed_set,
-        tracker=tracker,
-        store=store,
         developer_agents=developers,
-        test_agent=tester,
-        release_fn=release_fn,
         run_session_fn=user_run_session_fn,
         initial_ref="release",
     )
 
-    print("④ 跑 2 轮闭环（2 user agent × 2 dev agent，真模型，较慢，请稍候）...")
+    print("④ 跑 2 轮闭环（2 user agent × 2 dev agent，无门禁直接发版，真模型，较慢）...")
     refs = orch.run(2)
 
     print("\n=== 结果 ===")
