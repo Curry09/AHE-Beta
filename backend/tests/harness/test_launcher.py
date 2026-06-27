@@ -31,6 +31,23 @@ _NO_REPLY_ENTRY = (
     '    sys.stdout.write(json.dumps({"x": 1}) + "\\n"); sys.stdout.flush()\n'
 )
 _EARLY_EXIT_ENTRY = "import sys\nsys.exit(0)\n"
+# 固定回 "v2:<message>" 的 entry：用于验证同 ref 改内容后跑的是新代码而非陈旧缓存。
+_V2_ENTRY = (
+    "import json, sys\nfor line in sys.stdin:\n"
+    "    line = line.strip()\n    if not line:\n        continue\n"
+    '    msg = json.loads(line)["message"]\n'
+    '    sys.stdout.write(json.dumps({"reply": f"v2:{msg}"}) + "\\n"); sys.stdout.flush()\n'
+)
+
+
+def _commit_all(repo: str, message: str) -> None:
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", message],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
 
 
 def _make_repo(tmp_path: Path, entry_src: str, entry_argv: list[str]) -> str:
@@ -89,13 +106,34 @@ def test_checkout_writes_and_reuses(tmp_path) -> None:
     launcher = _launcher(tmp_path, _COUNTER_ENTRY)
     h1 = launcher.launch("main")
     h1.close()
-    dest = tmp_path / "runs" / "main"
+    runs = tmp_path / "runs"
+    dests = list(runs.iterdir())
+    assert len(dests) == 1  # 单一 checkout 目录（名含 SHA）
+    dest = dests[0]
     assert (dest / "params.yaml").exists()
     marker = dest / "_reuse_marker"
     marker.write_text("x")  # 若二次 launch 复用该目录，marker 应仍在
     h2 = launcher.launch("main")
     h2.close()
-    assert marker.exists()
+    assert marker.exists()  # 同 ref 同 SHA → 复用同目录
+    assert list(runs.iterdir()) == dests  # 未新建目录
+
+
+def test_checkout_invalidates_on_content_change(tmp_path) -> None:
+    """根因回归：同一分支(main)内容变更后，必须跑新代码而非陈旧 checkout 缓存。"""
+    launcher = _launcher(tmp_path, _COUNTER_ENTRY)
+    launcher.launch("main").close()  # 先缓存旧内容
+
+    repo = launcher._harness_repo  # 改 entry → main 指向新 SHA
+    (Path(repo) / "fake_entry.py").write_text(_V2_ENTRY, encoding="utf-8")
+    _commit_all(repo, "change entry")
+
+    h = launcher.launch("main")
+    try:
+        assert h.send("a") == "v2:a"  # 跑的是新内容，不是旧缓存的计数器 entry
+    finally:
+        h.close()
+    assert len(list((tmp_path / "runs").iterdir())) == 2  # 两个不同 SHA 的 checkout 并存
 
 
 def test_entry_command_not_found_raises(tmp_path) -> None:

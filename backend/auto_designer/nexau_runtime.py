@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -16,6 +17,29 @@ from pathlib import Path
 _PROMPT_FILE = "prompt.md"
 # 网关偶发 502，整次 agent.run 兜底重试次数。
 _RUN_RETRIES = 4
+# 单次 agent.run 硬超时（秒）：nexau 的 llm_config.timeout 实测不生效，故在此层用线程兜底防死等。
+_CALL_TIMEOUT = 240
+
+
+def _run_with_timeout(call: Callable[[], object], timeout: int) -> object:
+    """在 daemon 线程里跑 call，超 timeout 秒未返回则抛 TimeoutError（丢弃该线程，不阻塞进程）。"""
+    box: dict = {}
+
+    def target() -> None:
+        try:
+            box["out"] = call()
+        except Exception as exc:  # noqa: BLE001  透传给调用方判定/重试
+            box["err"] = exc
+
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        raise TimeoutError(f"nexau 调用超时 >{timeout}s")
+    if "err" in box:
+        raise box["err"]
+    return box.get("out")
+
 
 # nexau 后端：(system_prompt, input) -> output_text。注入便于测试替身。
 Backend = Callable[[str, str], str]
@@ -46,14 +70,18 @@ def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
                 f"  model: {model}\n"
                 f"  base_url: {base_url}\n"
                 f"  api_key: {api_key}\n"
-                "  max_tokens: 4096\n"
+                # Nex-N2-Pro 是推理模型：reasoning_content 先吃 token，4096 易被推理吃光致 content=null。
+                "  max_tokens: 32768\n"
+                # per-call 超时：不设则 openai 客户端无限挂起；超时即触发本模块重试。
+                "  timeout: 300\n"
                 "  api_type: openai_chat_completion\n",
                 encoding="utf-8",
             )
             try:
-                out = Agent.from_yaml(Path(tmp) / "agent.yaml").run(message=user_input)
+                agent = Agent.from_yaml(Path(tmp) / "agent.yaml")
+                out = _run_with_timeout(lambda a=agent: a.run(message=user_input), _CALL_TIMEOUT)
                 return out if isinstance(out, str) else out[0]
-            except Exception as exc:  # 多为网关 502，退避后重试
+            except Exception as exc:  # 网关 502/超时 → 退避后重试
                 last_err = exc
                 time.sleep(1.5 * (attempt + 1))
     raise RuntimeError(f"nexau 调用重试 {_RUN_RETRIES} 次仍失败：{last_err}") from last_err

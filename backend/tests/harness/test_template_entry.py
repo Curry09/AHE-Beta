@@ -1,0 +1,71 @@
+"""harness 种子 entry.py 的 _reply 鲁棒性单测：空回复不得静默通过（不依赖真 nexau/网络）。
+
+entry.py 在 harness_template/（非包），用 importlib 按路径加载；_reply 仅依赖 agent.run，注入假 agent。
+"""
+
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+from types import ModuleType
+
+import pytest
+
+_ENTRY = Path(__file__).resolve().parents[2] / "harness_template" / "entry.py"
+
+
+def _load_entry() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("harness_template_entry", _ENTRY)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _Agent:
+    """按预设序列逐次返回；Exception 项被 raise，其余原样返回。记录调用次数。"""
+
+    def __init__(self, outs: list) -> None:
+        self._outs = list(outs)
+        self.calls = 0
+
+    def run(self, *, message: str):
+        value = self._outs[self.calls]
+        self.calls += 1
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+
+@pytest.fixture()
+def entry(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    module = _load_entry()
+    monkeypatch.setattr(module.time, "sleep", lambda _s: None)  # 退避不真睡
+    return module
+
+
+def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
+    agent = _Agent(["hello"])
+    assert entry._reply(agent, "hi") == "hello"
+    assert agent.calls == 1
+
+
+def test_reply_retries_on_blank_then_succeeds(entry: ModuleType) -> None:
+    agent = _Agent(["", "   ", "real answer"])
+    assert entry._reply(agent, "hi") == "real answer"
+    assert agent.calls == 3  # 空串/纯空白都触发重试
+
+
+def test_reply_all_blank_returns_explicit_marker(entry: ModuleType) -> None:
+    agent = _Agent(["", "", "", ""])
+    out = entry._reply(agent, "hi")
+    assert out != ""  # 关键：绝不静默返回空
+    assert out.startswith("[harness error]")
+
+
+def test_reply_exception_then_marker(entry: ModuleType) -> None:
+    agent = _Agent(
+        [RuntimeError("502"), RuntimeError("502"), RuntimeError("502"), RuntimeError("502")]
+    )
+    out = entry._reply(agent, "hi")
+    assert out.startswith("[harness error]")

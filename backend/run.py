@@ -2,7 +2,7 @@
 
 接线：真 nexau（user/developer/harness agent，模型走 backend/.env 的 LLM_*）
      + 真 Gitea（issue，走 backend/deploy/gitea/.env）+ 本地 git 仓承载 harness 代码。
-为可观测，跑最小规模：1 persona × 1 scenario，max_turns=2，test n=1，1 轮。
+本地多轮规模：2 persona（2 user agent）× 2 dev agent，max_turns=2，体感门禁 n=1 抽样，跑 2 轮。
 
 前置：
   1) backend/.env 有 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY
@@ -63,12 +63,22 @@ def _seed_harness_repo() -> Path:
 
 def main() -> int:
     import os
+    from urllib.parse import urlparse
 
-    # 环境里有 HTTP(S)_PROXY，会把本地 Gitea(localhost) 也走代理 → 502；放行本地
-    os.environ.setdefault("NO_PROXY", "localhost,127.0.0.1")
-    os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
-    os.environ.update(_load_env(ROOT / ".env"))  # LLM_*
+    llm_env = _load_env(ROOT / ".env")  # LLM_*
+    os.environ.update(llm_env)
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
+
+    # 环境里的 HTTP(S)_PROXY 抽风（实测代理连不上，直连网关稳定 200）：放行本地 Gitea + 模型网关，
+    # 让 nexau/openai 调用绕过烂代理直连，根除偶发 APIConnectionError。
+    bypass = ["localhost", "127.0.0.1"]
+    for url in (llm_env.get("LLM_BASE_URL"), gitea.get("GITEA_URL")):
+        host = urlparse(url).hostname if url else None
+        if host and host not in bypass:
+            bypass.append(host)
+    no_proxy = ",".join(bypass)
+    os.environ["NO_PROXY"] = no_proxy
+    os.environ["no_proxy"] = no_proxy
 
     from auto_designer import nexau_runtime
     from auto_designer.dev.developer_agent import DeveloperAgent
@@ -105,30 +115,96 @@ def main() -> int:
             domain="Python 后端",
             goal="让一段慢 SQL 查询快起来",
             speaking_style="口语、偏急",
-        )
+        ),
+        Persona(
+            identity="创业公司全栈",
+            level="高级",
+            domain="Node.js/TypeScript",
+            goal="把一个 Express API 的 p99 延迟降下来",
+            speaking_style="简洁、爱追问细节",
+        ),
     ]
     scenarios = [
         SeedScenario(
             description="我有个 Django 接口很慢，怀疑是 ORM 查询，帮我看看怎么排查和优化。"
-        )
+        ),
+        SeedScenario(
+            description="我的 Express 接口 p99 到 800ms，想定位是中间件、DB 还是序列化的问题，给排查思路。"
+        ),
     ]
-    fixed_set = list(zip(personas, scenarios, strict=True))
+    fixed_set = list(zip(personas, scenarios, strict=True))  # 2 user agent
 
     def user_llm(*, kind: str, prompt: str) -> str:
         return user_nexau.run(prompt)
 
-    def run_session_fn(persona, scenario, harness):
-        ua = UserAgent(llm=user_llm, persona=persona, max_turns=2)
-        return run_session(persona, scenario, harness, ua, tracker, store)
+    from auto_designer.loop.live import clear_agents, update_agent
 
-    developer = DeveloperAgent(tracker, str(repo), dev_nexau)
+    clear_agents(data_dir=DATA)  # 一轮 run 开始清空 agent 活动注册表
+
+    def _session_with_emit(persona, scenario, harness, agent_id, role, label, prefix):
+        """跑一局会话，逐轮把 transcript 写进该 agent 的活动槽（流式），收尾标 running=False。"""
+
+        def on_progress(transcript):
+            turns = [t.to_dict() for t in transcript.turns]
+            waiting = bool(turns) and turns[-1]["role"] == "user"
+            update_agent(
+                data_dir=DATA,
+                agent_id=agent_id,
+                role=role,
+                label=label,
+                running=True,
+                status=f"{prefix}harness 回复中…" if waiting else f"{prefix}对话中…",
+                turns=turns,
+            )
+
+        ua = UserAgent(llm=user_llm, persona=persona, max_turns=2, on_progress=on_progress)
+        session = run_session(persona, scenario, harness, ua, tracker, store)
+        update_agent(
+            data_dir=DATA,
+            agent_id=agent_id,
+            role=role,
+            label=label,
+            running=False,
+            status=f"{prefix}已完成 · 体感 {session.feeling.score}",
+            turns=[t.to_dict() for t in session.transcript.turns],
+        )
+        return session
+
+    def user_run_session_fn(persona, scenario, harness):  # a 段：用户 agent
+        return _session_with_emit(
+            persona, scenario, harness, f"user-{persona.identity}", "user", persona.identity, ""
+        )
+
+    def test_run_session_fn(persona, scenario, harness):  # 体感门禁：测试 agent（归开发者侧）
+        return _session_with_emit(
+            persona, scenario, harness, "test", "developer", "测试 agent", "门禁会话 · "
+        )
+
+    def make_dev_status(agent_id, label):  # 开发者 agent 活动回调
+        def cb(*, running, status, issue_number=None, branch=None, detail=None):
+            update_agent(
+                data_dir=DATA,
+                agent_id=agent_id,
+                role="developer",
+                label=label,
+                running=running,
+                status=status,
+                detail=detail,
+            )
+
+        return cb
+
+    developers = [  # 2 dev agent：共用同一 nexau 定义，同轮各领一条不同 issue
+        DeveloperAgent(tracker, str(repo), dev_nexau, on_status=make_dev_status("dev-0", "dev#1")),
+        DeveloperAgent(tracker, str(repo), dev_nexau, on_status=make_dev_status("dev-1", "dev#2")),
+    ]
     tester = TestAgent(
         launcher=launcher,
-        fixed_set=fixed_set,
+        fixed_set=fixed_set[:1],  # 体感门禁取 1 个 persona 抽样，控制每次评测成本
         baseline=None,
         n=1,
         tol=0.5,
-        run_session_fn=run_session_fn,
+        run_session_fn=test_run_session_fn,
     )
 
     def release_fn(branch, verdict, issue_number):
@@ -139,15 +215,15 @@ def main() -> int:
         fixed_set=fixed_set,
         tracker=tracker,
         store=store,
-        developer_agent=developer,
+        developer_agents=developers,
         test_agent=tester,
         release_fn=release_fn,
-        run_session_fn=run_session_fn,
+        run_session_fn=user_run_session_fn,
         initial_ref="release",
     )
 
-    print("④ 跑 1 轮闭环（真模型，较慢，请稍候）...")
-    refs = orch.run(1)
+    print("④ 跑 2 轮闭环（2 user agent × 2 dev agent，真模型，较慢，请稍候）...")
+    refs = orch.run(2)
 
     print("\n=== 结果 ===")
     print("release_ref 链:", refs)

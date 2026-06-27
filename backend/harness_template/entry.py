@@ -14,11 +14,34 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 _RUN_RETRIES = 4
+# 单次 agent.run 硬超时（秒）：nexau 自身的 llm_config.timeout 实测不生效，故在此层用线程兜底，
+# 卡住即放弃该次（daemon 线程丢弃，不阻塞进程），保证 harness 永远在 bounded 时间内回一行。
+_CALL_TIMEOUT = 240
+
+
+def _run_with_timeout(agent, message, timeout):
+    box: dict = {}
+
+    def target():
+        try:
+            box["out"] = agent.run(message=message)
+        except Exception as exc:  # noqa: BLE001  透传给调用方判定/重试
+            box["err"] = exc
+
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        raise TimeoutError(f"agent.run 超时 >{timeout}s")
+    if "err" in box:
+        raise box["err"]
+    return box.get("out")
 
 
 def _build_agent():
@@ -38,7 +61,10 @@ def _build_agent():
         f"  model: {os.environ['LLM_MODEL']}\n"
         f"  base_url: {os.environ['LLM_BASE_URL']}\n"
         f"  api_key: {os.environ['LLM_API_KEY']}\n"
-        "  max_tokens: 4096\n"
+        # Nex-N2-Pro 是推理模型：reasoning_content 先吃 token，4096 会被推理吃光致 content=null。
+        "  max_tokens: 32768\n"
+        # per-call 超时：不设则 openai 客户端无限挂起（网关偶发卡死整轮）；超时即触发 _reply 重试。
+        "  timeout: 300\n"
         "  api_type: openai_chat_completion\n",
         encoding="utf-8",
     )
@@ -49,10 +75,14 @@ def _reply(agent, message: str) -> str:
     last = None
     for attempt in range(_RUN_RETRIES):
         try:
-            out = agent.run(message=message)
-            return out if isinstance(out, str) else out[0]
-        except Exception as exc:  # 网关 502 抽风 → 退避重试
+            out = _run_with_timeout(agent, message, _CALL_TIMEOUT)  # 硬超时，绝不死等
+            text = out if isinstance(out, str) else out[0]
+            if text and text.strip():  # 非空才算成功
+                return text
+            last = "empty reply"  # 空回复（网关 200+空内容不抛异常）视为失败，不得静默返回
+        except Exception as exc:  # 网关 502/超时 → 退避重试
             last = exc
+        if attempt < _RUN_RETRIES - 1:  # 末次不再睡
             time.sleep(1.5 * (attempt + 1))
     return f"[harness error] {last}"
 
