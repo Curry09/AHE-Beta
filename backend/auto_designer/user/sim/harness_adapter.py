@@ -4,23 +4,24 @@ harness_adapter.py
 读取其 stdout。本文件提供一个脚本化 harness 用于离线演示: 它复刻 timeutils 案例
 —— 反复幻觉 pytz API, 最后给出能跑但 DST 错误的实现。
 
-返回: str —— harness 在 B 线上吐出的自然语言 + 代码 + 运行回显。
-本轮不实现客观真值线(无 gold/exit_code): bug 直接体现在回复文本里(报错 / 可疑实现),
-由 persona 凭自身能力(D1)去识别。对齐 spec-0001/T2 的 send -> str 契约。
+实现 spec-0001/T2 的 HarnessInterface(send/reset/close): send 返回 harness 在 B 线上吐出的
+自然语言 + 代码 + 运行回显(str)。本轮不实现客观真值线(无 gold/exit_code): bug 直接体现在回复
+文本里(报错 / 可疑实现), 由 persona 凭自身能力(D1)去识别。
 """
 
 from __future__ import annotations
 
 
 class ScriptedHarness:
-    """按预设轨迹回应。仅消费 persona 发来的 message 是否要求'运行'。"""
+    """按预设轨迹回应的脚本化 harness, 满足 HarnessInterface(send/reset/close)。
+    仅消费 persona 发来的 message 是否要求'运行'。"""
 
     def __init__(self) -> None:
         self.step = 0
 
-    def respond(self, user_message: str) -> str:
+    def send(self, message: str) -> str:
         self.step += 1
-        m = user_message.lower()
+        m = message.lower()
         wants_run = any(k in m for k in ("run", "跑", "execute"))
 
         if self.step == 1:
@@ -61,3 +62,10 @@ class ScriptedHarness:
 
         # 之后: 继续给能跑的版本
         return "Re-ran, no error. 2024-07-01 09:00:00+08:00. Works."
+
+    def reset(self) -> None:
+        """回到新一局起点(幂等): 重置脚本步进。"""
+        self.step = 0
+
+    def close(self) -> None:
+        """无后端资源, 幂等空操作。"""

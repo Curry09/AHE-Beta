@@ -1,29 +1,46 @@
-"""spec-0005/T6：脚本化 harness 桩（respond->str）与离线 demo 烟测。"""
+"""spec-0005/T6：脚本化 harness 桩（实现 HarnessInterface send/reset/close）与离线 demo 烟测。"""
 
 from __future__ import annotations
 
+from auto_designer.harness.interface import HarnessInterface
 from auto_designer.user.sim import demo
 from auto_designer.user.sim.harness_adapter import ScriptedHarness
 from auto_designer.user.sim.scenarios import SplitBillHarness
 
 
+def test_stubs_satisfy_repo_harness_interface() -> None:
+    # 与仓库已有契约对齐: 桩满足 HarnessInterface(send/reset/close)
+    assert isinstance(ScriptedHarness(), HarnessInterface)
+    assert isinstance(SplitBillHarness(), HarnessInterface)
+
+
 def test_scripted_harness_returns_str_and_trajectory() -> None:
     h = ScriptedHarness()
-    first = h.respond("please implement to_user_tz")
+    first = h.send("please implement to_user_tz")
     assert isinstance(first, str) and "to_user_tz" in first and "Traceback" not in first
-    crash = h.respond("please run it once")
+    crash = h.send("please run it once")
     assert isinstance(crash, str) and "Traceback" in crash  # 要求运行 -> 报错暴露在文本
+
+
+def test_reset_rewinds_script() -> None:
+    h = ScriptedHarness()
+    h.send("a")
+    h.send("b")
+    h.reset()
+    again = h.send("please implement to_user_tz")
+    assert "to_user_tz" in again and h.step == 1  # reset 后从首步重来
+    h.close()  # 幂等空操作, 不抛
 
 
 def test_split_bill_bug_shows_in_text_only_when_probed() -> None:
     h1 = SplitBillHarness()
-    h1.respond("add split_bill to the repo")          # step1: 贴初始实现
-    normal = h1.respond("just run it")                # 泛泛要求跑 -> 常规偶整除用例
+    h1.send("add split_bill to the repo")          # step1: 贴初始实现
+    normal = h1.send("just run it")                # 泛泛要求跑 -> 常规偶整除用例
     assert isinstance(normal, str) and "100.00" in normal  # 看着没问题
 
     h2 = SplitBillHarness()
-    h2.respond("add split_bill to the repo")
-    probed = h2.respond("what about splitting by 3? does it sum exactly?")
+    h2.send("add split_bill to the repo")
+    probed = h2.send("what about splitting by 3? does it sum exactly?")
     assert isinstance(probed, str) and "99.99" in probed   # 探边界 -> bug 浮现在文本
 
 

@@ -11,8 +11,8 @@ SplitBillHarness —— 一个 correctness-edgecase 逃逸 bug 场景:
   - 浅层用户跑常规 100/4 用例 -> 文本里 sum=100、没报错 -> 按 FUNCTIONAL 阈值接受 -> 逃逸 bug。
   - 专家会构造 100/3 边界 -> 文本里看到 sum=99.99 != 100 -> 拒绝、逼证据 -> 耐心耗尽上报。
 
-返回: str。本轮不实现客观真值线: bug 仅以回复文本体现(sum=99.99), persona 看不到额外
-金标准, 只能凭自身能力去探边界 / 读文本识别。
+满足 spec-0001/T2 的 HarnessInterface(send/reset/close)。本轮不实现客观真值线: bug 仅以回复
+文本体现(sum=99.99), persona 看不到额外金标准, 只能凭自身能力去探边界 / 读文本识别。
 """
 
 from __future__ import annotations
@@ -22,9 +22,9 @@ class SplitBillHarness:
     def __init__(self) -> None:
         self.step = 0
 
-    def respond(self, user_message: str) -> str:
+    def send(self, message: str) -> str:
         self.step += 1
-        m = (user_message or "").lower()
+        m = (message or "").lower()
         wants_run = any(k in m for k in ("run", "execute", "跑", "try it", "check it"))
         probes_uneven = any(
             k in m for k in (
@@ -64,3 +64,10 @@ class SplitBillHarness:
 
         # 其他: 继续以偶整除用例安抚
         return "Re-checked split_bill(100.0, 4) -> [25.0]*4, sums to 100.00. Looks correct."
+
+    def reset(self) -> None:
+        """回到新一局起点(幂等): 重置脚本步进。"""
+        self.step = 0
+
+    def close(self) -> None:
+        """无后端资源, 幂等空操作。"""

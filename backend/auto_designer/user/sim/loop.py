@@ -110,7 +110,7 @@ def route(action_id: str, message: str, state: State, harness, mask: dict,
         return None
 
     if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE:
-        return harness.respond(message)            # 发 B 线 -> 驱动 harness 出下一轮文本
+        return harness.send(message)               # 发 B 线 -> 驱动 harness 出下一轮文本
 
     return None  # 终止动作: 不再驱动 harness
 

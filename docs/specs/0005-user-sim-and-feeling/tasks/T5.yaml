@@ -81,6 +81,7 @@ references: |-
   spec-0001/T3 用户 agent 驱动器（最小桩）、T2 黑盒对话协议、T4 会话编排 run_session。
   spec-0004 分层（harbor 只包外层 rollout，逐轮对话自立）。参考实现见本组 prototype（loop.py）。
 open-questions: |-
-  接入闭环需把引擎原生 run_session(persona, client, harness, task) 适配为 spec-0001/T4 的
-  run_session(persona, scenario, harness, user_agent, tracker, store)：harness 桩适配为 HarnessInterface
-  (send/reset/close)、turns 投影为 Transcript、issue_artifact 转 IssueDraft 经 IssueTracker。此适配归后续 Task/组。
+  harness 已统一为 spec-0001/T2 HarnessInterface(send/reset/close)（本组 T6）。接入闭环仍需把引擎原生
+  run_session(persona, client, harness, task) 适配为 spec-0001/T4 的 run_session(persona, scenario,
+  harness, user_agent, tracker, store)：turns 投影为 Transcript、issue_artifact 转 IssueDraft 经
+  IssueTracker、9 维 Persona 与 FeelingScore 与 models 并轨。此适配归后续 Task/组。
