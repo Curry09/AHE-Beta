@@ -26,6 +26,20 @@
   分层是本组关键，且与 spec-0001/T2「逐轮对话另立协议」一致：harbor 只包**外层 rollout 生命周期**；**内层**用户↔harness 的逐轮真人对话仍走 spec-0001 自立协议，不碰 harbor 批式 episode 接口。
 
   支撑件：**T1** 定义 checkpoint 存取与自包含 STATE_DIR（gitea + sessions + metrics + run_state）；**T2** 可恢复 harbor runner，在 orchestrator 外层加恢复与每轮 checkpoint。本组约束：**恢复按单元边界幂等重跑**（整会话重跑、开发者从分支 head 续作、release 见 tag 跳过），不快照 agent 进程内存。
+- **0005 用户侧重型实现：控制信封模拟器与体感评分** — 本组实现进化闭环 **a｜用户侧** 的重型版：以「控制信封」架构替代 spec-0001/T3 的最小桩，让 user agent 更拟真地多轮使用 harness（能力分叉、追问、绕路、放弃），并补齐 spec-0001 的训练信号 **FeelingScore（1–4 体感分）**。落点 `backend/auto_designer/user/sim/`，与 0001 最小实现**并存、不覆盖**。
+
+  读图即读任务：**T1** 定 persona 静态系数；**T2** 定每轮「能做什么 + 情绪如何演化」（纯主观状态机）； **T3** 把上下文喂 LLM 并取结构化判断、含会话末自评请求；**T5** 把它们编排成「跑一局」；**T4** 在会话末 产出训练信号（LLM 自评为主 + 框架派生兜底/校验）；**T6** 提供离线可跑的 harness 桩与运行入口。
+
+  **本轮纯主观（客观线不实现）**：本组只取用户体感作训练信号；客观真值线（gold / GAP / ESCAPED_BUG / control-plane）整体推迟，不写 state、不进体感、harness 桩只回文本。能力分叉改由「persona 能力 + 文本感知」 驱动，bug 直接体现在 harness 回复文本里。这与项目「训练信号=用户体感、benchmark held-out」一致；客观真值 线的观测留待后续 spec。
+
+  **与 0001 及闭环的关系**：本组是 0001 用户侧(a) 的重型实现/演进。真正接入闭环所需的契约并轨 （引擎 `run_session` ↔ 0001/T4、harness 桩 ↔ 0001/T2 `HarnessInterface`、9 维 Persona 与 `FeelingScore` 与 `models` 并轨、LLM 后端收敛 0003/T2 `nexau_runtime`、`issue_artifact` → `IssueDraft`） 集中记在各 Task 的 open-questions，归后续 Task/组。
+- **0006 Persona 管线：采集（蒸馏）与注入 sim** — 本组实现 persona 管线：把「从真实数据采集 persona」与「把 persona 注入控制信封 sim」串成一条链， 为 0005 的用户侧重型实现供给真实画像。对应 CLAUDE.md「蒸馏模块」，落实约束「persona 来自真实数据、 不依据 benchmark 或轨迹构造」。
+
+  读图即读任务：**T1** 定「采集什么、卡长什么样」——不另造 skill，而是收编既有的真实抽取方法（此前写在 NexAU 仓库里、非 NexAU 自身的方法），并按 **轮辐式**组织：唯一公共契约 `card-schema.md`（6 维卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则， source-agnostic）+ 各「薄抽取 skill」只描述「从某类来源提取 + ground 哪几维」、只依赖契约、彼此不依赖。本步 先落契约 + `extract-selfreport-persona`（第一人称自述，唯一 ground 信任轴 D4 且带 card_to_persona 覆盖规则）； cc/so/未来源作同契约的后续薄 skill 插入。库 schema 即该契约。**T2** 定「卡如何变成 sim 能跑的 Persona」 （唯一桥接层 card_to_persona）。
+
+  **覆盖派生（关键约束）**：6 维卡是「正交 ground 的真实画像」，每维各自有证据；sim 9 维里 d3/trust/d6 原是 「从 D1/D5 派生」。注入时 **卡里 grounded 的 验收 D2 → sim d3、信任 D4 → sim trust 直接写入、不被 derive_* 改写**（这两个正是 sim 的派生维），finalize_persona 只填卡未 ground 的派生维——否则 expert×over-trust （selfreport 例 C / Karpathy）会被模拟成 skeptical×rigorous 的反面。此约束在 extract-selfreport-persona reference 例 C 已写明（card_to_persona），并要求 0005/T1 把 finalize_persona 降为 fallback-only（本组同改）。 注：卡 D6 自主 → sim D5Autonomy 是采样维（直接写入，本无 derive）；sim 的派生维 D6Authz 卡中无对应来源， 仍按 D5Autonomy + task_risk 派生（见 T2）。
+
+  与 0005 的关系：本组是 0005（控制信封用户模拟器）的上游供给。6 维卡 ↔ sim 9 维 ↔ spec-0001 models.Persona 的最终并轨记在各 Task open-questions，待真实数据与下游需求收敛后定。
 - **0007 开发者侧改为纯 trunk(main) 自进化** — ## Summary
 
   去掉 harness 仓的 `release` 常驻分支、发版、体感门禁与回退，改纯 **trunk（单 `main`）** 自进化：user agent 永远使用最新 `main`（会话开始锁定其 HEAD SHA、整局跑该快照），dev agent 不分 bug/feature、直接 commit 到 `main`。每次成功推进给 `main` 打轻量 `vK` tag，**仅作观测锚点，不是发版**。一往无前，不回退。
@@ -174,6 +188,14 @@
 | 0003 | 0003/T6 | 闭环编排与曲线 | pending | T3, T4, T5, 0001/T4, 0001/T6 |
 | 0004 | 0004/T1 | checkpoint 存取（STATE_DIR ↔ artifact） | pending | 0001/T6 |
 | 0004 | 0004/T2 | 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复） | pending | T1, 0003/T6 |
+| 0005 | 0005/T1 | Persona 维度模型与文案 | pending | — |
+| 0005 | 0005/T2 | 动作模型、动作空间与状态机 | pending | T1 |
+| 0005 | 0005/T3 | 提示装配与 persona LLM 后端 | pending | T1, T2 |
+| 0005 | 0005/T4 | 体感评分（两路并出） | pending | 0001/T1 |
+| 0005 | 0005/T5 | 会话主循环引擎 | pending | T1, T2, T3, T4 |
+| 0005 | 0005/T6 | harness 桩与运行入口 | pending | T5 |
+| 0006 | 0006/T1 | Persona 采集（蒸馏，skill 形式） | pending | — |
+| 0006 | 0006/T2 | Persona 注入 sim | pending | T1, 0005/T1 |
 | 0007 | 0007/T1 | 开发者侧直推 main（去 branch/merge） | pending | — |
 | 0007 | 0007/T2 | 编排去 release 链 · 会话级 main SHA 快照回灌 | pending | T1 |
 | 0007 | 0007/T3 | 一次性迁移脚本：main ← release + 清理分支 | pending | — |
@@ -210,6 +232,18 @@ graph LR
         n0004_T1["T1 checkpoint 存取（STATE_DIR ↔ artifact）"]
         n0004_T2["T2 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复）"]
     end
+    subgraph G0005[0005 user-sim-and-feeling]
+        n0005_T1["T1 Persona 维度模型与文案"]
+        n0005_T2["T2 动作模型、动作空间与状态机"]
+        n0005_T3["T3 提示装配与 persona LLM 后端"]
+        n0005_T4["T4 体感评分（两路并出）"]
+        n0005_T5["T5 会话主循环引擎"]
+        n0005_T6["T6 harness 桩与运行入口"]
+    end
+    subgraph G0006[0006 persona-pipeline]
+        n0006_T1["T1 Persona 采集（蒸馏，skill 形式）"]
+        n0006_T2["T2 Persona 注入 sim"]
+    end
     subgraph G0007[0007 dev-trunk-main]
         n0007_T1["T1 开发者侧直推 main（去 branch/merge）"]
         n0007_T2["T2 编排去 release 链 · 会话级 main SHA 快照回灌"]
@@ -244,9 +278,28 @@ graph LR
     n0004_T1 --> n0001_T6
     n0004_T2 --> n0004_T1
     n0004_T2 --> n0003_T6
+    n0005_T2 --> n0005_T1
+    n0005_T3 --> n0005_T1
+    n0005_T3 --> n0005_T2
+    n0005_T4 --> n0001_T1
+    n0005_T5 --> n0005_T1
+    n0005_T5 --> n0005_T2
+    n0005_T5 --> n0005_T3
+    n0005_T5 --> n0005_T4
+    n0005_T6 --> n0005_T5
+    n0006_T2 --> n0006_T1
+    n0006_T2 --> n0005_T1
     n0007_T2 --> n0007_T1
     n0007_T4 --> n0007_T1
     n0007_T4 --> n0007_T2
+    n0005_T1 -.extends.-> n0001_T1
+    n0005_T4 -.extends.-> n0001_T1
+    n0005_T4 -.note.-> n0001_T3
+    n0005_T5 -.extends.-> n0001_T3
+    n0005_T5 -.note.-> n0001_T2
+    n0006_T1 -.note.-> n0005_T1
+    n0006_T2 -.extends.-> n0005_T1
+    n0006_T2 -.note.-> n0005_T5
 ```
 
 ## 文件冲突报告
@@ -280,6 +333,8 @@ backend/
       developer_agent.py         ← 0003/T3
       release.py                 ← 0003/T5
       test_agent.py              ← 0003/T4
+    distill/
+      library.py                 ← 0006/T1
     harness/
       interface.py               ← 0001/T2
       launcher.py                ← 0003/T1
@@ -294,6 +349,21 @@ backend/
       fake.py                    ← 0001/T5
       gitea.py                   ← 0002/T2
     user/
+      sim/
+        action_space.py          ← 0005/T2
+        actions.py               ← 0005/T2
+        clauses.py               ← 0005/T1
+        demo.py                  ← 0005/T6
+        dimensions.py            ← 0005/T1
+        feeling.py               ← 0005/T4
+        harness_adapter.py       ← 0005/T6
+        loop.py                  ← 0005/T5
+        persona_client.py        ← 0005/T3
+        persona_io.py            ← 0006/T2
+        prompt.py                ← 0005/T3
+        run_live.py              ← 0005/T6
+        scenarios.py             ← 0005/T6
+        state.py                 ← 0005/T2
       session.py                 ← 0001/T4
       session_store.py           ← 0001/T6
       user_agent.py              ← 0001/T3
@@ -318,6 +388,8 @@ backend/
       test_developer_agent.py    ← 0003/T3
       test_release.py            ← 0003/T5
       test_test_agent.py         ← 0003/T4
+    distill/
+      test_library.py            ← 0006/T1
     harness/
       test_interface.py          ← 0001/T2
       test_launcher.py           ← 0003/T1
@@ -331,6 +403,15 @@ backend/
       test_fake.py               ← 0001/T5
       test_gitea.py              ← 0002/T2
     user/
+      sim/
+        test_action_space.py     ← 0005/T2
+        test_dimensions.py       ← 0005/T1
+        test_feeling.py          ← 0005/T4
+        test_harness_adapter.py  ← 0005/T6
+        test_loop.py             ← 0005/T5
+        test_persona_io.py       ← 0006/T2
+        test_prompt.py           ← 0005/T3
+        test_state.py            ← 0005/T2
       test_session.py            ← 0001/T4
       test_session_store.py      ← 0001/T6
       test_user_agent.py         ← 0001/T3
@@ -339,6 +420,14 @@ backend/
     test_models.py               ← 0001/T1
     test_nexau_runtime.py        ← 0003/T2
   run.py                         ← 0007/T4
+tools/
+  persona-distill/
+    extract-selfreport-persona/
+      recruitment/
+        seeds.md                 ← 0006/T1
+      SKILL.md                   ← 0006/T1
+      reference.md               ← 0006/T1
+    card-schema.md               ← 0006/T1
 ```
 
 ## 各 feature 详情
@@ -519,6 +608,117 @@ harbor task（方案A：整条 run = 1 task）───────────�
 graph LR
     nT1["T1 checkpoint 存取（STATE_DIR ↔ artifact）"]
     nT2["T2 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复）"]
+    nT1 --> nT2
+```
+
+### 0005 用户侧重型实现：控制信封模拟器与体感评分（issue #0）
+
+> 人读方案见 [`0005-user-sim-and-feeling/summary.md`](./0005-user-sim-and-feeling/summary.md)。
+
+本组实现进化闭环 **a｜用户侧** 的重型版：以「控制信封」架构替代 spec-0001/T3 的最小桩，让 user agent
+更拟真地多轮使用 harness（能力分叉、追问、绕路、放弃），并补齐 spec-0001 的训练信号
+**FeelingScore（1–4 体感分）**。落点 `backend/auto_designer/user/sim/`，与 0001 最小实现**并存、不覆盖**。
+
+数据流脊柱（贯穿 T1…T6）：
+
+```
+Persona 维度(T1) ─► 动作空间/状态机(T2) ◄─ 提示装配 + LLM 后端(T3)
+                              │  每轮 persona 三层决策
+                              ▼
+                    会话主循环引擎(T5) ⇄ harness 桩(T6)
+                              │  会话末
+                              ▼
+                  体感评分 两路并出(T4) ─► FeelingScore 1–4（训练信号）
+```
+
+读图即读任务：**T1** 定 persona 静态系数；**T2** 定每轮「能做什么 + 情绪如何演化」（纯主观状态机）；
+**T3** 把上下文喂 LLM 并取结构化判断、含会话末自评请求；**T5** 把它们编排成「跑一局」；**T4** 在会话末
+产出训练信号（LLM 自评为主 + 框架派生兜底/校验）；**T6** 提供离线可跑的 harness 桩与运行入口。
+
+**本轮纯主观（客观线不实现）**：本组只取用户体感作训练信号；客观真值线（gold / GAP / ESCAPED_BUG /
+control-plane）整体推迟，不写 state、不进体感、harness 桩只回文本。能力分叉改由「persona 能力 + 文本感知」
+驱动，bug 直接体现在 harness 回复文本里。这与项目「训练信号=用户体感、benchmark held-out」一致；客观真值
+线的观测留待后续 spec。
+
+**与 0001 及闭环的关系**：本组是 0001 用户侧(a) 的重型实现/演进。真正接入闭环所需的契约并轨
+（引擎 `run_session` ↔ 0001/T4、harness 桩 ↔ 0001/T2 `HarnessInterface`、9 维 Persona 与
+`FeelingScore` 与 `models` 并轨、LLM 后端收敛 0003/T2 `nexau_runtime`、`issue_artifact` → `IssueDraft`）
+集中记在各 Task 的 open-questions，归后续 Task/组。
+
+**任务一览**
+
+- **T1 Persona 维度模型与文案**（pending） — 控制信封的 persona 模型：9 维（D1 评估能力 / D2 领域深度 / D3 验收阈值 / D4.1-4.3 委派·监督·纠偏 / D5 自主性 / D6 授权 + 派生 trust），以及维度→英文注入文案的确定性查表（clauses）。
+- **T2 动作模型、动作空间与状态机**（pending） — 控制信封的确定性机制层：动作目录（每个动作钉死 executor×channel×effect 三轴 + 终止原因）、动作空间 派生（局面 ∩ 能力掩码D1 ∩ 授权D6 ∪ 耐心门解锁的终止动作 ∪ accept）、自由产出归类与越权投影与 channel↔message 强校验、以及 patience/trust 状态机（只吃主观 verdict）。
+- **T3 提示装配与 persona LLM 后端**（pending） — 提示装配与 persona LLM 后端。
+- **T4 体感评分（两路并出）**（pending） — 对齐 spec-0001 训练信号 FeelingScore 的产出。
+- **T5 会话主循环引擎**（pending） — 控制信封会话主循环，是 spec-0001/T3「用户 agent 驱动器」的重型实现：把 persona 模型(T1)、动作空间 与状态机(T2)、提示与 LLM 后端(T3)、体感评分(T4) 编排成一局完整会话。
+- **T6 harness 桩与运行入口**（pending） — 脚本化 harness 桩与运行入口。
+
+```mermaid
+graph LR
+    nT1["T1 Persona 维度模型与文案"]
+    nT2["T2 动作模型、动作空间与状态机"]
+    nT3["T3 提示装配与 persona LLM 后端"]
+    nT4["T4 体感评分（两路并出）"]
+    nT5["T5 会话主循环引擎"]
+    nT6["T6 harness 桩与运行入口"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT1 --> nT5
+    nT2 --> nT5
+    nT3 --> nT5
+    nT4 --> nT5
+    nT5 --> nT6
+```
+
+### 0006 Persona 管线：采集（蒸馏）与注入 sim（issue #0）
+
+> 人读方案见 [`0006-persona-pipeline/summary.md`](./0006-persona-pipeline/summary.md)。
+
+本组实现 persona 管线：把「从真实数据采集 persona」与「把 persona 注入控制信封 sim」串成一条链，
+为 0005 的用户侧重型实现供给真实画像。对应 CLAUDE.md「蒸馏模块」，落实约束「persona 来自真实数据、
+不依据 benchmark 或轨迹构造」。
+
+数据流脊柱：
+
+```
+真实使用数据(第一人称自述 · GitHub 足迹 · Stack Overflow · 未来源)
+        │  采集/归纳（T1，轮辐式：共享卡契约 + 薄抽取 skill）
+        ▼
+   persona 卡库（6 维行为卡：D1–D6 + authenticity/era/provenance）
+        │  注入（T2，card_to_persona：grounded 轴透传 + 覆盖派生）
+        ▼
+   spec-0005 dimensions.Persona ─► 0005/T5 run_session 跑一局 ─► 体感 + issue
+```
+
+读图即读任务：**T1** 定「采集什么、卡长什么样」——不另造 skill，而是收编既有的真实抽取方法（此前写在 NexAU 仓库里、非 NexAU 自身的方法），并按
+**轮辐式**组织：唯一公共契约 `card-schema.md`（6 维卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则，
+source-agnostic）+ 各「薄抽取 skill」只描述「从某类来源提取 + ground 哪几维」、只依赖契约、彼此不依赖。本步
+先落契约 + `extract-selfreport-persona`（第一人称自述，唯一 ground 信任轴 D4 且带 card_to_persona 覆盖规则）；
+cc/so/未来源作同契约的后续薄 skill 插入。库 schema 即该契约。**T2** 定「卡如何变成 sim 能跑的 Persona」
+（唯一桥接层 card_to_persona）。
+
+**覆盖派生（关键约束）**：6 维卡是「正交 ground 的真实画像」，每维各自有证据；sim 9 维里 d3/trust/d6 原是
+「从 D1/D5 派生」。注入时 **卡里 grounded 的 验收 D2 → sim d3、信任 D4 → sim trust 直接写入、不被 derive_*
+改写**（这两个正是 sim 的派生维），finalize_persona 只填卡未 ground 的派生维——否则 expert×over-trust
+（selfreport 例 C / Karpathy）会被模拟成 skeptical×rigorous 的反面。此约束在 extract-selfreport-persona
+reference 例 C 已写明（card_to_persona），并要求 0005/T1 把 finalize_persona 降为 fallback-only（本组同改）。
+注：卡 D6 自主 → sim D5Autonomy 是采样维（直接写入，本无 derive）；sim 的派生维 D6Authz 卡中无对应来源，
+仍按 D5Autonomy + task_risk 派生（见 T2）。
+
+与 0005 的关系：本组是 0005（控制信封用户模拟器）的上游供给。6 维卡 ↔ sim 9 维 ↔ spec-0001 models.Persona
+的最终并轨记在各 Task open-questions，待真实数据与下游需求收敛后定。
+
+**任务一览**
+
+- **T1 Persona 采集（蒸馏，skill 形式）**（pending） — 采集（蒸馏）侧按**轮辐式**组织，不另造大 skill：① 唯一公共契约 card-schema.md（source-agnostic）—— 6 维行为卡 schema（D1–D6 + authenticity + era + provenance）+ 维度枚举 + D5.area 受控词表 + 注入分布 + 双向真实性门原则，采既有 selfreport skill 的最新约定（每维 source+basis+confidence、provenance 并集、value 键）； ② 薄抽取 skill extract-selfreport-persona——只描述「从第一人称自述（博客/访谈/演讲/推文长贴）提取 + ground 哪几维」，只引用契约、不依赖任何其它 skill。
+- **T2 Persona 注入 sim**（pending） — 把采集到的 persona 卡（0006/T1 6 维行为卡）注入控制信封 sim：card_to_persona 将一条卡映射为 sim 的 dimensions.Persona —— 卡里 grounded 的轴直接透传，finalize_persona 仅填卡未 ground 的派生维度（即 「覆盖派生」：grounded 的验收/信任/授权不被 derive_* 改写）。
+
+```mermaid
+graph LR
+    nT1["T1 Persona 采集（蒸馏，skill 形式）"]
+    nT2["T2 Persona 注入 sim"]
     nT1 --> nT2
 ```
 
