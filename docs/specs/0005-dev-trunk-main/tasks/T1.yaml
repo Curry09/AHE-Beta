@@ -1,0 +1,31 @@
+id: T1
+title: 开发者侧直推 main（去 branch/merge）
+status: pending
+priority: P0
+tags: []
+depends-on: []
+relates-to: []
+parallel: false
+files:
+  - backend/auto_designer/dev/agentic_developer.py
+  - backend/agent_defs/developer_agent/systemprompt.md
+  - backend/tests/dev/test_agentic_developer.py
+version: 1
+updated: '2026-06-28'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: ''
+motivation: ''
+scope: |-
+  把 dev agent 的 git 流程从「fix/issue-N 分支 + --no-ff 合 release + 打 tag + push branch/release/tag」改为直推 main：work_one 注入的流程与 systemprompt.md 文案统一为 `git checkout main → 改 agents/main.md → commit → git tag vK → git push origin main vK`，去掉 branch、merge、release 全部字样。DevOutcome.released 语义改为「committed（已推 main）」（字段名可保留或重命名，二选一在实现时定）；ground-truth 判定仍为「新 vK tag 出现」，成功即 close 该 issue（沿用 tracker.set_state）。不分 bug/feature，单 dev agent 串行领 issue 不变。不动 launcher、orchestrator。
+design: ''
+interface: ''
+tradeoffs: ''
+acceptance: |-
+  work_one 全程不创建 fix/issue-* 分支、不执行 --no-ff merge；实际 git 历史落在 main 上；流程产出新 vK tag 且 main 与 vK 均被 push origin；DevOutcome 表达「已 commit 到 main」语义；新 tag 出现→issue 被 close；systemprompt.md 无 branch/merge/release 字样、与注入流程一致。单测（mock nexau + 临时 git 仓 fixture）覆盖：直推 main 后仓内无新分支、有新 commit+tag；无可领 issue 返回空 DevOutcome；新 tag→close 调用。
+tests: ''
+references: ''
+open-questions: ''
