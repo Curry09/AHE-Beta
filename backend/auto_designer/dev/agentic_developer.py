@@ -1,8 +1,11 @@
+# Spec-0007/T1：开发者侧改纯 trunk（单 main）——去掉 fix/issue-N 分支、--no-ff merge 与 release，
+# dev 直推 main：checkout main → 改 main.md → commit → tag vK → push origin main vK。
 """agentic_developer：开发者 = 带 git 工具的 nexau agent（取代确定性 DeveloperAgent）。
 
-领一条 open issue，把确切的分支名 fix/issue-N 与下一个 tag vK 塞进任务消息，让 nexau agent 在
-harness 仓（LocalSandbox work_dir）里自己 改 main.md → commit → merge release → tag → push Gitea。
-跑完读仓状态（新 tag）判定是否发版。无门禁：dev 直接发版（体感退化为观测，benchmark held-out）。
+领一条 open issue，把下一个 tag vK 塞进任务消息，让 nexau agent 在 harness 仓（LocalSandbox
+work_dir）里自己 checkout main → 改 agents/main.md → commit → tag vK → push origin main vK。
+跑完读仓状态（新 tag）判定是否已推进 main。无 branch/merge/门禁：dev 直推 main，每次成功打轻量 vK
+tag 仅作观测锚点（体感退化为观测，benchmark held-out，坏 commit 靠后续多轮迭代回正——梯度下降式）。
 """
 
 from __future__ import annotations
@@ -26,12 +29,15 @@ StatusFn = Callable[..., None]
 
 @dataclass
 class DevOutcome:
-    """一次 work_one 的结果：拿到 tag 即本轮新发版（供编排回灌 ref）。"""
+    """一次 work_one 的结果。
+
+    Spec-0007/T1：去掉 branch 字段（不再建分支）；`released`→`committed`，语义从「已发版」改为
+    「已 commit 并推到 main」。判定仍以仓状态为 ground truth（新 vK tag 出现）。tag 仅作观测锚点。
+    """
 
     issue_number: int | None = None
-    branch: str | None = None
     tag: str | None = None
-    released: bool = False
+    committed: bool = False
 
 
 def _run_with_timeout(call: Callable[[], object], timeout: int) -> object:
@@ -76,48 +82,44 @@ class AgenticDeveloper:
             self._emit(running=False, status="无可领 open issue")
             return DevOutcome()
         issue = issues[0]
-        branch = f"fix/issue-{issue.number}"
         next_tag = f"v{self._next_version()}"
         self._emit(
             running=True,
             status=f"领取 issue #{issue.number}：{issue.title}",
             issue_number=issue.number,
-            branch=branch,
         )
 
         tags_before = set(self._tags())
         self._emit(
             running=True,
-            status=f"agent 改写+发版中…（{branch} → {next_tag}）",
+            status=f"agent 改 main + 直推中…（→ {next_tag}）",
             issue_number=issue.number,
-            branch=branch,
         )
         result_text = self._run_agent(
             issue_number=issue.number,
             title=issue.title,
             body=issue.body,
-            branch=branch,
             tag=next_tag,
         )
 
-        new_tags = set(self._tags()) - tags_before  # 仓状态是 ground truth：新 tag 出现即发版
-        released = bool(new_tags)
+        # Spec-0007/T1：仓状态是 ground truth——新 vK tag 出现 = dev 已 commit 并推进 main。
+        new_tags = set(self._tags()) - tags_before
+        committed = bool(new_tags)
         tag = next_tag if next_tag in new_tags else (sorted(new_tags)[-1] if new_tags else None)
-        if released and self._tracker is not None:
+        if committed and self._tracker is not None:
             try:
-                self._tracker.set_state(issue.number, "closed", f"发版 {tag}")
-            except Exception:  # noqa: BLE001  关 issue 失败不影响发版
+                self._tracker.set_state(issue.number, "closed", f"已推进 main {tag}")
+            except Exception:  # noqa: BLE001  关 issue 失败不影响已推进的 main
                 pass
         self._emit(
             running=False,
-            status=(f"已发版 {tag}（{branch}）" if released else "本轮未发版"),
+            status=(f"已推进 main {tag}" if committed else "本轮未推进 main"),
             issue_number=issue.number,
-            branch=branch,
             detail=result_text[:800] if result_text else None,
         )
-        return DevOutcome(issue_number=issue.number, branch=branch, tag=tag, released=released)
+        return DevOutcome(issue_number=issue.number, tag=tag, committed=committed)
 
-    def _run_agent(self, *, issue_number: int, title: str, body: str, branch: str, tag: str) -> str:
+    def _run_agent(self, *, issue_number: int, title: str, body: str, tag: str) -> str:
         os.environ["SANDBOX_WORK_DIR"] = str(
             self._repo
         )  # dev agent 的 sandbox 工作目录 = harness 仓
@@ -125,15 +127,15 @@ class AgenticDeveloper:
 
         cfg = AgentConfig.from_yaml(config_path=self._agent_def / "agent.yaml")
         agent = Agent(config=cfg)
+        # Spec-0007/T1：直推 main——无 branch/merge/release，commit 落 main、打 vK tag、push main+tag。
         msg = (
-            "处理这条 issue，端到端落地成一次发版（必须做完 git 才 complete_task）。\n"
+            "处理这条 issue，端到端落地成一次对 main 的推进（必须做完 git 才 complete_task）。\n"
             f"issue #{issue_number}：{title}\n{body}\n\n"
-            f"严格使用：分支名 `{branch}`、新 tag `{tag}`。\n"
-            f"流程：`git checkout -B {branch} release` → 针对该 issue 改 `agents/main.md` → "
+            f"严格使用新 tag `{tag}`。\n"
+            f"流程：`git checkout main` → 针对该 issue 改 `agents/main.md` → "
             f'`git add -A && git -c user.email=dev@auto-designer -c user.name=developer commit -m "fix: issue #{issue_number}"` → '
-            f'`git checkout release && git merge --no-ff {branch} -m "release: merge {branch}"` → '
-            f"`git tag {tag}` → `git push origin {branch}` `git push origin release` `git push origin {tag}` → "
-            "验证 → complete_task 报告分支与 tag。"
+            f"`git tag {tag}` → `git push origin main` `git push origin {tag}` → "
+            "验证 → complete_task 报告 main 与 tag。"
         )
         out = _run_with_timeout(lambda: agent.run(message=msg), _DEV_TIMEOUT)
         return out if isinstance(out, str) else str(out)

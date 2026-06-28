@@ -2,7 +2,8 @@
 
 接线：真 nexau（user/developer/harness agent，模型走 backend/.env 的 LLM_*）
      + 真 Gitea（issue，走 backend/deploy/gitea/.env）+ 本地 git 仓承载 harness 代码。
-本地多轮规模：2 persona（2 user agent）× 2 dev agent，max_turns=2，体感门禁 n=1 抽样，跑 2 轮。
+本地多轮规模：2 persona（2 user agent）× 2 dev agent，max_turns=2，跑 2 轮。
+Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析 main HEAD SHA 作会话级快照。
 
 前置：
   1) backend/.env 有 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY
@@ -62,7 +63,7 @@ def _set_gitea_remote(repo: Path, gitea: dict[str, str]) -> None:
 
 
 def _seed_harness_repo() -> Path:
-    """从 harness_template 种一个本地 git 仓：main 初始提交 + release 分支。"""
+    """从 harness_template 种一个本地 git 仓：仅 main（Spec-0007/T4：纯 trunk，不再建 release）。"""
     if HARNESS_REPO.exists():
         shutil.rmtree(HARNESS_REPO)
     HARNESS_REPO.mkdir(parents=True)
@@ -78,7 +79,6 @@ def _seed_harness_repo() -> Path:
     )
     _git(HARNESS_REPO, "add", ".")
     _git(HARNESS_REPO, "commit", "-m", "seed: harness v0")
-    _git(HARNESS_REPO, "branch", "release")
     return HARNESS_REPO
 
 
@@ -220,17 +220,18 @@ def main() -> int:
 
     orch = Orchestrator(
         launcher=launcher,
+        harness_repo=str(repo),  # Spec-0007/T4：每局解析 main HEAD SHA 用
         fixed_set=fixed_set,
         developer_agents=developers,
         run_session_fn=user_run_session_fn,
-        initial_ref="release",
+        initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
     )
 
-    print("④ 跑 2 轮闭环（2 user agent × 2 dev agent，无门禁直接发版，真模型，较慢）...")
+    print("④ 跑 2 轮闭环（2 user agent × 2 dev agent，dev 直推 main，真模型，较慢）...")
     refs = orch.run(2)
 
     print("\n=== 结果 ===")
-    print("release_ref 链:", refs)
+    print("各轮 main HEAD SHA:", refs)  # Spec-0007/T4：观测游标（main 最新 SHA），非 release 链
     m = Metrics(tracker, store)
     print("当前 open issue 数:", m.open_issue_count())
     print("体感趋势:", m.feeling_trend())

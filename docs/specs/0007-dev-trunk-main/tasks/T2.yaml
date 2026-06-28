@@ -1,0 +1,33 @@
+id: T2
+title: 编排去 release 链 · 会话级 main SHA 快照回灌
+status: pending
+priority: P0
+tags: []
+depends-on:
+  - T1
+relates-to: []
+parallel: false
+files:
+  - backend/auto_designer/loop/orchestrator.py
+  - backend/auto_designer/loop/run_state.py
+  - backend/tests/loop/test_orchestrator.py
+  - backend/tests/loop/test_run_state.py
+version: 1
+updated: '2026-06-28'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: ''
+motivation: ''
+scope: |-
+  去掉 release_ref 链：run_round 不再把 outcome.tag 链式回灌。phase-a 每局会话开始解析 harness 仓 main 的 HEAD SHA、按该 SHA launch（launcher 已支持按 SHA checkout，保证单会话内 harness 不在脚下变 = 会话级快照）；dev 直推 main 后，下一局自然解析到更新后的 main HEAD（对用户永远「最新 main」）。回灌语义从「release 链」简化为「main 最新 SHA」；run_state.current_release_ref 语义改为「当前 main SHA」（观测游标，字段名可保留或重命名）。run/run_round 签名与命名相应调整。不动 dev、launcher。
+design: ''
+interface: ''
+tradeoffs: ''
+acceptance: |-
+  run_round 不再读 outcome.tag 作链式 ref；每局 launch 的 ref 解析自 harness 仓 main 当前 HEAD SHA；同一会话内多轮 send 跑同一 SHA 快照；dev 推进 main 后下一局解析到新的 main HEAD。run_state 持久化「当前 main SHA」语义、读写往返一致。单测（mock launcher/developer + 临时 git 仓）覆盖：无 dev 发版时下一局仍取 main 最新；dev 推进后 SHA 前进；run_state to_dict/from_dict 往返。
+tests: ''
+references: ''
+open-questions: ''

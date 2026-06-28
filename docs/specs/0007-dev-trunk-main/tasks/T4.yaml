@@ -1,0 +1,33 @@
+id: T4
+title: 去 release：种子/bootstrap/e2e trunk 化
+status: pending
+priority: P1
+tags: []
+depends-on:
+  - T1
+  - T2
+relates-to: []
+parallel: false
+files:
+  - backend/run.py
+  - backend/scripts/bootstrap_harness.py
+  - backend/tests/test_bootstrap_harness.py
+version: 1
+updated: '2026-06-28'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: ''
+motivation: ''
+scope: |-
+  把建仓与 e2e 从「main + release」收敛到单 main：run.py 的 _seed_harness_repo 不再 `git branch release`（仅 main）、Orchestrator initial_ref 由 release 改 main、结果打印从「release_ref 链」改「main SHA / 分支 + tags」；bootstrap_harness.py 不再创建 release 分支、确保 Gitea 默认分支为 main。与 T1/T2 的直推 main + main SHA 回灌对齐。
+design: ''
+interface: ''
+tradeoffs: ''
+acceptance: |-
+  run.py 种出的本地仓只有 main 分支、initial_ref=main；跑通后仓内仅 main + vK tags、无 release。bootstrap_harness.py 不创建 release、默认分支为 main。test_bootstrap_harness 断言只建 main、无 release。e2e 结果打印反映 main SHA / tags 而非 release_ref 链。
+tests: ''
+references: ''
+open-questions: ''
