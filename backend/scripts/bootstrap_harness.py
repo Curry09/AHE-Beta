@@ -1,8 +1,9 @@
+# Spec-0005/T4：纯 trunk——bootstrap 不再建 release 分支，只种 main 并确保默认分支为 main。
 """harness 仓初始化（spec-0002/T3）：把 backend/harness_template/ 作为 v0 推到 Gitea，建独立 harness 仓。
 
-读 backend/deploy/gitea/.env 的 {GITEA_URL, OWNER, TOKEN} → 建仓（缺则建，幂等）→ git push 种子到 main →
-建 release 分支。幂等且保护演化历史：仓已存在则不强推覆盖，仅确保 release 分支存在。
-核心逻辑 bootstrap_harness 经依赖注入（session / run_git），便于 mock Gitea + 临时 git 单测。
+读 backend/deploy/gitea/.env 的 {GITEA_URL, OWNER, TOKEN} → 建仓（缺则建，幂等）→ git push 种子到 main。
+纯 trunk（Spec-0005）：只建单 main 分支（不再建 release），默认分支即 main。幂等且保护演化历史：仓已
+存在则不强推覆盖。核心逻辑 bootstrap_harness 经依赖注入（session / run_git），便于 mock Gitea + 临时 git 单测。
 """
 
 from __future__ import annotations
@@ -103,14 +104,14 @@ def bootstrap_harness(
             print(f"[bootstrap-harness] 建仓失败：HTTP {created.status_code}", file=sys.stderr)
             return 1
 
-        # 确保 release 分支存在（指向 main）；已存在(409)视为成功。
-        branch = session.post(
-            f"{api}/repos/{owner}/{harness_repo}/branches",
-            json={"new_branch_name": "release", "old_branch_name": "main"},
+        # Spec-0005/T4：纯 trunk——不再建 release 分支，确保 Gitea 默认分支为 main。
+        default = session.patch(
+            f"{api}/repos/{owner}/{harness_repo}",
+            json={"default_branch": "main"},
         )
-        if branch.status_code not in (201, 409):
+        if default.status_code not in (200, 201):
             print(
-                f"[bootstrap-harness] 建 release 分支失败：HTTP {branch.status_code}",
+                f"[bootstrap-harness] 设默认分支 main 失败：HTTP {default.status_code}",
                 file=sys.stderr,
             )
             return 1
@@ -118,7 +119,7 @@ def bootstrap_harness(
         print(f"[bootstrap-harness] Gitea 不可达：{exc}", file=sys.stderr)
         return 1
 
-    print(f"[bootstrap-harness] 完成：{owner}/{harness_repo}（main + release）")
+    print(f"[bootstrap-harness] 完成：{owner}/{harness_repo}（纯 trunk：单 main）")
     return 0
 
 
