@@ -488,9 +488,10 @@ text）；reset 重置脚本步进、close 幂等空操作。demo（离线脚本
 **整体设计**
 
 - harness 桩：实现 HarnessInterface（send/reset/close）。send 按预设步骤回应，仅消费 message 是否「要求运行
-  / 探不可整除边界」分叉轨迹，返回纯文本（str）；reset 把脚本步进归零、close 无资源可释放故幂等空操作。bug 体现
-  在文本中（如 split_bill(100,3) -> sum=99.99），高能力 persona 读文本即可识别，低能力 persona 看常规用例
-  （sum=100）即接受——分叉完全由 persona 能力 + 文本感知驱动，无需 gold。
+  / 探不可整除边界」分叉轨迹，返回纯文本（str）；reset 把脚本步进归零；close 置已关闭标志（无真资源）、幂等，
+  close 后再 send/reset 抛 RuntimeError（对齐 FakeHarness 暴露误用）。bug 体现在文本中（如 split_bill(100,3)
+  -> sum=99.99），高能力 persona 读文本即可识别，低能力 persona 看常规用例（sum=100）即接受——分叉完全由
+  persona 能力 + 文本感知驱动，无需 gold。
 - demo：make_client（无 key → ScriptedPersonaClient），两 persona（SHALLOW+FEEDBACK / EXPERT+FILE_ISSUE）
   各跑全新 harness 轨迹，print_result 并排打印 turns / 两路体感 / 行为信号 / issue artifact。
 - run_live：固定 ApiPersonaClient（走 repo .env 网关）对真实 user-agent 跑 SplitBillHarness。
@@ -500,7 +501,7 @@ text）；reset 重置脚本步进、close 幂等空操作。demo（离线脚本
 ScriptedHarness / SplitBillHarness 实现 spec-0001/T2 HarnessInterface：
   send(message: str) -> str   # 本轮只回文本(无 gold/exit_code)
   reset() -> None             # 重置脚本步进, 幂等
-  close() -> None             # 幂等空操作(无后端资源)
+  close() -> None             # 置已关闭标志(无真资源)；幂等，close 后再 send/reset 抛 RuntimeError
 demo.main() / run_live.main()   # 两个 __main__ 运行入口
 
 **取舍**
@@ -512,12 +513,12 @@ demo.main() / run_live.main()   # 两个 __main__ 运行入口
 
 **验收标准**
 
-ScriptedHarness/SplitBillHarness 满足 HarnessInterface（isinstance 通过、send/reset/close 齐备）；demo 无 key 用 ScriptedPersonaClient 跑通两 persona 并打印 llm-rated/derived 两路体感；run_live 在配好网关时可对真实 user-agent 跑；harness 桩对'要求运行/探边界'分支产出预期文本轨迹。
+ScriptedHarness/SplitBillHarness 满足 HarnessInterface（isinstance 通过、send/reset/close 齐备）；与 FakeHarness 行为一致：close 后再 send/reset 抛 RuntimeError、重复 close 幂等不抛；demo 无 key 用 ScriptedPersonaClient 跑通两 persona 并打印 llm-rated/derived 两路体感；run_live 在配好网关时可对真实 user-agent 跑；harness 桩对'要求运行/探边界'分支产出预期文本轨迹。
 
 **测试**
 
 单测/烟测：
-- 契约对齐：isinstance(ScriptedHarness()/SplitBillHarness(), HarnessInterface) 为真；reset 后脚本从首步重来、close 幂等不抛。
+- 契约对齐：isinstance(ScriptedHarness()/SplitBillHarness(), HarnessInterface) 为真；reset 后脚本从首步重来；close 后 send/reset 抛 RuntimeError、重复 close 幂等不抛（对齐 FakeHarness）。
 - harness 桩：首轮贴代码未跑；要求运行 → 回显常规用例(无报错)；探不可整除边界 → 文本暴露丢分钱/DST 错误；send 返回 str。
 - demo 无 key 跑通两 persona，输出含 llm-rated 与 derived 两路体感分；断言能力分叉（浅层 accept / 专家 file_issue）。
 

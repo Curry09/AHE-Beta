@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.user.sim import demo
 from auto_designer.user.sim.harness_adapter import ScriptedHarness
@@ -29,7 +31,17 @@ def test_reset_rewinds_script() -> None:
     h.reset()
     again = h.send("please implement to_user_tz")
     assert "to_user_tz" in again and h.step == 1  # reset 后从首步重来
-    h.close()  # 幂等空操作, 不抛
+
+
+def test_close_then_use_raises_and_is_idempotent() -> None:
+    # 与 FakeHarness 行为对齐: close 后 send/reset 抛 RuntimeError, 重复 close 不抛
+    for stub in (ScriptedHarness(), SplitBillHarness()):
+        stub.close()
+        stub.close()  # 幂等: 重复 close 不报错
+        with pytest.raises(RuntimeError):
+            stub.send("x")
+        with pytest.raises(RuntimeError):
+            stub.reset()
 
 
 def test_split_bill_bug_shows_in_text_only_when_probed() -> None:

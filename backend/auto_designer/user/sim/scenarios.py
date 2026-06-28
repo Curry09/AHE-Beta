@@ -21,8 +21,10 @@ from __future__ import annotations
 class SplitBillHarness:
     def __init__(self) -> None:
         self.step = 0
+        self._closed = False
 
     def send(self, message: str) -> str:
+        self._ensure_open()
         self.step += 1
         m = (message or "").lower()
         wants_run = any(k in m for k in ("run", "execute", "跑", "try it", "check it"))
@@ -67,7 +69,13 @@ class SplitBillHarness:
 
     def reset(self) -> None:
         """回到新一局起点(幂等): 重置脚本步进。"""
+        self._ensure_open()
         self.step = 0
 
     def close(self) -> None:
-        """无后端资源, 幂等空操作。"""
+        """释放后端资源(无真资源故仅置标志)。幂等: 重复 close 不报错。"""
+        self._closed = True
+
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise RuntimeError("SplitBillHarness 已关闭，不可再 send/reset")
