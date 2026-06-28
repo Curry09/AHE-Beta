@@ -93,16 +93,20 @@ D5 自主性 / D6 授权 + 派生 trust），以及维度→英文注入文案�
 **整体设计**
 
 维度分五层：A 能力底座(D1,D2)、B 验收(D3 派生 D1×D2)、C 交互(D4.1/4.2/4.3)、D 会话配置(D5,D6 半派生)、
-E 派生(trust = f(D1,D2))。自由采样维度由调用方给定；派生维度由 finalize_persona 确定性填齐：
+E 派生(trust = f(D1,D2))。自由采样维度由调用方给定；派生维度(d3/trust/d6)由 finalize_persona 填齐：
 - derive_d3：D1 定基线档，D2.depth 资深+1/新手-1（枚举序内 clamp）。
 - derive_trust：BLIND→blind、EXPERT→skeptical、其余 balanced。
 - derive_d6：D5 定基线，task_risk 高收紧一档、collaborative+低风险放开可跑。
+**fallback-only（正交契约）**：finalize_persona 只填「未提供」的派生维度；调用方已显式 ground 的 d3/trust/d6
+原样保留，derive_* 不改写。实现以 None 哨兵区分「未提供」与「已 ground」（d3/d6/trust 默认 None，finalize 仅
+填 None 的）。动机：真实 persona 的验收/信任/授权应可被 grounded 值直接给定（维度正交，expert 可 over-trust，
+见 extract-selfreport-persona 例 C），0006/T2 注入真实卡时据此保真——否则会把 grounded 真值改写成合成面。
 clauses 为每个维度取值给一句英文注入文案，compile_block_p 拼成 BLOCK-P（喂 persona LLM，不掺状态数值）。
 
 **接口**
 
-Persona(persona_id, d1, d2, d41, d42, d43, d5, d3=, d6=, trust=)   # frozen dataclass
-finalize_persona(p: Persona, task_risk: str = "low") -> Persona      # 填齐派生维度
+Persona(persona_id, d1, d2, d41, d42, d43, d5, d3=None, d6=None, trust=None)   # frozen dataclass；派生维度默认 None=未提供
+finalize_persona(p: Persona, task_risk: str = "low") -> Persona      # 仅填未提供(None)的派生维度（fallback-only，不改写已 grounded 值）
 compile_block_p(p: Persona) -> str                                   # 维度 → BLOCK-P 文案
 
 **取舍**
@@ -110,21 +114,26 @@ compile_block_p(p: Persona) -> str                                   # 维度 �
 - 9 维结构化 vs spec-0001/T1 自由文本五元组：选结构化（驱动能力分叉、可复现/可采样），代价是建模成本；
   与 models.Persona 的并轨留待接入闭环（见 open-questions）。
 - 派生维度确定性查表 vs LLM 推断：选确定性，保证可复现与可 codegen，杜绝采样噪声进入静态系数。
+- 派生 fallback-only vs 一律派生：选 fallback。真实 persona 的验收/信任/授权应可被 grounded 值直接给定（维度
+  正交，见 selfreport 例 C：expert 可 over-trust）；一律派生会把 grounded 真值改写成合成面（0006/T2 注入即失真）。
+  代价是 Persona 需用 None 哨兵区分「未提供」与「已 ground」。
 
 **验收标准**
 
-finalize_persona 对任意自由采样维度产出完整不可变 persona；派生映射确定性可复现；compile_block_p 对每个维度取值产出对应文案，无缺漏键。
+finalize_persona 对仅给自由采样维度的 persona 产出完整不可变 persona，派生映射确定性可复现；对已显式提供 d3/trust/d6 的 persona，三者原样保留不被改写（fallback-only）；compile_block_p 对每个维度取值产出对应文案，无缺漏键。
 
 **测试**
 
 单测：
-- finalize_persona：对各档 D1/D2/D5 组合，派生 d3/trust/d6 与查表一致、可复现。
+- finalize_persona（派生）：仅给自由采样维度时，派生 d3/trust/d6 与查表一致、可复现。
+- finalize_persona（fallback-only）：显式提供 d3/trust/d6 的 persona 过 finalize 后三者不变；未提供者按 derive_* 填齐。
 - derive_d3：senior 抬一档、novice 降一档且在枚举序内 clamp（不越界）。
 - compile_block_p：每个维度取值都命中文案、无 KeyError；frozen persona 不可变。
 
 **参考**
 
 spec-0001/T1 Persona 字段约定。CLAUDE.md：persona 来自真实数据、不依据 benchmark 构造。
+extract-selfreport-persona 例 C（维度正交：expert×over-trust，derive_* 须可被 grounded 值覆盖）。
 参考实现见本组 prototype（dimensions.py / clauses.py）。
 
 **待解问题**

@@ -16,7 +16,7 @@ Persona 维度定义 + 取值枚举 + 派生函数。
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -115,10 +115,11 @@ class Persona:
     d42: D42Supervise
     d43: D43Correct
     d5: D5Autonomy
-    # 派生 / 半派生 (由 derive() 填)
-    d3: D3Accept = field(default=D3Accept.FUNCTIONAL)
-    d6: D6Authz = field(default=D6Authz.WRITE_NO_RUN)
-    trust: TrustStance = field(default=TrustStance.BALANCED)
+    # 派生 / 半派生：默认 None 表示「未提供，待 finalize_persona 派生填齐」。
+    # 若调用方（如 0006/T2 注入层）显式给了 grounded 值，finalize 不再改写（fallback-only）。
+    d3: D3Accept | None = None
+    d6: D6Authz | None = None
+    trust: TrustStance | None = None
 
 
 # --------------------------------------------------------------------------
@@ -173,11 +174,16 @@ def derive_d6(d5: D5Autonomy, task_risk: str = "low") -> D6Authz:
 
 
 def finalize_persona(p: Persona, task_risk: str = "low") -> Persona:
-    """填齐派生维度, 返回不可变的完整 persona。"""
+    """填齐派生维度, 返回不可变的完整 persona。
+
+    fallback-only：只对未提供（None）的派生维度调用 derive_* 填齐；调用方已显式给的
+    grounded 值原样保留、不被改写。这样 0006/T2 注入层可让卡里 grounded 的验收(d3)/信任(trust)
+    覆盖派生——否则 expert×over-trust（Karpathy）会被模拟成 skeptical×rigorous 的反面。
+    """
     return Persona(
         persona_id=p.persona_id,
         d1=p.d1, d2=p.d2, d41=p.d41, d42=p.d42, d43=p.d43, d5=p.d5,
-        d3=derive_d3(p.d1, p.d2),
-        d6=derive_d6(p.d5, task_risk),
-        trust=derive_trust(p.d1, p.d2),
+        d3=p.d3 if p.d3 is not None else derive_d3(p.d1, p.d2),
+        d6=p.d6 if p.d6 is not None else derive_d6(p.d5, task_risk),
+        trust=p.trust if p.trust is not None else derive_trust(p.d1, p.d2),
     )
