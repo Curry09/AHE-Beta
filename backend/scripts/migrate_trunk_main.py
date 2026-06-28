@@ -1,4 +1,4 @@
-# Spec-0005/T3：一次性迁移脚本——把 harness 仓从 main+release 收敛到纯 trunk（单 main）。
+# Spec-0007/T3：一次性迁移脚本——把 harness 仓从 main+release 收敛到纯 trunk（单 main）。
 """把演化成果从 release 收敛到 main 且不丢东西：
 
 `git checkout main && git reset --hard release`（main 移到 release tip，保留全部 release 历史与内容）→

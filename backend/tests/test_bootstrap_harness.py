@@ -1,5 +1,5 @@
-# spec-0002/T3 + Spec-0005/T4：bootstrap_harness 单测，mock Gitea API + 临时 git（不触网、不真跑 git）。
-"""Spec-0005/T4：纯 trunk——断言只建 main、不再建 release，并确保默认分支为 main（PATCH 仓配置）。"""
+# spec-0002/T3 + Spec-0007/T4：bootstrap_harness 单测，mock Gitea API + 临时 git（不触网、不真跑 git）。
+"""Spec-0007/T4：纯 trunk——断言只建 main、不再建 release，并确保默认分支为 main（PATCH 仓配置）。"""
 
 from __future__ import annotations
 

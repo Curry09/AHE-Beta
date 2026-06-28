@@ -1,4 +1,4 @@
-# 0005 开发者侧改为纯 trunk(main) 自进化
+# 0007 开发者侧改为纯 trunk(main) 自进化
 
 > 本文件由 `spec render` 自动生成，请勿手工编辑。
 > 内容来源：本组 `metadata.yaml` 与 `tasks/T*.yaml`（关联 issue #12）。

@@ -26,7 +26,7 @@
   分层是本组关键，且与 spec-0001/T2「逐轮对话另立协议」一致：harbor 只包**外层 rollout 生命周期**；**内层**用户↔harness 的逐轮真人对话仍走 spec-0001 自立协议，不碰 harbor 批式 episode 接口。
 
   支撑件：**T1** 定义 checkpoint 存取与自包含 STATE_DIR（gitea + sessions + metrics + run_state）；**T2** 可恢复 harbor runner，在 orchestrator 外层加恢复与每轮 checkpoint。本组约束：**恢复按单元边界幂等重跑**（整会话重跑、开发者从分支 head 续作、release 见 tag 跳过），不快照 agent 进程内存。
-- **0005 开发者侧改为纯 trunk(main) 自进化** — ## Summary
+- **0007 开发者侧改为纯 trunk(main) 自进化** — ## Summary
 
   去掉 harness 仓的 `release` 常驻分支、发版、体感门禁与回退，改纯 **trunk（单 `main`）** 自进化：user agent 永远使用最新 `main`（会话开始锁定其 HEAD SHA、整局跑该快照），dev agent 不分 bug/feature、直接 commit 到 `main`。每次成功推进给 `main` 打轻量 `vK` tag，**仅作观测锚点，不是发版**。一往无前，不回退。
 
@@ -174,10 +174,10 @@
 | 0003 | 0003/T6 | 闭环编排与曲线 | pending | T3, T4, T5, 0001/T4, 0001/T6 |
 | 0004 | 0004/T1 | checkpoint 存取（STATE_DIR ↔ artifact） | pending | 0001/T6 |
 | 0004 | 0004/T2 | 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复） | pending | T1, 0003/T6 |
-| 0005 | 0005/T1 | 开发者侧直推 main（去 branch/merge） | pending | — |
-| 0005 | 0005/T2 | 编排去 release 链 · 会话级 main SHA 快照回灌 | pending | T1 |
-| 0005 | 0005/T3 | 一次性迁移脚本：main ← release + 清理分支 | pending | — |
-| 0005 | 0005/T4 | 去 release：种子/bootstrap/e2e trunk 化 | pending | T1, T2 |
+| 0007 | 0007/T1 | 开发者侧直推 main（去 branch/merge） | pending | — |
+| 0007 | 0007/T2 | 编排去 release 链 · 会话级 main SHA 快照回灌 | pending | T1 |
+| 0007 | 0007/T3 | 一次性迁移脚本：main ← release + 清理分支 | pending | — |
+| 0007 | 0007/T4 | 去 release：种子/bootstrap/e2e trunk 化 | pending | T1, T2 |
 
 ## 跨 feature 关系图
 
@@ -210,11 +210,11 @@ graph LR
         n0004_T1["T1 checkpoint 存取（STATE_DIR ↔ artifact）"]
         n0004_T2["T2 可恢复 harbor runner（任务入口 + 每轮 checkpoint + 恢复）"]
     end
-    subgraph G0005[0005 dev-trunk-main]
-        n0005_T1["T1 开发者侧直推 main（去 branch/merge）"]
-        n0005_T2["T2 编排去 release 链 · 会话级 main SHA 快照回灌"]
-        n0005_T3["T3 一次性迁移脚本：main ← release + 清理分支"]
-        n0005_T4["T4 去 release：种子/bootstrap/e2e trunk 化"]
+    subgraph G0007[0007 dev-trunk-main]
+        n0007_T1["T1 开发者侧直推 main（去 branch/merge）"]
+        n0007_T2["T2 编排去 release 链 · 会话级 main SHA 快照回灌"]
+        n0007_T3["T3 一次性迁移脚本：main ← release + 清理分支"]
+        n0007_T4["T4 去 release：种子/bootstrap/e2e trunk 化"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -244,21 +244,21 @@ graph LR
     n0004_T1 --> n0001_T6
     n0004_T2 --> n0004_T1
     n0004_T2 --> n0003_T6
-    n0005_T2 --> n0005_T1
-    n0005_T4 --> n0005_T1
-    n0005_T4 --> n0005_T2
+    n0007_T2 --> n0007_T1
+    n0007_T4 --> n0007_T1
+    n0007_T4 --> n0007_T2
 ```
 
 ## 文件冲突报告
 
 | 文件 | 涉及组 |
 |----|----|
-| backend/auto_designer/loop/orchestrator.py | 0003, 0005 |
-| backend/auto_designer/loop/run_state.py | 0004, 0005 |
-| backend/scripts/bootstrap_harness.py | 0002, 0005 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0005 |
-| backend/tests/loop/test_run_state.py | 0004, 0005 |
-| backend/tests/test_bootstrap_harness.py | 0002, 0005 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007 |
+| backend/auto_designer/loop/run_state.py | 0004, 0007 |
+| backend/scripts/bootstrap_harness.py | 0002, 0007 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007 |
+| backend/tests/loop/test_run_state.py | 0004, 0007 |
+| backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 
 ## 设计文件结构
 
@@ -269,14 +269,14 @@ backend/
   agent_defs/
     developer_agent/
       prompt.md                  ← 0003/T3
-      systemprompt.md            ← 0005/T1
+      systemprompt.md            ← 0007/T1
     test_agent/
       prompt.md                  ← 0003/T4
     user_agent/
       prompt.md                  ← 0003/T2
   auto_designer/
     dev/
-      agentic_developer.py       ← 0005/T1
+      agentic_developer.py       ← 0007/T1
       developer_agent.py         ← 0003/T3
       release.py                 ← 0003/T5
       test_agent.py              ← 0003/T4
@@ -286,8 +286,8 @@ backend/
     loop/
       checkpoint.py              ← 0004/T1
       metrics.py                 ← 0003/T6
-      orchestrator.py            ← 0003/T6, 0005/T2
-      run_state.py               ← 0004/T1, 0005/T2
+      orchestrator.py            ← 0003/T6, 0007/T2
+      run_state.py               ← 0004/T1, 0007/T2
       runner.py                  ← 0004/T2
     tracker/
       base.py                    ← 0001/T5
@@ -310,11 +310,11 @@ backend/
     entry.py                     ← 0003/T1
     params.yaml                  ← 0003/T1
   scripts/
-    bootstrap_harness.py         ← 0002/T3, 0005/T4
-    migrate_trunk_main.py        ← 0005/T3
+    bootstrap_harness.py         ← 0002/T3, 0007/T4
+    migrate_trunk_main.py        ← 0007/T3
   tests/
     dev/
-      test_agentic_developer.py  ← 0005/T1
+      test_agentic_developer.py  ← 0007/T1
       test_developer_agent.py    ← 0003/T3
       test_release.py            ← 0003/T5
       test_test_agent.py         ← 0003/T4
@@ -324,8 +324,8 @@ backend/
     loop/
       test_checkpoint.py         ← 0004/T1
       test_metrics.py            ← 0003/T6
-      test_orchestrator.py       ← 0003/T6, 0005/T2
-      test_run_state.py          ← 0004/T1, 0005/T2
+      test_orchestrator.py       ← 0003/T6, 0007/T2
+      test_run_state.py          ← 0004/T1, 0007/T2
       test_runner.py             ← 0004/T2
     tracker/
       test_fake.py               ← 0001/T5
@@ -334,11 +334,11 @@ backend/
       test_session.py            ← 0001/T4
       test_session_store.py      ← 0001/T6
       test_user_agent.py         ← 0001/T3
-    test_bootstrap_harness.py    ← 0002/T3, 0005/T4
-    test_migrate_trunk_main.py   ← 0005/T3
+    test_bootstrap_harness.py    ← 0002/T3, 0007/T4
+    test_migrate_trunk_main.py   ← 0007/T3
     test_models.py               ← 0001/T1
     test_nexau_runtime.py        ← 0003/T2
-  run.py                         ← 0005/T4
+  run.py                         ← 0007/T4
 ```
 
 ## 各 feature 详情
@@ -522,9 +522,9 @@ graph LR
     nT1 --> nT2
 ```
 
-### 0005 开发者侧改为纯 trunk(main) 自进化（issue #12）
+### 0007 开发者侧改为纯 trunk(main) 自进化（issue #12）
 
-> 人读方案见 [`0005-dev-trunk-main/summary.md`](./0005-dev-trunk-main/summary.md)。
+> 人读方案见 [`0007-dev-trunk-main/summary.md`](./0007-dev-trunk-main/summary.md)。
 
 ## Summary
 

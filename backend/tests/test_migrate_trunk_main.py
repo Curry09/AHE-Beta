@@ -1,4 +1,4 @@
-# Spec-0005/T3：migrate_trunk_main 一次性迁移单测（真临时 git 仓，不触远端）。
+# Spec-0007/T3：migrate_trunk_main 一次性迁移单测（真临时 git 仓，不触远端）。
 """验证 main←release 收敛：
 
 - main 指向旧 release tip（内容与历史全保留、git log 见 release 历史），release/孤儿/已合并分支全删，

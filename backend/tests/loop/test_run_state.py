@@ -1,6 +1,6 @@
-"""spec-0004/T1 + Spec-0005/T2：RunState 读写 round-trip 单测。
+"""spec-0004/T1 + Spec-0007/T2：RunState 读写 round-trip 单测。
 
-Spec-0005/T2：`current_release_ref` 字段名保留、语义改为「当前 main HEAD SHA」（观测游标）；
+Spec-0007/T2：`current_release_ref` 字段名保留、语义改为「当前 main HEAD SHA」（观测游标）；
 本测试用 SHA 形态的值断言读写往返一致。
 """
 
@@ -13,7 +13,7 @@ def test_round_trip_in_memory() -> None:
     rs = RunState(
         round=3,
         phase="b",
-        current_release_ref="a1b2c3d4e5f6",  # Spec-0005/T2：当前 main HEAD SHA
+        current_release_ref="a1b2c3d4e5f6",  # Spec-0007/T2：当前 main HEAD SHA
         done_session_keys=["p1|s1", "p1|s2"],
         issue_assignments={"7": "dev-0"},
         pending=["issue:7"],

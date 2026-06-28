@@ -1,4 +1,4 @@
-# Spec-0005/T1：AgenticDeveloper 直推 main 单测（mock nexau agent + 临时 git 仓 fixture）。
+# Spec-0007/T1：AgenticDeveloper 直推 main 单测（mock nexau agent + 临时 git 仓 fixture）。
 """验证开发者侧纯 trunk 流程：
 
 - 直推 main 后仓内**无新分支**（仅 main）、有新 commit + 新 vK tag；

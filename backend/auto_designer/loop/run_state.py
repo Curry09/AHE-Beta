@@ -19,13 +19,13 @@ _RUN_STATE_FILE = "run_state.json"
 class RunState:
     """轮次/阶段/当前 main SHA + 用户侧已完成 session、开发者侧 issue 分派、编排瞬态。
 
-    Spec-0005/T2：纯 trunk 后 `current_release_ref` 字段名保留、语义改为「当前 main HEAD SHA」——
+    Spec-0007/T2：纯 trunk 后 `current_release_ref` 字段名保留、语义改为「当前 main HEAD SHA」——
     纯观测游标（每轮末 orchestrator 解析的 main 最新 SHA），不再是 release 版本号、不参与解析。
     """
 
     round: int = 0
     phase: str = "a"
-    current_release_ref: str = ""  # Spec-0005/T2：语义 = 当前 main HEAD SHA（观测游标）
+    current_release_ref: str = ""  # Spec-0007/T2：语义 = 当前 main HEAD SHA（观测游标）
     done_session_keys: list[str] = field(default_factory=list)
     issue_assignments: dict[str, str] = field(default_factory=dict)
     pending: list[str] = field(default_factory=list)

@@ -1,4 +1,4 @@
-# Spec-0005/T2：Orchestrator 纯 trunk 编排单测——会话级 main SHA 快照 + 去 release 链。
+# Spec-0007/T2：Orchestrator 纯 trunk 编排单测——会话级 main SHA 快照 + 去 release 链。
 """mock launcher/developer + 临时 git 仓：
 
 - 每局 launch 的 ref 解析自 harness 仓 main 当前 HEAD SHA（非 release_ref 链）；

@@ -1,4 +1,4 @@
-# Spec-0005/T2：去 release 链 + 会话级 main SHA 快照回灌。
+# Spec-0007/T2：去 release 链 + 会话级 main SHA 快照回灌。
 """闭环编排 orchestrator：a（用户产 issue+体感）→ b（开发者 agent 直推 main）→ c（回灌 main SHA）。
 
 纯 trunk（单 main）：去掉 release_ref 链——run_round 不再把 outcome.tag 链式回灌。每局会话开始解析
@@ -38,14 +38,14 @@ class Orchestrator:
         initial_ref: str,
     ) -> None:
         self._launcher = launcher
-        self._harness_repo = harness_repo  # Spec-0005/T2：解析 main HEAD SHA 用的 harness 仓
+        self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
         self._fixed_set = fixed_set
         self._developers = developer_agents
         self._run_session = run_session_fn
         self._initial_ref = initial_ref  # 跟踪的主干分支名（trunk = "main"），每局解析其 HEAD SHA
 
     def run_round(self, ref: str) -> str:
-        # Spec-0005/T2：传入的 ref 仅为「上一轮观测游标」透传（供 harbor runner 的 checkpoint 续跑链），
+        # Spec-0007/T2：传入的 ref 仅为「上一轮观测游标」透传（供 harbor runner 的 checkpoint 续跑链），
         # trunk 永远跟 live main、不据此 pin——本轮起始解析 main 当前 HEAD SHA 作会话级快照锚点。
         sha = self._resolve_head(ref=self._initial_ref)
 

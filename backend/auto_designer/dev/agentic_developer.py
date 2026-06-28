@@ -1,4 +1,4 @@
-# Spec-0005/T1：开发者侧改纯 trunk（单 main）——去掉 fix/issue-N 分支、--no-ff merge 与 release，
+# Spec-0007/T1：开发者侧改纯 trunk（单 main）——去掉 fix/issue-N 分支、--no-ff merge 与 release，
 # dev 直推 main：checkout main → 改 main.md → commit → tag vK → push origin main vK。
 """agentic_developer：开发者 = 带 git 工具的 nexau agent（取代确定性 DeveloperAgent）。
 
@@ -31,7 +31,7 @@ StatusFn = Callable[..., None]
 class DevOutcome:
     """一次 work_one 的结果。
 
-    Spec-0005/T1：去掉 branch 字段（不再建分支）；`released`→`committed`，语义从「已发版」改为
+    Spec-0007/T1：去掉 branch 字段（不再建分支）；`released`→`committed`，语义从「已发版」改为
     「已 commit 并推到 main」。判定仍以仓状态为 ground truth（新 vK tag 出现）。tag 仅作观测锚点。
     """
 
@@ -102,7 +102,7 @@ class AgenticDeveloper:
             tag=next_tag,
         )
 
-        # Spec-0005/T1：仓状态是 ground truth——新 vK tag 出现 = dev 已 commit 并推进 main。
+        # Spec-0007/T1：仓状态是 ground truth——新 vK tag 出现 = dev 已 commit 并推进 main。
         new_tags = set(self._tags()) - tags_before
         committed = bool(new_tags)
         tag = next_tag if next_tag in new_tags else (sorted(new_tags)[-1] if new_tags else None)
@@ -127,7 +127,7 @@ class AgenticDeveloper:
 
         cfg = AgentConfig.from_yaml(config_path=self._agent_def / "agent.yaml")
         agent = Agent(config=cfg)
-        # Spec-0005/T1：直推 main——无 branch/merge/release，commit 落 main、打 vK tag、push main+tag。
+        # Spec-0007/T1：直推 main——无 branch/merge/release，commit 落 main、打 vK tag、push main+tag。
         msg = (
             "处理这条 issue，端到端落地成一次对 main 的推进（必须做完 git 才 complete_task）。\n"
             f"issue #{issue_number}：{title}\n{body}\n\n"
