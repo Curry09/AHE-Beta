@@ -21,7 +21,7 @@
    spec-0005 dimensions.Persona ─► 0005/T5 run_session 跑一局 ─► 体感 + issue
 ```
 
-读图即读任务：**T1** 定「采集什么、卡长什么样」——不另造 skill，而是收编 NexAU 已有的真实抽取方法，并按
+读图即读任务：**T1** 定「采集什么、卡长什么样」——不另造 skill，而是收编既有的真实抽取方法（此前写在 NexAU 仓库里、非 NexAU 自身的方法），并按
 **轮辐式**组织：唯一公共契约 `card-schema.md`（6 维卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则，
 source-agnostic）+ 各「薄抽取 skill」只描述「从某类来源提取 + ground 哪几维」、只依赖契约、彼此不依赖。本步
 先落契约 + `extract-selfreport-persona`（第一人称自述，唯一 ground 信任轴 D4 且带 card_to_persona 覆盖规则）；
@@ -70,7 +70,7 @@ graph LR
 
 采集（蒸馏）侧按**轮辐式**组织，不另造大 skill：① 唯一公共契约 card-schema.md（source-agnostic）——
 6 维行为卡 schema（D1–D6 + authenticity + era + provenance）+ 维度枚举 + D5.area 受控词表 + 注入分布 +
-双向真实性门原则，采 NexAU selfreport 的最新约定（每维 source+basis+confidence、provenance 并集、value 键）；
+双向真实性门原则，采既有 selfreport skill 的最新约定（每维 source+basis+confidence、provenance 并集、value 键）；
 ② 薄抽取 skill extract-selfreport-persona——只描述「从第一人称自述（博客/访谈/演讲/推文长贴）提取 + ground
 哪几维」，只引用契约、不依赖任何其它 skill。本步先落这两者；cc/so/未来源作同契约的后续薄 skill 插入。交付物：
 ③ persona 卡库的读写 library.py（按契约存取卡记录），供 0006/T2 注入消费。
@@ -78,8 +78,9 @@ graph LR
 **为什么**
 
 整条进化的训练信号取自「模拟真实使用」分布上的用户体感；其真实性根植于 persona 是否来自真实数据。
-NexAU 真实抽取方法已沉淀「证据或弃 / 维度正交 / 双向真实性门」——重写必失真，故收编。更关键是**可扩展性**：
-NexAU 现状是把公共 schema 只写在 cc、so/selfreport 反向引用 cc（skill→skill 依赖），这正是 basis/provenance
+既有真实抽取方法（此前写在 NexAU 仓库里，非 NexAU 自身的方法）已沉淀「证据或弃 / 维度正交 / 双向真实性门」——
+重写必失真，故收编。更关键是**可扩展性**：这些 skill 现状是把公共 schema 只写在 cc、so/selfreport 反向引用 cc
+（skill→skill 依赖），这正是 basis/provenance
 在三者间漂移的根因。轮辐式把公共部分抽成唯一契约、各 skill 只依赖契约且彼此独立——契约改一处全员生效，
 加新来源只是新增一个薄 skill，不碰别人。
 
@@ -118,7 +119,7 @@ PersonaLibrary(root|path)
 
 **取舍**
 
-- 轮辐式公共契约 vs 各 skill 自带 schema：选轮辐式。各自带必漂移（NexAU 现状 basis/provenance 已在三者间
+- 轮辐式公共契约 vs 各 skill 自带 schema：选轮辐式。各自带必漂移（既有 skill 现状 basis/provenance 已在三者间
   漂移）；契约一处改全员生效，新来源只插一个薄 skill、彼此解耦可扩展。代价是要先把公共部分抽成契约。
 - 收编真实方法 vs 另写 persona-distill skill：选收编。真实抽取已沉淀「证据或弃/正交/双向真实性门」，重写
   必失真且违背「persona 来自真实数据」；代价是带进跨仓制品需 vendored 并标注来源。
@@ -139,16 +140,18 @@ card-schema.md 为唯一 source-agnostic 公共契约（卡 schema + 枚举 + D5
 
 **参考**
 
-NexAU 真实抽取方法（公共 schema 原出处）：extract-cc-user-persona（GitHub，枚举/D5.area 词表/注入分布 canon）、
-extract-so-user-persona（Stack Overflow）、extract-selfreport-persona（第一人称自述；reference 例 C 写明
-card_to_persona 须以 grounded D2/D4 覆盖 derive_trust/derive_d3）。本组将其公共部分收敛为 card-schema.md 契约。
+既有真实抽取方法（此前写在 NexAU 仓库，非 NexAU 自身方法；公共 schema 原出处）：extract-cc-user-persona
+（GitHub，枚举/D5.area 词表/注入分布 canon）、extract-so-user-persona（Stack Overflow）、
+extract-selfreport-persona（第一人称自述；reference 例 C 写明 card_to_persona 须以 grounded D2/D4 覆盖
+derive_trust/derive_d3）。本组将其公共部分收敛为 card-schema.md 契约。
 CLAUDE.md「蒸馏模块」「persona 来自真实数据、不依据 benchmark 或轨迹构造」；spec-0001/T1 Persona 字段约定。
 
 **待解问题**
 
 - cc/so（及未来源）作「只依赖 card-schema.md 的薄 skill」何时补入：本步先契约 + selfreport，余者后续插入。
-- 是否把 NexAU 源仓也重构为轮辐式（公共契约 + 薄 skill，补 basis/统一 provenance/补 card_to_persona 覆盖
-  注记）？此为改 NexAU 源仓，属另一件事；本仓 card-schema.md 统一以 selfreport 最新约定为准。
+- 是否把这些 skill 的源仓（NexAU 仓库，仅是它们此前的存放处）也重构为轮辐式（公共契约 + 薄 skill，补 basis/
+  统一 provenance/补 card_to_persona 覆盖注记）？此为改其源仓，属另一件事；本仓 card-schema.md 统一以
+  selfreport 最新约定为准。
 - 6 维行为卡与 spec-0001 models.Persona（五元组）/ sim 9 维如何最终并轨？映射方式见 0006/T2。
 - 是否同时蒸馏「种子场景库」(SeedScenario)？CLAUDE.md 蒸馏模块含场景库，本组先聚焦 persona，场景库另议。
 

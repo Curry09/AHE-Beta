@@ -18,7 +18,7 @@ overview: |-
      spec-0005 dimensions.Persona ─► 0005/T5 run_session 跑一局 ─► 体感 + issue
   ```
 
-  读图即读任务：**T1** 定「采集什么、卡长什么样」——不另造 skill，而是收编 NexAU 已有的真实抽取方法，并按
+  读图即读任务：**T1** 定「采集什么、卡长什么样」——不另造 skill，而是收编既有的真实抽取方法（此前写在 NexAU 仓库里、非 NexAU 自身的方法），并按
   **轮辐式**组织：唯一公共契约 `card-schema.md`（6 维卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则，
   source-agnostic）+ 各「薄抽取 skill」只描述「从某类来源提取 + ground 哪几维」、只依赖契约、彼此不依赖。本步
   先落契约 + `extract-selfreport-persona`（第一人称自述，唯一 ground 信任轴 D4 且带 card_to_persona 覆盖规则）；
