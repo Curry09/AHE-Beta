@@ -2,15 +2,15 @@
 state.py
 状态层 —— 跨轮记忆带。三层认知主干每轮读它/写它。
 
-铁律(之前修过的 bug):
-  状态更新只吃 *主观 verdict*(persona 感知到的), 绝不吃客观线 outcome.failed。
-  情绪只对"自己感知到的事"反应; 客观真值走旁路(终止/评估/GAP), 不回灌状态。
+铁律:
+  状态更新只吃 *主观 verdict*(persona 感知到的)。情绪只对"自己感知到的事"反应。
+  本轮纯主观: 不存在任何客观真值入口(无 gold / outcome / GAP)。
 persona 是系数(决定变化速率/力度), state 是被积分的量。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .dimensions import D1Eval, D43Correct, Persona, TrustStance
 
@@ -36,9 +36,7 @@ class State:
     turn: int = 0
     patience: int = 4              # 跨轮耐心计数器, <=0 解锁终止
     trust: TrustStance = TrustStance.BALANCED
-    history: list = field(default_factory=list)  # 主观判断记录(perceived), 非客观真值
     pending_self_obs: str | None = None          # verify_self 注入下一轮的私有观察
-    last_verdict: str | None = None
 
 
 # 信任三档的整型刻度, 便于增减后再映射回枚举
@@ -93,5 +91,4 @@ def apply_verdict(state: State, verdict: str, coef: Coef) -> State:
         state.patience -= 0  # 存疑不耗耐心(可调为轻微损耗)
 
     state.trust = _int_to_trust(t)
-    state.last_verdict = verdict
     return state

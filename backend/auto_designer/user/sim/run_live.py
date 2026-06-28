@@ -31,7 +31,7 @@ from .loop import run_session
 from .persona_client import ApiPersonaClient
 from .scenarios import SplitBillHarness
 
-# NOTE: natural / underspecified on purpose (S6). The acceptance criterion (shares must
+# NOTE: natural / underspecified on purpose. The acceptance criterion (shares must
 # sum exactly to total) is NOT stated — whether the user catches the lost cent must come
 # from the PERSONA's capability + acceptance bar, not from the task leaking the oracle.
 TASK = (

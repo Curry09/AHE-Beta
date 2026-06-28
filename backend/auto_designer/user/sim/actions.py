@@ -2,9 +2,10 @@
 actions.py
 动作模型 —— 框架的核心。根除 run_once 的归属歧义。
 
-两根归属轴(任何动作必须同时声明):
+三根属性轴(任何动作必须同时声明):
   executor 执行者:  PERSONA_LOCAL / HARNESS / FRAMEWORK
   channel  信道:    EMIT (发 B 线 NL) / SILENT (内部动作, 不发话)
+  effect   效果:    ADVANCE (推进) / VERIFY (核查) / TERMINATE (终止)
 
 铁律:
   channel == EMIT   <=> message 必须非空
