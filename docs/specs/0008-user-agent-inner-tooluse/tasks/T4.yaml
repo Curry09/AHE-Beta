@@ -1,0 +1,45 @@
+id: T4
+title: 内层 tool-using agent（AgenticPersonaClient）
+status: done
+priority: P1
+tags: []
+depends-on:
+  - T1
+  - T2
+  - T3
+relates-to:
+  - ref: 0005/T3
+    type: extends
+  - ref: 0005/T5
+    type: note
+parallel: false
+files:
+  - backend/auto_designer/user/sim/persona_client.py
+  - backend/tests/user/sim/test_persona_client_agentic.py
+version: 1
+updated: '2026-06-29'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient：内层 LLM 拿 T3 装配的 system + T2 的工具集，在 T1 materialize 的工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。控制反转只局部发生在这个接缝内——外层控制信封（0005/T5 run_session、动作空间、状态机、体感、终止）原样不动。
+motivation: |-
+  这是本组的收口任务：前三个任务把底座（T1 工作区）、手（T2 工具/sandbox）、行为框架（T3 prompt）都备齐，T4 把它们接成一个真正会用工具核实的内层 agent。关键约束是「只换接缝、不动信封」：PersonaClient.respond(system, user) -> dict 这个协议是唯一改动点，外层引擎对内层是 LLM 心算还是真跑工具无感知，从而风险被收敛在一个类里、可灰度可回退。
+scope: |-
+  1) persona_client.py：新增 AgenticPersonaClient 实现 PersonaClient 协议。respond() 内部跑有界循环：构建内层 system（调 T3 build_inner_system）→ 喂 LLM → 解析 tool_call → 在 Sandbox（T2，cwd=T1 工作区）执行 → 回灌结果 → 直到 LLM 给出最终结构化输出或到步数上限。从 harness 文本里抽取助手提议的代码落进工作区拷贝再跑（用户对 advisory 助手的真实行为）。保留既有 ApiPersonaClient/ScriptedPersonaClient 不破坏。2) 输出契约与 0005 完全一致（perceive/verdict/action/message），交回外层 resolve_action/apply_verdict。
+design: |-
+  循环：respond(system,user) → tool_stack(D1)+build_inner_system → 内层多轮 [LLM→tool_call→Sandbox.run→observe]，有步数/超时上限兜底 → LLM 产出最终 JSON（与现协议同字段）→ 校验后返回。会话级上下文：persona 与工作区由 sim_user 桥接经 bind_session(persona, workspace_dir) 在每局开始绑定（run_session 不传 persona、签名不动）；respond 用绑定的 workspace 建 Sandbox(workspace=dir)，artifact 抽取把 harness_output 里的代码写进该工作区再核实，verdict grounded 在真实执行结果。失败兜底：LLM 不产出合法 JSON / 工具异常 / 超步数时，退化为一次主观判断（保证永远返回合法输出，外层不崩）。无工具的 blind persona、或未 bind_session（无 workspace）时自然退化为纯文本判断（等价旧行为）。
+interface: |-
+  AgenticPersonaClient(llm, *, max_inner_steps: int = ..., timeout: float = ...) 实现 respond(system: str, user: str) -> dict（同 PersonaClient 协议，返回 {perceive, verdict, action, message}）；另有 bind_session(persona, workspace_dir: str | None) 由 sim_user 每局调用绑定会话级 persona+工作区（未绑定则退化纯文本）。内部依赖：T2 tool_stack/Sandbox、T3 build_inner_system、T1 工作区（经 sim_user bind_session 注入）。对外层 0005/T5 run_session 与 respond(system,user) 两个签名均零改动。
+tradeoffs: |-
+  内层 LLM 多轮调用 → 延迟与 token 成本上升；用 max_inner_steps/timeout + 「可选核实默认不查」（T3）控制。tool-calling 输出不稳 → 强制最终结构化 JSON + 失败退化为主观判断兜底。只换接缝的好处是风险隔离、可与 ScriptedPersonaClient 并存做 CI；坏处是端到端真跑需要真实 LLM，集成测试用 FakeToolLLM + FakeSandbox 离线覆盖循环逻辑。
+acceptance: |-
+  AgenticPersonaClient.respond 返回字段与现协议一致、可被外层 resolve_action/apply_verdict 直接消费。给定一个会触发工具调用的 FakeToolLLM 脚本：循环正确执行 tool_call→observe→最终输出；blind persona（空工具）退化为纯文本判断。超步数/非法输出/工具异常时退化为合法主观判断、外层不崩。端到端经 run_session + T1 billing-split fixture 跑通一局（FakeSandbox 或真 Sandbox），外层引擎无改动。
+tests: |-
+  test_persona_client_agentic.py：(a) FakeToolLLM 多步 tool_call → FakeSandbox observe → 最终 JSON，断言循环步数与最终契约；(b) blind/空工具退化纯文本；(c) 超 max_inner_steps 兜底返回合法输出；(d) LLM 吐非法 JSON 时退化主观判断；(e) 集成：run_session + T1 fixture，断言外层状态机/终止不受影响、输出可被 resolve_action 消费；(f) ScriptedPersonaClient 仍工作（不回归）。
+references: |-
+  演进 0005/T3 的 LLM 后端（PersonaClient.respond 接缝）；外层 0005/T5 run_session 引擎零改动。依赖本组 T2 tool_stack/Sandbox、T3 build_inner_system、T1 工作区注入。tool-calling 形态可与 0003/T2 nexau_runtime 的内层循环参考并轨（见 open-questions）。
+open-questions: |-
+  1) 是否清理已渐冗余的外层 verify_self/pending_self_obs（核实已下沉内层）。2) 是否给内层喂显式状态信号（patience/trust）以让核实意愿更可控。3) max_inner_steps/timeout 默认值与成本上限。4) 与 0003/T2 nexau_runtime tool-calling 形态是否统一一套循环实现。5) 真实 LLM 的 tool-calling schema（function calling vs 文本协议）选型。

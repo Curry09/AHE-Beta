@@ -49,17 +49,49 @@ class Persona:
 
 
 @dataclass
-class SeedScenario:
-    """种子场景（给定输入）：一局会话的初始诉求/任务描述（非测试用例）。"""
+class WorkspaceSpec:
+    """种子工作区规格：指向一个 in-repo 基线项目 fixture，供用户 agent 自有核实落地。
 
-    description: str
+    fixture 为 backend/seed_workspaces/<fixture>/ 下的目录名；setup 为命令钩子（占位，本轮不执行）。
+    与 benchmark held-out 红线无关——工作区不含 gold 测试，只是一个可跑的基线项目。
+    """
+
+    fixture: str
+    setup: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"description": self.description}
+        return {"fixture": self.fixture, "setup": list(self.setup)}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> WorkspaceSpec:
+        return cls(fixture=data["fixture"], setup=list(data.get("setup", [])))
+
+
+@dataclass
+class SeedScenario:
+    """种子场景（给定输入）：一局会话的初始诉求/任务描述（非测试用例）。
+
+    workspace 可选：非空时携带一个基线项目工作区（spec-0008/T1），供内层 tool-using
+    用户 agent 在自有 sandbox 真执行核实；为 None 时退化为今天的纯文本场景。
+    """
+
+    description: str
+    workspace: WorkspaceSpec | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        # workspace=None 时不落该键，保持既有纯文本场景的序列化形状不变（向后兼容）。
+        d: dict[str, Any] = {"description": self.description}
+        if self.workspace is not None:
+            d["workspace"] = self.workspace.to_dict()
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SeedScenario:
-        return cls(description=data["description"])
+        ws = data.get("workspace")
+        return cls(
+            description=data["description"],
+            workspace=WorkspaceSpec.from_dict(ws) if ws else None,
+        )
 
 
 @dataclass

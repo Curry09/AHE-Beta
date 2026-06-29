@@ -10,9 +10,15 @@ KV cache 友好的排序(从不变到善变):
 
 from __future__ import annotations
 
-from .clauses import compile_block_p
+from typing import TYPE_CHECKING
+
+from .clauses import clause_capability, clause_verification_policy, compile_block_p
 from .dimensions import Persona
 from .state import State
+
+if TYPE_CHECKING:
+    from .skills import Skill
+    from .tools import ToolSpec
 
 BLOCK_G = """# ROLE
 You are simulating a real human software developer who is using an AI coding
@@ -54,6 +60,52 @@ Return EXACTLY ONE JSON object and nothing else:
 
 def build_system(persona: Persona) -> str:
     return BLOCK_G + "\n\n" + compile_block_p(persona)
+
+
+# --------------------------------------------------------------------------
+# 内层 tool-using system 装配（spec-0008/T3）
+# 外层 build_system 不变；内层把「可选核实框架 + 工具清单 + 个性倾向 + skill」拼成 system。
+# --------------------------------------------------------------------------
+INNER_PROTOCOL = """# INNER TOOL USE (private)
+Before you answer, you MAY take a few PRIVATE investigation steps. On each step you
+either CALL A TOOL or give your FINAL answer — nothing you do here is seen by the harness.
+- To call a tool, return EXACTLY ONE JSON object: {"tool": "<name>", "args": { ... }}.
+  You will then be shown that tool's result and may act again.
+- When you are done investigating, return the normal OUTPUT CONTRACT JSON
+  (perceive/verdict/action/message). Fold whatever you learned into "perceive".
+You are still bound by G1: only conclude what THIS person could actually conclude."""
+
+
+def _render_tools(tools: list[ToolSpec]) -> str:
+    if not tools:
+        return "# TOOLS\n(You have no tools this session.)"
+    lines = [f"- {t.name}({', '.join(t.args)}) — {t.description}" for t in tools]
+    return "# TOOLS\n" + "\n".join(lines)
+
+
+def _render_skills(skills: list[Skill]) -> str:
+    lines = [f"- {s.name}: {s.prompt}" for s in skills]
+    return "# SKILLS (general working methods)\n" + "\n".join(lines)
+
+
+def build_inner_system(
+    persona: Persona,
+    tools: list[ToolSpec],
+    skills: list[Skill],
+    state: State,
+) -> str:
+    """装配内层 system：BLOCK-G + 内层工具协议 + 可选核实框架 + 工具清单 + 个性倾向 + skill。"""
+    parts = [
+        BLOCK_G,
+        INNER_PROTOCOL,
+        _render_tools(tools),
+        clause_verification_policy(persona, state.trust),
+        compile_block_p(persona),
+        clause_capability(persona, [t.name for t in tools]),
+    ]
+    if skills:
+        parts.append(_render_skills(skills))
+    return "\n\n".join(parts)
 
 
 def _mood_tag(state: State) -> str:

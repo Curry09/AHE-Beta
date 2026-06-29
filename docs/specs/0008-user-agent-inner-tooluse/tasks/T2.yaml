@@ -1,0 +1,42 @@
+id: T2
+title: 内层原子工具与 sandbox
+status: done
+priority: P1
+tags: []
+depends-on:
+  - T1
+relates-to:
+  - ref: 0005/T2
+    type: extends
+parallel: false
+files:
+  - backend/auto_designer/user/sim/tools.py
+  - backend/auto_designer/user/sim/sandbox.py
+  - backend/tests/user/sim/test_tools.py
+version: 1
+updated: '2026-06-29'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  造内层 agent 的「手」：三个原子工具 read_file / run_shell / write_file（外加 web_search 占位、本轮不实现），以及一个最小 sandbox 执行环境（tempfile + subprocess），以 T1 materialize 出的工作区目录为 cwd。工具集按 persona D1 机械门控（tool_stack(D1)）：能力低的人物拿不到 write_file，从机制上挡住「自写测试套件」这类高能力动作。
+motivation: |-
+  0005 的能力分叉靠 prompt「请 LLM 自律别偷看答案」+ 纯文本感知，脆弱：强模型会心算 bug、或脑补伪造负向感知。把分叉钉在「工具可达性 + 真实执行结果」上更硬：blind 无工具只能凭文本，shallow 能读能跑但写不出测试，competent/expert 才拿 write_file 能自写测试。原子工具是不可再分的最小可组合单元——run_tests/construct_edge_cases 这类是「原子工具 + LLM 推理」涌现出的复合行为，不该做成工具（否则语义臃肿、易出实现问题）。
+scope: |-
+  1) tools.py：实现 read_file / run_shell / write_file 三个原子工具（统一签名、统一返回 {ok, stdout/content, error}）；web_search 仅留函数/schema 占位、调用即返回未实现。定义 tool_stack(d1) -> list[tool]：按 D1 给出可用工具子集（复用 0005/T2 的 cap_mask 思路做门控）。2) sandbox.py：Sandbox(workspace: str | None = None)——workspace 给定时以其为 cwd（来自 T1 materialize），缺省时建一个空 tempdir；提供受限 run_shell（超时、捕获 stdout/stderr、工作目录隔离）与文件读写，约束在 workspace 子树内。非安全沙箱（不做 Docker/seccomp），仅最小隔离执行上下文。
+design: |-
+  Sandbox 持有一个工作目录（workspace 或新建 tempdir），所有工具调用相对它解析路径、禁止逃逸到子树外。run_shell 经 subprocess 执行、带 timeout 与输出截断。tool_stack(D1)：blind→[]（无工具），shallow→[read_file, run_shell]，competent/expert→[read_file, run_shell, write_file]（+ web_search 占位永远不真实启用）。门控在「给 LLM 暴露哪些工具」这一层就发生（机制保底），不依赖 prompt 自律。工具本身工作区无关：workspace=None 时用空 tempdir 即可独立建、独立单测——故对 T1 是顺序/测试层面的软依赖（让 sandbox 测试能跑真实 fixture），而非硬代码依赖。
+interface: |-
+  read_file(sandbox, path) -> {ok, content|error}；run_shell(sandbox, cmd, timeout=...) -> {ok, stdout, stderr, returncode}；write_file(sandbox, path, content) -> {ok|error}；web_search(query) -> {ok: False, error: "not_implemented"}（占位）。Sandbox(workspace: str | None = None)，属性 cwd；方法 resolve(path)（防逃逸）、cleanup()。tool_stack(d1: D1) -> list[ToolSpec]，ToolSpec 含 name/schema/callable，供 T4 暴露给 LLM 并供 T3 prompt 渲染工具清单。
+tradeoffs: |-
+  非安全沙箱：MVP 取最小隔离（cwd 限定 + 超时），不抗恶意代码——可接受，因为执行的是助手提议的代码、用户自愿在自己机器上跑，威胁模型与生产沙箱不同；强隔离（Docker/nsjail）留后续。原子工具而非复合工具：换来语义清晰、易测、可组合，代价是高能力行为靠 LLM 编排涌现、不可直接断言「跑了测试」。D1 机械门控简单可靠，但粒度粗（三档）。
+acceptance: |-
+  三个原子工具在 Sandbox 内可用且路径不逃逸子树；run_shell 超时与非零退出码被正确捕获。Sandbox(workspace=dir) 以 dir 为 cwd、能跑 T1 的 billing-split fixture 里的代码；workspace=None 时退化为空 tempdir 仍可独立工作。tool_stack：blind 得空集、shallow 无 write_file、competent/expert 含 write_file；web_search 始终返回未实现。
+tests: |-
+  test_tools.py：(a) read/write/run 在 sandbox 内正常工作；(b) 路径逃逸（../../）被拒；(c) run_shell 超时/非零码返回结构正确；(d) Sandbox(workspace=临时 billing-split 拷贝) 能 import/跑 core.py；(e) tool_stack 各 D1 档位返回正确工具子集；(f) web_search 返回 not_implemented。用真实 tempdir + 小脚本，不 mock subprocess。
+references: |-
+  能力门控复用 0005/T2 的 cap_mask（D1）。工作区来自本组 T1 materialize（Sandbox 的 cwd）。被本组 T4 AgenticPersonaClient 消费（暴露 tool_stack 给内层 LLM、用 Sandbox 真执行）；工具清单由 T3 渲染进 system prompt。construct_edge_cases 等复合行为归 T3 的 prompt 行为框架。
+open-questions: |-
+  1) run_shell 是否需要资源上限（内存/CPU/网络禁用）做更强隔离。2) web_search 真实实现的接口与配额（后续）。3) 是否需要 apply_patch/diff 类工具，还是 write_file 足够。4) D1 门控三档是否够，或需更细的工具-能力映射表。
