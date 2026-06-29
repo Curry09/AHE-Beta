@@ -145,3 +145,24 @@ def test_capability_fork() -> None:
     assert expert.end_reason == "issue_filed"  # 高能力逼证据至耗尽 -> file_issue(低体感)
     assert expert.feeling.score <= 2
     assert expert.issue_artifact is not None
+
+
+def test_issue_artifact_is_user_voice_with_metadata_footer() -> None:
+    expert = run_session(
+        _persona(D1Eval.EXPERT, D43Correct.FILE_ISSUE, "P-expert"),
+        ScriptedPersonaClient(),
+        ScriptedHarness(),
+        TASK,
+    )
+    art = expert.issue_artifact
+    assert art is not None
+    # 不再套第三人称模板外壳
+    assert "### What the user reported" not in art
+    assert "Issue filed by simulated user" not in art
+    # 正文在前 = persona file_issue 当轮第一人称原话(非空)，与机器脚注用 --- 分隔
+    body, sep, footer = art.partition("\n---\n")
+    assert sep  # 有分隔线
+    assert body.strip()  # 用户原话非空
+    # 脚注是机器自动采集的元信息(含能力档/纠错风格)，供开发者分流
+    assert "auto-collected" in footer
+    assert "expert/file_issue" in footer

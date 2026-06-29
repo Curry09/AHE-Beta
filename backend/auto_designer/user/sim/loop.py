@@ -20,6 +20,7 @@ loop.py
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .action_space import derive_action_space, resolve_action
@@ -27,7 +28,7 @@ from .actions import CATALOG, Channel, Effect, Executor, Phase
 from .dimensions import Persona
 from .feeling import FeelingScore, derive_feeling, parse_feeling_llm
 from .persona_client import PersonaClient
-from .prompt import build_rating_turn, build_system, build_user_turn
+from .prompt import build_issue_turn, build_rating_turn, build_system, build_user_turn
 from .state import VERDICTS, State, apply_verdict, init_state, make_coef
 
 
@@ -75,23 +76,34 @@ def route(action_id: str, message: str, state: State, harness, observable: str) 
     return None  # 终止动作: 不再驱动 harness
 
 
-def emit_issue_artifact(persona: Persona, log: list[TurnLog]) -> str:
-    """从本局真实(主观)数据派生 issue(不写死场景, 不读客观真值)。"""
+def emit_issue_artifact(persona: Persona, log: list[TurnLog], issue_text: str) -> str:
+    """从本局真实(主观)数据派生 issue(不写死场景, 不读客观真值)。
+
+    正文 = issue_text：persona 经专门的 build_issue_turn 以本人口吻写的*自包含* issue(提交给不在场的
+    开发团队),不套第三人称标题或模板外壳; 末尾仅附一行斜体的机器自动采集元信息(能力档/纠错风格/复现轮数/
+    最近 harness 末行)供开发者分流, 与用户原话明确分隔。issue_text 为空时回落到 file_issue 当轮的 message。
+    """
     fails = [t for t in log if t.verdict == "failed_blame_harness"]
     last_out = next((t.harness_output for t in reversed(log) if t.harness_output.strip()), "")
-    if last_out.strip():
-        symptom = last_out.strip().splitlines()[-1][:160]
-    else:
-        symptom = "the delivered result did not meet the user's bar"
-    return (
-        f"## Issue filed by simulated user {persona.persona_id}\n"
-        f"**Repro turns:** {len(log)} (failed_blame_harness: {len(fails)})\n"
-        f"**Symptom (last harness output):** {symptom}\n"
-        f"**User capability:** {persona.d1.value}; correction style: {persona.d43.value}.\n"
+    symptom = last_out.strip().splitlines()[-1][:160] if last_out.strip() else "—"
+    body = (
+        issue_text.strip() or (log[-1].message.strip() if log else "") or "(filed without detail)"
     )
+    meta = (
+        f"_auto-collected · {persona.persona_id} · {persona.d1.value}/{persona.d43.value} · "
+        f"{len(log)} turns, {len(fails)} blamed the assistant · last reply: {symptom}_"
+    )
+    return f"{body}\n\n---\n{meta}\n"
 
 
-def run_session(persona: Persona, client: PersonaClient, harness, task: str) -> SessionResult:
+def run_session(
+    persona: Persona,
+    client: PersonaClient,
+    harness,
+    task: str,
+    on_progress: Callable[[SessionResult], None] | None = None,
+) -> SessionResult:
+    # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
     coef = make_coef(persona)
     state = init_state(persona)
     system = build_system(persona)
@@ -138,6 +150,8 @@ def run_session(persona: Persona, client: PersonaClient, harness, task: str) -> 
                 harness_output=harness_output,
             )
         )
+        if on_progress is not None:
+            on_progress(result)  # 逐轮观测钩子(含终止轮): 喂给看板等观测层, 不影响主循环
 
         # 记历史(只记 B 线可见内容)
         if spec.channel is Channel.EMIT:
@@ -147,7 +161,10 @@ def run_session(persona: Persona, client: PersonaClient, harness, task: str) -> 
         if spec.effect is Effect.TERMINATE:
             result.end_reason = spec.end_reason or "terminated"
             if action_id == "file_issue":
-                result.issue_artifact = emit_issue_artifact(persona, result.turns)
+                # 专门一轮：让 persona 跳出对话、以本人口吻写自包含 issue（≠ 撂给 harness 的临场 message）
+                issue_resp = client.respond(system, build_issue_turn(task, history, state))
+                issue_text = str(issue_resp.get("issue") or "")
+                result.issue_artifact = emit_issue_artifact(persona, result.turns, issue_text)
             break
 
         # ⑦ 路由 -> 下一轮 harness 输入

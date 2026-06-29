@@ -89,6 +89,32 @@ def build_user_turn(
     return "\n\n".join(parts)
 
 
+def build_issue_turn(task: str, history_lines: list[str], state: State) -> str:
+    """决定 file_issue 后的专门一轮：让 persona 跳出对话，以本人口吻写一条*自包含*的 issue
+    （提交给不在场、看不到聊天记录的开发团队），而非对 harness 撂下的那句临场话。
+
+    覆盖 system 的动作 OUTPUT CONTRACT —— 这一轮只要 {"issue"}, 不发 message / 不选 action。
+    """
+    hist = "\n".join(history_lines) if history_lines else "(empty)"
+    return "\n\n".join(
+        [
+            "<file_issue>",
+            "You've given up on getting this done in the session and are filing an issue to "
+            "the DEV TEAM behind the assistant — people who were NOT in your chat and cannot "
+            "see it. Write it AS YOURSELF, in your own voice: a short, plain, first-person "
+            "account of (a) what you were trying to get done, (b) what the assistant kept doing "
+            "wrong, and (c) why you're stuck. Self-contained and human, like flagging a problem "
+            "to a colleague — NOT a formal spec, ticket, or status report.",
+            f"<task>\n{task}\n</task>",
+            f"<history>\n{hist}\n</history>",
+            f"<mood>\n{_mood_tag(state)}\n</mood>",
+            "Return EXACTLY ONE JSON object and nothing else: "
+            '{"issue": "<your issue text, first person, in your own words>"}',
+            "</file_issue>",
+        ]
+    )
+
+
 def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
     """会话末自评请求: 让 persona 跳出对话, 按本人体感给 1–4 分 (类 CC 满意度评分)。
 

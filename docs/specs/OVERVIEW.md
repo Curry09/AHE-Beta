@@ -682,7 +682,9 @@ graph LR
     v_T4_1["T4 v1"]
     v_T5_1["T5 v1"]
     v_T5_2["T5 v2"]
+    v_T5_3["T5 v3"]
     v_T5_1 -->|redefined| v_T5_2
+    v_T5_2 -->|redefined| v_T5_3
     v_T6_1["T6 v1"]
     classDef st_pending fill:#eeeeee;
     class v_T1_2 st_pending;
@@ -691,6 +693,7 @@ graph LR
     class v_T4_1 st_pending;
     class v_T5_1 st_pending;
     class v_T5_2 st_pending;
+    class v_T5_3 st_pending;
     class v_T6_1 st_pending;
 ```
 

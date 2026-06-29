@@ -425,6 +425,12 @@ signals 为行为信号（如低能力用户无法自修而放弃），从 perso
 本版删除两者：persona 看到原始 harness 文本，verify_self 注入原始观察，能力分叉改由 prompt(G1)+persona
 档位约束 LLM「只在本人能力内感知」来达成，而非框架机械过滤输入。
 
+file_issue 撰写轮：当本轮 action 归类为 file_issue，主循环不拿对话内那条简短 message 当 issue 正文，
+而是在循环内追加一次专门的撰写轮——用 T3 的 build_issue_turn 让 persona 跳出对话、以本人第一人称把
+「想反馈给开发者的事」写成自包含正文（覆盖动作契约，只取 {issue}）。issue_artifact = 该第一人称正文 +
+`---` 分隔 + 机器脚注（persona_id/能力档/轮数/末轮回复症状等自动采集元数据）；不再套「### What the user
+reported」之类第三人称模板外壳，正文即用户原话，元数据明确标注为 auto-collected 脚注。
+
 **接口**
 
 run_session(persona: Persona, client: PersonaClient, harness, task: str) -> SessionResult
@@ -461,6 +467,8 @@ tracker, store) 的契约对齐留待接入闭环时做（见 open-questions）�
 - 能力分叉：低能力 persona 跑通常规用例即 accept（高体感）；高能力 persona 逼证据至耐心耗尽 → file_issue（低体感）。
 - 感知原样喂入：移除 perceive_filter/_filter_self_obs 后，run_session 把原始 harness 文本喂入 client，
   verify_self 注入原始观察（不再按子串伪造「崩了/没报错」）；能力分叉不依赖框架过滤而由 prompt 承载。
+- file_issue 正文是用户口吻：file_issue 分支专门调一次 build_issue_turn，issue_artifact 正文为第一人称
+  用户原话、机器元数据降级为 `---` 后的 auto-collected 脚注（断言无第三人称模板头、有脚注且含能力档/动作）。
 
 **参考**
 

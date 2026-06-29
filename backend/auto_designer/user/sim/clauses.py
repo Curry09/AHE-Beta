@@ -52,7 +52,7 @@ D43_CLAUSE = {
     D43Correct.HANDOVER: "when it fails you take over and write the fix yourself.",
     D43Correct.RESEND: "when it fails you re-send the request, possibly rephrased.",
     D43Correct.GIVE_UP: "when it keeps failing you give up the task quickly.",
-    D43Correct.FILE_ISSUE: "when it repeatedly fails you stop and file a structured issue report describing the problem.",
+    D43Correct.FILE_ISSUE: "when it repeatedly fails you stop and file an issue — written as YOURSELF venting to a colleague: plain first-person, a bit frustrated, concrete everyday words about what you wanted and what it kept doing wrong (e.g. 'I just wanted X in my project and it kept handing me snippets to paste instead of actually doing it'). Do NOT write it like a bug ticket / status report / spec — no detached phrasing like 'the assistant…', 'authorized', 'verification', 'remains undone'. Just talk like a person.",
 }
 
 D5_CLAUSE = {

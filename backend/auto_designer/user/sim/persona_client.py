@@ -110,6 +110,8 @@ class ScriptedPersonaClient:
     """
 
     def respond(self, system: str, user: str) -> dict:
+        if "<file_issue>" in user:  # 专门一轮: 以本人口吻写自包含 issue
+            return self._compose_issue()
         if "<rate_experience>" in user:  # 会话末自评: 按末态情绪给 1–4 + 理由
             return self._rate(user)
 
@@ -214,6 +216,15 @@ class ScriptedPersonaClient:
             "verdict": "unsure",
             "action": "give_feedback" if "give_feedback" in space else "free",
             "message": "Not quite there yet — please try again.",
+        }
+
+    @staticmethod
+    def _compose_issue() -> dict:
+        """离线脚本的自包含 issue：第一人称、口语化，不套工单腔（演示用，非真实推理）。"""
+        return {
+            "issue": "I just wanted this working in my project and proven, but it kept handing "
+            "me code that doesn't actually hold up and never showed me real evidence it works. "
+            "I'm stuck and out of patience — I shouldn't have to keep fixing its output myself."
         }
 
     @staticmethod
