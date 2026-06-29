@@ -93,6 +93,13 @@ class ApiPersonaClient:
             text = self._text(self._create(messages, 16000))
         return _parse_json(text)
 
+    def complete(self, messages: list[dict], max_tokens: int = 8000) -> str:
+        """通用补全：给定 messages 直接返回文本（供 0008/T4 内层 tool-calling 循环复用网关）。"""
+        text = self._text(self._create(messages, max_tokens))
+        if not text:
+            text = self._text(self._create(messages, max_tokens * 2))
+        return text
+
 
 # --------------------------------------------------------------------------
 # 离线脚本后端 (无 key 跑通用)
@@ -279,6 +286,108 @@ def _parse_json(text: str) -> dict:
         "action": "free",
         "message": "",
     }
+
+
+# --------------------------------------------------------------------------
+# 内层 tool-using 后端 (spec-0008/T4)
+# --------------------------------------------------------------------------
+class AgenticPersonaClient:
+    """把单次「纯函数判断」respond() 换成有界 tool-calling 内层循环。
+
+    控制反转只局部发生在这个接缝内：外层 run_session / 动作空间 / 状态机 / 终止全不变，
+    respond(system,user)->dict 协议也不变。会话级 persona+工作区由 sim_user 经 bind_session
+    注入；未绑定 / blind 无工具 / 特殊轮（file_issue·rate）时退化为一次主观判断（等价旧行为）。
+
+    llm: 可调用 (messages: list[dict]) -> str。便于离线注入 FakeToolLLM。
+    """
+
+    def __init__(
+        self,
+        llm,
+        *,
+        max_inner_steps: int = 4,
+        timeout: float = 10.0,
+        sandbox_factory=None,
+    ) -> None:
+        from .sandbox import Sandbox
+
+        self._llm = llm
+        self.max_inner_steps = max_inner_steps
+        self.timeout = timeout
+        self._sandbox_factory = sandbox_factory or Sandbox
+        self._persona = None  # 会话级，bind_session 注入
+        self._workspace_dir: str | None = None
+
+    def bind_session(self, persona, workspace_dir: str | None) -> None:
+        """sim_user 每局开始调用：绑定会话级 persona 与（可选）工作区目录。"""
+        self._persona = persona
+        self._workspace_dir = workspace_dir
+
+    # -- 单次主观判断（退化路径 / 特殊轮）--
+    def _final_call(self, system: str, user: str) -> dict:
+        text = self._llm([{"role": "system", "content": system}, {"role": "user", "content": user}])
+        return _parse_json(text or "")
+
+    def _dispatch(self, obj: dict, tools_by_name: dict, sandbox) -> dict:
+        name = obj.get("tool")
+        args = obj.get("args") or {}
+        spec = tools_by_name.get(name)
+        if spec is None:  # 不在 D1 工具栈内 / 未知 -> 机制保底，不执行
+            return {"ok": False, "error": f"unknown or unavailable tool: {name!r}"}
+        if not isinstance(args, dict):
+            return {"ok": False, "error": "args must be an object"}
+        try:
+            if spec.name == "run_shell":
+                args = {**args, "timeout": self.timeout}
+            return spec.fn(sandbox, **args)
+        except Exception as e:  # noqa: BLE001 — 工具异常转结构化观察，不崩内层循环
+            return {"ok": False, "error": f"bad tool call: {e}"}
+
+    def respond(self, system: str, user: str) -> dict:
+        from .prompt import build_inner_system
+        from .skills import select_skills
+        from .state import State
+        from .tools import tool_stack
+
+        # 特殊轮（自评 / 写 issue）或未绑定 -> 单次主观判断
+        if self._persona is None or "<file_issue>" in user or "<rate_experience>" in user:
+            return self._final_call(system, user)
+
+        tools = tool_stack(self._persona)
+        if not tools:  # blind：无工具，纯文本判断（等价旧行为）
+            return self._final_call(system, user)
+
+        skills = select_skills(self._persona)
+        inner_system = build_inner_system(
+            self._persona, tools, skills, State(trust=self._persona.trust)
+        )
+        tools_by_name = {t.name: t for t in tools}
+        sandbox = self._sandbox_factory(workspace=self._workspace_dir)
+        try:
+            messages = [
+                {"role": "system", "content": inner_system},
+                {"role": "user", "content": user},
+            ]
+            for _ in range(self.max_inner_steps):
+                text = self._llm(messages) or ""
+                obj = _parse_json(text)
+                if isinstance(obj.get("tool"), str):  # 工具调用 -> 执行并回灌观察
+                    result = self._dispatch(obj, tools_by_name, sandbox)
+                    messages.append({"role": "assistant", "content": text})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": f"<tool_result>\n{json.dumps(result)}\n</tool_result>",
+                        }
+                    )
+                    continue
+                return obj  # 最终结构化输出（contract）
+            # 超步数兜底：退化为一次主观判断，保证永远返回合法输出
+            return self._final_call(system, user)
+        except Exception:  # noqa: BLE001 — 任何内层异常都不得外溢，退化兜底
+            return self._final_call(system, user)
+        finally:
+            sandbox.cleanup()  # 仅清自建 tempdir；外部工作区不动
 
 
 def make_client() -> PersonaClient:

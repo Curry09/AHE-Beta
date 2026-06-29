@@ -26,6 +26,7 @@ from auto_designer.user.sim.dimensions import Persona as SimPersona
 from auto_designer.user.sim.loop import SessionResult
 from auto_designer.user.sim.loop import run_session as sim_run_session
 from auto_designer.user.sim.persona_client import PersonaClient
+from auto_designer.user.sim.workspace import materialize as materialize_workspace
 
 # 观测回调：(identity, sim_persona, 进行中/最终的 SessionResult, running) -> None。
 SimTurnHook = Callable[[str, SimPersona, SessionResult, bool], None]
@@ -69,6 +70,14 @@ def make_sim_run_session_fn(
 
     def run(persona: Persona, scenario: SeedScenario, harness: HarnessInterface) -> Session:
         sim_persona = sim_personas[persona.identity]
+
+        # spec-0008/T1：场景带工作区时每局 materialize 一份全新拷贝，并守卫式绑定到内层 client
+        # （仅 AgenticPersonaClient 暴露 bind_session；Scripted/Api 无此方法即跳过）。
+        # run_session 签名不变——会话级 persona+工作区只在这层注入。
+        if scenario.workspace is not None:
+            workspace_dir = materialize_workspace(scenario.workspace)
+            if hasattr(client, "bind_session"):
+                client.bind_session(persona=sim_persona, workspace_dir=workspace_dir)
 
         def progress(partial: SessionResult) -> None:
             if on_turn is not None:

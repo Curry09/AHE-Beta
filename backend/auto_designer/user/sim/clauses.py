@@ -83,6 +83,54 @@ def voice_for(p: Persona) -> str:
     return VOICE_CLAUSE["default"]
 
 
+# --------------------------------------------------------------------------
+# 内层 tool-using 核实子句（spec-0008/T3）
+# CAN（能力，机械）: 由 0008/T2 tool_stack 决定暴露哪些工具，这里只如实描述。
+# WILL（意愿，prompt）: 由 D3 + trust + 起疑状态 渲染「此刻是否倾向核实」。
+# --------------------------------------------------------------------------
+def clause_capability(p: Persona, tool_names: list[str]) -> str:
+    """如实描述「你能用哪些工具自行核实」。无工具 -> 只能凭阅读判断。"""
+    if not tool_names:
+        return (
+            "You have NO tools to run or test things yourself. You can only judge from what you "
+            "read in the output; you cannot independently execute or verify anything."
+        )
+    listed = ", ".join(tool_names)
+    extra = (
+        " You can even write your own throwaway test scripts to probe it."
+        if "write_file" in tool_names
+        else " You can read and run things, but you do not author your own test suites."
+    )
+    return f"You can verify on your OWN using these tools: {listed}.{extra}"
+
+
+def clause_verification_policy(p: Persona, trust: TrustStance) -> str:
+    """WILL：核实是可选且有成本的动作；倾向随 D3（验收严格度）+ trust（起疑）变化。"""
+    strict = p.d3 in (D3Accept.IDIOMATIC, D3Accept.RIGOROUS)
+    suspicious = trust == TrustStance.SKEPTICAL
+    if strict or suspicious:
+        lean = (
+            "Given your strict bar / skeptical stance, you ARE inclined to actually verify when "
+            "something looks important or you doubt it — but only then, and you weigh the effort."
+        )
+    elif trust == TrustStance.BLIND or p.d3 == D3Accept.RUNS:
+        lean = (
+            "You almost never bother verifying yourself; you take it at face value unless it very "
+            "obviously broke."
+        )
+    else:
+        lean = (
+            "You usually just judge from reading it; you only spend effort verifying when you have "
+            "a concrete reason to doubt it."
+        )
+    return (
+        "# VERIFICATION (optional, has a cost)\n"
+        "Verifying is an OPTIONAL, effortful action — like a real person, you do NOT run checks "
+        "every turn. By default you judge subjectively from what you read; you only reach for "
+        f"your tools when you are suspicious AND it feels worth the effort. {lean}"
+    )
+
+
 def compile_block_p(p: Persona) -> str:
     weak = ", ".join(p.d2.weak) if p.d2.weak else "none notable"
     return f"""# PERSONA  (id: {p.persona_id})

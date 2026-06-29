@@ -103,6 +103,17 @@
   ## Future possibilities
 
   - 体感分布回归看板：按 `vK` tag 对比体感分布（纯观测，不门禁）。 - benchmark held-out 评测挂钩到选定 `vK` 的 SHA，事后验证体感驱动进化是否带来真实能力提升。 - 坏 commit 的「软回退」观测：标记（而非 `revert`）退化点，保持「一往无前」的同时可视化退化。 - 多 dev 并发直推 `main` 的冲突合并策略（当前串行各领不同 issue）。
+- **0008 用户 agent 内层 tool-using（自有环境核实）** — 本组把 spec-0005 用户侧的「单次 `respond()` 主观判断」升级为**可在自有环境核实的内层 tool-using agent**： 让模拟用户像真人一样，在起疑时用**自己的工具栈**（读码 / 跑命令 / 写脚本）在自有 sandbox **真执行**， 使 `verdict` grounded 在真实结果而非脑补。**外层控制信封（动作空间 / 状态机 / 体感 / 终止）原样不动**， 唯一接缝是 `PersonaClient.respond(system, user) -> dict`。落点 `backend/auto_designer/user/sim/`，是 0005/T3 的演进。
+
+  读图即读任务：**T1** 先立工作区底座（现仓 seed 场景全仓只有 `description: str`，磁盘上没有项目可跑）——给 `SeedScenario` 加可选 workspace，每局 materialize 一个 in-repo 基线项目 fixture 当 sandbox 的 cwd；**T2** 造内层 agent 的「手」——原子工具 + sandbox（以工作区为 cwd）+ 按 D1 门控的工具集；**T3** 把 system prompt 的核实语义 从「义务」改为「可选、有成本」，并立 skill 占位接口（与 T1/T2 并行）；**T4** 把单次 `respond()` 换成有界 tool-calling 内层循环（控制反转只局部发生在这个接缝内）。执行序由 `depends-on` 表达且与编号一致： **T1 → T2 → T4**，T3 并行。
+
+  **动机**：0005 的能力分叉靠 prompt G1「请 LLM 自律不偷看答案」+ 文本感知，脆弱——强模型会「心算」bug、 或靠脑补伪造负向感知。本组让能力分叉落在**工具可达性（D1 机械门控）+ 真实执行结果 + 是否起疑（可选核实）**上： blind 无工具只能凭文本，shallow 能跑但写不出测试套件，competent/expert 能自写测试，而 expert 的「构造刁钻边界」 是不可化约的技巧差、归 prompt 行为。
+
+  **仍是纯主观、benchmark 仍 held-out**：真实执行结果对任何人都一样、**不是 gold**（与 0005 推迟的客观真值线 `gold/GAP/ESCAPED_BUG/control-plane` 无关，工作区亦不含 gold 测试）；能力分叉 = 工具门控 + 主观解读 + 是否起疑； 体感/状态仍只吃主观 `verdict`。核实是 persona 的角色内**可选**动作——真人（含专家）不会每次都跑，只在起疑且值得 时才查；默认不查。
+
+  **与 harness 完全解耦（关键）**：本组只动用户侧。harness 仍是 advisory（只输出文本建议），用户把助手提议的代码 贴进**自己的工作区拷贝**再跑——这正是真人对只会建议的助手的真实行为，无需 harness 先长出工具。「让 harness 真 编辑同一工作区、验证目标变成 harness 真实改动」是完全解耦的**第二期**，独立成上游 spec。
+
+  **与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎零改动。`web_search` 工具、skill 真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不 bug/benchmark 特定」红线约束，对接 0006 蒸馏）；是否清理已渐冗余的外层 `verify_self`/`pending_self_obs`、是否给 内层喂显式状态信号、git 工作区来源、与 0003/T2 `nexau_runtime` 的 tool-calling 形态并轨，集中记在各 Task open-questions，归后续 Task/组。
 
 ## 如何读这份文档
 
@@ -200,6 +211,10 @@
 | 0007 | 0007/T2 | 编排去 release 链 · 会话级 main SHA 快照回灌 | pending | T1 |
 | 0007 | 0007/T3 | 一次性迁移脚本：main ← release + 清理分支 | pending | — |
 | 0007 | 0007/T4 | 去 release：种子/bootstrap/e2e trunk 化 | pending | T1, T2 |
+| 0008 | 0008/T1 | seed 工作区扩展与注入 | done | — |
+| 0008 | 0008/T2 | 内层原子工具与 sandbox | done | T1 |
+| 0008 | 0008/T3 | prompt 行为框架（可选核实）与 skill 占位接口 | done | — |
+| 0008 | 0008/T4 | 内层 tool-using agent（AgenticPersonaClient） | done | T1, T2, T3 |
 
 ## 跨 feature 关系图
 
@@ -250,6 +265,12 @@ graph LR
         n0007_T3["T3 一次性迁移脚本：main ← release + 清理分支"]
         n0007_T4["T4 去 release：种子/bootstrap/e2e trunk 化"]
     end
+    subgraph G0008[0008 user-agent-inner-tooluse]
+        n0008_T1["T1 seed 工作区扩展与注入"]
+        n0008_T2["T2 内层原子工具与 sandbox"]
+        n0008_T3["T3 prompt 行为框架（可选核实）与 skill 占位接口"]
+        n0008_T4["T4 内层 tool-using agent（AgenticPersonaClient）"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -292,6 +313,10 @@ graph LR
     n0007_T2 --> n0007_T1
     n0007_T4 --> n0007_T1
     n0007_T4 --> n0007_T2
+    n0008_T2 --> n0008_T1
+    n0008_T4 --> n0008_T1
+    n0008_T4 --> n0008_T2
+    n0008_T4 --> n0008_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -300,6 +325,14 @@ graph LR
     n0006_T1 -.note.-> n0005_T1
     n0006_T2 -.extends.-> n0005_T1
     n0006_T2 -.note.-> n0005_T5
+    n0008_T1 -.extends.-> n0001_T1
+    n0008_T1 -.note.-> n0005_T5
+    n0008_T2 -.extends.-> n0005_T2
+    n0008_T3 -.extends.-> n0005_T3
+    n0008_T3 -.extends.-> n0005_T1
+    n0008_T3 -.note.-> n0006_T1
+    n0008_T4 -.extends.-> n0005_T3
+    n0008_T4 -.note.-> n0005_T5
 ```
 
 ## 文件冲突报告
@@ -308,6 +341,10 @@ graph LR
 |----|----|
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
+| backend/auto_designer/models.py | 0001, 0008 |
+| backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
@@ -321,113 +358,128 @@ graph LR
 backend/
   agent_defs/
     developer_agent/
-      prompt.md                  ← 0003/T3
-      systemprompt.md            ← 0007/T1
+      prompt.md                         ← 0003/T3
+      systemprompt.md                   ← 0007/T1
     test_agent/
-      prompt.md                  ← 0003/T4
+      prompt.md                         ← 0003/T4
     user_agent/
-      prompt.md                  ← 0003/T2
+      prompt.md                         ← 0003/T2
   auto_designer/
     dev/
-      agentic_developer.py       ← 0007/T1
-      developer_agent.py         ← 0003/T3
-      release.py                 ← 0003/T5
-      test_agent.py              ← 0003/T4
+      agentic_developer.py              ← 0007/T1
+      developer_agent.py                ← 0003/T3
+      release.py                        ← 0003/T5
+      test_agent.py                     ← 0003/T4
     distill/
-      library.py                 ← 0006/T1
+      library.py                        ← 0006/T1
     harness/
-      interface.py               ← 0001/T2
-      launcher.py                ← 0003/T1
+      interface.py                      ← 0001/T2
+      launcher.py                       ← 0003/T1
     loop/
-      checkpoint.py              ← 0004/T1
-      metrics.py                 ← 0003/T6
-      orchestrator.py            ← 0003/T6, 0007/T2
-      run_state.py               ← 0004/T1, 0007/T2
-      runner.py                  ← 0004/T2
+      checkpoint.py                     ← 0004/T1
+      metrics.py                        ← 0003/T6
+      orchestrator.py                   ← 0003/T6, 0007/T2
+      run_state.py                      ← 0004/T1, 0007/T2
+      runner.py                         ← 0004/T2
+      sim_user.py                       ← 0008/T1
     tracker/
-      base.py                    ← 0001/T5
-      fake.py                    ← 0001/T5
-      gitea.py                   ← 0002/T2
+      base.py                           ← 0001/T5
+      fake.py                           ← 0001/T5
+      gitea.py                          ← 0002/T2
     user/
       sim/
-        action_space.py          ← 0005/T2
-        actions.py               ← 0005/T2
-        clauses.py               ← 0005/T1
-        demo.py                  ← 0005/T6
-        dimensions.py            ← 0005/T1
-        feeling.py               ← 0005/T4
-        harness_adapter.py       ← 0005/T6
-        loop.py                  ← 0005/T5
-        persona_client.py        ← 0005/T3
-        persona_io.py            ← 0006/T2
-        prompt.py                ← 0005/T3
-        run_live.py              ← 0005/T6
-        scenarios.py             ← 0005/T6
-        state.py                 ← 0005/T2
-      session.py                 ← 0001/T4
-      session_store.py           ← 0001/T6
-      user_agent.py              ← 0001/T3
-    models.py                    ← 0001/T1
-    nexau_runtime.py             ← 0003/T2
+        action_space.py                 ← 0005/T2
+        actions.py                      ← 0005/T2
+        clauses.py                      ← 0005/T1, 0008/T3
+        demo.py                         ← 0005/T6
+        dimensions.py                   ← 0005/T1
+        feeling.py                      ← 0005/T4
+        harness_adapter.py              ← 0005/T6
+        loop.py                         ← 0005/T5
+        persona_client.py               ← 0005/T3, 0008/T4
+        persona_io.py                   ← 0006/T2
+        prompt.py                       ← 0005/T3, 0008/T3
+        run_live.py                     ← 0005/T6
+        sandbox.py                      ← 0008/T2
+        scenarios.py                    ← 0005/T6
+        skills.py                       ← 0008/T3
+        state.py                        ← 0005/T2
+        tools.py                        ← 0008/T2
+        workspace.py                    ← 0008/T1
+      session.py                        ← 0001/T4
+      session_store.py                  ← 0001/T6
+      user_agent.py                     ← 0001/T3
+    models.py                           ← 0001/T1, 0008/T1
+    nexau_runtime.py                    ← 0003/T2
   deploy/
     gitea/
-      README.md                  ← 0002/T1
-      bootstrap.sh               ← 0002/T1
-      docker-compose.yml         ← 0002/T1
+      README.md                         ← 0002/T1
+      bootstrap.sh                      ← 0002/T1
+      docker-compose.yml                ← 0002/T1
   harness_template/
     agents/
-      main.md                    ← 0003/T1
-    entry.py                     ← 0003/T1
-    params.yaml                  ← 0003/T1
+      main.md                           ← 0003/T1
+    entry.py                            ← 0003/T1
+    params.yaml                         ← 0003/T1
   scripts/
-    bootstrap_harness.py         ← 0002/T3, 0007/T4
-    migrate_trunk_main.py        ← 0007/T3
+    bootstrap_harness.py                ← 0002/T3, 0007/T4
+    migrate_trunk_main.py               ← 0007/T3
+  seed_workspaces/
+    billing-split/
+      project/
+        billing/
+          core.py                       ← 0008/T1
+      manifest.yaml                     ← 0008/T1
   tests/
     dev/
-      test_agentic_developer.py  ← 0007/T1
-      test_developer_agent.py    ← 0003/T3
-      test_release.py            ← 0003/T5
-      test_test_agent.py         ← 0003/T4
+      test_agentic_developer.py         ← 0007/T1
+      test_developer_agent.py           ← 0003/T3
+      test_release.py                   ← 0003/T5
+      test_test_agent.py                ← 0003/T4
     distill/
-      test_library.py            ← 0006/T1
+      test_library.py                   ← 0006/T1
     harness/
-      test_interface.py          ← 0001/T2
-      test_launcher.py           ← 0003/T1
+      test_interface.py                 ← 0001/T2
+      test_launcher.py                  ← 0003/T1
     loop/
-      test_checkpoint.py         ← 0004/T1
-      test_metrics.py            ← 0003/T6
-      test_orchestrator.py       ← 0003/T6, 0007/T2
-      test_run_state.py          ← 0004/T1, 0007/T2
-      test_runner.py             ← 0004/T2
+      test_checkpoint.py                ← 0004/T1
+      test_metrics.py                   ← 0003/T6
+      test_orchestrator.py              ← 0003/T6, 0007/T2
+      test_run_state.py                 ← 0004/T1, 0007/T2
+      test_runner.py                    ← 0004/T2
     tracker/
-      test_fake.py               ← 0001/T5
-      test_gitea.py              ← 0002/T2
+      test_fake.py                      ← 0001/T5
+      test_gitea.py                     ← 0002/T2
     user/
       sim/
-        test_action_space.py     ← 0005/T2
-        test_dimensions.py       ← 0005/T1
-        test_feeling.py          ← 0005/T4
-        test_harness_adapter.py  ← 0005/T6
-        test_loop.py             ← 0005/T5
-        test_persona_io.py       ← 0006/T2
-        test_prompt.py           ← 0005/T3
-        test_state.py            ← 0005/T2
-      test_session.py            ← 0001/T4
-      test_session_store.py      ← 0001/T6
-      test_user_agent.py         ← 0001/T3
-    test_bootstrap_harness.py    ← 0002/T3, 0007/T4
-    test_migrate_trunk_main.py   ← 0007/T3
-    test_models.py               ← 0001/T1
-    test_nexau_runtime.py        ← 0003/T2
-  run.py                         ← 0007/T4
+        test_action_space.py            ← 0005/T2
+        test_dimensions.py              ← 0005/T1
+        test_feeling.py                 ← 0005/T4
+        test_harness_adapter.py         ← 0005/T6
+        test_inner_prompt.py            ← 0008/T3
+        test_loop.py                    ← 0005/T5
+        test_persona_client_agentic.py  ← 0008/T4
+        test_persona_io.py              ← 0006/T2
+        test_prompt.py                  ← 0005/T3
+        test_state.py                   ← 0005/T2
+        test_tools.py                   ← 0008/T2
+        test_workspace.py               ← 0008/T1
+      test_session.py                   ← 0001/T4
+      test_session_store.py             ← 0001/T6
+      test_user_agent.py                ← 0001/T3
+    test_bootstrap_harness.py           ← 0002/T3, 0007/T4
+    test_migrate_trunk_main.py          ← 0007/T3
+    test_models.py                      ← 0001/T1
+    test_nexau_runtime.py               ← 0003/T2
+  run.py                                ← 0007/T4
 tools/
   persona-distill/
     extract-selfreport-persona/
       recruitment/
-        seeds.md                 ← 0006/T1
-      SKILL.md                   ← 0006/T1
-      reference.md               ← 0006/T1
-    card-schema.md               ← 0006/T1
+        seeds.md                        ← 0006/T1
+      SKILL.md                          ← 0006/T1
+      reference.md                      ← 0006/T1
+    card-schema.md                      ← 0006/T1
 ```
 
 ## 各 feature 详情
@@ -887,4 +939,74 @@ graph LR
     nT1 --> nT2
     nT1 --> nT4
     nT2 --> nT4
+```
+
+### 0008 用户 agent 内层 tool-using（自有环境核实）（issue #8）
+
+> 人读方案见 [`0008-user-agent-inner-tooluse/summary.md`](./0008-user-agent-inner-tooluse/summary.md)。
+
+本组把 spec-0005 用户侧的「单次 `respond()` 主观判断」升级为**可在自有环境核实的内层 tool-using agent**：
+让模拟用户像真人一样，在起疑时用**自己的工具栈**（读码 / 跑命令 / 写脚本）在自有 sandbox **真执行**，
+使 `verdict` grounded 在真实结果而非脑补。**外层控制信封（动作空间 / 状态机 / 体感 / 终止）原样不动**，
+唯一接缝是 `PersonaClient.respond(system, user) -> dict`。落点 `backend/auto_designer/user/sim/`，是 0005/T3 的演进。
+
+数据流脊柱（编号即执行序：先立工作区 T1，再内层执行 T2/T4，T3 并行）：
+
+```
+seed 场景 + 工作区 (T1: SeedScenario.workspace ─► materialize ─► 全新项目目录)
+   │  注入链 sim_user 桥接每局 materialize → client.bind_session(persona, workspace_dir)（run_session 不动）
+   ▼
+外层控制信封 (0005/T5 run_session, 原样不动)
+   │  接缝 respond(system,user) -> {perceive,verdict,action,message}
+   ▼
+内层 tool-using agent (T4 AgenticPersonaClient)
+   ├─ 工具 = tool_stack(D1) ─► 原子工具 read_file/run_shell/write_file(+web_search 占位) 在 Sandbox(workspace) 真跑 (T2)
+   ├─ prompt 行为框架: 可选核实（CAN=D1 工具门控, WILL=trust/D3/起疑, 默认不查） (T3)
+   └─ skill 占位: D2 领域 playbook 扩展（通用、非 bug 特定, held-out） (T3)
+```
+
+读图即读任务：**T1** 先立工作区底座（现仓 seed 场景全仓只有 `description: str`，磁盘上没有项目可跑）——给
+`SeedScenario` 加可选 workspace，每局 materialize 一个 in-repo 基线项目 fixture 当 sandbox 的 cwd；**T2** 造内层
+agent 的「手」——原子工具 + sandbox（以工作区为 cwd）+ 按 D1 门控的工具集；**T3** 把 system prompt 的核实语义
+从「义务」改为「可选、有成本」，并立 skill 占位接口（与 T1/T2 并行）；**T4** 把单次 `respond()` 换成有界
+tool-calling 内层循环（控制反转只局部发生在这个接缝内）。执行序由 `depends-on` 表达且与编号一致：
+**T1 → T2 → T4**，T3 并行。
+
+**动机**：0005 的能力分叉靠 prompt G1「请 LLM 自律不偷看答案」+ 文本感知，脆弱——强模型会「心算」bug、
+或靠脑补伪造负向感知。本组让能力分叉落在**工具可达性（D1 机械门控）+ 真实执行结果 + 是否起疑（可选核实）**上：
+blind 无工具只能凭文本，shallow 能跑但写不出测试套件，competent/expert 能自写测试，而 expert 的「构造刁钻边界」
+是不可化约的技巧差、归 prompt 行为。
+
+**仍是纯主观、benchmark 仍 held-out**：真实执行结果对任何人都一样、**不是 gold**（与 0005 推迟的客观真值线
+`gold/GAP/ESCAPED_BUG/control-plane` 无关，工作区亦不含 gold 测试）；能力分叉 = 工具门控 + 主观解读 + 是否起疑；
+体感/状态仍只吃主观 `verdict`。核实是 persona 的角色内**可选**动作——真人（含专家）不会每次都跑，只在起疑且值得
+时才查；默认不查。
+
+**与 harness 完全解耦（关键）**：本组只动用户侧。harness 仍是 advisory（只输出文本建议），用户把助手提议的代码
+贴进**自己的工作区拷贝**再跑——这正是真人对只会建议的助手的真实行为，无需 harness 先长出工具。「让 harness 真
+编辑同一工作区、验证目标变成 harness 真实改动」是完全解耦的**第二期**，独立成上游 spec。
+
+**与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎零改动。`web_search` 工具、skill
+真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不
+bug/benchmark 特定」红线约束，对接 0006 蒸馏）；是否清理已渐冗余的外层 `verify_self`/`pending_self_obs`、是否给
+内层喂显式状态信号、git 工作区来源、与 0003/T2 `nexau_runtime` 的 tool-calling 形态并轨，集中记在各 Task
+open-questions，归后续 Task/组。
+
+**任务一览**
+
+- **T1 seed 工作区扩展与注入**（done） — 本组的底座任务：给 SeedScenario 加一个可选 workspace 字段，让 seed 场景能携带一个 in-repo 基线项目（不再只有纯文本 description）；新增 workspace.py 的 materialize() 每局把 fixture 拷成一个临时全新目录，供内层 sandbox 当 cwd。
+- **T2 内层原子工具与 sandbox**（done） — 造内层 agent 的「手」：三个原子工具 read_file / run_shell / write_file（外加 web_search 占位、本轮不实现），以及一个最小 sandbox 执行环境（tempfile + subprocess），以 T1 materialize 出的工作区目录为 cwd。
+- **T3 prompt 行为框架（可选核实）与 skill 占位接口**（done） — 把内层 system prompt 的核实语义从「义务」改为「可选、有成本」：核实是 persona 的角色内动作，只在起疑且值得时才查，默认不查（真人含专家都不会每次都跑）。
+- **T4 内层 tool-using agent（AgenticPersonaClient）**（done） — 把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient：内层 LLM 拿 T3 装配的 system + T2 的工具集，在 T1 materialize 的工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。
+
+```mermaid
+graph LR
+    nT1["T1 seed 工作区扩展与注入"]
+    nT2["T2 内层原子工具与 sandbox"]
+    nT3["T3 prompt 行为框架（可选核实）与 skill 占位接口"]
+    nT4["T4 内层 tool-using agent（AgenticPersonaClient）"]
+    nT1 --> nT2
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
 ```
