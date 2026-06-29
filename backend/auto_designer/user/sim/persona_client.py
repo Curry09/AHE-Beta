@@ -74,18 +74,17 @@ class ApiPersonaClient:
 
     @staticmethod
     def _text(resp) -> str:
-        msg = resp.choices[0].message
-        out = (msg.content or "").strip()
-        if not out:  # reasoning 模型把整轮花在隐藏 CoT 上 -> 回落
-            out = (getattr(msg, "reasoning_content", None) or "").strip()
-        return out
+        # 只取正式回答 content; 绝不回落 reasoning_content —— 那是隐藏思维链(CoT)而非答案,
+        # 当成答案会把 "We need respond as user..." 这类推理过程当成 message 泄漏出去。
+        return (resp.choices[0].message.content or "").strip()
 
     def respond(self, system: str, user: str) -> dict:
         messages = [{"role": "system", "content": system},
                     {"role": "user", "content": user}]
-        text = self._text(self._create(messages, 3000))
+        # 推理模型隐藏 CoT 先吃 token; 给足头寸, 否则 JSON 契约会被截断成不可解析的半截。
+        text = self._text(self._create(messages, 8000))
         if not text:
-            text = self._text(self._create(messages, 6000))
+            text = self._text(self._create(messages, 16000))
         return _parse_json(text)
 
 
@@ -242,9 +241,10 @@ def _parse_json(text: str) -> dict:
             return obj
     except Exception:
         pass
-    # 无法解析: 当成自由文本, 交给框架归类
-    return {"perceive": text[:200], "verdict": "unsure",
-            "action": "free", "message": text[:400]}
+    # 无法解析(截断/非 JSON): 退化成安全 no-op, 绝不把原始文本灌进 message ——
+    # message 会发给 harness 且落进 transcript, 半截 JSON / 思维链不得外泄。
+    return {"perceive": "(unparseable model output)", "verdict": "unsure",
+            "action": "free", "message": ""}
 
 
 def make_client() -> PersonaClient:
