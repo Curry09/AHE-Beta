@@ -6,9 +6,9 @@
 
 本仓在做 **harness 自进化**。直接对轨迹做自进化，会把轨迹特征带进 harness、以 benchmark 分数为优化目标而过拟合，只能针对具体问题局部打补丁，难有结构性改进。本仓的根本做法是**训练信号与测试分离**：训练信号取「模拟真实使用」分布上的**用户体感**，benchmark 全程 **held-out**，只在事后验证体感驱动的进化是否带来真实能力提升——不进训练、不进发版门禁。
 
-为此模拟一条「**用户使用 → 开发者迭代**」的闭环：**a｜用户侧** user agent 按 persona + 种子场景多轮使用 harness，产出体感评分（训练信号）与 issue（bug/需求）；**b｜开发者侧** 开发者 agent 领 issue 改 harness（bug 走 release 快修、大 feature 走独立分支孵化），测试 agent 做体感门禁，过门禁才合并发版；**c｜回灌** 发版后的新 harness 回到用户侧，循环。
+为此模拟一条「**用户使用 → 开发者迭代**」的闭环：**a｜用户侧** user agent 按 persona + 种子场景多轮使用 harness，产出体感评分（观测信号）与 issue（bug/需求）；**b｜开发者侧** 纯 trunk（单 main）无门禁——开发者 agent 是带 git 工具的 nexau agent，领 issue 后自己 checkout main → 改 harness → commit → 打 vK tag → push，直接推进主干（坏 commit 靠后续多轮迭代回正）；**c｜回灌** dev 直推后下一局用户侧自然解析到更新后的 main HEAD，循环。
 
-被进化对象 harness 不是单个 agent，而是「可启动程序 + 黑盒对话契约」，内部 1 个或 N 个 nexau 的编排由其自带 entry 决定，源码独立托管于 Gitea，开发者 agent 走真实分支与合并。观测上记录 issue 数量随时间的曲线：长期不降说明 harness 在退化，过早归零说明 persona 多样性不足、探索停止。
+被进化对象 harness 不是单个 agent，而是「可启动程序 + 黑盒对话契约」，内部 1 个或 N 个 nexau 的编排由其自带 entry 决定，源码独立托管于 Gitea；开发者 agent 直接在单 main 主干上 commit/push（无 branch/merge/release）。观测上记录 issue 数量随时间的曲线：长期不降说明 harness 在退化，过早归零说明 persona 多样性不足、探索停止。
 
 下面按编号递进给出每组定位，串起整条脉络；依赖与衔接见后续「跨 feature 关系图」，单组完整方案见各组 `summary.md`。
 
@@ -110,8 +110,8 @@
 ### 三角色（agent 定义）
 
 - **user agent** — 扮演真实用户，按 Persona + SeedScenario 多轮使用 harness，产出体感评分（训练信号）与 issue。
-- **developer agent** — 从 Gitea 领取 open issue，按 label 分流到对应分支策略，用 nexau 修改 harness bundle 并提交。
-- **test agent** — 用候选 harness ref 跑固定集的 N 局用户会话，算平均体感与 release 基线比较，做体感回归门禁。
+- **developer agent** — 带 git 工具的 nexau agent，从 Gitea 领取 open issue 后自己在 harness 仓直接 checkout main → 改 agents/main.md → commit → 打 vK tag → push（纯 trunk，无分流/分支/门禁）。
+- **test agent** — （spec-0003 初版概念，已被 spec-0007 纯 trunk 取代）原指用候选 harness 跑 N 局算平均体感、与 release 基线比较做回归门禁；现纯 trunk 无门禁，体感仅作观测、benchmark held-out。
 
 ### 用户侧数据结构（spec-0001/T1）
 
@@ -139,10 +139,10 @@
 ### 基建与流程
 
 - **Gitea** — 自托管 git 服务（docker + sqlite），issue 与 harness 仓的家；负责发号/状态/标签/comment。
-- **release 分支** — harness 仓的稳定分支，bug 修复走此分支快速迭代；体感门禁通过的候选合入于此。
-- **feature 分支** — harness 仓的特性分支，大 feature 在此完成后再合入 release。
-- **tag** — harness 仓的发布版本标记，即用户侧下一轮 pin 的 harness 版本。
-- **体感门禁** — 唯一发版门禁，只检查体感是否回归（benchmark 不参与）；候选与 release 基线比较，不退化则放行。
+- **release 分支** — （spec-0003 初版概念，已被 spec-0007 纯 trunk 取代）原为 harness 仓的稳定分支；现单分支主干（main），开发者 agent 直接推进 main，不再有 release 常驻分支。
+- **feature 分支** — （spec-0003 初版概念，已被 spec-0007 纯 trunk 取代）原为大 feature 的特性分支；现纯 trunk 不分 bug/feature、直接 commit 到 main。
+- **tag** — harness 仓 main 上的轻量 vK 标记，每次开发者成功推进 main 打一个，仅作观测锚点（纯 trunk 下用户侧恒跟 live main，不据 tag pin）。
+- **体感门禁** — （spec-0003 初版概念，已被 spec-0007 纯 trunk 取代）原为唯一发版门禁；现纯 trunk 无门禁，体感退化为观测信号、benchmark 全程 held-out，坏 commit 靠后续多轮迭代回正。
 - **distill（蒸馏模块）** — 从真实使用数据（CC/codex/nexau 日志、issue tracker、社区反馈）蒸馏出 persona 库与种子场景库。
 - **harness_template** — v0 harness 种子（entry + agents + params），用于初始化 Gitea 上的 harness 独立仓。
 

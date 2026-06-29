@@ -21,10 +21,10 @@ terms:
     def: 扮演真实用户，按 Persona + SeedScenario 多轮使用 harness，产出体感评分（训练信号）与 issue。
   - term: developer agent
     category: 三角色（agent 定义）
-    def: 从 Gitea 领取 open issue，按 label 分流到对应分支策略，用 nexau 修改 harness bundle 并提交。
+    def: 带 git 工具的 nexau agent，从 Gitea 领取 open issue 后自己在 harness 仓直接 checkout main → 改 agents/main.md → commit → 打 vK tag → push（纯 trunk，无分流/分支/门禁）。
   - term: test agent
     category: 三角色（agent 定义）
-    def: 用候选 harness ref 跑固定集的 N 局用户会话，算平均体感与 release 基线比较，做体感回归门禁。
+    def: （spec-0003 初版概念，已被 spec-0007 纯 trunk 取代）原指用候选 harness 跑 N 局算平均体感、与 release 基线比较做回归门禁；现纯 trunk 无门禁，体感仅作观测、benchmark held-out。
 
   - term: Persona
     category: 用户侧数据结构（spec-0001/T1）
@@ -84,16 +84,16 @@ terms:
     def: 自托管 git 服务（docker + sqlite），issue 与 harness 仓的家；负责发号/状态/标签/comment。
   - term: release 分支
     category: 基建与流程
-    def: harness 仓的稳定分支，bug 修复走此分支快速迭代；体感门禁通过的候选合入于此。
+    def: （spec-0003 初版概念，已被 spec-0007 纯 trunk 取代）原为 harness 仓的稳定分支；现单分支主干（main），开发者 agent 直接推进 main，不再有 release 常驻分支。
   - term: feature 分支
     category: 基建与流程
-    def: harness 仓的特性分支，大 feature 在此完成后再合入 release。
+    def: （spec-0003 初版概念，已被 spec-0007 纯 trunk 取代）原为大 feature 的特性分支；现纯 trunk 不分 bug/feature、直接 commit 到 main。
   - term: tag
     category: 基建与流程
-    def: harness 仓的发布版本标记，即用户侧下一轮 pin 的 harness 版本。
+    def: harness 仓 main 上的轻量 vK 标记，每次开发者成功推进 main 打一个，仅作观测锚点（纯 trunk 下用户侧恒跟 live main，不据 tag pin）。
   - term: 体感门禁
     category: 基建与流程
-    def: 唯一发版门禁，只检查体感是否回归（benchmark 不参与）；候选与 release 基线比较，不退化则放行。
+    def: （spec-0003 初版概念，已被 spec-0007 纯 trunk 取代）原为唯一发版门禁；现纯 trunk 无门禁，体感退化为观测信号、benchmark 全程 held-out，坏 commit 靠后续多轮迭代回正。
   - term: distill（蒸馏模块）
     category: 基建与流程
     def: 从真实使用数据（CC/codex/nexau 日志、issue tracker、社区反馈）蒸馏出 persona 库与种子场景库。
