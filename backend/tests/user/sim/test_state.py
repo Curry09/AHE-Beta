@@ -70,3 +70,24 @@ def test_apply_verdict_rejects_unknown() -> None:
     p = _persona()
     with pytest.raises(AssertionError):
         apply_verdict(init_state(p), "objectively_failed", make_coef(p))
+
+
+def test_consec_blame_counts_only_consecutive_harness_failures() -> None:
+    p = _persona()
+    coef = make_coef(p)
+    s = init_state(p)
+
+    apply_verdict(s, "failed_blame_harness", coef)
+    apply_verdict(s, "failed_blame_harness", coef)
+    assert s.consec_blame == 2  # 连续坐实 harness 失败 -> 累计
+
+    apply_verdict(s, "unsure", coef)  # 非连续 -> 清零("连续"严格语义)
+    assert s.consec_blame == 0
+
+    apply_verdict(s, "failed_blame_harness", coef)
+    apply_verdict(s, "failed_blame_self", coef)  # 怪自己不算 harness 能力缺口 -> 清零
+    assert s.consec_blame == 0
+
+    apply_verdict(s, "failed_blame_harness", coef)
+    apply_verdict(s, "satisfied", coef)  # 满意 -> 清零
+    assert s.consec_blame == 0

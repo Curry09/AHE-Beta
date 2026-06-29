@@ -88,3 +88,36 @@ def test_resolve_enforces_channel_consistency() -> None:
     # EMIT 但 message 空 -> 兜底填充非空
     aid2, msg2 = resolve_action({"action": "give_feedback", "message": ""}, space, p)
     assert aid2 == "give_feedback" and msg2.strip()
+
+
+def test_diagnosis_gate_unlocks_terminal_for_capable_without_patience_drain() -> None:
+    # 耐心仍充足(>0), 但高能力档连续 2 次坐实 harness 失败 -> 诊断驱动解锁升级。
+    p = _persona(d1=D1Eval.EXPERT, d43=D43Correct.FILE_ISSUE)
+    diagnosed = State(turn=2, patience=4, trust=p.trust, consec_blame=2)
+    space = derive_action_space(Phase.ACTIVE, p, diagnosed, has_artifact=True)
+    assert "file_issue" in space
+
+
+def test_diagnosis_gate_requires_two_consecutive_blames() -> None:
+    p = _persona(d1=D1Eval.EXPERT, d43=D43Correct.FILE_ISSUE)
+    one = State(turn=1, patience=5, trust=p.trust, consec_blame=1)
+    space = derive_action_space(Phase.ACTIVE, p, one, has_artifact=True)
+    assert "file_issue" not in space  # 仅 1 次坐实未达阈值, 不解锁
+
+
+def test_diagnosis_gate_blocked_for_low_capability() -> None:
+    # 识别"结构性无能力"本身需要能力: blind/shallow 无诊断快速通道, 仍靠耐心消耗。
+    p = _persona(d1=D1Eval.SHALLOW, d43=D43Correct.FILE_ISSUE)
+    diagnosed = State(turn=2, patience=4, trust=p.trust, consec_blame=2)
+    space = derive_action_space(Phase.ACTIVE, p, diagnosed, has_artifact=True)
+    assert "file_issue" not in space
+
+
+def test_negative_terminal_never_projects_to_accept() -> None:
+    # file_issue/give_up 未解锁时, 绝不投影到 accept(语义相反), 降级为继续反馈。
+    p = _persona(d43=D43Correct.FILE_ISSUE)
+    space = ["accept", "give_feedback", "refine_request"]
+    aid, msg = resolve_action({"action": "file_issue", "message": "filing an issue"}, space, p)
+    assert aid == "give_feedback" and aid != "accept" and msg.strip()
+    aid2, _ = resolve_action({"action": "give_up", "message": "I quit"}, space, p)
+    assert aid2 == "give_feedback"

@@ -19,6 +19,7 @@ from __future__ import annotations
 from .actions import (
     CATALOG,
     Channel,
+    Effect,
     Phase,
     assert_channel,
 )
@@ -41,6 +42,9 @@ LEGAL_BY_PHASE: dict[Phase, set[str]] = {
         "grant_autorun",
     },
 }
+
+# 诊断驱动升级阈值: 连续 N 次坐实 harness 失败(含"婉拒/声称做不到")即认定能力缺口。
+_DIAGNOSIS_BLAME_THRESHOLD = 2
 
 
 # --------------------------------------------------------------------------
@@ -101,8 +105,15 @@ def derive_action_space(
     space = _cap_filter(legal, cap_mask(persona))
     space = _authz_filter(space, persona.d6)
 
-    # 耐心门: 耗尽才解锁终止动作
+    # 耐心门(消耗驱动): 耗尽才解锁终止动作
     if state.patience <= 0:
+        space.add(_d43_terminal(persona))
+
+    # 诊断门(诊断驱动): 高能力档连续坐实 harness 失败即认定能力缺口, 立即解锁升级,
+    # 不必等耐心磨到 0("婉拒=无能力, 看穿即可升级")。低能力档(blind/shallow)无此快速
+    # 通道——识别"结构性无能力"本身需要能力, 他们仍靠耐心消耗终止。
+    if (state.consec_blame >= _DIAGNOSIS_BLAME_THRESHOLD
+            and persona.d1 in (D1Eval.COMPETENT, D1Eval.EXPERT)):
         space.add(_d43_terminal(persona))
 
     # accept 与耐心无关: 有可接受产物即可
@@ -143,9 +154,17 @@ def project_to_legal(action_id: str, space: list[str]) -> str:
     """越权动作投影回合法集。"""
     if action_id in space:
         return action_id
-    # 同 effect 优先
     if action_id in CATALOG:
         want = CATALOG[action_id].effect
+        # 负向终止(file_issue/give_up)未解锁时, 绝不投影到 accept —— 语义相反, 会把
+        # "不满想升级"误记成"满意接受", 双重污染体感/issue 信号。降级为继续反馈, 把终止权
+        # 交回闸门(耐心 or 诊断): 下一轮闸门开了, persona 自然会真正落地 file_issue/give_up。
+        if want is Effect.TERMINATE and action_id != "accept":
+            if "give_feedback" in space:
+                return "give_feedback"
+            non_term = [a for a in space if CATALOG[a].effect is not Effect.TERMINATE]
+            if non_term:
+                return sorted(non_term)[0]
         same = [a for a in space if CATALOG[a].effect is want]
         if same:
             return same[0]
