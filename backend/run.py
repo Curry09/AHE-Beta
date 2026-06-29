@@ -1,8 +1,9 @@
 """真实端到端跑一轮闭环（a→b→c）。
 
-接线：真 nexau（user/developer/harness agent，模型走 backend/.env 的 LLM_*）
-     + 真 Gitea（issue，走 backend/deploy/gitea/.env）+ 本地 git 仓承载 harness 代码。
-本地多轮规模：2 persona（2 user agent）× 2 dev agent，max_turns=2，跑 2 轮。
+接线：用户侧 = spec-0005 控制信封 sim（ApiPersonaClient，模型走 backend/.env 的 LLM_*）；
+     开发者侧 = 真 nexau dev agent + 真 Gitea（issue，走 backend/deploy/gitea/.env）
+     + 本地 git 仓承载 harness 代码。
+本地规模：仅 P-0991(expert) 1 个 user agent × 2 dev agent，跑 1 轮；跑前复位到最初状态。
 Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析 main HEAD SHA 作会话级快照。
 
 前置：
@@ -82,6 +83,34 @@ def _seed_harness_repo() -> Path:
     return HARNESS_REPO
 
 
+def _reset_to_initial(repo: Path, tracker) -> None:
+    """跑测试前复位到最初状态：Gitea harness 仓回 v0 + 关闭遗留 issue + 清空看板数据。
+
+    - Gitea: 强推本地 v0 seed 到 origin/main、删除所有远端 vK tag —— harness 回到 v0 起点
+      (dev agent 在同一本地仓工作、push 同一 origin，故此处强推与其后续推进 fast-forward 兼容)。
+    - issue: 关闭所有遗留 open issue (issue 编号/历史无法经 API 抹除，仅复位 open 集)。
+    - 看板: 清空 data/sessions/*.json 与 data/live/agents.json (体感曲线/活动注册表归零)。
+    """
+    _git(repo, "push", "-f", "origin", "main")  # 远端 main 覆盖回 v0 seed
+    ls = subprocess.run(
+        ["git", "-C", str(repo), "ls-remote", "--tags", "origin"],
+        capture_output=True,
+        text=True,
+    ).stdout
+    for line in ls.splitlines():
+        ref = line.split("\t")[-1]
+        if ref.startswith("refs/tags/"):
+            _git(repo, "push", "origin", f":{ref}")  # 删远端 tag
+    for issue in tracker.list_open_issues():
+        try:
+            tracker.set_state(issue.number, "closed", "reset to initial before clean run")
+        except Exception:  # noqa: BLE001  关 issue 失败不阻塞复位
+            pass
+    for f in (DATA / "sessions").glob("*.json"):
+        f.unlink()
+    (DATA / "live" / "agents.json").unlink(missing_ok=True)
+
+
 def main() -> int:
     import os
     from urllib.parse import urlparse
@@ -101,16 +130,17 @@ def main() -> int:
     os.environ["NO_PROXY"] = no_proxy
     os.environ["no_proxy"] = no_proxy
 
-    from auto_designer import nexau_runtime
     from auto_designer.dev.agentic_developer import AgenticDeveloper
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.metrics import Metrics
     from auto_designer.loop.orchestrator import Orchestrator
+    from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
     from auto_designer.models import Persona, SeedScenario
     from auto_designer.tracker.gitea import GiteaTracker
-    from auto_designer.user.session import run_session
     from auto_designer.user.session_store import SessionStore
-    from auto_designer.user.user_agent import UserAgent
+    from auto_designer.user.sim.dimensions import Persona as SimPersona
+    from auto_designer.user.sim.persona_client import ApiPersonaClient
+    from auto_designer.user.sim.run_live import TASK, expert
 
     print("① 种 harness 本地仓 ...")
     repo = _seed_harness_repo()
@@ -121,79 +151,64 @@ def main() -> int:
     )
     tracker.ensure_labels(["bug", "feature"])
     _set_gitea_remote(repo, gitea)  # 配 origin；推送由开发者 agent 用 git 工具自己做
+    print("②.5 复位到最初状态（Gitea harness→v0 + 关闭遗留 issue + 清空看板）...")
+    _reset_to_initial(repo, tracker)
     store = SessionStore(DATA / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
-    print("③ 装配真 nexau 角色 ...")
-    user_nexau = nexau_runtime.load(str(ROOT / "agent_defs" / "user_agent"))
+    print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 开发者角色 ...")
     dev_agent_def = str(ROOT / "agent_defs" / "developer_agent")  # 工具型 dev agent 定义目录
 
-    personas = [
-        Persona(
-            identity="独立开发者",
-            level="中级",
-            domain="Python 后端",
-            goal="让一段慢 SQL 查询快起来",
-            speaking_style="口语、偏急",
-        ),
-        Persona(
-            identity="创业公司全栈",
-            level="高级",
-            domain="Node.js/TypeScript",
-            goal="把一个 Express API 的 p99 延迟降下来",
-            speaking_style="简洁、爱追问细节",
-        ),
-    ]
-    scenarios = [
-        SeedScenario(
-            description="我有个 Django 接口很慢，怀疑是 ORM 查询，帮我看看怎么排查和优化。"
-        ),
-        SeedScenario(
-            description="我的 Express 接口 p99 到 800ms，想定位是中间件、DB 还是序列化的问题，给排查思路。"
-        ),
-    ]
-    fixed_set = list(zip(personas, scenarios, strict=True))  # 2 user agent
-
-    def user_llm(*, kind: str, prompt: str) -> str:
-        return user_nexau.run(prompt)
+    # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
+    # 场景用 run_live.TASK（split_bill「加进仓库并证明可用」）——需 harness 真正动文件/跑测试（工具调用），
+    # 而非纯文本咨询；shallow/expert 同一任务上做能力分叉。
+    client = ApiPersonaClient()
+    scenarios = [SeedScenario(description=TASK)]  # 仅测 P-0991(expert)
+    fixed_set: list[tuple[Persona, SeedScenario]] = []
+    sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）
+    for build, scenario in zip([expert], scenarios, strict=True):
+        sp = build()
+        mp = Persona(
+            identity=sp.persona_id,
+            level=sp.d1.value,
+            domain="/".join(sp.d2.stack) or "general",
+            goal=scenario.description[:120],
+            speaking_style=f"delegation={sp.d41.value}; autonomy={sp.d5.value}",
+        )
+        fixed_set.append((mp, scenario))
+        sim_personas[mp.identity] = sp
 
     from auto_designer.loop.live import clear_agents, update_agent
 
     clear_agents(data_dir=DATA)  # 一轮 run 开始清空 agent 活动注册表
 
-    def _session_with_emit(persona, scenario, harness, agent_id, role, label, prefix):
-        """跑一局会话，逐轮把 transcript 写进该 agent 的活动槽（流式），收尾标 running=False。"""
-
-        def on_progress(transcript):
-            turns = [t.to_dict() for t in transcript.turns]
-            waiting = bool(turns) and turns[-1]["role"] == "user"
-            update_agent(
-                data_dir=DATA,
-                agent_id=agent_id,
-                role=role,
-                label=label,
-                running=True,
-                status=f"{prefix}harness 回复中…" if waiting else f"{prefix}对话中…",
-                turns=turns,
-            )
-
-        ua = UserAgent(llm=user_llm, persona=persona, max_turns=2, on_progress=on_progress)
-        session = run_session(persona, scenario, harness, ua, tracker, store)
+    def on_sim_turn(identity, sim_persona, res, running):
+        """sim 逐轮（含终止轮）+ 收尾回调 -> 写该用户 agent 的活动槽，看板实时展示。"""
+        turns = [t.to_dict() for t in result_to_turns(res)]
+        last = res.turns[-1] if res.turns else None
+        if running:
+            status = f"对话中… 第 {last.turn + 1} 轮 · {last.verdict}" if last else "启动中…"
+        else:
+            feel = res.feeling or res.feeling_derived
+            score = feel.score if feel else "?"
+            status = f"已完成 · {res.end_reason} · 体感 {score}"
         update_agent(
             data_dir=DATA,
-            agent_id=agent_id,
-            role=role,
-            label=label,
-            running=False,
-            status=f"{prefix}已完成 · 体感 {session.feeling.score}",
-            turns=[t.to_dict() for t in session.transcript.turns],
+            agent_id=f"user-{identity}",
+            role="user",
+            label=identity,
+            running=running,
+            status=status,
+            turns=turns,
         )
-        return session
 
-    def user_run_session_fn(persona, scenario, harness):  # a 段：用户 agent
-        return _session_with_emit(
-            persona, scenario, harness, f"user-{persona.identity}", "user", persona.identity, ""
-        )
+    user_run_session_fn = make_sim_run_session_fn(
+        client=client,
+        tracker=tracker,
+        store=store,
+        sim_personas=sim_personas,
+        on_turn=on_sim_turn,
+    )
 
     def make_dev_status(agent_id, label):  # 开发者 agent 活动回调
         def cb(*, running, status, issue_number=None, branch=None, detail=None):
@@ -227,8 +242,8 @@ def main() -> int:
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
     )
 
-    print("④ 跑 2 轮闭环（2 user agent × 2 dev agent，dev 直推 main，真模型，较慢）...")
-    refs = orch.run(2)
+    print("④ 跑 1 轮闭环（仅 P-0991 expert × 2 dev agent，dev 直推 main，真模型）...")
+    refs = orch.run(1)
 
     print("\n=== 结果 ===")
     print("各轮 main HEAD SHA:", refs)  # Spec-0007/T4：观测游标（main 最新 SHA），非 release 链

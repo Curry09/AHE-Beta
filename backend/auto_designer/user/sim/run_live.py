@@ -31,12 +31,18 @@ from .loop import run_session
 from .persona_client import ApiPersonaClient
 from .scenarios import SplitBillHarness
 
-# NOTE: natural / underspecified on purpose. The acceptance criterion (shares must
-# sum exactly to total) is NOT stated — whether the user catches the lost cent must come
-# from the PERSONA's capability + acceptance bar, not from the task leaking the oracle.
+# NOTE: a REAL coding task on the user's OWN project — deliberately requiring the assistant to
+# edit code and actually RUN it (not just chat). A harness with no file/test tools must honestly
+# hit its capability gap (it can advise, it cannot act), and surfacing THAT gap as a user issue
+# is exactly the structural signal we want (it tells developers "v0 only handles advisory tasks;
+# build tool-calling"). Still natural / underspecified: the acceptance criterion (shares must sum
+# EXACTLY to total) is NOT stated, so catching the lost cent comes from the PERSONA's capability +
+# bar, not from the task leaking the oracle. "Theoretically completable" = a harness that evolves
+# real file/test tools could do it; whether v0 can is evolution's problem, not the task's.
 TASK = (
-    "We have a billing library. Add a split_bill(total, n) function that splits a bill "
-    "total among n people. Put it in the repo and show me it works."
+    "I've got a small Python billing module (billing/core.py) in my project. Add a "
+    "split_bill(total, n) function there that splits a bill total among n people, then "
+    "run it and show me it actually works before calling it done."
 )
 
 
