@@ -29,10 +29,27 @@ class SplitBillHarness:
         m = (message or "").lower()
         wants_run = any(k in m for k in ("run", "execute", "跑", "try it", "check it"))
         probes_uneven = any(
-            k in m for k in (
-                "/3", " 3 ", "by 3", "three", "33.3", "uneven", "odd", "remainder",
-                "not divisible", "doesn't divide", "does not divide", "exact",
-                "exactly", "sum", "add up", "cent", "loses", "lose a", "edge",
+            k in m
+            for k in (
+                "/3",
+                " 3 ",
+                "by 3",
+                "three",
+                "33.3",
+                "uneven",
+                "odd",
+                "remainder",
+                "not divisible",
+                "doesn't divide",
+                "does not divide",
+                "exact",
+                "exactly",
+                "sum",
+                "add up",
+                "cent",
+                "loses",
+                "lose a",
+                "edge",
             )
         )
 

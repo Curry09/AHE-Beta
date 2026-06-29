@@ -34,24 +34,28 @@ TASK = (
 
 
 def make_personas():
-    p0473 = finalize_persona(Persona(
-        persona_id="P-0473",
-        d1=D1Eval.SHALLOW,
-        d2=D2Domain(stack=("python",), depth=D2Depth.PROFICIENT, weak=("timezone", "pytz")),
-        d41=D41Grain.HALF_CONTEXT,
-        d42=D42Supervise.PHASE_CHECK,
-        d43=D43Correct.FEEDBACK,
-        d5=D5Autonomy.COLLABORATIVE,
-    ))
-    p0991 = finalize_persona(Persona(
-        persona_id="P-0991",
-        d1=D1Eval.EXPERT,
-        d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR, weak=()),
-        d41=D41Grain.SPEC_LEVEL,
-        d42=D42Supervise.EVERY_STEP,
-        d43=D43Correct.FILE_ISSUE,
-        d5=D5Autonomy.COLLABORATIVE,
-    ))
+    p0473 = finalize_persona(
+        Persona(
+            persona_id="P-0473",
+            d1=D1Eval.SHALLOW,
+            d2=D2Domain(stack=("python",), depth=D2Depth.PROFICIENT, weak=("timezone", "pytz")),
+            d41=D41Grain.HALF_CONTEXT,
+            d42=D42Supervise.PHASE_CHECK,
+            d43=D43Correct.FEEDBACK,
+            d5=D5Autonomy.COLLABORATIVE,
+        )
+    )
+    p0991 = finalize_persona(
+        Persona(
+            persona_id="P-0991",
+            d1=D1Eval.EXPERT,
+            d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR, weak=()),
+            d41=D41Grain.SPEC_LEVEL,
+            d42=D42Supervise.EVERY_STEP,
+            d43=D43Correct.FILE_ISSUE,
+            d5=D5Autonomy.COLLABORATIVE,
+        )
+    )
     return [p0473, p0991]
 
 
@@ -86,7 +90,7 @@ def print_result(res):
 def main():
     client = make_client()
     for persona in make_personas():
-        harness = ScriptedHarness()   # 每个 persona 用全新 harness 轨迹
+        harness = ScriptedHarness()  # 每个 persona 用全新 harness 轨迹
         res = run_session(persona, client, harness, TASK)
         print_result(res)
 

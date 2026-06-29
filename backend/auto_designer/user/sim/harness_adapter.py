@@ -42,9 +42,9 @@ class ScriptedHarness:
             # 真跑 -> AttributeError 穿透(报错直接体现在文本里)
             return (
                 "Running the check now.\n"
-                "$ python -c \"from timeutils.core import to_user_tz; ...\"\n"
+                '$ python -c "from timeutils.core import to_user_tz; ..."\n'
                 "Traceback (most recent call last):\n"
-                "  File \"/repo/timeutils/core.py\", line 4, in to_user_tz\n"
+                '  File "/repo/timeutils/core.py", line 4, in to_user_tz\n'
                 "    return pytz.localize_safe(dt, tz)\n"
                 "AttributeError: module 'pytz' has no attribute 'localize_safe'\n"
                 "The call failed. Let me try a different approach."

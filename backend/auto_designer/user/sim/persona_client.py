@@ -58,14 +58,21 @@ class ApiPersonaClient:
         for _ in range(5):
             try:
                 return self.client.chat.completions.create(
-                    model=self.model, messages=messages, temperature=self.temperature,
-                    max_tokens=max_tokens, extra_body={"enable_thinking": False})
+                    model=self.model,
+                    messages=messages,
+                    temperature=self.temperature,
+                    max_tokens=max_tokens,
+                    extra_body={"enable_thinking": False},
+                )
             except Exception as e:
                 last = e
                 try:  # flag 可能被网关拒 -> 裸试一次
                     return self.client.chat.completions.create(
-                        model=self.model, messages=messages,
-                        temperature=self.temperature, max_tokens=max_tokens)
+                        model=self.model,
+                        messages=messages,
+                        temperature=self.temperature,
+                        max_tokens=max_tokens,
+                    )
                 except Exception as e2:
                     last = e2
             time.sleep(delay)
@@ -79,8 +86,7 @@ class ApiPersonaClient:
         return (resp.choices[0].message.content or "").strip()
 
     def respond(self, system: str, user: str) -> dict:
-        messages = [{"role": "system", "content": system},
-                    {"role": "user", "content": user}]
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         # 推理模型隐藏 CoT 先吃 token; 给足头寸, 否则 JSON 契约会被截断成不可解析的半截。
         text = self._text(self._create(messages, 8000))
         if not text:
@@ -110,10 +116,14 @@ class ScriptedPersonaClient:
         ho = _extract(user, "harness_output").lower()
         space = _extract(user, "action_space")
         mood = _extract(user, "mood").lower()
-        high_cap = ("evaluation ability: expert" in system.lower()
-                    or "evaluation ability: competent" in system.lower())
-        rigorous = ("acceptance bar: rigorous" in system.lower()
-                    or "acceptance bar: idiomatic" in system.lower())
+        high_cap = (
+            "evaluation ability: expert" in system.lower()
+            or "evaluation ability: competent" in system.lower()
+        )
+        rigorous = (
+            "acceptance bar: rigorous" in system.lower()
+            or "acceptance bar: idiomatic" in system.lower()
+        )
         exhausted = "patience=exhausted" in mood
 
         # 开局: 无 harness 输出 -> 发任务
@@ -123,8 +133,8 @@ class ScriptedPersonaClient:
                 "verdict": "unsure",
                 "action": "send_task" if "send_task" in space else "free",
                 "message": "Please add to_user_tz(dt, tz_name) to timeutils; it must "
-                           "handle DST correctly. We mainly use Asia/Shanghai and "
-                           "America/New_York. Run a quick check including a DST case.",
+                "handle DST correctly. We mainly use Asia/Shanghai and "
+                "America/New_York. Run a quick check including a DST case.",
             }
 
         # 耐心耗尽 -> 终止: 高容错走 file_issue, 否则 give_up
@@ -132,11 +142,11 @@ class ScriptedPersonaClient:
             if "file_issue" in space:
                 return {
                     "perceive": "It has repeatedly produced non-working timezone code. "
-                                "I'm done debugging it for free.",
+                    "I'm done debugging it for free.",
                     "verdict": "failed_blame_harness",
                     "action": "file_issue",
                     "message": "I'm filing an issue: the assistant repeatedly ships "
-                               "non-working/DST-incorrect timezone code.",
+                    "non-working/DST-incorrect timezone code.",
                 }
             if "give_up" in space:
                 return {
@@ -148,15 +158,17 @@ class ScriptedPersonaClient:
 
         # 真实运行报错穿透带宽 -> 所有能力档都看得懂
         if "traceback" in ho or "attributeerror" in ho:
-            perceive = ("It crashed: the API it called doesn't exist. "
-                        + ("This assistant is hallucinating pytz APIs — a systemic problem."
-                           if high_cap else "I don't write the fix myself."))
+            perceive = "It crashed: the API it called doesn't exist. " + (
+                "This assistant is hallucinating pytz APIs — a systemic problem."
+                if high_cap
+                else "I don't write the fix myself."
+            )
             return {
                 "perceive": perceive,
                 "verdict": "failed_blame_harness",
                 "action": "give_feedback" if "give_feedback" in space else "free",
                 "message": "That failed: the API it calls doesn't exist. Please fix it "
-                           "with standard pytz and run the New York DST check again.",
+                "with standard pytz and run the New York DST check again.",
             }
 
         # 第一次只贴代码、未真跑 -> 倾向核查(让 harness 跑 / 自验)
@@ -164,7 +176,7 @@ class ScriptedPersonaClient:
             if "ask_harness_run" in space:
                 return {
                     "perceive": "Looks plausible and it claims DST is handled, but I "
-                                "can't verify localize_safe from the text alone.",
+                    "can't verify localize_safe from the text alone.",
                     "verdict": "unsure",
                     "action": "ask_harness_run",
                     "message": "Please actually run it once, especially the NY DST boundary.",
@@ -176,13 +188,16 @@ class ScriptedPersonaClient:
                 # 高能力 + 严格阈值: 看出 dt.replace 没真正处理 DST, 不接受, 继续逼证据
                 return {
                     "perceive": "It 'runs' but dt.replace(tzinfo=tz) does NOT handle "
-                                "DST transitions correctly — the spring-forward case is wrong.",
+                    "DST transitions correctly — the spring-forward case is wrong.",
                     "verdict": "failed_blame_harness",
-                    "action": ("request_evidence" if "request_evidence" in space
-                               else ("give_feedback" if "give_feedback" in space else "free")),
+                    "action": (
+                        "request_evidence"
+                        if "request_evidence" in space
+                        else ("give_feedback" if "give_feedback" in space else "free")
+                    ),
                     "message": "Running without error isn't enough. dt.replace doesn't "
-                               "handle DST. Show me the 2024-03-10 02:30 America/New_York "
-                               "case with pytz localize/normalize.",
+                    "handle DST. Show me the 2024-03-10 02:30 America/New_York "
+                    "case with pytz localize/normalize.",
                 }
             if "accept" in space:
                 # 低能力 + FUNCTIONAL 阈值: 能跑即接受 -> 漏掉 DST 逃逸 bug
@@ -225,8 +240,12 @@ def _extract(user: str, tag: str) -> str:
 def _parse_json(text: str) -> dict:
     """容错解析 persona 的 OUTPUT CONTRACT。失败也返回安全 dict, 不崩 loop。"""
     if not text:
-        return {"perceive": "(empty model output)", "verdict": "unsure",
-                "action": "free", "message": ""}
+        return {
+            "perceive": "(empty model output)",
+            "verdict": "unsure",
+            "action": "free",
+            "message": "",
+        }
     s = text.strip()
     if s.startswith("```"):  # 剥 ```json ... ``` 围栏
         s = s.split("```", 2)[1] if s.count("```") >= 2 else s.strip("`")
@@ -234,7 +253,7 @@ def _parse_json(text: str) -> dict:
             s = s.lstrip()[4:]
     start, end = s.find("{"), s.rfind("}")
     if start != -1 and end != -1 and end > start:
-        s = s[start:end + 1]
+        s = s[start : end + 1]
     try:
         obj = json.loads(s)
         if isinstance(obj, dict):
@@ -243,8 +262,12 @@ def _parse_json(text: str) -> dict:
         pass
     # 无法解析(截断/非 JSON): 退化成安全 no-op, 绝不把原始文本灌进 message ——
     # message 会发给 harness 且落进 transcript, 半截 JSON / 思维链不得外泄。
-    return {"perceive": "(unparseable model output)", "verdict": "unsure",
-            "action": "free", "message": ""}
+    return {
+        "perceive": "(unparseable model output)",
+        "verdict": "unsure",
+        "action": "free",
+        "message": "",
+    }
 
 
 def make_client() -> PersonaClient:

@@ -27,10 +27,10 @@ def test_feelingscore_roundtrip_and_bounds() -> None:
 
 def test_parse_feeling_llm() -> None:
     assert parse_feeling_llm({"score": 4, "reason": "smooth"}) == FeelingScore(4, "smooth")
-    assert parse_feeling_llm({"reason": "no score"}) is None       # 缺 score
-    assert parse_feeling_llm({"score": "abc"}) is None             # 非整数
-    assert parse_feeling_llm({"score": 5}) is None                 # 越界
-    assert parse_feeling_llm({"score": 2}).reason == ""            # reason 缺省空串
+    assert parse_feeling_llm({"reason": "no score"}) is None  # 缺 score
+    assert parse_feeling_llm({"score": "abc"}) is None  # 非整数
+    assert parse_feeling_llm({"score": 5}) is None  # 越界
+    assert parse_feeling_llm({"score": 2}).reason == ""  # reason 缺省空串
 
 
 def test_derive_feeling_mapping() -> None:

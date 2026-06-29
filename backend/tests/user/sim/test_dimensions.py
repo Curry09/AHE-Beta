@@ -50,20 +50,20 @@ def test_finalize_is_fallback_only_preserves_grounded() -> None:
     # 调用方显式给了 grounded 的 d3/trust（与 derive 出来的相反）：finalize 不得改写。
     raw = Persona(
         persona_id="P-grounded",
-        d1=D1Eval.EXPERT,                  # derive_trust(EXPERT) = SKEPTICAL
+        d1=D1Eval.EXPERT,  # derive_trust(EXPERT) = SKEPTICAL
         d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR),  # derive_d3 -> RIGOROUS
         d41=D41Grain.HALF_CONTEXT,
         d42=D42Supervise.PHASE_CHECK,
         d43=D43Correct.FEEDBACK,
         d5=D5Autonomy.COLLABORATIVE,
-        d3=D3Accept.RUNS,                  # grounded: ship-fast
-        trust=TrustStance.BLIND,           # grounded: over-trust
+        d3=D3Accept.RUNS,  # grounded: ship-fast
+        trust=TrustStance.BLIND,  # grounded: over-trust
         # d6 留 None -> 仍由 finalize 派生
     )
     out = finalize_persona(raw)
-    assert out.d3 is D3Accept.RUNS         # 未被 derive_d3 改写成 RIGOROUS
+    assert out.d3 is D3Accept.RUNS  # 未被 derive_d3 改写成 RIGOROUS
     assert out.trust is TrustStance.BLIND  # 未被 derive_trust 改写成 SKEPTICAL
-    assert out.d6 is not None              # d6 未提供 -> 已派生填齐
+    assert out.d6 is not None  # d6 未提供 -> 已派生填齐
     assert out.d6 is derive_d6(D5Autonomy.COLLABORATIVE, "low")
 
 

@@ -37,8 +37,11 @@ from .state import State
 LEGAL_BY_PHASE: dict[Phase, set[str]] = {
     Phase.OPENING: {"send_task"},
     Phase.ACTIVE: {
-        "refine_request", "give_feedback",
-        "verify_self", "ask_harness_run", "request_evidence",
+        "refine_request",
+        "give_feedback",
+        "verify_self",
+        "ask_harness_run",
+        "request_evidence",
         "grant_autorun",
     },
 }
@@ -86,9 +89,9 @@ def _d43_terminal(p: Persona) -> str:
     return {
         D43Correct.GIVE_UP: "give_up",
         D43Correct.FILE_ISSUE: "file_issue",
-        D43Correct.FEEDBACK: "give_up",   # 反馈型耗尽后默认放弃
+        D43Correct.FEEDBACK: "give_up",  # 反馈型耗尽后默认放弃
         D43Correct.RESEND: "give_up",
-        D43Correct.HANDOVER: "give_up",   # 接管本演示当作放弃 harness 路径
+        D43Correct.HANDOVER: "give_up",  # 接管本演示当作放弃 harness 路径
     }[p.d43]
 
 
@@ -112,8 +115,10 @@ def derive_action_space(
     # 诊断门(诊断驱动): 高能力档连续坐实 harness 失败即认定能力缺口, 立即解锁升级,
     # 不必等耐心磨到 0("婉拒=无能力, 看穿即可升级")。低能力档(blind/shallow)无此快速
     # 通道——识别"结构性无能力"本身需要能力, 他们仍靠耐心消耗终止。
-    if (state.consec_blame >= _DIAGNOSIS_BLAME_THRESHOLD
-            and persona.d1 in (D1Eval.COMPETENT, D1Eval.EXPERT)):
+    if state.consec_blame >= _DIAGNOSIS_BLAME_THRESHOLD and persona.d1 in (
+        D1Eval.COMPETENT,
+        D1Eval.EXPERT,
+    ):
         space.add(_d43_terminal(persona))
 
     # accept 与耐心无关: 有可接受产物即可

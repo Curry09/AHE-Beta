@@ -26,6 +26,7 @@ VERDICTS = {
 @dataclass
 class Coef:
     """persona 派生的状态演化系数。"""
+
     patience_decay: int = 1
     trust_decay: int = 1
     trust_recover: int = 1
@@ -34,10 +35,10 @@ class Coef:
 @dataclass
 class State:
     turn: int = 0
-    patience: int = 4              # 跨轮耐心计数器, <=0 解锁终止
+    patience: int = 4  # 跨轮耐心计数器, <=0 解锁终止
     trust: TrustStance = TrustStance.BALANCED
-    pending_self_obs: str | None = None          # verify_self 注入下一轮的私有观察
-    consec_blame: int = 0          # 连续判定 harness 失败的次数; 驱动"诊断式"升级(非耐心消耗)
+    pending_self_obs: str | None = None  # verify_self 注入下一轮的私有观察
+    consec_blame: int = 0  # 连续判定 harness 失败的次数; 驱动"诊断式"升级(非耐心消耗)
 
 
 # 信任三档的整型刻度, 便于增减后再映射回枚举
@@ -86,9 +87,9 @@ def apply_verdict(state: State, verdict: str, coef: Coef) -> State:
     elif verdict == "failed_blame_harness":
         state.patience -= coef.patience_decay
         t -= coef.trust_decay
-        state.consec_blame += 1                 # 连续坐实 harness 失败 -> 累计诊断
+        state.consec_blame += 1  # 连续坐实 harness 失败 -> 累计诊断
     elif verdict == "failed_blame_self":
-        state.patience -= coef.patience_decay   # 怪自己也耗耐心
+        state.patience -= coef.patience_decay  # 怪自己也耗耐心
         # 但不砸对 harness 的信任 -> t 不变; 怪自己不计入"harness 能力缺口"诊断
         state.consec_blame = 0
     elif verdict == "unsure":

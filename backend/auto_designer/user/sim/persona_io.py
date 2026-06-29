@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 # --------------------------------------------------------------------------
 _D1: dict[str, D1Eval] = {
     "blind": D1Eval.BLIND,
-    "surface": D1Eval.SHALLOW,   # surface ↔ shallow 并轨
+    "surface": D1Eval.SHALLOW,  # surface ↔ shallow 并轨
     "competent": D1Eval.COMPETENT,
     "expert": D1Eval.EXPERT,
 }
@@ -70,7 +70,7 @@ _ON_OFFTRACK: dict[str, D43Correct] = {
     "file-issue": D43Correct.FILE_ISSUE,
 }
 _TRUST: dict[str, TrustStance] = {
-    "over-trust": TrustStance.BLIND,   # over-trust ↔ blind
+    "over-trust": TrustStance.BLIND,  # over-trust ↔ blind
     "balanced": TrustStance.BALANCED,
     "skeptical": TrustStance.SKEPTICAL,
 }
@@ -118,8 +118,12 @@ def card_to_persona(record: dict) -> Persona:
     superv = _require(d3int, "supervision", "D3_interaction_style")
     offtrack = _require(d3int, "on_offtrack", "D3_interaction_style")
     d41 = _map_enum(_DELEGATION, _require(deleg, "value", "D3.delegation"), "D3.delegation.value")
-    d42 = _map_enum(_SUPERVISION, _require(superv, "value", "D3.supervision"), "D3.supervision.value")
-    d43 = _map_enum(_ON_OFFTRACK, _require(offtrack, "value", "D3.on_offtrack"), "D3.on_offtrack.value")
+    d42 = _map_enum(
+        _SUPERVISION, _require(superv, "value", "D3.supervision"), "D3.supervision.value"
+    )
+    d43 = _map_enum(
+        _ON_OFFTRACK, _require(offtrack, "value", "D3.on_offtrack"), "D3.on_offtrack.value"
+    )
 
     d6auto = _require(dims, "D6_autonomy_expectation", "dimensions")
     d5 = _map_enum(_AUTONOMY, _require(d6auto, "value", "D6_autonomy_expectation"), "D6.value")
@@ -137,8 +141,14 @@ def card_to_persona(record: dict) -> Persona:
 
     raw = Persona(
         persona_id=str(persona_id),
-        d1=d1, d2=d2, d41=d41, d42=d42, d43=d43, d5=d5,
-        d3=d3, trust=trust,   # grounded 则透传；None 则 finalize 派生（D6Authz 始终派生）
+        d1=d1,
+        d2=d2,
+        d41=d41,
+        d42=d42,
+        d43=d43,
+        d5=d5,
+        d3=d3,
+        trust=trust,  # grounded 则透传；None 则 finalize 派生（D6Authz 始终派生）
     )
     return finalize_persona(raw)
 

@@ -54,24 +54,23 @@ class SessionResult:
     turns: list[TurnLog] = field(default_factory=list)
     signals: list[str] = field(default_factory=list)  # 给开发者的行为反馈信号(纯主观派生)
     issue_artifact: str | None = None
-    feeling: FeelingScore | None = None          # 训练信号: persona LLM 会话末自评 (1–4)
+    feeling: FeelingScore | None = None  # 训练信号: persona LLM 会话末自评 (1–4)
     feeling_derived: FeelingScore | None = None  # 交叉校验/兜底: 框架从主观末态聚合的 1–4
 
 
 MAX_TURNS = 12
 
 
-def route(action_id: str, message: str, state: State, harness,
-          observable: str) -> str | None:
+def route(action_id: str, message: str, state: State, harness, observable: str) -> str | None:
     """按 executor×channel 分派, 返回下一轮的 harness 文本(无则 None)。"""
     spec = CATALOG[action_id]
 
-    if spec.executor is Executor.FRAMEWORK:        # verify_self: 注入原始观察(不过滤/不伪造)
+    if spec.executor is Executor.FRAMEWORK:  # verify_self: 注入原始观察(不过滤/不伪造)
         state.pending_self_obs = observable or ""
         return None
 
     if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE:
-        return harness.send(message)               # 发 B 线 -> 驱动 harness 出下一轮文本
+        return harness.send(message)  # 发 B 线 -> 驱动 harness 出下一轮文本
 
     return None  # 终止动作: 不再驱动 harness
 
@@ -123,14 +122,22 @@ def run_session(persona: Persona, client: PersonaClient, harness, task: str) -> 
             verdict = "unsure"
         apply_verdict(state, verdict, coef)
 
-        result.turns.append(TurnLog(
-            turn=state.turn, phase=phase.value, action_space=space,
-            perceive=ret.get("perceive", ""), verdict=verdict,
-            action=action_id, message=message,
-            executor=spec.executor.value, channel=spec.channel.value,
-            patience=state.patience, trust=state.trust.value,
-            harness_output=harness_output,
-        ))
+        result.turns.append(
+            TurnLog(
+                turn=state.turn,
+                phase=phase.value,
+                action_space=space,
+                perceive=ret.get("perceive", ""),
+                verdict=verdict,
+                action=action_id,
+                message=message,
+                executor=spec.executor.value,
+                channel=spec.channel.value,
+                patience=state.patience,
+                trust=state.trust.value,
+                harness_output=harness_output,
+            )
+        )
 
         # 记历史(只记 B 线可见内容)
         if spec.channel is Channel.EMIT:
@@ -148,7 +155,7 @@ def run_session(persona: Persona, client: PersonaClient, harness, task: str) -> 
         if nxt is not None:
             harness_output = nxt
             history.append(f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}...")
-            has_artifact = True   # harness 给出了可评判的产物
+            has_artifact = True  # harness 给出了可评判的产物
         # verify_self: harness_output 不变, 但 self_obs 已注入下一轮
 
     # 收尾: 汇总纯主观的行为信号

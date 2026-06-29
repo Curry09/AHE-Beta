@@ -61,7 +61,7 @@ def test_patience_gate_unlocks_terminal_and_accept() -> None:
     exhausted = State(turn=3, patience=0, trust=p.trust)
     space = derive_action_space(Phase.ACTIVE, p, exhausted, has_artifact=True)
     assert "file_issue" in space  # 耐心耗尽解锁 D4.3 选定的终止动作
-    assert "accept" in space      # 有可接受产物 -> accept(与耐心无关)
+    assert "accept" in space  # 有可接受产物 -> accept(与耐心无关)
 
 
 def test_resolve_free_is_classified_into_space() -> None:

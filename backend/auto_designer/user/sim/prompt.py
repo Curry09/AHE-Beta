@@ -95,18 +95,20 @@ def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
     覆盖 system 的动作 OUTPUT CONTRACT —— 这一轮只要 {"score", "reason"}, 不发 message。
     """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
-    return "\n\n".join([
-        "<rate_experience>",
-        "The session is OVER. Step back and rate how this WHOLE experience felt to "
-        "YOU as this person, on a 1–4 satisfaction scale (judge by your own bar, G4):",
-        "  1 = bad   (frustrating; gave up / had to file an issue)",
-        "  2 = poor  (did not really get what I needed)",
-        "  3 = ok    (got there, but with friction)",
-        "  4 = good  (smooth; satisfied)",
-        f"<task>\n{task}\n</task>",
-        f"<history>\n{hist}\n</history>",
-        f"<mood>\n{_mood_tag(state)}\n</mood>",
-        'Return EXACTLY ONE JSON object and nothing else: '
-        '{"score": <integer 1-4>, "reason": "<one short sentence, in your own voice>"}',
-        "</rate_experience>",
-    ])
+    return "\n\n".join(
+        [
+            "<rate_experience>",
+            "The session is OVER. Step back and rate how this WHOLE experience felt to "
+            "YOU as this person, on a 1–4 satisfaction scale (judge by your own bar, G4):",
+            "  1 = bad   (frustrating; gave up / had to file an issue)",
+            "  2 = poor  (did not really get what I needed)",
+            "  3 = ok    (got there, but with friction)",
+            "  4 = good  (smooth; satisfied)",
+            f"<task>\n{task}\n</task>",
+            f"<history>\n{hist}\n</history>",
+            f"<mood>\n{_mood_tag(state)}\n</mood>",
+            "Return EXACTLY ONE JSON object and nothing else: "
+            '{"score": <integer 1-4>, "reason": "<one short sentence, in your own voice>"}',
+            "</rate_experience>",
+        ]
+    )

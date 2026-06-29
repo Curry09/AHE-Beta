@@ -41,27 +41,31 @@ TASK = (
 
 
 def shallow() -> Persona:
-    return finalize_persona(Persona(
-        persona_id="P-0473",
-        d1=D1Eval.SHALLOW,
-        d2=D2Domain(stack=("python",), depth=D2Depth.PROFICIENT, weak=("money/rounding",)),
-        d41=D41Grain.HALF_CONTEXT,
-        d42=D42Supervise.PHASE_CHECK,
-        d43=D43Correct.FEEDBACK,
-        d5=D5Autonomy.COLLABORATIVE,
-    ))
+    return finalize_persona(
+        Persona(
+            persona_id="P-0473",
+            d1=D1Eval.SHALLOW,
+            d2=D2Domain(stack=("python",), depth=D2Depth.PROFICIENT, weak=("money/rounding",)),
+            d41=D41Grain.HALF_CONTEXT,
+            d42=D42Supervise.PHASE_CHECK,
+            d43=D43Correct.FEEDBACK,
+            d5=D5Autonomy.COLLABORATIVE,
+        )
+    )
 
 
 def expert() -> Persona:
-    return finalize_persona(Persona(
-        persona_id="P-0991",
-        d1=D1Eval.EXPERT,
-        d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR, weak=()),
-        d41=D41Grain.SPEC_LEVEL,
-        d42=D42Supervise.EVERY_STEP,
-        d43=D43Correct.FILE_ISSUE,
-        d5=D5Autonomy.COLLABORATIVE,
-    ))
+    return finalize_persona(
+        Persona(
+            persona_id="P-0991",
+            d1=D1Eval.EXPERT,
+            d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR, weak=()),
+            d41=D41Grain.SPEC_LEVEL,
+            d42=D42Supervise.EVERY_STEP,
+            d43=D43Correct.FILE_ISSUE,
+            d5=D5Autonomy.COLLABORATIVE,
+        )
+    )
 
 
 PERSONAS = {"shallow": shallow, "expert": expert}

@@ -72,7 +72,7 @@ def test_harness_text_fed_raw_without_perception_filter() -> None:
     client = _RecordingClient(["send_task", "give_feedback", "accept"], verdict="unsure")
     run_session(p, client, ScriptedHarness(), TASK)
     after_harness = client.seen[1]  # turn1: 已看到 harness 首轮(含缩进源码)
-    assert "pytz.localize_safe(dt, tz)" in after_harness          # 源码原样可见
+    assert "pytz.localize_safe(dt, tz)" in after_harness  # 源码原样可见
     assert "you don't read the diff line by line" not in after_harness  # 无过滤占位串
 
 
@@ -84,7 +84,7 @@ def test_verify_self_injects_raw_observation() -> None:
     after_verify = client.seen[2]  # turn2: verify_self 注入的私有观察已进 user
     assert "<self_observation>" in after_verify
     assert "pytz.localize_safe(dt, tz)" in after_verify  # 原始观察(含代码)
-    assert "I ran it once" not in after_verify           # 无伪造串
+    assert "I ran it once" not in after_verify  # 无伪造串
 
 
 def test_runs_one_session_returns_result() -> None:
@@ -130,14 +130,18 @@ def test_pure_subjective_turnlog_has_no_objective_fields() -> None:
 def test_capability_fork() -> None:
     shallow = run_session(
         _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK, "P-shallow"),
-        ScriptedPersonaClient(), ScriptedHarness(), TASK,
+        ScriptedPersonaClient(),
+        ScriptedHarness(),
+        TASK,
     )
     expert = run_session(
         _persona(D1Eval.EXPERT, D43Correct.FILE_ISSUE, "P-expert"),
-        ScriptedPersonaClient(), ScriptedHarness(), TASK,
+        ScriptedPersonaClient(),
+        ScriptedHarness(),
+        TASK,
     )
-    assert shallow.end_reason == "accepted"      # 低能力跑通即接受(高体感)
+    assert shallow.end_reason == "accepted"  # 低能力跑通即接受(高体感)
     assert shallow.feeling.score >= 3
-    assert expert.end_reason == "issue_filed"     # 高能力逼证据至耗尽 -> file_issue(低体感)
+    assert expert.end_reason == "issue_filed"  # 高能力逼证据至耗尽 -> file_issue(低体感)
     assert expert.feeling.score <= 2
     assert expert.issue_artifact is not None

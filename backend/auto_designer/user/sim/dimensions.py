@@ -25,10 +25,11 @@ from enum import StrEnum
 # --------------------------------------------------------------------------
 class D1Eval(StrEnum):
     """D1 评估能力 —— 决定感知带宽 + 判断上限。自由采样。"""
-    BLIND = "blind"          # 盲信: 几乎不核查
-    SHALLOW = "shallow"      # 浅层: 读报错、跑一次, 不写测试/不审 diff
+
+    BLIND = "blind"  # 盲信: 几乎不核查
+    SHALLOW = "shallow"  # 浅层: 读报错、跑一次, 不写测试/不审 diff
     COMPETENT = "competent"  # 胜任: 跑测试、读 diff, 能识破多数似是而非的 API
-    EXPERT = "expert"        # 专家: 系统性验证, 识破幻觉/边界/DST 类 bug
+    EXPERT = "expert"  # 专家: 系统性验证, 识破幻觉/边界/DST 类 bug
 
 
 class D2Depth(StrEnum):
@@ -40,41 +41,42 @@ class D2Depth(StrEnum):
 @dataclass(frozen=True)
 class D2Domain:
     """D2 领域&深度。自由采样。weak 集合内的领域, D1 有效带宽降一档。"""
+
     stack: tuple[str, ...] = ("python",)
     depth: D2Depth = D2Depth.PROFICIENT
-    weak: tuple[str, ...] = ()        # e.g. ("timezone", "pytz")
+    weak: tuple[str, ...] = ()  # e.g. ("timezone", "pytz")
 
 
 # --------------------------------------------------------------------------
 # B. 验收 (派生)
 # --------------------------------------------------------------------------
 class D3Accept(StrEnum):
-    RUNS = "runs"            # 能跑就行
+    RUNS = "runs"  # 能跑就行
     FUNCTIONAL = "functional"  # 功能正确(测过的常规用例)
     IDIOMATIC = "idiomatic"  # 现代规范
-    RIGOROUS = "rigorous"    # 类型/边界严谨
+    RIGOROUS = "rigorous"  # 类型/边界严谨
 
 
 # --------------------------------------------------------------------------
 # C. 交互行为 (自由采样)
 # --------------------------------------------------------------------------
 class D41Grain(StrEnum):
-    ONE_LINER = "one_liner"      # 甩一句
+    ONE_LINER = "one_liner"  # 甩一句
     HALF_CONTEXT = "half_context"  # 半上下文
-    SPEC_LEVEL = "spec_level"    # 规范级(含信息供给)
+    SPEC_LEVEL = "spec_level"  # 规范级(含信息供给)
 
 
 class D42Supervise(StrEnum):
-    EVERY_STEP = "every_step"    # 盯每步
+    EVERY_STEP = "every_step"  # 盯每步
     PHASE_CHECK = "phase_check"  # 阶段抽查
     FIRE_FORGET = "fire_forget"  # 发完不管
 
 
 class D43Correct(StrEnum):
-    FEEDBACK = "feedback"    # 给反馈让它改
-    HANDOVER = "handover"    # 接管自己写
-    RESEND = "resend"        # 重发请求
-    GIVE_UP = "give_up"      # 放弃
+    FEEDBACK = "feedback"  # 给反馈让它改
+    HANDOVER = "handover"  # 接管自己写
+    RESEND = "resend"  # 重发请求
+    GIVE_UP = "give_up"  # 放弃
     FILE_ISSUE = "file_issue"  # 上报结构化 issue
 
 
@@ -88,16 +90,16 @@ class D5Autonomy(StrEnum):
 
 
 class D6Authz(StrEnum):
-    READ_ONLY = "read_only"      # 只读
+    READ_ONLY = "read_only"  # 只读
     WRITE_NO_RUN = "write_no_run"  # 可写不可跑
-    FULL_AUTO = "full_auto"      # 全自动(可写可跑)
+    FULL_AUTO = "full_auto"  # 全自动(可写可跑)
 
 
 # --------------------------------------------------------------------------
 # E. 派生: 信任模型
 # --------------------------------------------------------------------------
 class TrustStance(StrEnum):
-    BLIND = "blind"        # 盲信
+    BLIND = "blind"  # 盲信
     BALANCED = "balanced"  # 平衡
     SKEPTICAL = "skeptical"  # 怀疑
 
@@ -182,7 +184,12 @@ def finalize_persona(p: Persona, task_risk: str = "low") -> Persona:
     """
     return Persona(
         persona_id=p.persona_id,
-        d1=p.d1, d2=p.d2, d41=p.d41, d42=p.d42, d43=p.d43, d5=p.d5,
+        d1=p.d1,
+        d2=p.d2,
+        d41=p.d41,
+        d42=p.d42,
+        d43=p.d43,
+        d5=p.d5,
         d3=p.d3 if p.d3 is not None else derive_d3(p.d1, p.d2),
         d6=p.d6 if p.d6 is not None else derive_d6(p.d5, task_risk),
         trust=p.trust if p.trust is not None else derive_trust(p.d1, p.d2),

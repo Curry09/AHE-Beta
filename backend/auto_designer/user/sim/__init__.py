@@ -1,4 +1,5 @@
 """auto_designer.user.sim —— persona 驱动的 harness 用户模拟器(控制信封架构, 纯主观)。"""
+
 from .dimensions import (
     D1Eval,
     D2Depth,
@@ -17,10 +18,24 @@ from .persona_client import ApiPersonaClient, ScriptedPersonaClient, make_client
 from .persona_io import card_to_persona, card_to_personas
 
 __all__ = [
-    "Persona", "D1Eval", "D2Domain", "D2Depth", "D41Grain", "D42Supervise",
-    "D43Correct", "D5Autonomy", "finalize_persona",
-    "run_session", "SessionResult",
-    "FeelingScore", "derive_feeling", "parse_feeling_llm",
-    "make_client", "ScriptedPersonaClient", "ApiPersonaClient", "ScriptedHarness",
-    "card_to_persona", "card_to_personas",
+    "Persona",
+    "D1Eval",
+    "D2Domain",
+    "D2Depth",
+    "D41Grain",
+    "D42Supervise",
+    "D43Correct",
+    "D5Autonomy",
+    "finalize_persona",
+    "run_session",
+    "SessionResult",
+    "FeelingScore",
+    "derive_feeling",
+    "parse_feeling_llm",
+    "make_client",
+    "ScriptedPersonaClient",
+    "ApiPersonaClient",
+    "ScriptedHarness",
+    "card_to_persona",
+    "card_to_personas",
 ]

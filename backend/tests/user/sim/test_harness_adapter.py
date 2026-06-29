@@ -46,14 +46,14 @@ def test_close_then_use_raises_and_is_idempotent() -> None:
 
 def test_split_bill_bug_shows_in_text_only_when_probed() -> None:
     h1 = SplitBillHarness()
-    h1.send("add split_bill to the repo")          # step1: 贴初始实现
-    normal = h1.send("just run it")                # 泛泛要求跑 -> 常规偶整除用例
+    h1.send("add split_bill to the repo")  # step1: 贴初始实现
+    normal = h1.send("just run it")  # 泛泛要求跑 -> 常规偶整除用例
     assert isinstance(normal, str) and "100.00" in normal  # 看着没问题
 
     h2 = SplitBillHarness()
     h2.send("add split_bill to the repo")
     probed = h2.send("what about splitting by 3? does it sum exactly?")
-    assert isinstance(probed, str) and "99.99" in probed   # 探边界 -> bug 浮现在文本
+    assert isinstance(probed, str) and "99.99" in probed  # 探边界 -> bug 浮现在文本
 
 
 def test_demo_runs_offline_without_key() -> None:

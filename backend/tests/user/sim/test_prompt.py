@@ -44,8 +44,14 @@ def test_build_user_turn_has_sections() -> None:
     state = init_state(p)
     state.pending_self_obs = "I ran it; no error."
     user = build_user_turn("do X", ["[t0] you -> harness: hi"], "some output", ["accept"], state)
-    for tag in ("<task>", "<history>", "<harness_output>", "<action_space>", "<mood>",
-                "<self_observation>"):
+    for tag in (
+        "<task>",
+        "<history>",
+        "<harness_output>",
+        "<action_space>",
+        "<mood>",
+        "<self_observation>",
+    ):
         assert tag in user
 
 
@@ -57,7 +63,9 @@ def test_build_rating_turn_contract() -> None:
 
 def test_scripted_client_opening_sends_task() -> None:
     p = _persona()
-    ret = ScriptedPersonaClient().respond(build_system(p), build_user_turn("t", [], "", ["send_task"], init_state(p)))
+    ret = ScriptedPersonaClient().respond(
+        build_system(p), build_user_turn("t", [], "", ["send_task"], init_state(p))
+    )
     assert ret["action"] == "send_task"
 
 
@@ -84,9 +92,10 @@ def test_scripted_client_capability_fork() -> None:
         build_system(_persona(d1=D1Eval.EXPERT)), build_user_turn("t", ["p"], ho, space, state_full)
     )
     shallow = ScriptedPersonaClient().respond(
-        build_system(_persona(d1=D1Eval.SHALLOW)), build_user_turn("t", ["p"], ho, space, state_full)
+        build_system(_persona(d1=D1Eval.SHALLOW)),
+        build_user_turn("t", ["p"], ho, space, state_full),
     )
-    assert expert["action"] != "accept"   # 专家不轻易接受
+    assert expert["action"] != "accept"  # 专家不轻易接受
     assert shallow["action"] == "accept"  # 浅层能跑即接受
 
 
