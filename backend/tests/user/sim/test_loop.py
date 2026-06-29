@@ -53,6 +53,40 @@ class _StubClient:
         return {"perceive": "", "verdict": self._verdict, "action": a, "message": "x"}
 
 
+class _RecordingClient(_StubClient):
+    """记录每轮收到的 user 提示, 用于断言喂给 LLM 的内容(感知是否原样)。"""
+
+    def __init__(self, actions: list[str], verdict: str = "unsure") -> None:
+        super().__init__(actions, verdict=verdict)
+        self.seen: list[str] = []
+
+    def respond(self, system: str, user: str) -> dict:
+        if "<rate_experience>" not in user:
+            self.seen.append(user)
+        return super().respond(system, user)
+
+
+def test_harness_text_fed_raw_without_perception_filter() -> None:
+    # 低能力档(原型会用 perceive_filter 抹掉源码行)；删除过滤后, 源码应原样喂入 LLM。
+    p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
+    client = _RecordingClient(["send_task", "give_feedback", "accept"], verdict="unsure")
+    run_session(p, client, ScriptedHarness(), TASK)
+    after_harness = client.seen[1]  # turn1: 已看到 harness 首轮(含缩进源码)
+    assert "pytz.localize_safe(dt, tz)" in after_harness          # 源码原样可见
+    assert "you don't read the diff line by line" not in after_harness  # 无过滤占位串
+
+
+def test_verify_self_injects_raw_observation() -> None:
+    # verify_self 注入「原始」最近 harness 文本, 不再按子串伪造「崩了/没报错」。
+    p = _persona(D1Eval.EXPERT, D43Correct.FEEDBACK)
+    client = _RecordingClient(["send_task", "verify_self", "accept"], verdict="unsure")
+    run_session(p, client, ScriptedHarness(), TASK)
+    after_verify = client.seen[2]  # turn2: verify_self 注入的私有观察已进 user
+    assert "<self_observation>" in after_verify
+    assert "pytz.localize_safe(dt, tz)" in after_verify  # 原始观察(含代码)
+    assert "I ran it once" not in after_verify           # 无伪造串
+
+
 def test_runs_one_session_returns_result() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     res = run_session(p, ScriptedPersonaClient(), ScriptedHarness(), TASK)

@@ -17,9 +17,9 @@ parallel: false
 files:
   - backend/auto_designer/user/sim/loop.py
   - backend/tests/user/sim/test_loop.py
-version: 1
-updated: '2026-06-26'
-change-reason: ''
+version: 2
+updated: '2026-06-29'
+change-reason: 删感知侧启发式 perceive_filter/_filter_self_obs：persona 看原始 harness 文本，能力分叉由 prompt 主导；verify_self 注入原始观察而非伪造串
 supersedes: []
 split-from:
 merged-from: []
@@ -41,11 +41,11 @@ design: |-
   ```
   ① 物理接收   harness_output (文本)                  (harness 桩, T6)
   ② 派生动作空间 phase ∩ capD1 ∩ authzD6 ∪ 耐心门 ∪ accept   (T2)
-  ③ persona 三层 LLM → {perceive, verdict, action, message}  (T3 client)
-  ④ resolve     自由产出归类 + 越权投影 + channel 校验    (T2)
+  ③ persona 三层 LLM → {perceive, verdict, action, message}  (T3 client；harness 文本原样喂入)
+  ④ resolve     归类/校验 + channel 校验                (T2)
   ⑤ 状态写回    apply_verdict 只吃主观 verdict           (T2)
   ⑥ 终止判定    Effect.TERMINATE → 记 end_reason 并 break
-  ⑦ 路由        EMIT → 驱动 harness 出下一轮；verify_self → 注入私有自观察
+  ⑦ 路由        EMIT → 驱动 harness 出下一轮；verify_self → 注入原始观察(最近 harness 文本)
   ```
 
   会话末（循环外）：先 derive_feeling 产派生分；再发 build_rating_turn 取 LLM 自评，
@@ -53,6 +53,12 @@ design: |-
 
   signals 为行为信号（如低能力用户无法自修而放弃），从 persona 与会话轨迹派生；本轮不含任何依赖客观
   真值的信号（GAP/ESCAPED_BUG/control-plane 推迟，见 T2 open-questions）。
+
+  感知侧不再做代码层能力过滤：原型用 perceive_filter（按缩进/关键词猜「源码行」并抹掉）+ _filter_self_obs
+  （子串 Traceback/Error → 套「我跑了一次它崩了」串）机械改写喂给 LLM 的输入。这类字符串启发式脆弱——漏判
+  则强模型「心算」源码越过低能力档（违反 G1），误判则删掉正常文本或凭子串伪造负向感知，二者都污染体感信号。
+  本版删除两者：persona 看到原始 harness 文本，verify_self 注入原始观察，能力分叉改由 prompt(G1)+persona
+  档位约束 LLM「只在本人能力内感知」来达成，而非框架机械过滤输入。
 interface: |-
   run_session(persona: Persona, client: PersonaClient, harness, task: str) -> SessionResult
   SessionResult(persona_id, end_reason, turns: list[TurnLog], signals: list[str],
@@ -68,6 +74,9 @@ tradeoffs: |-
     用户自判终止」语义错位（与 spec-0001/T2、0004 决策一致）。
   - 体感末态产出 vs 逐轮打分：选末态一次（对齐 FeelingScore「一局一个总分」），丢失「第几轮变差」的
     细粒度，后续若需再升级。
+  - 感知能力分叉用代码过滤 vs prompt 约束：原型用 perceive_filter/_filter_self_obs 机械过滤喂给 LLM 的
+    输入，子串/缩进启发式脆弱（漏判越档违反 G1、误判删正常文本或伪造负向感知）；改为原样喂入、能力分叉
+    交由 prompt(G1)+persona 档位约束 LLM 自律，去掉脆弱的字符串规则层（代价：分叉真实性更依赖提示质量）。
 acceptance: |-
   给定 persona+client+harness+task 跑出 SessionResult；自判终止与 MAX_TURNS 兜底均生效；会话末 feeling 与 feeling_derived 均为合法 FeelingScore（LLM 解析失败时 feeling 回落 derived）；体感与状态全程只依赖主观信号，不读客观真值。
 tests: |-
@@ -77,6 +86,8 @@ tests: |-
   - 体感两路：会话末 feeling 与 feeling_derived 均为合法 FeelingScore；LLM 自评解析失败时 feeling 回落 derived。
   - 纯主观：构造无任何客观字段的 harness 文本回复即可跑通；状态/体感不依赖 gold。
   - 能力分叉：低能力 persona 跑通常规用例即 accept（高体感）；高能力 persona 逼证据至耐心耗尽 → file_issue（低体感）。
+  - 感知原样喂入：移除 perceive_filter/_filter_self_obs 后，run_session 把原始 harness 文本喂入 client，
+    verify_self 注入原始观察（不再按子串伪造「崩了/没报错」）；能力分叉不依赖框架过滤而由 prompt 承载。
 references: |-
   spec-0001/T3 用户 agent 驱动器（最小桩）、T2 黑盒对话协议、T4 会话编排 run_session。
   spec-0004 分层（harbor 只包外层 rollout，逐轮对话自立）。参考实现见本组 prototype（loop.py）。
