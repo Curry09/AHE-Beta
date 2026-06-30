@@ -1,0 +1,22 @@
+title: 种子工作区供给可插拔（SeedSource 接缝）
+issue: 9
+slug: seed-source-pluggable
+overview: |-
+  本组承接 spec-0008/T1：彼时 `SeedScenario.workspace` 经 `WorkspaceSpec{fixture, setup}` + `materialize()` 落地，供给路径是**唯一且硬编码的本地 copytree**。随着任务源增多（NL2Repo 式空仓起步、未来 SWE-bench / Terminal-Bench 等），**供给侧需可插拔**；而**消费港口**——`SeedScenario.description` 文本 + 一个被 `Sandbox`/`sim_user` 当 cwd 的工作区目录——保持冻结、零改动。
+
+  本组把「工作区供给」抽象为按 `kind` 注册的 `SeedSource` 协议：把既有 `materialize` 降为首个 `local-fixture` 实现（行为等价、向后兼容），并新增一个轻量 `empty` 源（新建空目录，可选写入需求说明文件，覆盖 NL2Repo 式「仅说明文档」起步）以证明**可加性**——新增一个源 = 落一个新模块（被自动发现注册）+ 注册侧/消费侧零改动。`workspace.materialize()` 退化为薄壳委托给注册表，故 `sim_user` 桥接与 `Sandbox` 调用点一行不改。
+
+  **明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）；git@commit 取数；依赖供给（venv/pip）。本组只动供给侧、只凿接缝 + 一个已验证的第二实现，不提前造框架。
+
+  数据流脊柱（编号即执行序：先立接缝 T1，再加第二源 T2 证明可插拔）：
+
+  ```
+  seed 场景  SeedScenario.workspace = WorkspaceSpec{kind, fixture?, params, setup}
+     │  按 kind 查 SeedSource 注册表（T1 立协议 + 注册表 + sources/ 自动发现）
+     ▼
+  SeedSource.provision(spec, dest) -> workspace_dir
+     ├─ kind="local-fixture": copytree in-repo fixture （T1，= 0008 行为）
+     └─ kind="empty":        新建空目录，可选写需求文档 （T2，可加性证明）
+     ▼
+  消费港口不变：workspace.materialize() 薄壳委托 → sim_user 桥接 → Sandbox(workspace=dir) 当 cwd（0008 原样）
+  ```
