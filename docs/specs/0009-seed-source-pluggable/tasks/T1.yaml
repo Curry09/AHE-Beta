@@ -1,6 +1,6 @@
 id: T1
 title: SeedSource 协议 + 注册表 + local-fixture 实现
-status: pending
+status: done
 priority: P1
 tags: []
 depends-on: []

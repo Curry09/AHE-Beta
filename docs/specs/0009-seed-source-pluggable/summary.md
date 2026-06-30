@@ -35,12 +35,12 @@ graph LR
 
 | 任务 | 标题 | 优先级 | 状态 | 依赖 |
 |----|----|----|----|----|
-| T1 | SeedSource 协议 + 注册表 + local-fixture 实现 | P1 | pending | — |
-| T2 | empty/nl-doc 源（可插拔证明） | P2 | pending | T1 |
+| T1 | SeedSource 协议 + 注册表 + local-fixture 实现 | P1 | done | — |
+| T2 | empty/nl-doc 源（可插拔证明） | P2 | done | T1 |
 
 ## 各任务方案
 
-### T1 · SeedSource 协议 + 注册表 + local-fixture 实现（P1 / pending）
+### T1 · SeedSource 协议 + 注册表 + local-fixture 实现（P1 / done）
 
 **涉及文件**
 
@@ -115,7 +115,7 @@ test_seed_source.py：(a) `provision` 按 kind 分派正确；未知 kind 抛 `V
 1) 依赖供给与 `WorkspaceSpec.setup` 钩子（0008 起仅占位、不执行）何时真正实现：用 cached venv 还是每局 pip install？这决定带第三方依赖的任务（部分 NL2Repo、多数真实仓库）能否在当前 stdlib-only 假设的 Sandbox 里跑起来。本组不做，归后续独立 spec。
 2) 后续重型源（容器化的 SWE-bench / Terminal-Bench、git@commit 快照）是否需把消费港口从「工作区目录」升级为「可运行句柄 {cwd, run(cmd), cleanup}」，以便 Provider 与（将来的）客观评测共享同一运行时能力。本组港口保持「目录 + 本地 shell」不变；是否升级、何时升级留下游评估，目的是让重型源接入时尽量不返工港口。
 
-### T2 · empty/nl-doc 源（可插拔证明）（P2 / pending）
+### T2 · empty/nl-doc 源（可插拔证明）（P2 / done）
 
 **涉及文件**
 

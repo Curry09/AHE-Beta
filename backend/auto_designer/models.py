@@ -50,21 +50,36 @@ class Persona:
 
 @dataclass
 class WorkspaceSpec:
-    """种子工作区规格：指向一个 in-repo 基线项目 fixture，供用户 agent 自有核实落地。
+    """种子工作区规格：经可插拔 SeedSource（按 kind 分派）落地一个隔离工作区目录。
 
-    fixture 为 backend/seed_workspaces/<fixture>/ 下的目录名；setup 为命令钩子（占位，本轮不执行）。
-    与 benchmark held-out 红线无关——工作区不含 gold 测试，只是一个可跑的基线项目。
+    spec-0009/T1：`kind` 选择供给实现（缺省 `local-fixture`，= 0008 行为）；`params` 为
+    source 专属入参的通用载体（如 empty 源的 doc/doc_name），使新增源不必扩 WorkspaceSpec。
+    `fixture` 为 local-fixture 源使用的 backend/seed_workspaces/<fixture>/ 目录名；
+    `setup` 为命令钩子（占位，本轮不执行）。与 benchmark held-out 红线无关——工作区不含 gold 测试。
     """
 
-    fixture: str
+    fixture: str = ""
+    kind: str = "local-fixture"
+    params: dict[str, Any] = field(default_factory=dict)
     setup: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"fixture": self.fixture, "setup": list(self.setup)}
+        # 默认 kind/空 params 不落键，保持 0008 既有序列化形状（向后兼容）。
+        d: dict[str, Any] = {"fixture": self.fixture, "setup": list(self.setup)}
+        if self.kind != "local-fixture":
+            d["kind"] = self.kind
+        if self.params:
+            d["params"] = dict(self.params)
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> WorkspaceSpec:
-        return cls(fixture=data["fixture"], setup=list(data.get("setup", [])))
+        return cls(
+            fixture=data.get("fixture", ""),
+            kind=data.get("kind", "local-fixture"),
+            params=dict(data.get("params", {})),
+            setup=list(data.get("setup", [])),
+        )
 
 
 @dataclass
