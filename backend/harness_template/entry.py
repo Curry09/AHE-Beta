@@ -71,20 +71,30 @@ def _build_agent():
     return Agent.from_yaml(cfg_dir / "agent.yaml")
 
 
-def _reply(agent, message: str) -> str:
+def _reply(agent, message: str, rebuild):
+    """返回 (live_agent, reply)：超时重试前重建 agent，避开被放弃线程仍持的 nexau 锁。
+
+    `_run_with_timeout` 超时时只能 raise，那个 daemon 线程杀不掉、仍持有该 (session, agent)
+    的 nexau 锁并持续心跳续期 → 同 agent 重试必撞 "already locked by holder=<pid>"（自锁）。
+    故超时分支换用 `rebuild()` 起一个新 agent（新 session/新锁键）再试；代价是丢该实例多轮
+    history（但卡死那次本就没拿到回复，可接受）。502/空回复时线程已结束、锁已释放，保持同 agent。
+    """
     last = None
     for attempt in range(_RUN_RETRIES):
         try:
             out = _run_with_timeout(agent, message, _CALL_TIMEOUT)  # 硬超时，绝不死等
             text = out if isinstance(out, str) else out[0]
             if text and text.strip():  # 非空才算成功
-                return text
+                return agent, text
             last = "empty reply"  # 空回复（网关 200+空内容不抛异常）视为失败，不得静默返回
-        except Exception as exc:  # 网关 502/超时 → 退避重试
+        except TimeoutError as exc:  # 线程被放弃仍持锁 → 重建避自锁
+            last = exc
+            agent = rebuild()
+        except Exception as exc:  # 网关 502 等 → 同 agent 退避重试（线程已结束、锁已释放）
             last = exc
         if attempt < _RUN_RETRIES - 1:  # 末次不再睡
             time.sleep(1.5 * (attempt + 1))
-    return f"[harness error] {last}"
+    return agent, f"[harness error] {last}"
 
 
 def main() -> None:
@@ -94,7 +104,7 @@ def main() -> None:
         if not line:
             continue
         message = json.loads(line)["message"]
-        reply = _reply(agent, message)
+        agent, reply = _reply(agent, message, _build_agent)  # 重建后续用 live agent
         sys.stdout.write(json.dumps({"reply": reply}, ensure_ascii=False) + "\n")
         sys.stdout.flush()
 
