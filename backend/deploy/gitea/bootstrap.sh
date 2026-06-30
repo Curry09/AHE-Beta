@@ -42,7 +42,7 @@ else
   echo "[bootstrap] 生成 access token ($TOKEN_NAME) ..."
   TOKEN="$($COMPOSE exec -T -u git gitea gitea admin user generate-access-token \
     --username "$OWNER" --token-name "$TOKEN_NAME" \
-    --scopes write:issue,write:repository --raw | tr -d '[:space:]')"
+    --scopes write:user,write:issue,write:repository --raw | tr -d '[:space:]')"
   if [[ -z "$TOKEN" ]]; then
     echo "[bootstrap] token 生成失败，终止（不写入空 token）" >&2
     exit 1
