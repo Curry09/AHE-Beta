@@ -15,7 +15,7 @@ import pytest
 
 from auto_designer.dev.agentic_developer import DevOutcome
 from auto_designer.loop.orchestrator import Orchestrator
-from auto_designer.models import Persona, SeedScenario
+from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -47,7 +47,7 @@ class _Launcher:
     def __init__(self, events: list) -> None:
         self._events = events
 
-    def launch(self, ref: str):
+    def launch(self, ref: str, workspace_dir: str | None = None):
         self._events.append(("launch", ref))
         return ("harness", ref)
 
@@ -72,7 +72,7 @@ class _Dev:
 
 
 def _orch(repo, events, developers, fixed_k=1):
-    def run_session_fn(persona, scenario, harness):
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
         events.append(("session", harness[1]))
 
     return Orchestrator(
@@ -168,3 +168,70 @@ def test_b_phase_error_propagates(tmp_path) -> None:
 
     with pytest.raises(RuntimeError):
         _orch(repo, events, [_BoomDev()]).run_round("c")
+
+
+# Spec-0008/T1 v2：共享工作区——每局先于 launch materialize，同一目录同时喂 launch 与 run_session。
+class _WsLauncher:
+    def __init__(self, events: list) -> None:
+        self._events = events
+
+    def launch(self, ref: str, workspace_dir: str | None = None):
+        self._events.append(("launch", workspace_dir))
+        return ("harness", ref)
+
+
+def test_round_materializes_shared_workspace_before_launch(tmp_path, monkeypatch) -> None:
+    repo = _seed_repo(tmp_path)
+    events: list = []
+    monkeypatch.setattr(
+        "auto_designer.loop.orchestrator.materialize_workspace",
+        lambda spec: events.append(("materialize", spec.fixture)) or f"/ws/{spec.fixture}",
+    )
+
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", workspace_dir))
+
+    orch = Orchestrator(
+        launcher=_WsLauncher(events),
+        harness_repo=str(repo),
+        fixed_set=[
+            (
+                _persona(),
+                SeedScenario(description="s", workspace=WorkspaceSpec(fixture="billing-split")),
+            )
+        ],
+        developer_agents=[_Dev(events, DevOutcome())],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+    )
+    orch.run_round("c")
+
+    # 顺序：materialize 早于 launch；launch 与 session 收到同一个 workspace_dir。
+    assert events[0] == ("materialize", "billing-split")
+    assert events[1] == ("launch", "/ws/billing-split")
+    assert events[2] == ("session", "/ws/billing-split")
+
+
+def test_round_no_workspace_passes_none(tmp_path, monkeypatch) -> None:
+    repo = _seed_repo(tmp_path)
+    events: list = []
+    monkeypatch.setattr(  # 无工作区时绝不该调 materialize
+        "auto_designer.loop.orchestrator.materialize_workspace",
+        lambda spec: (_ for _ in ()).throw(AssertionError("不应 materialize")),
+    )
+
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", workspace_dir))
+
+    orch = Orchestrator(
+        launcher=_WsLauncher(events),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],  # workspace=None
+        developer_agents=[_Dev(events, DevOutcome())],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+    )
+    orch.run_round("c")
+
+    assert ("launch", None) in events
+    assert ("session", None) in events

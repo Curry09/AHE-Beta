@@ -142,3 +142,18 @@ def test_bridge_no_error_when_client_lacks_bind(tmp_path) -> None:
     scenario = SeedScenario(description="task", workspace=WorkspaceSpec(fixture="billing-split"))
     session = fn(mp, scenario, ScriptedHarness())  # materialize 发生但无 bind，不应报错
     assert isinstance(session, Session)
+
+
+# Spec-0008/T1 v2：orchestrator 传入共享 workspace_dir 时，sim_user 复用它绑定、不再自行 materialize。
+def test_bridge_uses_passed_workspace_dir_and_skips_materialize(tmp_path, monkeypatch) -> None:
+    sp, client = expert(), _RecordingClient()
+    mp = _model_persona(sp)
+    monkeypatch.setattr(  # 传入 workspace_dir 后绝不该再 materialize
+        "auto_designer.loop.sim_user.materialize_workspace",
+        lambda spec: (_ for _ in ()).throw(AssertionError("不应 materialize")),
+    )
+    fn = _make_fn(client, tmp_path, sp, mp)
+    scenario = SeedScenario(description="task", workspace=WorkspaceSpec(fixture="billing-split"))
+    fn(mp, scenario, ScriptedHarness(), workspace_dir="/shared/ws")
+
+    assert client.bound == (sp, "/shared/ws")  # 复用传入目录，未走 materialize

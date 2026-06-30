@@ -14,15 +14,30 @@ harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA c
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Callable
+from typing import Protocol
 
 from auto_designer.dev.agentic_developer import AgenticDeveloper
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
 from auto_designer.models import Persona, SeedScenario
+from auto_designer.user.sim.workspace import materialize as materialize_workspace
 
-# 跑一局会话：(persona, scenario, harness) -> 任意（产物由实现落盘/提交，编排不关心返回）。
-SessionRunner = Callable[[Persona, SeedScenario, HarnessInterface], object]
+
+class SessionRunner(Protocol):
+    """跑一局会话：(persona, scenario, harness) -> 任意（产物由实现落盘/提交，编排不关心返回）。
+
+    Spec-0008/T1 v2：可选 keyword `workspace_dir`——orchestrator 每局先 materialize 的共享工作区，
+    既经 launcher 注入 harness，也由此传给会话实现绑定内层 client（缺省 None 退化为今天行为）。
+    """
+
+    def __call__(
+        self,
+        persona: Persona,
+        scenario: SeedScenario,
+        harness: HarnessInterface,
+        *,
+        workspace_dir: str | None = None,
+    ) -> object: ...
 
 
 class Orchestrator:
@@ -51,9 +66,17 @@ class Orchestrator:
 
         # a：固定集每个 (persona, scenario) 按该 main SHA launch 跑一局，产 issue（→tracker）+ 体感（→store）。
         #    launcher 按 SHA checkout → 同一会话内多轮 send 跑同一 SHA 快照，harness 不在脚下变。
+        #    Spec-0008/T1 v2：场景带工作区时，先于 launch materialize 一份共享工作区，同一目录既经
+        #    launcher 注入 harness（SANDBOX_WORK_DIR）又传给会话绑定内层 client——harness 改、用户 agent
+        #    同目录核实。scenario.workspace 为空时 workspace_dir=None，两侧均退化为今天行为。
         for persona, scenario in self._fixed_set:
-            harness = self._launcher.launch(sha)
-            self._run_session(persona, scenario, harness)
+            workspace_dir = (
+                materialize_workspace(scenario.workspace)
+                if scenario.workspace is not None
+                else None
+            )
+            harness = self._launcher.launch(sha, workspace_dir=workspace_dir)
+            self._run_session(persona, scenario, harness, workspace_dir=workspace_dir)
 
         # b：多个开发者 agent 依次各领一条不同 issue，自主改 harness 直推 main（无 branch/merge/门禁）。
         attempted: set[int] = set()

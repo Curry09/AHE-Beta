@@ -38,6 +38,13 @@ _V2_ENTRY = (
     '    msg = json.loads(line)["message"]\n'
     '    sys.stdout.write(json.dumps({"reply": f"v2:{msg}"}) + "\\n"); sys.stdout.flush()\n'
 )
+# 回 SANDBOX_WORK_DIR 当前值的 entry：验证 launch(workspace_dir=) 把它注入子进程 env。
+_ENV_ECHO_ENTRY = (
+    "import json, os, sys\nfor line in sys.stdin:\n"
+    "    line = line.strip()\n    if not line:\n        continue\n"
+    '    sys.stdout.write(json.dumps({"reply": os.environ.get("SANDBOX_WORK_DIR", "(unset)")})'
+    ' + "\\n"); sys.stdout.flush()\n'
+)
 
 
 def _commit_all(repo: str, message: str) -> None:
@@ -170,5 +177,23 @@ def test_early_exit_eof_raises(tmp_path) -> None:
     try:
         with pytest.raises(RuntimeError):
             h.send("a")
+    finally:
+        h.close()
+
+
+# Spec-0008/T1 v2：共享工作区——launch(workspace_dir=) 把目录注入 harness 子进程 SANDBOX_WORK_DIR。
+def test_launch_injects_workspace_dir_as_sandbox_work_dir(tmp_path) -> None:
+    h = _launcher(tmp_path, _ENV_ECHO_ENTRY).launch("main", workspace_dir="/shared/ws")
+    try:
+        assert h.send("x") == "/shared/ws"  # 子进程看到注入的 SANDBOX_WORK_DIR
+    finally:
+        h.close()
+
+
+def test_launch_without_workspace_dir_leaves_sandbox_work_dir_unset(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("SANDBOX_WORK_DIR", raising=False)  # 隔离宿主环境可能的残留
+    h = _launcher(tmp_path, _ENV_ECHO_ENTRY).launch("main")  # 不传 → 不注入（退化）
+    try:
+        assert h.send("x") == "(unset)"
     finally:
         h.close()

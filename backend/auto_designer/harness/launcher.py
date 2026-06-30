@@ -93,7 +93,7 @@ class HarnessLauncher:
         self._harness_repo = harness_repo
         self._runs_root = Path(runs_root)
 
-    def launch(self, ref: str) -> HarnessInterface:
+    def launch(self, ref: str, workspace_dir: str | None = None) -> HarnessInterface:
         dest = self._checkout(ref=ref)
         params = self._read_params(dest)
         entry = params["entry"]
@@ -104,6 +104,10 @@ class HarnessLauncher:
             argv[0] = sys.executable  # 用 launcher 的解释器跑 harness（其 venv 才有 nexau 等依赖）
         cwd = dest / params["cwd"] if params.get("cwd") else dest
         env = {str(k): str(v) for k, v in (params.get("env") or {}).items()}
+        if workspace_dir is not None:
+            # Spec-0008/T1 v2：与用户 agent 共享同一工作区——把它注入 harness 的 SANDBOX_WORK_DIR，
+            # harness entry 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；覆盖 params.yaml 同名键。
+            env["SANDBOX_WORK_DIR"] = str(workspace_dir)
         return _HarnessHandle(entry=argv, cwd=cwd, env=env)
 
     def _resolve_sha(self, *, ref: str) -> str:
