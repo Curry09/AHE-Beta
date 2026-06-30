@@ -6,13 +6,60 @@ issue_artifact 真落 tracker、SessionResult 转 models.Session 落 store、逐
 
 from __future__ import annotations
 
-from auto_designer.loop.sim_user import make_sim_run_session_fn
+from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
 from auto_designer.models import Persona, SeedScenario, Session
 from auto_designer.tracker.fake import FakeTracker
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.harness_adapter import ScriptedHarness
+from auto_designer.user.sim.loop import SessionResult, TurnLog
 from auto_designer.user.sim.persona_client import ScriptedPersonaClient
 from auto_designer.user.sim.run_live import expert
+
+
+def _turn(turn: int, action: str, channel: str, message: str, harness_output: str) -> TurnLog:
+    return TurnLog(
+        turn=turn,
+        phase="active",
+        action_space=[],
+        perceive="",
+        verdict="unsure",
+        action=action,
+        message=message,
+        executor="x",
+        channel=channel,
+        patience=3,
+        trust="ok",
+        harness_output=harness_output,
+    )
+
+
+def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
+    """harness_output 是「本轮 persona 看到的上轮回复」快照，会跨非-EMIT 轮重复携带。
+
+    silent 轮（verify_self 等）不重发 harness，却各自快照同一条 completion；result_to_turns
+    必须按「真有新 harness 回复」去重，否则同一条被展开成多条 harness 轮、与 user 错位。
+    """
+    completion = '{"result": "done: split_bill implemented"}'
+    res = SessionResult(
+        persona_id="P-0991",
+        end_reason="accepted",
+        turns=[
+            _turn(0, "send_task", "emit", "Please inspect billing/core.py ...", ""),
+            _turn(1, "verify_self", "silent", "", completion),  # 快照同一 completion
+            _turn(2, "verify_self", "silent", "", completion),
+            _turn(3, "verify_self", "silent", "", completion),
+            _turn(4, "accept", "emit", "Looks good, thanks.", completion),
+        ],
+    )
+
+    turns = result_to_turns(res)
+
+    # harness 实际只回了 1 次 → 只应有 1 条 harness 轮，且严格 user/harness/user 交替
+    roles = [t.role for t in turns]
+    assert roles == ["user", "harness", "user"]
+    assert turns[1].content == completion
+    assert turns[0].content.startswith("Please inspect")
+    assert turns[2].content == "Looks good, thanks."
 
 
 def _model_persona(sp) -> Persona:
