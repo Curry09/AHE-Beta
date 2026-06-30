@@ -4,8 +4,10 @@
 向 stdout 逐行写 {"reply": str}（JSONL，一读一写严格配对）。内部如何编排（这里是单 nexau，
 将来可演化为多 nexau）对 launcher 不可见——开发者 agent 后续就是在改本仓内容。
 
-真实运行：用本目录 agents/main.md 作系统提示 + 环境里的 LLM_* 构造一个 nexau Agent，
-单实例维护多轮 history。需要 nexau 可 import 且 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY 已注入。
+真实运行：按本目录 agent.yaml（最简「只有 bash」的工具型 agent，系统提示 = agents/main.md，
+LLM_* 走 ${env}）构造单个 nexau Agent，单实例维护多轮 history。bash 在一个每会话工作区
+（SANDBOX_WORK_DIR）里执行，作为「用户项目」根目录。需要 nexau 可 import 且
+LLM_MODEL/LLM_BASE_URL/LLM_API_KEY 已注入。
 """
 
 from __future__ import annotations
@@ -44,31 +46,21 @@ def _run_with_timeout(agent, message, timeout):
     return box.get("out")
 
 
-def _build_agent():
-    """以 agents/main.md 为系统提示，按环境 LLM_* 构造单个 nexau Agent。"""
-    from nexau import Agent
+def _setup_workspace() -> str:
+    """每会话建一个干净工作区作 bash 的「项目根目录」，写入 SANDBOX_WORK_DIR（nexau local sandbox 读它）。"""
+    ws = os.environ.get("SANDBOX_WORK_DIR")
+    if not ws:
+        ws = tempfile.mkdtemp(prefix="harness_ws_")
+        os.environ["SANDBOX_WORK_DIR"] = ws
+    return ws
 
-    cfg_dir = Path(tempfile.mkdtemp(prefix="harness_agent_"))
-    (cfg_dir / "prompt.md").write_text(
-        (_HERE / "agents" / "main.md").read_text(encoding="utf-8"), encoding="utf-8"
-    )
-    (cfg_dir / "agent.yaml").write_text(
-        "type: agent\n"
-        "name: harness\n"
-        "system_prompt: ./prompt.md\n"
-        "system_prompt_type: string\n"
-        "llm_config:\n"
-        f"  model: {os.environ['LLM_MODEL']}\n"
-        f"  base_url: {os.environ['LLM_BASE_URL']}\n"
-        f"  api_key: {os.environ['LLM_API_KEY']}\n"
-        # Nex-N2-Pro 是推理模型：reasoning_content 先吃 token，4096 会被推理吃光致 content=null。
-        "  max_tokens: 32768\n"
-        # per-call 超时：不设则 openai 客户端无限挂起（网关偶发卡死整轮）；超时即触发 _reply 重试。
-        "  timeout: 300\n"
-        "  api_type: openai_chat_completion\n",
-        encoding="utf-8",
-    )
-    return Agent.from_yaml(cfg_dir / "agent.yaml")
+
+def _build_agent():
+    """按本目录 agent.yaml 构造工具型 nexau Agent（只挂 bash + complete_task）。"""
+    from nexau import Agent, AgentConfig
+
+    cfg = AgentConfig.from_yaml(config_path=_HERE / "agent.yaml")
+    return Agent(config=cfg)
 
 
 def _reply(agent, message: str, rebuild):
@@ -83,7 +75,7 @@ def _reply(agent, message: str, rebuild):
     for attempt in range(_RUN_RETRIES):
         try:
             out = _run_with_timeout(agent, message, _CALL_TIMEOUT)  # 硬超时，绝不死等
-            text = out if isinstance(out, str) else out[0]
+            text = out if isinstance(out, str) else (out[0] if out else "")  # 工具型返回 result 串
             if text and text.strip():  # 非空才算成功
                 return agent, text
             last = "empty reply"  # 空回复（网关 200+空内容不抛异常）视为失败，不得静默返回
@@ -98,6 +90,7 @@ def _reply(agent, message: str, rebuild):
 
 
 def main() -> None:
+    _setup_workspace()  # 先就位 SANDBOX_WORK_DIR，供 agent 的 local sandbox 读取
     agent = _build_agent()  # 单实例，history 由 nexau 自身跨轮维护
     for line in sys.stdin:
         line = line.strip()
