@@ -242,8 +242,8 @@ def main() -> int:
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
     )
 
-    print("④ 跑 1 轮闭环（仅 P-0991 expert × 2 dev agent，dev 直推 main，真模型）...")
-    refs = orch.run(1)
+    print("④ 跑 3 轮闭环（仅 P-0991 expert × 2 dev agent，dev 直推 main，真模型）...")
+    refs = orch.run(3)
 
     print("\n=== 结果 ===")
     print("各轮 main HEAD SHA:", refs)  # Spec-0007/T4：观测游标（main 最新 SHA），非 release 链
