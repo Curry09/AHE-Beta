@@ -44,21 +44,30 @@ def entry(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     return module
 
 
+def _no_rebuild():
+    """非超时用例不该触发重建；若被调用即失败。"""
+    raise AssertionError("rebuild 不应被调用")
+
+
 def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
     agent = _Agent(["hello"])
-    assert entry._reply(agent, "hi") == "hello"
+    out_agent, text = entry._reply(agent, "hi", _no_rebuild)
+    assert text == "hello"
+    assert out_agent is agent  # 未重建，沿用同实例
     assert agent.calls == 1
 
 
 def test_reply_retries_on_blank_then_succeeds(entry: ModuleType) -> None:
     agent = _Agent(["", "   ", "real answer"])
-    assert entry._reply(agent, "hi") == "real answer"
+    out_agent, text = entry._reply(agent, "hi", _no_rebuild)
+    assert text == "real answer"
+    assert out_agent is agent  # 空回复同 agent 重试，不重建
     assert agent.calls == 3  # 空串/纯空白都触发重试
 
 
 def test_reply_all_blank_returns_explicit_marker(entry: ModuleType) -> None:
     agent = _Agent(["", "", "", ""])
-    out = entry._reply(agent, "hi")
+    _, out = entry._reply(agent, "hi", _no_rebuild)
     assert out != ""  # 关键：绝不静默返回空
     assert out.startswith("[harness error]")
 
@@ -67,5 +76,15 @@ def test_reply_exception_then_marker(entry: ModuleType) -> None:
     agent = _Agent(
         [RuntimeError("502"), RuntimeError("502"), RuntimeError("502"), RuntimeError("502")]
     )
-    out = entry._reply(agent, "hi")
+    _, out = entry._reply(agent, "hi", _no_rebuild)
     assert out.startswith("[harness error]")
+
+
+def test_reply_timeout_rebuilds_agent_then_succeeds(entry: ModuleType) -> None:
+    """超时分支：放弃的旧 agent 持锁不可用 → 重建新 agent 续跑，回传 live agent。"""
+    stale = _Agent([TimeoutError("agent.run 超时 >240s")])
+    fresh = _Agent(["after rebuild"])
+    out_agent, text = entry._reply(stale, "hi", lambda: fresh)
+    assert text == "after rebuild"
+    assert out_agent is fresh  # 已切到重建后的新实例
+    assert stale.calls == 1 and fresh.calls == 1
