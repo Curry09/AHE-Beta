@@ -71,23 +71,32 @@ def make_sim_run_session_fn(
     store: SessionStore,
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
-) -> Callable[[Persona, SeedScenario, HarnessInterface], Session]:
+) -> Callable[..., Session]:
     """返回 Orchestrator 用的 run_session_fn。
 
     sim_personas: 展示用 models.Persona.identity -> 9 维 sim persona（权威画像）。
     on_turn: 逐轮（含终止轮）+ 收尾各回调一次，供调用方发 agent 活动到看板。
     """
 
-    def run(persona: Persona, scenario: SeedScenario, harness: HarnessInterface) -> Session:
+    def run(
+        persona: Persona,
+        scenario: SeedScenario,
+        harness: HarnessInterface,
+        *,
+        workspace_dir: str | None = None,
+    ) -> Session:
         sim_persona = sim_personas[persona.identity]
 
-        # spec-0008/T1：场景带工作区时每局 materialize 一份全新拷贝，并守卫式绑定到内层 client
-        # （仅 AgenticPersonaClient 暴露 bind_session；Scripted/Api 无此方法即跳过）。
-        # run_session 签名不变——会话级 persona+工作区只在这层注入。
-        if scenario.workspace is not None:
-            workspace_dir = materialize_workspace(scenario.workspace)
-            if hasattr(client, "bind_session"):
-                client.bind_session(persona=sim_persona, workspace_dir=workspace_dir)
+        # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
+        # harness（SANDBOX_WORK_DIR）并把同一目录 workspace_dir 传到这里——两侧 cwd 同指一处，harness
+        # 改、用户 agent 同目录核实。这里复用传入目录绑定内层 client，不再自行 materialize。
+        # 兼容直连调用（不经 orchestrator）：未传 workspace_dir 但 scenario 带 workspace 时，回落自行
+        # materialize（等价 v1）。守卫式 bind_session：仅 AgenticPersonaClient 暴露，Scripted/Api 跳过。
+        ws = workspace_dir
+        if ws is None and scenario.workspace is not None:
+            ws = materialize_workspace(scenario.workspace)
+        if ws is not None and hasattr(client, "bind_session"):
+            client.bind_session(persona=sim_persona, workspace_dir=ws)
 
         def progress(partial: SessionResult) -> None:
             if on_turn is not None:

@@ -10,8 +10,9 @@ overview: |-
   数据流脊柱（编号即执行序：先立工作区 T1，再内层执行 T2/T4，T3 并行）：
 
   ```
-  seed 场景 + 工作区 (T1: SeedScenario.workspace ─► materialize ─► 全新项目目录)
-     │  注入链 sim_user 桥接每局 materialize → client.bind_session(persona, workspace_dir)（run_session 不动）
+  seed 场景 + 工作区 (T1: SeedScenario.workspace ─► orchestrator 每局先 materialize ─► 全新项目目录 = 两侧共享)
+     │  注入链：orchestrator 把同一 workspace_dir 同时喂 launcher(注入 SANDBOX_WORK_DIR 给 harness 子进程)
+     │  与 run_session → sim_user bind_session(persona, workspace_dir)（run_session/harness 协议不动）
      ▼
   外层控制信封 (0005/T5 run_session, 原样不动)
      │  接缝 respond(system,user) -> {perceive,verdict,action,message}
@@ -39,9 +40,13 @@ overview: |-
   体感/状态仍只吃主观 `verdict`。核实是 persona 的角色内**可选**动作——真人（含专家）不会每次都跑，只在起疑且值得
   时才查；默认不查。
 
-  **与 harness 完全解耦（关键）**：本组只动用户侧。harness 仍是 advisory（只输出文本建议），用户把助手提议的代码
-  贴进**自己的工作区拷贝**再跑——这正是真人对只会建议的助手的真实行为，无需 harness 先长出工具。「让 harness 真
-  编辑同一工作区、验证目标变成 harness 真实改动」是完全解耦的**第二期**，独立成上游 spec。
+  **harness 与用户 agent 共享同一工作区（v2 掰正，关键）**：本组目标场景一直是「助手（harness）能改、也能跑，用户
+  agent 在同一目录真核实」——纯文本建议核不了真。故 T1 把工作区做成两侧共享的同一目录：orchestrator 每局先
+  materialize，经 launcher 把 SANDBOX_WORK_DIR 注入 harness 子进程、同一目录绑定内层 client；harness（bash 工具）落地
+  的改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS，非 advisory 文本）。初版曾把此设为「harness 仅 advisory、用户
+  贴进自己的工作区拷贝、共享工作区留完全解耦的第二期上游 spec」——现掰正为缺陷假设：共享工作区即在本组 T1 落地（仅
+  追加可选 workspace_dir 接线，退化路径对纯文本场景与直连调用零破坏），不再另立上游 spec。两侧无并发写竞争靠逐轮
+  stdio 串行天然保证。
 
   **与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎零改动。`web_search` 工具、skill
   真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不

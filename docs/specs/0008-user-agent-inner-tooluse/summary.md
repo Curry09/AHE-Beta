@@ -13,8 +13,9 @@
 数据流脊柱（编号即执行序：先立工作区 T1，再内层执行 T2/T4，T3 并行）：
 
 ```
-seed 场景 + 工作区 (T1: SeedScenario.workspace ─► materialize ─► 全新项目目录)
-   │  注入链 sim_user 桥接每局 materialize → client.bind_session(persona, workspace_dir)（run_session 不动）
+seed 场景 + 工作区 (T1: SeedScenario.workspace ─► orchestrator 每局先 materialize ─► 全新项目目录 = 两侧共享)
+   │  注入链：orchestrator 把同一 workspace_dir 同时喂 launcher(注入 SANDBOX_WORK_DIR 给 harness 子进程)
+   │  与 run_session → sim_user bind_session(persona, workspace_dir)（run_session/harness 协议不动）
    ▼
 外层控制信封 (0005/T5 run_session, 原样不动)
    │  接缝 respond(system,user) -> {perceive,verdict,action,message}
@@ -42,9 +43,13 @@ blind 无工具只能凭文本，shallow 能跑但写不出测试套件，compet
 体感/状态仍只吃主观 `verdict`。核实是 persona 的角色内**可选**动作——真人（含专家）不会每次都跑，只在起疑且值得
 时才查；默认不查。
 
-**与 harness 完全解耦（关键）**：本组只动用户侧。harness 仍是 advisory（只输出文本建议），用户把助手提议的代码
-贴进**自己的工作区拷贝**再跑——这正是真人对只会建议的助手的真实行为，无需 harness 先长出工具。「让 harness 真
-编辑同一工作区、验证目标变成 harness 真实改动」是完全解耦的**第二期**，独立成上游 spec。
+**harness 与用户 agent 共享同一工作区（v2 掰正，关键）**：本组目标场景一直是「助手（harness）能改、也能跑，用户
+agent 在同一目录真核实」——纯文本建议核不了真。故 T1 把工作区做成两侧共享的同一目录：orchestrator 每局先
+materialize，经 launcher 把 SANDBOX_WORK_DIR 注入 harness 子进程、同一目录绑定内层 client；harness（bash 工具）落地
+的改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS，非 advisory 文本）。初版曾把此设为「harness 仅 advisory、用户
+贴进自己的工作区拷贝、共享工作区留完全解耦的第二期上游 spec」——现掰正为缺陷假设：共享工作区即在本组 T1 落地（仅
+追加可选 workspace_dir 接线，退化路径对纯文本场景与直连调用零破坏），不再另立上游 spec。两侧无并发写竞争靠逐轮
+stdio 串行天然保证。
 
 **与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎零改动。`web_search` 工具、skill
 真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不
@@ -56,7 +61,7 @@ open-questions，归后续 Task/组。
 
 ```mermaid
 graph LR
-    nT1["T1 seed 工作区扩展与注入"]
+    nT1["T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）"]
     nT2["T2 内层原子工具与 sandbox"]
     nT3["T3 prompt 行为框架（可选核实）与 skill 占位接口"]
     nT4["T4 内层 tool-using agent（AgenticPersonaClient）"]
@@ -68,14 +73,14 @@ graph LR
 
 | 任务 | 标题 | 优先级 | 状态 | 依赖 |
 |----|----|----|----|----|
-| T1 | seed 工作区扩展与注入 | P1 | done | — |
+| T1 | seed 工作区扩展与共享注入（harness/用户 agent 同目录） | P1 | done | — |
 | T2 | 内层原子工具与 sandbox | P1 | done | T1 |
 | T3 | prompt 行为框架（可选核实）与 skill 占位接口 | P1 | done | — |
 | T4 | 内层 tool-using agent（AgenticPersonaClient） | P1 | done | T1, T2, T3 |
 
 ## 各任务方案
 
-### T1 · seed 工作区扩展与注入（P1 / done）
+### T1 · seed 工作区扩展与共享注入（harness/用户 agent 同目录）（P1 / done）
 
 **涉及文件**
 
@@ -84,47 +89,51 @@ graph LR
 - `backend/seed_workspaces/billing-split/manifest.yaml`
 - `backend/auto_designer/models.py`
 - `backend/auto_designer/loop/sim_user.py`
+- `backend/auto_designer/loop/orchestrator.py`
+- `backend/auto_designer/harness/launcher.py`
 - `backend/tests/user/sim/test_workspace.py`
+- `backend/tests/harness/test_launcher.py`
+- `backend/tests/loop/test_orchestrator.py`
 
 **做什么**
 
-本组的底座任务：给 SeedScenario 加一个可选 workspace 字段，让 seed 场景能携带一个 in-repo 基线项目（不再只有纯文本 description）；新增 workspace.py 的 materialize() 每局把 fixture 拷成一个临时全新目录，供内层 sandbox 当 cwd。落首个 fixture billing-split（stdlib-only，无第三方依赖），并把工作区目录顺着 sim_user 桥接注入 run_session。编号即执行序：本任务最先做，T2 的 sandbox / T4 的内层 agent 才有真实项目可跑。
+本组的底座任务：给 SeedScenario 加一个可选 workspace 字段，让 seed 场景能携带一个 in-repo 基线项目（不再只有纯文本 description）；新增 workspace.py 的 materialize() 每局把 fixture 拷成一个临时全新目录，供内层 sandbox 当 cwd。落首个 fixture billing-split（stdlib-only，无第三方依赖）。v2 掰正：materialize 上移到 orchestrator 每局先落地一份工作区，经 launcher 注入 SANDBOX_WORK_DIR 给 harness 子进程、同一目录绑定到内层 client——harness 直接改、用户 agent 同目录真核实，两侧共享同一文件系统（不再各持私有副本）。编号即执行序：本任务最先做，T2 的 sandbox / T4 的内层 agent 才有真实项目可跑。
 
 **为什么**
 
-现仓 seed 场景全仓只有 `description: str`，磁盘上没有任何可执行的项目——内层 agent（T2 工具 / T4 内层循环）若要「真执行核实」，必须有一个真实的项目上下文落脚，否则只能在空 tempdir 里跑孤立片段、跑不起有依赖或多模块的代码。本任务是 T2/T4 内层执行的底座：先把工作区立起来，后续工具、sandbox、agent 才有地方运行；这也是为什么它排在最前（编号=执行序）。与 harness 完全解耦——工作区只服务用户侧的自有核实，harness 仍只输出文本建议。
+现仓 seed 场景全仓只有 `description: str`，磁盘上没有任何可执行的项目——内层 agent（T2 工具 / T4 内层循环）若要「真执行核实」，必须有一个真实的项目上下文落脚，否则只能在空 tempdir 里跑孤立片段、跑不起有依赖或多模块的代码。本任务是 T2/T4 内层执行的底座：先把工作区立起来，后续工具、sandbox、agent 才有地方运行；这也是为什么它排在最前（编号=执行序）。v2 掰正缺陷假设：初版把工作区设计成「用户 agent 私有副本、与 harness 两套 FS、harness 仅输出文本建议」，但本项目的目标场景一直是「助手（harness）能改、也能跑，用户 agent 在同一目录真核实」——文本建议核不了真。故工作区须是 harness 子进程与用户 agent 内层 sandbox 共享的同一目录：harness 落地的改动，用户 agent 当场可读可跑。
 
 **范围**
 
-1) models.py：SeedScenario 增 `workspace: WorkspaceSpec | None = None`（默认 None 时退化为今天的纯文本行为，全部既有路径不破）。2) workspace.py：定义 WorkspaceSpec（fixture 名/相对路径、setup 步骤占位）+ materialize(spec, dest) -> str，MVP 仅 copytree 落一个全新隔离目录并返回其路径。3) seed_workspaces/billing-split/：in-repo fixture——一个最小 stdlib-only 项目（manifest.yaml 描述元信息，project/billing/core.py 为可跑代码）。4) sim_user.py：把 materialize 出的工作区目录顺着桥接传进 run_session（作为后续 Sandbox 的 cwd 来源）。不实现依赖供给（venv/pip）、不实现 git 来源——仅本地 fixture copytree。
+1) models.py：SeedScenario 增 `workspace: WorkspaceSpec | None = None`（默认 None 时退化为今天的纯文本行为，全部既有路径不破）。2) workspace.py：定义 WorkspaceSpec（fixture 名/相对路径、setup 步骤占位）+ materialize(spec, dest) -> str，MVP 仅 copytree 落一个全新隔离目录并返回其路径。3) seed_workspaces/billing-split/：in-repo fixture——一个最小 stdlib-only 项目（manifest.yaml 描述元信息，project/billing/core.py 为可跑代码）。4) 共享工作区接线（v2）：orchestrator.py 每局在 launch *之前* 调 materialize 落地一份工作区 workspace_dir，并把它同时传给 launcher 与 run_session；launcher.py 的 launch(ref, workspace_dir=None) 把它作为 SANDBOX_WORK_DIR 注入 harness 子进程 env（harness entry 已读此变量当 bash 工作根）；sim_user.py 的 run(..., workspace_dir=None) 改为复用传入目录绑定内层 client（不再自行 materialize），未传时退化按 scenario.workspace 自落（直连兼容）。不实现依赖供给（venv/pip）、不实现 git 来源——仅本地 fixture copytree。不改 run_session/respond 引擎签名，不改 harness 协议。
 
 **整体设计**
 
-注入链（关键：run_session 与 respond 两个签名都不动）：seed 场景（SeedScenario.workspace: WorkspaceSpec）─► loop/sim_user.py 桥接每局调 workspace.materialize(spec) 落地 ─► 得到全新项目目录 workspace_dir ─► 由 sim_user 在会话级守卫式绑定到内层 client（`if hasattr(client, "bind_session"): client.bind_session(persona=sim_persona, workspace_dir=ws)`）─► 内层 T4 AgenticPersonaClient 把它交给 Sandbox(workspace=workspace_dir) 当 cwd（T2）。为何走 bind 而非 run_session 参数：loop.py 不在本组任何任务的 files 内（信封不动），且 run_session 只喂 system/user 文本、不传 persona 对象，而内层 client 需要每局变化的 persona(选工具集) + workspace(建 Sandbox)——这两样只能在 sim_user 这层会话级注入；bind_session 对 Scripted/Api 是 no-op（无此方法）。每局一份全新拷贝，互不污染；session 结束可清理。MVP 用 stdlib-only fixture 把 materialize 压到「只 copytree」，依赖供给（cached venv / pip install）推到 setup 钩子的后续实现。fixture 放 backend/seed_workspaces/ 下作为版本化资产，与 benchmark held-out 红线无关（工作区不含 gold 测试）。
+共享工作区注入链（v2；关键：run_session 与 respond 引擎签名、harness stdio 协议均不动）：orchestrator.run_round 每局先在 launch *之前* 落地工作区——scenario.workspace 非空时 `workspace_dir = materialize(scenario.workspace)`（为空则 None，退化为今天行为）─► 同一 workspace_dir 走两条边喂给两侧：(A) `launcher.launch(sha, workspace_dir=workspace_dir)`，launcher 把它写进子进程 env 的 SANDBOX_WORK_DIR，harness entry._setup_workspace() 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；(B) `run_session(persona, scenario, harness, workspace_dir=workspace_dir)`，sim_user 不再自行 materialize，而是守卫式 `client.bind_session(persona=sim_persona, workspace_dir=workspace_dir)`，内层 T4 AgenticPersonaClient 据此建 Sandbox(workspace=workspace_dir)（T2）当 cwd。两侧 cwd 同指一个目录 ⇒ harness 子进程落地的文件改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS、非 advisory 文本）。为何 materialize 上移到 orchestrator：launch 发生在 run_session 之前，要让 harness 与用户 agent 同目录，落地必须早于 launch 这一刻、且 workspace_dir 须同时可达两侧——orchestrator 是唯一同时持有 launcher 与 run_session 的层。为何仍走 bind 而非 run_session 文本参数：run_session 只喂 system/user 文本、不传 persona/workspace 对象，会话级的 persona(选工具集)+workspace(建 Sandbox) 只能经 bind_session 注入；对 Scripted/Api 无此方法即 no-op。SessionRunner 协议新增 keyword-only `workspace_dir: str | None = None`，旧直连调用（不传）按 scenario.workspace 自落、行为不变。每局一份全新拷贝、互不污染；session 结束可清理。fixture 仍 stdlib-only，把 materialize 压到「只 copytree」，依赖供给推后；fixture 置 backend/seed_workspaces/ 作版本化资产，与 benchmark held-out 红线无关（工作区不含 gold 测试）。
 
 **接口**
 
-WorkspaceSpec：dataclass，字段 `fixture: str`（seed_workspaces 下的目录名）、`setup: list[str] = []`（命令钩子，占位，本轮不执行）；带 to_dict/from_dict（与 models 其余 dataclass 一致，供 SeedScenario 序列化）。materialize(spec: WorkspaceSpec, dest_root: str | None = None) -> str：把 seed_workspaces/<fixture>/project 拷到一个新建的隔离目录，返回该目录绝对路径；dest_root 缺省用 tempfile.mkdtemp()。SeedScenario：新增 `workspace: WorkspaceSpec | None = None`（to_dict/from_dict 兼容旧数据：缺字段→None）。sim_user 桥接：scenario.workspace 非空时 materialize，并守卫式 `client.bind_session(persona=sim_persona, workspace_dir=ws)`；run_session 签名不变。
+WorkspaceSpec：dataclass，字段 `fixture: str`（seed_workspaces 下的目录名）、`setup: list[str] = []`（命令钩子，占位，本轮不执行）；带 to_dict/from_dict。materialize(spec, dest_root=None) -> str：拷 seed_workspaces/<fixture>/project 到新建隔离目录返其绝对路径。SeedScenario：新增 `workspace: WorkspaceSpec | None = None`（序列化兼容旧数据：缺字段→None）。launcher：`HarnessLauncher.launch(ref, workspace_dir: str | None = None) -> HarnessInterface`——workspace_dir 非空时把 SANDBOX_WORK_DIR=workspace_dir 并入子进程 env（覆盖 params.yaml 同名键），为空则保持今天行为（harness 自建 tmp 工作区）；签名向后兼容（仅追加 keyword）。SessionRunner 协议：`__call__(persona, scenario, harness, *, workspace_dir: str | None = None) -> object`。orchestrator：run_round 内 `workspace_dir = materialize(scenario.workspace) if scenario.workspace else None`，再 `launch(sha, workspace_dir=...)` 与 `run_session(..., workspace_dir=...)`。sim_user.run(persona, scenario, harness, *, workspace_dir=None)：ws 取 workspace_dir，缺省回落 `materialize(scenario.workspace)`（scenario.workspace 非空时），ws 非空且 client 暴露 bind_session 时 `bind_session(persona, workspace_dir=ws)`；run_session/respond 引擎签名与 harness 协议不变。
 
 **取舍**
 
-MVP 只支持本地 fixture + stdlib-only：换来 materialize 极简（copytree）、可重现、零网络；代价是带第三方依赖的场景暂不可跑（留 setup 钩子）。fixture 入仓增加仓体积，但保证每局环境确定。workspace=None 的退化路径保证对既有纯文本场景零破坏，渐进式落地。
+MVP 只支持本地 fixture + stdlib-only：换来 materialize 极简（copytree）、可重现、零网络；代价是带第三方依赖的场景暂不可跑（留 setup 钩子）。共享同一目录（而非各持私有副本）：换来 harness 改动对用户 agent 即时可见可跑（真核实，非文本 advisory），代价是两侧并发写同一 FS 须靠「单会话内逐轮串行（harness send 与用户回合不并发）」保证无竞争——本框架逐轮 stdio 协议天然串行，故可接受。materialize 上移到 orchestrator：让 launch 前工作区已就位，代价是 orchestrator/launcher 各加一个可选 workspace_dir 入参（keyword、缺省 None，跨组文件改动但向后兼容）。workspace=None / workspace_dir=None 的退化路径保证对既有纯文本场景与直连调用零破坏，渐进式落地。
 
 **验收标准**
 
-SeedScenario(workspace=None) 时所有既有行为不变；to_dict/from_dict 对有/无 workspace 都往返一致（旧 dict 缺字段→None）。给定 billing-split spec，materialize 返回一个全新存在的目录，内含 project/billing/core.py 且可被 python 直接 import/执行（stdlib-only）。两次 materialize 返回不同目录、互不影响（隔离性）。sim_user 在 scenario.workspace 非空时 materialize 并对暴露 bind_session 的 client 调用之（绑定 persona+workspace_dir）；run_session 签名不变。manifest.yaml 可被解析、描述 fixture 元信息。
+SeedScenario(workspace=None) 时所有既有行为不变；to_dict/from_dict 对有/无 workspace 都往返一致（旧 dict 缺字段→None）。给定 billing-split spec，materialize 返回一个全新存在的目录，内含 project/billing/core.py 且可被 python 直接 import/执行（stdlib-only）。两次 materialize 返回不同目录、互不影响（隔离性）。launcher.launch 传 workspace_dir 时，harness 子进程 env 含 SANDBOX_WORK_DIR=workspace_dir（断言注入）；不传时不含该键由 harness 自建 tmp（退化）。orchestrator 每局在 launch 之前 materialize，并把同一 workspace_dir 同时喂给 launch 与 run_session（断言 launch 与 run_session 收到的目录是同一个）。sim_user 传入 workspace_dir 时直接绑定它、不再自行 materialize；未传但 scenario.workspace 非空时回落自落地；ws 为空或 client 无 bind_session 时不调用、不报错。run_session/respond 引擎签名与 harness 协议不变。manifest.yaml 可被解析。
 
 **测试**
 
-test_workspace.py：(a) materialize 落地后目录存在、含预期文件、可执行 core.py；(b) 两次 materialize 隔离（改一份不影响另一份）；(c) WorkspaceSpec 默认 setup 为空且本轮不执行、to_dict/from_dict 往返；(d) SeedScenario.workspace 默认 None、老构造方式仍可用、序列化往返兼容旧数据；(e) sim_user 桥接：有 workspace 且 client 暴露 bind_session 时按 (persona, workspace_dir) 调用之（用 fake client 断言入参），无 workspace 或 client 无 bind_session 时不调用、不报错。
+test_workspace.py：(a) materialize 落地后目录存在、含预期文件、可执行 core.py；(b) 两次 materialize 隔离（改一份不影响另一份）；(c) WorkspaceSpec 默认 setup 为空且本轮不执行、to_dict/from_dict 往返；(d) SeedScenario.workspace 默认 None、老构造方式仍可用、序列化往返兼容旧数据；(e) sim_user 桥接：传入 workspace_dir 时直接按 (persona, workspace_dir) 调 bind_session 且不再自行 materialize（用 fake client + monkeypatch materialize 断言未被调），未传但 scenario.workspace 非空时回落 materialize 后绑定，ws 为空或 client 无 bind_session 时不调用、不报错。test_launcher.py：(f) launch 传 workspace_dir 时子进程 env 含 SANDBOX_WORK_DIR=workspace_dir（用 fake/捕获 Popen 断言），不传时不含该键（退化）。test_orchestrator.py：(g) run_round 每局在 launch 之前 materialize（用 spy 断言调用顺序），并把同一 workspace_dir 同时传给 launch 与 run_session；scenario.workspace 为 None 时两者均收 None（退化、不 materialize）。
 
 **参考**
 
-扩展 0001/T1 models.py 的 SeedScenario；注入发生在 0005/T5 调用方 sim_user 桥接（每局 materialize 后守卫式 bind_session 进内层 client），run_session 引擎本体与签名不动。被本组 T2（Sandbox 以此目录为 cwd）、T4（AgenticPersonaClient.bind_session 取用）消费。fixture 资产置于 backend/seed_workspaces/。
+扩展 0001/T1 models.py 的 SeedScenario；注入链跨 0005/T5 调用方 sim_user、0007/T2 orchestrator（materialize 上移）、0003/T1 launcher（SANDBOX_WORK_DIR 注入）——三者 files 跨组重叠仅产生 validate warning（与 models.py 跨 0001/0008/0009 同模式），run_session/respond 引擎签名与 harness stdio 协议不动。被本组 T2（Sandbox 以此目录为 cwd）、T4（AgenticPersonaClient.bind_session 取用）消费；harness 侧 entry._setup_workspace() 读 SANDBOX_WORK_DIR（见 backend/harness_template/entry.py、agent.yaml 的 sandbox_config）。fixture 资产置于 backend/seed_workspaces/。
 
 **待解问题**
 
-1) 依赖型场景的供给：setup 钩子用 cached venv 还是每局 pip？何时做（后续 Task/组）。2) 工作区来源是否需支持 git clone / 指定 commit（对接更真实的项目快照）。3) 临时目录清理策略与磁盘占用上限。4) manifest.yaml 的字段标准（语言/入口/期望命令）是否要与 0003 第二期 harness 编辑工作区的形态对齐。
+1) 依赖型场景的供给：setup 钩子用 cached venv 还是每局 pip？何时做（后续 Task/组）。2) 工作区来源是否需支持 git clone / 指定 commit（对接更真实的项目快照；与 0009 SeedSource 可插拔供给衔接）。3) 临时目录清理策略与磁盘占用上限。4) 共享 FS 下 harness 与用户 agent 的写竞争：当前靠逐轮 stdio 串行天然规避，若将来 harness 异步/并发执行需显式锁或快照隔离。5) 共享目录里 harness 改动与用户 agent 核实的可观测性（落盘 transcript 是否要记录工作区 diff）。
 
 ### T2 · 内层原子工具与 sandbox（P1 / done）
 
@@ -240,11 +249,11 @@ test_inner_prompt.py：(a) 各 D1 档位工具清单文案正确；(b) clause_ve
 
 **范围**
 
-1) persona_client.py：新增 AgenticPersonaClient 实现 PersonaClient 协议。respond() 内部跑有界循环：构建内层 system（调 T3 build_inner_system）→ 喂 LLM → 解析 tool_call → 在 Sandbox（T2，cwd=T1 工作区）执行 → 回灌结果 → 直到 LLM 给出最终结构化输出或到步数上限。从 harness 文本里抽取助手提议的代码落进工作区拷贝再跑（用户对 advisory 助手的真实行为）。保留既有 ApiPersonaClient/ScriptedPersonaClient 不破坏。2) 输出契约与 0005 完全一致（perceive/verdict/action/message），交回外层 resolve_action/apply_verdict。
+1) persona_client.py：新增 AgenticPersonaClient 实现 PersonaClient 协议。respond() 内部跑有界循环：构建内层 system（调 T3 build_inner_system）→ 喂 LLM → 解析 tool_call → 在 Sandbox（T2，cwd=T1 共享工作区）执行 → 回灌结果 → 直到 LLM 给出最终结构化输出或到步数上限。核实主路径（T1 v2 共享工作区）：harness 已把改动直接写进同一目录，内层 LLM 用 read_file/run_shell 当场读/跑 harness 的真实改动来核实——不需要从文本抠代码。仅当 harness 没写盘、只给了文本建议时（迫不得已），内层 LLM 才可用 write_file 把文本里的代码落进工作区再跑（兜底能力，非常态、非写死机制）。保留既有 ApiPersonaClient/ScriptedPersonaClient 不破坏。2) 输出契约与 0005 完全一致（perceive/verdict/action/message），交回外层 resolve_action/apply_verdict。
 
 **整体设计**
 
-循环：respond(system,user) → tool_stack(D1)+build_inner_system → 内层多轮 [LLM→tool_call→Sandbox.run→observe]，有步数/超时上限兜底 → LLM 产出最终 JSON（与现协议同字段）→ 校验后返回。会话级上下文：persona 与工作区由 sim_user 桥接经 bind_session(persona, workspace_dir) 在每局开始绑定（run_session 不传 persona、签名不动）；respond 用绑定的 workspace 建 Sandbox(workspace=dir)，artifact 抽取把 harness_output 里的代码写进该工作区再核实，verdict grounded 在真实执行结果。失败兜底：LLM 不产出合法 JSON / 工具异常 / 超步数时，退化为一次主观判断（保证永远返回合法输出，外层不崩）。无工具的 blind persona、或未 bind_session（无 workspace）时自然退化为纯文本判断（等价旧行为）。
+循环：respond(system,user) → tool_stack(D1)+build_inner_system → 内层多轮 [LLM→tool_call→Sandbox.run→observe]，有步数/超时上限兜底 → LLM 产出最终 JSON（与现协议同字段）→ 校验后返回。会话级上下文：persona 与工作区由 sim_user 桥接经 bind_session(persona, workspace_dir) 在每局开始绑定（run_session 不传 persona、签名不动）；respond 用绑定的 workspace 建 Sandbox(workspace=dir)。该 dir 即 T1 v2 落地的 harness/用户 agent 共享目录——harness 子进程已把改动写进来，内层 LLM 直接 read_file/run_shell 读/跑这些真实改动核实，verdict grounded 在真实执行结果（共享 FS，非从文本 advisory 抠代码）；harness 仅给文本未写盘的迫不得已情形下，write_file 作为兜底能力把文本代码落地再核（涌现，非写死）。失败兜底：LLM 不产出合法 JSON / 工具异常 / 超步数时，退化为一次主观判断（保证永远返回合法输出，外层不崩）。无工具的 blind persona、或未 bind_session（无 workspace）时自然退化为纯文本判断（等价旧行为）。
 
 **接口**
 
