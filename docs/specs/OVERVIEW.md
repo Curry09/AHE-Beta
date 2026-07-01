@@ -223,7 +223,7 @@
 | 0009 | 0009/T1 | SeedSource 协议 + 注册表 + local-fixture 实现 | done | — |
 | 0009 | 0009/T2 | empty/nl-doc 源（可插拔证明） | done | T1 |
 | 0009 | 0009/T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | done | T1 |
-| 0009 | 0009/T4 | git 源（clone repo@commit 成快照工作区） | pending | T1 |
+| 0009 | 0009/T4 | git 源（clone repo@commit 成快照工作区） | done | T1 |
 
 ## 跨 feature 关系图
 
@@ -1111,7 +1111,7 @@ SeedSource.provision(spec, dest) -> workspace_dir
 - **T1 SeedSource 协议 + 注册表 + local-fixture 实现**（done） — 本组底座任务：把工作区供给从「唯一硬编码的本地 copytree」抽象为按 `kind` 注册的 `SeedSource` 协议。
 - **T2 empty/nl-doc 源（可插拔证明）**（done） — 在 T1 接缝上接入第二个源 `empty`，作为「可插拔/可加性」的活体证明：新建一个隔离空工作区目录，`params` 含 `doc` 时把其文本写成一个需求说明文件（覆盖 NL2Repo 式「仅一份说明文档、从空仓起步」的场景）。
 - **T3 依赖供给（setup 钩子落地：per-workspace venv + pip）**（done） — 把 `WorkspaceSpec.setup`（0008 起仅占位、从不执行）真正落地，补上供给侧最后一环：一个源 provision 出工作区目录后，按 `setup` 命令在该目录里备好依赖环境（约定为 per-workspace `.venv` + pip 安装），并让消费侧 `Sandbox` 的 `run_shell` 自动使用该 venv。
-- **T4 git 源（clone repo@commit 成快照工作区）**（pending） — 在 T1 接缝上接入第三个源 `git`：`provision` 时把 `repo` clone 到隔离工作区目录并 `git checkout <commit>`，得到「某仓库停在某 commit」的干净快照，返回该目录。
+- **T4 git 源（clone repo@commit 成快照工作区）**（done） — 在 T1 接缝上接入第三个源 `git`：`provision` 时把 `repo` clone 到隔离工作区目录并 `git checkout <commit>`，得到「某仓库停在某 commit」的干净快照，返回该目录。
 
 ```mermaid
 graph LR
@@ -1138,6 +1138,8 @@ graph LR
     v_T3_2["T3 v2"]
     v_T3_1 -->|redefined| v_T3_2
     v_T4_1["T4 v1"]
+    v_T4_2["T4 v2"]
+    v_T4_1 -->|redefined| v_T4_2
     classDef st_done fill:#b7e4c7;
     classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
@@ -1147,4 +1149,5 @@ graph LR
     class v_T3_1 st_done;
     class v_T3_2 st_done;
     class v_T4_1 st_pending;
+    class v_T4_2 st_done;
 ```

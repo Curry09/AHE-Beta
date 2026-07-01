@@ -46,7 +46,7 @@ graph LR
 | T1 | SeedSource 协议 + 注册表 + local-fixture 实现 | P1 | done | — |
 | T2 | empty/nl-doc 源（可插拔证明） | P2 | done | T1 |
 | T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | P1 | done | T1 |
-| T4 | git 源（clone repo@commit 成快照工作区） | P1 | pending | T1 |
+| T4 | git 源（clone repo@commit 成快照工作区） | P1 | done | T1 |
 
 ## 各任务方案
 
@@ -258,7 +258,7 @@ test_deps.py：(a) `setup` 为空 → `ensure_deps` 空操作、目录无 `.venv
 
 1) 跨会话 venv 缓存/预热：每局现装耗时且需网络；是否按 (deps 指纹) 缓存复用一份 venv、或预构建镜像层。2) harness 子进程 bash 是否也应使用 workspace `.venv`（当前仅用户 agent Sandbox 用）：需 0003 harness entry 识别 workspace venv，涉及跨仓改动。3) 无网络/受限环境的依赖供给（离线镜像、vendored wheels）。4) setup 命令的来源：从需求文档（如 funcy start.md 的依赖清单）自动生成 setup，还是由场景/adapter 手写——前者需一个「文档→setup」的推导步骤，归后续。5) 依赖安装失败的策略：整局判失败，还是降级为「无该依赖的受限核实」。
 
-### T4 · git 源（clone repo@commit 成快照工作区）（P1 / pending）
+### T4 · git 源（clone repo@commit 成快照工作区）（P1 / done）
 
 **涉及文件**
 

@@ -1,6 +1,6 @@
 id: T4
 title: git 源（clone repo@commit 成快照工作区）
-status: pending
+status: done
 priority: P1
 tags: []
 depends-on:
@@ -14,9 +14,9 @@ parallel: false
 files:
   - backend/auto_designer/user/sim/sources/git.py
   - backend/tests/user/sim/test_git_source.py
-version: 1
+version: 2
 updated: '2026-07-01'
-change-reason: ''
+change-reason: 'done: 实现 git 源（clone repo@commit 成快照工作区）并离线单测通过'
 supersedes: []
 split-from:
 merged-from: []
