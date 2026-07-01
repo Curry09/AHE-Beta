@@ -1,0 +1,111 @@
+id: T1
+title: 种子场景采集（蒸馏，skill 形式）
+status: pending
+priority: P1
+tags: []
+depends-on: []
+relates-to:
+  - ref: 0006/T1
+    type: note
+  - ref: 0009/T1
+    type: note
+parallel: false
+files:
+  - tools/seed-distill/seed-card-schema.md
+  - tools/seed-distill/extract-harness-seed/SKILL.md
+  - tools/seed-distill/extract-harness-seed/reference.md
+  - backend/auto_designer/distill/seed_library.py
+  - backend/tests/distill/test_seed_library.py
+version: 1
+updated: '2026-07-01'
+change-reason: ''
+supersedes: []
+split-from:
+merged-from: []
+derived-from: []
+summary: |-
+  采集（蒸馏）侧按**轮辐式**组织，与 0006/T1（persona 采集）对称镜像，不另造大 skill：① 唯一公共契约
+  seed-card-schema.md（source-agnostic）——种子卡 schema（source · task · domain · capability_probed ·
+  difficulty · scope · autonomy_required · oracle · env · pairing_constraints · gates · provenance）+ 枚举
+  + 两道门原则（真实性/非 benchmark 门 + oracle 与 harbor 可复现门）+ held-out 侧字段（oracle/test_cmd/gates）
+  的存放约定；② 薄抽取 skill extract-harness-seed——只描述「从 closed issue+merged fix PR 等真实源 harvest +
+  过两道门 + ground 哪几字段」，只引用契约、不依赖任何其它 skill，收编 NexAU 既有 `extract-harness-seed`。本步
+  先落这两者；日志/SO/未来源作同契约的后续薄 skill 插入。交付物：③ 种子卡库的读写 seed_library.py（按契约存取
+  卡记录），供 0010/T2 注入消费。
+motivation: |-
+  整条进化的训练信号取自「模拟真实使用」分布上的用户体感；其真实性根植于种子场景是否来自真实数据、不据
+  benchmark 构造（CLAUDE.md 约束）。既有真实 harvest 方法（NexAU 仓库 `extract-harness-seed`）已沉淀「harvest
+  不 author / 从已解决的真实制品取沉淀 oracle / 两道门（oracle 门 + harbor 可复现门）/ 与 held-out benchmark
+  解耦」——重写必失真，故收编。更关键是**可扩展性**：与 persona 采集同构，公共部分（种子卡 schema + 枚举 +
+  两道门）抽成唯一契约、各薄 skill 只依赖契约且彼此独立——契约改一处全员生效，加新真实源只是新增一个薄 skill，
+  不碰别人。
+scope: |-
+  按轮辐式落地采集侧并定义种子卡库格式。本步范围：① seed-card-schema.md（唯一公共契约：种子卡 schema + 枚举
+  + 两道门原则 + held-out 字段存放约定，source-agnostic）；② extract-harness-seed（薄 skill，从 closed
+  issue+merged fix PR 等真实源 harvest，引用契约）；③ seed_library.py 读写。不接具体数据源拉取实现、不做
+  卡→SeedScenario 注入映射（归 T2）。日志/SO/未来源作同契约的后续薄 skill，留待补入（见 open-questions）。
+  智能配对（persona×seed）、容器/私有仓鉴权、oracle 客观判分运行时均为 out-of-scope（见 open-questions）。
+design: |-
+  - 轮辐式结构（tools/seed-distill/），与 tools/persona-distill/（0006）对称：
+      seed-card-schema.md            唯一公共契约（hub），source-agnostic
+      extract-harness-seed/          薄 skill（spoke），只依赖契约（收编 NexAU 既有方法）
+      (后续) extract-log-seed / extract-so-seed / …  各自薄 skill，同样只依赖契约
+    铁律：skill 只依赖契约，**彼此不依赖**（杜绝 skill→skill 与多副本漂移）。
+  - seed-card-schema.md（公共契约）：定义 source-agnostic 种子卡字段——
+      source{repo, issue_url?, fix_ref, not_in_benchmark}（真实来源 + 非 benchmark 断言）
+      task{prompt, context}（保留真实诉求原貌，不 sanitize；prompt 即注入 SeedScenario.description 的原文）
+      domain / capability_probed / difficulty / scope / autonomy_required（校准与配对元数据）
+      oracle{tier, spec, reference_solution, confidence} · env{repo_at, setup, test_cmd, base_image,
+        external_deps, budget} · pairing_constraints · gates{oracle_gate, harbor_repro_gate} · provenance
+    另含：各枚举受控取值（domain 词表与 persona D5.area 共享、capability 分类法、difficulty/scope/autonomy/
+    oracle tier 等）、两道门原则（oracle 门：成功须 harness-独立且可判；harbor 可复现门：可确定性搭环境跑
+    oracle），以及 **held-out 字段的存放约定**——`oracle`/`test_cmd`/`gates` 是 benchmark 侧客观判分制品，
+    契约明确它们随卡采集但注入时落 sidecar、绝不进 SeedScenario（红线由 0010/T2 落实、契约在此声明）。
+  - extract-harness-seed（薄 skill）：收编 NexAU 既有方法，只描述「从 closed issue+merged fix PR / 高票 Q&A
+    等**已解决**的真实制品 harvest 一张卡 + 过两道门 + FACT 字段转录/JUDGMENT 字段判定」；枚举/门/卡形状一律
+    引用 seed-card-schema.md，不再内嵌。**收编=只引契约、不把 NexAU 的 skill 文件拷进本仓**（spec 只描述交付物）。
+  - seed_library.py：一个库文件承载多条种子卡记录；纯数据，可双向序列化、对未知键前向兼容（演化友好）；提供
+    load / get(id) / add 最小读写。与 0006 的 PersonaLibrary 同构。
+  - 卡格式与 models.SeedScenario 解耦：卡是「采集到的真实任务 + benchmark 侧判分证据」，到 SeedScenario 的
+    映射（含 held-out 字段剥离）归 0010/T2。
+interface: |-
+  SeedLibrary(root|path)
+  - load() -> list[dict]           # 读全库（种子卡记录）
+  - get(seed_id: str) -> dict      # 按 id 取一条卡
+  - add(record: dict) -> None      # 追加一条卡记录
+  种子卡 schema 由 seed-card-schema.md（唯一契约）定义；与 models.SeedScenario 的映射见 0010/T2。
+tradeoffs: |-
+  - 轮辐式公共契约 vs 各 skill 自带 schema：选轮辐式（与 0006 同）。各自带必漂移；契约一处改全员生效，新真实源
+    只插一个薄 skill、彼此解耦可扩展。代价是要先把公共部分抽成契约。
+  - 收编 NexAU extract-harness-seed vs 另写 seed-distill skill：选收编。既有方法已沉淀「harvest 不 author /
+    两道门 / 与 held-out 解耦」，重写必失真且违背「seed 来自真实数据」；代价是带进跨仓制品需 vendored 并标注来源。
+  - 契约里保留完整 oracle/env/gates（含 test_cmd）vs 只留注入需要的字段：选保留完整。种子卡是真实制品的忠实
+    转录，判分证据（oracle/test_cmd/gates）必须随卡沉淀以供 harbor 侧评测；held-out 纪律靠**注入边界**剥离
+    （0010/T2），而非在采集侧就丢弃——丢弃会让卡不可复用于客观评测。
+acceptance: |-
+  seed-card-schema.md 为唯一 source-agnostic 公共契约（种子卡 schema + 枚举 + 两道门原则 + held-out 字段存放
+  约定）；extract-harness-seed 为薄 skill，只引用契约、无 skill→skill 依赖、无悬空引用，且不把 NexAU 的 skill
+  文件实际拷入本仓（spec 仅描述交付物）；seed_library 按契约读写多条卡库、可按 id 取、对未知键前向兼容；卡记录
+  `source.not_in_benchmark` 恒为真（契约级断言）；domain ∈ 受控词表、capability_probed ⊆ 能力分类法。
+tests: |-
+  单测（backend/tests/distill/test_seed_library.py）：
+  - SeedLibrary 读写：add 后 load 含该条、get(id) 取回等价记录；空库 load 返回空列表。
+  - 卡 schema round-trip：含 source/task/env/oracle/gates/provenance 的记录 to/from dict 字段级一致；
+    遇未知键忽略不报错（前向兼容）。
+  - 约束校验：卡记录 source.not_in_benchmark 为真（否则拒收，防 benchmark 污染）；domain ∈ seed-card-schema.md
+    受控词表、capability_probed ⊆ 能力分类法。
+references: |-
+  既有真实 harvest 方法（NexAU 仓库 `extract-harness-seed`，公共 schema/两道门原出处）：SKILL.md（capability
+  分类法、两道门、harvest 流水线）、reference.md（枚举/oracle tier/repro tier/harvest mechanics）、产物示例
+  seeds/seed-pytest-13537.json、seed-requests-6964.json、校验器 validate_seed.py。本组将其公共部分收敛为
+  seed-card-schema.md 契约。与 0006（persona 采集）对称镜像；domain 词表与 persona D5.area 共享。
+  CLAUDE.md「蒸馏模块」「种子场景库来自真实数据、benchmark 全程 held-out」；spec-0001/T1 SeedScenario 字段。
+open-questions: |-
+  - 日志/SO（及未来源）作「只依赖 seed-card-schema.md 的薄 skill」何时补入：本步先契约 + extract-harness-seed，
+    余者后续插入。
+  - 是否把 NexAU 的源 skill（仅是它此前的存放处）也重构为轮辐式（公共契约 + 薄 skill）？此为改其源仓，属另一件
+    事；本仓 seed-card-schema.md 统一以 extract-harness-seed 最新约定为准。
+  - 智能配对（persona×seed，domain 匹配 + 能力可信 + autonomy 适配）**不在本组**：run.py 现为 persona[i]×
+    seed[i % len] 取模轮转，约束配对为独立的下游 spec，本组不做成 task。
+  - env.base_image / external_deps（容器供给）与私有仓鉴权：引 0009/T4 open-question，标为超出本框架当前能力。
+  - oracle 客观判分（跑上游测试判修复对错）归 harbor 侧平行评测系统，红线 held-out、永不进本框架训练环。
