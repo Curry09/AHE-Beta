@@ -362,6 +362,7 @@ graph LR
 | backend/auto_designer/harness/launcher.py | 0003, 0008 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009 |
 | backend/auto_designer/models.py | 0001, 0008, 0009 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008 |
@@ -406,7 +407,7 @@ backend/
       orchestrator.py                   ← 0003/T6, 0007/T2, 0008/T1, 0009/T3
       run_state.py                      ← 0004/T1, 0007/T2
       runner.py                         ← 0004/T2
-      sim_user.py                       ← 0008/T1
+      sim_user.py                       ← 0008/T1, 0009/T3
     tracker/
       base.py                           ← 0001/T5
       fake.py                           ← 0001/T5
@@ -1123,10 +1124,13 @@ graph LR
     v_T2_2["T2 v2"]
     v_T2_1 -->|redefined| v_T2_2
     v_T3_1["T3 v1"]
+    v_T3_2["T3 v2"]
+    v_T3_1 -->|redefined| v_T3_2
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T1_2 st_done;
     class v_T2_1 st_done;
     class v_T2_2 st_done;
     class v_T3_1 st_done;
+    class v_T3_2 st_done;
 ```
