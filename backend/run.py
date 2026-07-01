@@ -3,7 +3,7 @@
 接线：用户侧 = spec-0005 控制信封 sim（ApiPersonaClient，模型走 backend/.env 的 LLM_*）；
      开发者侧 = 真 nexau dev agent + 真 Gitea（issue，走 backend/deploy/gitea/.env）
      + 本地 git 仓承载 harness 代码。
-本地规模：仅 P-0991(expert) 1 个 user agent × 2 dev agent，跑 1 轮；跑前复位到最初状态。
+本地规模：仅 P-0991(expert) 1 个 user agent × 2 dev agent，默认跑 3 轮；跑前复位到最初状态。
 Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析 main HEAD SHA 作会话级快照。
 
 前置：
@@ -135,11 +135,11 @@ def main() -> int:
     from auto_designer.loop.metrics import Metrics
     from auto_designer.loop.orchestrator import Orchestrator
     from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
-    from auto_designer.models import Persona, SeedScenario
+    from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
     from auto_designer.tracker.gitea import GiteaTracker
     from auto_designer.user.session_store import SessionStore
     from auto_designer.user.sim.dimensions import Persona as SimPersona
-    from auto_designer.user.sim.persona_client import ApiPersonaClient
+    from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
     from auto_designer.user.sim.run_live import TASK, expert
 
     print("① 种 harness 本地仓 ...")
@@ -162,8 +162,14 @@ def main() -> int:
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
     # 场景用 run_live.TASK（split_bill「加进仓库并证明可用」）——需 harness 真正动文件/跑测试（工具调用），
     # 而非纯文本咨询；shallow/expert 同一任务上做能力分叉。
-    client = ApiPersonaClient()
-    scenarios = [SeedScenario(description=TASK)]  # 仅测 P-0991(expert)
+    # 内层 tool-use 用户 agent：ApiPersonaClient.complete 作 LLM，AgenticPersonaClient 提供
+    # bind_session（sim_user 据此绑定共享工作区，令用户 agent 在 harness 同目录核实）。
+    api = ApiPersonaClient()
+    client = AgenticPersonaClient(api.complete)
+    # 场景携带 billing-split fixture：orchestrator 每局 materialize 共享工作区并注入 harness。
+    scenarios = [
+        SeedScenario(description=TASK, workspace=WorkspaceSpec(fixture="billing-split"))
+    ]  # 仅测 P-0991(expert)
     fixed_set: list[tuple[Persona, SeedScenario]] = []
     sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）
     for build, scenario in zip([expert], scenarios, strict=True):
