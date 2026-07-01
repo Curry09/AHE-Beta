@@ -16,9 +16,9 @@ files:
   - backend/auto_designer/user/sim/workspace.py
   - backend/tests/user/sim/test_seed_source.py
   - backend/tests/user/sim/test_workspace.py
-version: 1
-updated: '2026-06-30'
-change-reason: ''
+version: 2
+updated: '2026-07-01'
+change-reason: '对齐 T3：依赖供给（WorkspaceSpec.setup 钩子落地）由原「归后续独立 spec」收进本组 T3；更新 open-question #1 指向 T3'
 supersedes: []
 split-from:
 merged-from: []
@@ -64,5 +64,5 @@ tests: |-
 references: |-
   扩展 0008/T1（`workspace.py` 的 `materialize`、`WorkspaceSpec`，`models.py` 的 `SeedScenario`）。消费侧 0008/T1 的 `sim_user` 桥接与 0008/T2 的 `Sandbox(workspace=dir)` 原样复用、不在本任务 files 内。被本组 T2（落 `sources/empty.py` 经自动发现注册）消费。
 open-questions: |-
-  1) 依赖供给与 `WorkspaceSpec.setup` 钩子（0008 起仅占位、不执行）何时真正实现：用 cached venv 还是每局 pip install？这决定带第三方依赖的任务（部分 NL2Repo、多数真实仓库）能否在当前 stdlib-only 假设的 Sandbox 里跑起来。本组不做，归后续独立 spec。
+  1) 依赖供给与 `WorkspaceSpec.setup` 钩子（0008 起仅占位、不执行）的落地：**已收进本组 T3**（每局建 per-workspace `.venv` + pip、Sandbox 探测 `.venv` 使用之），使带第三方依赖的任务（部分 NL2Repo、多数真实仓库）能在 Sandbox 里跑起来；cached venv 复用等细节见 T3 open-questions。
   2) 后续重型源（容器化的 SWE-bench / Terminal-Bench、git@commit 快照）是否需把消费港口从「工作区目录」升级为「可运行句柄 {cwd, run(cmd), cleanup}」，以便 Provider 与（将来的）客观评测共享同一运行时能力。本组港口保持「目录 + 本地 shell」不变；是否升级、何时升级留下游评估，目的是让重型源接入时尽量不返工港口。
