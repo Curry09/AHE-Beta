@@ -1,0 +1,1501 @@
+[
+  {
+    "id": "selfreport-0aafcc54e7a4",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2026-04-28; ongoing autonomous Claude Code loop"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "It owns the `app.ticker.add` loop and mutates Pixi objects directly every frame. **Per-frame state never goes through React** — that would re-render the tree at 60fps and tank everything."
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "security",
+          "types",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "Tests first. Code second. Open a PR against `dev` (never `main`). Auto-merge if CI is green."
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated+observed",
+          "confidence": "high",
+          "evidence_quote": "`.claude/invariants.md` — hard rules. \"Leaderboard logic must remain server-trusted.\" \"No theme toggle.\" \"Desktop only.\""
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated+observed",
+          "confidence": "high",
+          "evidence_quote": "I review a `dev` branch periodically and merge it to `main`. The loop never touches production and never deploys."
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "The phrase \"do not invent bugs\" under Tier A is load-bearing. Without it, the loop fabricates problems to look productive."
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "I review a `dev` branch periodically and merge it to `main`. The loop never touches production and never deploys."
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "deep",
+        "stack": [
+          "TanStack Start",
+          "React 19",
+          "Cloudflare Workers",
+          "PixiJS v8",
+          "Drizzle",
+          "Neon Postgres",
+          "Clerk",
+          "bun",
+          "TypeScript",
+          "Zod"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "The product is TanStack Start (React 19, file routing, SSR) on Cloudflare Workers. PixiJS v8 for Word Fall, plain DOM for Type Race. Drizzle + Neon Postgres. Clerk for auth."
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "the bulk of the routine commits to it are written by an autonomous Claude Code loop"
+      }
+    },
+    "behavioral_prediction": "Runs an agentic, spec-fenced loop shipping small TDD PRs autonomously behind a green-CI gate while he reviews dev before promoting to main; satisfaction comes from the agent honoring invariants and not drifting into invented work.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@_khanshaheb/3561269",
+          "type": "blog"
+        }
+      ],
+      "reputation": "shipped named product type.win on Cloudflare Workers",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "It owns the `app.ticker.add` loop and mutates Pixi objects directly every frame. **Per-frame state never goes through React** — that would re-render the tree at 60fps and tank everything.",
+          "source": "dev.to/@_khanshaheb/3561269"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "Tests first. Code second. Open a PR against `dev` (never `main`). Auto-merge if CI is green.",
+          "source": "dev.to/@_khanshaheb/3561269"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "`.claude/invariants.md` — hard rules. \"Leaderboard logic must remain server-trusted.\" \"No theme toggle.\" \"Desktop only.\"",
+          "source": "dev.to/@_khanshaheb/3561269"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "I review a `dev` branch periodically and merge it to `main`. The loop never touches production and never deploys.",
+          "source": "dev.to/@_khanshaheb/3561269"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "The phrase \"do not invent bugs\" under Tier A is load-bearing. Without it, the loop fabricates problems to look productive.",
+          "source": "dev.to/@_khanshaheb/3561269"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "I review a `dev` branch periodically and merge it to `main`. The loop never touches production and never deploys.",
+          "source": "dev.to/@_khanshaheb/3561269"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "The product is TanStack Start (React 19, file routing, SSR) on Cloudflare Workers. PixiJS v8 for Word Fall, plain DOM for Type Race. Drizzle + Neon Postgres. Clerk for auth.",
+          "source": "dev.to/@_khanshaheb/3561269"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "the bulk of the routine commits to it are written by an autonomous Claude Code loop",
+          "source": "dev.to/@_khanshaheb/3561269"
+        }
+      ],
+      "pii": "public-figure exemption: handle is a public attribution (named maintainer / public project), not private PII"
+    }
+  },
+  {
+    "id": "selfreport-646aeb926728",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2026-05-03; vibe-coding/agent migration narrative"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "Worse: recursive Zod schemas hit TypeScript's instantiation depth limit and bail out with `TS2589: Type instantiation is excessively deep and possibly infinite`."
+      },
+      "D2_acceptance_bar": {
+        "primary": "type-safety-purist",
+        "flags": [
+          "tests",
+          "types",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "I tightened the prompt. Added a bold rule: `Tests are sacred. Do not modify, delete, or simplify them.`"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "The exact prompt I gave every agent is [public on the `next` branch](https://raw.githubusercontent.com/samchon/typia/next/GO-MIGRATION-INSTRUCTION.md). The core of it:"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "**Read the diff, not the summary.** Every failure above could have been caught in 30 seconds — by anyone who actually opened the diff."
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "Every prompt rule I added was a hole I tried to plug. Every morning I came back to find the agent had crawled out through a hole I hadn't thought to plug."
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "Give an AI a single signal — `pnpm test` is green — and it will reach for the path of *appearing to pass* over the path of *actually passing*. Every time."
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "TypeScript",
+          "Go",
+          "typia",
+          "Zod",
+          "tsc/tsgo",
+          "pnpm",
+          "GitHub Actions"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "**typia is a TypeScript compiler transformer.**"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "So I kicked off the agent before bed and went to sleep."
+      }
+    },
+    "behavioral_prediction": "Delegates large mechanical jobs to agents overnight but never trusts the green-CI summary; opens every diff, tightens the spec rule-by-rule, anchors with a hand-built demo file, treats tests/types as sacred.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@samchon/3604313",
+          "type": "blog"
+        }
+      ],
+      "reputation": "maintainer of typia / Nestia; public migration prompt + next branch",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "Worse: recursive Zod schemas hit TypeScript's instantiation depth limit and bail out with `TS2589: Type instantiation is excessively deep and possibly infinite`.",
+          "source": "dev.to/@samchon/3604313"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "I tightened the prompt. Added a bold rule: `Tests are sacred. Do not modify, delete, or simplify them.`",
+          "source": "dev.to/@samchon/3604313"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "The exact prompt I gave every agent is [public on the `next` branch](https://raw.githubusercontent.com/samchon/typia/next/GO-MIGRATION-INSTRUCTION.md). The core of it:",
+          "source": "dev.to/@samchon/3604313"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "**Read the diff, not the summary.** Every failure above could have been caught in 30 seconds — by anyone who actually opened the diff.",
+          "source": "dev.to/@samchon/3604313"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "Every prompt rule I added was a hole I tried to plug. Every morning I came back to find the agent had crawled out through a hole I hadn't thought to plug.",
+          "source": "dev.to/@samchon/3604313"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "Give an AI a single signal — `pnpm test` is green — and it will reach for the path of *appearing to pass* over the path of *actually passing*. Every time.",
+          "source": "dev.to/@samchon/3604313"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "**typia is a TypeScript compiler transformer.**",
+          "source": "dev.to/@samchon/3604313"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "So I kicked off the agent before bed and went to sleep.",
+          "source": "dev.to/@samchon/3604313"
+        }
+      ],
+      "pii": "public-figure exemption: handle is a public attribution (named maintainer / public project), not private PII"
+    }
+  },
+  {
+    "id": "selfreport-e8f9e1631f42",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2025-10-12; anti-'vibe coding' systematic Cursor workflow"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "In this phase, I deliberately elaborate as much technical knowledge as possible - architecture constraints, data models, invariants, performance budgets, failure modes, and edge cases - so the plan encodes my expertise and trade-offs."
+      },
+      "D2_acceptance_bar": {
+        "primary": "type-safety-purist",
+        "flags": [
+          "tests",
+          "types",
+          "a11y",
+          "style",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "✅ TypeScript compilation - No type errors"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated+observed",
+          "confidence": "high",
+          "evidence_quote": "so the plan encodes my expertise and trade-offs"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "I reflect on diffs with questions only I can answer (\"Does this match our failure modes?\" \"Will this scale with our data shape?\")."
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "This reflection step catches inconsistencies before they become problems."
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "The goal of this workflow is not to outsource judgment - it's to amplify it, so my advantages (taste, domain context, architectural instincts) compound through the AI, not get washed out by it."
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "deep",
+        "stack": [
+          "React",
+          "TypeScript",
+          "Cursor",
+          "Playwright",
+          "Vitest",
+          "ESLint",
+          "Prettier"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "The key here is my Cursor rules - custom guidelines I maintain that ensure consistent React patterns, accessibility standards, and quality requirements."
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "I developed a workflow that treats AI as a skilled collaborator rather than a code generator. It's structured, repeatable, and gives me complete control while leveraging AI's strengths."
+      }
+    },
+    "behavioral_prediction": "Runs a rigid spec-first pipeline with custom Cursor rules; refuses to ship without green types/lint/tests/a11y and reviews every diff against his own failure-mode questions; treats drift into autopilot as a 'process bug.'",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@haco29/2878943",
+          "type": "blog"
+        }
+      ],
+      "reputation": "Front-End Tech Lead at Verbit; public methodology repo",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "In this phase, I deliberately elaborate as much technical knowledge as possible - architecture constraints, data models, invariants, performance budgets, failure modes, and edge cases - so the plan encodes my expertise and trade-offs.",
+          "source": "dev.to/@haco29/2878943"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "✅ TypeScript compilation - No type errors",
+          "source": "dev.to/@haco29/2878943"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "so the plan encodes my expertise and trade-offs",
+          "source": "dev.to/@haco29/2878943"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "I reflect on diffs with questions only I can answer (\"Does this match our failure modes?\" \"Will this scale with our data shape?\").",
+          "source": "dev.to/@haco29/2878943"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "This reflection step catches inconsistencies before they become problems.",
+          "source": "dev.to/@haco29/2878943"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "The goal of this workflow is not to outsource judgment - it's to amplify it, so my advantages (taste, domain context, architectural instincts) compound through the AI, not get washed out by it.",
+          "source": "dev.to/@haco29/2878943"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "The key here is my Cursor rules - custom guidelines I maintain that ensure consistent React patterns, accessibility standards, and quality requirements.",
+          "source": "dev.to/@haco29/2878943"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "I developed a workflow that treats AI as a skilled collaborator rather than a code generator. It's structured, repeatable, and gives me complete control while leveraging AI's strengths.",
+          "source": "dev.to/@haco29/2878943"
+        }
+      ],
+      "pii": "public-figure exemption: handle is a public attribution (named maintainer / public project), not private PII"
+    }
+  },
+  {
+    "id": "selfreport-887e04634e37",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2026-05-18; references Claude Opus 4.7 / GPT-5.5 era"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "I know how to manage context and memory, how to map out documentation and spec files, and how to steer the model toward the outcome I want."
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "let the agent write the code, but you still make the architectural decisions, write the specs, and test the result"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "let the agent write the code, but you still make the architectural decisions, write the specs, and test the result"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "You need enough hand-written code under your belt that you can read code and actually see what it's doing, instead of skimming past it like noise."
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "injected",
+          "basis": "stated",
+          "confidence": "low"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "That's exactly why I'm not willing to pretend the tool alone is enough. Better output does not erase the need for actual judgment."
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "deep",
+        "stack": [
+          "Claude Code",
+          "GPT-5.5",
+          "Codex",
+          "OpenClaw",
+          "VS Code"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "I've been using it that way in my own workflow and in my home lab with eight machines managed by **OpenClaw**."
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "The AI handles the typing. You still have to handle the thinking."
+      }
+    },
+    "behavioral_prediction": "Drives agents with spec/doc files and managed context as a force multiplier but insists on reading generated code and owning architecture; frustrated by being asked to trust output blindly.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@bradtraversy/3694547",
+          "type": "blog"
+        }
+      ],
+      "reputation": "public web-dev instructor (Traversy Media); eight-machine OpenClaw home lab",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "I know how to manage context and memory, how to map out documentation and spec files, and how to steer the model toward the outcome I want.",
+          "source": "dev.to/@bradtraversy/3694547"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "let the agent write the code, but you still make the architectural decisions, write the specs, and test the result",
+          "source": "dev.to/@bradtraversy/3694547"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "let the agent write the code, but you still make the architectural decisions, write the specs, and test the result",
+          "source": "dev.to/@bradtraversy/3694547"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "You need enough hand-written code under your belt that you can read code and actually see what it's doing, instead of skimming past it like noise.",
+          "source": "dev.to/@bradtraversy/3694547"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "That's exactly why I'm not willing to pretend the tool alone is enough. Better output does not erase the need for actual judgment.",
+          "source": "dev.to/@bradtraversy/3694547"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "I've been using it that way in my own workflow and in my home lab with eight machines managed by **OpenClaw**.",
+          "source": "dev.to/@bradtraversy/3694547"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "The AI handles the typing. You still have to handle the thinking.",
+          "source": "dev.to/@bradtraversy/3694547"
+        }
+      ],
+      "pii": "public-figure exemption: handle is a public attribution (named maintainer / public project), not private PII"
+    }
+  },
+  {
+    "id": "selfreport-93cfcad328bf",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2026-05-13"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "I instrumented the router to log the actual model picked per prompt and the cost in real time"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "perf",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "Conservative context is cheap to ship and expensive to consume."
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "The first version does not have to be smart."
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated+observed",
+          "confidence": "high",
+          "evidence_quote": "Look at the input token count on three of your normal Cursor turns."
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated+observed",
+          "confidence": "high",
+          "evidence_quote": "The thing I built to replace the routing piece of Cursor"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "I did not believe the number. I assumed I had a bug."
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "TypeScript",
+          "Anthropic API",
+          "OpenAI API",
+          "Cursor",
+          "Claude Code",
+          "Copilot"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "Two hundred lines of TypeScript including imports, error handling, a pricing table, and a cost calculator"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "injected",
+        "basis": "stated",
+        "confidence": "low"
+      }
+    },
+    "behavioral_prediction": "Treats the harness as an instrument to be audited, not trusted: inspects token/cost telemetry, distrusts vendor defaults, replaces opaque routing with his own measured solution.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@thegdsks/3624038",
+          "type": "blog"
+        }
+      ],
+      "reputation": "builds Glincker; instrumented router + measured bills",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "I instrumented the router to log the actual model picked per prompt and the cost in real time",
+          "source": "dev.to/@thegdsks/3624038"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "Conservative context is cheap to ship and expensive to consume.",
+          "source": "dev.to/@thegdsks/3624038"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "The first version does not have to be smart.",
+          "source": "dev.to/@thegdsks/3624038"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "Look at the input token count on three of your normal Cursor turns.",
+          "source": "dev.to/@thegdsks/3624038"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "The thing I built to replace the routing piece of Cursor",
+          "source": "dev.to/@thegdsks/3624038"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "I did not believe the number. I assumed I had a bug.",
+          "source": "dev.to/@thegdsks/3624038"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "Two hundred lines of TypeScript including imports, error handling, a pricing table, and a cost calculator",
+          "source": "dev.to/@thegdsks/3624038"
+        }
+      ],
+      "pii": "public-figure exemption: handle is a public attribution (named maintainer / public project), not private PII"
+    }
+  },
+  {
+    "id": "selfreport-d6b8c874d43d",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2026-04-20; LLM-assisted build over ~10-12 months"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "Some problems are 'LLM hard'"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "tests",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "Infrastructure is not optional."
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "open a session and tell the clanker what to do"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "it happily generates abstractions that don't earn their keep unless you push back"
+        },
+        "on_offtrack": {
+          "value": "retry",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "I can blow up a module, regenerate it, and the test suite tells me whether I'm back where I was"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "I follow the AI critics and agree there are real risks in LLM-supported development."
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "working",
+        "stack": [
+          "Python",
+          "Claude Code",
+          "MCP",
+          "OpenAPI",
+          "PyPI",
+          "CI/CD"
+        ],
+        "weak": [
+          "Python idioms"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "ship a production-ready"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "The project is developed with Claude Code"
+      }
+    },
+    "behavioral_prediction": "Runs the harness instructionlessly but pins behaviour with a strong test suite as executable spec, freely regenerating modules and pushing back on unearned abstractions.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@sebs/3189120",
+          "type": "blog"
+        }
+      ],
+      "reputation": "ecosystems-cli on PyPI, public repo, OpenCollective-funded",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "Some problems are 'LLM hard'",
+          "source": "dev.to/@sebs/3189120"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "Infrastructure is not optional.",
+          "source": "dev.to/@sebs/3189120"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "open a session and tell the clanker what to do",
+          "source": "dev.to/@sebs/3189120"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "it happily generates abstractions that don't earn their keep unless you push back",
+          "source": "dev.to/@sebs/3189120"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "I can blow up a module, regenerate it, and the test suite tells me whether I'm back where I was",
+          "source": "dev.to/@sebs/3189120"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "I follow the AI critics and agree there are real risks in LLM-supported development.",
+          "source": "dev.to/@sebs/3189120"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "ship a production-ready",
+          "source": "dev.to/@sebs/3189120"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "The project is developed with Claude Code",
+          "source": "dev.to/@sebs/3189120"
+        }
+      ],
+      "pii": "public-figure exemption: handle is a public attribution (named maintainer / public project), not private PII"
+    }
+  },
+  {
+    "id": "selfreport-986ca7c71903",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2026-05-11"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "surface",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "The AI never mentioned indexes. I never asked. That's the trap"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [
+          "security",
+          "tests",
+          "perf",
+          "a11y"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "The gap between \"looks like it works\" and \"works in production\" is where careers go to die."
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "vibe-dump",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "I described a SaaS dashboard to Cursor. It generated the React components."
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "Read Every Line Before Shipping"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "Three hours to build. Three weeks to fix."
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "the humility to say: \"The AI wrote this, but I need to verify it works correctly.\""
+      },
+      "D5_domain": {
+        "area": "web-backend",
+        "depth": "working",
+        "stack": [
+          "React",
+          "Cursor",
+          "JWT",
+          "bcrypt",
+          "redis",
+          "npm"
+        ],
+        "weak": [
+          "database design",
+          "security",
+          "performance"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "If you don't understand database design, vibe-code the feature, then ask a human to review the schema"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "Vibe the Feature, Engineer the Foundation"
+      }
+    },
+    "behavioral_prediction": "Vibe-dumps features fast for prototypes but, after a production incident, gates anything user-facing behind a manual security/schema/perf review; satisfaction from speed that survives real load.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@mamoor_ahmad/3651450",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "The AI never mentioned indexes. I never asked. That's the trap",
+          "source": "dev.to/@mamoor_ahmad/3651450"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "The gap between \"looks like it works\" and \"works in production\" is where careers go to die.",
+          "source": "dev.to/@mamoor_ahmad/3651450"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "I described a SaaS dashboard to Cursor. It generated the React components.",
+          "source": "dev.to/@mamoor_ahmad/3651450"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "Read Every Line Before Shipping",
+          "source": "dev.to/@mamoor_ahmad/3651450"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "Three hours to build. Three weeks to fix.",
+          "source": "dev.to/@mamoor_ahmad/3651450"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "the humility to say: \"The AI wrote this, but I need to verify it works correctly.\"",
+          "source": "dev.to/@mamoor_ahmad/3651450"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "If you don't understand database design, vibe-code the feature, then ask a human to review the schema",
+          "source": "dev.to/@mamoor_ahmad/3651450"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "Vibe the Feature, Engineer the Foundation",
+          "source": "dev.to/@mamoor_ahmad/3651450"
+        }
+      ],
+      "pii": "stripped: id is sha256(handle)[:12]; only derived profile retained"
+    }
+  },
+  {
+    "id": "selfreport-786d1d5bece4",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2025-11-12; current Cursor Plan Mode"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "it analyzes your codebase to understand how you do things, asks clarifying questions"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "scope",
+          "style"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "This helps the agent follow the existing code patterns and stay consistent."
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "generates a plan that lets you think and reflect on whether what will be implemented is really what you need"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "I always try to be careful with the output and not blindly follow the steps that the AI describes"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "This reverts your code to the state it was in when you sent that prompt and lets you modify it."
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "I update the plan if necessary and add new requirements when the ones I gave"
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "working",
+        "stack": [
+          "React",
+          "Redux",
+          "Ruby on Rails",
+          "Cursor"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "I can reference external library documentation such as Redux, Ruby on Rails, or React"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "Once the plan feels solid, we need to give the AI the right context to execute it."
+      }
+    },
+    "behavioral_prediction": "Drives the harness in plan-first mode, curating context and reviewing/editing the AI's plan before execution, reverting via checkpoints when a prompt misses; values consistency with existing codebase patterns over raw speed.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@douguiluz/3017577",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "it analyzes your codebase to understand how you do things, asks clarifying questions",
+          "source": "dev.to/@douguiluz/3017577"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "This helps the agent follow the existing code patterns and stay consistent.",
+          "source": "dev.to/@douguiluz/3017577"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "generates a plan that lets you think and reflect on whether what will be implemented is really what you need",
+          "source": "dev.to/@douguiluz/3017577"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "I always try to be careful with the output and not blindly follow the steps that the AI describes",
+          "source": "dev.to/@douguiluz/3017577"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "This reverts your code to the state it was in when you sent that prompt and lets you modify it.",
+          "source": "dev.to/@douguiluz/3017577"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "I update the plan if necessary and add new requirements when the ones I gave",
+          "source": "dev.to/@douguiluz/3017577"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "I can reference external library documentation such as Redux, Ruby on Rails, or React",
+          "source": "dev.to/@douguiluz/3017577"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "Once the plan feels solid, we need to give the AI the right context to execute it.",
+          "source": "dev.to/@douguiluz/3017577"
+        }
+      ],
+      "pii": "stripped: id is sha256(handle)[:12]; only derived profile retained"
+    }
+  },
+  {
+    "id": "selfreport-a32abdbd82ee",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2025-11-02; references prior 'vibe coding' session"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium",
+        "evidence_quote": "When I looked at the code, I kept asking simpler questions:"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "scope",
+          "style"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "The best code is often the code you don't write. AI doesn't always know that."
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "this package was originally created by my AI assistant during a \"vibe coding\" session - I was just going with the flow and letting it build the structure."
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "When I looked at the code, I kept asking simpler questions:"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "When AI suggests adding complexity, ask: \"Can I do this more simply?\""
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "Use AI for implementation, but keep a human in the loop for architectural decisions."
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "working",
+        "stack": [
+          "TypeScript",
+          "React",
+          "React Native",
+          "wagmi",
+          "Ethereum auth"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium",
+        "evidence_quote": "I had a shared authentication package (`@do-not-stop/shared-auth`) that was being used by both my frontend (React web) and mobile (React Native) apps."
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "Use AI for implementation, but keep a human in the loop for architectural decisions."
+      }
+    },
+    "behavioral_prediction": "Delegates implementation to the agent but stays in the loop as the architectural editor, repeatedly pushing 'can this be simplified/removed?' to strip the agent's tendency to over-engineer.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@heyradcode/2984226",
+          "type": "blog"
+        }
+      ],
+      "reputation": "public repo heyradcode/do-not-stop",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "When I looked at the code, I kept asking simpler questions:",
+          "source": "dev.to/@heyradcode/2984226"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "The best code is often the code you don't write. AI doesn't always know that.",
+          "source": "dev.to/@heyradcode/2984226"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "this package was originally created by my AI assistant during a \"vibe coding\" session - I was just going with the flow and letting it build the structure.",
+          "source": "dev.to/@heyradcode/2984226"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "When I looked at the code, I kept asking simpler questions:",
+          "source": "dev.to/@heyradcode/2984226"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "When AI suggests adding complexity, ask: \"Can I do this more simply?\"",
+          "source": "dev.to/@heyradcode/2984226"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "Use AI for implementation, but keep a human in the loop for architectural decisions.",
+          "source": "dev.to/@heyradcode/2984226"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "I had a shared authentication package (`@do-not-stop/shared-auth`) that was being used by both my frontend (React web) and mobile (React Native) apps.",
+          "source": "dev.to/@heyradcode/2984226"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "Use AI for implementation, but keep a human in the loop for architectural decisions.",
+          "source": "dev.to/@heyradcode/2984226"
+        }
+      ],
+      "pii": "stripped: id is sha256(handle)[:12]; only derived profile retained"
+    }
+  },
+  {
+    "id": "selfreport-5fe2abff8deb",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2026-06-17"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium",
+        "evidence_quote": "When I ask a coding agent \"does this plan look good?\", the answer is usually useful but too polite."
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "scope",
+          "tests",
+          "security"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "I use it when the plan is still cheap to change but expensive to undo later: migrations, auth changes, data model changes, release plans, agent workflows that can touch many files"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "The input has to be concrete."
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "I still ask agents to review plans. I just do not stop there anymore."
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "It found the boring failure I was most likely to skip. The rollback boundary changed the plan before I touched the migration."
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "I started using premortems for a boring reason: I did not trust the default review question."
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "working",
+        "stack": [
+          "Claude Code",
+          "Codex",
+          "SQLite",
+          "Postgres"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "I made this one for how I actually use Claude Code and Codex:"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "I still ask agents to review plans. I just do not stop there anymore. For decisions that matter, I want one extra pass where the plan already failed and the agent has to tell me why."
+      }
+    },
+    "behavioral_prediction": "Front-loads concrete specs and distrusts agreeable default reviews, deliberately framing adversarial premortem passes before high-stakes diffs (migrations, auth).",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@pablonax/3922930",
+          "type": "blog"
+        }
+      ],
+      "reputation": "public premortem-skill repo",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "When I ask a coding agent \"does this plan look good?\", the answer is usually useful but too polite.",
+          "source": "dev.to/@pablonax/3922930"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "I use it when the plan is still cheap to change but expensive to undo later: migrations, auth changes, data model changes, release plans, agent workflows that can touch many files",
+          "source": "dev.to/@pablonax/3922930"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "The input has to be concrete.",
+          "source": "dev.to/@pablonax/3922930"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "I still ask agents to review plans. I just do not stop there anymore.",
+          "source": "dev.to/@pablonax/3922930"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "It found the boring failure I was most likely to skip. The rollback boundary changed the plan before I touched the migration.",
+          "source": "dev.to/@pablonax/3922930"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "I started using premortems for a boring reason: I did not trust the default review question.",
+          "source": "dev.to/@pablonax/3922930"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "I made this one for how I actually use Claude Code and Codex:",
+          "source": "dev.to/@pablonax/3922930"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "I still ask agents to review plans. I just do not stop there anymore. For decisions that matter, I want one extra pass where the plan already failed and the agent has to tell me why.",
+          "source": "dev.to/@pablonax/3922930"
+        }
+      ],
+      "pii": "stripped: id is sha256(handle)[:12]; only derived profile retained"
+    }
+  },
+  {
+    "id": "selfreport-68a6aeebb044",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "2026-05-06"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "surface",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "When I first started vibe coding, I used to hate it because the outputs always deviated from my vision."
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "And honestly, if the error is minor and doesn’t affect functionality, keep it on low priority and fix it later."
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "Always be clear about your idea before building. Make a small plan, define the workflow, and create a rough design for clarity."
+        },
+        "supervision": {
+          "value": "micromanage",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "Another thing I started doing is mentioning the exact file name where I want changes. This narrows the edits and protects the rest of the project from unnecessary modifications."
+        },
+        "on_offtrack": {
+          "value": "abandon",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium",
+          "evidence_quote": "The reason could be anything, but the result was the same: Abandoning the idea and moving on to another one."
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "Improve yourself before blaming the tool."
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "working",
+        "stack": [
+          "React",
+          "TypeScript",
+          "Vite",
+          "Tailwind CSS",
+          "Framer Motion",
+          "HTML",
+          "CSS",
+          "JavaScript"
+        ],
+        "weak": [
+          "backend"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high",
+        "evidence_quote": "It was built entirely using HTML, CSS, and vanilla JavaScript without any backend. Simple, lightweight, and fun."
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium",
+        "evidence_quote": "Sometimes I’m blank during challenges, and I need help understanding what can actually be built around the topic. AI helps me research ideas, improve concepts, and think differently."
+      }
+    },
+    "behavioral_prediction": "Turns ideas into deployed frontend apps fast, iterating prompt-by-prompt with tightly scoped file-level instructions; will abandon an idea rather than grind through a stalled build.",
+    "provenance": {
+      "sources": [
+        {
+          "url": "dev.to/@konark_13/3622503",
+          "type": "blog"
+        }
+      ],
+      "reputation": "named shipped projects with live URLs",
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "dim": "D1_evaluation_capability",
+          "quote": "When I first started vibe coding, I used to hate it because the outputs always deviated from my vision.",
+          "source": "dev.to/@konark_13/3622503"
+        },
+        {
+          "dim": "D2_acceptance_bar",
+          "quote": "And honestly, if the error is minor and doesn’t affect functionality, keep it on low priority and fix it later.",
+          "source": "dev.to/@konark_13/3622503"
+        },
+        {
+          "dim": "D3_interaction_style.delegation",
+          "quote": "Always be clear about your idea before building. Make a small plan, define the workflow, and create a rough design for clarity.",
+          "source": "dev.to/@konark_13/3622503"
+        },
+        {
+          "dim": "D3_interaction_style.supervision",
+          "quote": "Another thing I started doing is mentioning the exact file name where I want changes. This narrows the edits and protects the rest of the project from unnecessary modifications.",
+          "source": "dev.to/@konark_13/3622503"
+        },
+        {
+          "dim": "D3_interaction_style.on_offtrack",
+          "quote": "The reason could be anything, but the result was the same: Abandoning the idea and moving on to another one.",
+          "source": "dev.to/@konark_13/3622503"
+        },
+        {
+          "dim": "D4_trust_model",
+          "quote": "Improve yourself before blaming the tool.",
+          "source": "dev.to/@konark_13/3622503"
+        },
+        {
+          "dim": "D5_domain",
+          "quote": "It was built entirely using HTML, CSS, and vanilla JavaScript without any backend. Simple, lightweight, and fun.",
+          "source": "dev.to/@konark_13/3622503"
+        },
+        {
+          "dim": "D6_autonomy_expectation",
+          "quote": "Sometimes I’m blank during challenges, and I need help understanding what can actually be built around the topic. AI helps me research ideas, improve concepts, and think differently.",
+          "source": "dev.to/@konark_13/3622503"
+        }
+      ],
+      "pii": "stripped: id is sha256(handle)[:12]; only derived profile retained"
+    }
+  }
+]

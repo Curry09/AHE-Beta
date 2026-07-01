@@ -1,0 +1,73 @@
+{
+  "extracted_at": "2026-06-29",
+  "source": "dev.to first-person long-form (Forem API discovery + per-subject gate)",
+  "candidates_screened": 21,
+  "admitted": 11,
+  "rejected": 10,
+  "id_scheme": "sha256(handle)[:12]; PII stripped. Public-figure exemption noted in provenance.pii.",
+  "anchor_poles": {
+    "selfreport-0aafcc54e7a4": "agentic/spec-driven with gated-merge supervision (high-capability, balanced trust)",
+    "selfreport-646aeb926728": "skeptical/type-safety-purist (expert who distrusts the agent's self-report)",
+    "selfreport-e8f9e1631f42": "skeptical/spec-driven senior (process-purist, type-safety + tests gate)",
+    "selfreport-887e04634e37": "foundation-first skeptic (high-capability, spec-driven, trust-but-verify)",
+    "selfreport-93cfcad328bf": "skeptical/functional-cost-driven",
+    "selfreport-d6b8c874d43d": "skeptical/tests-as-spec-agentic",
+    "selfreport-986ca7c71903": "burned-pragmatic (ship-fast prototyper turned review-gated for production)",
+    "selfreport-786d1d5bece4": "mid-pragmatic (balanced/functional, plan-driven collaborator)",
+    "selfreport-a32abdbd82ee": "mid-pragmatic/simplification-reviewer",
+    "selfreport-5fe2abff8deb": "skeptical/spec-driven",
+    "selfreport-68a6aeebb044": "ship-fast/collaborative-with-tight-scoping"
+  },
+  "rejected_cards": [
+    {
+      "id": "selfreport-muggleai",
+      "authenticity": "suspect",
+      "reject_reason": "promotional — funnel for author's company product (Muggle Test)"
+    },
+    {
+      "id": "selfreport-gaganaryan",
+      "authenticity": "suspect",
+      "reject_reason": "promotional — launch/marketing piece for Workstreams (stars/Discord/roadmap)"
+    },
+    {
+      "id": "selfreport-maximsaplin",
+      "authenticity": "insufficient_evidence",
+      "reject_reason": "second-hand taxonomy of others' failure modes; no concrete personal workflow"
+    },
+    {
+      "id": "selfreport-ctahirih",
+      "authenticity": "insufficient_evidence",
+      "reject_reason": "generic second-person how-to with hypothetical examples; no first-person workflow"
+    },
+    {
+      "id": "selfreport-deviduttadas3",
+      "authenticity": "insufficient_evidence",
+      "reject_reason": "industry-trend opinion essay; no first-person workflow"
+    },
+    {
+      "id": "selfreport-tacoda",
+      "authenticity": "insufficient_evidence",
+      "reject_reason": "abstract structural essay; no first-person workflow disclosure"
+    },
+    {
+      "id": "selfreport-javz",
+      "authenticity": "contaminated",
+      "reject_reason": "promotional Gumroad guide funnel; worldview not workflow"
+    },
+    {
+      "id": "selfreport-xde013",
+      "authenticity": "insufficient_evidence",
+      "reject_reason": "philosophy essay (ship-fast vs think); no personal tools/incident/workflow"
+    },
+    {
+      "id": "selfreport-dyami_connell",
+      "authenticity": "insufficient_evidence",
+      "reject_reason": "business-model/credit opinion piece; only personal datum is lost credits"
+    },
+    {
+      "id": "selfreport-junothreadborne",
+      "authenticity": "insufficient_evidence",
+      "reject_reason": "history/opinion essay in collective 'we' voice; no per-subject workflow"
+    }
+  ]
+}

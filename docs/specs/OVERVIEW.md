@@ -111,7 +111,7 @@
 
   **仍是纯主观、benchmark 仍 held-out**：真实执行结果对任何人都一样、**不是 gold**（与 0005 推迟的客观真值线 `gold/GAP/ESCAPED_BUG/control-plane` 无关，工作区亦不含 gold 测试）；能力分叉 = 工具门控 + 主观解读 + 是否起疑； 体感/状态仍只吃主观 `verdict`。核实是 persona 的角色内**可选**动作——真人（含专家）不会每次都跑，只在起疑且值得 时才查；默认不查。
 
-  **与 harness 完全解耦（关键）**：本组只动用户侧。harness 仍是 advisory（只输出文本建议），用户把助手提议的代码 贴进**自己的工作区拷贝**再跑——这正是真人对只会建议的助手的真实行为，无需 harness 先长出工具。「让 harness 真 编辑同一工作区、验证目标变成 harness 真实改动」是完全解耦的**第二期**，独立成上游 spec。
+  **harness 与用户 agent 共享同一工作区（v2 掰正，关键）**：本组目标场景一直是「助手（harness）能改、也能跑，用户 agent 在同一目录真核实」——纯文本建议核不了真。故 T1 把工作区做成两侧共享的同一目录：orchestrator 每局先 materialize，经 launcher 把 SANDBOX_WORK_DIR 注入 harness 子进程、同一目录绑定内层 client；harness（bash 工具）落地 的改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS，非 advisory 文本）。初版曾把此设为「harness 仅 advisory、用户 贴进自己的工作区拷贝、共享工作区留完全解耦的第二期上游 spec」——现掰正为缺陷假设：共享工作区即在本组 T1 落地（仅 追加可选 workspace_dir 接线，退化路径对纯文本场景与直连调用零破坏），不再另立上游 spec。两侧无并发写竞争靠逐轮 stdio 串行天然保证。
 
   **与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎零改动。`web_search` 工具、skill 真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不 bug/benchmark 特定」红线约束，对接 0006 蒸馏）；是否清理已渐冗余的外层 `verify_self`/`pending_self_obs`、是否给 内层喂显式状态信号、git 工作区来源、与 0003/T2 `nexau_runtime` 的 tool-calling 形态并轨，集中记在各 Task open-questions，归后续 Task/组。
 - **0009 种子工作区供给可插拔（SeedSource 接缝）** — 本组承接 spec-0008/T1：彼时 `SeedScenario.workspace` 经 `WorkspaceSpec{fixture, setup}` + `materialize()` 落地，供给路径是**唯一且硬编码的本地 copytree**。随着任务源增多（NL2Repo 式空仓起步、未来 SWE-bench / Terminal-Bench 等），**供给侧需可插拔**；而**消费港口**——`SeedScenario.description` 文本 + 一个被 `Sandbox`/`sim_user` 当 cwd 的工作区目录——保持冻结、零改动。
@@ -216,7 +216,7 @@
 | 0007 | 0007/T2 | 编排去 release 链 · 会话级 main SHA 快照回灌 | pending | T1 |
 | 0007 | 0007/T3 | 一次性迁移脚本：main ← release + 清理分支 | pending | — |
 | 0007 | 0007/T4 | 去 release：种子/bootstrap/e2e trunk 化 | pending | T1, T2 |
-| 0008 | 0008/T1 | seed 工作区扩展与注入 | done | — |
+| 0008 | 0008/T1 | seed 工作区扩展与共享注入（harness/用户 agent 同目录） | done | — |
 | 0008 | 0008/T2 | 内层原子工具与 sandbox | done | T1 |
 | 0008 | 0008/T3 | prompt 行为框架（可选核实）与 skill 占位接口 | done | — |
 | 0008 | 0008/T4 | 内层 tool-using agent（AgenticPersonaClient） | done | T1, T2, T3 |
@@ -274,7 +274,7 @@ graph LR
         n0007_T4["T4 去 release：种子/bootstrap/e2e trunk 化"]
     end
     subgraph G0008[0008 user-agent-inner-tooluse]
-        n0008_T1["T1 seed 工作区扩展与注入"]
+        n0008_T1["T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）"]
         n0008_T2["T2 内层原子工具与 sandbox"]
         n0008_T3["T3 prompt 行为框架（可选核实）与 skill 占位接口"]
         n0008_T4["T4 内层 tool-using agent（AgenticPersonaClient）"]
@@ -342,6 +342,8 @@ graph LR
     n0006_T2 -.note.-> n0005_T5
     n0008_T1 -.extends.-> n0001_T1
     n0008_T1 -.note.-> n0005_T5
+    n0008_T1 -.note.-> n0003_T1
+    n0008_T1 -.note.-> n0007_T2
     n0008_T2 -.extends.-> n0005_T2
     n0008_T3 -.extends.-> n0005_T3
     n0008_T3 -.extends.-> n0005_T1
@@ -357,7 +359,8 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0009 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/models.py | 0001, 0008, 0009 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
@@ -366,7 +369,8 @@ graph LR
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007 |
+| backend/tests/harness/test_launcher.py | 0003, 0008 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009 |
@@ -395,11 +399,11 @@ backend/
       library.py                        ← 0006/T1
     harness/
       interface.py                      ← 0001/T2
-      launcher.py                       ← 0003/T1
+      launcher.py                       ← 0003/T1, 0008/T1
     loop/
       checkpoint.py                     ← 0004/T1
       metrics.py                        ← 0003/T6
-      orchestrator.py                   ← 0003/T6, 0007/T2, 0009/T3
+      orchestrator.py                   ← 0003/T6, 0007/T2, 0008/T1, 0009/T3
       run_state.py                      ← 0004/T1, 0007/T2
       runner.py                         ← 0004/T2
       sim_user.py                       ← 0008/T1
@@ -467,11 +471,11 @@ backend/
       test_library.py                   ← 0006/T1
     harness/
       test_interface.py                 ← 0001/T2
-      test_launcher.py                  ← 0003/T1
+      test_launcher.py                  ← 0003/T1, 0008/T1
     loop/
       test_checkpoint.py                ← 0004/T1
       test_metrics.py                   ← 0003/T6
-      test_orchestrator.py              ← 0003/T6, 0007/T2
+      test_orchestrator.py              ← 0003/T6, 0007/T2, 0008/T1
       test_run_state.py                 ← 0004/T1, 0007/T2
       test_runner.py                    ← 0004/T2
     tracker/
@@ -983,8 +987,9 @@ graph LR
 数据流脊柱（编号即执行序：先立工作区 T1，再内层执行 T2/T4，T3 并行）：
 
 ```
-seed 场景 + 工作区 (T1: SeedScenario.workspace ─► materialize ─► 全新项目目录)
-   │  注入链 sim_user 桥接每局 materialize → client.bind_session(persona, workspace_dir)（run_session 不动）
+seed 场景 + 工作区 (T1: SeedScenario.workspace ─► orchestrator 每局先 materialize ─► 全新项目目录 = 两侧共享)
+   │  注入链：orchestrator 把同一 workspace_dir 同时喂 launcher(注入 SANDBOX_WORK_DIR 给 harness 子进程)
+   │  与 run_session → sim_user bind_session(persona, workspace_dir)（run_session/harness 协议不动）
    ▼
 外层控制信封 (0005/T5 run_session, 原样不动)
    │  接缝 respond(system,user) -> {perceive,verdict,action,message}
@@ -1012,9 +1017,13 @@ blind 无工具只能凭文本，shallow 能跑但写不出测试套件，compet
 体感/状态仍只吃主观 `verdict`。核实是 persona 的角色内**可选**动作——真人（含专家）不会每次都跑，只在起疑且值得
 时才查；默认不查。
 
-**与 harness 完全解耦（关键）**：本组只动用户侧。harness 仍是 advisory（只输出文本建议），用户把助手提议的代码
-贴进**自己的工作区拷贝**再跑——这正是真人对只会建议的助手的真实行为，无需 harness 先长出工具。「让 harness 真
-编辑同一工作区、验证目标变成 harness 真实改动」是完全解耦的**第二期**，独立成上游 spec。
+**harness 与用户 agent 共享同一工作区（v2 掰正，关键）**：本组目标场景一直是「助手（harness）能改、也能跑，用户
+agent 在同一目录真核实」——纯文本建议核不了真。故 T1 把工作区做成两侧共享的同一目录：orchestrator 每局先
+materialize，经 launcher 把 SANDBOX_WORK_DIR 注入 harness 子进程、同一目录绑定内层 client；harness（bash 工具）落地
+的改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS，非 advisory 文本）。初版曾把此设为「harness 仅 advisory、用户
+贴进自己的工作区拷贝、共享工作区留完全解耦的第二期上游 spec」——现掰正为缺陷假设：共享工作区即在本组 T1 落地（仅
+追加可选 workspace_dir 接线，退化路径对纯文本场景与直连调用零破坏），不再另立上游 spec。两侧无并发写竞争靠逐轮
+stdio 串行天然保证。
 
 **与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎零改动。`web_search` 工具、skill
 真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不
@@ -1024,14 +1033,14 @@ open-questions，归后续 Task/组。
 
 **任务一览**
 
-- **T1 seed 工作区扩展与注入**（done） — 本组的底座任务：给 SeedScenario 加一个可选 workspace 字段，让 seed 场景能携带一个 in-repo 基线项目（不再只有纯文本 description）；新增 workspace.py 的 materialize() 每局把 fixture 拷成一个临时全新目录，供内层 sandbox 当 cwd。
+- **T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）**（done） — 本组的底座任务：给 SeedScenario 加一个可选 workspace 字段，让 seed 场景能携带一个 in-repo 基线项目（不再只有纯文本 description）；新增 workspace.py 的 materialize() 每局把 fixture 拷成一个临时全新目录，供内层 sandbox 当 cwd。
 - **T2 内层原子工具与 sandbox**（done） — 造内层 agent 的「手」：三个原子工具 read_file / run_shell / write_file（外加 web_search 占位、本轮不实现），以及一个最小 sandbox 执行环境（tempfile + subprocess），以 T1 materialize 出的工作区目录为 cwd。
 - **T3 prompt 行为框架（可选核实）与 skill 占位接口**（done） — 把内层 system prompt 的核实语义从「义务」改为「可选、有成本」：核实是 persona 的角色内动作，只在起疑且值得时才查，默认不查（真人含专家都不会每次都跑）。
 - **T4 内层 tool-using agent（AgenticPersonaClient）**（done） — 把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient：内层 LLM 拿 T3 装配的 system + T2 的工具集，在 T1 materialize 的工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。
 
 ```mermaid
 graph LR
-    nT1["T1 seed 工作区扩展与注入"]
+    nT1["T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）"]
     nT2["T2 内层原子工具与 sandbox"]
     nT3["T3 prompt 行为框架（可选核实）与 skill 占位接口"]
     nT4["T4 内层 tool-using agent（AgenticPersonaClient）"]
@@ -1039,6 +1048,27 @@ graph LR
     nT1 --> nT4
     nT2 --> nT4
     nT3 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T1_2["T1 v2"]
+    v_T1_1 -->|redefined| v_T1_2
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T4_2["T4 v2"]
+    v_T4_1 -->|redefined| v_T4_2
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T1_2 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T4_2 st_done;
 ```
 
 ### 0009 种子工作区供给可插拔（SeedSource 接缝）（issue #9）
