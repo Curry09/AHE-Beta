@@ -1,0 +1,38 @@
+title: 种子场景管线：采集(蒸馏)与注入 SeedSource
+issue: 10
+slug: seed-scenario-pipeline
+overview: |-
+  本组实现种子场景管线：把「从真实数据采集种子场景」与「把种子卡注入 SeedSource 供给」串成一条链，
+  为 0009 的 SeedSource（工作区供给接缝）与 0005 的用户侧模拟供给真实任务。对应 CLAUDE.md「蒸馏模块」
+  产出的**种子场景库**这一半（persona 半边是 0006，本组与之对称镜像），落实约束「seed 来自真实数据、
+  benchmark 全程 held-out」。上游供给给 0009 的 SeedSource，消费侧（models / seed_source / sources / run.py）零改。
+
+  数据流脊柱：
+
+  ```
+  真实源(closed issue+merged PR · 日志 · Stack Overflow · 未来源)
+          │  采集/归纳（T1，轮辐式：公共契约 seed-card-schema.md + 薄抽取 skill）
+          ▼
+     种子卡库（source-agnostic 种子卡：task/source/env/oracle… + 真实性·非 benchmark 门）
+          │  注入（T2，card_to_seed：字段映射 → SeedScenario；oracle/test_cmd 落 sidecar、绝不进环）
+          ▼
+     spec-0001 models.SeedScenario{description, workspace} ─► 0009 SeedSource.provision 物化工作区
+          ─► 0005 sim run_session 跑一局 ─► 体感 + issue
+  ```
+
+  读图即读任务：**T1** 定「采集什么、种子卡长什么样」——不另造 skill，而是收编既有的真实抽取方法（此前写在
+  NexAU 仓库里的 `extract-harness-seed`），并按**轮辐式**组织：唯一公共契约 `seed-card-schema.md`（种子卡 schema +
+  枚举 + 两道门原则，source-agnostic）+ 薄抽取 skill 只描述「从某类真实源 harvest + 判两道门」、只依赖契约、
+  彼此不依赖。本步先落契约 + `extract-harness-seed`（closed issue+merged fix PR 的 harvest 流水线，唯一 ground
+  oracle 的真实来源）；日志/SO/未来源作同契约的后续薄 skill 插入。库 schema 即该契约。**T2** 定「种子卡如何变成
+  0009 SeedSource 能物化的 SeedScenario」（唯一桥接层 card_to_seed）。
+
+  **held-out 纪律（关键约束，红线）**：种子卡采集了完整的 `oracle`/`test_cmd`/`gates`（客观判分证据），但这些是
+  **benchmark 侧**制品：注入时 `task.prompt → SeedScenario.description` **绝不携带 oracle/test_cmd**，判分字段落
+  **sidecar**、不进 `SeedScenario`、不进训练环。理由引 CLAUDE.md「benchmark 全程 held-out：不参与训练，不参与
+  发版门禁」——训练信号只取自「模拟真实使用」分布上的用户体感，oracle 客观判分归 harbor 侧的平行评测系统。
+
+  与 0009 的关系：本组是 0009（SeedSource 可插拔供给）的上游供给。种子卡的 `source.repo`+`env.repo_at` 映射为
+  0009/T4 的 `WorkspaceSpec{kind="git", params={repo, commit}}`，`env.setup` 映射为 `WorkspaceSpec.setup`（按
+  0009/T3 约定 venv 前缀化）；无 repo 的纯文本场景退化为 `workspace: null` 或 `kind="empty"`。智能配对
+  （persona×seed）与容器/私有仓鉴权等重型能力**不在本组**，记为 open-questions / out-of-scope（见各 Task）。

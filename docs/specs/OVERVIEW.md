@@ -119,6 +119,13 @@
   本组把「工作区供给」抽象为按 `kind` 注册的 `SeedSource` 协议：把既有 `materialize` 降为首个 `local-fixture` 实现（行为等价、向后兼容），并新增一个轻量 `empty` 源（新建空目录，可选写入需求说明文件，覆盖 NL2Repo 式「仅说明文档」起步）以证明**可加性**——新增一个源 = 落一个新模块（被自动发现注册）+ 注册侧/消费侧零改动。`workspace.materialize()` 退化为薄壳委托给注册表，故 `sim_user` 桥接与 `Sandbox` 调用点一行不改。
 
   **明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。git@commit 取数原亦列为下游非目标，现兑现为本组 **T4**（`git` 源：clone repo@commit 成快照工作区）——真实 repo 任务（SWE-bench 的 `base_commit` 未修复态、funcy@某版本等）的起点正是「某仓库停在某 commit 的快照」，两个本地源（local-fixture/empty）立不起来，故补上此扩展点。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）+ 通用 `git` 快照源（T4）；重型框架（容器 / Oracle / 具体 benchmark 适配层）仍留下游、不提前造。
+- **0010 种子场景管线：采集(蒸馏)与注入 SeedSource** — 本组实现种子场景管线：把「从真实数据采集种子场景」与「把种子卡注入 SeedSource 供给」串成一条链， 为 0009 的 SeedSource（工作区供给接缝）与 0005 的用户侧模拟供给真实任务。对应 CLAUDE.md「蒸馏模块」 产出的**种子场景库**这一半（persona 半边是 0006，本组与之对称镜像），落实约束「seed 来自真实数据、 benchmark 全程 held-out」。上游供给给 0009 的 SeedSource，消费侧（models / seed_source / sources / run.py）零改。
+
+  读图即读任务：**T1** 定「采集什么、种子卡长什么样」——不另造 skill，而是收编既有的真实抽取方法（此前写在 NexAU 仓库里的 `extract-harness-seed`），并按**轮辐式**组织：唯一公共契约 `seed-card-schema.md`（种子卡 schema + 枚举 + 两道门原则，source-agnostic）+ 薄抽取 skill 只描述「从某类真实源 harvest + 判两道门」、只依赖契约、 彼此不依赖。本步先落契约 + `extract-harness-seed`（closed issue+merged fix PR 的 harvest 流水线，唯一 ground oracle 的真实来源）；日志/SO/未来源作同契约的后续薄 skill 插入。库 schema 即该契约。**T2** 定「种子卡如何变成 0009 SeedSource 能物化的 SeedScenario」（唯一桥接层 card_to_seed）。
+
+  **held-out 纪律（关键约束，红线）**：种子卡采集了完整的 `oracle`/`test_cmd`/`gates`（客观判分证据），但这些是 **benchmark 侧**制品：注入时 `task.prompt → SeedScenario.description` **绝不携带 oracle/test_cmd**，判分字段落 **sidecar**、不进 `SeedScenario`、不进训练环。理由引 CLAUDE.md「benchmark 全程 held-out：不参与训练，不参与 发版门禁」——训练信号只取自「模拟真实使用」分布上的用户体感，oracle 客观判分归 harbor 侧的平行评测系统。
+
+  与 0009 的关系：本组是 0009（SeedSource 可插拔供给）的上游供给。种子卡的 `source.repo`+`env.repo_at` 映射为 0009/T4 的 `WorkspaceSpec{kind="git", params={repo, commit}}`，`env.setup` 映射为 `WorkspaceSpec.setup`（按 0009/T3 约定 venv 前缀化）；无 repo 的纯文本场景退化为 `workspace: null` 或 `kind="empty"`。智能配对 （persona×seed）与容器/私有仓鉴权等重型能力**不在本组**，记为 open-questions / out-of-scope（见各 Task）。
 
 ## 如何读这份文档
 
@@ -224,6 +231,8 @@
 | 0009 | 0009/T2 | empty/nl-doc 源（可插拔证明） | done | T1 |
 | 0009 | 0009/T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | done | T1 |
 | 0009 | 0009/T4 | git 源（clone repo@commit 成快照工作区） | done | T1 |
+| 0010 | 0010/T1 | 种子场景采集（蒸馏，skill 形式） | done | — |
+| 0010 | 0010/T2 | 种子注入（card → SeedScenario） | done | T1 |
 
 ## 跨 feature 关系图
 
@@ -286,6 +295,10 @@ graph LR
         n0009_T3["T3 依赖供给（setup 钩子落地：per-workspace venv + pip）"]
         n0009_T4["T4 git 源（clone repo@commit 成快照工作区）"]
     end
+    subgraph G0010[0010 seed-scenario-pipeline]
+        n0010_T1["T1 种子场景采集（蒸馏，skill 形式）"]
+        n0010_T2["T2 种子注入（card → SeedScenario）"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -335,6 +348,7 @@ graph LR
     n0009_T2 --> n0009_T1
     n0009_T3 --> n0009_T1
     n0009_T4 --> n0009_T1
+    n0010_T2 --> n0010_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -358,6 +372,12 @@ graph LR
     n0009_T3 -.note.-> n0008_T2
     n0009_T4 -.note.-> n0008_T1
     n0009_T4 -.note.-> n0009_T3
+    n0010_T1 -.note.-> n0006_T1
+    n0010_T1 -.note.-> n0009_T1
+    n0010_T2 -.note.-> n0006_T2
+    n0010_T2 -.note.-> n0009_T1
+    n0010_T2 -.note.-> n0009_T4
+    n0010_T2 -.note.-> n0009_T3
 ```
 
 ## 文件冲突报告
@@ -403,6 +423,8 @@ backend/
       test_agent.py                     ← 0003/T4
     distill/
       library.py                        ← 0006/T1
+      seed_adapter.py                   ← 0010/T2
+      seed_library.py                   ← 0010/T1
     harness/
       interface.py                      ← 0001/T2
       launcher.py                       ← 0003/T1, 0008/T1
@@ -476,6 +498,8 @@ backend/
       test_test_agent.py                ← 0003/T4
     distill/
       test_library.py                   ← 0006/T1
+      test_seed_adapter.py              ← 0010/T2
+      test_seed_library.py              ← 0010/T1
     harness/
       test_interface.py                 ← 0001/T2
       test_launcher.py                  ← 0003/T1, 0008/T1
@@ -522,6 +546,11 @@ tools/
       SKILL.md                          ← 0006/T1
       reference.md                      ← 0006/T1
     card-schema.md                      ← 0006/T1
+  seed-distill/
+    extract-harness-seed/
+      SKILL.md                          ← 0010/T1
+      reference.md                      ← 0010/T1
+    seed-card-schema.md                 ← 0010/T1
 ```
 
 ## 各 feature 详情
@@ -1150,4 +1179,73 @@ graph LR
     class v_T3_2 st_done;
     class v_T4_1 st_pending;
     class v_T4_2 st_done;
+```
+
+### 0010 种子场景管线：采集(蒸馏)与注入 SeedSource（issue #10）
+
+> 人读方案见 [`0010-seed-scenario-pipeline/summary.md`](./0010-seed-scenario-pipeline/summary.md)。
+
+本组实现种子场景管线：把「从真实数据采集种子场景」与「把种子卡注入 SeedSource 供给」串成一条链，
+为 0009 的 SeedSource（工作区供给接缝）与 0005 的用户侧模拟供给真实任务。对应 CLAUDE.md「蒸馏模块」
+产出的**种子场景库**这一半（persona 半边是 0006，本组与之对称镜像），落实约束「seed 来自真实数据、
+benchmark 全程 held-out」。上游供给给 0009 的 SeedSource，消费侧（models / seed_source / sources / run.py）零改。
+
+数据流脊柱：
+
+```
+真实源(closed issue+merged PR · 日志 · Stack Overflow · 未来源)
+        │  采集/归纳（T1，轮辐式：公共契约 seed-card-schema.md + 薄抽取 skill）
+        ▼
+   种子卡库（source-agnostic 种子卡：task/source/env/oracle… + 真实性·非 benchmark 门）
+        │  注入（T2，card_to_seed：字段映射 → SeedScenario；oracle/test_cmd 落 sidecar、绝不进环）
+        ▼
+   spec-0001 models.SeedScenario{description, workspace} ─► 0009 SeedSource.provision 物化工作区
+        ─► 0005 sim run_session 跑一局 ─► 体感 + issue
+```
+
+读图即读任务：**T1** 定「采集什么、种子卡长什么样」——不另造 skill，而是收编既有的真实抽取方法（此前写在
+NexAU 仓库里的 `extract-harness-seed`），并按**轮辐式**组织：唯一公共契约 `seed-card-schema.md`（种子卡 schema +
+枚举 + 两道门原则，source-agnostic）+ 薄抽取 skill 只描述「从某类真实源 harvest + 判两道门」、只依赖契约、
+彼此不依赖。本步先落契约 + `extract-harness-seed`（closed issue+merged fix PR 的 harvest 流水线，唯一 ground
+oracle 的真实来源）；日志/SO/未来源作同契约的后续薄 skill 插入。库 schema 即该契约。**T2** 定「种子卡如何变成
+0009 SeedSource 能物化的 SeedScenario」（唯一桥接层 card_to_seed）。
+
+**held-out 纪律（关键约束，红线）**：种子卡采集了完整的 `oracle`/`test_cmd`/`gates`（客观判分证据），但这些是
+**benchmark 侧**制品：注入时 `task.prompt → SeedScenario.description` **绝不携带 oracle/test_cmd**，判分字段落
+**sidecar**、不进 `SeedScenario`、不进训练环。理由引 CLAUDE.md「benchmark 全程 held-out：不参与训练，不参与
+发版门禁」——训练信号只取自「模拟真实使用」分布上的用户体感，oracle 客观判分归 harbor 侧的平行评测系统。
+
+与 0009 的关系：本组是 0009（SeedSource 可插拔供给）的上游供给。种子卡的 `source.repo`+`env.repo_at` 映射为
+0009/T4 的 `WorkspaceSpec{kind="git", params={repo, commit}}`，`env.setup` 映射为 `WorkspaceSpec.setup`（按
+0009/T3 约定 venv 前缀化）；无 repo 的纯文本场景退化为 `workspace: null` 或 `kind="empty"`。智能配对
+（persona×seed）与容器/私有仓鉴权等重型能力**不在本组**，记为 open-questions / out-of-scope（见各 Task）。
+
+**任务一览**
+
+- **T1 种子场景采集（蒸馏，skill 形式）**（done） — 采集（蒸馏）侧按**轮辐式**组织，与 0006/T1（persona 采集）对称镜像，不另造大 skill：① 唯一公共契约 seed-card-schema.md（source-agnostic）——种子卡 schema（source · task · domain · capability_probed · difficulty · scope · autonomy_required · oracle · env · pairing_constraints · gates · provenance）+ 枚举 + 两道门原则（真实性/非 benchmark 门 + oracle 与 harbor 可复现门）+ held-out 侧字段（oracle/test_cmd/gates） 的存放约定；② 薄抽取 skill extract-harness-seed——只描述「从 closed issue+merged fix PR 等真实源 harvest + 过两道门 + ground 哪几字段」，只引用契约、不依赖任何其它 skill，收编 NexAU 既有 `extract-harness-seed`。
+- **T2 种子注入（card → SeedScenario）**（done） — 把采集到的种子卡（0010/T1）注入 0009 的 SeedSource 供给：card_to_seed 将一条卡映射为 spec-0001 models.SeedScenario —— `task.prompt` 成 description，`source.repo`+`env.repo_at` 成 git 工作区（0009/T4）， `env.setup` 成 venv 前缀化的 setup（0009/T3）。
+
+```mermaid
+graph LR
+    nT1["T1 种子场景采集（蒸馏，skill 形式）"]
+    nT2["T2 种子注入（card → SeedScenario）"]
+    nT1 --> nT2
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T1_2["T1 v2"]
+    v_T1_1 -->|redefined| v_T1_2
+    v_T2_1["T2 v1"]
+    v_T2_2["T2 v2"]
+    v_T2_1 -->|redefined| v_T2_2
+    classDef st_done fill:#b7e4c7;
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T1_2 st_done;
+    class v_T2_1 st_pending;
+    class v_T2_2 st_done;
 ```
