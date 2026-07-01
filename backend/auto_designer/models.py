@@ -55,7 +55,8 @@ class WorkspaceSpec:
     spec-0009/T1：`kind` 选择供给实现（缺省 `local-fixture`，= 0008 行为）；`params` 为
     source 专属入参的通用载体（如 empty 源的 doc/doc_name），使新增源不必扩 WorkspaceSpec。
     `fixture` 为 local-fixture 源使用的 backend/seed_workspaces/<fixture>/ 目录名；
-    `setup` 为命令钩子（占位，本轮不执行）。与 benchmark held-out 红线无关——工作区不含 gold 测试。
+    `setup` 为命令钩子；由 spec-0009/T3 的 `ensure_deps` 在 materialize 后执行（约定建
+    per-workspace `.venv` + pip 装入依赖）。与 benchmark held-out 红线无关——工作区不含 gold 测试。
     """
 
     fixture: str = ""

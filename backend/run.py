@@ -1,6 +1,8 @@
 """真实端到端跑一轮闭环（a→b→c）。
 
-接线：用户侧 = spec-0005 控制信封 sim（ApiPersonaClient，模型走 backend/.env 的 LLM_*）；
+接线：用户侧 = spec-0005 控制信封 sim（内层 tool-use AgenticPersonaClient，LLM 由
+     ApiPersonaClient.complete 供给，模型走 backend/.env 的 LLM_*），场景携带 workspace
+     （billing-split fixture），orchestrator 每局 materialize 共享工作区并注入 harness（488c170）；
      开发者侧 = 真 nexau dev agent + 真 Gitea（issue，走 backend/deploy/gitea/.env）
      + 本地 git 仓承载 harness 代码。
 本地规模：仅 P-0991(expert) 1 个 user agent × 2 dev agent，默认跑 3 轮；跑前复位到最初状态。
