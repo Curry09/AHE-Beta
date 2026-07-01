@@ -42,7 +42,7 @@ graph LR
 |----|----|----|----|----|
 | T1 | SeedSource 协议 + 注册表 + local-fixture 实现 | P1 | done | — |
 | T2 | empty/nl-doc 源（可插拔证明） | P2 | done | T1 |
-| T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | P1 | pending | T1 |
+| T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | P1 | done | T1 |
 
 ## 各任务方案
 
@@ -176,7 +176,7 @@ test_seed_source_empty.py：(a) `provision(kind="empty")` 落地隔离空目录�
 
 依赖 0009/T1 的 `SeedSource` 协议、`register`/`provision` 注册表与 `sources/` 自动发现机制，以及 T1 为 `WorkspaceSpec` 增的 `kind`/`params`。落脚的 `Sandbox`（0008/T2）原样复用、不在本任务 files 内。NL2Repo 式任务的客观评测（跑上游测试）为非目标，归下游 spec。
 
-### T3 · 依赖供给（setup 钩子落地：per-workspace venv + pip）（P1 / pending）
+### T3 · 依赖供给（setup 钩子落地：per-workspace venv + pip）（P1 / done）
 
 **涉及文件**
 

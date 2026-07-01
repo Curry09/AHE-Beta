@@ -212,6 +212,52 @@ def test_round_materializes_shared_workspace_before_launch(tmp_path, monkeypatch
     assert events[2] == ("session", "/ws/billing-split")
 
 
+def test_round_ensures_deps_after_materialize_before_launch(tmp_path, monkeypatch) -> None:
+    # Spec-0009/T3：依赖供给 hook 落在 materialize 之后、launch 之前；无工作区时不调。
+    repo = _seed_repo(tmp_path)
+    events: list = []
+    monkeypatch.setattr(
+        "auto_designer.loop.orchestrator.materialize_workspace",
+        lambda spec: events.append(("materialize", spec.fixture)) or f"/ws/{spec.fixture}",
+    )
+    monkeypatch.setattr(
+        "auto_designer.loop.orchestrator.ensure_deps",
+        lambda ws, spec: events.append(("ensure_deps", ws)),
+    )
+
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", workspace_dir))
+
+    orch = Orchestrator(
+        launcher=_WsLauncher(events),
+        harness_repo=str(repo),
+        fixed_set=[
+            (_persona(), SeedScenario(description="s", workspace=WorkspaceSpec(fixture="funcy"))),
+        ],
+        developer_agents=[_Dev(events, DevOutcome())],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+    )
+    orch.run_round("c")
+
+    assert events[:3] == [
+        ("materialize", "funcy"),
+        ("ensure_deps", "/ws/funcy"),
+        ("launch", "/ws/funcy"),
+    ]
+
+
+def test_round_no_workspace_skips_ensure_deps(tmp_path, monkeypatch) -> None:
+    # 无工作区 → materialize 与 ensure_deps 都不该被调用。
+    repo = _seed_repo(tmp_path)
+    monkeypatch.setattr(
+        "auto_designer.loop.orchestrator.ensure_deps",
+        lambda ws, spec: (_ for _ in ()).throw(AssertionError("不应 ensure_deps")),
+    )
+    orch = _orch(repo, [], [_Dev([], DevOutcome())])  # fixed_set 场景无 workspace
+    orch.run_round("c")  # 不抛即通过
+
+
 def test_round_no_workspace_passes_none(tmp_path, monkeypatch) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []

@@ -9,6 +9,7 @@ shell 执行与路径解析。所有路径相对 cwd 解析、禁止逃逸子树
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -34,8 +35,27 @@ class Sandbox:
             raise ValueError(f"path escapes sandbox: {path!r}")
         return str(target)
 
+    def _env(self) -> dict[str, str] | None:
+        """spec-0009/T3：工作区带 `.venv` 时返回注入 VIRTUAL_ENV + PATH 前置的环境。
+
+        <cwd>/.venv/bin 存在则让 python/pytest 解析到该 venv（对内层 LLM 透明——照常
+        run_shell("pytest ...") 即命中）；无 `.venv` 返回 None（继承宿主，退化为今天的
+        ambient 行为，对 0008 既有场景零改动）。
+        """
+        bindir = Path(self.cwd) / ".venv" / "bin"
+        if not bindir.is_dir():
+            return None
+        env = dict(os.environ)
+        env["VIRTUAL_ENV"] = str(bindir.parent)
+        env["PATH"] = f"{bindir}{os.pathsep}{env.get('PATH', '')}"
+        env.pop("PYTHONHOME", None)  # venv 与 PYTHONHOME 互斥，清掉以免污染解析
+        return env
+
     def run(self, cmd: str, timeout: float = 10.0) -> dict:
-        """在 cwd 下跑一条 shell 命令。返回 {ok, stdout, stderr, returncode}；超时 ok=False。"""
+        """在 cwd 下跑一条 shell 命令。返回 {ok, stdout, stderr, returncode}；超时 ok=False。
+
+        工作区带 `.venv` 时（spec-0009/T3）注入其 PATH/VIRTUAL_ENV，使命令命中该 venv。
+        """
         try:
             proc = subprocess.run(
                 cmd,
@@ -44,6 +64,7 @@ class Sandbox:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                env=self._env(),
             )
         except subprocess.TimeoutExpired as e:
             return {

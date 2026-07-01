@@ -1,6 +1,6 @@
 id: T3
 title: 依赖供给（setup 钩子落地：per-workspace venv + pip）
-status: pending
+status: done
 priority: P1
 tags: []
 depends-on:
