@@ -1,11 +1,11 @@
 """真实端到端跑一轮闭环（a→b→c）。
 
 接线：用户侧 = spec-0005 控制信封 sim（内层 tool-use AgenticPersonaClient，LLM 由
-     ApiPersonaClient.complete 供给，模型走 backend/.env 的 LLM_*），场景携带 workspace
-     （billing-split fixture），orchestrator 每局 materialize 共享工作区并注入 harness（488c170）；
+     ApiPersonaClient.complete 供给，模型走 backend/.env 的 LLM_*）；
      开发者侧 = 真 nexau dev agent + 真 Gitea（issue，走 backend/deploy/gitea/.env）
      + 本地 git 仓承载 harness 代码。
-本地规模：仅 P-0991(expert) 1 个 user agent × 2 dev agent，默认跑 3 轮；跑前复位到最初状态。
+本地规模：persona 从 distill 卡库(persona_library.json)注入、场景从 seed_scenarios.json 加载，
+     × 2 dev agent，跑 5 轮；跑前复位到最初状态。
 Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析 main HEAD SHA 作会话级快照。
 
 前置：
@@ -16,6 +16,7 @@ Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
@@ -24,6 +25,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent  # backend/
 DATA = ROOT / "data"
 HARNESS_REPO = DATA / "harness_repo"
+PERSONA_LIBRARY = ROOT / "persona_library.json"  # distill 产物：6 张锚卡
+SEED_SCENARIOS = ROOT / "seed_scenarios.json"  # 种子场景库
+
+# 每轮跑几个 persona（None=用满卡库全部）。用户会话数≈persona 数，耗时按此线性放大，按需下调。
+PERSONA_LIMIT: int | None = None
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -33,6 +39,24 @@ def _load_env(path: Path) -> dict[str, str]:
         if line and not line.startswith("#") and "=" in line:
             k, _, v = line.partition("=")
             out[k.strip()] = v.strip().strip('"')
+    return out
+
+
+def _load_seeds(path: Path) -> list:
+    """从 seed_scenarios.json 加载种子场景（{version, seeds:[...]} 或裸数组均可）。"""
+    from auto_designer.models import SeedScenario, WorkspaceSpec
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    records = data["seeds"] if isinstance(data, dict) else data
+    out = []
+    for rec in records:
+        ws = rec.get("workspace")
+        out.append(
+            SeedScenario(
+                description=rec["description"],
+                workspace=WorkspaceSpec.from_dict(ws) if ws else None,
+            )
+        )
     return out
 
 
@@ -133,16 +157,17 @@ def main() -> int:
     os.environ["no_proxy"] = no_proxy
 
     from auto_designer.dev.agentic_developer import AgenticDeveloper
+    from auto_designer.distill.library import PersonaLibrary
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.metrics import Metrics
     from auto_designer.loop.orchestrator import Orchestrator
     from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
-    from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
+    from auto_designer.models import Persona, SeedScenario
     from auto_designer.tracker.gitea import GiteaTracker
     from auto_designer.user.session_store import SessionStore
     from auto_designer.user.sim.dimensions import Persona as SimPersona
     from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
-    from auto_designer.user.sim.run_live import TASK, expert
+    from auto_designer.user.sim.persona_io import card_to_personas
 
     print("① 种 harness 本地仓 ...")
     repo = _seed_harness_repo()
@@ -162,20 +187,21 @@ def main() -> int:
     dev_agent_def = str(ROOT / "agent_defs" / "developer_agent")  # 工具型 dev agent 定义目录
 
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
-    # 场景用 run_live.TASK（split_bill「加进仓库并证明可用」）——需 harness 真正动文件/跑测试（工具调用），
-    # 而非纯文本咨询；shallow/expert 同一任务上做能力分叉。
-    # 内层 tool-use 用户 agent：ApiPersonaClient.complete 作 LLM，AgenticPersonaClient 提供
-    # bind_session（sim_user 据此绑定共享工作区，令用户 agent 在 harness 同目录核实）。
+    # persona 从 distill 卡库（persona_library.json）注入、场景从 seed_scenarios.json 加载——
+    # 两个「给定输入」皆走 JSON，替代此前硬编码的 expert × TASK。
+    # 用户 agent 用 AgenticPersonaClient 走内层 tool-use，ApiPersonaClient.complete 作内层 LLM
+    # （sim_user 据此 bind_session 绑定共享工作区，令用户 agent 在 harness 同目录核实）。
     api = ApiPersonaClient()
     client = AgenticPersonaClient(api.complete)
-    # 场景携带 billing-split fixture：orchestrator 每局 materialize 共享工作区并注入 harness。
-    scenarios = [
-        SeedScenario(description=TASK, workspace=WorkspaceSpec(fixture="billing-split"))
-    ]  # 仅测 P-0991(expert)
+    sim_persona_list = card_to_personas(PersonaLibrary(PERSONA_LIBRARY))  # 6 张锚卡 → sim persona
+    if PERSONA_LIMIT is not None:
+        sim_persona_list = sim_persona_list[:PERSONA_LIMIT]
+    seeds = _load_seeds(SEED_SCENARIOS)
+    # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
     sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）
-    for build, scenario in zip([expert], scenarios, strict=True):
-        sp = build()
+    for i, sp in enumerate(sim_persona_list):
+        scenario = seeds[i % len(seeds)]
         mp = Persona(
             identity=sp.persona_id,
             level=sp.d1.value,
@@ -250,8 +276,11 @@ def main() -> int:
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
     )
 
-    print("④ 跑 3 轮闭环（仅 P-0991 expert × 2 dev agent，dev 直推 main，真模型）...")
-    refs = orch.run(3)
+    print(
+        f"④ 跑 5 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× 2 dev agent，"
+        "dev 直推 main，真模型）..."
+    )
+    refs = orch.run(5)
 
     print("\n=== 结果 ===")
     print("各轮 main HEAD SHA:", refs)  # Spec-0007/T4：观测游标（main 最新 SHA），非 release 链
