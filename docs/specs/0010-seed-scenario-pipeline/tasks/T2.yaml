@@ -1,6 +1,6 @@
 id: T2
 title: 种子注入（card → SeedScenario）
-status: pending
+status: done
 priority: P1
 tags: []
 depends-on:
@@ -18,9 +18,9 @@ parallel: false
 files:
   - backend/auto_designer/distill/seed_adapter.py
   - backend/tests/distill/test_seed_adapter.py
-version: 1
+version: 2
 updated: '2026-07-01'
-change-reason: ''
+change-reason: 'done: seed_adapter card_to_seed/card_to_seeds/extract_sidecar 落地，held-out 剥离 + 单测全过'
 supersedes: []
 split-from:
 merged-from: []

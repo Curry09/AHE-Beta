@@ -1,6 +1,6 @@
 id: T1
 title: 种子场景采集（蒸馏，skill 形式）
-status: pending
+status: done
 priority: P1
 tags: []
 depends-on: []
@@ -16,9 +16,9 @@ files:
   - tools/seed-distill/extract-harness-seed/reference.md
   - backend/auto_designer/distill/seed_library.py
   - backend/tests/distill/test_seed_library.py
-version: 1
+version: 2
 updated: '2026-07-01'
-change-reason: ''
+change-reason: 'done: 契约 seed-card-schema.md + 薄 skill extract-harness-seed + seed_library 落地，单测全过'
 supersedes: []
 split-from:
 merged-from: []

@@ -51,12 +51,12 @@ graph LR
 
 | 任务 | 标题 | 优先级 | 状态 | 依赖 |
 |----|----|----|----|----|
-| T1 | 种子场景采集（蒸馏，skill 形式） | P1 | pending | — |
-| T2 | 种子注入（card → SeedScenario） | P1 | pending | T1 |
+| T1 | 种子场景采集（蒸馏，skill 形式） | P1 | done | — |
+| T2 | 种子注入（card → SeedScenario） | P1 | done | T1 |
 
 ## 各任务方案
 
-### T1 · 种子场景采集（蒸馏，skill 形式）（P1 / pending）
+### T1 · 种子场景采集（蒸馏，skill 形式）（P1 / done）
 
 **涉及文件**
 
@@ -172,7 +172,7 @@ CLAUDE.md「蒸馏模块」「种子场景库来自真实数据、benchmark 全�
 - env.base_image / external_deps（容器供给）与私有仓鉴权：引 0009/T4 open-question，标为超出本框架当前能力。
 - oracle 客观判分（跑上游测试判修复对错）归 harbor 侧平行评测系统，红线 held-out、永不进本框架训练环。
 
-### T2 · 种子注入（card → SeedScenario）（P1 / pending）
+### T2 · 种子注入（card → SeedScenario）（P1 / done）
 
 **涉及文件**
 

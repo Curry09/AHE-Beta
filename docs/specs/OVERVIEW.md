@@ -231,8 +231,8 @@
 | 0009 | 0009/T2 | empty/nl-doc 源（可插拔证明） | done | T1 |
 | 0009 | 0009/T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | done | T1 |
 | 0009 | 0009/T4 | git 源（clone repo@commit 成快照工作区） | done | T1 |
-| 0010 | 0010/T1 | 种子场景采集（蒸馏，skill 形式） | pending | — |
-| 0010 | 0010/T2 | 种子注入（card → SeedScenario） | pending | T1 |
+| 0010 | 0010/T1 | 种子场景采集（蒸馏，skill 形式） | done | — |
+| 0010 | 0010/T2 | 种子注入（card → SeedScenario） | done | T1 |
 
 ## 跨 feature 关系图
 
@@ -1222,12 +1222,30 @@ oracle 的真实来源）；日志/SO/未来源作同契约的后续薄 skill �
 
 **任务一览**
 
-- **T1 种子场景采集（蒸馏，skill 形式）**（pending） — 采集（蒸馏）侧按**轮辐式**组织，与 0006/T1（persona 采集）对称镜像，不另造大 skill：① 唯一公共契约 seed-card-schema.md（source-agnostic）——种子卡 schema（source · task · domain · capability_probed · difficulty · scope · autonomy_required · oracle · env · pairing_constraints · gates · provenance）+ 枚举 + 两道门原则（真实性/非 benchmark 门 + oracle 与 harbor 可复现门）+ held-out 侧字段（oracle/test_cmd/gates） 的存放约定；② 薄抽取 skill extract-harness-seed——只描述「从 closed issue+merged fix PR 等真实源 harvest + 过两道门 + ground 哪几字段」，只引用契约、不依赖任何其它 skill，收编 NexAU 既有 `extract-harness-seed`。
-- **T2 种子注入（card → SeedScenario）**（pending） — 把采集到的种子卡（0010/T1）注入 0009 的 SeedSource 供给：card_to_seed 将一条卡映射为 spec-0001 models.SeedScenario —— `task.prompt` 成 description，`source.repo`+`env.repo_at` 成 git 工作区（0009/T4）， `env.setup` 成 venv 前缀化的 setup（0009/T3）。
+- **T1 种子场景采集（蒸馏，skill 形式）**（done） — 采集（蒸馏）侧按**轮辐式**组织，与 0006/T1（persona 采集）对称镜像，不另造大 skill：① 唯一公共契约 seed-card-schema.md（source-agnostic）——种子卡 schema（source · task · domain · capability_probed · difficulty · scope · autonomy_required · oracle · env · pairing_constraints · gates · provenance）+ 枚举 + 两道门原则（真实性/非 benchmark 门 + oracle 与 harbor 可复现门）+ held-out 侧字段（oracle/test_cmd/gates） 的存放约定；② 薄抽取 skill extract-harness-seed——只描述「从 closed issue+merged fix PR 等真实源 harvest + 过两道门 + ground 哪几字段」，只引用契约、不依赖任何其它 skill，收编 NexAU 既有 `extract-harness-seed`。
+- **T2 种子注入（card → SeedScenario）**（done） — 把采集到的种子卡（0010/T1）注入 0009 的 SeedSource 供给：card_to_seed 将一条卡映射为 spec-0001 models.SeedScenario —— `task.prompt` 成 description，`source.repo`+`env.repo_at` 成 git 工作区（0009/T4）， `env.setup` 成 venv 前缀化的 setup（0009/T3）。
 
 ```mermaid
 graph LR
     nT1["T1 种子场景采集（蒸馏，skill 形式）"]
     nT2["T2 种子注入（card → SeedScenario）"]
     nT1 --> nT2
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T1_2["T1 v2"]
+    v_T1_1 -->|redefined| v_T1_2
+    v_T2_1["T2 v1"]
+    v_T2_2["T2 v2"]
+    v_T2_1 -->|redefined| v_T2_2
+    classDef st_done fill:#b7e4c7;
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T1_2 st_done;
+    class v_T2_1 st_pending;
+    class v_T2_2 st_done;
 ```
