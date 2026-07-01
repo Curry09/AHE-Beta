@@ -9,17 +9,18 @@
 
 本组把「工作区供给」抽象为按 `kind` 注册的 `SeedSource` 协议：把既有 `materialize` 降为首个 `local-fixture` 实现（行为等价、向后兼容），并新增一个轻量 `empty` 源（新建空目录，可选写入需求说明文件，覆盖 NL2Repo 式「仅说明文档」起步）以证明**可加性**——新增一个源 = 落一个新模块（被自动发现注册）+ 注册侧/消费侧零改动。`workspace.materialize()` 退化为薄壳委托给注册表，故 `sim_user` 桥接与 `Sandbox` 调用点一行不改。
 
-**明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）；git@commit 取数。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）；重型框架（容器/git@commit/Oracle）仍留下游、不提前造。
+**明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。git@commit 取数原亦列为下游非目标，现兑现为本组 **T4**（`git` 源：clone repo@commit 成快照工作区）——真实 repo 任务（SWE-bench 的 `base_commit` 未修复态、funcy@某版本等）的起点正是「某仓库停在某 commit 的快照」，两个本地源（local-fixture/empty）立不起来，故补上此扩展点。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）+ 通用 `git` 快照源（T4）；重型框架（容器 / Oracle / 具体 benchmark 适配层）仍留下游、不提前造。
 
-数据流脊柱（编号即执行序：先立接缝 T1，再加第二源 T2 证明可插拔，再由 T3 激活 `setup` 依赖供给使工作区可跑其声明依赖）：
+数据流脊柱（编号即执行序：先立接缝 T1，再加第二源 T2 证明可插拔，再由 T3 激活 `setup` 依赖供给使工作区可跑其声明依赖，再由 T4 补通用 `git` 快照源接入真实 repo 任务）：
 
 ```
 seed 场景  SeedScenario.workspace = WorkspaceSpec{kind, fixture?, params, setup}
    │  按 kind 查 SeedSource 注册表（T1 立协议 + 注册表 + sources/ 自动发现）
    ▼
 SeedSource.provision(spec, dest) -> workspace_dir
-   ├─ kind="local-fixture": copytree in-repo fixture （T1，= 0008 行为）
-   └─ kind="empty":        新建空目录，可选写需求文档 （T2，可加性证明）
+   ├─ kind="local-fixture": copytree in-repo fixture      （T1，= 0008 行为）
+   ├─ kind="empty":         新建空目录，可选写需求文档     （T2，可加性证明）
+   └─ kind="git":           clone repo + checkout <commit> （T4，真实 repo 快照）
    ▼
 依赖供给：ensure_deps(dir, spec) 执行 spec.setup 备 per-workspace .venv （T3）
    │  → 消费侧 Sandbox.run_shell 探测 .venv 自动用之（python/pytest 命中依赖）
@@ -34,8 +35,10 @@ graph LR
     nT1["T1 SeedSource 协议 + 注册表 + local-fixture 实现"]
     nT2["T2 empty/nl-doc 源（可插拔证明）"]
     nT3["T3 依赖供给（setup 钩子落地：per-workspace venv + pip）"]
+    nT4["T4 git 源（clone repo@commit 成快照工作区）"]
     nT1 --> nT2
     nT1 --> nT3
+    nT1 --> nT4
 ```
 
 | 任务 | 标题 | 优先级 | 状态 | 依赖 |
@@ -43,6 +46,7 @@ graph LR
 | T1 | SeedSource 协议 + 注册表 + local-fixture 实现 | P1 | done | — |
 | T2 | empty/nl-doc 源（可插拔证明） | P2 | done | T1 |
 | T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | P1 | done | T1 |
+| T4 | git 源（clone repo@commit 成快照工作区） | P1 | pending | T1 |
 
 ## 各任务方案
 
@@ -253,3 +257,75 @@ test_deps.py：(a) `setup` 为空 → `ensure_deps` 空操作、目录无 `.venv
 **待解问题**
 
 1) 跨会话 venv 缓存/预热：每局现装耗时且需网络；是否按 (deps 指纹) 缓存复用一份 venv、或预构建镜像层。2) harness 子进程 bash 是否也应使用 workspace `.venv`（当前仅用户 agent Sandbox 用）：需 0003 harness entry 识别 workspace venv，涉及跨仓改动。3) 无网络/受限环境的依赖供给（离线镜像、vendored wheels）。4) setup 命令的来源：从需求文档（如 funcy start.md 的依赖清单）自动生成 setup，还是由场景/adapter 手写——前者需一个「文档→setup」的推导步骤，归后续。5) 依赖安装失败的策略：整局判失败，还是降级为「无该依赖的受限核实」。
+
+### T4 · git 源（clone repo@commit 成快照工作区）（P1 / pending）
+
+**涉及文件**
+
+- `backend/auto_designer/user/sim/sources/git.py`
+- `backend/tests/user/sim/test_git_source.py`
+
+**做什么**
+
+在 T1 接缝上接入第三个源 `git`：`provision` 时把 `repo` clone 到隔离工作区目录并 `git checkout <commit>`，得到「某仓库停在某 commit」的干净快照，返回该目录。兑现 0009 当初为「未来 SWE-bench / Terminal-Bench」预留的扩展点——真实 repo 任务（SWE-bench 的 `base_commit` 未修复态、funcy@某版本等）的起点正是这一快照，而现有两源（`local-fixture` 只拷 vendored 目录、`empty` 只给空目录）立不起来。`repo`/`commit`（及可选 `ref`/`depth`）经 `WorkspaceSpec.params` 承载，不扩 schema、`kind="git"`；每局 fresh（每 round 重 clone/checkout 一份，隔离避免跨局串状态，与 local-fixture 每局重拷同理）。接入它**只新增 `sources/git.py` 一个模块**，靠 T1 子包自动发现注册，协议/注册表/`materialize` 薄壳/既有两源/orchestrator/sim_user/Sandbox 一律不改。
+
+**为什么**
+
+0009 把供给做成可插拔（T1 接缝 + T2 可加性证明），明确目标之一是为「未来 SWE-bench / Terminal-Bench」留扩展点；但已落地的两源均只能起本地：`local-fixture` copytree 一个 in-repo vendored 目录、`empty` 开一个空目录（可选写说明文档）。真实软件工程任务的注入形状不是这两者——它是「某公开仓库停在某历史 commit 的工作树快照」：SWE-bench 实例即 `repo` 在 `base_commit` 处的未修复态，funcy 式任务是某发布版本的源码树。没有「从 git clone @commit」的源，这类任务的起点根本立不起来，可插拔接缝对真实 repo 分布形同虚设。本任务兑现该扩展点，补上通用 `git` 源，使供给侧能承载「基于某仓库某快照」的任务族（具体 benchmark 字段→场景的适配层为非目标，见下）。
+
+**范围**
+
+1) `sources/git.py`（新）：定义 `GitSource`，`@register("git")` 自注册（T1 子包扫描 import 期自动发现，无中心登记）。`provision(spec, dest_root)`：从 `spec.params` 读 `repo`（必填）、`commit`（必填）、可选 `ref`/`depth`；在隔离目录里 `git clone` 该 repo、`git checkout <commit>` 恢复快照，返回该目录绝对路径。隔离/返回契约同另两源（每局全新目录、互不污染、返回绝对路径）。2) 复用既有 `WorkspaceSpec.params` 承载 `repo`/`commit`/`ref`/`depth`——**不新增/不修改 `WorkspaceSpec` 字段**（与 T1 给 empty 用 params 一致，不碰 T1 的 models.py）。**不改** `SeedSource` 协议/注册表/顶层 `provision`（T1）、`empty`（T2）、`materialize` 薄壳、消费侧 `orchestrator`/`sim_user`/`Sandbox`。非目标（留后续/单独）：具体 benchmark（SWE-bench 等）字段→`SeedScenario` 的适配层（adapter）；容器/hermetic 与版本 pin 的环境强度；私有仓鉴权。
+
+**整体设计**
+
+第三源接入，消费侧零改（港口仍冻结：目录 + 本地 shell）：
+
+```
+WorkspaceSpec{kind="git", params={repo, commit, ref?, depth?}}
+        │ provision(spec, dest_root)   ← T1 顶层分派按 kind 命中 GitSource
+        ▼
+新建隔离目录（tempfile.mkdtemp 或 dest_root/<name>）
+        ├─ git clone <repo> <dir>        （可选 --depth / 指定 ref 加速）
+        └─ git checkout <commit>         （恢复到该快照：SWE-bench 即 base_commit 未修复态）
+返回目录绝对路径（该 repo 在该 commit 的工作树）
+        ▼
+每局时序不变：materialize(git clone+checkout) → ensure_deps(按 setup 在快照里装依赖，如 pip install -e .，T3)
+              → launch harness(注入 SANDBOX_WORK_DIR) → 跑会话(user agent 绑同一快照)
+```
+
+- 签名与另两源一致：`GitSource.kind="git"`、`provision(spec, dest_root=None) -> str`，从而 T1 顶层 `provision`/注册表分派、`materialize` 薄壳、消费侧全部零改——这是 ports-and-adapters 边界成立的又一判据（第三个 adapter 只落一个文件）。
+- 复用 `params` 而非给 `git` 引入专属 schema：`repo`/`commit`/`ref`/`depth` 全落在既有 `params: dict`，`WorkspaceSpec` 不随源膨胀（不碰 T1 models.py），与 T2 给 empty 用 `params.doc` 同构；字段完整性由 source 内部自校验。
+- 每局 fresh：每 round 重新 clone/checkout 一份干净快照，独立目录、跨局隔离、可清理，避免上一局 harness 改动或用户 agent 写入串到下一局——与 local-fixture 每局重拷同理。
+- 与 T3 依赖供给正交：`git` 只负责「把某仓库某快照落成工作区」，环境强度（venv/pip、`pip install -e .`）仍由 T3 的 `setup`/`ensure_deps` 在该快照目录里备齐；二者在既有时序里前后衔接，互不改对方文件。
+
+**接口**
+
+- `GitSource`（`sources/git.py`）：`kind="git"`；`provision(spec: WorkspaceSpec, dest_root: str | None = None) -> str`——从 `spec.params` 读 `repo`（必填，url 或 owner/repo）、`commit`（必填，恢复的快照 sha/ref）、可选 `ref`（clone 时定向分支/tag）、`depth`（浅克隆深度）；在隔离目录 clone + `git checkout <commit>`，返回该目录绝对路径。
+- 经 `@register("git")` 入 T1 注册表；调用方仍走 T1 顶层 `provision(spec)`，不直接依赖本类。
+- 复用 T1 的 `WorkspaceSpec`（不新增字段）：`git` 的输入完全落在既有 `kind` + `params` 上，再证 `params: dict` 扩展位足够承载新源。
+- `repo`/`commit` 缺失或 clone/checkout 失败时抛错并携带诊断（缺失字段名、失败命令 + stderr）。
+- 不改 `SeedSource`/`provision`/`materialize` 签名，不改消费侧 `orchestrator`/`sim_user`/`Sandbox`，不改 harness stdio 协议。
+
+**取舍**
+
+- clone 每局现做（而非缓存/共享 bare 镜像）：换来确定、隔离、可清理的干净快照；代价是耗时 + 需网络可达 git 源——跨局 clone 缓存/本地镜像复用留后续，不在本任务。
+- 用通用 `params.repo`/`commit` 而非给 `git` 引入专属强类型 schema：保持 `WorkspaceSpec` 不随每源膨胀、不碰 T1；代价是 `params` 弱类型，靠 source 内部自校验与测试约束（同 T2 empty）。
+- 只解决「把某仓库某快照落成工作区」：环境强度仍靠 T3 的 `setup`（venv+pip）；挑版本/系统依赖/需官方镜像的实例不保证可跑——属容器/hermetic 那条既有非目标，本任务不越界造重型运行时。
+- 第三源选通用 `git` 而非直接做 SWE-bench 专用源：通用 clone@commit 可复用于所有「基于某仓库某快照」的任务族，把 benchmark 专属字段映射隔离到独立 adapter；代价是本任务不产出可直接消费 SWE-bench 数据集的端到端链路（adapter 归后续）。
+
+**验收标准**
+
+给定 `WorkspaceSpec(kind="git", params={repo, commit})`，`provision` 后返回目录是该 repo 在该 commit 的工作树：可校验 `git rev-parse HEAD` == `commit`、关键文件存在。隔离——每次 provision 落独立目录、互不污染。`commit` 缺失（或 `repo` 缺失）时抛错且消息含缺失字段名；clone/checkout 失败时抛错并携带失败命令 + stderr 诊断。注册表按 `kind="git"` 分派到 `GitSource`；**不修改 T1/T2/T3 任何文件**的前提下 import `seed_source` 后 `available_kinds()` 含 `git`（自动发现注册生效）。与既有源（local-fixture/empty）及消费侧（materialize 薄壳 / orchestrator / sim_user / Sandbox）零回归。该目录可作为 `Sandbox` 的 cwd 与 harness 的 `SANDBOX_WORK_DIR` 正常复用（沿用既有行为，不重测消费侧内部）。CI 约束：默认单测**不走真实网络**——用一个本地临时 git 仓当 `repo`（origin），或对 clone 命令做 spy/mock；真实远端 clone 的端到端标记为可选/手动。
+
+**测试**
+
+test_git_source.py（皆离线、不走网络）：(a) 本地临时 git 仓——`git init` + 造两个 commit（记 C1、C2），以其路径为 `repo`；`provision(kind="git", params={repo, commit=C1})` 后断言工作树恢复到 C1（`git rev-parse HEAD` == C1、C1 特有文件在/C2 新增文件不在）；(b) 目录隔离——两次 provision 落不同目录、互不污染；(c) 缺 `commit`（及缺 `repo`）→ 抛错且消息含缺失字段名；clone/checkout 失败（如不存在的 commit 或坏 repo 路径）→ 抛错且携带失败命令 + stderr；(d) 可加性/分派——本测试不 import `git` 模块本身、仅 import `seed_source`，断言 `available_kinds()` 含 `git` 且顶层 `provision` 按 `kind="git"` 分派到 `GitSource`（证明仅靠落模块即被自动发现）；(e) 序列化——`WorkspaceSpec(kind="git", params={repo, commit})` to_dict/from_dict 往返一致。真实远端 clone 的端到端标记为可选/手动，不在默认 CI 用例内。
+
+**参考**
+
+依赖 0009/T1 的 `SeedSource` 协议、`register`/`provision` 注册表与 `sources/` 自动发现机制，以及 T1 为 `WorkspaceSpec` 增的 `kind`/`params`（本任务复用 `params`，不改其文件）。落脚的共享工作区（0008/T1 materialize 上移 orchestrator）与 `Sandbox`（0008/T2）原样复用、不在本任务 files 内。与本组 T3 依赖供给正交衔接：`git` 落快照、T3 的 `setup`/`ensure_deps` 在该快照里备依赖。兑现 0009 metadata 为「未来 SWE-bench / Terminal-Bench」预留的供给侧扩展点。
+
+**待解问题**
+
+1) 具体 benchmark（SWE-bench 等）字段 → `SeedScenario`/`WorkspaceSpec` 的适配层（adapter）：把数据集实例的 `repo`/`base_commit`/环境声明映射成本源可消费的 `params` + T3 的 `setup`——本任务只给通用 git 源，adapter 归后续/单独 spec。2) 容器 / hermetic 与版本 pin 的环境强度：挑系统依赖或需官方镜像的实例，仅靠 clone@commit + venv 不保证可跑（沿用既有「重型运行时留下游」非目标）。3) oracle / 客观判分（跑上游测试判修复对错）：红线 held-out，永不进本框架训练。4) harness 子进程 bash 是否用工作区 venv：属 harness 侧 / 开发者进化，已明确划出框架范围（同 T3 open-question）。5) 私有仓鉴权（token / ssh key 注入 clone）：本任务默认公开仓 / 本地仓，鉴权留后续。6) 跨局 clone 缓存 / 本地 bare 镜像复用以省耗时与网络：本轮每局现 clone，缓存留后续。

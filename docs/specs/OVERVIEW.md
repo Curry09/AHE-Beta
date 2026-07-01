@@ -118,7 +118,7 @@
 
   本组把「工作区供给」抽象为按 `kind` 注册的 `SeedSource` 协议：把既有 `materialize` 降为首个 `local-fixture` 实现（行为等价、向后兼容），并新增一个轻量 `empty` 源（新建空目录，可选写入需求说明文件，覆盖 NL2Repo 式「仅说明文档」起步）以证明**可加性**——新增一个源 = 落一个新模块（被自动发现注册）+ 注册侧/消费侧零改动。`workspace.materialize()` 退化为薄壳委托给注册表，故 `sim_user` 桥接与 `Sandbox` 调用点一行不改。
 
-  **明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）；git@commit 取数。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）；重型框架（容器/git@commit/Oracle）仍留下游、不提前造。
+  **明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。git@commit 取数原亦列为下游非目标，现兑现为本组 **T4**（`git` 源：clone repo@commit 成快照工作区）——真实 repo 任务（SWE-bench 的 `base_commit` 未修复态、funcy@某版本等）的起点正是「某仓库停在某 commit 的快照」，两个本地源（local-fixture/empty）立不起来，故补上此扩展点。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）+ 通用 `git` 快照源（T4）；重型框架（容器 / Oracle / 具体 benchmark 适配层）仍留下游、不提前造。
 
 ## 如何读这份文档
 
@@ -223,6 +223,7 @@
 | 0009 | 0009/T1 | SeedSource 协议 + 注册表 + local-fixture 实现 | done | — |
 | 0009 | 0009/T2 | empty/nl-doc 源（可插拔证明） | done | T1 |
 | 0009 | 0009/T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | done | T1 |
+| 0009 | 0009/T4 | git 源（clone repo@commit 成快照工作区） | pending | T1 |
 
 ## 跨 feature 关系图
 
@@ -283,6 +284,7 @@ graph LR
         n0009_T1["T1 SeedSource 协议 + 注册表 + local-fixture 实现"]
         n0009_T2["T2 empty/nl-doc 源（可插拔证明）"]
         n0009_T3["T3 依赖供给（setup 钩子落地：per-workspace venv + pip）"]
+        n0009_T4["T4 git 源（clone repo@commit 成快照工作区）"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -332,6 +334,7 @@ graph LR
     n0008_T4 --> n0008_T3
     n0009_T2 --> n0009_T1
     n0009_T3 --> n0009_T1
+    n0009_T4 --> n0009_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -353,6 +356,8 @@ graph LR
     n0009_T1 -.extends.-> n0008_T1
     n0009_T3 -.note.-> n0008_T1
     n0009_T3 -.note.-> n0008_T2
+    n0009_T4 -.note.-> n0008_T1
+    n0009_T4 -.note.-> n0009_T3
 ```
 
 ## 文件冲突报告
@@ -417,6 +422,7 @@ backend/
         sources/
           __init__.py                   ← 0009/T1
           empty.py                      ← 0009/T2
+          git.py                        ← 0009/T4
           local_fixture.py              ← 0009/T1
         action_space.py                 ← 0005/T2
         actions.py                      ← 0005/T2
@@ -488,6 +494,7 @@ backend/
         test_deps.py                    ← 0009/T3
         test_dimensions.py              ← 0005/T1
         test_feeling.py                 ← 0005/T4
+        test_git_source.py              ← 0009/T4
         test_harness_adapter.py         ← 0005/T6
         test_inner_prompt.py            ← 0008/T3
         test_loop.py                    ← 0005/T5
@@ -1080,17 +1087,18 @@ graph LR
 
 本组把「工作区供给」抽象为按 `kind` 注册的 `SeedSource` 协议：把既有 `materialize` 降为首个 `local-fixture` 实现（行为等价、向后兼容），并新增一个轻量 `empty` 源（新建空目录，可选写入需求说明文件，覆盖 NL2Repo 式「仅说明文档」起步）以证明**可加性**——新增一个源 = 落一个新模块（被自动发现注册）+ 注册侧/消费侧零改动。`workspace.materialize()` 退化为薄壳委托给注册表，故 `sim_user` 桥接与 `Sandbox` 调用点一行不改。
 
-**明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）；git@commit 取数。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）；重型框架（容器/git@commit/Oracle）仍留下游、不提前造。
+**明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。git@commit 取数原亦列为下游非目标，现兑现为本组 **T4**（`git` 源：clone repo@commit 成快照工作区）——真实 repo 任务（SWE-bench 的 `base_commit` 未修复态、funcy@某版本等）的起点正是「某仓库停在某 commit 的快照」，两个本地源（local-fixture/empty）立不起来，故补上此扩展点。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）+ 通用 `git` 快照源（T4）；重型框架（容器 / Oracle / 具体 benchmark 适配层）仍留下游、不提前造。
 
-数据流脊柱（编号即执行序：先立接缝 T1，再加第二源 T2 证明可插拔，再由 T3 激活 `setup` 依赖供给使工作区可跑其声明依赖）：
+数据流脊柱（编号即执行序：先立接缝 T1，再加第二源 T2 证明可插拔，再由 T3 激活 `setup` 依赖供给使工作区可跑其声明依赖，再由 T4 补通用 `git` 快照源接入真实 repo 任务）：
 
 ```
 seed 场景  SeedScenario.workspace = WorkspaceSpec{kind, fixture?, params, setup}
    │  按 kind 查 SeedSource 注册表（T1 立协议 + 注册表 + sources/ 自动发现）
    ▼
 SeedSource.provision(spec, dest) -> workspace_dir
-   ├─ kind="local-fixture": copytree in-repo fixture （T1，= 0008 行为）
-   └─ kind="empty":        新建空目录，可选写需求文档 （T2，可加性证明）
+   ├─ kind="local-fixture": copytree in-repo fixture      （T1，= 0008 行为）
+   ├─ kind="empty":         新建空目录，可选写需求文档     （T2，可加性证明）
+   └─ kind="git":           clone repo + checkout <commit> （T4，真实 repo 快照）
    ▼
 依赖供给：ensure_deps(dir, spec) 执行 spec.setup 备 per-workspace .venv （T3）
    │  → 消费侧 Sandbox.run_shell 探测 .venv 自动用之（python/pytest 命中依赖）
@@ -1103,14 +1111,17 @@ SeedSource.provision(spec, dest) -> workspace_dir
 - **T1 SeedSource 协议 + 注册表 + local-fixture 实现**（done） — 本组底座任务：把工作区供给从「唯一硬编码的本地 copytree」抽象为按 `kind` 注册的 `SeedSource` 协议。
 - **T2 empty/nl-doc 源（可插拔证明）**（done） — 在 T1 接缝上接入第二个源 `empty`，作为「可插拔/可加性」的活体证明：新建一个隔离空工作区目录，`params` 含 `doc` 时把其文本写成一个需求说明文件（覆盖 NL2Repo 式「仅一份说明文档、从空仓起步」的场景）。
 - **T3 依赖供给（setup 钩子落地：per-workspace venv + pip）**（done） — 把 `WorkspaceSpec.setup`（0008 起仅占位、从不执行）真正落地，补上供给侧最后一环：一个源 provision 出工作区目录后，按 `setup` 命令在该目录里备好依赖环境（约定为 per-workspace `.venv` + pip 安装），并让消费侧 `Sandbox` 的 `run_shell` 自动使用该 venv。
+- **T4 git 源（clone repo@commit 成快照工作区）**（pending） — 在 T1 接缝上接入第三个源 `git`：`provision` 时把 `repo` clone 到隔离工作区目录并 `git checkout <commit>`，得到「某仓库停在某 commit」的干净快照，返回该目录。
 
 ```mermaid
 graph LR
     nT1["T1 SeedSource 协议 + 注册表 + local-fixture 实现"]
     nT2["T2 empty/nl-doc 源（可插拔证明）"]
     nT3["T3 依赖供给（setup 钩子落地：per-workspace venv + pip）"]
+    nT4["T4 git 源（clone repo@commit 成快照工作区）"]
     nT1 --> nT2
     nT1 --> nT3
+    nT1 --> nT4
 ```
 
 演化图：
@@ -1126,11 +1137,14 @@ graph LR
     v_T3_1["T3 v1"]
     v_T3_2["T3 v2"]
     v_T3_1 -->|redefined| v_T3_2
+    v_T4_1["T4 v1"]
     classDef st_done fill:#b7e4c7;
+    classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
     class v_T1_2 st_done;
     class v_T2_1 st_done;
     class v_T2_2 st_done;
     class v_T3_1 st_done;
     class v_T3_2 st_done;
+    class v_T4_1 st_pending;
 ```
