@@ -114,6 +114,11 @@
   **harness 与用户 agent 共享同一工作区（v2 掰正，关键）**：本组目标场景一直是「助手（harness）能改、也能跑，用户 agent 在同一目录真核实」——纯文本建议核不了真。故 T1 把工作区做成两侧共享的同一目录：orchestrator 每局先 materialize，经 launcher 把 SANDBOX_WORK_DIR 注入 harness 子进程、同一目录绑定内层 client；harness（bash 工具）落地 的改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS，非 advisory 文本）。初版曾把此设为「harness 仅 advisory、用户 贴进自己的工作区拷贝、共享工作区留完全解耦的第二期上游 spec」——现掰正为缺陷假设：共享工作区即在本组 T1 落地（仅 追加可选 workspace_dir 接线，退化路径对纯文本场景与直连调用零破坏），不再另立上游 spec。两侧无并发写竞争靠逐轮 stdio 串行天然保证。
 
   **与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎零改动。`web_search` 工具、skill 真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不 bug/benchmark 特定」红线约束，对接 0006 蒸馏）；是否清理已渐冗余的外层 `verify_self`/`pending_self_obs`、是否给 内层喂显式状态信号、git 工作区来源、与 0003/T2 `nexau_runtime` 的 tool-calling 形态并轨，集中记在各 Task open-questions，归后续 Task/组。
+- **0009 种子工作区供给可插拔（SeedSource 接缝）** — 本组承接 spec-0008/T1：彼时 `SeedScenario.workspace` 经 `WorkspaceSpec{fixture, setup}` + `materialize()` 落地，供给路径是**唯一且硬编码的本地 copytree**。随着任务源增多（NL2Repo 式空仓起步、未来 SWE-bench / Terminal-Bench 等），**供给侧需可插拔**；而**消费港口**——`SeedScenario.description` 文本 + 一个被 `Sandbox`/`sim_user` 当 cwd 的工作区目录——保持冻结、零改动。
+
+  本组把「工作区供给」抽象为按 `kind` 注册的 `SeedSource` 协议：把既有 `materialize` 降为首个 `local-fixture` 实现（行为等价、向后兼容），并新增一个轻量 `empty` 源（新建空目录，可选写入需求说明文件，覆盖 NL2Repo 式「仅说明文档」起步）以证明**可加性**——新增一个源 = 落一个新模块（被自动发现注册）+ 注册侧/消费侧零改动。`workspace.materialize()` 退化为薄壳委托给注册表，故 `sim_user` 桥接与 `Sandbox` 调用点一行不改。
+
+  **明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）；git@commit 取数。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）；重型框架（容器/git@commit/Oracle）仍留下游、不提前造。
 
 ## 如何读这份文档
 
@@ -215,6 +220,9 @@
 | 0008 | 0008/T2 | 内层原子工具与 sandbox | done | T1 |
 | 0008 | 0008/T3 | prompt 行为框架（可选核实）与 skill 占位接口 | done | — |
 | 0008 | 0008/T4 | 内层 tool-using agent（AgenticPersonaClient） | done | T1, T2, T3 |
+| 0009 | 0009/T1 | SeedSource 协议 + 注册表 + local-fixture 实现 | done | — |
+| 0009 | 0009/T2 | empty/nl-doc 源（可插拔证明） | done | T1 |
+| 0009 | 0009/T3 | 依赖供给（setup 钩子落地：per-workspace venv + pip） | done | T1 |
 
 ## 跨 feature 关系图
 
@@ -271,6 +279,11 @@ graph LR
         n0008_T3["T3 prompt 行为框架（可选核实）与 skill 占位接口"]
         n0008_T4["T4 内层 tool-using agent（AgenticPersonaClient）"]
     end
+    subgraph G0009[0009 seed-source-pluggable]
+        n0009_T1["T1 SeedSource 协议 + 注册表 + local-fixture 实现"]
+        n0009_T2["T2 empty/nl-doc 源（可插拔证明）"]
+        n0009_T3["T3 依赖供给（setup 钩子落地：per-workspace venv + pip）"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -317,6 +330,8 @@ graph LR
     n0008_T4 --> n0008_T1
     n0008_T4 --> n0008_T2
     n0008_T4 --> n0008_T3
+    n0009_T2 --> n0009_T1
+    n0009_T3 --> n0009_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -335,6 +350,9 @@ graph LR
     n0008_T3 -.note.-> n0006_T1
     n0008_T4 -.extends.-> n0005_T3
     n0008_T4 -.note.-> n0005_T5
+    n0009_T1 -.extends.-> n0008_T1
+    n0009_T3 -.note.-> n0008_T1
+    n0009_T3 -.note.-> n0008_T2
 ```
 
 ## 文件冲突报告
@@ -342,17 +360,21 @@ graph LR
 | 文件 | 涉及组 |
 |----|----|
 | backend/auto_designer/harness/launcher.py | 0003, 0008 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/models.py | 0001, 0008 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009 |
+| backend/auto_designer/models.py | 0001, 0008, 0009 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008 |
+| backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
+| backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/harness/test_launcher.py | 0003, 0008 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
+| backend/tests/user/sim/test_workspace.py | 0008, 0009 |
 
 ## 设计文件结构
 
@@ -382,20 +404,25 @@ backend/
     loop/
       checkpoint.py                     ← 0004/T1
       metrics.py                        ← 0003/T6
-      orchestrator.py                   ← 0003/T6, 0007/T2, 0008/T1
+      orchestrator.py                   ← 0003/T6, 0007/T2, 0008/T1, 0009/T3
       run_state.py                      ← 0004/T1, 0007/T2
       runner.py                         ← 0004/T2
-      sim_user.py                       ← 0008/T1
+      sim_user.py                       ← 0008/T1, 0009/T3
     tracker/
       base.py                           ← 0001/T5
       fake.py                           ← 0001/T5
       gitea.py                          ← 0002/T2
     user/
       sim/
+        sources/
+          __init__.py                   ← 0009/T1
+          empty.py                      ← 0009/T2
+          local_fixture.py              ← 0009/T1
         action_space.py                 ← 0005/T2
         actions.py                      ← 0005/T2
         clauses.py                      ← 0005/T1, 0008/T3
         demo.py                         ← 0005/T6
+        deps.py                         ← 0009/T3
         dimensions.py                   ← 0005/T1
         feeling.py                      ← 0005/T4
         harness_adapter.py              ← 0005/T6
@@ -404,16 +431,17 @@ backend/
         persona_io.py                   ← 0006/T2
         prompt.py                       ← 0005/T3, 0008/T3
         run_live.py                     ← 0005/T6
-        sandbox.py                      ← 0008/T2
+        sandbox.py                      ← 0008/T2, 0009/T3
         scenarios.py                    ← 0005/T6
+        seed_source.py                  ← 0009/T1
         skills.py                       ← 0008/T3
         state.py                        ← 0005/T2
         tools.py                        ← 0008/T2
-        workspace.py                    ← 0008/T1
+        workspace.py                    ← 0008/T1, 0009/T1
       session.py                        ← 0001/T4
       session_store.py                  ← 0001/T6
       user_agent.py                     ← 0001/T3
-    models.py                           ← 0001/T1, 0008/T1
+    models.py                           ← 0001/T1, 0008/T1, 0009/T1
     nexau_runtime.py                    ← 0003/T2
   deploy/
     gitea/
@@ -457,6 +485,7 @@ backend/
     user/
       sim/
         test_action_space.py            ← 0005/T2
+        test_deps.py                    ← 0009/T3
         test_dimensions.py              ← 0005/T1
         test_feeling.py                 ← 0005/T4
         test_harness_adapter.py         ← 0005/T6
@@ -465,9 +494,11 @@ backend/
         test_persona_client_agentic.py  ← 0008/T4
         test_persona_io.py              ← 0006/T2
         test_prompt.py                  ← 0005/T3
+        test_seed_source.py             ← 0009/T1
+        test_seed_source_empty.py       ← 0009/T2
         test_state.py                   ← 0005/T2
         test_tools.py                   ← 0008/T2
-        test_workspace.py               ← 0008/T1
+        test_workspace.py               ← 0008/T1, 0009/T1
       test_session.py                   ← 0001/T4
       test_session_store.py             ← 0001/T6
       test_user_agent.py                ← 0001/T3
@@ -1039,4 +1070,67 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T4_2 st_done;
+```
+
+### 0009 种子工作区供给可插拔（SeedSource 接缝）（issue #9）
+
+> 人读方案见 [`0009-seed-source-pluggable/summary.md`](./0009-seed-source-pluggable/summary.md)。
+
+本组承接 spec-0008/T1：彼时 `SeedScenario.workspace` 经 `WorkspaceSpec{fixture, setup}` + `materialize()` 落地，供给路径是**唯一且硬编码的本地 copytree**。随着任务源增多（NL2Repo 式空仓起步、未来 SWE-bench / Terminal-Bench 等），**供给侧需可插拔**；而**消费港口**——`SeedScenario.description` 文本 + 一个被 `Sandbox`/`sim_user` 当 cwd 的工作区目录——保持冻结、零改动。
+
+本组把「工作区供给」抽象为按 `kind` 注册的 `SeedSource` 协议：把既有 `materialize` 降为首个 `local-fixture` 实现（行为等价、向后兼容），并新增一个轻量 `empty` 源（新建空目录，可选写入需求说明文件，覆盖 NL2Repo 式「仅说明文档」起步）以证明**可加性**——新增一个源 = 落一个新模块（被自动发现注册）+ 注册侧/消费侧零改动。`workspace.materialize()` 退化为薄壳委托给注册表，故 `sim_user` 桥接与 `Sandbox` 调用点一行不改。
+
+**明确非目标**（仅作为下游 spec 的扩展点记录，本组不实现）：Oracle / 客观判分（属平行评测系统，与用户主观核实解耦）；容器化「可运行句柄」运行时（`run(cmd)`/`cleanup`）；git@commit 取数。依赖供给（venv/pip）原亦列为非目标、拟推下游，现掰正收进本组 **T3**（见下）——因为「供给一个工作区」若不含「按其声明依赖可跑」，NL2Repo 式带依赖任务（如 funcy 需 pytest/whatever）在 stdlib-only 假设的 Sandbox 里根本跑不起来。本组动供给侧：凿接缝（T1）+ 一个已验证的第二实现（T2）+ 激活 `setup` 依赖供给（T3）；重型框架（容器/git@commit/Oracle）仍留下游、不提前造。
+
+数据流脊柱（编号即执行序：先立接缝 T1，再加第二源 T2 证明可插拔，再由 T3 激活 `setup` 依赖供给使工作区可跑其声明依赖）：
+
+```
+seed 场景  SeedScenario.workspace = WorkspaceSpec{kind, fixture?, params, setup}
+   │  按 kind 查 SeedSource 注册表（T1 立协议 + 注册表 + sources/ 自动发现）
+   ▼
+SeedSource.provision(spec, dest) -> workspace_dir
+   ├─ kind="local-fixture": copytree in-repo fixture （T1，= 0008 行为）
+   └─ kind="empty":        新建空目录，可选写需求文档 （T2，可加性证明）
+   ▼
+依赖供给：ensure_deps(dir, spec) 执行 spec.setup 备 per-workspace .venv （T3）
+   │  → 消费侧 Sandbox.run_shell 探测 .venv 自动用之（python/pytest 命中依赖）
+   ▼
+消费港口不变：workspace.materialize() 薄壳委托 → sim_user 桥接 → Sandbox(workspace=dir) 当 cwd（0008 原样）
+```
+
+**任务一览**
+
+- **T1 SeedSource 协议 + 注册表 + local-fixture 实现**（done） — 本组底座任务：把工作区供给从「唯一硬编码的本地 copytree」抽象为按 `kind` 注册的 `SeedSource` 协议。
+- **T2 empty/nl-doc 源（可插拔证明）**（done） — 在 T1 接缝上接入第二个源 `empty`，作为「可插拔/可加性」的活体证明：新建一个隔离空工作区目录，`params` 含 `doc` 时把其文本写成一个需求说明文件（覆盖 NL2Repo 式「仅一份说明文档、从空仓起步」的场景）。
+- **T3 依赖供给（setup 钩子落地：per-workspace venv + pip）**（done） — 把 `WorkspaceSpec.setup`（0008 起仅占位、从不执行）真正落地，补上供给侧最后一环：一个源 provision 出工作区目录后，按 `setup` 命令在该目录里备好依赖环境（约定为 per-workspace `.venv` + pip 安装），并让消费侧 `Sandbox` 的 `run_shell` 自动使用该 venv。
+
+```mermaid
+graph LR
+    nT1["T1 SeedSource 协议 + 注册表 + local-fixture 实现"]
+    nT2["T2 empty/nl-doc 源（可插拔证明）"]
+    nT3["T3 依赖供给（setup 钩子落地：per-workspace venv + pip）"]
+    nT1 --> nT2
+    nT1 --> nT3
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T1_2["T1 v2"]
+    v_T1_1 -->|redefined| v_T1_2
+    v_T2_1["T2 v1"]
+    v_T2_2["T2 v2"]
+    v_T2_1 -->|redefined| v_T2_2
+    v_T3_1["T3 v1"]
+    v_T3_2["T3 v2"]
+    v_T3_1 -->|redefined| v_T3_2
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T1_2 st_done;
+    class v_T2_1 st_done;
+    class v_T2_2 st_done;
+    class v_T3_1 st_done;
+    class v_T3_2 st_done;
 ```

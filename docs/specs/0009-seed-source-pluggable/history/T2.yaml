@@ -1,0 +1,53 @@
+  - id: T2
+    title: empty/nl-doc 源（可插拔证明）
+    status: done
+    priority: P2
+    tags: []
+    depends-on:
+      - T1
+    relates-to: []
+    parallel: false
+    files:
+      - backend/auto_designer/user/sim/sources/empty.py
+      - backend/tests/user/sim/test_seed_source_empty.py
+    version: 1
+    updated: '2026-06-30'
+    change-reason: ''
+    supersedes: []
+    split-from:
+    merged-from: []
+    derived-from: []
+    summary: |-
+      在 T1 接缝上接入第二个源 `empty`，作为「可插拔/可加性」的活体证明：新建一个隔离空工作区目录，`params` 含 `doc` 时把其文本写成一个需求说明文件（覆盖 NL2Repo 式「仅一份说明文档、从空仓起步」的场景）。关键约束——接入它**只新增 `sources/empty.py` 一个模块**，靠 T1 的子包自动发现注册，`seed_source.py` / `models.py` / `workspace.py` 与消费侧（sim_user / Sandbox）零改动。
+    motivation: |-
+      接缝若不被第二个真实源验证，「可插拔」只是声明。`empty` 选作第二源有两重价值：一是零新基建（仍是本地目录，不引入容器 / git / 依赖供给），把验证成本压到最低；二是它直接表达「空工作区 + 一段自然语言诉求」这一最小任务形态——即 NL2Repo 式从零构建的注入形状，证明现有港口已能承载这类任务（其客观评测属非目标，归下游）。本任务以「加一个源 = 一个文件、核心零改」来锁死 T1 边界是否真的解耦。
+    scope: ''
+    design: |-
+      `sources/empty.py` 定义 `EmptySource`，`@register("empty")` 自注册（T1 的子包扫描在 import 期自动发现，无需任何中心登记）：
+
+      ```
+      WorkspaceSpec{kind="empty", params={"doc"?: str, "doc_name"?: str}}
+              │ provision(spec, dest_root)
+              ▼
+      新建隔离目录（tempfile.mkdtemp 或 dest_root/<name>）
+              └─ params.doc 非空 → 写 params.doc_name（缺省 "SPEC.md"）为该目录下的说明文件
+      返回目录绝对路径（空或仅含说明文件）
+      ```
+
+      - 不读 `fixture`（empty 与本地 fixture 无关）；只认 `params`。`doc` 缺省为空 → 落纯空目录；给定 → 写一个需求说明文件，使内层 agent 有「读说明文档」的落脚。
+      - 隔离与返回契约同 local-fixture：每次 provision 一个全新目录、互不污染、返回绝对路径，从而 `Sandbox(workspace=dir)` 可直接当 cwd 复用。
+      - 可加性的硬证据：本任务 files 仅 `sources/empty.py` + 测试；T1 拥有的文件一律不在本任务 files 内（disjoint），却能在测试中验证 `empty` 已被注册——这正是 ports-and-adapters 边界成立的判据。
+    interface: |-
+      - `EmptySource`（`sources/empty.py`）：`kind="empty"`；`provision(spec, dest_root=None) -> str` 新建隔离目录；`spec.params.get("doc")` 非空时写 `spec.params.get("doc_name", "SPEC.md")`。
+      - 经 `@register("empty")` 入 T1 注册表；调用方仍走 T1 顶层 `provision(spec)`，不直接依赖本类。
+      - 复用 T1 的 `WorkspaceSpec`（不新增字段）：`empty` 的输入完全落在既有 `kind` + `params` 上，印证 `params: dict` 的扩展位足够承载新源。
+    tradeoffs: |-
+      - 用通用 `params.doc`/`doc_name` 而非给 `empty` 引入专属 schema：保持 `WorkspaceSpec` 不随每个源膨胀；代价是 `params` 弱类型，靠 source 内部自校验与测试约束。
+      - 第二源选 `empty` 而非直接做 git/容器源：以最低成本验证接缝是否解耦；代价是未覆盖「重型供给」路径——那是有意为之，重型运行时句柄、git@commit、依赖供给均为本组非目标，留下游 spec。
+    acceptance: |-
+      `provision(WorkspaceSpec(kind="empty"))` 返回一个存在的隔离空目录；带 `params={"doc": "..."}` 时目录下含对应说明文件且内容一致，`doc_name` 可覆盖文件名。两次 provision 目录隔离。**不修改 T1 任何文件**的前提下，import `seed_source` 后 `available_kinds()` 含 `empty`（自动发现注册生效）。该目录可作为 `Sandbox` 的 cwd 正常 run/读写（沿用 0008/T2 行为，不重测 Sandbox 内部）。
+    tests: |-
+      test_seed_source_empty.py：(a) `provision(kind="empty")` 落地隔离空目录、存在且为空；(b) 带 `doc` → 目录含说明文件且内容一致，`doc_name` 覆盖生效；(c) 两次 provision 隔离；(d) 可加性证据——本测试不 import `empty` 模块本身、仅 import `seed_source`，断言 `available_kinds()` 含 `empty`（证明仅靠落模块即被自动发现）；(e) 序列化——`WorkspaceSpec(kind="empty", params={...})` to_dict/from_dict 往返一致。
+    references: |-
+      依赖 0009/T1 的 `SeedSource` 协议、`register`/`provision` 注册表与 `sources/` 自动发现机制，以及 T1 为 `WorkspaceSpec` 增的 `kind`/`params`。落脚的 `Sandbox`（0008/T2）原样复用、不在本任务 files 内。NL2Repo 式任务的客观评测（跑上游测试）为非目标，归下游 spec。
+    open-questions: ''

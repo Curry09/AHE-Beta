@@ -105,7 +105,7 @@ backend/data/            # 运行产物(.gitignore)：sessions/ harness_runs/
 
 ## 代码规范
 - **提交信息**：遵循 Conventional Commits —— `<类型>(<范围>): <描述>`
-  - 类型：feat / fix / refactor / chore / docs / test / ci / style / perf / build
+  - 类型：feat / fix / refactor / chore / docs / test / ci / style / perf / build / spec（spec 制品撰写/修订）
 - **代码检查**：Ruff（行宽 100）
 - **Git 钩子**：lefthook —— pre-commit（lint）+ commit-msg（commitlint）
 - **Git 推送**：首次推送分支用 `git push -u origin <branch>` 设置 upstream tracking

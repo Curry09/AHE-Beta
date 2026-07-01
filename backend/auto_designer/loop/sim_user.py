@@ -22,6 +22,7 @@ from auto_designer.models import (
 )
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
+from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.dimensions import Persona as SimPersona
 from auto_designer.user.sim.loop import SessionResult
 from auto_designer.user.sim.loop import run_session as sim_run_session
@@ -95,6 +96,10 @@ def make_sim_run_session_fn(
         ws = workspace_dir
         if ws is None and scenario.workspace is not None:
             ws = materialize_workspace(scenario.workspace)
+            # Spec-0009/T3：回落路径 materialize 后对称调 ensure_deps（与 orchestrator 主路径同构），
+            # 使这条生产接缝「建了工作区即备好依赖」，不静默缺依赖。orchestrator 已传 workspace_dir
+            # 的主路径依赖由 orchestrator 就位，故仅在此回落分支 ensure，不重复调。
+            ensure_deps(ws, scenario.workspace)
         if ws is not None and hasattr(client, "bind_session"):
             client.bind_session(persona=sim_persona, workspace_dir=ws)
 

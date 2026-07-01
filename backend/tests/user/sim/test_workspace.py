@@ -55,6 +55,17 @@ def test_materialize_is_isolated() -> None:
     assert "clobbered" not in (Path(b) / "billing" / "core.py").read_text()
 
 
+def test_materialize_delegates_to_provision() -> None:
+    # spec-0009/T1：materialize 退化为 SeedSource 注册表 provision 的兼容壳。
+    from auto_designer.user.sim.seed_source import provision
+
+    spec = WorkspaceSpec(fixture="billing-split")
+    m, p = materialize(spec), provision(spec)
+    assert m != p  # 各自独立隔离
+    assert (Path(m) / "billing" / "core.py").is_file()
+    assert (Path(p) / "billing" / "core.py").is_file()
+
+
 # --------------------------------------------------------------------------
 # 序列化 / 向后兼容
 # --------------------------------------------------------------------------

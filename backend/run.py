@@ -1,6 +1,7 @@
 """真实端到端跑一轮闭环（a→b→c）。
 
-接线：用户侧 = spec-0005 控制信封 sim（ApiPersonaClient，模型走 backend/.env 的 LLM_*）；
+接线：用户侧 = spec-0005 控制信封 sim（内层 tool-use AgenticPersonaClient，LLM 由
+     ApiPersonaClient.complete 供给，模型走 backend/.env 的 LLM_*）；
      开发者侧 = 真 nexau dev agent + 真 Gitea（issue，走 backend/deploy/gitea/.env）
      + 本地 git 仓承载 harness 代码。
 本地规模：persona 从 distill 卡库(persona_library.json)注入、场景从 seed_scenarios.json 加载，
@@ -165,7 +166,7 @@ def main() -> int:
     from auto_designer.tracker.gitea import GiteaTracker
     from auto_designer.user.session_store import SessionStore
     from auto_designer.user.sim.dimensions import Persona as SimPersona
-    from auto_designer.user.sim.persona_client import ApiPersonaClient
+    from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
     from auto_designer.user.sim.persona_io import card_to_personas
 
     print("① 种 harness 本地仓 ...")
@@ -188,7 +189,10 @@ def main() -> int:
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
     # persona 从 distill 卡库（persona_library.json）注入、场景从 seed_scenarios.json 加载——
     # 两个「给定输入」皆走 JSON，替代此前硬编码的 expert × TASK。
-    client = ApiPersonaClient()
+    # 用户 agent 用 AgenticPersonaClient 走内层 tool-use，ApiPersonaClient.complete 作内层 LLM
+    # （sim_user 据此 bind_session 绑定共享工作区，令用户 agent 在 harness 同目录核实）。
+    api = ApiPersonaClient()
+    client = AgenticPersonaClient(api.complete)
     sim_persona_list = card_to_personas(PersonaLibrary(PERSONA_LIBRARY))  # 6 张锚卡 → sim persona
     if PERSONA_LIMIT is not None:
         sim_persona_list = sim_persona_list[:PERSONA_LIMIT]

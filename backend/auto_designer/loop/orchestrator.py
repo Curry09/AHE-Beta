@@ -20,6 +20,7 @@ from auto_designer.dev.agentic_developer import AgenticDeveloper
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
 from auto_designer.models import Persona, SeedScenario
+from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.workspace import materialize as materialize_workspace
 
 
@@ -75,6 +76,10 @@ class Orchestrator:
                 if scenario.workspace is not None
                 else None
             )
+            if workspace_dir is not None:
+                # Spec-0009/T3：materialize 之后、launch 之前按 scenario.workspace.setup
+                # 备好依赖（约定建 per-workspace .venv）——两侧共享的这个目录开跑前就绪。
+                ensure_deps(workspace_dir, scenario.workspace)
             harness = self._launcher.launch(sha, workspace_dir=workspace_dir)
             self._run_session(persona, scenario, harness, workspace_dir=workspace_dir)
 
