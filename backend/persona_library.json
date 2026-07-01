@@ -1,0 +1,116 @@
+[
+  {
+    "id": "SR-001",
+    "authenticity": "authentic",
+    "era": {"value": "post_vibe", "basis": "Tweets Jan-Mar 2025; peak 'vibe coding' discourse, term coined by Karpathy Feb 2025"},
+    "dimensions": {
+      "D1_evaluation_capability": {"value": "blind", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D2_acceptance_bar": {"primary": "ship-fast", "flags": [], "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D3_interaction_style": {
+        "delegation": {"value": "vibe-dump", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+        "supervision": {"value": "hands-off", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+        "on_offtrack": {"value": "retry", "source": "grounded", "basis": "stated+observed", "confidence": "medium"}
+      },
+      "D4_trust_model": {"value": "over-trust", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D5_domain": {"area": "web-backend", "depth": "shallow", "stack": ["Cursor", "Vercel", "Framer", "Apollo"], "weak": ["security", "auth", "backend"], "source": "grounded", "basis": "stated", "confidence": "medium"},
+      "D6_autonomy_expectation": {"value": "agentic", "source": "grounded", "basis": "stated", "confidence": "medium"}
+    },
+    "provenance": {"self_report": true, "sources": [{"url": "https://x.com/leojr94_/status/1877973300787208500", "type": "tweet-thread"}, {"url": "https://x.com/leojr94_/status/1900767509621674109", "type": "tweet-thread"}, {"url": "https://x.com/leojr94_/status/1901560276488511759", "type": "tweet-thread"}, {"url": "https://x.com/leojr94_/status/1902537756674318347", "type": "tweet-thread"}], "reputation": "Leo (@leojr94_), founder of EnrichLead; vibe-coded SaaS attacked and shut down within a week March 2025, widely cited as canonical vibe-coding-security-failure case", "evidence_quotes": [{"quote": "i built enrichlead in 2 months, without knowing how to code", "source": "https://x.com/leojr94_/status/1877973300787208500"}, {"quote": "my saas was built with Cursor, zero hand written code AI is no longer just an assistant, it's also the builder Now, you can continue to whine about it or start building. P.S. Yes, people pay for it", "source": "https://x.com/leojr94_/status/1900767509621674109"}, {"quote": "guys, i'm under attack ever since I started to share how I built my SaaS using Cursor random thing are happening, maxed out usage on api keys, people bypassing the subscription, creating random shit on db as you know, I'm not technical so this is taking me longer that usual to figure out", "source": "https://x.com/leojr94_/status/1901560276488511759"}, {"quote": "i'm shutting down my app 😑 Cursor just keeps breaking other parts of the code you guys were right, I shouldn't have deployed unsecured code to production", "source": "https://x.com/leojr94_/status/1902537756674318347"}]},
+    "behavioral_prediction": "Dumps a feature idea at the harness in plain non-technical language, accepts every generated change without reading it, and ships straight to production; feeling score is high whenever the app visibly runs and collapses only when something outright breaks or gets exploited, not from any code-quality or security judgment."
+  },
+  {
+    "id": "SR-002",
+    "authenticity": "authentic",
+    "era": {"value": "post_vibe", "basis": "Origin of the term: Karpathy's Feb 2, 2025 tweet that coined 'vibe coding'; self-report is definitional of the post-vibe era."},
+    "dimensions": {
+      "D1_evaluation_capability": {"value": "expert", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D2_acceptance_bar": {"primary": "ship-fast", "flags": ["scope"], "source": "grounded", "basis": "stated", "confidence": "high"},
+      "D3_interaction_style": {
+        "delegation": {"value": "vibe-dump", "source": "grounded", "basis": "stated", "confidence": "high"},
+        "supervision": {"value": "hands-off", "source": "grounded", "basis": "stated", "confidence": "high"},
+        "on_offtrack": {"value": "retry", "source": "grounded", "basis": "stated", "confidence": "high"}
+      },
+      "D4_trust_model": {"value": "over-trust", "source": "grounded", "basis": "stated", "confidence": "high"},
+      "D5_domain": {"area": "ml-ai", "depth": "deep", "stack": ["cursor-composer", "sonnet", "superwhisper"], "weak": [], "source": "grounded", "basis": "observed", "confidence": "high"},
+      "D6_autonomy_expectation": {"value": "agentic", "source": "grounded", "basis": "stated", "confidence": "high"}
+    },
+    "provenance": {"self_report": true, "sources": [{"url": "https://x.com/karpathy/status/1886192184808149383", "type": "tweet-thread"}], "reputation": "Capability corroborated: ex-Director of AI at Tesla, founding member of OpenAI, well-known deep-learning educator — the over-trust stance is stated in his own words, proving high D1 does not imply rigor.", "evidence_quotes": [{"quote": "There's a new kind of coding I call 'vibe coding', where you fully give in to the vibes, embrace exponentials, and forget that the code even exists.", "source": "https://x.com/karpathy/status/1886192184808149383"}, {"quote": "I 'Accept All' always, I don't read the diffs anymore. When I get error messages I just copy paste them in with no comment, usually that fixes it.", "source": "https://x.com/karpathy/status/1886192184808149383"}, {"quote": "It's not too bad for throwaway weekend projects, but still quite amusing.", "source": "https://x.com/karpathy/status/1886192184808149383"}]},
+    "behavioral_prediction": "On a throwaway weekend project this expert dumps loose voice-driven prompts at the agent, accepts every diff unread, and on errors just pastes the message back and re-runs rather than inspecting the code himself."
+  },
+  {
+    "id": "SR-003",
+    "authenticity": "authentic",
+    "era": {"value": "post_vibe", "basis": "Lex Fridman #440 recorded Dec 2024; actively builds AI products (Photo AI, Interior AI) and uses LLMs in his solo workflow"},
+    "dimensions": {
+      "D1_evaluation_capability": {"value": "competent", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D2_acceptance_bar": {"primary": "ship-fast", "flags": [], "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D3_interaction_style": {
+        "delegation": {"value": "loose", "source": "grounded", "basis": "stated", "confidence": "medium"},
+        "supervision": {"value": "reviews", "source": "grounded", "basis": "stated", "confidence": "medium"},
+        "on_offtrack": {"value": "fix-self", "source": "grounded", "basis": "stated", "confidence": "medium"}
+      },
+      "D4_trust_model": {"value": "balanced", "source": "grounded", "basis": "stated+observed", "confidence": "medium"},
+      "D5_domain": {"area": "web-backend", "depth": "working", "stack": ["PHP", "jQuery", "SQLite", "vanilla HTML/JS"], "weak": ["frameworks", "build-tooling", "type-systems"], "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D6_autonomy_expectation": {"value": "collaborative", "source": "injected", "basis": "stated", "confidence": "low"}
+    },
+    "provenance": {"self_report": true, "sources": [{"url": "https://lexfridman.com/pieter-levels-transcript/", "type": "podcast"}, {"url": "https://levels.io/how-i-build-my-minimum-viable-products", "type": "blog"}], "reputation": "Runs multiple profitable products solo (Photo AI, Interior AI, Nomad List, Remote OK) reportedly grossing millions/year, publicly verifiable via build-in-public revenue dashboards — corroborates D1 competent and ship-fast bar", "evidence_quotes": [{"quote": "I use vanilla HTML, jQuery, PHP and SQLite.", "source": "https://lexfridman.com/pieter-levels-transcript/"}, {"quote": "PHP just stays the same and works.", "source": "https://lexfridman.com/pieter-levels-transcript/"}, {"quote": "I need to go fast, I need to make things fast to see if an idea works.", "source": "https://lexfridman.com/pieter-levels-transcript/"}, {"quote": "Being alone by myself on my laptop, like in my underwear, in a hotel room or something, I can ship very fast", "source": "https://lexfridman.com/pieter-levels-transcript/"}, {"quote": "I do everything myself.", "source": "https://lexfridman.com/pieter-levels-transcript/"}]},
+    "behavioral_prediction": "Vibe-directs quick working solutions in PHP/jQuery/SQLite, skips tests/types/frameworks entirely, ships and verifies by running it live, and personally patches whatever breaks rather than blocking on review or process."
+  },
+  {
+    "id": "SR-004",
+    "authenticity": "authentic",
+    "era": {"value": "post_vibe", "basis": "Writings from 2025 (Mar 2025 'vibe coding' post, later 'vibe engineering' Oct 2025); post-dates agentic coding tools like Claude Code which he uses and writes about."},
+    "dimensions": {
+      "D1_evaluation_capability": {"value": "expert", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D2_acceptance_bar": {"primary": "modern-correct", "flags": ["tests", "scope"], "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D3_interaction_style": {
+        "delegation": {"value": "loose", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+        "supervision": {"value": "reviews", "source": "grounded", "basis": "stated", "confidence": "high"},
+        "on_offtrack": {"value": "correct", "source": "injected", "basis": "stated", "confidence": "low"}
+      },
+      "D4_trust_model": {"value": "skeptical", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
+      "D5_domain": {"area": "dev-tooling", "depth": "deep", "stack": ["Python", "Django", "SQLite", "Datasette", "LLM CLI"], "weak": ["frontend-heavy JS"], "source": "grounded", "basis": "observed", "confidence": "high"},
+      "D6_autonomy_expectation": {"value": "collaborative", "source": "grounded", "basis": "stated", "confidence": "medium"}
+    },
+    "provenance": {"self_report": true, "sources": [{"url": "https://simonwillison.net/2025/Mar/19/vibe-coding/", "type": "blog"}, {"url": "https://simonw.substack.com/p/vibe-engineering", "type": "newsletter"}], "reputation": "Django co-creator, maintainer of Datasette and the LLM CLI; widely-followed engineer whose expert-level capability (D1) is externally corroborated.", "evidence_quotes": [{"quote": "My golden rule for production-quality AI-assisted programming is that I won't commit any code to my repository if I couldn't explain exactly what it does to somebody else.", "source": "https://simonwillison.net/2025/Mar/19/vibe-coding/"}, {"quote": "If an LLM wrote the code for you, and you then reviewed it, tested it thoroughly and made sure you could explain how it works to someone else that's not vibe coding, it's software development.", "source": "https://simonwillison.net/2025/Mar/19/vibe-coding/"}]},
+    "behavioral_prediction": "He will accept agent-written code only after personally reviewing it, running it, and confirming he can explain exactly what it does, rejecting anything he cannot verify or account for himself."
+  },
+  {
+    "id": "SR-005",
+    "authenticity": "authentic",
+    "era": {"value": "post_vibe", "basis": "Published 2025-05-14, references Claude 3.7 Sonnet and Cursor agent workflow — squarely post vibe-coding era"},
+    "dimensions": {
+      "D1_evaluation_capability": {"value": "expert", "source": "grounded", "basis": "stated+observed", "confidence": "medium"},
+      "D2_acceptance_bar": {"primary": "type-safety-purist", "flags": ["types"], "source": "grounded", "basis": "stated", "confidence": "high"},
+      "D3_interaction_style": {
+        "delegation": {"value": "spec-driven", "source": "grounded", "basis": "stated", "confidence": "medium"},
+        "supervision": {"value": "reviews", "source": "grounded", "basis": "stated", "confidence": "medium"},
+        "on_offtrack": {"value": "correct", "source": "grounded", "basis": "stated", "confidence": "medium"}
+      },
+      "D4_trust_model": {"value": "skeptical", "source": "grounded", "basis": "stated", "confidence": "medium"},
+      "D5_domain": {"area": "dev-tooling", "depth": "deep", "stack": ["typescript"], "weak": [], "source": "grounded", "basis": "stated", "confidence": "medium"},
+      "D6_autonomy_expectation": {"value": "collaborative", "source": "grounded", "basis": "stated", "confidence": "medium"}
+    },
+    "provenance": {"self_report": true, "sources": [{"url": "https://pm.dartus.fr/posts/2025/typescript-ai-aided-development/", "type": "blog"}], "reputation": "Personal technical blog (Pierre-Marie Dartus); first pick passed authenticity gate, no rejection needed", "evidence_quotes": [{"quote": "Employing stricter typings that explicitly prohibit invalid states can significantly guide AI agents toward producing higher quality and more correct code.", "source": "https://pm.dartus.fr/posts/2025/typescript-ai-aided-development/"}, {"quote": "Well-defined types act as guardrails and guides, not just for human developers, but for our AI partners too, leading to more robust, maintainable, and correct software, faster.", "source": "https://pm.dartus.fr/posts/2025/typescript-ai-aided-development/"}, {"quote": "When the AI hallucinated, the TypeScript type system forced rapid iteration and correction", "source": "https://pm.dartus.fr/posts/2025/typescript-ai-aided-development/"}, {"quote": "Thanks to these stricter typings, the agent could also self-correct more effectively when it made mistakes, using TypeScript's error messages.", "source": "https://pm.dartus.fr/posts/2025/typescript-ai-aided-development/"}]},
+    "behavioral_prediction": "Will reject agent output that widens types or leaks `any`, demand discriminated unions that make illegal states unrepresentable, and lean on compiler errors to force iterative self-correction rather than trusting generated code on sight."
+  },
+  {
+    "id": "SR-006",
+    "authenticity": "authentic",
+    "era": {"value": "post_vibe", "basis": "HN 'Ask HN: How can I get better at using AI for programming?' thread, ~2026; discusses agentic/vibe-coding norms the author opts out of"},
+    "dimensions": {
+      "D1_evaluation_capability": {"value": "competent", "source": "grounded", "basis": "stated+observed", "confidence": "medium"},
+      "D2_acceptance_bar": {"primary": "modern-correct", "flags": ["scope"], "source": "grounded", "basis": "stated", "confidence": "low"},
+      "D3_interaction_style": {
+        "delegation": {"value": "loose", "source": "grounded", "basis": "stated", "confidence": "medium"},
+        "supervision": {"value": "reviews", "source": "grounded", "basis": "stated", "confidence": "medium"},
+        "on_offtrack": {"value": "fix-self", "source": "grounded", "basis": "stated", "confidence": "high"}
+      },
+      "D4_trust_model": {"value": "skeptical", "source": "grounded", "basis": "stated", "confidence": "high"},
+      "D5_domain": {"area": "cross-stack", "depth": "deep", "stack": ["vim"], "weak": [], "source": "injected", "basis": "stated", "confidence": "low"},
+      "D6_autonomy_expectation": {"value": "advisory", "source": "grounded", "basis": "stated", "confidence": "high"}
+    },
+    "provenance": {"self_report": true, "sources": [{"url": "https://news.ycombinator.com/item?id=46261121", "type": "hn-comment"}], "reputation": "HN user prisenco, comment on 'Ask HN: How can I get better at using AI for programming?'", "evidence_quotes": [{"quote": "I use it as a rubber-duck / conversation partner for bigger picture issues. I'll run my code through it as a sanity \"pre-check\" before a pr review. And I mapped autocomplete to ctrl-; in vim so I only bring it up when I need it. Otherwise, I write everything myself.", "source": "https://news.ycombinator.com/item?id=46261121"}, {"quote": "AI written code never felt safe. It adds velocity but velocity early on always steals speed from the future.", "source": "https://news.ycombinator.com/item?id=46261121"}, {"quote": "Don't twist up in knots trying to get it to do decently what you can already do well yourself.", "source": "https://news.ycombinator.com/item?id=46261121"}]},
+    "behavioral_prediction": "Will ask the agent for architectural options, explanations, and a sanity pre-check on code he already wrote, but writes all production code himself and refuses to let the agent edit files or take actions."
+  }
+]
