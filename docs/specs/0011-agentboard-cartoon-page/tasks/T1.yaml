@@ -1,6 +1,6 @@
 id: T1
 title: AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板
-status: pending
+status: done
 priority: P1
 tags: []
 depends-on: []
@@ -16,9 +16,9 @@ files:
   - frontend/src/main.tsx
   - frontend/src/index.css
   - frontend/src/components/AgentsPanel.tsx
-version: 1
+version: 2
 updated: '2026-07-02'
-change-reason: ''
+change-reason: 'done: AgentBoard 页 + AgentCard + lib/agentHealth + lib/avatar 落地，摘除旧 AgentsPanel，npm run build 通过、后端 web 测试全绿、真实数据冒烟通过'
 supersedes: []
 split-from:
 merged-from: []

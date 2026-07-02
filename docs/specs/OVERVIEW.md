@@ -238,7 +238,7 @@
 | 0009 | 0009/T4 | git 源（clone repo@commit 成快照工作区） | done | T1 |
 | 0010 | 0010/T1 | 种子场景采集（蒸馏，skill 形式） | done | — |
 | 0010 | 0010/T2 | 种子注入（card → SeedScenario） | done | T1 |
-| 0011 | 0011/T1 | AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板 | pending | — |
+| 0011 | 0011/T1 | AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板 | done | — |
 
 ## 跨 feature 关系图
 
@@ -1305,9 +1305,22 @@ held-out 纪律不受影响：本组只读观测，不触 benchmark、不改训�
 
 **任务一览**
 
-- **T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板**（pending） — 在观测看板前端新增独立页 AgentBoard（/agentboard），以卡通形式实时展示当前活动的 agent 并支持点击， 取代此前嵌于每页顶部的朴素折叠面板 AgentsPanel。
+- **T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板**（done） — 在观测看板前端新增独立页 AgentBoard（/agentboard），以卡通形式实时展示当前活动的 agent 并支持点击， 取代此前嵌于每页顶部的朴素折叠面板 AgentsPanel。
 
 ```mermaid
 graph LR
     nT1["T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T1_2["T1 v2"]
+    v_T1_1 -->|redefined| v_T1_2
+    classDef st_done fill:#b7e4c7;
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T1_2 st_done;
 ```
