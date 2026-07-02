@@ -1,39 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import "./index.css";
-import Overview from "./pages/Overview";
-import AgentBoard from "./pages/AgentBoard";
-import Sessions from "./pages/Sessions";
-import SessionDetail from "./pages/SessionDetail";
-import Issues from "./pages/Issues";
+import Town from "./town/Town";
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <nav>
-        <Link to="/">概览</Link>
-        <Link to="/agentboard">AgentBoard</Link>
-        <Link to="/sessions">会话</Link>
-        <Link to="/issues">Gitea 看板</Link>
-      </nav>
-      <div className="container">{children}</div>
-    </>
-  );
-}
-
+// 单屏 AI 小镇：不再需要多页路由，详情走内部抽屉状态（奥卡姆剃刀，去掉 react-router）。
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Shell>
-        <Routes>
-          <Route path="/" element={<Overview />} />
-          <Route path="/agentboard" element={<AgentBoard />} />
-          <Route path="/sessions" element={<Sessions />} />
-          <Route path="/sessions/:id" element={<SessionDetail />} />
-          <Route path="/issues" element={<Issues />} />
-        </Routes>
-      </Shell>
-    </BrowserRouter>
+    <Town />
   </React.StrictMode>
 );

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 // 实时：挂载即拉一次，之后每 intervalMs 轮询一次（文件存储下即可看到新会话/新 issue）。
 // fetcher 用 ref 持有，避免每次渲染重建 fetcher 导致定时器反复重启。
-export function useLiveData<T>(fetcher: () => Promise<T>, intervalMs = 5000) {
+// enabled=false（小镇「暂停」）时冻结轮询，不再拉取、不清空既有数据。
+export function useLiveData<T>(fetcher: () => Promise<T>, intervalMs = 5000, enabled = true) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
@@ -10,6 +11,7 @@ export function useLiveData<T>(fetcher: () => Promise<T>, intervalMs = 5000) {
   fetcherRef.current = fetcher;
 
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     const tick = () =>
       fetcherRef
@@ -29,7 +31,7 @@ export function useLiveData<T>(fetcher: () => Promise<T>, intervalMs = 5000) {
       alive = false;
       clearInterval(id);
     };
-  }, [intervalMs]);
+  }, [intervalMs, enabled]);
 
   return { data, error, updatedAt };
 }
