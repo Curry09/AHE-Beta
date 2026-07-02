@@ -12,6 +12,12 @@ venv/
 # Runtime artifacts (sessions, harness checkouts)
 data/
 
+# openagents 本地运行态（worktrees + state.json，本机专属）
+.openagents/
+
+# 依赖锁文件：本地各自生成，不入库
+uv.lock
+
 # 前端构建产物与依赖
 frontend/node_modules/
 frontend/dist/
