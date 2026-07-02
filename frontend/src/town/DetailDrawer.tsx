@@ -43,6 +43,7 @@ export function DetailDrawer({
   }, [agent.agent_id, agent.role, agent.label]);
 
   const h = health(agent, now);
+  const fullTurns = session?.transcript.turns ?? null;
   const meta = ROLE_META[agent.role] ?? { cn: agent.role, plate: "#eee", ink: "#555" };
   const updated = new Date(agent.updated_at).getTime();
   const started = agent.started_at ? new Date(agent.started_at).getTime() : updated;
@@ -68,12 +69,18 @@ export function DetailDrawer({
 
       <div className="drawer-status">{agent.status}</div>
 
-      {agent.turns.length > 0 && (
+      {/* 对话：有保存的完整会话则展示全量 transcript；否则退化为实时投影（可能只有最近几轮）。 */}
+      {fullTurns && fullTurns.length > 0 ? (
         <section>
-          <h4>实时对话</h4>
+          <h4>完整对话记录（{fullTurns.length} 轮）</h4>
+          <TranscriptThread turns={fullTurns} />
+        </section>
+      ) : agent.turns.length > 0 ? (
+        <section>
+          <h4>实时对话（进行中 · {agent.turns.length} 轮）</h4>
           <TranscriptThread turns={agent.turns} />
         </section>
-      )}
+      ) : null}
 
       {agent.detail && (
         <section>
@@ -85,7 +92,7 @@ export function DetailDrawer({
       {sessionErr && <p className="err">会话载入失败：{sessionErr}</p>}
       {session && (
         <section>
-          <h4>最新完整会话</h4>
+          <h4>会话信息</h4>
           <p className="muted">{session.scenario.description}</p>
           <div className="reason">体感 {session.feeling.score}/4 · {session.feeling.reason}</div>
           {session.issue_refs.length > 0 && (
