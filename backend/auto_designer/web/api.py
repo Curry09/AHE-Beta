@@ -13,11 +13,28 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import Response
+from starlette.types import Scope
 
 from auto_designer.loop.live import read_agents
 from auto_designer.loop.metrics import Metrics
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
+
+
+class _SPAStaticFiles(StaticFiles):
+    """托管 SPA：真实文件（index.html / assets/*）照常返回；其余路径（前端路由如 /agentboard、
+    /sessions/:id 的深链/刷新）回退到 index.html，交给 BrowserRouter 客户端路由。/api/* 由更早注册的
+    路由优先匹配，不会落到这里。"""
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return await super().get_response("index.html", scope)
+            raise
 
 
 def _open_issue_count(*, tracker: IssueTracker | None) -> int | None:
@@ -120,7 +137,7 @@ def create_app(
     # 构建过前端则由 FastAPI 直接托管 SPA（开发期 dist 不存在，跳过）。
     dist = Path(__file__).resolve().parents[3] / "frontend" / "dist"
     if dist.is_dir():
-        app.mount("/", StaticFiles(directory=str(dist), html=True), name="static")
+        app.mount("/", _SPAStaticFiles(directory=str(dist), html=True), name="static")
 
     return app
 
