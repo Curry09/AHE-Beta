@@ -5,6 +5,7 @@ import type {
   IssuesResponse,
   CommitsResponse,
   AgentsResponse,
+  ConfigResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -19,3 +20,4 @@ export const getSession = (id: string) => get<SessionDetail>(`/api/sessions/${id
 export const getIssues = () => get<IssuesResponse>("/api/issues");
 export const getCommits = () => get<CommitsResponse>("/api/commits");
 export const getAgents = () => get<AgentsResponse>("/api/agents");
+export const getConfig = () => get<ConfigResponse>("/api/config");

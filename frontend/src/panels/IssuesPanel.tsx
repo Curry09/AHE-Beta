@@ -1,7 +1,7 @@
 import type { IssuesResponse } from "../types";
 
-export default function IssuesPanel(props: { data: IssuesResponse | null }) {
-  const { data } = props;
+export default function IssuesPanel(props: { data: IssuesResponse | null; offline?: boolean }) {
+  const { data, offline } = props;
   return (
     <section className="board">
       <div className="board-head">
@@ -14,7 +14,8 @@ export default function IssuesPanel(props: { data: IssuesResponse | null }) {
         )}
       </div>
       <div className="board-body">
-        {!data && <div className="empty">加载中…</div>}
+        {!data && offline && <div className="empty">连接失败 · 后端离线（:8000）</div>}
+        {!data && !offline && <div className="empty">加载中…</div>}
         {data && !data.connected && <div className="empty">未连接 issue tracker</div>}
         {data?.connected && data.issues.length === 0 && <div className="empty">暂无 open issue</div>}
         <ul className="feed">

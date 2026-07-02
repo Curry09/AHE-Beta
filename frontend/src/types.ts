@@ -51,9 +51,11 @@ export interface CommitsResponse {
   commits: Commit[];
 }
 
+export type AgentRole = "user" | "designer" | "developer";
+
 export interface Agent {
   agent_id: string;
-  role: "user" | "developer";
+  role: AgentRole;
   label: string;
   running: boolean;
   status: string;
@@ -65,6 +67,17 @@ export interface Agent {
 
 export interface AgentsResponse {
   agents: Agent[];
+}
+
+// 编制（后端 roster 单一真源，经 /api/config 读）：三个房间的容量。
+export interface Roster {
+  user: number;
+  designer: number;
+  developer: number;
+}
+
+export interface ConfigResponse {
+  roster: Roster;
 }
 
 export interface IssueRef {

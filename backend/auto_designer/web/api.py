@@ -19,6 +19,7 @@ from starlette.types import Scope
 
 from auto_designer.loop.live import read_agents
 from auto_designer.loop.metrics import Metrics
+from auto_designer.loop.roster import load_roster
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 
@@ -136,6 +137,11 @@ def create_app(
     @app.get("/api/commits")
     def commits() -> dict[str, object]:
         return _list_commits(tracker=tracker, commits_url=commits_url)
+
+    @app.get("/api/config")
+    def config() -> dict[str, object]:
+        # 编制（单一真源，与后端 run.py 同一份 roster）：前端据此定三个房间的容量。
+        return {"roster": load_roster()}
 
     @app.get("/api/agents")
     def agents() -> dict[str, object]:

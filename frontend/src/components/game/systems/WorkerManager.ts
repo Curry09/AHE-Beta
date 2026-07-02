@@ -4,6 +4,7 @@ import type { Direction } from "../config/animations";
 import type { Pathfinder } from "../utils/Pathfinder";
 import type { SeatDef } from "../utils/MapHelpers";
 import type { SeatState } from "@/types/game";
+import type { Room } from "@/lib/roomLayout";
 
 export class WorkerManager {
   private scene: Phaser.Scene;
@@ -21,6 +22,11 @@ export class WorkerManager {
     this.pathfinder = pathfinder;
   }
 
+  /** 房间布局变化（roster/agents 更新）时替换座位定义，供 syncWorkers 据此增删小人。 */
+  setSeatDefs(seatDefs: SeatDef[]) {
+    this.seatDefs = seatDefs;
+  }
+
   spawnWorker(seatDef: SeatDef, seat: SeatState): Worker | null {
     if (!seat.spriteKey) return null;
     const initialFacing: Direction = seatDef.facing;
@@ -32,6 +38,7 @@ export class WorkerManager {
       seatDef.seatId,
       seat.label,
       initialFacing,
+      (seat.roleTitle as Room | undefined) ?? null,
     );
     worker.setPOIs(this.pois);
     worker.setPathfinder(this.pathfinder);

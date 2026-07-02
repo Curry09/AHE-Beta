@@ -13,6 +13,7 @@ import {
   type AnimatedProp,
 } from "../utils/MapHelpers";
 import { gameEvents } from "@/lib/events";
+import { roomHeadline, type RoomDef } from "@/lib/roomLayout";
 import { createLogger } from "@/lib/logger";
 import {
   BOSS_INTERACT_DISTANCE,
@@ -52,6 +53,8 @@ export class OfficeScene extends Phaser.Scene {
   private interactionManager!: InteractionManager;
   private doorManager!: DoorManager;
   private cleanupEventBridge: (() => void) | null = null;
+  private roomObjects: Phaser.GameObjects.GameObject[] = [];
+  private offRoomsUpdated: (() => void) | null = null;
 
   constructor() {
     super({ key: "OfficeScene" });
@@ -168,7 +171,11 @@ export class OfficeScene extends Phaser.Scene {
     );
     this.cameraController.init();
 
-    this.workerManager = new WorkerManager(this, workerSpawns, pois, pathfinder);
+    // 座位由 App 依 roster/agents 计算的三房间布局注入（rooms-updated），初始为空；
+    // pois 传空 → 小人只在各自房间原地做 idle 动作，不跨图游走（保持「房间」隔离感）。
+    void workerSpawns;
+    void pois;
+    this.workerManager = new WorkerManager(this, [], [], pathfinder);
 
     this.interactionManager = new InteractionManager(
       this,
@@ -193,10 +200,52 @@ export class OfficeScene extends Phaser.Scene {
       },
     );
 
-    gameEvents.emit("seats-discovered", workerSpawns);
+    // 三房间布局更新：重绘房间叠加层 + 替换座位定义 + 增删小人。App 在场景就绪后按 roster/agents 推送。
+    this.offRoomsUpdated = gameEvents.on("rooms-updated", (rooms, seatDefs, seats) => {
+      this.drawRooms(rooms);
+      this.workerManager.setSeatDefs(seatDefs);
+      this.workerManager.syncWorkers(seats, (w) => this.interactionManager.clearIfNearest(w));
+    });
+
+    gameEvents.emit("scene-ready");
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.cleanup());
+  }
+
+  // ── Room overlays ──────────────────────────────────────
+
+  /** 重绘三个房间（半透明地面色块 + 标题栏 + 「角色 (filled/capacity)」标题）。 */
+  private drawRooms(rooms: RoomDef[]) {
+    for (const obj of this.roomObjects) obj.destroy();
+    this.roomObjects = [];
+
+    const TITLE_H = 40;
+    for (const room of rooms) {
+      const g = this.add.graphics().setDepth(1);
+      // 地面色块（房间底色）
+      g.fillStyle(room.color, 0.12);
+      g.fillRoundedRect(room.x, room.y, room.w, room.h, 14);
+      // 标题栏
+      g.fillStyle(room.color, 0.28);
+      g.fillRoundedRect(room.x, room.y, room.w, TITLE_H, { tl: 14, tr: 14, bl: 0, br: 0 });
+      // 边框
+      g.lineStyle(2, room.color, 0.55);
+      g.strokeRoundedRect(room.x, room.y, room.w, room.h, 14);
+      this.roomObjects.push(g);
+
+      const title = this.add
+        .text(room.x + 14, room.y + TITLE_H / 2, roomHeadline(room), {
+          fontFamily: '"Press Start 2P", monospace',
+          fontSize: "12px",
+          color: "#f8fafc",
+          align: "left",
+        })
+        .setOrigin(0, 0.5)
+        .setDepth(15)
+        .setResolution(window.devicePixelRatio * 2);
+      this.roomObjects.push(title);
+    }
   }
 
   // ── Boss seat ──────────────────────────────────────────
@@ -227,6 +276,11 @@ export class OfficeScene extends Phaser.Scene {
   private cleanup() {
     this.cleanupEventBridge?.();
     this.cleanupEventBridge = null;
+    this.offRoomsUpdated?.();
+    this.offRoomsUpdated = null;
+
+    for (const obj of this.roomObjects) obj.destroy();
+    this.roomObjects = [];
 
     this.workerManager?.destroyAll();
     this.interactionManager?.destroy();

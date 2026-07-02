@@ -1,5 +1,6 @@
 import type { SeatState } from "@/types/game";
 import type { SeatDef } from "@/components/game/utils/MapHelpers";
+import type { RoomDef } from "./roomLayout";
 import { createLogger } from "./logger";
 
 const log = createLogger("GameEventBus");
@@ -7,6 +8,9 @@ const log = createLogger("GameEventBus");
 export interface GameEventMap {
   "seats-discovered": [seats: SeatDef[]];
   "seat-configs-updated": [seats: SeatState[]];
+  // 场景就绪（可接收房间布局）；三房间布局更新（房间矩形 + 座位定义 + 座位状态一并推给场景）。
+  "scene-ready": [];
+  "rooms-updated": [rooms: RoomDef[], seatDefs: SeatDef[], seats: SeatState[]];
   "task-assigned": [taskId: string, message: string, seatId?: string, sessionKey?: string];
   "task-routed": [taskId: string, seatId: string, actorName: string];
   "task-ready": [taskId: string, message: string, seatId?: string];

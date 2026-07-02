@@ -1,39 +1,15 @@
-// 数据适配层：把 backend 的 agents 映射成小镇工位（SeatState），驱动 Phaser 场景。
-// 这是「用我们自己的数据喂 agent-town 引擎」的唯一接线点——不接 OpenClaw gateway。
+// 数据适配层：把 backend 的 roster（编制）+ agents（实时）映射成小镇的三个房间与座位，驱动 Phaser 场景。
+// 这是「用我们自己的数据喂 agent-town 引擎」的唯一接线点——房间容量与后端 roster 一致。
 import { gameEvents } from "@/lib/events";
-import { WORKER_SPRITES } from "@/components/game/config/animations";
-import type { SeatDef } from "@/components/game/utils/MapHelpers";
-import type { SeatState } from "@/types/game";
-import type { Agent } from "./types";
+import { computeLayout, type LayoutResult } from "@/lib/roomLayout";
+import type { Agent, Roster } from "./types";
 
-/** 把 agents 按顺序铺到地图已发现的工位上，产出 Phaser 需要的 SeatState[]。 */
-export function agentsToSeats(agents: Agent[], seatDefs: SeatDef[]): SeatState[] {
-  return seatDefs.map((seat, i) => {
-    const agent = agents[i];
-    if (!agent) {
-      return { seatId: seat.seatId, label: "", seatType: "agent", status: "empty" };
-    }
-    return {
-      seatId: seat.seatId,
-      label: agent.label,
-      seatType: "agent",
-      assigned: true,
-      spriteKey: WORKER_SPRITES[i % WORKER_SPRITES.length].key,
-      status: agent.running ? "running" : "done",
-    };
-  });
+/** roster + agents → 三房间布局（房间矩形 + 座位定义 + 座位状态 + seatId→agent 绑定）。 */
+export function buildLayout(roster: Roster, agents: Agent[]): LayoutResult {
+  return computeLayout(roster, agents);
 }
 
-/** seatId → agent 的绑定，供「点击小人打开对话」查回是哪个 agent。 */
-export function seatAgentMap(agents: Agent[], seatDefs: SeatDef[]): Map<string, Agent> {
-  const map = new Map<string, Agent>();
-  seatDefs.forEach((seat, i) => {
-    if (agents[i]) map.set(seat.seatId, agents[i]);
-  });
-  return map;
-}
-
-/** 把最新工位状态推给场景（WorkerManager 据此增删小人）。 */
-export function pushSeats(seats: SeatState[]) {
-  gameEvents.emit("seat-configs-updated", seats);
+/** 把房间布局推给场景（OfficeScene 据此重绘房间、增删小人）。 */
+export function pushLayout(layout: LayoutResult) {
+  gameEvents.emit("rooms-updated", layout.rooms, layout.seatDefs, layout.seats);
 }

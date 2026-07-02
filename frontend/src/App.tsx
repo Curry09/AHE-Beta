@@ -1,31 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import PhaserGame from "@/components/game/PhaserGame";
 import { gameEvents } from "@/lib/events";
-import type { SeatDef } from "@/components/game/utils/MapHelpers";
-import { getAgents, getIssues, getCommits, getOverview } from "./api";
-import type { Agent, IssuesResponse, CommitsResponse, Overview } from "./types";
-import { agentsToSeats, seatAgentMap, pushSeats } from "./townBridge";
+import { getAgents, getIssues, getCommits, getOverview, getConfig } from "./api";
+import type { Agent, IssuesResponse, CommitsResponse, Overview, Roster } from "./types";
+import { buildLayout, pushLayout } from "./townBridge";
 import ConversationPanel from "./panels/ConversationPanel";
 import IssuesPanel from "./panels/IssuesPanel";
 import CommitsPanel from "./panels/CommitsPanel";
 
 const POLL_MS = 4000;
+// roster 未拉到前的默认编制（与后端 DEFAULT_ROSTER 一致），保证房间在离线时也能渲染。
+const DEFAULT_ROSTER: Roster = { user: 3, designer: 1, developer: 3 };
 
 export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [roster, setRoster] = useState<Roster>(DEFAULT_ROSTER);
   const [issues, setIssues] = useState<IssuesResponse | null>(null);
   const [commits, setCommits] = useState<CommitsResponse | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [seatDefs, setSeatDefs] = useState<SeatDef[]>([]);
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
+  const [sceneReady, setSceneReady] = useState(false);
+  const [loaded, setLoaded] = useState(false); // 首个 tick 完成后为 true，用于区分「加载中 vs 离线」
   const [live, setLive] = useState(false);
 
-  // 场景发现工位 / 点击小人 —— 两个事件桥接到 React 状态。
+  // 场景就绪 / 点击小人 —— 两个事件桥接到 React 状态。
   useEffect(() => {
-    const offSeats = gameEvents.on("seats-discovered", (defs) => setSeatDefs(defs));
+    const offReady = gameEvents.on("scene-ready", () => setSceneReady(true));
     const offClick = gameEvents.on("worker-clicked", (seatId) => setSelectedSeatId(seatId));
     return () => {
-      offSeats();
+      offReady();
       offClick();
     };
   }, []);
@@ -39,14 +42,17 @@ export default function App() {
         getIssues(),
         getCommits(),
         getOverview(),
+        getConfig(),
       ]);
       if (!alive) return;
-      const [a, i, c, o] = results;
+      const [a, i, c, o, cfg] = results;
       setLive(results.some((r) => r.status === "fulfilled"));
       if (a.status === "fulfilled") setAgents(a.value.agents);
       if (i.status === "fulfilled") setIssues(i.value);
       if (c.status === "fulfilled") setCommits(c.value);
       if (o.status === "fulfilled") setOverview(o.value);
+      if (cfg.status === "fulfilled") setRoster(cfg.value.roster);
+      setLoaded(true);
     }
     tick();
     const id = setInterval(tick, POLL_MS);
@@ -56,20 +62,21 @@ export default function App() {
     };
   }, []);
 
-  // agents / 工位变化 → 重推给场景。
+  // roster / agents 变化 → 重算三房间布局并推给场景（需场景就绪）。
+  const layout = useMemo(() => buildLayout(roster, agents), [roster, agents]);
   useEffect(() => {
-    if (seatDefs.length === 0) return;
-    pushSeats(agentsToSeats(agents, seatDefs));
-  }, [agents, seatDefs]);
+    if (!sceneReady) return;
+    pushLayout(layout);
+  }, [layout, sceneReady]);
 
-  const agentBySeat = useMemo(() => seatAgentMap(agents, seatDefs), [agents, seatDefs]);
-  const selectedAgent = selectedSeatId ? agentBySeat.get(selectedSeatId) ?? null : null;
+  const selectedAgent = selectedSeatId ? layout.seatAgents.get(selectedSeatId) ?? null : null;
 
   const openIssues = overview?.open_issue_count ?? issues?.issues.length ?? null;
+  const activeCount = agents.filter((a) => a.running).length;
 
   return (
     <div className="app">
-      {/* 左：像素小镇 */}
+      {/* 左：像素小镇（三房间：用户 / 设计师 / 开发者） */}
       <div className="town">
         <PhaserGame />
       </div>
@@ -93,7 +100,7 @@ export default function App() {
             </div>
             <div className="metric">
               <em>在岗</em>
-              <b>{agents.filter((a) => a.running).length}</b>
+              <b>{activeCount}</b>
             </div>
           </div>
           <span className={`live ${live ? "on" : "off"}`}>
@@ -107,8 +114,8 @@ export default function App() {
             <ConversationPanel agent={selectedAgent} onClose={() => setSelectedSeatId(null)} />
           ) : (
             <div className="boards">
-              <IssuesPanel data={issues} />
-              <CommitsPanel data={commits} />
+              <IssuesPanel data={issues} offline={loaded && !issues} />
+              <CommitsPanel data={commits} offline={loaded && !commits} />
             </div>
           )}
         </div>

@@ -34,7 +34,8 @@ HARNESS_REPO = DATA / "harness_repo"
 DEFAULT_PERSONA_LIBRARY = ROOT / "persona_library.json"  # distill 产物：6 张锚卡
 DEFAULT_SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；经 seed_adapter 注入）
 
-# 每轮跑几个 persona（None=用满卡库全部）。用户会话数≈persona 数，耗时按此线性放大，按需下调。
+# 每轮跑几个 persona（None=用满卡库全部）。默认由 roster（编制）的用户数决定，与前端房间容量一致；
+# 仍可设为具体整数手动覆盖。用户会话数≈persona 数，耗时按此线性放大，按需下调。
 PERSONA_LIMIT: int | None = None
 
 
@@ -165,6 +166,16 @@ def main() -> int:
     os.environ.update(llm_env)
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
 
+    from auto_designer.loop.roster import load_roster
+
+    # 编制（单一真源）：用户/设计师/开发者数量，前端房间容量经 /api/config 读同一份。
+    roster = load_roster()
+    user_limit = PERSONA_LIMIT if PERSONA_LIMIT is not None else roster["user"]
+    print(
+        f"⓪.5 编制 roster：用户×{roster['user']} · 设计师×{roster['designer']} · "
+        f"开发者×{roster['developer']}（前端房间容量与此一致）"
+    )
+
     # 环境里的 HTTP(S)_PROXY 抽风（实测代理连不上，直连网关稳定 200）：放行本地 Gitea + 模型网关，
     # 让 nexau/openai 调用绕过烂代理直连，根除偶发 APIConnectionError。
     bypass = ["localhost", "127.0.0.1"]
@@ -219,8 +230,7 @@ def main() -> int:
     sim_persona_list = card_to_personas(
         PersonaLibrary(args.persona_library)
     )  # persona 卡库 → sim persona
-    if PERSONA_LIMIT is not None:
-        sim_persona_list = sim_persona_list[:PERSONA_LIMIT]
+    sim_persona_list = sim_persona_list[:user_limit]  # 用户会话数 = roster 用户数（或 PERSONA_LIMIT）
     seeds = _load_seeds(args.seed_cards)
     # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
@@ -283,13 +293,14 @@ def main() -> int:
 
         return cb
 
-    developers = [  # 2 个工具型 dev agent：同轮各领一条不同 issue，自主改 harness + git 发版
+    developers = [  # roster 个工具型 dev agent：同轮各领一条不同 issue，自主改 harness + git 发版
         AgenticDeveloper(
-            tracker, str(repo), dev_agent_def, on_status=make_dev_status("dev-0", "dev#1")
-        ),
-        AgenticDeveloper(
-            tracker, str(repo), dev_agent_def, on_status=make_dev_status("dev-1", "dev#2")
-        ),
+            tracker,
+            str(repo),
+            dev_agent_def,
+            on_status=make_dev_status(f"dev-{i}", f"dev#{i + 1}"),
+        )
+        for i in range(roster["developer"])
     ]
 
     def make_designer_status(agent_id, label):  # 创新者 agent 活动回调
@@ -306,14 +317,17 @@ def main() -> int:
 
         return cb
 
-    designers = [  # 创新者 agent：a 之后综合全局 backlog+体感产结构性提案（design 标签），供 dev 领取
+    designers = [  # roster 个创新者 agent：a 之后综合全局 backlog+体感产结构性提案（design 标签），供 dev 领取
         Designer(
             tracker,
             store,
             str(repo),
             designer_agent_def,
-            on_status=make_designer_status("designer-0", "designer"),
-        ),
+            on_status=make_designer_status(
+                f"designer-{i}", "designer" if roster["designer"] == 1 else f"designer#{i + 1}"
+            ),
+        )
+        for i in range(roster["designer"])
     ]
 
     orch = Orchestrator(
@@ -327,8 +341,8 @@ def main() -> int:
     )
 
     print(
-        f"④ 跑 5 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× 2 dev agent，"
-        "dev 直推 main，真模型）..."
+        f"④ 跑 5 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× {len(developers)} dev agent"
+        f" × {len(designers)} designer，dev 直推 main，真模型）..."
     )
     refs = orch.run(5)
 

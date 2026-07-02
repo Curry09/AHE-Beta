@@ -5,6 +5,7 @@ import { ChatBubble } from "./ChatBubble";
 import type { Pathfinder, PathPoint } from "../utils/Pathfinder";
 import { buildSpriteFrames } from "../utils/MapHelpers";
 import { gameEvents } from "@/lib/events";
+import { ROLE_TAG, type Room } from "@/lib/roomLayout";
 import {
   WANDER_INITIAL_MIN,
   WANDER_INITIAL_MAX,
@@ -82,6 +83,7 @@ export class Worker implements WorkerCtx {
 
   // Internal
   private nameTag: Phaser.GameObjects.Text;
+  private roleTag: Phaser.GameObjects.Text | null = null;
   private taskStatusText: Phaser.GameObjects.Text;
   private statusDot: Phaser.GameObjects.Arc;
   private emoteSprite: Phaser.GameObjects.Sprite | null = null;
@@ -99,6 +101,7 @@ export class Worker implements WorkerCtx {
     seatId: string,
     label: string,
     facing: Direction = "up",
+    role: Room | null = null,
   ) {
     this.scene = scene;
     this.seatId = seatId;
@@ -137,6 +140,22 @@ export class Worker implements WorkerCtx {
 
     this.statusDot = scene.add.circle(x - this.nameTag.width / 2 - 6, nameY + 4, 3, 0x888888);
     this.statusDot.setDepth(20);
+
+    // 头顶角色徽标（用户/设计师/开发者），角色配色，令三类小人一眼可辨。
+    if (role) {
+      const tag = ROLE_TAG[role];
+      this.roleTag = scene.add
+        .text(x, y - FRAME_HEIGHT / 2 - 4, tag.text, {
+          fontFamily: '"Press Start 2P", monospace',
+          fontSize: "8px",
+          color: tag.css,
+          backgroundColor: "rgba(0,0,0,0.72)",
+          padding: { x: 4, y: 2 },
+          align: "center",
+        })
+        .setOrigin(0.5, 1)
+        .setDepth(21);
+    }
 
     this.taskStatusText = scene.add
       .text(x, nameY + 12, "", {
@@ -389,6 +408,9 @@ export class Worker implements WorkerCtx {
     const nameY = this.sprite.y + FRAME_HEIGHT / 2 + 2;
     this.nameTag.setPosition(this.sprite.x, nameY);
     this.statusDot.setPosition(this.sprite.x - this.nameTag.width / 2 - 6, nameY + 4);
+    if (this.roleTag) {
+      this.roleTag.setPosition(this.sprite.x, this.sprite.y - FRAME_HEIGHT / 2 - 4);
+    }
 
     const hasTask = this.assignedRunId || this.taskQueue.length > 0;
     if (this.taskStatusText) {
@@ -441,6 +463,7 @@ export class Worker implements WorkerCtx {
     }
     this.sprite.destroy();
     this.nameTag.destroy();
+    this.roleTag?.destroy();
     this.taskStatusText.destroy();
     this.statusDot.destroy();
     this.bubble.destroy();

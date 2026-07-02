@@ -1,4 +1,10 @@
-import type { Agent } from "../types";
+import type { Agent, AgentRole } from "../types";
+
+const ROLE_ZH: Record<AgentRole, string> = {
+  user: "用户",
+  designer: "设计师",
+  developer: "开发者",
+};
 
 // 点击小人后，完整对话覆盖右侧（Issue/main 面板）。
 export default function ConversationPanel(props: { agent: Agent; onClose: () => void }) {
@@ -9,7 +15,7 @@ export default function ConversationPanel(props: { agent: Agent; onClose: () => 
         <div className="conv-id">
           <span className={`conv-dot ${agent.running ? "on" : "off"}`} />
           <b>{agent.label}</b>
-          <span className={`role role-${agent.role}`}>{agent.role}</span>
+          <span className={`role role-${agent.role}`}>{ROLE_ZH[agent.role] ?? agent.role}</span>
         </div>
         <button className="conv-close" onClick={onClose} title="返回 Issue / main">
           ✕

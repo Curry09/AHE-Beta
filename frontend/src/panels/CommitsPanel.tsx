@@ -1,7 +1,7 @@
 import type { CommitsResponse } from "../types";
 
-export default function CommitsPanel(props: { data: CommitsResponse | null }) {
-  const { data } = props;
+export default function CommitsPanel(props: { data: CommitsResponse | null; offline?: boolean }) {
+  const { data, offline } = props;
   return (
     <section className="board">
       <div className="board-head">
@@ -14,7 +14,8 @@ export default function CommitsPanel(props: { data: CommitsResponse | null }) {
         )}
       </div>
       <div className="board-body">
-        {!data && <div className="empty">加载中…</div>}
+        {!data && offline && <div className="empty">连接失败 · 后端离线（:8000）</div>}
+        {!data && !offline && <div className="empty">加载中…</div>}
         {data && !data.connected && <div className="empty">未连接仓库</div>}
         {data?.connected && data.commits.length === 0 && <div className="empty">暂无 commit</div>}
         <ul className="feed">
