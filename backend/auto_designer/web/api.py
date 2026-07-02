@@ -85,10 +85,28 @@ def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict
     }
 
 
+def _list_commits(*, tracker: IssueTracker | None, commits_url: str | None) -> dict[str, object]:
+    """main 分支更新：列 harness 仓最近 commit + vK tag。tracker 无该读能力（Fake）或读取失败时
+    connected=False（前端降级为占位，不抛 500）。"""
+    fetch = getattr(tracker, "list_recent_commits", None)
+    if tracker is None or not callable(fetch):
+        return {"connected": False, "commits_url": commits_url, "commits": []}
+    try:
+        commits = fetch(limit=15)
+    except Exception:
+        return {"connected": False, "commits_url": commits_url, "commits": []}
+    return {"connected": True, "commits_url": commits_url, "commits": commits}
+
+
 def create_app(
-    *, store: SessionStore, tracker: IssueTracker | None, board_url: str | None = None
+    *,
+    store: SessionStore,
+    tracker: IssueTracker | None,
+    board_url: str | None = None,
+    repo_url: str | None = None,
 ) -> FastAPI:
     app = FastAPI(title="auto-designer observation dashboard", version="0.1.0")
+    commits_url = f"{repo_url.rstrip('/')}/commits/branch/main" if repo_url else None
 
     app.add_middleware(
         CORSMiddleware,
@@ -114,6 +132,10 @@ def create_app(
     @app.get("/api/issues")
     def issues() -> dict[str, object]:
         return _list_issues(tracker=tracker, board_url=board_url)
+
+    @app.get("/api/commits")
+    def commits() -> dict[str, object]:
+        return _list_commits(tracker=tracker, commits_url=commits_url)
 
     @app.get("/api/agents")
     def agents() -> dict[str, object]:
@@ -170,4 +192,19 @@ def _default_board_url() -> str | None:
     return f"{base_url.rstrip('/')}/{owner}/{repo}/issues"
 
 
-app = create_app(store=_default_store(), tracker=_default_tracker(), board_url=_default_board_url())
+def _default_repo_url() -> str | None:
+    """Gitea 仓地址：{GITEA_URL}/{OWNER}/{REPO}，环境不全则 None（commit 列表降级为空）。"""
+    base_url = os.environ.get("GITEA_URL")
+    owner = os.environ.get("OWNER")
+    repo = os.environ.get("REPO")
+    if not (base_url and owner and repo):
+        return None
+    return f"{base_url.rstrip('/')}/{owner}/{repo}"
+
+
+app = create_app(
+    store=_default_store(),
+    tracker=_default_tracker(),
+    board_url=_default_board_url(),
+    repo_url=_default_repo_url(),
+)

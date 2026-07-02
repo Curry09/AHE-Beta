@@ -191,6 +191,51 @@ def test_agents_empty_then_populated(tmp_path: Path) -> None:
     assert agents[0]["turns"][0]["content"] == "在吗"
 
 
+class _CommitTracker(FakeTracker):
+    """FakeTracker + 观测 commit 读能力，用来测 /api/commits 的 connected 路径。"""
+
+    def list_recent_commits(self, *, limit: int = 15):
+        return [
+            {
+                "sha": "abc1234def",
+                "short_sha": "abc1234",
+                "message": "feat(main): 收窄超时",
+                "author": "dev#1",
+                "date": "2026-07-02T10:00:00Z",
+                "url": "http://gitea/o/r/commit/abc1234def",
+                "tags": ["v7"],
+            }
+        ][:limit]
+
+
+def test_commits_connected(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions")
+    client = TestClient(create_app(store=store, tracker=_CommitTracker(), repo_url="http://gitea/o/r"))
+    body = client.get("/api/commits").json()
+    assert body["connected"] is True
+    assert body["commits_url"] == "http://gitea/o/r/commits/branch/main"
+    assert len(body["commits"]) == 1
+    commit = body["commits"][0]
+    assert commit["short_sha"] == "abc1234"
+    assert commit["tags"] == ["v7"]
+    assert commit["url"] == "http://gitea/o/r/commit/abc1234def"
+
+
+def test_commits_no_tracker(tmp_path: Path) -> None:
+    client = _client(tmp_path, tracker=None)
+    body = client.get("/api/commits").json()
+    assert body["connected"] is False
+    assert body["commits"] == []
+
+
+def test_commits_fake_tracker_no_capability(tmp_path: Path) -> None:
+    # FakeTracker 无 list_recent_commits → 降级 connected=False（不抛 500）。
+    client = _client(tmp_path, tracker=FakeTracker())
+    body = client.get("/api/commits").json()
+    assert body["connected"] is False
+    assert body["commits"] == []
+
+
 def test_issues_no_tracker(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=None)
     body = client.get("/api/issues").json()

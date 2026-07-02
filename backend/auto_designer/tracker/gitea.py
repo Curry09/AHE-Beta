@@ -94,6 +94,53 @@ class GiteaTracker:
         if reason:  # Gitea PATCH 不收 reason 字段，关闭理由以 comment 保留可追溯
             self.add_comment(number, reason)
 
+    # ---- 观测读路径（非 IssueTracker 协议，仅 GiteaTracker 提供）----
+
+    def list_recent_commits(self, *, limit: int = 15) -> list[dict[str, Any]]:
+        """列 harness 仓 main 最近 commit（带 vK tag 标注），供观测看板「main 分支更新」。
+
+        纯观测、不改任何状态。tag→sha 映射把开发者 agent 打的 vK 观测锚点贴回对应 commit。
+        取标签失败不致命（降级为无 tag），commit 主体照常返回。
+        """
+        commits = self._request(
+            "GET",
+            f"/repos/{self._owner}/{self._repo}/commits?limit={limit}&stat=false",
+            None,
+        )
+        tags_by_sha = self._tags_by_sha()
+        out: list[dict[str, Any]] = []
+        for item in commits or []:
+            sha = item.get("sha") or ""
+            commit = item.get("commit") or {}
+            author = commit.get("author") or {}
+            message = (commit.get("message") or "").strip()
+            out.append(
+                {
+                    "sha": sha,
+                    "short_sha": sha[:7],
+                    "message": message.splitlines()[0] if message else "",
+                    "author": author.get("name") or "",
+                    "date": author.get("date") or "",
+                    "url": item.get("html_url") or "",
+                    "tags": tags_by_sha.get(sha, []),
+                }
+            )
+        return out
+
+    def _tags_by_sha(self) -> dict[str, list[str]]:
+        """sha → [tag 名]。取标签失败降级为空映射（不阻断 commit 列表）。"""
+        try:
+            tags = self._request("GET", f"/repos/{self._owner}/{self._repo}/tags?limit=50", None)
+        except GiteaError:
+            return {}
+        mapping: dict[str, list[str]] = {}
+        for tag in tags or []:
+            sha = (tag.get("commit") or {}).get("sha") or ""
+            name = tag.get("name") or ""
+            if sha and name:
+                mapping.setdefault(sha, []).append(name)
+        return mapping
+
     # ---- 内部 ----
 
     def _refresh_label_cache(self) -> None:
