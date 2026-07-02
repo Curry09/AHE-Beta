@@ -1,0 +1,30 @@
+title: AgentBoard：卡通形式的活动 agent 页面
+issue: 19
+slug: agentboard-cartoon-page
+overview: |-
+  本组在观测看板前端新增一个独立页 **AgentBoard**：以卡通形式（emoji 头像 + CSS 动画）实时展示
+  当前活动的 agent，展示其身份并支持点击，取代此前嵌于每页顶部的朴素折叠面板 `AgentsPanel`。
+  数据源沿用既有 `/api/agents`（`data/live/agents.json` 的只读投影，2 秒轮询），**零后端改动、
+  零新依赖**——卡通表现由 emoji + CSS keyframes 实现，符合奥卡姆理念。
+
+  数据流脊柱：
+
+  ```
+  run.py 闭环 ─update_agent→ data/live/agents.json
+          │  （用户 agent: agent_id=user-{identity}, label=identity, turns[]
+          │    开发者 agent: agent_id=dev-N, label=dev#N, detail）
+          ▼
+    /api/agents（既有只读端点） ──2s 轮询──► useLiveData(getAgents)
+          ▼
+    AgentBoard 页（T1）：按 role 分两组卡片墙
+          ├─ AgentCard：emoji 头像(hash(label)) + role 装饰 + 身份 + status + 健康动画
+          └─ 点击：用户卡→按 persona_identity===label 匹配 /api/sessions 最新一条→跳 /sessions/:id
+                   开发者卡→就地展开 status/detail（无会话可跳，数据现实）
+  ```
+
+  一个 Task 即可交付（前端单页 + 抽出的共享工具 + 从 Shell 摘除旧面板）：**T1** 落地
+  `/agentboard` 路由页、`AgentCard` 卡通卡、`lib/agentHealth`（健康判定 + fmtDur，从旧
+  `AgentsPanel` 抽出复用）、`lib/avatar`（确定性 emoji 头像），并在 `main.tsx` 移除常驻
+  `AgentsPanel`、删除 `AgentsPanel.tsx`，导航加 AgentBoard 入口。
+
+  held-out 纪律不受影响：本组只读观测，不触 benchmark、不改训练信号、不写任何权威状态。

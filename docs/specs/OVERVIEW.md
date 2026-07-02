@@ -126,6 +126,11 @@
   **held-out 纪律（关键约束，红线）**：种子卡采集了完整的 `oracle`/`test_cmd`/`gates`（客观判分证据），但这些是 **benchmark 侧**制品：注入时 `task.prompt → SeedScenario.description` **绝不携带 oracle/test_cmd**，判分字段落 **sidecar**、不进 `SeedScenario`、不进训练环。理由引 CLAUDE.md「benchmark 全程 held-out：不参与训练，不参与 发版门禁」——训练信号只取自「模拟真实使用」分布上的用户体感，oracle 客观判分归 harbor 侧的平行评测系统。
 
   与 0009 的关系：本组是 0009（SeedSource 可插拔供给）的上游供给。种子卡的 `source.repo`+`env.repo_at` 映射为 0009/T4 的 `WorkspaceSpec{kind="git", params={repo, commit}}`，`env.setup` 映射为 `WorkspaceSpec.setup`（按 0009/T3 约定 venv 前缀化）；无 repo 的纯文本场景退化为 `workspace: null` 或 `kind="empty"`。智能配对 （persona×seed）与容器/私有仓鉴权等重型能力**不在本组**，记为 open-questions / out-of-scope（见各 Task）。
+- **0011 AgentBoard：卡通形式的活动 agent 页面** — 本组在观测看板前端新增一个独立页 **AgentBoard**：以卡通形式（emoji 头像 + CSS 动画）实时展示 当前活动的 agent，展示其身份并支持点击，取代此前嵌于每页顶部的朴素折叠面板 `AgentsPanel`。 数据源沿用既有 `/api/agents`（`data/live/agents.json` 的只读投影，2 秒轮询），**零后端改动、 零新依赖**——卡通表现由 emoji + CSS keyframes 实现，符合奥卡姆理念。
+
+  一个 Task 即可交付（前端单页 + 抽出的共享工具 + 从 Shell 摘除旧面板）：**T1** 落地 `/agentboard` 路由页、`AgentCard` 卡通卡、`lib/agentHealth`（健康判定 + fmtDur，从旧 `AgentsPanel` 抽出复用）、`lib/avatar`（确定性 emoji 头像），并在 `main.tsx` 移除常驻 `AgentsPanel`、删除 `AgentsPanel.tsx`，导航加 AgentBoard 入口。
+
+  held-out 纪律不受影响：本组只读观测，不触 benchmark、不改训练信号、不写任何权威状态。
 
 ## 如何读这份文档
 
@@ -233,6 +238,7 @@
 | 0009 | 0009/T4 | git 源（clone repo@commit 成快照工作区） | done | T1 |
 | 0010 | 0010/T1 | 种子场景采集（蒸馏，skill 形式） | done | — |
 | 0010 | 0010/T2 | 种子注入（card → SeedScenario） | done | T1 |
+| 0011 | 0011/T1 | AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板 | pending | — |
 
 ## 跨 feature 关系图
 
@@ -298,6 +304,9 @@ graph LR
     subgraph G0010[0010 seed-scenario-pipeline]
         n0010_T1["T1 种子场景采集（蒸馏，skill 形式）"]
         n0010_T2["T2 种子注入（card → SeedScenario）"]
+    end
+    subgraph G0011[0011 agentboard-cartoon-page]
+        n0011_T1["T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -378,6 +387,7 @@ graph LR
     n0010_T2 -.note.-> n0009_T1
     n0010_T2 -.note.-> n0009_T4
     n0010_T2 -.note.-> n0009_T3
+    n0011_T1 -.note.-> n0007_T4
 ```
 
 ## 文件冲突报告
@@ -538,6 +548,18 @@ backend/
     test_models.py                      ← 0001/T1
     test_nexau_runtime.py               ← 0003/T2
   run.py                                ← 0007/T4
+frontend/
+  src/
+    components/
+      AgentCard.tsx                     ← 0011/T1
+      AgentsPanel.tsx                   ← 0011/T1
+    lib/
+      agentHealth.ts                    ← 0011/T1
+      avatar.ts                         ← 0011/T1
+    pages/
+      AgentBoard.tsx                    ← 0011/T1
+    index.css                           ← 0011/T1
+    main.tsx                            ← 0011/T1
 tools/
   persona-distill/
     extract-selfreport-persona/
@@ -1248,4 +1270,44 @@ graph LR
     class v_T1_2 st_done;
     class v_T2_1 st_pending;
     class v_T2_2 st_done;
+```
+
+### 0011 AgentBoard：卡通形式的活动 agent 页面（issue #19）
+
+> 人读方案见 [`0011-agentboard-cartoon-page/summary.md`](./0011-agentboard-cartoon-page/summary.md)。
+
+本组在观测看板前端新增一个独立页 **AgentBoard**：以卡通形式（emoji 头像 + CSS 动画）实时展示
+当前活动的 agent，展示其身份并支持点击，取代此前嵌于每页顶部的朴素折叠面板 `AgentsPanel`。
+数据源沿用既有 `/api/agents`（`data/live/agents.json` 的只读投影，2 秒轮询），**零后端改动、
+零新依赖**——卡通表现由 emoji + CSS keyframes 实现，符合奥卡姆理念。
+
+数据流脊柱：
+
+```
+run.py 闭环 ─update_agent→ data/live/agents.json
+        │  （用户 agent: agent_id=user-{identity}, label=identity, turns[]
+        │    开发者 agent: agent_id=dev-N, label=dev#N, detail）
+        ▼
+  /api/agents（既有只读端点） ──2s 轮询──► useLiveData(getAgents)
+        ▼
+  AgentBoard 页（T1）：按 role 分两组卡片墙
+        ├─ AgentCard：emoji 头像(hash(label)) + role 装饰 + 身份 + status + 健康动画
+        └─ 点击：用户卡→按 persona_identity===label 匹配 /api/sessions 最新一条→跳 /sessions/:id
+                 开发者卡→就地展开 status/detail（无会话可跳，数据现实）
+```
+
+一个 Task 即可交付（前端单页 + 抽出的共享工具 + 从 Shell 摘除旧面板）：**T1** 落地
+`/agentboard` 路由页、`AgentCard` 卡通卡、`lib/agentHealth`（健康判定 + fmtDur，从旧
+`AgentsPanel` 抽出复用）、`lib/avatar`（确定性 emoji 头像），并在 `main.tsx` 移除常驻
+`AgentsPanel`、删除 `AgentsPanel.tsx`，导航加 AgentBoard 入口。
+
+held-out 纪律不受影响：本组只读观测，不触 benchmark、不改训练信号、不写任何权威状态。
+
+**任务一览**
+
+- **T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板**（pending） — 在观测看板前端新增独立页 AgentBoard（/agentboard），以卡通形式实时展示当前活动的 agent 并支持点击， 取代此前嵌于每页顶部的朴素折叠面板 AgentsPanel。
+
+```mermaid
+graph LR
+    nT1["T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板"]
 ```
