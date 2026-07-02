@@ -12,11 +12,16 @@ Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析
 前置：
   1) backend/.env 有 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY
   2) Gitea 已起并 bootstrap，backend/deploy/gitea/.env 有 GITEA_URL/OWNER/REPO/TOKEN
-运行：PYTHONPATH=backend .venv/bin/python backend/run.py
+运行：./run.sh  （或直接 PYTHONPATH=backend .venv/bin/python backend/run.py）
+  persona / 种子卡库两个「给定输入」经 CLI 参数注入，默认指向 backend/persona_library.json
+  与 backend/seeds.json：
+    ./run.sh --persona-library <path> --seed-cards <path>
+  或经 run.sh 的 PERSONA_LIBRARY / SEED_CARDS 环境变量覆盖。
 """
 
 from __future__ import annotations
 
+import argparse
 import shutil
 import subprocess
 import sys
@@ -25,11 +30,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent  # backend/
 DATA = ROOT / "data"
 HARNESS_REPO = DATA / "harness_repo"
-PERSONA_LIBRARY = ROOT / "persona_library.json"  # distill 产物：6 张锚卡
-SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；经 seed_adapter 注入为 SeedScenario）
+# 两个「给定输入」的默认卡库路径；均可经 CLI 参数（见 _parse_args）/ run.sh 覆盖注入。
+DEFAULT_PERSONA_LIBRARY = ROOT / "persona_library.json"  # distill 产物：6 张锚卡
+DEFAULT_SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；经 seed_adapter 注入）
 
 # 每轮跑几个 persona（None=用满卡库全部）。用户会话数≈persona 数，耗时按此线性放大，按需下调。
 PERSONA_LIMIT: int | None = None
+
+
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    """解析 CLI 参数：persona 卡库 / 种子卡库两个「给定输入」文件路径（其余默认）。"""
+    parser = argparse.ArgumentParser(description="真实端到端跑一轮闭环（a→b→c）")
+    parser.add_argument(
+        "--persona-library",
+        type=Path,
+        default=DEFAULT_PERSONA_LIBRARY,
+        help="persona distill 卡库 JSON（默认 backend/persona_library.json）",
+    )
+    parser.add_argument(
+        "--seed-cards",
+        type=Path,
+        default=DEFAULT_SEED_CARDS,
+        help="种子卡库 JSON（原始卡，经 seed_adapter 注入；默认 backend/seeds.json）",
+    )
+    return parser.parse_args(argv)
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -135,6 +159,8 @@ def main() -> int:
     import os
     from urllib.parse import urlparse
 
+    args = _parse_args(argv=sys.argv[1:])
+
     llm_env = _load_env(ROOT / ".env")  # LLM_*
     os.environ.update(llm_env)
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
@@ -163,6 +189,7 @@ def main() -> int:
     from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
     from auto_designer.user.sim.persona_io import card_to_personas
 
+    print(f"⓪ 输入：persona 卡库={args.persona_library} | 种子卡库={args.seed_cards}")
     print("① 种 harness 本地仓 ...")
     repo = _seed_harness_repo()
 
@@ -187,10 +214,12 @@ def main() -> int:
     # （sim_user 据此 bind_session 绑定共享工作区，令用户 agent 在 harness 同目录核实）。
     api = ApiPersonaClient()
     client = AgenticPersonaClient(api.complete)
-    sim_persona_list = card_to_personas(PersonaLibrary(PERSONA_LIBRARY))  # 6 张锚卡 → sim persona
+    sim_persona_list = card_to_personas(
+        PersonaLibrary(args.persona_library)
+    )  # persona 卡库 → sim persona
     if PERSONA_LIMIT is not None:
         sim_persona_list = sim_persona_list[:PERSONA_LIMIT]
-    seeds = _load_seeds(SEED_CARDS)
+    seeds = _load_seeds(args.seed_cards)
     # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
     sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）
