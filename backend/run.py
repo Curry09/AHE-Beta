@@ -176,6 +176,7 @@ def main() -> int:
     os.environ["NO_PROXY"] = no_proxy
     os.environ["no_proxy"] = no_proxy
 
+    from auto_designer.designer.designer import Designer
     from auto_designer.dev.agentic_developer import AgenticDeveloper
     from auto_designer.distill.library import PersonaLibrary
     from auto_designer.harness.launcher import HarnessLauncher
@@ -206,6 +207,7 @@ def main() -> int:
 
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 开发者角色 ...")
     dev_agent_def = str(ROOT / "agent_defs" / "developer_agent")  # 工具型 dev agent 定义目录
+    designer_agent_def = str(ROOT / "agent_defs" / "designer")  # 创新者 agent 定义目录（只读工具）
 
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
     # persona 从 distill 卡库（persona_library.json）注入、场景从种子卡库（seeds.json）经
@@ -290,6 +292,30 @@ def main() -> int:
         ),
     ]
 
+    def make_designer_status(agent_id, label):  # 创新者 agent 活动回调
+        def cb(*, running, status, detail=None):
+            update_agent(
+                data_dir=DATA,
+                agent_id=agent_id,
+                role="designer",
+                label=label,
+                running=running,
+                status=status,
+                detail=detail,
+            )
+
+        return cb
+
+    designers = [  # 创新者 agent：a 之后综合全局 backlog+体感产结构性提案（design 标签），供 dev 领取
+        Designer(
+            tracker,
+            store,
+            str(repo),
+            designer_agent_def,
+            on_status=make_designer_status("designer-0", "designer"),
+        ),
+    ]
+
     orch = Orchestrator(
         launcher=launcher,
         harness_repo=str(repo),  # Spec-0007/T4：每局解析 main HEAD SHA 用
@@ -297,6 +323,7 @@ def main() -> int:
         developer_agents=developers,
         run_session_fn=user_run_session_fn,
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
+        designers=designers,  # 创新者接入闭环：a → d(designer) → b → c
     )
 
     print(

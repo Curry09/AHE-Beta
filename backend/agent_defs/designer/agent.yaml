@@ -1,0 +1,34 @@
+type: agent
+name: designer
+max_context_tokens: 128000
+system_prompt: ./systemprompt.md
+system_prompt_type: string
+# xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
+tool_call_mode: structured
+max_iterations: 20
+
+llm_config:
+  model: ${env.LLM_MODEL}
+  base_url: ${env.LLM_BASE_URL}
+  api_key: ${env.LLM_API_KEY}
+  max_tokens: 32768
+  timeout: 300
+  api_type: openai_chat_completion
+
+# 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于读现状 grounding；
+# designer 不改文件、不碰 git，仅 read_file / list_directory 取证 + complete_task 交提案。
+sandbox_config:
+  type: local
+
+tools:
+  - name: read_file
+    yaml_path: ./tools/read_file.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:read_file
+  - name: list_directory
+    yaml_path: ./tools/list_directory.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:list_directory
+  - name: complete_task
+    yaml_path: ./tools/complete_task.tool.yaml
+    binding: nexau.archs.tool.builtin.session_tools:complete_task
+
+stop_tools: [complete_task]

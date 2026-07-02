@@ -1,5 +1,6 @@
 # Spec-0007/T2：去 release 链 + 会话级 main SHA 快照回灌。
-"""闭环编排 orchestrator：a（用户产 issue+体感）→ b（开发者 agent 直推 main）→ c（回灌 main SHA）。
+"""闭环编排 orchestrator：a（用户产 issue+体感）→ d（创新者综合全局产结构性提案，可选）
+→ b（开发者 agent 直推 main）→ c（回灌 main SHA）。
 
 纯 trunk（单 main）：去掉 release_ref 链——run_round 不再把 outcome.tag 链式回灌。每局会话开始解析
 harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA checkout → 单会话内 harness 不在
@@ -16,6 +17,7 @@ from __future__ import annotations
 import subprocess
 from typing import Protocol
 
+from auto_designer.designer.designer import Designer
 from auto_designer.dev.agentic_developer import AgenticDeveloper
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
@@ -52,11 +54,14 @@ class Orchestrator:
         developer_agents: list[AgenticDeveloper],
         run_session_fn: SessionRunner,
         initial_ref: str,
+        designers: list[Designer] | None = None,
     ) -> None:
         self._launcher = launcher
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
         self._fixed_set = fixed_set
         self._developers = developer_agents
+        # 创新者（可选）：在 a 之后、b 之前综合全局 backlog+体感产结构性提案，供开发者领取。
+        self._designers = designers or []
         self._run_session = run_session_fn
         self._initial_ref = initial_ref  # 跟踪的主干分支名（trunk = "main"），每局解析其 HEAD SHA
 
@@ -82,6 +87,12 @@ class Orchestrator:
                 ensure_deps(workspace_dir, scenario.workspace)
             harness = self._launcher.launch(sha, workspace_dir=workspace_dir)
             self._run_session(persona, scenario, harness, workspace_dir=workspace_dir)
+
+        # d（创新者，可选）：综合本轮及历史全量 open issue backlog + 体感曲线，产结构性设计提案
+        #    （打 design 标签）写回 tracker。跑在 b 之前，让提案与用户产的 issue 一起进 backlog 供
+        #    开发者领取；designer 不碰 git、不改文件，只提方向。无 designer 时整段跳过（退化为今天行为）。
+        for designer in self._designers:
+            designer.propose_once()
 
         # b：多个开发者 agent 依次各领一条不同 issue，自主改 harness 直推 main（无 branch/merge/门禁）。
         attempted: set[int] = set()

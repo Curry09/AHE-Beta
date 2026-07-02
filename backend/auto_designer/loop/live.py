@@ -1,4 +1,4 @@
-"""多 agent 活动注册表（流式观测）：各 agent（用户/开发者/测试）的实时状态写到 data/live/agents.json。
+"""多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/agents.json。
 
 与权威 SessionStore 解耦，是易失观测投影。每个 agent 一个槽（按 agent_id），互不覆盖；看板按 role
 分组、折叠展示，running 标志表示是否正在跑。原子写（temp+replace）避免读进程读到半成品。
@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any
 
 _AGENTS_NAME = "agents.json"
-# role 展示顺序：用户在前、开发者在后。
-_ROLE_ORDER = {"user": 0, "developer": 1}
+# role 展示顺序：用户 → 创新者 → 开发者（对齐闭环 a → d → b 的次序）。
+_ROLE_ORDER = {"user": 0, "designer": 1, "developer": 2}
 
 
 def _agents_file(*, data_dir: Path) -> Path:
