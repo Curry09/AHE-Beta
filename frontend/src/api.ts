@@ -3,6 +3,7 @@ import type {
   SessionSummary,
   SessionDetail,
   IssuesResponse,
+  CommitsResponse,
   AgentsResponse,
 } from "./types";
 
@@ -16,4 +17,5 @@ export const getOverview = () => get<Overview>("/api/overview");
 export const getSessions = () => get<SessionSummary[]>("/api/sessions");
 export const getSession = (id: string) => get<SessionDetail>(`/api/sessions/${id}`);
 export const getIssues = () => get<IssuesResponse>("/api/issues");
+export const getCommits = () => get<CommitsResponse>("/api/commits");
 export const getAgents = () => get<AgentsResponse>("/api/agents");

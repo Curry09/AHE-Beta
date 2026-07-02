@@ -35,6 +35,22 @@ export interface IssuesResponse {
   issues: Issue[];
 }
 
+export interface Commit {
+  sha: string;
+  short_sha: string;
+  message: string;
+  author: string;
+  date: string;
+  url: string;
+  tags: string[];
+}
+
+export interface CommitsResponse {
+  connected: boolean;
+  commits_url: string | null;
+  commits: Commit[];
+}
+
 export interface Agent {
   agent_id: string;
   role: "user" | "developer";
