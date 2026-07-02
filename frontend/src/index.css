@@ -23,28 +23,39 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #d0d7de;
 .chip { display: inline-block; background: #ddf4ff; color: #0969da; border-radius: 999px; padding: 1px 10px; margin-right: 6px; font-size: 12px; }
 .typing { font-style: italic; }
 
-/* 多 agent 活动面板 */
-.agents-panel { border: 2px solid #1a7f37; }
-.panel-title { margin: 0; }
-.agent-group { margin-top: 12px; }
-.agent-group h3 { margin: 0 0 6px; font-size: 14px; }
-.agent-row { border: 1px solid #d0d7de; border-radius: 6px; padding: 8px 12px; margin: 6px 0; background: #fff; }
-.agent-row summary { cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; }
-.agent-row summary::-webkit-details-marker { display: none; }
-.agent-row summary::before { content: "▸"; color: #656d76; }
-.agent-row[open] summary::before { content: "▾"; }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: #afb8c1; display: inline-block; flex: none; }
-.dot.ok { background: #1a7f37; box-shadow: 0 0 0 3px rgba(26,127,55,.18); }
-.dot.warn { background: #d4a72c; box-shadow: 0 0 0 3px rgba(212,167,44,.2); }
-.dot.err { background: #cf222e; box-shadow: 0 0 0 3px rgba(207,34,46,.18); }
-.dot.idle { background: #afb8c1; }
-.agent-label { white-space: nowrap; }
+/* 健康态徽标（AgentBoard 复用，色板沿用） */
 .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
 .badge.ok { background: #dafbe1; color: #1a7f37; }
 .badge.warn { background: #fff8c5; color: #9a6700; }
 .badge.err { background: #ffebe9; color: #cf222e; }
 .badge.idle { background: #eaeef2; color: #656d76; }
-.agent-status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-timing { white-space: nowrap; font-size: 12px; color: #656d76; font-variant-numeric: tabular-nums; }
-.agent-body { margin-top: 8px; border-top: 1px dashed #d0d7de; padding-top: 8px; }
 .detail { white-space: pre-wrap; font-size: 12px; background: #f6f8fa; padding: 8px; border-radius: 6px; max-height: 340px; overflow: auto; }
+
+/* AgentBoard 卡片墙 */
+.agent-wall { margin-top: 16px; }
+.agent-wall h3 { margin: 0 0 8px; font-size: 14px; }
+.agent-cards { display: flex; flex-wrap: wrap; gap: 12px; }
+.agent-card { width: 200px; background: #fff; border: 1px solid #d0d7de; border-radius: 12px; overflow: hidden; }
+.agent-card-face {
+  width: 100%; border: none; background: none; cursor: pointer; text-align: center;
+  padding: 14px 12px 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; font: inherit;
+}
+.agent-card-face:hover { background: #f6f8fa; }
+.avatar { position: relative; width: 64px; height: 64px; display: inline-flex; align-items: center; justify-content: center; }
+.avatar-face { font-size: 44px; line-height: 1; }
+.avatar-badge { position: absolute; right: -2px; bottom: -2px; font-size: 20px; }
+.agent-card-label { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.agent-card-role { font-size: 12px; color: #656d76; }
+.agent-card-status { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-card-timing { font-size: 11px; color: #656d76; font-variant-numeric: tabular-nums; }
+.agent-card-body { border-top: 1px dashed #d0d7de; padding: 8px; }
+
+/* 健康态动画：ok 浮动+光环 / warn 摇摆 / err 抖动 / idle 变暗静止 */
+.anim-ok { animation: bob 1.6s ease-in-out infinite; border-radius: 50%; box-shadow: 0 0 0 4px rgba(26,127,55,.16); }
+.anim-warn { animation: wobble 2.2s ease-in-out infinite; border-radius: 50%; box-shadow: 0 0 0 4px rgba(212,167,44,.18); }
+.anim-err { animation: shake .5s ease-in-out infinite; border-radius: 50%; box-shadow: 0 0 0 4px rgba(207,34,46,.16); }
+.anim-idle { filter: grayscale(1); opacity: .55; }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes wobble { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { .anim-ok, .anim-warn, .anim-err { animation: none; } }
