@@ -107,7 +107,7 @@ def make_sim_run_session_fn(
             if on_turn is not None:
                 on_turn(persona.identity, sim_persona, partial, True)
 
-        harness.reset()  # 开局责任归编排层（对齐基础版 user/session.run_session）
+        harness.reset()  # 开局责任归编排层
         try:
             res = sim_run_session(
                 sim_persona, client, harness, scenario.description, on_progress=progress
