@@ -4,7 +4,8 @@
      ApiPersonaClient.complete 供给，模型走 backend/.env 的 LLM_*）；
      开发者侧 = 真 nexau dev agent + 真 Gitea（issue，走 backend/deploy/gitea/.env）
      + 本地 git 仓承载 harness 代码。
-本地规模：persona 从 distill 卡库(persona_library.json)注入、场景从 seed_scenarios.json 加载，
+本地规模：persona 从 distill 卡库(persona_library.json)注入、场景从种子卡库(seeds.json)经
+     distill seed_adapter 注入（held-out 判分制品在注入边界剥离），
      × 2 dev agent，跑 5 轮；跑前复位到最初状态。
 Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析 main HEAD SHA 作会话级快照。
 
@@ -16,7 +17,6 @@ Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent  # backend/
 DATA = ROOT / "data"
 HARNESS_REPO = DATA / "harness_repo"
 PERSONA_LIBRARY = ROOT / "persona_library.json"  # distill 产物：6 张锚卡
-SEED_SCENARIOS = ROOT / "seed_scenarios.json"  # 种子场景库
+SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；经 seed_adapter 注入为 SeedScenario）
 
 # 每轮跑几个 persona（None=用满卡库全部）。用户会话数≈persona 数，耗时按此线性放大，按需下调。
 PERSONA_LIMIT: int | None = None
@@ -43,21 +43,15 @@ def _load_env(path: Path) -> dict[str, str]:
 
 
 def _load_seeds(path: Path) -> list:
-    """从 seed_scenarios.json 加载种子场景（{version, seeds:[...]} 或裸数组均可）。"""
-    from auto_designer.models import SeedScenario, WorkspaceSpec
+    """从种子卡库(seeds.json)经 distill seed_adapter 注入为 SeedScenario 列表。
 
-    data = json.loads(path.read_text(encoding="utf-8"))
-    records = data["seeds"] if isinstance(data, dict) else data
-    out = []
-    for rec in records:
-        ws = rec.get("workspace")
-        out.append(
-            SeedScenario(
-                description=rec["description"],
-                workspace=WorkspaceSpec.from_dict(ws) if ws else None,
-            )
-        )
-    return out
+    与 persona 侧对称：SeedLibrary 读原始卡 → card_to_seed 逐卡注入（契约校验 + held-out
+    判分制品 oracle/test_cmd/gates 在注入边界剥离，绝不进 SeedScenario / 训练环）。
+    """
+    from auto_designer.distill.seed_adapter import card_to_seed
+    from auto_designer.distill.seed_library import SeedLibrary
+
+    return [card_to_seed(record) for record in SeedLibrary(path).load()]
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -187,8 +181,8 @@ def main() -> int:
     dev_agent_def = str(ROOT / "agent_defs" / "developer_agent")  # 工具型 dev agent 定义目录
 
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
-    # persona 从 distill 卡库（persona_library.json）注入、场景从 seed_scenarios.json 加载——
-    # 两个「给定输入」皆走 JSON，替代此前硬编码的 expert × TASK。
+    # persona 从 distill 卡库（persona_library.json）注入、场景从种子卡库（seeds.json）经
+    # distill seed_adapter 注入——两个「给定输入」皆走 distill 卡库，替代此前硬编码的 expert × TASK。
     # 用户 agent 用 AgenticPersonaClient 走内层 tool-use，ApiPersonaClient.complete 作内层 LLM
     # （sim_user 据此 bind_session 绑定共享工作区，令用户 agent 在 harness 同目录核实）。
     api = ApiPersonaClient()
@@ -196,7 +190,7 @@ def main() -> int:
     sim_persona_list = card_to_personas(PersonaLibrary(PERSONA_LIBRARY))  # 6 张锚卡 → sim persona
     if PERSONA_LIMIT is not None:
         sim_persona_list = sim_persona_list[:PERSONA_LIMIT]
-    seeds = _load_seeds(SEED_SCENARIOS)
+    seeds = _load_seeds(SEED_CARDS)
     # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
     sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）

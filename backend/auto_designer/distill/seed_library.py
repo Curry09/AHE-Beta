@@ -121,12 +121,18 @@ class SeedLibrary:
         self._path = Path(path)
 
     def load(self) -> list[dict]:
-        """读全库；文件不存在视为空库（合法初始态）。"""
+        """读全库；文件不存在视为空库（合法初始态）。
+
+        顶层可为裸卡数组，或 harvest 产出的 `{version, harvested_at, note, seeds:[...]}` 信封
+        （前向兼容：取 seeds 数组、忽略其余元数据键）——与 run.py._load_seeds 的双形状容忍一致。
+        """
         if not self._path.exists():
             return []
         data = json.loads(self._path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and isinstance(data.get("seeds"), list):
+            return data["seeds"]
         if not isinstance(data, list):
-            raise ValueError(f"种子卡库文件 {self._path} 顶层应为卡记录数组")
+            raise ValueError(f"种子卡库文件 {self._path} 顶层应为卡记录数组或 {{seeds:[...]}} 信封")
         return data
 
     def get(self, seed_id: str) -> dict:

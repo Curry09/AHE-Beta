@@ -141,20 +141,23 @@ def test_card_to_seeds_envelope_shape_and_no_heldout(tmp_path) -> None:
         assert f'"{banned}"' not in text
 
 
-def test_envelope_feeds_run_load_seeds(tmp_path) -> None:
+def test_raw_card_library_feeds_run_load_seeds(tmp_path) -> None:
+    # run._load_seeds 走 SeedLibrary + card_to_seed：读原始种子卡库 → 注入 SeedScenario 列表。
     import run  # backend/run.py（pyproject pythonpath 暴露 backend）
 
-    lib = SeedLibrary(tmp_path / "seeds.json")
+    path = tmp_path / "seeds.json"
+    lib = SeedLibrary(path)
     lib.add(_git_card("seed-a"))
     lib.add(_text_card("seed-b"))
 
-    out = tmp_path / "seed_scenarios.json"
-    out.write_text(json.dumps(card_to_seeds(lib), ensure_ascii=False), encoding="utf-8")
-
-    seeds = run._load_seeds(out)
+    seeds = run._load_seeds(path)
     assert len(seeds) == 2  # 等长 SeedScenario 列表
     assert seeds[0].workspace is not None and seeds[0].workspace.kind == "git"
     assert seeds[1].workspace is None
+    # held-out 判分制品在注入边界剥离：SeedScenario 及其 to_dict 不含 oracle/test_cmd/gates。
+    text = json.dumps([s.to_dict() for s in seeds], ensure_ascii=False)
+    for banned in ("oracle", "test_cmd", "gates"):
+        assert f'"{banned}"' not in text
 
 
 def test_missing_repo_at_raises() -> None:

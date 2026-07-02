@@ -24,7 +24,7 @@ from auto_designer.models import SeedScenario, WorkspaceSpec
 if TYPE_CHECKING:
     from auto_designer.distill.seed_library import SeedLibrary
 
-# {version, seeds} 信封版本；对齐 backend/seed_scenarios.json 与 run.py._load_seeds。
+# {version, seeds} 信封版本：card_to_seeds 的可持久化产物形状（信封 JSON schema 版本号）。
 SEED_ENVELOPE_VERSION = 1
 
 # held-out 客观判分制品：注入时剥离到 sidecar，绝不进 SeedScenario。
@@ -90,8 +90,9 @@ def card_to_seed(record: dict) -> SeedScenario:
 def card_to_seeds(library: SeedLibrary) -> dict:
     """把库内每条卡注入为 {version, seeds:[SeedScenario.to_dict()...]} 信封。
 
-    Spec-0010/T2: 形状对齐 backend/seed_scenarios.json 与 run.py._load_seeds（可直接喂现有加载器、
-    消费侧零改）。held-out 字段已在 card_to_seed 剥离，故信封 JSON 不含 oracle/test_cmd/gates。
+    Spec-0010/T2: 可持久化的 {version, seeds} 信封（供旁路落盘 / 离线检视）。held-out 字段已在
+    card_to_seed 剥离，故信封 JSON 不含 oracle/test_cmd/gates。run.py 走 card_to_seed 直接注入
+    SeedScenario、不经此信封。
     """
     return {
         "version": SEED_ENVELOPE_VERSION,

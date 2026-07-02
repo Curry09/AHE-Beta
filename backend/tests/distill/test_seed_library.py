@@ -76,6 +76,25 @@ def test_add_then_load_and_get(tmp_path) -> None:
     assert lib.get("seed-requests-6964") == card
 
 
+def test_load_tolerates_harvest_envelope(tmp_path) -> None:
+    # harvest 产出的 {version, harvested_at, note, seeds:[...]} 信封：load 取 seeds、忽略元数据键。
+    import json
+
+    path = tmp_path / "seeds.json"
+    path.write_text(
+        json.dumps(
+            {"version": 1, "harvested_at": "2026-07-02", "note": "x", "seeds": [_card("seed-a")]},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    lib = SeedLibrary(path)
+    loaded = lib.load()
+    assert len(loaded) == 1
+    assert loaded[0]["id"] == "seed-a"
+    assert lib.get("seed-a")["id"] == "seed-a"
+
+
 def test_get_missing_raises_keyerror(tmp_path) -> None:
     lib = SeedLibrary(tmp_path / "seeds.json")
     lib.add(_card("seed-a"))

@@ -1,0 +1,447 @@
+{
+  "version": "1.0",
+  "harvested_at": "2026-07-02",
+  "note": "All FACT fields (repo_at, test_cmd, urls, resolution_quote) transcribed from real merged fix PRs via GitHub API; not_in_benchmark asserted by date rule (all merged >= 2025, after known SWE-bench cutoffs). oracle/env.test_cmd/gates are held-out (sidecar at injection).",
+  "seeds": [
+    {
+      "id": "seed-pandas-66069",
+      "source": {
+        "type": "closed_issue+fix_pr",
+        "repo": "pandas-dev/pandas",
+        "issue_url": "https://github.com/pandas-dev/pandas/issues/66069",
+        "fix_ref": "https://github.com/pandas-dev/pandas/pull/66070 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "Series.str.match with a PyArrow string dtype gives wrong results when the pattern is an alternation like 'a|b' — the anchor only seems to apply to the first branch. Fix it.",
+        "context": "pandas Series backed by ArrowDtype string; pat contains '|' alternation; compare against object-dtype behaviour."
+      },
+      "domain": "data-analysis",
+      "capability_probed": ["correctness-edgecase"],
+      "difficulty": "medium",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "pandas/tests/strings/test_find_replace.py::test_match_anchored_alternation (FAIL@parent -> PASS@fix)",
+        "reference_solution": "PR#66070: strip a leading '^' from pat before wrapping with '^({pat})' so the outer anchor applies to the whole alternation",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "medium",
+        "base_image": "python:3.11",
+        "repo_at": "4a1c7b57424248cb5cfcaf439457affeffeaed3e",
+        "setup": ["pip install -e '.[test]'"],
+        "test_cmd": "pytest pandas/tests/strings/test_find_replace.py::test_match_anchored_alternation",
+        "external_deps": "none",
+        "budget": {"timeout_s": 1200, "mem_gb": 4}
+      },
+      "pairing_constraints": {"domain": "data-analysis", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "Striped a leading `^` from `pat` before wrapping with `^({pat})`, so the outer anchor applies to the whole alternation instead of just the first branch.",
+        "source": "https://github.com/pandas-dev/pandas/pull/66070"
+      }
+    },
+    {
+      "id": "seed-pandas-66049",
+      "source": {
+        "type": "merged_fix_pr",
+        "repo": "pandas-dev/pandas",
+        "issue_url": "https://github.com/pandas-dev/pandas/pull/66049",
+        "fix_ref": "https://github.com/pandas-dev/pandas/pull/66049 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "For a Sparse-backed Series, .min()/.max()/.sum() with skipna=False still skips the missing values instead of returning NA. Make skipna=False respected.",
+        "context": "Series(SparseArray(...)) with NaN fill/values; reductions min/max/sum called with skipna=False."
+      },
+      "domain": "data-analysis",
+      "capability_probed": ["correctness-edgecase", "tool-use-verification"],
+      "difficulty": "medium",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "pandas/tests/arrays/sparse/test_reductions.py::test_min_max_skipna_false_with_nonnull_fill_value (and test_sum_skipna) FAIL@parent -> PASS@fix",
+        "reference_solution": "PR#66049: route min/max/sum through SparseArray._reduce (which previously only special-cased mean), passing skipna through; also fixes an inverted skipna in SparseArray.sum",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "medium",
+        "base_image": "python:3.11",
+        "repo_at": "9b83dfa1652f32f1abd243394085fdd8ed822e0d",
+        "setup": ["pip install -e '.[test]'"],
+        "test_cmd": "pytest pandas/tests/arrays/sparse/test_reductions.py::test_min_max_skipna_false_with_nonnull_fill_value pandas/tests/arrays/sparse/test_reductions.py::test_sum_skipna",
+        "external_deps": "none",
+        "budget": {"timeout_s": 1200, "mem_gb": 4}
+      },
+      "pairing_constraints": {"domain": "data-analysis", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "`SparseArray._reduce` only special-cased `mean`, so `Series(sparse).min/max/sum` with `skipna=False` went through `.dropna()` and silently ignored missing values. This routes `min`/`max`/`sum` through `_reduce` as well, passing `skipna` through.",
+        "source": "https://github.com/pandas-dev/pandas/pull/66049"
+      }
+    },
+    {
+      "id": "seed-pandas-65118",
+      "source": {
+        "type": "closed_issue+fix_pr",
+        "repo": "pandas-dev/pandas",
+        "issue_url": "https://github.com/pandas-dev/pandas/issues/65118",
+        "fix_ref": "https://github.com/pandas-dev/pandas/pull/66051 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "Assigning into a DataFrame that has MultiIndex columns with an object-dtype level silently does nothing (no-op) instead of setting the values. This is a regression. Fix the setitem alignment.",
+        "context": "DataFrame with MultiIndex columns, one level object-dtype; df[...] = value assignment is silently dropped."
+      },
+      "domain": "data-analysis",
+      "capability_probed": ["correctness-edgecase", "tool-use-verification"],
+      "difficulty": "hard",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "pandas/tests/indexing/multiindex/test_multiindex.py::test_multiindex_assign_alignment_with_object_dtype (FAIL@parent -> PASS@fix)",
+        "reference_solution": "PR#66051: fixes DataFrame setitem alignment with MultiIndex object-dtype level; also fixes the original bug intended by #62404",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "medium",
+        "base_image": "python:3.11",
+        "repo_at": "3d52407132956f43cc8a03e7e257d2ec75cec397",
+        "setup": ["pip install -e '.[test]'"],
+        "test_cmd": "pytest pandas/tests/indexing/multiindex/test_multiindex.py::test_multiindex_assign_alignment_with_object_dtype",
+        "external_deps": "none",
+        "budget": {"timeout_s": 1200, "mem_gb": 4}
+      },
+      "pairing_constraints": {"domain": "data-analysis", "min_capability": "expert"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "BUG: fix regression in DataFrame setitem with MultiIndex columns being a silent no-op with object-dtype level",
+        "source": "https://github.com/pandas-dev/pandas/pull/66051"
+      }
+    },
+    {
+      "id": "seed-matplotlib-31932",
+      "source": {
+        "type": "merged_fix_pr",
+        "repo": "matplotlib/matplotlib",
+        "issue_url": "https://github.com/matplotlib/matplotlib/pull/31932",
+        "fix_ref": "https://github.com/matplotlib/matplotlib/pull/31932 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "get_tightbbox does not include the axis labels when for_layout_only is False, so saved/tight figures clip long axis labels. Include the axis labels in that case.",
+        "context": "Axes with a long xlabel/ylabel; call ax.get_tightbbox(for_layout_only=False); label extent should be inside the bbox."
+      },
+      "domain": "data-viz",
+      "capability_probed": ["correctness-edgecase"],
+      "difficulty": "medium",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "lib/matplotlib/tests/test_axes.py::test_tightbbox_includes_long_label (FAIL@parent -> PASS@fix)",
+        "reference_solution": "PR#31932: include axis labels in get_tightbbox when not for_layout_only (Axes._base)",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "medium",
+        "base_image": "python:3.11",
+        "repo_at": "47c6307803cbee54e49e75018f3bda377e4a9dcc",
+        "setup": ["pip install -e '.[dev]'"],
+        "test_cmd": "pytest lib/matplotlib/tests/test_axes.py::test_tightbbox_includes_long_label",
+        "external_deps": "none",
+        "budget": {"timeout_s": 1200, "mem_gb": 4}
+      },
+      "pairing_constraints": {"domain": "data-viz", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "FIX: include axis labels in get_tightbbox when not for_layout_only",
+        "source": "https://github.com/matplotlib/matplotlib/pull/31932"
+      }
+    },
+    {
+      "id": "seed-matplotlib-31943",
+      "source": {
+        "type": "merged_fix_pr",
+        "repo": "matplotlib/matplotlib",
+        "issue_url": "https://github.com/matplotlib/matplotlib/pull/31943",
+        "fix_ref": "https://github.com/matplotlib/matplotlib/pull/31943 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "LinearSegmentedColormap.from_list rejects a values list that has repeated (non-strictly-increasing) entries, but repeated values should be allowed. Relax the check to allow non-strict monotonicity.",
+        "context": "LinearSegmentedColormap.from_list(name, colors, N, values=[...]) where values contains a repeated boundary."
+      },
+      "domain": "data-viz",
+      "capability_probed": ["correctness-edgecase", "scope-discipline"],
+      "difficulty": "easy",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "lib/matplotlib/tests/test_colors.py::test_LinearSegmentedColormap_from_list_repeat_values (FAIL@parent -> PASS@fix)",
+        "reference_solution": "PR#31943: allow non-strict monotonicity in LinearSegmentedColormap.from_list values (colors.py)",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "medium",
+        "base_image": "python:3.11",
+        "repo_at": "1cba20781634880c7b1327fb54033d9d71c6aeb2",
+        "setup": ["pip install -e '.[dev]'"],
+        "test_cmd": "pytest lib/matplotlib/tests/test_colors.py::test_LinearSegmentedColormap_from_list_repeat_values",
+        "external_deps": "none",
+        "budget": {"timeout_s": 1200, "mem_gb": 4}
+      },
+      "pairing_constraints": {"domain": "data-viz", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "FIX: allow non-strict monotonicity in LinearSegmented.from_list values",
+        "source": "https://github.com/matplotlib/matplotlib/pull/31943"
+      }
+    },
+    {
+      "id": "seed-pydantic-13287",
+      "source": {
+        "type": "closed_issue+fix_pr",
+        "repo": "pydantic/pydantic",
+        "issue_url": "https://github.com/pydantic/pydantic/issues/13287",
+        "fix_ref": "https://github.com/pydantic/pydantic/pull/13363 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "In the experimental pipeline API, nested/composed operators are not applied correctly. Fix so that nested composition (and nested composition with transform) behaves as expected.",
+        "context": "pydantic.experimental.pipeline with nested operator composition."
+      },
+      "domain": "dev-tooling",
+      "capability_probed": ["correctness-edgecase"],
+      "difficulty": "medium",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "tests/test_pipeline.py::test_nested_composition and ::test_nested_composition_transform (FAIL@parent -> PASS@fix)",
+        "reference_solution": "PR#13363: fix application of nested operators in pipeline API (experimental/pipeline.py)",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "medium",
+        "base_image": "python:3.11",
+        "repo_at": "8e168dee8afa69f00c775bdf535b25c3287667b1",
+        "setup": ["pip install -e '.[dev]'"],
+        "test_cmd": "pytest tests/test_pipeline.py::test_nested_composition tests/test_pipeline.py::test_nested_composition_transform",
+        "external_deps": "none",
+        "budget": {"timeout_s": 600, "mem_gb": 4}
+      },
+      "pairing_constraints": {"domain": "dev-tooling", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "Fix application of nested operators in pipeline API",
+        "source": "https://github.com/pydantic/pydantic/pull/13363"
+      }
+    },
+    {
+      "id": "seed-django-37191",
+      "source": {
+        "type": "closed_issue+fix_pr",
+        "repo": "django/django",
+        "issue_url": "https://code.djangoproject.com/ticket/37191",
+        "fix_ref": "https://github.com/django/django/pull/21558 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "FileBasedCache.touch() raises `ValueError: I/O operation on closed file` when called on an expired cache key. Prevent the crash.",
+        "context": "Django file-based cache backend; call cache.touch(key) on a key whose timeout has already elapsed."
+      },
+      "domain": "web-backend",
+      "capability_probed": ["correctness-edgecase", "error-recovery"],
+      "difficulty": "medium",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "cache.tests.FileBasedCacheTests.test_touch_expired_key_does_not_crash (FAIL@parent -> PASS@fix)",
+        "reference_solution": "PR#21558: in FileBasedCache.touch, _is_expired(f) closes the fd on timeout, so the finally block must not blindly operate on the closed file",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "easy",
+        "base_image": "python:3.11",
+        "repo_at": "99672c672a1537aeb0d1fd5911ca6f04154cc091",
+        "setup": ["pip install -e ."],
+        "test_cmd": "python tests/runtests.py cache.FileBasedCacheTests.test_touch_expired_key_does_not_crash",
+        "external_deps": "none",
+        "budget": {"timeout_s": 600, "mem_gb": 4}
+      },
+      "pairing_constraints": {"domain": "web-backend", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "This PR fixes a bug where `FileBasedCache.touch()` raises a `ValueError: I/O operation on closed file` when called on an expired cache key.",
+        "source": "https://github.com/django/django/pull/21558"
+      }
+    },
+    {
+      "id": "seed-rich-3577",
+      "source": {
+        "type": "closed_issue+fix_pr",
+        "repo": "Textualize/rich",
+        "issue_url": "https://github.com/Textualize/rich/issues/3577",
+        "fix_ref": "https://github.com/Textualize/rich/pull/4076 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "Decoding ANSI text through rich drops/collapses newlines instead of preserving them. Fix the ANSI decoder to preserve newlines.",
+        "context": "rich.ansi decoding of a string that contains embedded newlines."
+      },
+      "domain": "dev-tooling",
+      "capability_probed": ["correctness-edgecase"],
+      "difficulty": "easy",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "tests/test_ansi.py::test_decode_newlines (FAIL@parent -> PASS@fix)",
+        "reference_solution": "PR#4076: preserve newlines in rich/ansi.py decode",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "easy",
+        "base_image": "python:3.11",
+        "repo_at": "9cb198944f8184df92217efc8b20d3fffa4b4fa0",
+        "setup": ["pip install -e '.[dev]'"],
+        "test_cmd": "pytest tests/test_ansi.py::test_decode_newlines",
+        "external_deps": "none",
+        "budget": {"timeout_s": 300, "mem_gb": 2}
+      },
+      "pairing_constraints": {"domain": "dev-tooling", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "preserve newlines",
+        "source": "https://github.com/Textualize/rich/pull/4076"
+      }
+    },
+    {
+      "id": "seed-rich-4041",
+      "source": {
+        "type": "closed_issue+fix_pr",
+        "repo": "Textualize/rich",
+        "issue_url": "https://github.com/Textualize/rich/issues/4041",
+        "fix_ref": "https://github.com/Textualize/rich/pull/4077 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "rich's FileProxy wrapper does not proxy isatty() to the underlying file, so code that checks isatty() misbehaves. Make FileProxy proxy isatty.",
+        "context": "rich.file_proxy.FileProxy wrapping sys.stdout; caller invokes proxy.isatty()."
+      },
+      "domain": "dev-tooling",
+      "capability_probed": ["correctness-edgecase"],
+      "difficulty": "easy",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "tests/test_file_proxy.py::test_isatty (FAIL@parent -> PASS@fix)",
+        "reference_solution": "PR#4077: proxy isatty in rich/file_proxy.py",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "easy",
+        "base_image": "python:3.11",
+        "repo_at": "58ac15120fe254886c10d6253667733c83604cb4",
+        "setup": ["pip install -e '.[dev]'"],
+        "test_cmd": "pytest tests/test_file_proxy.py::test_isatty",
+        "external_deps": "none",
+        "budget": {"timeout_s": 300, "mem_gb": 2}
+      },
+      "pairing_constraints": {"domain": "dev-tooling", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "proxy isatty",
+        "source": "https://github.com/Textualize/rich/pull/4077"
+      }
+    },
+    {
+      "id": "seed-click-336",
+      "source": {
+        "type": "closed_issue+fix_pr",
+        "repo": "pallets/click",
+        "issue_url": "https://github.com/pallets/click/issues/336",
+        "fix_ref": "https://github.com/pallets/click/pull/3434 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "HelpFormatter.write_usage emits spurious trailing whitespace/characters in the usage line of --help output. Clean up the usage line so there are no trailing spaces.",
+        "context": "A click Command's --help output; inspect the 'Usage:' line for trailing spurious characters."
+      },
+      "domain": "dev-tooling",
+      "capability_probed": ["correctness-edgecase", "scope-discipline"],
+      "difficulty": "easy",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "tests/test_formatting.py::test_help_formatter_write_usage (and ::test_command_write_usage_no_args) FAIL@parent -> PASS@fix",
+        "reference_solution": "PR#3434: strip spurious trailing spaces in HelpFormatter.write_usage (formatting.py)",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "easy",
+        "base_image": "python:3.11",
+        "repo_at": "63274a79d08fdc5c19220696144489f7144a8547",
+        "setup": ["pip install -e ."],
+        "test_cmd": "pytest tests/test_formatting.py::test_help_formatter_write_usage tests/test_formatting.py::test_command_write_usage_no_args",
+        "external_deps": "none",
+        "budget": {"timeout_s": 300, "mem_gb": 2}
+      },
+      "pairing_constraints": {"domain": "dev-tooling", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "This cleans-up the way the usage line is produce in the help by stripping all spurious trailing spaces produced by various parameters and indention setup.",
+        "source": "https://github.com/pallets/click/pull/3434"
+      }
+    },
+    {
+      "id": "seed-click-2331",
+      "source": {
+        "type": "closed_issue+fix_pr",
+        "repo": "pallets/click",
+        "issue_url": "https://github.com/pallets/click/issues/2331",
+        "fix_ref": "https://github.com/pallets/click/pull/3582 (merged)",
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "@version_option resolves the wrong package version when the import/module name differs from the installed distribution name. Make package_name resolution map the import name to the correct distribution (and error clearly when ambiguous/unknown).",
+        "context": "A click app whose Python module name differs from its PyPI distribution name; @version_option with no explicit package_name."
+      },
+      "domain": "dev-tooling",
+      "capability_probed": ["correctness-edgecase", "error-recovery"],
+      "difficulty": "medium",
+      "scope": "single-file",
+      "autonomy_required": "collaborative",
+      "oracle": {
+        "tier": "executable-test",
+        "spec": "tests/test_basic.py::test_version_option_resolves_import_name_to_distribution (+ _ambiguous_import_name_errors, _unknown_package_errors) FAIL@parent -> PASS@fix",
+        "reference_solution": "PR#3582: fix package_name resolution when module differs from distribution name (decorators.py)",
+        "confidence": "high"
+      },
+      "env": {
+        "reproducible": "easy",
+        "base_image": "python:3.11",
+        "repo_at": "916883afad450c0c9bbc4212817900949131adbd",
+        "setup": ["pip install -e ."],
+        "test_cmd": "pytest tests/test_basic.py::test_version_option_resolves_import_name_to_distribution tests/test_basic.py::test_version_option_ambiguous_import_name_errors tests/test_basic.py::test_version_option_unknown_package_errors",
+        "external_deps": "none",
+        "budget": {"timeout_s": 300, "mem_gb": 2}
+      },
+      "pairing_constraints": {"domain": "dev-tooling", "min_capability": "competent"},
+      "gates": {"oracle_gate": "pass", "harbor_repro_gate": "pass"},
+      "provenance": {
+        "resolution_quote": "Fix `package_name` resolution when module differs from distribution name",
+        "source": "https://github.com/pallets/click/pull/3582"
+      }
+    }
+  ]
+}
