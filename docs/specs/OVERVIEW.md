@@ -224,6 +224,7 @@
 | 0005 | 0005/T6 | harness 桩与运行入口 | pending | T5 |
 | 0006 | 0006/T1 | Persona 采集（蒸馏，skill 形式） | pending | — |
 | 0006 | 0006/T2 | Persona 注入 sim | pending | T1, 0005/T1 |
+| 0006 | 0006/T3 | 观测型 persona spoke：SO / GitHub 收编（含局限声明） | done | T1 |
 | 0007 | 0007/T1 | 开发者侧直推 main（去 branch/merge） | pending | — |
 | 0007 | 0007/T2 | 编排去 release 链 · 会话级 main SHA 快照回灌 | pending | T1 |
 | 0007 | 0007/T3 | 一次性迁移脚本：main ← release + 清理分支 | pending | — |
@@ -282,6 +283,7 @@ graph LR
     subgraph G0006[0006 persona-pipeline]
         n0006_T1["T1 Persona 采集（蒸馏，skill 形式）"]
         n0006_T2["T2 Persona 注入 sim"]
+        n0006_T3["T3 观测型 persona spoke：SO / GitHub 收编（含局限声明）"]
     end
     subgraph G0007[0007 dev-trunk-main]
         n0007_T1["T1 开发者侧直推 main（去 branch/merge）"]
@@ -347,6 +349,7 @@ graph LR
     n0005_T6 --> n0005_T5
     n0006_T2 --> n0006_T1
     n0006_T2 --> n0005_T1
+    n0006_T3 --> n0006_T1
     n0007_T2 --> n0007_T1
     n0007_T4 --> n0007_T1
     n0007_T4 --> n0007_T2
@@ -366,6 +369,7 @@ graph LR
     n0006_T1 -.note.-> n0005_T1
     n0006_T2 -.extends.-> n0005_T1
     n0006_T2 -.note.-> n0005_T5
+    n0006_T3 -.note.-> n0006_T2
     n0008_T1 -.extends.-> n0001_T1
     n0008_T1 -.note.-> n0005_T5
     n0008_T1 -.note.-> n0003_T1
@@ -562,11 +566,21 @@ frontend/
     main.tsx                            ← 0011/T1
 tools/
   persona-distill/
+    extract-github-persona/
+      recruitment/
+        domains.md                      ← 0006/T3
+        swe-bench.md                    ← 0006/T3
+        terminal-bench.md               ← 0006/T3
+      SKILL.md                          ← 0006/T3
+      reference.md                      ← 0006/T3
     extract-selfreport-persona/
       recruitment/
         seeds.md                        ← 0006/T1
       SKILL.md                          ← 0006/T1
       reference.md                      ← 0006/T1
+    extract-stackoverflow-persona/
+      SKILL.md                          ← 0006/T3
+      reference.md                      ← 0006/T3
     card-schema.md                      ← 0006/T1
   seed-distill/
     extract-harness-seed/
@@ -884,12 +898,32 @@ reference 例 C 已写明（card_to_persona），并要求 0005/T1 把 finalize_
 
 - **T1 Persona 采集（蒸馏，skill 形式）**（pending） — 采集（蒸馏）侧按**轮辐式**组织，不另造大 skill：① 唯一公共契约 card-schema.md（source-agnostic）—— 6 维行为卡 schema（D1–D6 + authenticity + era + provenance）+ 维度枚举 + D5.area 受控词表 + 注入分布 + 双向真实性门原则，采既有 selfreport skill 的最新约定（每维 source+basis+confidence、provenance 并集、value 键）； ② 薄抽取 skill extract-selfreport-persona——只描述「从第一人称自述（博客/访谈/演讲/推文长贴）提取 + ground 哪几维」，只引用契约、不依赖任何其它 skill。
 - **T2 Persona 注入 sim**（pending） — 把采集到的 persona 卡（0006/T1 6 维行为卡）注入控制信封 sim：card_to_persona 将一条卡映射为 sim 的 dimensions.Persona —— 卡里 grounded 的轴直接透传，finalize_persona 仅填卡未 ground 的派生维度（即 「覆盖派生」：grounded 的验收/信任/授权不被 derive_* 改写）。
+- **T3 观测型 persona spoke：SO / GitHub 收编（含局限声明）**（done） — 兑现 0006「cc/so/未来源作同契约的后续薄 skill 插入」的规划：把两个既有的**观测型**抽取方法 （此前写在 NexAU 仓库里、非 NexAU 自身方法）改造后作为扩充 spoke 收编进 tools/persona-distill/， 与 T1 的 extract-selfreport-persona 并列、只依赖公共契约 card-schema.md。
 
 ```mermaid
 graph LR
     nT1["T1 Persona 采集（蒸馏，skill 形式）"]
     nT2["T2 Persona 注入 sim"]
+    nT3["T3 观测型 persona spoke：SO / GitHub 收编（含局限声明）"]
     nT1 --> nT2
+    nT1 --> nT3
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_4["T1 v4"]
+    v_T2_3["T2 v3"]
+    v_T3_1["T3 v1"]
+    v_T3_2["T3 v2"]
+    v_T3_1 -->|redefined| v_T3_2
+    classDef st_done fill:#b7e4c7;
+    classDef st_pending fill:#eeeeee;
+    class v_T1_4 st_pending;
+    class v_T2_3 st_pending;
+    class v_T3_1 st_pending;
+    class v_T3_2 st_done;
 ```
 
 ### 0007 开发者侧改为纯 trunk(main) 自进化（issue #12）

@@ -45,13 +45,16 @@ reference 例 C 已写明（card_to_persona），并要求 0005/T1 把 finalize_
 graph LR
     nT1["T1 Persona 采集（蒸馏，skill 形式）"]
     nT2["T2 Persona 注入 sim"]
+    nT3["T3 观测型 persona spoke：SO / GitHub 收编（含局限声明）"]
     nT1 --> nT2
+    nT1 --> nT3
 ```
 
 | 任务 | 标题 | 优先级 | 状态 | 依赖 |
 |----|----|----|----|----|
 | T1 | Persona 采集（蒸馏，skill 形式） | P1 | pending | — |
 | T2 | Persona 注入 sim | P1 | pending | T1, 0005/T1 |
+| T3 | 观测型 persona spoke：SO / GitHub 收编（含局限声明） | P1 | done | T1 |
 
 ## 各任务方案
 
@@ -236,3 +239,130 @@ derive_d3(expert)=rigorous，否则真实人物被模拟成其反面。spec-0005
 - 依赖 0005/T1 把 finalize_persona 降为 fallback-only（本组同改）；若未就绪则覆盖派生无法生效。
 - 6 维卡 → 9 维枚举映射表细则随 0006/T1 最终 schema 收敛；sim D6Authz 作注入轴的派生规则待定。
 - 若后续卡 schema 与 sim 维度并轨（共用一套 Persona），本注入层可退化为薄校验或被移除。
+
+### T3 · 观测型 persona spoke：SO / GitHub 收编（含局限声明）（P1 / done）
+
+**涉及文件**
+
+- `tools/persona-distill/extract-stackoverflow-persona/SKILL.md`
+- `tools/persona-distill/extract-stackoverflow-persona/reference.md`
+- `tools/persona-distill/extract-github-persona/SKILL.md`
+- `tools/persona-distill/extract-github-persona/reference.md`
+- `tools/persona-distill/extract-github-persona/recruitment/domains.md`
+- `tools/persona-distill/extract-github-persona/recruitment/swe-bench.md`
+- `tools/persona-distill/extract-github-persona/recruitment/terminal-bench.md`
+
+**做什么**
+
+兑现 0006「cc/so/未来源作同契约的后续薄 skill 插入」的规划：把两个既有的**观测型**抽取方法
+（此前写在 NexAU 仓库里、非 NexAU 自身方法）改造后作为扩充 spoke 收编进 tools/persona-distill/，
+与 T1 的 extract-selfreport-persona 并列、只依赖公共契约 card-schema.md。三项改造：① 收敛为薄 spoke
+（schema/枚举/D5 词表/注入分布/真实性门一律改引契约，删除 spoke→spoke 反向引用与自带整套 schema——
+这是 0006 点名的漂移根因）；② 每维封套补 basis（观测型源 grounded 值为 observed，区分转录事实 vs 评审
+判断）；③ 态度轴政策按内容评审收紧：观测型源观测不到态度，故 D4 信任、缺一手证据的 D2 验收默认降
+injected（与 selfreport「唯一能 ground D4」立场对齐），SO 的 D1 由单帖+reputation 弱信号降 medium；
+D1（能力）/D5（领域·栈）保留 grounded。并改名对齐 extract-<source>-persona 约定。
+
+**为什么**
+
+0006 总览与 T1 已规划「轮辐式 + 多源薄 skill」，且 T1 明确将 cc/so 列为「同契约的后续薄 skill 插入」；
+本 task 是其兑现。收编而非重写：两个观测型方法已沉淀「证据或弃 / trace-floor 真实性门 / 维度正交」，
+重写必失真。更关键是修复 0006 点名的漂移根因——这两个 skill 现状把公共 schema 只写在 cc、so 反向引用 cc
+（spoke→spoke 依赖），basis/provenance 在三者间漂移。轮辐式把公共部分收敛到唯一契约、各 spoke 只依赖
+契约且彼此独立，加新来源只是新增一个薄 spoke。同时按内容评审收紧态度轴：观测型源可靠观测到的只有
+能力与领域，把信任/验收/自主从外部行为反推是脆弱外推，须显式降 injected 并在文档记录质量边界，避免
+单卡被误当真人「态度」锚使用而污染训练信号真实性。
+
+**范围**
+
+改造并实现两个**观测型** spoke（照 T1 的 extract-selfreport-persona 结构），本 task 范围：
+① extract-github-persona（源 extract-cc-user-persona；真实来源是 GitHub 足迹 repos/issues/PRs）——含
+SKILL.md + reference.md + recruitment/（domains.md 域登记 + swe-bench.md + terminal-bench.md）；
+② extract-stackoverflow-persona（源 extract-so-user-persona；Stack Overflow API）——含 SKILL.md +
+reference.md。三项改造：引契约去 spoke→spoke、补 basis、态度轴降 injected（SO 的 D1 降 medium）。
+两个 spoke 各写「局限与缺陷」段，显著记录观测型方法内容质量边界。**不改** card-schema.md（契约，归 T1）、
+不改 extract-selfreport-persona/（归 T1）、不改 backend 代码（library.py/validate_card/persona_io.py 归 T1/T2）、
+不改动 NexAU 原件（vendored 改造版进本仓）。库侧硬门（basis 强制 / 观测源态度轴强制 injected）本 task 不做，
+见 open-questions。
+
+**整体设计**
+
+- 轮辐式扩充（tools/persona-distill/）：
+    card-schema.md                     唯一公共契约（hub，归 T1）
+    extract-selfreport-persona/        自述型 spoke（归 T1，grounds 态度轴 D2/D3/D4/D6）
+    extract-github-persona/            观测型 spoke（本 task，grounds D1/D5）
+    extract-stackoverflow-persona/     观测型 spoke（本 task，grounds D1/D5 低端）
+  铁律：spoke 只依赖契约，彼此不依赖 schema。三源互补——观测型 ground 能力/领域，自述型 ground 态度；
+  每轴至少被一个源观测或自述 ground，且 self-report 是唯一能 ground 信任轴 D4 的。
+- 改名（对齐 extract-<source>-persona，去含糊的 -user-）：
+    extract-cc-user-persona → extract-github-persona（"cc" 指驱动的 Claude Code/Codex harness，非来源；
+      真实来源是 GitHub 足迹，故按来源定名 github）
+    extract-so-user-persona → extract-stackoverflow-persona（来源 Stack Overflow）
+- 三项改造：
+    ① 引契约去 skill→skill：枚举/D5 词表/注入分布/卡形状/真实性裁决词表一律改引 ../card-schema.md；
+       删除 CC 自带的整套 6 维 schema 表与 SO→CC 的反向 schema 引用（漂移根因）。
+    ② 补 basis：每个 grounded 维封套补 basis（观测型 grounded 值 observed；罕见一手陈述 stated）；
+       injected 维不带 basis（basis 只描述已 ground 值的取证方式）。
+    ③ 态度轴政策（依据内容评审）：
+       · GitHub：D4 信任、缺一手证据的 D2 验收默认降 injected，仅有一手信任/验收陈述才 grounded；
+         改掉「从 CVE 卫生/auto-merge 推 D4 grounded」的写法；D1/D5 保留 grounded(observed)。
+       · SO：D4 保持默认 injected；D1 由单帖+reputation 弱信号封顶 medium（不再 blind@high）；补 basis；
+         D1/D5 保留 grounded(observed)，delegation 从问题文本弱观测。
+- 局限与缺陷段（每个 spoke 必写，显著位置）：只有 D1×D5 由一手观测可靠支撑；态度轴 D2/D3/D4/D6 在观测型
+  源里是注入先验/外推，单卡不忠于真人态度；来源偏差（SO 偏卡住来问者/幸存者自选择，GitHub 偏公开活跃）；
+  推断跨度大不可靠故降 injected；使用边界（适合铺 D1×D5 覆盖网格，态度轴真人锚须来自 selfreport）。
+- recruitment 多源 profile（swe-bench/terminal-bench + domains.md）随 github spoke 落地，SO spoke 引用其
+  pools.stackoverflow；这是共享招募数据（决定看谁），非 schema 契约，不构成 schema 漂移。
+
+**接口**
+
+两个 spoke 均产出 card-schema.md 定义的同一卡形状（6 维 + authenticity + era + provenance），
+可被 0006/T1 PersonaLibrary.validate_card 校验、被 0006/T2 card_to_persona 消费。本 task 不引入新代码接口。
+
+**取舍**
+
+- 收编改造 vs 重写：选收编。观测型方法已沉淀 trace-floor 真实性门/维度正交/证据或弃，重写必失真。
+- 态度轴降 injected vs 保留从行为反推 grounded：选降 injected。从 CVE 卫生/auto-merge/rep 反推信任/验收
+  是脆弱外推，会把合成态度当真人态度污染训练信号；代价是观测型卡的态度轴几乎全 injected（这正确反映
+  「观测型源观测不到态度」的事实），真人态度锚交给 selfreport。
+- recruitment profile 放 github spoke 供 SO 引用 vs 各自复制：选前者。profile 天然多源（一份同列 github repos
+  与 SO tags），复制会引入多副本漂移；跨 spoke 只剩这一处共享招募数据引用，且非 schema 契约。
+- 本 task 只做文档/skill 收编、不加库侧硬门：选先文档。硬门（basis 强制、观测源态度轴强制 injected）属库侧
+  加固，改 validate_card，风险与范围更大，归后续（open-questions）。
+
+**验收标准**
+
+两个 spoke 落在 tools/persona-distill/ 下、结构对齐 extract-selfreport-persona，只引用 ../card-schema.md、
+无 spoke→spoke 的 schema 反向引用、无自带整套 schema、无悬空引用；每个 grounded 维封套带 basis（观测型为
+observed），injected 维不带 basis 且 confidence=low；GitHub spoke 的 D4/无一手证据 D2 默认 injected、
+D1/D5 grounded；SO spoke 的 D1 grounded 封顶 medium、D4 默认 injected、D1/D5 grounded；两个 spoke 各含
+显著的「局限与缺陷」段（记录 D1×D5 可靠、态度轴注入/外推、来源偏差、使用边界）；两个 spoke 的
+worked-example 卡过 PersonaLibrary.validate_card 且可被 card_to_persona 消费；改名对齐 extract-<source>-persona。
+
+**测试**
+
+验证（本 task 为 doc/skill 收编，验证以「制品可被现有消费侧消费」为准，不新增库侧代码/测试）：
+- 两个 spoke 的 worked-example 卡（github 例 A、stackoverflow 例 A）实跑 PersonaLibrary.validate_card 通过、
+  card_to_persona 产出可用 Persona（grounded 轴透传、injected 态度轴交 finalize 派生）。
+- 静态核验：spoke 内无 spoke→spoke 的 schema 反向引用、无自带 schema 表；grounded 维均带 basis；
+  D5.area ∈ card-schema.md 受控词表。
+- spec validate 无 error、spec render 无 drift。
+
+**参考**
+
+兑现 0006 总览与 0006/T1 规划的「cc/so/未来源作同契约的后续薄 skill 插入」。公共契约
+tools/persona-distill/card-schema.md（6 维卡 + 枚举 + D5 词表 + 注入分布 + 真实性门 + basis 四元 +
+铁律 grounded 须有 evidence_quote / injected confidence=low）；模板 spoke
+tools/persona-distill/extract-selfreport-persona/（结构与文风）。源方法（此前写在 NexAU 仓库，非 NexAU 自身；
+vendored 改造版进本仓，不改动原件）：extract-cc-user-persona（GitHub 足迹 L0–L5）、
+extract-so-user-persona（Stack Overflow API）。消费侧（确认可消费，不改）：
+backend/auto_designer/distill/library.py（PersonaLibrary/validate_card）、
+backend/auto_designer/user/sim/persona_io.py（card_to_persona，0006/T2）。
+
+**待解问题**
+
+- 是否给契约补库侧硬门（basis 字段强制校验 / 观测型源态度轴强制 injected 的加固）？本 task 明确不做
+  （用户暂不做库侧硬门），归后续；届时改 card-schema.md 契约 + validate_card（属 T1 文件）。
+- recruitment profile 的跨 spoke 共享（SO 引用 github spoke 的 pools.stackoverflow）是否进一步抽到中立位置，
+  以彻底消除仅剩的这一处 spoke→spoke 引用？当前判定：招募数据天然多源、非 schema 契约，暂保留。
+- 是否把这些 skill 的源仓（NexAU 仓库，仅是它们此前的存放处）也重构为轮辐式？属改其源仓、另一件事。
