@@ -156,6 +156,29 @@ a:hover { text-decoration: underline; }
 .drawer section { margin-top: 14px; }
 .drawer h4 { margin: 0 0 6px; font-size: 13px; color: var(--accent); }
 
+/* ---- 用户 Persona（可收起） ---- */
+.persona {
+  border: 1px solid var(--line); border-radius: 10px; background: #f6f8fa;
+  padding: 0 12px; margin-bottom: 10px;
+}
+.persona > summary {
+  display: flex; align-items: baseline; gap: 8px; cursor: pointer; list-style: none;
+  padding: 10px 0; font-size: 13px; user-select: none;
+}
+.persona > summary::-webkit-details-marker { display: none; }
+.persona > summary::before {
+  content: "▸"; color: var(--muted); font-size: 11px; transition: transform 0.15s;
+}
+.persona[open] > summary::before { transform: rotate(90deg); }
+.persona-title { font-weight: 700; color: var(--accent); }
+.persona-sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.persona-grid {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0;
+  padding: 0 0 12px; font-size: 13px;
+}
+.persona-grid dt { color: var(--muted); font-weight: 700; white-space: nowrap; }
+.persona-grid dd { margin: 0; }
+
 /* ---- 对话气泡 / 细节 / 体感 ---- */
 .bubble { max-width: 92%; padding: 8px 12px; border-radius: 12px; margin: 6px 0; white-space: pre-wrap; font-size: 13px; }
 .bubble.user { background: #eaf2ff; margin-left: auto; }

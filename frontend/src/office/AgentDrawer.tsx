@@ -72,6 +72,27 @@ export function AgentDrawer({
 
       <div className="drawer-status">{agent.status}</div>
 
+      {session && (
+        <details className="persona" open>
+          <summary>
+            <span className="persona-title">用户 Persona</span>
+            <span className="persona-sub">{session.persona.identity}</span>
+          </summary>
+          <dl className="persona-grid">
+            <dt>身份</dt>
+            <dd>{session.persona.identity}</dd>
+            <dt>水平</dt>
+            <dd>{session.persona.level}</dd>
+            <dt>领域</dt>
+            <dd>{session.persona.domain}</dd>
+            <dt>目标</dt>
+            <dd>{session.persona.goal}</dd>
+            <dt>说话风格</dt>
+            <dd>{session.persona.speaking_style}</dd>
+          </dl>
+        </details>
+      )}
+
       {fullTurns && fullTurns.length > 0 ? (
         <section>
           <h4>完整对话记录（{fullTurns.length} 轮）</h4>
