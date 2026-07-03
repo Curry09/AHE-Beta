@@ -17,6 +17,12 @@ const TITLE_H = 58; // 房间标题区高度（座位从其下开始排）
 const SEAT_PAD_X = 26; // 座位区左右内边距
 const SEAT_PAD_BOTTOM = 60; // 底部留白：给最下排座位南侧的办公桌（48px 高桌面）留出空间
 
+// 工位网格间距：按房间尺寸铺满工位（比容量多的留空），办公室不显得空旷。
+const DESK_PITCH_X = 116; // 一列工位（96px 桌面 + 间隙）所需宽度
+const DESK_PITCH_Y = 150; // 一行工位（小人 + 桌面 + 间隙）所需高度
+const DESK_MAX_COLS = 4;
+const DESK_MAX_ROWS = 3;
+
 export type Room = "user" | "designer" | "developer";
 
 const ROOMS: Room[] = ["user", "designer", "developer"];
@@ -55,7 +61,8 @@ export function roomHeadline(def: RoomDef): string {
 // ── 实体墙 + 门几何（B 档）──────────────────────────────────
 // 每个房间四面实体墙围合，底墙居中留一道门（缺口）。墙既用于绘制，也用于生成物理碰撞体，
 // 让 boss（玩家）无法穿墙、只能从门进出，达成「严格分房间」。门朝下：boss 出生在房间带下方。
-export const WALL_THICK = 12; // 墙厚（像素）
+export const WALL_THICK = 12; // 墙帽厚（像素）——顶视角下墙的「顶面」
+export const WALL_FACE_H = 48; // 顶墙内侧白墙面高度（agent-town/LimeZu 风格：墙帽下露一段墙面）
 export const DOOR_W = 76; // 门洞宽（像素）
 
 export interface Rect {
@@ -66,25 +73,31 @@ export interface Rect {
 }
 
 export interface RoomWalls {
-  /** 四面墙的实心段（底墙被门洞切成左右两段）——绘制与碰撞共用。 */
+  /** 四面墙的实心段（底墙被门洞切成左右两段）——墙帽绘制与碰撞共用（顶墙含墙面高度）。 */
   walls: Rect[];
+  /** 顶墙内侧白墙面（视觉层，含在顶墙碰撞体内）——挂牌/黑板等挂墙物挂在这上面。 */
+  face: Rect;
   /** 门洞（底墙缺口）——绘制门槛用，无碰撞。 */
   door: Rect;
 }
 
-/** 由房间矩形算出四面墙段 + 底墙居中门洞。 */
+/** 由房间矩形算出四面墙段 + 顶墙白墙面 + 底墙居中门洞。 */
 export function roomWalls(def: RoomDef): RoomWalls {
   const t = WALL_THICK;
   const { x, y, w, h } = def;
   const doorX = x + (w - DOOR_W) / 2;
   const walls: Rect[] = [
-    { x, y, w, h: t }, // 顶墙
+    { x, y, w, h: t + WALL_FACE_H }, // 顶墙（帽 + 白墙面，一体碰撞：小人不可站上墙面）
     { x, y, w: t, h }, // 左墙
     { x: x + w - t, y, w: t, h }, // 右墙
     { x, y: y + h - t, w: (w - DOOR_W) / 2, h: t }, // 底墙·左段
     { x: doorX + DOOR_W, y: y + h - t, w: (w - DOOR_W) / 2, h: t }, // 底墙·右段
   ];
-  return { walls, door: { x: doorX, y: y + h - t, w: DOOR_W, h: t } };
+  return {
+    walls,
+    face: { x: x + t, y: y + t, w: w - t * 2, h: WALL_FACE_H },
+    door: { x: doorX, y: y + h - t, w: DOOR_W, h: t },
+  };
 }
 
 /** 按 roster 权重把房间带横向切成三块矩形（宽度∝容量，至少占 1 份）。 */
@@ -106,17 +119,21 @@ function roomRects(roster: Roster): Record<Room, { x: number; w: number }> {
   return rects;
 }
 
-/** 在房间座位区内按网格排 n 个座位坐标（≤3 容量用单/双列，容量大时自适应列数）。 */
-function seatGrid(rect: RoomDef, n: number): { x: number; y: number }[] {
-  if (n <= 0) return [];
-  const cols = n === 1 ? 1 : Math.min(n <= 4 ? 2 : 3, n);
-  const rows = Math.ceil(n / cols);
+/** 按房间尺寸铺工位网格（至少放得下 minSlots 个），行优先返回全部工位坐标。 */
+function deskGrid(rect: RoomDef, minSlots: number): { x: number; y: number }[] {
   const innerX = rect.x + SEAT_PAD_X;
   const innerW = rect.w - SEAT_PAD_X * 2;
   const innerY = rect.y + TITLE_H;
   const innerH = rect.h - TITLE_H - SEAT_PAD_BOTTOM;
+  let cols = Math.max(1, Math.min(DESK_MAX_COLS, Math.floor(innerW / DESK_PITCH_X)));
+  let rows = Math.max(1, Math.min(DESK_MAX_ROWS, Math.floor(innerH / DESK_PITCH_Y)));
+  // 容量超出网格时扩列/扩行兜底（退化为按容量均分，间距变密）。
+  while (cols * rows < minSlots) {
+    if (cols <= rows) cols += 1;
+    else rows += 1;
+  }
   const out: { x: number; y: number }[] = [];
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < cols * rows; i++) {
     const c = i % cols;
     const r = Math.floor(i / cols);
     const x = innerX + innerW * ((c + 0.5) / cols);
@@ -126,10 +143,19 @@ function seatGrid(rect: RoomDef, n: number): { x: number; y: number }[] {
   return out;
 }
 
+/** 无人坐的空工位（桌子+椅子照摆，人来即坐）。 */
+export interface DeskSpot {
+  room: Room;
+  x: number;
+  y: number;
+}
+
 export interface LayoutResult {
   rooms: RoomDef[];
   seatDefs: SeatDef[];
   seats: SeatState[];
+  /** 容量之外的空工位（仅绘制家具，不参与座位分配）。 */
+  extraDesks: DeskSpot[];
   /** seatId -> agent（点击小人查回是哪个 agent）。 */
   seatAgents: Map<string, Agent>;
 }
@@ -154,6 +180,7 @@ export function computeLayout(roster: Roster, agents: Agent[]): LayoutResult {
   const rooms: RoomDef[] = [];
   const seatDefs: SeatDef[] = [];
   const seats: SeatState[] = [];
+  const extraDesks: DeskSpot[] = [];
   const seatAgents = new Map<string, Agent>();
 
   let seatIndex = 0;
@@ -174,7 +201,11 @@ export function computeLayout(roster: Roster, agents: Agent[]): LayoutResult {
     };
     rooms.push(def);
 
-    const positions = seatGrid(def, capacity);
+    // 工位网格铺满房间：前 capacity 个是座位（行优先，先坐前排），其余留作空工位。
+    const positions = deskGrid(def, capacity);
+    for (const pos of positions.slice(capacity)) {
+      extraDesks.push({ room, x: pos.x, y: pos.y });
+    }
     for (let i = 0; i < capacity; i++) {
       const seatId = `${room}-${i}`;
       const pos = positions[i];
@@ -200,5 +231,5 @@ export function computeLayout(roster: Roster, agents: Agent[]): LayoutResult {
     }
   }
 
-  return { rooms, seatDefs, seats, seatAgents };
+  return { rooms, seatDefs, seats, extraDesks, seatAgents };
 }

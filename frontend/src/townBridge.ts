@@ -11,5 +11,5 @@ export function buildLayout(roster: Roster, agents: Agent[]): LayoutResult {
 
 /** 把房间布局推给场景（OfficeScene 据此重绘房间、增删小人）。 */
 export function pushLayout(layout: LayoutResult) {
-  gameEvents.emit("rooms-updated", layout.rooms, layout.seatDefs, layout.seats);
+  gameEvents.emit("rooms-updated", layout.rooms, layout.seatDefs, layout.seats, layout.extraDesks);
 }
