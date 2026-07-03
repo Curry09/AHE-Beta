@@ -5,12 +5,10 @@ import { Card } from "./Card";
 // 已完成工作项的 meta 行：按 kind 给出各角色最要紧的一眼信息。
 function historyMeta(item: HistoryItem): ReactNode {
   if (item.kind === "user_session") {
-    return (
-      <>
-        {item.score != null && <span className={`score s${item.score}`}>体感 {item.score}</span>}
-        {item.end_reason && <span>{item.end_reason}</span>}
-      </>
-    );
+    // status 已含结束原因，meta 只留彩色体感分供扫视。
+    return item.score != null ? (
+      <span className={`score s${item.score}`}>体感 {item.score}</span>
+    ) : null;
   }
   if (item.kind === "dev_run") {
     return (

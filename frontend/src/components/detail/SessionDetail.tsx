@@ -81,10 +81,10 @@ export function SessionDetailView(props: {
           <div className="block">
             <div className="block-title">体感评价</div>
             <div className="prose">
-              <span className={`score s${session.feeling.score}`}>
+              <span className={`score s${session.feeling.score}`} style={{ marginRight: 8 }}>
                 {session.feeling.score} / 4
               </span>
-              　{session.feeling.reason}
+              {session.feeling.reason}
             </div>
           </div>
         )}

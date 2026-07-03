@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAgents, getCommits, getHistory, getIssues, getState } from "./api";
 import { AgentColumn } from "./components/AgentColumn";
 import { SidePanel } from "./components/SidePanel";
@@ -14,6 +14,25 @@ const ROLES: { role: AgentRole; name: string }[] = [
   { role: "developer", name: "开发者" },
 ];
 
+// 看板状态 ↔ URL 查询串（?done=1&round=2&sel=issue:7）：刷新/分享不丢上下文。
+function parseSelection(raw: string | null): Selection | null {
+  if (!raw) return null;
+  const [type, ...rest] = raw.split(":");
+  const value = rest.join(":");
+  if (type === "agent" && value) return { type: "agent", agentId: value };
+  if (type === "history" && /^\d+$/.test(value)) return { type: "history", index: Number(value) };
+  if (type === "issue" && /^\d+$/.test(value)) return { type: "issue", number: Number(value) };
+  if (type === "commit" && value) return { type: "commit", sha: value };
+  return null;
+}
+
+function selectionToParam(sel: Selection): string {
+  if (sel.type === "agent") return `agent:${sel.agentId}`;
+  if (sel.type === "history") return `history:${sel.index}`;
+  if (sel.type === "issue") return `issue:${sel.number}`;
+  return `commit:${sel.sha}`;
+}
+
 export default function App() {
   const agents = usePolling(getAgents, POLL_MS);
   const state = usePolling(getState, POLL_MS);
@@ -21,9 +40,25 @@ export default function App() {
   const issues = usePolling(getIssues, POLL_MS);
   const commits = usePolling(getCommits, POLL_MS);
 
-  const [showDone, setShowDone] = useState(false);
-  const [round, setRound] = useState<"all" | number>("all");
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [showDone, setShowDone] = useState(
+    () => new URLSearchParams(location.search).get("done") === "1",
+  );
+  const [round, setRound] = useState<"all" | number>(() => {
+    const raw = new URLSearchParams(location.search).get("round");
+    return raw && /^\d+$/.test(raw) ? Number(raw) : "all";
+  });
+  const [selection, setSelection] = useState<Selection | null>(() =>
+    parseSelection(new URLSearchParams(location.search).get("sel")),
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (showDone) params.set("done", "1");
+    if (round !== "all") params.set("round", String(round));
+    if (selection) params.set("sel", selectionToParam(selection));
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : location.pathname);
+  }, [showDone, round, selection]);
 
   const items = useMemo(() => history?.items ?? [], [history]);
   // 可选轮次 = 归档里出现过的轮 ∪ 当前轮（运行中还没归档也能选）。
