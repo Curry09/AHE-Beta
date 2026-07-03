@@ -31,12 +31,13 @@ class _FakeSession:
         self._handler = handler
         self.calls: list[tuple[str, str, Any]] = []
 
-    def request(self, method: str, url: str, json: Any = None) -> _Resp:
+    def request(self, method: str, url: str, json: Any = None, timeout: float | None = None) -> _Resp:
+        assert timeout is not None, "GiteaTracker 的请求必须带超时（防挂死闭环）"
         self.calls.append((method, url, json))
         return self._handler(method, url, json)
 
-    def post(self, url: str, json: Any = None) -> _Resp:
-        return self.request("POST", url, json)
+    def post(self, url: str, json: Any = None, timeout: float | None = None) -> _Resp:
+        return self.request("POST", url, json, timeout=timeout)
 
 
 class FakeGitea:

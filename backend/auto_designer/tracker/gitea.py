@@ -16,6 +16,9 @@ from auto_designer.models import ISSUE_STATES, IssueDraft, IssueRef, OpenIssue
 # 新建 label 的默认颜色（标签语义集 {bug,feature} 由 T1 预置；此处仅兜底建缺失项）。
 _DEFAULT_LABEL_COLOR = "#ededed"
 
+# 每次 HTTP 请求的硬超时（秒）：无超时的请求一旦挂死会把整条闭环卡住（主线程 poll() 永等）。
+_REQUEST_TIMEOUT = 30
+
 
 class GiteaError(RuntimeError):
     """Gitea 返回非 2xx 或响应不可解析时抛出，携带状态码与端点便于在调用点定位。"""
@@ -151,7 +154,9 @@ class GiteaTracker:
     def _create_label(self, name: str) -> None:
         endpoint = f"/repos/{self._owner}/{self._repo}/labels"
         resp = self._session.post(
-            self._api + endpoint, json={"name": name, "color": _DEFAULT_LABEL_COLOR}
+            self._api + endpoint,
+            json={"name": name, "color": _DEFAULT_LABEL_COLOR},
+            timeout=_REQUEST_TIMEOUT,
         )
         if resp.status_code in (409, 422):  # 竞态：他处已建 → 回退 GET 取既有 id
             self._refresh_label_cache()
@@ -162,7 +167,9 @@ class GiteaTracker:
         self._label_ids[name] = data["id"]
 
     def _request(self, method: str, endpoint: str, json_body: dict[str, Any] | None) -> Any:
-        resp = self._session.request(method, self._api + endpoint, json=json_body)
+        resp = self._session.request(
+            method, self._api + endpoint, json=json_body, timeout=_REQUEST_TIMEOUT
+        )
         return self._ok(resp, endpoint)
 
     def _ok(self, resp: requests.Response, endpoint: str) -> Any:
