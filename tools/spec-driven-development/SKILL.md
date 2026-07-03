@@ -11,18 +11,34 @@ description: >
   Supports multi-agent parallelism via Task DAG + file allocation.
 ---
 
-> **auto-designer 适配说明（vendored from OpenAgents）**
-> - `spec` CLI 未作为 console_script 安装；在本仓用启动器调用：`./tools/spec-driven-development/spec <子命令>`。
-> - CLI 源码 vendored 在 `tools/spec-driven-development/vendor/openagents/spec/`，依赖装在仓库 `.venv`（ruamel.yaml + jsonschema）。
-> - specs 根用 CLI 原生默认 `docs/specs/`（`--specs-root` 仅部分子命令生效，勿依赖）。
-> - 本仓暂无 CI drift-check；`spec render` 后请手动确认 `OVERVIEW.md` 与各组 `summary.md` 已更新再提交。
-> - 下文提到的 `openagents/spec` 包路径、CLAUDE.md「设计理念 5–6」「多 worktree」等为 OpenAgents 语境，本仓按需对照，不强求一致。
+> **auto-designer 适配说明（vendored from OpenAgents，单 markdown 文件形态）**
+> - spec 形态与 OpenAgents 对齐：一个组 = 单文件 `docs/specs/NNNN-slug.md`（frontmatter 结构化源 + rust-RFC 9 段正文）。旧的目录式 `NNNN-slug/{metadata.yaml,tasks/T*.yaml,summary.md}` 与仓级 `glossary.yaml` 已迁移退役——下文 Disk Layout / 正文里凡出现目录式措辞，一律按顶部两个「格式更新」注记块映射为单-md 理解。
+> - `spec` CLI 未作为 console_script 安装；本仓用启动器调用：`./tools/spec-driven-development/spec <子命令>`。源码 vendored 在 `tools/spec-driven-development/vendor/openagents/spec/`（整包同步自 OpenAgents `openagents/spec/`），依赖装在 `.venv`（ruamel.yaml + jsonschema）。
+> - `spec graph` 用 `--package-root backend/auto_designer` 扫本仓包生成 `ARCHITECTURE.md`。
+> - CI（`spec-validate` job）跑 `validate` + `render` + `graph` 后 `git diff --exit-code docs/specs`；改 spec 后须重跑 `render`/`graph` 再提交。
 
 # Spec-Driven Development
 
-Structured workflow for OpenAgents: **Requirements -> Spec Design (Task DAG + File Allocation) -> Implementation & Verification**.
+> **格式更新（2026-06-24 spec-markdown-form，见 `docs/specs/2026-06-24-spec-markdown-form-design.md`）：**
+> spec 组从「YAML 文件夹 `docs/specs/<NNNN-slug>/{metadata.yaml,tasks/,history/}`」改为
+> **单个 markdown 文件 `docs/specs/<NNNN-slug>.md`**（YAML frontmatter 放结构化字段 + 正文放 prose）。
+> 新增「对代码的唯一映射」：`spec graph` 由 import 图 + 文件/模块级 docstring 生成 `ARCHITECTURE.md`。
+> 设计历史改用 **dated 设计文档** `docs/specs/YYYY-MM-DD-<topic>-design.md`（冻结、append）。
+> `spec amend` 与 per-task `history/` 已退役（版本演化交给 git）。下文凡提「tasks/T*.yaml 文件夹 /
+> metadata.yaml / amend」均按上述映射理解；改 Task 直接编辑组 `.md`。
 
-This skill **supersedes `rfc-driven-development`** (Spec-0014 / RFC-0014). The unit of design moved from a single RFC Markdown file to a **living snapshot**: a `docs/specs/<NNNN-slug>/` group whose basic unit is a **Task** (stable id, self-contained, one-to-one with live code). You never hand-edit an RFC `.md` — you drive the `spec` CLI, which writes canonical YAML and re-renders the human view.
+> **格式更新（issue #69 rust-RFC 形态，见 `docs/specs/2026-06-25-spec-rfc-form-design.md`）：**
+> spec 正文从「每个 Task 各写 prose」改为 **组级 rust-RFC 9 段总览**（Summary / Motivation /
+> Guide-level / Reference-level / Drawbacks / Rationale and alternatives / Prior art /
+> Unresolved questions / Future possibilities，参考 [rust-lang/rfcs](https://github.com/rust-lang/rfcs)）。
+> **总览先行**：feature 全貌在这 9 段里自包含地讲一遍，**DAG + 文件分配收进 Reference-level**；
+> Task 退化成 frontmatter 里的工作分解行（结构化字段 + `scope`/`acceptance`，不再挂重 prose）。
+> 下文凡提「各 Task 的 `design`/`interface`/`tradeoffs`/`tests`/`open-questions` prose」均已上移到
+> 组级总览;字段细节见 `references/task-fields.md`。
+
+Structured workflow for OpenAgents: **Requirements -> Spec Design (组级 RFC 总览先行 → Task DAG + File Allocation) -> Implementation & Verification**.
+
+This skill **supersedes `rfc-driven-development`**. The unit of design is a **living snapshot**: a `docs/specs/<NNNN-slug>.md` group file whose basic unit is a **Task** (stable id, self-contained, one-to-one with live code). You drive the `spec` CLI (`new` / `add-task` / `render` / `graph` / `validate` / `abandon`) or edit the group markdown directly, then `spec validate` + `spec render` + `spec graph`.
 
 Each phase requires human approval before proceeding. Within each phase, work autonomously.
 
@@ -32,17 +48,10 @@ This skill's instructions are in English for model comprehension. Spec prose fie
 (summary/design/…) are written in Chinese (read by the team). Code comments may be English
 or Chinese — clarity first (see `references/code-comment-conventions.md`).
 
-**Prose style — 精简、精确、学术化.** Spec prose fields (especially `summary`, which is
-surfaced verbatim in the human-facing `summary.md`) MUST use concise, precise, academic
-language. Define terms with their canonical names; describe mechanisms and contracts
-directly. Do NOT pad with metaphors, analogies, hand-holding, or colloquial phrasing —
-readability comes from precision and structure, not from dumbing concepts down. One idea
-per clause; no filler. This applies to every prose field, not just `summary`.
-
 ## Core Principles
 
 1. **Spec is a living snapshot, the single source of truth** — `docs/specs/` is always a snapshot of the repo. Every Task in the snapshot maps to currently-live code, so the snapshot never contains legacy. Done Tasks stay in the snapshot (`status: done`); only a refactored Task's *old version* or an *abandoned* Task leaves the snapshot into `history/`. The Task DAG lives in the spec so any agent session can read it.
-2. **Source data vs generated view are separated** — `docs/specs/<group>/` holds only structured YAML source (`metadata.yaml`, `tasks/T*.yaml`, `history/T*.yaml`). `spec render` produces two derivative human views: the global board `docs/specs/OVERVIEW.md` (cross-group dashboard) and a per-group plan `docs/specs/<group>/summary.md` (that group's Tasks rendered as a readable scheme — aggregates each Task's prose + the DAG). OVERVIEW.md contains, in order: 名词解释 (glossary) · 全局看板 · 跨 feature 关系图 · 文件冲突报告 · **设计文件结构** (the designed file tree, union of all Tasks' `files`, each annotated with its owner Task) · 各 feature 详情. The file tree is fully derived from Task `files` — to change it, change a Task's `files` and re-render. The **only** hand-maintained source feeding OVERVIEW is the repo-level **`docs/specs/glossary.yaml`** (term/category/def list; rendered into the 名词解释 block, skipped if absent). Both rendered views are committed for GitHub visibility and CI drift-checks them. Never hand-edit OVERVIEW.md or any summary.md — edit the Task YAML (or glossary.yaml) and re-render.
+2. **Source data vs generated view are separated** — `docs/specs/<group>/` holds only structured YAML source (`metadata.yaml`, `tasks/T*.yaml`, `history/T*.yaml`). The single human-readable view `docs/specs/OVERVIEW.md` is a pure derivative produced by `spec render` (committed for GitHub visibility; CI drift-checks it). Never hand-edit OVERVIEW.md.
 3. **Drive the `spec` CLI, never hand-write the tree** — use `spec new` / `spec add-task` / `spec amend` / `spec abandon`. They keep canonical key order, append history, and auto-render. Hand-editing risks schema/drift failures.
 4. **Spec id as code index** — new code references `# Spec-NNNN/T*` in comments so other agents can trace code to design. Existing `# RFC-NNNN` comments are grandfathered (spec group NNNN ≡ old RFC NNNN). See `references/code-comment-conventions.md`.
 5. **Human-in-the-loop at phase gates** — humans approve phase transitions; agents execute within phases.
@@ -84,12 +93,10 @@ A group with more than 6 Tasks is too large — split into multiple focused grou
 
 ```
 docs/specs/
-├── OVERVIEW.md            # global board view (spec render output; never hand-edit)
-├── glossary.yaml          # repo-level term glossary (hand-maintained; rendered into OVERVIEW 名词解释)
+├── OVERVIEW.md            # ONLY human view (spec render output; never hand-edit)
 ├── README.md              # specs dir doc + numbering rules (hand-written, static)
 └── <NNNN-slug>/
-    ├── metadata.yaml      # group meta: title / issue / slug / overview (group-level lead prose)
-    ├── summary.md         # per-group human plan (spec render output; never hand-edit)
+    ├── metadata.yaml      # group meta: title / issue / slug
     ├── tasks/T*.yaml      # current-version Task snapshot (one-to-one with live code)
     └── history/T*.yaml    # append-only old versions (only legacy lives here)
 ```
@@ -108,17 +115,22 @@ Same as before — iteratively clarify before designing.
 4. Cover: scope boundaries, affected modules, performance, backward compatibility.
 5. Do NOT persist requirements separately — they get absorbed into the spec's prose fields.
 
-### Phase 2: Spec Design (Task DAG + File Allocation)
+### Phase 2: Spec Design (组级 RFC 总览先行 → Task DAG + File Allocation)
 
-The spec group is the core artifact. Author it via the CLI — never hand-write YAML.
+The spec group is the core artifact. Author it via the CLI — never hand-write frontmatter.
+**总览先行**：先把组级 rust-RFC 9 段总览写清楚（feature 全貌），**再**拆 Task；Task 是总览
+之下的分解，不是总览的替代。
 
 1. **Create the group:**
    ```
-   spec new <slug> --issue <N> --title "<组标题>"
+   spec new <slug> --issue <N> --title "<组标题>" --summary "<一句话 TL;DR>"
    ```
-   The number is auto-assigned as local-max + 1. Cross-PR number conflicts are caught by CI (`check-spec-number-conflicts.py`); in shared-repo work, push the group skeleton and open a draft PR early so the number is visible to other agents. If you must pin a number, pass `--number NNNN`.
+   The number is auto-assigned as local-max + 1. Cross-PR number conflicts are caught by CI (`check-spec-number-conflicts.py`); in shared-repo work, push the group skeleton and open a draft PR early so the number is visible to other agents. If you must pin a number, pass `--number NNNN`. `spec new` 已在正文里铺好 9 段 `## <heading>` 脚手架（含 `<!-- 待填 -->` 占位）。
 2. **Explore the codebase** thoroughly before designing — use subagents for parallel context gathering.
-3. **Decompose into a Task DAG** and add each Task:
+3. **先写组级 RFC 总览（before any Task）** — 直接编辑组 `.md` 正文，填满 9 段（顺序见 `references/task-fields.md`）：
+   - **Summary**（必填）/ **Motivation**（必填，现状+为什么，**背景就地复述**）/ Guide-level / **Reference-level**（必填，技术方案 + **DAG + 文件分配表** + e2e 脚本路径）/ Drawbacks / **Rationale and alternatives**（必填，≥1 备选）/ Prior art / Unresolved questions / Future possibilities。
+   - **单 spec 自包含**：读完这 9 段即理解本 feature，**不能把必要信息留给「见 Spec-NNNN」式裸引用**；要提别的 spec 编号只能当线索，关键内容必须就地复述完整。
+4. **再拆 Task DAG（总览之后）** and add each Task:
    ```
    spec add-task <NNNN> --id T1 --title "<标题>" --priority P1 \
      --files openagents/x.py,tests/test_x.py \
@@ -126,30 +138,24 @@ The spec group is the core artifact. Author it via the CLI — never hand-write 
      --scope "<这个 Task 改什么>" --acceptance "<可验证的验收标准>"
    ```
    - **Task count must not exceed 6.** If it does, split into multiple groups.
-   - **`files` across Tasks must be disjoint** — this is what makes collaborative mode conflict-free. If two Tasks must touch one file, merge them or split that file's changes into its own Task.
-   - `depends-on` declares the DAG (cross-group refs use qualified ids like `0012/T2`). Tasks with no mutual dependency run in parallel.
-   - New Tasks start `status: pending`.
-4. **Fill design prose** on the relevant Tasks by editing the `tasks/T*.yaml` prose fields (`summary`/`motivation`/`design`/`interface`/`tradeoffs`/`tests`/`references`/`open-questions`) — block scalars carrying Markdown (mermaid allowed in `design`). Keep it architectural: **what & why, NOT implementation code**. After editing prose by hand, run `spec validate` then `spec render`.
-   - **Write a group-level `overview`** so the rendered `summary.md` opens with narrative, not a raw Task DAG. It is the lead a human reads first: where this group sits in the bigger picture, what it delivers, and the data-flow spine that threads T1…Tn (a small ascii/mermaid diagram mapping each box to a Task works well). It also renders into OVERVIEW's per-feature section, threading the groups into one story. Set it via CLI (prose with diagrams → `--file`):
-     ```
-     spec set-overview <NNNN> --file overview.md   # or --text "<short lead>"
-     ```
-     `spec new` also accepts `--overview`. Without an overview, summary.md jumps straight into the DAG and reads as foggy.
-5. **Confirm open questions with the user** before writing any `open-questions` prose — only questions the user chooses to keep are recorded.
+   - **`files` across Tasks must be disjoint** — 这是协同模式无冲突的根（单一 writer 所有权，理念 6），也是 issue #71 运行期 owner 检查的结构化源。两个 Task 必须碰同一文件就合并它们，或把该文件的改动独立成一个 Task。
+   - `depends-on` declares the DAG (cross-group refs use qualified ids like `0012/T2`). Tasks with no mutual dependency run in parallel. New Tasks start `status: pending`.
+   - Task 不再挂重 prose；它的设计依据在组级 Reference-level 里讲。每行必填 `files` + `acceptance`。
+5. **Confirm open questions with the user** before writing the `Unresolved questions` section — only questions the user chooses to keep are recorded.
 6. **Validate & render:**
    ```
-   spec validate          # must be error-free
-   spec render            # regenerates OVERVIEW.md + each group's summary.md
+   spec validate          # must be error-free（必填段空 / 缺 acceptance / files 重叠 = error）
+   spec render            # regenerates OVERVIEW.md
+   spec graph             # regenerates ARCHITECTURE.md
    ```
-   Review the group's `summary.md` as the human-readable plan; if it reads poorly, fix the
-   underlying Task prose (keep it 精简/精确/学术化, see Language Convention) and re-render.
-7. Present the group (Tasks + DAG + file lists, via OVERVIEW.md) to the user for review. Collect ALL feedback at once; apply in one pass. Repeat until approved.
+7. Present the group (9 段总览 + Task 表 + DAG，via the group `.md` / OVERVIEW.md) to the user for review. Collect ALL feedback at once; apply in one pass. Repeat until approved.
 
 **Quality bar:**
-- Design prose focuses on architecture, key decisions, interface contracts — not code.
-- `tradeoffs` includes at least one alternative considered.
-- Every Task is independently implementable/verifiable, has a disjoint `files` list, clear `depends-on`, and an `acceptance` criterion.
-- `tests` covers unit + integration for the Task's scope.
+- **总览先行**：每个组在拆 Task 前先有完整的 feature 级 9 段总览；读完总览即懂全貌。
+- **单 spec 自包含**：禁止把理解本 spec 的必要信息留在别处（无 load-bearing 跨 spec 引用）；复述胜过一个引用。`spec validate` 对必填段空报 error、对疑似裸引用报 warning。
+- **软约定硬化**：凡是想写进正文「调用方请务必…/别…/记得…」的软约定,先问能不能改成 frontmatter 字段 / `spec validate` 规则让它**根本无法违反**(`files` 同组互斥即范例——它把「别让两个 Task 抢写同一文件」从自觉变成 error；延伸见 issue #71)。
+- 总览叙述聚焦架构、关键决策、接口契约——不是实现代码;`Rationale and alternatives` 含 ≥1 备选。
+- Every Task is independently implementable/verifiable, has a disjoint required `files` list, clear `depends-on`, and a required `acceptance` criterion.
 
 ### Phase 3: Implementation & Verification
 

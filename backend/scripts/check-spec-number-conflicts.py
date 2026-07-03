@@ -3,9 +3,9 @@
 
 Spec-0014/T5: 编号校验脚本（check-rfc 的 spec 版）
 
-仓库约定：spec 源数据放在 docs/specs/NNNN-slug/ 目录下（metadata.yaml + tasks/ + history/）。
+仓库约定：spec 源数据为单 markdown 文件 docs/specs/NNNN-slug.md（frontmatter + rust-RFC 正文）。
 同一个编号 NNNN 不能被不同的 slug 复用（本地）；新建的组编号不能与其它 open PR 撞号。
-匹配 docs/specs/(NNNN)-slug/ 目录形态，本地 + open PR 并集取下一号（决策 D11）。
+匹配 docs/specs/(NNNN)-slug.md 单文件形态，本地 + open PR 并集取下一号（决策 D11）。
 """
 
 from __future__ import annotations
@@ -18,8 +18,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Spec-0014/T5：匹配 docs/specs/NNNN-slug/ 下任意文件，抽组编号与 slug。
-SPEC_PATH_RE = re.compile(r"^docs/specs/(?P<number>\d{4})-(?P<slug>[^/]+)/")
+# 匹配 docs/specs/NNNN-slug.md 单文件形态，抽组编号与 slug。
+# slug 以字母起，排除 dated 设计文档（YYYY-MM-DD-*.md）与 OVERVIEW/ARCHITECTURE/README。
+SPEC_PATH_RE = re.compile(r"^docs/specs/(?P<number>\d{4})-(?P<slug>[A-Za-z][^/]*)\.md$")
 NEW_SPEC_CHANGE_TYPES = {"ADDED", "RENAMED"}
 
 
@@ -44,17 +45,16 @@ def _extract_spec_identity(path: str) -> tuple[str, str] | None:
 
 
 def _iter_repo_spec_groups(repo_root: Path) -> list[tuple[str, str]]:
-    """本地 docs/specs/ 下的 (number, slug) 组目录列表。"""
+    """本地 docs/specs/ 下的 (number, slug) 组文件列表。"""
     specs_dir = repo_root / "docs" / "specs"
     if not specs_dir.is_dir():
         return []
     groups: list[tuple[str, str]] = []
-    for child in sorted(specs_dir.iterdir()):
-        # 仅 NNNN-slug 目录形态视为 spec 组。
-        if child.is_dir():
-            identity = _extract_spec_identity(f"docs/specs/{child.name}/")
-            if identity:
-                groups.append(identity)
+    for child in sorted(specs_dir.glob("*.md")):
+        # 仅 NNNN-slug.md 单文件形态视为 spec 组。
+        identity = _extract_spec_identity(f"docs/specs/{child.name}")
+        if identity:
+            groups.append(identity)
     return groups
 
 
