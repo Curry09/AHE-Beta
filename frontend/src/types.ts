@@ -53,6 +53,12 @@ export interface CommitsResponse {
 
 export type AgentRole = "user" | "designer" | "developer";
 
+/** 状态时间线条目（工作过程日志）：后端 live.py 在 status 变化时追加。 */
+export interface AgentLogEntry {
+  t: string;
+  text: string;
+}
+
 export interface Agent {
   agent_id: string;
   role: AgentRole;
@@ -61,6 +67,8 @@ export interface Agent {
   status: string;
   turns: Turn[];
   detail: string | null;
+  /** 旧数据可能无此字段，前端按 [] 处理。 */
+  log?: AgentLogEntry[];
   started_at: string;
   updated_at: string;
 }

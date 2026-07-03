@@ -139,6 +139,13 @@ a:hover { color: var(--gold); }
 .bubble.user { background: rgba(74,158,255,0.14); border: 1px solid rgba(74,158,255,0.25); margin-left: auto; }
 .bubble.harness { background: var(--panel); border: 1px solid var(--line); margin-right: auto; }
 .bubble strong { display: block; font-size: 10px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.4px; }
+/* 工作过程时间线（dev/designer 无 turns 时的主体） */
+.conv-section { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin: 4px 0 8px; }
+.conv-log-row { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 13px; line-height: 1.5; }
+.conv-log-row:last-child { border-bottom: none; }
+.conv-log-time { flex: none; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.conv-log-text { white-space: pre-wrap; }
+
 .conv-detail { margin-top: 12px; }
 .conv-detail summary { cursor: pointer; color: var(--gold); font-size: 12px; }
 .conv-detail pre {

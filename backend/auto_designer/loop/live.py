@@ -16,6 +16,8 @@ from typing import Any
 _AGENTS_NAME = "agents.json"
 # role 展示顺序：用户 → 创新者 → 开发者（对齐闭环 a → d → b 的次序）。
 _ROLE_ORDER = {"user": 0, "designer": 1, "developer": 2}
+# 状态时间线（工作过程日志）长度上限：dev/designer 无 turns，看板靠它展示工作过程。
+_LOG_CAP = 50
 
 
 def _agents_file(*, data_dir: Path) -> Path:
@@ -51,6 +53,11 @@ def update_agent(
     # started_at = 本段活动起始：刚由空闲转为 running（或新 agent）时重置，否则沿用，供前端算运行时长。
     became_running = running and not prev.get("running", False)
     started_at = now if became_running or not prev.get("started_at") else prev["started_at"]
+    # log = 状态时间线（工作过程）：status 变化即追加（连续重复去重），跨任务累计、封顶 _LOG_CAP。
+    log = list(prev.get("log", []))
+    if not log or log[-1].get("text") != status:
+        log.append({"t": now, "text": status})
+    log = log[-_LOG_CAP:]
     registry[agent_id] = {
         "agent_id": agent_id,
         "role": role,
@@ -59,6 +66,7 @@ def update_agent(
         "status": status,
         "turns": turns or [],
         "detail": detail,
+        "log": log,
         "started_at": started_at,
         "updated_at": now,
     }
