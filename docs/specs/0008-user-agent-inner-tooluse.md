@@ -154,43 +154,33 @@ open-questions，归后续 Task/组。
 
 ## Motivation
 
-### T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）
+0005 版用户 agent 的能力分叉完全靠 prompt 层的自律约束（「请 LLM 自律别偷看答案」）与纯文本感知，这一机制脆弱：强模型会心算 bug、或凭空脑补出负向感知，`verdict` 因而与真实结果脱钩。要把分叉落在更硬的地基上——工具可达性（机械门控）+ 真实执行结果——需要三层递进的基础设施，外加一个收口任务。
 
-现仓 seed 场景全仓只有 `description: str`，磁盘上没有任何可执行的项目——内层 agent（T2 工具 / T4 内层循环）若要「真执行核实」，必须有一个真实的项目上下文落脚，否则只能在空 tempdir 里跑孤立片段、跑不起有依赖或多模块的代码。本任务是 T2/T4 内层执行的底座：先把工作区立起来，后续工具、sandbox、agent 才有地方运行；这也是为什么它排在最前（编号=执行序）。v2 掰正缺陷假设：初版把工作区设计成「用户 agent 私有副本、与 harness 两套 FS、harness 仅输出文本建议」，但本项目的目标场景一直是「助手（harness）能改、也能跑，用户 agent 在同一目录真核实」——文本建议核不了真。故工作区须是 harness 子进程与用户 agent 内层 sandbox 共享的同一目录：harness 落地的改动，用户 agent 当场可读可跑。
+第一层是执行的落脚点（T1）：现仓 seed 场景全仓只有 `description: str`，磁盘上没有任何可执行的项目，内层 agent 若要「真核实」便无处下手，只能在空 tempdir 里跑孤立片段、跑不起有依赖或多模块的代码。更进一步，本项目的目标场景始终是「harness（助手）能改、也能跑，用户 agent 在同一目录真核实」——若像初版设想那样让工作区各持私有副本、harness 仅输出文本建议，文本建议终究核不了真；因此 T1 须把工作区做成 harness 子进程与用户 agent 内层 sandbox **共享**的同一目录，harness 落地的改动，用户 agent 当场可读可跑。
 
-### T2 内层原子工具与 sandbox
+有地方跑之后，第二层是能真正执行的「手」（T2）：三个原子工具（read_file / run_shell / write_file）与一个以工作区为 cwd 的最小 sandbox，按 persona 的 D1 维度机械门控可用工具集——blind 无工具只能凭文本，shallow 能读能跑但写不出测试，competent/expert 才拿 write_file 能自写测试，能力分叉从此钉在工具可达性上而非 prompt 自律。原子工具是不可再分的最小可组合单元，run_tests/construct_edge_cases 这类是「原子工具 + LLM 推理」涌现出的复合行为，不该做成工具（否则语义臃肿、易出实现问题）。
 
-0005 的能力分叉靠 prompt「请 LLM 自律别偷看答案」+ 纯文本感知，脆弱：强模型会心算 bug、或脑补伪造负向感知。把分叉钉在「工具可达性 + 真实执行结果」上更硬：blind 无工具只能凭文本，shallow 能读能跑但写不出测试，competent/expert 才拿 write_file 能自写测试。原子工具是不可再分的最小可组合单元——run_tests/construct_edge_cases 这类是「原子工具 + LLM 推理」涌现出的复合行为，不该做成工具（否则语义臃肿、易出实现问题）。
+第三层是让工具被恰当使用的行为框架（T3）：仅有工具不足以避免退化——要么从不核实（退化回 0005 纯文本），要么每轮都核实（不真实、烧成本）。真人的核实是可选且有成本的决策，只在起疑且值得时才查；T2 已经用机械门控保住了「能不能查」（CAN）的底线，T3 要在 prompt 层刻画「会不会查、查多狠」（WILL）这层个性差异，并为 D2 高深度 persona 预留 skill 占位扩展位，受「通用领域方法、绝不 bug/benchmark 特定」红线约束。
 
-### T3 prompt 行为框架（可选核实）与 skill 占位接口
-
-内层 agent 有了工具（T2）后，必须告诉 LLM「这些工具在什么角色逻辑下使用」——否则要么从不核实（退化回 0005 纯文本），要么每轮都核实（不真实、烧成本）。真人的核实是可选且有成本的决策：起疑 + 值得 才查。能力分叉（CAN）已由 T2 机械门控保底，但「会不会查、查多狠」（WILL）这层个性差异要靠 prompt 行为框架表达。skill 接口为 D2 高深度 persona 预留扩展位，但必须受「通用领域方法、绝不 bug/benchmark 特定」红线约束。
-
-### T4 内层 tool-using agent（AgenticPersonaClient）
-
-这是本组的收口任务：前三个任务把底座（T1 工作区）、手（T2 工具/sandbox）、行为框架（T3 prompt）都备齐，T4 把它们接成一个真正会用工具核实的内层 agent。关键约束是「只换接缝、不动信封」：PersonaClient.respond(system, user) -> dict 这个协议是唯一改动点，外层引擎对内层是 LLM 心算还是真跑工具无感知，从而风险被收敛在一个类里、可灰度可回退。
+最后由 T4 收口：把底座（T1 工作区）、手（T2 工具/sandbox）、行为框架（T3 prompt）接成一个真正会用工具核实的内层 agent AgenticPersonaClient。关键约束是「只换接缝、不动信封」——`PersonaClient.respond(system, user) -> dict` 是唯一改动点，外层引擎对内层是 LLM 心算还是真跑工具无感知，风险因而被收敛在一个类里，可灰度、可回退。
 
 ## Guide-level explanation
 
-### T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）
+执行序即编号：T1 → T2 → T4，T3 与 T1/T2 并行，产物汇入 T4。
 
-本组的底座任务：给 SeedScenario 加一个可选 workspace 字段，让 seed 场景能携带一个 in-repo 基线项目（不再只有纯文本 description）；新增 workspace.py 的 materialize() 每局把 fixture 拷成一个临时全新目录，供内层 sandbox 当 cwd。落首个 fixture billing-split（stdlib-only，无第三方依赖）。v2 掰正：materialize 上移到 orchestrator 每局先落地一份工作区，经 launcher 注入 SANDBOX_WORK_DIR 给 harness 子进程、同一目录绑定到内层 client——harness 直接改、用户 agent 同目录真核实，两侧共享同一文件系统（不再各持私有副本）。编号即执行序：本任务最先做，T2 的 sandbox / T4 的内层 agent 才有真实项目可跑。
+T1 打地基：给 SeedScenario 加一个可选 workspace 字段，让 seed 场景不再只带纯文本 description，还能携带一个 in-repo 基线项目；新增的 workspace.py 的 materialize() 在每局把 fixture（首个落地的是 stdlib-only、无第三方依赖的 billing-split）拷成一个全新隔离目录，供内层 sandbox 当 cwd。v2 版进一步把 materialize 上移到 orchestrator，在 launch 之前统一落地一份工作区，经 launcher 把它以 SANDBOX_WORK_DIR 注入 harness 子进程 env、同一目录同时绑定到内层 client——harness 直接改、用户 agent 同目录真核实，两侧共享同一文件系统（不再各持私有副本）。本任务最先做，T2 的 sandbox、T4 的内层 agent 才有真实项目可跑。
 
-### T2 内层原子工具与 sandbox
+有了工作区，T2 造出内层 agent 的「手」：三个原子工具 read_file / run_shell / write_file（外加 web_search 占位、本轮不实现），以及一个最小 sandbox 执行环境（tempfile + subprocess），以 T1 materialize 出的工作区目录为 cwd。工具集按 persona 的 D1 维度机械门控（tool_stack(D1)）：能力低的人物拿不到 write_file，从机制上挡住「自写测试套件」这类高能力动作。
 
-造内层 agent 的「手」：三个原子工具 read_file / run_shell / write_file（外加 web_search 占位、本轮不实现），以及一个最小 sandbox 执行环境（tempfile + subprocess），以 T1 materialize 出的工作区目录为 cwd。工具集按 persona D1 机械门控（tool_stack(D1)）：能力低的人物拿不到 write_file，从机制上挡住「自写测试套件」这类高能力动作。
+与 T1/T2 并行的 T3 负责把内层 system prompt 的核实语义从「义务」改为「可选、有成本」：核实是 persona 的角色内动作，只在起疑且值得时才查，默认不查（真人含专家都不会每次都跑）。BLOCK-G 写清工具的「可选核实」框架，BLOCK-P 按 D1（能不能查/会用哪些工具）与 D3/trust（会不会查、阈值多严）刻画核实倾向；并立 skill 占位接口（select_skills，D2 驱动）让专家 persona 能挂领域 playbook（本轮只占位、纯 prompt 引导）。
 
-### T3 prompt 行为框架（可选核实）与 skill 占位接口
-
-把内层 system prompt 的核实语义从「义务」改为「可选、有成本」：核实是 persona 的角色内动作，只在起疑且值得时才查，默认不查（真人含专家都不会每次都跑）。在 BLOCK-G 写清工具的「可选核实」框架，在 BLOCK-P 按 D1（能不能查/会用哪些工具）与 D3/trust（会不会查、阈值多严）刻画核实倾向；并立 skill 占位接口（select_skills，D2 驱动）让专家 persona 能挂领域 playbook（本轮只占位、纯 prompt 引导）。与 T1/T2 并行，产物喂给 T4。
-
-### T4 内层 tool-using agent（AgenticPersonaClient）
-
-把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient：内层 LLM 拿 T3 装配的 system + T2 的工具集，在 T1 materialize 的工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。控制反转只局部发生在这个接缝内——外层控制信封（0005/T5 run_session、动作空间、状态机、体感、终止）原样不动。
+T4 是收口任务：把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient——内层 LLM 拿 T3 装配的 system 与 T2 的工具集，在 T1 落地的共享工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。控制反转只局部发生在这一个接缝内，外层控制信封（0005/T5 run_session、动作空间、状态机、体感、终止）原样不动。
 
 ## Reference-level explanation
 
-### T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）
+以下按四个技术层展开：工作区与注入链（T1）→ 原子工具与 sandbox（T2，依赖 T1 提供的 cwd）→ prompt 行为框架与 skill 占位（T3，与 T1/T2 并行）→ 内层循环 AgenticPersonaClient（T4，收口，依赖前三者）。
+
+### 共享工作区与注入链（T1）
 
 共享工作区注入链（v2；关键：run_session 与 respond 引擎签名、harness stdio 协议均不动）：orchestrator.run_round 每局先在 launch *之前* 落地工作区——scenario.workspace 非空时 `workspace_dir = materialize(scenario.workspace)`（为空则 None，退化为今天行为）─► 同一 workspace_dir 走两条边喂给两侧：(A) `launcher.launch(sha, workspace_dir=workspace_dir)`，launcher 把它写进子进程 env 的 SANDBOX_WORK_DIR，harness entry._setup_workspace() 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；(B) `run_session(persona, scenario, harness, workspace_dir=workspace_dir)`，sim_user 不再自行 materialize，而是守卫式 `client.bind_session(persona=sim_persona, workspace_dir=workspace_dir)`，内层 T4 AgenticPersonaClient 据此建 Sandbox(workspace=workspace_dir)（T2）当 cwd。两侧 cwd 同指一个目录 ⇒ harness 子进程落地的文件改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS、非 advisory 文本）。为何 materialize 上移到 orchestrator：launch 发生在 run_session 之前，要让 harness 与用户 agent 同目录，落地必须早于 launch 这一刻、且 workspace_dir 须同时可达两侧——orchestrator 是唯一同时持有 launcher 与 run_session 的层。为何仍走 bind 而非 run_session 文本参数：run_session 只喂 system/user 文本、不传 persona/workspace 对象，会话级的 persona(选工具集)+workspace(建 Sandbox) 只能经 bind_session 注入；对 Scripted/Api 无此方法即 no-op。SessionRunner 协议新增 keyword-only `workspace_dir: str | None = None`，旧直连调用（不传）按 scenario.workspace 自落、行为不变。每局一份全新拷贝、互不污染；session 结束可清理。fixture 仍 stdlib-only，把 materialize 压到「只 copytree」，依赖供给推后；fixture 置 backend/seed_workspaces/ 作版本化资产，与 benchmark held-out 红线无关（工作区不含 gold 测试）。
 
@@ -215,7 +205,7 @@ test_workspace.py：(a) materialize 落地后目录存在、含预期文件、�
   - `backend/tests/harness/test_launcher.py`
   - `backend/tests/loop/test_orchestrator.py`
 
-### T2 内层原子工具与 sandbox
+### 原子工具与 Sandbox（T2）
 
 Sandbox 持有一个工作目录（workspace 或新建 tempdir），所有工具调用相对它解析路径、禁止逃逸到子树外。run_shell 经 subprocess 执行、带 timeout 与输出截断。tool_stack(D1)：blind→[]（无工具），shallow→[read_file, run_shell]，competent/expert→[read_file, run_shell, write_file]（+ web_search 占位永远不真实启用）。门控在「给 LLM 暴露哪些工具」这一层就发生（机制保底），不依赖 prompt 自律。工具本身工作区无关：workspace=None 时用空 tempdir 即可独立建、独立单测——故对 T1 是顺序/测试层面的软依赖（让 sandbox 测试能跑真实 fixture），而非硬代码依赖。
 
@@ -233,7 +223,7 @@ test_tools.py：(a) read/write/run 在 sandbox 内正常工作；(b) 路径逃�
   - `backend/auto_designer/user/sim/sandbox.py`
   - `backend/tests/user/sim/test_tools.py`
 
-### T3 prompt 行为框架（可选核实）与 skill 占位接口
+### Prompt 行为框架与 skill 占位（T3）
 
 CAN（能力，机械）：T2 tool_stack(D1) 决定暴露哪些工具——prompt 只如实描述，不靠它门控。WILL（意愿，prompt）：BLOCK-P 用 D3（验收严格度）+ trust/consecutive_blame 状态渲染倾向句，例如低 trust/高 D3 → 更倾向核实，反之直接接受。核实定性为「可选成本动作」：默认走主观判断，只有起疑且收益值得才动用工具。skill 注入点在 T4 内层循环的 system 段，本任务只立接口与装配位；skill 片段是通用方法论（如「先复现再定位」），严禁含具体 bug/答案。clauses 把这些做成可单测的纯函数（输入 persona+state，输出文本片段）。
 
@@ -252,7 +242,7 @@ test_inner_prompt.py：(a) 各 D1 档位工具清单文案正确；(b) clause_ve
   - `backend/auto_designer/user/sim/skills.py`
   - `backend/tests/user/sim/test_inner_prompt.py`
 
-### T4 内层 tool-using agent（AgenticPersonaClient）
+### 内层循环：AgenticPersonaClient（T4）
 
 循环：respond(system,user) → tool_stack(D1)+build_inner_system → 内层多轮 [LLM→tool_call→Sandbox.run→observe]，有步数/超时上限兜底 → LLM 产出最终 JSON（与现协议同字段）→ 校验后返回。会话级上下文：persona 与工作区由 sim_user 桥接经 bind_session(persona, workspace_dir) 在每局开始绑定（run_session 不传 persona、签名不动）；respond 用绑定的 workspace 建 Sandbox(workspace=dir)。该 dir 即 T1 v2 落地的 harness/用户 agent 共享目录——harness 子进程已把改动写进来，内层 LLM 直接 read_file/run_shell 读/跑这些真实改动核实，verdict grounded 在真实执行结果（共享 FS，非从文本 advisory 抠代码）；harness 仅给文本未写盘的迫不得已情形下，write_file 作为兜底能力把文本代码落地再核（涌现，非写死）。失败兜底：LLM 不产出合法 JSON / 工具异常 / 超步数时，退化为一次主观判断（保证永远返回合法输出，外层不崩）。无工具的 blind persona、或未 bind_session（无 workspace）时自然退化为纯文本判断（等价旧行为）。
 
@@ -277,57 +267,31 @@ test_persona_client_agentic.py：(a) FakeToolLLM 多步 tool_call → FakeSandbo
 
 ## Rationale and alternatives
 
-### T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）
+环境与隔离层面的取舍：T1 只支持本地 fixture + stdlib-only，换来 materialize 的极简（纯 copytree）、可重现、零网络，代价是带第三方依赖的场景暂不可跑（留 setup 钩子占位）；工作区选择两侧共享同一目录而非各持私有副本，换来 harness 改动对用户 agent 即时可见可跑（真核实而非文本 advisory），代价是并发写同一 FS 须有保证——本框架逐轮 stdio 协议天然串行（harness send 与用户回合不并发），故可接受；materialize 上移到 orchestrator 让工作区在 launch 前就绪，代价是 orchestrator/launcher 各加一个可选 keyword 入参（跨组文件改动但向后兼容，`workspace=None`/`workspace_dir=None` 的退化路径对既有纯文本场景与直连调用零破坏，渐进式落地）。T2 的 Sandbox 同样只取最小隔离（cwd 限定 + 超时），不做 Docker/nsjail 级别的强隔离——可接受，因为执行的是助手提议的代码、用户自愿在自己机器上跑，威胁模型与生产沙箱不同，强隔离留后续；三个工具选择原子而非复合（如 run_tests/construct_edge_cases），换来语义清晰、易测、可组合，代价是高能力行为只能靠 LLM 编排涌现、不可直接断言「跑了测试」；D1 三档机械门控简单可靠，但粒度较粗。
 
-MVP 只支持本地 fixture + stdlib-only：换来 materialize 极简（copytree）、可重现、零网络；代价是带第三方依赖的场景暂不可跑（留 setup 钩子）。共享同一目录（而非各持私有副本）：换来 harness 改动对用户 agent 即时可见可跑（真核实，非文本 advisory），代价是两侧并发写同一 FS 须靠「单会话内逐轮串行（harness send 与用户回合不并发）」保证无竞争——本框架逐轮 stdio 协议天然串行，故可接受。materialize 上移到 orchestrator：让 launch 前工作区已就位，代价是 orchestrator/launcher 各加一个可选 workspace_dir 入参（keyword、缺省 None，跨组文件改动但向后兼容）。workspace=None / workspace_dir=None 的退化路径保证对既有纯文本场景与直连调用零破坏，渐进式落地。
+行为控制层面的取舍：T3 用纯 prompt 引导刻画 WILL（会不会查、查多狠），实现轻、可演进，但不如机制硬——LLM 可能不完全遵循倾向；CAN 的底已由 T2 机械门控兜住，prompt 只补 competent↔expert 之间的软差异。skill 仅占位、不接真实 playbook 库，避免过早设计，代价是短期专家与普通能力的 prompt 差异有限。把核实定性为可选，会让低意愿 persona 很少核实——这是期望行为（更真实），不是缺陷。
 
-### T2 内层原子工具与 sandbox
-
-非安全沙箱：MVP 取最小隔离（cwd 限定 + 超时），不抗恶意代码——可接受，因为执行的是助手提议的代码、用户自愿在自己机器上跑，威胁模型与生产沙箱不同；强隔离（Docker/nsjail）留后续。原子工具而非复合工具：换来语义清晰、易测、可组合，代价是高能力行为靠 LLM 编排涌现、不可直接断言「跑了测试」。D1 机械门控简单可靠，但粒度粗（三档）。
-
-### T3 prompt 行为框架（可选核实）与 skill 占位接口
-
-纯 prompt 引导 WILL：实现轻、可演进，但不如机制硬——LLM 可能不完全遵循倾向；用 T2 机械门控保 CAN 的底，prompt 只补 competent↔expert 之间「会不会用、用多狠」的软差异。skill 仅占位：避免过早设计 playbook 库，但短期专家与普通能力的 prompt 差异有限。把核实定性为可选会让低意愿 persona 很少核实——这是期望行为（真实），不是 bug。
-
-### T4 内层 tool-using agent（AgenticPersonaClient）
-
-内层 LLM 多轮调用 → 延迟与 token 成本上升；用 max_inner_steps/timeout + 「可选核实默认不查」（T3）控制。tool-calling 输出不稳 → 强制最终结构化 JSON + 失败退化为主观判断兜底。只换接缝的好处是风险隔离、可与 ScriptedPersonaClient 并存做 CI；坏处是端到端真跑需要真实 LLM，集成测试用 FakeToolLLM + FakeSandbox 离线覆盖循环逻辑。
+收口层面的取舍：T4 内层 LLM 的多轮调用带来延迟与 token 成本上升，用 max_inner_steps/timeout 加上 T3 的「默认不查」共同控制；tool-calling 输出不稳定，用强制最终结构化 JSON + 失败退化为主观判断兜底应对。把改动收敛在 `PersonaClient.respond` 这一个接缝内，好处是风险隔离、可与 ScriptedPersonaClient 并存跑 CI，坏处是端到端真跑仍需真实 LLM，集成测试因此改用 FakeToolLLM + FakeSandbox 离线覆盖循环逻辑。
 
 ## Prior art
 
-### T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）
+整组沿用并演进已有 spec 的接口而非另起炉灶。T1 扩展 0001/T1 models.py 的 SeedScenario，其注入链横跨 0005/T5 的调用方 sim_user、0007/T2 的 orchestrator（materialize 上移之处）与 0003/T1 的 launcher（SANDBOX_WORK_DIR 注入之处）——三者 files 与本组重叠仅产生 validate warning（与 models.py 同时被 0001/0008/0009 引用属同一模式），run_session/respond 引擎签名与 harness stdio 协议不受影响；harness 侧读取该变量的入口在 backend/harness_template/entry.py 的 `_setup_workspace()`（agent.yaml 的 sandbox_config 声明），fixture 资产落于 backend/seed_workspaces/。T1 落地的目录被 T2 的 Sandbox 当作 cwd、被 T4 的 `AgenticPersonaClient.bind_session` 取用。
 
-扩展 0001/T1 models.py 的 SeedScenario；注入链跨 0005/T5 调用方 sim_user、0007/T2 orchestrator（materialize 上移）、0003/T1 launcher（SANDBOX_WORK_DIR 注入）——三者 files 跨组重叠仅产生 validate warning（与 models.py 跨 0001/0008/0009 同模式），run_session/respond 引擎签名与 harness stdio 协议不动。被本组 T2（Sandbox 以此目录为 cwd）、T4（AgenticPersonaClient.bind_session 取用）消费；harness 侧 entry._setup_workspace() 读 SANDBOX_WORK_DIR（见 backend/harness_template/entry.py、agent.yaml 的 sandbox_config）。fixture 资产置于 backend/seed_workspaces/。
+T2 的能力门控复用 0005/T2 的 cap_mask（D1）思路，不重新发明分级机制；其原子工具与 sandbox 被 T4 消费（暴露 tool_stack 给内层 LLM、用 Sandbox 真执行），工具清单则由 T3 渲染进 system prompt；run_tests/construct_edge_cases 这类复合行为不做成工具，而是归入 T3 的 prompt 行为框架、靠 LLM 编排涌现。
 
-### T2 内层原子工具与 sandbox
+T3 演进 0005/T3 的 prompt 结构（BLOCK-G/BLOCK-P）与 0005/T1 的 persona 维度（D1/D2/D3），工具清单来源即本组 T2 的 tool_stack；skill 占位受「通用、非 benchmark 特定」红线约束，对接 0006/T1 的蒸馏管线；其装配产物（build_inner_system）被 T4 在每次构建内层 prompt 时调用。
 
-能力门控复用 0005/T2 的 cap_mask（D1）。工作区来自本组 T1 materialize（Sandbox 的 cwd）。被本组 T4 AgenticPersonaClient 消费（暴露 tool_stack 给内层 LLM、用 Sandbox 真执行）；工具清单由 T3 渲染进 system prompt。construct_edge_cases 等复合行为归 T3 的 prompt 行为框架。
-
-### T3 prompt 行为框架（可选核实）与 skill 占位接口
-
-演进 0005/T3 prompt（BLOCK-G/BLOCK-P）与 0005/T1 persona 维度（D1/D2/D3）。工具清单来源 0008/T2 tool_stack。skill 红线（通用、非 benchmark 特定）对接 0006/T1 蒸馏。产物被本组 T4 内层循环装配 system 时调用。
-
-### T4 内层 tool-using agent（AgenticPersonaClient）
-
-演进 0005/T3 的 LLM 后端（PersonaClient.respond 接缝）；外层 0005/T5 run_session 引擎零改动。依赖本组 T2 tool_stack/Sandbox、T3 build_inner_system、T1 工作区注入。tool-calling 形态可与 0003/T2 nexau_runtime 的内层循环参考并轨（见 open-questions）。
+T4 是整条演进链的收口：它演进 0005/T3 的 LLM 后端、即 `PersonaClient.respond` 这一接缝，外层 0005/T5 的 run_session 引擎零改动；依赖本组 T2 的 tool_stack/Sandbox、T3 的 build_inner_system、T1 的工作区注入。其 tool-calling 内层循环形态未来可与 0003/T2 nexau_runtime 的 tool-calling 参考并轨（详见 Unresolved questions），本轮不强求统一实现。
 
 ## Unresolved questions
 
-### T1 seed 工作区扩展与共享注入（harness/用户 agent 同目录）
+依赖与来源：带第三方依赖场景的供给方式——setup 钩子用 cached venv 还是每局 pip、何时做（T1）；工作区来源是否需支持 git clone / 指定 commit，以对接更真实的项目快照并与 0009 SeedSource 的可插拔供给衔接（T1）；临时目录清理策略与磁盘占用上限（T1）。
 
-1) 依赖型场景的供给：setup 钩子用 cached venv 还是每局 pip？何时做（后续 Task/组）。2) 工作区来源是否需支持 git clone / 指定 commit（对接更真实的项目快照；与 0009 SeedSource 可插拔供给衔接）。3) 临时目录清理策略与磁盘占用上限。4) 共享 FS 下 harness 与用户 agent 的写竞争：当前靠逐轮 stdio 串行天然规避，若将来 harness 异步/并发执行需显式锁或快照隔离。5) 共享目录里 harness 改动与用户 agent 核实的可观测性（落盘 transcript 是否要记录工作区 diff）。
+隔离与工具边界：共享 FS 下 harness 与用户 agent 的写竞争，当前靠逐轮 stdio 串行天然规避，若将来 harness 异步/并发执行则需显式锁或快照隔离（T1）；共享目录里 harness 改动与用户 agent 核实过程的可观测性，即落盘 transcript 是否要记录工作区 diff（T1）；run_shell 是否需要资源上限（内存/CPU/网络禁用）做更强隔离（T2）；web_search 真实实现的接口与配额留后续（T2）；是否需要 apply_patch/diff 类工具，还是 write_file 已足够（T2）；D1 门控三档是否够，或需更细的工具-能力映射表（T2）。
 
-### T2 内层原子工具与 sandbox
+核实行为与 skill：skill 真实库的来源与组织——手写还是从成功会话蒸馏，仍受 held-out 约束（T3）；WILL 层纯 prompt 引导是否足够，还是需要给内层喂显式「核实预算/成本」信号做更硬的约束（T3）；核实倾向句的粒度取连续还是离散档位（T3）；是否要把外层已渐冗余的 verify_self 语义与内层可选核实统一表述，及是否索性清理外层 verify_self/pending_self_obs（核实已下沉内层）——这一问题横跨 T3 与 T4，尚未定论。
 
-1) run_shell 是否需要资源上限（内存/CPU/网络禁用）做更强隔离。2) web_search 真实实现的接口与配额（后续）。3) 是否需要 apply_patch/diff 类工具，还是 write_file 足够。4) D1 门控三档是否够，或需更细的工具-能力映射表。
-
-### T3 prompt 行为框架（可选核实）与 skill 占位接口
-
-1) skill 真实库的来源与组织（手写 vs 从成功会话蒸馏，受 held-out 约束）。2) WILL 纯 prompt 是否够，还是需要给内层喂显式「核实预算/成本」信号做更硬的约束。3) 倾向句的粒度（连续 vs 离散档位）。4) 是否要把外层已渐冗余的 verify_self 语义与内层可选核实统一表述。
-
-### T4 内层 tool-using agent（AgenticPersonaClient）
-
-1) 是否清理已渐冗余的外层 verify_self/pending_self_obs（核实已下沉内层）。2) 是否给内层喂显式状态信号（patience/trust）以让核实意愿更可控。3) max_inner_steps/timeout 默认值与成本上限。4) 与 0003/T2 nexau_runtime tool-calling 形态是否统一一套循环实现。5) 真实 LLM 的 tool-calling schema（function calling vs 文本协议）选型。
+收口与统一实现：是否给内层喂显式状态信号（patience/trust）以让核实意愿更可控（T4）；max_inner_steps/timeout 的默认值与成本上限（T4）；本组内层循环与 0003/T2 nexau_runtime 的 tool-calling 形态是否要统一成一套实现（T4）；真实 LLM 的 tool-calling schema 选型——function calling 还是文本协议（T4）。
 
 ## Future possibilities
 

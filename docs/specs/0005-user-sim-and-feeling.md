@@ -150,175 +150,150 @@ control-plane）整体推迟，不写 state、不进体感、harness 桩只回�
 
 ## Motivation
 
-### T1 Persona 维度模型与文案
+训练信号的可信度取决于 persona 扮演的拟真度：自由文本 persona 难以稳定驱动能力分叉（同一 harness
+轨迹下浅层用户接受、专家识破），因此 T1 将 persona 收敛为 9 维结构化模型 + 确定性派生，使其可复现、
+可采样、可 codegen，把「能感知什么」「验收到什么程度」量化为可被动作空间与状态机消费的系数。在此
+基础上，T2 把「用户这一轮能做什么、做完情绪怎么变」从 LLM 自由发挥收敛为可控、可复现的纯代码机制：
+能力掩码防止低能力 persona 越级核查（不违反 G1「不偷看真值」），耐心/信任状态机把情绪积分成可终止
+的轨迹。
 
-训练信号「真不真」取决于 persona 扮得「像不像真人」。自由文本 Persona 难以稳定驱动能力分叉
-（同一 harness 轨迹下浅层用户接受、专家识破）。结构化维度 + 确定性派生使 persona 可复现、可采样、
-可 codegen，并把「能感知什么」与「验收到什么程度」量化为可被动作空间与状态机消费的系数。
+persona 的主观判断终究要由 LLM 在角色内产生，其输出还须能被框架结构化消费，这是 T3 提示装配与双
+LLM 后端存在的理由：分层提示把稳定前缀（角色/铁律/输出契约）与善变状态分离以节省 token，双后端
+（真实网关 / 离线脚本）使无 key 环境（CI、demo）也能跑通整条 loop，把真实推理与框架编排解耦；T3
+的会话末自评请求同时是体感分的入口。
 
-### T2 动作模型、动作空间与状态机
+控制信封引擎此前只产生结构化 verdict 与终止原因，与 spec-0001 训练信号契约（FeelingScore 1–4）
+之间的缺口正是 T4 存在的理由：LLM 自评贴近真实满意度但有噪声、可能解析失败，框架派生可复现且永远
+可得，两路并出互为校验与兜底，补齐这条信号是把控制信封接入闭环用户侧的前置条件。
 
-把「用户这一轮能做什么、做完情绪怎么变」从 LLM 自由发挥收敛为可控、可复现的纯代码机制：能力掩码
-保证低能力 persona 不会越级核查（G1 不偷看真值），耐心/信任状态机把情绪积分成可终止的轨迹。
-
-### T3 提示装配与 persona LLM 后端
-
-persona 的主观判断必须由 LLM 在角色内产生，且输出要可被框架结构化消费（OUTPUT CONTRACT）。提示分层
-把稳定前缀与善变状态分离以省 token；双后端让无 key 环境（CI/demo）也能跑通整条 loop，真实推理与框架
-编排解耦。会话末自评请求是 T4 LLM 自评体感分的入口。
-
-### T4 体感评分（两路并出）
-
-整条自进化的训练信号是用户体感（FeelingScore 1–4）。控制信封引擎此前只产结构化 verdict 与终止
-原因，与 spec-0001 训练信号契约的缺口正在于此；补齐体感分是把该引擎接入闭环用户侧的前置。
-两路并出的动机：LLM 自评贴近真实满意度但有噪声、可能解析失败；框架派生可复现且永远可得，互为
-校验与兜底。
-
-### T5 会话主循环引擎
-
-spec-0001/T3 的最小桩用「sentinel + max_turns」驱动多轮，拟真度有限。控制信封以「能力掩码 + 耐心/信任
-状态机」更真实地刻画追问、绕路、卡顿、放弃等真实使用行为——训练信号的真实性正取决于此。
-本任务把分散部件总装为唯一的「跑一局」引擎，供上层接入用户侧(a) 与 dev 侧体感门禁复用。
-
-### T6 harness 桩与运行入口
-
-要离线、确定性地验证整条控制信封 loop（CI/demo 无 key 可跑），并演示同一 harness 轨迹下能力分叉如何产生
-不同体感——这是把引擎讲清楚、可回归的最小载体。生产中此适配层替换为真实 CLI harness。
+spec-0001/T3 的最小桩用「sentinel + max_turns」驱动多轮，拟真度有限；训练信号的真实性恰恰取决于
+能否刻画追问、绕路、卡顿、放弃这些真实使用行为，这是 T5 存在的理由——把 T1–T4 的分散部件总装为
+唯一的「跑一局」引擎，供用户侧(a) 与后续 dev 侧体感门禁复用。而要离线、确定性地验证这整条 loop
+（CI/demo 无 key 可跑），并演示同一 harness 轨迹下能力分叉如何产生不同体感，则需要 T6 提供的脚本化
+harness 桩与运行入口——这是把引擎讲清楚、可回归的最小载体，生产环境中再替换为真实 CLI harness。
 
 ## Guide-level explanation
 
-### T1 Persona 维度模型与文案
+控制信封以 persona 为静态系数起点：9 维模型（D1 评估能力 / D2 领域深度 / D3 验收阈值 / D4.1–4.3
+委派·监督·纠偏 / D5 自主性 / D6 授权 + 派生 trust）由 T1 定义，配一份维度→英文注入文案的确定性查表
+（clauses）。persona 在会话开始时定死、循环中不变，是 spec-0001/T1 自由文本 Persona 的结构化重型版。
 
-控制信封的 persona 模型：9 维（D1 评估能力 / D2 领域深度 / D3 验收阈值 / D4.1-4.3 委派·监督·纠偏 /
-D5 自主性 / D6 授权 + 派生 trust），以及维度→英文注入文案的确定性查表（clauses）。persona 为会话级
-静态系数，会话开始定死、循环中不变。是 spec-0001/T1 自由文本 Persona 的结构化重型版。
+在 persona 之上，T2 构成控制信封的确定性机制层：动作目录钉死每个动作的 executor×channel×effect
+三轴与终止原因；动作空间由「局面 ∩ 能力掩码(D1) ∩ 授权(D6) ∪ 耐心门解锁的终止动作 ∪ accept」派生；
+自由产出经归类与越权投影、channel↔message 强校验回落到合法集；patience/trust 状态机只吃主观 verdict
+演化。本轮纯主观，不含客观真值线。
 
-### T2 动作模型、动作空间与状态机
+T3 负责把这两层接到 LLM：system 提示由 BLOCK-G（固定角色/铁律/输出契约）与 BLOCK-P（T1 编译出的
+persona 实例）拼成，KV-cache 友好（不变前缀在前）；每轮 user 消息携带 <task><history><harness_output>
+<self_observation><action_space><mood>；会话末追加 build_rating_turn 自评请求。PersonaClient 协议
+提供两个后端：ApiPersonaClient 对接 OpenAI 兼容网关（reasoning 模型加固），ScriptedPersonaClient
+提供离线脚本（含自评分支），使整条 loop 在无 key 环境下也能确定性复现。
 
-控制信封的确定性机制层：动作目录（每个动作钉死 executor×channel×effect 三轴 + 终止原因）、动作空间
-派生（局面 ∩ 能力掩码D1 ∩ 授权D6 ∪ 耐心门解锁的终止动作 ∪ accept）、自由产出归类与越权投影与
-channel↔message 强校验、以及 patience/trust 状态机（只吃主观 verdict）。本轮纯主观，不含客观真值线。
+T4 在会话末把控制信封原生产出的 verdict / end_reason / signals 对齐为 spec-0001 的训练信号契约
+FeelingScore：一路是 LLM 自评（persona 在角色内按本人验收阈值打 1–4 + 理由，走 T3 的会话末请求，
+对齐 spec-0001/T3「会话末经 LLM 产出 FeelingScore」）；另一路是框架派生（从 end_reason 与主观
+verdict/trust 确定性聚合，可复现）。前者为主信号，后者作交叉校验兼 LLM 解析失败时的兜底。两路输入
+均为主观信号，客观真值（gold）全程 held-out 不参与。
 
-### T3 提示装配与 persona LLM 后端
+T5 是把 T1–T4 编排成一局完整会话的主循环，是 spec-0001/T3「用户 agent 驱动器」的重型实现：每轮按
+「派生动作空间 → persona 三层决策(perceive/verdict/action/message) → resolve 归类与投影 → 状态写回
+→ 终止判定」推进；会话末两路并出体感分。本轮纯主观（不含客观真值线）；逐轮真人对话走自立协议，
+不套 harbor 的批式 episode 接口。
 
-提示装配与 persona LLM 后端。prompt：system = BLOCK-G（固定角色/铁律/输出契约）+ BLOCK-P（persona 实例，
-T1 编译），KV-cache 友好（不变前缀在前）；每轮 user 消息 <task><history><harness_output><self_observation>
-<action_space><mood>；会话末 build_rating_turn 自评请求。persona_client：PersonaClient 协议双后端——
-ApiPersonaClient（OpenAI 兼容网关，reasoning 模型加固）/ ScriptedPersonaClient（离线脚本，含自评分支）。
-
-### T4 体感评分（两路并出）
-
-对齐 spec-0001 训练信号 FeelingScore 的产出。控制信封引擎原生只产 verdict / end_reason /
-signals，缺 1–4 体感分；本任务补齐会话末两条产出路径并统一为 FeelingScore：① LLM 自评——
-persona 在角色内按本人验收阈值打 1–4 + 理由，对齐 spec-0001/T3「会话末经 LLM 产出 FeelingScore」；
-② 框架派生——从 end_reason 与主观 verdict / trust 确定性聚合，可复现。前者为主信号，后者作交叉
-校验兼 LLM 解析失败兜底。两路输入均为主观信号，客观真值（gold）全程 held-out 不参与。
-
-### T5 会话主循环引擎
-
-控制信封会话主循环，是 spec-0001/T3「用户 agent 驱动器」的重型实现：把 persona 模型(T1)、动作空间
-与状态机(T2)、提示与 LLM 后端(T3)、体感评分(T4) 编排成一局完整会话。每轮按「派生动作空间 → persona
-三层决策(perceive/verdict/action/message) → resolve 归类与投影 → 状态写回 → 终止判定」推进；会话末两路
-并出体感分。本轮纯主观（不含客观真值线）；逐轮真人对话走自立协议，不套 harbor 批式 episode 接口。
-
-### T6 harness 桩与运行入口
-
-脚本化 harness 桩与运行入口。harness_adapter.ScriptedHarness / scenarios.SplitBillHarness 直接实现
-spec-0001/T2 的 HarnessInterface（send/reset/close）：send(message) -> str，按预设轨迹复刻能力分叉场景
-（timeutils DST / split_bill 丢分钱），bug 体现在回复文本里（如 sum=99.99），由 persona 凭能力自行识别——
-本轮 send 只回文本、无 gold/exit_code（无客观线）。demo（离线脚本后端、无 key 可跑）与 run_live（真实
-NexAU 网关）两个入口，并排打印两路体感分与行为信号。
+最后，T6 提供脚本化 harness 桩与两个运行入口：harness_adapter.ScriptedHarness / scenarios.
+SplitBillHarness 直接实现 spec-0001/T2 的 HarnessInterface（send/reset/close，send(message) -> str），
+按预设轨迹复刻能力分叉场景（timeutils DST、split_bill 丢分钱），bug 只体现在回复文本里（如
+sum=99.99），由 persona 凭自身能力识别——本轮 send 只回文本，无 gold/exit_code（无客观线）。demo
+用离线脚本后端演示两个 persona 的分叉轨迹（无 key 可跑），run_live 接真实 NexAU 网关跑通整条 loop，
+两者都并排打印两路体感分与行为信号。
 
 ## Reference-level explanation
 
-### T1 Persona 维度模型与文案
+### 用户建模核心：persona 维度与动作空间/状态机（T1、T2）
 
-维度分五层：A 能力底座(D1,D2)、B 验收(D3 派生 D1×D2)、C 交互(D4.1/4.2/4.3)、D 会话配置(D5,D6 半派生)、
-E 派生(trust = f(D1,D2))。自由采样维度由调用方给定；派生维度(d3/trust/d6)由 finalize_persona 填齐：
-- derive_d3：D1 定基线档，D2.depth 资深+1/新手-1（枚举序内 clamp）。
-- derive_trust：BLIND→blind、EXPERT→skeptical、其余 balanced。
-- derive_d6：D5 定基线，task_risk 高收紧一档、collaborative+低风险放开可跑。
-**fallback-only（正交契约）**：finalize_persona 只填「未提供」的派生维度；调用方已显式 ground 的 d3/trust/d6
-原样保留，derive_* 不改写。实现以 None 哨兵区分「未提供」与「已 ground」（d3/d6/trust 默认 None，finalize 仅
-填 None 的）。动机：真实 persona 的验收/信任/授权应可被 grounded 值直接给定（维度正交，expert 可 over-trust，
-见 extract-selfreport-persona 例 C），0006/T2 注入真实卡时据此保真——否则会把 grounded 真值改写成合成面。
-clauses 为每个维度取值给一句英文注入文案，compile_block_p 拼成 BLOCK-P（喂 persona LLM，不掺状态数值）。
+persona 维度分五层：A 能力底座(D1,D2)、B 验收(D3，由 D1×D2 派生)、C 交互(D4.1/4.2/4.3)、D 会话配置
+(D5,D6，半派生)、E 派生(trust = f(D1,D2))。自由采样维度由调用方给定，派生维度(d3/trust/d6) 由
+finalize_persona 填齐：derive_d3 按 D1 定基线档、D2.depth 资深+1/新手-1（枚举序内 clamp）；
+derive_trust 按 BLIND→blind、EXPERT→skeptical、其余 balanced；derive_d6 按 D5 定基线、task_risk 高
+收紧一档、collaborative+低风险放开可跑。派生遵循 **fallback-only（正交契约）**：finalize_persona
+只填「未提供」的派生维度，调用方已显式 ground 的 d3/trust/d6 原样保留，derive_* 不改写；实现以 None
+哨兵区分「未提供」与「已 ground」（d3/d6/trust 默认 None，finalize 仅填 None 的一项）。这一契约的
+动机是真实 persona 的验收/信任/授权应可被 grounded 值直接给定（维度正交，expert 可 over-trust，见
+extract-selfreport-persona 例 C），0006/T2 注入真实卡时据此保真，否则会把 grounded 真值改写成合成
+面。clauses 为每个维度取值给一句英文注入文案，compile_block_p 拼成 BLOCK-P（喂给 persona LLM，不掺
+状态数值）。
+
+在 persona 之上，T2 构成动作与状态的确定性层。动作目录（actions）列出 send_task / refine_request /
+give_feedback / verify_self / ask_harness_run / request_evidence / grant_autorun / accept /
+give_up / file_issue，每个钉死 executor∈{PERSONA_LOCAL,HARNESS,FRAMEWORK}、channel∈{EMIT,SILENT}、
+effect∈{ADVANCE,VERIFY,TERMINATE}，并强校验 channel↔message 一致性。动作空间（action_space）为
+LEGAL_BY_PHASE ∩ cap_mask(D1) ∩ authz(D6)，耐心 <=0 时解锁 D4.3 选定的终止动作，有可接受产物时加入
+accept；resolve_action 把 LLM 的自由或越权产出归类并投影回合法集。状态机（state）中 apply_verdict
+只按主观 verdict 改 patience/trust（satisfied 提信任、failed_blame_harness 降耐心降信任……），演化
+速率由 persona 派生系数(make_coef) 决定；客观真值不参与状态演化（本轮不实现客观线）。
 
 **接口**
 
+```
 Persona(persona_id, d1, d2, d41, d42, d43, d5, d3=None, d6=None, trust=None)   # frozen dataclass；派生维度默认 None=未提供
 finalize_persona(p: Persona, task_risk: str = "low") -> Persona      # 仅填未提供(None)的派生维度（fallback-only，不改写已 grounded 值）
 compile_block_p(p: Persona) -> str                                   # 维度 → BLOCK-P 文案
 
-**测试**
-
-单测：
-- finalize_persona（派生）：仅给自由采样维度时，派生 d3/trust/d6 与查表一致、可复现。
-- finalize_persona（fallback-only）：显式提供 d3/trust/d6 的 persona 过 finalize 后三者不变；未提供者按 derive_* 填齐。
-- derive_d3：senior 抬一档、novice 降一档且在枚举序内 clamp（不越界）。
-- compile_block_p：每个维度取值都命中文案、无 KeyError；frozen persona 不可变。
-
-**文件（单一 writer 所有权）**
-
-  - `backend/auto_designer/user/sim/dimensions.py`
-  - `backend/auto_designer/user/sim/clauses.py`
-  - `backend/tests/user/sim/test_dimensions.py`
-
-### T2 动作模型、动作空间与状态机
-
-- 动作目录(actions)：send_task/refine_request/give_feedback/verify_self/ask_harness_run/
-  request_evidence/grant_autorun/accept/give_up/file_issue，各钉死 executor∈{PERSONA_LOCAL,HARNESS,
-  FRAMEWORK}、channel∈{EMIT,SILENT}、effect∈{ADVANCE,VERIFY,TERMINATE}；channel↔message 一致性强校验。
-- 动作空间(action_space)：LEGAL_BY_PHASE ∩ cap_mask(D1) ∩ authz(D6)，耐心<=0 解锁 D4.3 选定的终止动作，
-  有可接受产物加 accept；resolve_action 把 LLM 的 free/越权产出归类并投影回合法集。
-- 状态机(state)：apply_verdict 仅按主观 verdict 改 patience/trust（satisfied↑信任、failed_blame_harness↓
-  耐心↓信任…）；persona 派生系数(make_coef) 决定演化速率。客观真值不参与状态演化（本轮不实现客观线）。
-
-**接口**
-
 derive_action_space(phase, persona, state, has_artifact) -> list[str]
 resolve_action(ret: dict, space: list[str], persona) -> tuple[action_id, message]
 apply_verdict(state, verdict, coef) -> State
+```
 
 **测试**
 
 单测：
-- derive_action_space：OPENING 只含 send_task；ACTIVE 随 D1 能力掩码增删 verify_self/request_evidence；
-  READ_ONLY/WRITE_NO_RUN 授权剔除 ask_harness_run/grant_autorun；patience<=0 解锁对应终止动作；有产物加 accept。
-- resolve_action：free → 归类到合法动作；越权 → 同 effect 投影；SILENT 清空 message、EMIT 空则兜底；最终 assert_channel 通过。
-- apply_verdict：satisfied/ failed_blame_harness/ failed_blame_self/ unsure 对 patience/trust 的增减符合系数。
-- 纯主观：状态机仅依赖 verdict，构造不含任何客观字段的输入即可驱动全部分支。
+- finalize_persona（派生）：仅给自由采样维度时，派生 d3/trust/d6 与查表一致、可复现；derive_d3
+  senior 抬一档、novice 降一档且在枚举序内 clamp（不越界）。
+- finalize_persona（fallback-only）：显式提供 d3/trust/d6 的 persona 过 finalize 后三者不变；未提供
+  者按 derive_* 填齐。
+- compile_block_p：每个维度取值都命中文案、无 KeyError；frozen persona 不可变。
+- derive_action_space：OPENING 只含 send_task；ACTIVE 随 D1 能力掩码增删 verify_self/
+  request_evidence；READ_ONLY/WRITE_NO_RUN 授权剔除 ask_harness_run/grant_autorun；patience<=0
+  解锁对应终止动作；有产物加 accept。
+- resolve_action：free → 归类到合法动作；越权 → 同 effect 投影；SILENT 清空 message、EMIT 空则兜底；
+  最终 assert_channel 通过。
+- apply_verdict：satisfied/ failed_blame_harness/ failed_blame_self/ unsure 对 patience/trust 的
+  增减符合系数；纯主观——状态机仅依赖 verdict，构造不含任何客观字段的输入即可驱动全部分支。
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/actions.py`
-  - `backend/auto_designer/user/sim/action_space.py`
-  - `backend/auto_designer/user/sim/state.py`
-  - `backend/tests/user/sim/test_action_space.py`
-  - `backend/tests/user/sim/test_state.py`
+| Task | 文件 |
+|---|---|
+| T1 | `backend/auto_designer/user/sim/dimensions.py`、`backend/auto_designer/user/sim/clauses.py`、`backend/tests/user/sim/test_dimensions.py` |
+| T2 | `backend/auto_designer/user/sim/actions.py`、`backend/auto_designer/user/sim/action_space.py`、`backend/auto_designer/user/sim/state.py`、`backend/tests/user/sim/test_action_space.py`、`backend/tests/user/sim/test_state.py` |
 
-### T3 提示装配与 persona LLM 后端
+### 提示装配与 persona LLM 后端（T3）
 
-- prompt：BLOCK_G 固定（ROLE / GROUND RULES G1-G5 / ACTION SEMANTICS / OUTPUT CONTRACT），
-  build_system = BLOCK_G + compile_block_p(persona)；build_user_turn 拼每轮上下文，mood 仅离散标签
-  （full/lowered/low/exhausted + trust）不进数值；build_rating_turn 覆盖动作契约、只要 {"score","reason"}。
-- persona_client：PersonaClient.respond(system, user) -> dict。ApiPersonaClient 走 LLM_BASE_URL/
-  LLM_API_KEY，enable_thinking=False 抑制 CoT、content 空回落 reasoning_content、退避重试、容错 JSON。
-  ScriptedPersonaClient 读 system 的 D1/D3 档 + user 的 harness_output/mood 分叉，并对 <rate_experience> 自评。
-- make_client：有网关/OPENAI_API_KEY 用 Api，否则回落 Scripted。
+prompt 模块中，BLOCK_G 固定（ROLE / GROUND RULES G1-G5 / ACTION SEMANTICS / OUTPUT CONTRACT），
+build_system = BLOCK_G + compile_block_p(persona)；build_user_turn 拼每轮上下文，mood 仅离散标签
+（full/lowered/low/exhausted + trust）不进数值；build_rating_turn 覆盖动作契约、只要
+{"score","reason"}。persona_client 模块中，PersonaClient 协议约定 respond(system, user) -> dict：
+ApiPersonaClient 走 LLM_BASE_URL/LLM_API_KEY，enable_thinking=False 抑制 CoT、content 空回落
+reasoning_content、退避重试、容错 JSON 解析；ScriptedPersonaClient 读 system 的 D1/D3 档 + user 的
+harness_output/mood 分叉，并对 <rate_experience> 自评。make_client 在检测到网关/OPENAI_API_KEY 时用
+Api 后端，否则回落 Scripted。
 
 **接口**
 
+```
 build_system(persona) -> str; build_user_turn(task, history, harness_output, action_space, state) -> str
 build_rating_turn(task, history, state) -> str
 PersonaClient(Protocol).respond(system: str, user: str) -> dict   # {perceive,verdict,action,message} 或 {score,reason}
 make_client() -> PersonaClient
+```
 
 **测试**
 
 单测：
-- build_system 前缀稳定（同 persona 多次一致）；build_user_turn 含全部 section；build_rating_turn 含 1–4 指令与 {"score","reason"}。
-- ScriptedPersonaClient：开局发 send_task；<rate_experience> 返回 1–4；exhausted → file_issue/give_up；能力档分叉符合预期。
+- build_system 前缀稳定（同 persona 多次一致）；build_user_turn 含全部 section；build_rating_turn
+  含 1–4 指令与 {"score","reason"}。
+- ScriptedPersonaClient：开局发 send_task；<rate_experience> 返回 1–4；exhausted → file_issue/
+  give_up；能力档分叉符合预期。
 - _parse_json：剥 ```json fence、抽取首个 {...}、解析失败回落安全 dict 不抛。
 
 **文件（单一 writer 所有权）**
@@ -327,17 +302,13 @@ make_client() -> PersonaClient
   - `backend/auto_designer/user/sim/persona_client.py`
   - `backend/tests/user/sim/test_prompt.py`
 
-### T4 体感评分（两路并出）
+### 体感评分：两路并出（T4）
 
-两路均在会话末产出一次，互不耦合：
-
-① LLM 自评（parse_feeling_llm）
-- prompt（0005/T3 build_rating_turn）让 persona 跳出对话，按本人验收阈值(G4)给 1–4 + 一句理由，
-  覆盖动作 OUTPUT CONTRACT 只要 {"score","reason"}。
-- 容错解析：缺 score / 非整数 / 越界 → 返回 None（越界经 FeelingScore.__post_init__ 断言失败被
-  捕获），交由调用方回落派生分，不崩 loop。
-
-② 框架派生（derive_feeling）—— 只吃主观末态：
+两路评分均在会话末产出一次，互不耦合。① LLM 自评（parse_feeling_llm）：prompt（0005/T3
+build_rating_turn）让 persona 跳出对话，按本人验收阈值(G4)给 1–4 + 一句理由，覆盖动作 OUTPUT
+CONTRACT 只要 {"score","reason"}；容错解析对缺 score / 非整数 / 越界一律返回 None（越界经
+FeelingScore.__post_init__ 断言失败被捕获），交由调用方回落派生分，不崩 loop。② 框架派生
+（derive_feeling），只吃主观末态：
 
 | end_reason              | base |
 |-------------------------|------|
@@ -346,17 +317,17 @@ make_client() -> PersonaClient
 | abandoned               | 1    |
 
 其余 end_reason 落 2。摩擦修正：accepted 但 failed_blame_harness>=2 或末态 trust=skeptical → 降为 3。
-
 FeelingScore 契约对齐 spec-0001/T1：score:int(1..4) + reason，__post_init__ 越界即失败，
-to_dict/from_dict 双向序列化（from_dict 忽略未知键，前向兼容）。
-
-held-out 边界：两路输入均为主观信号（end_reason / verdict / trust），不读 objective 的 gold。
+to_dict/from_dict 双向序列化（from_dict 忽略未知键，前向兼容）。held-out 边界：两路输入均为主观信号
+（end_reason / verdict / trust），不读 objective 的 gold。
 
 **接口**
 
+```
 FeelingScore(score: int, reason: str)            # __post_init__ 断言 1<=score<=4；to_dict/from_dict
 parse_feeling_llm(ret: dict) -> FeelingScore | None   # 解析 LLM 自评；无效（缺字段/非整数/越界）返回 None
 derive_feeling(end_reason: str, turns: list) -> FeelingScore  # turns 仅 duck-type 读 verdict/trust
+```
 
 **测试**
 
@@ -373,7 +344,7 @@ derive_feeling(end_reason: str, turns: list) -> FeelingScore  # turns 仅 duck-t
   - `backend/auto_designer/user/sim/feeling.py`
   - `backend/tests/user/sim/test_feeling.py`
 
-### T5 会话主循环引擎
+### 会话主循环引擎（T5）
 
 每轮流水线（turn < MAX_TURNS）：
 
@@ -391,7 +362,7 @@ derive_feeling(end_reason: str, turns: list) -> FeelingScore  # turns 仅 duck-t
 parse_feeling_llm 解析，失败回落派生分。两者分别落 SessionResult.feeling / feeling_derived。
 
 signals 为行为信号（如低能力用户无法自修而放弃），从 persona 与会话轨迹派生；本轮不含任何依赖客观
-真值的信号（GAP/ESCAPED_BUG/control-plane 推迟，见 T2 open-questions）。
+真值的信号（GAP/ESCAPED_BUG/control-plane 推迟，见 T2 相关 Unresolved questions）。
 
 感知侧不再做代码层能力过滤：原型用 perceive_filter（按缩进/关键词猜「源码行」并抹掉）+ _filter_self_obs
 （子串 Traceback/Error → 套「我跑了一次它崩了」串）机械改写喂给 LLM 的输入。这类字符串启发式脆弱——漏判
@@ -407,13 +378,16 @@ reported」之类第三人称模板外壳，正文即用户原话，元数据明
 
 **接口**
 
+```
 run_session(persona: Persona, client: PersonaClient, harness, task: str) -> SessionResult
 SessionResult(persona_id, end_reason, turns: list[TurnLog], signals: list[str],
               issue_artifact: str | None,
               feeling: FeelingScore | None,          # LLM 自评（主信号）
               feeling_derived: FeelingScore | None)  # 框架派生（交叉校验/兜底）
+```
+
 注：此为引擎原生签名；与 spec-0001/T4 run_session(persona, scenario, harness, user_agent,
-tracker, store) 的契约对齐留待接入闭环时做（见 open-questions）。
+tracker, store) 的契约对齐留待接入闭环时做（见 Unresolved questions）。
 
 **测试**
 
@@ -433,24 +407,26 @@ tracker, store) 的契约对齐留待接入闭环时做（见 open-questions）�
   - `backend/auto_designer/user/sim/loop.py`
   - `backend/tests/user/sim/test_loop.py`
 
-### T6 harness 桩与运行入口
+### harness 桩与运行入口（T6）
 
-- harness 桩：实现 HarnessInterface（send/reset/close）。send 按预设步骤回应，仅消费 message 是否「要求运行
-  / 探不可整除边界」分叉轨迹，返回纯文本（str）；reset 把脚本步进归零；close 置已关闭标志（无真资源）、幂等，
-  close 后再 send/reset 抛 RuntimeError（对齐 FakeHarness 暴露误用）。bug 体现在文本中（如 split_bill(100,3)
-  -> sum=99.99），高能力 persona 读文本即可识别，低能力 persona 看常规用例（sum=100）即接受——分叉完全由
-  persona 能力 + 文本感知驱动，无需 gold。
-- demo：make_client（无 key → ScriptedPersonaClient），两 persona（SHALLOW+FEEDBACK / EXPERT+FILE_ISSUE）
-  各跑全新 harness 轨迹，print_result 并排打印 turns / 两路体感 / 行为信号 / issue artifact。
-- run_live：固定 ApiPersonaClient（走 repo .env 网关）对真实 user-agent 跑 SplitBillHarness。
+harness 桩实现 HarnessInterface（send/reset/close）：send 按预设步骤回应，仅消费 message 是否「要求
+运行 / 探不可整除边界」分叉轨迹，返回纯文本（str）；reset 把脚本步进归零；close 置已关闭标志（无真
+资源）、幂等，close 后再 send/reset 抛 RuntimeError（对齐 FakeHarness 暴露误用）。bug 体现在文本中
+（如 split_bill(100,3) -> sum=99.99），高能力 persona 读文本即可识别，低能力 persona 看常规用例
+（sum=100）即接受——分叉完全由 persona 能力 + 文本感知驱动，无需 gold。demo 用 make_client（无 key
+→ ScriptedPersonaClient）对两个 persona（SHALLOW+FEEDBACK / EXPERT+FILE_ISSUE）各跑全新 harness
+轨迹，print_result 并排打印 turns / 两路体感 / 行为信号 / issue artifact；run_live 固定
+ApiPersonaClient（走 repo .env 网关）对真实 user-agent 跑 SplitBillHarness。
 
 **接口**
 
+```
 ScriptedHarness / SplitBillHarness 实现 spec-0001/T2 HarnessInterface：
   send(message: str) -> str   # 本轮只回文本(无 gold/exit_code)
   reset() -> None             # 重置脚本步进, 幂等
   close() -> None             # 置已关闭标志(无真资源)；幂等，close 后再 send/reset 抛 RuntimeError
 demo.main() / run_live.main()   # 两个 __main__ 运行入口
+```
 
 **测试**
 
@@ -471,45 +447,50 @@ demo.main() / run_live.main()   # 两个 __main__ 运行入口
 
 ## Drawbacks
 
-<!-- 待填 -->
+本组以工程复杂度换取拟真度，代价集中在几处：9 维结构化 persona（T1）相比 spec-0001/T1 的自由文本
+五元组显著提高建模与维护成本，且需要 None 哨兵区分「未提供」与「已 grounded」的派生维度，接口不如
+自由文本直观。体感评分（T4）两路并出多消耗一次 LLM 调用与一个冗余字段（feeling_derived）。会话主
+循环（T5）把 T1–T4 总装为单一引擎后复杂度与多模块依赖显著上升；体感只在会话末产出一次，丢失「第几
+轮变差」的细粒度；感知侧从代码过滤改为纯 prompt 约束（G1 + persona 档位）后，能力分叉的真实性完全
+依赖提示质量，不再有代码层兜底，提示退化时可能出现低能力 persona 越级识破 bug 或高能力 persona 误
+判。T6 的 harness 桩为脚本化 shim，仅覆盖预设分叉轨迹，尚非真实 CLI harness，代表性有限。最根本的
+限制是本轮全程未实现客观真值线（gold/GAP/ESCAPED_BUG/control-plane）：体感与 issue 完全建立在主观
+信号之上，无法核实 persona 的判断本身是否准确，只能依赖后续多轮迭代与真实数据校准间接收敛。
 
 ## Rationale and alternatives
 
-### T1 Persona 维度模型与文案
+### 用户建模核心：persona 维度与动作空间/状态机（T1、T2）
 
 - 9 维结构化 vs spec-0001/T1 自由文本五元组：选结构化（驱动能力分叉、可复现/可采样），代价是建模成本；
-  与 models.Persona 的并轨留待接入闭环（见 open-questions）。
+  与 models.Persona 的并轨留待接入闭环（见 Unresolved questions）。
 - 派生维度确定性查表 vs LLM 推断：选确定性，保证可复现与可 codegen，杜绝采样噪声进入静态系数。
 - 派生 fallback-only vs 一律派生：选 fallback。真实 persona 的验收/信任/授权应可被 grounded 值直接给定（维度
   正交，见 selfreport 例 C：expert 可 over-trust）；一律派生会把 grounded 真值改写成合成面（0006/T2 注入即失真）。
   代价是 Persona 需用 None 哨兵区分「未提供」与「已 ground」。
-
-### T2 动作模型、动作空间与状态机
-
 - executor×channel 双轴钉死 vs 单一 run_once 动作：选双轴，根除「自己跑 vs 让 harness 跑」的归属歧义。
 - 能力掩码 gate 动作 + 感知输入 vs 只 gate 动作：选都 gate，防强模型「心算」源码越过低能力档（G1）。
 - 本轮纯主观（不实现客观线）vs 含 gold/GAP：选纯主观。训练信号只取用户体感，客观真值线（GAP/
   ESCAPED_BUG/control-plane）整体推迟，避免过早引入 oracle 依赖；后续如需观测再开 spec。
 
-### T3 提示装配与 persona LLM 后端
+### 提示装配与 persona LLM 后端（T3）
 
 - 约定文本 OUTPUT CONTRACT vs 强制 JSON schema / tool-calling：选约定文本 + 容错解析，避免对模型形态
   强假设（对齐「兼容多种 agent/模型」），解析失败安全降级。
 - 自带 openai client vs 收敛到 0003/T2 nexau_runtime：当前自带（sim 可独立跑）；接入闭环时收敛到单一
-  nexau 运行时（单一运行时约束），见 open-questions。
+  nexau 运行时（单一运行时约束），见 Unresolved questions。
 
-### T4 体感评分（两路并出）
+### 体感评分：两路并出（T4）
 
 - 两路并出 vs 只取一路：选并出。只取 LLM 自评则解析失败即无信号、且不可复现；只取派生则丢失 persona
   角色内的真实满意度。并出以 LLM 为主、派生兜底兼校验，代价是多一次 LLM 调用与一个冗余字段。
 - 派生分由代码聚合 vs 让 LLM 直接打分：spec-0001/T3 字面要求 LLM 产出；但控制信封每轮已产 verdict，
   再让 LLM 额外打 1–4 与之冗余且引入噪声。折中：保留 LLM 自评对齐 spec，同时代码派生作可复现交叉校验。
 - 复用 0001 models.FeelingScore vs sim 内自定义：当前 sim 自包含定义（零跨包耦合、可独立测）；接入闭环
-  时再改用 models.FeelingScore，见 open-questions。
+  时再改用 models.FeelingScore，见 Unresolved questions。
 - 越界处理 assert+捕获为 None vs 直接抛：选前者。既守住「越界即非法」的单一校验点（T1 __post_init__），
   又不让一次坏自评崩掉整局。
 
-### T5 会话主循环引擎
+### 会话主循环引擎（T5）
 
 - 控制信封引擎 vs spec-0001/T3 最小桩：选引擎。最小桩仅 sentinel+max_turns，无法表达能力分叉与
   情绪演化，训练信号失真；引擎更贴真实使用，代价是复杂度与多模块依赖。
@@ -521,7 +502,7 @@ demo.main() / run_live.main()   # 两个 __main__ 运行入口
   输入，子串/缩进启发式脆弱（漏判越档违反 G1、误判删正常文本或伪造负向感知）；改为原样喂入、能力分叉
   交由 prompt(G1)+persona 档位约束 LLM 自律，去掉脆弱的字符串规则层（代价：分叉真实性更依赖提示质量）。
 
-### T6 harness 桩与运行入口
+### harness 桩与运行入口（T6）
 
 - 脚本化 harness vs 真实 CLI harness：本组用脚本化（确定性、可回归、无外部依赖），但与真实接入统一实现
   spec-0001/T2 的 HarnessInterface（send/reset/close）；真实 CLI 接入归 0003/T1 launcher。
@@ -530,73 +511,72 @@ demo.main() / run_live.main()   # 两个 __main__ 运行入口
 
 ## Prior art
 
-### T1 Persona 维度模型与文案
+### 用户建模核心：persona 维度与动作空间/状态机（T1、T2）
 
-spec-0001/T1 Persona 字段约定。CLAUDE.md：persona 来自真实数据、不依据 benchmark 构造。
-extract-selfreport-persona 例 C（维度正交：expert×over-trust，derive_* 须可被 grounded 值覆盖）。
-参考实现见本组 prototype（dimensions.py / clauses.py）。
+spec-0001/T1 Persona 字段约定，spec-0001/T2 黑盒对话协议（channel 语义对齐）。CLAUDE.md：persona
+来自真实数据、不依据 benchmark 构造；benchmark held-out。extract-selfreport-persona 例 C（维度正交：
+expert×over-trust，derive_* 须可被 grounded 值覆盖）。参考实现见本组 prototype（dimensions.py /
+clauses.py / actions.py / action_space.py / state.py）。
 
-### T2 动作模型、动作空间与状态机
-
-spec-0001/T2 黑盒对话协议（channel 语义对齐）。CLAUDE.md benchmark held-out。
-参考实现见本组 prototype（actions/action_space/state.py）。
-
-### T3 提示装配与 persona LLM 后端
+### 提示装配与 persona LLM 后端（T3）
 
 spec-0001/T3 LLM 后端注入为 Callable。CLAUDE.md 单一运行时 nexau（0003/T2）。
 参考实现见本组 prototype（prompt.py / persona_client.py）。
 
-### T4 体感评分（两路并出）
+### 体感评分：两路并出（T4）
 
 spec-0001/T1 FeelingScore 数据契约；spec-0001/T3「会话末经 LLM 产出 FeelingScore」。
 CLAUDE.md 用户侧(a)：体感评分作训练信号、benchmark held-out。参考实现见本组 prototype（feeling.py）。
 
-### T5 会话主循环引擎
+### 会话主循环引擎（T5）
 
 spec-0001/T3 用户 agent 驱动器（最小桩）、T2 黑盒对话协议、T4 会话编排 run_session。
 spec-0004 分层（harbor 只包外层 rollout，逐轮对话自立）。参考实现见本组 prototype（loop.py）。
 
-### T6 harness 桩与运行入口
+### harness 桩与运行入口（T6）
 
 spec-0001/T2 HarnessInterface + FakeHarness（send/reset/close）、spec-0003/T1 harness launcher（真实接入）。
 参考实现见本组 prototype（harness_adapter / scenarios / demo / run_live.py）。
 
 ## Unresolved questions
 
-### T1 Persona 维度模型与文案
+### 用户建模核心：persona 维度与动作空间/状态机（T1、T2）
 
-接入闭环时 9 维 Persona 与 spec-0001 models.Persona（五元组）如何并轨：扩展 models.Persona、
-还是加 9 维↔五元组转换层？本组先自包含，留待 dev 侧对接时定。
+- 接入闭环时 9 维 Persona 与 spec-0001 models.Persona（五元组）如何并轨：扩展 models.Persona、
+  还是加 9 维↔五元组转换层？本组先自包含，留待 dev 侧对接时定。
+- 客观真值线（objective/gold/GAP/control-plane）本轮不实现，整体推迟到后续观测 spec；届时按「只走旁路、
+  不写 state/persona、不进体感」的 held-out 约束补回。
 
-### T2 动作模型、动作空间与状态机
-
-客观真值线（objective/gold/GAP/control-plane）本轮不实现，整体推迟到后续观测 spec；届时按「只走旁路、
-不写 state/persona、不进体感」的 held-out 约束补回。
-
-### T3 提示装配与 persona LLM 后端
+### 提示装配与 persona LLM 后端（T3）
 
 接入闭环时 PersonaClient 是否收敛到 0003/T2 nexau_runtime（单一运行时约束）：现有 ApiPersonaClient
 与 nexau_runtime.Agent 后端形态不同（respond(system,user)->dict vs run(input)->str），需一层适配，待对接时定。
 
-### T4 体感评分（两路并出）
+### 体感评分：两路并出（T4）
 
 接入闭环时是否将 sim 的 FeelingScore 收敛为复用 spec-0001 models.FeelingScore（去重、单一数据契约）？
 两路分歧时（如 1 vs 2）训练信号取 LLM 自评、派生还是融合，待 dev 侧体感门禁（0003/T4）对接时定。
 评分细则（阈值/权重）为 CLAUDE.md 待定项#1，本组给出首版粗映射，待真实数据校准。
 
-### T5 会话主循环引擎
+### 会话主循环引擎（T5）
 
 harness 已统一为 spec-0001/T2 HarnessInterface(send/reset/close)（本组 T6）。接入闭环仍需把引擎原生
 run_session(persona, client, harness, task) 适配为 spec-0001/T4 的 run_session(persona, scenario,
 harness, user_agent, tracker, store)：turns 投影为 Transcript、issue_artifact 转 IssueDraft 经
 IssueTracker、9 维 Persona 与 FeelingScore 与 models 并轨。此适配归后续 Task/组。
 
-### T6 harness 桩与运行入口
+### harness 桩与运行入口（T6）
 
 桩已实现 HarnessInterface（send/reset/close）；真实 CLI harness 接入仍归 0003/T1 launcher。控制平面（进程
 exit_code）与客观真值线是否后续补回，归后续观测 spec，本轮不涉及。
 
 ## Future possibilities
 
-<!-- 待填 -->
+控制信封目前刻意搁置的几条线，是本组之后自然的延伸方向：其一是补回客观真值线（gold/GAP/
+ESCAPED_BUG/control-plane），以「只走旁路、不写 state/persona、不进体感」的方式接入，用于校验主观
+体感与真实缺陷检出率的一致性（见 Unresolved questions）；其二是把体感评分从「会话末一次」升级为逐
+轮打分，恢复「第几轮变差」的细粒度（T5 Rationale 已提及该取舍，后续若需可再升级）；其三是生产环境
+中把 T6 的脚本化 harness 桩替换为真实 CLI harness（同样实现 HarnessInterface，归 0003/T1
+launcher），覆盖比预设轨迹更广的真实缺陷分布；其四是待 0006/T2 从真实数据蒸馏出 persona 卡后，用
+真实 grounded 的 d3/trust/d6 校准 T1 当前的确定性派生查表，检验其与真实用户分布的贴合度。
 

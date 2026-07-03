@@ -62,16 +62,12 @@ held-out 纪律不受影响：本组只读观测，不触 benchmark、不改训�
 
 ## Motivation
 
-### T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板
-
 旧 AgentsPanel 把 agent 活动塞进每页顶部的朴素折叠列表，信息密度低、身份不直观，且常驻挤占各页顶部空间。
 用户要「以卡通形式展示活动 agent、展示身份、支持点击」的独立页面：卡通头像让「谁在跑、什么身份、健康与否」
 一眼可辨，独立页把 agent 观测从各业务页解耦出来。选 emoji + CSS 而非引入头像生成库（DiceBear 等），是遵循
 CLAUDE.md 奥卡姆理念——最小可用、零新依赖即可达成卡通表现；数据源已就绪，无需任何后端或注册表结构改动。
 
 ## Guide-level explanation
-
-### T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板
 
 在观测看板前端新增独立页 AgentBoard（/agentboard），以卡通形式实时展示当前活动的 agent 并支持点击，
 取代此前嵌于每页顶部的朴素折叠面板 AgentsPanel。数据源沿用既有只读端点 /api/agents（data/live/agents.json
@@ -84,8 +80,6 @@ health(a, now)（异常>卡顿>运行>完成）与 fmtDur、STALE_MS，供复用
 导航入口，并删除 components/AgentsPanel.tsx（仅此一处引用）。
 
 ## Reference-level explanation
-
-### T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板
 
 - 目录：pages/AgentBoard.tsx（页面）、components/AgentCard.tsx（卡片）、lib/agentHealth.ts 与 lib/avatar.ts
   （纯函数工具）。页面/卡片/工具三层职责分离（理念 2 解耦、3 结构化）。
@@ -145,8 +139,6 @@ health(a, now)（异常>卡顿>运行>完成）与 fmtDur、STALE_MS，供复用
 
 ## Rationale and alternatives
 
-### T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板
-
 - emoji + CSS vs 引头像生成库（DiceBear/boring-avatars）：选前者。零新依赖即达卡通表现（奥卡姆），代价是
   头像多样性有限（一组固定脸），但对内部观测看板足够。
 - 独立页 vs 保留顶部常驻面板：选独立页并摘除旧面板。避免两处重复展示同批 agent、还各页顶部挤占空间；代价是
@@ -157,8 +149,6 @@ health(a, now)（异常>卡顿>运行>完成）与 fmtDur、STALE_MS，供复用
 
 ## Prior art
 
-### T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板
-
 既有实现：frontend/src/components/AgentsPanel.tsx（health/fmtDur/STALE_MS 原逻辑出处，本 Task 抽出后删除）、
 frontend/src/types.ts（Agent DTO 契约）、frontend/src/hooks/useLiveData.ts、frontend/src/api.ts
 （getAgents/getSessions）、frontend/src/pages/SessionDetail.tsx（点击跳转目标）、frontend/src/index.css
@@ -166,8 +156,6 @@ frontend/src/types.ts（Agent DTO 契约）、frontend/src/hooks/useLiveData.ts�
 /api/sessions）、loop/live.py（agents.json 写入）、run.py（agent_id/label 约定）。
 
 ## Unresolved questions
-
-### T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板
 
 - 头像脸谱表规模：初版一组固定 emoji 脸即可；persona 增多后是否需更大脸库或按 domain 着色，留待观测后定。
 - 用户卡点击的会话匹配用「最新一条」：同一 persona 多局会话时只跳最近一局；若需选具体某局，属后续增强。

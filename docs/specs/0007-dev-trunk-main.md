@@ -72,8 +72,6 @@ tasks:
 
 ## Summary
 
-## Summary
-
 去掉 harness 仓的 `release` 常驻分支、发版、体感门禁与回退，改纯 **trunk（单 `main`）** 自进化：user agent 永远使用最新 `main`（会话开始锁定其 HEAD SHA、整局跑该快照），dev agent 不分 bug/feature、直接 commit 到 `main`。每次成功推进给 `main` 打轻量 `vK` tag，**仅作观测锚点，不是发版**。一往无前，不回退。
 
 一轮闭环（节点后标负责任务）：
@@ -191,68 +189,4 @@ T3（一次性迁移）与 T1 无代码依赖，可并行；T4 总装 e2e，依�
 - benchmark held-out 评测挂钩到选定 `vK` 的 SHA，事后验证体感驱动进化是否带来真实能力提升。
 - 坏 commit 的「软回退」观测：标记（而非 `revert`）退化点，保持「一往无前」的同时可视化退化。
 - 多 dev 并发直推 `main` 的冲突合并策略（当前串行各领不同 issue）。
-
-## Motivation
-
-本组（开发者侧改为纯 trunk(main) 自进化）的动机见组级总览与各 Task scope。
-
-## Guide-level explanation
-
-<!-- 待填 -->
-
-## Reference-level explanation
-
-### T1 开发者侧直推 main（去 branch/merge）
-
-**文件（单一 writer 所有权）**
-
-  - `backend/auto_designer/dev/agentic_developer.py`
-  - `backend/agent_defs/developer_agent/systemprompt.md`
-  - `backend/tests/dev/test_agentic_developer.py`
-
-### T2 编排去 release 链 · 会话级 main SHA 快照回灌
-
-**文件（单一 writer 所有权）**
-
-  - `backend/auto_designer/loop/orchestrator.py`
-  - `backend/auto_designer/loop/run_state.py`
-  - `backend/tests/loop/test_orchestrator.py`
-  - `backend/tests/loop/test_run_state.py`
-
-### T3 一次性迁移脚本：main ← release + 清理分支
-
-**文件（单一 writer 所有权）**
-
-  - `backend/scripts/migrate_trunk_main.py`
-  - `backend/tests/test_migrate_trunk_main.py`
-
-### T4 去 release：种子/bootstrap/e2e trunk 化
-
-**文件（单一 writer 所有权）**
-
-  - `backend/run.py`
-  - `backend/scripts/bootstrap_harness.py`
-  - `backend/tests/test_bootstrap_harness.py`
-
-依赖 DAG：`T1 → T2`，`T1 → T4`，`T2 → T4`
-
-## Drawbacks
-
-<!-- 待填 -->
-
-## Rationale and alternatives
-
-本组各 Task 的设计取舍与备选方案散见其 scope / Reference-level 叙述。
-
-## Prior art
-
-<!-- 待填 -->
-
-## Unresolved questions
-
-<!-- 待填 -->
-
-## Future possibilities
-
-<!-- 待填 -->
 
