@@ -1,5 +1,7 @@
 # auto-designer 观测看板（前端）
 
+> 交互与视觉参考 [vibe-kanban](https://github.com/BloopAI/vibe-kanban)（BloopAI）——四列同屏、极简看板风格。
+
 极简 vibe-kanban 风格的只读看板：同一页四列——用户 / 设计师 / 开发者的运行中状态 +
 Issues·Main 栏。顶部可切「运行中 / +已完成」，已完成按轮分组；点任意方块，第四栏展示
 该对象的完整信息（用户会话完整对话、dev/designer 完整过程流与最终报告、issue 正文+评论、
