@@ -289,7 +289,8 @@ def main() -> int:
         last = res.turns[-1] if res.turns else None
         feel = res.feeling or res.feeling_derived
         if running:
-            status = f"对话中… 第 {last.turn + 1} 轮 · {last.verdict}" if last else "启动中…"
+            # TurnLog.turn 已是 1-based（apply_verdict 先自增再落日志），直接用，勿再 +1
+            status = f"对话中… 第 {last.turn} 轮 · {last.verdict}" if last else "启动中…"
         else:
             score = feel.score if feel else "?"
             status = f"已完成 · {res.end_reason} · 体感 {score}"

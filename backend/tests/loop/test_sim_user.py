@@ -62,6 +62,27 @@ def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
     assert turns[2].content == "Looks good, thanks."
 
 
+def test_result_to_turns_includes_pending_harness_reply() -> None:
+    """实时快照：已到手、尚未随下一条 TurnLog 落日志的悬挂 harness 回复也要进对话，
+    否则 harness 长任务期间看板只见用户消息不见回复；与末条已入日志回复相同时不重复。"""
+    res = SessionResult(
+        persona_id="P-0991",
+        end_reason="max_turns",
+        turns=[_turn(1, "send_task", "emit", "Implement the interpreter ...", "")],
+        pending_harness_output="done: interpreter implemented",
+    )
+    turns = result_to_turns(res)
+    assert [(t.role, t.content) for t in turns] == [
+        ("user", "Implement the interpreter ..."),
+        ("harness", "done: interpreter implemented"),
+    ]
+
+    # 悬挂内容与最后一条已入日志的 harness 快照相同 → 视为同一条，不重复
+    res.turns.append(_turn(2, "give_feedback", "emit", "again", "done: interpreter implemented"))
+    roles = [t.role for t in result_to_turns(res)]
+    assert roles == ["user", "harness", "user"]
+
+
 def _model_persona(sp) -> Persona:
     return Persona(
         identity=sp.persona_id,

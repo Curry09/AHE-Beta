@@ -57,6 +57,9 @@ class SessionResult:
     issue_artifact: str | None = None
     feeling: FeelingScore | None = None  # 训练信号: persona LLM 会话末自评 (1–4)
     feeling_derived: FeelingScore | None = None  # 交叉校验/兜底: 框架从主观末态聚合的 1–4
+    # 已收到但尚未进入 TurnLog 的 harness 回复(harness 回复要等下一轮 TurnLog 才随
+    # harness_output 落日志, 这里先行暴露给观测层实时展示; 下一条 TurnLog 追加时清空)
+    pending_harness_output: str | None = None
 
 
 MAX_TURNS = 12
@@ -134,6 +137,7 @@ def run_session(
             verdict = "unsure"
         apply_verdict(state, verdict, coef)
 
+        result.pending_harness_output = None  # 该回复即将随本条 TurnLog 落日志, 不再悬挂
         result.turns.append(
             TurnLog(
                 turn=state.turn,
@@ -173,6 +177,10 @@ def run_session(
             harness_output = nxt
             history.append(f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}...")
             has_artifact = True  # harness 给出了可评判的产物
+            # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
+            result.pending_harness_output = nxt
+            if on_progress is not None:
+                on_progress(result)
         # verify_self: harness_output 不变, 但 self_obs 已注入下一轮
 
     # 收尾: 汇总纯主观的行为信号

@@ -103,6 +103,25 @@ def test_self_terminates_at_chosen_turn() -> None:
     assert len(res.turns) == 2
 
 
+def test_on_progress_pushes_pending_harness_reply_immediately() -> None:
+    """harness 回复到手即推观测层：send 返回后、persona 下一轮响应前，多触发一次
+    on_progress 且快照悬挂该回复；下一条 TurnLog 落日志时悬挂清空（回复已随日志携带）。"""
+    p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
+    client = _StubClient(["send_task", "accept"], verdict="satisfied")
+    snaps: list[tuple[int, str | None]] = []
+    run_session(
+        p,
+        client,
+        ScriptedHarness(),
+        TASK,
+        on_progress=lambda res: snaps.append((len(res.turns), res.pending_harness_output)),
+    )
+    # turn1 落日志(无悬挂) → harness 回复到手(悬挂推送) → turn2 落日志(悬挂已清)
+    assert snaps[0] == (1, None)
+    assert snaps[1][0] == 1 and snaps[1][1]
+    assert snaps[2] == (2, None)
+
+
 def test_max_turns_cutoff() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _StubClient(["send_task", "give_feedback"], verdict="unsure")  # 永不终止
