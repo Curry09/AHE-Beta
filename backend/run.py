@@ -38,6 +38,9 @@ DEFAULT_SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；�
 # 仍可设为具体整数手动覆盖。用户会话数≈persona 数，耗时按此线性放大，按需下调。
 PERSONA_LIMIT: int | None = None
 
+# 闭环轮数：run.json 运行态与看板「按轮分组」以此为总轮数。
+TOTAL_ROUNDS = 5
+
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """解析 CLI 参数：persona 卡库 / 种子卡库两个「给定输入」文件路径（其余默认）。"""
@@ -134,7 +137,7 @@ def _reset_to_initial(repo: Path, tracker) -> None:
     - Gitea: 强推本地 v0 seed 到 origin/main、删除所有远端 vK tag —— harness 回到 v0 起点
       (dev agent 在同一本地仓工作、push 同一 origin，故此处强推与其后续推进 fast-forward 兼容)。
     - issue: 关闭所有遗留 open issue (issue 编号/历史无法经 API 抹除，仅复位 open 集)。
-    - 看板: 清空 data/sessions/*.json 与 data/live/agents.json (体感曲线/活动注册表归零)。
+    - 看板: 清空 data/sessions/*.json 与 data/live/ 全部投影 (体感曲线/活动注册表/轮次归档归零)。
     """
     _git(repo, "push", "-f", "origin", "main")  # 远端 main 覆盖回 v0 seed
     ls = subprocess.run(
@@ -153,7 +156,9 @@ def _reset_to_initial(repo: Path, tracker) -> None:
             pass
     for f in (DATA / "sessions").glob("*.json"):
         f.unlink()
-    (DATA / "live" / "agents.json").unlink(missing_ok=True)
+    from auto_designer.loop.live import clear_live  # noqa: PLC0415  与 main() 同风格延迟导入
+
+    clear_live(data_dir=DATA)
 
 
 def main() -> int:
@@ -249,21 +254,43 @@ def main() -> int:
         fixed_set.append((mp, scenario))
         sim_personas[mp.identity] = sp
 
-    from auto_designer.loop.live import append_agent_log, clear_agents, update_agent
+    from auto_designer.loop.live import (
+        append_agent_log,
+        archive_agent,
+        clear_live,
+        update_agent,
+        update_live_run,
+    )
 
-    clear_agents(data_dir=DATA)  # 一轮 run 开始清空 agent 活动注册表
+    clear_live(data_dir=DATA)  # 一轮 run 开始清空 live 观测投影（agents/run/history）
 
-    def make_step_logger(agent_id):  # 逐步过程（每个工具调用）→ 该 agent 的看板时间线
-        return lambda text: append_agent_log(data_dir=DATA, agent_id=agent_id, text=text)
+    # 当前轮游标：orchestrator 轮次回调写入，各 agent 活动/归档据此标轮。round_shas 逐轮累计。
+    current = {"round": 0}
+    round_shas: list[str] = []
 
-    def on_sim_turn(identity, sim_persona, res, running):
-        """sim 逐轮（含终止轮）+ 收尾回调 -> 写该用户 agent 的活动槽，看板实时展示。"""
+    def on_round_start(k):
+        current["round"] = k
+        update_live_run(data_dir=DATA, running=True, round_no=k, total_rounds=TOTAL_ROUNDS)
+
+    def on_round_end(k, sha):
+        round_shas.append(sha)
+        update_live_run(
+            data_dir=DATA, running=True, round_no=k, total_rounds=TOTAL_ROUNDS, round_shas=round_shas
+        )
+
+    def make_event_logger(agent_id):  # 过程流（assistant 发言/工具调用/结果）→ 该 agent 的看板时间线
+        return lambda kind, text: append_agent_log(
+            data_dir=DATA, agent_id=agent_id, text=text, kind=kind
+        )
+
+    def on_sim_turn(identity, sim_persona, res, running, *, session_id=None):
+        """sim 逐轮（含终止轮）+ 收尾回调 -> 写该用户 agent 的活动槽；收尾再按轮归档。"""
         turns = [t.to_dict() for t in result_to_turns(res)]
         last = res.turns[-1] if res.turns else None
+        feel = res.feeling or res.feeling_derived
         if running:
             status = f"对话中… 第 {last.turn + 1} 轮 · {last.verdict}" if last else "启动中…"
         else:
-            feel = res.feeling or res.feeling_derived
             score = feel.score if feel else "?"
             status = f"已完成 · {res.end_reason} · 体感 {score}"
         update_agent(
@@ -274,7 +301,20 @@ def main() -> int:
             running=running,
             status=status,
             turns=turns,
+            round_no=current["round"],
         )
+        if not running:
+            archive_agent(
+                data_dir=DATA,
+                agent_id=f"user-{identity}",
+                round_no=current["round"],
+                extra={
+                    "kind": "user_session",
+                    "session_id": session_id,
+                    "score": feel.score if feel else None,
+                    "end_reason": res.end_reason,
+                },
+            )
 
     user_run_session_fn = make_sim_run_session_fn(
         client=client,
@@ -284,8 +324,8 @@ def main() -> int:
         on_turn=on_sim_turn,
     )
 
-    def make_dev_status(agent_id, label):  # 开发者 agent 活动回调
-        def cb(*, running, status, issue_number=None, branch=None, detail=None):
+    def make_dev_status(agent_id, label):  # 开发者 agent 活动回调（收尾时按轮归档）
+        def cb(*, running, status, issue_number=None, detail=None, tag=None, committed=False):
             update_agent(
                 data_dir=DATA,
                 agent_id=agent_id,
@@ -294,7 +334,20 @@ def main() -> int:
                 running=running,
                 status=status,
                 detail=detail,
+                round_no=current["round"],
             )
+            if not running and issue_number is not None:  # 「无可领 issue」不算工作项，不归档
+                archive_agent(
+                    data_dir=DATA,
+                    agent_id=agent_id,
+                    round_no=current["round"],
+                    extra={
+                        "kind": "dev_run",
+                        "issue_number": issue_number,
+                        "tag": tag,
+                        "committed": committed,
+                    },
+                )
 
         return cb
 
@@ -304,13 +357,13 @@ def main() -> int:
             str(repo),
             dev_agent_def,
             on_status=make_dev_status(f"dev-{i}", f"dev#{i + 1}"),
-            on_step=make_step_logger(f"dev-{i}"),
+            on_event=make_event_logger(f"dev-{i}"),
         )
         for i in range(roster["developer"])
     ]
 
-    def make_designer_status(agent_id, label):  # 创新者 agent 活动回调
-        def cb(*, running, status, detail=None):
+    def make_designer_status(agent_id, label):  # 创新者 agent 活动回调（收尾时按轮归档）
+        def cb(*, running, status, detail=None, proposals=None):
             update_agent(
                 data_dir=DATA,
                 agent_id=agent_id,
@@ -319,7 +372,15 @@ def main() -> int:
                 running=running,
                 status=status,
                 detail=detail,
+                round_no=current["round"],
             )
+            if not running:
+                archive_agent(
+                    data_dir=DATA,
+                    agent_id=agent_id,
+                    round_no=current["round"],
+                    extra={"kind": "designer_run", "proposals": proposals or []},
+                )
 
         return cb
 
@@ -332,7 +393,7 @@ def main() -> int:
             on_status=make_designer_status(
                 f"designer-{i}", "designer" if roster["designer"] == 1 else f"designer#{i + 1}"
             ),
-            on_step=make_step_logger(f"designer-{i}"),
+            on_event=make_event_logger(f"designer-{i}"),
         )
         for i in range(roster["designer"])
     ]
@@ -345,13 +406,25 @@ def main() -> int:
         run_session_fn=user_run_session_fn,
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
         designers=designers,  # 创新者接入闭环：a → d(designer) → b → c
+        on_round_start=on_round_start,  # 轮次运行态 → data/live/run.json（看板 /api/state）
+        on_round_end=on_round_end,
     )
 
     print(
-        f"④ 跑 5 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× {len(developers)} dev agent"
-        f" × {len(designers)} designer，dev 直推 main，真模型）..."
+        f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
+        f"{len(developers)} dev agent × {len(designers)} designer，dev 直推 main，真模型）..."
     )
-    refs = orch.run(5)
+    try:
+        refs = orch.run(TOTAL_ROUNDS)
+    finally:
+        # 无论正常结束还是中途炸掉，运行态都落 running=False，看板不悬挂「运行中」。
+        update_live_run(
+            data_dir=DATA,
+            running=False,
+            round_no=current["round"],
+            total_rounds=TOTAL_ROUNDS,
+            round_shas=round_shas,
+        )
 
     print("\n=== 结果 ===")
     print("各轮 main HEAD SHA:", refs)  # Spec-0007/T4：观测游标（main 最新 SHA），非 release 链

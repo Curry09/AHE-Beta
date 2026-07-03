@@ -77,14 +77,16 @@ def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
     mp = _model_persona(sp)
     tracker = FakeTracker()
     store = SessionStore(tmp_path)
-    seen: list[bool] = []
+    seen: list[tuple[bool, str | None]] = []
 
     fn = make_sim_run_session_fn(
         client=ScriptedPersonaClient(),
         tracker=tracker,
         store=store,
         sim_personas={mp.identity: sp},
-        on_turn=lambda ident, sim_p, res, running: seen.append(running),
+        on_turn=lambda ident, sim_p, res, running, *, session_id=None: seen.append(
+            (running, session_id)
+        ),
     )
     session = fn(mp, SeedScenario(description="task"), ScriptedHarness())
 
@@ -97,8 +99,10 @@ def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
     assert session.issue_refs and session.issue_refs[0].number == open_issues[0].number
     # session 落盘可回读
     assert store.load(session.session_id).session_id == session.session_id
-    # 逐轮回调(若干 True) + 收尾一次 False
-    assert seen and seen[-1] is False and any(seen[:-1])
+    # 逐轮回调(若干 True，无 session_id) + 收尾一次 False（带 session_id 供看板归档关联）
+    assert seen and seen[-1] == (False, session.session_id)
+    assert any(running for running, _ in seen[:-1])
+    assert all(sid is None for _, sid in seen[:-1])
 
 
 def test_sim_adapter_no_issue_when_not_filed(tmp_path) -> None:

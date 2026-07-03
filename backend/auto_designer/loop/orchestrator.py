@@ -15,6 +15,7 @@ harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA c
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from typing import Protocol
 
 from auto_designer.designer.designer import Designer
@@ -55,6 +56,8 @@ class Orchestrator:
         run_session_fn: SessionRunner,
         initial_ref: str,
         designers: list[Designer] | None = None,
+        on_round_start: Callable[[int], None] | None = None,
+        on_round_end: Callable[[int, str], None] | None = None,
     ) -> None:
         self._launcher = launcher
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
@@ -64,6 +67,9 @@ class Orchestrator:
         self._designers = designers or []
         self._run_session = run_session_fn
         self._initial_ref = initial_ref  # 跟踪的主干分支名（trunk = "main"），每局解析其 HEAD SHA
+        # 轮次观测回调（可选）：round 从 1 起；end 时携带本轮 main 最新 SHA。看板运行态由此得知轮数。
+        self._on_round_start = on_round_start
+        self._on_round_end = on_round_end
 
     def run_round(self, ref: str) -> str:
         # Spec-0007/T2：传入的 ref 仅为「上一轮观测游标」透传（供 harbor runner 的 checkpoint 续跑链），
@@ -109,9 +115,13 @@ class Orchestrator:
             raise ValueError(f"n_rounds 须为正：{n_rounds}")
         refs: list[str] = []
         ref = self._initial_ref  # 起始游标 = main 分支名；首轮 run_round 即解析其 HEAD SHA
-        for _ in range(n_rounds):
+        for i in range(n_rounds):
+            if self._on_round_start is not None:
+                self._on_round_start(i + 1)
             ref = self.run_round(ref)  # 返回本轮 main 最新 SHA（观测）；不参与 trunk 解析
             refs.append(ref)
+            if self._on_round_end is not None:
+                self._on_round_end(i + 1, ref)
         return refs
 
     def _resolve_head(self, *, ref: str) -> str:

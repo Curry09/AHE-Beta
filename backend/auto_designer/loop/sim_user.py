@@ -29,8 +29,9 @@ from auto_designer.user.sim.loop import run_session as sim_run_session
 from auto_designer.user.sim.persona_client import PersonaClient
 from auto_designer.user.sim.workspace import materialize as materialize_workspace
 
-# 观测回调：(identity, sim_persona, 进行中/最终的 SessionResult, running) -> None。
-SimTurnHook = Callable[[str, SimPersona, SessionResult, bool], None]
+# 观测回调：(identity, sim_persona, 进行中/最终的 SessionResult, running, *, session_id) -> None。
+# session_id 仅收尾（running=False）时携带（session 已落 store），供看板归档关联全量会话。
+SimTurnHook = Callable[..., None]
 
 
 def result_to_turns(res: SessionResult) -> list[Turn]:
@@ -105,7 +106,7 @@ def make_sim_run_session_fn(
 
         def progress(partial: SessionResult) -> None:
             if on_turn is not None:
-                on_turn(persona.identity, sim_persona, partial, True)
+                on_turn(persona.identity, sim_persona, partial, True, session_id=None)
 
         harness.reset()  # 开局责任归编排层
         try:
@@ -126,7 +127,8 @@ def make_sim_run_session_fn(
         )
         store.save(session)  # 体感 + session 落本地（issue 权威源在 Gitea）
         if on_turn is not None:
-            on_turn(persona.identity, sim_persona, res, False)  # 收尾：标 running=False
+            # 收尾：标 running=False，带 session_id 供看板归档关联全量会话。
+            on_turn(persona.identity, sim_persona, res, False, session_id=session.session_id)
         return session
 
     return run

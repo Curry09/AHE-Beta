@@ -69,13 +69,13 @@ class AgenticDeveloper:
         harness_repo: str,
         agent_def_dir: str,
         on_status: StatusFn | None = None,
-        on_step: Callable[[str], None] | None = None,
+        on_event: Callable[[str, str], None] | None = None,
     ) -> None:
         self._tracker = tracker
         self._repo = Path(harness_repo)
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
-        self._on_step = on_step  # 逐步过程回调（每个工具调用一条），看板时间线用
+        self._on_event = on_event  # 过程流回调 (kind, text)：assistant 发言/工具调用/结果，看板时间线用
 
     def work_one(self, skip: set[int] | None = None) -> DevOutcome:
         skip = skip or set()
@@ -117,7 +117,9 @@ class AgenticDeveloper:
             running=False,
             status=(f"已推进 main {tag}" if committed else "本轮未推进 main"),
             issue_number=issue.number,
-            detail=result_text[:800] if result_text else None,
+            tag=tag,
+            committed=committed,
+            detail=result_text or None,  # 最终报告全文（详情面板展示，不截断）
         )
         return DevOutcome(issue_number=issue.number, tag=tag, committed=committed)
 
@@ -128,13 +130,14 @@ class AgenticDeveloper:
         from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
         cfg = AgentConfig.from_yaml(config_path=self._agent_def / "agent.yaml")
-        if self._on_step is not None:
-            # 逐工具调用流到看板时间线（黑盒 run 变逐步可观测），见 loop/live_tracer。
+        if self._on_event is not None:
+            # 过程流（assistant 发言 + 逐工具调用/结果）流到看板时间线（黑盒 run 变逐步可观测），
+            # 见 loop/live_tracer。
             from auto_designer.loop.live_tracer import (
                 StepTracer,  # noqa: PLC0415  依赖 nexau，懒加载
             )
 
-            cfg.resolved_tracer = StepTracer(self._on_step)
+            cfg.resolved_tracer = StepTracer(self._on_event)
         agent = Agent(config=cfg)
         # Spec-0007/T1：直推 main——无 branch/merge/release，commit 落 main、打 vK tag、push main+tag。
         msg = (
