@@ -342,6 +342,30 @@ export class Worker implements WorkerCtx {
     idleScheduleWander(this);
   }
 
+  // ── Live sync（/api/agents 轮询 → 状态点 + 对话气泡）───
+
+  /** 收工后气泡的停留时长（淡出前）。 */
+  private static readonly LIVE_BUBBLE_DONE_TTL = 8000;
+  private lastLiveMessage: string | null = null;
+
+  /**
+   * 把后端实时状态应用到小人：状态点变色（黄=工作中/绿=完成/红=失败），
+   * 头顶气泡展示最新一条对话——工作中常驻（ttl=0，随消息更新），收工后停留片刻淡出。
+   */
+  syncLive(status: WorkerStatus, message: string | null) {
+    const wasWorking = this._status === "working";
+    if (this._status !== status) this.setStatus(status);
+    const working = status === "working";
+
+    if (message && message !== this.lastLiveMessage) {
+      this.lastLiveMessage = message;
+      this.showBubble(message, working ? 0 : Worker.LIVE_BUBBLE_DONE_TTL);
+    } else if (wasWorking && !working && this.lastLiveMessage) {
+      // 工作中 → 收工：把常驻气泡换成限时展示，停留片刻后淡出
+      this.showBubble(this.lastLiveMessage, Worker.LIVE_BUBBLE_DONE_TTL);
+    }
+  }
+
   // ── Bubble ────────────────────────────────────────────
 
   showBubble(message: string, ttl = 5000) {

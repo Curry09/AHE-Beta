@@ -44,6 +44,8 @@ export interface SeatState {
   spawnY?: number;
   spawnFacing?: SeatFacing;
   status: SeatStatus;
+  /** 该 agent 最新一条对话/状态文案，小人头顶气泡展示（工作中常驻，收工后淡出）。 */
+  latestMessage?: string;
   taskSnippet?: string;
   runId?: string;
   startedAt?: string;

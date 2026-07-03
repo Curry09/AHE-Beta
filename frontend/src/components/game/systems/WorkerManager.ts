@@ -1,10 +1,18 @@
 import * as Phaser from "phaser";
-import { Worker, type POI } from "../entities/Worker";
+import { Worker, type POI, type WorkerStatus } from "../entities/Worker";
 import type { Direction } from "../config/animations";
 import type { Pathfinder } from "../utils/Pathfinder";
 import type { SeatDef } from "../utils/MapHelpers";
-import type { SeatState } from "@/types/game";
+import type { SeatState, SeatStatus } from "@/types/game";
 import type { Room } from "@/lib/roomLayout";
+
+/** 座位状态（后端 /api/agents 投影）→ 小人可视状态（状态点颜色 / 是否游走）。 */
+function toWorkerStatus(status: SeatStatus): WorkerStatus {
+  if (status === "running" || status === "returning") return "working";
+  if (status === "done") return "done";
+  if (status === "failed") return "failed";
+  return "idle";
+}
 
 export class WorkerManager {
   private scene: Phaser.Scene;
@@ -78,10 +86,15 @@ export class WorkerManager {
           existingBySeatId.delete(seatDef.seatId);
         }
         const created = this.spawnWorker(seatDef, seat);
-        if (created) nextWorkers.push(created);
+        if (created) {
+          created.syncLive(toWorkerStatus(seat.status), seat.latestMessage ?? null);
+          nextWorkers.push(created);
+        }
         continue;
       }
 
+      // 每次轮询把后端实时状态同步到小人：状态点 + 最新对话气泡。
+      existing.syncLive(toWorkerStatus(seat.status), seat.latestMessage ?? null);
       nextWorkers.push(existing);
       existingBySeatId.delete(seatDef.seatId);
     }

@@ -138,6 +138,16 @@ function agentsByRole(agents: Agent[], role: AgentRole): Agent[] {
   return agents.filter((a) => a.role === role);
 }
 
+/** 气泡文案：最新一条非空对话（harness 回复加 🤖 前缀区分说话方），无对话则退到 status。 */
+function latestMessage(agent: Agent): string | undefined {
+  for (let i = agent.turns.length - 1; i >= 0; i--) {
+    const turn = agent.turns[i];
+    const content = turn?.content?.trim();
+    if (content) return turn.role === "harness" ? `🤖 ${content}` : content;
+  }
+  return agent.status?.trim() || undefined;
+}
+
 /** roster + agents → 三房间 + 座位 + 座位/agent 绑定。座位数=房间容量，按角色顺序填入实时 agent。 */
 export function computeLayout(roster: Roster, agents: Agent[]): LayoutResult {
   const rects = roomRects(roster);
@@ -181,6 +191,7 @@ export function computeLayout(roster: Roster, agents: Agent[]): LayoutResult {
           assigned: true,
           spriteKey: meta.sprite,
           status: agent.running ? "running" : "done",
+          latestMessage: latestMessage(agent),
         });
       } else {
         // 空槽：不派小人，仅由房间标题的 filled/capacity 体现。

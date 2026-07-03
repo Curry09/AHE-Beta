@@ -46,8 +46,10 @@ export function stopIdleActivity(ctx: WorkerCtx) {
 }
 
 export function scheduleWander(ctx: WorkerCtx) {
-  stopIdleActivity(ctx);
+  // 守卫在前：非 idle（如工作中）直接返回，不做 stopIdleActivity——
+  // 否则出生时的 initTimer 会把工作中小人的常驻对话气泡误藏掉。
   if (!ctx.canWander || ctx._status !== "idle") return;
+  stopIdleActivity(ctx);
 
   const delay = Phaser.Math.Between(WANDER_MIN_DELAY, WANDER_MAX_DELAY);
   if (ctx.wanderTimer) ctx.wanderTimer.destroy();
