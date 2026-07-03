@@ -52,6 +52,41 @@ export function roomHeadline(def: RoomDef): string {
   return `${def.title} (${def.filled}/${def.capacity})`;
 }
 
+// ── 实体墙 + 门几何（B 档）──────────────────────────────────
+// 每个房间四面实体墙围合，底墙居中留一道门（缺口）。墙既用于绘制，也用于生成物理碰撞体，
+// 让 boss（玩家）无法穿墙、只能从门进出，达成「严格分房间」。门朝下：boss 出生在房间带下方。
+export const WALL_THICK = 12; // 墙厚（像素）
+export const DOOR_W = 76; // 门洞宽（像素）
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface RoomWalls {
+  /** 四面墙的实心段（底墙被门洞切成左右两段）——绘制与碰撞共用。 */
+  walls: Rect[];
+  /** 门洞（底墙缺口）——绘制门槛用，无碰撞。 */
+  door: Rect;
+}
+
+/** 由房间矩形算出四面墙段 + 底墙居中门洞。 */
+export function roomWalls(def: RoomDef): RoomWalls {
+  const t = WALL_THICK;
+  const { x, y, w, h } = def;
+  const doorX = x + (w - DOOR_W) / 2;
+  const walls: Rect[] = [
+    { x, y, w, h: t }, // 顶墙
+    { x, y, w: t, h }, // 左墙
+    { x: x + w - t, y, w: t, h }, // 右墙
+    { x, y: y + h - t, w: (w - DOOR_W) / 2, h: t }, // 底墙·左段
+    { x: doorX + DOOR_W, y: y + h - t, w: (w - DOOR_W) / 2, h: t }, // 底墙·右段
+  ];
+  return { walls, door: { x: doorX, y: y + h - t, w: DOOR_W, h: t } };
+}
+
 /** 按 roster 权重把房间带横向切成三块矩形（宽度∝容量，至少占 1 份）。 */
 function roomRects(roster: Roster): Record<Room, { x: number; w: number }> {
   const weights: Record<Room, number> = {

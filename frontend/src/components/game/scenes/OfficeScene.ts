@@ -13,7 +13,7 @@ import {
   type AnimatedProp,
 } from "../utils/MapHelpers";
 import { gameEvents } from "@/lib/events";
-import { roomHeadline, type RoomDef } from "@/lib/roomLayout";
+import { roomHeadline, roomWalls, type RoomDef } from "@/lib/roomLayout";
 import { createLogger } from "@/lib/logger";
 import {
   BOSS_INTERACT_DISTANCE,
@@ -54,6 +54,7 @@ export class OfficeScene extends Phaser.Scene {
   private doorManager!: DoorManager;
   private cleanupEventBridge: (() => void) | null = null;
   private roomObjects: Phaser.GameObjects.GameObject[] = [];
+  private roomWallGroup!: Phaser.Physics.Arcade.StaticGroup;
   private offRoomsUpdated: (() => void) | null = null;
 
   constructor() {
@@ -157,6 +158,10 @@ export class OfficeScene extends Phaser.Scene {
     this.player = new Player(this, bossSpawn.x, bossSpawn.y, bossSpawn.facing);
     this.physics.add.collider(this.player.sprite, collisionGroup);
 
+    // 三房间实体墙：碰撞体在 rooms-updated 时按房间矩形重建，玩家撞墙、只能走门。
+    this.roomWallGroup = this.physics.add.staticGroup();
+    this.physics.add.collider(this.player.sprite, this.roomWallGroup);
+
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.player.sprite.setCollideWorldBounds(true);
 
@@ -213,26 +218,50 @@ export class OfficeScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.cleanup());
   }
 
-  // ── Room overlays ──────────────────────────────────────
+  // ── Room overlays（实体墙 + 门）──────────────────────────
 
-  /** 重绘三个房间（半透明地面色块 + 标题栏 + 「角色 (filled/capacity)」标题）。 */
+  // 墙深度低于角色（5），角色始终在墙之上；门槛更低，压在地面色块上。
+  private static readonly FLOOR_DEPTH = 1;
+  private static readonly DOOR_DEPTH = 2;
+  private static readonly WALL_DEPTH = 4;
+  private static readonly WALL_FILL = 0x2b3448; // 墙体主色（深板岩）
+  private static readonly WALL_TOP = 0x475569; // 墙顶高光
+
+  /** 重绘三房间：地面色块 + 标题栏 + 四面实体墙（底墙留门）+ 门槛，并重建墙的物理碰撞体。 */
   private drawRooms(rooms: RoomDef[]) {
     for (const obj of this.roomObjects) obj.destroy();
     this.roomObjects = [];
+    // 清空并重建墙碰撞体（房间尺寸随 roster 变化）。
+    this.roomWallGroup.clear(true, true);
 
     const TITLE_H = 40;
     for (const room of rooms) {
-      const g = this.add.graphics().setDepth(1);
+      const g = this.add.graphics().setDepth(OfficeScene.FLOOR_DEPTH);
       // 地面色块（房间底色）
-      g.fillStyle(room.color, 0.12);
-      g.fillRoundedRect(room.x, room.y, room.w, room.h, 14);
+      g.fillStyle(room.color, 0.14);
+      g.fillRect(room.x, room.y, room.w, room.h);
       // 标题栏
-      g.fillStyle(room.color, 0.28);
-      g.fillRoundedRect(room.x, room.y, room.w, TITLE_H, { tl: 14, tr: 14, bl: 0, br: 0 });
-      // 边框
-      g.lineStyle(2, room.color, 0.55);
-      g.strokeRoundedRect(room.x, room.y, room.w, room.h, 14);
+      g.fillStyle(room.color, 0.3);
+      g.fillRect(room.x, room.y, room.w, TITLE_H);
       this.roomObjects.push(g);
+
+      // 四面实体墙（底墙被门洞切成两段）：矩形即视觉 + 物理体。
+      const { walls, door } = roomWalls(room);
+      for (const wr of walls) {
+        const wall = this.add
+          .rectangle(wr.x + wr.w / 2, wr.y + wr.h / 2, wr.w, wr.h, OfficeScene.WALL_FILL, 1)
+          .setDepth(OfficeScene.WALL_DEPTH);
+        wall.setStrokeStyle(2, OfficeScene.WALL_TOP, 1);
+        this.physics.add.existing(wall, true);
+        this.roomWallGroup.add(wall);
+        this.roomObjects.push(wall);
+      }
+
+      // 门槛（门洞地面，房间色高亮，无碰撞）——标示可通行入口。
+      const sill = this.add
+        .rectangle(door.x + door.w / 2, door.y + door.h / 2, door.w, door.h + 4, room.color, 0.55)
+        .setDepth(OfficeScene.DOOR_DEPTH);
+      this.roomObjects.push(sill);
 
       const title = this.add
         .text(room.x + 14, room.y + TITLE_H / 2, roomHeadline(room), {
@@ -281,6 +310,7 @@ export class OfficeScene extends Phaser.Scene {
 
     for (const obj of this.roomObjects) obj.destroy();
     this.roomObjects = [];
+    this.roomWallGroup?.clear(true, true);
 
     this.workerManager?.destroyAll();
     this.interactionManager?.destroy();
