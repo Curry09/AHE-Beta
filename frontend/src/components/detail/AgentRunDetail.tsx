@@ -105,10 +105,12 @@ export function AgentRunDetail(props: {
             <Turns turns={turns} />
           </div>
         )}
-        <div className="block">
-          <div className="block-title">工作过程</div>
-          <ProcessStream log={log} />
-        </div>
+        {role !== "user" && (
+          <div className="block">
+            <div className="block-title">工作过程</div>
+            <ProcessStream log={log} />
+          </div>
+        )}
         {detail && (
           <div className="block">
             <div className="block-title">最终报告</div>
