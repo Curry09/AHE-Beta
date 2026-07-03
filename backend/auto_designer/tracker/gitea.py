@@ -99,6 +99,94 @@ class GiteaTracker:
 
     # ---- 观测读路径（非 IssueTracker 协议，仅 GiteaTracker 提供）----
 
+    def list_issues(self, *, state: str = "all", limit: int = 100) -> list[dict[str, Any]]:
+        """列 issue（含已关闭 + 正文 + 时间戳），供观测看板完整展示。纯观测、不改任何状态。"""
+        data = self._request(
+            "GET",
+            f"/repos/{self._owner}/{self._repo}/issues?state={state}&type=issues&limit={limit}",
+            None,
+        )
+        return [self._issue_dto(item) for item in (data or [])]
+
+    def get_issue(self, *, number: int) -> dict[str, Any]:
+        """取单条 issue 全量（含正文/labels/状态/时间戳）。不存在时抛 GiteaError(404)。"""
+        data = self._request("GET", f"/repos/{self._owner}/{self._repo}/issues/{number}", None)
+        return self._issue_dto(data or {})
+
+    def list_comments(self, *, number: int) -> list[dict[str, Any]]:
+        """取某 issue 的全部评论（作者/内容/时间），供详情面板展示完整讨论过程。"""
+        data = self._request(
+            "GET", f"/repos/{self._owner}/{self._repo}/issues/{number}/comments", None
+        )
+        return [
+            {
+                "author": (item.get("user") or {}).get("login") or "",
+                "body": item.get("body") or "",
+                "created_at": item.get("created_at") or "",
+            }
+            for item in (data or [])
+        ]
+
+    def get_commit_detail(self, *, sha: str) -> dict[str, Any]:
+        """取单个 commit 全量：message 全文 + 作者/时间 + 文件级增删统计 + 原始 diff 文本。
+
+        diff 走 Gitea 的 `.diff` 原文端点（text/plain）；文件统计走 commit API。tag 标注
+        沿用 _tags_by_sha（失败降级为无 tag）。
+        """
+        item = (
+            self._request(
+                "GET", f"/repos/{self._owner}/{self._repo}/git/commits/{sha}?stat=true", None
+            )
+            or {}
+        )
+        commit = item.get("commit") or {}
+        author = commit.get("author") or {}
+        stats = item.get("stats") or {}
+        return {
+            "sha": item.get("sha") or sha,
+            "short_sha": (item.get("sha") or sha)[:7],
+            "message": (commit.get("message") or "").strip(),
+            "author": author.get("name") or "",
+            "date": author.get("date") or "",
+            "url": item.get("html_url") or "",
+            "tags": self._tags_by_sha().get(item.get("sha") or sha, []),
+            "stats": {
+                "additions": stats.get("additions") or 0,
+                "deletions": stats.get("deletions") or 0,
+                "total": stats.get("total") or 0,
+            },
+            "files": [
+                {"filename": f.get("filename") or "", "status": f.get("status") or ""}
+                for f in (item.get("files") or [])
+            ],
+            "diff": self._commit_diff(sha=sha),
+        }
+
+    def _commit_diff(self, *, sha: str) -> str:
+        """commit 原始 diff 文本；取不到降级为空串（不阻断 commit 详情主体）。"""
+        endpoint = f"/repos/{self._owner}/{self._repo}/git/commits/{sha}.diff"
+        try:
+            resp = self._session.request("GET", self._api + endpoint, timeout=_REQUEST_TIMEOUT)
+        except requests.RequestException:
+            return ""
+        if not 200 <= resp.status_code < 300:
+            return ""
+        return resp.text or ""
+
+    @staticmethod
+    def _issue_dto(item: dict[str, Any]) -> dict[str, Any]:
+        """Gitea issue 响应 → 看板 DTO（观测读路径统一形状）。"""
+        return {
+            "number": item.get("number") or 0,
+            "title": item.get("title") or "",
+            "body": item.get("body") or "",
+            "labels": [lbl.get("name") or "" for lbl in (item.get("labels") or [])],
+            "state": item.get("state") or "open",
+            "created_at": item.get("created_at") or "",
+            "closed_at": item.get("closed_at") or None,
+            "url": item.get("html_url") or "",
+        }
+
     def list_recent_commits(self, *, limit: int = 15) -> list[dict[str, Any]]:
         """列 harness 仓 main 最近 commit（带 vK tag 标注），供观测看板「main 分支更新」。
 
