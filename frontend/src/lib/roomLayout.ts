@@ -15,7 +15,7 @@ const OUTER_MARGIN = 56; // 左右外边距
 const ROOM_GAP = 28; // 房间间距
 const TITLE_H = 58; // 房间标题区高度（座位从其下开始排）
 const SEAT_PAD_X = 26; // 座位区左右内边距
-const SEAT_PAD_BOTTOM = 30;
+const SEAT_PAD_BOTTOM = 60; // 底部留白：给最下排座位南侧的办公桌（48px 高桌面）留出空间
 
 export type Room = "user" | "designer" | "developer";
 

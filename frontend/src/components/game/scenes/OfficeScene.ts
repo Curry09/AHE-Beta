@@ -4,7 +4,7 @@ import { resetWanderClock } from "../entities/Worker";
 import { SPRITE_KEY, SPRITE_PATH, WORKER_SPRITES } from "../config/animations";
 import { EMOTE_SHEET_KEY, EMOTE_SHEET_PATH, EMOTE_FRAME_SIZE } from "../config/emotes";
 import { Pathfinder } from "../utils/Pathfinder";
-import { buildSpriteFrames, parseSpawns } from "../utils/MapHelpers";
+import { buildSpriteFrames, parseSpawns, type SeatDef } from "../utils/MapHelpers";
 import { gameEvents } from "@/lib/events";
 import { roomHeadline, roomWalls, type RoomDef } from "@/lib/roomLayout";
 import {
@@ -52,6 +52,9 @@ export class OfficeScene extends Phaser.Scene {
   preload() {
     // 地图 JSON 只用于取 boss 出生点与地图尺寸；瓦片图层不再渲染（场景改为自绘三房间）。
     this.load.tilemapTiledJSON("office", "/maps/office2.json");
+
+    // 办公家具贴图（桌子/电脑/绿植按 48px tile 索引切帧，见 officeTile）。
+    this.load.image("office-tiles", "/tilesets/Modern_Office_48x48.png");
 
     this.load.image(SPRITE_KEY, SPRITE_PATH);
 
@@ -132,7 +135,7 @@ export class OfficeScene extends Phaser.Scene {
 
     // 三房间布局更新：重绘房间叠加层 + 替换座位定义 + 增删小人。App 在场景就绪后按 roster/agents 推送。
     this.offRoomsUpdated = gameEvents.on("rooms-updated", (rooms, seatDefs, seats) => {
-      this.drawRooms(rooms);
+      this.drawRooms(rooms, seatDefs);
       this.workerManager.setSeatDefs(seatDefs);
       this.workerManager.syncWorkers(seats, (w) => this.interactionManager.clearIfNearest(w));
     });
@@ -177,8 +180,66 @@ export class OfficeScene extends Phaser.Scene {
     g.strokeRect(x, y, w, h);
   }
 
-  /** 重绘三房间：木地板 + 四面实体墙（底墙留门）+ 门槛 + 职能立牌，并重建墙碰撞体。 */
-  private drawRooms(rooms: RoomDef[]) {
+  // Modern_Office_48x48 内的家具 tile 索引（16 列，id = row*16+col；经贴图目检确认）。
+  private static readonly TILESET_COLS = 16;
+  private static readonly TILE = 48;
+  private static readonly DESK_TOP: [number, number] = [504, 505]; // 木纹桌面（左/右），与米色地板有对比
+  private static readonly MONITOR = 588; // 蓝屏显示器
+  private static readonly PLANTS: [number, number][] = [
+    // [叶, 盆]：竖向两 tile 的盆栽，三种样式轮换
+    [134, 150],
+    [166, 182],
+    [214, 230],
+  ];
+  private static readonly FURNITURE_DEPTH = 6; // 家具盖在墙(4)/角色(5)之上；名牌(20)不受影响
+
+  /** 取办公贴图中第 lid 块 tile 的 image（帧按需切）。 */
+  private officeTile(lid: number, x: number, y: number, depth: number) {
+    const frame = `t${lid}`;
+    const tex = this.textures.get("office-tiles");
+    if (!tex.has(frame)) {
+      const T = OfficeScene.TILE;
+      const sx = (lid % OfficeScene.TILESET_COLS) * T;
+      const sy = Math.floor(lid / OfficeScene.TILESET_COLS) * T;
+      tex.add(frame, 0, sx, sy, T, T);
+    }
+    const img = this.add.image(x, y, "office-tiles", frame).setDepth(depth);
+    this.roomObjects.push(img);
+    return img;
+  }
+
+  /** 座位南侧的办公桌工位：两块桌面 tile + 桌上显示器。小人（帧高 96，脚在 y+48）站桌后。 */
+  private drawWorkstation(seat: SeatDef) {
+    const D = OfficeScene.FURNITURE_DEPTH;
+    const yTop = seat.y + 72; // 桌面行中心：紧贴小人脚下往南一格
+    this.officeTile(OfficeScene.DESK_TOP[0], seat.x - 24, yTop, D);
+    this.officeTile(OfficeScene.DESK_TOP[1], seat.x + 24, yTop, D);
+    // 显示器立在桌面上，只压小人腿部（工位朝下的经典画法）
+    this.officeTile(OfficeScene.MONITOR, seat.x, yTop - 12, D + 1);
+  }
+
+  /** 房间角落绿植：顶部两角必放，房间够宽时底部两角（避开中央门洞）再各放一盆。 */
+  private drawPlants(room: RoomDef, index: number) {
+    const spots: { x: number; y: number }[] = [
+      { x: room.x + 40, y: room.y + 92 },
+      { x: room.x + room.w - 40, y: room.y + 92 },
+    ];
+    if (room.w > 320) {
+      spots.push(
+        { x: room.x + 40, y: room.y + room.h - 44 },
+        { x: room.x + room.w - 40, y: room.y + room.h - 44 },
+      );
+    }
+    for (let i = 0; i < spots.length; i++) {
+      const [leaf, pot] = OfficeScene.PLANTS[(index + i) % OfficeScene.PLANTS.length];
+      const s = spots[i];
+      this.officeTile(pot, s.x, s.y, OfficeScene.FURNITURE_DEPTH);
+      this.officeTile(leaf, s.x, s.y - 48, OfficeScene.FURNITURE_DEPTH);
+    }
+  }
+
+  /** 重绘三房间：木地板 + 四面实体墙（底墙留门）+ 门槛 + 职能立牌 + 家具，并重建墙碰撞体。 */
+  private drawRooms(rooms: RoomDef[], seatDefs: SeatDef[]) {
     for (const obj of this.roomObjects) obj.destroy();
     this.roomObjects = [];
     // 清空并重建墙碰撞体（房间尺寸随 roster 变化）。
@@ -217,6 +278,12 @@ export class OfficeScene extends Phaser.Scene {
       this.roomObjects.push(sill);
 
       this.drawSign(room);
+      this.drawPlants(room, rooms.indexOf(room));
+
+      // 房间内每个座位配一张办公桌工位（含空位——工位常驻，人来即坐）。
+      for (const seat of seatDefs) {
+        if (seat.seatId.startsWith(`${room.room}-`)) this.drawWorkstation(seat);
+      }
     }
   }
 
