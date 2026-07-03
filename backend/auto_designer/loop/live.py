@@ -16,8 +16,9 @@ from typing import Any
 _AGENTS_NAME = "agents.json"
 # role 展示顺序：用户 → 创新者 → 开发者（对齐闭环 a → d → b 的次序）。
 _ROLE_ORDER = {"user": 0, "designer": 1, "developer": 2}
-# 状态时间线（工作过程日志）长度上限：dev/designer 无 turns，看板靠它展示工作过程。
-_LOG_CAP = 50
+# 状态时间线（工作过程日志）长度上限：dev/designer 无 turns，看板靠它展示工作过程
+# （含 StepTracer 逐工具调用步骤，一次 agent.run 可达数十条）。
+_LOG_CAP = 200
 
 
 def _agents_file(*, data_dir: Path) -> Path:
@@ -73,6 +74,29 @@ def update_agent(
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp, path)  # 原子替换，读进程不会看到半成品
+
+
+def append_agent_log(*, data_dir: Path, agent_id: str, text: str) -> None:
+    """往某 agent 的工作过程时间线追加一条（逐步过程，如工具调用）。
+
+    不动 status/turns 等其余字段，updated_at 照刷。agent 槽不存在则 no-op（步骤必然发生在
+    update_agent 建槽之后；不为孤儿步骤造半空槽）。连续重复去重，同 _LOG_CAP 封顶。
+    """
+    path = _agents_file(data_dir=data_dir)
+    registry = _read_raw(path=path)
+    slot = registry.get(agent_id)
+    if slot is None:
+        return
+    log = list(slot.get("log", []))
+    if log and log[-1].get("text") == text:
+        return
+    now = datetime.now().isoformat()
+    log.append({"t": now, "text": text})
+    slot["log"] = log[-_LOG_CAP:]
+    slot["updated_at"] = now
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def read_agents(*, data_dir: Path) -> list[dict[str, Any]]:

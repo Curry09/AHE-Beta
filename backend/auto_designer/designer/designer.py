@@ -71,12 +71,14 @@ class Designer:
         harness_repo: str,
         agent_def_dir: str,
         on_status: StatusFn | None = None,
+        on_step: Callable[[str], None] | None = None,
     ) -> None:
         self._tracker = tracker
         self._store = store  # 体感曲线数据源（本地 SessionStore 索引）
         self._repo = Path(harness_repo)  # 只读 grounding：agent 看 harness 现状
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
+        self._on_step = on_step  # 逐步过程回调（每个工具调用一条），看板时间线用
 
     def propose_once(self) -> DesignOutcome:
         backlog = self._tracker.list_open_issues()
@@ -109,6 +111,13 @@ class Designer:
         from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
         cfg = AgentConfig.from_yaml(config_path=self._agent_def / "agent.yaml")
+        if self._on_step is not None:
+            # 逐工具调用流到看板时间线（黑盒 run 变逐步可观测），见 loop/live_tracer。
+            from auto_designer.loop.live_tracer import (
+                StepTracer,  # noqa: PLC0415  依赖 nexau，懒加载
+            )
+
+            cfg.resolved_tracer = StepTracer(self._on_step)
         agent = Agent(config=cfg)
         msg = (
             "综合下面的全量 open issue backlog 与体感曲线，找跨 issue 的结构性根因，"

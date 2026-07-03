@@ -230,7 +230,9 @@ def main() -> int:
     sim_persona_list = card_to_personas(
         PersonaLibrary(args.persona_library)
     )  # persona 卡库 → sim persona
-    sim_persona_list = sim_persona_list[:user_limit]  # 用户会话数 = roster 用户数（或 PERSONA_LIMIT）
+    sim_persona_list = sim_persona_list[
+        :user_limit
+    ]  # 用户会话数 = roster 用户数（或 PERSONA_LIMIT）
     seeds = _load_seeds(args.seed_cards)
     # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
@@ -247,9 +249,12 @@ def main() -> int:
         fixed_set.append((mp, scenario))
         sim_personas[mp.identity] = sp
 
-    from auto_designer.loop.live import clear_agents, update_agent
+    from auto_designer.loop.live import append_agent_log, clear_agents, update_agent
 
     clear_agents(data_dir=DATA)  # 一轮 run 开始清空 agent 活动注册表
+
+    def make_step_logger(agent_id):  # 逐步过程（每个工具调用）→ 该 agent 的看板时间线
+        return lambda text: append_agent_log(data_dir=DATA, agent_id=agent_id, text=text)
 
     def on_sim_turn(identity, sim_persona, res, running):
         """sim 逐轮（含终止轮）+ 收尾回调 -> 写该用户 agent 的活动槽，看板实时展示。"""
@@ -299,6 +304,7 @@ def main() -> int:
             str(repo),
             dev_agent_def,
             on_status=make_dev_status(f"dev-{i}", f"dev#{i + 1}"),
+            on_step=make_step_logger(f"dev-{i}"),
         )
         for i in range(roster["developer"])
     ]
@@ -326,6 +332,7 @@ def main() -> int:
             on_status=make_designer_status(
                 f"designer-{i}", "designer" if roster["designer"] == 1 else f"designer#{i + 1}"
             ),
+            on_step=make_step_logger(f"designer-{i}"),
         )
         for i in range(roster["designer"])
     ]

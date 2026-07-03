@@ -146,6 +146,21 @@ a:hover { color: var(--gold); }
 .conv-log-time { flex: none; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
 .conv-log-text { white-space: pre-wrap; }
 
+/* 历史会话（用户 agent：该 persona 落盘的往局，逐条展开看全文） */
+.hist-item { border: 1px solid var(--line); border-radius: 9px; margin: 8px 0; background: var(--panel); }
+.hist-item > summary {
+  display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 8px 12px;
+  font-size: 12px; list-style: none;
+}
+.hist-item > summary::before { content: "▸"; color: var(--gold); flex: none; }
+.hist-item[open] > summary::before { content: "▾"; }
+.hist-time { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hist-scenario { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-meta { flex: none; color: var(--muted); }
+.hist-body { padding: 4px 12px 10px; border-top: 1px dashed var(--line); }
+.hist-feeling { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.hist-feeling a { color: var(--gold); }
+
 .conv-detail { margin-top: 12px; }
 .conv-detail summary { cursor: pointer; color: var(--gold); font-size: 12px; }
 .conv-detail pre {
