@@ -156,6 +156,7 @@ def test_issues_connected(tmp_path: Path) -> None:
     assert len(body["issues"]) == 1
     issue = body["issues"][0]
     assert issue["title"] == "慢查询排查"
+    assert issue["body"] == "b"  # 正文随列表返回（详情面板完整信息）
     assert issue["url"] == "http://gitea/o/r/issues/1"
     assert "bug" in issue["labels"]
     assert issue["state"] == "open"
@@ -241,6 +242,136 @@ def test_issues_no_tracker(tmp_path: Path) -> None:
     body = client.get("/api/issues").json()
     assert body["connected"] is False
     assert body["issues"] == []
+
+
+_ISSUE_DTO = {
+    "number": 7,
+    "title": "harness 卡顿",
+    "body": "复现步骤……",
+    "labels": ["bug"],
+    "state": "closed",
+    "created_at": "2026-07-01T10:00:00Z",
+    "closed_at": "2026-07-02T09:00:00Z",
+    "url": "http://gitea/o/r/issues/7",
+}
+
+
+class _ObserveTracker(FakeTracker):
+    """FakeTracker + Gitea 观测读能力（全状态 issue/评论/commit 详情），测富端点连通路径。"""
+
+    def list_issues(self, *, state: str = "all", limit: int = 100):
+        assert state == "all"
+        return [_ISSUE_DTO]
+
+    def get_issue(self, *, number: int):
+        if number != 7:
+            raise RuntimeError("boom")
+        return _ISSUE_DTO
+
+    def list_comments(self, *, number: int):
+        return [{"author": "developer", "body": "已推进 main v2", "created_at": "2026-07-02"}]
+
+    def get_commit_detail(self, *, sha: str):
+        return {
+            "sha": sha,
+            "short_sha": sha[:7],
+            "message": "fix: issue #7\n\n详细说明",
+            "author": "developer",
+            "date": "2026-07-02T08:00:00Z",
+            "url": f"http://gitea/o/r/commit/{sha}",
+            "tags": ["v2"],
+            "stats": {"additions": 3, "deletions": 1, "total": 4},
+            "files": [{"filename": "agents/main.md", "status": "modified"}],
+            "diff": "diff --git a/agents/main.md b/agents/main.md\n+新增",
+        }
+
+
+def test_issues_full_states_via_observe_tracker(tmp_path: Path) -> None:
+    client = _client(tmp_path, tracker=_ObserveTracker())
+    body = client.get("/api/issues").json()
+    assert body["connected"] is True
+    assert body["issues"] == [_ISSUE_DTO]  # 全状态 + 正文 + 时间戳原样透传
+
+
+def test_issue_detail_with_comments(tmp_path: Path) -> None:
+    client = _client(tmp_path, tracker=_ObserveTracker())
+    body = client.get("/api/issues/7").json()
+    assert body["connected"] is True
+    assert body["issue"]["title"] == "harness 卡顿"
+    assert body["comments"][0]["author"] == "developer"
+
+
+def test_issue_detail_no_capability_degrades(tmp_path: Path) -> None:
+    # FakeTracker 无 get_issue/list_comments → connected=False（不抛 500）。
+    client = _client(tmp_path, tracker=FakeTracker())
+    body = client.get("/api/issues/1").json()
+    assert body == {"connected": False, "issue": None, "comments": []}
+
+
+def test_issue_detail_404(tmp_path: Path) -> None:
+    class _NotFound(_ObserveTracker):
+        def get_issue(self, *, number: int):
+            exc = RuntimeError("not found")
+            exc.status = 404
+            raise exc
+
+    client = _client(tmp_path, tracker=_NotFound())
+    assert client.get("/api/issues/99").status_code == 404
+
+
+def test_commit_detail_full(tmp_path: Path) -> None:
+    client = _client(tmp_path, tracker=_ObserveTracker())
+    body = client.get("/api/commits/" + "a" * 40).json()
+    assert body["connected"] is True
+    commit = body["commit"]
+    assert commit["message"] == "fix: issue #7\n\n详细说明"  # 全文非首行
+    assert commit["stats"]["additions"] == 3
+    assert "+新增" in commit["diff"]
+
+
+def test_commit_detail_no_capability_degrades(tmp_path: Path) -> None:
+    client = _client(tmp_path, tracker=FakeTracker())
+    assert client.get("/api/commits/abc").json() == {"connected": False, "commit": None}
+
+
+def test_state_defaults_then_running(tmp_path: Path) -> None:
+    from auto_designer.loop.live import update_live_run
+
+    client = _client(tmp_path, tracker=FakeTracker())
+    body = client.get("/api/state").json()
+    assert body["running"] is False and body["round"] == 0
+
+    update_live_run(data_dir=tmp_path, running=True, round_no=2, total_rounds=5)
+    body = client.get("/api/state").json()
+    assert body["running"] is True and body["round"] == 2 and body["total_rounds"] == 5
+
+
+def test_history_grouped_source(tmp_path: Path) -> None:
+    from auto_designer.loop.live import archive_agent, update_agent
+
+    client = _client(tmp_path, tracker=FakeTracker())
+    assert client.get("/api/history").json() == {"items": []}
+
+    update_agent(
+        data_dir=tmp_path,
+        agent_id="dev-0",
+        role="developer",
+        label="dev#1",
+        running=False,
+        status="已推进 main v1",
+        detail="完整报告",
+        round_no=1,
+    )
+    archive_agent(
+        data_dir=tmp_path,
+        agent_id="dev-0",
+        round_no=1,
+        extra={"kind": "dev_run", "issue_number": 3, "tag": "v1", "committed": True},
+    )
+    items = client.get("/api/history").json()["items"]
+    assert len(items) == 1
+    assert items[0]["kind"] == "dev_run" and items[0]["round"] == 1
+    assert items[0]["detail"] == "完整报告" and items[0]["log"]
 
 
 def test_issues_tracker_error(tmp_path: Path) -> None:

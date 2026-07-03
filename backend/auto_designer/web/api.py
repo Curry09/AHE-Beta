@@ -17,7 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 from starlette.types import Scope
 
-from auto_designer.loop.live import read_agents
+from auto_designer.loop.live import read_agents, read_history, read_live_run
 from auto_designer.loop.metrics import Metrics
 from auto_designer.loop.roster import load_roster
 from auto_designer.tracker.base import IssueTracker
@@ -63,27 +63,61 @@ def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
 
 
 def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict[str, object]:
-    """Gitea 看板整合：列 open issue + 看板链接；无 tracker 或读取失败时 connected=False。"""
+    """Gitea 看板整合：列全状态 issue（含正文/时间戳）+ 看板链接；无 tracker 或读取失败时
+    connected=False。tracker 无 list_issues 观测能力（Fake）时回落 open issue 列表。"""
     if tracker is None:
         return {"connected": False, "board_url": board_url, "issues": []}
+    fetch_all = getattr(tracker, "list_issues", None)
     try:
-        open_issues = tracker.list_open_issues()
+        if callable(fetch_all):
+            issues = fetch_all(state="all")
+        else:  # Fake 等仅协议实现：回落 open 集（正文仍有，时间戳缺省）
+            issues = [
+                {
+                    "number": i.number,
+                    "title": i.title,
+                    "body": i.body,
+                    "labels": list(i.labels),
+                    "state": i.state,
+                    "created_at": "",
+                    "closed_at": None,
+                    "url": f"{board_url}/{i.number}" if board_url else "",
+                }
+                for i in tracker.list_open_issues()
+            ]
     except Exception:
         return {"connected": False, "board_url": board_url, "issues": []}
-    return {
-        "connected": True,
-        "board_url": board_url,
-        "issues": [
-            {
-                "number": i.number,
-                "title": i.title,
-                "labels": list(i.labels),
-                "state": i.state,
-                "url": f"{board_url}/{i.number}" if board_url else "",
-            }
-            for i in open_issues
-        ],
-    }
+    return {"connected": True, "board_url": board_url, "issues": issues}
+
+
+def _issue_detail(*, tracker: IssueTracker | None, number: int) -> dict[str, object]:
+    """单条 issue 全量 + 评论时间线。不存在抛 404；无观测能力/读失败 connected=False。"""
+    get_issue = getattr(tracker, "get_issue", None)
+    list_comments = getattr(tracker, "list_comments", None)
+    if tracker is None or not callable(get_issue) or not callable(list_comments):
+        return {"connected": False, "issue": None, "comments": []}
+    try:
+        issue = get_issue(number=number)
+        comments = list_comments(number=number)
+    except Exception as exc:
+        if getattr(exc, "status", None) == 404:
+            raise HTTPException(status_code=404, detail=f"issue not found: #{number}") from None
+        return {"connected": False, "issue": None, "comments": []}
+    return {"connected": True, "issue": issue, "comments": comments}
+
+
+def _commit_detail(*, tracker: IssueTracker | None, sha: str) -> dict[str, object]:
+    """单个 commit 全量（message 全文/stats/files/diff）。不存在抛 404；无能力/读失败 connected=False。"""
+    fetch = getattr(tracker, "get_commit_detail", None)
+    if tracker is None or not callable(fetch):
+        return {"connected": False, "commit": None}
+    try:
+        commit = fetch(sha=sha)
+    except Exception as exc:
+        if getattr(exc, "status", None) == 404:
+            raise HTTPException(status_code=404, detail=f"commit not found: {sha}") from None
+        return {"connected": False, "commit": None}
+    return {"connected": True, "commit": commit}
 
 
 def _list_commits(*, tracker: IssueTracker | None, commits_url: str | None) -> dict[str, object]:
@@ -134,9 +168,27 @@ def create_app(
     def issues() -> dict[str, object]:
         return _list_issues(tracker=tracker, board_url=board_url)
 
+    @app.get("/api/issues/{number}")
+    def issue_detail(number: int) -> dict[str, object]:
+        return _issue_detail(tracker=tracker, number=number)
+
     @app.get("/api/commits")
     def commits() -> dict[str, object]:
         return _list_commits(tracker=tracker, commits_url=commits_url)
+
+    @app.get("/api/commits/{sha}")
+    def commit_detail(sha: str) -> dict[str, object]:
+        return _commit_detail(tracker=tracker, sha=sha)
+
+    @app.get("/api/state")
+    def state() -> dict[str, object]:
+        # 整条 run 的运行态（data/live/run.json）：running/当前轮/总轮数/各轮 main SHA。
+        return read_live_run(data_dir=store.root.parent)
+
+    @app.get("/api/history")
+    def history() -> dict[str, object]:
+        # 按轮归档的已完成工作项（data/live/history.json），前端按 round 分组回看。
+        return {"items": read_history(data_dir=store.root.parent)}
 
     @app.get("/api/config")
     def config() -> dict[str, object]:
