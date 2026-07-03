@@ -1,31 +1,86 @@
-// 镜像后端 DTO（backend/auto_designer/web/api.py）。字段名是契约，须与后端一致。
+// 数据契约：字段名与 backend/auto_designer/web/api.py 的响应一一对应，两侧须同步修改。
 
-export interface Overview {
-  open_issue_count: number | null;
-  session_count: number;
-  feeling_trend: [string, number][]; // [created_at, score]
-  issue_curve: [string, number, number][]; // [created_at, opened, net_open]
-}
-
-export interface SessionSummary {
-  session_id: string;
-  created_at: string;
-  score: number;
-  n_issues: number;
-  persona_identity: string;
-  scenario: string;
-}
+export type AgentRole = "user" | "designer" | "developer";
 
 export interface Turn {
   role: "user" | "harness";
   content: string;
 }
 
+// 过程流条目：status(状态变化) / assistant(模型发言) / tool(工具调用) / tool_result / tool_error
+export interface LogEntry {
+  t: string;
+  kind: string;
+  text: string;
+}
+
+export interface Agent {
+  agent_id: string;
+  role: AgentRole;
+  label: string;
+  running: boolean;
+  status: string;
+  round: number | null;
+  turns: Turn[];
+  detail: string | null;
+  log: LogEntry[];
+  started_at: string;
+  updated_at: string;
+}
+
+export interface AgentsResponse {
+  agents: Agent[];
+}
+
+// 整条 run 的运行态（data/live/run.json）
+export interface RunState {
+  running: boolean;
+  round: number;
+  total_rounds: number;
+  round_shas: string[];
+  started_at: string | null;
+  updated_at: string | null;
+}
+
+// 按轮归档的已完成工作项（data/live/history.json）
+export type HistoryKind = "user_session" | "designer_run" | "dev_run";
+
+export interface HistoryItem {
+  kind: HistoryKind;
+  round: number;
+  agent_id: string;
+  role: AgentRole;
+  label: string;
+  status: string;
+  turns: Turn[];
+  detail: string | null;
+  log: LogEntry[];
+  started_at: string | null;
+  archived_at: string;
+  // user_session
+  session_id?: string | null;
+  score?: number | null;
+  end_reason?: string;
+  // dev_run
+  issue_number?: number | null;
+  tag?: string | null;
+  committed?: boolean;
+  // designer_run
+  proposals?: number[];
+}
+
+export interface HistoryResponse {
+  items: HistoryItem[];
+}
+
 export interface Issue {
   number: number;
   title: string;
+  body: string;
   labels: string[];
   state: string;
+  created_at: string;
+  closed_at: string | null;
   url: string;
 }
 
@@ -33,6 +88,18 @@ export interface IssuesResponse {
   connected: boolean;
   board_url: string | null;
   issues: Issue[];
+}
+
+export interface IssueComment {
+  author: string;
+  body: string;
+  created_at: string;
+}
+
+export interface IssueDetailResponse {
+  connected: boolean;
+  issue: Issue | null;
+  comments: IssueComment[];
 }
 
 export interface Commit {
@@ -51,47 +118,15 @@ export interface CommitsResponse {
   commits: Commit[];
 }
 
-export type AgentRole = "user" | "designer" | "developer";
-
-/** 状态时间线条目（工作过程日志）：后端 live.py 在 status 变化时追加。 */
-export interface AgentLogEntry {
-  t: string;
-  text: string;
+export interface CommitDetail extends Commit {
+  stats: { additions: number; deletions: number; total: number };
+  files: { filename: string; status: string }[];
+  diff: string;
 }
 
-export interface Agent {
-  agent_id: string;
-  role: AgentRole;
-  label: string;
-  running: boolean;
-  status: string;
-  turns: Turn[];
-  detail: string | null;
-  /** 旧数据可能无此字段，前端按 [] 处理。 */
-  log?: AgentLogEntry[];
-  started_at: string;
-  updated_at: string;
-}
-
-export interface AgentsResponse {
-  agents: Agent[];
-}
-
-// 编制（后端 roster 单一真源，经 /api/config 读）：三个房间的容量。
-export interface Roster {
-  user: number;
-  designer: number;
-  developer: number;
-}
-
-export interface ConfigResponse {
-  roster: Roster;
-}
-
-export interface IssueRef {
-  number: number;
-  url: string;
-  state: string;
+export interface CommitDetailResponse {
+  connected: boolean;
+  commit: CommitDetail | null;
 }
 
 export interface SessionDetail {
@@ -107,5 +142,22 @@ export interface SessionDetail {
   scenario: { description: string };
   transcript: { turns: Turn[] };
   feeling: { score: number; reason: string };
-  issue_refs: IssueRef[];
+  issue_refs: { number: number; url: string; state: string }[];
 }
+
+export interface Roster {
+  user: number;
+  designer: number;
+  developer: number;
+}
+
+export interface ConfigResponse {
+  roster: Roster;
+}
+
+// 看板选中态：点谁，第四栏就展示谁的完整信息。
+export type Selection =
+  | { type: "agent"; agentId: string }
+  | { type: "history"; index: number }
+  | { type: "issue"; number: number }
+  | { type: "commit"; sha: string };

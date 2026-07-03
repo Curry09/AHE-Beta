@@ -1,23 +1,29 @@
+// 薄 fetch 客户端：/api 相对路径——dev 由 vite 代理到 :8000，生产同源（FastAPI 托管 dist）。
+
 import type {
-  Overview,
-  SessionSummary,
-  SessionDetail,
-  IssuesResponse,
-  CommitsResponse,
   AgentsResponse,
+  CommitDetailResponse,
+  CommitsResponse,
   ConfigResponse,
+  HistoryResponse,
+  IssueDetailResponse,
+  IssuesResponse,
+  RunState,
+  SessionDetail,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
-  const resp = await fetch(path);
-  if (!resp.ok) throw new Error(`${path} → ${resp.status}`);
+  const resp = await fetch(`/api${path}`);
+  if (!resp.ok) throw new Error(`GET /api${path} -> ${resp.status}`);
   return (await resp.json()) as T;
 }
 
-export const getOverview = () => get<Overview>("/api/overview");
-export const getSessions = () => get<SessionSummary[]>("/api/sessions");
-export const getSession = (id: string) => get<SessionDetail>(`/api/sessions/${id}`);
-export const getIssues = () => get<IssuesResponse>("/api/issues");
-export const getCommits = () => get<CommitsResponse>("/api/commits");
-export const getAgents = () => get<AgentsResponse>("/api/agents");
-export const getConfig = () => get<ConfigResponse>("/api/config");
+export const getAgents = () => get<AgentsResponse>("/agents");
+export const getState = () => get<RunState>("/state");
+export const getHistory = () => get<HistoryResponse>("/history");
+export const getIssues = () => get<IssuesResponse>("/issues");
+export const getIssue = (number: number) => get<IssueDetailResponse>(`/issues/${number}`);
+export const getCommits = () => get<CommitsResponse>("/commits");
+export const getCommit = (sha: string) => get<CommitDetailResponse>(`/commits/${sha}`);
+export const getConfig = () => get<ConfigResponse>("/config");
+export const getSession = (id: string) => get<SessionDetail>(`/sessions/${id}`);
