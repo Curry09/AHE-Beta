@@ -1,45 +1,38 @@
-"""spec 数据层：Task / Metadata / Group 模型与 YAML round-trip 读写。
+"""spec 数据层：Task / Overview / Metadata / Group 模型与 **markdown 单文件** round-trip 读写。
 
-Spec-0014/T1: 数据层 + JSON Schema + 依赖/入口声明
+issue #69 rust-RFC 形态（总览先行 + 单 spec 自包含）：
+一个 spec 组 = 一个 markdown 文件 `docs/specs/NNNN-slug.md`：
+- **YAML frontmatter**（机器读）：组元数据 number/title/issue/slug/summary + tasks 列表
+  （结构化字段 + scope/acceptance；`files` = 单一 writer 所有权声明，为 issue #71 留源）。
+- **Markdown 正文**（人/agent 读）：组级 rust-RFC 9 段总览（Summary…Future possibilities），
+  feature 全貌自包含地讲一遍，DAG + 文件分配收进 Reference-level；不再有 per-Task 小节。
 
 只懂 docs/specs/ 源数据结构的纯模块（理念 10 解耦），不感知 git / GitHub。
-用 ruamel.yaml 以**规范化**形式写回——prose 字段强制块标量 `|`、键按固定顺序排列，
-因此 load→dump→load 内容保真（块标量样式、键序、relates-to 列表均稳定），且输出确定，
-为 render 幂等（决策 D9）与迁移脚本产出干净文件打底。
+per-task 版本历史机制退役（决策 D3），历史交给 git + dated 设计文档，Group.history 恒为空。
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from io import StringIO
 from pathlib import Path
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
-from ruamel.yaml.scalarstring import LiteralScalarString
+from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
-# Spec-0014/T1：统一的 YAML round-trip 实例。
-# width 调大避免长行被折断；indent 固定让输出确定（幂等前提）。
+# 统一的 YAML round-trip 实例（用于 frontmatter）。
 _yaml = YAML()
 _yaml.preserve_quotes = True
 _yaml.width = 4096
 _yaml.indent(mapping=2, sequence=4, offset=2)
 
-# Spec-0014/T1：prose（长文）字段——用 YAML 块标量 `|` 承载 Markdown（决策 D4）。
-_PROSE_FIELDS = (
-    "summary",
-    "motivation",
-    "scope",
-    "design",
-    "interface",
-    "tradeoffs",
-    "acceptance",
-    "tests",
-    "references",
-    "open_questions",
-)
-
-# Spec-0014/T1：Task 字段的规范化顺序（yaml_key, attr）。dump 一律按此序输出，保证键序稳定。
-_TASK_FIELD_ORDER: tuple[tuple[str, str], ...] = (
+# frontmatter 里每个 Task 的结构化字段顺序（yaml_key, attr）。dump 一律按此序，键序稳定。
+# 注意：version/lineage/change-reason 等随历史机制退役（决策 D3），不再进 frontmatter。
+# issue #69：scope/acceptance 由正文 prose 改为 frontmatter 短字段（Task 退化成工作分解行，
+# 重 prose 上移到组级 Overview）。
+_TASK_FM_ORDER: tuple[tuple[str, str], ...] = (
     ("id", "id"),
     ("title", "title"),
     ("status", "status"),
@@ -49,44 +42,53 @@ _TASK_FIELD_ORDER: tuple[tuple[str, str], ...] = (
     ("relates-to", "relates_to"),
     ("parallel", "parallel"),
     ("files", "files"),
-    ("version", "version"),
-    ("updated", "updated"),
-    ("change-reason", "change_reason"),
-    ("supersedes", "supersedes"),
-    ("split-from", "split_from"),
-    ("merged-from", "merged_from"),
-    ("derived-from", "derived_from"),
-    ("summary", "summary"),
-    ("motivation", "motivation"),
     ("scope", "scope"),
-    ("design", "design"),
-    ("interface", "interface"),
-    ("tradeoffs", "tradeoffs"),
     ("acceptance", "acceptance"),
-    ("tests", "tests"),
-    ("references", "references"),
-    ("open-questions", "open_questions"),
 )
+
+# issue #69：组级正文 = rust-RFC 9 段总览（markdown 标题, Overview 属性），dump 按此序。
+# 一个 spec 单独可读、总览先行：feature 全貌在这 9 段讲一遍，Task 只是 frontmatter 工作分解行。
+_OVERVIEW_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("Summary", "summary"),
+    ("Motivation", "motivation"),
+    ("Guide-level explanation", "guide_level"),
+    ("Reference-level explanation", "reference_level"),
+    ("Drawbacks", "drawbacks"),
+    ("Rationale and alternatives", "rationale_alternatives"),
+    ("Prior art", "prior_art"),
+    ("Unresolved questions", "unresolved_questions"),
+    ("Future possibilities", "future_possibilities"),
+)
+_SECTION_BY_HEADING = {heading: attr for heading, attr in _OVERVIEW_SECTIONS}
+
+# 正文切分用：组级段标题 `## Summary` / `## Reference-level explanation` …
+_SECTION_HEADING_RE = re.compile(r"^##\s+(.+?)\s*$")
+
+# spec new 脚手架占位：非空（让段标题成型），但 _strip_placeholder 归一为空串。
+_PLACEHOLDER = "<!-- 待填 -->"
 
 
 @dataclass(frozen=True)
 class RelatesTo:
-    """Spec-0014/T1：非阻塞的跨 feature 关联（画虚线）。"""
+    """非阻塞的跨 feature 关联（render 里画虚线）。"""
 
-    # Spec-0014/T1：跨组限定 ID，如 "0012/T2"
+    # 跨组限定 ID，如 "0012/T2"
     ref: str
-    # Spec-0014/T1：关联类型 extends | supersedes | note
+    # 关联类型 extends | supersedes | note
     type: str
 
 
 @dataclass
 class Task:
-    """A single spec Task —— 快照的基本单元，与当前活代码一一对应。
+    """A single spec Task —— DAG + 文件分配的工作分解行（issue #69 后退化为结构化为主）。
 
-    Spec-0014/T1: Task 模型，覆盖旧 RFC 全部元素（见 RFC 元素→Task 字段对照表）。
+    结构化字段（status/priority/depends-on/files…）放 frontmatter、可机器校验；
+    issue #69 起，feature 设计叙述上移到组级 Overview，Task 只留两个一行短 prose
+    （scope/acceptance），且二者也放 frontmatter——`files` 是单一 writer 所有权声明
+    （理念 6 / issue #71 运行期 owner 检查的结构化源）。
 
-    结构化字段（status/priority/depends-on/files/血缘…）可机器校验；prose 字段
-    （summary/design/interface…）用块标量承载 Markdown。
+    version/lineage 字段保留在数据类里（带默认值）以最小化 render 改动（决策 D2），
+    但历史机制退役后不再由 frontmatter 写入、Group.history 恒空。
     """
 
     # ── 身份与状态 ──
@@ -100,7 +102,7 @@ class Task:
     relates_to: list[RelatesTo] = field(default_factory=list)
     parallel: bool = False
     files: list[str] = field(default_factory=list)
-    # ── 演化 / 血缘 ──
+    # ── 演化 / 血缘（保留默认值，决策 D3 后不活跃）──
     version: int = 1
     updated: str = ""
     change_reason: str = ""
@@ -108,150 +110,137 @@ class Task:
     split_from: str | None = None
     merged_from: list[str] = field(default_factory=list)
     derived_from: list[str] = field(default_factory=list)
-    # ── 设计内容（prose）──
+    # ── 工作分解短 prose（进 frontmatter；重设计叙述见组级 Overview）──
+    scope: str = ""
+    acceptance: str = ""
+
+
+@dataclass(frozen=True)
+class Overview:
+    """组级 rust-RFC 9 段总览（issue #69）—— feature 全貌的自包含叙述，放 markdown 正文。
+
+    单 spec 自包含：读完这 9 段即理解本 feature，无需打开其它 spec；DAG + 文件分配
+    收进 reference_level。字段名与 `_OVERVIEW_SECTIONS` 的 attr 一一对应。
+    """
+
     summary: str = ""
     motivation: str = ""
-    scope: str = ""
-    design: str = ""
-    interface: str = ""
-    tradeoffs: str = ""
-    acceptance: str = ""
-    tests: str = ""
-    references: str = ""
-    open_questions: str = ""
+    guide_level: str = ""
+    reference_level: str = ""
+    drawbacks: str = ""
+    rationale_alternatives: str = ""
+    prior_art: str = ""
+    unresolved_questions: str = ""
+    future_possibilities: str = ""
 
 
 @dataclass(frozen=True)
 class Metadata:
-    """Spec-0014/T1：组级元数据（一个 spec 组 = 一个 issue/feature）。"""
+    """组级元数据（一个 spec 组 = 一个 issue/feature）。"""
 
     title: str
     issue: int
     slug: str
-    # 组级导语（prose, Markdown，可含 mermaid）：一句话讲清本组在闭环中的位置、
-    # 交付什么、数据流脊柱。渲染在 summary.md 开篇与 OVERVIEW 各 feature 段。可选，缺省空。
-    overview: str = ""
+    # Spec-0015：组级人话 TL;DR（整个 feature 的「是啥/为什么/产出什么」）。
+    # 默认空串兼容旧调用点；非空由 validate 的 _summary_checks 强制。
+    summary: str = ""
 
 
 @dataclass(frozen=True)
 class Group:
-    """Spec-0014/T1：一个 spec 组的全部源数据（当前版快照 + 历史版本）。"""
+    """一个 spec 组的全部源数据。markdown 形态下 history 恒为空（决策 D3）。"""
 
-    # Spec-0014/T1：四位编号 "0009"（与旧 RFC 编号 1:1 兼容，决策 D11）
+    # 四位编号 "0009"（与旧 RFC 编号 1:1 兼容）
     number: str
     metadata: Metadata
-    # Spec-0014/T1：当前版 Task 快照（status 含 done，做完不离开快照，决策 D2）
+    # 当前版 Task 快照（status 含 done，做完不离开快照）
     tasks: list[Task]
-    # Spec-0014/T1：task_id -> 历史版本列表（旧→新），只增不改
-    history: dict[str, list[Task]]
+    # issue #69：组级 rust-RFC 9 段总览（feature 全貌，放正文）
+    overview: Overview = field(default_factory=Overview)
+    # 退役：保留字段让 render/validate 无需改动，恒为空 dict
+    history: dict[str, list[Task]] = field(default_factory=dict)
 
 
 def qualified_id(*, group: str, task_id: str) -> str:
-    """Build a cross-group qualified task id like "0009/T3".
-
-    Spec-0014/T1：跨组引用用限定 ID（组内简写 T3 → 全局 0009/T3）。
-    """
+    """Build a cross-group qualified task id like "0009/T3"."""
     return f"{group}/{task_id}"
 
 
-def load_group(*, group_dir: Path) -> Group:
-    """Load one spec group (metadata + current tasks + history) from disk.
+def group_path(*, specs_root: Path, number: str, slug: str) -> Path:
+    """组 markdown 文件路径 docs/specs/NNNN-slug.md。"""
+    return specs_root / f"{number}-{slug}.md"
 
-    Spec-0014/T1：读 group_dir 下 metadata.yaml、tasks/T*.yaml、history/T*.yaml，
-    组装成 Group。number 取目录名前四位。
+
+def load_group(*, path: Path) -> Group:
+    """Load one spec group from a markdown file (frontmatter + body).
+
+    frontmatter 提供组元数据与各 Task 结构化字段；正文按 `## <rust 段名>` 切出组级
+    Overview 9 段（issue #69）。
     """
-    # 1. 组编号取目录名前缀 NNNN。
-    number = group_dir.name[:4]
+    text = path.read_text(encoding="utf-8")
+    meta, body = _split_frontmatter(text=text)
+    number = str(meta.get("number") or path.name[:4]).zfill(4)
+    metadata = Metadata(
+        title=str(meta.get("title", "")),
+        issue=int(meta.get("issue", 0)),
+        slug=str(meta.get("slug", "")),
+        summary=str(meta.get("summary", "")),
+    )
 
-    # 2. 组元数据。
-    metadata = _load_metadata(path=group_dir / "metadata.yaml")
+    overview = _parse_body(body=body)
+    tasks = [task_from_mapping(data=raw) for raw in meta.get("tasks") or []]
 
-    # 3. 当前版 Task 快照（tasks/T*.yaml，按文件名排序保证确定性）。
-    tasks: list[Task] = []
-    tasks_dir = group_dir / "tasks"
-    if tasks_dir.is_dir():
-        for task_path in sorted(tasks_dir.glob("*.yaml")):
-            tasks.append(task_from_mapping(data=_yaml.load(task_path)))
-
-    # 4. 历史版本列表（history/T*.yaml，每文件是一个版本对象数组）。
-    history: dict[str, list[Task]] = {}
-    history_dir = group_dir / "history"
-    if history_dir.is_dir():
-        for hist_path in sorted(history_dir.glob("*.yaml")):
-            versions = _yaml.load(hist_path) or []
-            history[hist_path.stem] = [task_from_mapping(data=item) for item in versions]
-
-    return Group(number=number, metadata=metadata, tasks=tasks, history=history)
-
-
-def load_yaml(*, path: Path) -> object:
-    """Load an arbitrary YAML file with the canonical round-trip instance (None if absent).
-
-    供 render 读非 Task 的辅助源（如 glossary.yaml）复用同一 YAML 实例，避免重复构造。
-    """
-    if not path.is_file():
-        return None
-    return _yaml.load(path)
+    return Group(number=number, metadata=metadata, tasks=tasks, overview=overview, history={})
 
 
 def load_all(*, specs_root: Path) -> list[Group]:
-    """Load every spec group under specs_root (sorted by number).
+    """Load every spec group markdown file under specs_root (sorted by number).
 
-    Spec-0014/T1：聚合 docs/specs/ 下全部 NNNN-slug/ 组目录；空仓库返回 []。
+    只认组文件 `NNNN-slug.md`（slug 以字母起，排除 dated 设计文档 `YYYY-MM-DD-*.md`
+    与 OVERVIEW.md / ARCHITECTURE.md / README.md）；空仓库返回 []。
     """
     if not specs_root.is_dir():
         return []
     groups: list[Group] = []
-    for group_dir in sorted(specs_root.iterdir()):
-        # 仅 NNNN-slug 形态的目录视为 spec 组（跳过 OVERVIEW.md / README.md 等）。
-        if group_dir.is_dir() and _is_group_dir(name=group_dir.name):
-            groups.append(load_group(group_dir=group_dir))
+    for md_path in sorted(specs_root.glob("*.md")):
+        if _is_group_file(name=md_path.name):
+            groups.append(load_group(path=md_path))
     return groups
 
 
-def dump_task(*, task: Task, path: Path) -> None:
-    """Write a Task to path as canonical YAML (block scalars + fixed key order).
-
-    Spec-0014/T1：规范化写回——prose 用块标量、键按 _TASK_FIELD_ORDER 排序，输出确定。
-    """
+def dump_group(*, group: Group, path: Path) -> None:
+    """Write a Group to a markdown file (frontmatter + body), deterministically."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        _yaml.dump(task_to_mapping(task=task), handle)
+    path.write_text(render_group(group=group), encoding="utf-8")
 
 
-def dump_history(*, versions: list[Task], path: Path) -> None:
-    """Write a history version list (append-only) to path.
+def render_group(*, group: Group) -> str:
+    """Serialize a Group to markdown text (frontmatter + body). Pure."""
+    fm = CommentedMap()
+    fm["number"] = DoubleQuotedScalarString(group.number)
+    fm["title"] = group.metadata.title
+    fm["issue"] = group.metadata.issue
+    fm["slug"] = group.metadata.slug
+    fm["summary"] = group.metadata.summary
+    fm["tasks"] = [_task_frontmatter(task=task) for task in group.tasks]
 
-    Spec-0014/T1：历史文件是版本对象数组，每项是一个完整 Task 快照（决策 D6）。
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = [task_to_mapping(task=version) for version in versions]
-    with path.open("w", encoding="utf-8") as handle:
-        _yaml.dump(payload, handle)
+    buf = StringIO()
+    _yaml.dump(fm, buf)
+    fm_text = buf.getvalue()
 
-
-def dump_metadata(*, metadata: Metadata, path: Path) -> None:
-    """Write metadata.yaml with fixed key order (title/issue/slug).
-
-    issue #53：组级元数据的规范化写入单一来源——migrate 与 `spec new` 共用，避免键序漂移。
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = CommentedMap(
-        [("title", metadata.title), ("issue", metadata.issue), ("slug", metadata.slug)]
+    title = group.metadata.title or group.metadata.slug
+    head = (
+        f"---\n{fm_text}---\n\n"
+        f"# {group.number} · {title}\n\n"
+        "<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），"
+        "正文为组级 rust-RFC 9 段总览。 -->\n"
     )
-    # overview 仅在非空时写入，并强制块标量 `|`（与 prose 字段一致）；空组 metadata 保持三行精简。
-    if metadata.overview:
-        payload["overview"] = _as_block_scalar(text=metadata.overview)
-    with path.open("w", encoding="utf-8") as handle:
-        _yaml.dump(payload, handle)
+    body = _render_body(group=group)
+    return head + ("\n" + body if body else "") + "\n"
 
 
 def next_number(*, specs_root: Path) -> str:
-    """Return the next free 4-digit group number (max existing + 1, "0001" if none).
-
-    issue #53：`spec new` 缺省取本地最大组号 +1（与旧 RFC 流程「扫描取下一号」同构）。
-    跨 PR 的编号冲突由 CI 的 check-spec-number-conflicts 兜底（本函数只看本地）。
-    """
+    """Return the next free 4-digit group number (max existing + 1, "0001" if none)."""
     highest = 0
     for group in load_all(specs_root=specs_root):
         try:
@@ -261,33 +250,8 @@ def next_number(*, specs_root: Path) -> str:
     return f"{highest + 1:04d}"
 
 
-def task_to_mapping(*, task: Task) -> CommentedMap:
-    """Convert a Task to a canonical-ordered CommentedMap (prose as block scalars).
-
-    Spec-0014/T1：dump 与 history append 复用的单一序列化入口。
-    """
-    out = CommentedMap()
-    for yaml_key, attr in _TASK_FIELD_ORDER:
-        value = getattr(task, attr)
-        if attr == "relates_to":
-            # relates-to 列表 → [{ref, type}] 映射列表。
-            out[yaml_key] = [
-                CommentedMap([("ref", item.ref), ("type", item.type)]) for item in value
-            ]
-        elif attr in _PROSE_FIELDS:
-            # prose 字段强制块标量 `|`（含内嵌 mermaid 的 Markdown）。
-            out[yaml_key] = _as_block_scalar(text=value)
-        else:
-            out[yaml_key] = value
-    return out
-
-
 def task_from_mapping(*, data: object) -> Task:
-    """Build a Task from a loaded YAML mapping, applying defaults for optional fields.
-
-    Spec-0014/T1：缺省可选字段（tags/tests/open-questions…）取合理默认；
-    relates-to 解析为 RelatesTo 列表。
-    """
+    """Build a Task from a frontmatter task mapping (structured fields only)."""
     raw = data or {}
     relates = [
         RelatesTo(ref=str(item.get("ref", "")), type=str(item.get("type", "")))
@@ -303,60 +267,88 @@ def task_from_mapping(*, data: object) -> Task:
         relates_to=relates,
         parallel=bool(raw.get("parallel", False)),
         files=_str_list(value=raw.get("files")),
-        version=int(raw.get("version", 1)),
-        updated=str(raw.get("updated", "")),
-        change_reason=str(raw.get("change-reason", "")),
-        supersedes=_str_list(value=raw.get("supersedes")),
-        split_from=_optional_str(value=raw.get("split-from")),
-        merged_from=_str_list(value=raw.get("merged-from")),
-        derived_from=_str_list(value=raw.get("derived-from")),
-        summary=_text(value=raw.get("summary")),
-        motivation=_text(value=raw.get("motivation")),
-        scope=_text(value=raw.get("scope")),
-        design=_text(value=raw.get("design")),
-        interface=_text(value=raw.get("interface")),
-        tradeoffs=_text(value=raw.get("tradeoffs")),
-        acceptance=_text(value=raw.get("acceptance")),
-        tests=_text(value=raw.get("tests")),
-        references=_text(value=raw.get("references")),
-        open_questions=_text(value=raw.get("open-questions")),
+        scope=str(raw.get("scope", "")),
+        acceptance=str(raw.get("acceptance", "")),
     )
 
 
-def _load_metadata(*, path: Path) -> Metadata:
-    """读 metadata.yaml → Metadata；缺字段取空默认（issue 缺省 0）。"""
-    raw = (_yaml.load(path) if path.is_file() else None) or {}
-    return Metadata(
-        title=str(raw.get("title", "")),
-        issue=int(raw.get("issue", 0)),
-        slug=str(raw.get("slug", "")),
-        overview=_text(value=raw.get("overview")),
-    )
+def _task_frontmatter(*, task: Task) -> CommentedMap:
+    """Task → frontmatter CommentedMap（仅结构化字段，固定键序）。"""
+    out = CommentedMap()
+    for yaml_key, attr in _TASK_FM_ORDER:
+        value = getattr(task, attr)
+        if attr == "relates_to":
+            out[yaml_key] = [
+                CommentedMap([("ref", item.ref), ("type", item.type)]) for item in value
+            ]
+        else:
+            out[yaml_key] = value
+    return out
 
 
-def _is_group_dir(*, name: str) -> bool:
-    """目录名是否 NNNN-slug 形态（四位数字 + 连字符 + slug）。"""
-    return len(name) > 5 and name[:4].isdigit() and name[4] == "-"
+def _render_body(*, group: Group) -> str:
+    """组级 rust-RFC 9 段总览（issue #69）：永远输出全部 `## <段名>`，空段填占位。
+
+    始终成型 9 段既给作者脚手架（spec new），又让「总览先行」结构稳定可断言/可校验。
+    """
+    chunks: list[str] = []
+    for heading, attr in _OVERVIEW_SECTIONS:
+        text = getattr(group.overview, attr).rstrip()
+        chunks.append(f"## {heading}\n\n{text or _PLACEHOLDER}\n")
+    return "\n".join(chunks)
 
 
-def _as_block_scalar(*, text: str) -> object:
-    """非空 prose 包成块标量 `|`；空串原样返回（避免空块标量歧义）。"""
-    if text == "":
-        return ""
-    return LiteralScalarString(text)
+def _split_frontmatter(*, text: str) -> tuple[dict, str]:
+    """拆出 YAML frontmatter（首段 --- … ---）与其后正文。无 frontmatter 则返回 ({}, text)。"""
+    if not text.startswith("---"):
+        return {}, text
+    lines = text.split("\n")
+    end = None
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            end = index
+            break
+    if end is None:
+        return {}, text
+    fm_text = "\n".join(lines[1:end])
+    body = "\n".join(lines[end + 1 :])
+    meta = _yaml.load(fm_text) if fm_text.strip() else None
+    return (meta or {}), body
 
 
-def _text(*, value: object) -> str:
-    """prose 字段取字符串；None → 空串。"""
-    return "" if value is None else str(value)
+def _parse_body(*, body: str) -> Overview:
+    """正文 → 组级 Overview（issue #69）。按 `## <rust 段名>` 切段；占位段归一为空串。"""
+    sections: dict[str, str] = {}
+    current_attr: str | None = None
+    buffer: list[str] = []
+
+    def _flush() -> None:
+        if current_attr is not None:
+            sections[current_attr] = _strip_placeholder(text="\n".join(buffer).strip("\n"))
+
+    for line in body.split("\n"):
+        heading_match = _SECTION_HEADING_RE.match(line)
+        if heading_match and heading_match.group(1) in _SECTION_BY_HEADING:
+            _flush()
+            current_attr = _SECTION_BY_HEADING[heading_match.group(1)]
+            buffer = []
+            continue
+        buffer.append(line)
+    _flush()
+    return Overview(**sections)
 
 
-def _optional_str(*, value: object) -> str | None:
-    """可空字符串字段：None / 空串 → None。"""
-    if value is None:
-        return None
-    text = str(value)
-    return text or None
+def _strip_placeholder(*, text: str) -> str:
+    """占位 `<!-- 待填 -->`-only 的段归一为空串（spec new 脚手架与真实空段等价）。"""
+    return "" if text.strip() == _PLACEHOLDER else text
+
+
+def _is_group_file(*, name: str) -> bool:
+    """文件名是否组文件 `NNNN-slug.md`（四位数字 + '-' + 字母起的 slug）。
+
+    排除 dated 设计文档 `YYYY-MM-DD-*.md`（第 6 位是数字）与生成物/README。
+    """
+    return bool(re.match(r"^\d{4}-[A-Za-z][^/]*\.md$", name))
 
 
 def _str_list(*, value: object) -> list[str]:

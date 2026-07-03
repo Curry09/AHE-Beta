@@ -4,17 +4,9 @@ import { resetWanderClock } from "../entities/Worker";
 import { SPRITE_KEY, SPRITE_PATH, WORKER_SPRITES } from "../config/animations";
 import { EMOTE_SHEET_KEY, EMOTE_SHEET_PATH, EMOTE_FRAME_SIZE } from "../config/emotes";
 import { Pathfinder } from "../utils/Pathfinder";
-import {
-  buildSpriteFrames,
-  parseSpawns,
-  parsePOIs,
-  buildCollisionRects,
-  renderTileObjectLayer,
-  type AnimatedProp,
-} from "../utils/MapHelpers";
+import { buildSpriteFrames, parseSpawns } from "../utils/MapHelpers";
 import { gameEvents } from "@/lib/events";
 import { roomHeadline, roomWalls, type RoomDef } from "@/lib/roomLayout";
-import { createLogger } from "@/lib/logger";
 import {
   BOSS_INTERACT_DISTANCE,
   PF_PADDING,
@@ -26,10 +18,7 @@ import {
 import { CameraController } from "../systems/CameraController";
 import { WorkerManager } from "../systems/WorkerManager";
 import { InteractionManager } from "../systems/InteractionManager";
-import { DoorManager } from "../systems/DoorManager";
 import { initSceneEventBridge } from "../systems/SceneEventBridge";
-
-const log = createLogger("OfficeScene");
 
 function isInputFocused(): boolean {
   const el = document.activeElement;
@@ -51,7 +40,6 @@ export class OfficeScene extends Phaser.Scene {
   private cameraController!: CameraController;
   private workerManager!: WorkerManager;
   private interactionManager!: InteractionManager;
-  private doorManager!: DoorManager;
   private cleanupEventBridge: (() => void) | null = null;
   private roomObjects: Phaser.GameObjects.GameObject[] = [];
   private roomWallGroup!: Phaser.Physics.Arcade.StaticGroup;
@@ -62,16 +50,8 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   preload() {
+    // 地图 JSON 只用于取 boss 出生点与地图尺寸；瓦片图层不再渲染（场景改为自绘三房间）。
     this.load.tilemapTiledJSON("office", "/maps/office2.json");
-
-    this.load.once("filecomplete-tilemapJSON-office", () => {
-      const cached = this.cache.tilemap.get("office");
-      if (!cached?.data?.tilesets) return;
-      for (const ts of cached.data.tilesets) {
-        const basename = (ts.image as string).split("/").pop()!;
-        this.load.image(ts.name, `/tilesets/${basename}`);
-      }
-    });
 
     this.load.image(SPRITE_KEY, SPRITE_PATH);
 
@@ -88,16 +68,6 @@ export class OfficeScene extends Phaser.Scene {
       frameWidth: 48,
       frameHeight: 48,
     });
-
-    this.load.spritesheet("anim-cauldron", "/sprites/animated_witch_cauldron_48x48.png", {
-      frameWidth: 96,
-      frameHeight: 96,
-    });
-
-    this.load.spritesheet("anim-door", "/sprites/animated_door_big_4_48x48.png", {
-      frameWidth: 48,
-      frameHeight: 144,
-    });
   }
 
   create() {
@@ -106,57 +76,17 @@ export class OfficeScene extends Phaser.Scene {
       buildSpriteFrames(this, ws.key);
     }
 
+    // 地图仅提供尺寸与 boss 出生点；瓦片图层（原 4 房间办公室）不再渲染，场景改为自绘三房间。
     const map = this.make.tilemap({ key: "office" });
 
-    const allTilesets: Phaser.Tilemaps.Tileset[] = [];
-    for (const ts of map.tilesets) {
-      const added = map.addTilesetImage(ts.name, ts.name);
-      if (added) allTilesets.push(added);
-    }
-    if (allTilesets.length === 0) {
-      log.error("No tilesets loaded");
-      return;
-    }
+    this.drawBuildingFloor(map.widthInPixels);
 
-    map.createLayer("floor", allTilesets);
-    map.createLayer("walls", allTilesets);
-    map.createLayer("ground", allTilesets);
-    map.createLayer("furniture", allTilesets);
-    map.createLayer("objects", allTilesets);
+    // 无瓦片碰撞：可行走性只由三房间实体墙约束（见 drawRooms）。
+    const pathfinder = new Pathfinder(map.widthInPixels, map.heightInPixels, [], PF_PADDING);
 
-    const animatedProps: AnimatedProp[] = [
-      {
-        tilesetName: "11_Halloween_48x48",
-        anchorLocalId: 130,
-        skipLocalIds: new Set([130, 131, 146, 147]),
-        spriteKey: "anim-cauldron",
-        frameWidth: 96,
-        frameHeight: 96,
-        endFrame: 11,
-        frameRate: 8,
-      },
-    ];
-    renderTileObjectLayer(this, map, "props", allTilesets, 5, animatedProps);
-    renderTileObjectLayer(this, map, "props-over", allTilesets, 11);
-
-    const overheadLayer = map.createLayer("overhead", allTilesets);
-    if (overheadLayer) overheadLayer.setDepth(10);
-
-    const collisionGroup = this.physics.add.staticGroup();
-    const collisionRects = buildCollisionRects(map, collisionGroup);
-
-    const pathfinder = new Pathfinder(
-      map.widthInPixels,
-      map.heightInPixels,
-      collisionRects,
-      PF_PADDING,
-    );
-
-    const { bossSpawn, workerSpawns } = parseSpawns(map);
-    const pois = parsePOIs(map);
+    const { bossSpawn } = parseSpawns(map);
 
     this.player = new Player(this, bossSpawn.x, bossSpawn.y, bossSpawn.facing);
-    this.physics.add.collider(this.player.sprite, collisionGroup);
 
     // 三房间实体墙：碰撞体在 rooms-updated 时按房间矩形重建，玩家撞墙、只能走门。
     this.roomWallGroup = this.physics.add.staticGroup();
@@ -178,8 +108,6 @@ export class OfficeScene extends Phaser.Scene {
 
     // 座位由 App 依 roster/agents 计算的三房间布局注入（rooms-updated），初始为空；
     // pois 传空 → 小人只在各自房间原地做 idle 动作，不跨图游走（保持「房间」隔离感）。
-    void workerSpawns;
-    void pois;
     this.workerManager = new WorkerManager(this, [], [], pathfinder);
 
     this.interactionManager = new InteractionManager(
@@ -189,9 +117,6 @@ export class OfficeScene extends Phaser.Scene {
       this.cameraController,
     );
     this.interactionManager.initInteractionUI();
-
-    this.doorManager = new DoorManager(this, this.player, () => this.workerManager.workers);
-    this.doorManager.initDoors();
 
     resetWanderClock();
     this.initBossSeat(bossSpawn);
@@ -218,31 +143,59 @@ export class OfficeScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.cleanup());
   }
 
-  // ── Room overlays（实体墙 + 门）──────────────────────────
+  // ── 自绘三房间（地板 + 实体墙 + 门 + 职能立牌）───────────
 
-  // 墙深度低于角色（5），角色始终在墙之上；门槛更低，压在地面色块上。
+  // 深度：地板(0) < 房间地板(1) < 门槛(2) < 墙(4) < 角色(5) < 立牌(6)。
+  // 墙低于角色，角色贴墙时始终可见；立牌立在房间上部空档（座位区之上），不与小人重叠。
+  private static readonly SLAB_DEPTH = 0;
   private static readonly FLOOR_DEPTH = 1;
   private static readonly DOOR_DEPTH = 2;
   private static readonly WALL_DEPTH = 4;
+  private static readonly SIGN_DEPTH = 6;
   private static readonly WALL_FILL = 0x2b3448; // 墙体主色（深板岩）
   private static readonly WALL_TOP = 0x475569; // 墙顶高光
+  private static readonly ROOM_FLOOR = 0xd6c49a; // 房间木地板
+  private static readonly SLAB_FLOOR = 0xb9a67e; // 楼层底板（房间外走廊，色略深）
+  private static readonly GRID = 0x8a7a58; // 地板网格线
+  private static readonly SIGN_BOARD = 0x8a5f36; // 牌面木色
+  private static readonly SIGN_EDGE = 0x4e3319; // 牌子描边/柱脚
+  private static readonly SIGN_POST = 0x6b4a2c; // 立柱
 
-  /** 重绘三房间：地面色块 + 标题栏 + 四面实体墙（底墙留门）+ 门槛，并重建墙的物理碰撞体。 */
+  /** 楼层底板：覆盖房间带与下方走廊（boss 活动区），带 48px 瓦片网格。仅绘制一次。 */
+  private drawBuildingFloor(mapW: number) {
+    const x = 24;
+    const y = 220;
+    const w = mapW - 48;
+    const h = 640; // 覆盖房间带（250~720）+ 底部走廊（boss 出生于 y≈753）
+    const g = this.add.graphics().setDepth(OfficeScene.SLAB_DEPTH);
+    g.fillStyle(OfficeScene.SLAB_FLOOR, 1);
+    g.fillRect(x, y, w, h);
+    g.lineStyle(1, OfficeScene.GRID, 0.18);
+    for (let gx = x; gx <= x + w; gx += 48) g.lineBetween(gx, y, gx, y + h);
+    for (let gy = y; gy <= y + h; gy += 48) g.lineBetween(x, gy, x + w, gy);
+    g.lineStyle(3, OfficeScene.SIGN_EDGE, 0.35);
+    g.strokeRect(x, y, w, h);
+  }
+
+  /** 重绘三房间：木地板 + 四面实体墙（底墙留门）+ 门槛 + 职能立牌，并重建墙碰撞体。 */
   private drawRooms(rooms: RoomDef[]) {
     for (const obj of this.roomObjects) obj.destroy();
     this.roomObjects = [];
     // 清空并重建墙碰撞体（房间尺寸随 roster 变化）。
     this.roomWallGroup.clear(true, true);
 
-    const TITLE_H = 40;
     for (const room of rooms) {
+      // 房间木地板（统一米色 + 瓦片网格），不再用彩色覆盖框。
       const g = this.add.graphics().setDepth(OfficeScene.FLOOR_DEPTH);
-      // 地面色块（房间底色）
-      g.fillStyle(room.color, 0.14);
+      g.fillStyle(OfficeScene.ROOM_FLOOR, 1);
       g.fillRect(room.x, room.y, room.w, room.h);
-      // 标题栏
-      g.fillStyle(room.color, 0.3);
-      g.fillRect(room.x, room.y, room.w, TITLE_H);
+      g.lineStyle(1, OfficeScene.GRID, 0.22);
+      for (let gx = room.x + 48; gx < room.x + room.w; gx += 48) {
+        g.lineBetween(gx, room.y, gx, room.y + room.h);
+      }
+      for (let gy = room.y + 48; gy < room.y + room.h; gy += 48) {
+        g.lineBetween(room.x, gy, room.x + room.w, gy);
+      }
       this.roomObjects.push(g);
 
       // 四面实体墙（底墙被门洞切成两段）：矩形即视觉 + 物理体。
@@ -263,18 +216,44 @@ export class OfficeScene extends Phaser.Scene {
         .setDepth(OfficeScene.DOOR_DEPTH);
       this.roomObjects.push(sill);
 
-      const title = this.add
-        .text(room.x + 14, room.y + TITLE_H / 2, roomHeadline(room), {
-          fontFamily: '"Press Start 2P", monospace',
-          fontSize: "12px",
-          color: "#f8fafc",
-          align: "left",
-        })
-        .setOrigin(0, 0.5)
-        .setDepth(15)
-        .setResolution(window.devicePixelRatio * 2);
-      this.roomObjects.push(title);
+      this.drawSign(room);
     }
+  }
+
+  /** 房间职能立牌：木牌 + 立柱，牌面写角色名与在岗数（如「用户 (2/3)」），顶部镶房间色条。 */
+  private drawSign(room: RoomDef) {
+    const cx = room.x + room.w / 2;
+    const boardCy = room.y + 44; // 牌面中心（房间上部空档，座位区从 y+58 起）
+
+    const text = this.add
+      .text(cx, boardCy, roomHeadline(room), {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "12px",
+        color: "#fdf6e3",
+        align: "center",
+      })
+      .setOrigin(0.5)
+      .setDepth(OfficeScene.SIGN_DEPTH + 1)
+      .setResolution(window.devicePixelRatio * 2);
+
+    const bw = Math.ceil(text.width) + 28;
+    const bh = 32;
+
+    const g = this.add.graphics().setDepth(OfficeScene.SIGN_DEPTH);
+    // 立柱（牌面下方两条腿）
+    g.fillStyle(OfficeScene.SIGN_POST, 1);
+    g.fillRect(cx - bw / 2 + 8, boardCy + bh / 2 - 2, 8, 22);
+    g.fillRect(cx + bw / 2 - 16, boardCy + bh / 2 - 2, 8, 22);
+    // 牌面
+    g.fillStyle(OfficeScene.SIGN_BOARD, 1);
+    g.fillRect(cx - bw / 2, boardCy - bh / 2, bw, bh);
+    g.lineStyle(2, OfficeScene.SIGN_EDGE, 1);
+    g.strokeRect(cx - bw / 2, boardCy - bh / 2, bw, bh);
+    // 顶部房间色条（职能配色）
+    g.fillStyle(room.color, 1);
+    g.fillRect(cx - bw / 2, boardCy - bh / 2, bw, 4);
+
+    this.roomObjects.push(g, text);
   }
 
   // ── Boss seat ──────────────────────────────────────────
@@ -327,7 +306,6 @@ export class OfficeScene extends Phaser.Scene {
 
     if (this.terminalOpen || isInputFocused()) {
       this.workerManager.updateAll();
-      this.doorManager.updateDoors();
       return;
     }
 
@@ -336,7 +314,6 @@ export class OfficeScene extends Phaser.Scene {
       this.cameraController.resumeCameraFollow();
     }
     this.workerManager.updateAll();
-    this.doorManager.updateDoors();
 
     // Worker proximity + E-key interaction
     if (this.interactionManager.updateProximity(this.eKey)) {

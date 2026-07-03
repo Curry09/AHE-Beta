@@ -15,6 +15,7 @@ Spec-0014/T2: spec validate（schema + 语义校验）
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,14 +23,21 @@ from jsonschema import Draft202012Validator
 
 from openagents.spec import model
 from openagents.spec.model import Group
-from openagents.spec.schema import (
-    HISTORY_SCHEMA,
-    METADATA_SCHEMA,
-    TASK_SCHEMA,
-)
+from openagents.spec.schema import GROUP_FRONTMATTER_SCHEMA
 
 _ERROR = "error"
 _WARNING = "warning"
+
+# issue #69：单 spec 自包含 + 总览先行的质量门槛。
+# 必填总览段（attr, 人读标题）——这四段撑起「读完即懂、无需翻别的 spec」。
+_REQUIRED_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("summary", "Summary"),
+    ("motivation", "Motivation"),
+    ("reference_level", "Reference-level explanation"),
+    ("rationale_alternatives", "Rationale and alternatives"),
+)
+# 疑似跨 spec 裸引用：`Spec-0012`、`Spec-0012 决策 8`、`Spec-0012/T2`。命中即提示就地复述。
+_BARE_REF_RE = re.compile(r"Spec-\d{4}(?:\s*决策\s*\d+|/T\w+)?")
 
 
 @dataclass(frozen=True)
@@ -72,53 +80,86 @@ def validate(*, specs_root: Path) -> ValidationReport:
     issues.extend(_dag_acyclic_checks(groups=groups))
     # 5. 血缘 / 跨组引用指向存在的 Task。
     issues.extend(_reference_checks(groups=groups))
+    # 7. metadata.summary 非空（Spec-0015/T3：每个 feature 必须有人话 TL;DR）。
+    issues.extend(_summary_checks(groups=groups))
+    # 8. 必填总览段非空（issue #69：总览先行）。                          -> error
+    issues.extend(_overview_required_checks(groups=groups))
+    # 9. 总览里疑似跨 spec 裸引用（issue #69：单 spec 自包含）。         -> warning
+    issues.extend(_self_contained_checks(groups=groups))
 
     ok = not any(issue.level == _ERROR for issue in issues)
     return ValidationReport(ok=ok, issues=issues)
 
 
+def _overview_required_checks(*, groups: list[Group]) -> list[ValidationIssue]:
+    """issue #69：每个组的必填总览段去空白后非空，否则 error（总览先行、读完即懂）。"""
+    issues: list[ValidationIssue] = []
+    for group in groups:
+        for attr, label in _REQUIRED_SECTIONS:
+            if not getattr(group.overview, attr).strip():
+                issues.append(
+                    ValidationIssue(
+                        level=_ERROR,
+                        where=f"{group.number}/overview",
+                        message=f"必填总览段「{label}」为空（单 spec 自包含、总览先行）",
+                    )
+                )
+    return issues
+
+
+def _self_contained_checks(*, groups: list[Group]) -> list[ValidationIssue]:
+    """issue #69：扫总览 9 段，命中「见 Spec-NNNN」式裸引用 → warning（提示就地复述）。"""
+    issues: list[ValidationIssue] = []
+    for group in groups:
+        for _, attr in model._OVERVIEW_SECTIONS:
+            text = getattr(group.overview, attr)
+            for match in _BARE_REF_RE.finditer(text):
+                issues.append(
+                    ValidationIssue(
+                        level=_WARNING,
+                        where=f"{group.number}/overview/{attr}",
+                        message=(
+                            f"疑似跨 spec 裸引用 {match.group(0)!r}："
+                            "确认理解本 spec 的必要信息已就地复述（issue #69）"
+                        ),
+                    )
+                )
+    return issues
+
+
+def _summary_checks(*, groups: list[Group]) -> list[ValidationIssue]:
+    """Spec-0015/T3：每个组的 metadata.summary 去空白后非空，否则 error。"""
+    issues: list[ValidationIssue] = []
+    for group in groups:
+        if not group.metadata.summary.strip():
+            issues.append(
+                ValidationIssue(
+                    level=_ERROR,
+                    where=f"{group.number}/frontmatter",
+                    message="metadata.summary 为空（每个 feature 必须有人话 TL;DR）",
+                )
+            )
+    return issues
+
+
 def _schema_checks(*, specs_root: Path) -> list[ValidationIssue]:
-    """JSON Schema 校验每个 metadata / task / history 文件；每个 schema 错误一条 error。"""
+    """JSON Schema 校验每个组 markdown 文件的 frontmatter；每个错误一条 error。"""
     issues: list[ValidationIssue] = []
     if not specs_root.is_dir():
         return issues
 
-    for group_dir in sorted(specs_root.iterdir()):
-        if not (group_dir.is_dir() and _is_group_dir(name=group_dir.name)):
+    for md_path in sorted(specs_root.glob("*.md")):
+        if not model._is_group_file(name=md_path.name):
             continue
-        number = group_dir.name[:4]
-
-        # metadata.yaml 必须存在且合规。
-        meta_path = group_dir / "metadata.yaml"
-        if meta_path.is_file():
-            issues.extend(
-                _validate_doc(
-                    data=_load_raw(path=meta_path),
-                    json_schema=METADATA_SCHEMA,
-                    where=f"{number}/metadata.yaml",
-                )
+        meta, _body = model._split_frontmatter(text=md_path.read_text(encoding="utf-8"))
+        number = md_path.name[:4]
+        issues.extend(
+            _validate_doc(
+                data=meta,
+                json_schema=GROUP_FRONTMATTER_SCHEMA,
+                where=f"{number}/frontmatter",
             )
-        else:
-            issues.append(ValidationIssue(level=_ERROR, where=number, message="缺少 metadata.yaml"))
-
-        # tasks/T*.yaml。
-        for task_path in _yaml_files(directory=group_dir / "tasks"):
-            issues.extend(
-                _validate_doc(
-                    data=_load_raw(path=task_path),
-                    json_schema=TASK_SCHEMA,
-                    where=f"{number}/{task_path.stem}",
-                )
-            )
-        # history/T*.yaml。
-        for hist_path in _yaml_files(directory=group_dir / "history"):
-            issues.extend(
-                _validate_doc(
-                    data=_load_raw(path=hist_path),
-                    json_schema=HISTORY_SCHEMA,
-                    where=f"{number}/history/{hist_path.stem}",
-                )
-            )
+        )
     return issues
 
 
@@ -310,20 +351,3 @@ def _find_cycle(*, adjacency: dict[str, list[str]]) -> list[str] | None:
             if found is not None:
                 return found
     return None
-
-
-def _load_raw(*, path: Path) -> object:
-    """读原始 YAML（ruamel 容器，dict/list/str 子类，可直接喂 jsonschema）。"""
-    return model._yaml.load(path)
-
-
-def _yaml_files(*, directory: Path) -> list[Path]:
-    """目录下 *.yaml 文件（排序）；目录不存在返回 []。"""
-    if not directory.is_dir():
-        return []
-    return sorted(directory.glob("*.yaml"))
-
-
-def _is_group_dir(*, name: str) -> bool:
-    """目录名是否 NNNN-slug 形态。"""
-    return len(name) > 5 and name[:4].isdigit() and name[4] == "-"

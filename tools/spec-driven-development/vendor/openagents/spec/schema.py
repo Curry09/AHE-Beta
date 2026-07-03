@@ -1,13 +1,11 @@
-"""spec JSON Schema —— Task / metadata / history 的结构校验单一真源。
+"""spec JSON Schema —— 组 markdown frontmatter / Task 的结构校验单一真源。
 
-Spec-0014/T1: 数据层 + JSON Schema + 依赖/入口声明
-
+Spec-0014/T1（2026-06-24 spec-markdown-form 更新）：
 用 JSON Schema draft 2020-12 声明式描述源数据形状与枚举（决策 D8）：
-- TASK_SCHEMA：tasks/T*.yaml 单个 Task 对象
-- METADATA_SCHEMA：metadata.yaml
-- HISTORY_SCHEMA：history/T*.yaml（Task 对象数组）
+- TASK_SCHEMA：frontmatter `tasks` 列表里的单个 Task 对象
+- GROUP_FRONTMATTER_SCHEMA：组 markdown 文件的 frontmatter（number/title/issue/slug/summary/tasks）
 
-校验逻辑在 validate.py 调用这三个 schema；这里只放声明，保持单一真源。
+校验逻辑在 validate.py 调用这两个 schema；这里只放声明，保持单一真源。
 """
 
 from __future__ import annotations
@@ -19,18 +17,11 @@ STATUS_VALUES = ("pending", "in-progress", "done", "abandoned")
 PRIORITY_VALUES = ("P0", "P1", "P2", "P3")
 RELATES_TYPE_VALUES = ("extends", "supersedes", "note")
 
-# Spec-0014/T1：prose 字段（块标量承载的 Markdown）—— schema 里都是可选 string。
+# issue #69：Task 退化为工作分解行，只保留两个一行短 prose（进 frontmatter）。
+# 重设计叙述上移到组级 Overview 9 段（正文，不进 frontmatter，故不在此 schema）。
 _PROSE_KEYS = (
-    "summary",
-    "motivation",
     "scope",
-    "design",
-    "interface",
-    "tradeoffs",
     "acceptance",
-    "tests",
-    "references",
-    "open-questions",
 )
 
 _RELATES_TO_SCHEMA = {
@@ -66,27 +57,25 @@ TASK_SCHEMA: dict = {
         "derived-from": {"type": "array", "items": {"type": "string"}},
         **{key: {"type": "string"} for key in _PROSE_KEYS},
     },
-    "required": ["id", "title", "status", "priority"],
+    # issue #69：files（单一 writer 所有权）+ acceptance（可验证）每行必填。
+    "required": ["id", "title", "status", "priority", "files", "acceptance"],
     "additionalProperties": False,
 }
 
-# Spec-0014/T1：组元数据 schema。overview 为组级导语（可选 prose），渲染在 summary.md 开篇。
-METADATA_SCHEMA: dict = {
+# 2026-06-24 spec-markdown-form：组 markdown 文件的 frontmatter schema（取代 metadata + history）。
+# 组元数据 number/title/issue/slug + tasks 列表（每项复用 TASK_SCHEMA）。
+GROUP_FRONTMATTER_SCHEMA: dict = {
     "$schema": _DRAFT,
     "type": "object",
     "properties": {
+        "number": {"type": ["string", "integer"]},
         "title": {"type": "string"},
         "issue": {"type": "integer"},
         "slug": {"type": "string"},
-        "overview": {"type": "string"},
+        # Spec-0015：组级人话 TL;DR。schema 只声明类型；非空由 validate 的 _summary_checks 强制。
+        "summary": {"type": "string"},
+        "tasks": {"type": "array", "items": TASK_SCHEMA},
     },
-    "required": ["title", "issue", "slug"],
+    "required": ["number", "title", "issue", "slug", "tasks"],
     "additionalProperties": False,
-}
-
-# Spec-0014/T1：历史文件 schema —— Task 对象数组（每项是一个完整快照）。
-HISTORY_SCHEMA: dict = {
-    "$schema": _DRAFT,
-    "type": "array",
-    "items": TASK_SCHEMA,
 }
