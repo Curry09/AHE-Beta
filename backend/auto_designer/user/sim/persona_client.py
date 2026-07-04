@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Protocol
 
-try:  # 对齐 NexAU: 读 repo 根 .env (LLM_BASE_URL / LLM_API_KEY / LLM_MODEL)
+try:  # 对齐 NexAU: 读 repo 根 .env (USER_LLM_BASE_URL / USER_LLM_API_KEY / USER_LLM_MODEL)
     from dotenv import load_dotenv
 
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -40,12 +40,12 @@ class ApiPersonaClient:
     def __init__(self, model: str | None = None, temperature: float = 0.8):
         from openai import OpenAI  # 延迟导入
 
-        base_url = os.getenv("LLM_BASE_URL")
-        api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+        # 分角色配置：用户 agent 独立用 USER_LLM_*（无公共回落；显式传参最高优先）。
+        base_url = os.getenv("USER_LLM_BASE_URL")
+        api_key = os.getenv("USER_LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise RuntimeError("no LLM_API_KEY / OPENAI_API_KEY in env")
-        # 分角色模型：用户 agent 优先 USER_LLM_MODEL，未设回落公共 LLM_MODEL（显式传参最高优先）。
-        self.model = model or os.getenv("USER_LLM_MODEL") or os.getenv("LLM_MODEL", "nex-agi/Nex-N2-Pro")
+            raise RuntimeError("no USER_LLM_API_KEY / OPENAI_API_KEY in env")
+        self.model = model or os.getenv("USER_LLM_MODEL", "nex-agi/Nex-N2-Pro")
         self.temperature = temperature
         kwargs: dict = {"api_key": api_key}
         if base_url:
@@ -392,9 +392,11 @@ class AgenticPersonaClient:
 
 
 def make_client() -> PersonaClient:
-    """有 NexAU 网关 (LLM_BASE_URL+LLM_API_KEY) 或 OPENAI_API_KEY 用真实 API,
+    """有 NexAU 网关 (USER_LLM_BASE_URL+USER_LLM_API_KEY) 或 OPENAI_API_KEY 用真实 API,
     否则回落离线脚本后端。"""
-    if (os.getenv("LLM_BASE_URL") and os.getenv("LLM_API_KEY")) or os.getenv("OPENAI_API_KEY"):
+    if (os.getenv("USER_LLM_BASE_URL") and os.getenv("USER_LLM_API_KEY")) or os.getenv(
+        "OPENAI_API_KEY"
+    ):
         try:
             return ApiPersonaClient()
         except Exception:

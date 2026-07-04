@@ -1,7 +1,7 @@
 """真实端到端跑一轮闭环（a→b→c）。
 
 接线：用户侧 = spec-0005 控制信封 sim（内层 tool-use AgenticPersonaClient，LLM 由
-     ApiPersonaClient.complete 供给，模型走 backend/.env 的 LLM_*）；
+     ApiPersonaClient.complete 供给，模型走 backend/.env 的 USER_LLM_*）；
      开发者侧 = 真 nexau dev agent + 真 Gitea（issue，走 backend/deploy/gitea/.env）
      + 本地 git 仓承载 harness 代码。
 本地规模：persona 从 distill 卡库(persona_library.json)注入、场景从种子卡库(seeds.json)经
@@ -10,7 +10,7 @@
 Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析 main HEAD SHA 作会话级快照。
 
 前置：
-  1) backend/.env 有 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY
+  1) backend/.env 有三组分角色配置 {USER,DEV,DESIGNER}_LLM_{MODEL,BASE_URL,API_KEY}
   2) Gitea 已起并 bootstrap，backend/deploy/gitea/.env 有 GITEA_URL/OWNER/REPO/TOKEN
 运行：./run.sh  （或直接 PYTHONPATH=backend .venv/bin/python backend/run.py）
   persona / 种子卡库两个「给定输入」经 CLI 参数注入，默认指向 backend/persona_library.json
@@ -167,15 +167,11 @@ def main() -> int:
 
     args = _parse_args(argv=sys.argv[1:])
 
-    llm_env = _load_env(ROOT / ".env")  # LLM_*
+    llm_env = _load_env(ROOT / ".env")  # {USER,DEV,DESIGNER}_LLM_*
     os.environ.update(llm_env)
-    # 分角色模型：各角色可用 {USER,DEV,DESIGNER}_LLM_MODEL 单独覆盖，未设则回落公共 LLM_MODEL。
-    # 在此把回落值写实到进程环境，保证 agent.yaml 的 ${env.DEV_LLM_MODEL} / ${env.DESIGNER_LLM_MODEL}
-    # 及 user 侧 ApiPersonaClient 恒能解析到有效模型。
-    for _role in ("USER", "DEV", "DESIGNER"):
-        _key = f"{_role}_LLM_MODEL"
-        if not os.environ.get(_key):
-            os.environ[_key] = os.environ.get("LLM_MODEL", "")
+    # 分角色 LLM 配置：三种角色各用 {USER,DEV,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、
+    # 无公共回落——agent.yaml 的 ${env.DEV_LLM_*} / ${env.DESIGNER_LLM_*} 与 user 侧 ApiPersonaClient
+    # 直接读各自角色变量（.env 三组均已填全）。
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
 
     from auto_designer.loop.roster import load_roster
@@ -191,7 +187,12 @@ def main() -> int:
     # 环境里的 HTTP(S)_PROXY 抽风（实测代理连不上，直连网关稳定 200）：放行本地 Gitea + 模型网关，
     # 让 nexau/openai 调用绕过烂代理直连，根除偶发 APIConnectionError。
     bypass = ["localhost", "127.0.0.1"]
-    for url in (llm_env.get("LLM_BASE_URL"), gitea.get("GITEA_URL")):
+    for url in (
+        os.environ.get("USER_LLM_BASE_URL"),
+        os.environ.get("DEV_LLM_BASE_URL"),
+        os.environ.get("DESIGNER_LLM_BASE_URL"),
+        gitea.get("GITEA_URL"),
+    ):
         host = urlparse(url).hostname if url else None
         if host and host not in bypass:
             bypass.append(host)

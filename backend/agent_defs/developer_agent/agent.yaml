@@ -8,10 +8,10 @@ tool_call_mode: structured
 max_iterations: 40
 
 llm_config:
-  # 分角色模型：开发者 agent 用 DEV_LLM_MODEL（run.py 未单独设置时已回落公共 LLM_MODEL）。
+  # 分角色配置：开发者 agent 用 DEV_LLM_*（run.py 未单独设置时已回落公共 LLM_*）。
   model: ${env.DEV_LLM_MODEL}
-  base_url: ${env.LLM_BASE_URL}
-  api_key: ${env.LLM_API_KEY}
+  base_url: ${env.DEV_LLM_BASE_URL}
+  api_key: ${env.DEV_LLM_API_KEY}
   max_tokens: 32768
   timeout: 300
   api_type: openai_chat_completion

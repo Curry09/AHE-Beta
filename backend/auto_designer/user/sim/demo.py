@@ -6,7 +6,7 @@ demo.py
 
 运行(无需 API key, 用离线脚本后端):
   python3 -m auto_designer.user.sim.demo
-有 LLM 网关 (LLM_BASE_URL+LLM_API_KEY) 或 OPENAI_API_KEY 时自动改用真实 LLM。
+有 LLM 网关 (USER_LLM_BASE_URL+USER_LLM_API_KEY) 或 OPENAI_API_KEY 时自动改用真实 LLM。
 """
 
 from __future__ import annotations

@@ -8,10 +8,10 @@ tool_call_mode: structured
 max_iterations: 20
 
 llm_config:
-  # 分角色模型：创新者 agent 用 DESIGNER_LLM_MODEL（run.py 未单独设置时已回落公共 LLM_MODEL）。
+  # 分角色配置：创新者 agent 用 DESIGNER_LLM_*。
   model: ${env.DESIGNER_LLM_MODEL}
-  base_url: ${env.LLM_BASE_URL}
-  api_key: ${env.LLM_API_KEY}
+  base_url: ${env.DESIGNER_LLM_BASE_URL}
+  api_key: ${env.DESIGNER_LLM_API_KEY}
   max_tokens: 32768
   timeout: 300
   api_type: openai_chat_completion

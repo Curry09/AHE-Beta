@@ -7,7 +7,7 @@
 **真实执行输出**都打印出来，看 agent 是不是用 read/run/write 在自己工作区核实，而非只读 harness 文本。
 
 LLM 后端自动选择：
-- 检测到 NexAU 网关 env（LLM_BASE_URL+LLM_API_KEY）或 OPENAI_API_KEY -> 真模型（ApiPersonaClient.complete）；
+- 检测到 NexAU 网关 env（USER_LLM_BASE_URL+USER_LLM_API_KEY）或 OPENAI_API_KEY -> 真模型（ApiPersonaClient.complete）；
 - 否则 -> 内置确定性「专家」决策桩 _ExpertToolLLM（离线也能看清工具循环机制）。
 """
 
@@ -148,7 +148,9 @@ class _LoggingSandbox:
 
 
 def _make_llm():
-    if (os.getenv("LLM_BASE_URL") and os.getenv("LLM_API_KEY")) or os.getenv("OPENAI_API_KEY"):
+    if (os.getenv("USER_LLM_BASE_URL") and os.getenv("USER_LLM_API_KEY")) or os.getenv(
+        "OPENAI_API_KEY"
+    ):
         try:
             from .persona_client import ApiPersonaClient
 
