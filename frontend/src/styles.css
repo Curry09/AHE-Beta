@@ -552,6 +552,44 @@ select:focus-visible,
 
 .turn.harness .who { color: var(--text-faint); }
 
+/* harness 回复可折叠：who 行做成整宽点击热区，收起态显示单行预览。 */
+.turn .who.toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  cursor: pointer;
+  color: var(--text-faint);
+}
+
+.turn .who.toggle:hover { color: var(--text-dim); }
+
+.turn .who .caret {
+  font-size: 9px;
+  line-height: 1;
+}
+
+.turn .who .latest {
+  margin-left: auto;
+  color: var(--role-user);
+  letter-spacing: 0.04em;
+}
+
+.turn.harness.collapsed { background: transparent; }
+
+.prose.preview {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-dim);
+}
+
+.prose.preview:hover { color: var(--text); }
+
 /* ---- 过程流（dev/designer 的完整工作过程）：签名元素 ---- */
 .stream {
   display: flex;
