@@ -33,6 +33,9 @@ class _HarnessHandle:
         self._env = {**os.environ, **env}
         self._proc: subprocess.Popen[str] | None = None
         self._closed = False
+        # 最近一次 send 的 harness 内层过程流（{kind,text} 序列）：协议 reply 之外的观测旁路，
+        # persona 只吃 send 返回的 reply、看不到 steps。调用方 send 后立即 getattr 读取。
+        self.last_steps: list[dict] = []
         self._start()
 
     def _start(self) -> None:
@@ -51,6 +54,7 @@ class _HarnessHandle:
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可再 send")
         assert self._proc.stdin is not None and self._proc.stdout is not None
+        self.last_steps = []  # 清上一轮，protocol 违例/无 steps 时保持空
         self._proc.stdin.write(json.dumps({"message": message}, ensure_ascii=False) + "\n")
         self._proc.stdin.flush()
         line = self._proc.stdout.readline()
@@ -58,9 +62,13 @@ class _HarnessHandle:
             raise RuntimeError("harness 子进程已退出（stdout EOF）")
         try:
             payload = json.loads(line)
-            return payload["reply"]
+            reply = payload["reply"]
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
+        # steps 为可选观测旁路：老 harness / 无内层过程时缺省，不作协议硬约束。
+        steps = payload.get("steps")
+        self.last_steps = steps if isinstance(steps, list) else []
+        return reply
 
     def reset(self) -> None:
         if self._closed:

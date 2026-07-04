@@ -46,6 +46,9 @@ class TurnLog:
     patience: int
     trust: str
     harness_output: str = ""
+    # 与 harness_output 配对：该轮 persona 所看回复的 harness 内层过程流（{kind,text} 序列）。
+    # 观测层展开时才用；persona 只感知 harness_output（最终答案），不吃 steps。
+    harness_steps: list = field(default_factory=list)
 
 
 @dataclass
@@ -60,6 +63,7 @@ class SessionResult:
     # 已收到但尚未进入 TurnLog 的 harness 回复(harness 回复要等下一轮 TurnLog 才随
     # harness_output 落日志, 这里先行暴露给观测层实时展示; 下一条 TurnLog 追加时清空)
     pending_harness_output: str | None = None
+    pending_harness_steps: list | None = None  # 与 pending_harness_output 配对的内层过程流
 
 
 MAX_TURNS = 12
@@ -114,6 +118,7 @@ def run_session(
     result = SessionResult(persona_id=persona.persona_id, end_reason="max_turns")
     history: list[str] = []
     harness_output = ""
+    harness_steps: list = []  # 与 harness_output 配对的内层过程流
     has_artifact = False
 
     while state.turn < MAX_TURNS:
@@ -138,6 +143,7 @@ def run_session(
         apply_verdict(state, verdict, coef)
 
         result.pending_harness_output = None  # 该回复即将随本条 TurnLog 落日志, 不再悬挂
+        result.pending_harness_steps = None
         result.turns.append(
             TurnLog(
                 turn=state.turn,
@@ -152,6 +158,7 @@ def run_session(
                 patience=state.patience,
                 trust=state.trust.value,
                 harness_output=harness_output,
+                harness_steps=harness_steps,
             )
         )
         if on_progress is not None:
@@ -175,10 +182,15 @@ def run_session(
         nxt = route(action_id, message, state, harness, harness_output)
         if nxt is not None:
             harness_output = nxt
+            # 与回复配对的内层过程流：send 后 launcher 把它挂在 harness.last_steps（观测旁路）。
+            # Fake/Scripted harness 无此属性 → []。route 只在 EMIT 轮真调 send，此处取值即本轮回复的。
+            steps = getattr(harness, "last_steps", None)
+            harness_steps = list(steps) if isinstance(steps, list) else []
             history.append(f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}...")
             has_artifact = True  # harness 给出了可评判的产物
             # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
             result.pending_harness_output = nxt
+            result.pending_harness_steps = harness_steps
             if on_progress is not None:
                 on_progress(result)
         # verify_self: harness_output 不变, 但 self_obs 已注入下一轮

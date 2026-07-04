@@ -47,7 +47,8 @@ def result_to_turns(res: SessionResult) -> list[Turn]:
     for t in res.turns:
         ho = t.harness_output.strip()
         if ho and ho != prev_ho:  # 仅新一轮 harness 回复才记，连续相同快照视为同一条
-            turns.append(Turn(role="harness", content=ho))
+            # steps = 该回复的内层迭代过程（观测层展开才看，persona 只吃 content）
+            turns.append(Turn(role="harness", content=ho, steps=list(t.harness_steps or [])))
         if ho:
             prev_ho = ho
         if t.message.strip():
@@ -55,7 +56,7 @@ def result_to_turns(res: SessionResult) -> list[Turn]:
     # 悬挂中的 harness 回复（已到手、尚未随下一条 TurnLog 落日志）：实时快照补上这半边
     pending = (res.pending_harness_output or "").strip()
     if pending and pending != prev_ho:
-        turns.append(Turn(role="harness", content=pending))
+        turns.append(Turn(role="harness", content=pending, steps=list(res.pending_harness_steps or [])))
     return turns
 
 

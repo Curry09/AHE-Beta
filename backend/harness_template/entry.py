@@ -25,6 +25,11 @@ _RUN_RETRIES = 4
 # 单次 agent.run 硬超时（秒）：nexau 自身的 llm_config.timeout 实测不生效，故在此层用线程兜底，
 # 卡住即放弃该次（daemon 线程丢弃，不阻塞进程），保证 harness 永远在 bounded 时间内回一行。
 _CALL_TIMEOUT = 240
+# 内层过程流各类文本上限（对齐 auto_designer StepTracer）：工具入参/输出可能带整文件内容，
+# 摘要后进时间线；assistant 是过程主体，给宽上限只防极端失控。
+_TOOL_TEXT_CAP = 200
+_TOOL_RESULT_CAP = 500
+_ASSISTANT_TEXT_CAP = 20_000
 
 
 def _run_with_timeout(agent, message, timeout):
@@ -55,12 +60,134 @@ def _setup_workspace() -> str:
     return ws
 
 
-def _build_agent():
-    """按本目录 agent.yaml 构造工具型 nexau Agent（只挂 bash + complete_task）。"""
+def _build_agent(collector):
+    """按本目录 agent.yaml 构造工具型 nexau Agent（只挂 bash + complete_task）。
+
+    挂 collector 作 tracer：把内层每步（模型发言/工具调用/结果）收进 collector.steps，
+    供 harness 经协议 steps 字段吐给观测层。"""
     from nexau import Agent, AgentConfig
 
     cfg = AgentConfig.from_yaml(config_path=_HERE / "agent.yaml")
+    cfg.resolved_tracer = collector  # 内层过程流 → collector.steps（观测用，不影响回复）
     return Agent(config=cfg)
+
+
+def _unwrap_reply(text: str) -> str:
+    """拆 complete_task 信封 → 给用户看的最终答案。
+
+    工具型 agent 收尾常把整个信封（{"success":…, "status":"TASK_COMPLETED",
+    "output":{"result":…}}）当字符串返回，甚至双层 JSON 编码。用户只该看 result 本身，
+    不是协议元数据。至多解两层，取 output.result（或顶层 result）；非信封/解不出则原样返回。
+    """
+    s: object = text
+    for _ in range(2):  # 至多双层解码
+        if not (isinstance(s, str) and s.lstrip()[:1] in ("{", '"')):
+            break
+        try:
+            dec = json.loads(s)
+        except (json.JSONDecodeError, ValueError):
+            break
+        if isinstance(dec, dict):
+            out = dec.get("output")
+            if isinstance(out, dict) and isinstance(out.get("result"), str):
+                return out["result"]
+            if isinstance(dec.get("result"), str):
+                return dec["result"]
+            break  # 是 dict 但不含 result：保底原文
+        s = dec  # 解出来仍是 str（双层编码），再解一层
+    return text
+
+
+def _make_step_collector():
+    """构造把 nexau span 收成 {kind,text} 过程流的 tracer（自包含，只依赖 nexau）。
+
+    镜像 auto_designer 的 StepTracer：LLM end→assistant，TOOL start→tool，
+    TOOL end→tool_result/tool_error。每次 agent.run 前 reset()，run 后读 steps —— 即该轮
+    harness 内层迭代的完整过程；经协议 steps 字段吐给观测层（persona 只吃 reply，看不到 steps）。
+    收集失败一律静默，绝不拖垮 agent 主流程。
+    """
+    from nexau import BaseTracer, Span, SpanType
+
+    def _compact_params(params):
+        for key in ("command", "cmd"):
+            v = params.get(key)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        try:
+            return json.dumps(params, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            return str(params)
+
+    def _assistant_text(outputs):
+        if not isinstance(outputs, dict):
+            return ""
+        content = outputs.get("content")
+        if isinstance(content, str):
+            return content.strip()
+        if isinstance(content, list):  # Anthropic content blocks
+            parts = [
+                b.get("text", "") for b in content
+                if isinstance(b, dict) and b.get("type") == "text"
+            ]
+            return "\n".join(p for p in parts if p).strip()
+        choices = outputs.get("choices")
+        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+            msg = choices[0].get("message")
+            if isinstance(msg, dict) and isinstance(msg.get("content"), str):
+                return msg["content"].strip()
+        return ""
+
+    def _compact_outputs(outputs):
+        if outputs is None:
+            return ""
+        if isinstance(outputs, str):
+            return outputs.strip()
+        try:
+            return json.dumps(outputs, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            return str(outputs)
+
+    class _StepCollector(BaseTracer):
+        def __init__(self):
+            self.steps: list[dict] = []
+
+        def reset(self):
+            self.steps = []
+
+        def _add(self, kind, text, cap):
+            try:
+                t = (text or "")[:cap]
+                if t:
+                    self.steps.append({"kind": kind, "text": t})
+            except Exception:  # noqa: BLE001  观测层失败不影响 agent
+                pass
+
+        def start_span(self, name, span_type, inputs=None, parent_span=None, attributes=None):
+            span = Span(id="", name=name, type=span_type)
+            if span_type == SpanType.TOOL:
+                tool = name.removeprefix("Tool: ")
+                params = (inputs or {}).get("parameters") or {}
+                summary = _compact_params(params) if isinstance(params, dict) else str(params)
+                self._add(
+                    "tool", f"🔧 {tool}: {summary}" if summary else f"🔧 {tool}", _TOOL_TEXT_CAP
+                )
+            return span
+
+        def end_span(self, span, outputs=None, error=None, attributes=None):
+            if span.type == SpanType.TOOL:
+                tool = span.name.removeprefix("Tool: ")
+                if error is not None:
+                    self._add("tool_error", f"❌ {tool}: {error}", _TOOL_TEXT_CAP)
+                else:
+                    summary = _compact_outputs(outputs)
+                    if summary:
+                        self._add("tool_result", summary, _TOOL_RESULT_CAP)
+            elif span.type == SpanType.LLM and error is None:
+                text = _assistant_text(outputs)
+                if text:
+                    self._add("assistant", text, _ASSISTANT_TEXT_CAP)
+
+    return _StepCollector()
 
 
 def _reply(agent, message: str, rebuild):
@@ -91,14 +218,21 @@ def _reply(agent, message: str, rebuild):
 
 def main() -> None:
     _setup_workspace()  # 先就位 SANDBOX_WORK_DIR，供 agent 的 local sandbox 读取
-    agent = _build_agent()  # 单实例，history 由 nexau 自身跨轮维护
+    collector = _make_step_collector()  # 跨轮/跨重建复用同一实例，逐轮 reset
+    agent = _build_agent(collector)  # 单实例，history 由 nexau 自身跨轮维护
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
         message = json.loads(line)["message"]
-        agent, reply = _reply(agent, message, _build_agent)  # 重建后续用 live agent
-        sys.stdout.write(json.dumps({"reply": reply}, ensure_ascii=False) + "\n")
+        collector.reset()  # 只收本轮内层过程
+        agent, raw = _reply(agent, message, lambda: _build_agent(collector))
+        reply = _unwrap_reply(raw)  # 拆信封：用户只看最终答案
+        payload: dict = {"reply": reply}
+        steps = list(collector.steps)  # 完整内层迭代 → 观测层（persona 不吃）
+        if steps:
+            payload["steps"] = steps
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
         sys.stdout.flush()
 
 

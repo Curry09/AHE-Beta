@@ -112,20 +112,29 @@ class SeedScenario:
 
 @dataclass
 class Turn:
-    """对话一轮：role ∈ {user, harness} 与 content。Transcript 的组成单元。"""
+    """对话一轮：role ∈ {user, harness} 与 content。Transcript 的组成单元。
+
+    steps：仅 harness 轮可选携带——该轮 harness 内层迭代的过程流（{kind,text} 序列，
+    assistant 发言 / 工具调用 / 结果）。content 是给用户看的最终答案；steps 是观测层展开时才看的
+    完整内层过程（persona 只吃 content，不吃 steps）。默认空，非空才进 to_dict（不改既有序列化形状）。
+    """
 
     role: str
     content: str
+    steps: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         assert self.role in _ROLES, f"非法 role：{self.role!r}（须属 {_ROLES}）"
 
     def to_dict(self) -> dict[str, Any]:
-        return {"role": self.role, "content": self.content}
+        d: dict[str, Any] = {"role": self.role, "content": self.content}
+        if self.steps:
+            d["steps"] = self.steps
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Turn:
-        return cls(role=data["role"], content=data["content"])
+        return cls(role=data["role"], content=data["content"], steps=data.get("steps", []))
 
 
 @dataclass
