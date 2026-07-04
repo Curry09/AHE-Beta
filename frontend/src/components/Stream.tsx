@@ -55,15 +55,25 @@ export function Turns({ turns }: { turns: Turn[] }) {
           );
         }
         const open = isOpen(i);
+        const steps = t.steps ?? [];
         return (
           <div key={i} className={`turn harness${open ? "" : " collapsed"}`}>
             <button className="who toggle" onClick={() => toggle(i)}>
               <span className="caret">{open ? "▾" : "▸"}</span>
               harness
+              {steps.length > 0 && <span className="steps-count">{steps.length} 步</span>}
               {i === lastHarness && <span className="latest">最新</span>}
             </button>
             {open ? (
-              <div className="prose">{t.content}</div>
+              <>
+                {steps.length > 0 && (
+                  <details className="inner-steps">
+                    <summary>内层过程（{steps.length} 步）</summary>
+                    <ProcessStream log={steps} />
+                  </details>
+                )}
+                <div className="prose">{t.content}</div>
+              </>
             ) : (
               <button className="prose preview" onClick={() => toggle(i)}>
                 {previewLine(t.content)}

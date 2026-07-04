@@ -5,11 +5,15 @@ export type AgentRole = "user" | "designer" | "developer";
 export interface Turn {
   role: "user" | "harness";
   content: string;
+  // 仅 harness 轮：该轮内层迭代过程流（模型发言/工具调用/结果）。content 是给用户看的最终答案，
+  // steps 是观测层展开时才看的完整内层过程。缺省即无（老数据/无过程）。
+  steps?: LogEntry[];
 }
 
 // 过程流条目：status(状态变化) / assistant(模型发言) / tool(工具调用) / tool_result / tool_error
+// t 可选：dev/designer 的 live log 带时间戳；harness 内层 steps 无时间戳。
 export interface LogEntry {
-  t: string;
+  t?: string;
   kind: string;
   text: string;
 }

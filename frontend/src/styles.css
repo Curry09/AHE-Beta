@@ -569,10 +569,55 @@ select:focus-visible,
   line-height: 1;
 }
 
-.turn .who .latest {
+.turn .who .steps-count {
   margin-left: auto;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.turn .who .latest {
   color: var(--role-user);
   letter-spacing: 0.04em;
+}
+
+/* steps-count 占了 margin-left:auto 时，latest 紧随其后留一点间距 */
+.turn .who .steps-count + .latest {
+  margin-left: 8px;
+}
+
+.turn .who .latest:first-of-type {
+  margin-left: auto;
+}
+
+/* 内层迭代过程：展开态里再套一层默认收起的 disclosure，默认只看最终答案，点开看全过程。 */
+.inner-steps {
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.inner-steps > summary {
+  cursor: pointer;
+  padding: 5px 9px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  user-select: none;
+}
+
+.inner-steps > summary:hover {
+  color: var(--text);
+}
+
+.inner-steps[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.inner-steps .stream {
+  padding: 8px 9px;
 }
 
 .turn.harness.collapsed { background: transparent; }
