@@ -169,6 +169,13 @@ def main() -> int:
 
     llm_env = _load_env(ROOT / ".env")  # LLM_*
     os.environ.update(llm_env)
+    # 分角色模型：各角色可用 {USER,DEV,DESIGNER}_LLM_MODEL 单独覆盖，未设则回落公共 LLM_MODEL。
+    # 在此把回落值写实到进程环境，保证 agent.yaml 的 ${env.DEV_LLM_MODEL} / ${env.DESIGNER_LLM_MODEL}
+    # 及 user 侧 ApiPersonaClient 恒能解析到有效模型。
+    for _role in ("USER", "DEV", "DESIGNER"):
+        _key = f"{_role}_LLM_MODEL"
+        if not os.environ.get(_key):
+            os.environ[_key] = os.environ.get("LLM_MODEL", "")
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
 
     from auto_designer.loop.roster import load_roster

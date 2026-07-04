@@ -44,7 +44,8 @@ class ApiPersonaClient:
         api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("no LLM_API_KEY / OPENAI_API_KEY in env")
-        self.model = model or os.getenv("LLM_MODEL", "nex-agi/Nex-N2-Pro")
+        # 分角色模型：用户 agent 优先 USER_LLM_MODEL，未设回落公共 LLM_MODEL（显式传参最高优先）。
+        self.model = model or os.getenv("USER_LLM_MODEL") or os.getenv("LLM_MODEL", "nex-agi/Nex-N2-Pro")
         self.temperature = temperature
         kwargs: dict = {"api_key": api_key}
         if base_url:

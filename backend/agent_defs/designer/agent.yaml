@@ -8,7 +8,8 @@ tool_call_mode: structured
 max_iterations: 20
 
 llm_config:
-  model: ${env.LLM_MODEL}
+  # 分角色模型：创新者 agent 用 DESIGNER_LLM_MODEL（run.py 未单独设置时已回落公共 LLM_MODEL）。
+  model: ${env.DESIGNER_LLM_MODEL}
   base_url: ${env.LLM_BASE_URL}
   api_key: ${env.LLM_API_KEY}
   max_tokens: 32768
