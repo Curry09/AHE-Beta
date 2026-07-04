@@ -10,7 +10,8 @@
 Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析 main HEAD SHA 作会话级快照。
 
 前置：
-  1) backend/.env 有三组分角色配置 {USER,DEV,DESIGNER}_LLM_{MODEL,BASE_URL,API_KEY}
+  1) backend/.env 有四组独立配置 {USER,DEV,DESIGNER,HARNESS}_LLM_{MODEL,BASE_URL,API_KEY}
+     （前三=编排角色，HARNESS=被进化的产品本体，run.py 据其导出 harness 子进程读的 plain LLM_*）
   2) Gitea 已起并 bootstrap，backend/deploy/gitea/.env 有 GITEA_URL/OWNER/REPO/TOKEN
 运行：./run.sh  （或直接 PYTHONPATH=backend .venv/bin/python backend/run.py）
   persona / 种子卡库两个「给定输入」经 CLI 参数注入，默认指向 backend/persona_library.json
@@ -167,11 +168,22 @@ def main() -> int:
 
     args = _parse_args(argv=sys.argv[1:])
 
-    llm_env = _load_env(ROOT / ".env")  # {USER,DEV,DESIGNER}_LLM_*
+    llm_env = _load_env(ROOT / ".env")  # {USER,DEV,DESIGNER,HARNESS}_LLM_*
     os.environ.update(llm_env)
-    # 分角色 LLM 配置：三种角色各用 {USER,DEV,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、
+    # 分角色 LLM 配置：三种编排角色各用 {USER,DEV,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、
     # 无公共回落——agent.yaml 的 ${env.DEV_LLM_*} / ${env.DESIGNER_LLM_*} 与 user 侧 ApiPersonaClient
-    # 直接读各自角色变量（.env 三组均已填全）。
+    # 直接读各自角色变量（.env 各组均已填全）。
+    # 被进化的产品本体 harness 是第 4 个独立实体：其（可移植的）agent.yaml 只认 plain LLM_*，不知我们
+    # 的角色命名。在此把 HARNESS_LLM_* 写实到 plain LLM_*，让 launcher 起的 harness 子进程（继承
+    # os.environ）拿到自己的模型凭证。缺 HARNESS_LLM_* 即报错，绝不静默回落到别的角色。
+    for _suffix in ("MODEL", "BASE_URL", "API_KEY"):
+        _val = os.environ.get(f"HARNESS_LLM_{_suffix}")
+        if not _val:
+            raise SystemExit(
+                f"backend/.env 缺 HARNESS_LLM_{_suffix}（harness 本体的独立 LLM 配置）；"
+                "见 backend/.env.example"
+            )
+        os.environ[f"LLM_{_suffix}"] = _val
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
 
     from auto_designer.loop.roster import load_roster
