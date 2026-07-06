@@ -144,10 +144,11 @@ class AgenticDeveloper:
             "处理这条 issue，端到端落地成一次对 main 的推进（必须做完 git 才 complete_task）。\n"
             f"issue #{issue_number}：{title}\n{body}\n\n"
             f"严格使用新 tag `{tag}`。\n"
-            f"流程：`git checkout main` → 针对该 issue 改 `agents/main.md` → "
+            f"流程：先诊断根因（看清 harness 的 main.md/entry.py/agent.yaml，判断是行为问题还是结构问题）"
+            f" → `git checkout main` → 改**相关文件**做结构性改进 → "
             f'`git add -A && git -c user.email=dev@auto-designer -c user.name=developer commit -m "fix: issue #{issue_number}"` → '
             f"`git tag {tag}` → `git push origin main` `git push origin {tag}` → "
-            "验证 → complete_task 报告 main 与 tag。"
+            "验证 → complete_task 报告根因、改了哪些文件、新 tag。"
         )
         out = _run_with_timeout(lambda: agent.run(message=msg), _DEV_TIMEOUT)
         return out if isinstance(out, str) else str(out)
