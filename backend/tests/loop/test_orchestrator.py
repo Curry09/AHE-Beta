@@ -258,10 +258,13 @@ def test_round_no_workspace_skips_ensure_deps(tmp_path, monkeypatch) -> None:
     orch.run_round("c")  # 不抛即通过
 
 
-def test_round_no_workspace_passes_none(tmp_path, monkeypatch) -> None:
+def test_round_no_workspace_uses_shared_scratch(tmp_path, monkeypatch) -> None:
+    # 纯文本卡（workspace=None）也开一个空的共享 scratch：不 materialize fixture，但 launch 与
+    # session 拿到**同一个**非空目录——确保用户 agent 落到 harness 同一工作目录真核实，
+    # 而非只凭 harness 回复"嘴上验"。
     repo = _seed_repo(tmp_path)
     events: list = []
-    monkeypatch.setattr(  # 无工作区时绝不该调 materialize
+    monkeypatch.setattr(  # 无 fixture 工作区时绝不该调 materialize
         "auto_designer.loop.orchestrator.materialize_workspace",
         lambda spec: (_ for _ in ()).throw(AssertionError("不应 materialize")),
     )
@@ -279,5 +282,6 @@ def test_round_no_workspace_passes_none(tmp_path, monkeypatch) -> None:
     )
     orch.run_round("c")
 
-    assert ("launch", None) in events
-    assert ("session", None) in events
+    launch_ws = next(ws for kind, ws in events if kind == "launch")
+    session_ws = next(ws for kind, ws in events if kind == "session")
+    assert launch_ws is not None and launch_ws == session_ws  # harness 与用户 agent 同一目录

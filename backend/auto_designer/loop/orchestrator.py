@@ -15,6 +15,7 @@ harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA c
 from __future__ import annotations
 
 import subprocess
+import tempfile
 from collections.abc import Callable
 from typing import Protocol
 
@@ -78,19 +79,19 @@ class Orchestrator:
 
         # a：固定集每个 (persona, scenario) 按该 main SHA launch 跑一局，产 issue（→tracker）+ 体感（→store）。
         #    launcher 按 SHA checkout → 同一会话内多轮 send 跑同一 SHA 快照，harness 不在脚下变。
-        #    Spec-0008/T1 v2：场景带工作区时，先于 launch materialize 一份共享工作区，同一目录既经
-        #    launcher 注入 harness（SANDBOX_WORK_DIR）又传给会话绑定内层 client——harness 改、用户 agent
-        #    同目录核实。scenario.workspace 为空时 workspace_dir=None，两侧均退化为今天行为。
+        #    Spec-0008/T1 v2：每局先备一份**共享工作区**，同一目录既经 launcher 注入 harness
+        #    （SANDBOX_WORK_DIR）又传给会话绑定内层 client——harness 改、用户 agent 同目录核实。
+        #    git/fixture 型种子 materialize + ensure_deps；纯文本卡（workspace=None）也开一个空的
+        #    scratch（每局新建、隔离），确保用户 agent 落到 harness 同一工作目录真核实，而非只凭
+        #    harness 回复"嘴上验"（否则无环境时会脑补"测试通过"污染体感）。
         for persona, scenario in self._fixed_set:
-            workspace_dir = (
-                materialize_workspace(scenario.workspace)
-                if scenario.workspace is not None
-                else None
-            )
-            if workspace_dir is not None:
-                # Spec-0009/T3：materialize 之后、launch 之前按 scenario.workspace.setup
-                # 备好依赖（约定建 per-workspace .venv）——两侧共享的这个目录开跑前就绪。
+            if scenario.workspace is not None:
+                workspace_dir = materialize_workspace(scenario.workspace)
+                # Spec-0009/T3：materialize 之后、launch 之前按 scenario.workspace.setup 备好依赖
+                # （约定建 per-workspace .venv）——两侧共享的这个目录开跑前就绪。
                 ensure_deps(workspace_dir, scenario.workspace)
+            else:
+                workspace_dir = tempfile.mkdtemp(prefix="shared_ws_")
             harness = self._launcher.launch(sha, workspace_dir=workspace_dir)
             self._run_session(persona, scenario, harness, workspace_dir=workspace_dir)
 
