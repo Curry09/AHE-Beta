@@ -132,6 +132,11 @@ def run_session(
         ret = client.respond(system, user)
         state.pending_self_obs = None  # 用后即焚: self_observation 已被消费
 
+        # ③.5 方案 B：action=='free' 交给模型自评归类到合法 id（替代关键词硬猜）。
+        # 仅 client 支持 classify_action 时启用；否则落 resolve 的安全兜底。
+        if ret.get("action") == "free" and hasattr(client, "classify_action"):
+            ret = {**ret, "action": client.classify_action(system, ret, space)}
+
         # ④ resolve: 归类 + 投影 + channel 校验
         action_id, message = resolve_action(ret, space, persona)
         spec = CATALOG[action_id]
@@ -171,9 +176,21 @@ def run_session(
         # ⑥ 终止判定
         if spec.effect is Effect.TERMINATE:
             result.end_reason = spec.end_reason or "terminated"
-            if action_id == "file_issue":
-                # 专门一轮：让 persona 跳出对话、以本人口吻写自包含 issue（≠ 撂给 harness 的临场 message）
-                issue_resp = client.respond(system, build_issue_turn(task, history, state))
+            # 三种终止都以本人口吻留一条自包含 issue（把"提 issue"从特定动作解耦——不满就留信号）：
+            #   file_issue                → "filed"：会话里搞不定、正式开单
+            #   give_up                   → "left" ：直接走人，留一条"为什么把我逼走"的问卷式 issue
+            #                               （否则气跑=空跑，backlog 收不到任何信号）
+            #   accept_with_reservations  → "accepted"：照常交付，但留一条体感落差反馈
+            # 三者 end_reason 各自不同（issue_filed / abandoned / accepted），仅"是否留 issue"被拉平。
+            _issue_mode = {
+                "file_issue": "filed",
+                "give_up": "left",
+                "accept_with_reservations": "accepted",
+            }.get(action_id)
+            if _issue_mode is not None:
+                issue_resp = client.respond(
+                    system, build_issue_turn(task, history, state, mode=_issue_mode)
+                )
                 issue_text = str(issue_resp.get("issue") or "")
                 result.issue_artifact = emit_issue_artifact(persona, result.turns, issue_text)
             break

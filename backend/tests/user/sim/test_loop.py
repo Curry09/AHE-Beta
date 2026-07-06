@@ -166,6 +166,19 @@ def test_capability_fork() -> None:
     assert expert.issue_artifact is not None
 
 
+def test_give_up_also_leaves_exit_issue() -> None:
+    # 走人=弃坑也留一条"为什么把我逼走"的问卷式 issue：把"提 issue"从特定动作解耦,
+    # 否则 FEEDBACK/GIVE_UP 型气跑后 backlog 收不到任何信号。end_reason 仍是 abandoned。
+    p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
+    # EXPERT 连坐实 harness 失败 2 次触发诊断门, give_up 解锁; 第 3 轮走人。
+    client = _StubClient(
+        ["send_task", "give_feedback", "give_up"], verdict="failed_blame_harness"
+    )
+    res = run_session(p, client, ScriptedHarness(), TASK)
+    assert res.end_reason == "abandoned"  # 机制不变: 仍是放弃
+    assert res.issue_artifact is not None  # 但额外留下退出 issue
+
+
 def test_issue_artifact_is_user_voice_with_metadata_footer() -> None:
     expert = run_session(
         _persona(D1Eval.EXPERT, D43Correct.FILE_ISSUE, "P-expert"),

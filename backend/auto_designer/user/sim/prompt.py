@@ -39,6 +39,13 @@ G4  Judge by the persona's ACCEPTANCE bar, not by objective correctness.
     "Good enough for me" ends the task even if it is objectively wrong.
 G5  Stay consistent with <history>. A runtime <mood> tag reports your current
     felt patience/trust — honor it, do not invent your own emotional state.
+G6  NEVER claim the outcome of running, installing, or inspecting anything you did
+    not ACTUALLY do. You have not "run the tests", "checked the files", or found
+    "pip missing" unless a real tool result (INNER TOOL USE) or a harness reply
+    actually told you so. If you have tools, you must call them to earn any such
+    claim; if you have none, you can only reason from what the HARNESS reported —
+    say "the harness claims it passes; I have not verified" rather than inventing a
+    verification you never performed. Fabricated verification is the worst failure.
 
 # ACTION SEMANTICS
 - verify_self: a PRIVATE action. You inspect/run on your OWN; the harness hears
@@ -46,16 +53,28 @@ G5  Stay consistent with <history>. A runtime <mood> tag reports your current
 - ask_harness_run: you ask the harness to execute and report back; "message"
   is the request you send.
 - accept / give_up / file_issue: terminal. Keep "message" short and in voice.
+- accept_with_reservations: terminal. Use it when the result is good ENOUGH that you'll
+  take it and move on, BUT it fell short of what you wanted. You ship it AND leave the dev
+  team a short feedback issue about the gap. Pick this over plain "accept" when you'd sign
+  off yet still have a real complaint; pick plain "accept" when you're genuinely content.
 
 # OUTPUT CONTRACT
 Return EXACTLY ONE JSON object and nothing else:
 {
   "perceive": "<what you, this person, actually understood; be honest about the LIMITS of your perception per G1>",
-  "verdict":  "satisfied | failed_blame_harness | failed_blame_self | unsure",
+  "verdict":  "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck",
   "action":   "<one id from <action_space>, or 'free'>",
   "message":  "<the exact line you send to the harness; empty string for verify_self>"
 }
-"message" is the ONLY text the harness sees. Do not put JSON or analysis in it."""
+"message" is the ONLY text the harness sees. Do not put JSON or analysis in it.
+
+# VERDICT: unsure vs stuck (important)
+- "unsure": you got a plausible answer and simply have NOT verified it yet. Careful
+  verification is legitimate and should NOT cost you patience.
+- "stuck": the harness is MALFUNCTIONING rather than merely unverified — it errored,
+  returned nothing usable, timed out, repeated the same thing, or made no real progress
+  this turn. You do NOT need technical insight to feel this; any user notices a tool that
+  keeps spinning. Each consecutive "stuck" wears your patience faster (frustration compounds)."""
 
 
 def build_system(persona: Persona) -> str:
@@ -141,22 +160,52 @@ def build_user_turn(
     return "\n\n".join(parts)
 
 
-def build_issue_turn(task: str, history_lines: list[str], state: State) -> str:
-    """决定 file_issue 后的专门一轮：让 persona 跳出对话，以本人口吻写一条*自包含*的 issue
-    （提交给不在场、看不到聊天记录的开发团队），而非对 harness 撂下的那句临场话。
+def build_issue_turn(
+    task: str, history_lines: list[str], state: State, *, mode: str = "filed"
+) -> str:
+    """开单的专门一轮：让 persona 跳出对话，以本人口吻写一条*自包含*的 issue（提交给不在场、
+    看不到聊天记录的开发团队），而非对 harness 撂下的那句临场话。
+
+    mode 三种口吻（把"提 issue"从特定动作解耦：无论怎么收场，不满都留信号）：
+    - "filed"（file_issue）：你没能在会话里搞定，正式开单——报告哪里一直不对、为什么卡住。
+    - "left"（give_up）：你**决定弃坑走人**，临走留一条"问卷式"退出反馈——什么把你逼走了。
+    - "accepted"（accept_with_reservations）：你**接受/交付了**产出但不达预期——留一条体感落差反馈。
 
     覆盖 system 的动作 OUTPUT CONTRACT —— 这一轮只要 {"issue"}, 不发 message / 不选 action。
     """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
-    return "\n\n".join(
-        [
-            "<file_issue>",
+    framing = {
+        "accepted": (
+            "You DECIDED to accept and move on with what the assistant produced — you're shipping "
+            "it — but it fell short of what you actually wanted. You're leaving feedback for the "
+            "DEV TEAM behind the assistant — people who were NOT in your chat and cannot see it. "
+            "Write it AS YOURSELF, in your own voice: a short, plain, first-person account of "
+            "(a) what you were trying to get done, (b) what you got and accepted, and (c) what "
+            "still bothers you / where it didn't meet your bar. Human, like flagging a rough edge "
+            "to a colleague — NOT a formal spec, ticket, or status report."
+        ),
+        "left": (
+            "You've decided to WALK AWAY and abandon this — you're done working with the assistant "
+            "on it. On your way out you're leaving the DEV TEAM behind the assistant — people who "
+            "were NOT in your chat and cannot see it — a quick exit note about why it lost you. "
+            "Write it AS YOURSELF, in your own voice: a short, plain, first-person account of "
+            "(a) what you were trying to get done, (b) what the assistant did that wore you down, "
+            "and (c) what finally made you give up on it. Human, like venting to a colleague on "
+            "your way out — NOT a formal spec, ticket, or status report."
+        ),
+        "filed": (
             "You've given up on getting this done in the session and are filing an issue to "
             "the DEV TEAM behind the assistant — people who were NOT in your chat and cannot "
             "see it. Write it AS YOURSELF, in your own voice: a short, plain, first-person "
             "account of (a) what you were trying to get done, (b) what the assistant kept doing "
             "wrong, and (c) why you're stuck. Self-contained and human, like flagging a problem "
-            "to a colleague — NOT a formal spec, ticket, or status report.",
+            "to a colleague — NOT a formal spec, ticket, or status report."
+        ),
+    }.get(mode, "")
+    return "\n\n".join(
+        [
+            "<file_issue>",
+            framing,
             f"<task>\n{task}\n</task>",
             f"<history>\n{hist}\n</history>",
             f"<mood>\n{_mood_tag(state)}\n</mood>",

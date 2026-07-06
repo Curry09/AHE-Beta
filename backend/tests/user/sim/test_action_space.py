@@ -64,11 +64,26 @@ def test_patience_gate_unlocks_terminal_and_accept() -> None:
     assert "accept" in space  # 有可接受产物 -> accept(与耐心无关)
 
 
-def test_resolve_free_is_classified_into_space() -> None:
+def test_accept_with_reservations_offered_alongside_accept() -> None:
+    # 有可接受产物时，accept 与 accept_with_reservations 一起给出：完成了但不达预期，
+    # 模型可选后者「照样交付 + 留一条体感落差 issue」。无产物时都不出现。
+    p = _persona()
+    with_art = derive_action_space(Phase.ACTIVE, p, init_state(p), has_artifact=True)
+    assert "accept" in with_art and "accept_with_reservations" in with_art
+    no_art = derive_action_space(Phase.ACTIVE, p, init_state(p), has_artifact=False)
+    assert "accept_with_reservations" not in no_art
+    # 它是终止动作、end_reason 仍是 accepted（照常交付，不改变交付事实）。
+    assert CATALOG["accept_with_reservations"].effect is CATALOG["accept"].effect
+    assert CATALOG["accept_with_reservations"].end_reason == "accepted"
+
+
+def test_resolve_free_falls_back_to_safe_nonterminal() -> None:
+    # 方案 B: resolve 不再用关键词猜意图。无模型自评时, free 一律落安全的非终止动作,
+    # 即便文本里写着 "accept it" 也绝不擅自终止(避免污染体感/issue 信号)。
     p = _persona()
     space = ["accept", "give_feedback", "refine_request"]
     aid, msg = resolve_action({"action": "free", "message": "looks good, accept it"}, space, p)
-    assert aid == "accept" and msg
+    assert aid == "give_feedback" and aid != "accept" and msg.strip()
 
 
 def test_resolve_projects_illegal_to_same_effect() -> None:

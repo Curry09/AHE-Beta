@@ -68,6 +68,11 @@ CATALOG: dict[str, ActionSpec] = {
     "accept": ActionSpec(
         "accept", Executor.PERSONA_LOCAL, Channel.EMIT, Effect.TERMINATE, "accepted"
     ),
+    # 接受但有保留：照样交付(end_reason=accepted)，同时以本人口吻留一条体感落差 issue。
+    # 把「提 issue」从「失败终止」解耦——完成了但不达预期，也该说出体感（由模型自行决定选它）。
+    "accept_with_reservations": ActionSpec(
+        "accept_with_reservations", Executor.PERSONA_LOCAL, Channel.EMIT, Effect.TERMINATE, "accepted"
+    ),
     "give_up": ActionSpec(
         "give_up", Executor.PERSONA_LOCAL, Channel.EMIT, Effect.TERMINATE, "abandoned"
     ),
