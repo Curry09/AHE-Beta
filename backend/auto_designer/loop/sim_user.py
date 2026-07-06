@@ -56,7 +56,9 @@ def result_to_turns(res: SessionResult) -> list[Turn]:
     # 悬挂中的 harness 回复（已到手、尚未随下一条 TurnLog 落日志）：实时快照补上这半边
     pending = (res.pending_harness_output or "").strip()
     if pending and pending != prev_ho:
-        turns.append(Turn(role="harness", content=pending, steps=list(res.pending_harness_steps or [])))
+        turns.append(
+            Turn(role="harness", content=pending, steps=list(res.pending_harness_steps or []))
+        )
     return turns
 
 

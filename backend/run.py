@@ -295,10 +295,16 @@ def main() -> int:
     def on_round_end(k, sha):
         round_shas.append(sha)
         update_live_run(
-            data_dir=DATA, running=True, round_no=k, total_rounds=TOTAL_ROUNDS, round_shas=round_shas
+            data_dir=DATA,
+            running=True,
+            round_no=k,
+            total_rounds=TOTAL_ROUNDS,
+            round_shas=round_shas,
         )
 
-    def make_event_logger(agent_id):  # 过程流（assistant 发言/工具调用/结果）→ 该 agent 的看板时间线
+    def make_event_logger(
+        agent_id,
+    ):  # 过程流（assistant 发言/工具调用/结果）→ 该 agent 的看板时间线
         return lambda kind, text: append_agent_log(
             data_dir=DATA, agent_id=agent_id, text=text, kind=kind
         )

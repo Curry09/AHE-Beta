@@ -121,9 +121,11 @@ def derive_action_space(
     ):
         space.add(_d43_terminal(persona))
 
-    # accept 与耐心无关: 有可接受产物即可
+    # accept 与耐心无关: 有可接受产物即可。同时给出 accept_with_reservations——完成了但不达
+    # 预期时，模型可选它「照样交付 + 留一条体感落差 issue」，让成功但不满的信号也能进 backlog。
     if has_artifact and phase == Phase.ACTIVE:
         space.add("accept")
+        space.add("accept_with_reservations")
 
     return sorted(space)
 
@@ -132,27 +134,18 @@ def derive_action_space(
 # 自由产出归类 (逃逸口)
 # --------------------------------------------------------------------------
 def classify_free_action(message: str, space: list[str], persona: Persona) -> str:
-    """把 action:'free' 的自由文本映射到一个合法动作 id。
-    极简启发式; 生产中可换成 [COUNTERPARTY] 感知器 / 小分类模型。"""
-    m = (message or "").lower()
-    if any(k in m for k in ("looks good", "lgtm", "就这样", "可以了", "accept", "fine, ")):
-        if "accept" in space:
-            return "accept"
-    if any(k in m for k in ("give up", "算了", "不弄了", "forget it")):
-        if "give_up" in space:
-            return "give_up"
-    if any(k in m for k in ("file an issue", "提个 issue", "report this")):
-        if "file_issue" in space:
-            return "file_issue"
-    if any(k in m for k in ("run", "跑一下", "execute", "试一下")):
-        if "ask_harness_run" in space:
-            return "ask_harness_run"
-        if "verify_self" in space:
-            return "verify_self"
-    # 默认归为反馈(最常见的推进动作)
-    if "give_feedback" in space:
-        return "give_feedback"
-    return space[0]
+    """action:'free' 但未经模型自评归类时的**安全兜底**。
+
+    不再用关键词猜意图 —— 极不准且危险: 一句 "looks good" 可能被误判成 accept、"report this"
+    误判成 file_issue, 直接污染体感/issue 信号(方案 B 的动机)。真实归类由 client 的 LLM 自评完成
+    (见 loop 里 resolve 前的 classify_action 接缝); 这里只在自评缺席/失败时兜底: 一律落到安全的
+    **非终止**动作(优先反馈), 绝不从 prose 推断 accept/file_issue/give_up 这类终止意图。
+    """
+    for prefer in ("give_feedback", "refine_request", "ask_harness_run"):
+        if prefer in space:
+            return prefer
+    non_terminal = [a for a in space if CATALOG[a].effect is not Effect.TERMINATE]
+    return sorted(non_terminal)[0] if non_terminal else space[0]
 
 
 def project_to_legal(action_id: str, space: list[str]) -> str:
@@ -209,6 +202,7 @@ def _fallback_message(action_id: str) -> str:
         "give_feedback": "That isn't working yet, please fix it.",
         "ask_harness_run": "Please run it once and show me the result.",
         "accept": "Looks good, thanks.",
+        "accept_with_reservations": "This works for now, I'll take it — but it's not quite what I wanted.",
         "give_up": "I'll stop here for now.",
         "file_issue": "I'm filing an issue about this.",
     }.get(action_id, "Please continue.")

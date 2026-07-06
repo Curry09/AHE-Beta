@@ -85,15 +85,16 @@ def derive_feeling(end_reason: str, turns: list) -> FeelingScore:
     turns: list[TurnLog]; 仅读 verdict / trust 两个主观字段, 不依赖客观线。
     """
     fails = sum(1 for t in turns if t.verdict == "failed_blame_harness")
+    stucks = sum(1 for t in turns if t.verdict == "stuck")
     final_trust = turns[-1].trust if turns else "balanced"
 
     score = _BASE_BY_END.get(end_reason, 2)
-    # 即便最终接受, 多次怪 harness 或信任崩到 skeptical -> 降一档为"有摩擦的接受"
-    if score == 4 and (fails >= 2 or final_trust == "skeptical"):
+    # 即便最终接受, 多次怪 harness / 多次卡住 / 信任崩到 skeptical -> 降一档为"有摩擦的接受"
+    if score == 4 and (fails >= 2 or stucks >= 2 or final_trust == "skeptical"):
         score = 3
 
     reason = (
-        f"end={end_reason}; harness-blamed failures={fails}; "
+        f"end={end_reason}; harness-blamed failures={fails}; stuck turns={stucks}; "
         f"final trust={final_trust}. " + _VERDICT_TEXT[score]
     )
     return FeelingScore(score=score, reason=reason)

@@ -101,6 +101,28 @@ class ApiPersonaClient:
             text = self._text(self._create(messages, max_tokens * 2))
         return text
 
+    def classify_action(self, system: str, ret: dict, space: list[str]) -> str:
+        """方案 B：action=='free' 时的模型自评归类。
+
+        让**同一个 persona 模型**在自己刚写的自由产出上，从当前合法动作集里挑最贴合本意的一个
+        id（而非框架用关键词硬猜）。返回落在 space 内的 id；解析失败/越界则回 'free'，交由
+        resolve 的安全兜底(classify_free_action)处理，绝不擅自投影到终止动作。
+        """
+        prompt = (
+            "You previously chose action:'free'. Now map your own intent to EXACTLY ONE "
+            "action id from the allowed set — pick the id that best matches what you want to "
+            "do next; do NOT invent ids outside the set.\n\n"
+            f"your perceive: {ret.get('perceive', '')}\n"
+            f"your verdict: {ret.get('verdict', '')}\n"
+            f"your free-text message: {ret.get('message', '')}\n\n"
+            f"allowed action ids: {space}\n\n"
+            'Return ONLY JSON: {"action": "<one id from allowed action ids>"}'
+        )
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+        parsed = _parse_json(self._text(self._create(messages, 2000)))
+        aid = str(parsed.get("action", "")).strip()
+        return aid if aid in space else "free"
+
 
 # --------------------------------------------------------------------------
 # 离线脚本后端 (无 key 跑通用)

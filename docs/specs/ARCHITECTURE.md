@@ -61,7 +61,8 @@ _（缺模块级 docstring）_
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
 | `checkpoint.py` | checkpoint 存取（spec-0004/T1）：把自包含 STATE_DIR 打包成可下载 artifact，反向还原。 |
-| `live.py` | 多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/agents.json。 |
+| `live.py` | 多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/。 |
+| `live_tracer.py` | StepTracer：把 nexau agent 运行中的过程流成看板可见的结构化事件。 |
 | `metrics.py` | metrics（spec-0003/T6）：从本地 SessionStore 统计 issue 数量与体感随时间的曲线。 |
 | `orchestrator.py` | 闭环编排 orchestrator：a（用户产 issue+体感）→ d（创新者综合全局产结构性提案，可选） |
 | `roster.py` | 角色编制（roster）：三类 agent 的数量，作为「后端编排」与「前端小镇房间」的单一真源。 |
@@ -157,6 +158,7 @@ graph LR
     nauto_designer_loop["auto_designer.loop"]
     nauto_designer_loop_checkpoint["loop.checkpoint"]
     nauto_designer_loop_live["loop.live"]
+    nauto_designer_loop_live_tracer["loop.live_tracer"]
     nauto_designer_loop_metrics["loop.metrics"]
     nauto_designer_loop_orchestrator["loop.orchestrator"]
     nauto_designer_loop_roster["loop.roster"]
@@ -199,9 +201,11 @@ graph LR
     nauto_designer_user_sim_workspace["sim.workspace"]
     nauto_designer_web["auto_designer.web"]
     nauto_designer_web_api["web.api"]
+    nauto_designer_designer_designer --> nauto_designer_loop_live_tracer
     nauto_designer_designer_designer --> nauto_designer_models
     nauto_designer_designer_designer --> nauto_designer_tracker_base
     nauto_designer_designer_designer --> nauto_designer_user_session_store
+    nauto_designer_dev_agentic_developer --> nauto_designer_loop_live_tracer
     nauto_designer_dev_agentic_developer --> nauto_designer_tracker_base
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
