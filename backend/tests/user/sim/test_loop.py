@@ -171,9 +171,7 @@ def test_give_up_also_leaves_exit_issue() -> None:
     # 否则 FEEDBACK/GIVE_UP 型气跑后 backlog 收不到任何信号。end_reason 仍是 abandoned。
     p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
     # EXPERT 连坐实 harness 失败 2 次触发诊断门, give_up 解锁; 第 3 轮走人。
-    client = _StubClient(
-        ["send_task", "give_feedback", "give_up"], verdict="failed_blame_harness"
-    )
+    client = _StubClient(["send_task", "give_feedback", "give_up"], verdict="failed_blame_harness")
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.end_reason == "abandoned"  # 机制不变: 仍是放弃
     assert res.issue_artifact is not None  # 但额外留下退出 issue

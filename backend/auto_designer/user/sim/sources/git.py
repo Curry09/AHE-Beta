@@ -52,9 +52,7 @@ class GitSource:
         ref = spec.params.get("ref")
         depth = spec.params.get("depth")
 
-        cache = _ensure_commit_cached(
-            repo=str(repo), commit=str(commit), ref=ref, depth=depth
-        )
+        cache = _ensure_commit_cached(repo=str(repo), commit=str(commit), ref=ref, depth=depth)
 
         # 2. 每局 fresh：从缓存复制一份独立目录再 checkout，跨局互不污染、可清理。
         base = dest_root or tempfile.mkdtemp(prefix="sim_ws_git_")
@@ -74,9 +72,7 @@ class GitSource:
         return str(dest.resolve())
 
 
-def _ensure_commit_cached(
-    *, repo: str, commit: str, ref: str | None, depth: int | None
-) -> Path:
+def _ensure_commit_cached(*, repo: str, commit: str, ref: str | None, depth: int | None) -> Path:
     """确保 commit 对象在 repo 的共享缓存里并返回缓存路径；只有 miss 时才碰网络。
 
     取法优先级：① `fetch --depth 1 <repo> <sha>:refs/seeds/<sha>` 按 SHA 定向浅取并落 ref

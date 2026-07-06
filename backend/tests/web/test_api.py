@@ -211,7 +211,9 @@ class _CommitTracker(FakeTracker):
 
 def test_commits_connected(tmp_path: Path) -> None:
     store = SessionStore(tmp_path / "sessions")
-    client = TestClient(create_app(store=store, tracker=_CommitTracker(), repo_url="http://gitea/o/r"))
+    client = TestClient(
+        create_app(store=store, tracker=_CommitTracker(), repo_url="http://gitea/o/r")
+    )
     body = client.get("/api/commits").json()
     assert body["connected"] is True
     assert body["commits_url"] == "http://gitea/o/r/commits/branch/main"

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from auto_designer.loop.live import (
     append_agent_log,
     archive_agent,
@@ -50,7 +52,13 @@ def test_update_upserts_and_keeps_separate_slots(tmp_path: Path) -> None:
 def test_round_preserved_when_not_passed(tmp_path: Path) -> None:
     """round_no 不传时沿用槽内已有值（逐轮更新中间态时不必每次带 round）。"""
     update_agent(
-        data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="1", round_no=2
+        data_dir=tmp_path,
+        agent_id="u",
+        role="user",
+        label="l",
+        running=True,
+        status="1",
+        round_no=2,
     )
     update_agent(data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="2")
     assert read_agents(data_dir=tmp_path)[0]["round"] == 2
@@ -112,12 +120,18 @@ def test_append_agent_log_adds_typed_steps_without_touching_status(tmp_path: Pat
         running=True,
         status="改 main 中…",
     )
-    append_agent_log(data_dir=tmp_path, agent_id="d", text="先看看 issue 涉及的文件", kind="assistant")
-    append_agent_log(data_dir=tmp_path, agent_id="d", text="🔧 run_shell: git checkout main", kind="tool")
+    append_agent_log(
+        data_dir=tmp_path, agent_id="d", text="先看看 issue 涉及的文件", kind="assistant"
+    )
+    append_agent_log(
+        data_dir=tmp_path, agent_id="d", text="🔧 run_shell: git checkout main", kind="tool"
+    )
     append_agent_log(
         data_dir=tmp_path, agent_id="d", text="🔧 run_shell: git checkout main", kind="tool"
     )  # 去重
-    append_agent_log(data_dir=tmp_path, agent_id="d", text="Switched to branch 'main'", kind="tool_result")
+    append_agent_log(
+        data_dir=tmp_path, agent_id="d", text="Switched to branch 'main'", kind="tool_result"
+    )
     (agent,) = read_agents(data_dir=tmp_path)
     assert agent["status"] == "改 main 中…"
     assert [(e["kind"], e["text"]) for e in agent["log"]] == [
@@ -196,6 +210,7 @@ def test_archive_agent_snapshots_slot_per_round(tmp_path: Path) -> None:
 
 def test_step_tracer_emits_process_stream() -> None:
     """StepTracer：TOOL start → tool；TOOL end → tool_result/tool_error；LLM end → assistant。"""
+    pytest.importorskip("nexau")
     from nexau import SpanType
 
     from auto_designer.loop.live_tracer import StepTracer

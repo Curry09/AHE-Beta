@@ -126,7 +126,8 @@ def _make_step_collector():
             return content.strip()
         if isinstance(content, list):  # Anthropic content blocks
             parts = [
-                b.get("text", "") for b in content
+                b.get("text", "")
+                for b in content
                 if isinstance(b, dict) and b.get("type") == "text"
             ]
             return "\n".join(p for p in parts if p).strip()

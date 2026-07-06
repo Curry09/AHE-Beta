@@ -78,7 +78,9 @@ class Designer:
         self._repo = Path(harness_repo)  # 只读 grounding：agent 看 harness 现状
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
-        self._on_event = on_event  # 过程流回调 (kind, text)：assistant 发言/工具调用/结果，看板时间线用
+        self._on_event = (
+            on_event  # 过程流回调 (kind, text)：assistant 发言/工具调用/结果，看板时间线用
+        )
 
     def propose_once(self) -> DesignOutcome:
         backlog = self._tracker.list_open_issues()
