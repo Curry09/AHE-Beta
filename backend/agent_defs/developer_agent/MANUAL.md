@@ -39,10 +39,10 @@ assistant text. Set `HARNESS_PROGRESS=0` to suppress stderr progress output.
   request can take a long time.
 - It handles **one request at a time**, in order.
 - Broad, multi-file, end-to-end, package-build, or otherwise large requests are
-  constrained with a budget-safe progressive-delivery hint before work starts.
-  This tells the assistant to first produce the smallest complete, verifiable
-  slice, such as one file, one function, one CLI path, or a minimal test, instead
-  of treating the whole request as a single all-or-nothing goal.
+  constrained with a mandatory minimal-verifiable-slice directive before work
+  starts. The assistant must first produce one independently checkable slice,
+  report the touched files, verification command, and verification result, and
+  must not claim the whole request is complete until that slice is verified.
 - On a **very large request it can hit an internal limit and return an error**
   (for example a timeout or "maximum iteration" message) instead of a finished
   result.
