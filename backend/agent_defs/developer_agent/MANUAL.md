@@ -38,9 +38,24 @@ assistant text. Set `HARNESS_PROGRESS=0` to suppress stderr progress output.
   message and its reply; you receive the final reply when it is done. A large
   request can take a long time.
 - It handles **one request at a time**, in order.
+- Broad, multi-file, end-to-end, package-build, or otherwise large requests are
+  constrained with a budget-safe progressive-delivery hint before work starts.
+  This tells the assistant to first produce the smallest complete, verifiable
+  slice, such as one file, one function, one CLI path, or a minimal test, instead
+  of treating the whole request as a single all-or-nothing goal.
 - On a **very large request it can hit an internal limit and return an error**
   (for example a timeout or "maximum iteration" message) instead of a finished
   result.
+- When bounded execution fails, the final reply includes an actionable summary:
+  what was produced, whether anything was verified, what remains unverified, the
+  blocking reason, and a concrete path to shrink scope for the next attempt.
+  If the failure involved a timeout and agent rebuild, the reply also points to a
+  recovery snapshot written in the workspace at `.harness_recovery.json`. That
+  snapshot contains the blocking reason, attempt count, observed step count, and
+  the last observed steps so the next request can continue from visible facts or
+  deliberately narrow the scope.
+  The raw internal process is still available through the `steps` field for
+  diagnosis, but the user-facing `reply` should not be treated as completed work.
 - Messages are plain natural language.
 
 > This manual describes the current version. The tool evolves over time; when its
