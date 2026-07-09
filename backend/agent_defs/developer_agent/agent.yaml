@@ -23,6 +23,12 @@ middlewares:
     params:
       first_commit_by_frac: 0.34
       big_diff_lines: 150
+  # 收尾闸门：complete_task 前强制"完整提交（工作区干净 + 改了可观察行为要同步提交 MANUAL.md）"，
+  # 并软性提醒把自验冒烟落库成回归测试；预算紧自动让路，不为它耗到超时。
+  - import: auto_designer.dev.completion_gate:CompletionGateMiddleware
+    params:
+      observable_paths: ["entry.py"]
+      manual_path: MANUAL.md
 
 llm_config:
   # 分角色配置：开发者 agent 用 DEV_LLM_*（run.py 未单独设置时已回落公共 LLM_*）。
