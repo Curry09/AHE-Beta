@@ -40,7 +40,8 @@ DEFAULT_SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；�
 PERSONA_LIMIT: int | None = None
 
 # 闭环轮数：run.json 运行态与看板「按轮分组」以此为总轮数。
-TOTAL_ROUNDS = 5
+# 临时（截图 demo）：降到 2 轮快速出图；原值 5，demo 后恢复。
+TOTAL_ROUNDS = 2
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:

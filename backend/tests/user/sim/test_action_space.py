@@ -15,7 +15,7 @@ from auto_designer.user.sim.dimensions import (
     Persona,
     finalize_persona,
 )
-from auto_designer.user.sim.state import State, init_state
+from auto_designer.user.sim.state import init_state
 
 
 def _persona(
@@ -38,41 +38,35 @@ def _persona(
 
 def test_opening_only_send_task() -> None:
     p = _persona()
-    assert derive_action_space(Phase.OPENING, p, init_state(p), has_artifact=False) == ["send_task"]
+    assert derive_action_space(Phase.OPENING, p, init_state(p)) == ["send_task"]
 
 
 def test_capability_mask_gates_verify_actions() -> None:
     expert = _persona(d1=D1Eval.EXPERT)
     blind = _persona(d1=D1Eval.BLIND)
-    se = derive_action_space(Phase.ACTIVE, expert, init_state(expert), has_artifact=False)
-    sb = derive_action_space(Phase.ACTIVE, blind, init_state(blind), has_artifact=False)
+    se = derive_action_space(Phase.ACTIVE, expert, init_state(expert))
+    sb = derive_action_space(Phase.ACTIVE, blind, init_state(blind))
     assert "verify_self" in se and "request_evidence" in se
     assert "verify_self" not in sb and "request_evidence" not in sb
 
 
 def test_authz_read_only_removes_run_actions() -> None:
     p = _persona(d1=D1Eval.EXPERT, d5=D5Autonomy.ADVISORY)  # advisory -> READ_ONLY
-    space = derive_action_space(Phase.ACTIVE, p, init_state(p), has_artifact=False)
+    space = derive_action_space(Phase.ACTIVE, p, init_state(p))
     assert "ask_harness_run" not in space and "grant_autorun" not in space
 
 
-def test_patience_gate_unlocks_terminal_and_accept() -> None:
+def test_active_offers_all_four_terminals_without_framework_gate() -> None:
+    # loosen：进 ACTIVE 后四个终止动作(accept/accept_with_reservations/file_issue/give_up)全放开，
+    # 不被耐心/诊断/产物门控——验收与否、何时退，均由模型按 persona 性格 + <mood> 自判。耐心满也一样。
     p = _persona(d43=D43Correct.FILE_ISSUE)
-    exhausted = State(turn=3, patience=0, trust=p.trust)
-    space = derive_action_space(Phase.ACTIVE, p, exhausted, has_artifact=True)
-    assert "file_issue" in space  # 耐心耗尽解锁 D4.3 选定的终止动作
-    assert "accept" in space  # 有可接受产物 -> accept(与耐心无关)
-
-
-def test_accept_with_reservations_offered_alongside_accept() -> None:
-    # 有可接受产物时，accept 与 accept_with_reservations 一起给出：完成了但不达预期，
-    # 模型可选后者「照样交付 + 留一条体感落差 issue」。无产物时都不出现。
-    p = _persona()
-    with_art = derive_action_space(Phase.ACTIVE, p, init_state(p), has_artifact=True)
-    assert "accept" in with_art and "accept_with_reservations" in with_art
-    no_art = derive_action_space(Phase.ACTIVE, p, init_state(p), has_artifact=False)
-    assert "accept_with_reservations" not in no_art
-    # 它是终止动作、end_reason 仍是 accepted（照常交付，不改变交付事实）。
+    fresh = derive_action_space(Phase.ACTIVE, p, init_state(p))
+    assert {"accept", "accept_with_reservations", "file_issue", "give_up"} <= set(fresh)
+    # 对所有 persona 都放开（该开单/该走人由 prompt 里的 D43_CLAUSE 主导，框架不替选）。
+    p2 = _persona(d43=D43Correct.GIVE_UP)
+    fresh2 = derive_action_space(Phase.ACTIVE, p2, init_state(p2))
+    assert {"accept", "accept_with_reservations", "file_issue", "give_up"} <= set(fresh2)
+    # accept_with_reservations 与 accept 同为 TERMINATE、end_reason=accepted（照常交付，留体感落差）。
     assert CATALOG["accept_with_reservations"].effect is CATALOG["accept"].effect
     assert CATALOG["accept_with_reservations"].end_reason == "accepted"
 
@@ -100,32 +94,19 @@ def test_resolve_enforces_channel_consistency() -> None:
     space = ["verify_self", "give_feedback"]
     aid, msg = resolve_action({"action": "verify_self", "message": "noisy"}, space, p)
     assert aid == "verify_self" and msg == "" and CATALOG[aid].channel is Channel.SILENT
-    # EMIT 但 message 空 -> 兜底填充非空
+    # EMIT 但 message 空 -> 框架不再 fabricate 罐头，保持空（补齐由 client 侧重问模型完成）。
     aid2, msg2 = resolve_action({"action": "give_feedback", "message": ""}, space, p)
-    assert aid2 == "give_feedback" and msg2.strip()
+    assert aid2 == "give_feedback" and msg2 == ""
 
 
-def test_diagnosis_gate_unlocks_terminal_for_capable_without_patience_drain() -> None:
-    # 耐心仍充足(>0), 但高能力档连续 2 次坐实 harness 失败 -> 诊断驱动解锁升级。
-    p = _persona(d1=D1Eval.EXPERT, d43=D43Correct.FILE_ISSUE)
-    diagnosed = State(turn=2, patience=4, trust=p.trust, consec_blame=2)
-    space = derive_action_space(Phase.ACTIVE, p, diagnosed, has_artifact=True)
-    assert "file_issue" in space
-
-
-def test_diagnosis_gate_requires_two_consecutive_blames() -> None:
-    p = _persona(d1=D1Eval.EXPERT, d43=D43Correct.FILE_ISSUE)
-    one = State(turn=1, patience=5, trust=p.trust, consec_blame=1)
-    space = derive_action_space(Phase.ACTIVE, p, one, has_artifact=True)
-    assert "file_issue" not in space  # 仅 1 次坐实未达阈值, 不解锁
-
-
-def test_diagnosis_gate_blocked_for_low_capability() -> None:
-    # 识别"结构性无能力"本身需要能力: blind/shallow 无诊断快速通道, 仍靠耐心消耗。
-    p = _persona(d1=D1Eval.SHALLOW, d43=D43Correct.FILE_ISSUE)
-    diagnosed = State(turn=2, patience=4, trust=p.trust, consec_blame=2)
-    space = derive_action_space(Phase.ACTIVE, p, diagnosed, has_artifact=True)
-    assert "file_issue" not in space
+def test_opening_is_the_only_structural_gate_against_accepting_nothing() -> None:
+    # 唯一防"验收虚无"的结构边界是 OPENING（还没发任务→只能 send_task，无任何终止动作）。
+    # 进了 ACTIVE 就至少有一条 harness 回合可反应，验收与否交给模型。
+    p = _persona()
+    opening = derive_action_space(Phase.OPENING, p, init_state(p))
+    assert opening == ["send_task"]
+    active = derive_action_space(Phase.ACTIVE, p, init_state(p))
+    assert "accept" in active and "file_issue" in active
 
 
 def test_negative_terminal_never_projects_to_accept() -> None:

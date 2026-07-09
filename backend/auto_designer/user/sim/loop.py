@@ -20,6 +20,7 @@ loop.py
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -68,6 +69,17 @@ class SessionResult:
 
 MAX_TURNS = 12
 
+# 时间感知（用户视角的墙钟预算，全局固定，可调）：一次 harness 回合等待多久算"难受"。
+# EXTREME 之外只把耗时如实 surfacing 给模型自判（见 build_user_turn）；到 EXTREME 才额外给一点
+# 自动耗心（干等太久的挫败会累积，防"再好的 persona 也无限干等"）。默认对齐 harness 自身 ~240s 硬超时。
+_TURN_WAIT_BUDGET_SEC = 240.0
+_EXTREME_WAIT_SEC = 480.0
+
+# 框架自有的 harness 失败哨兵前缀：route 在 harness.send() 崩溃/超时时回填此串（见下），原样喂给
+# 用户 agent 感知。它不再触发任何框架侧动作门控——面对崩溃是否验收/开单/走人，由有判断力的模型自判
+# （prompt G6 + 终止时机条主导）；框架只负责把失败如实surfacing，不炸整局、也不替模型下结论。
+HARNESS_ERROR_PREFIX = "[harness error] "
+
 
 def route(action_id: str, message: str, state: State, harness, observable: str) -> str | None:
     """按 executor×channel 分派, 返回下一轮的 harness 文本(无则 None)。"""
@@ -78,7 +90,16 @@ def route(action_id: str, message: str, state: State, harness, observable: str) 
         return None
 
     if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE:
-        return harness.send(message)  # 发 B 线 -> 驱动 harness 出下一轮文本
+        if not message.strip():
+            # 模型选了要发话的动作却没给出这句话（client 重问后仍空，极少见）：不 fabricate、不外发。
+            # 本轮空转（harness 不推进），MAX_TURNS 兜底；绝不把框架编的话发给 harness。
+            return None
+        try:
+            return harness.send(message)  # 发 B 线 -> 驱动 harness 出下一轮文本
+        except Exception as exc:  # noqa: BLE001
+            # harness 是黑盒：崩溃/超时/协议违例都不该炸掉整局，而应作为可观测的失败信号回给用户 agent
+            # （读作 [harness error] → 判 stuck/failed_blame_harness → 掉耐心 → 最终终止并留 issue）。
+            return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
 
     return None  # 终止动作: 不再驱动 harness
 
@@ -108,6 +129,8 @@ def run_session(
     client: PersonaClient,
     harness,
     task: str,
+    *,
+    manual: str = "",
     on_progress: Callable[[SessionResult], None] | None = None,
 ) -> SessionResult:
     # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
@@ -119,16 +142,19 @@ def run_session(
     history: list[str] = []
     harness_output = ""
     harness_steps: list = []  # 与 harness_output 配对的内层过程流
-    has_artifact = False
+    last_wait_sec: float | None = None  # 上一条 harness 回复的墙钟等待耗时（首轮 None）
 
     while state.turn < MAX_TURNS:
         phase = Phase.OPENING if state.turn == 0 and not history else Phase.ACTIVE
 
         # ② 派生动作空间
-        space = derive_action_space(phase, persona, state, has_artifact)
+        space = derive_action_space(phase, persona, state)
 
         # ③ 主观三层 (LLM). harness 文本原样喂入; 能力分叉由 prompt(G1)+persona 档位约束, 不在框架侧过滤。
-        user = build_user_turn(task, history, harness_output, space, state)
+        # manual：该版本 harness 用户手册（能力预期锚点）；last_wait_sec：上条回复的墙钟等待（时间感知）。
+        user = build_user_turn(
+            task, history, harness_output, space, state, manual=manual, wait_sec=last_wait_sec
+        )
         ret = client.respond(system, user)
         state.pending_self_obs = None  # 用后即焚: self_observation 已被消费
 
@@ -169,8 +195,8 @@ def run_session(
         if on_progress is not None:
             on_progress(result)  # 逐轮观测钩子(含终止轮): 喂给看板等观测层, 不影响主循环
 
-        # 记历史(只记 B 线可见内容)
-        if spec.channel is Channel.EMIT:
+        # 记历史(只记 B 线真正发出的话；空 message 不 fabricate、不入史)
+        if spec.channel is Channel.EMIT and message.strip():
             history.append(f"[turn {state.turn}] you -> harness: {message}")
 
         # ⑥ 终止判定
@@ -195,16 +221,21 @@ def run_session(
                 result.issue_artifact = emit_issue_artifact(persona, result.turns, issue_text)
             break
 
-        # ⑦ 路由 -> 下一轮 harness 输入
+        # ⑦ 路由 -> 下一轮 harness 输入（掐墙钟：route 里 harness.send 是阻塞的，其耗时即用户干等时长）
+        _t0 = time.monotonic()
         nxt = route(action_id, message, state, harness, harness_output)
         if nxt is not None:
+            elapsed = time.monotonic() - _t0
+            last_wait_sec = elapsed  # 供下一轮 persona 感知"这条回复我等了多久、全程零可见性"
+            # 时间感知·轻耗心：仅极端超时才自动扣一点耐心（挫败累积），日常耗时只 surfacing 交模型自判。
+            if elapsed >= _EXTREME_WAIT_SEC:
+                state.patience = max(0, state.patience - 1)
             harness_output = nxt
             # 与回复配对的内层过程流：send 后 launcher 把它挂在 harness.last_steps（观测旁路）。
             # Fake/Scripted harness 无此属性 → []。route 只在 EMIT 轮真调 send，此处取值即本轮回复的。
             steps = getattr(harness, "last_steps", None)
             harness_steps = list(steps) if isinstance(steps, list) else []
             history.append(f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}...")
-            has_artifact = True  # harness 给出了可评判的产物
             # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
             result.pending_harness_output = nxt
             result.pending_harness_steps = harness_steps

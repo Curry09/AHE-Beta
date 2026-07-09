@@ -2,12 +2,20 @@
 action_space.py
 动作空间派生 + 能力掩码 + 自由产出的事后校验 + 路由。
 
-派生公式:
-  本轮动作空间 = 局面合法集(phase)
-               ∩ 能力掩码(D1)
-               ∩ 授权尺度(D6)
-               ∪ 耐心门解锁的终止动作(patience<=0 时, 由 D4.3 选)
-               ∪ (有可接受产物 ? {accept})
+派生公式（框架只钉唯一的结构边界，所有"判断"交给有判断力的模型）:
+  本轮动作空间 = 局面合法集(phase)                          # 唯一结构边界: OPENING 还没东西可评→只能发任务
+               ∩ 能力掩码(D1)                              # persona 保真: 做不做得到(盲评不读 diff)
+               ∩ 授权尺度(D6)                              # persona 保真: 被不被允许(只读不给自动跑)
+               ∪ (ACTIVE ? {accept, accept_with_reservations, file_issue, give_up})  # 四个终止全放开，模型自判
+
+为何终止动作(含 accept)不再被框架门控:
+  旧设计里 accept 门槛低(有产物即可)、file_issue/give_up 门槛高(耐心耗尽/连续坐实 2 次), 这种不
+  对称会在开局把"明显失败"漏斗式挤进 accept——菜单里只剩正向出口(R4 就是首条即超时却被验收)。根因
+  不是模型不会判断, 而是它想退却只有 accept 一个出口。出口补齐后, 一个有判断力的用户面对崩溃/超时
+  自然会开单/走人而非验收。故连"accept 需真产物"这条也去掉: 能不能验收(包括能不能验收一次崩溃)本就
+  是模型该判的, [harness error] 照样原样喂它感知, 由 prompt(G6 + ACTION SEMANTICS 的终止时机条 +
+  D43_CLAUSE 性格 + <mood> 耐心)主导。真正防"验收虚无"的是 OPENING 边界(还没发任务→无 accept);
+  进了 ACTIVE 就至少有一条 harness 回合可反应。耐心/consec_blame 照常算, 只喂 prompt/体感, 不锁动作。
 
 生成纪律:
   LLM 优先从动作空间挑; 若无合适项可返回 action:"free" + message, 框架事后归类。
@@ -21,12 +29,10 @@ from .actions import (
     Channel,
     Effect,
     Phase,
-    assert_channel,
 )
 from .dimensions import (
     D1Eval,
     D6Authz,
-    D43Correct,
     Persona,
 )
 from .state import State
@@ -45,10 +51,6 @@ LEGAL_BY_PHASE: dict[Phase, set[str]] = {
         "grant_autorun",
     },
 }
-
-# 诊断驱动升级阈值: 连续 N 次坐实 harness 失败(含"婉拒/声称做不到")即认定能力缺口。
-_DIAGNOSIS_BLAME_THRESHOLD = 2
-
 
 # --------------------------------------------------------------------------
 # 能力掩码: D1 决定哪些核查动作可用
@@ -84,48 +86,24 @@ def _authz_filter(space: set[str], authz: D6Authz) -> set[str]:
     return out
 
 
-def _d43_terminal(p: Persona) -> str:
-    """耐心耗尽时 D4.3 决定走哪个终止动作。"""
-    return {
-        D43Correct.GIVE_UP: "give_up",
-        D43Correct.FILE_ISSUE: "file_issue",
-        D43Correct.FEEDBACK: "give_up",  # 反馈型耗尽后默认放弃
-        D43Correct.RESEND: "give_up",
-        D43Correct.HANDOVER: "give_up",  # 接管本演示当作放弃 harness 路径
-    }[p.d43]
-
-
 # --------------------------------------------------------------------------
 # 派生
 # --------------------------------------------------------------------------
 def derive_action_space(
     phase: Phase,
     persona: Persona,
-    state: State,
-    has_artifact: bool,
+    state: State,  # noqa: ARG001  接口保留：状态不再锁动作（耐心/产物皆交模型判断），签名沿用备后用
 ) -> list[str]:
     legal = set(LEGAL_BY_PHASE[phase])
     space = _cap_filter(legal, cap_mask(persona))
     space = _authz_filter(space, persona.d6)
 
-    # 耐心门(消耗驱动): 耗尽才解锁终止动作
-    if state.patience <= 0:
-        space.add(_d43_terminal(persona))
-
-    # 诊断门(诊断驱动): 高能力档连续坐实 harness 失败即认定能力缺口, 立即解锁升级,
-    # 不必等耐心磨到 0("婉拒=无能力, 看穿即可升级")。低能力档(blind/shallow)无此快速
-    # 通道——识别"结构性无能力"本身需要能力, 他们仍靠耐心消耗终止。
-    if state.consec_blame >= _DIAGNOSIS_BLAME_THRESHOLD and persona.d1 in (
-        D1Eval.COMPETENT,
-        D1Eval.EXPERT,
-    ):
-        space.add(_d43_terminal(persona))
-
-    # accept 与耐心无关: 有可接受产物即可。同时给出 accept_with_reservations——完成了但不达
-    # 预期时，模型可选它「照样交付 + 留一条体感落差 issue」，让成功但不满的信号也能进 backlog。
-    if has_artifact and phase == Phase.ACTIVE:
-        space.add("accept")
-        space.add("accept_with_reservations")
+    if phase == Phase.ACTIVE:
+        # 进了 ACTIVE（= 已发过任务、至少有一条 harness 回合，哪怕是 [harness error]），四个终止动作
+        # 全放开，由模型按 persona 性格(D43_CLAUSE) + <mood> 自判：验收 / 带保留验收 / 走人 / 开单。
+        # 框架不替它判断"能不能验收"——包括 harness 崩溃/超时：错误照样喂它感知，有判断力的用户面对
+        # 崩溃自然开单/走人而非验收（R4 的假验收纯是当时"只有 accept 一个出口"的漏斗所迫，已补齐）。
+        space.update({"accept", "accept_with_reservations", "file_issue", "give_up"})
 
     return sorted(space)
 
@@ -175,7 +153,12 @@ def project_to_legal(action_id: str, space: list[str]) -> str:
 def resolve_action(ret: dict, space: list[str], persona: Persona) -> tuple[str, str]:
     """
     ret: LLM 返回的 dict, 含 action / message。
-    返回 (action_id, message), 已保证: 在动作空间内 + channel<->message 一致。
+    返回 (action_id, message): 动作已在空间内; message 一律取模型原文, 框架绝不代写。
+
+    空 message 的补齐**只**发生在 client 侧（选了要发话的动作却空 message → 重问模型自己补，见
+    persona_client._retry_reminder）。这里不再 fabricate 任何罐头：SILENT 动作清空 message（铁律）;
+    EMIT 动作若仍为空，就保持空，由 run_session 决定「本轮不外发、不入 transcript」——宁可空转，
+    也绝不把框架编的话当成用户原话发给 harness / 落进体感信号。
     """
     action_id = ret.get("action", "")
     message = ret.get("message", "") or ""
@@ -186,23 +169,6 @@ def resolve_action(ret: dict, space: list[str], persona: Persona) -> tuple[str, 
         action_id = project_to_legal(action_id, space)
 
     spec = CATALOG[action_id]
-    # channel 修正: SILENT 强制清空 message; EMIT 但空 -> 兜底填充
-    if spec.channel is Channel.SILENT:
+    if spec.channel is Channel.SILENT:  # SILENT 铁律：内部动作不发话
         message = ""
-    elif spec.channel is Channel.EMIT and not message.strip():
-        message = _fallback_message(action_id)
-
-    assert_channel(action_id, message)  # 最终一致性断言
-    return action_id, message
-
-
-def _fallback_message(action_id: str) -> str:
-    return {
-        "send_task": "Please implement the requested function.",
-        "give_feedback": "That isn't working yet, please fix it.",
-        "ask_harness_run": "Please run it once and show me the result.",
-        "accept": "Looks good, thanks.",
-        "accept_with_reservations": "This works for now, I'll take it — but it's not quite what I wanted.",
-        "give_up": "I'll stop here for now.",
-        "file_issue": "I'm filing an issue about this.",
-    }.get(action_id, "Please continue.")
+    return action_id, message.strip()

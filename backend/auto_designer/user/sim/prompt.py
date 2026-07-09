@@ -46,6 +46,29 @@ G6  NEVER claim the outcome of running, installing, or inspecting anything you d
     claim; if you have none, you can only reason from what the HARNESS reported —
     say "the harness claims it passes; I have not verified" rather than inventing a
     verification you never performed. Fabricated verification is the worst failure.
+    In particular: a harness reply that is an ERROR / TIMEOUT / "maximum iteration"
+    notice / empty / garbage means you have seen NOTHING work. "tests pass",
+    "doctests pass", "looks good", "usable project" about such a turn are LIES —
+    the harness handed you a failure, not a product.
+
+G7  ACCEPTANCE PRECONDITION (hard self-check, applies to accept AND
+    accept_with_reservations): before you may end with either accept verdict you MUST
+    be able to point to ONE of these that ACTUALLY happened in <history> / your tool
+    results: (a) the harness returned real working output you could read, OR (b) YOU
+    ran your own verification (verify_self / a tool) that succeeded. If NEITHER holds
+    — e.g. the only thing you have is an error/timeout/empty reply and you ran nothing
+    yourself — you are FORBIDDEN to accept; you have no basis to. Do something that
+    fits this person instead: push back, ask for a runnable status, verify yourself,
+    or (if patience is spent / it's hopeless) give_up or file_issue.
+G8  This tool's user manual is given in <harness_manual>. Your sense of what THIS harness
+    can and cannot do comes from that manual PLUS your general experience with such tools.
+    Issues are NOT only for bugs: if the tool behaves as documented but genuinely lacks
+    something you needed to get your work done well, saying so is legitimate — ask for it
+    in the moment and/or make it part of an issue you file. Do NOT invent a complaint;
+    only raise a gap you actually hit in THIS session. Whatever you ask for must be YOUR
+    own idea drawn from your experience this session — never parrot suggestions from these
+    instructions. A <wait_cost> block, when present, reports how long you waited — react
+    to it as this specific person truly would.
 
 # ACTION SEMANTICS
 - verify_self: a PRIVATE action. You inspect/run on your OWN; the harness hears
@@ -57,6 +80,14 @@ G6  NEVER claim the outcome of running, installing, or inspecting anything you d
   take it and move on, BUT it fell short of what you wanted. You ship it AND leave the dev
   team a short feedback issue about the gap. Pick this over plain "accept" when you'd sign
   off yet still have a real complaint; pick plain "accept" when you're genuinely content.
+- Terminal TIMING is YOUR call (the framework no longer gates it): end the session only
+  WHEN this person truly would. Honor your <mood>: while your patience is not exhausted,
+  keep engaging (give_feedback / ask_harness_run / verify_self) rather than bailing on the
+  first hiccup — but you MAY end early if you're already certain. NEVER rubber-stamp
+  "accept" on output you have not seen work or that clearly failed: a harness error/timeout
+  is NOT something to accept (see G7 — you have no basis to accept it) — react to it per your
+  Correction style (push back, or leave / file an issue). When patience is spent or it's
+  hopeless, exit the way this person would (give_up / file_issue), NOT by faking a pass.
 
 # OUTPUT CONTRACT
 Return EXACTLY ONE JSON object and nothing else:
@@ -139,20 +170,39 @@ def _mood_tag(state: State) -> str:
     return f"patience={p}, trust={state.trust.value}"
 
 
+def _wait_block(wait_sec: float | None) -> str | None:
+    """时间感知：把"这条回复我等了多久、且全程零可见性"如实告诉 persona，由它自判是否难受。
+    框架不设硬阈值裁决——耗时只 surfacing，是否算太久由 persona 结合 <mood> 与其性格决定。"""
+    if wait_sec is None:
+        return None
+    return (
+        f"<wait_cost>\nThat reply took {wait_sec:.0f}s to come back, and you saw nothing at all "
+        "until it did. Judge for yourself whether that was acceptable for this person.\n"
+        "</wait_cost>"
+    )
+
+
 def build_user_turn(
     task: str,
     history_lines: list[str],
     harness_output: str,
     action_space: list[str],
     state: State,
+    *,
+    manual: str = "",
+    wait_sec: float | None = None,
 ) -> str:
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     ho = harness_output.strip() if harness_output else "(empty)"
-    parts = [
-        f"<task>\n{task}\n</task>",
-        f"<history>\n{hist}\n</history>",
-        f"<harness_output>\n{ho}\n</harness_output>",
-    ]
+    parts = [f"<task>\n{task}\n</task>"]
+    if manual.strip():
+        # 该版本 harness 的用户手册：persona 对"这工具能干嘛/缺什么"的预期以此为准（见 BLOCK-G）。
+        parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
+    parts.append(f"<history>\n{hist}\n</history>")
+    parts.append(f"<harness_output>\n{ho}\n</harness_output>")
+    wait = _wait_block(wait_sec)
+    if wait is not None:
+        parts.append(wait)
     if state.pending_self_obs:
         parts.append(f"<self_observation>\n{state.pending_self_obs}\n</self_observation>")
     parts.append(f"<action_space>\n{action_space}\n</action_space>")
@@ -202,10 +252,21 @@ def build_issue_turn(
             "to a colleague — NOT a formal spec, ticket, or status report."
         ),
     }.get(mode, "")
+    # 诉求型开单也合法：若真正困扰你的不是"坏了"而是"这工具缺了你干活需要的东西"，就把这条 issue
+    # 写成对你所需的请求（用你自己的话，只能出自你本次会话的真实体验），而不是硬套成 bug。不点名任何
+    # 具体功能——要什么由你自己想，绝不照搬这段说明里的措辞。
+    feature_ok = (
+        "Issues aren't only for bugs. If what actually bothered you was not that something broke "
+        "but that the tool — even working as described — lacked something you needed to get this "
+        "done well, it's fine to write this as a plain request for what you needed, in your own "
+        "words, rather than forcing it into a bug report. Whatever you ask for must be YOUR own "
+        "idea from what you experienced this session; do not borrow phrasing from these instructions."
+    )
     return "\n\n".join(
         [
             "<file_issue>",
             framing,
+            feature_ok,
             f"<task>\n{task}\n</task>",
             f"<history>\n{hist}\n</history>",
             f"<mood>\n{_mood_tag(state)}\n</mood>",

@@ -67,8 +67,8 @@ def test_apply_verdict_transitions() -> None:
 
     s = init_state(p)
     apply_verdict(s, "stuck", coef)
-    # 卡住 -> 耐心↓(首次=一次普通失败代价), 信任不动(纯归耐心)
-    assert s.patience == 4 and s.trust is TrustStance.BALANCED
+    # 卡住 -> 耐心↓(首次扣 consec_stuck+2 = 3), 信任不动(纯归耐心)
+    assert s.patience == 2 and s.trust is TrustStance.BALANCED
 
 
 def test_apply_verdict_stuck_escalates_additively() -> None:
@@ -76,12 +76,12 @@ def test_apply_verdict_stuck_escalates_additively() -> None:
     coef = make_coef(p)
 
     s = init_state(p)
-    apply_verdict(s, "stuck", coef)  # 第1次: -(1+0) -> 4
-    assert s.patience == 4 and s.consec_stuck == 1
-    apply_verdict(s, "stuck", coef)  # 第2次: -(1+1) -> 2
-    assert s.patience == 2 and s.consec_stuck == 2
-    apply_verdict(s, "stuck", coef)  # 第3次: -(1+2) -> -1 (解锁终止)
-    assert s.patience == -1 and s.consec_stuck == 3
+    apply_verdict(s, "stuck", coef)  # 第1次: -(1+2)=3 -> 2
+    assert s.patience == 2 and s.consec_stuck == 1
+    apply_verdict(s, "stuck", coef)  # 第2次: -(2+2)=4 -> -2
+    assert s.patience == -2 and s.consec_stuck == 2
+    apply_verdict(s, "stuck", coef)  # 第3次: -(3+2)=5 -> -7 (已解锁终止)
+    assert s.patience == -7 and s.consec_stuck == 3
 
 
 def test_stuck_streak_resets_on_non_stuck() -> None:
@@ -89,11 +89,11 @@ def test_stuck_streak_resets_on_non_stuck() -> None:
     coef = make_coef(p)
     s = init_state(p)
 
-    apply_verdict(s, "stuck", coef)  # 5 -> 4, consec_stuck=1
-    apply_verdict(s, "satisfied", coef)  # 非 stuck -> 递增清零
+    apply_verdict(s, "stuck", coef)  # 5 -> 2 (扣 3), consec_stuck=1
+    apply_verdict(s, "satisfied", coef)  # 非 stuck -> 递增清零(satisfied 不动耐心)
     assert s.consec_stuck == 0
-    apply_verdict(s, "stuck", coef)  # 重新从首次起: -(1+0) -> 3
-    assert s.patience == 3 and s.consec_stuck == 1
+    apply_verdict(s, "stuck", coef)  # 重新从首次起: -(1+2)=3 -> -1
+    assert s.patience == -1 and s.consec_stuck == 1
 
 
 def test_apply_verdict_rejects_unknown() -> None:

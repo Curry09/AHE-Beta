@@ -104,9 +104,9 @@ def apply_verdict(state: State, verdict: str, coef: Coef) -> State:
     elif verdict == "stuck":
         # harness 故障/空转/复读/无进展：受挫掉耐心，且连续越久掉得越狠(加性递增，符合"越拖越火")。
         # 全归于耐心——不另开升级门，最终仍走 patience<=0 解锁终止(能力无关：任何用户都察觉得到卡住)。
-        # 首次 = 一次普通失败的代价(patience_decay)，之后每多连一次 +1。
+        # 加性递增：首次 stuck 扣 3，之后每多连一次 +1（3→4→5→6…）。
         state.consec_stuck += 1
-        state.patience -= coef.patience_decay + (state.consec_stuck - 1)
+        state.patience -= state.consec_stuck + 2
         state.consec_blame = 0  # stuck 非"坐实能力缺口"式的 blame -> 诊断计数清零
 
     state.trust = _int_to_trust(t)

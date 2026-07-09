@@ -5,7 +5,24 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-max_iterations: 40
+# 迭代上限 34：既让"迭代预算"先于 _DEV_TIMEOUT(900s 墙钟) 触顶走中间件优雅收尾，又给足余量让
+# dev 干完 git（commit/tag/push）后还能调 complete_task 写报告——26 太紧（实测干完活正好被掐、报告只剩
+# [Max iteration]）。膨胀已被最小改动纪律摁住（entry.py 稳在 ~270 行），放宽到 34 安全。
+max_iterations: 34
+
+# 预算到点→逼收尾：临近 max_iterations 时注入"还剩 N 轮，别再开新工具调用，给结论性回复/总结"。
+# 把过去"墙钟硬砍、无产出"换成"优雅收尾"（要么把手头改动验证+提交，要么总结剩余作 follow-up）。
+middlewares:
+  - import: nexau.archs.main_sub.execution.middleware.round_and_token_reminder:RoundAndTokenReminderMiddleware
+    params:
+      max_context_tokens: 128000
+      desired_max_tokens: 16384
+  # 机制保证"尽早落一个已提交增量"：预算过 1/3 或未提交改动过大却还没 commit 时，
+  # 主动注入升级指令逼 dev 缩到最小、自验、立刻提交——治"贪大→撞墙→零提交"。
+  - import: auto_designer.dev.commit_checkpoint:CommitCheckpointMiddleware
+    params:
+      first_commit_by_frac: 0.34
+      big_diff_lines: 150
 
 llm_config:
   # 分角色配置：开发者 agent 用 DEV_LLM_*（run.py 未单独设置时已回落公共 LLM_*）。
