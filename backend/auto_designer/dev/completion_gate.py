@@ -67,6 +67,7 @@ class CompletionGateMiddleware(Middleware):
         observable_paths: tuple[str, ...] = ("entry.py",),
         manual_path: str = "MANUAL.md",
         max_blocks: int = 8,
+        soft_gate_min_remaining: int = 6,
     ) -> None:
         """配置收尾闸门。
 
@@ -75,11 +76,14 @@ class CompletionGateMiddleware(Middleware):
             observable_paths: 视为"对外可观察行为"的文件（改了它们就要同步手册）。
             manual_path: 用户手册文件名。
             max_blocks: 累计拦截次数上限，防病态死循环耗预算。
+            soft_gate_min_remaining: 剩余预算不足此值时不再催"落地测试"软闸——避免在临界
+                才逼它写测试却提交不完、反而留下脏工作区；此时测试留作 follow-up。
         """
         self.stop_tool = stop_tool
         self.observable_paths = observable_paths
         self.manual_path = manual_path
         self.max_blocks = max_blocks
+        self.soft_gate_min_remaining = soft_gate_min_remaining
         self._repo: str | None = None
         self._start_sha: str | None = None
         self._blocks = 0
@@ -107,7 +111,7 @@ class CompletionGateMiddleware(Middleware):
             return HookResult.no_changes()  # 预算兜底/防死循环：让它收尾
 
         report = self._report_text(completing)
-        problems = self._check(report=report, drop_soft=remaining <= 3)
+        problems = self._check(report=report, drop_soft=remaining <= self.soft_gate_min_remaining)
         if not problems:
             return HookResult.no_changes()  # 达标，放行收尾
 
