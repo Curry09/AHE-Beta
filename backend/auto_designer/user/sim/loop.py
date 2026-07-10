@@ -36,7 +36,15 @@ from .prompt import (
     build_user_turn,
     build_waiting_turn,
 )
-from .state import VERDICTS, State, apply_task_load, apply_verdict, init_state, make_coef
+from .state import (
+    VERDICTS,
+    Coef,
+    State,
+    apply_task_load,
+    apply_verdict,
+    init_state,
+    make_coef,
+)
 
 
 @dataclass
@@ -223,6 +231,7 @@ def _supervise_send(
     task: str,
     history: list[str],
     state: State,
+    coef: Coef,
     manual: str,
     result: SessionResult,
     on_progress: Callable[[SessionResult], None] | None,
@@ -257,7 +266,10 @@ def _supervise_send(
         if heartbeats >= _MAX_HEARTBEATS:
             action = "give_up"  # 兜底：唤醒到顶强制收束，防病态无限等
         elif action == "keep_waiting":
-            state.patience = max(0, state.patience - 1)  # 干等挫败累积
+            # 干等挫败累积，口径与主路径 apply_verdict 统一：按 persona 的 patience_decay 加权
+            # （急躁型掉得更快），而非平扣 1。等待挫败在此逐次建模，故非心跳路径的极端等待惩罚
+            # 只对阻塞 route 生效，避免同一段等待被双记（见 run_session 的 _EXTREME_WAIT_SEC 分支）。
+            state.patience = max(0, state.patience - coef.patience_decay)
             if state.patience <= 0:
                 action = "give_up"  # 耐心耗尽：这个人不会再等了
         _log_waiting(result, state, action, control, ret, on_progress)
@@ -377,7 +389,8 @@ def run_session(
         _t0 = time.monotonic()
         _emits = spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE
         terminal_from_wait: str | None = None
-        if _emits and message.strip() and _supports_heartbeat(harness):
+        supervised = _emits and bool(message.strip()) and _supports_heartbeat(harness)
+        if supervised:
             nxt, elapsed, terminal_from_wait = _supervise_send(
                 harness,
                 message,
@@ -386,6 +399,7 @@ def run_session(
                 task=task,
                 history=history,
                 state=state,
+                coef=coef,
                 manual=manual,
                 result=result,
                 on_progress=on_progress,
@@ -408,7 +422,9 @@ def run_session(
         if nxt is not None:
             last_wait_sec = elapsed  # 供下一轮 persona 感知"这条回复我等了多久、全程零可见性"
             # 时间感知·轻耗心：仅极端超时才自动扣一点耐心（挫败累积），日常耗时只 surfacing 交模型自判。
-            if elapsed >= _EXTREME_WAIT_SEC:
+            # 仅对阻塞 route 路径生效：心跳路径的等待挫败已由 _supervise_send 的 keep_waiting 逐次
+            # 按 coef 建模，此处不再叠加，避免同一段等待被双记。
+            if not supervised and elapsed >= _EXTREME_WAIT_SEC:
                 state.patience = max(0, state.patience - 1)
             harness_output = nxt
             # 与回复配对的内层过程流：send 后 launcher 把它挂在 harness.last_steps（观测旁路）。

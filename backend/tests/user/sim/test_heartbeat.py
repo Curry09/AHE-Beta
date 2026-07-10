@@ -141,6 +141,25 @@ def test_keep_waiting_then_reply_logs_waiting_turn() -> None:
     assert client.waiting_prompts and "interrupt" in client.waiting_prompts[0]
 
 
+def test_keep_waiting_decay_follows_persona_coef() -> None:
+    # 去重：keep_waiting 扣耐心口径与 apply_verdict 统一，按 persona 的 patience_decay 加权，非平扣 1。
+    # FEEDBACK：基线 5、coef=1 → 一次 keep_waiting 后 4；GIVE_UP：基线 3、coef=2 → 一次后 1。
+    def _waiting_patience_after_one_keep(d43: D43Correct) -> int:
+        harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
+        client = WaitStubClient(
+            actions=["send_task", "accept"],
+            waiting=[{"action": "keep_waiting"}],
+            verdict="satisfied",
+        )
+        res = run_session(_persona(d43=d43), client, harness, TASK, manual=harness.manual)
+        wt = [t for t in res.turns if t.phase == "waiting"]
+        assert len(wt) == 1
+        return wt[0].patience
+
+    assert _waiting_patience_after_one_keep(D43Correct.FEEDBACK) == 4  # 5 - coef(1)
+    assert _waiting_patience_after_one_keep(D43Correct.GIVE_UP) == 1  # 3 - coef(2)
+
+
 def test_invoke_control_routes_through_generic_control() -> None:
     harness = HeartbeatHarness([("pending", 120.0)])
     client = WaitStubClient(
