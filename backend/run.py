@@ -31,7 +31,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent  # backend/
 DATA = ROOT / "data"
-HARNESS_REPO = DATA / "harness_repo"
+# dev/designer 的 sandbox 工作目录 = harness 仓。把它下沉到一个**只含它自己**的独立父目录
+# （data/harness_sandbox/harness_repo），使 trace 目录（data/sessions 体感+会话、data/harness_runs
+# harness 运行副本）不再是它的 `../` 同级——`../sessions/*.json`、`../harness_runs/**` 这类相对路径
+# 直接够不着。堵住「dev/designer 回看任务轨迹 → 把该任务专属产物（某库 API/某类文件/预期输出）带进
+# harness」的过拟合泄漏（与提交边界闸同源之患；见 agent_defs/designer/systemprompt.md 硬禁区）。
+# 注：bash 仍可走绝对路径，但相对导航（ls ..）已看不到 trace，堵住了唯一的现实发现路径。
+_SANDBOX_ROOT = DATA / "harness_sandbox"
+HARNESS_REPO = _SANDBOX_ROOT / "harness_repo"
 # 两个「给定输入」的默认卡库路径；均可经 CLI 参数（见 _parse_args）/ run.sh 覆盖注入。
 DEFAULT_PERSONA_LIBRARY = ROOT / "persona_library.json"  # distill 产物：6 张锚卡
 DEFAULT_SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；经 seed_adapter 注入）
