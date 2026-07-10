@@ -9,6 +9,13 @@ tool_call_mode: structured
 # 不再被 max-iteration 掐（此前撞满多因误读巨大的原始 session 轨迹按页翻——现已在 systemprompt 硬禁）。
 max_iterations: 30
 
+middlewares:
+  # 工作区 jail：designer 只能读自己的 harness 仓，文件工具越界读一律拒——机制硬禁读 trace
+  # （data/sessions 体感+会话、data/harness_runs 运行副本）。此前"禁读 trace"仅靠 systemprompt
+  # 一句话、无机制兜底；逐行看某任务轨迹会把该任务专属产物带进提案 = 过拟合的源头。通用 jail 一并
+  # 挡住仓外任何路径（data/live 等），不止点名 trace。
+  - import: auto_designer.dev.workspace_jail:WorkspaceJailMiddleware
+
 llm_config:
   # 分角色配置：创新者 agent 用 DESIGNER_LLM_*。
   model: ${env.DESIGNER_LLM_MODEL}

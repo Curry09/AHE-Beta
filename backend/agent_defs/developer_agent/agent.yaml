@@ -13,6 +13,10 @@ max_iterations: 34
 # 预算到点→逼收尾：临近 max_iterations 时注入"还剩 N 轮，别再开新工具调用，给结论性回复/总结"。
 # 把过去"墙钟硬砍、无产出"换成"优雅收尾"（要么把手头改动验证+提交，要么总结剩余作 follow-up）。
 middlewares:
+  # 工作区 jail（放首位，最外层先判）：dev 只能碰自己的 harness 仓，文件工具/bash 越界读写一律拒。
+  # 机制隔离 trace（data/sessions、data/harness_runs）——nexau 的 read 类工具不走权限、只读 bash
+  # 无条件放行，agent 顺 ../ 或绝对路径就能读到任务轨迹并把任务专属产物带进 harness（过拟合）。
+  - import: auto_designer.dev.workspace_jail:WorkspaceJailMiddleware
   - import: nexau.archs.main_sub.execution.middleware.round_and_token_reminder:RoundAndTokenReminderMiddleware
     params:
       max_context_tokens: 128000
