@@ -23,6 +23,7 @@ Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -40,8 +41,8 @@ DEFAULT_SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；�
 PERSONA_LIMIT: int | None = None
 
 # 闭环轮数：run.json 运行态与看板「按轮分组」以此为总轮数。
-# 临时（截图 demo）：降到 2 轮快速出图；原值 5，demo 后恢复。
-TOTAL_ROUNDS = 2
+# 默认 2（截图 demo 用），可用环境变量 TOTAL_ROUNDS 覆盖（如端到端跑 5 轮）。
+TOTAL_ROUNDS = int(os.environ.get("TOTAL_ROUNDS", "2") or "2")
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -128,6 +129,14 @@ def _seed_harness_repo() -> Path:
     subprocess.run(
         ["git", "init", "-b", "main", str(HARNESS_REPO)], check=True, capture_output=True
     )
+    # 提交边界硬闸：装 pre-commit 钩子，dev 之后想把 harness 本体外的任务代码提交进来会被直接拒。
+    # 顺手清掉模板复制带来的字节码缓存、写 .gitignore，让 v0 seed 只含 harness 制品（钩子放行）。
+    from auto_designer.dev.harness_boundary import install_pre_commit  # noqa: PLC0415
+
+    for pyc in HARNESS_REPO.rglob("__pycache__"):
+        shutil.rmtree(pyc, ignore_errors=True)
+    (HARNESS_REPO / ".gitignore").write_text("__pycache__/\n*.pyc\n", encoding="utf-8")
+    install_pre_commit(HARNESS_REPO)
     _git(HARNESS_REPO, "add", ".")
     _git(HARNESS_REPO, "commit", "-m", "seed: harness v0")
     return HARNESS_REPO
@@ -164,7 +173,6 @@ def _reset_to_initial(repo: Path, tracker) -> None:
 
 
 def main() -> int:
-    import os
     from urllib.parse import urlparse
 
     args = _parse_args(argv=sys.argv[1:])
