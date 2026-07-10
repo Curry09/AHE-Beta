@@ -37,6 +37,12 @@ assistant text. Set `HARNESS_PROGRESS=0` to suppress stderr progress output.
 - It replies **once per request, when it is finished.** It works between your
   message and its reply; you receive the final reply when it is done. A large
   request can take a long time.
+- The stdout JSON response always contains `reply`; it may also contain
+  `status` and `meta`. `status` is `ok`, `interrupted`, or `error`, and `meta`
+  reports attempts, elapsed time, and whether the inner agent/context had to be
+  rebuilt. Launchers should use these fields to distinguish normal completion
+  from recoverable interruption/timeout rather than treating every non-ok reply
+  as an empty failure.
 - It handles **one request at a time**, in order.
 - Broad, multi-file, end-to-end, package-build, transliteration, or otherwise
   large requests are constrained with a mandatory `verified-slice-first`
@@ -50,6 +56,10 @@ assistant text. Set `HARNESS_PROGRESS=0` to suppress stderr progress output.
 - On a **very large request it can hit an internal limit and return an error**
   (for example a timeout or "maximum iteration" message) instead of a finished
   result.
+- If you interrupt a request, the current workspace is preserved. Ask the next
+  request for a checkpoint summary (changed files, verification commands/output,
+  runnable entry point, and next step) if you need to review or continue from
+  the interrupted state.
 - When bounded execution fails, the final reply includes an actionable summary:
   what was produced, whether anything was verified, what remains unverified, the
   blocking reason, and a concrete path to shrink scope for the next attempt. If
