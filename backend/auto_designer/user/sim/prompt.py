@@ -210,6 +210,54 @@ def build_user_turn(
     return "\n\n".join(parts)
 
 
+def build_waiting_turn(
+    task: str,
+    history_lines: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    waited_sec: float = 0.0,
+) -> str:
+    """心跳唤醒的一轮：你发出请求后干等了 waited_sec 秒，harness 还没回、也没有任何可见进度。
+
+    这不是一次普通动作轮——你还没拿到回复，只是"等得起了念头"。请像这个真实用户那样判断：继续等、
+    动用手册里写明的某个控制操作（如打断/停止）、还是放弃走人。控制有哪些**以手册为准**——框架不替你
+    枚举，也不写死任何具体控制名；你从 <harness_manual> 里得知这版工具支持什么，自己点名。
+    """
+    hist = "\n".join(history_lines) if history_lines else "(empty)"
+    parts = ["<waiting>"]
+    if manual.strip():
+        parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
+    parts.append(f"<task>\n{task}\n</task>")
+    parts.append(f"<history>\n{hist}\n</history>")
+    parts.append(
+        f"You sent your last message and have now been waiting ~{waited_sec:.0f}s with NO reply "
+        "and NOTHING visible happening — a black box. It may still be working on a big request, or "
+        "it may be stuck. Decide what YOU, this person, would actually do right now."
+    )
+    parts.append(
+        "# YOUR OPTIONS\n"
+        "- keep_waiting: give it more time (you believe it's still legitimately working).\n"
+        "- invoke_control: use a control operation THIS tool documents in <harness_manual> for a "
+        "request that's in progress (e.g. stopping/interrupting it so you can redirect). Name the "
+        "control exactly as the manual calls it. Only invoke a control the manual actually lists.\n"
+        "- give_up: you're done — abandon this and walk away.\n"
+        "Honor your <mood>: if patience remains and it's plausibly still working, keep_waiting is "
+        "fine; interrupting or leaving is for when this person truly would. Do NOT fabricate that "
+        "anything succeeded — you have seen nothing yet."
+    )
+    parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
+    parts.append(
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"perceive": "<what you feel about the wait, honestly>", '
+        '"action": "keep_waiting | invoke_control | give_up", '
+        '"control": "<control name from the manual, only if action==invoke_control else empty>", '
+        '"message": "<short in-voice line, only if you give_up else empty>"}'
+    )
+    parts.append("</waiting>")
+    return "\n\n".join(parts)
+
+
 def build_issue_turn(
     task: str, history_lines: list[str], state: State, *, mode: str = "filed"
 ) -> str:

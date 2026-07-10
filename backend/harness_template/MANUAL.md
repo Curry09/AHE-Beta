@@ -18,6 +18,12 @@ language; it works on it and sends back a single final reply.
 - **It works on real files.** It has a shell and a working directory (your
   project root); it can create/edit files and run commands and tests there. Its
   reply reports what it did.
+- **You can interrupt a request while it's still working.** If it's taking too
+  long, you can stop the current request. It halts promptly, keeps the
+  conversation so far, and hands control back to you with a short note — you then
+  send your next instruction (a revised request, a narrower ask, or a follow-up)
+  and it continues from where things stood. Interrupting cancels only the
+  in-progress request; it does not wipe the session.
 
 ## Getting good results
 - Describe what you want clearly. It may ask a brief clarifying question.

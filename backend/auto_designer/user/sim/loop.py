@@ -29,7 +29,13 @@ from .actions import CATALOG, Channel, Effect, Executor, Phase
 from .dimensions import Persona
 from .feeling import FeelingScore, derive_feeling, parse_feeling_llm
 from .persona_client import PersonaClient
-from .prompt import build_issue_turn, build_rating_turn, build_system, build_user_turn
+from .prompt import (
+    build_issue_turn,
+    build_rating_turn,
+    build_system,
+    build_user_turn,
+    build_waiting_turn,
+)
 from .state import VERDICTS, State, apply_verdict, init_state, make_coef
 
 
@@ -80,6 +86,34 @@ _EXTREME_WAIT_SEC = 480.0
 # （prompt G6 + 终止时机条主导）；框架只负责把失败如实surfacing，不炸整局、也不替模型下结论。
 HARNESS_ERROR_PREFIX = "[harness error] "
 
+# 心跳（用户等待中的主动权）：一次 send 阻塞超过该秒数仍无回复，就唤醒用户 agent 做一次"等待决策"
+# （继续等 / 动用手册里的控制 / 放弃）。这把"计时"从事后感知升级为等待中途可介入，贴近真实用户。
+_HEARTBEAT_SEC = 90.0
+# 心跳唤醒次数硬上限（兜底防病态：模型一直"继续等"而 harness 永不回）。到顶即强制放弃；正常情况下
+# 会先被 harness 自身单轮上界（~16min → [harness error]）或耐心耗尽终结。
+_MAX_HEARTBEATS = 8
+# 心跳唤醒时给用户 agent 的等待动作集（框架元行为 + 一个"调用手册所述控制"的通用口）。
+WAITING_ACTIONS = ["keep_waiting", "invoke_control", "give_up"]
+
+
+def _supports_heartbeat(harness) -> bool:
+    """真实子进程句柄才有 begin/poll/control（可续等 + 通用控制面）；Fake/Scripted 即时返回、无需心跳。"""
+    return all(hasattr(harness, m) for m in ("begin", "poll", "control"))
+
+
+def _resolve_waiting(ret: dict) -> tuple[str, str]:
+    """把心跳唤醒的自由产出归到 {keep_waiting, invoke_control, give_up} 之一 + 控制名（仅 invoke_control）。
+
+    非法/缺省一律安全落到 keep_waiting（绝不擅自替用户放弃或打断）。控制名对框架不透明，原样透传给
+    harness.control()——是否为该版 harness 支持的控制，由 harness 自己校验（手册是能力真相源）。"""
+    action = str(ret.get("action", "")).strip()
+    if action not in WAITING_ACTIONS:
+        action = "keep_waiting"
+    control = str(ret.get("control", "")).strip()
+    if action == "invoke_control" and not control:
+        action = "keep_waiting"  # 说要用控制却没点名 → 退回继续等，不瞎猜控制名
+    return action, control
+
 
 def route(action_id: str, message: str, state: State, harness, observable: str) -> str | None:
     """按 executor×channel 分派, 返回下一轮的 harness 文本(无则 None)。"""
@@ -122,6 +156,120 @@ def emit_issue_artifact(persona: Persona, log: list[TurnLog], issue_text: str) -
         f"{len(log)} turns, {len(fails)} blamed the assistant · last reply: {symptom}_"
     )
     return f"{body}\n\n---\n{meta}\n"
+
+
+def _log_waiting(
+    result: SessionResult,
+    state: State,
+    action: str,
+    control: str,
+    ret: dict,
+    on_progress: Callable[[SessionResult], None] | None,
+) -> None:
+    """把一次心跳唤醒的等待决策记为 phase='waiting' 的 TurnLog（观测用，不占 harness_output）。"""
+    label = f"{action}:{control}" if action == "invoke_control" and control else action
+    result.turns.append(
+        TurnLog(
+            turn=state.turn,
+            phase="waiting",
+            action_space=list(WAITING_ACTIONS),
+            perceive=str(ret.get("perceive", "")),
+            verdict="stuck",
+            action=label,
+            message="",
+            executor=Executor.PERSONA_LOCAL.value,
+            channel=Channel.SILENT.value,
+            patience=state.patience,
+            trust=state.trust.value,
+            harness_output="",
+            harness_steps=[],
+        )
+    )
+    if on_progress is not None:
+        on_progress(result)
+
+
+def _finalize_terminal(
+    action_id: str,
+    *,
+    result: SessionResult,
+    persona: Persona,
+    client: PersonaClient,
+    system: str,
+    task: str,
+    history: list[str],
+    state: State,
+) -> None:
+    """终止收尾：记 end_reason；对 file_issue/give_up/accept_with_reservations 以本人口吻并出一条 issue。"""
+    spec = CATALOG[action_id]
+    result.end_reason = spec.end_reason or "terminated"
+    issue_mode = {
+        "file_issue": "filed",
+        "give_up": "left",
+        "accept_with_reservations": "accepted",
+    }.get(action_id)
+    if issue_mode is not None:
+        issue_resp = client.respond(system, build_issue_turn(task, history, state, mode=issue_mode))
+        issue_text = str(issue_resp.get("issue") or "")
+        result.issue_artifact = emit_issue_artifact(persona, result.turns, issue_text)
+
+
+def _supervise_send(
+    harness,
+    message: str,
+    *,
+    client: PersonaClient,
+    system: str,
+    task: str,
+    history: list[str],
+    state: State,
+    manual: str,
+    result: SessionResult,
+    on_progress: Callable[[SessionResult], None] | None,
+) -> tuple[str, float, str | None]:
+    """驱动 harness 出下一轮，但用心跳守望等待：超阈值仍无回复就唤醒用户 agent 决策。
+
+    返回 (harness_output, elapsed_sec, terminal_action)：
+      - 正常/打断：harness_output 为回复文本（打断走 harness.control → "[interrupted]…"），terminal=None；
+      - 崩溃/超时：harness_output 为 [harness error] 串，terminal=None；
+      - 用户在等待中放弃：harness_output=""，terminal="give_up"（由调用方走终止路径）。
+    心跳唤醒轮以 phase='waiting' 记入 result.turns（观测用）。"""
+    t0 = time.monotonic()
+    try:
+        harness.begin(message)
+    except Exception as exc:  # noqa: BLE001  黑盒起轮失败 → 可观测失败信号
+        return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}", time.monotonic() - t0, None
+    heartbeats = 0
+    while True:
+        try:
+            kind, val = harness.poll(_HEARTBEAT_SEC)
+        except Exception as exc:  # noqa: BLE001  黑盒崩溃/超时 → 可观测失败信号（不炸整局）
+            return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}", time.monotonic() - t0, None
+        if kind == "reply":
+            return str(val), time.monotonic() - t0, None
+        # kind == "pending"：等待超阈值 → 唤醒用户 agent 做一次等待决策
+        waited = float(val)  # type: ignore[arg-type]
+        heartbeats += 1
+        ret = client.respond(
+            system, build_waiting_turn(task, history, state, manual=manual, waited_sec=waited)
+        )
+        action, control = _resolve_waiting(ret)
+        if heartbeats >= _MAX_HEARTBEATS:
+            action = "give_up"  # 兜底：唤醒到顶强制收束，防病态无限等
+        elif action == "keep_waiting":
+            state.patience = max(0, state.patience - 1)  # 干等挫败累积
+            if state.patience <= 0:
+                action = "give_up"  # 耐心耗尽：这个人不会再等了
+        _log_waiting(result, state, action, control, ret, on_progress)
+        if action == "invoke_control":
+            try:
+                reply = harness.control(control)  # control 名对框架不透明，由 harness 校验
+            except Exception as exc:  # noqa: BLE001
+                reply = f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
+            return reply, time.monotonic() - t0, None
+        if action == "give_up":
+            return "", time.monotonic() - t0, "give_up"
+        # keep_waiting：回到 poll 续等（在途读线程保留，计算不丢）
 
 
 def run_session(
@@ -199,33 +347,54 @@ def run_session(
         if spec.channel is Channel.EMIT and message.strip():
             history.append(f"[turn {state.turn}] you -> harness: {message}")
 
-        # ⑥ 终止判定
+        # ⑥ 终止判定（三种终止都以本人口吻留一条自包含 issue，见 _finalize_terminal）
         if spec.effect is Effect.TERMINATE:
-            result.end_reason = spec.end_reason or "terminated"
-            # 三种终止都以本人口吻留一条自包含 issue（把"提 issue"从特定动作解耦——不满就留信号）：
-            #   file_issue                → "filed"：会话里搞不定、正式开单
-            #   give_up                   → "left" ：直接走人，留一条"为什么把我逼走"的问卷式 issue
-            #                               （否则气跑=空跑，backlog 收不到任何信号）
-            #   accept_with_reservations  → "accepted"：照常交付，但留一条体感落差反馈
-            # 三者 end_reason 各自不同（issue_filed / abandoned / accepted），仅"是否留 issue"被拉平。
-            _issue_mode = {
-                "file_issue": "filed",
-                "give_up": "left",
-                "accept_with_reservations": "accepted",
-            }.get(action_id)
-            if _issue_mode is not None:
-                issue_resp = client.respond(
-                    system, build_issue_turn(task, history, state, mode=_issue_mode)
-                )
-                issue_text = str(issue_resp.get("issue") or "")
-                result.issue_artifact = emit_issue_artifact(persona, result.turns, issue_text)
+            _finalize_terminal(
+                action_id,
+                result=result,
+                persona=persona,
+                client=client,
+                system=system,
+                task=task,
+                history=history,
+                state=state,
+            )
             break
 
-        # ⑦ 路由 -> 下一轮 harness 输入（掐墙钟：route 里 harness.send 是阻塞的，其耗时即用户干等时长）
+        # ⑦ 路由 -> 下一轮 harness 输入。EMIT 且要驱动 harness 的轮：若后端支持心跳（真实子进程），
+        # 用 _supervise_send 守望等待（超阈值唤醒用户 agent 决策：继续等/动用控制/放弃）；否则退回阻塞 route。
         _t0 = time.monotonic()
-        nxt = route(action_id, message, state, harness, harness_output)
-        if nxt is not None:
+        _emits = spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE
+        terminal_from_wait: str | None = None
+        if _emits and message.strip() and _supports_heartbeat(harness):
+            nxt, elapsed, terminal_from_wait = _supervise_send(
+                harness,
+                message,
+                client=client,
+                system=system,
+                task=task,
+                history=history,
+                state=state,
+                manual=manual,
+                result=result,
+                on_progress=on_progress,
+            )
+            if terminal_from_wait == "give_up":  # 用户在等待中放弃：走终止路径并结束
+                _finalize_terminal(
+                    "give_up",
+                    result=result,
+                    persona=persona,
+                    client=client,
+                    system=system,
+                    task=task,
+                    history=history,
+                    state=state,
+                )
+                break
+        else:
+            nxt = route(action_id, message, state, harness, harness_output)
             elapsed = time.monotonic() - _t0
+        if nxt is not None:
             last_wait_sec = elapsed  # 供下一轮 persona 感知"这条回复我等了多久、全程零可见性"
             # 时间感知·轻耗心：仅极端超时才自动扣一点耐心（挫败累积），日常耗时只 surfacing 交模型自判。
             if elapsed >= _EXTREME_WAIT_SEC:
