@@ -16,7 +16,13 @@ from auto_designer.user.sim.dimensions import (
     TrustStance,
     finalize_persona,
 )
-from auto_designer.user.sim.state import apply_verdict, init_state, make_coef
+from auto_designer.user.sim.state import (
+    TASK_LOAD_DELTA,
+    apply_task_load,
+    apply_verdict,
+    init_state,
+    make_coef,
+)
 
 
 def _persona(d1: D1Eval = D1Eval.SHALLOW, d43: D43Correct = D43Correct.FEEDBACK) -> Persona:
@@ -37,6 +43,24 @@ def test_init_state_patience_base_by_d43() -> None:
     assert init_state(_persona(d43=D43Correct.GIVE_UP)).patience == 3
     assert init_state(_persona(d43=D43Correct.FEEDBACK)).patience == 5
     assert init_state(_persona(d43=D43Correct.FILE_ISSUE)).patience == 6
+
+
+def test_apply_task_load_floats_around_base() -> None:
+    # 同一个人（FEEDBACK 基线 5）接不同分量任务，起始耐心不同：大任务加、小任务减、常规不动。
+    p = _persona(d43=D43Correct.FEEDBACK)
+    assert apply_task_load(init_state(p), "normal").patience == 5
+    assert apply_task_load(init_state(p), "quick").patience == 4
+    assert apply_task_load(init_state(p), "big").patience == 6
+    assert apply_task_load(init_state(p), "epic").patience == 7
+    assert TASK_LOAD_DELTA["epic"] == 2
+
+
+def test_apply_task_load_unknown_is_noop_and_floor() -> None:
+    p = _persona(d43=D43Correct.GIVE_UP)  # 基线 3
+    assert apply_task_load(init_state(p), "wat").patience == 3  # 未知读数不动基线
+    s = init_state(p)
+    s.patience = 1
+    assert apply_task_load(s, "quick").patience == 1  # quick=-1 但钳到 >=1，别一开局就可终止
 
 
 def test_make_coef_reflects_persona() -> None:

@@ -182,6 +182,23 @@ def _wait_block(wait_sec: float | None) -> str | None:
     )
 
 
+# 开局一轮附加：让 persona 自己给这任务估个“分量”，框架据此在耐心基线上叠加一次性小浮动。
+# 只在 OPENING 追加（其余轮忽略该字段）——同一个人接不同任务的起始耐心本就不同（见 state.apply_task_load）。
+_TASK_APPRAISAL = (
+    "# SIZE UP THIS TASK (first turn only)\n"
+    "This is the FIRST thing you're asking this tool for. Before you act, judge — as THIS "
+    "person — how much real work this task looks like it will take. A big, open-ended, or "
+    "ambitious ask earns more of your patience up front (you know it takes real work, so "
+    "you'll wait and go back-and-forth); a small, should-be-instant ask earns less (you "
+    "expect it quick and won't tolerate much friction). Add ONE extra field to your JSON "
+    "this turn:\n"
+    '  "task_load": "quick | normal | big | epic"\n'
+    "quick = trivial / should be instant; normal = a regular task; big = substantial, "
+    "multi-step; epic = large, open-ended, ambitious. Judge honestly by YOUR read of the "
+    "task text — not by what you hope it'll be."
+)
+
+
 def build_user_turn(
     task: str,
     history_lines: list[str],
@@ -191,6 +208,7 @@ def build_user_turn(
     *,
     manual: str = "",
     wait_sec: float | None = None,
+    appraise_task: bool = False,
 ) -> str:
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     ho = harness_output.strip() if harness_output else "(empty)"
@@ -207,6 +225,8 @@ def build_user_turn(
         parts.append(f"<self_observation>\n{state.pending_self_obs}\n</self_observation>")
     parts.append(f"<action_space>\n{action_space}\n</action_space>")
     parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
+    if appraise_task:
+        parts.append(_TASK_APPRAISAL)
     return "\n\n".join(parts)
 
 

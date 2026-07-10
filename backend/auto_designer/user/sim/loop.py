@@ -36,7 +36,7 @@ from .prompt import (
     build_user_turn,
     build_waiting_turn,
 )
-from .state import VERDICTS, State, apply_verdict, init_state, make_coef
+from .state import VERDICTS, State, apply_task_load, apply_verdict, init_state, make_coef
 
 
 @dataclass
@@ -301,10 +301,21 @@ def run_session(
         # ③ 主观三层 (LLM). harness 文本原样喂入; 能力分叉由 prompt(G1)+persona 档位约束, 不在框架侧过滤。
         # manual：该版本 harness 用户手册（能力预期锚点）；last_wait_sec：上条回复的墙钟等待（时间感知）。
         user = build_user_turn(
-            task, history, harness_output, space, state, manual=manual, wait_sec=last_wait_sec
+            task,
+            history,
+            harness_output,
+            space,
+            state,
+            manual=manual,
+            wait_sec=last_wait_sec,
+            appraise_task=phase is Phase.OPENING,  # 开局让 persona 估任务分量，据此调起始耐心
         )
         ret = client.respond(system, user)
         state.pending_self_obs = None  # 用后即焚: self_observation 已被消费
+
+        # 开局：据 persona 主观任务量读数，在耐心基线上叠加一次性小浮动（同一个人接不同任务耐心不同）。
+        if phase is Phase.OPENING:
+            apply_task_load(state, str(ret.get("task_load", "normal")))
 
         # ③.5 方案 B：action=='free' 交给模型自评归类到合法 id（替代关键词硬猜）。
         # 仅 client 支持 classify_action 时启用；否则落 resolve 的安全兜底。

@@ -77,6 +77,23 @@ def init_state(p: Persona) -> State:
     return State(turn=0, patience=patience_base, trust=p.trust)
 
 
+# 任务量 -> 起始耐心浮动：同一个人接不同任务，耐心不一样。大/开放式/有野心的活儿预期要真功夫，
+# 愿意多等、多来回（起始耐心更高）；该秒回的小任务则对任何摩擦零容忍（起始耐心更低）。
+# 范围压得很小（-1…+2），只做基线上的微浮动，不盖过 D4.3 性格给的耐心档位。
+TASK_LOAD_DELTA: dict[str, int] = {
+    "quick": -1,  # 琐碎/理应秒回
+    "normal": 0,  # 常规任务
+    "big": 1,  # 有分量、多步
+    "epic": 2,  # 大、开放式、有野心
+}
+
+
+def apply_task_load(state: State, load: str) -> State:
+    """开局据 persona 对任务量的主观读数，在耐心基线上叠加一次性小浮动（钳到 >=1，别一开局就可终止）。"""
+    state.patience = max(1, state.patience + TASK_LOAD_DELTA.get(load, 0))
+    return state
+
+
 def apply_verdict(state: State, verdict: str, coef: Coef) -> State:
     """每轮: 用主观 verdict 改写状态。客观线绝不进此函数。"""
     assert verdict in VERDICTS, f"unknown verdict {verdict}"

@@ -131,6 +131,39 @@ def test_manual_is_threaded_into_persona_prompt() -> None:
     assert any("no live progress" in u for u in client.seen)
 
 
+class _AppraisingClient(_RecordingClient):
+    """开局返回一个 task_load 读数；其余轮正常。用于验证起始耐心据任务量浮动。"""
+
+    def __init__(self, actions: list[str], task_load: str) -> None:
+        super().__init__(actions, verdict="unsure")
+        self._task_load = task_load
+
+    def respond(self, system: str, user: str) -> dict:
+        ret = super().respond(system, user)
+        if "SIZE UP THIS TASK" in user:  # 仅开局那轮带任务量评估指令
+            ret = {**ret, "task_load": self._task_load}
+        return ret
+
+
+def test_opening_appraisal_floats_starting_patience() -> None:
+    # FEEDBACK 基线 5；开局报 epic(+2) -> 起始耐心 7，落在首轮 TurnLog。
+    p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
+    client = _AppraisingClient(["send_task", "give_feedback"], task_load="epic")
+    res = run_session(p, client, ScriptedHarness(), TASK)
+    assert res.turns[0].patience == 7  # 5 + epic(+2)，unsure 不再动耐心
+    # 评估指令只在开局出现，后续轮不再要 task_load 字段
+    assert "SIZE UP THIS TASK" in client.seen[0]
+    assert all("SIZE UP THIS TASK" not in u for u in client.seen[1:])
+
+
+def test_opening_appraisal_quick_lowers_patience() -> None:
+    # GIVE_UP 基线 3；开局报 quick(-1) -> 起始耐心 2。
+    p = _persona(D1Eval.SHALLOW, D43Correct.GIVE_UP)
+    client = _AppraisingClient(["send_task", "give_feedback"], task_load="quick")
+    res = run_session(p, client, ScriptedHarness(), TASK)
+    assert res.turns[0].patience == 2  # 3 + quick(-1)
+
+
 def test_max_turns_cutoff() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _StubClient(["send_task", "give_feedback"], verdict="unsure")  # 永不终止
