@@ -38,23 +38,32 @@ assistant text. Set `HARNESS_PROGRESS=0` to suppress stderr progress output.
   message and its reply; you receive the final reply when it is done. A large
   request can take a long time.
 - It handles **one request at a time**, in order.
-- Broad, multi-file, end-to-end, package-build, or otherwise large requests are
-  constrained with a mandatory minimal-verifiable-slice directive before work
-  starts. The assistant must first produce one independently checkable slice,
-  report the touched files, verification command, and verification result, and
-  must not claim the whole request is complete until that slice is verified.
+- Broad, multi-file, end-to-end, package-build, transliteration, or otherwise
+  large requests are constrained with a mandatory `verified-slice-first`
+  directive before work starts. The assistant must keep the full scope visible
+  with a scope map: verified slices, in-progress ranges, remaining risks or
+  unverified items, and the next smallest committable step. Each step should
+  include touched files, a verification command, and the real result. If the next
+  change plus verification is unlikely to fit safely in the remaining budget, the
+  assistant must stop expanding and report the smallest trusted verified entry
+  rather than risking an empty failure.
 - On a **very large request it can hit an internal limit and return an error**
   (for example a timeout or "maximum iteration" message) instead of a finished
   result.
 - When bounded execution fails, the final reply includes an actionable summary:
   what was produced, whether anything was verified, what remains unverified, the
-  blocking reason, and a concrete path to shrink scope for the next attempt.
-  If the failure involved a timeout and agent rebuild, the reply also points to a
-  recovery snapshot written in the workspace at `.harness_recovery.json`. That
-  snapshot contains the blocking reason, attempt count, observed step count, and
-  the last observed steps so the next request can continue from visible facts or
-  deliberately narrow the scope.
-  The raw internal process is still available through the `steps` field for
+  blocking reason, and a concrete path to shrink scope for the next attempt. If
+  a real verified slice exists, it should be preserved and reported as the
+  current deliverable; if no verified slice exists, the reply must explicitly say
+  so. If the failure involved a timeout and agent rebuild, the reply also points
+  to a recovery snapshot written in the workspace at `.harness_recovery.json`.
+  That snapshot contains the blocking reason, attempt count, observed step count,
+  and the last observed steps so the next request can continue from visible facts
+  or deliberately narrow the scope.
+- If the local `nexau` dependency is unavailable, the harness returns a
+  deterministic fallback reply asking the user to install the dependency instead
+  of surfacing an uncontrolled import crash.
+- The raw internal process is still available through the `steps` field for
   diagnosis, but the user-facing `reply` should not be treated as completed work.
 - Messages are plain natural language.
 
