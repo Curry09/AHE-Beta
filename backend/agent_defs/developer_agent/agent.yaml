@@ -17,12 +17,14 @@ middlewares:
     params:
       max_context_tokens: 128000
       desired_max_tokens: 16384
-  # 机制保证"尽早落一个已提交增量"：预算过 1/3 或未提交改动过大却还没 commit 时，
-  # 主动注入升级指令逼 dev 缩到最小、自验、立刻提交——治"贪大→撞墙→零提交"。
+  # 机制保证"尽早落一个已提交增量"：预算过 1/4 或未提交改动过大却还没 commit 时主动施压；
+  # 到最后 ~3 轮仍零提交则升级为"硬落地"指令，逼它停止探索、下一步就提交——治"软提示被无视、
+  # 空转到 max_iterations 零提交白跑"（实测 round5 dev-0）。仍不替模型写/提交未验证代码。
   - import: auto_designer.dev.commit_checkpoint:CommitCheckpointMiddleware
     params:
-      first_commit_by_frac: 0.34
+      first_commit_by_frac: 0.25
       big_diff_lines: 150
+      hard_commit_by_remaining: 3
   # 收尾闸门：complete_task 前强制"完整提交（工作区干净 + 改了可观察行为要同步提交 MANUAL.md）"，
   # 并软性提醒把自验冒烟落库成回归测试；预算紧自动让路，不为它耗到超时。
   - import: auto_designer.dev.completion_gate:CompletionGateMiddleware

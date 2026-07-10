@@ -78,3 +78,21 @@ def test_nudge_on_big_uncommitted_diff_even_if_early(tmp_path: Path) -> None:
     # 预算才 10% 但未提交改动已 >150 行 → 提前施压（正在贪大）
     res = _gate(repo, seed).before_model(_hi(repo, seed, cur=3))
     assert res.has_modifications()
+
+
+def test_hard_landing_directive_in_final_stretch(tmp_path: Path) -> None:
+    repo, seed = _seed_repo(tmp_path)
+    # 只剩 2 轮预算（cur=32/34）、仍零提交 → 升级为硬落地指令（不同于普通/严重档措辞）
+    res = _gate(repo, seed).before_model(_hi(repo, seed, cur=32))
+    assert res.has_modifications()
+    text = res.messages[-1].get_text_content()
+    assert "最后" in text and "下一次工具调用就应该是提交" in text
+
+
+def test_final_stretch_silent_after_commit(tmp_path: Path) -> None:
+    repo, seed = _seed_repo(tmp_path)
+    (repo / "entry.py").write_text("print('v1')\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "feat: step1")  # 本轮已提交
+    # 即便到最后窗口，已提交 → 依然闭嘴（不误催已达标的轮）
+    assert not _gate(repo, seed).before_model(_hi(repo, seed, cur=33)).has_modifications()
