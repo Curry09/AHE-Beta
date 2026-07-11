@@ -37,6 +37,11 @@ tools:
   - name: list_directory
     yaml_path: ./tools/list_directory.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:list_directory
+  # grep：设计师无 shell，靠它「先搜后读」——按关键词跳到相关函数再精读那一段，
+  # 别把 entry.py 等大文件整篇通读烧 iteration（此前撞满 max-iter 的老毛病之一）。
+  - name: search_file_content
+    yaml_path: ./tools/search_file_content.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:search_file_content
   - name: complete_task
     yaml_path: ./tools/complete_task.tool.yaml
     binding: nexau.archs.tool.builtin.session_tools:complete_task

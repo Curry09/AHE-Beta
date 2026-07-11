@@ -22,6 +22,12 @@ import time
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
+# ── 一级预算钮（延迟体感的总闸；改这里最省事，先质疑它再谈别的）─────────────────
+# 单轮最坏墙钟 ≈ _CALL_TIMEOUT × _RUN_RETRIES = 240 × 4 = 16 分钟：卡住时用户只看到静默硬磨、
+# 直到最后才吐 [harness error]。这段「等很久才失败」是体感杀手（分数看不出、只在 reason 里）。
+# 若要治「延迟/等待不可控」，优先动这两个钮或交付方式，别只在外层堆恢复/重试逻辑：
+#   · 调小 _RUN_RETRIES / _CALL_TIMEOUT 收紧总预算；
+#   · 首次超时即回一个「进行中」的部分结果 / 让用户可打断续跑，而不是闷头重试到底。
 _RUN_RETRIES = 4
 # 单次 agent.run 硬超时（秒）：nexau 自身的 llm_config.timeout 实测不生效，故在此层用线程兜底，
 # 卡住即放弃该次（daemon 线程丢弃，不阻塞进程），保证 harness 永远在 bounded 时间内回一行。

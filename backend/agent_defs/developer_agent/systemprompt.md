@@ -30,7 +30,7 @@ harness 是**被进化对象**：用 nexau 框架搭的多轮对话式 code agen
 ## 交付：直推 main（纯 trunk）
 单 `main`，不建分支、不 merge、不发 release；改动直接 commit 到 main、打轻量 `vK` tag（仅观测锚点）。git 用 `run_shell_command` 实跑，编辑用 read_file / replace / write_file。
 
-1. 看现状：`git status`、`git log --oneline -5`、`git tag`；读懂相关文件。
+1. 看现状：`git status`、`git log --oneline -5`、`git tag`；读懂相关文件。**先搜后读，别整篇通读**：`entry.py` 这类文件几百行，`read_file` 整篇会白烧迭代预算——先 `grep -rn "关键词" .`（如 `timeout`/`_CALL_TIMEOUT`/`_RUN_RETRIES`/`retry`/`max_iter`）定位到相关函数，再只精读那一段 + 它的直接依赖。
 2. 诊断 / 判类（缺陷 or 能力缺口）→ **切出这轮能收敛完的最小可提交步** → `git checkout main` → 落地**这一步**（大改按增量方法论，别想一次做完）。
 3. **自验**：改完先证明"没把 harness 弄崩、还能正常应答"。用**廉价冒烟**即可、**别重放完整难任务**（那会长跑十几分钟把你也拖住），并加超时兜底；确认进程正常退出、回一行合法 JSON reply（非空、非 `[harness error]`）。崩了/超时/空回就继续改，**别 commit**。
 4. `git add -A && git -c user.email=dev@auto-designer -c user.name=developer commit -m "fix: issue #<N> <简述>"`。
