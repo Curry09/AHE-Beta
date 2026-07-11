@@ -139,7 +139,7 @@ class Designer:
         )
         return DesignOutcome(proposal_numbers=numbers)
 
-    def _run_agent(self, *, backlog: list, trend: list[tuple[str, int]]) -> str:
+    def _run_agent(self, *, backlog: list, trend: list[tuple[str, int, str]]) -> str:
         os.environ["SANDBOX_WORK_DIR"] = str(self._repo)  # 只读 grounding：sandbox = harness 仓
         from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
@@ -172,10 +172,14 @@ class Designer:
         out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
         return out if isinstance(out, str) else str(out)
 
-    def _feeling_trend(self) -> list[tuple[str, int]]:
-        """体感随时间：[(created_at, score)]，按时间升序。空数据源返回空序列。"""
+    def _feeling_trend(self) -> list[tuple[str, int, str]]:
+        """体感随时间：[(created_at, score, reason)]，按时间升序。空数据源返回空序列。
+
+        reason = 用户末态那句「为什么」（feeling.reason）。设计师光看分数无法判根因——
+        「延迟/等待本身就是痛点」这类只能从 reason 里读出（老索引无此键时回落空串）。
+        """
         rows = sorted(self._store.index(), key=lambda e: e["created_at"])
-        return [(e["created_at"], e["score"]) for e in rows]
+        return [(e["created_at"], e["score"], str(e.get("reason", ""))) for e in rows]
 
     @staticmethod
     def _format_backlog(backlog: list) -> str:
@@ -186,10 +190,14 @@ class Designer:
         )
 
     @staticmethod
-    def _format_trend(trend: list[tuple[str, int]]) -> str:
+    def _format_trend(trend: list[tuple[str, int, str]]) -> str:
         if not trend:
             return "（暂无体感数据）"
-        return "\n".join(f"- {ts}: {score}" for ts, score in trend)
+        lines = []
+        for ts, score, reason in trend:
+            why = f" — {reason}" if reason else ""
+            lines.append(f"- {ts}: {score}{why}")
+        return "\n".join(lines)
 
     @staticmethod
     def _parse_proposals(text: str) -> list[IssueDraft]:

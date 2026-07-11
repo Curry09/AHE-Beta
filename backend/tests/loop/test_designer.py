@@ -42,21 +42,21 @@ def _persona() -> Persona:
     return Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s")
 
 
-def _seed_session(store: SessionStore, *, score: int) -> None:
+def _seed_session(store: SessionStore, *, score: int, reason: str = "r") -> None:
     store.save(
         Session(
             persona=_persona(),
             scenario=SeedScenario(description="s"),
             transcript=Transcript(turns=[]),
-            feeling=FeelingScore(score=score, reason="r"),
+            feeling=FeelingScore(score=score, reason=reason),
         )
     )
 
 
 def _designer(tmp_path: Path, tracker: FakeTracker, canned: str) -> _StubDesigner:
     store = SessionStore(tmp_path / "sessions")
-    _seed_session(store, score=2)
-    _seed_session(store, score=1)  # 体感偏低，构成一条曲线
+    _seed_session(store, score=2, reason="等太久")
+    _seed_session(store, score=1, reason="超时两次颗粒无收")  # 体感偏低，构成一条曲线
     return _StubDesigner(
         tracker,
         store,
@@ -87,9 +87,10 @@ def test_proposals_become_design_labeled_issues(tmp_path) -> None:
         assert DESIGN_LABEL in opened[number].labels
     titles = {i.title for i in opened.values()}
     assert {"统一错误处理契约", "澄清前置追问策略"} <= titles
-    # backlog + 体感曲线确实喂进了 agent。
+    # backlog + 体感曲线确实喂进了 agent（曲线现在带上体感 reason 那句「为什么」）。
     assert [i.title for i in designer.seen_backlog] == ["慢"]
-    assert [s for _, s in designer.seen_trend] == [2, 1]
+    assert [s for _, s, _ in designer.seen_trend] == [2, 1]
+    assert [reason for _, _, reason in designer.seen_trend] == ["等太久", "超时两次颗粒无收"]
 
 
 def test_empty_or_invalid_result_yields_no_proposals(tmp_path) -> None:

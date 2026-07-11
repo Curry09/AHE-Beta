@@ -1,7 +1,7 @@
 """本地 SessionStore（spec-0001/T6）：一局 Session 全量落盘 + 单一总索引。
 
 全量文件 root/<session_id>.json 为唯一权威；索引 root/index.json 是其派生投影（可由全量重建），
-承载体感曲线/回归基线所需最小信息 {session_id, score, created_at, n_issues}。先写全量后追加索引。
+承载体感曲线/回归基线所需最小信息 {session_id, score, reason, created_at, n_issues}。先写全量后追加索引。
 """
 
 from __future__ import annotations
@@ -38,6 +38,9 @@ class SessionStore:
             {
                 "session_id": session.session_id,
                 "score": session.feeling.score,
+                # 体感的「为什么」（用户末态那句话）：设计师据此判根因，不再只看分数。
+                # 见 designer._feeling_trend——延迟/等待本身这类痛点只能从 reason 里看出来。
+                "reason": session.feeling.reason,
                 "created_at": session.created_at.isoformat(),
                 "n_issues": len(session.issue_refs),
             }
