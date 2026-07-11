@@ -32,12 +32,12 @@ harness 是**被进化对象**：用 nexau 框架搭的多轮对话式 code agen
 
 1. 看现状：`git status`、`git log --oneline -5`、`git tag`；读懂相关文件。**先搜后读，别整篇通读**：`entry.py` 这类文件几百行，`read_file` 整篇会白烧迭代预算——先 `grep -rn "关键词" .`（如 `timeout`/`_CALL_TIMEOUT`/`_RUN_RETRIES`/`retry`/`max_iter`）定位到相关函数，再只精读那一段 + 它的直接依赖。
 2. 诊断 / 判类（缺陷 or 能力缺口）→ **切出这轮能收敛完的最小可提交步** → `git checkout main` → 落地**这一步**（大改按增量方法论，别想一次做完）。
-3. **自验**：改完先证明"没把 harness 弄崩、还能正常应答"。用**廉价冒烟**即可、**别重放完整难任务**（那会长跑十几分钟把你也拖住），并加超时兜底；确认进程正常退出、回一行合法 JSON reply（非空、非 `[harness error]`）。崩了/超时/空回就继续改，**别 commit**。
+3. **自验（一次冒烟即止，别陷进"反复自证"的无底洞）**：改完用**一个廉价冒烟**证明"没把 harness 弄崩、还能正常应答"——`python3 -m py_compile` 通过 + **一条** smoke（或 `python3 -m unittest tests/`）绿，即视为**验证充分**，**立刻进入第 4 步提交**。**硬规矩：验证方式只跑一种、只跑一遍**——通过了就别再发明第二种/第三种花样（signal 模拟、多个 tempfile 脚本、反复 `git status`/`diff` 复查……）反复自我确认；那不会让改动更对，只会把迭代预算耗到撞上限、零提交白跑（实测最坏结果）。**别重放完整难任务**（会长跑十几分钟拖死你）。只有冒烟真的崩了/超时/空回（非 `[harness error]`、回一行合法 JSON reply 才算过）才继续改、**别 commit**；一旦过了，**停止验证、马上提交**。
 4. `git add -A && git -c user.email=dev@auto-designer -c user.name=developer commit -m "fix: issue #<N> <简述>"`。
 5. 打 tag：现有最大 `v<K>` → 新 tag `v<K+1>`（无则 v1）。
 6. `git push origin main` && `git push origin v<新版本>`；再 `git tag`、`git log main --oneline -2` 确认 tag 与 commit 都在 main 上。
 7. 全部成功后才 `complete_task`，report 写清：**根因、改了哪些文件及为什么改在这层、自验命令与输出、新 tag**。
 
-**绝对规则**：① 拿不出"改完亲自跑通"的自验输出，绝不 commit；② push 成功并打出新 tag 之前绝不 complete_task；③ 所有改动落 `main`、不建分支；某步失败读报错重试，push 失败重试一次；④ **任务太大就按增量方法论只落最小一步——手上有可交付的一步却撞满迭代/墙钟、零提交落 main，是最坏结果，绝不空手收场**。
+**绝对规则**：① 拿不出"改完亲自跑通"的自验输出，绝不 commit；**但反过来——一个冒烟一旦通过，就必须立刻 commit，绝不再补第二种验证**（验证只跑一种一遍，过了就提交，"再确认一下"是禁止动作）；② push 成功并打出新 tag 之前绝不 complete_task；③ 所有改动落 `main`、不建分支；某步失败读报错重试，push 失败重试一次；④ **任务太大就按增量方法论只落最小一步——手上有可交付的一步却撞满迭代/墙钟、零提交落 main，是最坏结果，绝不空手收场**。
 
 **收尾契约（会被机制强制校验）**：调用 `complete_task` 前必须满足——(a) 工作区干净：所有改动已 commit + push，`git status` 无残留；(b) 若这轮改了**对外可观察行为**（如 `entry.py` 的输出/协议），必须在提交里**同步更新 `MANUAL.md`**；确属纯内部改动、无对外可见变化时，在 report 里显式写明「本次无对外可见变化」；(c) 尽量把自验冒烟落库成一个小回归测试一并提交——**放到仓内 `tests/` 目录下**（仓已带 `tests/test_smoke.py` 示范；测试必须在 `tests/` 内，顶层散落的 `test_*.py` 会被提交边界钩子拒）；预算实在紧张可在 report 里说明留作 follow-up。不满足会被挡回、要求你同轮补齐后再收尾。
