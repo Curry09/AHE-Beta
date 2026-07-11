@@ -1,7 +1,7 @@
 # Spec-0007：dev 侧硬提交边界，堵「任务代码焊进 harness 仓」的过拟合泄漏。
 """harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品——
 `entry.py`（启动器）、`agents/`（角色定义）、`tools/`（工具声明）、`MANUAL.md`（用户手册）、
-`params.yaml`/`agent.yaml`（配置），外加仓基建 `.gitignore`。
+`params.yaml`/`agent.yaml`（配置）、`tests/`（harness 自身的回归测试），外加仓基建 `.gitignore`。
 
 真实闭环里观测到：用户 agent 把「跑不动某个 benchmark 任务（如 unidecode）」当 bug 提 issue，
 dev agent 领到后照字面 `mkdir -p unicode_ascii/tables; cat > pyproject.toml …` 把**被测项目本体**
@@ -19,8 +19,11 @@ from collections.abc import Iterable
 from pathlib import Path
 
 # harness 本体允许出现在仓根的顶层路径（目录或文件）。其余一律视为越界（任务代码/被测项目脚手架）。
+# `tests/` 收 harness **自身**的回归测试：任务代码本就被本闸挡在仓外，`tests/` 里能有意义测的
+# 只可能是 harness 本体（entry.py 超时/打断行为等），故放开不会重开泄漏口；顶层散落的 test_*.py
+# 仍拒，逼测试统一进 tests/。禁的是被测项目的测试（其项目代码根本进不来，此类测试无处可测、prompt 亦禁）。
 ALLOWED_TOP: frozenset[str] = frozenset(
-    {"MANUAL.md", "agent.yaml", "params.yaml", "entry.py", "agents", "tools", ".gitignore"}
+    {"MANUAL.md", "agent.yaml", "params.yaml", "entry.py", "agents", "tools", "tests", ".gitignore"}
 )
 
 
@@ -66,9 +69,11 @@ bad = [p.strip() for p in staged if p.strip() and not _ignorable(p.strip())
 if bad:
     sys.stderr.write(
         "\\n[harness-boundary] 提交被拒。harness 是通用编码助手，仓里只允许它自身的制品："
-        "entry.py / agents/ / tools/ / MANUAL.md / params.yaml / agent.yaml。\\n"
-        "严禁把某个具体任务的项目代码（被测项目本体、pyproject.toml、新建包、任务 tests/ 等）"
-        "焊进来——那是过拟合，且白耗迭代。请删除下列越界文件，只提交对 harness *能力* 的改动：\\n  "
+        "entry.py / agents/ / tools/ / MANUAL.md / params.yaml / agent.yaml，以及 harness 自身的"
+        " tests/（放 harness 本体的回归测试，如 entry.py 超时/打断行为）。\\n"
+        "严禁把某个具体任务的项目代码（被测项目本体、pyproject.toml、新建包等）焊进来——那是过拟合、"
+        "且白耗迭代。测试请放 tests/ 下（顶层散落的 test_*.py 也会被拒）。请删除下列越界文件，"
+        "只提交对 harness *能力* 的改动：\\n  "
         + "\\n  ".join(bad)
         + "\\n"
     )

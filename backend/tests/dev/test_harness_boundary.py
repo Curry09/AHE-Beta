@@ -40,16 +40,18 @@ def test_violations_flags_only_out_of_bounds() -> None:
         "tools/x.tool.yaml",
         "MANUAL.md",
         ".gitignore",
+        "tests/test_entry.py",  # 合法：harness 自身的回归测试
         "__pycache__/entry.cpython-312.pyc",  # 噪声 → 忽略
         "unicode_ascii/core.py",  # 越界：任务代码
         "pyproject.toml",  # 越界：项目脚手架
-        "tests/test_x.py",  # 越界：任务测试
+        "test_toplevel.py",  # 越界：顶层散落测试（须进 tests/）
     ]
-    assert violations(staged) == ["unicode_ascii/core.py", "pyproject.toml", "tests/test_x.py"]
+    assert violations(staged) == ["unicode_ascii/core.py", "pyproject.toml", "test_toplevel.py"]
 
 
 def test_violations_empty_for_pure_harness() -> None:
     assert violations(["entry.py", "agents/main.md", "params.yaml", "agent.yaml"]) == []
+    assert violations(["tests/test_smoke.py", "tests/helpers/util.py"]) == []  # harness 自测放行
     assert violations([]) == []
     assert violations(["  ", ""]) == []  # 空/空白路径不算
 
@@ -62,6 +64,7 @@ def test_allowed_top_is_harness_skeleton() -> None:
         "entry.py",
         "agents",
         "tools",
+        "tests",
         ".gitignore",
     }
 
@@ -97,6 +100,27 @@ def test_hook_allows_harness_only_commit(tmp_path: Path) -> None:
     res = _git(repo, "commit", "-m", "feat: improve harness scaffolding")
     assert res.returncode == 0
     assert _git(repo, "log", "--oneline").stdout.count("\n") == 2
+
+
+def test_hook_allows_harness_self_test(tmp_path: Path) -> None:
+    # 合法：harness 自身的回归测试放 tests/ → 放行（区别于被测任务的项目代码）。
+    repo = _seed_repo(tmp_path)
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_smoke.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    res = _git(repo, "commit", "-m", "test: add harness smoke")
+    assert res.returncode == 0
+    assert _git(repo, "log", "--oneline").stdout.count("\n") == 2
+
+
+def test_hook_blocks_toplevel_test_file(tmp_path: Path) -> None:
+    # 顶层散落 test_*.py 仍拒——逼测试统一进 tests/（顶层段不在白名单）。
+    repo = _seed_repo(tmp_path)
+    (repo / "test_toplevel.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    res = _git(repo, "commit", "-m", "test: stray toplevel test")
+    assert res.returncode != 0
+    assert "test_toplevel.py" in res.stderr
 
 
 def test_hook_ignores_pyc_noise(tmp_path: Path) -> None:

@@ -174,7 +174,9 @@ class CompletionGateMiddleware(Middleware):
             if logic_changed and not has_test:
                 problems.append(
                     "[落地测试] 本轮改了逻辑却没提交任何回归测试——把你自验用的冒烟脚本落库成一个"
-                    "小测试（如 test_entry.py）并提交；若预算实在紧张，可在报告里说明留作 follow-up。"
+                    "小测试放到 `tests/` 下（如 `tests/test_entry.py`，仓已有 `tests/test_smoke.py` 示范；"
+                    "注意测试必须在 tests/ 内，顶层散落 test_*.py 会被边界钩子拒）并提交；"
+                    "若预算实在紧张，可在报告里说明留作 follow-up。"
                 )
         return problems
 
