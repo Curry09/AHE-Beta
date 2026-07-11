@@ -47,7 +47,7 @@ def violations(staged_paths: Iterable[str]) -> list[str]:
 
 # pre-commit 钩子脚本：自包含（只依赖 python3 stdlib + git），不 import 本包——harness 仓是独立仓，
 # 钩子在其内跑，PYTHONPATH 未必含 auto_designer。白名单从 ALLOWED_TOP 注入，逻辑与 violations() 同源。
-_HOOK_TEMPLATE = '''#!/usr/bin/env python3
+_HOOK_TEMPLATE = """#!/usr/bin/env python3
 # auto-designer harness boundary gate（由 auto_designer.dev.harness_boundary 生成，勿手改）。
 # 拒绝把 harness 本体之外的文件（某个具体任务的项目代码）提交进 harness 仓——保通用工具不被过拟合。
 import subprocess
@@ -78,7 +78,7 @@ if bad:
         + "\\n"
     )
     sys.exit(1)
-'''
+"""
 
 
 def render_hook() -> str:

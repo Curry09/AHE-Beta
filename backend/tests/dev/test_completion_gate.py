@@ -13,10 +13,17 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from nexau.archs.main_sub.execution.hooks import AfterModelHookInput
-from nexau.archs.main_sub.execution.parse_structures import ParsedResponse, ToolCall
+import pytest
 
-from auto_designer.dev.completion_gate import CompletionGateMiddleware
+pytest.importorskip("nexau")  # CI 无 nexau 时跳过本模块（对齐 test_live.py 惯例）
+
+from nexau.archs.main_sub.execution.hooks import AfterModelHookInput  # noqa: E402
+from nexau.archs.main_sub.execution.parse_structures import (  # noqa: E402
+    ParsedResponse,
+    ToolCall,
+)
+
+from auto_designer.dev.completion_gate import CompletionGateMiddleware  # noqa: E402
 
 
 def _git(repo: Path, *args: str) -> str:

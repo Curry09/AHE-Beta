@@ -5,9 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from nexau.archs.main_sub.execution.hooks import ToolCallParams
+import pytest
 
-from auto_designer.dev.workspace_jail import (
+pytest.importorskip("nexau")  # CI 无 nexau 时跳过本模块（对齐 test_live.py 惯例）
+
+from nexau.archs.main_sub.execution.hooks import ToolCallParams  # noqa: E402
+
+from auto_designer.dev.workspace_jail import (  # noqa: E402
     WorkspaceJailMiddleware,
     _escapes,
     _shell_offender,
@@ -43,7 +47,9 @@ def _run(mw: WorkspaceJailMiddleware, params: ToolCallParams) -> tuple[Any, bool
 
 
 def _denied(result: Any) -> bool:
-    return isinstance(result, dict) and result.get("error", {}).get("type") == "WORKSPACE_JAIL_DENIED"
+    return (
+        isinstance(result, dict) and result.get("error", {}).get("type") == "WORKSPACE_JAIL_DENIED"
+    )
 
 
 def test_escapes_detects_out_of_workdir(tmp_path: Path) -> None:
@@ -101,7 +107,9 @@ def test_wrap_allows_in_repo_shell(tmp_path: Path) -> None:
     work = (tmp_path / "harness_repo").resolve()
     work.mkdir()
     mw = WorkspaceJailMiddleware()
-    result, ran = _run(mw, _params(work, "run_shell_command", {"command": "git add -A && git commit -m x"}))
+    result, ran = _run(
+        mw, _params(work, "run_shell_command", {"command": "git add -A && git commit -m x"})
+    )
     assert result == "REAL_TOOL_RAN" and ran is True
 
 
@@ -114,7 +122,9 @@ def test_wrap_denies_write_escape(tmp_path: Path) -> None:
     # 但 replace 的 new_string 里含 ../ 只是内容、不该误伤（file_path 合法）
     ok, ok_ran = _run(
         mw,
-        _params(work, "replace", {"file_path": "entry.py", "old_string": "a", "new_string": "../x"}),
+        _params(
+            work, "replace", {"file_path": "entry.py", "old_string": "a", "new_string": "../x"}
+        ),
     )
     assert ok == "REAL_TOOL_RAN" and ok_ran is True
 

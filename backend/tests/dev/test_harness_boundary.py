@@ -106,7 +106,9 @@ def test_hook_allows_harness_self_test(tmp_path: Path) -> None:
     # 合法：harness 自身的回归测试放 tests/ → 放行（区别于被测任务的项目代码）。
     repo = _seed_repo(tmp_path)
     (repo / "tests").mkdir()
-    (repo / "tests" / "test_smoke.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    (repo / "tests" / "test_smoke.py").write_text(
+        "def test_ok():\n    assert True\n", encoding="utf-8"
+    )
     _git(repo, "add", "-A")
     res = _git(repo, "commit", "-m", "test: add harness smoke")
     assert res.returncode == 0

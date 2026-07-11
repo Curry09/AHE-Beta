@@ -63,6 +63,8 @@ def _force_stop(agent) -> bool:
     except Exception:  # noqa: BLE001  打断是尽力而为，失败绝不炸 harness
         pass
     return False
+
+
 # 内层过程流各类文本上限（对齐 auto_designer StepTracer）：工具入参/输出可能带整文件内容，
 # 摘要后进时间线；assistant 是过程主体，给宽上限只防极端失控。
 _TOOL_TEXT_CAP = 200

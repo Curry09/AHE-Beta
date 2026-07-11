@@ -5,10 +5,14 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from nexau.archs.main_sub.execution.hooks import BeforeModelHookInput
-from nexau.core.messages import Message, Role, TextBlock
+import pytest
 
-from auto_designer.dev.commit_checkpoint import CommitCheckpointMiddleware
+pytest.importorskip("nexau")  # CI 无 nexau 时跳过本模块（对齐 test_live.py 惯例）
+
+from nexau.archs.main_sub.execution.hooks import BeforeModelHookInput  # noqa: E402
+from nexau.core.messages import Message, Role, TextBlock  # noqa: E402
+
+from auto_designer.dev.commit_checkpoint import CommitCheckpointMiddleware  # noqa: E402
 
 
 def _git(repo: Path, *args: str) -> str:
