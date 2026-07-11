@@ -31,6 +31,10 @@ _（缺模块级 docstring）_
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
 | `agentic_developer.py` | agentic_developer：开发者 = 带 git 工具的 nexau agent（取代确定性 DeveloperAgent）。 |
+| `commit_checkpoint.py` | CommitCheckpointMiddleware：用机制（而非软提示）保证 dev 尽早落一个已提交的增量。 |
+| `completion_gate.py` | CompletionGateMiddleware：收尾闸门——保证 dev 收尾时是一次"完整提交"。 |
+| `harness_boundary.py` | harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品—— |
+| `workspace_jail.py` | WorkspaceJailMiddleware：dev/designer 只能碰自己的 harness 仓，越界读写一律拒。 |
 
 ### auto_designer.distill
 
@@ -148,6 +152,10 @@ graph LR
     nauto_designer_designer_designer["designer.designer"]
     nauto_designer_dev["auto_designer.dev"]
     nauto_designer_dev_agentic_developer["dev.agentic_developer"]
+    nauto_designer_dev_commit_checkpoint["dev.commit_checkpoint"]
+    nauto_designer_dev_completion_gate["dev.completion_gate"]
+    nauto_designer_dev_harness_boundary["dev.harness_boundary"]
+    nauto_designer_dev_workspace_jail["dev.workspace_jail"]
     nauto_designer_distill["auto_designer.distill"]
     nauto_designer_distill_library["distill.library"]
     nauto_designer_distill_seed_adapter["distill.seed_adapter"]
@@ -258,6 +266,7 @@ graph LR
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_persona_client
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_prompt
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_state
+    nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_actions
     nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_prompt
     nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_sandbox
     nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_skills

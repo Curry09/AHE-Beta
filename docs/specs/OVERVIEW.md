@@ -37,6 +37,21 @@
 ### 0011 AgentBoard：卡通形式的活动 agent 页面
 本组在观测看板前端新增一个独立页 **AgentBoard**：以卡通形式（emoji 头像 + CSS 动画）实时展示 当前活动的 agent，展示其身份并支持点击，取代此前嵌于每页顶部的朴素折叠面板 `AgentsPanel`。 数据源沿用既有 `/api/agents`（`data/live/agents.json` 的只读投影，2 秒轮询），**零后端改动、 零新依赖**——卡通表现由 emoji + CSS keyframes 实现，符合奥卡姆理念。
 
+### 0012 用户侧等待体感真实化：等待中主动权 + 任务相关耐心
+把用户 agent 面对慢/卡 harness 时的「干等」升级为可感知的真实体感：等待中赋予主动权（心跳唤醒后可轮询/追问/打断），起始耐心随任务量浮动（同一 persona 不同任务耐心不同），并统一等待耐心的衰减口径、去除心跳与判定双记。落点 backend/auto_designer/user/sim/，是 0005/0008 用户侧的行为增强。
+
+### 0013 Harness 呈现与交互协议：拆信封 · 过程流分层 · 打断/心跳
+把 harness 的对用户呈现与内层过程彻底分层，并补齐慢会话的交互协议：拆 complete_task 信封（用户只看最终答案）、内层过程流经协议 steps 只吐观测层（persona 只吃 reply）、control:interrupt 即时打断回 [interrupted] 保留会话、launcher begin/poll/control 把一轮 send 拆成分片轮询（进程活着即合法长任务、不按墙钟盲杀）。落点 harness_template（v0 种子/黑盒对话契约参考实现）+ harness/launcher。是被进化 harness 的呈现与协议底座，配合 0012 用户侧心跳。
+
+### 0014 开发者侧提交纪律：增量落地闸 + 完整收尾闸
+用机制（而非软提示）保证 dev agent 每轮产出「干净的已提交增量」：CommitCheckpointMiddleware 在预算过线/改动过大/末段仍零提交时逐级施压，逼它尽早落一个已提交最小片，堵「贪大→撞满迭代→零提交白跑」；CompletionGateMiddleware 拦在 complete_task 上，强制收尾时工作区干净、改了对外可观察行为要同步 MANUAL、并软性催把自验冒烟落成回归测试。配套调 dev agent 的 max_iterations、硬落地窗口与 systemprompt「一次冒烟即止」纪律。落点 backend/auto_designer/dev/ + agent_defs/developer_agent/。
+
+### 0015 开发者侧过拟合泄漏隔离：提交边界 + trace 物理隔离 + 工作区 jail
+堵 dev/designer 把「某个具体任务的产物」焊进通用 harness 的过拟合泄漏，三道机制层防线：① harness 仓 pre-commit 提交边界钩子——暂存区出现 harness 本体之外路径即拒（任务代码/被测项目脚手架进不来）；② sandbox 工作目录下沉到独立父目录（data/harness_sandbox/harness_repo），使 trace 目录（data/sessions 体感+会话、data/harness_runs 运行副本）不再是其 ../ 同级、断掉相对路径可达；③ WorkspaceJailMiddleware——nexau read 类工具/只读 bash 不走权限，用 wrap_tool_call 把文件/shell 操作关进 SANDBOX_WORK_DIR，越界读写一律拒。落点 backend/auto_designer/dev/ + run.py。
+
+### 0016 设计师根因信号 + 读码效率：体感 reason 喂设计师 · 先搜后读
+补上设计师的「为什么差」根因信号并降低其读码开销：把用户体感的 reason（打分背后那句话）随分数一起落进 SessionStore index 并喂给设计师——分数只告诉差、reason 才告诉差在哪（尤其「延迟/等待本身」这类只在 reason 里、分数看不出的痛点），设计师据此先判 bug/feature 再给 dev 提需求，别把延迟误读成没交付去堆恢复逻辑；同时给设计师 search_file_content(grep) + 「先搜后读」纪律，避免把 entry.py 等大文件整篇通读烧迭代。落点 designer/ + user/session_store.py + agent_defs/designer/。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -82,6 +97,18 @@
 | 0010 | 0010/T1 | 种子场景采集（蒸馏，skill 形式） | done | — | tools/seed-distill/seed-card-schema.md<br>tools/seed-distill/extract-harness-seed/SKILL.md<br>tools/seed-distill/extract-harness-seed/reference.md<br>backend/auto_designer/distill/seed_library.py<br>backend/tests/distill/test_seed_library.py |
 | 0010 | 0010/T2 | 种子注入（card → SeedScenario） | done | T1 | backend/auto_designer/distill/seed_adapter.py<br>backend/tests/distill/test_seed_adapter.py |
 | 0011 | 0011/T1 | AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板 | done | — | frontend/src/pages/AgentBoard.tsx<br>frontend/src/components/AgentCard.tsx<br>frontend/src/lib/agentHealth.ts<br>frontend/src/lib/avatar.ts<br>frontend/src/main.tsx<br>frontend/src/index.css<br>frontend/src/components/AgentsPanel.tsx |
+| 0012 | 0012/T1 | 等待中主动权：心跳唤醒 + 通用控制面 + 等待衰减口径统一 | pending | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/sim/test_loop.py |
+| 0012 | 0012/T2 | 状态耐心模型：任务量起始浮动 + 性格衰减系数 | pending | — | backend/auto_designer/user/sim/state.py<br>backend/tests/user/sim/test_state.py |
+| 0013 | 0013/T1 | 拆 complete_task 信封 + 过程流分层 + begin/poll/control 心跳协议 | pending | — | backend/harness_template/entry.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/interface.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/models.py<br>backend/tests/harness/test_template_entry.py<br>backend/tests/harness/test_launcher.py |
+| 0013 | 0013/T2 | v0 种子自测 smoke + MANUAL 呈现契约 | pending | — | backend/harness_template/tests/test_smoke.py<br>backend/harness_template/MANUAL.md |
+| 0014 | 0014/T1 | CommitCheckpointMiddleware：逐级施压逼尽早落已提交增量 | pending | — | backend/auto_designer/dev/commit_checkpoint.py<br>backend/tests/dev/test_commit_checkpoint.py |
+| 0014 | 0014/T2 | CompletionGateMiddleware：收尾时强制完整提交（含手册）+ 软催回归测试 | pending | — | backend/auto_designer/dev/completion_gate.py<br>backend/tests/dev/test_completion_gate.py |
+| 0014 | 0014/T3 | dev agent 配置/提示对齐：迭代预算·硬落地窗口·一次冒烟即止 | pending | — | backend/agent_defs/developer_agent/agent.yaml<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/agent_defs/developer_agent/MANUAL.md |
+| 0015 | 0015/T1 | harness 仓提交边界硬闸（pre-commit 钩子） | pending | — | backend/auto_designer/dev/harness_boundary.py<br>backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_harness_boundary.py |
+| 0015 | 0015/T2 | sandbox 工作目录下沉，物理隔离 trace | pending | — | backend/run.py<br>backend/tests/test_sandbox_isolation.py |
+| 0015 | 0015/T3 | WorkspaceJailMiddleware：工具级越界读写一律拒 | pending | — | backend/auto_designer/dev/workspace_jail.py<br>backend/tests/dev/test_workspace_jail.py |
+| 0016 | 0016/T1 | 体感 reason 作根因信号喂设计师 | pending | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_designer.py |
+| 0016 | 0016/T2 | 设计师 grep + 先搜后读，降低读码开销 | pending | — | backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/search_file_content.tool.yaml |
 
 ## 跨 feature 关系图
 
@@ -149,6 +176,28 @@ graph LR
     end
     subgraph G0011[0011 agentboard-cartoon-page]
         n0011_T1["T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板"]
+    end
+    subgraph G0012[0012 user-wait-realism]
+        n0012_T1["T1 等待中主动权：心跳唤醒 + 通用控制面 + 等待衰减口径统一"]
+        n0012_T2["T2 状态耐心模型：任务量起始浮动 + 性格衰减系数"]
+    end
+    subgraph G0013[0013 harness-present-protocol]
+        n0013_T1["T1 拆 complete_task 信封 + 过程流分层 + begin/poll/control 心跳协议"]
+        n0013_T2["T2 v0 种子自测 smoke + MANUAL 呈现契约"]
+    end
+    subgraph G0014[0014 dev-commit-discipline]
+        n0014_T1["T1 CommitCheckpointMiddleware：逐级施压逼尽早落已提交增量"]
+        n0014_T2["T2 CompletionGateMiddleware：收尾时强制完整提交（含手册）+ 软催回归测试"]
+        n0014_T3["T3 dev agent 配置/提示对齐：迭代预算·硬落地窗口·一次冒烟即止"]
+    end
+    subgraph G0015[0015 dev-overfit-isolation]
+        n0015_T1["T1 harness 仓提交边界硬闸（pre-commit 钩子）"]
+        n0015_T2["T2 sandbox 工作目录下沉，物理隔离 trace"]
+        n0015_T3["T3 WorkspaceJailMiddleware：工具级越界读写一律拒"]
+    end
+    subgraph G0016[0016 designer-rootcause-signal]
+        n0016_T1["T1 体感 reason 作根因信号喂设计师"]
+        n0016_T2["T2 设计师 grep + 先搜后读，降低读码开销"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -238,21 +287,31 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
-| backend/auto_designer/harness/launcher.py | 0003, 0008 |
+| backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
+| backend/auto_designer/dev/agentic_developer.py | 0007, 0015 |
+| backend/auto_designer/harness/interface.py | 0001, 0013 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009 |
-| backend/auto_designer/models.py | 0001, 0008, 0009 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013 |
+| backend/auto_designer/models.py | 0001, 0008, 0009, 0013 |
+| backend/auto_designer/user/session_store.py | 0001, 0016 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0012 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008 |
-| backend/auto_designer/user/sim/prompt.py | 0005, 0008 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0012 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
+| backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
+| backend/harness_template/entry.py | 0003, 0013 |
+| backend/run.py | 0007, 0015 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
-| backend/tests/harness/test_launcher.py | 0003, 0008 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
+| backend/tests/user/sim/test_loop.py | 0005, 0012 |
+| backend/tests/user/sim/test_state.py | 0005, 0012 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009 |
 
 ## 各 feature 详情
@@ -563,4 +622,105 @@ graph LR
     v_T1_1["T1 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
+```
+
+### 0012 用户侧等待体感真实化：等待中主动权 + 任务相关耐心（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 等待中主动权：心跳唤醒 + 通用控制面 + 等待衰减口径统一"]
+    nT2["T2 状态耐心模型：任务量起始浮动 + 性格衰减系数"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+```
+
+### 0013 Harness 呈现与交互协议：拆信封 · 过程流分层 · 打断/心跳（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 拆 complete_task 信封 + 过程流分层 + begin/poll/control 心跳协议"]
+    nT2["T2 v0 种子自测 smoke + MANUAL 呈现契约"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+```
+
+### 0014 开发者侧提交纪律：增量落地闸 + 完整收尾闸（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 CommitCheckpointMiddleware：逐级施压逼尽早落已提交增量"]
+    nT2["T2 CompletionGateMiddleware：收尾时强制完整提交（含手册）+ 软催回归测试"]
+    nT3["T3 dev agent 配置/提示对齐：迭代预算·硬落地窗口·一次冒烟即止"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+```
+
+### 0015 开发者侧过拟合泄漏隔离：提交边界 + trace 物理隔离 + 工作区 jail（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 harness 仓提交边界硬闸（pre-commit 钩子）"]
+    nT2["T2 sandbox 工作目录下沉，物理隔离 trace"]
+    nT3["T3 WorkspaceJailMiddleware：工具级越界读写一律拒"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+```
+
+### 0016 设计师根因信号 + 读码效率：体感 reason 喂设计师 · 先搜后读（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 体感 reason 作根因信号喂设计师"]
+    nT2["T2 设计师 grep + 先搜后读，降低读码开销"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
 ```
