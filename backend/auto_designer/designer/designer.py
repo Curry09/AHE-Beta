@@ -27,6 +27,7 @@ DESIGN_LABEL = "design"
 # 一次 propose_once 是多轮工具调用（读文件 + 综合），给足硬超时兜底防总挂死。
 _DESIGN_TIMEOUT = 900
 
+
 StatusFn = Callable[..., None]
 
 
@@ -39,6 +40,35 @@ class DesignOutcome:
     @property
     def count(self) -> int:
         return len(self.proposal_numbers)
+
+
+def _iter_top_level_arrays(s: str):
+    """扫描出所有**顶层**平衡的 [...] 片段，尊重字符串字面量与转义（防被内嵌 [] / 散文带偏）。"""
+    depth = 0
+    start = -1
+    in_str = False
+    esc = False
+    for i, ch in enumerate(s):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "[":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "]":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start != -1:
+                    yield s[start : i + 1]
+                    start = -1
 
 
 def _run_with_timeout(call: Callable[[], object], timeout: int) -> object:
@@ -109,7 +139,7 @@ class Designer:
         )
         return DesignOutcome(proposal_numbers=numbers)
 
-    def _run_agent(self, *, backlog: list, trend: list[tuple[str, int]]) -> str:
+    def _run_agent(self, *, backlog: list, trend: list[tuple[str, int, str]]) -> str:
         os.environ["SANDBOX_WORK_DIR"] = str(self._repo)  # 只读 grounding：sandbox = harness 仓
         from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
@@ -126,7 +156,14 @@ class Designer:
         msg = (
             "综合下面的全量 open issue backlog 与体感曲线，找跨 issue 的结构性根因，"
             "产出 0..n 条结构性设计提案（宁缺毋滥；无值得提的方向就返回 `[]`）。\n"
-            "可先用 read_file 读 `agents/main.md` 看 harness 现状再提。\n\n"
+            "**先 read_file 读懂 harness 源码**（`agents/main.md` + `entry.py` + `agent.yaml`，"
+            "看清超时/重试/迭代上限/交付方式这些一级钮）再提；没读机制源码别断言机制根因。\n"
+            "**你只给「问题 + 方向」，不写实现**：绝不在 body 里写 manifest/checkpoint/gate、"
+            "schema、分步协议这类施工细节（照抄就能敲键盘=越权，退回只留问题和方向）。\n"
+            "**动笔前先按系统提示里的「重复判定 rubric」逐条过滤**：每条候选对照下面 backlog 每条 issue "
+            "及你本轮其它候选，命中 R1 同根因 / R2 同施力点方向 / R3 开发者视角 subsume 任一即为重复，不提；"
+            "只提带来新根因或新施力点的方向。若 backlog 里多条依 rubric 互为重复或已被现状覆盖，"
+            "用一条整合性提案点明「#X/#Y 系同一根因，建议合并/关闭」，而非换皮再加一条。\n\n"
             f"## open issue backlog（{len(backlog)} 条）\n{self._format_backlog(backlog)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组"
@@ -135,10 +172,14 @@ class Designer:
         out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
         return out if isinstance(out, str) else str(out)
 
-    def _feeling_trend(self) -> list[tuple[str, int]]:
-        """体感随时间：[(created_at, score)]，按时间升序。空数据源返回空序列。"""
+    def _feeling_trend(self) -> list[tuple[str, int, str]]:
+        """体感随时间：[(created_at, score, reason)]，按时间升序。空数据源返回空序列。
+
+        reason = 用户末态那句「为什么」（feeling.reason）。设计师光看分数无法判根因——
+        「延迟/等待本身就是痛点」这类只能从 reason 里读出（老索引无此键时回落空串）。
+        """
         rows = sorted(self._store.index(), key=lambda e: e["created_at"])
-        return [(e["created_at"], e["score"]) for e in rows]
+        return [(e["created_at"], e["score"], str(e.get("reason", ""))) for e in rows]
 
     @staticmethod
     def _format_backlog(backlog: list) -> str:
@@ -149,31 +190,41 @@ class Designer:
         )
 
     @staticmethod
-    def _format_trend(trend: list[tuple[str, int]]) -> str:
+    def _format_trend(trend: list[tuple[str, int, str]]) -> str:
         if not trend:
             return "（暂无体感数据）"
-        return "\n".join(f"- {ts}: {score}" for ts, score in trend)
+        lines = []
+        for ts, score, reason in trend:
+            why = f" — {reason}" if reason else ""
+            lines.append(f"- {ts}: {score}{why}")
+        return "\n".join(lines)
 
     @staticmethod
     def _parse_proposals(text: str) -> list[IssueDraft]:
         """从 agent 的 result 文本里抽出 JSON 数组并解析成 IssueDraft 列表。
 
-        容忍 ```json 代码块与前后散文：取第一个 `[` 到最后一个 `]` 的切片解析。解析失败或非列表
-        一律返回空列表（本轮无提案），不抛错——designer 出错不该拖垮闭环。
+        容忍 ```json 代码块与前后散文。裸输出时**不再**用 find('[')→rfind(']') 一把抓
+        （那会被散文/字符串里的 [] 或多段数组带偏、抠出非法片段 → 静默吞掉提案，与 persona
+        _parse_json 曾踩的同类坑），改用尊重字符串转义的**平衡括号扫描**取最后一个能解析的顶层
+        数组。解析失败或非列表一律返回空列表（本轮无提案），不抛错——designer 出错不该拖垮闭环。
         """
         if not text:
             return []
         fenced = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", text, re.DOTALL)
-        blob = fenced.group(1) if fenced else None
-        if blob is None:
-            start, end = text.find("["), text.rfind("]")
-            if start == -1 or end <= start:
-                return []
-            blob = text[start : end + 1]
-        try:
-            data = json.loads(blob)
-        except (ValueError, TypeError):
-            return []
+        data: object | None = None
+        if fenced is not None:
+            try:
+                data = json.loads(fenced.group(1))
+            except (ValueError, TypeError):
+                data = None
+        if data is None:
+            for chunk in _iter_top_level_arrays(text):  # 保留最后一个成功者
+                try:
+                    parsed = json.loads(chunk)
+                except (ValueError, TypeError):
+                    continue
+                if isinstance(parsed, list):
+                    data = parsed
         if not isinstance(data, list):
             return []
         drafts: list[IssueDraft] = []

@@ -278,29 +278,134 @@ def _extract(user: str, tag: str) -> str:
     return seg
 
 
+# 解析失败重试：追加这句「只回合法 JSON」提醒再要一次（治标于散文/畸形/被截断的偶发输出）。
+_JSON_ONLY_REMINDER = (
+    "Your previous reply could not be parsed. Reply again with ONLY one single valid JSON "
+    "object for the OUTPUT CONTRACT — no prose, no markdown/code fence, no comments, "
+    "no trailing commas, and make sure it is complete (not truncated)."
+)
+
+# 空 message 重试：模型选了「要发话」的动作却没写 message 时，让它**自己**补出这句话——绝不由框架代写
+# 罐头（那会把假话灌进 transcript / 发给 harness，污染体感与 issue 信号）。
+_MESSAGE_REQUIRED_REMINDER = (
+    "Your previous reply chose an action that SENDS a line to the harness (or was 'free'), "
+    "but 'message' was empty. Reply again with the SAME OUTPUT CONTRACT JSON and put the exact "
+    "line you would actually send in 'message' — non-empty, first person, in your own voice. "
+    "If you genuinely have nothing to say, choose a different action that fits."
+)
+
+
+def _emit_action_missing_message(obj: dict) -> bool:
+    """正常轮里选了「要发话」的动作(EMIT 或 free)却没给 message —— 需要让模型补出这句话。"""
+    from .actions import CATALOG, Channel  # 局部导入避免任何潜在循环依赖
+
+    action = obj.get("action") or ""
+    msg_empty = not (obj.get("message") or "").strip()
+    if action == "free":  # free 也必须带 message 才能被归类
+        return msg_empty
+    spec = CATALOG.get(action)
+    return bool(spec and spec.channel is Channel.EMIT and msg_empty)
+
+
+def _retry_reminder(obj: dict) -> str | None:
+    """判定这次输出要不要重试并给出对应提醒；无需重试返回 None。
+
+    两类都只重试一次：①解析失败（畸形/散文/截断）→ 只回 JSON；②选了要发话的动作却空 message
+    → 让模型自己补出这句话。special 轮（file_issue/rate 无 action 字段）不会触发②。
+    """
+    if obj.get("_parse_failed"):
+        return _JSON_ONLY_REMINDER
+    if _emit_action_missing_message(obj):
+        return _MESSAGE_REQUIRED_REMINDER
+    return None
+
+
+def _dump_unparseable(*, first: str, second: str) -> None:
+    """把两次都解析失败的原始输出落到 backend/data/parse_failures.jsonl，供事后判「没 JSON 还是畸形」。
+
+    纯可观测旁路：写盘失败绝不影响主流程（persona 仍走中性兜底继续跑）。
+    """
+    if os.getenv("PYTEST_CURRENT_TEST"):  # 单测里别往真实 data/ 写脏数据（否则污染观测）
+        return
+    try:
+        import datetime
+
+        path = Path(__file__).resolve().parents[3] / "data" / "parse_failures.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        rec = {
+            "ts": datetime.datetime.now().isoformat(),
+            "first_raw": first[:4000],
+            "retry_raw": second[:4000],
+        }
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001 观测旁路，坏了也不许拖垮 loop
+        pass
+
+
+def _iter_top_level_objects(s: str):
+    """扫描出所有**顶层**平衡的 {...} 片段，尊重字符串字面量与转义。
+
+    旧实现用 find('{')→rfind('}') 一把抓，只要输出里有不止一处花括号（推理文字带 {}、
+    message 内含 {}、或多段 JSON）就抠出跨段非法片段 → 解析失败 → 静默空 message。
+    这里逐字符跟踪括号深度，只在**字符串外**计数括号，深度归零即得到一个完整对象。
+    """
+    depth = 0
+    start = -1
+    in_str = False
+    esc = False
+    for i, ch in enumerate(s):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start != -1:
+                    yield s[start : i + 1]
+                    start = -1
+
+
 def _parse_json(text: str) -> dict:
-    """容错解析 persona 的 OUTPUT CONTRACT。失败也返回安全 dict, 不崩 loop。"""
+    """容错解析 persona 的 OUTPUT CONTRACT。失败也返回安全 dict, 不崩 loop。
+
+    抓所有顶层 {...} 对象、取**最后一个**能解析成 dict 的（内层 tool-loop 里最终答案总在末尾；
+    前面的推理/工具示例即便带花括号也不干扰）。仍解析不出才退化空壳。
+    """
     if not text:
         return {
             "perceive": "(empty model output)",
             "verdict": "unsure",
             "action": "free",
             "message": "",
+            "_parse_failed": True,  # 供上层识别→触发「只回 JSON」重试；绝非模型真实意图
         }
     s = text.strip()
     if s.startswith("```"):  # 剥 ```json ... ``` 围栏
         s = s.split("```", 2)[1] if s.count("```") >= 2 else s.strip("`")
         if s.lstrip().lower().startswith("json"):
             s = s.lstrip()[4:]
-    start, end = s.find("{"), s.rfind("}")
-    if start != -1 and end != -1 and end > start:
-        s = s[start : end + 1]
-    try:
-        obj = json.loads(s)
+    parsed: dict | None = None
+    for chunk in _iter_top_level_objects(s):  # 顺序扫描，保留最后一个成功者
+        try:
+            obj = json.loads(chunk)
+        except Exception:
+            continue
         if isinstance(obj, dict):
-            return obj
-    except Exception:
-        pass
+            parsed = obj
+    if parsed is not None:
+        return parsed
     # 无法解析(截断/非 JSON): 退化成安全 no-op, 绝不把原始文本灌进 message ——
     # message 会发给 harness 且落进 transcript, 半截 JSON / 思维链不得外泄。
     return {
@@ -308,6 +413,7 @@ def _parse_json(text: str) -> dict:
         "verdict": "unsure",
         "action": "free",
         "message": "",
+        "_parse_failed": True,  # 供上层识别→触发「只回 JSON」重试；绝非模型真实意图
     }
 
 
@@ -346,10 +452,31 @@ class AgenticPersonaClient:
         self._persona = persona
         self._workspace_dir = workspace_dir
 
+    def _parse_with_retry(self, messages: list[dict], text: str) -> dict:
+        """解析首次输出；失败则追加「只回 JSON」提醒重试一次，仍失败才 dump 原文 + 落中性兜底。
+
+        根治「解析失败 → free → 空 message → 兜底假抱怨」链：多数偶发散文/畸形/截断一次重试即好；
+        真解析不出也只落 `_parse_failed` 空壳（下游走中性兜底），绝不无中生有替用户喊「坏了」。
+        """
+        obj = _parse_json(text)
+        reminder = _retry_reminder(obj)
+        if reminder is None:
+            return obj
+        retry_messages = [
+            *messages,
+            {"role": "assistant", "content": text},
+            {"role": "user", "content": reminder},
+        ]
+        text2 = self._llm(retry_messages) or ""
+        obj2 = _parse_json(text2)
+        if obj2.get("_parse_failed"):
+            _dump_unparseable(first=text, second=text2)  # 两次都败：留证据供事后定位
+        return obj2
+
     # -- 单次主观判断（退化路径 / 特殊轮）--
     def _final_call(self, system: str, user: str) -> dict:
-        text = self._llm([{"role": "system", "content": system}, {"role": "user", "content": user}])
-        return _parse_json(text or "")
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        return self._parse_with_retry(messages, self._llm(messages) or "")
 
     def _dispatch(self, obj: dict, tools_by_name: dict, sandbox) -> dict:
         name = obj.get("tool")
@@ -404,6 +531,8 @@ class AgenticPersonaClient:
                         }
                     )
                     continue
+                if _retry_reminder(obj) is not None:  # 解析失败 / 该发话却空 message -> 重试一次
+                    obj = self._parse_with_retry(messages, text)
                 return obj  # 最终结构化输出（contract）
             # 超步数兜底：退化为一次主观判断，保证永远返回合法输出
             return self._final_call(system, user)

@@ -55,6 +55,29 @@ def test_build_user_turn_has_sections() -> None:
         assert tag in user
 
 
+def test_build_user_turn_injects_manual_and_wait_cost() -> None:
+    p = _persona()
+    state = init_state(p)
+    user = build_user_turn(
+        "do X",
+        [],
+        "out",
+        ["accept"],
+        state,
+        manual="# Manual\nno live progress; no /btw.",
+        wait_sec=372.0,
+    )
+    assert "<harness_manual>" in user and "no live progress" in user
+    assert "<wait_cost>" in user and "372s" in user
+
+
+def test_build_user_turn_omits_manual_and_wait_when_absent() -> None:
+    p = _persona()
+    user = build_user_turn("do X", [], "out", ["accept"], init_state(p))  # 默认无手册/无耗时
+    assert "<harness_manual>" not in user
+    assert "<wait_cost>" not in user
+
+
 def test_build_rating_turn_contract() -> None:
     out = build_rating_turn("do X", [], init_state(_persona()))
     assert "1-4" in out or "1–4" in out

@@ -118,7 +118,14 @@ def make_sim_run_session_fn(
         harness.reset()  # 开局责任归编排层
         try:
             res = sim_run_session(
-                sim_persona, client, harness, scenario.description, on_progress=progress
+                sim_persona,
+                client,
+                harness,
+                scenario.description,
+                # 该版本 harness 的用户手册：让 persona 的能力预期锚定"这工具文档说的"，
+                # 而非空泛先验；缺省空串（老后端无 manual 属性）。
+                manual=getattr(harness, "manual", ""),
+                on_progress=progress,
             )
         finally:
             harness.close()  # 无论成败都释放 harness 子进程

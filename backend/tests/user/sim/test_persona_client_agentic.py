@@ -149,15 +149,32 @@ def test_exceed_steps_falls_back() -> None:
 
 
 # --------------------------------------------------------------------------
-# (d) 非法 JSON -> 安全退化（unsure/free）
+# (d) 非法 JSON -> 先「只回 JSON」重试一次；两次都废才安全退化（unsure/free）
 # --------------------------------------------------------------------------
-def test_invalid_json_degrades_safely() -> None:
-    llm = FakeToolLLM(["this is not json at all"])
+def test_invalid_json_retry_then_degrades_safely() -> None:
+    # 两次都非法：重试仍解析不出 -> 落 _parse_failed 空壳（free/unsure），绝不伪造抱怨
+    llm = FakeToolLLM(["this is not json at all", "still not json"])
     c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox())
     c.bind_session(_persona(D1Eval.EXPERT), "/ws")
 
     out = c.respond("SYS", "<task>x</task>")
     assert out["action"] == "free" and out["verdict"] == "unsure"
+    assert out.get("_parse_failed") is True
+    assert len(llm.calls) == 2  # 确有重试
+
+
+def test_invalid_json_retry_recovers() -> None:
+    # 首次非法、重试给出合法 contract -> 恢复真实意图，而非降级/伪造
+    good = json.dumps(
+        {"perceive": "ok", "verdict": "satisfied", "action": "accept", "message": "great"}
+    )
+    llm = FakeToolLLM(["oops not json", good])
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox())
+    c.bind_session(_persona(D1Eval.EXPERT), "/ws")
+
+    out = c.respond("SYS", "<task>x</task>")
+    assert out["action"] == "accept" and out["verdict"] == "satisfied"
+    assert len(llm.calls) == 2
 
 
 # --------------------------------------------------------------------------

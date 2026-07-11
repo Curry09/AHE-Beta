@@ -5,7 +5,38 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-max_iterations: 40
+# 迭代上限 38：既让"迭代预算"先于 _DEV_TIMEOUT(900s 墙钟) 触顶走中间件优雅收尾，又给足余量让
+# dev 干完 git（commit/tag/push）后还能调 complete_task 写报告——26 太紧（实测干完活正好被掐、报告只剩
+# [Max iteration]）；34 时实测「最后一口气才提交、没预算收尾 git 尾巴」，配合硬落地窗口前移到 8，放宽到 38。
+max_iterations: 38
+
+# 预算到点→逼收尾：临近 max_iterations 时注入"还剩 N 轮，别再开新工具调用，给结论性回复/总结"。
+# 把过去"墙钟硬砍、无产出"换成"优雅收尾"（要么把手头改动验证+提交，要么总结剩余作 follow-up）。
+middlewares:
+  # 工作区 jail（放首位，最外层先判）：dev 只能碰自己的 harness 仓，文件工具/bash 越界读写一律拒。
+  # 机制隔离 trace（data/sessions、data/harness_runs）——nexau 的 read 类工具不走权限、只读 bash
+  # 无条件放行，agent 顺 ../ 或绝对路径就能读到任务轨迹并把任务专属产物带进 harness（过拟合）。
+  - import: auto_designer.dev.workspace_jail:WorkspaceJailMiddleware
+  - import: nexau.archs.main_sub.execution.middleware.round_and_token_reminder:RoundAndTokenReminderMiddleware
+    params:
+      max_context_tokens: 128000
+      desired_max_tokens: 16384
+  # 机制保证"尽早落一个已提交增量"：预算过 1/4 或未提交改动过大却还没 commit 时主动施压；
+  # 到最后 ~8 轮仍零提交则升级为"硬落地"指令，逼它停止探索、下一步就提交——治"软提示被无视、
+  # 空转到 max_iterations 零提交白跑"（实测 round5 dev-0）。窗口从 3 提前到 8：3 太晚——实测提交
+  # 落在最后一口气(34/34)、没预算再走 tag/push/complete_task 尾巴；留 8 轮够收完整条 git 尾。
+  # 仍不替模型写/提交未验证代码。
+  - import: auto_designer.dev.commit_checkpoint:CommitCheckpointMiddleware
+    params:
+      first_commit_by_frac: 0.25
+      big_diff_lines: 150
+      hard_commit_by_remaining: 8
+  # 收尾闸门：complete_task 前强制"完整提交（工作区干净 + 改了可观察行为要同步提交 MANUAL.md）"，
+  # 并软性提醒把自验冒烟落库成回归测试；预算紧自动让路，不为它耗到超时。
+  - import: auto_designer.dev.completion_gate:CompletionGateMiddleware
+    params:
+      observable_paths: ["entry.py"]
+      manual_path: MANUAL.md
 
 llm_config:
   # 分角色配置：开发者 agent 用 DEV_LLM_*（run.py 未单独设置时已回落公共 LLM_*）。

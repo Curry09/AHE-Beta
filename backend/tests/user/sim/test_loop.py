@@ -122,6 +122,48 @@ def test_on_progress_pushes_pending_harness_reply_immediately() -> None:
     assert snaps[2] == (2, None)
 
 
+def test_manual_is_threaded_into_persona_prompt() -> None:
+    # 手册经 run_session(manual=) 穿透到每轮 persona 看到的 user turn（能力预期锚点）。
+    p = _persona(D1Eval.EXPERT, D43Correct.FEEDBACK)
+    client = _RecordingClient(["send_task", "accept"], verdict="satisfied")
+    run_session(p, client, ScriptedHarness(), TASK, manual="# Manual\nno live progress; no /btw.")
+    assert client.seen and all("<harness_manual>" in u for u in client.seen)
+    assert any("no live progress" in u for u in client.seen)
+
+
+class _AppraisingClient(_RecordingClient):
+    """开局返回一个 task_load 读数；其余轮正常。用于验证起始耐心据任务量浮动。"""
+
+    def __init__(self, actions: list[str], task_load: str) -> None:
+        super().__init__(actions, verdict="unsure")
+        self._task_load = task_load
+
+    def respond(self, system: str, user: str) -> dict:
+        ret = super().respond(system, user)
+        if "SIZE UP THIS TASK" in user:  # 仅开局那轮带任务量评估指令
+            ret = {**ret, "task_load": self._task_load}
+        return ret
+
+
+def test_opening_appraisal_floats_starting_patience() -> None:
+    # FEEDBACK 基线 5；开局报 epic(+2) -> 起始耐心 7，落在首轮 TurnLog。
+    p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
+    client = _AppraisingClient(["send_task", "give_feedback"], task_load="epic")
+    res = run_session(p, client, ScriptedHarness(), TASK)
+    assert res.turns[0].patience == 7  # 5 + epic(+2)，unsure 不再动耐心
+    # 评估指令只在开局出现，后续轮不再要 task_load 字段
+    assert "SIZE UP THIS TASK" in client.seen[0]
+    assert all("SIZE UP THIS TASK" not in u for u in client.seen[1:])
+
+
+def test_opening_appraisal_quick_lowers_patience() -> None:
+    # GIVE_UP 基线 3；开局报 quick(-1) -> 起始耐心 2。
+    p = _persona(D1Eval.SHALLOW, D43Correct.GIVE_UP)
+    client = _AppraisingClient(["send_task", "give_feedback"], task_load="quick")
+    res = run_session(p, client, ScriptedHarness(), TASK)
+    assert res.turns[0].patience == 2  # 3 + quick(-1)
+
+
 def test_max_turns_cutoff() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _StubClient(["send_task", "give_feedback"], verdict="unsure")  # 永不终止
@@ -175,6 +217,25 @@ def test_give_up_also_leaves_exit_issue() -> None:
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.end_reason == "abandoned"  # 机制不变: 仍是放弃
     assert res.issue_artifact is not None  # 但额外留下退出 issue
+
+
+class _RaisingHarness:
+    """首条即崩：send 抛异常，模拟 harness 超时/崩溃（route 会兜成 [harness error] 哨兵）。"""
+
+    def send(self, message: str) -> str:  # noqa: ARG002
+        raise TimeoutError("agent.run 超时 >240s")
+
+
+def test_harness_error_surfaced_and_negative_exit_available_immediately() -> None:
+    # 松锁后：框架不再拦 accept，而是把 [harness error] 原样喂给 persona，并让负向出口(give_up/
+    # file_issue)开局即可用——有判断力的用户面对崩溃自然走人/开单而非验收（R4 漏斗已补齐）。
+    # 这里 persona 首轮见崩溃即 give_up：会话以 abandoned 收场并留一条退出 issue，不会被逼进 accept。
+    p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
+    client = _StubClient(["send_task", "give_up"], verdict="stuck")
+    res = run_session(p, client, _RaisingHarness(), TASK)
+    assert res.end_reason == "abandoned"  # 走人，而非假验收
+    assert res.issue_artifact is not None  # 留下"为什么把我逼走"的退出 issue
+    assert any("[harness error]" in t.harness_output for t in res.turns if t.harness_output)
 
 
 def test_issue_artifact_is_user_voice_with_metadata_footer() -> None:

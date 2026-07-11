@@ -16,7 +16,13 @@ from auto_designer.user.sim.dimensions import (
     TrustStance,
     finalize_persona,
 )
-from auto_designer.user.sim.state import apply_verdict, init_state, make_coef
+from auto_designer.user.sim.state import (
+    TASK_LOAD_DELTA,
+    apply_task_load,
+    apply_verdict,
+    init_state,
+    make_coef,
+)
 
 
 def _persona(d1: D1Eval = D1Eval.SHALLOW, d43: D43Correct = D43Correct.FEEDBACK) -> Persona:
@@ -37,6 +43,24 @@ def test_init_state_patience_base_by_d43() -> None:
     assert init_state(_persona(d43=D43Correct.GIVE_UP)).patience == 3
     assert init_state(_persona(d43=D43Correct.FEEDBACK)).patience == 5
     assert init_state(_persona(d43=D43Correct.FILE_ISSUE)).patience == 6
+
+
+def test_apply_task_load_floats_around_base() -> None:
+    # 同一个人（FEEDBACK 基线 5）接不同分量任务，起始耐心不同：大任务加、小任务减、常规不动。
+    p = _persona(d43=D43Correct.FEEDBACK)
+    assert apply_task_load(init_state(p), "normal").patience == 5
+    assert apply_task_load(init_state(p), "quick").patience == 4
+    assert apply_task_load(init_state(p), "big").patience == 6
+    assert apply_task_load(init_state(p), "epic").patience == 7
+    assert TASK_LOAD_DELTA["epic"] == 2
+
+
+def test_apply_task_load_unknown_is_noop_and_floor() -> None:
+    p = _persona(d43=D43Correct.GIVE_UP)  # 基线 3
+    assert apply_task_load(init_state(p), "wat").patience == 3  # 未知读数不动基线
+    s = init_state(p)
+    s.patience = 1
+    assert apply_task_load(s, "quick").patience == 1  # quick=-1 但钳到 >=1，别一开局就可终止
 
 
 def test_make_coef_reflects_persona() -> None:
@@ -67,8 +91,8 @@ def test_apply_verdict_transitions() -> None:
 
     s = init_state(p)
     apply_verdict(s, "stuck", coef)
-    # 卡住 -> 耐心↓(首次=一次普通失败代价), 信任不动(纯归耐心)
-    assert s.patience == 4 and s.trust is TrustStance.BALANCED
+    # 卡住 -> 耐心↓(首次扣 consec_stuck+2 = 3), 信任不动(纯归耐心)
+    assert s.patience == 2 and s.trust is TrustStance.BALANCED
 
 
 def test_apply_verdict_stuck_escalates_additively() -> None:
@@ -76,12 +100,12 @@ def test_apply_verdict_stuck_escalates_additively() -> None:
     coef = make_coef(p)
 
     s = init_state(p)
-    apply_verdict(s, "stuck", coef)  # 第1次: -(1+0) -> 4
-    assert s.patience == 4 and s.consec_stuck == 1
-    apply_verdict(s, "stuck", coef)  # 第2次: -(1+1) -> 2
-    assert s.patience == 2 and s.consec_stuck == 2
-    apply_verdict(s, "stuck", coef)  # 第3次: -(1+2) -> -1 (解锁终止)
-    assert s.patience == -1 and s.consec_stuck == 3
+    apply_verdict(s, "stuck", coef)  # 第1次: -(1+2)=3 -> 2
+    assert s.patience == 2 and s.consec_stuck == 1
+    apply_verdict(s, "stuck", coef)  # 第2次: -(2+2)=4 -> -2
+    assert s.patience == -2 and s.consec_stuck == 2
+    apply_verdict(s, "stuck", coef)  # 第3次: -(3+2)=5 -> -7 (已解锁终止)
+    assert s.patience == -7 and s.consec_stuck == 3
 
 
 def test_stuck_streak_resets_on_non_stuck() -> None:
@@ -89,11 +113,11 @@ def test_stuck_streak_resets_on_non_stuck() -> None:
     coef = make_coef(p)
     s = init_state(p)
 
-    apply_verdict(s, "stuck", coef)  # 5 -> 4, consec_stuck=1
-    apply_verdict(s, "satisfied", coef)  # 非 stuck -> 递增清零
+    apply_verdict(s, "stuck", coef)  # 5 -> 2 (扣 3), consec_stuck=1
+    apply_verdict(s, "satisfied", coef)  # 非 stuck -> 递增清零(satisfied 不动耐心)
     assert s.consec_stuck == 0
-    apply_verdict(s, "stuck", coef)  # 重新从首次起: -(1+0) -> 3
-    assert s.patience == 3 and s.consec_stuck == 1
+    apply_verdict(s, "stuck", coef)  # 重新从首次起: -(1+2)=3 -> -1
+    assert s.patience == -1 and s.consec_stuck == 1
 
 
 def test_apply_verdict_rejects_unknown() -> None:

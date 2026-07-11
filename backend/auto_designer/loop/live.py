@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -34,17 +35,29 @@ def _live_file(*, data_dir: Path, name: str) -> Path:
 def _read_json(*, path: Path, fallback: Any) -> Any:
     if not path.exists():
         return fallback
+    # errors="replace"：harness 可能吐非法 UTF-8 字节，容错读回而非炸掉观测（易失投影，坏了就回落）。
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        return json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (json.JSONDecodeError, OSError, ValueError):
         return fallback
 
 
 def _write_atomic(*, path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)  # 原子替换，读进程不会看到半成品
+    # 唯一临时名（mkstemp）+ 原子 replace：并发写者（dev tracer 与 status 回调可能跨线程同时写）绝不
+    # 共用同一 .tmp 而相互串字节；encode errors="replace" 兜底非法字符，杜绝写出坏字节。
+    payload = json.dumps(data, ensure_ascii=False).encode("utf-8", errors="replace")
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(payload)
+        os.replace(tmp_name, path)  # 原子替换，读进程不会看到半成品
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
 
 # ---- agents.json：agent 活动槽 ----

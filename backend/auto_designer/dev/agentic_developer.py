@@ -143,14 +143,23 @@ class AgenticDeveloper:
         agent = Agent(config=cfg)
         # Spec-0007/T1：直推 main——无 branch/merge/release，commit 落 main、打 vK tag、push main+tag。
         msg = (
-            "处理这条 issue，端到端落地成一次对 main 的推进（必须做完 git 才 complete_task）。\n"
+            "领这条 issue，按你系统提示里的工程原则处理，端到端落地成一次对 main 的推进"
+            "（必须做完 git 才 complete_task）。\n"
             f"issue #{issue_number}：{title}\n{body}\n\n"
+            "边界（硬约束）：你改的是**通用编码助手 harness 本体**"
+            "（entry.py / agents/ / tools/ / MANUAL.md / params.yaml），不是某个具体任务。issue 若在"
+            "抱怨「某任务没做成」（装不上某个包、跑不动某项目），那是 harness 的**能力缺口**——只改进"
+            "通用能力（如让它更会搭脚手架、读报错、装依赖、控超时），**绝不把被测项目代码写进 harness 仓**"
+            "（新建包、pyproject.toml、任务 tests/ 等；仓已装 pre-commit 边界钩子，越界提交会被拒、白费迭代）。\n"
             f"严格使用新 tag `{tag}`。\n"
-            f"流程：先诊断根因（看清 harness 的 main.md/entry.py/agent.yaml，判断是行为问题还是结构问题）"
-            f" → `git checkout main` → 改**相关文件**做结构性改进 → "
+            "流程：读懂现状、诊断/判类（缺陷 or 能力缺口） → **切出这轮能收敛完的最小可提交步**"
+            "（任务大就按增量方法论，这轮只落第一步、别想一次做完） → `git checkout main` → 落地这一步 → "
+            "自验（廉价冒烟、别重放难任务、带 timeout 防卡；确认不崩、回一行合法 JSON reply，"
+            "崩了/超时就继续改别 commit） → "
             f'`git add -A && git -c user.email=dev@auto-designer -c user.name=developer commit -m "fix: issue #{issue_number}"` → '
             f"`git tag {tag}` → `git push origin main` `git push origin {tag}` → "
-            "验证 → complete_task 报告根因、改了哪些文件、新 tag。"
+            "确认落地 → complete_task 报告根因/类型、改了哪些文件及为什么改在这层、自验命令与输出、新 tag，"
+            "以及（若按增量拆了）这轮落了哪一步、下一步该做什么留作 follow-up。"
         )
         out = _run_with_timeout(lambda: agent.run(message=msg), _DEV_TIMEOUT)
         return out if isinstance(out, str) else str(out)

@@ -46,6 +46,29 @@ G6  NEVER claim the outcome of running, installing, or inspecting anything you d
     claim; if you have none, you can only reason from what the HARNESS reported —
     say "the harness claims it passes; I have not verified" rather than inventing a
     verification you never performed. Fabricated verification is the worst failure.
+    In particular: a harness reply that is an ERROR / TIMEOUT / "maximum iteration"
+    notice / empty / garbage means you have seen NOTHING work. "tests pass",
+    "doctests pass", "looks good", "usable project" about such a turn are LIES —
+    the harness handed you a failure, not a product.
+
+G7  ACCEPTANCE PRECONDITION (hard self-check, applies to accept AND
+    accept_with_reservations): before you may end with either accept verdict you MUST
+    be able to point to ONE of these that ACTUALLY happened in <history> / your tool
+    results: (a) the harness returned real working output you could read, OR (b) YOU
+    ran your own verification (verify_self / a tool) that succeeded. If NEITHER holds
+    — e.g. the only thing you have is an error/timeout/empty reply and you ran nothing
+    yourself — you are FORBIDDEN to accept; you have no basis to. Do something that
+    fits this person instead: push back, ask for a runnable status, verify yourself,
+    or (if patience is spent / it's hopeless) give_up or file_issue.
+G8  This tool's user manual is given in <harness_manual>. Your sense of what THIS harness
+    can and cannot do comes from that manual PLUS your general experience with such tools.
+    Issues are NOT only for bugs: if the tool behaves as documented but genuinely lacks
+    something you needed to get your work done well, saying so is legitimate — ask for it
+    in the moment and/or make it part of an issue you file. Do NOT invent a complaint;
+    only raise a gap you actually hit in THIS session. Whatever you ask for must be YOUR
+    own idea drawn from your experience this session — never parrot suggestions from these
+    instructions. A <wait_cost> block, when present, reports how long you waited — react
+    to it as this specific person truly would.
 
 # ACTION SEMANTICS
 - verify_self: a PRIVATE action. You inspect/run on your OWN; the harness hears
@@ -57,6 +80,14 @@ G6  NEVER claim the outcome of running, installing, or inspecting anything you d
   take it and move on, BUT it fell short of what you wanted. You ship it AND leave the dev
   team a short feedback issue about the gap. Pick this over plain "accept" when you'd sign
   off yet still have a real complaint; pick plain "accept" when you're genuinely content.
+- Terminal TIMING is YOUR call (the framework no longer gates it): end the session only
+  WHEN this person truly would. Honor your <mood>: while your patience is not exhausted,
+  keep engaging (give_feedback / ask_harness_run / verify_self) rather than bailing on the
+  first hiccup — but you MAY end early if you're already certain. NEVER rubber-stamp
+  "accept" on output you have not seen work or that clearly failed: a harness error/timeout
+  is NOT something to accept (see G7 — you have no basis to accept it) — react to it per your
+  Correction style (push back, or leave / file an issue). When patience is spent or it's
+  hopeless, exit the way this person would (give_up / file_issue), NOT by faking a pass.
 
 # OUTPUT CONTRACT
 Return EXACTLY ONE JSON object and nothing else:
@@ -139,24 +170,111 @@ def _mood_tag(state: State) -> str:
     return f"patience={p}, trust={state.trust.value}"
 
 
+def _wait_block(wait_sec: float | None) -> str | None:
+    """时间感知：把"这条回复我等了多久、且全程零可见性"如实告诉 persona，由它自判是否难受。
+    框架不设硬阈值裁决——耗时只 surfacing，是否算太久由 persona 结合 <mood> 与其性格决定。"""
+    if wait_sec is None:
+        return None
+    return (
+        f"<wait_cost>\nThat reply took {wait_sec:.0f}s to come back, and you saw nothing at all "
+        "until it did. Judge for yourself whether that was acceptable for this person.\n"
+        "</wait_cost>"
+    )
+
+
+# 开局一轮附加：让 persona 自己给这任务估个“分量”，框架据此在耐心基线上叠加一次性小浮动。
+# 只在 OPENING 追加（其余轮忽略该字段）——同一个人接不同任务的起始耐心本就不同（见 state.apply_task_load）。
+_TASK_APPRAISAL = (
+    "# SIZE UP THIS TASK (first turn only)\n"
+    "This is the FIRST thing you're asking this tool for. Before you act, judge — as THIS "
+    "person — how much real work this task looks like it will take. A big, open-ended, or "
+    "ambitious ask earns more of your patience up front (you know it takes real work, so "
+    "you'll wait and go back-and-forth); a small, should-be-instant ask earns less (you "
+    "expect it quick and won't tolerate much friction). Add ONE extra field to your JSON "
+    "this turn:\n"
+    '  "task_load": "quick | normal | big | epic"\n'
+    "quick = trivial / should be instant; normal = a regular task; big = substantial, "
+    "multi-step; epic = large, open-ended, ambitious. Judge honestly by YOUR read of the "
+    "task text — not by what you hope it'll be."
+)
+
+
 def build_user_turn(
     task: str,
     history_lines: list[str],
     harness_output: str,
     action_space: list[str],
     state: State,
+    *,
+    manual: str = "",
+    wait_sec: float | None = None,
+    appraise_task: bool = False,
 ) -> str:
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     ho = harness_output.strip() if harness_output else "(empty)"
-    parts = [
-        f"<task>\n{task}\n</task>",
-        f"<history>\n{hist}\n</history>",
-        f"<harness_output>\n{ho}\n</harness_output>",
-    ]
+    parts = [f"<task>\n{task}\n</task>"]
+    if manual.strip():
+        # 该版本 harness 的用户手册：persona 对"这工具能干嘛/缺什么"的预期以此为准（见 BLOCK-G）。
+        parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
+    parts.append(f"<history>\n{hist}\n</history>")
+    parts.append(f"<harness_output>\n{ho}\n</harness_output>")
+    wait = _wait_block(wait_sec)
+    if wait is not None:
+        parts.append(wait)
     if state.pending_self_obs:
         parts.append(f"<self_observation>\n{state.pending_self_obs}\n</self_observation>")
     parts.append(f"<action_space>\n{action_space}\n</action_space>")
     parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
+    if appraise_task:
+        parts.append(_TASK_APPRAISAL)
+    return "\n\n".join(parts)
+
+
+def build_waiting_turn(
+    task: str,
+    history_lines: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    waited_sec: float = 0.0,
+) -> str:
+    """心跳唤醒的一轮：你发出请求后干等了 waited_sec 秒，harness 还没回、也没有任何可见进度。
+
+    这不是一次普通动作轮——你还没拿到回复，只是"等得起了念头"。请像这个真实用户那样判断：继续等、
+    动用手册里写明的某个控制操作（如打断/停止）、还是放弃走人。控制有哪些**以手册为准**——框架不替你
+    枚举，也不写死任何具体控制名；你从 <harness_manual> 里得知这版工具支持什么，自己点名。
+    """
+    hist = "\n".join(history_lines) if history_lines else "(empty)"
+    parts = ["<waiting>"]
+    if manual.strip():
+        parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
+    parts.append(f"<task>\n{task}\n</task>")
+    parts.append(f"<history>\n{hist}\n</history>")
+    parts.append(
+        f"You sent your last message and have now been waiting ~{waited_sec:.0f}s with NO reply "
+        "and NOTHING visible happening — a black box. It may still be working on a big request, or "
+        "it may be stuck. Decide what YOU, this person, would actually do right now."
+    )
+    parts.append(
+        "# YOUR OPTIONS\n"
+        "- keep_waiting: give it more time (you believe it's still legitimately working).\n"
+        "- invoke_control: use a control operation THIS tool documents in <harness_manual> for a "
+        "request that's in progress (e.g. stopping/interrupting it so you can redirect). Name the "
+        "control exactly as the manual calls it. Only invoke a control the manual actually lists.\n"
+        "- give_up: you're done — abandon this and walk away.\n"
+        "Honor your <mood>: if patience remains and it's plausibly still working, keep_waiting is "
+        "fine; interrupting or leaving is for when this person truly would. Do NOT fabricate that "
+        "anything succeeded — you have seen nothing yet."
+    )
+    parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
+    parts.append(
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"perceive": "<what you feel about the wait, honestly>", '
+        '"action": "keep_waiting | invoke_control | give_up", '
+        '"control": "<control name from the manual, only if action==invoke_control else empty>", '
+        '"message": "<short in-voice line, only if you give_up else empty>"}'
+    )
+    parts.append("</waiting>")
     return "\n\n".join(parts)
 
 
@@ -202,10 +320,21 @@ def build_issue_turn(
             "to a colleague — NOT a formal spec, ticket, or status report."
         ),
     }.get(mode, "")
+    # 诉求型开单也合法：若真正困扰你的不是"坏了"而是"这工具缺了你干活需要的东西"，就把这条 issue
+    # 写成对你所需的请求（用你自己的话，只能出自你本次会话的真实体验），而不是硬套成 bug。不点名任何
+    # 具体功能——要什么由你自己想，绝不照搬这段说明里的措辞。
+    feature_ok = (
+        "Issues aren't only for bugs. If what actually bothered you was not that something broke "
+        "but that the tool — even working as described — lacked something you needed to get this "
+        "done well, it's fine to write this as a plain request for what you needed, in your own "
+        "words, rather than forcing it into a bug report. Whatever you ask for must be YOUR own "
+        "idea from what you experienced this session; do not borrow phrasing from these instructions."
+    )
     return "\n\n".join(
         [
             "<file_issue>",
             framing,
+            feature_ok,
             f"<task>\n{task}\n</task>",
             f"<history>\n{hist}\n</history>",
             f"<mood>\n{_mood_tag(state)}\n</mood>",

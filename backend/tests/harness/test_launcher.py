@@ -197,3 +197,24 @@ def test_launch_without_workspace_dir_leaves_sandbox_work_dir_unset(tmp_path, mo
         assert h.send("x") == "(unset)"
     finally:
         h.close()
+
+
+# 用户手册：checkout 时读 MANUAL.md 全文挂到句柄，供用户 agent 形成能力预期。
+def test_launch_exposes_manual_from_repo(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _COUNTER_ENTRY)
+    repo = launcher._harness_repo
+    (Path(repo) / "MANUAL.md").write_text("# Manual\nno live progress.\n", encoding="utf-8")
+    _commit_all(repo, "add manual")
+    h = launcher.launch("main")
+    try:
+        assert "no live progress" in h.manual
+    finally:
+        h.close()
+
+
+def test_launch_manual_empty_when_absent(tmp_path) -> None:
+    h = _launcher(tmp_path, _COUNTER_ENTRY).launch("main")  # repo 无 MANUAL.md
+    try:
+        assert h.manual == ""
+    finally:
+        h.close()
