@@ -8,9 +8,15 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from auto_designer.designer.designer import DESIGN_LABEL, Designer, DesignOutcome
+from auto_designer.designer.designer import (
+    DESIGN_LABEL,
+    Designer,
+    DesignOutcome,
+    _unwrap_result,
+)
 from auto_designer.models import (
     FeelingScore,
     IssueDraft,
@@ -99,3 +105,77 @@ def test_empty_or_invalid_result_yields_no_proposals(tmp_path) -> None:
         outcome = _designer(tmp_path, tracker, canned).propose_once()
         assert outcome.count == 0
     assert tracker.list_open_issues() == []  # 全程未建任何 issue
+
+
+# ---- Spec-0018/T1：拆 complete_task 信封（提案被静默丢弃的回归） ----
+
+# 真实回归夹具：一次长跑里被静默丢弃的那条 designer 返回原文（逐字照抄，未做任何整形）。
+# 注意它是**双重编码**的——整段是一个 JSON 字符串，里面才是 complete_task 信封：
+# 只 json.loads 一次只得到 str（而非 dict），这正是「看似修好、实则没修」的陷阱所在。
+_REAL_ENVELOPE = (
+    r'"{\"success\": true, \"message\": \"Result submitted and task completed.\", '
+    r"\"status\": \"TASK_COMPLETED\", \"task_completed\": true, \"output\": {\"result\": "
+    r"\"[\\n  {\\n    \\\"title\\\": \\\"长编码任务的完成性预算与未完成交付\\\",\\n    "
+    r"\\\"body\\\": \\\"#19 与体感曲线中“首次超时但最终通过”的那次共同指向同一根因：当任务超过"
+    r"单轮稳定完成预算时，用户拿到的是中断/等待后的低信任状态，而不是可审查、可验证、可继续推进的"
+    r"产物。\\\",\\n    \\\"labels\\\": [\\n      \\\"structural\\\",\\n      "
+    r'\\\"reliability\\\"\\n    ]\\n  }\\n]\"}}"'
+)
+
+
+def _envelope(result: object) -> str:
+    """nexau complete_task 信封；实测还会被再 JSON 编码一层，故双重 dumps。"""
+    inner = {
+        "success": True,
+        "message": "Result submitted and task completed.",
+        "status": "TASK_COMPLETED",
+        "task_completed": True,
+        "output": {"result": result},
+    }
+    return json.dumps(json.dumps(inner, ensure_ascii=False), ensure_ascii=False)
+
+
+def _titles(text: str) -> list[str]:
+    return [d.title for d in Designer._parse_proposals(_unwrap_result(text))]
+
+
+def test_unwrap_envelope_with_result_as_json_string() -> None:
+    """信封里 result 是「JSON 数组的字符串」（agent 听话用 complete_task 交付的标准形状）。"""
+    drafts = json.dumps([{"title": "预算拖垮可用交付", "body": "b", "labels": ["design"]}])
+    assert _titles(_envelope(drafts)) == ["预算拖垮可用交付"]
+
+
+def test_unwrap_envelope_with_result_as_array_body() -> None:
+    """信封里 result 直接是数组本体（而非其字符串形式）——两种都要接。"""
+    assert _titles(_envelope([{"title": "等待不可见", "body": "b"}])) == ["等待不可见"]
+
+
+def test_unwrap_envelope_with_empty_result_yields_no_proposals() -> None:
+    """宁缺毋滥：信封里 result 为空数组 → 0 条提案，而非报错。"""
+    assert _titles(_envelope("[]")) == []
+
+
+def test_bare_array_path_unchanged() -> None:
+    """裸 JSON 数组（agent 不调 complete_task 时的形状）行为一字不变。"""
+    bare = json.dumps([{"title": "裸数组", "body": "b"}], ensure_ascii=False)
+    assert _titles(bare) == ["裸数组"]
+
+
+def test_fenced_and_prose_paths_unchanged() -> None:
+    """```json 围栏 + 前后散文两条既有路径行为不变。"""
+    fenced = '想了想：\n```json\n[{"title": "围栏", "body": "b"}]\n```\n以上。'
+    assert _titles(fenced) == ["围栏"]
+
+
+def test_malformed_envelope_falls_back_to_raw_text() -> None:
+    """畸形 / 非信封 JSON → 回落原文、不抛错（退回今天的行为，而非炸）。"""
+    assert _unwrap_result('{"success": true}') == '{"success": true}'  # dict 但无 output.result
+    assert _unwrap_result("就是一段散文，没有 JSON") == "就是一段散文，没有 JSON"
+    assert _unwrap_result(None) == "None"  # 非 str 兜底
+
+
+def test_real_long_run_envelope_regression() -> None:
+    """回归：长跑里被静默丢弃的那条真实返回原文——修前解析出 0 条，修后必须解析出提案。"""
+    assert Designer._parse_proposals(_REAL_ENVELOPE) == []  # 修前的行为：提案被信封吞掉
+    titles = _titles(_REAL_ENVELOPE)  # 修后：提案回来了
+    assert titles and "长编码任务的完成性预算与未完成交付" in titles[0]
