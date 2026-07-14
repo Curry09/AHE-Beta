@@ -59,6 +59,7 @@ def test_violations_empty_for_pure_harness() -> None:
 def test_allowed_top_is_harness_skeleton() -> None:
     assert ALLOWED_TOP == {
         "MANUAL.md",
+        "RUNTIME.md",
         "agent.yaml",
         "params.yaml",
         "entry.py",
@@ -67,6 +68,10 @@ def test_allowed_top_is_harness_skeleton() -> None:
         "tests",
         ".gitignore",
     }
+
+
+def test_violations_allows_runtime_md() -> None:
+    assert violations(["RUNTIME.md"]) == []
 
 
 def test_render_hook_is_executable_python() -> None:

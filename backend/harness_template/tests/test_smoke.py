@@ -20,13 +20,38 @@ class HarnessSmokeTest(unittest.TestCase):
     def test_entry_imports_and_exposes_core_surface(self) -> None:
         """入口可导入且核心编排函数在位——挡住语法错误 / 误删核心函数。"""
         entry = importlib.import_module("entry")
-        for name in ("main", "_reply", "_run_supervised", "_setup_workspace"):
+        for name in (
+            "main",
+            "_reply",
+            "_run_supervised",
+            "_setup_workspace",
+            "_build_agent",
+            "_snapshot_history",
+            "_seed_history",
+        ):
             self.assertTrue(callable(getattr(entry, name, None)), f"entry.{name} 应可调用")
 
     def test_interrupt_reply_is_marked(self) -> None:
         """打断回复带 [interrupted] 标记且非空——协议契约的最小成形检查。"""
         entry = importlib.import_module("entry")
         self.assertTrue(entry._INTERRUPT_REPLY.startswith("[interrupted]"))
+
+    def test_timeout_reply_is_marked_continuable(self) -> None:
+        """超时回复带 [timeout] 且声明上下文保留——与 MANUAL/RUNTIME 可续聊语义一致。"""
+        entry = importlib.import_module("entry")
+        self.assertTrue(entry._TIMEOUT_REPLY.startswith("[timeout]"))
+        self.assertIn("会话上下文已保留", entry._TIMEOUT_REPLY)
+
+    def test_runtime_md_present(self) -> None:
+        """仓根 RUNTIME.md：短宪法含边界与 session 硬约束。"""
+        from pathlib import Path
+
+        runtime = Path(__file__).resolve().parents[1] / "RUNTIME.md"
+        self.assertTrue(runtime.is_file(), "RUNTIME.md 应在仓根")
+        text = runtime.read_text(encoding="utf-8")
+        self.assertIn("session_id", text)
+        self.assertIn("只读", text)
+        self.assertIn("NexAU", text)
 
 
 if __name__ == "__main__":

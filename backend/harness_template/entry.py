@@ -5,9 +5,9 @@
 将来可演化为多 nexau）对 launcher 不可见——开发者 agent 后续就是在改本仓内容。
 
 真实运行：按本目录 agent.yaml（最简「只有 bash」的工具型 agent，系统提示 = agents/main.md，
-LLM_* 走 ${env}）构造单个 nexau Agent，单实例维护多轮 history。bash 在一个每会话工作区
-（SANDBOX_WORK_DIR）里执行，作为「用户项目」根目录。需要 nexau 可 import 且
-LLM_MODEL/LLM_BASE_URL/LLM_API_KEY 已注入。
+LLM_* 走 ${env}）构造 nexau Agent。进程级固定 session_id；超时/强打断时 rebuild 换新
+agent_id 避锁，并显式回灌 history（见 RUNTIME.md）。bash 在 SANDBOX_WORK_DIR 工作区执行。
+需要 nexau 可 import 且 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY 已注入。
 """
 
 from __future__ import annotations
@@ -19,28 +19,33 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 # ── 一级预算钮（延迟体感的总闸；改这里最省事，先质疑它再谈别的）─────────────────
-# 单轮最坏墙钟 ≈ _CALL_TIMEOUT × _RUN_RETRIES = 240 × 4 = 16 分钟：卡住时用户只看到静默硬磨、
-# 直到最后才吐 [harness error]。这段「等很久才失败」是体感杀手（分数看不出、只在 reason 里）。
-# 若要治「延迟/等待不可控」，优先动这两个钮或交付方式，别只在外层堆恢复/重试逻辑：
-#   · 调小 _RUN_RETRIES / _CALL_TIMEOUT 收紧总预算；
-#   · 首次超时即回一个「进行中」的部分结果 / 让用户可打断续跑，而不是闷头重试到底。
+# 单轮最坏墙钟 ≈ _CALL_TIMEOUT（首次超时即回可续说明，不再闷头 × _RUN_RETRIES）。
+# 空回复 / 网关毛刺仍用 _RUN_RETRIES 退避重试（同实例，不换 session）。
 _RUN_RETRIES = 4
 # 单次 agent.run 硬超时（秒）：nexau 自身的 llm_config.timeout 实测不生效，故在此层用线程兜底，
-# 卡住即放弃该次（daemon 线程丢弃，不阻塞进程），保证 harness 永远在 bounded 时间内回一行。
+# 卡住即放弃该次（daemon 线程丢弃），rebuild 换锁键并回灌 history 后把控制权交回用户。
 _CALL_TIMEOUT = 240
 # 打断（control:interrupt）后等待 nexau 优雅停止（保留 session/history）的宽限秒数：
 # executor.force_stop() 只置位中断信号，run 会在下一个检查点安全退出。超过宽限仍没退，
-# 说明这次没赶上优雅停止 → 丢弃该 agent 实例重建，避开被放弃线程仍持 nexau 锁导致的自锁。
+# 说明这次没赶上优雅停止 → 换新 agent_id 重建避自锁，并显式回灌 history。
 _INTERRUPT_GRACE = 15.0
 # 打断时回给用户的定型回复：明确"已中止、未完成、会话上下文保留"，让用户据此决定下一步。
 _INTERRUPT_REPLY = (
     "[interrupted] 已按你的要求停止当前处理，这一步没有完成。"
     "会话上下文已保留——你可以直接给出修改后的要求或下一条指示，我会接着当前进度继续。"
 )
+# 硬超时：不闷头重试；rebuild 接上 history 后回可续说明（与 MANUAL / RUNTIME 一致）。
+_TIMEOUT_REPLY = (
+    "[timeout] 这一步在内部时限内没有完成，当前请求已停下。"
+    "会话上下文已保留——你可以收窄要求、让我从已有进度继续，或换一条指示。"
+    "工作区里可能已有部分改动，请以磁盘实况为准并告诉我下一步怎么处理。"
+)
+_HARNESS_USER_ID = "harness_user"
 
 
 class _Interrupted(Exception):
@@ -76,9 +81,9 @@ def _run_supervised(agent, message, timeout, ctrl_q):
     """跑一次 agent.run，同时守望硬超时与用户打断（control 队列）。
 
     - 正常完成：返回结果。
-    - 硬超时：raise TimeoutError（daemon 线程被放弃，caller 重建避自锁）。
+    - 硬超时：raise TimeoutError（daemon 线程被放弃，caller 重建避自锁并回灌 history）。
     - 收到 interrupt：force_stop 优雅停止（保留 session）→ raise _Interrupted(rebuild=False)；
-      若宽限内没停下 → _Interrupted(rebuild=True)，由 caller 重建避自锁。
+      若宽限内没停下 → _Interrupted(rebuild=True)，由 caller 重建避自锁并回灌 history。
     ctrl_q 为 None（无打断能力的调用场景）时退化为纯超时行为。"""
     box: dict = {}
 
@@ -122,16 +127,43 @@ def _setup_workspace() -> str:
     return ws
 
 
-def _build_agent(collector):
+def _snapshot_history(agent) -> list:
+    """从 live agent 取出可回灌的 history 快照；失败则空列表（rebuild 仍换锁，只是无记忆可接）。"""
+    try:
+        hist = getattr(agent, "history", None)
+        if hist is None:
+            return []
+        return list(hist)
+    except Exception:  # noqa: BLE001  快照失败不得挡住 rebuild 避锁
+        return []
+
+
+def _seed_history(agent, messages) -> None:
+    """把快照种进新 agent，使下一轮 run 带着旧上下文（换了 agent_id 后存储 key 不同，必须显式回灌）。"""
+    if not messages:
+        return
+    try:
+        agent.history = list(messages)
+    except Exception:  # noqa: BLE001  回灌失败不炸进程；表现为记忆缺口，由上层体感暴露
+        pass
+
+
+def _build_agent(collector, session_id, agent_id):
     """按本目录 agent.yaml 构造工具型 nexau Agent（只挂 bash + complete_task）。
 
-    挂 collector 作 tracer：把内层每步（模型发言/工具调用/结果）收进 collector.steps，
-    供 harness 经协议 steps 字段吐给观测层。"""
+    session_id 进程内固定；agent_id 标识锁键——rebuild 时必须换新 agent_id 避自锁。
+    挂 collector 作 tracer：内层每步收进 collector.steps，经协议 steps 吐给观测层。
+    """
     from nexau import Agent, AgentConfig
 
     cfg = AgentConfig.from_yaml(config_path=_HERE / "agent.yaml")
     cfg.resolved_tracer = collector  # 内层过程流 → collector.steps（观测用，不影响回复）
-    return Agent(config=cfg)
+    return Agent(
+        config=cfg,
+        session_id=session_id,
+        agent_id=agent_id,
+        user_id=_HARNESS_USER_ID,
+    )
 
 
 def _unwrap_reply(text: str) -> str:
@@ -254,15 +286,12 @@ def _make_step_collector():
 
 
 def _reply(agent, message: str, rebuild, ctrl_q=None):
-    """返回 (live_agent, reply)：超时/打断重试前视情重建 agent，避开被放弃线程仍持的 nexau 锁。
+    """返回 (live_agent, reply)。
 
-    `_run_supervised` 超时时只能 raise，那个 daemon 线程杀不掉、仍持有该 (session, agent)
-    的 nexau 锁并持续心跳续期 → 同 agent 重试必撞 "already locked by holder=<pid>"（自锁）。
-    故超时分支换用 `rebuild()` 起一个新 agent（新 session/新锁键）再试；代价是丢该实例多轮
-    history（但卡死那次本就没拿到回复，可接受）。502/空回复时线程已结束、锁已释放，保持同 agent。
-
-    打断（_Interrupted）：立即回定型的 [interrupted] 回复、不再重试；rebuild 为真时先重建 agent
-    （没赶上优雅停止），为假时保持同 agent —— 优雅停止已保留 history，用户下一条可接着聊。
+    硬超时后旧实例仍持 nexau 锁 → 必须 `rebuild()` 换新 agent_id（避自锁）。
+    rebuild 由调用方闭合：固定同一 session_id，并显式回灌 history（见 RUNTIME.md）。
+    超时不闷头重试，立即回 `_TIMEOUT_REPLY` 把控制权交回用户。
+    空回复 / 502 等同实例退避重试。优雅打断保持同实例；强打断才 rebuild。
     """
     last = None
     for attempt in range(_RUN_RETRIES):
@@ -274,11 +303,11 @@ def _reply(agent, message: str, rebuild, ctrl_q=None):
             last = "empty reply"  # 空回复（网关 200+空内容不抛异常）视为失败，不得静默返回
         except _Interrupted as it:  # 用户打断：不重试，保留/重建后回定型回复
             if it.rebuild:
-                agent = rebuild()
+                agent = rebuild(agent)
             return agent, _INTERRUPT_REPLY
-        except TimeoutError as exc:  # 线程被放弃仍持锁 → 重建避自锁
-            last = exc
-            agent = rebuild()
+        except TimeoutError:  # 线程被放弃仍持锁 → 重建避自锁并交回用户（可续聊）
+            agent = rebuild(agent)
+            return agent, _TIMEOUT_REPLY
         except Exception as exc:  # 网关 502 等 → 同 agent 退避重试（线程已结束、锁已释放）
             last = exc
         if attempt < _RUN_RETRIES - 1:  # 末次不再睡
@@ -314,7 +343,23 @@ def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue) -> None:
 def main() -> None:
     _setup_workspace()  # 先就位 SANDBOX_WORK_DIR，供 agent 的 local sandbox 读取
     collector = _make_step_collector()  # 跨轮/跨重建复用同一实例，逐轮 reset
-    agent = _build_agent(collector)  # 单实例，history 由 nexau 自身跨轮维护
+    # 进程级会话：session_id 固定；rebuild 只换 agent_id + 回灌 history（见 RUNTIME.md）。
+    session_id = f"harness_{uuid.uuid4().hex}"
+    history_snapshot: list = []
+
+    def rebuild(stale):
+        nonlocal history_snapshot
+        snap = _snapshot_history(stale) or history_snapshot
+        history_snapshot = list(snap)
+        fresh = _build_agent(
+            collector,
+            session_id,
+            f"harness_{uuid.uuid4().hex[:8]}",
+        )
+        _seed_history(fresh, snap)
+        return fresh
+
+    agent = _build_agent(collector, session_id, "harness")
     msg_q: queue.Queue = queue.Queue()
     ctrl_q: queue.Queue = queue.Queue()
     threading.Thread(target=_stdin_reader, args=(msg_q, ctrl_q), daemon=True).start()
@@ -325,7 +370,8 @@ def main() -> None:
         while not ctrl_q.empty():  # 丢弃上一轮遗留的过期 control，避免误打断本轮
             ctrl_q.get_nowait()
         collector.reset()  # 只收本轮内层过程
-        agent, raw = _reply(agent, message, lambda: _build_agent(collector), ctrl_q)
+        agent, raw = _reply(agent, message, rebuild, ctrl_q)
+        history_snapshot = _snapshot_history(agent) or history_snapshot
         reply = _unwrap_reply(raw)  # 拆信封：用户只看最终答案
         payload: dict = {"reply": reply}
         steps = list(collector.steps)  # 完整内层迭代 → 观测层（persona 不吃）
