@@ -55,6 +55,9 @@
 ### 0017 多用户会话并行化：a 段线程池 + 共享状态加锁
 把闭环 a 段的用户会话从串行改为 ThreadPoolExecutor 并行：并发单元=整局会话（工作区+harness 子进程+client+run_session 一整包），信封内部时序不动；配套修共享状态（client 每局一实例、工作区供给前移、SessionStore/live 加锁），单会话失败降级不废整轮。d/b 段维持串行（同仓 push + 全局 env 的固有约束）。落点 loop/orchestrator + loop/sim_user + run.py + user/session_store + loop/live。
 
+### 0018 设计师提案拆信封：complete_task 交付不再被静默丢弃
+设计师用 complete_task 交回提案时，nexau 把结果套进 tool 信封（{success,status,output:{result:'[...]'}}），而 _parse_proposals 的平衡括号扫描刻意不进字符串内部，扫不到顶层数组 → 静默返回「本轮无提案」。实测 8 轮长跑 6 条结构性提案 0 条进 backlog；且该缺陷非确定性——agent 听话调 complete_task 就被丢，不听话直接吐裸数组反而入库（第 6 轮侥幸入库的 #6/#7/#8 使 dev 立刻去改 entry.py 与 tools/，证明结构性进化通道本身是通的、只是被这里堵死）。落点：designer/_run_agent 出口拆信封 + 单测覆盖两条路径（带信封 / 裸数组）。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -118,6 +121,7 @@
 | 0017 | 0017/T4 | 并发端到端回归测试 | done | T3 | backend/tests/loop/test_parallel_sessions.py |
 | 0017 | 0017/T5 | harness checkout 并发安全 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 | 0017 | 0017/T6 | tracker HTTP 会话线程安全 | done | — | backend/auto_designer/tracker/gitea.py<br>backend/tests/tracker/test_gitea.py |
+| 0018 | 0018/T1 | _run_agent 出口拆 complete_task 信封 | done | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
 
 ## 跨 feature 关系图
 
@@ -216,6 +220,9 @@ graph LR
         n0017_T5["T5 harness checkout 并发安全"]
         n0017_T6["T6 tracker HTTP 会话线程安全"]
     end
+    subgraph G0018[0018 designer-proposal-envelope]
+        n0018_T1["T1 _run_agent 出口拆 complete_task 信封"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -308,6 +315,7 @@ graph LR
 | 文件 | 涉及组 |
 |----|----|
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
+| backend/auto_designer/designer/designer.py | 0016, 0018 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017 |
@@ -328,6 +336,7 @@ graph LR
 | backend/run.py | 0007, 0015, 0017 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017 |
+| backend/tests/loop/test_designer.py | 0016, 0018 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
@@ -780,4 +789,20 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0018 设计师提案拆信封：complete_task 交付不再被静默丢弃（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 _run_agent 出口拆 complete_task 信封"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
 ```

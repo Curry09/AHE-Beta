@@ -26,9 +26,50 @@ from auto_designer.user.session_store import SessionStore
 DESIGN_LABEL = "design"
 # 一次 propose_once 是多轮工具调用（读文件 + 综合），给足硬超时兜底防总挂死。
 _DESIGN_TIMEOUT = 900
+# 拆信封的最大层数：实测 nexau 会把信封再 JSON 编码一层（故 ≥2），留一层余量；有界防畸形输入打转。
+_UNWRAP_MAX_DEPTH = 4
 
 
 StatusFn = Callable[..., None]
+
+
+def _unwrap_result(out: object) -> str:
+    """拆 nexau 的 complete_task 信封 → `output.result`；非信封原样返回（Spec-0018/T1）。
+
+    agent 用 `complete_task` 交付时，nexau 把结果套进信封、真正的 JSON 数组成了信封里的**字符串**：
+
+        {"success": true, "status": "TASK_COMPLETED", "output": {"result": "[{...}]"}}
+
+    而 `_parse_proposals` 的平衡括号扫描**刻意不进字符串内部**（防被散文里的 `[]` 带偏，是对的设计），
+    于是扫不到顶层数组 → 静默记「本轮无提案」。实测代价：8 轮长跑 6 条结构性提案 0 条进 backlog，且
+    **反向激励**——agent 听话调 complete_task 就被丢，不听话直接吐裸数组反而入库。信封在信封层拆，
+    解析器保持严格。
+
+    实测信封还会被**再编码一层**（返回值是「信封 JSON 的 JSON 字符串」，`json.loads` 一次只得到 str），
+    故按层剥（有界，防畸形输入下打转）。
+
+    非信封（裸 JSON 数组 / ```json 围栏 / 散文 / 畸形 JSON）一律回落原文，既有路径行为不变。
+    harness 侧的同名同源处置见 `harness_template/entry.py::_unwrap_reply`。
+    """
+    text = out if isinstance(out, str) else str(out)
+    node: object = text
+    for _ in range(_UNWRAP_MAX_DEPTH):
+        if not isinstance(node, str):
+            break
+        try:
+            node = json.loads(node)
+        except (ValueError, TypeError):
+            return text  # 非 JSON（散文/围栏/半截 JSON）→ 交给 _parse_proposals 按原路解析
+    if not isinstance(node, dict):
+        return text  # 裸 JSON 数组等：本就是 _parse_proposals 认得的形状，原样透传
+    output = node.get("output")
+    result = output.get("result") if isinstance(output, dict) else None
+    if isinstance(result, str):
+        return result
+    if isinstance(result, list | dict):
+        # agent 有时把数组本体（而非其字符串形式）直接放进 result，两种都要接。
+        return json.dumps(result, ensure_ascii=False)
+    return text  # 是 dict 但不是 complete_task 信封 → 回落原文，不臆断
 
 
 @dataclass
@@ -170,7 +211,7 @@ class Designer:
             "（每项含 title/body/labels），无提案则 `[]`。"
         )
         out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
-        return out if isinstance(out, str) else str(out)
+        return _unwrap_result(out)
 
     def _feeling_trend(self) -> list[tuple[str, int, str]]:
         """体感随时间：[(created_at, score, reason)]，按时间升序。空数据源返回空序列。
