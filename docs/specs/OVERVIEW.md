@@ -117,6 +117,7 @@
 | 0017 | 0017/T3 | a 段并行化 + 并发度旋钮 | done | T1, T2 | backend/auto_designer/loop/orchestrator.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py |
 | 0017 | 0017/T4 | 并发端到端回归测试 | done | T3 | backend/tests/loop/test_parallel_sessions.py |
 | 0017 | 0017/T5 | harness checkout 并发安全 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
+| 0017 | 0017/T6 | tracker HTTP 会话线程安全 | done | — | backend/auto_designer/tracker/gitea.py<br>backend/tests/tracker/test_gitea.py |
 
 ## 跨 feature 关系图
 
@@ -213,6 +214,7 @@ graph LR
         n0017_T3["T3 a 段并行化 + 并发度旋钮"]
         n0017_T4["T4 并发端到端回归测试"]
         n0017_T5["T5 harness checkout 并发安全"]
+        n0017_T6["T6 tracker HTTP 会话线程安全"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -313,6 +315,7 @@ graph LR
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013 |
+| backend/auto_designer/tracker/gitea.py | 0002, 0017 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
 | backend/auto_designer/user/sim/loop.py | 0005, 0012 |
@@ -328,6 +331,7 @@ graph LR
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
+| backend/tests/tracker/test_gitea.py | 0002, 0017 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012 |
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
@@ -753,6 +757,7 @@ graph LR
     nT3["T3 a 段并行化 + 并发度旋钮"]
     nT4["T4 并发端到端回归测试"]
     nT5["T5 harness checkout 并发安全"]
+    nT6["T6 tracker HTTP 会话线程安全"]
     nT1 --> nT3
     nT2 --> nT3
     nT3 --> nT4
@@ -767,10 +772,12 @@ graph LR
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
     v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```

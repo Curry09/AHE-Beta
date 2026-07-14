@@ -74,8 +74,21 @@ tasks:
     files:
       - backend/auto_designer/harness/launcher.py
       - backend/tests/harness/test_launcher.py
-    scope: 生产实跑踩中的审计漏项：并行会话同轮同 SHA → 同一 checkout dest，_checkout 的 check-then-extract 无锁——多线程同时通过存在性检查后并发 extractall 同一目录（params.yaml 被两条 tar 流叠写出重复 entry 键/乱字节），或 A 半解压时 B 见「目录非空」复用残缺副本。修法双保险：① launcher 实例级 threading.Lock 包住存在性检查+归档+解压全程（进程内互斥，首线程干活其余命中缓存）；② 解压到 runs_root 下唯一临时目录（mkdtemp）后原子 rename 占位——半解压目录绝不可能以 dest 之名存在，进程崩溃只留无害 tmp 孤儿不污染缓存；rename 因 dest 已就位而失败（跨进程输者）则弃 tmp 复用 dest。
-    acceptance: 屏障齐射 8 线程并发 _checkout 同一 ref：全部返回同一目录、runs_root 无 tmp 残留、params.yaml 可被 safe YAML 整洁解析（重复键即 DuplicateKeyError 回归）；现有 launcher 全部测试不回归（复用 marker / 内容变更失效缓存语义不变）。
+    scope: 生产实跑踩中的审计漏项：并行会话同轮同 SHA → 同一 checkout dest，_checkout 的 check-then-extract 无锁——多线程同时通过存在性检查后并发 extractall 同一目录（params.yaml 被两条 tar 流叠写出重复 entry 键/乱字节），或 A 半解压时 B 见「目录非空」复用残缺副本。修法双保险：① launcher 实例级 threading.Lock 包住存在性检查+归档+解压全程（进程内互斥，首线程干活其余命中缓存）；② 解压到 runs_root 下唯一临时目录（mkdtemp）后原子 rename 占位——半解压目录绝不可能以 dest 之名存在，进程崩溃只留无害 tmp 孤儿不污染缓存；rename 因 dest 已就位而失败（跨进程输者）则弃 tmp 复用 dest。生产第二轮追加：模块级共享 ruamel YAML 单例（_yaml）非线程安全，并行 launch 并发 _read_params 会搅乱解析器内部状态 → 删单例、每次解析新建 YAML 实例（构造开销微不足道）。
+    acceptance: 屏障齐射 8 线程并发 _checkout 同一 ref：全部返回同一目录、runs_root 无 tmp 残留、params.yaml 可被 safe YAML 整洁解析（重复键即 DuplicateKeyError 回归）；现有 launcher 全部测试不回归（复用 marker / 内容变更失效缓存语义不变）。追加：屏障齐射并发 _read_params 同一 params.yaml，全部结果完好一致；模块级不再存在共享 YAML 实例。
+  - id: T6
+    title: tracker HTTP 会话线程安全
+    status: done
+    priority: P1
+    tags: []
+    depends-on: []
+    relates-to: []
+    parallel: false
+    files:
+      - backend/auto_designer/tracker/gitea.py
+      - backend/tests/tracker/test_gitea.py
+    scope: 全仓共享实例线程安全审计（生产第二轮发现）落点之一：GiteaTracker 单 requests.Session 被所有会话线程共享，requests 官方不承诺 Session 线程安全，且 Gitea 会回 Set-Cookie（cookiejar 并发变异真实存在）。改为 thread-local Session：_session 变 property，每线程惰性新建带全 header 的独立 Session；setter 保留整体注入口（override 覆盖所有线程，单线程测试语义不变）。_label_ids 缓存不加锁——_create_label 已内置 409/422 竞态回退（他处已建则 refresh 复用），且 run.py 开跑前已预热 bug/feature。openai 客户端（httpx 底座）官方线程安全，共享保持不动。
+    acceptance: 不同线程取 _session 得到不同 Session 实例且各自带全 Authorization header；同线程复用同一实例；测试注入 override 后所有线程读到注入对象；现有 GiteaTracker 全部单测不回归。
 ---
 
 # 0017 · 多用户会话并行化：a 段线程池 + 共享状态加锁
@@ -198,7 +211,9 @@ with ThreadPoolExecutor(max_workers=min(len(prepared), self._max_parallel_users)
 | `live.py` agents/history/run.json | mkstemp 原子写只防撕裂写；`update_agent` 等仍是读-改-写，并发丢更新 | **加锁**：模块级一把锁包住 update_agent / append_agent_log / archive_agent / update_live_run / clear_live 的读-改-写全程 |
 | `sources/git.py` clone 缓存 | 同仓并发 provision 撞缓存目录 | **前移规避**（T3 阶段一），不加锁 |
 | `HarnessLauncher._checkout`（同 SHA 共享缓存目录） | check-then-extract 无锁：并发解压叠写 params.yaml（重复键/乱字节）、半解压目录被误判完整复用——初版审计漏项，生产实跑踩中 | **T5 加锁 + 临时目录原子 rename** |
-| `GiteaTracker`（共享 `requests.Session`） | 仅 token header、无 cookie 状态，urllib3 连接池线程安全 | 无需改（见 Unresolved #3 留观察） |
+| `GiteaTracker`（共享 `requests.Session`） | requests 官方不承诺 Session 线程安全，且 Gitea 会回 Set-Cookie（cookiejar 并发变异）——初判「留观察」被生产第二轮推翻 | **T6 thread-local Session**（每线程一个，setter 保测试注入口）；`_label_ids` 缓存靠既有 409/422 竞态回退，不加锁 |
+| `launcher._yaml`（模块级共享 ruamel YAML 实例） | ruamel YAML 实例非线程安全（解析器内部状态跨调用共享），并行 launch 并发 load 互相搅乱——生产第二轮发现 | **T5 追加：每次解析新建实例**（构造开销微不足道） |
+| `ApiPersonaClient.client`（共享 openai 客户端） | httpx 底座，官方文档承诺线程安全 | 无需改 |
 | `os.environ` | 用户段不碰（launcher 显式传 env dict 给 Popen）；dev/designer 段才设全局 env | d/b 串行，天然无冲突（Non-goal 的依据之一） |
 | run.py `current["round"]` | a 段内只读（round 游标只在轮边界写） | 无需改 |
 
@@ -281,8 +296,7 @@ harness 管道 IO 是两个大头）：**
 
 1. **跨会话 LLM 并发信号量**：是否需要 `threading.Semaphore(MAX_LLM_CONCURRENCY)` 包住
    `ApiPersonaClient._create`？先不做，跑起来观察网关 429 频率再决定（退避已有）。
-2. **GiteaTracker 共享 `requests.Session`**：官方不承诺线程安全，但本用法仅 token header、无
-   cookie 变异，实践中并发 POST 安全；留观察，若出现连接池异常再改 per-thread session。
+   （原第 2 条「GiteaTracker Session 留观察」已被生产第二轮推翻，转为 T6 修复，见审计表。）
 
 ## Future possibilities
 
