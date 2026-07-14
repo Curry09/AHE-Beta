@@ -76,7 +76,9 @@ def test_shell_offender_flags_trace_and_escape(tmp_path: Path) -> None:
     # 仓内命令放行
     assert _shell_offender(work, "git log --oneline -5", roots) is None
     assert _shell_offender(work, "pytest -q && git status", roots) is None
-    assert _shell_offender(work, "grep sessions agents/main.md", roots) is None  # sessions 作搜索词不误伤
+    assert (
+        _shell_offender(work, "grep sessions agents/main.md", roots) is None
+    )  # sessions 作搜索词不误伤
 
 
 def test_shell_offender_flags_heredoc_redirect_escape(tmp_path: Path) -> None:
