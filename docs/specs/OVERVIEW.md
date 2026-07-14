@@ -116,6 +116,7 @@
 | 0017 | 0017/T2 | client 每局一实例（工厂注入） | done | — | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/sim/test_workspace.py |
 | 0017 | 0017/T3 | a 段并行化 + 并发度旋钮 | done | T1, T2 | backend/auto_designer/loop/orchestrator.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py |
 | 0017 | 0017/T4 | 并发端到端回归测试 | done | T3 | backend/tests/loop/test_parallel_sessions.py |
+| 0017 | 0017/T5 | harness checkout 并发安全 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 
 ## 跨 feature 关系图
 
@@ -211,6 +212,7 @@ graph LR
         n0017_T2["T2 client 每局一实例（工厂注入）"]
         n0017_T3["T3 a 段并行化 + 并发度旋钮"]
         n0017_T4["T4 并发端到端回归测试"]
+        n0017_T5["T5 harness checkout 并发安全"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -306,7 +308,7 @@ graph LR
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017 |
@@ -322,7 +324,7 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013 |
 | backend/run.py | 0007, 0015, 0017 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
-| backend/tests/harness/test_launcher.py | 0003, 0008, 0013 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
@@ -750,6 +752,7 @@ graph LR
     nT2["T2 client 每局一实例（工厂注入）"]
     nT3["T3 a 段并行化 + 并发度旋钮"]
     nT4["T4 并发端到端回归测试"]
+    nT5["T5 harness checkout 并发安全"]
     nT1 --> nT3
     nT2 --> nT3
     nT3 --> nT4
@@ -763,9 +766,11 @@ graph LR
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```

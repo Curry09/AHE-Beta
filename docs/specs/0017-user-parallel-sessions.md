@@ -63,6 +63,19 @@ tasks:
       - backend/tests/loop/test_parallel_sessions.py
     scope: 新增本组 e2e 专测（全 Fake，不依赖真 LLM/Gitea）：①并发正确性——8 局并发后 sessions 目录 8 个全量文件、index.json 恰 8 条、live history 按轮归档完整；②慢会话注入——fake harness 延迟回复，断言快会话先完成、慢会话不阻塞收割、轮末全部汇齐；③崩溃注入——send 抛 RuntimeError，断言会话内 [harness error] 信号路径在并发下仍成立且不影响同批其他会话。
     acceptance: 三类专测全绿；断言为精确计数（index 条数/文件数/live 槽位数），可捕获竞态丢更新回归；pytest 全套通过。
+  - id: T5
+    title: harness checkout 并发安全
+    status: done
+    priority: P0
+    tags: []
+    depends-on: []
+    relates-to: []
+    parallel: false
+    files:
+      - backend/auto_designer/harness/launcher.py
+      - backend/tests/harness/test_launcher.py
+    scope: 生产实跑踩中的审计漏项：并行会话同轮同 SHA → 同一 checkout dest，_checkout 的 check-then-extract 无锁——多线程同时通过存在性检查后并发 extractall 同一目录（params.yaml 被两条 tar 流叠写出重复 entry 键/乱字节），或 A 半解压时 B 见「目录非空」复用残缺副本。修法双保险：① launcher 实例级 threading.Lock 包住存在性检查+归档+解压全程（进程内互斥，首线程干活其余命中缓存）；② 解压到 runs_root 下唯一临时目录（mkdtemp）后原子 rename 占位——半解压目录绝不可能以 dest 之名存在，进程崩溃只留无害 tmp 孤儿不污染缓存；rename 因 dest 已就位而失败（跨进程输者）则弃 tmp 复用 dest。
+    acceptance: 屏障齐射 8 线程并发 _checkout 同一 ref：全部返回同一目录、runs_root 无 tmp 残留、params.yaml 可被 safe YAML 整洁解析（重复键即 DuplicateKeyError 回归）；现有 launcher 全部测试不回归（复用 marker / 内容变更失效缓存语义不变）。
 ---
 
 # 0017 · 多用户会话并行化：a 段线程池 + 共享状态加锁
@@ -168,8 +181,12 @@ with ThreadPoolExecutor(max_workers=min(len(prepared), self._max_parallel_users)
 
 - `max_parallel_users` 经 Orchestrator 构造参数注入；run.py 读 `MAX_PARALLEL_USERS` 环境变量，
   默认 = roster 用户数。
-- launch 放进线程（而非前移）：checkout 有 SHA 目录缓存，第一个线程解包后其余复用；即便并发
-  首轮各自解包也只是浪费不冲突（`dest.mkdir(exist_ok=True)` + 同内容覆盖）——**保持简单**。
+- launch 放进线程（而非前移）：checkout 按 SHA 目录缓存复用，但**缓存写入侧必须并发安全（T5）**。
+  初版此处误判「并发首轮各自解包只是浪费不冲突（同内容覆盖）」——生产实跑打脸：同轮所有会话同
+  SHA 同 dest，无锁 check-then-extract 下多线程并发 `extractall` 同一目录会交错叠写同一批文件
+  （params.yaml 出现重复 entry 键/乱字节），且 A 半解压时 B 的「目录非空」检查会把残缺副本当
+  完整缓存复用。T5 修法：launcher 实例锁包住检查+解压全程 + 解压到唯一临时目录后原子 rename
+  占位（半成品绝无 dest 之名，崩溃只留无害 tmp 孤儿）。
 - a 段全部汇齐（`as_completed` 循环走完）后才进 d/b 段，轮边界语义与 checkpoint（spec-0004，
   轮粒度）不受影响。
 
@@ -180,6 +197,7 @@ with ThreadPoolExecutor(max_workers=min(len(prepared), self._max_parallel_users)
 | `SessionStore.save`（index.json 读-改-写） | docstring 自认「单进程 MVP 不处理并发写竞态」 | **加锁**：实例级 `threading.Lock`，save 全程持锁（先全量后索引的顺序不变） |
 | `live.py` agents/history/run.json | mkstemp 原子写只防撕裂写；`update_agent` 等仍是读-改-写，并发丢更新 | **加锁**：模块级一把锁包住 update_agent / append_agent_log / archive_agent / update_live_run / clear_live 的读-改-写全程 |
 | `sources/git.py` clone 缓存 | 同仓并发 provision 撞缓存目录 | **前移规避**（T3 阶段一），不加锁 |
+| `HarnessLauncher._checkout`（同 SHA 共享缓存目录） | check-then-extract 无锁：并发解压叠写 params.yaml（重复键/乱字节）、半解压目录被误判完整复用——初版审计漏项，生产实跑踩中 | **T5 加锁 + 临时目录原子 rename** |
 | `GiteaTracker`（共享 `requests.Session`） | 仅 token header、无 cookie 状态，urllib3 连接池线程安全 | 无需改（见 Unresolved #3 留观察） |
 | `os.environ` | 用户段不碰（launcher 显式传 env dict 给 Popen）；dev/designer 段才设全局 env | d/b 串行，天然无冲突（Non-goal 的依据之一） |
 | run.py `current["round"]` | a 段内只读（round 游标只在轮边界写） | 无需改 |
@@ -190,6 +208,7 @@ with ThreadPoolExecutor(max_workers=min(len(prepared), self._max_parallel_users)
 T1（存储/投影加锁）──┐
                       ├──> T3（a 段并行化 + 旋钮）──> T4（并发端到端回归）
 T2（client 工厂）────┘
+T5（checkout 并发安全，无依赖——生产实跑踩中审计漏项后补）
 ```
 
 | Task | files（互斥） |
@@ -198,6 +217,7 @@ T2（client 工厂）────┘
 | T2 | `backend/auto_designer/loop/sim_user.py`, `backend/tests/loop/test_sim_user.py` |
 | T3 | `backend/auto_designer/loop/orchestrator.py`, `backend/run.py`, `backend/tests/loop/test_orchestrator.py` |
 | T4 | `backend/tests/loop/test_parallel_sessions.py`（新增，本组 e2e） |
+| T5 | `backend/auto_designer/harness/launcher.py`, `backend/tests/harness/test_launcher.py` |
 
 e2e 验证路径：`backend/tests/loop/test_parallel_sessions.py`（全 Fake，不依赖真 LLM/Gitea）。
 另有一项**不进 CI 的真实小规模验证**：3 用户 × 1 轮，并行 vs 串行基线对比体感分布与 issue
