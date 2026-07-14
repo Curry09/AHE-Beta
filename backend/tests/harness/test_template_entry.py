@@ -14,6 +14,7 @@ from types import ModuleType
 import pytest
 
 _ENTRY = Path(__file__).resolve().parents[2] / "harness_template" / "entry.py"
+_TEMPLATE = _ENTRY.parent
 
 
 def _load_entry() -> ModuleType:
@@ -30,6 +31,7 @@ class _Agent:
     def __init__(self, outs: list) -> None:
         self._outs = list(outs)
         self.calls = 0
+        self.history: list = []
 
     def run(self, *, message: str):
         value = self._outs[self.calls]
@@ -46,9 +48,17 @@ def entry(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     return module
 
 
-def _no_rebuild():
+def _no_rebuild(_stale):
     """非超时用例不该触发重建；若被调用即失败。"""
     raise AssertionError("rebuild 不应被调用")
+
+
+def test_runtime_md_documents_boundary_and_session_contract() -> None:
+    """RUNTIME 短宪法：工作边界 + 换实例 ≠ 换 session。"""
+    text = (_TEMPLATE / "RUNTIME.md").read_text(encoding="utf-8")
+    assert "session_id" in text
+    assert "只读" in text and "NexAU" in text
+    assert "换实例" in text
 
 
 def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
@@ -82,14 +92,36 @@ def test_reply_exception_then_marker(entry: ModuleType) -> None:
     assert out.startswith("[harness error]")
 
 
-def test_reply_timeout_rebuilds_agent_then_succeeds(entry: ModuleType) -> None:
-    """超时分支：放弃的旧 agent 持锁不可用 → 重建新 agent 续跑，回传 live agent。"""
+def test_reply_timeout_rebuilds_and_returns_continuable(entry: ModuleType) -> None:
+    """超时：rebuild 换实例，立即回可续 [timeout]，不闷头对同一轮静默重试。"""
     stale = _Agent([TimeoutError("agent.run 超时 >240s")])
-    fresh = _Agent(["after rebuild"])
-    out_agent, text = entry._reply(stale, "hi", lambda: fresh)
-    assert text == "after rebuild"
-    assert out_agent is fresh  # 已切到重建后的新实例
-    assert stale.calls == 1 and fresh.calls == 1
+    stale.history = ["prior user turn", "prior assistant turn"]
+    fresh = _Agent(["should not run"])
+    seen: list = []
+
+    def rebuild(old):
+        # 模拟 main()：从旧实例快照 history 种进新实例
+        fresh.history = list(getattr(old, "history", []) or [])
+        seen.append(old)
+        return fresh
+
+    out_agent, text = entry._reply(stale, "hi", rebuild)
+    assert out_agent is fresh
+    assert text == entry._TIMEOUT_REPLY
+    assert text.startswith("[timeout]")
+    assert fresh.calls == 0  # 超时后不自动再跑同一 message
+    assert fresh.history == stale.history  # 调用方回灌路径可拿到旧记忆
+    assert seen == [stale]
+
+
+def test_snapshot_and_seed_history_roundtrip(entry: ModuleType) -> None:
+    """_snapshot_history / _seed_history：rebuild 接线用的纯辅助，不依赖真 nexau。"""
+    src = _Agent([])
+    src.history = [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}]
+    snap = entry._snapshot_history(src)
+    dst = _Agent([])
+    entry._seed_history(dst, snap)
+    assert dst.history == src.history
 
 
 class _StopExec:
@@ -108,6 +140,7 @@ class _StoppableAgent:
     def __init__(self) -> None:
         self.executor = _StopExec()
         self.calls = 0
+        self.history: list = ["kept"]
 
     def run(self, *, message: str):  # noqa: ARG002
         self.calls += 1
@@ -131,6 +164,7 @@ class _UnstoppableAgent:
 
     def __init__(self) -> None:
         self.calls = 0
+        self.history: list = ["from-stale"]
         self._never = threading.Event()
 
     def run(self, *, message: str):  # noqa: ARG002
@@ -139,11 +173,17 @@ class _UnstoppableAgent:
         return "x"
 
 
-def test_reply_interrupt_without_stop_capability_rebuilds(entry: ModuleType) -> None:
+def test_reply_interrupt_without_stop_capability_rebuilds_with_history(entry: ModuleType) -> None:
     stale = _UnstoppableAgent()
     fresh = _Agent(["after rebuild interrupt"])
     ctrl_q: queue.Queue = queue.Queue()
     ctrl_q.put({"control": "interrupt"})  # 起手即有打断
-    out_agent, text = entry._reply(stale, "hi", lambda: fresh, ctrl_q)
+
+    def rebuild(old):
+        fresh.history = list(getattr(old, "history", []) or [])
+        return fresh
+
+    out_agent, text = entry._reply(stale, "hi", rebuild, ctrl_q)
     assert text == entry._INTERRUPT_REPLY  # 打断仍回定型回复，不重试
     assert out_agent is fresh  # 没有优雅停止能力 → 重建避自锁
+    assert fresh.history == ["from-stale"]

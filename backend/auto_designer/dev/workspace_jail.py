@@ -1,23 +1,15 @@
 # Spec-0007：把 dev/designer 的文件/shell 操作关进 SANDBOX_WORK_DIR，越界即拒——机制隔离 trace。
-"""WorkspaceJailMiddleware：dev/designer 只能碰自己的 harness 仓，越界读写一律拒。
+"""WorkspaceJailMiddleware：dev/designer 以 harness 仓为可写工作区；NexAU 源码只读放行。
 
-动机（同源于提交边界闸的过拟合泄漏）：dev/designer 的 sandbox 工作目录 = harness 仓，但 nexau 的
-read 类工具（read_file/list_directory…）**不走权限体系**、只读 bash（cat/grep/find/less）又在只读
-白名单里**无条件放行**——agent 顺 `../` 或绝对路径就能读到仓外 data/sessions（体感+会话）、
-data/harness_runs（运行副本）里的**任务轨迹**。逐行看某任务轨迹会把该任务专属产物（某库 API、某类
-文件、预期输出）带进 harness = 过拟合。这两类角色的合法工作全在自己仓内（git/pytest/改文件），故直接
-jail：路径逃出 work_dir 即拒。
-
-拦截点：nexau 的 `wrap_tool_call`（tool_executor 里包住每次工具执行）——本中间件不调 `call_next`、
-直接返回一个"拒绝"结果，真工具就不执行。
+动机：堵住读 `data/sessions` / `data/harness_runs` 任务轨迹导致的过拟合；同时允许只读查阅
+钉死的 NexAU 库（多 agent / session / 锁等），无需外部观察者扩契约、也禁止改框架本身。
 
 覆盖：
-- 文件类工具（read_file/write_file/replace/list_directory/glob_tool/search_file_content/
-  read_many_files/read_visual_file）：把路径参数按 work_dir resolve，逃出 work_dir 一律拒。
-- run_shell_command：best-effort 扫命令里的 path-like token，越界即拒；另有 trace 目录名正则兜底。
+- 写类工具（write_file/replace/…）：目标必须在 harness work_dir 内。
+- 读类工具：work_dir **或** NexAU 仓根（由 `import nexau` 解析）内放行。
+- run_shell_command：path-like token 同读规则；trace 目录名仍一律拒。
 
-caveat：bash 若用 `python -c` 之类**动态拼绝对路径**读文件，静态扫描扫不出——要 100% airtight 得上
-OS 级沙箱（容器/sandbox-exec），出本层范围。但对非对抗性的 LLM，这已堵住所有现实发现路径。
+caveat：bash `python -c` 动态拼路径静态扫不出——要 100% airtight 需 OS 级沙箱。
 """
 
 from __future__ import annotations
@@ -46,11 +38,51 @@ _PATH_PARAMS: dict[str, tuple[str, ...]] = {
     "search_file_content": ("dir_path", "path"),
     "read_many_files": ("paths",),
 }
+# 写工具：只允许 harness 仓；读工具额外放行 NexAU。
+_WRITE_TOOLS: frozenset[str] = frozenset({"write_file", "replace", "multiedit_tool"})
 _SHELL_TOOL = "run_shell_command"
 
 # trace 目录名兜底正则：harness_runs 唯一、绝不该出现在 harness 仓内的命令里；sessions 仅当经 `../`
 # 或绝对路径以「路径段」形式出现才算（`grep sessions foo` 这种把 sessions 当搜索词的不误伤）。
 _TRACE_REF = re.compile(r"harness_runs|(?:\.\./|/)[^\s'\"]*sessions(?:/|\b)")
+
+# heredoc 起始：`<<EOF` / `<<-EOF` / `<< 'PY'` / `<<"END"`（marker 为标识符）。用于剥掉正文行——
+# 正文是数据不是路径（扫它误伤），但含 `<<` 那一行的**重定向目标**（`cat > OUT <<EOF`）是真路径，须留。
+_HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+
+
+def _nexau_repo_root() -> Path | None:
+    """当前环境 `import nexau` 所在的源码仓根（包目录的上一级）；解析失败则无只读放行根。"""
+    try:
+        import nexau
+
+        return Path(nexau.__file__).resolve().parents[1]
+    except Exception:  # noqa: BLE001  无 nexau 时退化为纯 work_dir jail
+        return None
+
+
+def _strip_heredoc_bodies(command: str) -> str:
+    """去掉 heredoc 正文（`<<MARKER` 之后到闭合 `MARKER` 行之间的内容），保留命令/重定向行本身。
+
+    旧实现「命令一含 `<<` 即整条跳过 token 扫描」把重定向目标（`cat > /仓外/x <<EOF`）也放行了，
+    成了绕过 jail 往仓外写文件的口子（实测被 dev 用来把 harness 内容写进自己的 def MANUAL.md）。
+    这里只剥正文、保留含 `<<MARKER` 的首行，让后续 token 扫描照样能抓到那个越界重定向目标。
+    """
+    lines = command.splitlines()
+    kept: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        kept.append(line)  # 保留含 `<<MARKER` 的这行（重定向目标在此）
+        m = _HEREDOC_RE.search(line)
+        if m:
+            marker = m.group(2)
+            i += 1
+            while i < len(lines) and lines[i].strip() != marker:
+                i += 1  # 丢弃正文行
+            # 跳过闭合 marker 行（若存在；不存在则 i 已到末尾）
+        i += 1
+    return "\n".join(kept)
 
 
 def _iter_path_values(tool_name: str, parameters: dict[str, Any]):
@@ -65,41 +97,69 @@ def _iter_path_values(tool_name: str, parameters: dict[str, Any]):
                     yield item
 
 
-def _escapes(work_dir: Path, raw: str) -> bool:
-    """raw 路径按 work_dir resolve 后是否逃出 work_dir（含符号链接、`..` 归一）。解析不了当作越界。"""
+def _resolve_against(work_dir: Path, raw: str) -> Path | None:
+    """相对路径相对 work_dir；解析失败返回 None（视为越界）。"""
     raw = raw.strip()
     if not raw:
-        return False
+        return None
     cand = Path(raw)
     full = cand if cand.is_absolute() else work_dir / cand
     try:
-        real = full.resolve()
+        return full.resolve()
     except (OSError, RuntimeError, ValueError):
-        return True
-    return real != work_dir and work_dir not in real.parents
+        return None
 
 
-def _shell_offender(work_dir: Path, command: str) -> str | None:
-    """返回命令里第一个越界引用（供报错）；无则 None。best-effort：heredoc 正文不当路径扫，仅兜底正则。"""
+def _inside_any(roots: list[Path], real: Path) -> bool:
+    for root in roots:
+        if real == root or root in real.parents:
+            return True
+    return False
+
+
+def _escapes(work_dir: Path, raw: str) -> bool:
+    """raw 路径按 work_dir resolve 后是否逃出 work_dir（含符号链接、`..` 归一）。解析不了当作越界。
+
+    保留给单测/旧语义：只审 work_dir，不含 NexAU 只读根。
+    """
+    real = _resolve_against(work_dir, raw)
+    if real is None:
+        return bool(raw.strip())
+    return not _inside_any([work_dir], real)
+
+
+def _escapes_roots(work_dir: Path, roots: list[Path], raw: str) -> bool:
+    """相对 work_dir resolve 后是否不在任一允许根内。"""
+    real = _resolve_against(work_dir, raw)
+    if real is None:
+        return bool(raw.strip())
+    return not _inside_any(roots, real)
+
+
+def _shell_offender(work_dir: Path, command: str, read_roots: list[Path]) -> str | None:
+    """返回命令里第一个越界引用（供报错）；无则 None。
+
+    read_roots：读放行根（含 work_dir 与可选 NexAU）。写重定向到 NexAU 仍可能被 path token 放行
+    （静态分不清读写）——靠 prompt「NexAU 只读」约束；轨迹路径仍由 _TRACE_REF 硬拒。
+    """
     if _TRACE_REF.search(command):
         return "trace 目录（sessions / harness_runs）"
-    if "<<" in command:  # heredoc：正文是内容不是路径，跳过 token 扫描避免误伤
-        return None
+    scanned = _strip_heredoc_bodies(command)  # 剥正文、留重定向行——堵住 `> /仓外 <<EOF` 绕过口
     try:
-        tokens = shlex.split(command, posix=True)
+        tokens = shlex.split(scanned, posix=True)
     except ValueError:
-        tokens = command.split()
+        tokens = scanned.split()
     for tok in tokens:
-        t = tok.strip()
+        t = tok.strip().lstrip("<>")  # 去掉重定向操作符前缀（>path / >>path / <path / <<MARKER）
         if "/" not in t and t != "..":  # 只审 path-like token
             continue
-        if _escapes(work_dir, t):
+        if _escapes_roots(work_dir, read_roots, t):
             return t
     return None
 
 
 class WorkspaceJailMiddleware(Middleware):
-    """把 dev/designer 的文件/shell 操作关进 SANDBOX_WORK_DIR，越界读写一律拒（机制隔离 trace）。"""
+    """harness 仓可读写；NexAU 仓只读放行；轨迹与其它路径一律拒。"""
 
     def wrap_tool_call(
         self,
@@ -115,15 +175,19 @@ class WorkspaceJailMiddleware(Middleware):
         except (OSError, RuntimeError, ValueError):
             return call_next(params)
 
+        nexau_root = _nexau_repo_root()
+        read_roots = [work_dir] + ([nexau_root] if nexau_root is not None else [])
+
         tool = params.tool_name
         if tool in _PATH_PARAMS:
+            roots = [work_dir] if tool in _WRITE_TOOLS else read_roots
             for raw in _iter_path_values(tool, params.parameters):
-                if _escapes(work_dir, raw):
+                if _escapes_roots(work_dir, roots, raw):
                     return self._deny(f"{tool} 目标路径 {raw!r}")
         elif tool == _SHELL_TOOL:
             command = params.parameters.get("command")
             if isinstance(command, str):
-                offender = _shell_offender(work_dir, command)
+                offender = _shell_offender(work_dir, command, read_roots)
                 if offender is not None:
                     return self._deny(f"命令引用了 {offender}")
 
@@ -132,9 +196,10 @@ class WorkspaceJailMiddleware(Middleware):
     @staticmethod
     def _deny(what: str) -> dict[str, Any]:
         msg = (
-            f"[workspace-jail] 拒绝：{what} 在你的工作区（harness 仓）之外。你只能读写自己仓内的文件。"
-            "绝不读取任务轨迹/会话录像（data/sessions、data/harness_runs）——逐行看某任务轨迹会把该任务"
-            "专属产物带进 harness，造成过拟合。请只在仓内工作；诊断靠 `git log`/读仓内源码，不靠翻轨迹。"
+            f"[workspace-jail] 拒绝：{what} 越界。"
+            "可写范围 = harness 仓；可读范围 = harness 仓 + NexAU 源码（只读，禁止改框架）。"
+            "绝不读取任务轨迹/会话录像（data/sessions、data/harness_runs）——会过拟合。"
+            "框架细节读 NexAU；改动只落 harness 仓。"
         )
         logger.warning("workspace-jail 拦截越界访问：%s", what)
         return {
