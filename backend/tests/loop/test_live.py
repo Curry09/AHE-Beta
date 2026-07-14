@@ -252,6 +252,78 @@ def test_step_tracer_emits_process_stream() -> None:
     ]
 
 
+def test_concurrent_update_agent_keeps_all_slots(tmp_path: Path) -> None:
+    """Spec-0017/T1 竞态回归：并发 upsert 不同 agent_id，槽位一个不丢。
+
+    加锁前 agents.json 是无锁读-改-写（mkstemp 原子写只防撕裂写），并发 upsert 会基于
+    同一旧快照互相覆盖整个 registry（丢别人的槽）。屏障齐射逼出交错。
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    n = 12
+    barrier = threading.Barrier(n)
+
+    def upsert(i: int) -> None:
+        barrier.wait()
+        update_agent(
+            data_dir=tmp_path,
+            agent_id=f"user-{i:02d}",
+            role="user",
+            label=f"U{i}",
+            running=True,
+            status=f"跑第 {i} 局",
+            round_no=1,
+        )
+
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        list(pool.map(upsert, range(n)))
+
+    agents = read_agents(data_dir=tmp_path)
+    assert [a["agent_id"] for a in agents] == [f"user-{i:02d}" for i in range(n)]  # 全在且有序
+
+
+def test_concurrent_append_log_and_archive_lose_nothing(tmp_path: Path) -> None:
+    """Spec-0017/T1：并发 append_agent_log 不丢行；并发 archive_agent 不丢归档条目。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    n = 8
+    for i in range(n):
+        update_agent(
+            data_dir=tmp_path,
+            agent_id=f"a{i}",
+            role="user",
+            label=f"A{i}",
+            running=True,
+            status="s",
+            round_no=1,
+        )
+
+    def log_steps(i: int) -> None:
+        for k in range(10):
+            append_agent_log(data_dir=tmp_path, agent_id=f"a{i}", text=f"a{i} 步骤 {k}")
+
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        list(pool.map(log_steps, range(n)))
+    for i, agent in enumerate(read_agents(data_dir=tmp_path)):
+        steps = [e["text"] for e in agent["log"] if e["kind"] == "step"]
+        assert steps == [f"a{i} 步骤 {k}" for k in range(10)]  # 每槽 10 行按序全在
+
+    def archive(i: int) -> None:
+        archive_agent(
+            data_dir=tmp_path,
+            agent_id=f"a{i}",
+            round_no=1,
+            extra={"kind": "user_session", "session_id": f"s-{i}"},
+        )
+
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        list(pool.map(archive, range(n)))
+    history = read_history(data_dir=tmp_path)
+    assert len(history) == n  # append-only 并发归档不丢
+    assert {h["session_id"] for h in history} == {f"s-{i}" for i in range(n)}
+
+
 def test_clear_removes_all(tmp_path: Path) -> None:
     update_agent(data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="x")
     update_live_run(data_dir=tmp_path, running=True, round_no=1, total_rounds=5)

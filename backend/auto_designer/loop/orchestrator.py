@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+import traceback
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Protocol
 
 from auto_designer.designer.designer import Designer
@@ -59,6 +61,7 @@ class Orchestrator:
         designers: list[Designer] | None = None,
         on_round_start: Callable[[int], None] | None = None,
         on_round_end: Callable[[int, str], None] | None = None,
+        max_parallel_users: int = 1,
     ) -> None:
         self._launcher = launcher
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
@@ -71,6 +74,9 @@ class Orchestrator:
         # 轮次观测回调（可选）：round 从 1 起；end 时携带本轮 main 最新 SHA。看板运行态由此得知轮数。
         self._on_round_start = on_round_start
         self._on_round_end = on_round_end
+        # Spec-0017/T3：a 段用户会话并发度（并发单元=整局会话）。默认 1 = 与旧串行行为等价；
+        # d/b 段始终串行（同仓 push + 全局 env 的固有约束，见 spec-0017 Non-goal）。
+        self._max_parallel_users = max(1, max_parallel_users)
 
     def run_round(self, ref: str) -> str:
         # Spec-0007/T2：传入的 ref 仅为「上一轮观测游标」透传（供 harbor runner 的 checkpoint 续跑链），
@@ -84,6 +90,10 @@ class Orchestrator:
         #    git/fixture 型种子 materialize + ensure_deps；纯文本卡（workspace=None）也开一个空的
         #    scratch（每局新建、隔离），确保用户 agent 落到 harness 同一工作目录真核实，而非只凭
         #    harness 回复"嘴上验"（否则无环境时会脑补"测试通过"污染体感）。
+        #    Spec-0017/T3：拆两阶段——阶段一串行备工作区（materialize/ensure_deps 走 git clone 缓存
+        #    等共享资源，前移规避并发竞争）；阶段二线程池并行跑会话（launch + run_session 一整包，
+        #    并发单元=整局会话，信封内部时序不动）。max_parallel_users=1 时行为与旧串行等价。
+        prepared: list[tuple[Persona, SeedScenario, str]] = []
         for persona, scenario in self._fixed_set:
             if scenario.workspace is not None:
                 workspace_dir = materialize_workspace(scenario.workspace)
@@ -92,8 +102,28 @@ class Orchestrator:
                 ensure_deps(workspace_dir, scenario.workspace)
             else:
                 workspace_dir = tempfile.mkdtemp(prefix="shared_ws_")
+            prepared.append((persona, scenario, workspace_dir))
+
+        def _one_session(persona: Persona, scenario: SeedScenario, workspace_dir: str) -> None:
             harness = self._launcher.launch(sha, workspace_dir=workspace_dir)
             self._run_session(persona, scenario, harness, workspace_dir=workspace_dir)
+
+        if prepared:
+            with ThreadPoolExecutor(
+                max_workers=min(len(prepared), self._max_parallel_users)
+            ) as pool:
+                futures = {pool.submit(_one_session, p, s, ws): p for p, s, ws in prepared}
+                for fut in as_completed(futures):
+                    try:
+                        fut.result()
+                    except Exception:  # noqa: BLE001
+                        # 0012 后 harness 故障已在会话内转 [harness error] 信号（不上抛），这里只剩
+                        # launch/落盘类意外——单会话失败记日志跳过，不废整轮、不阻塞其余会话。
+                        print(
+                            f"[orchestrator] 用户会话异常（persona="
+                            f"{futures[fut].identity}），跳过该局，同轮其余会话继续："
+                        )
+                        traceback.print_exc()
 
         # d（创新者，可选）：综合本轮及历史全量 open issue backlog + 体感曲线，产结构性设计提案
         #    （打 design 标签）写回 tracker。跑在 b 之前，让提案与用户产的 issue 一起进 backlog 供

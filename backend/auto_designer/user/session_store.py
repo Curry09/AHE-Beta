@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 from auto_designer.models import Session
@@ -15,10 +16,16 @@ _INDEX_NAME = "index.json"
 
 
 class SessionStore:
-    """把 Session 持久化到本地 root/。单进程 MVP，不处理并发写竞态。"""
+    """把 Session 持久化到本地 root/。
+
+    Spec-0017/T1：save 全程持实例锁——index.json 是读-改-写追加，a 段多用户会话并行后
+    并发 save 会基于同一旧快照互相覆盖（丢条目）；锁粒度=单次 save 全程（纯本地文件 IO，
+    持锁期内无网络/子进程等待，无死锁面）。跨进程并发仍不支持（单进程内多线程即本仓形态）。
+    """
 
     def __init__(self, root: str | Path) -> None:
         self._root = Path(root)
+        self._lock = threading.Lock()
 
     @property
     def root(self) -> Path:
@@ -26,6 +33,10 @@ class SessionStore:
         return self._root
 
     def save(self, session: Session) -> None:
+        with self._lock:
+            self._save_locked(session=session)
+
+    def _save_locked(self, *, session: Session) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
         # 先写全量文件（唯一权威），后追加索引：中途失败至多「有全量缺索引」，可重建。
         full_path = self._root / f"{session.session_id}.json"

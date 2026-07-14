@@ -111,7 +111,7 @@ class _RecordingClient:
 
 def _make_fn(client, tmp_path, sp, mp):
     return make_sim_run_session_fn(
-        client=client,
+        client_factory=lambda: client,  # Spec-0017/T2：工厂注入；本测试关心 bind，恒返同一实例即可
         tracker=FakeTracker(),
         store=SessionStore(tmp_path),
         sim_personas={mp.identity: sp},

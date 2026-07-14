@@ -266,8 +266,13 @@ def main() -> int:
     # distill seed_adapter 注入——两个「给定输入」皆走 distill 卡库，替代此前硬编码的 expert × TASK。
     # 用户 agent 用 AgenticPersonaClient 走内层 tool-use，ApiPersonaClient.complete 作内层 LLM
     # （sim_user 据此 bind_session 绑定共享工作区，令用户 agent 在 harness 同目录核实）。
+    # Spec-0017/T2：client 每局一实例（bind_session 是会话级状态，并发下复用单实例必串台）；
+    # 底层 ApiPersonaClient 无会话态、跨会话共享同一实例，工厂只新建外壳。
     api = ApiPersonaClient()
-    client = AgenticPersonaClient(api.complete)
+
+    def client_factory() -> AgenticPersonaClient:
+        return AgenticPersonaClient(api.complete)
+
     sim_persona_list = card_to_personas(
         PersonaLibrary(args.persona_library)
     )  # persona 卡库 → sim persona
@@ -360,7 +365,7 @@ def main() -> int:
             )
 
     user_run_session_fn = make_sim_run_session_fn(
-        client=client,
+        client_factory=client_factory,
         tracker=tracker,
         store=store,
         sim_personas=sim_personas,
@@ -441,6 +446,13 @@ def main() -> int:
         for i in range(roster["designer"])
     ]
 
+    # Spec-0017/T3：a 段并发度。默认 = roster 用户数（全并行），MAX_PARALLEL_USERS 环境变量
+    # 可下调（设 1 即回到串行）。覆盖面（每轮跑几个 persona，PERSONA_LIMIT/roster）与并发度
+    # （同时跑几个）是两个独立旋钮。
+    raw_parallel = os.environ.get("MAX_PARALLEL_USERS", "").strip()
+    max_parallel_users = int(raw_parallel) if raw_parallel.isdigit() else (len(fixed_set) or 1)
+    max_parallel_users = max(1, max_parallel_users)  # 0/负值/非数字一律回落（1=串行）
+
     orch = Orchestrator(
         launcher=launcher,
         harness_repo=str(repo),  # Spec-0007/T4：每局解析 main HEAD SHA 用
@@ -451,11 +463,13 @@ def main() -> int:
         designers=designers,  # 创新者接入闭环：a → d(designer) → b → c
         on_round_start=on_round_start,  # 轮次运行态 → data/live/run.json（看板 /api/state）
         on_round_end=on_round_end,
+        max_parallel_users=max_parallel_users,  # Spec-0017/T3
     )
 
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
-        f"{len(developers)} dev agent × {len(designers)} designer，dev 直推 main，真模型）..."
+        f"{len(developers)} dev agent × {len(designers)} designer，"
+        f"a 段并发 {max_parallel_users}，dev 直推 main，真模型）..."
     )
     try:
         refs = orch.run(TOTAL_ROUNDS)

@@ -10,10 +10,12 @@ from __future__ import annotations
 import io
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
 import tarfile
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -24,7 +26,6 @@ from ruamel.yaml import YAML
 from auto_designer.harness.interface import HarnessInterface
 
 _PARAMS_FILE = "params.yaml"
-_yaml = YAML(typ="safe")
 
 # 单轮回复的兜底机制。注意：harness 自身对每轮已有上界（v0 模板 _CALL_TIMEOUT×_RUN_RETRIES ≈ 16min
 # 后必回 [harness error]），所以「慢」是合法的长任务，绝不能按墙钟盲杀（会误杀真长任务）。
@@ -206,6 +207,9 @@ class HarnessLauncher:
     def __init__(self, harness_repo: str, runs_root: str | Path = "data/harness_runs") -> None:
         self._harness_repo = harness_repo
         self._runs_root = Path(runs_root)
+        # Spec-0017/T5：a 段并行后同轮所有会话同 SHA → 同一 checkout dest，_checkout 的
+        # check-then-extract 必须进程内互斥（首线程干活，其余命中缓存）。
+        self._checkout_lock = threading.Lock()
 
     def launch(self, ref: str, workspace_dir: str | None = None) -> HarnessInterface:
         dest = self._checkout(ref=ref)
@@ -249,23 +253,44 @@ class HarnessLauncher:
         # 绝不复用陈旧 checkout（曾导致跑的是旧 entry.py、harness 静默空回复）。
         sha = self._resolve_sha(ref=ref)
         dest = self._runs_root / f"{ref.replace('/', '_')}-{sha[:12]}"
-        if dest.is_dir() and any(dest.iterdir()):
-            return dest  # 同 ref 同 SHA（内容一致）→ 安全复用
-        result = subprocess.run(
-            ["git", "-C", self._harness_repo, "archive", "--format=tar", sha],
-            capture_output=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"checkout {ref!r}@{sha[:12]} 失败：{result.stderr.decode(errors='replace')[:200]}"
+        # Spec-0017/T5：并行会话同 SHA 同 dest，check-then-extract 全程持锁——无锁时多线程同时
+        # 通过存在性检查后并发 extractall 同一目录，params.yaml 被两条 tar 流叠写出重复键/乱字节；
+        # 且 A 半解压时 B 会把「非空目录」误判为完整缓存复用（生产实跑踩中）。
+        with self._checkout_lock:
+            if dest.is_dir() and any(dest.iterdir()):
+                return dest  # 同 ref 同 SHA（内容一致）→ 安全复用
+            result = subprocess.run(
+                ["git", "-C", self._harness_repo, "archive", "--format=tar", sha],
+                capture_output=True,
             )
-        dest.mkdir(parents=True, exist_ok=True)
-        with tarfile.open(fileobj=io.BytesIO(result.stdout)) as tf:
-            tf.extractall(dest, filter="data")
-        return dest
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"checkout {ref!r}@{sha[:12]} 失败："
+                    f"{result.stderr.decode(errors='replace')[:200]}"
+                )
+            # 解压到唯一临时目录后原子 rename 占位：半解压目录绝不可能以 dest 之名存在——进程
+            # 中途崩溃只留无害 *.tmp* 孤儿（不匹配任何 dest 名，不污染缓存）；跨进程并发时输者
+            # rename 失败（dest 已被赢者完整就位）→ 弃自己的 tmp、复用 dest。
+            self._runs_root.mkdir(parents=True, exist_ok=True)
+            tmp = Path(tempfile.mkdtemp(dir=self._runs_root, prefix=dest.name + ".tmp"))
+            try:
+                with tarfile.open(fileobj=io.BytesIO(result.stdout)) as tf:
+                    tf.extractall(tmp, filter="data")
+            except BaseException:
+                shutil.rmtree(tmp, ignore_errors=True)
+                raise
+            try:
+                tmp.rename(dest)
+            except OSError:
+                shutil.rmtree(tmp, ignore_errors=True)
+                if not (dest.is_dir() and any(dest.iterdir())):
+                    raise  # 不是「别人已就位」而是真失败：如实上抛
+            return dest
 
     def _read_params(self, dest: Path) -> dict[str, Any]:
         params_path = dest / _PARAMS_FILE
         if not params_path.is_file():
             raise FileNotFoundError(f"harness 缺 {_PARAMS_FILE}：{params_path}")
-        return dict(_yaml.load(params_path))
+        # Spec-0017/T5：ruamel 的 YAML 实例非线程安全（解析器内部状态跨调用共享），并行 launch
+        # 下共享模块级单例会被并发 load 互相搅乱 → 每次解析新建实例（构造开销微不足道）。
+        return dict(YAML(typ="safe").load(params_path))

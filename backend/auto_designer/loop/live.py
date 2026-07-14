@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,12 @@ _HISTORY_NAME = "history.json"
 _ROLE_ORDER = {"user": 0, "designer": 1, "developer": 2}
 # 过程流时间线长度上限：status 变化 + assistant 发言 + 逐工具调用/结果，一次 agent.run 可达数百条。
 _LOG_CAP = 500
+
+# Spec-0017/T1：模块级一把锁，包住所有写函数的「读-改-写」全程。mkstemp 原子写只防撕裂写，
+# 不防两个写者基于同一旧快照互相覆盖（丢更新/丢槽位）——a 段多用户会话并行后，多个会话线程
+# 会同时 update_agent/append_agent_log/archive_agent。锁粒度=单文件操作全程（纯本地文件 IO，
+# 持锁期内无网络/子进程等待，无死锁面）；读函数不加锁（原子 replace 保证读到的总是完整快照）。
+_WRITE_LOCK = threading.Lock()
 
 
 def _live_file(*, data_dir: Path, name: str) -> Path:
@@ -77,32 +84,33 @@ def update_agent(
 ) -> None:
     """更新某 agent 的活动槽（upsert）。turns 给会话型 agent，detail 给 dev/designer 最终报告，
     round_no 标注该活动属于第几轮（前端按轮分组的依据）。"""
-    path = _live_file(data_dir=data_dir, name=_AGENTS_NAME)
-    registry = _read_json(path=path, fallback={})
-    prev = registry.get(agent_id, {})
-    now = datetime.now().isoformat()
-    # started_at = 本段活动起始：刚由空闲转为 running（或新 agent）时重置，否则沿用，供前端算运行时长。
-    became_running = running and not prev.get("running", False)
-    started_at = now if became_running or not prev.get("started_at") else prev["started_at"]
-    # log = 过程流时间线：status 变化即追加（连续重复去重），跨任务累计、封顶 _LOG_CAP。
-    log = list(prev.get("log", []))
-    if not log or log[-1].get("text") != status:
-        log.append({"t": now, "kind": "status", "text": status})
-    log = log[-_LOG_CAP:]
-    registry[agent_id] = {
-        "agent_id": agent_id,
-        "role": role,
-        "label": label,
-        "running": running,
-        "status": status,
-        "round": round_no if round_no is not None else prev.get("round"),
-        "turns": turns or [],
-        "detail": detail,
-        "log": log,
-        "started_at": started_at,
-        "updated_at": now,
-    }
-    _write_atomic(path=path, data=registry)
+    with _WRITE_LOCK:  # Spec-0017/T1：读-改-写全程持锁，并发 upsert 不同槽位不互相覆盖
+        path = _live_file(data_dir=data_dir, name=_AGENTS_NAME)
+        registry = _read_json(path=path, fallback={})
+        prev = registry.get(agent_id, {})
+        now = datetime.now().isoformat()
+        # started_at = 本段活动起始：刚由空闲转为 running（或新 agent）时重置，否则沿用，供前端算运行时长。
+        became_running = running and not prev.get("running", False)
+        started_at = now if became_running or not prev.get("started_at") else prev["started_at"]
+        # log = 过程流时间线：status 变化即追加（连续重复去重），跨任务累计、封顶 _LOG_CAP。
+        log = list(prev.get("log", []))
+        if not log or log[-1].get("text") != status:
+            log.append({"t": now, "kind": "status", "text": status})
+        log = log[-_LOG_CAP:]
+        registry[agent_id] = {
+            "agent_id": agent_id,
+            "role": role,
+            "label": label,
+            "running": running,
+            "status": status,
+            "round": round_no if round_no is not None else prev.get("round"),
+            "turns": turns or [],
+            "detail": detail,
+            "log": log,
+            "started_at": started_at,
+            "updated_at": now,
+        }
+        _write_atomic(path=path, data=registry)
 
 
 def append_agent_log(*, data_dir: Path, agent_id: str, text: str, kind: str = "step") -> None:
@@ -111,19 +119,20 @@ def append_agent_log(*, data_dir: Path, agent_id: str, text: str, kind: str = "s
     不动 status/turns 等其余字段，updated_at 照刷。agent 槽不存在则 no-op（步骤必然发生在
     update_agent 建槽之后；不为孤儿步骤造半空槽）。连续重复去重，同 _LOG_CAP 封顶。
     """
-    path = _live_file(data_dir=data_dir, name=_AGENTS_NAME)
-    registry = _read_json(path=path, fallback={})
-    slot = registry.get(agent_id)
-    if slot is None:
-        return
-    log = list(slot.get("log", []))
-    if log and log[-1].get("text") == text:
-        return
-    now = datetime.now().isoformat()
-    log.append({"t": now, "kind": kind, "text": text})
-    slot["log"] = log[-_LOG_CAP:]
-    slot["updated_at"] = now
-    _write_atomic(path=path, data=registry)
+    with _WRITE_LOCK:  # Spec-0017/T1：并发追加不丢行
+        path = _live_file(data_dir=data_dir, name=_AGENTS_NAME)
+        registry = _read_json(path=path, fallback={})
+        slot = registry.get(agent_id)
+        if slot is None:
+            return
+        log = list(slot.get("log", []))
+        if log and log[-1].get("text") == text:
+            return
+        now = datetime.now().isoformat()
+        log.append({"t": now, "kind": kind, "text": text})
+        slot["log"] = log[-_LOG_CAP:]
+        slot["updated_at"] = now
+        _write_atomic(path=path, data=registry)
 
 
 def read_agents(*, data_dir: Path) -> list[dict[str, Any]]:
@@ -147,20 +156,21 @@ def update_live_run(
     round_shas: list[str] | None = None,
 ) -> None:
     """更新 run 运行态。round_shas 不传则沿用已有值（各轮结束时才追加 SHA）。"""
-    path = _live_file(data_dir=data_dir, name=_RUN_NAME)
-    prev = _read_json(path=path, fallback={})
-    now = datetime.now().isoformat()
-    _write_atomic(
-        path=path,
-        data={
-            "running": running,
-            "round": round_no,
-            "total_rounds": total_rounds,
-            "round_shas": round_shas if round_shas is not None else prev.get("round_shas", []),
-            "started_at": prev.get("started_at") or now,
-            "updated_at": now,
-        },
-    )
+    with _WRITE_LOCK:  # Spec-0017/T1：prev 快照与写回之间不被其他写者插入
+        path = _live_file(data_dir=data_dir, name=_RUN_NAME)
+        prev = _read_json(path=path, fallback={})
+        now = datetime.now().isoformat()
+        _write_atomic(
+            path=path,
+            data={
+                "running": running,
+                "round": round_no,
+                "total_rounds": total_rounds,
+                "round_shas": round_shas if round_shas is not None else prev.get("round_shas", []),
+                "started_at": prev.get("started_at") or now,
+                "updated_at": now,
+            },
+        )
 
 
 def read_live_run(*, data_dir: Path) -> dict[str, Any]:
@@ -193,29 +203,30 @@ def archive_agent(
     （user_session/designer_run/dev_run）与各角色专属字段（session_id/issue_number/tag…）。
     槽不存在则 no-op（无活动可归档）。
     """
-    registry = _read_json(path=_live_file(data_dir=data_dir, name=_AGENTS_NAME), fallback={})
-    slot = registry.get(agent_id)
-    if slot is None:
-        return
-    record: dict[str, Any] = {
-        "round": round_no,
-        "agent_id": agent_id,
-        "role": slot.get("role"),
-        "label": slot.get("label"),
-        "status": slot.get("status"),
-        "turns": slot.get("turns", []),
-        "detail": slot.get("detail"),
-        "log": slot.get("log", []),
-        "started_at": slot.get("started_at"),
-        "archived_at": datetime.now().isoformat(),
-        **extra,
-    }
-    path = _live_file(data_dir=data_dir, name=_HISTORY_NAME)
-    history = _read_json(path=path, fallback=[])
-    if not isinstance(history, list):
-        history = []
-    history.append(record)
-    _write_atomic(path=path, data=history)
+    with _WRITE_LOCK:  # Spec-0017/T1：history 读-追加-写全程持锁，并发归档不丢条目
+        registry = _read_json(path=_live_file(data_dir=data_dir, name=_AGENTS_NAME), fallback={})
+        slot = registry.get(agent_id)
+        if slot is None:
+            return
+        record: dict[str, Any] = {
+            "round": round_no,
+            "agent_id": agent_id,
+            "role": slot.get("role"),
+            "label": slot.get("label"),
+            "status": slot.get("status"),
+            "turns": slot.get("turns", []),
+            "detail": slot.get("detail"),
+            "log": slot.get("log", []),
+            "started_at": slot.get("started_at"),
+            "archived_at": datetime.now().isoformat(),
+            **extra,
+        }
+        path = _live_file(data_dir=data_dir, name=_HISTORY_NAME)
+        history = _read_json(path=path, fallback=[])
+        if not isinstance(history, list):
+            history = []
+        history.append(record)
+        _write_atomic(path=path, data=history)
 
 
 def read_history(*, data_dir: Path) -> list[dict[str, Any]]:
@@ -229,5 +240,6 @@ def read_history(*, data_dir: Path) -> list[dict[str, Any]]:
 
 def clear_live(*, data_dir: Path) -> None:
     """清空 live 观测投影（agents/run/history 全部）。一轮 run 开始时调用。幂等。"""
-    for name in (_AGENTS_NAME, _RUN_NAME, _HISTORY_NAME):
-        _live_file(data_dir=data_dir, name=name).unlink(missing_ok=True)
+    with _WRITE_LOCK:  # Spec-0017/T1：与在途写者互斥，清空不与 upsert 交错出半新半旧
+        for name in (_AGENTS_NAME, _RUN_NAME, _HISTORY_NAME):
+            _live_file(data_dir=data_dir, name=name).unlink(missing_ok=True)

@@ -170,6 +170,84 @@ def test_b_phase_error_propagates(tmp_path) -> None:
         _orch(repo, events, [_BoomDev()]).run_round("c")
 
 
+# Spec-0017/T3：a 段并行化——线程池并发跑会话、单会话异常不废整轮、汇齐后才进 d/b 段。
+
+
+def test_parallel_sessions_all_run_and_devs_wait(tmp_path) -> None:
+    """max_parallel_users=4 并发 8 局：全部会话都跑到，且 b 段在 a 段全部汇齐后才开始。"""
+    import threading
+
+    repo = _seed_repo(tmp_path)
+    events: list = []
+    lock = threading.Lock()
+    barrier = threading.Barrier(4)  # 4 个 worker 齐射，证明确实并发（串行会在此死锁超时）
+
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        barrier.wait(timeout=10)  # 若实际串行（并发度<4），首局在此卡死 → BrokenBarrierError
+        with lock:
+            events.append(("session", scenario.description))
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description=f"s{i}")) for i in range(8)],
+        developer_agents=[_Dev(events, DevOutcome(issue_number=1, tag="v", committed=True))],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+        max_parallel_users=4,
+    )
+    orch.run_round("c")
+
+    sessions = [e for e in events if e[0] == "session"]
+    assert len(sessions) == 8  # 8 局全部跑到
+    assert {d for _, d in sessions} == {f"s{i}" for i in range(8)}
+    assert events.index(("dev", frozenset())) == len(events) - 1  # dev 在全部会话之后
+
+
+def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
+    """单会话抛异常（launch/落盘类意外）：记日志跳过，其余会话正常完成、d/b 段照常。"""
+    repo = _seed_repo(tmp_path)
+    events: list = []
+
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        if scenario.description == "s1":
+            raise RuntimeError("这局炸了")
+        events.append(("session", scenario.description))
+
+    head = _git(repo, "rev-parse", "main")
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description=f"s{i}")) for i in range(3)],
+        developer_agents=[_Dev(events, DevOutcome())],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+        max_parallel_users=2,
+    )
+    out = orch.run_round("c")  # 不抛 → 轮未被单会话失败废掉
+
+    assert out == head
+    assert {d for k, d in events if k == "session"} == {"s0", "s2"}  # 其余会话都完成
+    assert any(k == "dev" for k, *_ in events)  # b 段照常执行
+
+
+def test_parallel_default_is_serial_equivalent(tmp_path) -> None:
+    """缺省 max_parallel_users=1：事件顺序与旧串行完全一致（回归基线，见 0017 acceptance）。"""
+    repo = _seed_repo(tmp_path)
+    head = _git(repo, "rev-parse", "main")
+    events: list = []
+    dev = _Dev(events, DevOutcome(issue_number=1, tag="v2", committed=True))
+    orch = _orch(repo, events, [dev], fixed_k=2)  # _orch 不传 max_parallel_users → 默认 1
+
+    orch.run_round("c")
+    assert events[:4] == [
+        ("launch", head),
+        ("session", head),
+        ("launch", head),
+        ("session", head),
+    ]  # 逐局 launch→session 交替，与并行化之前的串行时序一致
+
+
 # Spec-0008/T1 v2：共享工作区——每局先于 launch materialize，同一目录同时喂 launch 与 run_session。
 class _WsLauncher:
     def __init__(self, events: list) -> None:

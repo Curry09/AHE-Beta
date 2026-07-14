@@ -101,7 +101,7 @@ def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
     seen: list[tuple[bool, str | None]] = []
 
     fn = make_sim_run_session_fn(
-        client=ScriptedPersonaClient(),
+        client_factory=ScriptedPersonaClient,  # Spec-0017/T2：工厂注入，每局新建
         tracker=tracker,
         store=store,
         sim_personas={mp.identity: sp},
@@ -140,7 +140,7 @@ def test_sim_adapter_no_issue_when_not_filed(tmp_path) -> None:
             return {"perceive": "", "verdict": "satisfied", "action": "accept", "message": "ok"}
 
     fn = make_sim_run_session_fn(
-        client=_HappyClient(), tracker=tracker, store=store, sim_personas={mp.identity: sp}
+        client_factory=_HappyClient, tracker=tracker, store=store, sim_personas={mp.identity: sp}
     )
     session = fn(mp, SeedScenario(description="task"), ScriptedHarness())
 
@@ -152,11 +152,61 @@ def _fn(tmp_path):
     sp = expert()
     mp = _model_persona(sp)
     return make_sim_run_session_fn(
-        client=ScriptedPersonaClient(),
+        client_factory=ScriptedPersonaClient,
         tracker=FakeTracker(),
         store=SessionStore(tmp_path),
         sim_personas={mp.identity: sp},
     ), mp
+
+
+def test_client_factory_gives_each_session_its_own_instance(tmp_path) -> None:
+    """Spec-0017/T2：每局一实例——工厂逐局调用，bind_session 互不覆盖（并发串台的根治点）。
+
+    用记录型 fake：既记工厂产出的实例，也记每个实例 bind 到的 (persona, workspace)。
+    并发跑两局（线程屏障齐射），断言两局各自的实例独立、各自 bind 各自的工作区。
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    sp = expert()
+    mp = _model_persona(sp)
+
+    class _RecordingClient(ScriptedPersonaClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.bound: list[tuple[object, str | None]] = []
+
+        def bind_session(self, *, persona, workspace_dir) -> None:
+            self.bound.append((persona, workspace_dir))
+
+    made: list[_RecordingClient] = []
+
+    def factory() -> _RecordingClient:
+        c = _RecordingClient()
+        made.append(c)
+        return c
+
+    fn = make_sim_run_session_fn(
+        client_factory=factory,
+        tracker=FakeTracker(),
+        store=SessionStore(tmp_path),
+        sim_personas={mp.identity: sp},
+    )
+
+    barrier = threading.Barrier(2)
+
+    def one(ws: str) -> None:
+        barrier.wait()
+        fn(mp, SeedScenario(description="task"), ScriptedHarness(), workspace_dir=ws)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(one, ["/ws/a", "/ws/b"]))
+
+    assert len(made) == 2 and made[0] is not made[1]  # 每局独立实例
+    # 每个实例恰 bind 一次、且两局的 workspace 各归各（无后 bind 覆盖先 bind）
+    all_bound = [c.bound for c in made]
+    assert all(len(b) == 1 for b in all_bound)
+    assert {b[0][1] for b in all_bound} == {"/ws/a", "/ws/b"}
 
 
 def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:

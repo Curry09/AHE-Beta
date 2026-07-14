@@ -75,7 +75,7 @@ def _issue_draft(res: SessionResult) -> IssueDraft:
 
 def make_sim_run_session_fn(
     *,
-    client: PersonaClient,
+    client_factory: Callable[[], PersonaClient],
     tracker: IssueTracker,
     store: SessionStore,
     sim_personas: dict[str, SimPersona],
@@ -83,6 +83,10 @@ def make_sim_run_session_fn(
 ) -> Callable[..., Session]:
     """返回 Orchestrator 用的 run_session_fn。
 
+    client_factory: 每局新建 persona client（Spec-0017/T2）。AgenticPersonaClient 是会话级
+    有状态的（bind_session 写 _persona/_workspace_dir），a 段多用户会话并行后跨局复用单实例
+    必串台（后 bind 覆盖先 bind）；底层 ApiPersonaClient.complete 无会话态可全局共享，工厂
+    只新建外壳。
     sim_personas: 展示用 models.Persona.identity -> 9 维 sim persona（权威画像）。
     on_turn: 逐轮（含终止轮）+ 收尾各回调一次，供调用方发 agent 活动到看板。
     """
@@ -95,6 +99,7 @@ def make_sim_run_session_fn(
         workspace_dir: str | None = None,
     ) -> Session:
         sim_persona = sim_personas[persona.identity]
+        client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
 
         # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
         # harness（SANDBOX_WORK_DIR）并把同一目录 workspace_dir 传到这里——两侧 cwd 同指一处，harness
