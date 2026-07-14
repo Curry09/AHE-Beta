@@ -1,12 +1,14 @@
 """GiteaTracker（spec-0002/T2）：spec-0001/T5 IssueTracker 接口的真后端。
 
 一个打 Gitea /api/v1 的薄 REST 客户端：把接口调用翻译为 HTTP，状态权威留在 Gitea，
-客户端除 label id 缓存外无状态。非 2xx 一律转为带状态码与端点的 GiteaError，不静默返回空回执。
+客户端除 label id 缓存与每线程 HTTP 会话（Spec-0017/T6）外无状态。非 2xx 一律转为带
+状态码与端点的 GiteaError，不静默返回空回执。
 配置（base_url/owner/repo/token）由构造注入，来源是 spec-0002/T1 的 backend/deploy/gitea/.env。
 """
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 import requests
@@ -36,11 +38,34 @@ class GiteaTracker:
         self._api = f"{base_url.rstrip('/')}/api/v1"
         self._owner = owner
         self._repo = repo
-        self._session = requests.Session()
-        self._session.headers.update(
-            {"Authorization": f"token {token}", "Content-Type": "application/json"}
-        )
+        self._token = token
+        # Spec-0017/T6：requests.Session 非线程安全（cookiejar/内部状态并发变异，Gitea 会回
+        # Set-Cookie），a 段并行后各会话线程收尾并发 create_issue → Session 改每线程一个
+        # （thread-local，惰性新建、各带全 header）。_session_override 是测试注入口（见 setter）。
+        self._local = threading.local()
+        self._session_override: Any | None = None
+        # label id 缓存不加锁：_create_label 已内置 409/422 竞态回退（他处已建则 refresh 复用），
+        # 且 run.py 开跑前已 ensure_labels 预热，并行段内通常纯读。
         self._label_ids: dict[str, int] = {}
+
+    @property
+    def _session(self) -> Any:
+        """当前线程的 HTTP 会话：override 优先（测试注入），否则每线程惰性建独立 Session。"""
+        if self._session_override is not None:
+            return self._session_override
+        session = getattr(self._local, "session", None)
+        if session is None:
+            session = requests.Session()
+            session.headers.update(
+                {"Authorization": f"token {self._token}", "Content-Type": "application/json"}
+            )
+            self._local.session = session
+        return session
+
+    @_session.setter
+    def _session(self, value: Any) -> None:
+        # 测试注入口：整体替换（所有线程都读到注入对象）；单线程测试语义与旧字段赋值等价。
+        self._session_override = value
 
     # ---- IssueTracker 协议 ----
 

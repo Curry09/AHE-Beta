@@ -99,6 +99,42 @@ def test_authorization_header_set() -> None:
     assert t._api == "http://gitea/api/v1"  # base_url 去尾斜杠 + /api/v1
 
 
+def test_session_is_thread_local_with_injectable_override() -> None:
+    """Spec-0017/T6：requests.Session 非线程安全 → 每线程独立会话；注入 override 全线程共用。
+
+    并行 a 段各会话线程收尾并发 create_issue：每线程必须拿到自己的 Session（各带全 header、
+    同线程复用同一实例）；测试的 `t._session = fake` 注入语义保持不变（setter 存 override）。
+    """
+    import threading
+
+    t = GiteaTracker(base_url="http://gitea", owner="o", repo="r", token="SECRET")
+    grabbed: dict[str, object] = {}
+
+    def grab(key: str) -> None:
+        first = t._session
+        grabbed[key] = first
+        assert t._session is first  # 同线程复用同一实例
+
+    for key in ("a", "b"):
+        th = threading.Thread(target=grab, args=(key,))
+        th.start()
+        th.join()
+    main = t._session
+    assert grabbed["a"] is not grabbed["b"]  # 各线程独立
+    assert grabbed["a"] is not main and grabbed["b"] is not main
+    for s in (grabbed["a"], grabbed["b"], main):
+        assert s.headers["Authorization"] == "token SECRET"  # 每线程都带全 header
+
+    fake = _FakeSession(FakeGitea())
+    t._session = fake  # 测试注入：override 覆盖所有线程
+    assert t._session is fake
+    result: list[object] = []
+    th = threading.Thread(target=lambda: result.append(t._session))
+    th.start()
+    th.join()
+    assert result[0] is fake
+
+
 def test_create_issue_posts_and_parses_ref() -> None:
     backend = FakeGitea()
     backend.labels = {"bug": 5}
