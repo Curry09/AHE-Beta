@@ -7,7 +7,7 @@ summary: 把闭环 a 段的用户会话从串行改为 ThreadPoolExecutor 并行
 tasks:
   - id: T1
     title: 存储与观测投影加锁
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -22,7 +22,7 @@ tasks:
     acceptance: 多线程并发 save N 局后 index.json 恰好 N 条、sessions 目录 N 个全量文件（竞态回归测试）；多线程并发 update_agent 不同 agent_id 后 agents.json 各槽位全部保留；append_agent_log 并发追加不丢行；现有单线程测试全绿。
   - id: T2
     title: client 每局一实例（工厂注入）
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -31,11 +31,12 @@ tasks:
     files:
       - backend/auto_designer/loop/sim_user.py
       - backend/tests/loop/test_sim_user.py
-    scope: 'make_sim_run_session_fn 的 client 参数改为 client_factory: Callable[[], PersonaClient]（破坏性改签名，调用方仅 run.py 与本测试）；run() 内每局 client = client_factory() 后再守卫式 bind_session（仅具 bind_session 的实现调用）。底层 ApiPersonaClient 无会话态可全局共享，工厂只新建 AgenticPersonaClient 外壳。杜绝并发下后 bind 覆盖先 bind 的串台。'
+      - backend/tests/user/sim/test_workspace.py
+    scope: 'make_sim_run_session_fn 的 client 参数改为 client_factory: Callable[[], PersonaClient]（破坏性改签名，调用方为 run.py 与 test_sim_user/test_workspace 两个测试）；run() 内每局 client = client_factory() 后再守卫式 bind_session（仅具 bind_session 的实现调用）。底层 ApiPersonaClient 无会话态可全局共享，工厂只新建 AgenticPersonaClient 外壳。杜绝并发下后 bind 覆盖先 bind 的串台。'
     acceptance: 注入记录型 fake factory 的单测断言：每局获得独立 client 实例、各自 bind 的 persona/workspace 互不覆盖；两个并发会话（线程模拟）产出的 TurnLog 归属正确不串台；现有 sim_user 测试改造后全绿。
   - id: T3
     title: a 段并行化 + 并发度旋钮
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -51,7 +52,7 @@ tasks:
     acceptance: FakeHarness+Scripted 下 max_workers=4 跑 8 局：全部落盘、d/b 段在 a 汇齐后才执行；单会话 launch 抛异常时其余会话正常完成、轮不中断；max_parallel_users=1 与旧串行行为等价（回归基线）；现有 orchestrator 测试全绿。
   - id: T4
     title: 并发端到端回归测试
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
@@ -138,8 +139,8 @@ round K:
 `client_factory: Callable[[], PersonaClient]`，`run()` 内每局 `client = client_factory()` 后再
 守卫式 `bind_session`。底层 `ApiPersonaClient.complete` 无会话态（纯函数式补全 + 429 退避），
 openai SDK 客户端线程安全，**全部会话共享同一个 `ApiPersonaClient` 实例**、只是各自新建外壳：
-`client_factory = lambda: AgenticPersonaClient(shared_api.complete)`。破坏性改签名，调用方仅
-run.py（随 T3 一起改）与 sim_user 测试。
+`client_factory = lambda: AgenticPersonaClient(shared_api.complete)`。破坏性改签名，调用方为
+run.py（随 T3 一起改）与 test_sim_user / test_workspace 两个测试。
 
 ### T3：a 段两阶段拆分 + 线程池
 

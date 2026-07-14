@@ -112,10 +112,10 @@
 | 0015 | 0015/T3 | WorkspaceJailMiddleware：工具级越界读写一律拒 | pending | — | backend/auto_designer/dev/workspace_jail.py<br>backend/tests/dev/test_workspace_jail.py |
 | 0016 | 0016/T1 | 体感 reason 作根因信号喂设计师 | pending | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_designer.py |
 | 0016 | 0016/T2 | 设计师 grep + 先搜后读，降低读码开销 | pending | — | backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/search_file_content.tool.yaml |
-| 0017 | 0017/T1 | 存储与观测投影加锁 | pending | — | backend/auto_designer/user/session_store.py<br>backend/auto_designer/loop/live.py<br>backend/tests/user/test_session_store.py<br>backend/tests/loop/test_live.py |
-| 0017 | 0017/T2 | client 每局一实例（工厂注入） | pending | — | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
-| 0017 | 0017/T3 | a 段并行化 + 并发度旋钮 | pending | T1, T2 | backend/auto_designer/loop/orchestrator.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py |
-| 0017 | 0017/T4 | 并发端到端回归测试 | pending | T3 | backend/tests/loop/test_parallel_sessions.py |
+| 0017 | 0017/T1 | 存储与观测投影加锁 | done | — | backend/auto_designer/user/session_store.py<br>backend/auto_designer/loop/live.py<br>backend/tests/user/test_session_store.py<br>backend/tests/loop/test_live.py |
+| 0017 | 0017/T2 | client 每局一实例（工厂注入） | done | — | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/sim/test_workspace.py |
+| 0017 | 0017/T3 | a 段并行化 + 并发度旋钮 | done | T1, T2 | backend/auto_designer/loop/orchestrator.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py |
+| 0017 | 0017/T4 | 并发端到端回归测试 | done | T3 | backend/tests/loop/test_parallel_sessions.py |
 
 ## 跨 feature 关系图
 
@@ -328,7 +328,7 @@ graph LR
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012 |
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
-| backend/tests/user/sim/test_workspace.py | 0008, 0009 |
+| backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017 |
 
 ## 各 feature 详情
@@ -763,9 +763,9 @@ graph LR
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
-    classDef st_pending fill:#eeeeee;
-    class v_T1_1 st_pending;
-    class v_T2_1 st_pending;
-    class v_T3_1 st_pending;
-    class v_T4_1 st_pending;
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
 ```
