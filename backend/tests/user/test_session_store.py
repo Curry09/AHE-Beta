@@ -87,3 +87,33 @@ def test_resave_overwrites_full_index_duplicates(tmp_path) -> None:
     store.save(s)
     # 全量被覆盖（仍单文件），索引不去重 → 两条
     assert len(store.index()) == 2
+
+
+def test_concurrent_saves_lose_no_index_entries(tmp_path) -> None:
+    """Spec-0017/T1 竞态回归：并发 save N 局后 index 恰好 N 条、全量文件 N 个。
+
+    加锁前 index.json 是无锁读-改-写，并发追加会基于同一旧快照互相覆盖（丢条目）。
+    用屏障让所有线程同时冲 save，最大化竞态窗口。
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    store = SessionStore(tmp_path)
+    n = 16
+    sessions = [_session() for _ in range(n)]
+    barrier = threading.Barrier(n)
+
+    def save_one(s):
+        barrier.wait()  # 齐射，逼出读-改-写交错
+        store.save(s)
+
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        list(pool.map(save_one, sessions))
+
+    entries = store.index()
+    assert len(entries) == n  # 丢条目即回归
+    assert {e["session_id"] for e in entries} == {s.session_id for s in sessions}
+    full_files = {p.name for p in tmp_path.glob("*.json")} - {"index.json"}
+    assert len(full_files) == n  # 全量文件一个不少，逐个可读回
+    for s in sessions:
+        assert store.load(s.session_id) == s
