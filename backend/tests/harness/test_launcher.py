@@ -143,6 +143,37 @@ def test_checkout_invalidates_on_content_change(tmp_path) -> None:
     assert len(list((tmp_path / "runs").iterdir())) == 2  # 两个不同 SHA 的 checkout 并存
 
 
+def test_checkout_concurrent_same_sha_yields_single_intact_copy(tmp_path) -> None:
+    """Spec-0017/T5 竞态回归：并行会话同 SHA 同时 checkout，params.yaml 绝不被交错写坏。
+
+    加锁 + 临时目录原子 rename 前：多线程同时通过存在性检查 → 并发 extractall 同一目录
+    （params.yaml 被叠写出重复 entry 键/乱字节，生产实跑踩中），或复用他人半解压目录。
+    屏障齐射逼出竞态窗口；重复键会让 safe YAML 抛 DuplicateKeyError，即断言失败。
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from ruamel.yaml import YAML
+
+    launcher = _launcher(tmp_path, _COUNTER_ENTRY)
+    n = 8
+    barrier = threading.Barrier(n)
+
+    def checkout(_: int) -> str:
+        barrier.wait()  # 齐射：全员同时冲 check-then-extract
+        return str(launcher._checkout(ref="main"))
+
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        dests = list(pool.map(checkout, range(n)))
+
+    assert len(set(dests)) == 1  # 全部落到同一 checkout 目录
+    runs = tmp_path / "runs"
+    assert [d.name for d in runs.iterdir()] == [Path(dests[0]).name]  # 无 tmp 残留、无重复目录
+    params = YAML(typ="safe").load((Path(dests[0]) / "params.yaml").read_text(encoding="utf-8"))
+    assert isinstance(params["entry"], list) and params["entry"]  # 结构完好、单一 entry 键
+    assert (Path(dests[0]) / "fake_entry.py").is_file()  # 副本内容完整
+
+
 def test_entry_command_not_found_raises(tmp_path) -> None:
     launcher = _launcher(tmp_path, _COUNTER_ENTRY, entry_argv=["no_such_cmd_xyz_42"])
     with pytest.raises(FileNotFoundError):
