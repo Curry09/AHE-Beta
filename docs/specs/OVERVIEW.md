@@ -52,6 +52,9 @@
 ### 0016 设计师根因信号 + 读码效率：体感 reason 喂设计师 · 先搜后读
 补上设计师的「为什么差」根因信号并降低其读码开销：把用户体感的 reason（打分背后那句话）随分数一起落进 SessionStore index 并喂给设计师——分数只告诉差、reason 才告诉差在哪（尤其「延迟/等待本身」这类只在 reason 里、分数看不出的痛点），设计师据此先判 bug/feature 再给 dev 提需求，别把延迟误读成没交付去堆恢复逻辑；同时给设计师 search_file_content(grep) + 「先搜后读」纪律，避免把 entry.py 等大文件整篇通读烧迭代。落点 designer/ + user/session_store.py + agent_defs/designer/。
 
+### 0017 多用户会话并行化：a 段线程池 + 共享状态加锁
+把闭环 a 段的用户会话从串行改为 ThreadPoolExecutor 并行：并发单元=整局会话（工作区+harness 子进程+client+run_session 一整包），信封内部时序不动；配套修共享状态（client 每局一实例、工作区供给前移、SessionStore/live 加锁），单会话失败降级不废整轮。d/b 段维持串行（同仓 push + 全局 env 的固有约束）。落点 loop/orchestrator + loop/sim_user + run.py + user/session_store + loop/live。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -109,6 +112,10 @@
 | 0015 | 0015/T3 | WorkspaceJailMiddleware：工具级越界读写一律拒 | pending | — | backend/auto_designer/dev/workspace_jail.py<br>backend/tests/dev/test_workspace_jail.py |
 | 0016 | 0016/T1 | 体感 reason 作根因信号喂设计师 | pending | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_designer.py |
 | 0016 | 0016/T2 | 设计师 grep + 先搜后读，降低读码开销 | pending | — | backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/search_file_content.tool.yaml |
+| 0017 | 0017/T1 | 存储与观测投影加锁 | pending | — | backend/auto_designer/user/session_store.py<br>backend/auto_designer/loop/live.py<br>backend/tests/user/test_session_store.py<br>backend/tests/loop/test_live.py |
+| 0017 | 0017/T2 | client 每局一实例（工厂注入） | pending | — | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
+| 0017 | 0017/T3 | a 段并行化 + 并发度旋钮 | pending | T1, T2 | backend/auto_designer/loop/orchestrator.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py |
+| 0017 | 0017/T4 | 并发端到端回归测试 | pending | T3 | backend/tests/loop/test_parallel_sessions.py |
 
 ## 跨 feature 关系图
 
@@ -199,6 +206,12 @@ graph LR
         n0016_T1["T1 体感 reason 作根因信号喂设计师"]
         n0016_T2["T2 设计师 grep + 先搜后读，降低读码开销"]
     end
+    subgraph G0017[0017 user-parallel-sessions]
+        n0017_T1["T1 存储与观测投影加锁"]
+        n0017_T2["T2 client 每局一实例（工厂注入）"]
+        n0017_T3["T3 a 段并行化 + 并发度旋钮"]
+        n0017_T4["T4 并发端到端回归测试"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -250,6 +263,9 @@ graph LR
     n0009_T3 --> n0009_T1
     n0009_T4 --> n0009_T1
     n0010_T2 --> n0010_T1
+    n0017_T3 --> n0017_T1
+    n0017_T3 --> n0017_T2
+    n0017_T4 --> n0017_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -291,11 +307,11 @@ graph LR
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013 |
-| backend/auto_designer/user/session_store.py | 0001, 0016 |
+| backend/auto_designer/user/session_store.py | 0001, 0016, 0017 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
 | backend/auto_designer/user/sim/loop.py | 0005, 0012 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008 |
@@ -304,15 +320,16 @@ graph LR
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/harness_template/entry.py | 0003, 0013 |
-| backend/run.py | 0007, 0015 |
+| backend/run.py | 0007, 0015, 0017 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012 |
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009 |
+| backend/tests/user/test_session_store.py | 0001, 0017 |
 
 ## 各 feature 详情
 
@@ -723,4 +740,32 @@ graph LR
     classDef st_pending fill:#eeeeee;
     class v_T1_1 st_pending;
     class v_T2_1 st_pending;
+```
+
+### 0017 多用户会话并行化：a 段线程池 + 共享状态加锁（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 存储与观测投影加锁"]
+    nT2["T2 client 每局一实例（工厂注入）"]
+    nT3["T3 a 段并行化 + 并发度旋钮"]
+    nT4["T4 并发端到端回归测试"]
+    nT1 --> nT3
+    nT2 --> nT3
+    nT3 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
 ```
