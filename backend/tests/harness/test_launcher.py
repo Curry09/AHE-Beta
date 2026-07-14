@@ -174,6 +174,33 @@ def test_checkout_concurrent_same_sha_yields_single_intact_copy(tmp_path) -> Non
     assert (Path(dests[0]) / "fake_entry.py").is_file()  # 副本内容完整
 
 
+def test_read_params_concurrent_parses_cleanly(tmp_path) -> None:
+    """Spec-0017/T5 追加：ruamel YAML 实例非线程安全 → 每次解析新建实例。
+
+    旧实现共享模块级单例 _yaml，并行 launch 并发 load 会搅乱解析器内部状态（生产实跑踩中）。
+    屏障齐射并发解析同一 params.yaml，断言全部结果完好一致。
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    (dest / "params.yaml").write_text(
+        "entry:\n  - python\n  - entry.py\nenv:\n  K: v\n", encoding="utf-8"
+    )
+    launcher = HarnessLauncher(harness_repo="unused", runs_root=tmp_path / "runs")
+    n = 16
+    barrier = threading.Barrier(n)
+
+    def read(_: int) -> dict:
+        barrier.wait()  # 齐射：并发进解析器
+        return launcher._read_params(dest)
+
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        results = list(pool.map(read, range(n)))
+    assert all(r == {"entry": ["python", "entry.py"], "env": {"K": "v"}} for r in results)
+
+
 def test_entry_command_not_found_raises(tmp_path) -> None:
     launcher = _launcher(tmp_path, _COUNTER_ENTRY, entry_argv=["no_such_cmd_xyz_42"])
     with pytest.raises(FileNotFoundError):

@@ -26,7 +26,6 @@ from ruamel.yaml import YAML
 from auto_designer.harness.interface import HarnessInterface
 
 _PARAMS_FILE = "params.yaml"
-_yaml = YAML(typ="safe")
 
 # 单轮回复的兜底机制。注意：harness 自身对每轮已有上界（v0 模板 _CALL_TIMEOUT×_RUN_RETRIES ≈ 16min
 # 后必回 [harness error]），所以「慢」是合法的长任务，绝不能按墙钟盲杀（会误杀真长任务）。
@@ -292,4 +291,6 @@ class HarnessLauncher:
         params_path = dest / _PARAMS_FILE
         if not params_path.is_file():
             raise FileNotFoundError(f"harness 缺 {_PARAMS_FILE}：{params_path}")
-        return dict(_yaml.load(params_path))
+        # Spec-0017/T5：ruamel 的 YAML 实例非线程安全（解析器内部状态跨调用共享），并行 launch
+        # 下共享模块级单例会被并发 load 互相搅乱 → 每次解析新建实例（构造开销微不足道）。
+        return dict(YAML(typ="safe").load(params_path))
