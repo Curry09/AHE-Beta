@@ -637,9 +637,7 @@ def run_session(
                     f"{nxt.splitlines()[0][:80]}..."
                 )
             else:
-                history.append(
-                    f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}..."
-                )
+                history.append(f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}...")
             # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
             result.pending_harness_output = nxt
             result.pending_harness_steps = harness_steps

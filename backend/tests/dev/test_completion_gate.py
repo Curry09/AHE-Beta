@@ -182,20 +182,14 @@ def test_local_used_before_assign_detects_main_steps_bug() -> None:
 
 
 def test_local_used_before_assign_ok_when_order_correct() -> None:
-    src = (
-        "def main():\n"
-        "    steps = list(collector.steps)\n"
-        "    reply = _append('done', steps)\n"
-    )
+    src = "def main():\n    steps = list(collector.steps)\n    reply = _append('done', steps)\n"
     assert _local_used_before_assign(src, func_names=frozenset({"main"})) == []
 
 
 def test_wiring_gate_blocks_used_before_assign(tmp_path: Path) -> None:
     repo, seed = _seed_repo(tmp_path)
     (repo / "entry.py").write_text(
-        "def main():\n"
-        "    reply = _append('done', steps)\n"
-        "    steps = []\n",
+        "def main():\n    reply = _append('done', steps)\n    steps = []\n",
         encoding="utf-8",
     )
     (repo / "MANUAL.md").write_text("# manual v1\n- evidence\n", encoding="utf-8")

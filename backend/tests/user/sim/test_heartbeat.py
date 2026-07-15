@@ -234,9 +234,7 @@ def test_two_mode_judge_intent_combined() -> None:
         intents=[{"intent": "keep_waiting"}],
         verdict="satisfied",
     )
-    res = run_session(
-        _persona(), client, harness, TASK, manual=harness.manual, waiting_mode="two"
-    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual, waiting_mode="two")
     assert len(client.judge_intent_prompts) == 1
     assert len(client.judge_prompts) == 0
     assert len(client.intent_prompts) == 0
@@ -272,7 +270,7 @@ def test_check_status_via_invoke_control_has_no_gap() -> None:
     harness = HeartbeatHarness(
         [("pending", 90.0), ("reply", "done")],
         control_reply="phase=running; elapsed=1",
-        manual="# Manual\nSend {\"control\":\"status\"} to peek.\n",
+        manual='# Manual\nSend {"control":"status"} to peek.\n',
     )
     client = WaitStubClient(
         actions=["send_task", "accept"],
@@ -310,7 +308,7 @@ def test_status_peek_continues_wait_then_final_reply() -> None:
     harness = HeartbeatHarness(
         [("pending", 60.0), ("reply", "all done")],
         control_reply="phase=running; step=pytest",
-        manual="# Manual\n{\"control\":\"status\"} peeks; {\"control\":\"interrupt\"} stops.\n",
+        manual='# Manual\n{"control":"status"} peeks; {"control":"interrupt"} stops.\n',
     )
     client = WaitStubClient(
         actions=["send_task", "accept"],
@@ -523,9 +521,7 @@ def test_prior_activity_carried() -> None:
         intents=[{"intent": "keep_waiting"}, {"intent": "interrupt"}],
         verdict="unsure",
     )
-    run_session(
-        _persona(), client, harness, TASK, manual=harness.manual, waiting_mode="three"
-    )
+    run_session(_persona(), client, harness, TASK, manual=harness.manual, waiting_mode="three")
     assert len(client.judge_prompts) >= 2
     assert "<prior_activity>" in client.judge_prompts[1]
     assert "rm -rf" in client.judge_prompts[1]

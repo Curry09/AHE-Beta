@@ -387,15 +387,9 @@ def build_waiting_intent_turn(
             prior_activity=prior_activity,
         )
     )
-    parts.append(
-        f"<judgment>\n{judgment}\n"
-        f"your notes: {perceive.strip() or '(none)'}\n"
-        "</judgment>"
-    )
+    parts.append(f"<judgment>\n{judgment}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
     parts.append(_intent_options_block())
-    parts.append(
-        "Do NOT pick a menu action yet. Say what you would do if you had a full UI."
-    )
+    parts.append("Do NOT pick a menu action yet. Say what you would do if you had a full UI.")
     parts.append(
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"intent": "keep_waiting | check_status | ask_where | redirect | interrupt | walk_away", '
@@ -476,16 +470,8 @@ def build_waiting_act_turn(
             prior_activity=prior_activity,
         )
     )
-    parts.append(
-        f"<judgment>\n{judgment}\n"
-        f"your notes: {perceive.strip() or '(none)'}\n"
-        "</judgment>"
-    )
-    parts.append(
-        f"<intent>\n{intent}\n"
-        f"detail: {intent_detail.strip() or '(none)'}\n"
-        "</intent>"
-    )
+    parts.append(f"<judgment>\n{judgment}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
+    parts.append(f"<intent>\n{intent}\ndetail: {intent_detail.strip() or '(none)'}\n</intent>")
     parts.append(
         "# MENU — only these actions exist right now\n"
         "- keep_waiting: leave it running.\n"

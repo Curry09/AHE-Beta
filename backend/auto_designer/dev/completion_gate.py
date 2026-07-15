@@ -90,7 +90,11 @@ def _local_used_before_assign(source: str, *, func_names: frozenset[str]) -> lis
             for s in node.body
             if not isinstance(s, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
         ]
-        later_stores = set().union(*(_names_stored_excluding_nested(s) for s in body_stmts)) if body_stmts else set()
+        later_stores = (
+            set().union(*(_names_stored_excluding_nested(s) for s in body_stmts))
+            if body_stmts
+            else set()
+        )
         assigned: set[str] = {a.arg for a in node.args.args}
         assigned.update(a.arg for a in node.args.kwonlyargs)
         if node.args.vararg:

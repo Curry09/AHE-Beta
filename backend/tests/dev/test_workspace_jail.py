@@ -124,9 +124,7 @@ def test_wrap_allows_nexau_bash_tool_results_read(tmp_path: Path) -> None:
     assert _denied(bad_w) and bad_w_ran is False
 
     # shell 读临时输出放行；读 sessions 仍拒
-    sh_ok, sh_ran = _run(
-        mw, _params(work, "run_shell_command", {"command": f"head -1 {artifact}"})
-    )
+    sh_ok, sh_ran = _run(mw, _params(work, "run_shell_command", {"command": f"head -1 {artifact}"}))
     assert sh_ok == "REAL_TOOL_RAN" and sh_ran is True
     sh_bad, sh_bad_ran = _run(
         mw, _params(work, "run_shell_command", {"command": "cat ../../data/sessions/1.json"})

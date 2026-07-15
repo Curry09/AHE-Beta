@@ -84,8 +84,7 @@ class ScriptedProgressHarness:
     def control(self, name: str) -> str:
         self.controls.append(name)
         return (
-            f"[interrupted] You stopped this request via `{name}`; "
-            "session kept — send a follow-up."
+            f"[interrupted] You stopped this request via `{name}`; session kept — send a follow-up."
         )
 
     def reset(self) -> None:
@@ -180,9 +179,7 @@ def _run_one(
     )
     print(f"\n======== mode={mode} {label} d1={eval_d1.value} ========")
     t0 = time.monotonic()
-    res = run_session(
-        persona, client, harness, task, manual=harness.manual, waiting_mode=mode
-    )
+    res = run_session(persona, client, harness, task, manual=harness.manual, waiting_mode=mode)
     gaps = [s for s in res.signals if s.startswith("WAIT_GAP:")]
     print(
         f"elapsed={time.monotonic() - t0:.1f}s end={res.end_reason} "
@@ -197,10 +194,7 @@ def _run_one(
             if t.perceive.startswith("[") and "]" in t.perceive:
                 head, _, note = t.perceive[1:].partition("]")
                 note = note.strip()
-            print(
-                f"  WAIT [{head}] action={t.action} patience={t.patience} "
-                f"note={note!r}"
-            )
+            print(f"  WAIT [{head}] action={t.action} patience={t.patience} note={note!r}")
         elif t.message:
             print(f"  turn={t.turn} action={t.action} msg={t.message[:90]!r}")
 

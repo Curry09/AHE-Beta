@@ -235,8 +235,7 @@ def main() -> int:
                 score=1,
                 reason=(
                     "I just wanted a simple billing change and command output, but it kept "
-                    "stalling and I had to interrupt. "
-                    + blind_gaps
+                    "stalling and I had to interrupt. " + blind_gaps
                 ),
             ),
         )
@@ -274,7 +273,9 @@ def main() -> int:
     )
     print(f"seeded bugs: #{bug_expert.number}, #{bug_blind.number}")
     print("\n=== runtime_agg ===")
-    print(format_runtime_agg(aggregate_runtime(store=store, harness_repo=harness_repo, recent_n=50)))
+    print(
+        format_runtime_agg(aggregate_runtime(store=store, harness_repo=harness_repo, recent_n=50))
+    )
 
     print("\n=== D｜Designer.propose_once ===")
     t0 = time.monotonic()

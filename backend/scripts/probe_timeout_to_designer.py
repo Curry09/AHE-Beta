@@ -39,7 +39,9 @@ def _setup_llm_env() -> None:
     home = _load_env(HOME_ENV) if HOME_ENV.is_file() else {}
     backend = _load_env(ROOT / ".env") if (ROOT / ".env").is_file() else {}
     model = home.get("LLM_MODEL") or backend.get("USER_LLM_MODEL") or backend.get("LLM_MODEL")
-    base = home.get("LLM_BASE_URL") or backend.get("USER_LLM_BASE_URL") or backend.get("LLM_BASE_URL")
+    base = (
+        home.get("LLM_BASE_URL") or backend.get("USER_LLM_BASE_URL") or backend.get("LLM_BASE_URL")
+    )
     key = home.get("LLM_API_KEY") or backend.get("USER_LLM_API_KEY") or backend.get("LLM_API_KEY")
     if not (model and base and key):
         raise SystemExit(f"缺 LLM 凭证：请检查 {HOME_ENV} 或 {ROOT / '.env'}")
@@ -111,8 +113,10 @@ def main() -> int:
         D41Grain,
         D42Supervise,
         D43Correct,
-        Persona as SimPersona,
         finalize_persona,
+    )
+    from auto_designer.user.sim.dimensions import (
+        Persona as SimPersona,
     )
     from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
 

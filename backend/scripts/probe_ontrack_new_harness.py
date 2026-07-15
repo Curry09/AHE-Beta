@@ -112,8 +112,7 @@ class NewHarnessContract:
             return preview  # keep in_flight
         self._inflight = False
         return (
-            f"[interrupted] You stopped this request via `{name}`; "
-            "session kept — send a follow-up."
+            f"[interrupted] You stopped this request via `{name}`; session kept — send a follow-up."
         )
 
     def reset(self) -> None:
@@ -155,7 +154,6 @@ ON_TRACK: list[list[str]] = [
 
 def _run_one(*, d1: object) -> None:
     from auto_designer.user.sim.dimensions import (
-        D1Eval,
         D2Depth,
         D2Domain,
         D5Autonomy,
@@ -187,9 +185,7 @@ def _run_one(*, d1: object) -> None:
     )
     print(f"\n======== ON-TRACK d1={d1.value} (new harness contract) ========")  # type: ignore[attr-defined]
     t0 = time.monotonic()
-    res = run_session(
-        persona, client, harness, task, manual=harness.manual, waiting_mode="three"
-    )
+    res = run_session(persona, client, harness, task, manual=harness.manual, waiting_mode="three")
     gaps = [s for s in res.signals if s.startswith("WAIT_GAP:")]
     peeks = [c for c in harness.controls if c in ("status", "peek")]
     interrupts = [c for c in harness.controls if c == "interrupt"]
@@ -206,10 +202,7 @@ def _run_one(*, d1: object) -> None:
             if t.perceive.startswith("[") and "]" in t.perceive:
                 head, _, note = t.perceive[1:].partition("]")
                 note = note.strip()
-            print(
-                f"  WAIT [{head}] action={t.action} patience={t.patience} "
-                f"note={note!r}"
-            )
+            print(f"  WAIT [{head}] action={t.action} patience={t.patience} note={note!r}")
         elif t.message:
             print(f"  turn={t.turn} action={t.action} msg={t.message[:100]!r}")
         elif t.harness_output:
