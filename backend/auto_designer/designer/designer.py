@@ -2,7 +2,7 @@
 """Designer：创新者 = 综合全局的 nexau agent（对偶于开发者的「局部补丁」）。
 
 开发者 agent 只做聚焦的局部修改，难产生结构性改进（会把轨迹特征带进 harness）。designer 补上这一环：
-读**全量 open issue backlog + 体感曲线**，只读查看 harness 现状（agents/main.md），跳出单条 issue
+读**全量 open issue backlog + 体感曲线 + 运行时行为聚合**，只读查看 harness 现状，跳出单条 issue
 找跨 issue 的结构性根因，产出 0..n 条**设计提案**（打 `design` 标签）写回 tracker，由开发者后续领取
 落地。designer 不碰 git、不改文件——它只提方向，不动手。产出形态与用户 agent 一致（agent 出草稿、
 driver 落库），与开发者侧解耦。
@@ -18,6 +18,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from auto_designer.designer.runtime_agg import aggregate_runtime, format_runtime_agg
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
@@ -156,9 +157,11 @@ class Designer:
     def propose_once(self) -> DesignOutcome:
         backlog = self._tracker.list_open_issues()
         trend = self._feeling_trend()
+        # 任务无关机制层数字：扫已落盘 steps/reply + 仓内预算钮（不改协议、不碰 a 段）。
+        runtime = format_runtime_agg(aggregate_runtime(store=self._store, harness_repo=self._repo))
         self._emit(running=True, status=f"综合全局中…（{len(backlog)} open issue）")
 
-        result_text = self._run_agent(backlog=backlog, trend=trend)
+        result_text = self._run_agent(backlog=backlog, trend=trend, runtime=runtime)
         drafts = self._parse_proposals(result_text)
 
         numbers: list[int] = []
@@ -180,7 +183,13 @@ class Designer:
         )
         return DesignOutcome(proposal_numbers=numbers)
 
-    def _run_agent(self, *, backlog: list, trend: list[tuple[str, int, str]]) -> str:
+    def _run_agent(
+        self,
+        *,
+        backlog: list,
+        trend: list[tuple[str, int, str]],
+        runtime: str,
+    ) -> str:
         os.environ["SANDBOX_WORK_DIR"] = str(self._repo)  # 只读 grounding：sandbox = harness 仓
         from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
@@ -195,7 +204,7 @@ class Designer:
             cfg.resolved_tracer = StepTracer(self._on_event)
         agent = Agent(config=cfg)
         msg = (
-            "综合下面的全量 open issue backlog 与体感曲线，找跨 issue 的结构性根因，"
+            "综合下面的全量 open issue backlog、体感曲线与运行时行为聚合，找跨 issue 的结构性根因，"
             "产出 0..n 条结构性设计提案（宁缺毋滥；无值得提的方向就返回 `[]`）。\n"
             "**先 read_file 读懂 harness 源码**（`agents/main.md` + `entry.py` + `agent.yaml`，"
             "看清超时/重试/迭代上限/交付方式这些一级钮）再提；没读机制源码别断言机制根因。\n"
@@ -207,6 +216,7 @@ class Designer:
             "用一条整合性提案点明「#X/#Y 系同一根因，建议合并/关闭」，而非换皮再加一条。\n\n"
             f"## open issue backlog（{len(backlog)} 条）\n{self._format_backlog(backlog)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
+            f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组"
             "（每项含 title/body/labels），无提案则 `[]`。"
         )
