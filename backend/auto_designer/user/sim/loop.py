@@ -249,6 +249,7 @@ def _supervise_send(
     except Exception as exc:  # noqa: BLE001  黑盒起轮失败 → 可观测失败信号
         return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}", time.monotonic() - t0, None
     heartbeats = 0
+    progress_seen = 0  # 已喂给用户的 progress 条数；用来判「自上次心跳以来有无新活动」
     while True:
         try:
             kind, val = harness.poll(_HEARTBEAT_SEC)
@@ -259,17 +260,28 @@ def _supervise_send(
         # kind == "pending"：等待超阈值 → 唤醒用户 agent 做一次等待决策
         waited = float(val)  # type: ignore[arg-type]
         heartbeats += 1
+        # Codex 式活动条：launcher/假 harness 挂在 last_progress；只把增量/全量短标题喂进等待轮。
+        progress = list(getattr(harness, "last_progress", None) or [])
+        new_progress = len(progress) > progress_seen
+        progress_seen = len(progress)
         ret = client.respond(
-            system, build_waiting_turn(task, history, state, manual=manual, waited_sec=waited)
+            system,
+            build_waiting_turn(
+                task,
+                history,
+                state,
+                manual=manual,
+                waited_sec=waited,
+                progress=progress,
+            ),
         )
         action, control = _resolve_waiting(ret)
         if heartbeats >= _MAX_HEARTBEATS:
             action = "give_up"  # 兜底：唤醒到顶强制收束，防病态无限等
         elif action == "keep_waiting":
-            # 干等挫败累积，口径与主路径 apply_verdict 统一：按 persona 的 patience_decay 加权
-            # （急躁型掉得更快），而非平扣 1。等待挫败在此逐次建模，故非心跳路径的极端等待惩罚
-            # 只对阻塞 route 生效，避免同一段等待被双记（见 run_session 的 _EXTREME_WAIT_SEC 分支）。
-            state.patience = max(0, state.patience - coef.patience_decay)
+            # 有新可见进度 → 不扣耐心（像真人看见它还在干活）；死静默才按性格耗心。
+            if not new_progress:
+                state.patience = max(0, state.patience - coef.patience_decay)
             if state.patience <= 0:
                 action = "give_up"  # 耐心耗尽：这个人不会再等了
         _log_waiting(result, state, action, control, ret, on_progress)

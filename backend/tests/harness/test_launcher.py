@@ -305,3 +305,43 @@ def test_launch_manual_empty_when_absent(tmp_path) -> None:
         assert h.manual == ""
     finally:
         h.close()
+
+
+# 进度旁路：reply 前可多行 {"progress":...}；poll pending 期间 last_progress 可见。
+_PROGRESS_ENTRY = """\
+import json, sys, time
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    obj = json.loads(line)
+    if "control" in obj:
+        sys.stdout.write(json.dumps({"reply": "[interrupted]"}) + "\\n")
+        sys.stdout.flush()
+        continue
+    for text in ("read core.py", "run pytest"):
+        sys.stdout.write(json.dumps({"progress": {"kind": "tool", "text": text}}) + "\\n")
+        sys.stdout.flush()
+        time.sleep(0.15)
+    sys.stdout.write(json.dumps({"reply": "all done", "steps": [{"kind": "tool", "text": "x"}]}) + "\\n")
+    sys.stdout.flush()
+"""
+
+
+def test_progress_lines_accumulate_before_reply(tmp_path) -> None:
+    h = _launcher(tmp_path, _PROGRESS_ENTRY).launch("main")
+    try:
+        h.begin("go")
+        # 第一次短 poll 多半还在跑 → pending，但可能已读到部分 progress
+        kind, val = h.poll(0.05)
+        # 等到终态
+        while kind == "pending":
+            kind, val = h.poll(2.0)
+        assert kind == "reply"
+        assert val == "all done"
+        texts = [p.get("text") for p in h.last_progress]
+        assert "read core.py" in texts
+        assert "run pytest" in texts
+        assert h.last_steps == [{"kind": "tool", "text": "x"}]
+    finally:
+        h.close()
