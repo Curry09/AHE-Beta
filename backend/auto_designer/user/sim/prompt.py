@@ -230,6 +230,18 @@ def build_user_turn(
     return "\n\n".join(parts)
 
 
+def _activity_bullets(items: list | None, *, limit: int = 12) -> str:
+    """把 progress / 上轮活动收成短标题列表；空则空串。"""
+    bullets: list[str] = []
+    for item in list(items or [])[-limit:]:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if text:
+            bullets.append(f"- {text}")
+    return "\n".join(bullets)
+
+
 def build_waiting_turn(
     task: str,
     history_lines: list[str],
@@ -238,11 +250,13 @@ def build_waiting_turn(
     manual: str = "",
     waited_sec: float = 0.0,
     progress: list | None = None,
+    prior_activity: list | None = None,
 ) -> str:
-    """心跳唤醒的一轮：终态 reply 未到；可选 progress = Codex 式活动条。
+    """心跳唤醒：终态 reply 未到。活动条是可评判的过程记忆，不是「有动就好」。
 
-    有 <progress> 时用户看见「它正在跑什么工具」（不是最终答案）；没有则仍是黑盒。
-    据此决定 continue wait / 手册控制 / 放弃。
+    - <prior_activity>：上一轮（已完成的）请求里它干过什么
+    - <progress>：本轮请求至今的活动条
+    用户应对照任务判断对不对路；空转/偏题/不该做的事 → 打断，哪怕还在「动」。
     """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     parts = ["<waiting>"]
@@ -250,23 +264,20 @@ def build_waiting_turn(
         parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
     parts.append(f"<task>\n{task}\n</task>")
     parts.append(f"<history>\n{hist}\n</history>")
-    prog = list(progress or [])
-    if prog:
-        bullets = []
-        for item in prog[-12:]:
-            if not isinstance(item, dict):
-                continue
-            text = str(item.get("text") or "").strip()
-            if text:
-                bullets.append(f"- {text}")
-        body = "\n".join(bullets) if bullets else "(empty)"
-        parts.append(f"<progress>\n{body}\n</progress>")
+    prior_body = _activity_bullets(prior_activity)
+    if prior_body:
+        parts.append(f"<prior_activity>\n{prior_body}\n</prior_activity>")
+    prog_body = _activity_bullets(progress)
+    if prog_body:
+        parts.append(f"<progress>\n{prog_body}\n</progress>")
         parts.append(
-            f"You sent your last message ~{waited_sec:.0f}s ago. The final reply is not ready yet, "
-            "but you CAN see the activity strip above (tools it has been running). That is live "
-            "status — not the finished answer. Decide what YOU, this person, would do: keep waiting "
-            "if it still looks productively busy, interrupt/redirect if it looks stuck or off-track, "
-            "or give up if you would walk away."
+            f"You sent your last message ~{waited_sec:.0f}s ago. No final reply yet. "
+            "The activity strip above is live process memory — what tools it has been running "
+            "THIS request (compare with <prior_activity> from the previous request if present). "
+            "Busy ≠ correct. Judge the CONTENT against your task: is it doing the right kind of "
+            "work, repeating useless steps, wandering off, or doing something you would not want? "
+            "Keep waiting only if it still looks productively on-track; interrupt/redirect if the "
+            "activity looks wrong, stuck looping, or off-task; give up if you would walk away."
         )
     else:
         parts.append(
@@ -276,20 +287,18 @@ def build_waiting_turn(
         )
     parts.append(
         "# YOUR OPTIONS\n"
-        "- keep_waiting: give it more time (you believe it's still legitimately working).\n"
-        "- invoke_control: use a control operation THIS tool documents in <harness_manual> for a "
-        "request that's in progress (e.g. stopping/interrupting it so you can redirect). Name the "
-        "control exactly as the manual calls it. Only invoke a control the manual actually lists.\n"
+        "- keep_waiting: give it more time because the activity (if any) still looks on-track "
+        "for YOUR task — not merely because something is moving.\n"
+        "- invoke_control: use a control from <harness_manual> when the activity looks wrong, "
+        "off-task, looping, or you want to redirect (e.g. interrupt). Name it exactly as the manual.\n"
         "- give_up: you're done — abandon this and walk away.\n"
-        "Honor your <mood>: if patience remains and visible progress (or a plausible long job) "
-        "suggests it's still working, keep_waiting is fine; interrupting or leaving is for when "
-        "this person truly would. Do NOT fabricate that the final answer succeeded — you only have "
-        "the activity strip (if any), not a completed reply."
+        "Honor your <mood>. Do NOT treat 'any activity' as success. Do NOT fabricate a finished "
+        "answer — you only have activity strips + history, not a completed reply."
     )
     parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
     parts.append(
         "Return EXACTLY ONE JSON object and nothing else:\n"
-        '{"perceive": "<what you feel about the wait, honestly>", '
+        '{"perceive": "<what you notice in the activity vs your task, honestly>", '
         '"action": "keep_waiting | invoke_control | give_up", '
         '"control": "<control name from the manual, only if action==invoke_control else empty>", '
         '"message": "<short in-voice line, only if you give_up else empty>"}'

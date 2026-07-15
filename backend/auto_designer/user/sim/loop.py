@@ -222,6 +222,21 @@ def _finalize_terminal(
         result.issue_artifact = emit_issue_artifact(persona, result.turns, issue_text)
 
 
+def _activity_from_harness(harness) -> list[dict]:
+    """本轮已见活动：优先 last_progress；否则从 last_steps 抽 tool/tool_error（短标题）。"""
+    progress = list(getattr(harness, "last_progress", None) or [])
+    if progress:
+        return progress
+    steps = list(getattr(harness, "last_steps", None) or [])
+    out: list[dict] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        if step.get("kind") in ("tool", "tool_error"):
+            out.append({"kind": str(step.get("kind")), "text": str(step.get("text") or "")})
+    return out
+
+
 def _supervise_send(
     harness,
     message: str,
@@ -235,6 +250,7 @@ def _supervise_send(
     manual: str,
     result: SessionResult,
     on_progress: Callable[[SessionResult], None] | None,
+    prior_activity: list[dict],
 ) -> tuple[str, float, str | None]:
     """驱动 harness 出下一轮，但用心跳守望等待：超阈值仍无回复就唤醒用户 agent 决策。
 
@@ -249,7 +265,6 @@ def _supervise_send(
     except Exception as exc:  # noqa: BLE001  黑盒起轮失败 → 可观测失败信号
         return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}", time.monotonic() - t0, None
     heartbeats = 0
-    progress_seen = 0  # 已喂给用户的 progress 条数；用来判「自上次心跳以来有无新活动」
     while True:
         try:
             kind, val = harness.poll(_HEARTBEAT_SEC)
@@ -260,10 +275,8 @@ def _supervise_send(
         # kind == "pending"：等待超阈值 → 唤醒用户 agent 做一次等待决策
         waited = float(val)  # type: ignore[arg-type]
         heartbeats += 1
-        # Codex 式活动条：launcher/假 harness 挂在 last_progress；只把增量/全量短标题喂进等待轮。
+        # 活动条 = 可评判的过程记忆（对照 prior_activity）；「有动」不等于「对」。
         progress = list(getattr(harness, "last_progress", None) or [])
-        new_progress = len(progress) > progress_seen
-        progress_seen = len(progress)
         ret = client.respond(
             system,
             build_waiting_turn(
@@ -273,15 +286,15 @@ def _supervise_send(
                 manual=manual,
                 waited_sec=waited,
                 progress=progress,
+                prior_activity=prior_activity,
             ),
         )
         action, control = _resolve_waiting(ret)
         if heartbeats >= _MAX_HEARTBEATS:
             action = "give_up"  # 兜底：唤醒到顶强制收束，防病态无限等
         elif action == "keep_waiting":
-            # 有新可见进度 → 不扣耐心（像真人看见它还在干活）；死静默才按性格耗心。
-            if not new_progress:
-                state.patience = max(0, state.patience - coef.patience_decay)
+            # 续等一律耗心——有活动也不免税；偏题/空转由模型据活动内容选择打断。
+            state.patience = max(0, state.patience - coef.patience_decay)
             if state.patience <= 0:
                 action = "give_up"  # 耐心耗尽：这个人不会再等了
         _log_waiting(result, state, action, control, ret, on_progress)
@@ -315,6 +328,7 @@ def run_session(
     harness_output = ""
     harness_steps: list = []  # 与 harness_output 配对的内层过程流
     last_wait_sec: float | None = None  # 上一条 harness 回复的墙钟等待耗时（首轮 None）
+    prior_activity: list[dict] = []  # 上一轮已完成请求的活动条（过程记忆，供对照）
 
     while state.turn < MAX_TURNS:
         phase = Phase.OPENING if state.turn == 0 and not history else Phase.ACTIVE
@@ -415,6 +429,7 @@ def run_session(
                 manual=manual,
                 result=result,
                 on_progress=on_progress,
+                prior_activity=prior_activity,
             )
             if terminal_from_wait == "give_up":  # 用户在等待中放弃：走终止路径并结束
                 _finalize_terminal(
@@ -443,6 +458,19 @@ def run_session(
             # Fake/Scripted harness 无此属性 → []。route 只在 EMIT 轮真调 send，此处取值即本轮回复的。
             steps = getattr(harness, "last_steps", None)
             harness_steps = list(steps) if isinstance(steps, list) else []
+            # 本轮活动条写入过程记忆：下一轮等待时可对照「上一轮干了啥 / 这一轮在干啥」。
+            prior_activity = _activity_from_harness(harness)
+            if prior_activity:
+                titles = [
+                    str(p.get("text") or "").strip()
+                    for p in prior_activity[-8:]
+                    if isinstance(p, dict) and str(p.get("text") or "").strip()
+                ]
+                if titles:
+                    history.append(
+                        f"[turn {state.turn}] harness activity (this request): "
+                        + "; ".join(titles)[:240]
+                    )
             history.append(f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}...")
             # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
             result.pending_harness_output = nxt
