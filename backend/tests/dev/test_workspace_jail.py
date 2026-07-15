@@ -15,6 +15,7 @@ from auto_designer.dev.workspace_jail import (  # noqa: E402
     WorkspaceJailMiddleware,
     _escapes,
     _nexau_repo_root,
+    _nexau_runtime_read_roots,
     _shell_offender,
 )
 
@@ -98,6 +99,39 @@ def test_shell_offender_flags_heredoc_redirect_escape(tmp_path: Path) -> None:
     # heredoc 正文里出现 `../` / 绝对路径只是**内容**，不该误伤（重定向目标在仓内）
     cmd_body_noise = "cat > notes.md <<EOF\nsee ../../data/x and /etc/passwd\nEOF"
     assert _shell_offender(work, cmd_body_noise, roots) is None
+
+
+def test_wrap_allows_nexau_bash_tool_results_read(tmp_path: Path) -> None:
+    """边界补全：NexAU bash/tool 临时输出只读放行；写仍拒；轨迹仍拒。"""
+    work = (tmp_path / "harness_repo").resolve()
+    work.mkdir()
+    runtime_roots = _nexau_runtime_read_roots()
+    assert runtime_roots, "应解析到至少一处 NexAU 运行时临时根"
+    bash_root = runtime_roots[0]
+    bash_root.mkdir(parents=True, exist_ok=True)
+    artifact = bash_root / "deadbeef" / "stderr.txt"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text("err\n", encoding="utf-8")
+
+    mw = WorkspaceJailMiddleware()
+    ok, ran = _run(mw, _params(work, "read_file", {"file_path": str(artifact)}))
+    assert ok == "REAL_TOOL_RAN" and ran is True
+
+    # 写工具不能往临时目录写（可写范围仍只有 harness 仓）
+    bad_w, bad_w_ran = _run(
+        mw, _params(work, "write_file", {"file_path": str(artifact), "content": "x"})
+    )
+    assert _denied(bad_w) and bad_w_ran is False
+
+    # shell 读临时输出放行；读 sessions 仍拒
+    sh_ok, sh_ran = _run(
+        mw, _params(work, "run_shell_command", {"command": f"head -1 {artifact}"})
+    )
+    assert sh_ok == "REAL_TOOL_RAN" and sh_ran is True
+    sh_bad, sh_bad_ran = _run(
+        mw, _params(work, "run_shell_command", {"command": "cat ../../data/sessions/1.json"})
+    )
+    assert _denied(sh_bad) and sh_bad_ran is False
 
 
 def test_wrap_allows_nexau_read_denies_nexau_write(tmp_path: Path) -> None:

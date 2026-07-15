@@ -58,6 +58,9 @@
 ### 0018 设计师提案拆信封：complete_task 交付不再被静默丢弃
 设计师用 complete_task 交回提案时，nexau 把结果套进 tool 信封（{success,status,output:{result:'[...]'}}），而 _parse_proposals 的平衡括号扫描刻意不进字符串内部，扫不到顶层数组 → 静默返回「本轮无提案」。实测 8 轮长跑 6 条结构性提案 0 条进 backlog；且该缺陷非确定性——agent 听话调 complete_task 就被丢，不听话直接吐裸数组反而入库（第 6 轮侥幸入库的 #6/#7/#8 使 dev 立刻去改 entry.py 与 tools/，证明结构性进化通道本身是通的、只是被这里堵死）。落点：designer/_run_agent 出口拆信封 + 单测覆盖两条路径（带信封 / 裸数组）。
 
+### 0019 控制旁路放宽 + peek 后继续等待决策
+放宽 harness stdout 旁路协议（任意非 reply JSON 可收），并区分终结型与旁路型 control：status/peek 不结束本轮、写入等待上下文后立刻再决策；interrupt 仍吐 reply 收工。手册仍为能力真相源、控制名不注册。补齐 0012/0013 将 control 一律按打断收工的缺口。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -122,6 +125,8 @@
 | 0017 | 0017/T5 | harness checkout 并发安全 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 | 0017 | 0017/T6 | tracker HTTP 会话线程安全 | done | — | backend/auto_designer/tracker/gitea.py<br>backend/tests/tracker/test_gitea.py |
 | 0018 | 0018/T1 | _run_agent 出口拆 complete_task 信封 | done | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
+| 0019 | 0019/T1 | launcher：非 reply 旁路一律收 + control 旁路/终结分流 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
+| 0019 | 0019/T2 | 用户 sim：旁路型 control 写上下文并立刻再决策 | done | T1 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_heartbeat.py |
 
 ## 跨 feature 关系图
 
@@ -223,6 +228,10 @@ graph LR
     subgraph G0018[0018 designer-proposal-envelope]
         n0018_T1["T1 _run_agent 出口拆 complete_task 信封"]
     end
+    subgraph G0019[0019 control-sideband-peek-wait]
+        n0019_T1["T1 launcher：非 reply 旁路一律收 + control 旁路/终结分流"]
+        n0019_T2["T2 用户 sim：旁路型 control 写上下文并立刻再决策"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -277,6 +286,7 @@ graph LR
     n0017_T3 --> n0017_T1
     n0017_T3 --> n0017_T2
     n0017_T4 --> n0017_T3
+    n0019_T2 --> n0019_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -318,7 +328,7 @@ graph LR
 | backend/auto_designer/designer/designer.py | 0016, 0018 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017 |
@@ -326,21 +336,22 @@ graph LR
 | backend/auto_designer/tracker/gitea.py | 0002, 0017 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0012 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0012, 0019 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008 |
-| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0012 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0012, 0019 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/harness_template/entry.py | 0003, 0013 |
 | backend/run.py | 0007, 0015, 0017 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
-| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019 |
 | backend/tests/loop/test_designer.py | 0016, 0018 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017 |
+| backend/tests/user/sim/test_heartbeat.py | 0012, 0019 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012 |
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
@@ -805,4 +816,24 @@ graph LR
     v_T1_1["T1 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
+```
+
+### 0019 控制旁路放宽 + peek 后继续等待决策（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 launcher：非 reply 旁路一律收 + control 旁路/终结分流"]
+    nT2["T2 用户 sim：旁路型 control 写上下文并立刻再决策"]
+    nT1 --> nT2
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
 ```

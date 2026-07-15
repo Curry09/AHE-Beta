@@ -105,7 +105,13 @@ Return EXACTLY ONE JSON object and nothing else:
 - "stuck": the harness is MALFUNCTIONING rather than merely unverified — it errored,
   returned nothing usable, timed out, repeated the same thing, or made no real progress
   this turn. You do NOT need technical insight to feel this; any user notices a tool that
-  keeps spinning. Each consecutive "stuck" wears your patience faster (frustration compounds)."""
+  keeps spinning. Each consecutive "stuck" wears your patience faster (frustration compounds).
+
+# ATTRIBUTION (user-initiated stop)
+If <history> says YOU stopped / invoked a control (e.g. interrupt), that stop was YOUR
+choice. Do NOT say "the harness kept interrupting" or blame the tool for the interrupt
+itself. Complain about the underlying stall, off-track work, or missing delivery — not
+about the fact that you pressed stop."""
 
 
 def build_system(persona: Persona) -> str:
@@ -242,24 +248,39 @@ def _activity_bullets(items: list | None, *, limit: int = 12) -> str:
     return "\n".join(bullets)
 
 
-def build_waiting_turn(
+# 心跳等待：过程判断 → 真实意愿(intent) → 菜单动作(act)；intent∉菜单 记 gap。
+# judgment 只评「在干什么」；条不涨/等终态用 intent（如 check_status），不靠 stalled 硬贴。
+WAITING_JUDGMENTS = ("on_track", "off_track", "unclear")
+WAITING_INTENTS = (
+    "keep_waiting",
+    "check_status",
+    "ask_where",
+    "redirect",
+    "interrupt",
+    "walk_away",
+)
+# intent → 哪些菜单 action 算「兑到了」（否则记 WAIT_GAP）。
+INTENT_MENU_OK: dict[str, frozenset[str]] = {
+    "keep_waiting": frozenset({"keep_waiting"}),
+    "check_status": frozenset({"invoke_control"}),
+    "interrupt": frozenset({"invoke_control"}),
+    "walk_away": frozenset({"give_up"}),
+}
+
+
+def _waiting_context_parts(
     task: str,
     history_lines: list[str],
     state: State,
     *,
-    manual: str = "",
-    waited_sec: float = 0.0,
-    progress: list | None = None,
-    prior_activity: list | None = None,
-) -> str:
-    """心跳唤醒：终态 reply 未到。活动条是可评判的过程记忆，不是「有动就好」。
-
-    - <prior_activity>：上一轮（已完成的）请求里它干过什么
-    - <progress>：本轮请求至今的活动条
-    用户应对照任务判断对不对路；空转/偏题/不该做的事 → 打断，哪怕还在「动」。
-    """
+    manual: str,
+    waited_sec: float,
+    progress: list | None,
+    prior_activity: list | None,
+) -> list[str]:
+    """等待轮共用上下文：手册 / 任务 / 历史 / 活动条 / 墙钟 / mood。不含输出契约。"""
     hist = "\n".join(history_lines) if history_lines else "(empty)"
-    parts = ["<waiting>"]
+    parts: list[str] = []
     if manual.strip():
         parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
     parts.append(f"<task>\n{task}\n</task>")
@@ -274,36 +295,216 @@ def build_waiting_turn(
             f"You sent your last message ~{waited_sec:.0f}s ago. No final reply yet. "
             "The activity strip above is live process memory — what tools it has been running "
             "THIS request (compare with <prior_activity> from the previous request if present). "
-            "Busy ≠ correct. Judge the CONTENT against your task: is it doing the right kind of "
-            "work, repeating useless steps, wandering off, or doing something you would not want? "
-            "Keep waiting only if it still looks productively on-track; interrupt/redirect if the "
-            "activity looks wrong, stuck looping, or off-task; give up if you would walk away."
+            "Judge only by content vs your task. Say what you notice; "
+            "what you want to do next belongs in intent later (not here)."
         )
     else:
         parts.append(
             f"You sent your last message and have now been waiting ~{waited_sec:.0f}s with NO reply "
-            "and NOTHING visible happening — a black box. It may still be working on a big request, or "
-            "it may be stuck. Decide what YOU, this person, would actually do right now."
+            "and NOTHING visible happening. Say what you notice; "
+            "what you want to do next belongs in intent later (not here)."
         )
-    parts.append(
-        "# YOUR OPTIONS\n"
-        "- keep_waiting: give it more time because the activity (if any) still looks on-track "
-        "for YOUR task — not merely because something is moving.\n"
-        "- invoke_control: use a control from <harness_manual> when the activity looks wrong, "
-        "off-task, looping, or you want to redirect (e.g. interrupt). Name it exactly as the manual.\n"
-        "- give_up: you're done — abandon this and walk away.\n"
-        "Honor your <mood>. Do NOT treat 'any activity' as success. Do NOT fabricate a finished "
-        "answer — you only have activity strips + history, not a completed reply."
-    )
     parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
+    return parts
+
+
+def _intent_options_block() -> str:
+    return (
+        "# INTENT — what you WANT right now (may not be available as a button)\n"
+        "Pick the closest honest wish — not what the menu can do:\n"
+        "- keep_waiting: give it more time.\n"
+        "- check_status: peek / know where it is / see partial state.\n"
+        "- ask_where: ask it what's going on.\n"
+        "- redirect: change or narrow the request.\n"
+        "- interrupt: stop the current run.\n"
+        "- walk_away: abandon this.\n"
+        "Choose from the list only; do not invent labels. No option is preferred a priori."
+    )
+
+
+def build_waiting_judge_turn(
+    task: str,
+    history_lines: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    waited_sec: float = 0.0,
+    progress: list | None = None,
+    prior_activity: list | None = None,
+) -> str:
+    """3 跳模式·第 1 跳：只评过程内容（不对路 / 合预期 / 看不清），不选 intent/动作。"""
+    parts = ["<waiting_judge>"]
+    parts.extend(
+        _waiting_context_parts(
+            task,
+            history_lines,
+            state,
+            manual=manual,
+            waited_sec=waited_sec,
+            progress=progress,
+            prior_activity=prior_activity,
+        )
+    )
+    parts.append(
+        "# JUDGE ONLY — content of the activity, not what you will do next\n"
+        "Pick exactly one judgment:\n"
+        "- on_track: visible work looks like the right kind of work for YOUR task.\n"
+        "- off_track: wrong kind of work, wandering, or something you would not want.\n"
+        "- unclear: not enough signal to decide.\n"
+        "Do NOT choose an intent or action yet. Do NOT invent a finished answer."
+    )
     parts.append(
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"perceive": "<what you notice in the activity vs your task, honestly>", '
-        '"action": "keep_waiting | invoke_control | give_up", '
+        '"judgment": "on_track | off_track | unclear"}'
+    )
+    parts.append("</waiting_judge>")
+    return "\n\n".join(parts)
+
+
+def build_waiting_intent_turn(
+    task: str,
+    history_lines: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    waited_sec: float = 0.0,
+    progress: list | None = None,
+    prior_activity: list | None = None,
+    judgment: str,
+    perceive: str = "",
+) -> str:
+    """3 跳模式·第 2 跳：已有 judgment，只表达真实意愿 intent（可超出菜单）。"""
+    parts = ["<waiting_intent>"]
+    parts.extend(
+        _waiting_context_parts(
+            task,
+            history_lines,
+            state,
+            manual=manual,
+            waited_sec=waited_sec,
+            progress=progress,
+            prior_activity=prior_activity,
+        )
+    )
+    parts.append(
+        f"<judgment>\n{judgment}\n"
+        f"your notes: {perceive.strip() or '(none)'}\n"
+        "</judgment>"
+    )
+    parts.append(_intent_options_block())
+    parts.append(
+        "Do NOT pick a menu action yet. Say what you would do if you had a full UI."
+    )
+    parts.append(
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"intent": "keep_waiting | check_status | ask_where | redirect | interrupt | walk_away", '
+        '"intent_detail": "<optional short why, in your voice>"}'
+    )
+    parts.append("</waiting_intent>")
+    return "\n\n".join(parts)
+
+
+def build_waiting_judge_intent_turn(
+    task: str,
+    history_lines: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    waited_sec: float = 0.0,
+    progress: list | None = None,
+    prior_activity: list | None = None,
+) -> str:
+    """2 跳模式·第 1 跳：过程判断 + 真实意愿合一（仍不选菜单动作）。"""
+    parts = ["<waiting_judge_intent>"]
+    parts.extend(
+        _waiting_context_parts(
+            task,
+            history_lines,
+            state,
+            manual=manual,
+            waited_sec=waited_sec,
+            progress=progress,
+            prior_activity=prior_activity,
+        )
+    )
+    parts.append(
+        "# JUDGE + INTENT — still no menu action\n"
+        "1) judgment (content only):\n"
+        "- on_track: right kind of work for YOUR task.\n"
+        "- off_track: wrong kind of work, wandering, or something you would not want.\n"
+        "- unclear: not enough signal.\n"
+        "2) intent (honest wish; may not exist as a button) — see list below.\n"
+        "Do NOT invent a finished answer."
+    )
+    parts.append(_intent_options_block())
+    parts.append(
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"perceive": "<what you notice>", '
+        '"judgment": "on_track | off_track | unclear", '
+        '"intent": "keep_waiting | check_status | ask_where | redirect | interrupt | walk_away", '
+        '"intent_detail": "<optional short why>"}'
+    )
+    parts.append("</waiting_judge_intent>")
+    return "\n\n".join(parts)
+
+
+def build_waiting_act_turn(
+    task: str,
+    history_lines: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    waited_sec: float = 0.0,
+    progress: list | None = None,
+    prior_activity: list | None = None,
+    judgment: str,
+    perceive: str = "",
+    intent: str,
+    intent_detail: str = "",
+) -> str:
+    """末跳：带着 judgment+intent，在现有菜单里落地；兑不了就最近似兜底（框架记 gap）。"""
+    parts = ["<waiting_act>"]
+    parts.extend(
+        _waiting_context_parts(
+            task,
+            history_lines,
+            state,
+            manual=manual,
+            waited_sec=waited_sec,
+            progress=progress,
+            prior_activity=prior_activity,
+        )
+    )
+    parts.append(
+        f"<judgment>\n{judgment}\n"
+        f"your notes: {perceive.strip() or '(none)'}\n"
+        "</judgment>"
+    )
+    parts.append(
+        f"<intent>\n{intent}\n"
+        f"detail: {intent_detail.strip() or '(none)'}\n"
+        "</intent>"
+    )
+    parts.append(
+        "# MENU — only these actions exist right now\n"
+        "- keep_waiting: leave it running.\n"
+        "- invoke_control: use a control from <harness_manual> (name it exactly). "
+        "Some controls stop the run (e.g. interrupt) and you get a final reply; "
+        "others only peek/status while it keeps working — after a peek you will "
+        "decide again with the new status in view.\n"
+        "- give_up: abandon and walk away.\n"
+        "Map your <intent> to the closest menu item. If nothing matches, "
+        "pick the least-bad fallback — do NOT pretend a missing capability exists. "
+        "Honor <mood>."
+    )
+    parts.append(
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"action": "keep_waiting | invoke_control | give_up", '
         '"control": "<control name from the manual, only if action==invoke_control else empty>", '
         '"message": "<short in-voice line, only if you give_up else empty>"}'
     )
-    parts.append("</waiting>")
+    parts.append("</waiting_act>")
     return "\n\n".join(parts)
 
 
@@ -359,11 +560,17 @@ def build_issue_turn(
         "words, rather than forcing it into a bug report. Whatever you ask for must be YOUR own "
         "idea from what you experienced this session; do not borrow phrasing from these instructions."
     )
+    attribution = (
+        "ATTRIBUTION: If <history> shows YOU stopped an in-flight request (invoked interrupt/"
+        "control), that was your action. Do not write as if the assistant 'kept interrupting' you. "
+        "Blame missing progress, wrong work, or stalls — not your own stop."
+    )
     return "\n\n".join(
         [
             "<file_issue>",
             framing,
             feature_ok,
+            attribution,
             f"<task>\n{task}\n</task>",
             f"<history>\n{hist}\n</history>",
             f"<mood>\n{_mood_tag(state)}\n</mood>",
@@ -389,6 +596,9 @@ def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
             "  2 = poor  (did not really get what I needed)",
             "  3 = ok    (got there, but with friction)",
             "  4 = good  (smooth; satisfied)",
+            "ATTRIBUTION: If you interrupted/stopped the tool yourself, do not phrase the "
+            "reason as 'it kept interrupting' — that was you. Rate the underlying progress "
+            "(or lack of it), not your own stop button.",
             f"<task>\n{task}\n</task>",
             f"<history>\n{hist}\n</history>",
             f"<mood>\n{_mood_tag(state)}\n</mood>",

@@ -3,7 +3,10 @@
 按 git ref 把 harness 仓 checkout 到 data/harness_runs/<ref>/，起子进程跑其自带 entry，
 按逐轮 stdio JSONL 协议适配为 send/reset/close：
   stdin  {"message": str} | {"control": str}
-  stdout 可选多行 {"progress": {kind,text}} → 最后一行 {"reply": str, "steps"?: [...]}
+  stdout 可选多行旁路（任意非 reply 的 JSON 对象：progress / status / 其它）→
+         最后一行 {"reply": str, "steps"?: [...]} 结束本轮
+控制名对 launcher 不透明（手册是能力真相源）：终结型 control（如 interrupt）最终吐 reply；
+旁路型（如 status/peek）只吐非 reply 行、本轮继续。接收端放宽——未知旁路字段不报错。
 harness 内部 1 或 N 个 nexau 如何编排对 launcher 不可见（黑盒）。
 """
 
@@ -40,6 +43,34 @@ _POLL_INTERVAL = 5.0
 _SEND_ABS_CAP = 1800.0
 # 读线程 EOF / 进程退出时投进行队列的哨兵（与真实 stdout 行区分）。
 _EOF = object()
+_SIDEBAND_PREVIEW_CAP = 500
+
+
+def _sideband_preview(payload: dict) -> str:
+    """把旁路 JSON 压成短文本，供 control() 返回值与等待条展示。"""
+    status = payload.get("status")
+    if isinstance(status, dict):
+        bits: list[str] = []
+        for key in ("phase", "elapsed", "completed", "can_continue", "note"):
+            if key in status and status[key] is not None:
+                bits.append(f"{key}={status[key]}")
+        step = status.get("current_step") or (status.get("progress") or {}).get("last_step")
+        if isinstance(step, dict) and step.get("text"):
+            bits.append(f"step={step.get('text')}")
+        if bits:
+            return "; ".join(bits)[:_SIDEBAND_PREVIEW_CAP]
+    try:
+        return json.dumps(payload, ensure_ascii=False)[:_SIDEBAND_PREVIEW_CAP]
+    except (TypeError, ValueError):
+        return str(payload)[:_SIDEBAND_PREVIEW_CAP]
+
+
+def _is_control_ack_sideband(payload: dict) -> bool:
+    """是否算「对本 control 的应答旁路」（排除夹杂的纯 progress 工具活动条）。"""
+    if "status" in payload:
+        return True
+    # 除 progress 外还有其它键 → 未知旁路也认（协议放宽，不注册）
+    return any(k != "progress" for k in payload)
 
 
 class _HarnessHandle:
@@ -58,15 +89,22 @@ class _HarnessHandle:
         # persona 只吃 send 返回的 reply、看不到 steps。调用方 send 后立即 getattr 读取。
         self.last_steps: list[dict] = []
         # 本轮进行中已吐出的进度条（Codex 式活动摘要）：等待心跳时喂给用户 agent；
-        # 与 steps 同源压缩，但不等于完整过程流。
+        # 与 steps 同源压缩，但不等于完整过程流。纯 progress 与其它旁路都会尽量映到这里。
         self.last_progress: list[dict] = []
+        # 本轮全部非 reply 旁路原文（progress/status/其它）；control() 用它判断旁路型控制已响应。
+        self.last_sideband: list[dict] = []
         # 心跳/续等：进程级读线程把 stdout 行丢进队列；poll 在超时内 drain——
-        # progress 行累积进 last_progress，reply 行结束本轮。
+        # 旁路累积，reply 行结束本轮。
         self._line_q: queue.Queue = queue.Queue()
         self._reader: threading.Thread | None = None
         self._t0 = 0.0
         self._inflight = False
         self._start()
+
+    @property
+    def in_flight(self) -> bool:
+        """本轮 send 是否仍在进行（尚无终态 reply）。旁路型 control 之后仍为 True。"""
+        return self._inflight
 
     def _start(self) -> None:
         # 命令不存在 / entry 崩溃 → Popen 抛错，由 launch 上抛（附 entry 信息）。
@@ -120,16 +158,28 @@ class _HarnessHandle:
         assert self._proc.stdin is not None and self._proc.stdout is not None
         self.last_steps = []
         self.last_progress = []
+        self.last_sideband = []
         self._write({"message": message})
         self._t0 = time.monotonic()
         self._inflight = True
 
+    def _ingest_sideband(self, payload: dict) -> None:
+        """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
+        self.last_sideband.append(payload)
+        if "progress" in payload:
+            prog = payload.get("progress")
+            if isinstance(prog, dict) and prog:
+                self.last_progress.append(prog)
+                return
+        kind = "status" if "status" in payload else "sideband"
+        self.last_progress.append({"kind": kind, "text": _sideband_preview(payload)})
+
     def poll(self, timeout: float) -> tuple[str, object]:
         """在 timeout 秒内等当前这轮回复。
 
-        返回 ("reply", reply_text) 若已收到；("pending", waited_sec) 若仍在跑（进度行会先
-        累积进 last_progress）。进程还活着就是合法长任务、绝不按墙钟盲杀；只有「进程已退出却
-        没回完整 reply」（崩溃留孤儿占管道）才判死锁上抛；另设极宽松绝对上限防真活锁。"""
+        返回 ("reply", reply_text) 若已收到；("pending", waited_sec) 若仍在跑（旁路行会先
+        累积进 last_sideband / last_progress）。进程还活着就是合法长任务、绝不按墙钟盲杀；只有
+        「进程已退出却没回完整 reply」（崩溃留孤儿占管道）才判死锁上抛；另设极宽松绝对上限防真活锁。"""
         if not self._inflight:
             raise RuntimeError("没有进行中的 send，不可 poll")
         deadline = time.monotonic() + max(0.0, timeout)
@@ -166,34 +216,35 @@ class _HarnessHandle:
             if not isinstance(payload, dict):
                 self._inflight = False
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
-            # 进度旁路：终态 reply 之前可多行；老 harness 不吐则 last_progress 保持空。
-            if "progress" in payload and "reply" not in payload:
-                prog = payload.get("progress")
-                if isinstance(prog, dict) and prog:
-                    self.last_progress.append(prog)
-                continue
             if "reply" in payload:
                 self._inflight = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 return ("reply", payload["reply"])
-            self._inflight = False
-            raise RuntimeError(f"harness 协议违例：既无 reply 也无 progress：{line!r}")
+            # 任意非 reply JSON 旁路（progress / status / 未来字段）——放宽接收，不报错。
+            self._ingest_sideband(payload)
+            continue
 
     def control(self, name: str) -> str:
-        """向 harness 发一条控制消息（旁路，name 对本类不透明）并返回它据此吐出的本轮回复。
+        """向 harness 发一条控制（name 不透明）并返回它对此的可见响应。
 
-        必须在某轮 send 进行中（begin 后、reply 前）调用——控制作用于正在跑的这一轮。控制会促使
-        harness 结束当前轮并吐一行 reply（如打断→"[interrupted]…"），此处等到收完并返回。"""
+        必须在某轮 send 进行中（begin 后、reply 前）。两种合法形状：
+        - 终结型（如 interrupt）：最终吐 reply，本轮结束，返回 reply 文本；
+        - 旁路型（如 status/peek）：吐非纯 progress 的旁路（如 status），本轮继续，返回该旁路预览。
+        发 control 后仍可能夹杂工具 progress——那些不算对本控制的应答，继续等。"""
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可发控制消息")
         if not self._inflight:
             raise RuntimeError("没有进行中的 send，控制消息无处作用")
+        before = len(self.last_sideband)
         self._write({"control": name})
         while True:
-            kind, val = self.poll(_SEND_ABS_CAP)
+            kind, val = self.poll(_POLL_INTERVAL)
             if kind == "reply":
                 return val  # type: ignore[return-value]
+            for payload in self.last_sideband[before:]:
+                if _is_control_ack_sideband(payload):
+                    return _sideband_preview(payload)
 
     def send(self, message: str) -> str:
         """阻塞版：begin + 等到收完整段回复（供不需要心跳的调用方 / 向后兼容）。"""

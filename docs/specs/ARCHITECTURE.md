@@ -35,7 +35,7 @@ _（缺模块级 docstring）_
 | `commit_checkpoint.py` | CommitCheckpointMiddleware：用机制（而非软提示）保证 dev 尽早落一个已提交的增量。 |
 | `completion_gate.py` | CompletionGateMiddleware：收尾闸门——保证 dev 收尾时是一次"完整提交"。 |
 | `harness_boundary.py` | harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品—— |
-| `workspace_jail.py` | WorkspaceJailMiddleware：dev/designer 以 harness 仓为可写工作区；NexAU 源码只读放行。 |
+| `workspace_jail.py` | WorkspaceJailMiddleware：dev/designer 以 harness 仓为可写工作区；NexAU 源码与运行时产物只读放行。 |
 
 ### auto_designer.distill
 

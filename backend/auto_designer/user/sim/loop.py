@@ -30,11 +30,17 @@ from .dimensions import Persona
 from .feeling import FeelingScore, derive_feeling, parse_feeling_llm
 from .persona_client import PersonaClient
 from .prompt import (
+    INTENT_MENU_OK,
+    WAITING_INTENTS,
+    WAITING_JUDGMENTS,
     build_issue_turn,
     build_rating_turn,
     build_system,
     build_user_turn,
-    build_waiting_turn,
+    build_waiting_act_turn,
+    build_waiting_intent_turn,
+    build_waiting_judge_intent_turn,
+    build_waiting_judge_turn,
 )
 from .state import (
     VERDICTS,
@@ -102,6 +108,7 @@ _HEARTBEAT_SEC = 90.0
 _MAX_HEARTBEATS = 8
 # 心跳唤醒时给用户 agent 的等待动作集（框架元行为 + 一个"调用手册所述控制"的通用口）。
 WAITING_ACTIONS = ["keep_waiting", "invoke_control", "give_up"]
+# 等待决策：waiting_mode "two" | "three"（见 _supervise_send / run_session）。
 
 
 def _supports_heartbeat(harness) -> bool:
@@ -121,6 +128,34 @@ def _resolve_waiting(ret: dict) -> tuple[str, str]:
     if action == "invoke_control" and not control:
         action = "keep_waiting"  # 说要用控制却没点名 → 退回继续等，不瞎猜控制名
     return action, control
+
+
+def _resolve_judgment(ret: dict) -> str:
+    """心跳判断轮：归到 WAITING_JUDGMENTS；非法/缺省 → unclear（安全偏向续等侧，由动作轮再决）。"""
+    raw = str(ret.get("judgment", "")).strip().lower().replace("-", "_")
+    # 旧标签 stalled 并入 unclear（内容不够判废时不硬贴卡住）。
+    if raw == "stalled":
+        return "unclear"
+    if raw in WAITING_JUDGMENTS:
+        return raw
+    return "unclear"
+
+
+def _resolve_intent(ret: dict) -> tuple[str, str]:
+    """真实意愿；非法/缺省 → keep_waiting。返回 (intent, intent_detail)。"""
+    raw = str(ret.get("intent", "")).strip().lower().replace("-", "_")
+    if raw not in WAITING_INTENTS:
+        raw = "keep_waiting"
+    detail = str(ret.get("intent_detail", "")).strip()
+    return raw, detail
+
+
+def _intent_has_gap(intent: str, action: str) -> bool:
+    """intent 是否被当前菜单 action 兑现；未兑现 → 进化信号。"""
+    ok = INTENT_MENU_OK.get(intent)
+    if ok is None:
+        return True
+    return action not in ok
 
 
 def route(action_id: str, message: str, state: State, harness, observable: str) -> str | None:
@@ -171,17 +206,28 @@ def _log_waiting(
     state: State,
     action: str,
     control: str,
-    ret: dict,
+    *,
+    judgment: str,
+    intent: str,
+    perceive: str,
+    intent_detail: str,
     on_progress: Callable[[SessionResult], None] | None,
 ) -> None:
-    """把一次心跳唤醒的等待决策记为 phase='waiting' 的 TurnLog（观测用，不占 harness_output）。"""
+    """把一次心跳唤醒的等待决策记为 phase='waiting' 的 TurnLog（观测用，不占 harness_output）。
+
+    perceive 形如 [judgment|intent→action] notes；intent 兑不进菜单时追加 WAIT_GAP 信号。"""
     label = f"{action}:{control}" if action == "invoke_control" and control else action
+    note = perceive.strip()
+    if intent_detail:
+        note = f"{note} | want: {intent_detail}".strip(" |")
+    head = f"[{judgment}|{intent}→{label}]"
+    perceive_logged = f"{head} {note}" if note else head
     result.turns.append(
         TurnLog(
             turn=state.turn,
             phase="waiting",
             action_space=list(WAITING_ACTIONS),
-            perceive=str(ret.get("perceive", "")),
+            perceive=perceive_logged,
             verdict="stuck",
             action=label,
             message="",
@@ -193,6 +239,8 @@ def _log_waiting(
             harness_steps=[],
         )
     )
+    if _intent_has_gap(intent, action):
+        result.signals.append(f"WAIT_GAP: intent={intent} action={label}")
     if on_progress is not None:
         on_progress(result)
 
@@ -237,6 +285,35 @@ def _activity_from_harness(harness) -> list[dict]:
     return out
 
 
+def _harness_in_flight(harness) -> bool:
+    """本轮是否仍在跑（尚无终态 reply）。旁路型 control 之后应为 True。"""
+    if hasattr(harness, "in_flight"):
+        return bool(harness.in_flight)
+    return bool(getattr(harness, "_inflight", False))
+
+
+def _note_control_sideband(history: list[str], control: str, preview: str) -> None:
+    """把 peek/status 旁路写进等待上下文（历史），供下一跳自我选择看见——不是收工。"""
+    one = preview.strip().splitlines()[0][:160] if preview.strip() else "(empty)"
+    history.append(
+        f"[waiting] you invoked control `{control}` while it was still running "
+        f"(peek/status — request NOT stopped). saw: {one}"
+    )
+
+
+def _ensure_status_on_progress(harness, preview: str) -> None:
+    """若 harness 未把本次旁路映进 last_progress，补一条 status，避免下一跳看不到。"""
+    lp = getattr(harness, "last_progress", None)
+    if not isinstance(lp, list):
+        return
+    text = preview.strip().splitlines()[0][:200] if preview.strip() else ""
+    if not text:
+        return
+    if lp and str(lp[-1].get("text") or "") == text:
+        return
+    lp.append({"kind": "status", "text": text})
+
+
 def _supervise_send(
     harness,
     message: str,
@@ -251,68 +328,140 @@ def _supervise_send(
     result: SessionResult,
     on_progress: Callable[[SessionResult], None] | None,
     prior_activity: list[dict],
-) -> tuple[str, float, str | None]:
+    waiting_mode: str,
+) -> tuple[str, float, str | None, str | None]:
     """驱动 harness 出下一轮，但用心跳守望等待：超阈值仍无回复就唤醒用户 agent 决策。
 
-    返回 (harness_output, elapsed_sec, terminal_action)：
-      - 正常/打断：harness_output 为回复文本（打断走 harness.control → "[interrupted]…"），terminal=None；
-      - 崩溃/超时：harness_output 为 [harness error] 串，terminal=None；
-      - 用户在等待中放弃：harness_output=""，terminal="give_up"（由调用方走终止路径）。
-    心跳唤醒轮以 phase='waiting' 记入 result.turns（观测用）。"""
+    waiting_mode:
+      - "two"：judge+intent 合一 → act（2 次 LLM）
+      - "three"：judge → intent → act（3 次 LLM）
+
+    返回 (harness_output, elapsed_sec, terminal_action, user_control)：
+      - 正常 reply：terminal=None，user_control=None；
+      - 终结型 invoke_control（如 interrupt）：控制回复入 harness_output，user_control=控制名；
+      - 旁路型 invoke_control（如 status/peek）：不返回——写入上下文后立刻再决策，请求继续跑；
+      - 崩溃/超时：harness_output 为 [harness error] 串；
+      - 用户放弃：harness_output=""，terminal="give_up"。
+    """
+    if waiting_mode not in ("two", "three"):
+        waiting_mode = "three"
     t0 = time.monotonic()
     try:
         harness.begin(message)
-    except Exception as exc:  # noqa: BLE001  黑盒起轮失败 → 可观测失败信号
-        return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}", time.monotonic() - t0, None
+    except Exception as exc:  # noqa: BLE001
+        return (
+            f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}",
+            time.monotonic() - t0,
+            None,
+            None,
+        )
     heartbeats = 0
-    progress_seen = 0  # 已展示的 progress 条数；无新增 = 静默/空转
+    progress_seen = 0
+    force_redecide = False
+    waited = 0.0
     while True:
-        try:
-            kind, val = harness.poll(_HEARTBEAT_SEC)
-        except Exception as exc:  # noqa: BLE001  黑盒崩溃/超时 → 可观测失败信号（不炸整局）
-            return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}", time.monotonic() - t0, None
-        if kind == "reply":
-            return str(val), time.monotonic() - t0, None
-        # kind == "pending"：等待超阈值 → 唤醒用户 agent 做一次等待决策
-        waited = float(val)  # type: ignore[arg-type]
-        heartbeats += 1
-        # 活动条 = 可评判的过程记忆（对照 prior_activity）；「有动」不等于「对」——偏题应打断。
+        if not force_redecide:
+            try:
+                kind, val = harness.poll(_HEARTBEAT_SEC)
+            except Exception as exc:  # noqa: BLE001
+                return (
+                    f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}",
+                    time.monotonic() - t0,
+                    None,
+                    None,
+                )
+            if kind == "reply":
+                return str(val), time.monotonic() - t0, None, None
+            waited = float(val)  # type: ignore[arg-type]
+            heartbeats += 1
+        else:
+            # 旁路 peek 之后：不重新 poll，带着新状态立刻再选；仍计入决策预算防只 peek 空转。
+            force_redecide = False
+            waited = time.monotonic() - t0
+            heartbeats += 1
+
         progress = list(getattr(harness, "last_progress", None) or [])
         new_progress = len(progress) > progress_seen
         progress_seen = len(progress)
-        ret = client.respond(
+        ctx = dict(
+            task=task,
+            history_lines=history,
+            state=state,
+            manual=manual,
+            waited_sec=waited,
+            progress=progress,
+            prior_activity=prior_activity,
+        )
+        if waiting_mode == "two":
+            jiret = client.respond(system, build_waiting_judge_intent_turn(**ctx))
+            judgment = _resolve_judgment(jiret)
+            perceive = str(jiret.get("perceive", ""))
+            intent, intent_detail = _resolve_intent(jiret)
+        else:
+            jret = client.respond(system, build_waiting_judge_turn(**ctx))
+            judgment = _resolve_judgment(jret)
+            perceive = str(jret.get("perceive", ""))
+            iret = client.respond(
+                system,
+                build_waiting_intent_turn(
+                    **ctx,
+                    judgment=judgment,
+                    perceive=perceive,
+                ),
+            )
+            intent, intent_detail = _resolve_intent(iret)
+        aret = client.respond(
             system,
-            build_waiting_turn(
-                task,
-                history,
-                state,
-                manual=manual,
-                waited_sec=waited,
-                progress=progress,
-                prior_activity=prior_activity,
+            build_waiting_act_turn(
+                **ctx,
+                judgment=judgment,
+                perceive=perceive,
+                intent=intent,
+                intent_detail=intent_detail,
             ),
         )
-        action, control = _resolve_waiting(ret)
+        action, control = _resolve_waiting(aret)
         if heartbeats >= _MAX_HEARTBEATS:
-            action = "give_up"  # 兜底：唤醒到顶强制收束，防病态无限等
+            action = "give_up"
         elif action == "keep_waiting":
-            # 耐心税只打「不符合预期的干等」：死静默/无新活动才扣。
-            # 有新进度且用户仍选 keep_waiting = 他判断活动合预期、愿继续等 → 不扣。
-            # 偏题不靠扣心治——靠活动内容让用户选 interrupt（Busy≠correct）。
             if not new_progress:
                 state.patience = max(0, state.patience - coef.patience_decay)
             if state.patience <= 0:
-                action = "give_up"  # 耐心耗尽：这个人不会再等了
-        _log_waiting(result, state, action, control, ret, on_progress)
+                action = "give_up"
+        _log_waiting(
+            result,
+            state,
+            action,
+            control,
+            judgment=judgment,
+            intent=intent,
+            perceive=perceive,
+            intent_detail=intent_detail,
+            on_progress=on_progress,
+        )
         if action == "invoke_control":
             try:
-                reply = harness.control(control)  # control 名对框架不透明，由 harness 校验
+                ctrl_out = harness.control(control)
             except Exception as exc:  # noqa: BLE001
-                reply = f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
-            return reply, time.monotonic() - t0, None
+                return (
+                    f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}",
+                    time.monotonic() - t0,
+                    None,
+                    None,
+                )
+            if isinstance(ctrl_out, str) and ctrl_out.startswith(HARNESS_ERROR_PREFIX):
+                return ctrl_out, time.monotonic() - t0, None, control
+            # 旁路型：请求仍在跑 → 写入上下文，立刻再自我选择（不结束本轮）。
+            if _harness_in_flight(harness):
+                _note_control_sideband(history, control, str(ctrl_out))
+                _ensure_status_on_progress(harness, str(ctrl_out))
+                progress_seen = len(list(getattr(harness, "last_progress", None) or []))
+                force_redecide = True
+                continue
+            # 终结型（interrupt 等）：本轮结束。
+            return str(ctrl_out), time.monotonic() - t0, None, control
         if action == "give_up":
-            return "", time.monotonic() - t0, "give_up"
-        # keep_waiting：回到 poll 续等（在途读线程保留，计算不丢）
+            return "", time.monotonic() - t0, "give_up", None
 
 
 def run_session(
@@ -323,6 +472,7 @@ def run_session(
     *,
     manual: str = "",
     on_progress: Callable[[SessionResult], None] | None = None,
+    waiting_mode: str = "three",
 ) -> SessionResult:
     # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
     coef = make_coef(persona)
@@ -421,9 +571,10 @@ def run_session(
         _t0 = time.monotonic()
         _emits = spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE
         terminal_from_wait: str | None = None
+        user_control: str | None = None
         supervised = _emits and bool(message.strip()) and _supports_heartbeat(harness)
         if supervised:
-            nxt, elapsed, terminal_from_wait = _supervise_send(
+            nxt, elapsed, terminal_from_wait, user_control = _supervise_send(
                 harness,
                 message,
                 client=client,
@@ -436,6 +587,7 @@ def run_session(
                 result=result,
                 on_progress=on_progress,
                 prior_activity=prior_activity,
+                waiting_mode=waiting_mode,
             )
             if terminal_from_wait == "give_up":  # 用户在等待中放弃：走终止路径并结束
                 _finalize_terminal(
@@ -477,7 +629,17 @@ def run_session(
                         f"[turn {state.turn}] harness activity (this request): "
                         + "; ".join(titles)[:240]
                     )
-            history.append(f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}...")
+            # 归因：仅终结型 control（interrupt 等）才是「你停了请求」；旁路 peek 不走这条。
+            if user_control:
+                history.append(
+                    f"[turn {state.turn}] YOU stopped the in-flight request "
+                    f"(invoked control `{user_control}`); harness acknowledged: "
+                    f"{nxt.splitlines()[0][:80]}..."
+                )
+            else:
+                history.append(
+                    f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}..."
+                )
             # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
             result.pending_harness_output = nxt
             result.pending_harness_steps = harness_steps

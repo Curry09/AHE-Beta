@@ -1,12 +1,14 @@
 # Spec-0007：把 dev/designer 的文件/shell 操作关进 SANDBOX_WORK_DIR，越界即拒——机制隔离 trace。
-"""WorkspaceJailMiddleware：dev/designer 以 harness 仓为可写工作区；NexAU 源码只读放行。
+"""WorkspaceJailMiddleware：dev/designer 以 harness 仓为可写工作区；NexAU 源码与运行时产物只读放行。
 
-动机：堵住读 `data/sessions` / `data/harness_runs` 任务轨迹导致的过拟合；同时允许只读查阅
-钉死的 NexAU 库（多 agent / session / 锁等），无需外部观察者扩契约、也禁止改框架本身。
+动机：堵住读 `data/sessions` / `data/harness_runs` 任务轨迹导致的过拟合；同时允许：
+- 只读查阅钉死的 NexAU 库（多 agent / session / 锁等）；
+- 只读 NexAU 本地 bash/tool 临时输出（`nexau_bash_tool_results` / `nexau_tool_outputs`）——
+  这是框架自己落盘的 stdout/stderr，不是任务轨迹；拒读会误伤正常工具环。
 
 覆盖：
 - 写类工具（write_file/replace/…）：目标必须在 harness work_dir 内。
-- 读类工具：work_dir **或** NexAU 仓根（由 `import nexau` 解析）内放行。
+- 读类工具：work_dir **或** NexAU 仓根 **或** NexAU 运行时临时目录内放行。
 - run_shell_command：path-like token 同读规则；trace 目录名仍一律拒。
 
 caveat：bash `python -c` 动态拼路径静态扫不出——要 100% airtight 需 OS 级沙箱。
@@ -17,6 +19,7 @@ from __future__ import annotations
 import logging
 import re
 import shlex
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -38,7 +41,7 @@ _PATH_PARAMS: dict[str, tuple[str, ...]] = {
     "search_file_content": ("dir_path", "path"),
     "read_many_files": ("paths",),
 }
-# 写工具：只允许 harness 仓；读工具额外放行 NexAU。
+# 写工具：只允许 harness 仓；读工具额外放行 NexAU 源码 + 运行时临时目录。
 _WRITE_TOOLS: frozenset[str] = frozenset({"write_file", "replace", "multiedit_tool"})
 _SHELL_TOOL = "run_shell_command"
 
@@ -50,6 +53,10 @@ _TRACE_REF = re.compile(r"harness_runs|(?:\.\./|/)[^\s'\"]*sessions(?:/|\b)")
 # 正文是数据不是路径（扫它误伤），但含 `<<` 那一行的**重定向目标**（`cat > OUT <<EOF`）是真路径，须留。
 _HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 
+# NexAU 本地临时目录名（与 nexau.archs.platform.path_helpers 对齐；import 失败时作兜底）。
+_BASH_TOOL_RESULTS_DIR = "nexau_bash_tool_results"
+_TOOL_OUTPUTS_DIR = "nexau_tool_outputs"
+
 
 def _nexau_repo_root() -> Path | None:
     """当前环境 `import nexau` 所在的源码仓根（包目录的上一级）；解析失败则无只读放行根。"""
@@ -59,6 +66,41 @@ def _nexau_repo_root() -> Path | None:
         return Path(nexau.__file__).resolve().parents[1]
     except Exception:  # noqa: BLE001  无 nexau 时退化为纯 work_dir jail
         return None
+
+
+def _nexau_runtime_read_roots() -> list[Path]:
+    """NexAU 框架落盘的本地临时目录（bash stdout/stderr、长工具输出）——只读放行。
+
+    不是任务轨迹；agent 用 read_file 回看 shell 结果时必须能读，否则 jail 误伤工具环。
+    """
+    roots: list[Path] = []
+    try:
+        from nexau.archs.platform.path_helpers import (
+            get_local_bash_tool_results_dir,
+            get_local_tool_output_dir,
+        )
+
+        roots.extend([get_local_bash_tool_results_dir(), get_local_tool_output_dir()])
+    except Exception:  # noqa: BLE001  旧 nexau / 无 path_helpers → 按 tempfile 惯例兜底
+        tmp = Path(tempfile.gettempdir())
+        roots.extend([tmp / _BASH_TOOL_RESULTS_DIR, tmp / _TOOL_OUTPUTS_DIR])
+    out: list[Path] = []
+    for r in roots:
+        try:
+            out.append(r.resolve())
+        except (OSError, RuntimeError, ValueError):
+            continue
+    return out
+
+
+def _read_roots_for(work_dir: Path) -> list[Path]:
+    """读放行根：harness 仓 + NexAU 源码 + NexAU 运行时临时目录。"""
+    roots = [work_dir]
+    nexau_root = _nexau_repo_root()
+    if nexau_root is not None:
+        roots.append(nexau_root)
+    roots.extend(_nexau_runtime_read_roots())
+    return roots
 
 
 def _strip_heredoc_bodies(command: str) -> str:
@@ -159,7 +201,7 @@ def _shell_offender(work_dir: Path, command: str, read_roots: list[Path]) -> str
 
 
 class WorkspaceJailMiddleware(Middleware):
-    """harness 仓可读写；NexAU 仓只读放行；轨迹与其它路径一律拒。"""
+    """harness 仓可读写；NexAU 源码 + 运行时临时目录只读放行；轨迹与其它路径一律拒。"""
 
     def wrap_tool_call(
         self,
@@ -175,8 +217,7 @@ class WorkspaceJailMiddleware(Middleware):
         except (OSError, RuntimeError, ValueError):
             return call_next(params)
 
-        nexau_root = _nexau_repo_root()
-        read_roots = [work_dir] + ([nexau_root] if nexau_root is not None else [])
+        read_roots = _read_roots_for(work_dir)
 
         tool = params.tool_name
         if tool in _PATH_PARAMS:
@@ -197,7 +238,8 @@ class WorkspaceJailMiddleware(Middleware):
     def _deny(what: str) -> dict[str, Any]:
         msg = (
             f"[workspace-jail] 拒绝：{what} 越界。"
-            "可写范围 = harness 仓；可读范围 = harness 仓 + NexAU 源码（只读，禁止改框架）。"
+            "可写范围 = harness 仓；可读范围 = harness 仓 + NexAU 源码（只读）"
+            " + NexAU 运行时临时目录（bash/tool 输出，只读）。"
             "绝不读取任务轨迹/会话录像（data/sessions、data/harness_runs）——会过拟合。"
             "框架细节读 NexAU；改动只落 harness 仓。"
         )

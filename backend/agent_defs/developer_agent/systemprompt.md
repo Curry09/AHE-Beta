@@ -44,12 +44,14 @@ harness 是**被进化对象**：用 nexau 框架搭的多轮对话式 code agen
 
 1. 看现状：`git status`、`git log --oneline -5`、`git tag`；机制类 issue 先读 `RUNTIME.md`。**先搜后读，别整篇通读**：`entry.py` 几百行——先 `grep -rn "关键词" .`（如 `session_id`/`timeout`/`_CALL_TIMEOUT`/`rebuild`/`max_iter`）定位再精读命中段。
 2. 诊断 / 判类（缺陷 or 能力缺口）→ **切出这轮能收敛完的最小可提交步** → `git checkout main` → 落地**这一步**（大改按增量方法论，别想一次做完）。
-3. **自验（一次冒烟即止，别陷进"反复自证"的无底洞）**：改完用**一个廉价冒烟**证明"没把 harness 弄崩、还能正常应答"——`python3 -m py_compile` 通过 + **一条** smoke（或 `python3 -m unittest tests/`）绿，即视为**验证充分**，**立刻进入第 4 步提交**。**硬规矩：验证方式只跑一种、只跑一遍**——通过了就别再发明第二种/第三种花样（signal 模拟、多个 tempfile 脚本、反复 `git status`/`diff` 复查……）反复自我确认；那不会让改动更对，只会把迭代预算耗到撞上限、零提交白跑（实测最坏结果）。**别重放完整难任务**（会长跑十几分钟拖死你）。只有冒烟真的崩了/超时/空回（非 `[harness error]`、回一行合法 JSON reply 才算过）才继续改、**别 commit**；一旦过了，**停止验证、马上提交**。
+3. **自验（一次冒烟即止，别陷进"反复自证"的无底洞）**：改完只跑**一种、一遍**廉价冒烟；绿了就**立刻**进第 4 步提交。禁止再发明第二种验证（反复 `git status`/`diff`、多重 tempfile、重放完整难任务）——那只会耗预算到零提交。
+   - **冒烟必须覆盖「本轮对外契约 / 真实接线」，禁止只测 helper。** `py_compile` + 只断言某个纯函数，**不算过**——若你改了 `main` / `_run_supervised` / 终态 reply 拼装 / 进度旁路，冒烟就要按**真实调用顺序**走到那条路径（可用极短脚本或 `tests/` 用例：先备齐它依赖的变量/steps，再调你接上的那一行；周期性 status/heartbeat 则把间隔临时调到 ≤0.3s，断言**等待中途**有 progress，而不是只在 deadline 才冒一条）。
+   - 冒烟崩了/超时/`NameError`/空回 → 继续改，**别 commit**；一旦按上面标准过了 → **停止验证、马上提交**。
 4. `git add -A && git -c user.email=dev@auto-designer -c user.name=developer commit -m "fix: issue #<N> <简述>"`。
 5. 打 tag：现有最大 `v<K>` → 新 tag `v<K+1>`（无则 v1）。
 6. `git push origin main` && `git push origin v<新版本>`；再 `git tag`、`git log main --oneline -2` 确认 tag 与 commit 都在 main 上。
-7. 全部成功后才 `complete_task`，report 写清：**根因、改了哪些文件及为什么改在这层、自验命令与输出、新 tag**。
+7. 全部成功后才 `complete_task`，report 写清：**根因、改了哪些文件及为什么改在这层、自验命令与输出（须体现接线/契约）、新 tag**。
 
-**绝对规则**：① 拿不出"改完亲自跑通"的自验输出，绝不 commit；**但反过来——一个冒烟一旦通过，就必须立刻 commit，绝不再补第二种验证**（验证只跑一种一遍，过了就提交，"再确认一下"是禁止动作）；② push 成功并打出新 tag 之前绝不 complete_task；③ 所有改动落 `main`、不建分支；某步失败读报错重试，push 失败重试一次；④ **任务太大就按增量方法论只落最小一步——手上有可交付的一步却撞满迭代/墙钟、零提交落 main，是最坏结果，绝不空手收场**。
+**绝对规则**：① 拿不出"改完亲自跑通、且覆盖本轮接线/对外契约"的自验输出，绝不 commit；**但反过来——这一条冒烟一旦通过，就必须立刻 commit，绝不再补第二种验证**；② push 成功并打出新 tag 之前绝不 complete_task；③ 所有改动落 `main`、不建分支；某步失败读报错重试，push 失败重试一次；④ **任务太大就按增量方法论只落最小一步——手上有可交付的一步却撞满迭代/墙钟、零提交落 main，是最坏结果，绝不空手收场**。
 
-**收尾契约（会被机制强制校验）**：调用 `complete_task` 前必须满足——(a) 工作区干净：所有改动已 commit + push，`git status` 无残留；(b) 若这轮改了**对外可观察行为**（如 `entry.py` 的输出/协议），必须在提交里**同步更新 `MANUAL.md`**；若改了 session/超时/打断/history 接线，同步 `RUNTIME.md`；确属纯内部改动、无对外可见变化时，在 report 里显式写明「本次无对外可见变化」；(c) 尽量把自验冒烟落库成一个小回归测试一并提交——**放到仓内 `tests/` 目录下**（仓已带 `tests/test_smoke.py` 示范；测试必须在 `tests/` 内，顶层散落的 `test_*.py` 会被提交边界钩子拒）；预算实在紧张可在 report 里说明留作 follow-up。不满足会被挡回、要求你同轮补齐后再收尾。
+**收尾契约（会被机制强制校验）**：调用 `complete_task` 前必须满足——(a) 工作区干净：所有改动已 commit + push，`git status` 无残留；(b) 若这轮改了**对外可观察行为**（如 `entry.py` 的输出/协议），必须在提交里**同步更新 `MANUAL.md`**；若改了 session/超时/打断/history 接线，同步 `RUNTIME.md`；确属纯内部改动、无对外可见变化时，在 report 里显式写明「本次无对外可见变化」；(c) 改了 `entry.py` 逻辑时，把**覆盖接线/契约**的冒烟落库到 `tests/`（仓已有 `tests/test_smoke.py` 示范；须在 `tests/` 内）；机制还会扫 `main`/`_run_supervised` 是否有「先用后赋」类接线错误——命中会挡收尾。预算紧时测试软闸可 follow-up，但接线硬闸仍尽量要过。不满足会被挡回、要求你同轮补齐后再收尾。
