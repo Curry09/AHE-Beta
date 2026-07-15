@@ -211,8 +211,8 @@ def test_pathological_keep_waiting_is_bounded_and_gives_up() -> None:
     assert 0 < len(waiting_turns) <= _MAX_HEARTBEATS
 
 
-def test_visible_progress_enters_waiting_prompt_but_still_taxes_patience() -> None:
-    """有活动条进入 waiting prompt；但 keep_waiting 仍扣耐心（有动≠免税）。"""
+def test_on_track_progress_keep_waiting_skips_patience_tax() -> None:
+    """有新活动且用户 keep_waiting（判断合预期）→ 不扣耐心；活动条仍进 prompt 供内容评判。"""
     progress_on_poll = [
         [{"kind": "tool", "text": "🔧 read_file: billing/core.py"}],
         [
@@ -242,11 +242,34 @@ def test_visible_progress_enters_waiting_prompt_but_still_taxes_patience() -> No
     )
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert len(waiting) == 2
-    assert waiting[0].patience == 4  # 5 - 1
-    assert waiting[1].patience == 3  # 4 - 1
+    # 两次都有新 progress → 耐心保持开局 5
+    assert waiting[0].patience == 5
+    assert waiting[1].patience == 5
     assert any("<progress>" in p for p in client.waiting_prompts)
     assert any("pytest" in p for p in client.waiting_prompts)
     assert any("Busy" in p or "CONTENT" in p or "on-track" in p for p in client.waiting_prompts)
+
+
+def test_stale_progress_still_taxes_patience() -> None:
+    """活动条不再增长（空转复读）时 keep_waiting 仍扣耐心——不符合「有进展」的预期。"""
+    same = [{"kind": "tool", "text": "🔧 run_shell: sleep 999"}]
+    harness = HeartbeatHarness(
+        [("pending", 90.0), ("pending", 180.0), ("reply", "done")],
+        # 两次 pending 看到的是同一条、无新增
+        progress_on_poll=[same, same, same],
+    )
+    client = WaitStubClient(
+        actions=["send_task", "accept"],
+        waiting=[{"action": "keep_waiting"}, {"action": "keep_waiting"}],
+        verdict="satisfied",
+    )
+    res = run_session(
+        _persona(d43=D43Correct.FEEDBACK), client, harness, TASK, manual=harness.manual
+    )
+    waiting = [t for t in res.turns if t.phase == "waiting"]
+    assert len(waiting) == 2
+    assert waiting[0].patience == 5  # 首次见到活动，有「新」条 → 不扣
+    assert waiting[1].patience == 4  # 无新增 → 扣
 
 
 def test_prior_activity_carried_into_next_wait() -> None:

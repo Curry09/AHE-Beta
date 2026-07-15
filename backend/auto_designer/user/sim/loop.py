@@ -265,6 +265,7 @@ def _supervise_send(
     except Exception as exc:  # noqa: BLE001  黑盒起轮失败 → 可观测失败信号
         return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}", time.monotonic() - t0, None
     heartbeats = 0
+    progress_seen = 0  # 已展示的 progress 条数；无新增 = 静默/空转
     while True:
         try:
             kind, val = harness.poll(_HEARTBEAT_SEC)
@@ -275,8 +276,10 @@ def _supervise_send(
         # kind == "pending"：等待超阈值 → 唤醒用户 agent 做一次等待决策
         waited = float(val)  # type: ignore[arg-type]
         heartbeats += 1
-        # 活动条 = 可评判的过程记忆（对照 prior_activity）；「有动」不等于「对」。
+        # 活动条 = 可评判的过程记忆（对照 prior_activity）；「有动」不等于「对」——偏题应打断。
         progress = list(getattr(harness, "last_progress", None) or [])
+        new_progress = len(progress) > progress_seen
+        progress_seen = len(progress)
         ret = client.respond(
             system,
             build_waiting_turn(
@@ -293,8 +296,11 @@ def _supervise_send(
         if heartbeats >= _MAX_HEARTBEATS:
             action = "give_up"  # 兜底：唤醒到顶强制收束，防病态无限等
         elif action == "keep_waiting":
-            # 续等一律耗心——有活动也不免税；偏题/空转由模型据活动内容选择打断。
-            state.patience = max(0, state.patience - coef.patience_decay)
+            # 耐心税只打「不符合预期的干等」：死静默/无新活动才扣。
+            # 有新进度且用户仍选 keep_waiting = 他判断活动合预期、愿继续等 → 不扣。
+            # 偏题不靠扣心治——靠活动内容让用户选 interrupt（Busy≠correct）。
+            if not new_progress:
+                state.patience = max(0, state.patience - coef.patience_decay)
             if state.patience <= 0:
                 action = "give_up"  # 耐心耗尽：这个人不会再等了
         _log_waiting(result, state, action, control, ret, on_progress)
