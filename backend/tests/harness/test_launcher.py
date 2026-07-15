@@ -31,6 +31,8 @@ _NO_REPLY_ENTRY = (
     '    sys.stdout.write(json.dumps({"x": 1}) + "\\n"); sys.stdout.flush()\n'
 )
 _EARLY_EXIT_ENTRY = "import sys\nsys.exit(0)\n"
+# 读一行后长睡不回：让读线程卡在 stdout.readline() 里（在途），用于收尾竞态回归。
+_BLOCKING_ENTRY = "import sys, time\nsys.stdin.readline()\ntime.sleep(300)\n"
 # 固定回 "v2:<message>" 的 entry：用于验证同 ref 改内容后跑的是新代码而非陈旧缓存。
 _V2_ENTRY = (
     "import json, sys\nfor line in sys.stdin:\n"
@@ -228,6 +230,33 @@ def test_missing_reply_key_raises(tmp_path) -> None:
             h.send("a")
     finally:
         h.close()
+
+
+def test_terminate_while_reader_blocked_leaves_no_thread_error(tmp_path) -> None:
+    """收尾竞态回归：一轮 send 在途（读线程正卡在 stdout.readline()）时 close()，
+    不得让读线程抛 ValueError: I/O operation on closed file / AttributeError。
+
+    _terminate 必须先杀进程、让读线程靠 EOF 收场并 join，之后再关流 / 置空 _proc；反序会与
+    仍卡在 readline() 的读线程抢同一 stdout / _proc。用 threading.excepthook 捕获后台线程异常。
+    """
+    import threading
+
+    errors: list = []
+    prev_hook = threading.excepthook
+    threading.excepthook = errors.append  # 任何后台线程未捕获异常都会落进 errors
+    try:
+        h = _launcher(tmp_path, _BLOCKING_ENTRY).launch("main")
+        h.begin("x")
+        kind, _ = h.poll(0.5)
+        assert kind == "pending"  # 确认读线程正卡在 readline()（在途）
+        reader = h._reader
+        assert reader is not None
+        h.close()  # 收尾：必须干净——读线程靠 EOF 退出，主线程随后关流才无并发
+        reader.join(timeout=5)
+        assert not reader.is_alive()  # 读线程已因 EOF 自然退出，未泄漏
+    finally:
+        threading.excepthook = prev_hook
+    assert errors == []  # 后台读线程全程未抛异常（反序实现会在此落进 I/O closed file）
 
 
 def test_early_exit_eof_raises(tmp_path) -> None:

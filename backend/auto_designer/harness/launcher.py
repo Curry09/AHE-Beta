@@ -87,8 +87,14 @@ class _HarnessHandle:
         self._proc.stdin.write(json.dumps(obj, ensure_ascii=False) + "\n")
         self._proc.stdin.flush()
 
-    def _read_one(self) -> None:
-        self._box["line"] = self._proc.stdout.readline()  # type: ignore[union-attr]
+    def _read_one(self, *, stream: Any, box: dict) -> None:
+        # 读线程只认 begin 绑定给它的 stream 与 box（局部量）：reset() 换掉 self._proc/self._box 后，
+        # 旧线程也绝不误读新进程的首行 reply、不污染新一轮结果盒。关流/断管时 readline 抛
+        # ValueError(I/O on closed file) 或 OSError——此轮已作废，静默收场，不让 daemon 读线程抛未捕获异常。
+        try:
+            box["line"] = stream.readline()
+        except (ValueError, OSError):
+            box.setdefault("line", "")
 
     def begin(self, message: str) -> None:
         """启动一轮 send（写入 message + 起后台读一行线程），不阻塞等待。配合 poll 使用。"""
@@ -100,7 +106,13 @@ class _HarnessHandle:
         self.last_steps = []  # 清上一轮，protocol 违例/无 steps 时保持空
         self._box = {}
         self._write({"message": message})
-        self._reader = threading.Thread(target=self._read_one, daemon=True)
+        # 把本轮 stdout 与结果盒绑定给读线程（局部量）：即便之后 reset() 换了 self._proc/self._box，
+        # 这个读线程也只碰自己这份，不会误读新进程的行、不污染新一轮——从根上消除换绑竞态。
+        stream = self._proc.stdout
+        box = self._box
+        self._reader = threading.Thread(
+            target=lambda: self._read_one(stream=stream, box=box), daemon=True
+        )
         self._reader.start()
         self._t0 = time.monotonic()
         self._inflight = True
@@ -185,19 +197,25 @@ class _HarnessHandle:
         self._inflight = False  # 复位/关闭时作废在途轮，之后可重新 begin
         if self._proc is None:
             return
+        # 顺序：先杀整组（含子/孙进程）→ wait/兜底 SIGKILL → join 读线程 → 再关流、置空 _proc。
+        # readline 得 EOF 的前提是管道所有写端都关闭，故 join 必须放在 SIGKILL 兜底之后——harness 若
+        # 吞 SIGTERM 拖到强杀，早 join 是白等；孙进程若脱组仍攥写端则 EOF 永不来，故 join 带 timeout，
+        # 且 _read_one 已兜 (ValueError, OSError)。三者合起来才根除收尾竞态（反序会与在途读线程抢 stdout）。
+        self._kill_group(signal.SIGTERM)  # 先礼：连子进程一起收，写端一关 → 读线程 readline 得 EOF
+        self._proc.terminate()
+        try:
+            self._proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self._kill_group(signal.SIGKILL)  # 后兵：强杀整组，杜绝孤儿（连带占管道的子进程）
+            self._proc.kill()
+        if self._reader is not None:
+            self._reader.join(timeout=5)  # 读线程靠 EOF 收场；脱组孙进程占管道时靠 timeout 不无限等
         for stream in (self._proc.stdin, self._proc.stdout):
             if stream is not None:
                 try:
                     stream.close()
                 except (BrokenPipeError, OSError):
                     pass  # 子进程已崩时管道可能已断，关闭报错无妨
-        self._kill_group(signal.SIGTERM)  # 先礼：连子进程一起收
-        self._proc.terminate()
-        try:
-            self._proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self._kill_group(signal.SIGKILL)  # 后兵：强杀整组，杜绝孤儿
-            self._proc.kill()
         self._proc = None
 
 
