@@ -123,13 +123,21 @@ class _HarnessHandle:
         self._reader.start()
 
     def _read_loop(self) -> None:
-        """进程存活期间持续 readline → 队列；EOF 投 _EOF 后退出。"""
+        """进程存活期间持续 readline → 队列；EOF 投 _EOF 后退出。
+
+        关流/断管时 readline 可能抛 ValueError(I/O on closed file) 或 OSError——视为 EOF，
+        不让 daemon 读线程抛未捕获异常（对齐 origin/main 对单行读线程的兜底）。
+        """
         stdout = self._proc.stdout if self._proc is not None else None
         if stdout is None:
             self._line_q.put(_EOF)
             return
         while True:
-            line = stdout.readline()
+            try:
+                line = stdout.readline()
+            except (ValueError, OSError):
+                self._line_q.put(_EOF)
+                return
             if line == "":
                 self._line_q.put(_EOF)
                 return
@@ -268,29 +276,26 @@ class _HarnessHandle:
         self._inflight = False  # 复位/关闭时作废在途轮，之后可重新 begin
         if self._proc is None:
             return
-        # 顺序：先杀整组（含子/孙进程）→ wait/兜底 SIGKILL → join 读线程 → 再关流、置空 _proc。
-        # readline 得 EOF 的前提是管道所有写端都关闭，故 join 必须放在 SIGKILL 兜底之后——harness 若
-        # 吞 SIGTERM 拖到强杀，早 join 是白等；孙进程若脱组仍攥写端则 EOF 永不来，故 join 带 timeout，
-        # 且 _read_one 已兜 (ValueError, OSError)。三者合起来才根除收尾竞态（反序会与在途读线程抢 stdout）。
-        self._kill_group(signal.SIGTERM)  # 先礼：连子进程一起收，写端一关 → 读线程 readline 得 EOF
+        # 顺序：先杀整组 → wait/兜底 SIGKILL → join 读线程 → 再关流、置空 _proc。
+        # readline 得 EOF 的前提是管道写端都关闭，故 join 放在 SIGKILL 兜底之后；
+        # _read_loop 已兜 (ValueError, OSError)。反序关流会与在途读线程抢 stdout。
+        self._kill_group(signal.SIGTERM)
         self._proc.terminate()
         try:
             self._proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            self._kill_group(signal.SIGKILL)  # 后兵：强杀整组，杜绝孤儿（连带占管道的子进程）
+            self._kill_group(signal.SIGKILL)
             self._proc.kill()
         if self._reader is not None:
-            self._reader.join(timeout=5)  # 读线程靠 EOF 收场；脱组孙进程占管道时靠 timeout 不无限等
+            self._reader.join(timeout=5)
+            self._reader = None
         for stream in (self._proc.stdin, self._proc.stdout):
             if stream is not None:
                 try:
                     stream.close()
                 except (BrokenPipeError, OSError):
-                    pass  # 子进程已崩时管道可能已断，关闭报错无妨
+                    pass
         self._proc = None
-        if self._reader is not None:
-            self._reader.join(timeout=2.0)
-            self._reader = None
 
 
 class HarnessLauncher:
