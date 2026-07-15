@@ -23,7 +23,10 @@ from nexau.archs.main_sub.execution.parse_structures import (  # noqa: E402
     ToolCall,
 )
 
-from auto_designer.dev.completion_gate import CompletionGateMiddleware  # noqa: E402
+from auto_designer.dev.completion_gate import (  # noqa: E402
+    CompletionGateMiddleware,
+    _local_used_before_assign,
+)
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -164,3 +167,57 @@ def test_non_completing_call_ignored(tmp_path: Path) -> None:
         ),
     )
     assert not gate.after_model(hi).has_modifications()  # 不是收尾调用 → 不干预
+
+
+def test_local_used_before_assign_detects_main_steps_bug() -> None:
+    """复现 WAIT 探针：main 里先 append(evidence, steps) 再 steps=… → 应检出。"""
+    src = (
+        "def main():\n"
+        "    reply = 'done'\n"
+        "    reply = _append(reply, steps)\n"
+        "    steps = list(collector.steps)\n"
+    )
+    hits = _local_used_before_assign(src, func_names=frozenset({"main"}))
+    assert any("steps" in h and "main()" in h for h in hits)
+
+
+def test_local_used_before_assign_ok_when_order_correct() -> None:
+    src = "def main():\n    steps = list(collector.steps)\n    reply = _append('done', steps)\n"
+    assert _local_used_before_assign(src, func_names=frozenset({"main"})) == []
+
+
+def test_wiring_gate_blocks_used_before_assign(tmp_path: Path) -> None:
+    repo, seed = _seed_repo(tmp_path)
+    (repo / "entry.py").write_text(
+        "def main():\n    reply = _append('done', steps)\n    steps = []\n",
+        encoding="utf-8",
+    )
+    (repo / "MANUAL.md").write_text("# manual v1\n- evidence\n", encoding="utf-8")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_smoke.py").write_text(
+        "def test_helper():\n    assert True\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "feat: broken wiring")
+    tags = _tags(_gate(repo, seed)._check(report="", drop_soft=False))
+    assert "[接线健全]" in tags
+
+
+def test_heartbeat_soft_gate_when_tests_lack_timing(tmp_path: Path) -> None:
+    repo, seed = _seed_repo(tmp_path)
+    (repo / "entry.py").write_text(
+        "def _emit_progress_heartbeat():\n    pass\n\ndef main():\n    return 1\n",
+        encoding="utf-8",
+    )
+    (repo / "MANUAL.md").write_text("# manual v1\n- heartbeat\n", encoding="utf-8")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_smoke.py").write_text(
+        "def test_status_format():\n    assert True\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "feat: heartbeat without timing test")
+    tags = _tags(_gate(repo, seed)._check(report="", drop_soft=False))
+    assert "[进度自验]" in tags
+    assert _gate(repo, seed)._check(report="", drop_soft=True) == []  # 预算紧让路

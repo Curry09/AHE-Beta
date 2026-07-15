@@ -223,11 +223,15 @@ def test_bad_json_output_raises(tmp_path) -> None:
         h.close()
 
 
-def test_missing_reply_key_raises(tmp_path) -> None:
+def test_unknown_sideband_is_accepted_without_protocol_error(tmp_path) -> None:
+    """非 reply 的未知 JSON 旁路应被收下，不再报「既无 reply 也无 progress」。"""
     h = _launcher(tmp_path, _NO_REPLY_ENTRY).launch("main")
     try:
-        with pytest.raises(RuntimeError):
-            h.send("a")
+        h.begin("a")
+        kind, _ = h.poll(1.0)
+        assert kind == "pending"
+        assert h.last_sideband and h.last_sideband[0].get("x") == 1
+        assert any(p.get("kind") == "sideband" for p in h.last_progress)
     finally:
         h.close()
 
@@ -303,5 +307,109 @@ def test_launch_manual_empty_when_absent(tmp_path) -> None:
     h = _launcher(tmp_path, _COUNTER_ENTRY).launch("main")  # repo 无 MANUAL.md
     try:
         assert h.manual == ""
+    finally:
+        h.close()
+
+
+# 进度旁路：reply 前可多行 {"progress":...}；poll pending 期间 last_progress 可见。
+_PROGRESS_ENTRY = """\
+import json, sys, time
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    obj = json.loads(line)
+    if "control" in obj:
+        sys.stdout.write(json.dumps({"reply": "[interrupted]"}) + "\\n")
+        sys.stdout.flush()
+        continue
+    for text in ("read core.py", "run pytest"):
+        sys.stdout.write(json.dumps({"progress": {"kind": "tool", "text": text}}) + "\\n")
+        sys.stdout.flush()
+        time.sleep(0.15)
+    sys.stdout.write(json.dumps({"reply": "all done", "steps": [{"kind": "tool", "text": "x"}]}) + "\\n")
+    sys.stdout.flush()
+"""
+
+
+def test_progress_lines_accumulate_before_reply(tmp_path) -> None:
+    h = _launcher(tmp_path, _PROGRESS_ENTRY).launch("main")
+    try:
+        h.begin("go")
+        # 第一次短 poll 多半还在跑 → pending，但可能已读到部分 progress
+        kind, val = h.poll(0.05)
+        # 等到终态
+        while kind == "pending":
+            kind, val = h.poll(2.0)
+        assert kind == "reply"
+        assert val == "all done"
+        texts = [p.get("text") for p in h.last_progress]
+        assert "read core.py" in texts
+        assert "run pytest" in texts
+        assert h.last_steps == [{"kind": "tool", "text": "x"}]
+    finally:
+        h.close()
+
+
+# status/peek 旁路型 control：吐 status、不结束本轮；夹杂的 progress 不算应答。
+_STATUS_PEEK_ENTRY = """\
+import json, sys, threading, time
+busy = {"on": False}
+
+def work():
+    n = 0
+    while busy["on"]:
+        n += 1
+        sys.stdout.write(json.dumps({"progress": {"kind": "tool", "text": f"step-{n}"}}) + "\\n")
+        sys.stdout.flush()
+        time.sleep(0.15)
+
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    obj = json.loads(line)
+    if obj.get("control") in ("status", "peek"):
+        sys.stdout.write(json.dumps({
+            "status": {"phase": "running", "elapsed": 0.4, "completed": False,
+                       "current_step": {"kind": "tool", "text": "pytest"}}
+        }) + "\\n")
+        sys.stdout.flush()
+        continue
+    if obj.get("control") == "interrupt":
+        busy["on"] = False
+        time.sleep(0.05)
+        sys.stdout.write(json.dumps({"reply": "[interrupted]"}) + "\\n")
+        sys.stdout.flush()
+        continue
+    if "message" in obj:
+        busy["on"] = True
+        threading.Thread(target=work, daemon=True).start()
+"""
+
+
+def test_status_control_returns_sideband_and_keeps_inflight(tmp_path) -> None:
+    h = _launcher(tmp_path, _STATUS_PEEK_ENTRY).launch("main")
+    try:
+        h.begin("go")
+        h.poll(0.25)
+        out = h.control("status")
+        assert "phase=running" in out
+        assert h.in_flight is True  # 旁路型控制不结束本轮
+        # 本轮仍可用终结型 control 收尾
+        assert h.control("interrupt") == "[interrupted]"
+        assert h.in_flight is False
+    finally:
+        h.close()
+
+
+def test_interrupt_control_still_ends_with_reply(tmp_path) -> None:
+    h = _launcher(tmp_path, _STATUS_PEEK_ENTRY).launch("main")
+    try:
+        h.begin("go")
+        h.poll(0.2)
+        out = h.control("interrupt")
+        assert out == "[interrupted]"
+        assert h.in_flight is False
     finally:
         h.close()

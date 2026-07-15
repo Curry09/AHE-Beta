@@ -1,9 +1,9 @@
 ---
 number: "0012"
-title: 用户侧等待体感真实化：等待中主动权 + 任务相关耐心
+title: 用户侧等待体感真实化：心跳主动权 · 进度可见 · 任务相关耐心
 issue: 0
 slug: user-wait-realism
-summary: 把用户 agent 面对慢/卡 harness 时的「干等」升级为可感知的真实体感：等待中赋予主动权（心跳唤醒后可轮询/追问/打断），起始耐心随任务量浮动（同一 persona 不同任务耐心不同），并统一等待耐心的衰减口径、去除心跳与判定双记。落点 backend/auto_designer/user/sim/，是 0005/0008 用户侧的行为增强。
+summary: 把用户 agent 面对慢/卡 harness 时的「干等」升级为可感知的真实体感：等待中赋予主动权（心跳唤醒后经 judge→intent→act 决策，可续等/调控制面/放弃），等待条展示 live progress 与 prior_activity；keep_waiting 仅在无新进度时耗耐心；意图兑不进菜单记 WAIT_GAP；体感评分 ATTRIBUTION 不把用户自打断归咎 harness。起始耐心随任务量浮动。落点 backend/auto_designer/user/sim/，是 0005/0008 用户侧的行为增强（peek 续等协议见 0019）。
 tasks:
   - id: T1
     title: 等待中主动权：心跳唤醒 + 通用控制面 + 等待衰减口径统一
@@ -18,8 +18,8 @@ tasks:
       - backend/auto_designer/user/sim/prompt.py
       - backend/tests/user/sim/test_heartbeat.py
       - backend/tests/user/sim/test_loop.py
-    scope: harness send 阻塞时不再让 user agent 干等：当 harness 句柄支持 begin/poll/control（真实子进程会话）时，_supervise_send 在等待超阈（_TURN_WAIT_BUDGET_SEC≈240s，对齐 harness 硬超时）经心跳唤醒 user agent 做一次等待决策，动作集 WAITING_ACTIONS={keep_waiting, invoke_control, give_up}。invoke_control 把控制名原样透传 harness.control()——控制名对框架不透明，是否受支持由 harness 按其 MANUAL 自校验（手册是能力真相源）。非法/缺省决策一律安全落 keep_waiting（绝不擅自替用户放弃/打断）；说要控制却没点名也退回 keep_waiting。keep_waiting 按 persona 的 coef.patience_decay 逐次耗心（急躁型掉更快），与主路径 apply_verdict 同口径；耐心<=0 转 give_up。_MAX_HEARTBEATS=8 兜底强制收束防病态无限等。等待衰减去重：心跳路径已逐次建模等待挫败，故非心跳阻塞 route 的 _EXTREME_WAIT_SEC 极端等待惩罚只对非 supervised 生效，避免同一段等待被双扣。Fake/Scripted 即时返回、不触发心跳。prompt.py 提供 build_waiting_turn（把已等秒数/历史/手册喂给 persona 做等待决策）。
-    acceptance: 真实子进程 harness（具 begin/poll/control）才走 supervised 心跳，Fake/Scripted 不心跳；等待超阈唤醒产 WAITING 决策并记一条 waiting step（executor=persona_local, channel=silent）；非法/缺省决策落 keep_waiting、声明控制却缺控制名也落 keep_waiting；keep_waiting 按 coef.patience_decay 扣心、耐心耗尽转 give_up；心跳达 _MAX_HEARTBEATS 强制 give_up；同一段等待不被心跳 keep_waiting 与 _EXTREME_WAIT_SEC 双扣（supervised 路径不再叠加 _EXTREME_WAIT 惩罚）。单测覆盖：心跳唤醒→续等/打断/放弃三分支、非法动作归一、衰减不双记。
+    scope: harness send 阻塞时不再让 user agent 干等：当 harness 句柄支持 begin/poll/control（真实子进程会话）时，_supervise_send 经心跳唤醒做等待决策。动作菜单 WAITING_ACTIONS={keep_waiting, invoke_control, give_up}；控制名对框架不透明，原样透传 harness.control()（手册是能力真相源）。决策管线 waiting_mode∈{two,three}（默认 three）：judge（WAITING_JUDGMENTS={on_track,off_track,unclear}）→ intent（WAITING_INTENTS含 keep_waiting/check_status/ask_where/redirect/interrupt/walk_away）→ act（兑付到菜单）；two 模式合并 judge+intent 一轮。intent 兑不进菜单 action 时记 WAIT_GAP 信号。等待上下文喂 live progress（launcher.last_progress）与 prior_activity（上一轮已完成请求的活动条），Busy≠正确——按内容判 on/off track。keep_waiting：仅当本心跳相对上次无 new_progress 时按 coef.patience_decay 耗心；有新进度不扣；耐心<=0 转 give_up。_MAX_HEARTBEATS=8 兜底。阻塞路径 _EXTREME_WAIT_SEC 只对非 supervised 生效，避免双扣。Fake/Scripted 不心跳。体感/评分 prompt 含 ATTRIBUTION：history 若记「YOU stopped…」则勿把停归咎 harness（终结型 interrupt 写 history 见 0019）。prompt.py：build_waiting_judge/intent/act_turn（及 two 模式合并版）。
+    acceptance: 真实子进程才走 supervised 心跳；非法/缺省 action 落 keep_waiting、缺控制名亦然；无新进度的 keep_waiting 按 patience_decay 扣心、有新进度不扣、耐心耗尽/心跳上限转 give_up；waiting_mode three 产出 judgment+intent+action，intent≠兑付菜单时记 WAIT_GAP；等待 prompt 含 progress/prior_activity；评分 prompt 含 ATTRIBUTION。单测覆盖：续等/打断/放弃、无进度才耗心、WAIT_GAP、非法归一、衰减不双记。
   - id: T2
     title: 状态耐心模型：任务量起始浮动 + 性格衰减系数
     status: pending
@@ -35,15 +35,21 @@ tasks:
     acceptance: 同一 persona 面对 quick 任务的起始耐心严格低于 epic；任务量浮动只在 OPENING 施加一次、钳位 >=1；不改 D4.3→基线档位映射；Coef.patience_decay 对急躁性格=2、其余=1；apply_verdict：unsure 不耗耐心、stuck 加性递增、failed_* 按 patience_decay 扣。单测覆盖 TASK_LOAD_DELTA 各档 + 钳位 + 各 verdict 耗心 + 急躁系数。
 ---
 
-# 0012 · 用户侧等待体感真实化：等待中主动权 + 任务相关耐心
+# 0012 · 用户侧等待体感真实化：心跳主动权 · 进度可见 · 任务相关耐心
 
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
 
-把用户 agent 面对慢/卡 harness 时的行为，从「静默干等到超时」升级为两项拟真机制：**（1）等待中的主动权**——harness 单轮处理超时阈值后，通过心跳唤醒 user agent 做一次等待决策（继续等 / 调用 harness 控制面 / 放弃），而非被动挂起；**（2）任务相关的起始耐心**——同一 persona 面对不同任务量的活儿，起始耐心不同（该秒回的小任务对摩擦零容忍、有野心的大活愿意多来回）。同时统一「等待耗心」的衰减口径，消除心跳路径与阻塞路径对同一段等待的双记。
+把用户 agent 面对慢/卡 harness 时的行为，从「静默干等到超时」升级为拟真机制：
 
-本组只增强用户侧行为（`backend/auto_designer/user/sim/`），不改动作空间的对外契约与体感评分，是 0005（控制信封模拟器）/0008（内层 tool-using）在「时间维度真实性」上的补齐。
+1. **等待中的主动权**——心跳唤醒后走 **judge → intent → act**（`waiting_mode` 默认 `three`，可选 `two` 合并前两步），在菜单 `{keep_waiting, invoke_control, give_up}` 上兑付；控制名对框架不透明。
+2. **可见进度**——等待 prompt 喂 `last_progress` 与跨轮 `prior_activity`；Busy≠正确，按内容判 on/off track。
+3. **有条件耗心**——`keep_waiting` **仅当本心跳无 new_progress** 才按 `patience_decay` 扣耐心；有新活动不罚。
+4. **WAIT_GAP + ATTRIBUTION**——intent 兑不进菜单记 gap；用户自打断不归咎 harness。
+5. **任务相关起始耐心**——性格档位 + 任务量微浮动。
+
+peek/status 续等与旁路接收见 **0019**。落点 `backend/auto_designer/user/sim/`。
 
 ## Motivation
 
@@ -52,42 +58,40 @@ tasks:
 由此产生两个体感失真：
 
 1. **等待被抹平成「结果的一部分」。** 真人等 10 分钟无动静会追问、会打断、会弃坑；回合制模型把这段煎熬压缩成「最终拿到回复时的一次主观判断」，丢掉了「等待过程本身就是体感杀手」这一真实信号。
-2. **耐心与任务无关。** 0005 的起始耐心只由 persona 性格（D4.3）定档，同一个人无论接「改个错别字」还是「从零迁移一个包」，起始耐心一样——不符合真实：小任务对任何摩擦零容忍，大任务预期要真功夫、愿意多等。
+2. **耐心与任务无关。** 0005 的起始耐心只由 persona 性格（D4.3）定档，同一个人无论接小任务还是大活，起始耐心一样——不符合真实。
 
-此外，早期实现里「等待耗心」有两处独立扣减（心跳路径逐次扣、阻塞路径按极端超时扣），对同一段等待可能双记，使耐心衰减比设计更快。
+此外，早期「等待耗心」可能双记；后来又发现「有进度仍每次 keep_waiting 都扣心」会惩罚合法长任务，故改为**仅无新进度才耗心**。单轮选 action 不足以表达「先判轨道 → 真实意愿 → 菜单兑付」，故拆成 judge/intent/act，并用 WAIT_GAP 暴露错配。
 
-**为什么现在做。** 训练信号是体感；「延迟/等待」是体感的重要维度且只会出现在体感的定性理由里（分数高低看不出）。要让这维信号真实进入闭环，用户侧必须能在等待中表达主动权、且耐心建模要贴合任务——否则设计师侧拿不到「延迟即痛点」的可靠信号（见 0016）。
+**为什么现在做。** 训练信号是体感；延迟是关键维度。用户侧必须能在等待中表达主动权、看到过程、耐心贴合「有无进展」与任务量——否则设计师拿不到可靠延迟信号（见 0016）。
 
 ## Guide-level explanation
 
-改完后用户侧的行为：
-
-- **等待中（新）。** 当且仅当 harness 是支持 `begin/poll/control` 的真实子进程会话时，单轮等待超阈（`_TURN_WAIT_BUDGET_SEC≈240s`）会**心跳唤醒** user agent：把「已等多久、对话历史、harness 手册」喂给 persona，让它在 `{keep_waiting, invoke_control, give_up}` 里选一个动作。
-  - `keep_waiting`：回到 poll 继续等（在途计算不丢），并按性格逐次耗一点耐心；
-  - `invoke_control`：调用 harness 手册所述的某个控制（如打断/续跑），控制名对框架不透明、原样透传给 `harness.control()`，由 harness 按自己的 MANUAL 校验；
-  - `give_up`：这个人不再等了，走放弃终止。
-  - 兜底：耐心耗尽自动转 `give_up`；心跳次数达上限（`_MAX_HEARTBEATS=8`）强制收束，防病态无限等。
-  - Fake/Scripted harness 即时返回，不触发心跳——机制只在真实慢 harness 上生效。
-- **起始耐心（增强）。** 开局时，persona 先对任务量给一个主观读数（`quick/normal/big/epic`），在性格基线上叠加一次性小浮动（`-1…+2`，钳到 ≥1）。范围压得很小，只微调、不盖过性格档位。
-- **对外不变。** 动作空间、体感评分、终止判定（`patience<=0` 解锁终止）语义不变；等待只是新增了「过程中的动作」与「更贴任务的起点」。
+- **等待中。** 真实子进程 harness（`begin/poll/control`）心跳唤醒；Fake/Scripted 不触发。
+  - 决策：`judge` → `intent` → `act` 兑付到菜单；兑不齐记 `WAIT_GAP`。
+  - 上下文：已等秒数、history、MANUAL、本轮 `progress`、上一轮 `prior_activity`。
+  - `keep_waiting`：**无新进度才耗心**；有进度不扣；耐心≤0 或 `_MAX_HEARTBEATS` → `give_up`。
+  - `invoke_control`：控制名原样透传（peek 续等 vs interrupt 终结见 0019）。
+- **起始耐心。** OPENING 据 `task_load` 微浮动（`-1…+2`，钳 ≥1）。
+- **归因。** 评分 ATTRIBUTION：用户自己 interrupt 勿怪 harness。
 
 ## Reference-level explanation
 
 ### 现状代码锚点
 
-- `user/sim/loop.py`：`_supervise_send`（心跳监督发送）、`_resolve_waiting`（自由产出归一到 `WAITING_ACTIONS`）、`_supports_heartbeat`（`begin/poll/control` 探测）、`_log_waiting`（记 waiting step）；常量 `_TURN_WAIT_BUDGET_SEC=240`、`_EXTREME_WAIT_SEC=480`、`_MAX_HEARTBEATS=8`、`WAITING_ACTIONS=[keep_waiting, invoke_control, give_up]`。
-- `user/sim/state.py`：`Coef.patience_decay`（性格派生）、`init_state`（D4.3→耐心基线）、`TASK_LOAD_DELTA` + `apply_task_load`（任务量浮动，钳 ≥1）、`apply_verdict`（各 verdict 耗心规则）。
-- `user/sim/prompt.py`：`build_waiting_turn`（等待决策 prompt）、OPENING 轮采集 `task_load`。
+- `user/sim/loop.py`：`_supervise_send`（`waiting_mode`、`new_progress`、`force_redecide`）、judgment/intent/action 归一、`WAITING_ACTIONS`、`prior_activity`。
+- `user/sim/prompt.py`：`WAITING_JUDGMENTS`/`WAITING_INTENTS`/`INTENT_MENU_OK`、`build_waiting_*_turn`、评分 ATTRIBUTION。
+- `user/sim/state.py`：`Coef.patience_decay`、`init_state`、`TASK_LOAD_DELTA`、`apply_verdict`。
 
 ### 目标方案
 
 | 关注点 | 现状（0005） | 目标（本组） |
 |---|---|---|
-| 慢 harness 等待 | 单条阻塞 `send()`，无可见性/干预 | 超阈心跳唤醒 → `{keep_waiting, invoke_control, give_up}` |
-| harness 控制 | 无 | `invoke_control` 原样透传 `harness.control()`，手册为能力真相源 |
-| 起始耐心 | 仅 D4.3 性格档位 | 性格档位 + 任务量微浮动（`-1…+2`，钳 ≥1） |
-| 等待耗心 | 可能双记 | 心跳逐次按 `coef.patience_decay`；阻塞路径 `_EXTREME_WAIT` 仅对非 supervised 生效 |
-| 无限等待 | 只靠超时 | 耐心耗尽 / `_MAX_HEARTBEATS` 双兜底 |
+| 慢 harness 等待 | 阻塞 `send()` | 心跳 → judge/intent/act |
+| 可见性 | 无 | `progress` + `prior_activity` |
+| 等待耗心 | 可能双记 / 有进度也扣 | 仅无 new_progress 才扣 |
+| 意图错配 | 无 | `WAIT_GAP` |
+| 自打断归因 | 易怪 harness | ATTRIBUTION |
+| 起始耐心 | 仅 D4.3 | + 任务量微浮动 |
 
 ### DAG
 
@@ -97,47 +101,34 @@ graph LR
   T2[T2 状态耐心模型·任务量浮动]
 ```
 
-T1、T2 无代码依赖，`files` 互斥（T1 落 `loop.py`/`prompt.py`，T2 落 `state.py`），可并行。
+### 文件分配
 
-### 文件分配（各 Task `files` 互斥）
-
-- **T1**：`user/sim/loop.py`、`user/sim/prompt.py`、`tests/user/sim/test_heartbeat.py`、`tests/user/sim/test_loop.py`
-- **T2**：`user/sim/state.py`、`tests/user/sim/test_state.py`
+- **T1**：`loop.py`、`prompt.py`、`test_heartbeat.py`、`test_loop.py`
+- **T2**：`state.py`、`test_state.py`
 
 ### 与 harness 侧的接缝
 
-心跳依赖 harness 句柄暴露 `begin/poll/control`（真实子进程会话），控制面的语义与 `[interrupted]` 回复由 harness 侧实现——见 0013「Harness 呈现与交互协议」。本组只消费该接缝，不定义协议本身。
+progress 发射见 **0013**；旁路接收/peek 续等见 **0019**。
 
 ## Drawbacks
 
-- **只对真实子进程 harness 生效**：Fake/Scripted 走不到心跳分支，等待类体感在单测里需专门构造子进程或桩才能覆盖。
-- **心跳唤醒有成本**：每次唤醒都是一次 persona LLM 调用，慢会话会额外产生若干次调用（`_MAX_HEARTBEATS` 封顶）。
-- **任务量读数是主观的**：`task_load` 由 persona 自评，可能与「客观任务量」不符；本设计有意如此（体感即主观），但会给耐心起点引入 persona 噪声。
-- **常量为经验值**：`_TURN_WAIT_BUDGET_SEC`/`_EXTREME_WAIT_SEC`/`_MAX_HEARTBEATS`/`TASK_LOAD_DELTA` 均为拍定的经验阈值，未据真实分布标定。
+- 只对真实子进程生效；three 模式每心跳最多三次 LLM 调用；`new_progress` 以条数增长为准可能偏松；常量为经验值。
 
 ## Rationale and alternatives
 
-选「心跳唤醒 + 主动权」而非把等待完全交给超时，是因为要让「等待过程」成为可观测、可决策的一等信号，而不是被结果吞掉——这直接服务闭环的体感训练信号。
-
-- **备选 A：固定超时后直接判定放弃。** 最简，但抹平了「追问/打断/续等」的真实分化，且无法让 persona 用 harness 控制面——丢信号。
-- **备选 B：等待耗心只在阻塞路径按极端超时扣。** 无法建模「等待中的分次挫败」，且与心跳路径冲突（双记根源）。故统一为心跳逐次扣、阻塞路径仅在非 supervised 补极端惩罚。
-- **备选 C：起始耐心只按性格。** 即 0005 现状，忽略「同一个人不同任务耐心不同」的真实性；本组用小浮动补齐，且刻意压小范围以免盖过性格主导。
+- **备选 A：超时直接放弃**——丢分化信号。
+- **备选 B：每次 keep_waiting 都扣心**——惩罚合法长任务。
+- **备选 C：单轮选 action**——意图/菜单错配不可见。
+- **备选 D：起始耐心只按性格**——忽略任务量。
 
 ## Prior art
 
-- **0005 控制信封模拟器 / 0008 内层 tool-using**：本组是其在时间维度上的延伸——0005 定义动作空间与体感、0008 让判断 grounded，本组让「等待」也成为可决策动作。
-- **交互式 agent 的 heartbeat/keepalive**：长任务期间周期性回报进度、允许中途干预，是长运行 agent 的通行实践；此处把「干预权」交给模拟用户。
-- **控制面对框架不透明**：呼应 harness「黑盒对话契约」原则——控制名由 harness 的 MANUAL 定义、框架不硬编码，保证 harness 可替换（CC/codex）。
+0005/0008 时间维度延伸；0019 peek 续等；长运行 agent heartbeat。
 
 ## Unresolved questions
 
-- **阈值标定**：`_TURN_WAIT_BUDGET_SEC`/`_MAX_HEARTBEATS`/`TASK_LOAD_DELTA` 是否应据真实使用日志的等待时长分布重标？
-- **task_load 的采集方式**：靠 persona 主观自评 vs 由种子场景显式带任务量标签——哪个更少噪声？
-- **控制面词表**：当前控制名完全由 harness MANUAL 决定、user agent 自由生成；是否需要一层「已知控制」提示以减少 persona 瞎点名后退回 `keep_waiting` 的浪费？
+阈值与 `TASK_LOAD_DELTA` 重标？`new_progress` 是否内容去重？是否提示已知控制名以减 WAIT_GAP？
 
 ## Future possibilities
 
-- 把等待时长与心跳决策序列显式落进 session 记录，供设计师侧「延迟即痛点」诊断（0016）与体感曲线归因。
-- 更细的等待动作（如「先追问澄清再决定等不等」），而非当前三分。
-- 据 persona 情绪状态动态调整心跳阈值（急躁的人更早被唤醒）。
-
+等待序列结构化喂 0016；按情绪调心跳频率；two/three 默认 A/B。

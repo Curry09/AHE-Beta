@@ -36,6 +36,9 @@ language; it works on it and sends back a single final reply.
 ## How it behaves
 - It replies **once per request, when it is finished** (or when stopped / timed
   out). It works between your message and its reply.
+- **While it works, you can see a short activity strip** (what tool it is running
+  — e.g. reading a file, running a command). That is live status, not the final
+  answer; the final answer still arrives as one reply when the request completes.
 - It handles **one request at a time**, in order.
 - On a **very large request it can hit an internal time or iteration limit**.
   When that happens you get an explicit note (not a silent hang): the current

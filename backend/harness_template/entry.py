@@ -75,6 +75,25 @@ def _force_stop(agent) -> bool:
 _TOOL_TEXT_CAP = 200
 _TOOL_RESULT_CAP = 500
 _ASSISTANT_TEXT_CAP = 20_000
+# stdout 写锁：tracer 线程吐 progress、主线程吐终态 reply，必须互斥防行交错。
+_stdout_lock = threading.Lock()
+
+
+def _emit_progress(*, kind: str, text: str) -> None:
+    """向用户侧吐一条 Codex 式活动摘要（终态 reply 之前的旁路行）。
+
+    只发 tool / tool_error——短、可扫；assistant 全文不进进度条（那是过程流，给观测层）。
+    失败一律静默：进度丢了不该拖垮 agent。
+    """
+    if kind not in ("tool", "tool_error"):
+        return
+    try:
+        line = json.dumps({"progress": {"kind": kind, "text": text}}, ensure_ascii=False)
+        with _stdout_lock:
+            sys.stdout.write(line + "\n")
+            sys.stdout.flush()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _run_supervised(agent, message, timeout, ctrl_q):
@@ -254,6 +273,7 @@ def _make_step_collector():
                 t = (text or "")[:cap]
                 if t:
                     self.steps.append({"kind": kind, "text": t})
+                    _emit_progress(kind=kind, text=t)  # 等待中可见的活动条（旁路）
             except Exception:  # noqa: BLE001  观测层失败不影响 agent
                 pass
 
@@ -377,8 +397,9 @@ def main() -> None:
         steps = list(collector.steps)  # 完整内层迭代 → 观测层（persona 不吃）
         if steps:
             payload["steps"] = steps
-        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        sys.stdout.flush()
+        with _stdout_lock:  # 与 progress 旁路互斥，保证终态行完整
+            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ _（缺模块级 docstring）_
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
 | `designer.py` | Designer：创新者 = 综合全局的 nexau agent（对偶于开发者的「局部补丁」）。 |
+| `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂设计师作机制层判别证据。 |
 
 ### auto_designer.dev
 
@@ -34,7 +35,7 @@ _（缺模块级 docstring）_
 | `commit_checkpoint.py` | CommitCheckpointMiddleware：用机制（而非软提示）保证 dev 尽早落一个已提交的增量。 |
 | `completion_gate.py` | CompletionGateMiddleware：收尾闸门——保证 dev 收尾时是一次"完整提交"。 |
 | `harness_boundary.py` | harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品—— |
-| `workspace_jail.py` | WorkspaceJailMiddleware：dev/designer 以 harness 仓为可写工作区；NexAU 源码只读放行。 |
+| `workspace_jail.py` | WorkspaceJailMiddleware：dev/designer 以 harness 仓为可写工作区；NexAU 源码与运行时产物只读放行。 |
 
 ### auto_designer.distill
 
@@ -150,6 +151,7 @@ graph LR
     nauto_designer["auto_designer"]
     nauto_designer_designer["auto_designer.designer"]
     nauto_designer_designer_designer["designer.designer"]
+    nauto_designer_designer_runtime_agg["designer.runtime_agg"]
     nauto_designer_dev["auto_designer.dev"]
     nauto_designer_dev_agentic_developer["dev.agentic_developer"]
     nauto_designer_dev_commit_checkpoint["dev.commit_checkpoint"]
@@ -209,10 +211,13 @@ graph LR
     nauto_designer_user_sim_workspace["sim.workspace"]
     nauto_designer_web["auto_designer.web"]
     nauto_designer_web_api["web.api"]
+    nauto_designer_designer_designer --> nauto_designer_designer_runtime_agg
     nauto_designer_designer_designer --> nauto_designer_loop_live_tracer
     nauto_designer_designer_designer --> nauto_designer_models
     nauto_designer_designer_designer --> nauto_designer_tracker_base
     nauto_designer_designer_designer --> nauto_designer_user_session_store
+    nauto_designer_designer_runtime_agg --> nauto_designer_models
+    nauto_designer_designer_runtime_agg --> nauto_designer_user_session_store
     nauto_designer_dev_agentic_developer --> nauto_designer_loop_live_tracer
     nauto_designer_dev_agentic_developer --> nauto_designer_tracker_base
     nauto_designer_distill --> nauto_designer_distill_library

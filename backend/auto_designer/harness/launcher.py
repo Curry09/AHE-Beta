@@ -1,7 +1,12 @@
 """harness launcher（spec-0003/T1）：把某版 harness 程序接成 spec-0001 的 HarnessInterface。
 
 按 git ref 把 harness 仓 checkout 到 data/harness_runs/<ref>/，起子进程跑其自带 entry，
-按逐轮 stdio JSONL 协议（stdin {"message": str} → stdout {"reply": str}）适配为 send/reset/close。
+按逐轮 stdio JSONL 协议适配为 send/reset/close：
+  stdin  {"message": str} | {"control": str}
+  stdout 可选多行旁路（任意非 reply 的 JSON 对象：progress / status / 其它）→
+         最后一行 {"reply": str, "steps"?: [...]} 结束本轮
+控制名对 launcher 不透明（手册是能力真相源）：终结型 control（如 interrupt）最终吐 reply；
+旁路型（如 status/peek）只吐非 reply 行、本轮继续。接收端放宽——未知旁路字段不报错。
 harness 内部 1 或 N 个 nexau 如何编排对 launcher 不可见（黑盒）。
 """
 
@@ -10,6 +15,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import queue
 import shutil
 import signal
 import subprocess
@@ -35,6 +41,36 @@ _POLL_INTERVAL = 5.0
 # 绝对上限：仅作最后兜底，防「进程还活着但真活锁」（如被改坏、自身上界被移除的 harness 无限空转）。
 # 设得远高于 harness 自身 ~16min 的上界，正常长任务绝不会触达。
 _SEND_ABS_CAP = 1800.0
+# 读线程 EOF / 进程退出时投进行队列的哨兵（与真实 stdout 行区分）。
+_EOF = object()
+_SIDEBAND_PREVIEW_CAP = 500
+
+
+def _sideband_preview(payload: dict) -> str:
+    """把旁路 JSON 压成短文本，供 control() 返回值与等待条展示。"""
+    status = payload.get("status")
+    if isinstance(status, dict):
+        bits: list[str] = []
+        for key in ("phase", "elapsed", "completed", "can_continue", "note"):
+            if key in status and status[key] is not None:
+                bits.append(f"{key}={status[key]}")
+        step = status.get("current_step") or (status.get("progress") or {}).get("last_step")
+        if isinstance(step, dict) and step.get("text"):
+            bits.append(f"step={step.get('text')}")
+        if bits:
+            return "; ".join(bits)[:_SIDEBAND_PREVIEW_CAP]
+    try:
+        return json.dumps(payload, ensure_ascii=False)[:_SIDEBAND_PREVIEW_CAP]
+    except (TypeError, ValueError):
+        return str(payload)[:_SIDEBAND_PREVIEW_CAP]
+
+
+def _is_control_ack_sideband(payload: dict) -> bool:
+    """是否算「对本 control 的应答旁路」（排除夹杂的纯 progress 工具活动条）。"""
+    if "status" in payload:
+        return True
+    # 除 progress 外还有其它键 → 未知旁路也认（协议放宽，不注册）
+    return any(k != "progress" for k in payload)
 
 
 class _HarnessHandle:
@@ -52,13 +88,23 @@ class _HarnessHandle:
         # 最近一次 send 的 harness 内层过程流（{kind,text} 序列）：协议 reply 之外的观测旁路，
         # persona 只吃 send 返回的 reply、看不到 steps。调用方 send 后立即 getattr 读取。
         self.last_steps: list[dict] = []
-        # 心跳/续等状态（begin 起、poll 续、reply/异常止）：一轮 send 拆成"起线程读一行 + 分片轮询"，
-        # 让调用方能在等待中途拿回控制权（心跳唤醒），而在途读线程保留、计算不丢。
+        # 本轮进行中已吐出的进度条（Codex 式活动摘要）：等待心跳时喂给用户 agent；
+        # 与 steps 同源压缩，但不等于完整过程流。纯 progress 与其它旁路都会尽量映到这里。
+        self.last_progress: list[dict] = []
+        # 本轮全部非 reply 旁路原文（progress/status/其它）；control() 用它判断旁路型控制已响应。
+        self.last_sideband: list[dict] = []
+        # 心跳/续等：进程级读线程把 stdout 行丢进队列；poll 在超时内 drain——
+        # 旁路累积，reply 行结束本轮。
+        self._line_q: queue.Queue = queue.Queue()
         self._reader: threading.Thread | None = None
-        self._box: dict[str, str] = {}
         self._t0 = 0.0
         self._inflight = False
         self._start()
+
+    @property
+    def in_flight(self) -> bool:
+        """本轮 send 是否仍在进行（尚无终态 reply）。旁路型 control 之后仍为 True。"""
+        return self._inflight
 
     def _start(self) -> None:
         # 命令不存在 / entry 崩溃 → Popen 抛错，由 launch 上抛（附 entry 信息）。
@@ -72,6 +118,30 @@ class _HarnessHandle:
             bufsize=1,
             start_new_session=True,  # 独立进程组：超时/关闭时连 harness 起的子进程一并回收
         )
+        self._line_q = queue.Queue()
+        self._reader = threading.Thread(target=self._read_loop, daemon=True)
+        self._reader.start()
+
+    def _read_loop(self) -> None:
+        """进程存活期间持续 readline → 队列；EOF 投 _EOF 后退出。
+
+        关流/断管时 readline 可能抛 ValueError(I/O on closed file) 或 OSError——视为 EOF，
+        不让 daemon 读线程抛未捕获异常（对齐 origin/main 对单行读线程的兜底）。
+        """
+        stdout = self._proc.stdout if self._proc is not None else None
+        if stdout is None:
+            self._line_q.put(_EOF)
+            return
+        while True:
+            try:
+                line = stdout.readline()
+            except (ValueError, OSError):
+                self._line_q.put(_EOF)
+                return
+            if line == "":
+                self._line_q.put(_EOF)
+                return
+            self._line_q.put(line)
 
     def _kill_group(self, sig: int) -> None:
         """给 harness 整个进程组发信号（含其 nexau/sandbox 子进程）；进程已亡则忽略。"""
@@ -87,93 +157,102 @@ class _HarnessHandle:
         self._proc.stdin.write(json.dumps(obj, ensure_ascii=False) + "\n")
         self._proc.stdin.flush()
 
-    def _read_one(self, *, stream: Any, box: dict) -> None:
-        # 读线程只认 begin 绑定给它的 stream 与 box（局部量）：reset() 换掉 self._proc/self._box 后，
-        # 旧线程也绝不误读新进程的首行 reply、不污染新一轮结果盒。关流/断管时 readline 抛
-        # ValueError(I/O on closed file) 或 OSError——此轮已作废，静默收场，不让 daemon 读线程抛未捕获异常。
-        try:
-            box["line"] = stream.readline()
-        except (ValueError, OSError):
-            box.setdefault("line", "")
-
     def begin(self, message: str) -> None:
-        """启动一轮 send（写入 message + 起后台读一行线程），不阻塞等待。配合 poll 使用。"""
+        """启动一轮 send（写入 message），不阻塞等待。配合 poll 使用。"""
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可再 send")
         if self._inflight:
             raise RuntimeError("上一轮 send 尚未收完回复，不可并发 begin")
         assert self._proc.stdin is not None and self._proc.stdout is not None
-        self.last_steps = []  # 清上一轮，protocol 违例/无 steps 时保持空
-        self._box = {}
+        self.last_steps = []
+        self.last_progress = []
+        self.last_sideband = []
         self._write({"message": message})
-        # 把本轮 stdout 与结果盒绑定给读线程（局部量）：即便之后 reset() 换了 self._proc/self._box，
-        # 这个读线程也只碰自己这份，不会误读新进程的行、不污染新一轮——从根上消除换绑竞态。
-        stream = self._proc.stdout
-        box = self._box
-        self._reader = threading.Thread(
-            target=lambda: self._read_one(stream=stream, box=box), daemon=True
-        )
-        self._reader.start()
         self._t0 = time.monotonic()
         self._inflight = True
+
+    def _ingest_sideband(self, payload: dict) -> None:
+        """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
+        self.last_sideband.append(payload)
+        if "progress" in payload:
+            prog = payload.get("progress")
+            if isinstance(prog, dict) and prog:
+                self.last_progress.append(prog)
+                return
+        kind = "status" if "status" in payload else "sideband"
+        self.last_progress.append({"kind": kind, "text": _sideband_preview(payload)})
 
     def poll(self, timeout: float) -> tuple[str, object]:
         """在 timeout 秒内等当前这轮回复。
 
-        返回 ("reply", reply_text) 若已收到；("pending", waited_sec) 若仍在跑（在途读线程保留、
-        计算不丢，可再次 poll 续等）。进程还活着就是合法长任务、绝不按墙钟盲杀；只有「进程已退出却
-        没回完整行」（崩溃留孤儿占管道，readline 收不到 EOF）才判死锁上抛；另设极宽松绝对上限防真活锁。"""
-        if not self._inflight or self._reader is None:
+        返回 ("reply", reply_text) 若已收到；("pending", waited_sec) 若仍在跑（旁路行会先
+        累积进 last_sideband / last_progress）。进程还活着就是合法长任务、绝不按墙钟盲杀；只有
+        「进程已退出却没回完整 reply」（崩溃留孤儿占管道）才判死锁上抛；另设极宽松绝对上限防真活锁。"""
+        if not self._inflight:
             raise RuntimeError("没有进行中的 send，不可 poll")
         deadline = time.monotonic() + max(0.0, timeout)
         while True:
-            remaining = deadline - time.monotonic()
-            self._reader.join(min(_POLL_INTERVAL, remaining) if remaining > 0 else 0.0)
-            if not self._reader.is_alive():
-                return ("reply", self._finish_inflight())
             waited = time.monotonic() - self._t0
-            if self._proc.poll() is not None:  # type: ignore[union-attr]
-                self._kill_group(signal.SIGKILL)
-                self._inflight = False
-                raise RuntimeError("harness 子进程已退出但未回完整行（崩溃/孤儿占管道）")
             if waited >= _SEND_ABS_CAP:
                 self._kill_group(signal.SIGKILL)
                 self._inflight = False
                 raise RuntimeError(
                     f"harness 单轮回复超绝对上限 >{_SEND_ABS_CAP:.0f}s（疑似活锁，已杀进程组）"
                 )
-            if time.monotonic() >= deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 return ("pending", waited)
-
-    def _finish_inflight(self) -> str:
-        self._inflight = False
-        line = self._box.get("line", "")
-        if line == "":  # EOF：子进程提前退出
-            raise RuntimeError("harness 子进程已退出（stdout EOF）")
-        try:
-            payload = json.loads(line)
-            reply = payload["reply"]
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
-        # steps 为可选观测旁路：老 harness / 无内层过程时缺省，不作协议硬约束。
-        steps = payload.get("steps")
-        self.last_steps = steps if isinstance(steps, list) else []
-        return reply
+            try:
+                item = self._line_q.get(timeout=min(_POLL_INTERVAL, remaining))
+            except queue.Empty:
+                if self._proc is not None and self._proc.poll() is not None:
+                    self._kill_group(signal.SIGKILL)
+                    self._inflight = False
+                    raise RuntimeError(
+                        "harness 子进程已退出但未回完整行（崩溃/孤儿占管道）"
+                    ) from None
+                continue
+            if item is _EOF:
+                self._inflight = False
+                raise RuntimeError("harness 子进程已退出（stdout EOF）")
+            line = str(item)
+            try:
+                payload = json.loads(line)
+            except (json.JSONDecodeError, TypeError) as exc:
+                self._inflight = False
+                raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
+            if not isinstance(payload, dict):
+                self._inflight = False
+                raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
+            if "reply" in payload:
+                self._inflight = False
+                steps = payload.get("steps")
+                self.last_steps = steps if isinstance(steps, list) else []
+                return ("reply", payload["reply"])
+            # 任意非 reply JSON 旁路（progress / status / 未来字段）——放宽接收，不报错。
+            self._ingest_sideband(payload)
+            continue
 
     def control(self, name: str) -> str:
-        """向 harness 发一条控制消息（旁路，name 对本类不透明）并返回它据此吐出的本轮回复。
+        """向 harness 发一条控制（name 不透明）并返回它对此的可见响应。
 
-        必须在某轮 send 进行中（begin 后、reply 前）调用——控制作用于正在跑的这一轮。控制会促使
-        harness 结束当前轮并吐一行 reply（如打断→"[interrupted]…"），此处等到收完并返回。"""
+        必须在某轮 send 进行中（begin 后、reply 前）。两种合法形状：
+        - 终结型（如 interrupt）：最终吐 reply，本轮结束，返回 reply 文本；
+        - 旁路型（如 status/peek）：吐非纯 progress 的旁路（如 status），本轮继续，返回该旁路预览。
+        发 control 后仍可能夹杂工具 progress——那些不算对本控制的应答，继续等。"""
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可发控制消息")
         if not self._inflight:
             raise RuntimeError("没有进行中的 send，控制消息无处作用")
+        before = len(self.last_sideband)
         self._write({"control": name})
         while True:
-            kind, val = self.poll(_SEND_ABS_CAP)
+            kind, val = self.poll(_POLL_INTERVAL)
             if kind == "reply":
                 return val  # type: ignore[return-value]
+            for payload in self.last_sideband[before:]:
+                if _is_control_ack_sideband(payload):
+                    return _sideband_preview(payload)
 
     def send(self, message: str) -> str:
         """阻塞版：begin + 等到收完整段回复（供不需要心跳的调用方 / 向后兼容）。"""
@@ -197,25 +276,25 @@ class _HarnessHandle:
         self._inflight = False  # 复位/关闭时作废在途轮，之后可重新 begin
         if self._proc is None:
             return
-        # 顺序：先杀整组（含子/孙进程）→ wait/兜底 SIGKILL → join 读线程 → 再关流、置空 _proc。
-        # readline 得 EOF 的前提是管道所有写端都关闭，故 join 必须放在 SIGKILL 兜底之后——harness 若
-        # 吞 SIGTERM 拖到强杀，早 join 是白等；孙进程若脱组仍攥写端则 EOF 永不来，故 join 带 timeout，
-        # 且 _read_one 已兜 (ValueError, OSError)。三者合起来才根除收尾竞态（反序会与在途读线程抢 stdout）。
-        self._kill_group(signal.SIGTERM)  # 先礼：连子进程一起收，写端一关 → 读线程 readline 得 EOF
+        # 顺序：先杀整组 → wait/兜底 SIGKILL → join 读线程 → 再关流、置空 _proc。
+        # readline 得 EOF 的前提是管道写端都关闭，故 join 放在 SIGKILL 兜底之后；
+        # _read_loop 已兜 (ValueError, OSError)。反序关流会与在途读线程抢 stdout。
+        self._kill_group(signal.SIGTERM)
         self._proc.terminate()
         try:
             self._proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            self._kill_group(signal.SIGKILL)  # 后兵：强杀整组，杜绝孤儿（连带占管道的子进程）
+            self._kill_group(signal.SIGKILL)
             self._proc.kill()
         if self._reader is not None:
-            self._reader.join(timeout=5)  # 读线程靠 EOF 收场；脱组孙进程占管道时靠 timeout 不无限等
+            self._reader.join(timeout=5)
+            self._reader = None
         for stream in (self._proc.stdin, self._proc.stdout):
             if stream is not None:
                 try:
                     stream.close()
                 except (BrokenPipeError, OSError):
-                    pass  # 子进程已崩时管道可能已断，关闭报错无妨
+                    pass
         self._proc = None
 
 
