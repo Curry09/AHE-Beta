@@ -31,8 +31,9 @@ tasks:
     parallel: false
     files:
       - backend/run.py
-    scope: '两处（同文件一并落）：① 凭证隔离——main() env 段（deferred import 与任何 agent 起跑前）设 os.environ.setdefault(''GIT_SSH_COMMAND'',''false'') + os.environ[''GIT_TERMINAL_PROMPT'']=''0''，掐 ssh 传输（GitHub git@… 推送失败）与 HTTPS 交互凭证提示；Gitea HTTP（token in URL）与本地无传输 git 不受影响。② 绊线接线——构造 developers 后、orch.run 前 before=snapshot_repo(repo=str(ROOT))，integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before) 注入 Orchestrator（ROOT=编排仓根=逃逸目标；run 期间编排仓应全程冻结）。'
-    acceptance: 启动后 GIT_SSH_COMMAND=='false'（未显式覆盖时）、GIT_TERMINAL_PROMPT=='0'；harness seed/reset 与 dev 推 Gitea 的 HTTP 流程不受影响。orch 收到非 None integrity_guard；正常跑（编排仓未被动）不抛；人工写改编排仓后再跑，run 抛 RepoIntegrityError 且 finally 落 running=False。
+      - backend/tests/test_run_git_isolation.py
+    scope: '两处（同文件一并落）：① 凭证隔离 _isolate_git_credentials()——多信道封堵（单关终端提示不够，实测 VS Code 注入的 GIT_ASKPASS 会绕过）：GIT_SSH_COMMAND=false（setdefault）+ GIT_TERMINAL_PROMPT=0 + 清 GIT_ASKPASS/SSH_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* + 经 GIT_CONFIG_* 空值重置 credential.helper；Gitea HTTP（token in URL）与本地无传输 git 不受影响。② 绊线接线——构造 developers 后、orch.run 前 before=snapshot_repo(repo=str(ROOT))，integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before) 注入 Orchestrator（ROOT=编排仓根=逃逸目标；run 期间编排仓应全程冻结）。'
+    acceptance: 启动后 GIT_SSH_COMMAND=='false'（未显式覆盖时）、GIT_TERMINAL_PROMPT=='0'、GIT_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* 全清、GIT_CONFIG_* 注入空 credential.helper（追加不覆盖既有）；单测覆盖以上分支。harness seed/reset 与 dev 推 Gitea 的 HTTP 流程不受影响。orch 收到非 None integrity_guard；正常跑（编排仓未被动）不抛；人工写改编排仓后再跑，run 抛 RepoIntegrityError 且 finally 落 running=False。
   - id: T3
     title: 清理历史逃逸污染制品 MANUAL.md
     status: done
@@ -136,16 +137,31 @@ run_round → 传播出 run()，finally 仍落 running=False。
 
 ### T2 凭证隔离 + 绊线接线（run.py，两处一并落）
 
-**① 凭证隔离**——main() 早段（deferred import 之前、任何 agent 起跑之前）：
+**① 凭证隔离**——main() 早段（deferred import 之前、任何 agent 起跑之前）`_isolate_git_credentials()`。
+凭证泄漏有**多条静默信道**，单关一条不够（实测踩坑：只设 `GIT_TERMINAL_PROMPT=0` 时，VS Code + WSL
+注入的 `GIT_ASKPASS` 仍静默交出 GitHub token，dry-run push 照样成功）：
 
 ```python
 os.environ.setdefault("GIT_SSH_COMMAND", "false")   # 掐 ssh 传输：GitHub git@… 推送失败
-os.environ["GIT_TERMINAL_PROMPT"] = "0"              # 禁 HTTPS 交互凭证提示
+os.environ["GIT_TERMINAL_PROMPT"] = "0"             # 禁终端交互凭证提示
+# 清 askpass / ssh-agent 静默信道（GIT_TERMINAL_PROMPT 管不到 askpass）：
+for k in ("GIT_ASKPASS", "SSH_ASKPASS", "SSH_AUTH_SOCK",
+          "VSCODE_GIT_ASKPASS_NODE", "VSCODE_GIT_ASKPASS_MAIN",
+          "VSCODE_GIT_ASKPASS_EXTRA_ARGS", "VSCODE_GIT_IPC_HANDLE"):
+    os.environ.pop(k, None)
+# 空值经 GIT_CONFIG_* 注入重置 credential.helper 列表（store/manager/keychain 也是静默信道）：
+n = int(os.environ.get("GIT_CONFIG_COUNT", "0") or "0")   # 追加，不覆盖既有注入
+os.environ["GIT_CONFIG_COUNT"] = str(n + 1)
+os.environ[f"GIT_CONFIG_KEY_{n}"] = "credential.helper"
+os.environ[f"GIT_CONFIG_VALUE_{n}"] = ""
 ```
 
-- 用 `setdefault` 保留运维显式覆盖的余地；`GIT_TERMINAL_PROMPT` 强设（防已有残留放行）。
-- 影响面核验：`_seed_harness_repo`/`_reset_to_initial`/dev/designer 推送全走 Gitea HTTP（token in URL），
-  launcher/orchestrator 的 git 全是本地无传输——均不受 ssh 阻断影响。
+- 四条信道全封：ssh 传输、终端提示、askpass（含 VS Code 注入）、credential.helper。
+- 用 `setdefault` 保留运维对 `GIT_SSH_COMMAND` 的显式覆盖；`GIT_TERMINAL_PROMPT` 强设（防残留放行）。
+- 影响面核验：`_seed_harness_repo`/`_reset_to_initial`/dev/designer 推送全走 Gitea HTTP（`http://
+  OWNER:TOKEN@host/…`，凭证在 URL、不经 askpass/helper），launcher/orchestrator 的 git 全是本地无传输
+  ——均不受影响。git ≥2.31 支持 GIT_CONFIG_* 注入；实测注入后 `git config credential.helper` 为空、
+  常规 git 操作正常。
 - 生产在 WSL（POSIX），`false` 在 PATH 内、忽略参数退出码 1 → ssh 调用失败。
 
 **② 绊线接线**——构造 developers 后、`orch.run` 前：`before = snapshot_repo(repo=str(ROOT))`，
@@ -183,7 +199,8 @@ T2 依赖 T1（用 repo_guard）；T3 独立。凭证隔离与绊线接线是两
 
 - **T1**：`backend/auto_designer/dev/repo_guard.py`、`backend/auto_designer/loop/orchestrator.py`、
   `backend/tests/dev/test_repo_guard.py`、`backend/tests/loop/test_orchestrator.py`
-- **T2**：`backend/run.py`（凭证隔离 env 段 + orchestrator 接线段）
+- **T2**：`backend/run.py`（凭证隔离 env 段 + orchestrator 接线段）、
+  `backend/tests/test_run_git_isolation.py`
 - **T3**：`backend/agent_defs/developer_agent/MANUAL.md`（删除）
 
 ## Drawbacks
@@ -192,9 +209,11 @@ T2 依赖 T1（用 repo_guard）；T3 独立。凭证隔离与绊线接线是两
   push 失败、绊线让「即便 push 成功也秒级可见」，纵深互补。
 - **绊线可能误报**：若某轮里编排仓被**合法**改动（正常不会——闭环只动 harness 沙盒与 data/），会误抛。
   接受：编排仓在 run 期间本就该冻结，误报本身是有价值的信号。
-- **凭证隔离依赖 origin 传输类型**：只挡 ssh 与交互式 HTTPS；若有人把编排仓 origin 配成 URL 内嵌 token 的
-  HTTPS，凭证隔离挡不住（但那种配置本身是把凭证写进 remote，另一个问题）。绊线作为第二道兜底覆盖此缺口。
-- **非 airtight**：agent 若能写 `~/.ssh` 或改 git config 仍有绕过面。真正闭合需 OS 沙箱（Future）。
+- **凭证隔离封的是「已知信道」**：ssh / 终端提示 / askpass / credential.helper 四条已封（实测 VS Code
+  的 GIT_ASKPASS 缺口已补）。但若有人把编排仓 origin 配成 URL 内嵌 token 的 HTTPS，凭证在 URL 里、
+  隔离挡不住（那种配置本身是把凭证写进 remote，另一问题）；绊线作为第二道兜底覆盖此缺口。
+- **非 airtight**：agent 若能写 `~/.ssh`、改 git config、或自己拼 token URL 仍有绕过面。真正闭合需
+  OS 沙箱（Future/spec-0022）——届时 agent 根本进不了宿主文件系统与凭证。
 
 ## Rationale and alternatives
 
