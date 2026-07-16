@@ -22,7 +22,7 @@ tasks:
     acceptance: snapshot/verify：未变→放行、新增 commit/改 tracked/新 untracked→抛 RepoIntegrityError，既有 untracked 前后都在→不误报。orchestrator：注入的 guard 在 b 段后被调用一次；guard 抛出使 run_round 抛出（不吞）。repo_guard 测试用 symbolic-ref 建仓（兼容 git <2.28，本机可跑）。
   - id: T2
     title: run.py 凭证隔离 + 构造并注入编排仓绊线 guard
-    status: pending
+    status: done
     priority: P0
     tags: []
     depends-on:

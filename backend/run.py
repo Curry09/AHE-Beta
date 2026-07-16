@@ -184,6 +184,13 @@ def main() -> int:
 
     args = _parse_args(argv=sys.argv[1:])
 
+    # Spec-0021/T2：进程级 git 凭证隔离——dev agent 可能用 heredoc 隧道绕过 workspace-jail、chdir 到
+    # 编排仓并 git push（实测逃逸链）。掐断 ssh 传输：本进程及所有子进程（含 dev 的 subprocess git）推
+    # GitHub（git@… = ssh）一律失败；禁 HTTPS 交互凭证提示。dev 推 Gitea 走 URL 内嵌 token 的 HTTP
+    # origin（无需 ssh/helper）、本地无传输 git 操作均不受影响。setdefault 保留运维显式覆盖的余地。
+    os.environ.setdefault("GIT_SSH_COMMAND", "false")
+    os.environ["GIT_TERMINAL_PROMPT"] = "0"
+
     llm_env = _load_env(ROOT / ".env")  # {USER,DEV,DESIGNER,HARNESS}_LLM_*
     os.environ.update(llm_env)
     # 分角色 LLM 配置：三种编排角色各用 {USER,DEV,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、
@@ -464,6 +471,16 @@ def main() -> int:
     max_parallel_users = int(raw_parallel) if raw_parallel.isdigit() else (len(fixed_set) or 1)
     max_parallel_users = max(1, max_parallel_users)  # 0/负值/非数字一律回落（1=串行）
 
+    # Spec-0021/T2：编排仓完整性绊线。run 期间编排仓（ROOT=auto-designer 检出）应全程冻结——只该动
+    # harness 沙盒与 data/。开跑前拍一张 (HEAD, porcelain) 快照，每轮 b 段后校验未变；被 dev agent
+    # 逃逸改动即抛 RepoIntegrityError 中止（凭证隔离已掐推送，这是第二道独立信道兜底）。
+    from auto_designer.dev.repo_guard import snapshot_repo, verify_unchanged  # noqa: PLC0415
+
+    _repo_baseline = snapshot_repo(repo=str(ROOT))
+
+    def integrity_guard() -> None:
+        verify_unchanged(repo=str(ROOT), before=_repo_baseline)
+
     orch = Orchestrator(
         launcher=launcher,
         harness_repo=str(repo),  # Spec-0007/T4：每局解析 main HEAD SHA 用
@@ -475,6 +492,7 @@ def main() -> int:
         on_round_start=on_round_start,  # 轮次运行态 → data/live/run.json（看板 /api/state）
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
+        integrity_guard=integrity_guard,  # Spec-0021/T2
     )
 
     n_bug_first = sum(1 for p in dev_policies if p == "bug_first")
