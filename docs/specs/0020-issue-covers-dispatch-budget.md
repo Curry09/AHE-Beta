@@ -7,7 +7,7 @@ summary: 补全 designer 覆盖判定的执行链（covers 结构化-挂链-降�
 tasks:
   - id: T1
     title: designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
