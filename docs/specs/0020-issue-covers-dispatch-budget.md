@@ -64,7 +64,7 @@ tasks:
     acceptance: 带 covers 行的 open design 票返回 covers 数组；被其覆盖的 bug 返回 covered_by；design 票 closed 后其覆盖的 bug covered_by 为 null；无 covers 行为 [] / null；test_api 覆盖三态。
   - id: T5
     title: 前端：issue 列表与详情的覆盖徽标
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
