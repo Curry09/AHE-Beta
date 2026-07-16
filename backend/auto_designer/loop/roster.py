@@ -34,3 +34,28 @@ def _read_count(*, role: str) -> int:
 def load_roster() -> dict[str, int]:
     """返回当前编制 {user, designer, developer}，环境变量覆盖默认值。"""
     return {role: _read_count(role=role) for role in DEFAULT_ROSTER}
+
+
+# ---- Spec-0020/T3：开发者领取策略配置 ----
+# 前 N 个 dev 用 bug_first（保底消化用户 bug），其余 design_first（设计票优先，治设计票饿死）。
+_BUG_FIRST_ENV = "N_BUG_FIRST_DEVS"
+DEFAULT_BUG_FIRST_DEVS = 1
+
+
+def load_dev_pick_policies(*, n_developers: int) -> list[str]:
+    """按编制返回每个 dev 的领取策略（长度 = n_developers，前段 bug_first 其余 design_first）。
+
+    N_BUG_FIRST_DEVS 覆盖默认 1：0 → 全 design_first；≥编制 → 截断为全 bug_first；
+    负数/非整数 → 回落默认。n_developers=0 返回空列表。
+    """
+    raw = os.environ.get(_BUG_FIRST_ENV)
+    n_bug_first = DEFAULT_BUG_FIRST_DEVS
+    if raw is not None and raw.strip() != "":
+        try:
+            value = int(raw)
+        except ValueError:
+            value = -1
+        if value >= 0:
+            n_bug_first = value
+    n_bug_first = min(n_bug_first, max(0, n_developers))
+    return ["bug_first"] * n_bug_first + ["design_first"] * (n_developers - n_bug_first)

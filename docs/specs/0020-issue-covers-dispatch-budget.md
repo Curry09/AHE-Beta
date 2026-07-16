@@ -35,7 +35,7 @@ tasks:
     acceptance: "design_first 在 bug 满池时仍先领最老 design 票；bug_first 反之；单池空回落。covered bug 沉底但池内无他票时仍可被领。design 票 budget=budget_design；带 1 条 [dev-attempt] comment 的票升档 ×1.5；带 ≥2 条 attempt 的票沉底（有其它可领票时不被领取；池空兜底领取时预算为升档值不再加）。committed 后被覆盖 open bug 被关闭且 comment 含 'covered by #D → vK'；未推进时票上出现 [dev-attempt] comment。Fake 无 list_comments 时（用裸桩）不升档不沉底不抛错。单测覆盖以上全部分支。"
   - id: T3
     title: 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
