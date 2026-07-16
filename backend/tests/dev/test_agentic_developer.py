@@ -200,8 +200,12 @@ def test_budget_by_label_and_escalation_once(tmp_path) -> None:
     d = _design(tracker, "design票")
 
     dev = _DirectPushDev(
-        tracker, str(repo), str(tmp_path / "a"),
-        pick_policy="bug_first", budget_bug=38, budget_design=60,
+        tracker,
+        str(repo),
+        str(tmp_path / "a"),
+        pick_policy="bug_first",
+        budget_bug=38,
+        budget_design=60,
     )
     dev.work_one()  # 领 bug
     dev.work_one()  # 领 design

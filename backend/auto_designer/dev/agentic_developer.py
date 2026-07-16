@@ -254,7 +254,9 @@ class AgenticDeveloper:
                 continue
             try:
                 self._tracker.set_state(
-                    n, "closed", f"covered by #{issue.number} → {tag}"  # type: ignore[attr-defined]
+                    n,
+                    "closed",
+                    f"covered by #{issue.number} → {tag}",  # type: ignore[attr-defined]
                 )
             except Exception:  # noqa: BLE001  单票关闭失败不影响其余
                 continue

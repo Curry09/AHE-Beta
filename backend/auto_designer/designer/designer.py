@@ -202,7 +202,9 @@ class Designer:
             if covers:
                 # 机器可读行 = 覆盖关系单一真源（消费方：dev 领取降权/连带关闭、web 徽标）。
                 body = f"{body}\n\ncovers: {' '.join(f'#{n}' for n in covers)}"
-            ref = self._tracker.create_issue(IssueDraft(title=draft.title, body=body, labels=labels))
+            ref = self._tracker.create_issue(
+                IssueDraft(title=draft.title, body=body, labels=labels)
+            )
             numbers.append(ref.number)
             for n in covers:
                 try:
@@ -250,7 +252,7 @@ class Designer:
             "只提带来新根因或新施力点的方向。若 backlog 里多条依 rubric 互为重复或已被现状覆盖，"
             "用一条整合性提案点明「#X/#Y 系同一根因，建议合并/关闭」，而非换皮再加一条。\n"
             "**整合性提案请用 covers 字段声明覆盖关系**：若某条提案已包含 backlog 里若干 bug 的"
-            "根因（修好它这些 bug 即解决），在该项加 `\"covers\": [票号,…]`（只填 bug 票号）——"
+            '根因（修好它这些 bug 即解决），在该项加 `"covers": [票号,…]`（只填 bug 票号）——'
             "编排会据此让被覆盖 bug 让位于你的提案、并在提案落地后连带关闭它们；"
             "不确定是否真覆盖就别填（错误覆盖会延迟真实 bug 的处理）。\n\n"
             f"## open issue backlog（{len(backlog)} 条）\n{self._format_backlog(backlog)}\n\n"

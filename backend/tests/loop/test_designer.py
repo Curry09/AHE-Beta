@@ -158,7 +158,9 @@ def test_covers_skips_closed_missing_and_design_numbers(tmp_path) -> None:
     tracker = FakeTracker()
     closed = tracker.create_issue(IssueDraft(title="已关", body="x", labels=["bug"])).number
     tracker.set_state(closed, "closed", "done")
-    other_design = tracker.create_issue(IssueDraft(title="设计", body="d", labels=["design"])).number
+    other_design = tracker.create_issue(
+        IssueDraft(title="设计", body="d", labels=["design"])
+    ).number
     ok = tracker.create_issue(IssueDraft(title="有效bug", body="y", labels=["bug"])).number
 
     covers = [closed, other_design, ok, 999]
