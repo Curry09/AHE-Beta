@@ -50,7 +50,7 @@ tasks:
     acceptance: 默认编制（3 dev）下 1 个 bug_first + 2 个 design_first；N_BUG_FIRST_DEVS=0/超编/非法值时分别为全 design_first/全 bug_first/回落默认；env 覆盖预算生效；test_roster 覆盖解析分支。
   - id: T4
     title: web API：/api/issues 附 covers/covered_by 字段
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:

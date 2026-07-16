@@ -292,7 +292,54 @@ def test_issues_full_states_via_observe_tracker(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=_ObserveTracker())
     body = client.get("/api/issues").json()
     assert body["connected"] is True
-    assert body["issues"] == [_ISSUE_DTO]  # 全状态 + 正文 + 时间戳原样透传
+    # 全状态 + 正文 + 时间戳原样透传；Spec-0020/T4 附加 covers/covered_by（bug 票恒 []/None）
+    assert body["issues"] == [{**_ISSUE_DTO, "covers": [], "covered_by": None}]
+
+
+# ---- Spec-0020/T4：/api/issues 覆盖关系字段 covers / covered_by ----
+
+
+def test_issues_covers_and_covered_by(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    bug = tracker.create_issue(IssueDraft(title="被覆盖bug", body="x", labels=["bug"])).number
+    plain = tracker.create_issue(IssueDraft(title="无关bug", body="y", labels=["bug"])).number
+    design = tracker.create_issue(
+        IssueDraft(title="整合", body=f"根因\n\ncovers: #{bug}", labels=["design"])
+    ).number
+
+    client = _client(tmp_path, tracker=tracker)
+    issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}
+
+    assert issues[design]["covers"] == [bug]
+    assert issues[bug]["covered_by"] == design
+    assert issues[plain] == {**issues[plain], "covers": [], "covered_by": None}
+
+
+def test_issues_covered_by_gone_when_design_closed(tmp_path: Path) -> None:
+    """design 票 closed 后其覆盖关系消失（covered_by 只认 open design 票）。"""
+    tracker = FakeTracker()
+    bug = tracker.create_issue(IssueDraft(title="bug", body="x", labels=["bug"])).number
+    design = tracker.create_issue(
+        IssueDraft(title="整合", body=f"covers: #{bug}", labels=["design"])
+    ).number
+    tracker.set_state(design, "closed", "已落地")
+
+    client = _client(tmp_path, tracker=tracker)
+    issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}
+    assert issues[bug]["covered_by"] is None
+
+
+def test_issues_covered_by_prefers_smallest_design_number(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    bug = tracker.create_issue(IssueDraft(title="bug", body="x", labels=["bug"])).number
+    d1 = tracker.create_issue(
+        IssueDraft(title="早提案", body=f"covers: #{bug}", labels=["design"])
+    ).number
+    tracker.create_issue(IssueDraft(title="晚提案", body=f"covers: #{bug}", labels=["design"]))
+
+    client = _client(tmp_path, tracker=tracker)
+    issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}
+    assert issues[bug]["covered_by"] == d1
 
 
 def test_issue_detail_with_comments(tmp_path: Path) -> None:
