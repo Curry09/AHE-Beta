@@ -141,7 +141,7 @@
 | 0020 | 0020/T5 | 前端：issue 列表与详情的覆盖徽标 | done | T4 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/types.ts<br>frontend/src/api.ts |
 | 0021 | 0021/T1 | repo_guard 模块 + orchestrator b 段绊线 | done | — | backend/auto_designer/dev/repo_guard.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/dev/test_repo_guard.py<br>backend/tests/loop/test_orchestrator.py |
 | 0021 | 0021/T2 | run.py 凭证隔离 + 构造并注入编排仓绊线 guard | done | T1 | backend/run.py |
-| 0021 | 0021/T3 | 清理历史逃逸污染制品 MANUAL.md | pending | — | backend/agent_defs/developer_agent/MANUAL.md |
+| 0021 | 0021/T3 | 清理历史逃逸污染制品 MANUAL.md | done | — | backend/agent_defs/developer_agent/MANUAL.md |
 
 ## 跨 feature 关系图
 
@@ -929,8 +929,7 @@ graph LR
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
     classDef st_done fill:#b7e4c7;
-    classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
-    class v_T3_1 st_pending;
+    class v_T3_1 st_done;
 ```

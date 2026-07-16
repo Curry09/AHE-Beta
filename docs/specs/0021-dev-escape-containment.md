@@ -35,7 +35,7 @@ tasks:
     acceptance: 启动后 GIT_SSH_COMMAND=='false'（未显式覆盖时）、GIT_TERMINAL_PROMPT=='0'；harness seed/reset 与 dev 推 Gitea 的 HTTP 流程不受影响。orch 收到非 None integrity_guard；正常跑（编排仓未被动）不抛；人工写改编排仓后再跑，run 抛 RepoIntegrityError 且 finally 落 running=False。
   - id: T3
     title: 清理历史逃逸污染制品 MANUAL.md
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
