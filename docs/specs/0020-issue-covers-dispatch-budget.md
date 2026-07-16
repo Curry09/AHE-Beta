@@ -20,7 +20,7 @@ tasks:
     acceptance: 带 covers 的提案落库后 design 票 body 含 covers 行、被覆盖 bug 各有一条 covered-by comment；covers 缺省/为空/含非法值时行为与今天完全一致；covers 指向不存在或已 closed 的号不抛错（跳过）；单测覆盖以上三类。
   - id: T2
     title: dev 领取分池 + 票种预算与重试升档 + 结果回写 comment
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []

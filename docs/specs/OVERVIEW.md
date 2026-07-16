@@ -132,7 +132,7 @@
 | 0019 | 0019/T1 | launcher：非 reply 旁路一律收 + control 旁路/终结分流 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 | 0019 | 0019/T2 | 用户 sim：旁路型 control 写上下文并立刻再决策 | done | T1 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_heartbeat.py |
 | 0020 | 0020/T1 | designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链 | done | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
-| 0020 | 0020/T2 | dev 领取分池 + 票种预算与重试升档 + 结果回写 comment | pending | — | backend/auto_designer/dev/agentic_developer.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/tracker/test_fake.py |
+| 0020 | 0020/T2 | dev 领取分池 + 票种预算与重试升档 + 结果回写 comment | done | — | backend/auto_designer/dev/agentic_developer.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/tracker/test_fake.py |
 | 0020 | 0020/T3 | 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮 | pending | T2 | backend/run.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_roster.py |
 | 0020 | 0020/T4 | web API：/api/issues 附 covers/covered_by 字段 | pending | T1 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
 | 0020 | 0020/T5 | 前端：issue 列表与详情的覆盖徽标 | pending | T4 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/types.ts<br>frontend/src/api.ts |
@@ -893,7 +893,7 @@ graph LR
     classDef st_done fill:#b7e4c7;
     classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
-    class v_T2_1 st_pending;
+    class v_T2_1 st_done;
     class v_T3_1 st_pending;
     class v_T4_1 st_pending;
     class v_T5_1 st_pending;

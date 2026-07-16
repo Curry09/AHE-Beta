@@ -33,6 +33,19 @@ def test_add_comment() -> None:
     assert "一条评论" in t.issue(r.number)["comments"]
 
 
+def test_list_comments_matches_gitea_shape() -> None:
+    """Spec-0020/T2：观测读路径，形状对齐 GiteaTracker.list_comments。"""
+    t = FakeTracker()
+    r = t.create_issue(_draft())
+    assert t.list_comments(number=r.number) == []
+    t.add_comment(r.number, "[dev-attempt] 失败一次")
+    rows = t.list_comments(number=r.number)
+    assert [c["body"] for c in rows] == ["[dev-attempt] 失败一次"]
+    assert set(rows[0]) == {"author", "body", "created_at"}
+    with pytest.raises(KeyError):
+        t.list_comments(number=999)
+
+
 def test_set_state_round_trip() -> None:
     t = FakeTracker()
     r = t.create_issue(_draft())
