@@ -61,6 +61,9 @@
 ### 0019 控制旁路放宽 + peek 后继续等待决策
 放宽 harness stdout 旁路协议（任意非 reply JSON 可收），并区分终结型与旁路型 control：status/peek 不结束本轮、写入等待上下文后立刻再决策；interrupt 仍吐 reply 收工。手册仍为能力真相源、控制名不注册。补齐 0012/0013 将 control 一律按打断收工的缺口。
 
+### 0020 覆盖关系兑现 + 开发者领取策略与票种预算
+补全 designer 覆盖判定的执行链（covers 结构化-挂链-降权-连带关闭-前端徽标），开发者领取改可配置分池（design 优先 + 保留 bug 专属 dev），并按票种给初始迭代预算、同票重试自动升级。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -128,6 +131,11 @@
 | 0018 | 0018/T1 | _run_agent 出口拆 complete_task 信封 | done | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
 | 0019 | 0019/T1 | launcher：非 reply 旁路一律收 + control 旁路/终结分流 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 | 0019 | 0019/T2 | 用户 sim：旁路型 control 写上下文并立刻再决策 | done | T1 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_heartbeat.py |
+| 0020 | 0020/T1 | designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链 | pending | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
+| 0020 | 0020/T2 | dev 领取分池 + 票种预算与重试升档 + 结果回写 comment | pending | — | backend/auto_designer/dev/agentic_developer.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/tracker/test_fake.py |
+| 0020 | 0020/T3 | 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮 | pending | T2 | backend/run.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_roster.py |
+| 0020 | 0020/T4 | web API：/api/issues 附 covers/covered_by 字段 | pending | T1 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
+| 0020 | 0020/T5 | 前端：issue 列表与详情的覆盖徽标 | pending | T4 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/types.ts<br>frontend/src/api.ts |
 
 ## 跨 feature 关系图
 
@@ -234,6 +242,13 @@ graph LR
         n0019_T1["T1 launcher：非 reply 旁路一律收 + control 旁路/终结分流"]
         n0019_T2["T2 用户 sim：旁路型 control 写上下文并立刻再决策"]
     end
+    subgraph G0020[0020 issue-covers-dispatch-budget]
+        n0020_T1["T1 designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链"]
+        n0020_T2["T2 dev 领取分池 + 票种预算与重试升档 + 结果回写 comment"]
+        n0020_T3["T3 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮"]
+        n0020_T4["T4 web API：/api/issues 附 covers/covered_by 字段"]
+        n0020_T5["T5 前端：issue 列表与详情的覆盖徽标"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -290,6 +305,9 @@ graph LR
     n0017_T3 --> n0017_T2
     n0017_T4 --> n0017_T3
     n0019_T2 --> n0019_T1
+    n0020_T3 --> n0020_T2
+    n0020_T4 --> n0020_T1
+    n0020_T5 --> n0020_T4
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -328,14 +346,15 @@ graph LR
 | 文件 | 涉及组 |
 |----|----|
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
-| backend/auto_designer/designer/designer.py | 0016, 0018 |
-| backend/auto_designer/dev/agentic_developer.py | 0007, 0015 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020 |
+| backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013 |
+| backend/auto_designer/tracker/fake.py | 0001, 0020 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
@@ -346,13 +365,15 @@ graph LR
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/harness_template/entry.py | 0003, 0013 |
-| backend/run.py | 0007, 0015, 0017 |
+| backend/run.py | 0007, 0015, 0017, 0020 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
+| backend/tests/dev/test_agentic_developer.py | 0007, 0020 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019 |
-| backend/tests/loop/test_designer.py | 0016, 0018 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
+| backend/tests/tracker/test_fake.py | 0001, 0020 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017 |
 | backend/tests/user/sim/test_heartbeat.py | 0012, 0019 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012 |
@@ -844,4 +865,35 @@ graph LR
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
+```
+
+### 0020 覆盖关系兑现 + 开发者领取策略与票种预算（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链"]
+    nT2["T2 dev 领取分池 + 票种预算与重试升档 + 结果回写 comment"]
+    nT3["T3 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮"]
+    nT4["T4 web API：/api/issues 附 covers/covered_by 字段"]
+    nT5["T5 前端：issue 列表与详情的覆盖徽标"]
+    nT2 --> nT3
+    nT1 --> nT4
+    nT4 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
 ```
