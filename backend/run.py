@@ -202,7 +202,7 @@ def main() -> int:
         os.environ[f"LLM_{_suffix}"] = _val
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
 
-    from auto_designer.loop.roster import load_roster
+    from auto_designer.loop.roster import load_dev_pick_policies, load_roster
 
     # 编制（单一真源）：用户/设计师/开发者数量，前端房间容量经 /api/config 读同一份。
     roster = load_roster()
@@ -399,6 +399,14 @@ def main() -> int:
 
         return cb
 
+    # Spec-0020/T3：dev 领取策略（前 N_BUG_FIRST_DEVS 个 bug 优先、其余设计票优先）+ 票种预算
+    # 两档（bug/design，env 可覆盖；重试升档在 dev 侧按 attempt 记录自动做）。
+    raw_bug = os.environ.get("DEV_BUDGET_BUG", "").strip()
+    raw_design = os.environ.get("DEV_BUDGET_DESIGN", "").strip()
+    budget_bug = int(raw_bug) if raw_bug.isdigit() and int(raw_bug) > 0 else 38
+    budget_design = int(raw_design) if raw_design.isdigit() and int(raw_design) > 0 else 60
+    dev_policies = load_dev_pick_policies(n_developers=roster["developer"])
+
     developers = [  # roster 个工具型 dev agent：同轮各领一条不同 issue，自主改 harness + git 发版
         AgenticDeveloper(
             tracker,
@@ -406,6 +414,9 @@ def main() -> int:
             dev_agent_def,
             on_status=make_dev_status(f"dev-{i}", f"dev#{i + 1}"),
             on_event=make_event_logger(f"dev-{i}"),
+            pick_policy=dev_policies[i],
+            budget_bug=budget_bug,
+            budget_design=budget_design,
         )
         for i in range(roster["developer"])
     ]
@@ -466,10 +477,13 @@ def main() -> int:
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
     )
 
+    n_bug_first = sum(1 for p in dev_policies if p == "bug_first")
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
         f"{len(developers)} dev agent × {len(designers)} designer，"
-        f"a 段并发 {max_parallel_users}，dev 直推 main，真模型）..."
+        f"a 段并发 {max_parallel_users}，dev 策略 bug_first×{n_bug_first} + "
+        f"design_first×{len(dev_policies) - n_bug_first}，"
+        f"预算 bug={budget_bug}/design={budget_design}，dev 直推 main，真模型）..."
     )
     try:
         refs = orch.run(TOTAL_ROUNDS)

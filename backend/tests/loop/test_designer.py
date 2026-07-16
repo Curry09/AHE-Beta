@@ -111,6 +111,78 @@ def test_empty_or_invalid_result_yields_no_proposals(tmp_path) -> None:
     assert tracker.list_open_issues() == []  # 全程未建任何 issue
 
 
+# ---- Spec-0020/T1：covers 覆盖关系——提案字段 → body 机器行 + 被覆盖 bug 挂链 ----
+
+
+def _covers_canned(covers: object) -> str:
+    return json.dumps(
+        [{"title": "整合根因", "body": "多 bug 同根因", "labels": [], "covers": covers}],
+        ensure_ascii=False,
+    )
+
+
+def test_covers_written_to_body_and_linked_on_bugs(tmp_path) -> None:
+    tracker = FakeTracker()
+    b1 = tracker.create_issue(IssueDraft(title="bug甲", body="x", labels=["bug"])).number
+    b2 = tracker.create_issue(IssueDraft(title="bug乙", body="y", labels=["bug"])).number
+
+    outcome = _designer(tmp_path, tracker, _covers_canned([b1, b2])).propose_once()
+
+    assert outcome.count == 1
+    design_no = outcome.proposal_numbers[0]
+    body = tracker.issue(design_no)["body"]
+    assert f"covers: #{b1} #{b2}" in body  # 机器可读行（单一真源）
+    for n in (b1, b2):
+        assert f"covered-by: #{design_no}" in tracker.issue(n)["comments"]  # 挂链
+        assert tracker.issue(n)["state"] == "open"  # designer 无关票权：bug 仍 open
+
+
+def test_covers_absent_or_invalid_behaves_like_today(tmp_path) -> None:
+    """covers 缺省/空/整体非法时：body 无 covers 行、无任何 comment——与今天行为一致。"""
+    for covers in (None, [], "not-a-list", [0, -3, True, "7"]):
+        tracker = FakeTracker()
+        bug = tracker.create_issue(IssueDraft(title="bug", body="x", labels=["bug"])).number
+        canned = (
+            _covers_canned(covers)
+            if covers is not None
+            else json.dumps([{"title": "无覆盖", "body": "b", "labels": []}], ensure_ascii=False)
+        )
+        outcome = _designer(tmp_path, tracker, canned).propose_once()
+        assert outcome.count == 1
+        assert "covers:" not in tracker.issue(outcome.proposal_numbers[0])["body"]
+        assert tracker.issue(bug)["comments"] == []
+
+
+def test_covers_skips_closed_missing_and_design_numbers(tmp_path) -> None:
+    """covers 指向已 closed / 不存在 / design 票的号：静默跳过，只留合法 bug 号。"""
+    tracker = FakeTracker()
+    closed = tracker.create_issue(IssueDraft(title="已关", body="x", labels=["bug"])).number
+    tracker.set_state(closed, "closed", "done")
+    other_design = tracker.create_issue(
+        IssueDraft(title="设计", body="d", labels=["design"])
+    ).number
+    ok = tracker.create_issue(IssueDraft(title="有效bug", body="y", labels=["bug"])).number
+
+    covers = [closed, other_design, ok, 999]
+    outcome = _designer(tmp_path, tracker, _covers_canned(covers)).propose_once()
+
+    design_no = outcome.proposal_numbers[0]
+    body = tracker.issue(design_no)["body"]
+    assert f"covers: #{ok}" in body and f"#{closed}" not in body.split("covers:")[1]
+    assert tracker.issue(other_design)["comments"] == []  # design 票不被互指
+    assert f"covered-by: #{design_no}" in tracker.issue(ok)["comments"]
+
+
+def test_parse_covers_field_shapes() -> None:
+    """_parse_proposals 对 covers 的宽进严出：去重、剔 bool/负数/字符串。"""
+    text = json.dumps(
+        [{"title": "t", "body": "b", "covers": [5, 5, 6, True, -1, 0, "8"]}],
+        ensure_ascii=False,
+    )
+    (prop,) = Designer._parse_proposals(text)
+    assert prop.covers == (5, 6)
+
+
 # ---- Spec-0018/T1：拆 complete_task 信封（提案被静默丢弃的回归） ----
 
 # 真实回归夹具：一次长跑里被静默丢弃的那条 designer 返回原文（逐字照抄，未做任何整形）。
@@ -140,7 +212,7 @@ def _envelope(result: object) -> str:
 
 
 def _titles(text: str) -> list[str]:
-    return [d.title for d in Designer._parse_proposals(_unwrap_result(text))]
+    return [p.draft.title for p in Designer._parse_proposals(_unwrap_result(text))]
 
 
 def test_unwrap_envelope_with_result_as_json_string() -> None:

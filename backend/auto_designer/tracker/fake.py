@@ -53,6 +53,15 @@ class FakeTracker:
     def add_comment(self, number: int, body: str) -> None:
         self._require(number)["comments"].append(body)
 
+    def list_comments(self, *, number: int) -> list[dict[str, Any]]:
+        """观测读路径（Spec-0020/T2，对齐 GiteaTracker.list_comments 形状）：[{author, body, created_at}]。
+
+        不属 IssueTracker 协议；dev 侧经 getattr 探测使用（重试升档/沉底的判定数据源）。
+        """
+        return [
+            {"author": "", "body": c, "created_at": ""} for c in self._require(number)["comments"]
+        ]
+
     def set_state(self, number: int, state: str, reason: str) -> None:
         if state not in ISSUE_STATES:
             raise ValueError(f"非法 state：{state!r}（须属 {ISSUE_STATES}）")

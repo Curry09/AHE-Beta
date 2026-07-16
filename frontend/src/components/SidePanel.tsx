@@ -116,6 +116,17 @@ export function SidePanel(props: {
                     {l}
                   </span>
                 ))}
+                {/* Spec-0020/T5 覆盖徽标：bug 被 design 覆盖显 ⊂ #N；design 显其覆盖清单 */}
+                {issue.covered_by != null && (
+                  <span className="chip" title={`已被设计票 #${issue.covered_by} 覆盖`}>
+                    ⊂ #{issue.covered_by}
+                  </span>
+                )}
+                {(issue.covers?.length ?? 0) > 0 && (
+                  <span className="chip" title="该设计票覆盖的 bug">
+                    覆盖 {issue.covers!.map((n) => `#${n}`).join(" ")}
+                  </span>
+                )}
                 <span className={`chip ${issue.state}`}>{issue.state}</span>
               </button>
             ))}

@@ -86,6 +86,10 @@ export interface Issue {
   created_at: string;
   closed_at: string | null;
   url: string;
+  // Spec-0020/T4 覆盖关系（老后端缺省 → 不渲染徽标）：
+  // covers = design 票声明覆盖的 bug 票号；covered_by = 被哪张 open design 票覆盖。
+  covers?: number[];
+  covered_by?: number | null;
 }
 
 export interface IssuesResponse {

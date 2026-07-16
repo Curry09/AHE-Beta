@@ -84,6 +84,28 @@ class DesignOutcome:
         return len(self.proposal_numbers)
 
 
+@dataclass(frozen=True)
+class _Proposal:
+    """一条解析后的提案：issue 草稿 + 它声明覆盖的 bug 票号（Spec-0020/T1）。"""
+
+    draft: IssueDraft
+    covers: tuple[int, ...] = ()
+
+
+def _parse_covers(raw: object) -> tuple[int, ...]:
+    """提案的 covers 字段 → 去重正整数元组；非列表/非法元素静默丢弃（宽进严出）。"""
+    if not isinstance(raw, list):
+        return ()
+    out: list[int] = []
+    for x in raw:
+        # bool 是 int 子类，需显式排除（True 会被当 #1）。
+        if isinstance(x, bool) or not isinstance(x, int) or x <= 0:
+            continue
+        if x not in out:
+            out.append(x)
+    return tuple(out)
+
+
 def _iter_top_level_arrays(s: str):
     """扫描出所有**顶层**平衡的 [...] 片段，尊重字符串字面量与转义（防被内嵌 [] / 散文带偏）。"""
     depth = 0
@@ -162,18 +184,33 @@ class Designer:
         self._emit(running=True, status=f"综合全局中…（{len(backlog)} open issue）")
 
         result_text = self._run_agent(backlog=backlog, trend=trend, runtime=runtime)
-        drafts = self._parse_proposals(result_text)
+        proposals = self._parse_proposals(result_text)
+
+        # Spec-0020/T1：covers 只认「开局 backlog 里 open 且非 design」的票——指向不存在/已 closed/
+        # design 票的号静默跳过（覆盖语义是"设计票整合 bug"，不做设计票互指）。
+        coverable = {i.number for i in backlog if DESIGN_LABEL not in i.labels}
 
         numbers: list[int] = []
-        if drafts:
+        if proposals:
             self._tracker.ensure_labels([DESIGN_LABEL])
-        for draft in drafts:
+        for prop in proposals:
+            draft = prop.draft
             # 强制打上 design 标签（去重），保证提案在 tracker 里可辨识。
             labels = list(dict.fromkeys([*draft.labels, DESIGN_LABEL]))
+            covers = tuple(n for n in prop.covers if n in coverable)
+            body = draft.body
+            if covers:
+                # 机器可读行 = 覆盖关系单一真源（消费方：dev 领取降权/连带关闭、web 徽标）。
+                body = f"{body}\n\ncovers: {' '.join(f'#{n}' for n in covers)}"
             ref = self._tracker.create_issue(
-                IssueDraft(title=draft.title, body=draft.body, labels=labels)
+                IssueDraft(title=draft.title, body=body, labels=labels)
             )
             numbers.append(ref.number)
+            for n in covers:
+                try:
+                    self._tracker.add_comment(n, f"covered-by: #{ref.number}")
+                except Exception:  # noqa: BLE001  挂链是可读性旁路，单条失败不影响其余与提案本身
+                    pass
 
         self._emit(
             running=False,
@@ -213,12 +250,16 @@ class Designer:
             "**动笔前先按系统提示里的「重复判定 rubric」逐条过滤**：每条候选对照下面 backlog 每条 issue "
             "及你本轮其它候选，命中 R1 同根因 / R2 同施力点方向 / R3 开发者视角 subsume 任一即为重复，不提；"
             "只提带来新根因或新施力点的方向。若 backlog 里多条依 rubric 互为重复或已被现状覆盖，"
-            "用一条整合性提案点明「#X/#Y 系同一根因，建议合并/关闭」，而非换皮再加一条。\n\n"
+            "用一条整合性提案点明「#X/#Y 系同一根因，建议合并/关闭」，而非换皮再加一条。\n"
+            "**整合性提案请用 covers 字段声明覆盖关系**：若某条提案已包含 backlog 里若干 bug 的"
+            '根因（修好它这些 bug 即解决），在该项加 `"covers": [票号,…]`（只填 bug 票号）——'
+            "编排会据此让被覆盖 bug 让位于你的提案、并在提案落地后连带关闭它们；"
+            "不确定是否真覆盖就别填（错误覆盖会延迟真实 bug 的处理）。\n\n"
             f"## open issue backlog（{len(backlog)} 条）\n{self._format_backlog(backlog)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
             f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组"
-            "（每项含 title/body/labels），无提案则 `[]`。"
+            "（每项含 title/body/labels，可选 covers），无提案则 `[]`。"
         )
         out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
         return _unwrap_result(out)
@@ -251,13 +292,14 @@ class Designer:
         return "\n".join(lines)
 
     @staticmethod
-    def _parse_proposals(text: str) -> list[IssueDraft]:
-        """从 agent 的 result 文本里抽出 JSON 数组并解析成 IssueDraft 列表。
+    def _parse_proposals(text: str) -> list[_Proposal]:
+        """从 agent 的 result 文本里抽出 JSON 数组并解析成 _Proposal 列表。
 
         容忍 ```json 代码块与前后散文。裸输出时**不再**用 find('[')→rfind(']') 一把抓
         （那会被散文/字符串里的 [] 或多段数组带偏、抠出非法片段 → 静默吞掉提案，与 persona
         _parse_json 曾踩的同类坑），改用尊重字符串转义的**平衡括号扫描**取最后一个能解析的顶层
         数组。解析失败或非列表一律返回空列表（本轮无提案），不抛错——designer 出错不该拖垮闭环。
+        Spec-0020/T1：每项可带可选 covers: list[int]（该提案覆盖的 bug 票号），非法值静默丢弃。
         """
         if not text:
             return []
@@ -278,18 +320,21 @@ class Designer:
                     data = parsed
         if not isinstance(data, list):
             return []
-        drafts: list[IssueDraft] = []
+        proposals: list[_Proposal] = []
         for item in data:
             if not isinstance(item, dict) or not item.get("title"):
                 continue
-            drafts.append(
-                IssueDraft(
-                    title=str(item["title"]),
-                    body=str(item.get("body", "")),
-                    labels=[str(x) for x in item.get("labels", []) if x],
+            proposals.append(
+                _Proposal(
+                    draft=IssueDraft(
+                        title=str(item["title"]),
+                        body=str(item.get("body", "")),
+                        labels=[str(x) for x in item.get("labels", []) if x],
+                    ),
+                    covers=_parse_covers(item.get("covers")),
                 )
             )
-        return drafts
+        return proposals
 
     def _emit(self, *, running: bool, status: str, **kw: object) -> None:
         if self._on_status is not None:

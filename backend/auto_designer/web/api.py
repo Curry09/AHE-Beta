@@ -8,6 +8,7 @@ ASYNC 告警）。create_app 注入依赖（测试传 Fake，运行时传真）�
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -62,6 +63,42 @@ def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
     }
 
 
+# Spec-0020/T4：design 票 body 里的覆盖声明机器行（spec-0020/T1 产出）：`covers: #5 #6`。
+_COVERS_LINE_RE = re.compile(r"^covers:((?:\s*#\d+)+)\s*$", re.MULTILINE)
+_DESIGN_LABEL = "design"
+
+
+def _parse_covers_line(body: str) -> list[int]:
+    """issue body → covers 行声明的票号列表（无该行返回空；多条取最后一条）。"""
+    last: str | None = None
+    for m in _COVERS_LINE_RE.finditer(body or ""):
+        last = m.group(1)
+    if last is None:
+        return []
+    return [int(x) for x in re.findall(r"#(\d+)", last)]
+
+
+def _annotate_covers(*, issues: list[dict]) -> None:
+    """就地附加覆盖关系字段（Spec-0020/T4，纯解析计算、无新存储）：
+
+    - `covers: list[int]`——design 票自身 body covers 行声明的票号（非 design 恒 []）；
+    - `covered_by: int | None`——被哪张 **open** design 票覆盖（多票覆盖取号最小者；
+      design 票关了覆盖关系随之消失——那批 bug 应已被连带关闭）。
+    """
+    covered_by: dict[int, int] = {}
+    for it in issues:
+        labels = it.get("labels") or []
+        is_design = _DESIGN_LABEL in labels
+        covers = _parse_covers_line(str(it.get("body") or "")) if is_design else []
+        it["covers"] = covers
+        if is_design and it.get("state") == "open":
+            for n in covers:
+                if n not in covered_by or int(it["number"]) < covered_by[n]:
+                    covered_by[n] = int(it["number"])
+    for it in issues:
+        it["covered_by"] = covered_by.get(int(it["number"]))
+
+
 def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict[str, object]:
     """Gitea 看板整合：列全状态 issue（含正文/时间戳）+ 看板链接；无 tracker 或读取失败时
     connected=False。tracker 无 list_issues 观测能力（Fake）时回落 open issue 列表。"""
@@ -87,6 +124,7 @@ def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict
             ]
     except Exception:
         return {"connected": False, "board_url": board_url, "issues": []}
+    _annotate_covers(issues=issues)
     return {"connected": True, "board_url": board_url, "issues": issues}
 
 
