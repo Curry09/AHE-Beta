@@ -202,7 +202,7 @@ def main() -> int:
         os.environ[f"LLM_{_suffix}"] = _val
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
 
-    from auto_designer.loop.roster import load_roster
+    from auto_designer.loop.roster import load_dev_pick_policies, load_roster
 
     # 编制（单一真源）：用户/设计师/开发者数量，前端房间容量经 /api/config 读同一份。
     roster = load_roster()
@@ -401,8 +401,6 @@ def main() -> int:
 
     # Spec-0020/T3：dev 领取策略（前 N_BUG_FIRST_DEVS 个 bug 优先、其余设计票优先）+ 票种预算
     # 两档（bug/design，env 可覆盖；重试升档在 dev 侧按 attempt 记录自动做）。
-    from auto_designer.loop.roster import load_dev_pick_policies  # noqa: PLC0415  与 load_roster 同源
-
     raw_bug = os.environ.get("DEV_BUDGET_BUG", "").strip()
     raw_design = os.environ.get("DEV_BUDGET_DESIGN", "").strip()
     budget_bug = int(raw_bug) if raw_bug.isdigit() and int(raw_bug) > 0 else 38
