@@ -7,7 +7,7 @@ summary: 实测发现 dev agent 经 heredoc 隧道绕过 workspace-jail 的路�
 tasks:
   - id: T1
     title: repo_guard 模块 + orchestrator b 段绊线
-    status: pending
+    status: done
     priority: P0
     tags: []
     depends-on: []

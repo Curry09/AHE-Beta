@@ -363,3 +363,57 @@ def test_round_no_workspace_uses_shared_scratch(tmp_path, monkeypatch) -> None:
     launch_ws = next(ws for kind, ws in events if kind == "launch")
     session_ws = next(ws for kind, ws in events if kind == "session")
     assert launch_ws is not None and launch_ws == session_ws  # harness 与用户 agent 同一目录
+
+
+# Spec-0021/T1：编排仓完整性绊线——b 段后调用；guard 抛出中止本轮并传播（fail-closed）。
+
+
+def _orch_with_guard(repo, events, developers, guard):
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", harness[1]))
+
+    return Orchestrator(
+        launcher=_Launcher(events),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        developer_agents=developers,
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+        integrity_guard=guard,
+    )
+
+
+def test_integrity_guard_called_after_b_phase(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    events: list = []
+
+    def guard() -> None:
+        events.append(("guard", None))
+
+    orch = _orch_with_guard(repo, events, [_Dev(events, DevOutcome())], guard)
+    orch.run_round("c")
+
+    # guard 在 b 段（dev）之后、返回前恰调一次
+    assert [k for k, *_ in events].count("guard") == 1
+    assert events.index(("guard", None)) > max(i for i, e in enumerate(events) if e[0] == "dev")
+
+
+def test_integrity_guard_raise_aborts_round(tmp_path) -> None:
+    from auto_designer.dev.repo_guard import RepoIntegrityError
+
+    repo = _seed_repo(tmp_path)
+    events: list = []
+
+    def guard() -> None:
+        raise RepoIntegrityError("编排仓被动了")
+
+    orch = _orch_with_guard(repo, events, [_Dev(events, DevOutcome())], guard)
+    with pytest.raises(RepoIntegrityError):  # 安全事件 fail-closed，向上传播中止
+        orch.run_round("c")
+
+
+def test_no_guard_is_backward_compatible(tmp_path) -> None:
+    """不传 integrity_guard → 行为与今天完全一致（退化）。"""
+    repo = _seed_repo(tmp_path)
+    head = _git(repo, "rev-parse", "main")
+    assert _orch(repo, [], [_Dev([], DevOutcome())]).run_round("c") == head
