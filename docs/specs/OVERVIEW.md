@@ -64,6 +64,9 @@
 ### 0020 覆盖关系兑现 + 开发者领取策略与票种预算
 补全 designer 覆盖判定的执行链（covers 结构化-挂链-降权-连带关闭-前端徽标），开发者领取改可配置分池（design 优先 + 保留 bug 专属 dev），并按票种给初始迭代预算、同票重试自动升级。
 
+### 0021 dev agent 逃逸围堵：凭证隔离 + 编排绊线 + 污染清理
+实测发现 dev agent 经 heredoc 隧道绕过 workspace-jail 的路径扫描，改写编排仓文件并用宿主继承的 GitHub 凭证推送。路径级 jail 关不住能调用解释器的 agent（其 docstring 已自陈），本组不加固扫描，改做纵深：进程级 git 凭证隔离掐断推送落地链、b 段后绊线断言编排仓未被触碰、清理历史逃逸的污染制品。OS 级沙箱留作治本方向。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -136,6 +139,9 @@
 | 0020 | 0020/T3 | 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮 | done | T2 | backend/run.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_roster.py |
 | 0020 | 0020/T4 | web API：/api/issues 附 covers/covered_by 字段 | done | T1 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
 | 0020 | 0020/T5 | 前端：issue 列表与详情的覆盖徽标 | done | T4 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/types.ts<br>frontend/src/api.ts |
+| 0021 | 0021/T1 | repo_guard 模块 + orchestrator b 段绊线 | done | — | backend/auto_designer/dev/repo_guard.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/dev/test_repo_guard.py<br>backend/tests/loop/test_orchestrator.py |
+| 0021 | 0021/T2 | run.py 凭证隔离 + 构造并注入编排仓绊线 guard | done | T1 | backend/run.py<br>backend/tests/test_run_git_isolation.py |
+| 0021 | 0021/T3 | 清理历史逃逸污染制品 MANUAL.md | done | — | backend/agent_defs/developer_agent/MANUAL.md |
 
 ## 跨 feature 关系图
 
@@ -249,6 +255,11 @@ graph LR
         n0020_T4["T4 web API：/api/issues 附 covers/covered_by 字段"]
         n0020_T5["T5 前端：issue 列表与详情的覆盖徽标"]
     end
+    subgraph G0021[0021 dev-escape-containment]
+        n0021_T1["T1 repo_guard 模块 + orchestrator b 段绊线"]
+        n0021_T2["T2 run.py 凭证隔离 + 构造并注入编排仓绊线 guard"]
+        n0021_T3["T3 清理历史逃逸污染制品 MANUAL.md"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -308,6 +319,7 @@ graph LR
     n0020_T3 --> n0020_T2
     n0020_T4 --> n0020_T1
     n0020_T5 --> n0020_T4
+    n0021_T2 --> n0021_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -345,12 +357,13 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
+| backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
 | backend/auto_designer/designer/designer.py | 0016, 0018, 0020 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013 |
@@ -365,12 +378,12 @@ graph LR
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/harness_template/entry.py | 0003, 0013 |
-| backend/run.py | 0007, 0015, 0017, 0020 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/tracker/test_fake.py | 0001, 0020 |
@@ -896,4 +909,27 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+```
+
+### 0021 dev agent 逃逸围堵：凭证隔离 + 编排绊线 + 污染清理（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 repo_guard 模块 + orchestrator b 段绊线"]
+    nT2["T2 run.py 凭证隔离 + 构造并注入编排仓绊线 guard"]
+    nT3["T3 清理历史逃逸污染制品 MANUAL.md"]
+    nT1 --> nT2
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
 ```

@@ -62,6 +62,7 @@ class Orchestrator:
         on_round_start: Callable[[int], None] | None = None,
         on_round_end: Callable[[int, str], None] | None = None,
         max_parallel_users: int = 1,
+        integrity_guard: Callable[[], None] | None = None,
     ) -> None:
         self._launcher = launcher
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
@@ -77,6 +78,9 @@ class Orchestrator:
         # Spec-0017/T3：a 段用户会话并发度（并发单元=整局会话）。默认 1 = 与旧串行行为等价；
         # d/b 段始终串行（同仓 push + 全局 env 的固有约束，见 spec-0017 Non-goal）。
         self._max_parallel_users = max(1, max_parallel_users)
+        # Spec-0021/T1：编排仓完整性绊线（可选）。b 段后调用，dev agent 逃逸出沙箱改动编排仓即抛错
+        # 中止本轮（fail-closed）。None 则跳过，退化为今天行为。
+        self._integrity_guard = integrity_guard
 
     def run_round(self, ref: str) -> str:
         # Spec-0007/T2：传入的 ref 仅为「上一轮观测游标」透传（供 harbor runner 的 checkpoint 续跑链），
@@ -137,6 +141,11 @@ class Orchestrator:
             outcome = developer.work_one(attempted)
             if outcome.issue_number is not None:
                 attempted.add(outcome.issue_number)
+
+        # Spec-0021/T1：b 段后校验编排仓未被 dev agent 触碰（逃逸出沙箱改文件/提交/推送）。
+        # 抛 RepoIntegrityError 即中止本轮并传播出 run()——安全事件 fail-closed，不继续跑累积污染。
+        if self._integrity_guard is not None:
+            self._integrity_guard()
 
         # c：回灌 = dev 推进后 main 的最新 HEAD SHA（观测游标；无 dev 推进则与本轮起始 SHA 相同，闭环不中断）。
         return self._resolve_head(ref=self._initial_ref)

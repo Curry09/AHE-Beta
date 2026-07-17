@@ -109,6 +109,43 @@ def _gitea_remote_url(gitea: dict[str, str]) -> str:
     return urlunparse((u.scheme, netloc, f"/{gitea['OWNER']}/{gitea['REPO']}.git", "", "", ""))
 
 
+def _isolate_git_credentials() -> None:
+    """进程级 git 凭证隔离（Spec-0021/T2）：dev agent 逃逸后不得推到 GitHub。
+
+    实测逃逸链：dev agent 用 python heredoc 隧道绕过 workspace-jail 的路径扫描、`os.chdir` 到编排仓
+    并 `git push`。凭证泄漏有**多条静默信道**，单关一条不够：
+    - **ssh 传输**（GitHub `git@…`）：`GIT_SSH_COMMAND=false` 让 ssh 调用失败。
+    - **终端交互提示**：`GIT_TERMINAL_PROMPT=0`。
+    - **askpass 静默信道**：`GIT_ASKPASS`/`SSH_ASKPASS` 指向一个能直接吐凭证的程序（实测 VS Code +
+      WSL 环境注入 `GIT_ASKPASS`，git 走 HTTPS 时静默拿到 GitHub token——`GIT_TERMINAL_PROMPT=0`
+      **管不到它**）。连同 VS Code 的 `VSCODE_GIT_ASKPASS_*`/IPC 一并清除。
+    - **credential.helper 静默信道**：store/manager/keychain 也会静默交出凭证。用空值经 GIT_CONFIG_*
+      注入重置 helper 列表（追加而非覆盖既有注入）——git ≥2.31 支持。
+
+    对合法流程无影响：dev/harness 推 Gitea 走 `http://OWNER:TOKEN@host/…`（凭证在 URL，不经
+    askpass/helper），本地无传输 git 操作也不涉及凭证。`GIT_SSH_COMMAND` 用 setdefault 留运维覆盖余地。
+    """
+    os.environ.setdefault("GIT_SSH_COMMAND", "false")
+    os.environ["GIT_TERMINAL_PROMPT"] = "0"
+    for _k in (
+        "GIT_ASKPASS",
+        "SSH_ASKPASS",
+        "SSH_AUTH_SOCK",
+        "VSCODE_GIT_ASKPASS_NODE",
+        "VSCODE_GIT_ASKPASS_MAIN",
+        "VSCODE_GIT_ASKPASS_EXTRA_ARGS",
+        "VSCODE_GIT_IPC_HANDLE",
+    ):
+        os.environ.pop(_k, None)
+    try:
+        _n = int(os.environ.get("GIT_CONFIG_COUNT", "0") or "0")
+    except ValueError:
+        _n = 0
+    os.environ["GIT_CONFIG_COUNT"] = str(_n + 1)
+    os.environ[f"GIT_CONFIG_KEY_{_n}"] = "credential.helper"
+    os.environ[f"GIT_CONFIG_VALUE_{_n}"] = ""
+
+
 def _set_gitea_remote(repo: Path, gitea: dict[str, str]) -> None:
     """仅给本地 harness 仓配好 Gitea origin（带 token）。推送由开发者 agent 用 git 工具自己做，不在此 push。"""
     url = _gitea_remote_url(gitea)
@@ -183,6 +220,8 @@ def main() -> int:
     from urllib.parse import urlparse
 
     args = _parse_args(argv=sys.argv[1:])
+
+    _isolate_git_credentials()  # Spec-0021/T2：进程级 git 凭证隔离（多信道封堵，见函数注释）
 
     llm_env = _load_env(ROOT / ".env")  # {USER,DEV,DESIGNER,HARNESS}_LLM_*
     os.environ.update(llm_env)
@@ -464,6 +503,16 @@ def main() -> int:
     max_parallel_users = int(raw_parallel) if raw_parallel.isdigit() else (len(fixed_set) or 1)
     max_parallel_users = max(1, max_parallel_users)  # 0/负值/非数字一律回落（1=串行）
 
+    # Spec-0021/T2：编排仓完整性绊线。run 期间编排仓（ROOT=auto-designer 检出）应全程冻结——只该动
+    # harness 沙盒与 data/。开跑前拍一张 (HEAD, porcelain) 快照，每轮 b 段后校验未变；被 dev agent
+    # 逃逸改动即抛 RepoIntegrityError 中止（凭证隔离已掐推送，这是第二道独立信道兜底）。
+    from auto_designer.dev.repo_guard import snapshot_repo, verify_unchanged  # noqa: PLC0415
+
+    _repo_baseline = snapshot_repo(repo=str(ROOT))
+
+    def integrity_guard() -> None:
+        verify_unchanged(repo=str(ROOT), before=_repo_baseline)
+
     orch = Orchestrator(
         launcher=launcher,
         harness_repo=str(repo),  # Spec-0007/T4：每局解析 main HEAD SHA 用
@@ -475,6 +524,7 @@ def main() -> int:
         on_round_start=on_round_start,  # 轮次运行态 → data/live/run.json（看板 /api/state）
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
+        integrity_guard=integrity_guard,  # Spec-0021/T2
     )
 
     n_bug_first = sum(1 for p in dev_policies if p == "bug_first")
