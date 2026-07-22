@@ -50,8 +50,7 @@ _HARNESS_USER_ID = "harness_user"
 # 内部分发：message 首词匹配 slash（如 /exit|/quit）→ 定型 reply 后退出；其余走 agent。
 _EXIT_COMMANDS = frozenset({"/exit", "/quit"})
 _EXIT_REPLY = (
-    "[exited] Session closed at your request. "
-    "Send a new message in a new session to start again."
+    "[exited] Session closed at your request. Send a new message in a new session to start again."
 )
 
 
