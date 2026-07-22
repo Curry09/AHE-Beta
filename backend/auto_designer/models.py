@@ -2,7 +2,8 @@
 
 全部为纯数据 dataclass，无行为，可双向 dict 序列化（to_dict / from_dict）。
 体感与 Session 落本地 data/sessions/（T6）；issue 不落本地，经 IssueTracker 提交至 Gitea，
-本地只持 IssueRef 回执（T5）。轻量不变量在 __post_init__ 断言，不引入外部校验器。
+本地只持 IssueRef 回执（T5）。Session.sim_trace 可选承载 god-view（决策时间线+心路）。
+轻量不变量在 __post_init__ 断言，不引入外部校验器。
 """
 
 from __future__ import annotations
@@ -170,6 +171,152 @@ class FeelingScore:
 
 
 @dataclass
+class PersonaCallTrace:
+    """用户 agent 单次 LLM 调用的原始痕迹（先全量落盘，后续再筛）。
+
+    system/user 保留完整原文，便于事后看 KV 复用（重复多 → 提示词未优化）。
+    raw = 模型原文；parsed = 解析后的合同 JSON；steps = Agentic 内层 tool 过程流。
+    """
+
+    role: str
+    system: str
+    user: str
+    raw: str
+    parsed: dict[str, Any] = field(default_factory=dict)
+    steps: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "role": self.role,
+            "system": self.system,
+            "user": self.user,
+            "raw": self.raw,
+            "parsed": dict(self.parsed),
+        }
+        if self.steps:
+            d["steps"] = list(self.steps)
+        return d
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PersonaCallTrace:
+        return cls(
+            role=data.get("role", ""),
+            system=data.get("system", ""),
+            user=data.get("user", ""),
+            raw=data.get("raw", ""),
+            parsed=dict(data.get("parsed") or {}),
+            steps=list(data.get("steps") or []),
+        )
+
+
+@dataclass
+class SimTurn:
+    """sim 上帝视角一轮：对话片段 + 心路同条共置（对齐 user.sim.loop.TurnLog）。
+
+    与 Transcript 不是 1:1——一条 SimTurn = 一次 persona 决策（含 waiting 心跳、silent 自观察），
+    message / harness_output 是该决策时刻的对话片段，perceive / verdict / action 是心路。
+    persona_trace：该决策触发的用户 agent LLM 原始调用（含 system/user，供 KV 复用分析）。
+    """
+
+    turn: int
+    phase: str
+    action_space: list[Any]
+    perceive: str
+    verdict: str
+    action: str
+    message: str
+    executor: str
+    channel: str
+    patience: int
+    trust: str
+    harness_output: str = ""
+    harness_steps: list[dict[str, Any]] = field(default_factory=list)
+    persona_trace: list[PersonaCallTrace] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "turn": self.turn,
+            "phase": self.phase,
+            "action_space": list(self.action_space),
+            "perceive": self.perceive,
+            "verdict": self.verdict,
+            "action": self.action,
+            "message": self.message,
+            "executor": self.executor,
+            "channel": self.channel,
+            "patience": self.patience,
+            "trust": self.trust,
+            "harness_output": self.harness_output,
+        }
+        if self.harness_steps:
+            d["harness_steps"] = list(self.harness_steps)
+        if self.persona_trace:
+            d["persona_trace"] = [c.to_dict() for c in self.persona_trace]
+        return d
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SimTurn:
+        return cls(
+            turn=data["turn"],
+            phase=data["phase"],
+            action_space=list(data.get("action_space", [])),
+            perceive=data.get("perceive", ""),
+            verdict=data.get("verdict", ""),
+            action=data.get("action", ""),
+            message=data.get("message", ""),
+            executor=data.get("executor", ""),
+            channel=data.get("channel", ""),
+            patience=int(data.get("patience", 0)),
+            trust=data.get("trust", ""),
+            harness_output=data.get("harness_output", ""),
+            harness_steps=list(data.get("harness_steps", [])),
+            persona_trace=[PersonaCallTrace.from_dict(c) for c in data.get("persona_trace", [])],
+        )
+
+
+@dataclass
+class SimTrace:
+    """一局会话的完整 god-view（SessionResult 可持久化投影）。
+
+    transcript 仍是对话投影（看板/聚合用）；sim_trace 是决策时间线权威源。
+    persona_tail：局末不挂在某一 Turn 上的调用（file_issue 正文 / 体感评分）。
+    旧 session 无此字段 → None。
+    """
+
+    persona_id: str
+    end_reason: str
+    turns: list[SimTurn] = field(default_factory=list)
+    signals: list[str] = field(default_factory=list)
+    feeling_derived: FeelingScore | None = None
+    persona_tail: list[PersonaCallTrace] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "persona_id": self.persona_id,
+            "end_reason": self.end_reason,
+            "turns": [t.to_dict() for t in self.turns],
+            "signals": list(self.signals),
+        }
+        if self.feeling_derived is not None:
+            d["feeling_derived"] = self.feeling_derived.to_dict()
+        if self.persona_tail:
+            d["persona_tail"] = [c.to_dict() for c in self.persona_tail]
+        return d
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SimTrace:
+        fd = data.get("feeling_derived")
+        return cls(
+            persona_id=data["persona_id"],
+            end_reason=data["end_reason"],
+            turns=[SimTurn.from_dict(t) for t in data.get("turns", [])],
+            signals=list(data.get("signals", [])),
+            feeling_derived=FeelingScore.from_dict(fd) if fd else None,
+            persona_tail=[PersonaCallTrace.from_dict(c) for c in data.get("persona_tail", [])],
+        )
+
+
+@dataclass
 class IssueDraft:
     """用户 agent 产出的问题草稿（title/body/labels），一局 0..n 条。对齐 Gitea 建 issue 入参。"""
 
@@ -243,6 +390,7 @@ class Session:
     """一局会话的完整封装：聚合 persona/scenario/transcript/feeling/issue_refs，自带 id 与时间。
 
     session_id 与 created_at 缺省自动生成（T4 构造时不必显式传），to_dict/from_dict 保真。
+    sim_trace：可选 god-view（决策时间线）；缺省 None，旧 JSON 无该键兼容。
     """
 
     persona: Persona
@@ -252,9 +400,10 @@ class Session:
     issue_refs: list[IssueRef] = field(default_factory=list)
     session_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     created_at: datetime = field(default_factory=datetime.now)
+    sim_trace: SimTrace | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "session_id": self.session_id,
             "created_at": self.created_at.isoformat(),
             "persona": self.persona.to_dict(),
@@ -263,9 +412,13 @@ class Session:
             "feeling": self.feeling.to_dict(),
             "issue_refs": [r.to_dict() for r in self.issue_refs],
         }
+        if self.sim_trace is not None:
+            d["sim_trace"] = self.sim_trace.to_dict()
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Session:
+        st = data.get("sim_trace")
         return cls(
             persona=Persona.from_dict(data["persona"]),
             scenario=SeedScenario.from_dict(data["scenario"]),
@@ -274,4 +427,5 @@ class Session:
             issue_refs=[IssueRef.from_dict(r) for r in data.get("issue_refs", [])],
             session_id=data["session_id"],
             created_at=datetime.fromisoformat(data["created_at"]),
+            sim_trace=SimTrace.from_dict(st) if st else None,
         )

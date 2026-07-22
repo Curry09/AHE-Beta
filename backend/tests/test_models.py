@@ -11,8 +11,11 @@ from auto_designer.models import (
     IssueDraft,
     IssueRef,
     Persona,
+    PersonaCallTrace,
     SeedScenario,
     Session,
+    SimTrace,
+    SimTurn,
     Transcript,
     Turn,
 )
@@ -37,6 +40,28 @@ def _session() -> Session:
         ),
         feeling=FeelingScore(score=3, reason="有帮助但绕了一圈"),
         issue_refs=[IssueRef(number=1, url="fake://issues/1", state="open")],
+        sim_trace=SimTrace(
+            persona_id="P-1",
+            end_reason="issue_filed",
+            turns=[
+                SimTurn(
+                    turn=0,
+                    phase="active",
+                    action_space=["send_task"],
+                    perceive="还是偶发",
+                    verdict="failed_blame_harness",
+                    action="file_issue",
+                    message="帮我定位偶发 504",
+                    executor="harness",
+                    channel="emit",
+                    patience=2,
+                    trust="skeptical",
+                    harness_output="看下上游超时配置",
+                )
+            ],
+            signals=["WAIT_GAP: intent=peek action=keep_waiting"],
+            feeling_derived=FeelingScore(score=2, reason="框架派生"),
+        ),
     )
 
 
@@ -50,6 +75,37 @@ def _session() -> Session:
         FeelingScore(score=4, reason="很顺"),
         IssueDraft(title="t", body="b", labels=["bug"]),
         IssueRef(number=7, url="fake://issues/7", state="closed"),
+        SimTurn(
+            turn=1,
+            phase="waiting",
+            action_space=["keep_waiting"],
+            perceive="[stuck|peek→keep_waiting] 还在转",
+            verdict="stuck",
+            action="keep_waiting",
+            message="",
+            executor="local",
+            channel="silent",
+            patience=3,
+            trust="ok",
+            persona_trace=[
+                PersonaCallTrace(
+                    role="waiting_act",
+                    system="SYS",
+                    user="<waiting_act>",
+                    raw='{"action":"keep_waiting"}',
+                    parsed={"action": "keep_waiting"},
+                )
+            ],
+        ),
+        SimTrace(persona_id="P", end_reason="accepted", turns=[], signals=[]),
+        PersonaCallTrace(
+            role="decide",
+            system="you are a user",
+            user="<task>",
+            raw="{}",
+            parsed={},
+            steps=[{"kind": "assistant", "text": "{}"}],
+        ),
     ],
 )
 def test_round_trip_simple(obj) -> None:
@@ -58,12 +114,37 @@ def test_round_trip_simple(obj) -> None:
 
 
 def test_session_round_trip_nested() -> None:
-    """嵌套 Session（含 transcript/feeling/issue_refs）round-trip 一致，datetime 可逆。"""
+    """嵌套 Session（含 transcript/feeling/issue_refs/sim_trace）round-trip 一致，datetime 可逆。"""
     s = _session()
     d = s.to_dict()
     assert isinstance(d["created_at"], str)
     datetime.fromisoformat(d["created_at"])  # ISO-8601 可解析
+    assert "sim_trace" in d
+    assert d["sim_trace"]["turns"][0]["perceive"] == "还是偶发"
     assert Session.from_dict(d) == s
+
+
+def test_session_without_sim_trace_omits_key_and_loads_none() -> None:
+    """旧 JSON 无 sim_trace → from_dict 得 None；新 Session 无 trace 时 to_dict 不落该键。"""
+    s = Session(
+        persona=_persona(),
+        scenario=SeedScenario(description="x"),
+        transcript=Transcript(),
+        feeling=FeelingScore(score=2, reason="一般"),
+    )
+    assert "sim_trace" not in s.to_dict()
+    loaded = Session.from_dict(
+        {
+            "session_id": "abc",
+            "created_at": datetime.now().isoformat(),
+            "persona": _persona().to_dict(),
+            "scenario": {"description": "x"},
+            "transcript": {"turns": []},
+            "feeling": {"score": 2, "reason": "一般"},
+            "issue_refs": [],
+        }
+    )
+    assert loaded.sim_trace is None
 
 
 def test_feeling_score_out_of_range() -> None:

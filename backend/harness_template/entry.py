@@ -47,6 +47,13 @@ _TIMEOUT_REPLY = (
 )
 _HARNESS_USER_ID = "harness_user"
 
+# 内部分发：message 首词匹配 slash（如 /exit|/quit）→ 定型 reply 后退出；其余走 agent。
+_EXIT_COMMANDS = frozenset({"/exit", "/quit"})
+_EXIT_REPLY = (
+    "[exited] Session closed at your request. "
+    "Send a new message in a new session to start again."
+)
+
 
 class _Interrupted(Exception):
     """收到用户打断：中止当前这轮 agent.run。rebuild=True 表示没赶上优雅停止、需重建 agent 避自锁。"""
@@ -54,6 +61,20 @@ class _Interrupted(Exception):
     def __init__(self, *, rebuild: bool) -> None:
         super().__init__("interrupted by user")
         self.rebuild = rebuild
+
+
+def _slash_command(message: str) -> str | None:
+    """按 message 正文识别内置 slash 功能；命中则返回定型 reply，否则 None（走正常 agent）。
+
+    示范：功能识别在 harness 内部、通道仍是 message。仅认首词精确匹配（大小写不敏感）。
+    """
+    text = (message or "").strip()
+    if not text:
+        return None
+    head = text.split(None, 1)[0].lower()
+    if head in _EXIT_COMMANDS:
+        return _EXIT_REPLY
+    return None
 
 
 def _force_stop(agent) -> bool:
@@ -389,6 +410,13 @@ def main() -> None:
             break
         while not ctrl_q.empty():  # 丢弃上一轮遗留的过期 control，避免误打断本轮
             ctrl_q.get_nowait()
+        # slash 内部分发：命中则回 reply 后结束进程。
+        slash_reply = _slash_command(message)
+        if slash_reply is not None:
+            with _stdout_lock:
+                sys.stdout.write(json.dumps({"reply": slash_reply}, ensure_ascii=False) + "\n")
+                sys.stdout.flush()
+            break
         collector.reset()  # 只收本轮内层过程
         agent, raw = _reply(agent, message, rebuild, ctrl_q)
         history_snapshot = _snapshot_history(agent) or history_snapshot

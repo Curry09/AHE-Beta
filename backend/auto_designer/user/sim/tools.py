@@ -4,6 +4,7 @@
 - read_file(sandbox, path)         读文件
 - run_shell(sandbox, cmd, timeout) 在 sandbox cwd 跑命令
 - write_file(sandbox, path, content) 写文件（高能力档专属：能写测试脚本）
+- report_issue(sandbox, body)      中途记一条 issue（不结束对话；真实写入由 agentic client 拦截）
 - web_search(query)                占位，本轮不实现
 
 「跑测试 / 构造边界用例」这类是「原子工具 + LLM 推理」涌现出的复合行为，不做成工具。
@@ -50,6 +51,11 @@ def run_shell(sandbox: Sandbox, cmd: str, timeout: float = 10.0) -> dict:
     return sandbox.run(cmd, timeout=timeout)
 
 
+def report_issue(sandbox: Sandbox, body: str) -> dict:  # noqa: ARG001
+    """占位：真实记笔记由 AgenticPersonaClient._dispatch 拦截；直接调则失败。"""
+    return {"ok": False, "error": "report_issue requires agentic client dispatch"}
+
+
 def web_search(query: str) -> dict:
     """占位：本轮不实现，永远返回未实现。"""
     return {"ok": False, "error": "not_implemented"}
@@ -75,16 +81,26 @@ RUN_SHELL = ToolSpec(
 WRITE_FILE = ToolSpec(
     "write_file", "Write/overwrite a file in your workspace.", ("path", "content"), write_file
 )
+REPORT_ISSUE = ToolSpec(
+    "report_issue",
+    "Optionally file an issue note for the team behind the tool. Does NOT end this "
+    "conversation — you can keep talking after. Skip if you have nothing worth reporting; "
+    "there is no obligation to use this. (Distinct from ending the session with action "
+    "file_issue.)",
+    ("body",),
+    report_issue,
+)
 
 # 门控映射（与 cap_mask 同源）：
 #   blind                 -> []                 （只凭文本，不核实）
-#   shallow               -> read_file,run_shell（能读能跑一次，但写不出测试套件）
-#   competent / expert    -> + write_file       （能自写测试脚本）
+#   shallow               -> read_file,run_shell + report_issue
+#   competent / expert    -> + write_file
+# report_issue 不绑核实能力：有工具栈的人即可中途记一笔；允许闲置，不靠 prompt 硬推。
 _STACK: dict[D1Eval, list[ToolSpec]] = {
     D1Eval.BLIND: [],
-    D1Eval.SHALLOW: [READ_FILE, RUN_SHELL],
-    D1Eval.COMPETENT: [READ_FILE, RUN_SHELL, WRITE_FILE],
-    D1Eval.EXPERT: [READ_FILE, RUN_SHELL, WRITE_FILE],
+    D1Eval.SHALLOW: [READ_FILE, RUN_SHELL, REPORT_ISSUE],
+    D1Eval.COMPETENT: [READ_FILE, RUN_SHELL, WRITE_FILE, REPORT_ISSUE],
+    D1Eval.EXPERT: [READ_FILE, RUN_SHELL, WRITE_FILE, REPORT_ISSUE],
 }
 
 

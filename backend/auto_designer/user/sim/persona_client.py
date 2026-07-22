@@ -28,6 +28,42 @@ class PersonaClient(Protocol):
     def respond(self, system: str, user: str) -> dict: ...
 
 
+def _push_call_trace(
+    client: object,
+    *,
+    system: str,
+    user: str,
+    raw: str,
+    parsed: dict,
+    steps: list | None,
+) -> None:
+    """把一次 LLM 调用原文挂到 client._call_traces，供 loop drain 后落盘。"""
+    buf = getattr(client, "_call_traces", None)
+    if buf is None:
+        buf = []
+        client._call_traces = buf
+    buf.append(
+        {
+            "role": "",
+            "system": system,
+            "user": user,
+            "raw": raw,
+            "parsed": dict(parsed) if isinstance(parsed, dict) else {},
+            "steps": list(steps or []),
+        }
+    )
+
+
+def drain_call_traces(client: object) -> list[dict]:
+    """取出并清空 client 上累积的原始调用痕迹；无采集能力则空列表。"""
+    buf = getattr(client, "_call_traces", None)
+    if not isinstance(buf, list):
+        return []
+    out = list(buf)
+    buf.clear()
+    return out
+
+
 # --------------------------------------------------------------------------
 # 真实 API 后端 (NexAU 网关, OpenAI 兼容)
 # --------------------------------------------------------------------------
@@ -92,7 +128,9 @@ class ApiPersonaClient:
         text = self._text(self._create(messages, 8000))
         if not text:
             text = self._text(self._create(messages, 16000))
-        return _parse_json(text)
+        obj = _parse_json(text)
+        _push_call_trace(self, system=system, user=user, raw=text, parsed=obj, steps=None)
+        return obj
 
     def complete(self, messages: list[dict], max_tokens: int = 8000) -> str:
         """通用补全：给定 messages 直接返回文本（供 0008/T4 内层 tool-calling 循环复用网关）。"""
@@ -119,7 +157,9 @@ class ApiPersonaClient:
             'Return ONLY JSON: {"action": "<one id from allowed action ids>"}'
         )
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
-        parsed = _parse_json(self._text(self._create(messages, 2000)))
+        text = self._text(self._create(messages, 2000))
+        parsed = _parse_json(text)
+        _push_call_trace(self, system=system, user=prompt, raw=text, parsed=parsed, steps=None)
         aid = str(parsed.get("action", "")).strip()
         return aid if aid in space else "free"
 
@@ -140,6 +180,18 @@ class ScriptedPersonaClient:
     """
 
     def respond(self, system: str, user: str) -> dict:
+        ret = self._respond_body(system, user)
+        _push_call_trace(
+            self,
+            system=system,
+            user=user,
+            raw=json.dumps(ret, ensure_ascii=False),
+            parsed=ret,
+            steps=None,
+        )
+        return ret
+
+    def _respond_body(self, system: str, user: str) -> dict:
         if "<file_issue>" in user:  # 专门一轮: 以本人口吻写自包含 issue
             return self._compose_issue()
         if "<rate_experience>" in user:  # 会话末自评: 按末态情绪给 1–4 + 理由
@@ -446,37 +498,69 @@ class AgenticPersonaClient:
         self._sandbox_factory = sandbox_factory or Sandbox
         self._persona = None  # 会话级，bind_session 注入
         self._workspace_dir: str | None = None
+        self._issue_notes: list[str] = []  # 中途 report_issue tool 累积；drain 给 session
 
     def bind_session(self, persona, workspace_dir: str | None) -> None:
         """sim_user 每局开始调用：绑定会话级 persona 与（可选）工作区目录。"""
         self._persona = persona
         self._workspace_dir = workspace_dir
+        self._issue_notes = []
 
-    def _parse_with_retry(self, messages: list[dict], text: str) -> dict:
-        """解析首次输出；失败则追加「只回 JSON」提醒重试一次，仍失败才 dump 原文 + 落中性兜底。
+    def drain_issue_notes(self) -> list[str]:
+        """取出并清空中途 report_issue 笔记（供 run_session / 观测）。"""
+        notes = list(self._issue_notes)
+        self._issue_notes.clear()
+        return notes
 
-        根治「解析失败 → free → 空 message → 兜底假抱怨」链：多数偶发散文/畸形/截断一次重试即好；
-        真解析不出也只落 `_parse_failed` 空壳（下游走中性兜底），绝不无中生有替用户喊「坏了」。
+    def _record_issue_note(self, *, body: str) -> dict:
+        """中途开单：写入会话缓冲，不终止对话。"""
+        text = body.strip()
+        if not text:
+            return {"ok": False, "error": "body must be non-empty"}
+        self._issue_notes.append(text)
+        return {
+            "ok": True,
+            "filed": True,
+            "n": len(self._issue_notes),
+            "note": "issue noted; conversation continues — you are not obligated to stop",
+        }
+
+    def _parse_with_retry(
+        self,
+        messages: list[dict],
+        text: str,
+        steps: list | None,
+    ) -> tuple[dict, str]:
+        """解析首次输出；失败则追加「只回 JSON」提醒重试一次。
+
+        返回 (parsed, final_raw)。steps 非空时把每次模型原文记入过程流。
         """
+        if steps is not None:
+            steps.append({"kind": "assistant", "text": text})
         obj = _parse_json(text)
         reminder = _retry_reminder(obj)
         if reminder is None:
-            return obj
+            return obj, text
         retry_messages = [
             *messages,
             {"role": "assistant", "content": text},
             {"role": "user", "content": reminder},
         ]
         text2 = self._llm(retry_messages) or ""
+        if steps is not None:
+            steps.append({"kind": "assistant", "text": text2})
         obj2 = _parse_json(text2)
         if obj2.get("_parse_failed"):
             _dump_unparseable(first=text, second=text2)  # 两次都败：留证据供事后定位
-        return obj2
+        return obj2, text2
 
     # -- 单次主观判断（退化路径 / 特殊轮）--
     def _final_call(self, system: str, user: str) -> dict:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        return self._parse_with_retry(messages, self._llm(messages) or "")
+        text = self._llm(messages) or ""
+        obj, raw = self._parse_with_retry(messages, text, steps=None)
+        _push_call_trace(self, system=system, user=user, raw=raw, parsed=obj, steps=None)
+        return obj
 
     def _dispatch(self, obj: dict, tools_by_name: dict, sandbox) -> dict:
         name = obj.get("tool")
@@ -487,6 +571,8 @@ class AgenticPersonaClient:
         if not isinstance(args, dict):
             return {"ok": False, "error": "args must be an object"}
         try:
+            if spec.name == "report_issue":
+                return self._record_issue_note(body=str(args.get("body") or ""))
             if spec.name == "run_shell":
                 args = {**args, "timeout": self.timeout}
             return spec.fn(sandbox, **args)
@@ -513,6 +599,7 @@ class AgenticPersonaClient:
         )
         tools_by_name = {t.name: t for t in tools}
         sandbox = self._sandbox_factory(workspace=self._workspace_dir)
+        steps: list[dict] = []
         try:
             messages = [
                 {"role": "system", "content": inner_system},
@@ -522,7 +609,23 @@ class AgenticPersonaClient:
                 text = self._llm(messages) or ""
                 obj = _parse_json(text)
                 if isinstance(obj.get("tool"), str):  # 工具调用 -> 执行并回灌观察
+                    steps.append({"kind": "assistant", "text": text})
+                    name = str(obj.get("tool") or "")
+                    args = obj.get("args") or {}
+                    try:
+                        args_s = json.dumps(args, ensure_ascii=False, default=str)
+                    except (TypeError, ValueError):
+                        args_s = str(args)
+                    steps.append({"kind": "tool", "text": f"{name} {args_s}"[:2000]})
                     result = self._dispatch(obj, tools_by_name, sandbox)
+                    kind = "tool_result"
+                    if isinstance(result, dict) and result.get("ok") is False:
+                        kind = "tool_error"
+                    try:
+                        result_s = json.dumps(result, ensure_ascii=False, default=str)
+                    except (TypeError, ValueError):
+                        result_s = str(result)
+                    steps.append({"kind": kind, "text": result_s[:4000]})
                     messages.append({"role": "assistant", "content": text})
                     messages.append(
                         {
@@ -532,7 +635,18 @@ class AgenticPersonaClient:
                     )
                     continue
                 if _retry_reminder(obj) is not None:  # 解析失败 / 该发话却空 message -> 重试一次
-                    obj = self._parse_with_retry(messages, text)
+                    obj, raw = self._parse_with_retry(messages, text, steps)
+                else:
+                    steps.append({"kind": "assistant", "text": text})
+                    raw = text
+                _push_call_trace(
+                    self,
+                    system=inner_system,
+                    user=user,
+                    raw=raw,
+                    parsed=obj,
+                    steps=steps,
+                )
                 return obj  # 最终结构化输出（contract）
             # 超步数兜底：退化为一次主观判断，保证永远返回合法输出
             return self._final_call(system, user)

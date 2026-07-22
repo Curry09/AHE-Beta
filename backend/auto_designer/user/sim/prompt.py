@@ -108,10 +108,10 @@ Return EXACTLY ONE JSON object and nothing else:
   keeps spinning. Each consecutive "stuck" wears your patience faster (frustration compounds).
 
 # ATTRIBUTION (user-initiated stop)
-If <history> says YOU stopped / invoked a control (e.g. interrupt), that stop was YOUR
-choice. Do NOT say "the harness kept interrupting" or blame the tool for the interrupt
-itself. Complain about the underlying stall, off-track work, or missing delivery — not
-about the fact that you pressed stop."""
+If <history> says YOU interrupted (Ctrl+C), that stop was YOUR choice. Do NOT say
+"the harness kept interrupting" or blame the tool for the interrupt itself.
+Complain about the underlying stall, off-track work, or missing delivery — not
+about the fact that you pressed Ctrl+C."""
 
 
 def build_system(persona: Persona) -> str:
@@ -248,24 +248,9 @@ def _activity_bullets(items: list | None, *, limit: int = 12) -> str:
     return "\n".join(bullets)
 
 
-# 心跳等待：过程判断 → 真实意愿(intent) → 菜单动作(act)；intent∉菜单 记 gap。
-# judgment 只评「在干什么」；条不涨/等终态用 intent（如 check_status），不靠 stalled 硬贴。
+# 心跳等待：过程判断 → 开放意愿(intent) → 菜单动作(act) 收敛；act 自报 gap 时记 WAIT_GAP。
+# judgment 只评「在干什么」；intent 自由文本；菜单四按钮才是能力边界。
 WAITING_JUDGMENTS = ("on_track", "off_track", "unclear")
-WAITING_INTENTS = (
-    "keep_waiting",
-    "check_status",
-    "ask_where",
-    "redirect",
-    "interrupt",
-    "walk_away",
-)
-# intent → 哪些菜单 action 算「兑到了」（否则记 WAIT_GAP）。
-INTENT_MENU_OK: dict[str, frozenset[str]] = {
-    "keep_waiting": frozenset({"keep_waiting"}),
-    "check_status": frozenset({"invoke_control"}),
-    "interrupt": frozenset({"invoke_control"}),
-    "walk_away": frozenset({"give_up"}),
-}
 
 
 def _waiting_context_parts(
@@ -310,15 +295,12 @@ def _waiting_context_parts(
 
 def _intent_options_block() -> str:
     return (
-        "# INTENT — what you WANT right now (may not be available as a button)\n"
-        "Pick the closest honest wish — not what the menu can do:\n"
-        "- keep_waiting: give it more time.\n"
-        "- check_status: peek / know where it is / see partial state.\n"
-        "- ask_where: ask it what's going on.\n"
-        "- redirect: change or narrow the request.\n"
-        "- interrupt: stop the current run.\n"
-        "- walk_away: abandon this.\n"
-        "Choose from the list only; do not invent labels. No option is preferred a priori."
+        "# INTENT — what you WANT right now (free text; may not be available as a button)\n"
+        "Say honestly what you would do if you had a full UI — in your own words.\n"
+        "Examples only (not a closed list): keep waiting; ask where it is; send /status or "
+        "/btw … if the manual says so; change the request; Ctrl+C interrupt; walk away.\n"
+        "Do NOT pick a menu action yet. Read <harness_manual> for how to talk to the tool; "
+        "that knowledge belongs in what you want, not in inventing buttons."
     )
 
 
@@ -374,7 +356,7 @@ def build_waiting_intent_turn(
     judgment: str,
     perceive: str = "",
 ) -> str:
-    """3 跳模式·第 2 跳：已有 judgment，只表达真实意愿 intent（可超出菜单）。"""
+    """3 跳模式·第 2 跳：已有 judgment，只表达真实意愿 intent（开放文本）。"""
     parts = ["<waiting_intent>"]
     parts.extend(
         _waiting_context_parts(
@@ -389,11 +371,9 @@ def build_waiting_intent_turn(
     )
     parts.append(f"<judgment>\n{judgment}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
     parts.append(_intent_options_block())
-    parts.append("Do NOT pick a menu action yet. Say what you would do if you had a full UI.")
     parts.append(
         "Return EXACTLY ONE JSON object and nothing else:\n"
-        '{"intent": "keep_waiting | check_status | ask_where | redirect | interrupt | walk_away", '
-        '"intent_detail": "<optional short why, in your voice>"}'
+        '{"intent": "<free-text wish in your voice — what you want right now>"}'
     )
     parts.append("</waiting_intent>")
     return "\n\n".join(parts)
@@ -428,7 +408,7 @@ def build_waiting_judge_intent_turn(
         "- on_track: right kind of work for YOUR task.\n"
         "- off_track: wrong kind of work, wandering, or something you would not want.\n"
         "- unclear: not enough signal.\n"
-        "2) intent (honest wish; may not exist as a button) — see list below.\n"
+        "2) intent: honest free-text wish (may not exist as a button).\n"
         "Do NOT invent a finished answer."
     )
     parts.append(_intent_options_block())
@@ -436,8 +416,7 @@ def build_waiting_judge_intent_turn(
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"perceive": "<what you notice>", '
         '"judgment": "on_track | off_track | unclear", '
-        '"intent": "keep_waiting | check_status | ask_where | redirect | interrupt | walk_away", '
-        '"intent_detail": "<optional short why>"}'
+        '"intent": "<free-text wish in your voice>"}'
     )
     parts.append("</waiting_judge_intent>")
     return "\n\n".join(parts)
@@ -455,9 +434,8 @@ def build_waiting_act_turn(
     judgment: str,
     perceive: str = "",
     intent: str,
-    intent_detail: str = "",
 ) -> str:
-    """末跳：带着 judgment+intent，在现有菜单里落地；兑不了就最近似兜底（框架记 gap）。"""
+    """末跳：把开放 intent 收敛到菜单；兑不了就兜底并 gap=true（框架记 WAIT_GAP）。"""
     parts = ["<waiting_act>"]
     parts.extend(
         _waiting_context_parts(
@@ -471,24 +449,26 @@ def build_waiting_act_turn(
         )
     )
     parts.append(f"<judgment>\n{judgment}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
-    parts.append(f"<intent>\n{intent}\ndetail: {intent_detail.strip() or '(none)'}\n</intent>")
+    parts.append(f"<intent>\n{intent.strip() or '(none)'}\n</intent>")
     parts.append(
-        "# MENU — only these actions exist right now\n"
+        "# MENU — only these actions exist right now (this is where wishes converge)\n"
         "- keep_waiting: leave it running.\n"
-        "- invoke_control: use a control from <harness_manual> (name it exactly). "
-        "Some controls stop the run (e.g. interrupt) and you get a final reply; "
-        "others only peek/status while it keeps working — after a peek you will "
-        "decide again with the new status in view.\n"
+        "- send_message: send another message while it is still running "
+        "(inside the harness — ordinary text or slash forms from <harness_manual>, "
+        "e.g. /btw … /status; whether it handles that message is the harness's job).\n"
+        "- interrupt: stop the current run like Ctrl+C (outside the chat).\n"
         "- give_up: abandon and walk away.\n"
-        "Map your <intent> to the closest menu item. If nothing matches, "
-        "pick the least-bad fallback — do NOT pretend a missing capability exists. "
+        "Map <intent> to the closest menu item. If nothing really matches, "
+        "pick the least-bad fallback and set gap=true — do NOT pretend a missing "
+        "capability exists. If the action honestly satisfies the intent, gap=false. "
         "Honor <mood>."
     )
     parts.append(
         "Return EXACTLY ONE JSON object and nothing else:\n"
-        '{"action": "keep_waiting | invoke_control | give_up", '
-        '"control": "<control name from the manual, only if action==invoke_control else empty>", '
-        '"message": "<short in-voice line, only if you give_up else empty>"}'
+        '{"action": "keep_waiting | send_message | interrupt | give_up", '
+        '"message": "<text to send if action==send_message; optional short line if give_up; '
+        'else empty>", '
+        '"gap": <true if this is only a fallback that does not satisfy intent; else false>}'
     )
     parts.append("</waiting_act>")
     return "\n\n".join(parts)
@@ -547,8 +527,8 @@ def build_issue_turn(
         "idea from what you experienced this session; do not borrow phrasing from these instructions."
     )
     attribution = (
-        "ATTRIBUTION: If <history> shows YOU stopped an in-flight request (invoked interrupt/"
-        "control), that was your action. Do not write as if the assistant 'kept interrupting' you. "
+        "ATTRIBUTION: If <history> shows YOU interrupted (Ctrl+C) an in-flight request, "
+        "that was your action. Do not write as if the assistant 'kept interrupting' you. "
         "Blame missing progress, wrong work, or stalls — not your own stop."
     )
     return "\n\n".join(

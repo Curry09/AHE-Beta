@@ -108,10 +108,12 @@ def test_tool_stack_gating() -> None:
         return [t.name for t in tool_stack(_persona(d1))]
 
     assert names(D1Eval.BLIND) == []
-    assert names(D1Eval.SHALLOW) == ["read_file", "run_shell"]
+    assert names(D1Eval.SHALLOW) == ["read_file", "run_shell", "report_issue"]
     assert "write_file" in names(D1Eval.COMPETENT)
     assert "write_file" in names(D1Eval.EXPERT)
-    # shallow 拿不到 write_file（写不出测试套件）
+    assert "report_issue" in names(D1Eval.COMPETENT)
+    assert "report_issue" in names(D1Eval.EXPERT)
+    # shallow 拿不到 write_file（写不出测试套件）；report_issue 不绑核实能力，shallow 也有
     assert "write_file" not in names(D1Eval.SHALLOW)
 
 

@@ -26,6 +26,17 @@ language; it works on it and sends back a single final reply.
   and it continues from where things stood. Interrupting cancels only the
   in-progress request; it does not wipe the session.
 
+## Slash commands
+A few commands are typed as ordinary messages. The first word is the command
+(case-insensitive); anything after it is optional arguments.
+
+| Command | What happens |
+|---------|----------------|
+| `/exit` or `/quit` | Ends this session. You get a short `[exited]` reply, then the process stops. Start a new session to talk again. |
+
+Any other message — including an unknown `/something` — is handled as a normal
+request to the assistant.
+
 ## Getting good results
 - Describe what you want clearly. It may ask a brief clarifying question.
 - Iterate by replying with feedback.
@@ -35,7 +46,7 @@ language; it works on it and sends back a single final reply.
 
 ## How it behaves
 - It replies **once per request, when it is finished** (or when stopped / timed
-  out). It works between your message and its reply.
+  out / exited). It works between your message and its reply.
 - **While it works, you can see a short activity strip** (what tool it is running
   — e.g. reading a file, running a command). That is live status, not the final
   answer; the final answer still arrives as one reply when the request completes.
@@ -45,7 +56,6 @@ language; it works on it and sends back a single final reply.
   step did not finish, but **the conversation context is kept** so you can
   continue, narrow the ask, or redirect. Files it already wrote in the working
   directory may still be there — say what you want done with them next.
-- Messages are plain natural language.
 
 > This manual describes the current version. The tool evolves over time; when its
 > behavior changes, this manual is expected to change with it.

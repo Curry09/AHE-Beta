@@ -101,6 +101,16 @@ def test_tool_call_then_final_contract() -> None:
     assert sb.runs and sb.runs[0][0] == "python billing/core.py"
     assert out["verdict"] == "satisfied" and out["action"] == "accept"
     assert len(llm.calls) == 2 and sb.cleaned
+    from auto_designer.user.sim.persona_client import drain_call_traces
+
+    traces = drain_call_traces(c)
+    assert len(traces) == 1
+    assert traces[0]["system"]  # 实际喂入的 inner_system，非整局 SYS 占位
+    assert traces[0]["user"] == "<task>x</task>"
+    kinds = [s["kind"] for s in traces[0]["steps"]]
+    assert kinds[:2] == ["assistant", "tool"]
+    assert "tool_result" in kinds or "tool_error" in kinds
+    assert kinds[-1] == "assistant"
 
 
 # --------------------------------------------------------------------------
@@ -203,3 +213,92 @@ def test_scripted_client_still_works() -> None:
     )
     out = ScriptedPersonaClient().respond("sys", user)
     assert out["action"] == "send_task"
+
+
+# --------------------------------------------------------------------------
+# (g) 中途 report_issue：不终止；可闲置；写入 drain → SessionResult
+# --------------------------------------------------------------------------
+def test_report_issue_tool_continues_and_drains() -> None:
+    sb = FakeSandbox()
+    llm = FakeToolLLM(
+        [
+            json.dumps({"tool": "report_issue", "args": {"body": "split is off by a cent"}}),
+            json.dumps(
+                {
+                    "perceive": "noted the bug, still trying",
+                    "verdict": "failed_blame_harness",
+                    "action": "give_feedback",
+                    "message": "try again please",
+                }
+            ),
+        ]
+    )
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: sb)
+    c.bind_session(_persona(D1Eval.COMPETENT), "/ws")
+
+    out = c.respond("SYS", "<task>x</task>")
+    assert out["action"] == "give_feedback"  # 未因开单而终止
+    notes = c.drain_issue_notes()
+    assert notes == ["split is off by a cent"]
+    assert c.drain_issue_notes() == []  # 已清空
+
+
+def test_report_issue_idle_when_unused() -> None:
+    """允许闲置：从不调用 report_issue 时 notes 为空，不影响既有路径。"""
+    sb = FakeSandbox()
+    llm = FakeToolLLM(
+        [
+            json.dumps(
+                {"perceive": "ok", "verdict": "satisfied", "action": "accept", "message": "thanks"}
+            ),
+        ]
+    )
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: sb)
+    c.bind_session(_persona(D1Eval.COMPETENT), "/ws")
+    c.respond("SYS", "<task>x</task>")
+    assert c.drain_issue_notes() == []
+
+
+def test_report_issue_empty_body_rejected() -> None:
+    sb = FakeSandbox()
+    llm = FakeToolLLM(
+        [
+            json.dumps({"tool": "report_issue", "args": {"body": "  "}}),
+            json.dumps(
+                {"perceive": "skip", "verdict": "unsure", "action": "accept", "message": "bye"}
+            ),
+        ]
+    )
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: sb)
+    c.bind_session(_persona(D1Eval.COMPETENT), "/ws")
+    c.respond("SYS", "<task>x</task>")
+    assert c.drain_issue_notes() == []
+
+
+def test_run_session_collects_mid_session_issue_notes() -> None:
+    persona = _persona(D1Eval.COMPETENT)
+    llm = FakeToolLLM(
+        [
+            # OPENING：先记一笔再发任务
+            json.dumps({"tool": "report_issue", "args": {"body": "docs are wrong about /status"}}),
+            json.dumps(
+                {
+                    "perceive": "filed a note, still starting",
+                    "verdict": "unsure",
+                    "action": "send_task",
+                    "message": "please implement X",
+                    "task_load": "normal",
+                }
+            ),
+            # 下一轮接受
+            json.dumps(
+                {"perceive": "done", "verdict": "satisfied", "action": "accept", "message": "ok"}
+            ),
+        ]
+    )
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox(workspace))
+    c.bind_session(persona, "/ws")
+    res = run_session(persona, c, ScriptedHarness(), "task")
+    assert res.end_reason == "accepted"
+    assert res.issue_notes == ["docs are wrong about /status"]
+    assert any(s.startswith("ISSUE_TOOL: report_issue") for s in res.signals)

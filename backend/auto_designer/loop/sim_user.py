@@ -15,8 +15,11 @@ from auto_designer.models import (
     FeelingScore,
     IssueDraft,
     Persona,
+    PersonaCallTrace,
     SeedScenario,
     Session,
+    SimTrace,
+    SimTurn,
     Transcript,
     Turn,
 )
@@ -62,15 +65,68 @@ def result_to_turns(res: SessionResult) -> list[Turn]:
     return turns
 
 
-def _issue_draft(res: SessionResult) -> IssueDraft:
-    """sim 的 issue_artifact（markdown）→ Gitea 建 issue 入参。sim issue 均失败/不满驱动，打 bug。
+def result_to_sim_trace(res: SessionResult) -> SimTrace:
+    """SessionResult → 可落盘的 god-view：TurnLog 决策时间线原样投影，心路与对话片段同条共置。"""
+    derived = None
+    if res.feeling_derived is not None:
+        derived = FeelingScore(score=res.feeling_derived.score, reason=res.feeling_derived.reason)
+    return SimTrace(
+        persona_id=res.persona_id,
+        end_reason=res.end_reason,
+        turns=[
+            SimTurn(
+                turn=t.turn,
+                phase=t.phase,
+                action_space=list(t.action_space),
+                perceive=t.perceive,
+                verdict=t.verdict,
+                action=t.action,
+                message=t.message,
+                executor=t.executor,
+                channel=t.channel,
+                patience=t.patience,
+                trust=t.trust,
+                harness_output=t.harness_output,
+                harness_steps=list(t.harness_steps or []),
+                persona_trace=[
+                    PersonaCallTrace.from_dict(c) if isinstance(c, dict) else c
+                    for c in (t.persona_trace or [])
+                ],
+            )
+            for t in res.turns
+        ],
+        signals=list(res.signals),
+        feeling_derived=derived,
+        persona_tail=[
+            PersonaCallTrace.from_dict(c) if isinstance(c, dict) else c
+            for c in (res.persona_tail or [])
+        ],
+    )
 
-    标题取正文首行（即用户第一人称原话的开头），不加框架前缀，读起来就是用户自己提的 issue；
-    persona 身份等机器信息已在正文末的脚注里，开发者仍可分流。
+
+def _issue_draft_from_body(body: str) -> IssueDraft:
+    """markdown/正文 → Gitea 建 issue 入参。sim issue 均失败/不满驱动，打 bug。
+
+    标题取正文首行（即用户第一人称原话的开头），不加框架前缀。
     """
-    body = res.issue_artifact or ""
-    first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "simulated user issue")
-    return IssueDraft(title=first[:80], body=body, labels=["bug"])
+    text = body or ""
+    first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "simulated user issue")
+    return IssueDraft(title=first[:80], body=text, labels=["bug"])
+
+
+def _issue_draft(res: SessionResult) -> IssueDraft:
+    """兼容旧单测：仅从终结收场的 issue_artifact 建 draft。"""
+    return _issue_draft_from_body(res.issue_artifact or "")
+
+
+def _flush_issues(tracker: IssueTracker, res: SessionResult) -> list:
+    """中途 report_issue notes + 终结 issue_artifact 一并建单（顺序：先中途、后收场）。"""
+    refs = []
+    for body in res.issue_notes:
+        refs.append(tracker.create_issue(_issue_draft_from_body(body)))
+    if res.issue_artifact:
+        refs.append(tracker.create_issue(_issue_draft_from_body(res.issue_artifact)))
+    return refs
 
 
 def make_sim_run_session_fn(
@@ -135,7 +191,7 @@ def make_sim_run_session_fn(
         finally:
             harness.close()  # 无论成败都释放 harness 子进程
 
-        issue_refs = [tracker.create_issue(_issue_draft(res))] if res.issue_artifact else []
+        issue_refs = _flush_issues(tracker, res)
         feel = res.feeling or res.feeling_derived
         session = Session(
             persona=persona,
@@ -143,6 +199,7 @@ def make_sim_run_session_fn(
             transcript=Transcript(turns=result_to_turns(res)),
             feeling=FeelingScore(score=feel.score, reason=feel.reason),
             issue_refs=issue_refs,
+            sim_trace=result_to_sim_trace(res),
         )
         store.save(session)  # 体感 + session 落本地（issue 权威源在 Gitea）
         if on_turn is not None:
