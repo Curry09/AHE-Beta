@@ -28,8 +28,20 @@ class HarnessSmokeTest(unittest.TestCase):
             "_build_agent",
             "_snapshot_history",
             "_seed_history",
+            "_slash_command",
         ):
             self.assertTrue(callable(getattr(entry, name, None)), f"entry.{name} 应可调用")
+
+    def test_slash_exit_quit_are_in_band_dispatch(self) -> None:
+        """/exit|/quit：message 首词内部分发；其它（含未知 slash）走 None → agent。"""
+        entry = importlib.import_module("entry")
+        for raw in ("/exit", "/quit", "/EXIT", "  /Quit  now"):
+            reply = entry._slash_command(raw)
+            self.assertIsNotNone(reply)
+            self.assertTrue(reply.startswith("[exited]"))
+        self.assertIsNone(entry._slash_command("please fix the bug"))
+        self.assertIsNone(entry._slash_command("/help"))
+        self.assertIsNone(entry._slash_command(""))
 
     def test_interrupt_reply_is_marked(self) -> None:
         """打断回复带 [interrupted] 标记且非空——协议契约的最小成形检查。"""

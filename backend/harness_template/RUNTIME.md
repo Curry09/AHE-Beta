@@ -30,5 +30,6 @@
 3. **硬超时** → rebuild + 回 `[timeout]`（可续聊），不闷头静默重试同一轮。  
 4. **两条状态轴**：对话记忆（NexAU history）≠ 盘面（`SANDBOX_WORK_DIR`）。记忆必须接上；半成品可能仍在磁盘。
 5. **一级钮**：`entry.py` 的 `_CALL_TIMEOUT` / `_RUN_RETRIES`；`agent.yaml` 的 `max_iterations` / llm timeout。先质疑这些和交付方式，再堆恢复逻辑。
+6. **stdin 两通道**：`{"message"}` = 用户说话（含 slash 正文，entry 内部分发，见 `/exit` `/quit`）；`{"control":"interrupt"}` = 外打断。
 
 框架侧（如何 `Agent(...)`、history key、多 agent 原语等）→ **读 NexAU**，以你环境里 import 到的那份为准。

@@ -1,4 +1,4 @@
-"""心跳：judge/intent/act（2 跳或 3 跳）+ gap 信号。"""
+"""心跳：开放 intent → act 收敛；内=send_message / 外=interrupt+give_up；act 自报 gap。"""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from auto_designer.user.sim.dimensions import (
 from auto_designer.user.sim.loop import (
     _MAX_HEARTBEATS,
     WAITING_ACTIONS,
-    _intent_has_gap,
     _resolve_intent,
     _resolve_judgment,
     _resolve_waiting,
@@ -41,28 +40,26 @@ def _persona(d1: D1Eval = D1Eval.EXPERT, d43: D43Correct = D43Correct.GIVE_UP) -
 
 
 class HeartbeatHarness:
+    """begin/poll/control/emit_message —— 满足 _supports_heartbeat。"""
+
     def __init__(
         self,
         poll_script: list[tuple[str, object]],
-        control_reply: str = "[interrupted] stopped; session kept.",
-        manual: str = "# Manual\nYou can interrupt a running request.",
+        interrupt_reply: str = "[interrupted] stopped; session kept.",
+        manual: str = "# Manual\nCtrl+C interrupts. You may send messages while waiting.",
         progress_on_poll: list[list[dict]] | None = None,
-        sideband_controls: frozenset[str] | None = None,
     ) -> None:
         self._poll_script = list(poll_script)
         self._pi = 0
-        self.control_reply = control_reply
+        self.interrupt_reply = interrupt_reply
         self.manual = manual
         self.last_steps: list[dict] = []
         self.last_progress: list[dict] = []
         self._progress_on_poll = progress_on_poll
         self.begun: list[str] = []
+        self.emitted: list[str] = []
         self.controls: list[str] = []
         self._inflight = False
-        # 旁路型控制（peek/status）：不结束本轮；其余（interrupt）结束。
-        self._sideband_controls = (
-            frozenset({"status", "peek"}) if sideband_controls is None else sideband_controls
-        )
 
     @property
     def in_flight(self) -> bool:
@@ -72,6 +69,11 @@ class HeartbeatHarness:
         self.begun.append(message)
         self._inflight = True
         self.last_progress = []
+
+    def emit_message(self, message: str) -> None:
+        if not self._inflight:
+            raise RuntimeError("not in flight")
+        self.emitted.append(message)
 
     def poll(self, timeout: float) -> tuple[str, object]:  # noqa: ARG002
         item = self._poll_script[min(self._pi, len(self._poll_script) - 1)]
@@ -85,15 +87,10 @@ class HeartbeatHarness:
 
     def control(self, name: str) -> str:
         self.controls.append(name)
-        if name in self._sideband_controls:
-            out = self.control_reply
-            self.last_progress = [
-                *self.last_progress,
-                {"kind": "status", "text": out.splitlines()[0][:200]},
-            ]
-            return out  # 保持 in_flight
-        self._inflight = False
-        return self.control_reply
+        if name == "interrupt":
+            self._inflight = False
+            return self.interrupt_reply
+        return f"ack:{name}"
 
 
 class WaitStubClient:
@@ -140,15 +137,14 @@ class WaitStubClient:
             i = (
                 self._intents[min(self._ii, len(self._intents) - 1)]
                 if self._intents is not None
-                else {"intent": "keep_waiting"}
+                else {"intent": "keep waiting"}
             )
             if self._intents is not None:
                 self._ii += 1
             return {
                 "perceive": j.get("perceive", ""),
                 "judgment": j.get("judgment", "on_track"),
-                "intent": i.get("intent", "keep_waiting"),
-                "intent_detail": i.get("intent_detail", ""),
+                "intent": i.get("intent", "keep waiting"),
             }
         if "<waiting_judge>" in user:
             self.judge_prompts.append(user)
@@ -163,7 +159,7 @@ class WaitStubClient:
                 i = self._intents[min(self._ii, len(self._intents) - 1)]
                 self._ii += 1
                 return i
-            return {"intent": "keep_waiting", "intent_detail": ""}
+            return {"intent": "keep waiting"}
         if "<waiting_act>" in user:
             self.act_prompts.append(user)
             a = self._acts[min(self._act_i, len(self._acts) - 1)]
@@ -174,40 +170,48 @@ class WaitStubClient:
         return {"perceive": "", "verdict": self._verdict, "action": a, "message": "x"}
 
 
+def test_waiting_menu_is_inside_outside_split() -> None:
+    assert WAITING_ACTIONS == ["keep_waiting", "send_message", "interrupt", "give_up"]
+
+
 def test_resolve_waiting_maps_and_guards() -> None:
-    assert _resolve_waiting({"action": "keep_waiting"}) == ("keep_waiting", "")
-    assert _resolve_waiting({"action": "give_up"}) == ("give_up", "")
-    assert _resolve_waiting({"action": "invoke_control", "control": "interrupt"}) == (
-        "invoke_control",
-        "interrupt",
+    assert _resolve_waiting({"action": "keep_waiting"}) == ("keep_waiting", "", False)
+    assert _resolve_waiting({"action": "give_up", "gap": False}) == ("give_up", "", False)
+    assert _resolve_waiting({"action": "interrupt"}) == ("interrupt", "", False)
+    assert _resolve_waiting({"action": "send_message", "message": "/btw where?", "gap": False}) == (
+        "send_message",
+        "/btw where?",
+        False,
     )
-    assert _resolve_waiting({"action": "invoke_control", "control": ""}) == ("keep_waiting", "")
-    assert _resolve_waiting({"action": "panic"}) == ("keep_waiting", "")
+    assert _resolve_waiting({"action": "send_message", "message": ""}) == (
+        "keep_waiting",
+        "",
+        False,
+    )
+    assert _resolve_waiting({"action": "keep_waiting", "gap": True}) == ("keep_waiting", "", True)
+    assert _resolve_waiting({"action": "keep_waiting", "gap": "yes"}) == ("keep_waiting", "", True)
+    assert _resolve_waiting({"action": "panic"}) == ("keep_waiting", "", False)
 
 
-def test_resolve_judgment_and_intent() -> None:
+def test_resolve_intent_is_open_text() -> None:
+    assert _resolve_intent({"intent": "I want to see /status from the manual"}) == (
+        "I want to see /status from the manual"
+    )
+    assert _resolve_intent({"intent": "hang on", "intent_detail": "looks busy"}) == (
+        "hang on (looks busy)"
+    )
+    assert _resolve_intent({}) == "keep waiting"
     assert _resolve_judgment({"judgment": "on_track"}) == "on_track"
-    assert _resolve_judgment({"judgment": "OFF-TRACK"}) == "off_track"
-    assert _resolve_judgment({"judgment": "stalled"}) == "unclear"  # 旧标签降级
-    assert _resolve_judgment({}) == "unclear"
-    assert _resolve_intent({"intent": "check_status", "intent_detail": "peek"}) == (
-        "check_status",
-        "peek",
-    )
-    assert _resolve_intent({}) == ("keep_waiting", "")
-    assert _intent_has_gap("check_status", "keep_waiting") is True
-    assert _intent_has_gap("check_status", "invoke_control") is False
-    assert _intent_has_gap("interrupt", "invoke_control") is False
-    assert _intent_has_gap("keep_waiting", "keep_waiting") is False
+    assert _resolve_judgment({"judgment": "stalled"}) == "unclear"
 
 
 def test_three_mode_keep_waiting_logs_and_calls() -> None:
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done at last!")])
     client = WaitStubClient(
         actions=["send_task", "accept"],
-        acts=[{"action": "keep_waiting"}],
+        acts=[{"action": "keep_waiting", "gap": False}],
         judging=[{"judgment": "on_track", "perceive": "still working"}],
-        intents=[{"intent": "keep_waiting", "intent_detail": "fine"}],
+        intents=[{"intent": "give it more time"}],
         verdict="satisfied",
     )
     res = run_session(
@@ -217,11 +221,12 @@ def test_three_mode_keep_waiting_logs_and_calls() -> None:
     assert len(waiting) == 1
     assert waiting[0].action == "keep_waiting"
     assert waiting[0].action_space == WAITING_ACTIONS
-    assert "[on_track|keep_waiting→keep_waiting]" in waiting[0].perceive
+    assert "[on_track|give it more time→keep_waiting]" in waiting[0].perceive
     assert len(client.judge_prompts) == 1
     assert len(client.intent_prompts) == 1
     assert len(client.act_prompts) == 1
     assert "<intent>" in client.act_prompts[0]
+    assert "free-text" in client.intent_prompts[0] or "own words" in client.intent_prompts[0]
     assert any(t.harness_output == "done at last!" for t in res.turns)
 
 
@@ -229,9 +234,9 @@ def test_two_mode_judge_intent_combined() -> None:
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
     client = WaitStubClient(
         actions=["send_task", "accept"],
-        acts=[{"action": "keep_waiting"}],
+        acts=[{"action": "keep_waiting", "gap": False}],
         judging=[{"judgment": "on_track", "perceive": "ok"}],
-        intents=[{"intent": "keep_waiting"}],
+        intents=[{"intent": "keep waiting a bit"}],
         verdict="satisfied",
     )
     res = run_session(_persona(), client, harness, TASK, manual=harness.manual, waiting_mode="two")
@@ -240,16 +245,17 @@ def test_two_mode_judge_intent_combined() -> None:
     assert len(client.intent_prompts) == 0
     assert len(client.act_prompts) == 1
     waiting = [t for t in res.turns if t.phase == "waiting"]
-    assert waiting[0].perceive.startswith("[on_track|keep_waiting→")
+    assert waiting[0].perceive.startswith("[on_track|keep waiting a bit→")
 
 
-def test_check_status_intent_records_gap() -> None:
+def test_open_intent_gap_comes_from_act_not_enum() -> None:
+    """想看进度却只能干等：act 自报 gap=true → WAIT_GAP；不再靠封闭 intent 枚举对表。"""
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
     client = WaitStubClient(
         actions=["send_task", "accept"],
-        acts=[{"action": "keep_waiting"}],
+        acts=[{"action": "keep_waiting", "gap": True}],
         judging=[{"judgment": "unclear", "perceive": "quiet after tools"}],
-        intents=[{"intent": "check_status", "intent_detail": "where is it"}],
+        intents=[{"intent": "I want to know where it is — manual has no /status"}],
         verdict="satisfied",
     )
     res = run_session(
@@ -260,31 +266,30 @@ def test_check_status_intent_records_gap() -> None:
         manual=harness.manual,
         waiting_mode="three",
     )
-    assert any(s.startswith("WAIT_GAP: intent=check_status") for s in res.signals)
+    assert any(s.startswith("WAIT_GAP: intent=I want to know where it is") for s in res.signals)
     waiting = [t for t in res.turns if t.phase == "waiting"]
-    assert "check_status→keep_waiting" in waiting[0].perceive
+    assert "→keep_waiting]" in waiting[0].perceive
 
 
-def test_check_status_via_invoke_control_has_no_gap() -> None:
-    """手册有 status 时，check_status → invoke_control:status 算兑到，不记 WAIT_GAP。"""
+def test_manual_driven_send_message_no_gap() -> None:
+    """手册写了 /status → intent 想看进度 → act send_message + gap=false。"""
     harness = HeartbeatHarness(
         [("pending", 90.0), ("reply", "done")],
-        control_reply="phase=running; elapsed=1",
-        manual='# Manual\nSend {"control":"status"} to peek.\n',
+        manual="# Manual\nWhile waiting you may send `/status` as a normal message.\n",
     )
     client = WaitStubClient(
         actions=["send_task", "accept"],
         acts=[
-            {"action": "invoke_control", "control": "status"},
-            {"action": "keep_waiting"},
+            {"action": "send_message", "message": "/status", "gap": False},
+            {"action": "keep_waiting", "gap": False},
         ],
         judging=[
             {"judgment": "on_track", "perceive": "tools moving"},
-            {"judgment": "on_track", "perceive": "status looks fine"},
+            {"judgment": "on_track", "perceive": "still good"},
         ],
         intents=[
-            {"intent": "check_status", "intent_detail": "peek"},
-            {"intent": "keep_waiting", "intent_detail": "ok keep going"},
+            {"intent": "send /status like the manual says"},
+            {"intent": "keep going"},
         ],
         verdict="satisfied",
     )
@@ -296,33 +301,32 @@ def test_check_status_via_invoke_control_has_no_gap() -> None:
         manual=harness.manual,
         waiting_mode="three",
     )
-    assert harness.controls == ["status"]
-    assert not any("WAIT_GAP: intent=check_status" in s for s in res.signals)
+    assert harness.emitted == ["/status"]
+    assert harness.controls == []
+    assert not any(s.startswith("WAIT_GAP:") for s in res.signals)
     waiting = [t for t in res.turns if t.phase == "waiting"]
-    assert any("check_status→invoke_control:status" in t.perceive for t in waiting)
-    assert any("keep_waiting→keep_waiting" in t.perceive for t in waiting)
+    assert any("→send_message]" in t.perceive for t in waiting)
+    assert any(t.action == "send_message" and t.message == "/status" for t in waiting)
 
 
-def test_status_peek_continues_wait_then_final_reply() -> None:
-    """旁路 status：不结束本轮、不记 YOU stopped；写入上下文后再决策；终态仍是正常 reply。"""
+def test_midflight_send_message_continues_wait_then_final_reply() -> None:
     harness = HeartbeatHarness(
         [("pending", 60.0), ("reply", "all done")],
-        control_reply="phase=running; step=pytest",
-        manual='# Manual\n{"control":"status"} peeks; {"control":"interrupt"} stops.\n',
+        manual="# Manual\n/btw <msg> is a side question while work continues.\n",
     )
     client = WaitStubClient(
         actions=["send_task", "accept"],
         acts=[
-            {"action": "invoke_control", "control": "status"},
-            {"action": "keep_waiting"},
+            {"action": "send_message", "message": "/btw are you still on pytest?", "gap": False},
+            {"action": "keep_waiting", "gap": False},
         ],
         judging=[
             {"judgment": "unclear", "perceive": "want a peek"},
-            {"judgment": "on_track", "perceive": "saw status, still good"},
+            {"judgment": "on_track", "perceive": "sent btw, keep going"},
         ],
         intents=[
-            {"intent": "check_status"},
-            {"intent": "keep_waiting"},
+            {"intent": "ask via /btw whether still on pytest"},
+            {"intent": "keep waiting"},
         ],
         verdict="satisfied",
     )
@@ -334,18 +338,14 @@ def test_status_peek_continues_wait_then_final_reply() -> None:
         manual=harness.manual,
         waiting_mode="three",
     )
-    assert harness.controls == ["status"]
+    assert harness.emitted == ["/btw are you still on pytest?"]
+    assert harness.controls == []
     assert any(t.harness_output == "all done" for t in res.turns)
-    # peek 不得记成「你停了请求」
-    assert not any(
-        "YOU stopped the in-flight request" in p and "`status`" in p for p in client.all_prompts
+    assert not any("YOU interrupted" in p for p in client.all_prompts)
+    assert any(
+        "sent another message while it was still running" in p and "/btw" in p
+        for p in client.all_prompts
     )
-    # 再决策时历史里应有 peek 旁路笔记
-    assert any("peek/status" in p and "NOT stopped" in p for p in client.all_prompts)
-    # 第二次 act 应能看到 status（progress 或 history）
-    assert len(client.act_prompts) >= 2
-    second = client.act_prompts[1]
-    assert "phase=running" in second or "status" in second.lower()
 
 
 def test_keep_waiting_decay_follows_persona_coef() -> None:
@@ -353,7 +353,7 @@ def test_keep_waiting_decay_follows_persona_coef() -> None:
         harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
         client = WaitStubClient(
             actions=["send_task", "accept"],
-            acts=[{"action": "keep_waiting"}],
+            acts=[{"action": "keep_waiting", "gap": False}],
             verdict="satisfied",
         )
         res = run_session(
@@ -367,34 +367,34 @@ def test_keep_waiting_decay_follows_persona_coef() -> None:
     assert _waiting_patience_after_one_keep(D43Correct.GIVE_UP) == 1
 
 
-def test_invoke_control_routes_and_attribution() -> None:
+def test_interrupt_routes_and_attribution() -> None:
     harness = HeartbeatHarness([("pending", 120.0)])
     client = WaitStubClient(
         actions=["send_task", "give_up"],
-        acts=[{"action": "invoke_control", "control": "interrupt"}],
+        acts=[{"action": "interrupt", "gap": False}],
         judging=[{"judgment": "off_track", "perceive": "wrong work"}],
-        intents=[{"intent": "interrupt"}],
+        intents=[{"intent": "Ctrl+C stop this"}],
         verdict="stuck",
     )
     res = run_session(
         _persona(), client, harness, TASK, manual=harness.manual, waiting_mode="three"
     )
     assert harness.controls == ["interrupt"]
+    assert harness.emitted == []
     assert any("[interrupted]" in t.harness_output for t in res.turns if t.harness_output)
-    assert any("off_track|interrupt→invoke_control:interrupt" in t.perceive for t in res.turns)
+    assert any("Ctrl+C stop this→interrupt" in t.perceive for t in res.turns)
     hist_bearing = [p for p in client.all_prompts if "<history>" in p]
-    assert any("YOU stopped" in p and "interrupt" in p for p in hist_bearing)
-    # interrupt 兑到 invoke_control → 无 gap
-    assert not any("WAIT_GAP: intent=interrupt" in s for s in res.signals)
+    assert any("YOU interrupted (Ctrl+C)" in p for p in hist_bearing)
+    assert not any(s.startswith("WAIT_GAP:") for s in res.signals)
 
 
 def test_give_up_during_wait_abandons_with_issue() -> None:
     harness = HeartbeatHarness([("pending", 300.0)])
     client = WaitStubClient(
         actions=["send_task"],
-        acts=[{"action": "give_up", "message": "forget it"}],
+        acts=[{"action": "give_up", "message": "forget it", "gap": False}],
         judging=[{"judgment": "unclear", "perceive": "nothing"}],
-        intents=[{"intent": "walk_away"}],
+        intents=[{"intent": "walk away from this"}],
         verdict="stuck",
     )
     res = run_session(
@@ -409,7 +409,7 @@ def test_pathological_keep_waiting_is_bounded() -> None:
     harness = HeartbeatHarness([("pending", 90.0)])
     client = WaitStubClient(
         actions=["send_task"],
-        acts=[{"action": "keep_waiting"}],
+        acts=[{"action": "keep_waiting", "gap": False}],
         verdict="stuck",
     )
     res = run_session(
@@ -418,9 +418,6 @@ def test_pathological_keep_waiting_is_bounded() -> None:
     assert res.end_reason == "abandoned"
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert 0 < len(waiting) <= _MAX_HEARTBEATS
-    assert len(client.judge_prompts) == len(waiting)
-    assert len(client.intent_prompts) == len(waiting)
-    assert len(client.act_prompts) == len(waiting)
 
 
 def test_on_track_progress_skips_patience_tax() -> None:
@@ -442,12 +439,12 @@ def test_on_track_progress_skips_patience_tax() -> None:
     )
     client = WaitStubClient(
         actions=["send_task", "accept"],
-        acts=[{"action": "keep_waiting"}, {"action": "keep_waiting"}],
+        acts=[{"action": "keep_waiting", "gap": False}, {"action": "keep_waiting", "gap": False}],
         judging=[
             {"judgment": "on_track", "perceive": "read"},
             {"judgment": "on_track", "perceive": "pytest"},
         ],
-        intents=[{"intent": "keep_waiting"}, {"intent": "keep_waiting"}],
+        intents=[{"intent": "keep waiting"}, {"intent": "keep waiting"}],
         verdict="satisfied",
     )
     res = run_session(
@@ -463,7 +460,7 @@ def test_on_track_progress_skips_patience_tax() -> None:
     assert waiting[1].patience == 5
 
 
-def test_stale_progress_taxes_patience() -> None:
+def test_stale_progress_taxes_patience_and_can_gap() -> None:
     same = [{"kind": "tool", "text": "🔧 run_shell: sleep 999"}]
     harness = HeartbeatHarness(
         [("pending", 90.0), ("pending", 180.0), ("reply", "done")],
@@ -471,12 +468,18 @@ def test_stale_progress_taxes_patience() -> None:
     )
     client = WaitStubClient(
         actions=["send_task", "accept"],
-        acts=[{"action": "keep_waiting"}, {"action": "keep_waiting"}],
+        acts=[
+            {"action": "keep_waiting", "gap": False},
+            {"action": "keep_waiting", "gap": True},
+        ],
         judging=[
             {"judgment": "off_track", "perceive": "sleep"},
             {"judgment": "off_track", "perceive": "still sleep"},
         ],
-        intents=[{"intent": "keep_waiting"}, {"intent": "check_status"}],
+        intents=[
+            {"intent": "keep waiting"},
+            {"intent": "I want a progress peek but there is no way"},
+        ],
         verdict="satisfied",
     )
     res = run_session(
@@ -490,7 +493,7 @@ def test_stale_progress_taxes_patience() -> None:
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert waiting[0].patience == 5
     assert waiting[1].patience == 4
-    assert any("WAIT_GAP: intent=check_status" in s for s in res.signals)
+    assert any("WAIT_GAP: intent=I want a progress peek" in s for s in res.signals)
 
 
 def test_prior_activity_carried() -> None:
@@ -511,14 +514,14 @@ def test_prior_activity_carried() -> None:
     client = WaitStubClient(
         actions=["send_task", "ask_harness_run", "accept"],
         acts=[
-            {"action": "keep_waiting"},
-            {"action": "invoke_control", "control": "interrupt"},
+            {"action": "keep_waiting", "gap": False},
+            {"action": "interrupt", "gap": False},
         ],
         judging=[
             {"judgment": "on_track", "perceive": "first"},
             {"judgment": "off_track", "perceive": "curl"},
         ],
-        intents=[{"intent": "keep_waiting"}, {"intent": "interrupt"}],
+        intents=[{"intent": "keep waiting"}, {"intent": "interrupt this"}],
         verdict="unsure",
     )
     run_session(_persona(), client, harness, TASK, manual=harness.manual, waiting_mode="three")

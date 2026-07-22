@@ -6,7 +6,11 @@ issue_artifact 真落 tracker、SessionResult 转 models.Session 落 store、逐
 
 from __future__ import annotations
 
-from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
+from auto_designer.loop.sim_user import (
+    make_sim_run_session_fn,
+    result_to_sim_trace,
+    result_to_turns,
+)
 from auto_designer.models import Persona, SeedScenario, Session, WorkspaceSpec
 from auto_designer.tracker.fake import FakeTracker
 from auto_designer.user.session_store import SessionStore
@@ -16,13 +20,23 @@ from auto_designer.user.sim.persona_client import ScriptedPersonaClient
 from auto_designer.user.sim.run_live import expert
 
 
-def _turn(turn: int, action: str, channel: str, message: str, harness_output: str) -> TurnLog:
+def _turn(
+    turn: int,
+    action: str,
+    channel: str,
+    message: str,
+    harness_output: str,
+    *,
+    perceive: str = "",
+    verdict: str = "unsure",
+    phase: str = "active",
+) -> TurnLog:
     return TurnLog(
         turn=turn,
-        phase="active",
+        phase=phase,
         action_space=[],
-        perceive="",
-        verdict="unsure",
+        perceive=perceive,
+        verdict=verdict,
         action=action,
         message=message,
         executor="x",
@@ -60,6 +74,46 @@ def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
     assert turns[1].content == completion
     assert turns[0].content.startswith("Please inspect")
     assert turns[2].content == "Looks good, thanks."
+
+
+def test_result_to_sim_trace_keeps_perceive_alongside_dialogue() -> None:
+    """god-view 投影保留心路；message/harness_output 与 perceive 同条，无需事后对表。"""
+    res = SessionResult(
+        persona_id="P-0991",
+        end_reason="abandoned",
+        turns=[
+            _turn(
+                0,
+                "send_task",
+                "emit",
+                "fix DST",
+                "",
+                perceive="starting",
+                verdict="unsure",
+            ),
+            _turn(
+                1,
+                "keep_waiting",
+                "silent",
+                "",
+                "still working...",
+                perceive="[stuck|peek→keep_waiting] spinner",
+                verdict="stuck",
+                phase="waiting",
+            ),
+        ],
+        signals=["WAIT_GAP: intent=peek action=keep_waiting"],
+    )
+    trace = result_to_sim_trace(res)
+    assert trace.persona_id == "P-0991"
+    assert trace.end_reason == "abandoned"
+    assert trace.signals == ["WAIT_GAP: intent=peek action=keep_waiting"]
+    assert len(trace.turns) == 2
+    assert trace.turns[0].message == "fix DST"
+    assert trace.turns[0].perceive == "starting"
+    assert trace.turns[1].phase == "waiting"
+    assert "peek" in trace.turns[1].perceive
+    assert trace.turns[1].harness_output == "still working..."
 
 
 def test_result_to_turns_includes_pending_harness_reply() -> None:
@@ -119,7 +173,23 @@ def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
     assert "bug" in open_issues[0].labels
     assert session.issue_refs and session.issue_refs[0].number == open_issues[0].number
     # session 落盘可回读
-    assert store.load(session.session_id).session_id == session.session_id
+    loaded = store.load(session.session_id)
+    assert loaded.session_id == session.session_id
+    # god-view 一并落盘：心路与决策时间线可回读
+    assert session.sim_trace is not None
+    assert loaded.sim_trace is not None
+    assert loaded.sim_trace.persona_id == sp.persona_id
+    assert loaded.sim_trace.turns  # 至少有决策轮
+    assert any(t.perceive or t.verdict or t.action for t in loaded.sim_trace.turns)
+    # 用户 agent 原始调用：system/user 全量落盘（供后续 KV 复用分析）
+    assert any(t.persona_trace for t in loaded.sim_trace.turns)
+    first_call = next(c for t in loaded.sim_trace.turns for c in t.persona_trace)
+    assert first_call.role == "decide"
+    assert first_call.system  # 完整 system 原文
+    assert first_call.user
+    assert first_call.parsed  # 至少有合同字段
+    assert loaded.sim_trace.persona_tail  # file_issue / rate 局末调用
+    assert {c.role for c in loaded.sim_trace.persona_tail} >= {"file_issue", "rate"}
     # 逐轮回调(若干 True，无 session_id) + 收尾一次 False（带 session_id 供看板归档关联）
     assert seen and seen[-1] == (False, session.session_id)
     assert any(running for running, _ in seen[:-1])
@@ -146,6 +216,45 @@ def test_sim_adapter_no_issue_when_not_filed(tmp_path) -> None:
 
     assert session.issue_refs == []
     assert tracker.list_open_issues() == []
+
+
+def test_sim_adapter_flushes_mid_session_issue_notes(tmp_path) -> None:
+    """中途 report_issue notes 与终结 artifact 一并 create_issue；无 notes 时行为不变。"""
+    sp = expert()
+    mp = _model_persona(sp)
+    tracker = FakeTracker()
+    store = SessionStore(tmp_path)
+
+    class _NoteClient:
+        def respond(self, system: str, user: str) -> dict:
+            if "<rate_experience>" in user:
+                return {"score": 3, "reason": "ok"}
+            if "<file_issue>" in user:
+                return {"issue": "terminal voice issue"}
+            return {
+                "perceive": "",
+                "verdict": "failed_blame_harness",
+                "action": "file_issue",
+                "message": "filing",
+            }
+
+        def drain_issue_notes(self) -> list[str]:
+            # 第一轮 respond 后被 drain；这里用一次性标记模拟中途已记
+            notes = getattr(self, "_notes", ["mid-session: rounding bug"])
+            self._notes = []
+            return notes
+
+    fn = make_sim_run_session_fn(
+        client_factory=_NoteClient, tracker=tracker, store=store, sim_personas={mp.identity: sp}
+    )
+    session = fn(mp, SeedScenario(description="task"), ScriptedHarness())
+
+    open_issues = tracker.list_open_issues()
+    assert len(open_issues) == 2
+    bodies = [i.body for i in open_issues]
+    assert "mid-session: rounding bug" in bodies
+    assert any("terminal voice issue" in b for b in bodies)
+    assert len(session.issue_refs) == 2
 
 
 def _fn(tmp_path):

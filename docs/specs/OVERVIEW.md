@@ -38,7 +38,7 @@
 本组在观测看板前端新增一个独立页 **AgentBoard**：以卡通形式（emoji 头像 + CSS 动画）实时展示 当前活动的 agent，展示其身份并支持点击，取代此前嵌于每页顶部的朴素折叠面板 `AgentsPanel`。 数据源沿用既有 `/api/agents`（`data/live/agents.json` 的只读投影，2 秒轮询），**零后端改动、 零新依赖**——卡通表现由 emoji + CSS keyframes 实现，符合奥卡姆理念。
 
 ### 0012 用户侧等待体感真实化：心跳主动权 · 进度可见 · 任务相关耐心
-把用户 agent 面对慢/卡 harness 时的「干等」升级为可感知的真实体感：等待中赋予主动权（心跳唤醒后经 judge→intent→act 决策，可续等/调控制面/放弃），等待条展示 live progress 与 prior_activity；keep_waiting 仅在无新进度时耗耐心；意图兑不进菜单记 WAIT_GAP；体感评分 ATTRIBUTION 不把用户自打断归咎 harness。起始耐心随任务量浮动。落点 backend/auto_designer/user/sim/，是 0005/0008 用户侧的行为增强（peek 续等协议见 0019）。
+把用户 agent 面对慢/卡 harness 时的「干等」升级为可感知的真实体感：等待中心跳唤醒后经 judge→intent→act 决策；等待条展示 live progress 与 prior_activity；keep_waiting 仅在无新进度时耗耐心；WAIT_GAP 与 ATTRIBUTION。起始耐心随任务量浮动。等待菜单与内外 IO 语义以 0022 为准（本组不再定义 invoke_control）。
 
 ### 0013 Harness 呈现与交互协议：拆信封 · 过程流分层 · 打断/心跳
 把 harness 的对用户呈现与内层过程彻底分层，并补齐慢会话的交互协议：拆 complete_task 信封；内层过程经 steps 只吐观测层；进行中可发 mid-flight {'progress':…} 活动条（stdout 可多行旁路，终态仍为一行含 reply）；control:interrupt 回 [interrupted]；launcher begin/poll/control 分片轮询不盲杀。落点 harness_template + harness/launcher。旁路放宽与 peek 续等见 0019。
@@ -58,14 +58,17 @@
 ### 0018 设计师提案拆信封：complete_task 交付不再被静默丢弃
 设计师用 complete_task 交回提案时，nexau 把结果套进 tool 信封（{success,status,output:{result:'[...]'}}），而 _parse_proposals 的平衡括号扫描刻意不进字符串内部，扫不到顶层数组 → 静默返回「本轮无提案」。实测 8 轮长跑 6 条结构性提案 0 条进 backlog；且该缺陷非确定性——agent 听话调 complete_task 就被丢，不听话直接吐裸数组反而入库（第 6 轮侥幸入库的 #6/#7/#8 使 dev 立刻去改 entry.py 与 tools/，证明结构性进化通道本身是通的、只是被这里堵死）。落点：designer/_run_agent 出口拆信封 + 单测覆盖两条路径（带信封 / 裸数组）。
 
-### 0019 控制旁路放宽 + peek 后继续等待决策
-放宽 harness stdout 旁路协议（任意非 reply JSON 可收），并区分终结型与旁路型 control：status/peek 不结束本轮、写入等待上下文后立刻再决策；interrupt 仍吐 reply 收工。手册仍为能力真相源、控制名不注册。补齐 0012/0013 将 control 一律按打断收工的缺口。
+### 0019 launcher 非 reply 旁路放宽（progress 等）
+放宽 harness stdout 旁路协议（任意非 reply JSON 可收，写入 last_sideband/last_progress）；control() 仍支持旁路 ack 或终态 reply 两种形状（wire 兼容）。用户侧经 control 做 peek/status 的路径已由 0022 取代并 abandon（原 T2）。现行用户等待环见 0022。
 
 ### 0020 覆盖关系兑现 + 开发者领取策略与票种预算
 补全 designer 覆盖判定的执行链（covers 结构化-挂链-降权-连带关闭-前端徽标），开发者领取改可配置分池（design 优先 + 保留 bug 专属 dev），并按票种给初始迭代预算、同票重试自动升级。
 
 ### 0021 dev agent 逃逸围堵：凭证隔离 + 编排绊线 + 污染清理
 实测发现 dev agent 经 heredoc 隧道绕过 workspace-jail 的路径扫描，改写编排仓文件并用宿主继承的 GitHub 凭证推送。路径级 jail 关不住能调用解释器的 agent（其 docstring 已自陈），本组不加固扫描，改做纵深：进程级 git 凭证隔离掐断推送落地链、b 段后绊线断言编排仓未被触碰、清理历史逃逸的污染制品。OS 级沙箱留作治本方向。
+
+### 0022 用户↔harness 内外通道：开放 intent · 中途 report_issue · slash 示范
+钉死用户与 harness 的内外窗口：内=message（含 in-flight emit、slash 正文内分发），外=interrupt（Ctrl+C）与会话收场；等待菜单改为 keep_waiting/send_message/interrupt/give_up；intent 开放、由 act 收敛并自报 gap；中途 report_issue tool 可闲置；初始 harness 以 /exit\|/quit 示范 slash。取代原 0019 用户侧 peek-via-control 与 0012 的 invoke_control 菜单语义。
 
 ## 全局看板
 
@@ -112,8 +115,8 @@
 | 0010 | 0010/T1 | 种子场景采集（蒸馏，skill 形式） | done | — | tools/seed-distill/seed-card-schema.md<br>tools/seed-distill/extract-harness-seed/SKILL.md<br>tools/seed-distill/extract-harness-seed/reference.md<br>backend/auto_designer/distill/seed_library.py<br>backend/tests/distill/test_seed_library.py |
 | 0010 | 0010/T2 | 种子注入（card → SeedScenario） | done | T1 | backend/auto_designer/distill/seed_adapter.py<br>backend/tests/distill/test_seed_adapter.py |
 | 0011 | 0011/T1 | AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板 | done | — | frontend/src/pages/AgentBoard.tsx<br>frontend/src/components/AgentCard.tsx<br>frontend/src/lib/agentHealth.ts<br>frontend/src/lib/avatar.ts<br>frontend/src/main.tsx<br>frontend/src/index.css<br>frontend/src/components/AgentsPanel.tsx |
-| 0012 | 0012/T1 | 等待中主动权：心跳唤醒 + 通用控制面 + 等待衰减口径统一 | pending | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/sim/test_loop.py |
-| 0012 | 0012/T2 | 状态耐心模型：任务量起始浮动 + 性格衰减系数 | pending | — | backend/auto_designer/user/sim/state.py<br>backend/tests/user/sim/test_state.py |
+| 0012 | 0012/T1 | 等待中主动权：心跳唤醒 + 进度可见 + 等待衰减口径统一 | done | — | backend/tests/user/sim/test_loop.py |
+| 0012 | 0012/T2 | 状态耐心模型：任务量起始浮动 + 性格衰减系数 | done | — | backend/auto_designer/user/sim/state.py<br>backend/tests/user/sim/test_state.py |
 | 0013 | 0013/T1 | 拆 complete_task 信封 + 过程流分层 + begin/poll/control 心跳协议 | pending | — | backend/harness_template/entry.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/interface.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/models.py<br>backend/tests/harness/test_template_entry.py<br>backend/tests/harness/test_launcher.py |
 | 0013 | 0013/T2 | v0 种子自测 smoke + MANUAL 呈现契约 | pending | — | backend/harness_template/tests/test_smoke.py<br>backend/harness_template/MANUAL.md |
 | 0014 | 0014/T1 | CommitCheckpointMiddleware：逐级施压逼尽早落已提交增量 | pending | — | backend/auto_designer/dev/commit_checkpoint.py<br>backend/tests/dev/test_commit_checkpoint.py |
@@ -133,7 +136,6 @@
 | 0017 | 0017/T6 | tracker HTTP 会话线程安全 | done | — | backend/auto_designer/tracker/gitea.py<br>backend/tests/tracker/test_gitea.py |
 | 0018 | 0018/T1 | _run_agent 出口拆 complete_task 信封 | done | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
 | 0019 | 0019/T1 | launcher：非 reply 旁路一律收 + control 旁路/终结分流 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
-| 0019 | 0019/T2 | 用户 sim：旁路型 control 写上下文并立刻再决策 | done | T1 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_heartbeat.py |
 | 0020 | 0020/T1 | designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链 | done | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
 | 0020 | 0020/T2 | dev 领取分池 + 票种预算与重试升档 + 结果回写 comment | done | — | backend/auto_designer/dev/agentic_developer.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/tracker/test_fake.py |
 | 0020 | 0020/T3 | 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮 | done | T2 | backend/run.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_roster.py |
@@ -142,6 +144,9 @@
 | 0021 | 0021/T1 | repo_guard 模块 + orchestrator b 段绊线 | done | — | backend/auto_designer/dev/repo_guard.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/dev/test_repo_guard.py<br>backend/tests/loop/test_orchestrator.py |
 | 0021 | 0021/T2 | run.py 凭证隔离 + 构造并注入编排仓绊线 guard | done | T1 | backend/run.py<br>backend/tests/test_run_git_isolation.py |
 | 0021 | 0021/T3 | 清理历史逃逸污染制品 MANUAL.md | done | — | backend/agent_defs/developer_agent/MANUAL.md |
+| 0022 | 0022/T1 | 内外窗口 + 等待菜单 + emit_message + 开放 intent | done | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/harness/test_launcher.py |
+| 0022 | 0022/T2 | 中途 report_issue tool（可闲置）+ issue_notes flush | done | — | backend/auto_designer/user/sim/tools.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/user/sim/test_tools.py<br>backend/tests/user/sim/test_persona_client_agentic.py<br>backend/tests/loop/test_sim_user.py |
+| 0022 | 0022/T3 | 初始 harness：/exit\|/quit slash 内部分发 + MANUAL | done | — | backend/harness_template/entry.py<br>backend/harness_template/MANUAL.md<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/tests/test_smoke.py |
 
 ## 跨 feature 关系图
 
@@ -211,7 +216,7 @@ graph LR
         n0011_T1["T1 AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板"]
     end
     subgraph G0012[0012 user-wait-realism]
-        n0012_T1["T1 等待中主动权：心跳唤醒 + 通用控制面 + 等待衰减口径统一"]
+        n0012_T1["T1 等待中主动权：心跳唤醒 + 进度可见 + 等待衰减口径统一"]
         n0012_T2["T2 状态耐心模型：任务量起始浮动 + 性格衰减系数"]
     end
     subgraph G0013[0013 harness-present-protocol]
@@ -246,7 +251,6 @@ graph LR
     end
     subgraph G0019[0019 control-sideband-peek-wait]
         n0019_T1["T1 launcher：非 reply 旁路一律收 + control 旁路/终结分流"]
-        n0019_T2["T2 用户 sim：旁路型 control 写上下文并立刻再决策"]
     end
     subgraph G0020[0020 issue-covers-dispatch-budget]
         n0020_T1["T1 designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链"]
@@ -259,6 +263,11 @@ graph LR
         n0021_T1["T1 repo_guard 模块 + orchestrator b 段绊线"]
         n0021_T2["T2 run.py 凭证隔离 + 构造并注入编排仓绊线 guard"]
         n0021_T3["T3 清理历史逃逸污染制品 MANUAL.md"]
+    end
+    subgraph G0022[0022 user-harness-io-boundary]
+        n0022_T1["T1 内外窗口 + 等待菜单 + emit_message + 开放 intent"]
+        n0022_T2["T2 中途 report_issue tool（可闲置）+ issue_notes flush"]
+        n0022_T3["T3 初始 harness：/exit\|/quit slash 内部分发 + MANUAL"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -315,7 +324,6 @@ graph LR
     n0017_T3 --> n0017_T1
     n0017_T3 --> n0017_T2
     n0017_T4 --> n0017_T3
-    n0019_T2 --> n0019_T1
     n0020_T3 --> n0020_T2
     n0020_T4 --> n0020_T1
     n0020_T5 --> n0020_T4
@@ -351,6 +359,13 @@ graph LR
     n0010_T2 -.note.-> n0009_T4
     n0010_T2 -.note.-> n0009_T3
     n0011_T1 -.note.-> n0007_T4
+    n0012_T1 -.note.-> n0022_T1
+    n0019_T1 -.note.-> n0022_T1
+    n0022_T1 -.note.-> n0012_T1
+    n0022_T1 -.extends.-> n0013_T1
+    n0022_T1 -.note.-> n0019_T1
+    n0022_T2 -.extends.-> n0008_T2
+    n0022_T3 -.extends.-> n0013_T1
 ```
 
 ## 文件冲突报告
@@ -362,35 +377,40 @@ graph LR
 | backend/auto_designer/designer/designer.py | 0016, 0018, 0020 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0012, 0019 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008 |
-| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0012, 0019 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
+| backend/auto_designer/user/sim/tools.py | 0008, 0022 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
-| backend/harness_template/entry.py | 0003, 0013 |
+| backend/harness_template/MANUAL.md | 0013, 0022 |
+| backend/harness_template/entry.py | 0003, 0013, 0022 |
+| backend/harness_template/tests/test_smoke.py | 0013, 0022 |
 | backend/run.py | 0007, 0015, 0017, 0020, 0021 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020 |
-| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
+| backend/tests/loop/test_sim_user.py | 0017, 0022 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/tracker/test_fake.py | 0001, 0020 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017 |
-| backend/tests/user/sim/test_heartbeat.py | 0012, 0019 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012 |
+| backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022 |
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
+| backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017 |
 
@@ -708,7 +728,7 @@ graph LR
 
 ```mermaid
 graph LR
-    nT1["T1 等待中主动权：心跳唤醒 + 通用控制面 + 等待衰减口径统一"]
+    nT1["T1 等待中主动权：心跳唤醒 + 进度可见 + 等待衰减口径统一"]
     nT2["T2 状态耐心模型：任务量起始浮动 + 性格衰减系数"]
 ```
 
@@ -718,9 +738,9 @@ graph LR
 graph LR
     v_T1_1["T1 v1"]
     v_T2_1["T2 v1"]
-    classDef st_pending fill:#eeeeee;
-    class v_T1_1 st_pending;
-    class v_T2_1 st_pending;
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
 ```
 
 ### 0013 Harness 呈现与交互协议：拆信封 · 过程流分层 · 打断/心跳（issue #0）
@@ -860,13 +880,11 @@ graph LR
     class v_T1_1 st_done;
 ```
 
-### 0019 控制旁路放宽 + peek 后继续等待决策（issue #0）
+### 0019 launcher 非 reply 旁路放宽（progress 等）（issue #0）
 
 ```mermaid
 graph LR
     nT1["T1 launcher：非 reply 旁路一律收 + control 旁路/终结分流"]
-    nT2["T2 用户 sim：旁路型 control 写上下文并立刻再决策"]
-    nT1 --> nT2
 ```
 
 演化图：
@@ -874,10 +892,8 @@ graph LR
 ```mermaid
 graph LR
     v_T1_1["T1 v1"]
-    v_T2_1["T2 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
-    class v_T2_1 st_done;
 ```
 
 ### 0020 覆盖关系兑现 + 开发者领取策略与票种预算（issue #0）
@@ -919,6 +935,28 @@ graph LR
     nT2["T2 run.py 凭证隔离 + 构造并注入编排仓绊线 guard"]
     nT3["T3 清理历史逃逸污染制品 MANUAL.md"]
     nT1 --> nT2
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+```
+
+### 0022 用户↔harness 内外通道：开放 intent · 中途 report_issue · slash 示范（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 内外窗口 + 等待菜单 + emit_message + 开放 intent"]
+    nT2["T2 中途 report_issue tool（可闲置）+ issue_notes flush"]
+    nT3["T3 初始 harness：/exit\|/quit slash 内部分发 + MANUAL"]
 ```
 
 演化图：

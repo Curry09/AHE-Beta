@@ -413,3 +413,76 @@ def test_interrupt_control_still_ends_with_reply(tmp_path) -> None:
         assert h.in_flight is False
     finally:
         h.close()
+
+
+# in-flight 再塞 message：框架允许写入；本桩忽略第二条 message，仍跑到 interrupt 才结束。
+_MIDFLIGHT_MSG_ENTRY = """\
+import json, sys, threading, time
+busy = {"on": False}
+seen = []
+
+def work():
+    while busy["on"]:
+        sys.stdout.write(json.dumps({"progress": {"kind": "tool", "text": "working"}}) + "\\n")
+        sys.stdout.flush()
+        time.sleep(0.12)
+
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    obj = json.loads(line)
+    if obj.get("control") == "interrupt":
+        busy["on"] = False
+        time.sleep(0.05)
+        sys.stdout.write(json.dumps({"reply": "[interrupted] saw=" + ",".join(seen)}) + "\\n")
+        sys.stdout.flush()
+        continue
+    if "message" in obj:
+        seen.append(obj["message"])
+        if not busy["on"]:
+            busy["on"] = True
+            threading.Thread(target=work, daemon=True).start()
+"""
+
+
+def test_emit_message_while_inflight_does_not_clear_inflight(tmp_path) -> None:
+    h = _launcher(tmp_path, _MIDFLIGHT_MSG_ENTRY).launch("main")
+    try:
+        h.begin("first")
+        h.poll(0.2)
+        assert h.in_flight is True
+        h.emit_message("/btw still going?")
+        assert h.in_flight is True  # 内通道插话不结束本轮
+        kind, _ = h.poll(0.2)
+        assert kind == "pending"
+        assert h.control("interrupt").startswith("[interrupted]")
+        assert h.in_flight is False
+    finally:
+        h.close()
+
+
+def test_emit_message_without_inflight_raises(tmp_path) -> None:
+    h = _launcher(tmp_path, _COUNTER_ENTRY).launch("main")
+    try:
+        try:
+            h.emit_message("nope")
+            raise AssertionError("expected RuntimeError")
+        except RuntimeError as exc:
+            assert "没有进行中的 send" in str(exc)
+    finally:
+        h.close()
+
+
+def test_begin_while_inflight_still_raises(tmp_path) -> None:
+    h = _launcher(tmp_path, _MIDFLIGHT_MSG_ENTRY).launch("main")
+    try:
+        h.begin("first")
+        try:
+            h.begin("second")
+            raise AssertionError("expected RuntimeError")
+        except RuntimeError as exc:
+            assert "尚未收完" in str(exc)
+        h.control("interrupt")
+    finally:
+        h.close()

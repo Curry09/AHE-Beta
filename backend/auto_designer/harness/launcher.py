@@ -171,6 +171,17 @@ class _HarnessHandle:
         self._t0 = time.monotonic()
         self._inflight = True
 
+    def emit_message(self, message: str) -> None:
+        """in-flight 再塞一条 message（内通道）。不改变 in_flight；harness 接不接是它的事。
+
+        与 begin 不同：不开启新一轮、不清空 progress/sideband。用于等待中插话（如 /btw）。
+        """
+        if self._closed or self._proc is None:
+            raise RuntimeError("harness 句柄已关闭，不可再 send")
+        if not self._inflight:
+            raise RuntimeError("没有进行中的 send，应使用 begin/send，不可 emit_message")
+        self._write({"message": message})
+
     def _ingest_sideband(self, payload: dict) -> None:
         """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
         self.last_sideband.append(payload)
@@ -234,12 +245,13 @@ class _HarnessHandle:
             continue
 
     def control(self, name: str) -> str:
-        """向 harness 发一条控制（name 不透明）并返回它对此的可见响应。
+        """外通道：向 harness 发控制（用户侧主路径是 interrupt ≈ Ctrl+C）。
 
-        必须在某轮 send 进行中（begin 后、reply 前）。两种合法形状：
-        - 终结型（如 interrupt）：最终吐 reply，本轮结束，返回 reply 文本；
-        - 旁路型（如 status/peek）：吐非纯 progress 的旁路（如 status），本轮继续，返回该旁路预览。
-        发 control 后仍可能夹杂工具 progress——那些不算对本控制的应答，继续等。"""
+        必须在某轮 send 进行中（begin 后、reply 前）。
+        - interrupt（及同类终结型）：最终吐 reply，本轮结束，返回 reply 文本。
+        - 若 harness 仍对其它名吐旁路 ack：本轮继续，返回旁路预览（兼容旧 wire；用户 sim 不再经此发 peek/status——那些属内通道 message）。
+        发 control 后仍可能夹杂工具 progress——那些不算对本控制的应答，继续等。
+        """
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可发控制消息")
         if not self._inflight:
