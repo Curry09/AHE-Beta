@@ -205,11 +205,7 @@ class MatrixHarness:
     def emit_message(self, message: str) -> None:
         self.emitted.append(message)
         if self._scenario.status_slash and message.strip().startswith("/status"):
-            preview = (
-                self.last_progress[-1]["text"]
-                if self.last_progress
-                else "(no activity yet)"
-            )
+            preview = self.last_progress[-1]["text"] if self.last_progress else "(no activity yet)"
             self.last_progress = [
                 *self.last_progress,
                 {"kind": "status", "text": f"status: still running; last={preview}"},
@@ -311,11 +307,7 @@ def _run_one(persona, scenario: Scenario) -> Row:
         feeling=(
             f"{res.feeling.score}/4 {res.feeling.reason[:80]}"
             if res.feeling
-            else (
-                f"derived:{res.feeling_derived.score}"
-                if res.feeling_derived
-                else ""
-            )
+            else (f"derived:{res.feeling_derived.score}" if res.feeling_derived else "")
         ),
         n_gap=sum(1 for s in res.signals if s.startswith("WAIT_GAP:")),
         n_send_status=sum(1 for m in harness.emitted if m.strip().startswith("/status")),
@@ -382,7 +374,7 @@ def _print_summary(rows: list[Row], persona_meta: dict[str, str]) -> None:
         statuses = {r.persona_id: r.n_send_status for r in rs}
         ints = {r.persona_id: r.n_interrupt for r in rs}
         keeps = {r.persona_id: r.n_keep for r in rs}
-        print(f"  {sid}: status={peeks} interrupt={ints} keep={keeps}")
+        print(f"  {sid}: status={statuses} interrupt={ints} keep={keeps}")
 
 
 def main() -> int:
@@ -415,8 +407,7 @@ def main() -> int:
         p = card_to_persona(card)
         personas.append(p)
         persona_meta[p.persona_id] = (
-            f"d1={p.d1.value} d42={p.d42.value} d43={p.d43.value} "
-            f"trust={p.trust.value}"
+            f"d1={p.d1.value} d42={p.d42.value} d43={p.d43.value} trust={p.trust.value}"
         )
     if not personas:
         raise SystemExit(f"persona 库中未命中: {sorted(want_p)}")
