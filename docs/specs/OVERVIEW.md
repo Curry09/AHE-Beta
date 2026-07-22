@@ -76,6 +76,9 @@
 ### 0024 用户 god-view 落盘 + 设计师按需取用
 Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 issue_numbers；设计师经 get_session_timeline(issue\|session_id) 按需取落盘原样 JSON；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。脱敏加工与废弃 runtime_agg 另议。
 
+### 0025 issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev
+把 issue 流建成真实软件团队的 triage 漏斗，并把现有单一 designer 拆成两个 agent。用户 sim 产出 raw issue（用户端模板填用户可见字段、按 type 标签、needs-triage、盖轮号）；triage agent 就地分类(确认 type)+定位(读 harness 代码 + get_session_timeline 轨迹)+去重+驳回/needs-info；synthesize agent（原 designer 收窄）只做跨 issue 结构综合、产 RFC（独立标签，凌驾 type，consolidate/supersede 局部 issue、最高 dev 预算）。dev 每轮按容量(N dev)顺序领 triaged issue + RFC，未清空的积压到下一轮（backlog = 上轮 carryover + 本轮新 triaged）。预算按 kind 分档、去 0020 分池/retry/stuck。产品/方向层 = distill persona/seed 卡库（人经 CLI，⓪ 层，不设 agent）；PM 职能 = 优先级由体感+频率机制派生。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -160,6 +163,14 @@ Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 iss
 | 0024 | 0024/T1 | Session.sim_trace 落盘（TurnLog→SimTrace） | done | — | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_models.py<br>backend/tests/loop/test_sim_user.py |
 | 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py<br>backend/tests/user/test_session_store.py |
 | 0024 | 0024/T3 | get_session_timeline tool（落盘原样） | done | T2 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/designer/test_session_timeline.py |
+| 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | pending | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
+| 0025 | 0025/T2 | 用户 sim 产结构化 raw issue：persona 填用户端字段 + type 标签 + needs-triage + 轮号 | pending | T1 | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
+| 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | pending | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
+| 0025 | 0025/T4 | synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC | pending | T3 | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
+| 0025 | 0025/T5 | dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck | pending | T4 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
+| 0025 | 0025/T6 | 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster | pending | T5 | backend/run.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
+| 0025 | 0025/T7 | web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压) | pending | T4 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
+| 0025 | 0025/T8 | 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示 | pending | T7 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/types.ts<br>frontend/src/api.ts |
 
 ## 跨 feature 关系图
 
@@ -293,6 +304,16 @@ graph LR
         n0024_T2["T2 index 扩 issue_numbers + 体感曲线带 session_id"]
         n0024_T3["T3 get_session_timeline tool（落盘原样）"]
     end
+    subgraph G0025[0025 issue-triage-funnel]
+        n0025_T1["T1 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render"]
+        n0025_T2["T2 用户 sim 产结构化 raw issue：persona 填用户端字段 + type 标签 + needs-triage + 轮号"]
+        n0025_T3["T3 triage agent（新角色）：就地分类+定位+去重+驳回/needs-info"]
+        n0025_T4["T4 synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC"]
+        n0025_T5["T5 dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck"]
+        n0025_T6["T6 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster"]
+        n0025_T7["T7 web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压)"]
+        n0025_T8["T8 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -356,6 +377,14 @@ graph LR
     n0023_T3 --> n0023_T1
     n0024_T2 --> n0024_T1
     n0024_T3 --> n0024_T2
+    n0025_T2 --> n0025_T1
+    n0025_T3 --> n0025_T1
+    n0025_T3 --> n0025_T2
+    n0025_T4 --> n0025_T3
+    n0025_T5 --> n0025_T4
+    n0025_T6 --> n0025_T5
+    n0025_T7 --> n0025_T4
+    n0025_T8 --> n0025_T7
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -410,13 +439,15 @@ graph LR
 | backend/agent_defs/designer/systemprompt.md | 0016, 0024 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024 |
-| backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025 |
+| backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021 |
+| backend/auto_designer/loop/metrics.py | 0003, 0025 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025 |
+| backend/auto_designer/loop/roster.py | 0020, 0025 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017 |
@@ -429,17 +460,20 @@ graph LR
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
+| backend/auto_designer/web/api.py | 0020, 0025 |
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/entry.py | 0003, 0013, 0022 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
-| backend/tests/dev/test_agentic_developer.py | 0007, 0020 |
+| backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025 |
+| backend/tests/loop/test_metrics.py | 0003, 0025 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025 |
+| backend/tests/loop/test_roster.py | 0020, 0025 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
-| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024 |
+| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/tracker/test_fake.py | 0001, 0020 |
@@ -452,6 +486,11 @@ graph LR
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
+| backend/tests/web/test_api.py | 0020, 0025 |
+| frontend/src/api.ts | 0020, 0025 |
+| frontend/src/components/SidePanel.tsx | 0020, 0025 |
+| frontend/src/components/detail/IssueDetail.tsx | 0020, 0025 |
+| frontend/src/types.ts | 0020, 0025 |
 
 ## 各 feature 详情
 
@@ -1060,4 +1099,49 @@ graph LR
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
+```
+
+### 0025 issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render"]
+    nT2["T2 用户 sim 产结构化 raw issue：persona 填用户端字段 + type 标签 + needs-triage + 轮号"]
+    nT3["T3 triage agent（新角色）：就地分类+定位+去重+驳回/needs-info"]
+    nT4["T4 synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC"]
+    nT5["T5 dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck"]
+    nT6["T6 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster"]
+    nT7["T7 web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压)"]
+    nT8["T8 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT3 --> nT4
+    nT4 --> nT5
+    nT5 --> nT6
+    nT4 --> nT7
+    nT7 --> nT8
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    v_T7_1["T7 v1"]
+    v_T8_1["T8 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_pending;
+    class v_T7_1 st_pending;
+    class v_T8_1 st_pending;
 ```
