@@ -224,9 +224,7 @@ def test_three_mode_keep_waiting_logs_and_calls() -> None:
         intents=[{"intent": "give it more time"}],
         verdict="satisfied",
     )
-    res = run_session(
-        _persona(), client, harness, TASK, manual=harness.manual
-    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert len(waiting) == 1
     assert waiting[0].action == "keep_waiting"
@@ -363,9 +361,7 @@ def test_reply_ready_after_heartbeat_aborts_give_up() -> None:
         intents=[{"intent": "walk away"}],
         verdict="satisfied",
     )
-    res = run_session(
-        _persona(), client, harness, TASK, manual=harness.manual
-    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
     assert res.end_reason == "accepted"  # 未 abandon
     assert harness.controls == []
     assert harness.emitted == []
@@ -388,14 +384,14 @@ def test_reply_ready_after_heartbeat_aborts_interrupt() -> None:
         intents=[{"intent": "Ctrl+C"}],
         verdict="satisfied",
     )
-    res = run_session(
-        _persona(), client, harness, TASK, manual=harness.manual
-    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
     assert harness.controls == []  # 未真正 interrupt
     assert any(
         t.phase != "waiting" and t.harness_output == "done without interrupt" for t in res.turns
     )
-    assert any("waiting decision aborted before acting (interrupt)" in p for p in client.all_prompts)
+    assert any(
+        "waiting decision aborted before acting (interrupt)" in p for p in client.all_prompts
+    )
 
 
 def test_keep_waiting_is_one_shot_reply_wakes_main() -> None:
@@ -414,9 +410,7 @@ def test_keep_waiting_is_one_shot_reply_wakes_main() -> None:
         intents=[{"intent": "give it more time"}, {"intent": "stop"}],
         verdict="satisfied",
     )
-    res = run_session(
-        _persona(), client, harness, TASK, manual=harness.manual
-    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert len(waiting) == 1
     assert waiting[0].action == "keep_waiting"
@@ -436,9 +430,7 @@ def test_keep_waiting_decay_follows_persona_coef() -> None:
             acts=[{"action": "keep_waiting", "gap": False}],
             verdict="satisfied",
         )
-        res = run_session(
-            _persona(d43=d43), client, harness, TASK, manual=harness.manual
-        )
+        res = run_session(_persona(d43=d43), client, harness, TASK, manual=harness.manual)
         wt = [t for t in res.turns if t.phase == "waiting"]
         assert len(wt) == 1
         return wt[0].patience
@@ -456,9 +448,7 @@ def test_interrupt_routes_and_attribution() -> None:
         intents=[{"intent": "Ctrl+C stop this"}],
         verdict="stuck",
     )
-    res = run_session(
-        _persona(), client, harness, TASK, manual=harness.manual
-    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
     assert harness.controls == ["interrupt"]
     assert harness.emitted == []
     assert any("[interrupted]" in t.harness_output for t in res.turns if t.harness_output)
@@ -477,9 +467,7 @@ def test_give_up_during_wait_abandons_with_issue() -> None:
         intents=[{"intent": "walk away from this"}],
         verdict="stuck",
     )
-    res = run_session(
-        _persona(), client, harness, TASK, manual=harness.manual
-    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
     assert res.end_reason == "abandoned"
     assert res.issue_artifact is not None
     assert any(t.phase == "waiting" and t.action == "give_up" for t in res.turns)
@@ -492,9 +480,7 @@ def test_pathological_keep_waiting_is_bounded() -> None:
         acts=[{"action": "keep_waiting", "gap": False}],
         verdict="stuck",
     )
-    res = run_session(
-        _persona(), client, harness, TASK, manual=harness.manual
-    )
+    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
     assert res.end_reason == "abandoned"
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert 0 < len(waiting) <= _MAX_HEARTBEATS
