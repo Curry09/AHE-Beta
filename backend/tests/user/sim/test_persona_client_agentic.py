@@ -279,21 +279,28 @@ def test_run_session_collects_mid_session_issue_notes() -> None:
     persona = _persona(D1Eval.COMPETENT)
     llm = FakeToolLLM(
         [
-            # OPENING：先记一笔再发任务
+            # OPENING · judge：先记一笔再给现状
             json.dumps({"tool": "report_issue", "args": {"body": "docs are wrong about /status"}}),
             json.dumps(
                 {
                     "perceive": "filed a note, still starting",
                     "verdict": "unsure",
-                    "action": "send_task",
-                    "message": "please implement X",
                     "task_load": "normal",
                 }
             ),
-            # 下一轮接受
+            # OPENING · intent / act
+            json.dumps({"intent": "start the task"}),
             json.dumps(
-                {"perceive": "done", "verdict": "satisfied", "action": "accept", "message": "ok"}
+                {
+                    "action": "send_task",
+                    "message": "please implement X",
+                    "gap": False,
+                }
             ),
+            # 下一轮 · judge / intent / act → 接受
+            json.dumps({"perceive": "done", "verdict": "satisfied"}),
+            json.dumps({"intent": "accept and move on"}),
+            json.dumps({"action": "accept", "message": "ok", "gap": False}),
         ]
     )
     c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox(workspace))

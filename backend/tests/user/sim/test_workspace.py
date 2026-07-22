@@ -106,7 +106,25 @@ class _RecordingClient:
     def respond(self, system: str, user: str) -> dict:
         if "<rate_experience>" in user:
             return {"score": 4, "reason": "great"}
-        return {"perceive": "", "verdict": "satisfied", "action": "accept", "message": "ok"}
+        if "<file_issue>" in user:
+            return {"issue": "n/a"}
+        if "<main_judge>" in user or "<main_judge_intent>" in user:
+            return {
+                "perceive": "",
+                "verdict": "satisfied",
+                "intent": "accept",
+                "task_load": "normal",
+            }
+        if "<main_intent>" in user:
+            return {"intent": "accept and move on"}
+        return {
+            "perceive": "",
+            "verdict": "satisfied",
+            "intent": "accept",
+            "action": "accept",
+            "message": "ok",
+            "gap": False,
+        }
 
 
 def _make_fn(client, tmp_path, sp, mp):
@@ -147,7 +165,22 @@ def test_bridge_no_error_when_client_lacks_bind(tmp_path) -> None:
         def respond(self, system: str, user: str) -> dict:
             if "<rate_experience>" in user:
                 return {"score": 4, "reason": "ok"}
-            return {"perceive": "", "verdict": "satisfied", "action": "accept", "message": "ok"}
+            if "<main_judge>" in user or "<main_judge_intent>" in user:
+                return {
+                    "perceive": "",
+                    "verdict": "satisfied",
+                    "intent": "accept",
+                    "task_load": "normal",
+                }
+            if "<main_intent>" in user:
+                return {"intent": "accept"}
+            return {
+                "perceive": "",
+                "verdict": "satisfied",
+                "action": "accept",
+                "message": "ok",
+                "gap": False,
+            }
 
     fn = _make_fn(_Plain(), tmp_path, sp, mp)
     scenario = SeedScenario(description="task", workspace=WorkspaceSpec(fixture="billing-split"))

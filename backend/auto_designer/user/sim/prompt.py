@@ -37,8 +37,9 @@ G3  Prefer an action id from this turn's <action_space>. If none fits what this
     will classify it. Never invent new ids.
 G4  Judge by the persona's ACCEPTANCE bar, not by objective correctness.
     "Good enough for me" ends the task even if it is objectively wrong.
-G5  Stay consistent with <history>. A runtime <mood> tag reports your current
-    felt patience/trust — honor it, do not invent your own emotional state.
+G5  Stay consistent with <history>. Lines are time-ordered with a session-relative
+    `[+Ns]` prefix (seconds since the session started). A runtime <mood> tag reports
+    your current felt patience/trust — honor it, do not invent your own emotional state.
 G6  NEVER claim the outcome of running, installing, or inspecting anything you did
     not ACTUALLY do. You have not "run the tests", "checked the files", or found
     "pip missing" unless a real tool result (INNER TOOL USE) or a harness reply
@@ -67,8 +68,8 @@ G8  This tool's user manual is given in <harness_manual>. Your sense of what THI
     in the moment and/or make it part of an issue you file. Do NOT invent a complaint;
     only raise a gap you actually hit in THIS session. Whatever you ask for must be YOUR
     own idea drawn from your experience this session — never parrot suggestions from these
-    instructions. A <wait_cost> block, when present, reports how long you waited — react
-    to it as this specific person truly would.
+    instructions. Read `[+Ns]` timestamps in <history> for how long things have been
+    taking — react to elapsed time as this specific person truly would.
 
 # ACTION SEMANTICS
 - verify_self: a PRIVATE action. You inspect/run on your OWN; the harness hears
@@ -176,18 +177,6 @@ def _mood_tag(state: State) -> str:
     return f"patience={p}, trust={state.trust.value}"
 
 
-def _wait_block(wait_sec: float | None) -> str | None:
-    """时间感知：把"这条回复我等了多久、且全程零可见性"如实告诉 persona，由它自判是否难受。
-    框架不设硬阈值裁决——耗时只 surfacing，是否算太久由 persona 结合 <mood> 与其性格决定。"""
-    if wait_sec is None:
-        return None
-    return (
-        f"<wait_cost>\nThat reply took {wait_sec:.0f}s to come back, and you saw nothing at all "
-        "until it did. Judge for yourself whether that was acceptable for this person.\n"
-        "</wait_cost>"
-    )
-
-
 # 开局一轮附加：让 persona 自己给这任务估个“分量”，框架据此在耐心基线上叠加一次性小浮动。
 # 只在 OPENING 追加（其余轮忽略该字段）——同一个人接不同任务的起始耐心本就不同（见 state.apply_task_load）。
 _TASK_APPRAISAL = (
@@ -205,7 +194,7 @@ _TASK_APPRAISAL = (
 )
 
 
-def build_user_turn(
+def _main_context_parts(
     task: str,
     history_lines: list[str],
     harness_output: str,
@@ -213,26 +202,130 @@ def build_user_turn(
     state: State,
     *,
     manual: str = "",
-    wait_sec: float | None = None,
-    appraise_task: bool = False,
-) -> str:
+) -> list[str]:
+    """主 decide 共用上下文（不含分步输出契约）。等待时长只靠 <history> 的 [+Ns]。"""
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     ho = harness_output.strip() if harness_output else "(empty)"
-    parts = [f"<task>\n{task}\n</task>"]
+    parts: list[str] = []
+    parts.append(f"<task>\n{task}\n</task>")
     if manual.strip():
-        # 该版本 harness 的用户手册：persona 对"这工具能干嘛/缺什么"的预期以此为准（见 BLOCK-G）。
         parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
     parts.append(f"<history>\n{hist}\n</history>")
     parts.append(f"<harness_output>\n{ho}\n</harness_output>")
-    wait = _wait_block(wait_sec)
-    if wait is not None:
-        parts.append(wait)
     if state.pending_self_obs:
         parts.append(f"<self_observation>\n{state.pending_self_obs}\n</self_observation>")
     parts.append(f"<action_space>\n{action_space}\n</action_space>")
     parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
+    return parts
+
+
+def build_main_judge_turn(
+    task: str,
+    history_lines: list[str],
+    harness_output: str,
+    action_space: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    appraise_task: bool = False,
+) -> str:
+    """主 loop · Judge：只评现状（perceive + verdict）；意愿留给 intent。"""
+    parts = ["<main_judge>"]
+    parts.extend(
+        _main_context_parts(
+            task,
+            history_lines,
+            harness_output,
+            action_space,
+            state,
+            manual=manual,
+        )
+    )
+    parts.append(
+        "# JUDGE — how things stand NOW (not what you will do next)\n"
+        "Be honest about the limits of your perception (G1). "
+        "Use verdict labels as in the system contract: "
+        "satisfied / failed_blame_harness / failed_blame_self / unsure / stuck.\n"
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"perceive": "<what you actually understood>", '
+        '"verdict": "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck"}'
+    )
     if appraise_task:
         parts.append(_TASK_APPRAISAL)
+    parts.append("</main_judge>")
+    return "\n\n".join(parts)
+
+
+def build_main_intent_turn(
+    task: str,
+    history_lines: list[str],
+    harness_output: str,
+    action_space: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    verdict: str,
+    perceive: str = "",
+) -> str:
+    """主 loop · Intent：开放意愿（可超菜单）。"""
+    parts = ["<main_intent>"]
+    parts.extend(
+        _main_context_parts(
+            task,
+            history_lines,
+            harness_output,
+            action_space,
+            state,
+            manual=manual,
+        )
+    )
+    parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
+    parts.append(_intent_options_block())
+    parts.append(
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"intent": "<free text: what you WANT next>"}'
+    )
+    parts.append("</main_intent>")
+    return "\n\n".join(parts)
+
+
+def build_main_act_turn(
+    task: str,
+    history_lines: list[str],
+    harness_output: str,
+    action_space: list[str],
+    state: State,
+    *,
+    manual: str = "",
+    verdict: str,
+    perceive: str = "",
+    intent: str,
+) -> str:
+    """主 loop · Act：把开放 intent 收敛到 action_space；兑不了就兜底并 gap=true。"""
+    parts = ["<main_act>"]
+    parts.extend(
+        _main_context_parts(
+            task,
+            history_lines,
+            harness_output,
+            action_space,
+            state,
+            manual=manual,
+        )
+    )
+    parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
+    parts.append(f"<intent>\n{intent.strip() or '(none)'}\n</intent>")
+    parts.append(
+        "# MENU — only ids in <action_space> exist right now\n"
+        'Map <intent> to the closest id (or action:"free" + message if none fit — '
+        "the framework will classify). If the chosen id is only a fallback that does NOT "
+        "really satisfy intent, set gap=true; otherwise gap=false. Honor <mood> and G7.\n"
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"action": "<id from <action_space>, or free>", '
+        '"message": "<exact line to the harness; empty for verify_self>", '
+        '"gap": <true if fallback; else false>}'
+    )
+    parts.append("</main_act>")
     return "\n\n".join(parts)
 
 
@@ -376,49 +469,6 @@ def build_waiting_intent_turn(
         '{"intent": "<free-text wish in your voice — what you want right now>"}'
     )
     parts.append("</waiting_intent>")
-    return "\n\n".join(parts)
-
-
-def build_waiting_judge_intent_turn(
-    task: str,
-    history_lines: list[str],
-    state: State,
-    *,
-    manual: str = "",
-    waited_sec: float = 0.0,
-    progress: list | None = None,
-    prior_activity: list | None = None,
-) -> str:
-    """2 跳模式·第 1 跳：过程判断 + 真实意愿合一（仍不选菜单动作）。"""
-    parts = ["<waiting_judge_intent>"]
-    parts.extend(
-        _waiting_context_parts(
-            task,
-            history_lines,
-            state,
-            manual=manual,
-            waited_sec=waited_sec,
-            progress=progress,
-            prior_activity=prior_activity,
-        )
-    )
-    parts.append(
-        "# JUDGE + INTENT — still no menu action\n"
-        "1) judgment (content only):\n"
-        "- on_track: right kind of work for YOUR task.\n"
-        "- off_track: wrong kind of work, wandering, or something you would not want.\n"
-        "- unclear: not enough signal.\n"
-        "2) intent: honest free-text wish (may not exist as a button).\n"
-        "Do NOT invent a finished answer."
-    )
-    parts.append(_intent_options_block())
-    parts.append(
-        "Return EXACTLY ONE JSON object and nothing else:\n"
-        '{"perceive": "<what you notice>", '
-        '"judgment": "on_track | off_track | unclear", '
-        '"intent": "<free-text wish in your voice>"}'
-    )
-    parts.append("</waiting_judge_intent>")
     return "\n\n".join(parts)
 
 

@@ -1,4 +1,4 @@
-"""spec-0005/T3：提示装配 + 离线 ScriptedPersonaClient + 容错解析。"""
+"""主/等待 three 跳 prompt 契约 + 离线 ScriptedPersonaClient + 容错解析。"""
 
 from __future__ import annotations
 
@@ -14,7 +14,16 @@ from auto_designer.user.sim.dimensions import (
     finalize_persona,
 )
 from auto_designer.user.sim.persona_client import ScriptedPersonaClient, _parse_json
-from auto_designer.user.sim.prompt import build_rating_turn, build_system, build_user_turn
+from auto_designer.user.sim.prompt import (
+    build_main_act_turn,
+    build_main_intent_turn,
+    build_main_judge_turn,
+    build_rating_turn,
+    build_system,
+    build_waiting_act_turn,
+    build_waiting_intent_turn,
+    build_waiting_judge_turn,
+)
 from auto_designer.user.sim.state import State, init_state
 
 
@@ -39,43 +48,80 @@ def test_build_system_prefix_is_stable() -> None:
     assert a.startswith("# ROLE")
 
 
-def test_build_user_turn_has_sections() -> None:
+def test_main_three_builders_have_sections() -> None:
     p = _persona()
     state = init_state(p)
     state.pending_self_obs = "I ran it; no error."
-    user = build_user_turn("do X", ["[t0] you -> harness: hi"], "some output", ["accept"], state)
-    for tag in (
-        "<task>",
-        "<history>",
-        "<harness_output>",
-        "<action_space>",
-        "<mood>",
-        "<self_observation>",
-    ):
-        assert tag in user
+    hist = ["[+0s] you -> harness: hi"]
+    judge = build_main_judge_turn("do X", hist, "some output", ["accept"], state)
+    intent = build_main_intent_turn(
+        "do X", hist, "some output", ["accept"], state, verdict="unsure", perceive="notes"
+    )
+    act = build_main_act_turn(
+        "do X",
+        hist,
+        "some output",
+        ["accept"],
+        state,
+        verdict="unsure",
+        perceive="notes",
+        intent="accept if good",
+    )
+    for user in (judge, intent, act):
+        for tag in (
+            "<task>",
+            "<history>",
+            "<harness_output>",
+            "<action_space>",
+            "<mood>",
+            "<self_observation>",
+        ):
+            assert tag in user
+        assert "<wait_cost>" not in user
+    assert "<main_judge>" in judge
+    assert "<main_intent>" in intent
+    assert "<main_act>" in act and '"gap"' in act
 
 
-def test_build_user_turn_injects_manual_and_wait_cost() -> None:
+def test_main_judge_injects_manual() -> None:
     p = _persona()
     state = init_state(p)
-    user = build_user_turn(
+    user = build_main_judge_turn(
         "do X",
         [],
         "out",
         ["accept"],
         state,
         manual="# Manual\nno live progress; no /btw.",
-        wait_sec=372.0,
     )
     assert "<harness_manual>" in user and "no live progress" in user
-    assert "<wait_cost>" in user and "372s" in user
 
 
-def test_build_user_turn_omits_manual_and_wait_when_absent() -> None:
+def test_main_judge_omits_manual_when_absent() -> None:
     p = _persona()
-    user = build_user_turn("do X", [], "out", ["accept"], init_state(p))  # 默认无手册/无耗时
+    user = build_main_judge_turn("do X", [], "out", ["accept"], init_state(p))
     assert "<harness_manual>" not in user
-    assert "<wait_cost>" not in user
+
+
+def test_waiting_three_builders_tags() -> None:
+    state = init_state(_persona())
+    judge = build_waiting_judge_turn("t", [], state, waited_sec=90.0)
+    intent = build_waiting_intent_turn(
+        "t", [], state, waited_sec=90.0, judgment="on_track", perceive="ok"
+    )
+    act = build_waiting_act_turn(
+        "t",
+        [],
+        state,
+        waited_sec=90.0,
+        judgment="on_track",
+        perceive="ok",
+        intent="keep waiting",
+    )
+    assert "<waiting_judge>" in judge
+    assert "<waiting_intent>" in intent
+    assert "<waiting_act>" in act and "gap" in act
+    assert "<wait_cost>" not in judge + intent + act
 
 
 def test_build_rating_turn_contract() -> None:
@@ -86,8 +132,18 @@ def test_build_rating_turn_contract() -> None:
 
 def test_scripted_client_opening_sends_task() -> None:
     p = _persona()
+    state = init_state(p)
     ret = ScriptedPersonaClient().respond(
-        build_system(p), build_user_turn("t", [], "", ["send_task"], init_state(p))
+        build_system(p),
+        build_main_act_turn(
+            "t",
+            [],
+            "",
+            ["send_task"],
+            state,
+            verdict="unsure",
+            intent="start",
+        ),
     )
     assert ret["action"] == "send_task"
 
@@ -102,7 +158,15 @@ def test_scripted_client_rate_experience_returns_score() -> None:
 def test_scripted_client_exhausted_files_issue() -> None:
     p = _persona(d43=D43Correct.FILE_ISSUE)
     exhausted = State(turn=5, patience=0, trust=p.trust)
-    user = build_user_turn("t", ["prev"], "Works now.", ["accept", "file_issue"], exhausted)
+    user = build_main_act_turn(
+        "t",
+        ["prev"],
+        "Works now.",
+        ["accept", "file_issue"],
+        exhausted,
+        verdict="failed_blame_harness",
+        intent="file an issue",
+    )
     ret = ScriptedPersonaClient().respond(build_system(p), user)
     assert ret["action"] == "file_issue"
 
@@ -111,15 +175,23 @@ def test_scripted_client_capability_fork() -> None:
     state_full = init_state(_persona())
     ho = "$ ran it: 2024-07-01 09:00:00+08:00 (no error)\nWorks now."
     space = ["accept", "request_evidence", "give_feedback"]
-    expert = ScriptedPersonaClient().respond(
-        build_system(_persona(d1=D1Eval.EXPERT)), build_user_turn("t", ["p"], ho, space, state_full)
-    )
-    shallow = ScriptedPersonaClient().respond(
-        build_system(_persona(d1=D1Eval.SHALLOW)),
-        build_user_turn("t", ["p"], ho, space, state_full),
-    )
-    assert expert["action"] != "accept"  # 专家不轻易接受
-    assert shallow["action"] == "accept"  # 浅层能跑即接受
+
+    def _act(d1: D1Eval) -> dict:
+        return ScriptedPersonaClient().respond(
+            build_system(_persona(d1=d1)),
+            build_main_act_turn(
+                "t",
+                ["p"],
+                ho,
+                space,
+                state_full,
+                verdict="unsure",
+                intent="decide next",
+            ),
+        )
+
+    assert _act(D1Eval.EXPERT)["action"] != "accept"  # 专家不轻易接受
+    assert _act(D1Eval.SHALLOW)["action"] == "accept"  # 浅层能跑即接受
 
 
 def test_parse_json_tolerant() -> None:

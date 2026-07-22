@@ -120,13 +120,13 @@ def main() -> int:
     # —— 按最近探针结果种两局会话（WAIT_GAP 不落盘，写进 feeling.reason + issue body）——
     expert_gaps = (
         "WAIT_GAP: intent=check_status action=keep_waiting (×2); "
-        "WAIT_GAP: intent=check_status action=invoke_control:interrupt (×3). "
-        "User wanted status/peek while work looked on-track; menu only wait/interrupt."
+        "WAIT_GAP: intent=send /status action=send_message (×1). "
+        "User wanted a status peek via message while work looked on-track."
     )
     blind_gaps = (
         "WAIT_GAP: intent=check_status action=keep_waiting (×7); "
         "later interrupt only after repeated 'done' without stdout. "
-        "Blind persona waited through on-track activity; gap still = missing status."
+        "Blind persona waited through on-track activity; gap still = missing /status path."
     )
 
     store.save(
@@ -247,7 +247,7 @@ def main() -> int:
             body=(
                 "Task: tiny billing-only split_bill + smoke test.\n"
                 "While tools looked on-track (read billing/core.py, import smoke, pytest), "
-                "I repeatedly wanted to peek/check status. The menu only offered keep_waiting "
+                "I repeatedly wanted /status while waiting. Sometimes I could only keep_waiting "
                 "or interrupt — so I interrupted and got no final deliverable.\n"
                 f"Signals: {expert_gaps}\n"
                 "Feeling 1/4: stalling; I had to interrupt myself.\n"

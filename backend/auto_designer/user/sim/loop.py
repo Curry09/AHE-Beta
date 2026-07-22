@@ -32,12 +32,13 @@ from .persona_client import PersonaClient, drain_call_traces
 from .prompt import (
     WAITING_JUDGMENTS,
     build_issue_turn,
+    build_main_act_turn,
+    build_main_intent_turn,
+    build_main_judge_turn,
     build_rating_turn,
     build_system,
-    build_user_turn,
     build_waiting_act_turn,
     build_waiting_intent_turn,
-    build_waiting_judge_intent_turn,
     build_waiting_judge_turn,
 )
 from .state import (
@@ -93,10 +94,7 @@ class SessionResult:
 
 MAX_TURNS = 12
 
-# 时间感知（用户视角的墙钟预算，全局固定，可调）：一次 harness 回合等待多久算"难受"。
-# EXTREME 之外只把耗时如实 surfacing 给模型自判（见 build_user_turn）；到 EXTREME 才额外给一点
-# 自动耗心（干等太久的挫败会累积，防"再好的 persona 也无限干等"）。默认对齐 harness 自身 ~240s 硬超时。
-_TURN_WAIT_BUDGET_SEC = 240.0
+# 阻塞 send 路径：墙钟超过此值额外耗一点耐心（防无限干等）。心跳路径用 history [+Ns] + 有条件耗心。
 _EXTREME_WAIT_SEC = 480.0
 
 # 框架自有的 harness 失败哨兵前缀：route 在 harness.send() 崩溃/超时时回填此串（见下），原样喂给
@@ -104,15 +102,15 @@ _EXTREME_WAIT_SEC = 480.0
 # （prompt G6 + 终止时机条主导）；框架只负责把失败如实surfacing，不炸整局、也不替模型下结论。
 HARNESS_ERROR_PREFIX = "[harness error] "
 
-# 心跳（用户等待中的主动权）：一次 send 阻塞超过该秒数仍无回复，就唤醒用户 agent 做一次"等待决策"
-# （继续等 / 再塞 message / Ctrl+C 打断 / 放弃）。这把"计时"从事后感知升级为等待中途可介入。
+# 事件等待（用户等待中的主动权）：
+#   AwaitEvent = poll 直到 harness reply（唤醒主 loop）或到心跳阈值（一次性等待决策）。
+#   心跳是一次性动作（含 keep_waiting）——做完即结束，回到 AwaitEvent；不为「认领上一笔 send」
+#   在心跳里继续 poll。用户不知道下一笔 reply 属于哪一轮；真相只在 reply 到达主 decide 后看见。
 _HEARTBEAT_SEC = 90.0
-# 心跳唤醒次数硬上限（兜底防病态：模型一直"继续等"而 harness 永不回）。到顶即强制放弃；正常情况下
-# 会先被 harness 自身单轮上界（~16min → [harness error]）或耐心耗尽终结。
+# 心跳唤醒次数硬上限（兜底防病态：模型一直 keep_waiting 而 harness 永不回）。到顶即强制放弃。
 _MAX_HEARTBEATS = 8
-# 等待菜单：内 = send_message；外 = interrupt（Ctrl+C）+ give_up；keep_waiting 为续等。
+# 等待菜单：内 = send_message；外 = interrupt（Ctrl+C）+ give_up；keep_waiting = 决定继续等。
 WAITING_ACTIONS = ["keep_waiting", "send_message", "interrupt", "give_up"]
-# 等待决策：waiting_mode "two" | "three"（见 _supervise_send / run_session）。
 
 
 def _supports_heartbeat(harness) -> bool:
@@ -130,6 +128,14 @@ def _take_persona_calls(client: PersonaClient, role: str) -> list[dict]:
     return out
 
 
+def _resolve_gap(ret: dict) -> bool:
+    """act 自报 gap；非法缺省 → False。"""
+    gap_raw = ret.get("gap")
+    return gap_raw is True or (
+        isinstance(gap_raw, str) and gap_raw.strip().lower() in ("true", "1", "yes")
+    )
+
+
 def _resolve_waiting(ret: dict) -> tuple[str, str, bool]:
     """把心跳唤醒的自由产出归到 WAITING_ACTIONS + message + gap。
 
@@ -145,19 +151,12 @@ def _resolve_waiting(ret: dict) -> tuple[str, str, bool]:
         action = "keep_waiting"
     if action != "send_message":
         message = ""
-    gap_raw = ret.get("gap")
-    gap = gap_raw is True or (
-        isinstance(gap_raw, str) and gap_raw.strip().lower() in ("true", "1", "yes")
-    )
-    return action, message, gap
+    return action, message, _resolve_gap(ret)
 
 
 def _resolve_judgment(ret: dict) -> str:
     """心跳判断轮：归到 WAITING_JUDGMENTS；非法/缺省 → unclear（安全偏向续等侧，由动作轮再决）。"""
     raw = str(ret.get("judgment", "")).strip().lower().replace("-", "_")
-    # 旧标签 stalled 并入 unclear（内容不够判废时不硬贴卡住）。
-    if raw == "stalled":
-        return "unclear"
     if raw in WAITING_JUDGMENTS:
         return raw
     return "unclear"
@@ -172,6 +171,87 @@ def _resolve_intent(ret: dict) -> str:
     if detail and detail.lower() not in raw.lower():
         return f"{raw} ({detail})"
     return raw
+
+
+def _main_decide(
+    *,
+    client: PersonaClient,
+    system: str,
+    task: str,
+    history: list[str],
+    harness_output: str,
+    space: list,
+    state: State,
+    manual: str,
+    appraise_task: bool,
+    result: SessionResult,
+) -> tuple[dict, list[dict], str, bool]:
+    """主 loop 同构决策：judge → intent → act（Spec-0023：仅 three）。
+
+    返回 (act_ret 含 action/message, persona_calls, intent, gap)。
+    judge 的 perceive/verdict/task_load 已合并进 act_ret，供后续 apply_verdict / 开局 task_load。
+    """
+    calls: list[dict] = []
+    jret = client.respond(
+        system,
+        build_main_judge_turn(
+            task,
+            history,
+            harness_output,
+            space,
+            state,
+            manual=manual,
+            appraise_task=appraise_task,
+        ),
+    )
+    calls.extend(_take_persona_calls(client, "main_judge"))
+    perceive = str(jret.get("perceive", ""))
+    verdict = str(jret.get("verdict", "unsure"))
+    task_load = jret.get("task_load")
+    iret = client.respond(
+        system,
+        build_main_intent_turn(
+            task,
+            history,
+            harness_output,
+            space,
+            state,
+            manual=manual,
+            verdict=verdict,
+            perceive=perceive,
+        ),
+    )
+    calls.extend(_take_persona_calls(client, "main_intent"))
+    intent = _resolve_intent(iret)
+
+    aret = client.respond(
+        system,
+        build_main_act_turn(
+            task,
+            history,
+            harness_output,
+            space,
+            state,
+            manual=manual,
+            verdict=verdict,
+            perceive=perceive,
+            intent=intent,
+        ),
+    )
+    calls.extend(_take_persona_calls(client, "main_act"))
+    _drain_issue_notes(client, result)
+    gap = _resolve_gap(aret)
+    merged = {
+        "perceive": perceive,
+        "verdict": verdict,
+        "intent": intent,
+        "action": aret.get("action"),
+        "message": aret.get("message", ""),
+        "gap": gap,
+    }
+    if task_load is not None:
+        merged["task_load"] = task_load
+    return merged, calls, intent, gap
 
 
 def route(action_id: str, message: str, state: State, harness, observable: str) -> str | None:
@@ -280,6 +360,57 @@ def _log_waiting(
         on_progress(result)
 
 
+class _SessionClock:
+    """会话相对时间轴：history 一律 `[+Ns] …`，避免多种增量时间写法混用。
+
+    墙钟与 harness 上报的 waited_sec 取 max，便于单测用 fake poll 的 waited 推进时间轴。
+    """
+
+    def __init__(self) -> None:
+        self._t0 = time.monotonic()
+        self._logical = 0.0
+
+    def wall(self) -> float:
+        return max(0.0, time.monotonic() - self._t0)
+
+    def now(self) -> float:
+        self._logical = max(self._logical, self.wall())
+        return self._logical
+
+    def observe(self, sec: float) -> float:
+        self._logical = max(self._logical, float(sec), self.wall())
+        return self._logical
+
+    def stamp(self, history: list[str], body: str) -> None:
+        history.append(f"[+{self.now():.0f}s] {body}")
+
+
+def _note_waiting_memory(
+    history: list[str],
+    clock: _SessionClock,
+    *,
+    judgment: str,
+    intent: str,
+    action: str,
+    message: str,
+    perceive: str,
+    gap: bool,
+) -> None:
+    """心跳思考+动作写入 history（时间由 clock 统一打 [+Ns] 前缀）。"""
+    intent_one = intent.strip().replace("\n", " ")[:120] or "(no intent)"
+    note = perceive.strip().replace("\n", " ")[:160]
+    gap_bit = " (felt a gap — action did not fully match intent)" if gap else ""
+    if action == "send_message":
+        msg_one = message.strip().splitlines()[0][:120] if message.strip() else "(empty)"
+        act_bit = f"chose send_message: {msg_one}"
+    else:
+        act_bit = f"chose {action}"
+    body = f"waiting: judged {judgment}; wanted {intent_one!r}; {act_bit}{gap_bit}."
+    if note:
+        body = f"{body} notes: {note}"
+    clock.stamp(history, body)
+
+
 def _finalize_terminal(
     action_id: str,
     *,
@@ -321,16 +452,112 @@ def _activity_from_harness(harness) -> list[dict]:
     return out
 
 
-def _note_midflight_send(history: list[str], message: str) -> None:
-    """in-flight 再塞的 message 写入等待上下文；是否被 harness 处理不在此保证。"""
-    one = message.strip().splitlines()[0][:160] if message.strip() else "(empty)"
-    history.append(
-        f"[waiting] you sent another message while it was still running "
-        f"(inside harness — it may or may not handle it): {one}"
+def _heartbeat_once(
+    *,
+    client: PersonaClient,
+    system: str,
+    task: str,
+    history: list[str],
+    clock: _SessionClock,
+    state: State,
+    coef: Coef,
+    manual: str,
+    result: SessionResult,
+    on_progress: Callable[[SessionResult], None] | None,
+    prior_activity: list[dict],
+    waited_sec: float,
+    progress: list[dict],
+    progress_seen: int,
+    heartbeats: int,
+) -> tuple[str, str, bool, int]:
+    """一次性等待决策（timer 触发）。任意动作（含 keep_waiting）做完即结束本次心跳。
+
+    Spec-0023：仅 judge → intent → act（three）。
+    返回 (action, message, gap, new_progress_seen)。
+    强制 give_up：心跳次数触顶，或 keep_waiting 且无新进度把耐心耗尽。
+    """
+    new_progress = len(progress) > progress_seen
+    seen = len(progress)
+    ctx = dict(
+        task=task,
+        history_lines=history,
+        state=state,
+        manual=manual,
+        waited_sec=waited_sec,
+        progress=progress,
+        prior_activity=prior_activity,
     )
+    jret = client.respond(system, build_waiting_judge_turn(**ctx))
+    wait_calls = _take_persona_calls(client, "waiting_judge")
+    judgment = _resolve_judgment(jret)
+    perceive = str(jret.get("perceive", ""))
+    iret = client.respond(
+        system,
+        build_waiting_intent_turn(
+            **ctx,
+            judgment=judgment,
+            perceive=perceive,
+        ),
+    )
+    wait_calls.extend(_take_persona_calls(client, "waiting_intent"))
+    intent = _resolve_intent(iret)
+    aret = client.respond(
+        system,
+        build_waiting_act_turn(
+            **ctx,
+            judgment=judgment,
+            perceive=perceive,
+            intent=intent,
+        ),
+    )
+    wait_calls.extend(_take_persona_calls(client, "waiting_act"))
+    _drain_issue_notes(client, result)
+    action, wait_message, gap = _resolve_waiting(aret)
+    if heartbeats >= _MAX_HEARTBEATS:
+        action = "give_up"
+        wait_message = ""
+        gap = False
+    elif action == "keep_waiting":
+        if not new_progress:
+            state.patience = max(0, state.patience - coef.patience_decay)
+        if state.patience <= 0:
+            action = "give_up"
+            wait_message = ""
+            gap = False
+    _log_waiting(
+        result,
+        state,
+        action,
+        wait_message,
+        judgment=judgment,
+        intent=intent,
+        perceive=perceive,
+        gap=gap,
+        on_progress=on_progress,
+        persona_trace=wait_calls,
+    )
+    _note_waiting_memory(
+        history,
+        clock,
+        judgment=judgment,
+        intent=intent,
+        action=action,
+        message=wait_message,
+        perceive=perceive,
+        gap=gap,
+    )
+    return action, wait_message, gap, seen
 
 
-def _supervise_send(
+def _try_ready_reply(harness) -> str | None:
+    """心跳动作执行前：非阻塞看 reply 是否已到（LLM 思考期间可能已进缓冲）。"""
+    fn = getattr(harness, "try_reply", None)
+    if not callable(fn):
+        return None
+    return fn()
+
+
+def _await_harness(
     harness,
     message: str,
     *,
@@ -338,30 +565,27 @@ def _supervise_send(
     system: str,
     task: str,
     history: list[str],
+    clock: _SessionClock,
     state: State,
     coef: Coef,
     manual: str,
     result: SessionResult,
     on_progress: Callable[[SessionResult], None] | None,
     prior_activity: list[dict],
-    waiting_mode: str,
 ) -> tuple[str, float, str | None, str | None]:
-    """驱动 harness 出下一轮，但用心跳守望等待：超阈值仍无回复就唤醒用户 agent 决策。
+    """begin 后进入 AwaitEvent：reply → 交主 loop；timer → 一次性心跳后回到 AwaitEvent。
 
-    waiting_mode:
-      - "two"：judge+intent 合一 → act（2 次 LLM）
-      - "three"：judge → intent → act（3 次 LLM）
+    不写死「在等某一笔 send 的配对」：下一笔 reply 原样交给主 decide，由用户看见内容才知真相。
+    心跳动作（含 keep_waiting / send_message）做完即结束本次心跳，不在心跳内 continue poll。
 
     返回 (harness_output, elapsed_sec, terminal_action, user_control)：
-      - 正常 reply：terminal=None，user_control=None；
-      - interrupt（外）：控制回复入 harness_output，user_control="interrupt"；
-      - send_message（内）：emit_message 后继续等，不结束本轮；
-      - 崩溃/超时：harness_output 为 [harness error] 串；
-      - 用户放弃：harness_output=""，terminal="give_up"。
+      - reply：terminal=None，user_control=None（主 loop 下一轮 decide）；
+      - interrupt：控制回复入 harness_output，user_control="interrupt"；
+      - give_up：harness_output=""，terminal="give_up"；
+      - 崩溃：harness_output 为 [harness error] 串。
     """
-    if waiting_mode not in ("two", "three"):
-        waiting_mode = "three"
     t0 = time.monotonic()
+    begin_at = clock.now()
     try:
         harness.begin(message)
     except Exception as exc:  # noqa: BLE001
@@ -373,8 +597,8 @@ def _supervise_send(
         )
     heartbeats = 0
     progress_seen = 0
-    waited = 0.0
     while True:
+        # —— AwaitEvent ——
         try:
             kind, val = harness.poll(_HEARTBEAT_SEC)
         except Exception as exc:  # noqa: BLE001
@@ -385,78 +609,45 @@ def _supervise_send(
                 None,
             )
         if kind == "reply":
+            clock.observe(begin_at + (time.monotonic() - t0))
+            # 主 loop 触发：不在此解释「这是哪一轮」，交主 decide 看内容。
             return str(val), time.monotonic() - t0, None, None
-        waited = float(val)  # type: ignore[arg-type]
-        heartbeats += 1
 
+        # —— HeartbeatOnce（timer）——
+        waited = float(val)  # type: ignore[arg-type]
+        clock.observe(begin_at + waited)
+        heartbeats += 1
         progress = list(getattr(harness, "last_progress", None) or [])
-        new_progress = len(progress) > progress_seen
-        progress_seen = len(progress)
-        ctx = dict(
+        action, wait_message, _gap, progress_seen = _heartbeat_once(
+            client=client,
+            system=system,
             task=task,
-            history_lines=history,
+            history=history,
+            clock=clock,
             state=state,
+            coef=coef,
             manual=manual,
+            result=result,
+            on_progress=on_progress,
+            prior_activity=prior_activity,
             waited_sec=waited,
             progress=progress,
-            prior_activity=prior_activity,
+            progress_seen=progress_seen,
+            heartbeats=heartbeats,
         )
-        if waiting_mode == "two":
-            jiret = client.respond(system, build_waiting_judge_intent_turn(**ctx))
-            wait_calls = _take_persona_calls(client, "waiting_judge_intent")
-            judgment = _resolve_judgment(jiret)
-            perceive = str(jiret.get("perceive", ""))
-            intent = _resolve_intent(jiret)
-        else:
-            jret = client.respond(system, build_waiting_judge_turn(**ctx))
-            wait_calls = _take_persona_calls(client, "waiting_judge")
-            judgment = _resolve_judgment(jret)
-            perceive = str(jret.get("perceive", ""))
-            iret = client.respond(
-                system,
-                build_waiting_intent_turn(
-                    **ctx,
-                    judgment=judgment,
-                    perceive=perceive,
-                ),
+        # 决策期间 reply 可能已进缓冲：动作执行前先确认；有则作废等待动作，交回主 loop。
+        ready = _try_ready_reply(harness)
+        if ready is not None:
+            clock.stamp(
+                history,
+                f"waiting decision aborted before acting ({action}): "
+                "a harness reply arrived while you were deciding; "
+                "you did not carry out that waiting action — "
+                "back to the main loop to read the reply.",
             )
-            wait_calls.extend(_take_persona_calls(client, "waiting_intent"))
-            intent = _resolve_intent(iret)
-        aret = client.respond(
-            system,
-            build_waiting_act_turn(
-                **ctx,
-                judgment=judgment,
-                perceive=perceive,
-                intent=intent,
-            ),
-        )
-        wait_calls.extend(_take_persona_calls(client, "waiting_act"))
-        _drain_issue_notes(client, result)
-        action, wait_message, gap = _resolve_waiting(aret)
-        if heartbeats >= _MAX_HEARTBEATS:
-            action = "give_up"
-            wait_message = ""
-            gap = False
-        elif action == "keep_waiting":
-            if not new_progress:
-                state.patience = max(0, state.patience - coef.patience_decay)
-            if state.patience <= 0:
-                action = "give_up"
-                wait_message = ""
-                gap = False
-        _log_waiting(
-            result,
-            state,
-            action,
-            wait_message,
-            judgment=judgment,
-            intent=intent,
-            perceive=perceive,
-            gap=gap,
-            on_progress=on_progress,
-            persona_trace=wait_calls,
-        )
+            clock.observe(begin_at + (time.monotonic() - t0))
+            return ready, time.monotonic() - t0, None, None
+        # 任意动作都结束本次心跳；下面只执行 I/O 副作用，然后要么 return 给主环，要么回 AwaitEvent。
         if action == "send_message":
             try:
                 harness.emit_message(wait_message)
@@ -467,9 +658,7 @@ def _supervise_send(
                     None,
                     None,
                 )
-            _note_midflight_send(history, wait_message)
-            # 不结束本轮：继续 poll；harness 若吐旁路/终态 reply，下一圈自然看见。
-            continue
+            continue  # 回 AwaitEvent：下一笔 reply 唤醒主 loop，不再嵌套心跳决策
         if action == "interrupt":
             try:
                 ctrl_out = harness.control("interrupt")
@@ -480,11 +669,14 @@ def _supervise_send(
                     None,
                     None,
                 )
+            clock.observe(begin_at + (time.monotonic() - t0))
             if isinstance(ctrl_out, str) and ctrl_out.startswith(HARNESS_ERROR_PREFIX):
                 return ctrl_out, time.monotonic() - t0, None, "interrupt"
             return str(ctrl_out), time.monotonic() - t0, None, "interrupt"
         if action == "give_up":
             return "", time.monotonic() - t0, "give_up", None
+        # keep_waiting：动作已记录并可能耗心；回 AwaitEvent，等下一笔 reply 或下一跳 timer。
+        continue
 
 
 def run_session(
@@ -495,18 +687,18 @@ def run_session(
     *,
     manual: str = "",
     on_progress: Callable[[SessionResult], None] | None = None,
-    waiting_mode: str = "three",
 ) -> SessionResult:
     # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
+    # Spec-0023：主决定与心跳均为 judge → intent → act（three），无 mode 旋钮。
     coef = make_coef(persona)
     state = init_state(persona)
     system = build_system(persona)
 
     result = SessionResult(persona_id=persona.persona_id, end_reason="max_turns")
     history: list[str] = []
+    clock = _SessionClock()
     harness_output = ""
     harness_steps: list = []  # 与 harness_output 配对的内层过程流
-    last_wait_sec: float | None = None  # 上一条 harness 回复的墙钟等待耗时（首轮 None）
     prior_activity: list[dict] = []  # 上一轮已完成请求的活动条（过程记忆，供对照）
 
     while state.turn < MAX_TURNS:
@@ -515,22 +707,20 @@ def run_session(
         # ② 派生动作空间
         space = derive_action_space(phase, persona, state)
 
-        # ③ 主观三层 (LLM). harness 文本原样喂入; 能力分叉由 prompt(G1)+persona 档位约束, 不在框架侧过滤。
-        # manual：该版本 harness 用户手册（能力预期锚点）；last_wait_sec：上条回复的墙钟等待（时间感知）。
-        user = build_user_turn(
-            task,
-            history,
-            harness_output,
-            space,
-            state,
+        # ③ 同构主决定：judge → intent → act。
+        ret, decide_calls, intent, gap = _main_decide(
+            client=client,
+            system=system,
+            task=task,
+            history=history,
+            harness_output=harness_output,
+            space=space,
+            state=state,
             manual=manual,
-            wait_sec=last_wait_sec,
-            appraise_task=phase is Phase.OPENING,  # 开局让 persona 估任务分量，据此调起始耐心
+            appraise_task=phase is Phase.OPENING,
+            result=result,
         )
-        ret = client.respond(system, user)
-        decide_calls = _take_persona_calls(client, "decide")
         state.pending_self_obs = None  # 用后即焚: self_observation 已被消费
-        _drain_issue_notes(client, result)
 
         # 开局：据 persona 主观任务量读数，在耐心基线上叠加一次性小浮动（同一个人接不同任务耐心不同）。
         if phase is Phase.OPENING:
@@ -552,6 +742,10 @@ def run_session(
             verdict = "unsure"
         apply_verdict(state, verdict, coef)
 
+        note = str(ret.get("perceive", "")).strip()
+        head = f"[{verdict}|{intent}→{action_id}]"
+        perceive_logged = f"{head} {note}" if note else head
+
         result.pending_harness_output = None  # 该回复即将随本条 TurnLog 落日志, 不再悬挂
         result.pending_harness_steps = None
         result.turns.append(
@@ -559,7 +753,7 @@ def run_session(
                 turn=state.turn,
                 phase=phase.value,
                 action_space=space,
-                perceive=ret.get("perceive", ""),
+                perceive=perceive_logged,
                 verdict=verdict,
                 action=action_id,
                 message=message,
@@ -572,12 +766,14 @@ def run_session(
                 persona_trace=decide_calls,
             )
         )
+        if gap:
+            result.signals.append(f"WAIT_GAP: intent={intent} action={action_id}")
         if on_progress is not None:
             on_progress(result)  # 逐轮观测钩子(含终止轮): 喂给看板等观测层, 不影响主循环
 
-        # 记历史(只记 B 线真正发出的话；空 message 不 fabricate、不入史)
+        # 记历史(只记 B 线真正发出的话；空 message 不 fabricate、不入史)；统一 [+Ns] 前缀。
         if spec.channel is Channel.EMIT and message.strip():
-            history.append(f"[turn {state.turn}] you -> harness: {message}")
+            clock.stamp(history, f"you -> harness: {message}")
 
         # ⑥ 终止判定（三种终止都以本人口吻留一条自包含 issue，见 _finalize_terminal）
         if spec.effect is Effect.TERMINATE:
@@ -593,31 +789,30 @@ def run_session(
             )
             break
 
-        # ⑦ 路由 -> 下一轮 harness 输入。EMIT 且要驱动 harness 的轮：若后端支持心跳（真实子进程），
-        # 用 _supervise_send 守望等待（超阈值唤醒：继续等 / 再 send message / interrupt / 放弃）；
-        # 否则退回阻塞 route。
+        # ⑦ 路由。EMIT：真实子进程走 AwaitEvent（reply→主 decide；timer→一次性心跳）；
+        # Fake/Scripted 退回阻塞 route。
         _t0 = time.monotonic()
         _emits = spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE
         terminal_from_wait: str | None = None
         user_control: str | None = None
         supervised = _emits and bool(message.strip()) and _supports_heartbeat(harness)
         if supervised:
-            nxt, elapsed, terminal_from_wait, user_control = _supervise_send(
+            nxt, elapsed, terminal_from_wait, user_control = _await_harness(
                 harness,
                 message,
                 client=client,
                 system=system,
                 task=task,
                 history=history,
+                clock=clock,
                 state=state,
                 coef=coef,
                 manual=manual,
                 result=result,
                 on_progress=on_progress,
                 prior_activity=prior_activity,
-                waiting_mode=waiting_mode,
             )
-            if terminal_from_wait == "give_up":  # 用户在等待中放弃：走终止路径并结束
+            if terminal_from_wait == "give_up":  # 等待决策放弃：走终止路径并结束
                 _finalize_terminal(
                     "give_up",
                     result=result,
@@ -632,11 +827,11 @@ def run_session(
         else:
             nxt = route(action_id, message, state, harness, harness_output)
             elapsed = time.monotonic() - _t0
+            if nxt is not None:
+                clock.observe(clock.now() + elapsed)
         if nxt is not None:
-            last_wait_sec = elapsed  # 供下一轮 persona 感知"这条回复我等了多久、全程零可见性"
-            # 时间感知·轻耗心：仅极端超时才自动扣一点耐心（挫败累积），日常耗时只 surfacing 交模型自判。
-            # 仅对阻塞 route 路径生效：心跳路径的等待挫败已由 _supervise_send 的 keep_waiting 逐次
-            # 按 coef 建模，此处不再叠加，避免同一段等待被双记。
+            # 时间感知·轻耗心：仅极端超时才自动扣一点耐心。
+            # 仅对阻塞 route：AwaitEvent 路径的等待挫败已由 keep_waiting 一次性心跳建模，不双记。
             if not supervised and elapsed >= _EXTREME_WAIT_SEC:
                 state.patience = max(0, state.patience - 1)
             harness_output = nxt
@@ -644,7 +839,7 @@ def run_session(
             # Fake/Scripted harness 无此属性 → []。route 只在 EMIT 轮真调 send，此处取值即本轮回复的。
             steps = getattr(harness, "last_steps", None)
             harness_steps = list(steps) if isinstance(steps, list) else []
-            # 本轮活动条写入过程记忆：下一轮等待时可对照「上一轮干了啥 / 这一轮在干啥」。
+            # 活动条写入过程记忆：下次等待时可对照（不宣称「这是哪一轮的活动」归属）。
             prior_activity = _activity_from_harness(harness)
             if prior_activity:
                 titles = [
@@ -653,18 +848,19 @@ def run_session(
                     if isinstance(p, dict) and str(p.get("text") or "").strip()
                 ]
                 if titles:
-                    history.append(
-                        f"[turn {state.turn}] harness activity (this request): "
-                        + "; ".join(titles)[:240]
+                    clock.stamp(
+                        history,
+                        "harness activity: " + "; ".join(titles)[:240],
                     )
-            # 归因：仅外通道 interrupt（Ctrl+C）才是「你停了请求」；in-flight send_message 不走这条。
+            # 归因：仅 interrupt 记 Ctrl+C；普通 reply 不预设「这是对哪一笔 send 的应答」。
             if user_control:
-                history.append(
-                    f"[turn {state.turn}] YOU interrupted (Ctrl+C) the in-flight request; "
-                    f"harness acknowledged: {nxt.splitlines()[0][:80]}..."
+                clock.stamp(
+                    history,
+                    "YOU interrupted (Ctrl+C); harness acknowledged: "
+                    f"{nxt.splitlines()[0][:80]}...",
                 )
             else:
-                history.append(f"[turn {state.turn}] harness -> you: {nxt.splitlines()[0][:80]}...")
+                clock.stamp(history, f"harness -> you: {nxt.splitlines()[0][:80]}...")
             # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
             result.pending_harness_output = nxt
             result.pending_harness_steps = harness_steps

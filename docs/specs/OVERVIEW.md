@@ -70,6 +70,9 @@
 ### 0022 用户↔harness 内外通道：开放 intent · 中途 report_issue · slash 示范
 钉死用户与 harness 的内外窗口：内=message（含 in-flight emit、slash 正文内分发），外=interrupt（Ctrl+C）与会话收场；等待菜单改为 keep_waiting/send_message/interrupt/give_up；intent 开放、由 act 收敛并自报 gap；中途 report_issue tool 可闲置；初始 harness 以 /exit\|/quit 示范 slash。取代原 0019 用户侧 peek-via-control 与 0012 的 invoke_control 菜单语义。
 
+### 0023 等待环事件化钉死 · 废弃 one/two 与遗留信号
+钉死 AwaitEvent 等待环（主 loop 吃 reply、心跳一次性、动作前 try_reply）；统一 [+Ns] history（已删 wait_cost）；废弃 decide/waiting 的 one\|two 与合并 builder；清死常量与无消费者 MAIN_GAP；探针对齐 0022 菜单。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -147,6 +150,10 @@
 | 0022 | 0022/T1 | 内外窗口 + 等待菜单 + emit_message + 开放 intent | done | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/harness/test_launcher.py |
 | 0022 | 0022/T2 | 中途 report_issue tool（可闲置）+ issue_notes flush | done | — | backend/auto_designer/user/sim/tools.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/user/sim/test_tools.py<br>backend/tests/user/sim/test_persona_client_agentic.py<br>backend/tests/loop/test_sim_user.py |
 | 0022 | 0022/T3 | 初始 harness：/exit\|/quit slash 内部分发 + MANUAL | done | — | backend/harness_template/entry.py<br>backend/harness_template/MANUAL.md<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/tests/test_smoke.py |
+| 0023 | 0023/T1 | loop：只留 three · 清 MAIN_GAP/死常量/stalled | done | — | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py |
+| 0023 | 0023/T2 | prompt：删除 one/two 合并 builder · 单测改打 three | done | T1 | backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_prompt.py |
+| 0023 | 0023/T3 | 探针：去掉 two 臂与 peek-via-control 心智 | done | T1 | backend/scripts/probe_wait_progress.py<br>backend/scripts/probe_peek_decision_trace.py<br>backend/scripts/probe_persona_wait_matrix.py<br>backend/scripts/probe_ontrack_new_harness.py<br>backend/scripts/probe_wait_signals_to_evolution.py |
+| 0023 | 0023/T4 | launcher.try_reply 非阻塞契约（已落地） | done | — | backend/auto_designer/harness/launcher.py |
 
 ## 跨 feature 关系图
 
@@ -269,6 +276,12 @@ graph LR
         n0022_T2["T2 中途 report_issue tool（可闲置）+ issue_notes flush"]
         n0022_T3["T3 初始 harness：/exit\|/quit slash 内部分发 + MANUAL"]
     end
+    subgraph G0023[0023 event-driven-wait-cleanup]
+        n0023_T1["T1 loop：只留 three · 清 MAIN_GAP/死常量/stalled"]
+        n0023_T2["T2 prompt：删除 one/two 合并 builder · 单测改打 three"]
+        n0023_T3["T3 探针：去掉 two 臂与 peek-via-control 心智"]
+        n0023_T4["T4 launcher.try_reply 非阻塞契约（已落地）"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -328,6 +341,8 @@ graph LR
     n0020_T4 --> n0020_T1
     n0020_T5 --> n0020_T4
     n0021_T2 --> n0021_T1
+    n0023_T2 --> n0023_T1
+    n0023_T3 --> n0023_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -366,6 +381,12 @@ graph LR
     n0022_T1 -.note.-> n0019_T1
     n0022_T2 -.extends.-> n0008_T2
     n0022_T3 -.extends.-> n0013_T1
+    n0023_T1 -.extends.-> n0022_T1
+    n0023_T1 -.note.-> n0012_T1
+    n0023_T2 -.note.-> n0022_T1
+    n0023_T3 -.note.-> n0022_T1
+    n0023_T4 -.extends.-> n0022_T1
+    n0023_T4 -.note.-> n0019_T1
 ```
 
 ## 文件冲突报告
@@ -377,7 +398,7 @@ graph LR
 | backend/auto_designer/designer/designer.py | 0016, 0018, 0020 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022 |
@@ -386,9 +407,9 @@ graph LR
 | backend/auto_designer/tracker/gitea.py | 0002, 0017 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022 |
-| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022 |
@@ -407,8 +428,10 @@ graph LR
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/tracker/test_fake.py | 0001, 0020 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017 |
-| backend/tests/user/sim/test_loop.py | 0005, 0012 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023 |
+| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022 |
+| backend/tests/user/sim/test_prompt.py | 0005, 0023 |
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
@@ -970,4 +993,31 @@ graph LR
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
+```
+
+### 0023 等待环事件化钉死 · 废弃 one/two 与遗留信号（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 loop：只留 three · 清 MAIN_GAP/死常量/stalled"]
+    nT2["T2 prompt：删除 one/two 合并 builder · 单测改打 three"]
+    nT3["T3 探针：去掉 two 臂与 peek-via-control 心智"]
+    nT4["T4 launcher.try_reply 非阻塞契约（已落地）"]
+    nT1 --> nT2
+    nT1 --> nT3
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
 ```

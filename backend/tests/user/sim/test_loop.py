@@ -37,7 +37,7 @@ TASK = "Add to_user_tz(dt, tz_name); handle DST. We use Asia/Shanghai and Americ
 
 
 class _StubClient:
-    """受控 client：按脚本逐轮出动作；<rate_experience> 返回固定 rating。"""
+    """受控 client：按脚本逐轮出动作；同构三跳时 judge/intent 不消耗动作。"""
 
     def __init__(self, actions: list[str], verdict: str = "unsure", rating: dict | None = None):
         self._actions = actions
@@ -48,6 +48,31 @@ class _StubClient:
     def respond(self, system: str, user: str) -> dict:
         if "<rate_experience>" in user:
             return self._rating
+        if "<file_issue>" in user:
+            return {"issue": "stub issue"}
+        if "<main_judge>" in user or "<main_judge_intent>" in user:
+            out: dict = {
+                "perceive": "",
+                "verdict": self._verdict,
+                "intent": "do the scripted next step",
+            }
+            if "SIZE UP THIS TASK" in user or "task_load" in user.lower():
+                out["task_load"] = "normal"
+            return out
+        if "<main_intent>" in user:
+            return {"intent": "do the scripted next step"}
+        if "<main_act>" in user or "<main_decide>" in user:
+            a = self._actions[self._i] if self._i < len(self._actions) else self._actions[-1]
+            self._i += 1
+            return {
+                "perceive": "",
+                "verdict": self._verdict,
+                "intent": "do the scripted next step",
+                "action": a,
+                "message": "x",
+                "gap": False,
+            }
+        # 兼容旧单次 decide / 其它提示
         a = self._actions[self._i] if self._i < len(self._actions) else self._actions[-1]
         self._i += 1
         return {"perceive": "", "verdict": self._verdict, "action": a, "message": "x"}
@@ -71,9 +96,29 @@ def test_harness_text_fed_raw_without_perception_filter() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _RecordingClient(["send_task", "give_feedback", "accept"], verdict="unsure")
     run_session(p, client, ScriptedHarness(), TASK)
-    after_harness = client.seen[1]  # turn1: 已看到 harness 首轮(含缩进源码)
-    assert "pytz.localize_safe(dt, tz)" in after_harness  # 源码原样可见
+    after_harness = next(u for u in client.seen if "pytz.localize_safe(dt, tz)" in u)
     assert "you don't read the diff line by line" not in after_harness  # 无过滤占位串
+
+
+def test_main_decide_is_judge_intent_act_isomorphic() -> None:
+    """主 loop 默认 three：judge → intent → act；perceive 带 [verdict|intent→action]。"""
+    p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
+    client = _RecordingClient(["send_task", "accept"], verdict="satisfied")
+    res = run_session(p, client, ScriptedHarness(), TASK)
+    tags = []
+    for u in client.seen:
+        if "<main_judge>" in u:
+            tags.append("judge")
+        elif "<main_intent>" in u:
+            tags.append("intent")
+        elif "<main_act>" in u:
+            tags.append("act")
+    # 至少两轮主决定 × 三跳
+    assert tags.count("judge") >= 2
+    assert tags.count("intent") >= 2
+    assert tags.count("act") >= 2
+    active = [t for t in res.turns if t.phase in ("opening", "active")]
+    assert any("|" in t.perceive and "→" in t.perceive for t in active)
 
 
 def test_verify_self_injects_raw_observation() -> None:
@@ -81,8 +126,7 @@ def test_verify_self_injects_raw_observation() -> None:
     p = _persona(D1Eval.EXPERT, D43Correct.FEEDBACK)
     client = _RecordingClient(["send_task", "verify_self", "accept"], verdict="unsure")
     run_session(p, client, ScriptedHarness(), TASK)
-    after_verify = client.seen[2]  # turn2: verify_self 注入的私有观察已进 user
-    assert "<self_observation>" in after_verify
+    after_verify = next(u for u in client.seen if "<self_observation>" in u)
     assert "pytz.localize_safe(dt, tz)" in after_verify  # 原始观察(含代码)
     assert "I ran it once" not in after_verify  # 无伪造串
 

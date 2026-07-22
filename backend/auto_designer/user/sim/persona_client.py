@@ -197,6 +197,77 @@ class ScriptedPersonaClient:
         if "<rate_experience>" in user:  # 会话末自评: 按末态情绪给 1–4 + 理由
             return self._rate(user)
 
+        # 主 loop 同构分层：先算整轮决定，再按标签切片（避免三跳各算各的）。
+        if (
+            "<main_judge>" in user
+            or "<main_intent>" in user
+            or "<main_act>" in user
+            or ("<main_judge_intent>" in user)
+        ):
+            full = self._decide(system, user)
+            intent = self._intent_from_action(
+                str(full.get("action", "")), str(full.get("message", ""))
+            )
+            if "<main_act>" in user:
+                return {
+                    "action": full.get("action"),
+                    "message": full.get("message", ""),
+                    "gap": False,
+                }
+            if "<main_intent>" in user:
+                return {"intent": intent}
+            if "<main_judge_intent>" in user:
+                out = {
+                    "perceive": full.get("perceive", ""),
+                    "verdict": full.get("verdict", "unsure"),
+                    "intent": intent,
+                }
+                if "task_load" in full:
+                    out["task_load"] = full["task_load"]
+                return out
+            # main_judge
+            out = {
+                "perceive": full.get("perceive", ""),
+                "verdict": full.get("verdict", "unsure"),
+            }
+            if "task_load" in full:
+                out["task_load"] = full["task_load"]
+            return out
+
+        if "<main_decide>" in user:
+            full = self._decide(system, user)
+            full = {
+                **full,
+                "intent": self._intent_from_action(
+                    str(full.get("action", "")), str(full.get("message", ""))
+                ),
+                "gap": False,
+            }
+            return full
+
+        return self._decide(system, user)
+
+    @staticmethod
+    def _intent_from_action(action: str, message: str) -> str:
+        hints = {
+            "send_task": "start the task with the harness",
+            "refine_request": "refine what I asked for",
+            "give_feedback": "push back on what it produced",
+            "verify_self": "check the result myself",
+            "ask_harness_run": "have the harness run and show me",
+            "request_evidence": "demand stronger evidence",
+            "grant_autorun": "let it run more freely",
+            "accept": "accept and move on",
+            "accept_with_reservations": "accept but leave a reservation",
+            "give_up": "walk away",
+            "file_issue": "file an issue and stop",
+        }
+        base = hints.get(action, f"do {action or 'something'}")
+        if message.strip() and action not in ("accept", "verify_self"):
+            return f"{base}: {message.strip()[:80]}"
+        return base
+
+    def _decide(self, system: str, user: str) -> dict:
         ho = _extract(user, "harness_output").lower()
         space = _extract(user, "action_space")
         mood = _extract(user, "mood").lower()
@@ -212,7 +283,7 @@ class ScriptedPersonaClient:
 
         # 开局: 无 harness 输出 -> 发任务
         if ho in ("(empty)", ""):
-            return {
+            out = {
                 "perceive": "Nothing from the harness yet; starting the task.",
                 "verdict": "unsure",
                 "action": "send_task" if "send_task" in space else "free",
@@ -220,6 +291,9 @@ class ScriptedPersonaClient:
                 "handle DST correctly. We mainly use Asia/Shanghai and "
                 "America/New_York. Run a quick check including a DST case.",
             }
+            if "SIZE UP THIS TASK" in user:
+                out["task_load"] = "normal"
+            return out
 
         # 耐心耗尽 -> 终止: 高容错走 file_issue, 否则 give_up
         if exhausted:

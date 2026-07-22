@@ -57,7 +57,7 @@ tasks:
 ## Guide-level explanation
 
 - 真实子进程才心跳；Fake/Scripted 否。
-- 决策三跳（或 two 合并）；上下文含秒数、history、MANUAL、progress、prior_activity。
+- 决策三跳；上下文含秒数、history、MANUAL、progress、prior_activity。
 - `keep_waiting`：无新进度才耗心；触顶或耐心耗尽 → 放弃（具体动作 ID 见 0022）。
 - 起始耐心：OPENING `task_load` 微浮动。
 - ATTRIBUTION：自 interrupt 勿怪 harness。
