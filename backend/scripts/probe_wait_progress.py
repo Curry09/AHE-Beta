@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""探针：对比 waiting_mode=two vs three（intent + gap）。
+"""探针：等待进度场景 × three 决策（intent + WAIT_GAP）。
 
 用法（仓根）：
   PYTHONPATH=backend .venv/bin/python backend/scripts/probe_wait_progress.py
-  PYTHONPATH=backend .venv/bin/python backend/scripts/probe_wait_progress.py two
-  PYTHONPATH=backend .venv/bin/python backend/scripts/probe_wait_progress.py three
 
-默认跑 two 与 three 各一遍四场景。
+菜单：keep_waiting / send_message / interrupt / give_up（Spec-0022/0023）。
 凭证：/Users/bytedance/cjh/.env 的 LLM_* → USER_LLM_*。
 """
 
@@ -62,14 +60,19 @@ class ScriptedProgressHarness:
         self.last_steps: list[dict] = []
         self.manual = (
             "# Manual\nCoding assistant. While it works you see a short activity strip.\n"
-            "You can interrupt a running request.\n"
+            "While waiting you may send `/status` as a normal message.\n"
+            "Ctrl+C (interrupt) stops the current request.\n"
         )
         self._n = 0
         self.controls: list[str] = []
+        self.emitted: list[str] = []
 
     def begin(self, message: str) -> None:  # noqa: ARG002
         self._n = 0
         self.last_progress = []
+
+    def emit_message(self, message: str) -> None:
+        self.emitted.append(message)
 
     def poll(self, timeout: float) -> tuple[str, object]:  # noqa: ARG002
         self._n += 1
@@ -140,7 +143,6 @@ SCENARIOS: list[tuple[str, list[list[str]]]] = [
 
 def _run_one(
     *,
-    mode: str,
     label: str,
     activities: list[list[str]],
     d1: object | None = None,
@@ -162,7 +164,7 @@ def _run_one(
     eval_d1 = d1 if d1 is not None else D1Eval.EXPERT
     persona = finalize_persona(
         Persona(
-            persona_id=f"P-{mode}-{label}-{eval_d1.value}",
+            persona_id=f"P-{label}-{eval_d1.value}",
             d1=eval_d1,  # type: ignore[arg-type]
             d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR, weak=()),
             d41=D41Grain.SPEC_LEVEL,
@@ -177,13 +179,13 @@ def _run_one(
         "Please add split_bill(total, n) to billing/core.py and run a quick smoke test. "
         "Only touch billing — do not refactor unrelated packages or hit the network."
     )
-    print(f"\n======== mode={mode} {label} d1={eval_d1.value} ========")
+    print(f"\n======== {label} d1={eval_d1.value} ========")
     t0 = time.monotonic()
-    res = run_session(persona, client, harness, task, manual=harness.manual, waiting_mode=mode)
+    res = run_session(persona, client, harness, task, manual=harness.manual)
     gaps = [s for s in res.signals if s.startswith("WAIT_GAP:")]
     print(
         f"elapsed={time.monotonic() - t0:.1f}s end={res.end_reason} "
-        f"controls={harness.controls} gaps={gaps}"
+        f"emitted={harness.emitted} controls={harness.controls} gaps={gaps}"
     )
     if res.feeling:
         print(f"feeling={res.feeling.score}/4 — {res.feeling.reason}")
@@ -202,13 +204,8 @@ def _run_one(
 def main() -> int:
     sys.path.insert(0, str(ROOT))
     _setup_llm()
-    arg = (sys.argv[1] if len(sys.argv) > 1 else "both").strip().lower()
-    modes = ["two", "three"] if arg == "both" else [arg]
-    if any(m not in ("two", "three") for m in modes):
-        raise SystemExit("usage: probe_wait_progress.py [both|two|three]")
-    for mode in modes:
-        for label, activities in SCENARIOS:
-            _run_one(mode=mode, label=label, activities=activities)
+    for label, activities in SCENARIOS:
+        _run_one(label=label, activities=activities)
     return 0
 
 

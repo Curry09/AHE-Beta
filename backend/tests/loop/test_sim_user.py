@@ -184,7 +184,7 @@ def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
     # 用户 agent 原始调用：system/user 全量落盘（供后续 KV 复用分析）
     assert any(t.persona_trace for t in loaded.sim_trace.turns)
     first_call = next(c for t in loaded.sim_trace.turns for c in t.persona_trace)
-    assert first_call.role == "decide"
+    assert first_call.role in ("decide", "main_judge", "main_judge_intent")
     assert first_call.system  # 完整 system 原文
     assert first_call.user
     assert first_call.parsed  # 至少有合同字段
@@ -207,7 +207,22 @@ def test_sim_adapter_no_issue_when_not_filed(tmp_path) -> None:
         def respond(self, system: str, user: str) -> dict:
             if "<rate_experience>" in user:
                 return {"score": 4, "reason": "great"}
-            return {"perceive": "", "verdict": "satisfied", "action": "accept", "message": "ok"}
+            if "<main_judge>" in user or "<main_judge_intent>" in user:
+                return {
+                    "perceive": "",
+                    "verdict": "satisfied",
+                    "intent": "accept",
+                    "task_load": "normal",
+                }
+            if "<main_intent>" in user:
+                return {"intent": "accept"}
+            return {
+                "perceive": "",
+                "verdict": "satisfied",
+                "action": "accept",
+                "message": "ok",
+                "gap": False,
+            }
 
     fn = make_sim_run_session_fn(
         client_factory=_HappyClient, tracker=tracker, store=store, sim_personas={mp.identity: sp}
@@ -231,11 +246,21 @@ def test_sim_adapter_flushes_mid_session_issue_notes(tmp_path) -> None:
                 return {"score": 3, "reason": "ok"}
             if "<file_issue>" in user:
                 return {"issue": "terminal voice issue"}
+            if "<main_judge>" in user or "<main_judge_intent>" in user:
+                return {
+                    "perceive": "",
+                    "verdict": "failed_blame_harness",
+                    "intent": "file an issue",
+                    "task_load": "normal",
+                }
+            if "<main_intent>" in user:
+                return {"intent": "file an issue"}
             return {
                 "perceive": "",
                 "verdict": "failed_blame_harness",
                 "action": "file_issue",
                 "message": "filing",
+                "gap": False,
             }
 
         def drain_issue_notes(self) -> list[str]:

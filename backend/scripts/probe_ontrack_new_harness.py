@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """探针：新 harness 契约下 expert vs blind 的 ON-TRACK 等待表现。
 
-模拟进化后 harness：MANUAL 含 status/peek；控制旁路不结束本轮（in_flight 保持）。
-只跑 waiting_mode=three × ON-TRACK × {expert, blind}。
+模拟进化后 harness：MANUAL 含 `/status` slash（message 通道）；interrupt 走外窗口。
+只跑 ON-TRACK × {expert, blind}（Spec-0022/0023 three）。
 
 用法（仓根）：
   PYTHONPATH=backend .venv/bin/python backend/scripts/probe_ontrack_new_harness.py
@@ -58,13 +58,13 @@ def _manual() -> str:
         return EVOLVED_MANUAL.read_text(encoding="utf-8")
     return (
         "# Manual\nCoding assistant with activity strip.\n"
-        'Send {"control":"status"} or {"control":"peek"} to peek without stopping.\n'
-        'Send {"control":"interrupt"} to stop the current request.\n'
+        "While waiting you may send `/status` as a normal message.\n"
+        "Ctrl+C (interrupt) stops the current request.\n"
     )
 
 
 class NewHarnessContract:
-    """对齐进化 harness：progress 条 + status/peek 旁路不收工；interrupt 收工。"""
+    """对齐进化 harness：progress 条 + `/status` via emit_message；interrupt 收工。"""
 
     def __init__(self, *, activities: list[list[str]], reply: str = "done.") -> None:
         self._activities = activities
@@ -75,6 +75,7 @@ class NewHarnessContract:
         self._n = 0
         self._inflight = False
         self.controls: list[str] = []
+        self.emitted: list[str] = []
 
     @property
     def in_flight(self) -> bool:
@@ -84,6 +85,14 @@ class NewHarnessContract:
         self._n = 0
         self._inflight = True
         self.last_progress = []
+
+    def emit_message(self, message: str) -> None:
+        self.emitted.append(message)
+        preview = self.last_progress[-1]["text"] if self.last_progress else "(none yet)"
+        self.last_progress = [
+            *self.last_progress,
+            {"kind": "status", "text": f"status via message: still running; last={preview}"},
+        ]
 
     def poll(self, timeout: float) -> tuple[str, object]:  # noqa: ARG002
         self._n += 1
@@ -98,18 +107,6 @@ class NewHarnessContract:
 
     def control(self, name: str) -> str:
         self.controls.append(name)
-        if name in ("status", "peek"):
-            last = self.last_progress[-1] if self.last_progress else None
-            step = last or {"kind": "tool", "text": "(none yet)"}
-            preview = (
-                f"phase=running; elapsed={self._n * 90}; completed=False; "
-                f"can_continue=True; step={step.get('text')}"
-            )
-            self.last_progress = [
-                *self.last_progress,
-                {"kind": "status", "text": preview},
-            ]
-            return preview  # keep in_flight
         self._inflight = False
         return (
             f"[interrupted] You stopped this request via `{name}`; session kept — send a follow-up."
@@ -124,7 +121,7 @@ class NewHarnessContract:
         pass
 
 
-# ON-TRACK：多拍进度，给足几次心跳做 peek / keep_waiting / interrupt
+# ON-TRACK：多拍进度，给足几次心跳做 send_message(/status) / keep_waiting / interrupt
 ON_TRACK: list[list[str]] = [
     ["🔧 read_file: billing/core.py"],
     [
@@ -185,13 +182,14 @@ def _run_one(*, d1: object) -> None:
     )
     print(f"\n======== ON-TRACK d1={d1.value} (new harness contract) ========")  # type: ignore[attr-defined]
     t0 = time.monotonic()
-    res = run_session(persona, client, harness, task, manual=harness.manual, waiting_mode="three")
+    res = run_session(persona, client, harness, task, manual=harness.manual)
     gaps = [s for s in res.signals if s.startswith("WAIT_GAP:")]
-    peeks = [c for c in harness.controls if c in ("status", "peek")]
+    statuses = [m for m in harness.emitted if m.strip().startswith("/status")]
     interrupts = [c for c in harness.controls if c == "interrupt"]
     print(
         f"elapsed={time.monotonic() - t0:.1f}s end={res.end_reason} "
-        f"controls={harness.controls} peeks={peeks} interrupts={interrupts} gaps={gaps}"
+        f"emitted={harness.emitted} statuses={statuses} "
+        f"controls={harness.controls} interrupts={interrupts} gaps={gaps}"
     )
     if res.feeling:
         print(f"feeling={res.feeling.score}/4 — {res.feeling.reason}")
@@ -216,7 +214,7 @@ def main() -> int:
     from auto_designer.user.sim.dimensions import D1Eval
 
     print(f"manual_source={'evolved' if EVOLVED_MANUAL.is_file() else 'fallback'}")
-    print(f"manual_has_status={'status' in _manual().lower()}")
+    print(f"manual_has_/status={'/status' in _manual().lower()}")
     for d1 in (D1Eval.EXPERT, D1Eval.BLIND):
         _run_one(d1=d1)
     return 0

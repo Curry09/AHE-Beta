@@ -244,6 +244,38 @@ class _HarnessHandle:
             self._ingest_sideband(payload)
             continue
 
+    def try_reply(self) -> str | None:
+        """非阻塞：若终态 reply 已在 stdout 缓冲中，取出并结束本轮 inflight。
+
+        供心跳决策之后、执行动作之前调用：LLM 思考期间到的 reply 不应再被 give_up/interrupt 吞掉。
+        旁路行照常吞进 last_progress；队列空则返回 None（仍 in flight）。
+        """
+        if not self._inflight:
+            return None
+        while True:
+            try:
+                item = self._line_q.get_nowait()
+            except queue.Empty:
+                return None
+            if item is _EOF:
+                self._inflight = False
+                raise RuntimeError("harness 子进程已退出（stdout EOF）")
+            line = str(item)
+            try:
+                payload = json.loads(line)
+            except (json.JSONDecodeError, TypeError) as exc:
+                self._inflight = False
+                raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
+            if not isinstance(payload, dict):
+                self._inflight = False
+                raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
+            if "reply" in payload:
+                self._inflight = False
+                steps = payload.get("steps")
+                self.last_steps = steps if isinstance(steps, list) else []
+                return str(payload["reply"])
+            self._ingest_sideband(payload)
+
     def control(self, name: str) -> str:
         """外通道：向 harness 发控制（用户侧主路径是 interrupt ≈ Ctrl+C）。
 
