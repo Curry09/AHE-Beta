@@ -1,11 +1,12 @@
-# 创新者侧：designer = 带只读工具的 nexau agent，综合全局 backlog + 体感曲线产结构性设计提案。
-"""Designer：创新者 = 综合全局的 nexau agent（对偶于开发者的「局部补丁」）。
+# synthesize agent：designer 收窄为纯结构综合——在已 triaged backlog 上跨 issue 找根因、产 RFC。
+"""Designer = synthesize agent：综合全局的 nexau agent（对偶于 triage 的逐条梳理、开发者的局部补丁）。
 
-开发者 agent 只做聚焦的局部修改，难产生结构性改进（会把轨迹特征带进 harness）。designer 补上这一环：
-读**全量 open issue backlog + 体感曲线 + 运行时行为聚合**，只读查看 harness 现状，跳出单条 issue
-找跨 issue 的结构性根因，产出 0..n 条**设计提案**（打 `design` 标签）写回 tracker，由开发者后续领取
-落地。designer 不碰 git、不改文件——它只提方向，不动手。产出形态与用户 agent 一致（agent 出草稿、
-driver 落库），与开发者侧解耦。
+Spec-0025/T4：designer 拆分后只保留 **synthesize** 这半——逐条分类/定位/去重/驳回已移交 triage agent
+（designer/triage.py）。它读**已 groomed（triaged）的工作项 backlog（含跨轮积压）+ 体感曲线 + 运行时
+行为聚合**，只读查看 harness 现状、按需拉 god-view 轨迹，跳出单条 issue 找跨 issue 的结构性根因，产
+0..n 条 **RFC**（打 `RFC` 标签，凌驾 type；covers/supersede 它综合的局部 triaged issue，最高 dev
+预算）写回 tracker，由开发者后续领取落地。designer 不碰 git、不改文件、不关 raw issue——只提方向。
+产出形态与 triage/用户/开发者侧一致（agent 出草稿、driver 落库），彼此解耦。
 """
 
 from __future__ import annotations
@@ -18,14 +19,20 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from auto_designer.designer.issue_schema import RFC_LABEL, SUPERSEDED, TRIAGED
+from auto_designer.designer.issue_schema import fields_of as _schema_fields_of
+from auto_designer.designer.issue_schema import render as _schema_render
+from auto_designer.designer.issue_schema import validate as _schema_validate
 from auto_designer.designer.runtime_agg import aggregate_runtime, format_runtime_agg
 from auto_designer.designer.session_timeline import bind_session_store
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 
-# designer 的默认标签：结构性提案与用户 agent 产的 bug/feature 区分，便于观测（开发者领取不分流）。
-DESIGN_LABEL = "design"
+# Spec-0025/T4：designer 收窄为纯 synthesize——只在已 groomed(triaged) backlog 上找跨 issue 结构根因，
+# 产 RFC（凌驾 type 的结构综合提案），covers/supersede 它综合的局部 triaged issue。逐条分诊/格式化已
+# 移交 triage agent（designer/triage.py）。RFC_LABEL 取代旧的 design 标签。
+DESIGN_LABEL = RFC_LABEL  # 向后兼容别名（旧测/引用）；语义现为 RFC
 # 一次 propose_once 是多轮工具调用（读文件 + 综合），给足硬超时兜底防总挂死。
 _DESIGN_TIMEOUT = 900
 # 拆信封的最大层数：实测 nexau 会把信封再 JSON 编码一层（故 ≥2），留一层余量；有界防畸形输入打转。
@@ -87,10 +94,17 @@ class DesignOutcome:
 
 @dataclass(frozen=True)
 class _Proposal:
-    """一条解析后的提案：issue 草稿 + 它声明覆盖的 bug 票号（Spec-0020/T1）。"""
+    """一条解析后的 RFC 提案（Spec-0025/T4）：标题 + RFC 字段(中文 label 键) + 覆盖的 triaged 票号。"""
 
-    draft: IssueDraft
+    title: str
+    fields: dict
     covers: tuple[int, ...] = ()
+
+
+def _rfc_fields_by_label(fields: dict) -> dict:
+    """agent 用中文 label 填的 RFC 字段 → schema key（问题→problem 等）；未知 label 原样保留。"""
+    label_to_key = {f.label: f.key for f in _schema_fields_of(kind="rfc")}
+    return {label_to_key.get(str(k), str(k)): v for k, v in fields.items()}
 
 
 def _parse_covers(raw: object) -> tuple[int, ...]:
@@ -179,53 +193,65 @@ class Designer:
 
     def propose_once(self) -> DesignOutcome:
         backlog = self._tracker.list_open_issues()
+        # Spec-0025/T4：synthesize 只在**已 groomed（triaged）**的工作项上找跨条根因（含跨轮积压）；
+        # 排除 RFC 自身与已 superseded 的（不做 RFC 互指、不重复综合已被取代的）。
+        triaged = [
+            i
+            for i in backlog
+            if TRIAGED in i.labels and RFC_LABEL not in i.labels and SUPERSEDED not in i.labels
+        ]
         trend = self._feeling_trend()
         # 任务无关机制层数字：扫已落盘 steps/reply + 仓内预算钮（不改协议、不碰 a 段）。
         runtime = format_runtime_agg(aggregate_runtime(store=self._store, harness_repo=self._repo))
-        self._emit(running=True, status=f"综合全局中…（{len(backlog)} open issue）")
+        self._emit(running=True, status=f"综合中…（{len(triaged)} 条 triaged）")
 
-        result_text = self._run_agent(backlog=backlog, trend=trend, runtime=runtime)
+        result_text = self._run_agent(triaged=triaged, trend=trend, runtime=runtime)
         proposals = self._parse_proposals(result_text)
 
-        # Spec-0020/T1：covers 只认「开局 backlog 里 open 且非 design」的票——指向不存在/已 closed/
-        # design 票的号静默跳过（覆盖语义是"设计票整合 bug"，不做设计票互指）。
-        coverable = {i.number for i in backlog if DESIGN_LABEL not in i.labels}
+        # covers 只认本轮 triaged 集合里的号（指向不存在/未 triaged/已 superseded 的号静默跳过）。
+        by_number = {i.number: i for i in triaged}
 
         numbers: list[int] = []
         if proposals:
-            self._tracker.ensure_labels([DESIGN_LABEL])
+            self._tracker.ensure_labels([RFC_LABEL, SUPERSEDED])
         for prop in proposals:
-            draft = prop.draft
-            # 强制打上 design 标签（去重），保证提案在 tracker 里可辨识。
-            labels = list(dict.fromkeys([*draft.labels, DESIGN_LABEL]))
-            covers = tuple(n for n in prop.covers if n in coverable)
-            body = draft.body
+            fields = _rfc_fields_by_label(prop.fields)
+            if _schema_validate(kind="rfc", fields=fields, section="triage"):
+                continue  # RFC 字段没填全 → 跳过（不产半成品结构提案）
+            covers = tuple(n for n in prop.covers if n in by_number)
+            body = _schema_render(kind="rfc", fields=fields)
             if covers:
-                # 机器可读行 = 覆盖关系单一真源（消费方：dev 领取降权/连带关闭、web 徽标）。
+                # 机器可读行 = 覆盖关系单一真源（消费方：dev 两级连带关闭、web 徽标）。
                 body = f"{body}\n\ncovers: {' '.join(f'#{n}' for n in covers)}"
             ref = self._tracker.create_issue(
-                IssueDraft(title=draft.title, body=body, labels=labels)
+                IssueDraft(title=str(prop.title), body=body, labels=[RFC_LABEL])
             )
             numbers.append(ref.number)
-            for n in covers:
-                try:
-                    self._tracker.add_comment(n, f"covered-by: #{ref.number}")
-                except Exception:  # noqa: BLE001  挂链是可读性旁路，单条失败不影响其余与提案本身
-                    pass
+            for n in covers:  # 被综合的局部 triaged issue → superseded（从 dev 可领集合排除）
+                self._mark_superseded(issue=by_number[n], rfc_number=ref.number)
 
         self._emit(
             running=False,
-            status=(f"提了 {len(numbers)} 条设计提案" if numbers else "本轮无结构性提案"),
+            status=(f"提了 {len(numbers)} 条 RFC" if numbers else "本轮无结构性 RFC"),
             proposals=numbers,
             detail=(result_text or None),  # 最终报告全文（详情面板展示，不截断）
         )
         return DesignOutcome(proposal_numbers=numbers)
 
+    def _mark_superseded(self, *, issue, rfc_number: int) -> None:
+        """把被 RFC 综合的 triaged issue 标 superseded（保留原标签）+ 挂链，从 dev 可领集合排除。"""
+        try:
+            new_labels = list(dict.fromkeys([*issue.labels, SUPERSEDED]))
+            self._tracker.set_labels(issue.number, new_labels)
+            self._tracker.add_comment(issue.number, f"superseded by #{rfc_number}")
+        except Exception:  # noqa: BLE001  单条挂链失败不影响其余与 RFC 本身
+            pass
+
     def _run_agent(
         self,
         *,
-        backlog: list,
-        trend: list[tuple[str, int, str]],
+        triaged: list,
+        trend: list[tuple[str, int, str, str]],
         runtime: str,
     ) -> str:
         os.environ["SANDBOX_WORK_DIR"] = str(self._repo)  # 只读 grounding：sandbox = harness 仓
@@ -242,28 +268,23 @@ class Designer:
             cfg.resolved_tracer = StepTracer(self._on_event)
         agent = Agent(config=cfg)
         msg = (
-            "综合下面的全量 open issue backlog、体感曲线与运行时行为聚合，找跨 issue 的结构性根因，"
-            "产出 0..n 条结构性设计提案（宁缺毋滥；无值得提的方向就返回 `[]`）。\n"
-            "**先 read_file 读懂 harness 源码**（`agents/main.md` + `entry.py` + `agent.yaml`，"
-            "看清超时/重试/迭代上限/交付方式这些一级钮）再提；没读机制源码别断言机制根因。\n"
-            "**你只给「问题 + 方向」，不写实现**：绝不在 body 里写 manifest/checkpoint/gate、"
-            "schema、分步协议这类施工细节（照抄就能敲键盘=越权，退回只留问题和方向）。\n"
-            "**动笔前先按系统提示里的「重复判定 rubric」逐条过滤**：每条候选对照下面 backlog 每条 issue "
-            "及你本轮其它候选，命中 R1 同根因 / R2 同施力点方向 / R3 开发者视角 subsume 任一即为重复，不提；"
-            "只提带来新根因或新施力点的方向。若 backlog 里多条依 rubric 互为重复或已被现状覆盖，"
-            "用一条整合性提案点明「#X/#Y 系同一根因，建议合并/关闭」，而非换皮再加一条。\n"
-            "**整合性提案请用 covers 字段声明覆盖关系**：若某条提案已包含 backlog 里若干 bug 的"
-            '根因（修好它这些 bug 即解决），在该项加 `"covers": [票号,…]`（只填 bug 票号）——'
-            "编排会据此让被覆盖 bug 让位于你的提案、并在提案落地后连带关闭它们；"
-            "不确定是否真覆盖就别填（错误覆盖会延迟真实 bug 的处理）。\n\n"
-            f"## open issue backlog（{len(backlog)} 条）\n{self._format_backlog(backlog)}\n\n"
+            "下面是**已 triaged 的工作项 backlog**（含跨轮积压）+ 体感曲线 + 运行时行为聚合。逐条的分类/"
+            "定位已由 triage 做完；你的活是**跳出单条，找跨 issue 的结构性根因**，产 0..n 条 **RFC**"
+            "（结构综合提案；宁缺毋滥，无跨条主题就返回 `[]`——大多数轮可能没有，别硬凑）。\n"
+            "**先 read_file 读懂 harness 源码**（`agents/main.md` + `entry.py` + `agent.yaml`，看清超时/"
+            "重试/迭代上限/交付方式这些一级钮）再提；没读机制源码别断言机制根因。\n"
+            "**你只给「问题 + 根因 + 方向」，不写实现**：绝不写 manifest/checkpoint/gate、schema、分步"
+            "协议这类施工细节（照抄就能敲键盘=越权）。\n"
+            "**RFC 综合多条 triaged issue 时，用 covers 声明**：若某 RFC 的根因涵盖 backlog 里若干条 "
+            'triaged issue（修好它这些就该让位），在该项加 `"covers": [票号,…]`——编排会把它们标 '
+            "superseded（从 dev 领取排除）、并在 RFC 落地后连带关闭；不确定就别填。\n\n"
+            f"## 已 triaged backlog（{len(triaged)} 条）\n{self._format_backlog(triaged)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
             f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
-            "对某条 issue 或某个体感点有疑惑时，先调 `get_session_timeline`"
-            "（issue_number=… 或 session_id=…）看该局落盘的 sim_trace 上帝视角，再下结论；"
-            "不要尝试直接读 sessions/ 原始文件。\n\n"
-            "最后用 complete_task 交回：result 里只放一个 JSON 数组"
-            "（每项含 title/body/labels，可选 covers），无提案则 `[]`。"
+            "对某条 issue 或某个体感点有疑惑时，调 `get_session_timeline`（issue_number=… 或 "
+            "session_id=…）看该局落盘的 god-view 轨迹，再下结论；不要直接读 sessions/ 原始文件。\n\n"
+            "最后用 complete_task 交回：result 里只放一个 JSON 数组，每项一个 RFC——含 `title`、"
+            '`fields`（RFC 字段：问题/根因/涉及issue/方向/验收，中文 label 键）、可选 `covers`；无 RFC 则 `[]`。'
         )
         with bind_session_store(self._store):
             out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
@@ -337,13 +358,11 @@ class Designer:
         for item in data:
             if not isinstance(item, dict) or not item.get("title"):
                 continue
+            fields = item.get("fields")
             proposals.append(
                 _Proposal(
-                    draft=IssueDraft(
-                        title=str(item["title"]),
-                        body=str(item.get("body", "")),
-                        labels=[str(x) for x in item.get("labels", []) if x],
-                    ),
+                    title=str(item["title"]),
+                    fields=fields if isinstance(fields, dict) else {},
                     covers=_parse_covers(item.get("covers")),
                 )
             )

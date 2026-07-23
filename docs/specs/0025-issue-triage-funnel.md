@@ -50,7 +50,7 @@ tasks:
     acceptance: needs-triage issue 经 triage 后带确认 type + triaged + 优先级标签、TRIAGE 区已填(按 kind 正确字段、经 validate)；feature 用 边界/交付物/验收；重复→关并链主 issue；驳回/needs-info→关+原因+对应标签；非法 priority 不打标签但仍采纳；单测覆盖五路 + 字段校验 + per-kind 字段 + 优先级。
   - id: T4
     title: synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
