@@ -69,6 +69,12 @@ class FakeTracker:
         issue["state"] = state
         issue["reason"] = reason
 
+    def set_labels(self, number: int, labels: list[str]) -> None:
+        """Spec-0025/T3a：整组替换标签（替换语义）；顺带 ensure 进标签集（对齐 Gitea）。"""
+        issue = self._require(number)
+        self._labels.update(labels)
+        issue["labels"] = list(labels)
+
     def issue(self, number: int) -> dict[str, Any]:
         """只读：返回该 issue 的快照副本，供单测断言 comment/state 生效。"""
         snapshot = self._require(number)

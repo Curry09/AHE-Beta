@@ -40,6 +40,7 @@ tasks:
     depends-on:
       - T1
       - T2
+      - T3a
     relates-to: []
     parallel: false
     files:
@@ -59,7 +60,7 @@ tasks:
     files:
       - backend/auto_designer/designer/designer.py
       - backend/tests/loop/test_designer.py
-    scope: Designer 收窄为纯 synthesize：输入=已 groomed(triaged)的 backlog(含跨轮积压) + 体感曲线(带session_id) + runtime_agg + 只读 harness 代码 + get_session_timeline。产 0..n 条 RFC（独立 `RFC` 标签，凌驾 type）：字段走 issue_schema RFC 区(问题/根因/涉及issue/方向/验收)；covers/consolidate 它综合的局部 triaged issue，被综合的打 `superseded-by #RFC`（从 dev 可领集合排除）。不做跨轮切分(大需求也一条 RFC)。不碰 git、不关 raw issue。宁缺毋滥(无主题→[])。
+    scope: "Designer 收窄为纯 synthesize：输入=已 groomed(triaged)的 backlog(含跨轮积压) + 体感曲线(带session_id) + runtime_agg + 只读 harness 代码 + get_session_timeline。产 0..n 条 RFC（独立 RFC 标签，凌驾 type）：字段走 issue_schema RFC 区(问题/根因/涉及issue/方向/验收)；body 用 covers 机器行声明它综合的局部 triaged issue（复用 0020），被综合的打 superseded 标签（记主 RFC 号，从 dev 可领集合排除）。不做跨轮切分(大需求也一条 RFC)。不碰 git、不关 raw issue。宁缺毋滥(无主题→[])。"
     acceptance: RFC 带 RFC 标签 + 结构字段 + covers 关联的 triaged issue；被综合的 issue 打 superseded-by；无跨条主题时产 []；仍能调 get_session_timeline/read_file 定位；单测覆盖 RFC 产出、supersede 标记、空产出、covers。
   - id: T5
     title: dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck
@@ -122,11 +123,28 @@ tasks:
       - frontend/src/components/detail/IssueDetail.tsx
       - frontend/src/types.ts
       - frontend/src/api.ts
-    scope: SidePanel issue 区重构：按状态/type 分组展示(未 triage / 已 triage backlog / 已驳回)，RFC 单独一区突出、显示它 covers/取代的 issue；issue 显示 kind/priority/round 徽标 + '被 #N 覆盖' 或 '✗ 驳回:<原因>' 或 'superseded by #RFC'；积压项(跨多轮仍 open)可标龄。IssueDetail 展示全字段。types/api 增补 kind/round/状态/priority/covers。
+    scope: "SidePanel issue 区重构：按状态/type 分组展示(未 triage / 已 triage backlog / 已驳回)，RFC 单独一区突出、显示它 covers/取代的 issue；issue 显示 kind/priority/round 徽标 + 覆盖链(被某设计 issue 覆盖) 或 驳回原因 或 superseded 标注。IssueDetail 展示全字段。types/api 增补 kind/round/状态/priority/covers。"
     acceptance: mock 下按状态/type 分组、RFC 区突出、被取代 issue 标注、积压项标龄；徽标齐全；字段缺省(老后端)退化不崩；npm build 通过。
+  - id: T3a
+    title: tracker 补 set_labels：整组替换已有 issue 标签
+    status: done
+    priority: P1
+    tags: []
+    depends-on:
+      - T1
+    relates-to: []
+    parallel: false
+    files:
+      - backend/auto_designer/tracker/base.py
+      - backend/auto_designer/tracker/gitea.py
+      - backend/auto_designer/tracker/fake.py
+      - backend/tests/tracker/test_fake.py
+      - backend/tests/tracker/test_gitea.py
+    scope: IssueTracker 协议加 set_labels(number, labels)——整组替换某 issue 的标签（triage 去 needs-triage 加 triaged 需要）。GiteaTracker：ensure 标签存在拿 id → PUT /repos/{o}/{r}/issues/{n}/labels {labels:[id…]}。FakeTracker：替换内存 issue 的 labels。对齐 Gitea 语义（替换而非增量，调用方自己算目标标签集）。
+    acceptance: set_labels 后 issue 标签变为给定集合（旧的移除、新的加入）；未知标签先 ensure；number 不存在抛 KeyError（Fake）；Gitea 走 PUT labels；单测覆盖替换语义 + FakeTracker。
 ---
 
-# 0025 · issue triage 漏斗：用户提 issue → triage agent → synthesize agent(RFC) → dev
+# 0025 · issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev
 
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
@@ -322,3 +340,4 @@ graph LR
 - **换仓开发者 agent 接入**：dev 侧过渡实现替换；届时处理"大需求/硬 issue 跨轮 carryover"的精细协作。
 - **优先级/预算自动校准**：用下轮 runtime_agg 撞顶率回调预算档与优先级公式。
 - **schema 扩 chore/document + 更多字段**：随需要扩。
+

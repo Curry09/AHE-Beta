@@ -165,12 +165,13 @@ Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 iss
 | 0024 | 0024/T3 | get_session_timeline tool（落盘原样） | done | T2 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/designer/test_session_timeline.py |
 | 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
 | 0025 | 0025/T2 | 用户 sim 产结构化 raw issue：暂定 type + needs-triage + 轮号 | done | T1 | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
-| 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | pending | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
+| 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | pending | T1, T2, T3a | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
 | 0025 | 0025/T4 | synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC | pending | T3 | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
 | 0025 | 0025/T5 | dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck | pending | T4 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
 | 0025 | 0025/T6 | 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster | pending | T5 | backend/run.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
 | 0025 | 0025/T7 | web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压) | pending | T4 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
 | 0025 | 0025/T8 | 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示 | pending | T7 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/types.ts<br>frontend/src/api.ts |
+| 0025 | 0025/T3a | tracker 补 set_labels：整组替换已有 issue 标签 | done | T1 | backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
 
 ## 跨 feature 关系图
 
@@ -313,6 +314,7 @@ graph LR
         n0025_T6["T6 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster"]
         n0025_T7["T7 web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压)"]
         n0025_T8["T8 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示"]
+        n0025_T3a["T3a tracker 补 set_labels：整组替换已有 issue 标签"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -380,11 +382,13 @@ graph LR
     n0025_T2 --> n0025_T1
     n0025_T3 --> n0025_T1
     n0025_T3 --> n0025_T2
+    n0025_T3 --> n0025_T3a
     n0025_T4 --> n0025_T3
     n0025_T5 --> n0025_T4
     n0025_T6 --> n0025_T5
     n0025_T7 --> n0025_T4
     n0025_T8 --> n0025_T7
+    n0025_T3a --> n0025_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -449,8 +453,9 @@ graph LR
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024 |
-| backend/auto_designer/tracker/fake.py | 0001, 0020 |
-| backend/auto_designer/tracker/gitea.py | 0002, 0017 |
+| backend/auto_designer/tracker/base.py | 0001, 0025 |
+| backend/auto_designer/tracker/fake.py | 0001, 0020, 0025 |
+| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
 | backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024 |
@@ -476,8 +481,8 @@ graph LR
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
-| backend/tests/tracker/test_fake.py | 0001, 0020 |
-| backend/tests/tracker/test_gitea.py | 0002, 0017 |
+| backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
+| backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
 | backend/tests/user/sim/test_heartbeat.py | 0022, 0023 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012, 0023 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022 |
@@ -1113,14 +1118,17 @@ graph LR
     nT6["T6 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster"]
     nT7["T7 web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压)"]
     nT8["T8 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示"]
+    nT3a["T3a tracker 补 set_labels：整组替换已有 issue 标签"]
     nT1 --> nT2
     nT1 --> nT3
     nT2 --> nT3
+    nT3a --> nT3
     nT3 --> nT4
     nT4 --> nT5
     nT5 --> nT6
     nT4 --> nT7
     nT7 --> nT8
+    nT1 --> nT3a
 ```
 
 演化图：
@@ -1130,6 +1138,7 @@ graph LR
     v_T1_1["T1 v1"]
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
+    v_T3a_1["T3a v1"]
     v_T4_1["T4 v1"]
     v_T5_1["T5 v1"]
     v_T6_1["T6 v1"]
@@ -1140,6 +1149,7 @@ graph LR
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_pending;
+    class v_T3a_1 st_done;
     class v_T4_1 st_pending;
     class v_T5_1 st_pending;
     class v_T6_1 st_pending;

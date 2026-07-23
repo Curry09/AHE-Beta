@@ -46,6 +46,18 @@ def test_list_comments_matches_gitea_shape() -> None:
         t.list_comments(number=999)
 
 
+def test_set_labels_replaces() -> None:
+    """Spec-0025/T3a：整组替换标签（去旧加新）+ ensure 进标签集；number 不存在抛 KeyError。"""
+    t = FakeTracker()
+    r = t.create_issue(IssueDraft(title="t", body="b", labels=["bug", "needs-triage"]))
+    t.set_labels(r.number, ["bug", "triaged"])
+    labels = t.issue(r.number)["labels"]
+    assert set(labels) == {"bug", "triaged"}  # needs-triage 移除、triaged 加入
+    assert "triaged" in t.labels()  # 顺带 ensure
+    with pytest.raises(KeyError):
+        t.set_labels(999, ["x"])
+
+
 def test_set_state_round_trip() -> None:
     t = FakeTracker()
     r = t.create_issue(_draft())

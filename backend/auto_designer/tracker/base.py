@@ -33,3 +33,10 @@ class IssueTracker(Protocol):
     def set_state(self, number: int, state: str, reason: str) -> None:
         """改状态。state ∈ {open, closed}，非法抛 ValueError；number 不存在抛 KeyError。"""
         ...
+
+    def set_labels(self, number: int, labels: list[str]) -> None:
+        """整组替换某 issue 的标签为 labels（Spec-0025/T3a：triage 去 needs-triage 加 triaged 用）。
+
+        替换语义（非增量）——调用方自己算好目标标签集。未知标签先 ensure 存在。number 不存在抛 KeyError。
+        """
+        ...
