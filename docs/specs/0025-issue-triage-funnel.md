@@ -111,7 +111,7 @@ tasks:
     acceptance: issue 附全部新字段；曲线只数可执行 backlog(含积压)；rejected 带原因；covered_by 单值；test_api/test_metrics 覆盖新字段与口径。
   - id: T8
     title: 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
@@ -121,6 +121,7 @@ tasks:
     files:
       - frontend/src/components/SidePanel.tsx
       - frontend/src/components/detail/IssueDetail.tsx
+      - frontend/src/lib/issueMeta.ts
       - frontend/src/types.ts
       - frontend/src/api.ts
     scope: "SidePanel issue 区重构：按状态/type 分组展示(未 triage / 已 triage backlog / 已驳回)，RFC 单独一区突出、显示它 covers/取代的 issue；issue 显示 kind/priority/round 徽标 + 覆盖链(被某设计 issue 覆盖) 或 驳回原因 或 superseded 标注。IssueDetail 展示全字段。types/api 增补 kind/round/状态/priority/covers。"

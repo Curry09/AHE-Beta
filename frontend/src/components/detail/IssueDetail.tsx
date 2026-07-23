@@ -1,7 +1,17 @@
 import { getIssue } from "../../api";
 import { useFetch } from "../../hooks/useFetch";
 import { fmtDate } from "../../lib/format";
+import { issueKind, priorityOf, roundOf, triageStatus } from "../../lib/issueMeta";
 import type { IssueComment } from "../../types";
+
+// triage 状态 → 中文标签（展示用）。
+const STATUS_LABEL: Record<string, string> = {
+  "needs-triage": "待 triage",
+  triaged: "已 triage（可执行）",
+  rejected: "已驳回",
+  "needs-info": "信息不足",
+  superseded: "被 RFC 取代",
+};
 
 // Spec-0020/T5：详情页覆盖关系直接从已有数据推导（零新端点）——
 // covers 解析 body 的机器行（T1 产出，最后一条为准）；covered_by 解析 T1 挂的 covered-by 评论。
@@ -27,6 +37,11 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
   const issue = data?.issue ?? null;
   const covers = issue ? parseCovers(issue.body) : [];
   const coveredBy = coveredByFrom(data?.comments ?? []);
+  // 详情端点不附平台层派生字段（那是 /api/issues 列表口径）——这里按 labels 客户端推导（Spec-0025/T8）。
+  const kind = issue ? issueKind(issue) : "";
+  const status = issue ? triageStatus(issue) : null;
+  const prio = issue ? priorityOf(issue) : null;
+  const round = issue ? roundOf(issue) : null;
 
   return (
     <div className="detail">
@@ -47,6 +62,32 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
         {data && issue && (
           <>
             <dl className="kv">
+              <dt>kind</dt>
+              <dd>
+                <span className="chip">{kind}</span>
+              </dd>
+              {status && (
+                <>
+                  <dt>triage 状态</dt>
+                  <dd>
+                    <span className="chip">{STATUS_LABEL[status] ?? status}</span>
+                  </dd>
+                </>
+              )}
+              {prio && (
+                <>
+                  <dt>优先级</dt>
+                  <dd>
+                    <span className="chip">{prio}</span>
+                  </dd>
+                </>
+              )}
+              {round != null && (
+                <>
+                  <dt>轮次</dt>
+                  <dd>round-{round}</dd>
+                </>
+              )}
               {issue.labels.length > 0 && (
                 <>
                   <dt>labels</dt>

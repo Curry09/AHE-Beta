@@ -4,10 +4,19 @@ import type {
   Commit,
   CommitsResponse,
   HistoryItem,
+  Issue,
   IssuesResponse,
   Selection,
 } from "../types";
 import { fmtDate } from "../lib/format";
+import {
+  ageDays,
+  isRfc,
+  issueKind,
+  priorityOf,
+  roundOf,
+  triageStatus,
+} from "../lib/issueMeta";
 import { AgentRunDetail } from "./detail/AgentRunDetail";
 import { CommitDetailView } from "./detail/CommitDetail";
 import { IssueDetailView } from "./detail/IssueDetail";
@@ -103,33 +112,9 @@ export function SidePanel(props: {
             {issues?.connected && issues.issues.length === 0 && (
               <div className="empty">暂无 issue</div>
             )}
-            {(issues?.issues ?? []).map((issue) => (
-              <button
-                key={issue.number}
-                className={`row ${issue.state}`}
-                onClick={() => onSelect({ type: "issue", number: issue.number })}
-              >
-                <span className="num">#{issue.number}</span>
-                <span className="row-title">{issue.title}</span>
-                {issue.labels.slice(0, 2).map((l) => (
-                  <span key={l} className="chip">
-                    {l}
-                  </span>
-                ))}
-                {/* Spec-0020/T5 覆盖徽标：bug 被 design 覆盖显 ⊂ #N；design 显其覆盖清单 */}
-                {issue.covered_by != null && (
-                  <span className="chip" title={`已被设计票 #${issue.covered_by} 覆盖`}>
-                    ⊂ #{issue.covered_by}
-                  </span>
-                )}
-                {(issue.covers?.length ?? 0) > 0 && (
-                  <span className="chip" title="该设计票覆盖的 bug">
-                    覆盖 {issue.covers!.map((n) => `#${n}`).join(" ")}
-                  </span>
-                )}
-                <span className={`chip ${issue.state}`}>{issue.state}</span>
-              </button>
-            ))}
+            {/* Spec-0025/T8：按 triage 状态 / type 分组——RFC 区突出、可执行 backlog、待 triage、
+                其它、已驳回/取代。各组仅在非空时出现。 */}
+            <IssueGroups issues={issues?.issues ?? []} onSelect={onSelect} />
 
             <div className="side-section-head">
               Main
@@ -165,6 +150,135 @@ export function SidePanel(props: {
         </>
       )}
     </section>
+  );
+}
+
+// 优先级徽标配色（内联，避免改 styles.css——非本 task 分配文件）。P0 红、P1 琥珀、其余淡。
+const PRIORITY_COLOR: Record<string, string> = {
+  P0: "var(--red)",
+  P1: "var(--amber)",
+  P2: "var(--text-dim)",
+  P3: "var(--text-faint)",
+};
+
+// 把 issue 分到五组：RFC / 可执行 backlog / 待 triage / 其它 / 已驳回·取代。组内按票号升序。
+function groupIssues(issues: Issue[]) {
+  const rfc: Issue[] = [];
+  const backlog: Issue[] = [];
+  const untriaged: Issue[] = [];
+  const rejected: Issue[] = [];
+  const other: Issue[] = [];
+  for (const it of issues) {
+    const st = triageStatus(it);
+    if (isRfc(it)) rfc.push(it);
+    else if (st === "rejected" || st === "needs-info" || st === "superseded") rejected.push(it);
+    else if (st === "triaged") backlog.push(it);
+    else if (st === "needs-triage") untriaged.push(it);
+    else other.push(it);
+  }
+  const byNum = (a: Issue, b: Issue) => a.number - b.number;
+  return {
+    rfc: rfc.sort(byNum),
+    backlog: backlog.sort(byNum),
+    untriaged: untriaged.sort(byNum),
+    other: other.sort(byNum),
+    rejected: rejected.sort(byNum),
+  };
+}
+
+function IssueGroups(props: { issues: Issue[]; onSelect: (sel: Selection) => void }) {
+  const g = groupIssues(props.issues);
+  const { onSelect } = props;
+  return (
+    <>
+      <IssueGroup title="RFC · 结构提案" issues={g.rfc} onSelect={onSelect} highlight />
+      <IssueGroup title="Backlog · 可执行" issues={g.backlog} onSelect={onSelect} />
+      <IssueGroup title="待 triage" issues={g.untriaged} onSelect={onSelect} />
+      <IssueGroup title="其它" issues={g.other} onSelect={onSelect} />
+      <IssueGroup title="已驳回 · 取代" issues={g.rejected} onSelect={onSelect} dim />
+    </>
+  );
+}
+
+function IssueGroup(props: {
+  title: string;
+  issues: Issue[];
+  onSelect: (sel: Selection) => void;
+  highlight?: boolean;
+  dim?: boolean;
+}) {
+  const { title, issues, onSelect, highlight, dim } = props;
+  if (issues.length === 0) return null;
+  return (
+    <>
+      <div
+        className="side-section-head"
+        style={highlight ? { color: "var(--amber)" } : dim ? { color: "var(--text-faint)" } : undefined}
+      >
+        {title}
+        <span className="count">{issues.length}</span>
+      </div>
+      {issues.map((issue) => (
+        <IssueRow key={issue.number} issue={issue} onSelect={onSelect} />
+      ))}
+    </>
+  );
+}
+
+function IssueRow(props: { issue: Issue; onSelect: (sel: Selection) => void }) {
+  const { issue, onSelect } = props;
+  const kind = issueKind(issue);
+  const prio = priorityOf(issue);
+  const round = roundOf(issue);
+  const st = triageStatus(issue);
+  const age = st === "triaged" && issue.state === "open" ? ageDays(issue.created_at) : null;
+  return (
+    <button
+      className={`row ${issue.state}`}
+      onClick={() => onSelect({ type: "issue", number: issue.number })}
+    >
+      <span className="num">#{issue.number}</span>
+      <span className="row-title">{issue.title}</span>
+      <span className="chip" title={`kind: ${kind}`}>
+        {kind}
+      </span>
+      {prio && (
+        <span className="chip" style={{ color: PRIORITY_COLOR[prio] }} title={`优先级 ${prio}`}>
+          {prio}
+        </span>
+      )}
+      {round != null && (
+        <span className="chip" title={`第 ${round} 轮提出`}>
+          r{round}
+        </span>
+      )}
+      {age != null && age > 0 && (
+        <span className="chip" title={`已挂 ${age} 天（积压龄）`}>
+          {age}d
+        </span>
+      )}
+      {/* RFC 显覆盖清单；被 RFC 覆盖显 ⊂ #N；被取代/驳回给标注 */}
+      {(issue.covers?.length ?? 0) > 0 && (
+        <span className="chip tag" title="该 RFC 综合/取代的 issue">
+          覆盖 {issue.covers!.map((n) => `#${n}`).join(" ")}
+        </span>
+      )}
+      {issue.covered_by != null && (
+        <span className="chip" title={`已被 RFC #${issue.covered_by} 覆盖`}>
+          ⊂ #{issue.covered_by}
+        </span>
+      )}
+      {st === "superseded" && (
+        <span className="chip" title="被 RFC 取代">
+          取代
+        </span>
+      )}
+      {issue.reject_reason && (
+        <span className="chip" title={issue.reject_reason}>
+          驳回
+        </span>
+      )}
+    </button>
   );
 }
 

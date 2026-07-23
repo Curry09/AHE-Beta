@@ -77,6 +77,14 @@ export interface HistoryResponse {
   items: HistoryItem[];
 }
 
+// triage 状态（Spec-0025/T7 后端标签投影；老后端缺省 → 由 labels 客户端兜底推导）。
+export type TriageStatus =
+  | "needs-triage"
+  | "triaged"
+  | "rejected"
+  | "needs-info"
+  | "superseded";
+
 export interface Issue {
   number: number;
   title: string;
@@ -86,8 +94,13 @@ export interface Issue {
   created_at: string;
   closed_at: string | null;
   url: string;
-  // Spec-0020/T4 覆盖关系（老后端缺省 → 不渲染徽标）：
-  // covers = design 票声明覆盖的 bug 票号；covered_by = 被哪张 open design 票覆盖。
+  // Spec-0025/T7 平台层标签投影（老后端缺省 → 前端按 labels 兜底推导，见 lib/issueMeta）：
+  kind?: string; // bug/feature/chore/document 或 rfc（RFC 凌驾 type）
+  round?: number | null; // round-N 的 N
+  triage_status?: TriageStatus | null;
+  priority?: string | null; // P0-P3
+  reject_reason?: string | null; // 驳回/needs-info 原因（权威原因见详情评论）
+  // 覆盖关系：covers = RFC 声明覆盖的 triaged 票号；covered_by = 被哪张 open RFC 覆盖。
   covers?: number[];
   covered_by?: number | null;
 }
