@@ -1,0 +1,23 @@
+type: tool
+name: get_session_timeline
+description: >-
+  Fetch the stored god-view timeline (sim_trace) for one user-sim session, as
+  persisted — no desensitization yet. Use when an open issue or a feeling-curve
+  point is unclear. Prefer issue_number for backlog bugs; use session_id from
+  feeling-curve rows that show [session=...]. Do not read raw sessions/ files
+  yourself; this tool is the only allowed access.
+
+input_schema:
+  type: object
+  properties:
+    issue_number:
+      type: integer
+      description: >-
+        Open (or historical) issue number to resolve to the session that filed it.
+    session_id:
+      type: string
+      description: >-
+        Session id from the feeling curve line ([session=...]). If both are set,
+        session_id wins.
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

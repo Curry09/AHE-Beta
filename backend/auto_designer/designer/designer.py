@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from auto_designer.designer.runtime_agg import aggregate_runtime, format_runtime_agg
+from auto_designer.designer.session_timeline import bind_session_store
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
@@ -258,20 +259,31 @@ class Designer:
             f"## open issue backlog（{len(backlog)} 条）\n{self._format_backlog(backlog)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
             f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
+            "对某条 issue 或某个体感点有疑惑时，先调 `get_session_timeline`"
+            "（issue_number=… 或 session_id=…）看该局落盘的 sim_trace 上帝视角，再下结论；"
+            "不要尝试直接读 sessions/ 原始文件。\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组"
             "（每项含 title/body/labels，可选 covers），无提案则 `[]`。"
         )
-        out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
+        with bind_session_store(self._store):
+            out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
         return _unwrap_result(out)
 
-    def _feeling_trend(self) -> list[tuple[str, int, str]]:
-        """体感随时间：[(created_at, score, reason)]，按时间升序。空数据源返回空序列。
+    def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
+        """体感随时间：[(created_at, score, reason, session_id)]，按时间升序。
 
-        reason = 用户末态那句「为什么」（feeling.reason）。设计师光看分数无法判根因——
-        「延迟/等待本身就是痛点」这类只能从 reason 里读出（老索引无此键时回落空串）。
+        reason = 用户末态那句「为什么」。session_id 供 get_session_timeline 按体感点取用。
         """
         rows = sorted(self._store.index(), key=lambda e: e["created_at"])
-        return [(e["created_at"], e["score"], str(e.get("reason", ""))) for e in rows]
+        return [
+            (
+                e["created_at"],
+                e["score"],
+                str(e.get("reason", "")),
+                str(e.get("session_id", "")),
+            )
+            for e in rows
+        ]
 
     @staticmethod
     def _format_backlog(backlog: list) -> str:
@@ -282,13 +294,14 @@ class Designer:
         )
 
     @staticmethod
-    def _format_trend(trend: list[tuple[str, int, str]]) -> str:
+    def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:
         if not trend:
             return "（暂无体感数据）"
         lines = []
-        for ts, score, reason in trend:
+        for ts, score, reason, sid in trend:
             why = f" — {reason}" if reason else ""
-            lines.append(f"- {ts}: {score}{why}")
+            sid_bit = f" [session={sid}]" if sid else ""
+            lines.append(f"- {ts}{sid_bit}: {score}{why}")
         return "\n".join(lines)
 
     @staticmethod

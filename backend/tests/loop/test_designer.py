@@ -97,8 +97,9 @@ def test_proposals_become_design_labeled_issues(tmp_path) -> None:
     assert {"统一错误处理契约", "澄清前置追问策略"} <= titles
     # backlog + 体感曲线确实喂进了 agent（曲线现在带上体感 reason 那句「为什么」）。
     assert [i.title for i in designer.seen_backlog] == ["慢"]
-    assert [s for _, s, _ in designer.seen_trend] == [2, 1]
-    assert [reason for _, _, reason in designer.seen_trend] == ["等太久", "超时两次颗粒无收"]
+    assert [s for _, s, _, _ in designer.seen_trend] == [2, 1]
+    assert [reason for _, _, reason, _ in designer.seen_trend] == ["等太久", "超时两次颗粒无收"]
+    assert all(sid for _, _, _, sid in designer.seen_trend)  # 带 session_id 供 timeline tool
     # 运行时聚合也注入了（空 transcript 会话 → 0 harness 轮，但仍有窗口说明）。
     assert "局会话" in designer.seen_runtime or "暂无会话数据" in designer.seen_runtime
 
