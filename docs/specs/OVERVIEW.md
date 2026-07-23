@@ -163,7 +163,7 @@ Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 iss
 | 0024 | 0024/T1 | Session.sim_trace 落盘（TurnLog→SimTrace） | done | — | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_models.py<br>backend/tests/loop/test_sim_user.py |
 | 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py<br>backend/tests/user/test_session_store.py |
 | 0024 | 0024/T3 | get_session_timeline tool（落盘原样） | done | T2 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/designer/test_session_timeline.py |
-| 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | pending | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
+| 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
 | 0025 | 0025/T2 | 用户 sim 产结构化 raw issue：persona 填用户端字段 + type 标签 + needs-triage + 轮号 | pending | T1 | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
 | 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | pending | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
 | 0025 | 0025/T4 | synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC | pending | T3 | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
@@ -1135,8 +1135,9 @@ graph LR
     v_T6_1["T6 v1"]
     v_T7_1["T7 v1"]
     v_T8_1["T8 v1"]
+    classDef st_done fill:#b7e4c7;
     classDef st_pending fill:#eeeeee;
-    class v_T1_1 st_pending;
+    class v_T1_1 st_done;
     class v_T2_1 st_pending;
     class v_T3_1 st_pending;
     class v_T4_1 st_pending;

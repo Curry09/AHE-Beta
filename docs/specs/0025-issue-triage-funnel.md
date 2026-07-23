@@ -7,7 +7,7 @@ summary: 把 issue 流建成真实软件团队的 triage 漏斗，并把现有�
 tasks:
   - id: T1
     title: 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
