@@ -417,3 +417,46 @@ def test_no_guard_is_backward_compatible(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     head = _git(repo, "rev-parse", "main")
     assert _orch(repo, [], [_Dev([], DevOutcome())]).run_round("c") == head
+
+
+# Spec-0025/T6：d 段两 agent——triage 先于 synthesize，两者都在 b 之前。
+
+
+class _Phase:
+    """记录自己被调用的时刻（往共享 events 里打一条）。"""
+
+    def __init__(self, events: list, name: str) -> None:
+        self._events = events
+        self._name = name
+
+    def triage_once(self):
+        self._events.append(("d", self._name))
+
+    def propose_once(self):
+        self._events.append(("d", self._name))
+
+
+def test_triage_runs_before_synthesize_before_dev(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    events: list = []
+    triager = _Phase(events, "triage")
+    synth = _Phase(events, "synth")
+
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", None))
+
+    orch = Orchestrator(
+        launcher=_Launcher(events),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        developer_agents=[_Dev(events, DevOutcome())],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+        triagers=[triager],
+        designers=[synth],
+    )
+    orch.run_round("c")
+
+    # a（session）→ d1 triage → d2 synth → b（dev），严格此序
+    kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d", "dev")]
+    assert kinds == ["session", "triage", "synth", "dev"]

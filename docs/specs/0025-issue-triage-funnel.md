@@ -78,7 +78,7 @@ tasks:
     acceptance: dev 只领 triaged/RFC、跳过 needs-triage/rejected/superseded；按票号升序一条；多 dev attempted 防撞；预算按 kind 分档、RFC 最高；backlog 超容量时未领 issue 保持 open(可下轮领)；无 pick_policy/attempt/stuck 残留；RFC 推进两级连带关闭；单测覆盖过滤/顺序/积压/预算/两级关闭。
   - id: T6
     title: 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:

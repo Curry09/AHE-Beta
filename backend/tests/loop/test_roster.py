@@ -1,40 +1,37 @@
-# Spec-0020/T3：dev 领取策略配置（N_BUG_FIRST_DEVS）解析单测。
-"""验证 load_dev_pick_policies：默认 1 个 bug_first；0/超编/非法值各回落到位；空编制返回空。"""
+# Spec-0025/T6：roster 编制解析——含 triager（issue 规范化角色）。
+"""验证 load_roster：默认 user3/triager1/designer1/developer3；各 N_* 环境变量覆盖、非法回落默认。"""
 
 from __future__ import annotations
 
-from auto_designer.loop.roster import load_dev_pick_policies
+from auto_designer.loop.roster import DEFAULT_ROSTER, load_roster
 
 
-def test_default_one_bug_first(monkeypatch) -> None:
-    monkeypatch.delenv("N_BUG_FIRST_DEVS", raising=False)
-    assert load_dev_pick_policies(n_developers=3) == [
-        "bug_first",
-        "design_first",
-        "design_first",
-    ]
+def test_defaults(monkeypatch) -> None:
+    for k in ("N_USERS", "N_TRIAGERS", "N_DESIGNERS", "N_DEVELOPERS"):
+        monkeypatch.delenv(k, raising=False)
+    assert load_roster() == {"user": 3, "triager": 1, "designer": 1, "developer": 3}
+    assert DEFAULT_ROSTER["triager"] == 1  # 新增 triager 编制
 
 
-def test_zero_means_all_design_first(monkeypatch) -> None:
-    monkeypatch.setenv("N_BUG_FIRST_DEVS", "0")
-    assert load_dev_pick_policies(n_developers=3) == ["design_first"] * 3
+def test_triager_override(monkeypatch) -> None:
+    monkeypatch.setenv("N_TRIAGERS", "2")
+    assert load_roster()["triager"] == 2
 
 
-def test_over_roster_truncates_to_all_bug_first(monkeypatch) -> None:
-    monkeypatch.setenv("N_BUG_FIRST_DEVS", "99")
-    assert load_dev_pick_policies(n_developers=2) == ["bug_first"] * 2
+def test_zero_triagers_allowed(monkeypatch) -> None:
+    monkeypatch.setenv("N_TRIAGERS", "0")
+    assert load_roster()["triager"] == 0  # 0 合法（关掉 triage 段）
 
 
-def test_invalid_values_fall_back_to_default(monkeypatch) -> None:
-    for raw in ("-1", "abc", "1.5", "  "):
-        monkeypatch.setenv("N_BUG_FIRST_DEVS", raw)
-        assert load_dev_pick_policies(n_developers=3) == [
-            "bug_first",
-            "design_first",
-            "design_first",
-        ]
+def test_invalid_falls_back(monkeypatch) -> None:
+    for raw in ("abc", "-1", "1.5"):
+        monkeypatch.setenv("N_TRIAGERS", raw)
+        assert load_roster()["triager"] == 1  # 非法/负值回落默认
 
 
-def test_zero_developers_yields_empty(monkeypatch) -> None:
-    monkeypatch.setenv("N_BUG_FIRST_DEVS", "2")
-    assert load_dev_pick_policies(n_developers=0) == []
+def test_all_roles_overridable(monkeypatch) -> None:
+    monkeypatch.setenv("N_USERS", "6")
+    monkeypatch.setenv("N_DESIGNERS", "2")
+    monkeypatch.setenv("N_DEVELOPERS", "4")
+    r = load_roster()
+    assert (r["user"], r["designer"], r["developer"]) == (6, 2, 4)
