@@ -73,6 +73,9 @@
 ### 0023 等待环事件化钉死 · 废弃 one/two 与遗留信号
 钉死 AwaitEvent 等待环（主 loop 吃 reply、心跳一次性、动作前 try_reply）；统一 [+Ns] history（已删 wait_cost）；废弃 decide/waiting 的 one\|two 与合并 builder；清死常量与无消费者 MAIN_GAP；探针对齐 0022 菜单。
 
+### 0024 用户 god-view 落盘 + 设计师按需取用
+Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 issue_numbers；设计师经 get_session_timeline(issue\|session_id) 按需取落盘原样 JSON；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。脱敏加工与废弃 runtime_agg 另议。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -154,6 +157,9 @@
 | 0023 | 0023/T2 | prompt：删除 one/two 合并 builder · 单测改打 three | done | T1 | backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_prompt.py |
 | 0023 | 0023/T3 | 探针：去掉 two 臂与 peek-via-control 心智 | done | T1 | backend/scripts/probe_wait_progress.py<br>backend/scripts/probe_peek_decision_trace.py<br>backend/scripts/probe_persona_wait_matrix.py<br>backend/scripts/probe_ontrack_new_harness.py<br>backend/scripts/probe_wait_signals_to_evolution.py |
 | 0023 | 0023/T4 | launcher.try_reply 非阻塞契约（已落地） | done | — | backend/auto_designer/harness/launcher.py |
+| 0024 | 0024/T1 | Session.sim_trace 落盘（TurnLog→SimTrace） | done | — | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_models.py<br>backend/tests/loop/test_sim_user.py |
+| 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py<br>backend/tests/user/test_session_store.py |
+| 0024 | 0024/T3 | get_session_timeline tool（落盘原样） | done | T2 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/designer/test_session_timeline.py |
 
 ## 跨 feature 关系图
 
@@ -282,6 +288,11 @@ graph LR
         n0023_T3["T3 探针：去掉 two 臂与 peek-via-control 心智"]
         n0023_T4["T4 launcher.try_reply 非阻塞契约（已落地）"]
     end
+    subgraph G0024[0024 designer-godview-timeline-tool]
+        n0024_T1["T1 Session.sim_trace 落盘（TurnLog→SimTrace）"]
+        n0024_T2["T2 index 扩 issue_numbers + 体感曲线带 session_id"]
+        n0024_T3["T3 get_session_timeline tool（落盘原样）"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -343,6 +354,8 @@ graph LR
     n0021_T2 --> n0021_T1
     n0023_T2 --> n0023_T1
     n0023_T3 --> n0023_T1
+    n0024_T2 --> n0024_T1
+    n0024_T3 --> n0024_T2
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -393,22 +406,24 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
+| backend/agent_defs/designer/agent.yaml | 0016, 0024 |
+| backend/agent_defs/designer/systemprompt.md | 0016, 0024 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022 |
-| backend/auto_designer/models.py | 0001, 0008, 0009, 0013 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024 |
+| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017 |
-| backend/auto_designer/user/session_store.py | 0001, 0016, 0017 |
+| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
@@ -421,11 +436,12 @@ graph LR
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
-| backend/tests/loop/test_sim_user.py | 0017, 0022 |
+| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
+| backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/tracker/test_fake.py | 0001, 0020 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017 |
 | backend/tests/user/sim/test_heartbeat.py | 0022, 0023 |
@@ -435,7 +451,7 @@ graph LR
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
-| backend/tests/user/test_session_store.py | 0001, 0017 |
+| backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
 
 ## 各 feature 详情
 
@@ -1020,4 +1036,28 @@ graph LR
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
+```
+
+### 0024 用户 god-view 落盘 + 设计师按需取用（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 Session.sim_trace 落盘（TurnLog→SimTrace）"]
+    nT2["T2 index 扩 issue_numbers + 体感曲线带 session_id"]
+    nT3["T3 get_session_timeline tool（落盘原样）"]
+    nT1 --> nT2
+    nT2 --> nT3
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
 ```

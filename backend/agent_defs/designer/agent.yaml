@@ -42,6 +42,11 @@ tools:
   - name: search_file_content
     yaml_path: ./tools/search_file_content.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:search_file_content
+  # 按需取一局用户模拟落盘的 god-view（sim_trace 原样；暂不脱敏）；
+  # 编排侧读 SessionStore，jail 仍禁直接读 sessions/。
+  - name: get_session_timeline
+    yaml_path: ./tools/get_session_timeline.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_session_timeline
   - name: complete_task
     yaml_path: ./tools/complete_task.tool.yaml
     binding: nexau.archs.tool.builtin.session_tools:complete_task

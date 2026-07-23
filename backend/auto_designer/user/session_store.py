@@ -54,6 +54,8 @@ class SessionStore:
                 "reason": session.feeling.reason,
                 "created_at": session.created_at.isoformat(),
                 "n_issues": len(session.issue_refs),
+                # 供设计师 get_session_timeline(issue_number=…) 快查；旧 index 无此键则扫盘回落。
+                "issue_numbers": [r.number for r in session.issue_refs],
             }
         )
         (self._root / _INDEX_NAME).write_text(
