@@ -19,8 +19,8 @@ tasks:
     scope: 新模块 issue_schema（平台层，dev 够不着）。每 type 声明式字段，且字段分两区——USER 填(用户可见)与 TRIAGE 填(需读码/轨迹)：bug=USER{复现步骤,期望,实际} + TRIAGE{根因区域,边界,验收,优先级}；feature=USER{背景,目标,场景} + TRIAGE{边界,交付物,验收,优先级}；chore/document 起步可省字段。RFC 独立一类(非 type)：{问题,根因,涉及issue,方向,验收}。validate(kind, fields, section)->errors（缺必填/枚举非法/未知kind）；render(kind, fields)->'### <label>\n\n<value>' 分节 markdown（单一布局）。priority 枚举 P0-P3。运行时读声明防 drift。
     acceptance: 每 type 的 USER/TRIAGE 字段分区正确；bug 有复现三段、feature 有背景/交付；RFC 字段独立；validate 拒缺必填/非法枚举/未知kind；render 布局稳定；单测覆盖分区、每 kind render、validate 各失败分支。
   - id: T2
-    title: 用户 sim 产结构化 raw issue：persona 填用户端字段 + type 标签 + needs-triage + 轮号
-    status: pending
+    title: 用户 sim 产结构化 raw issue：暂定 type + needs-triage + 轮号
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -30,8 +30,8 @@ tasks:
     files:
       - backend/auto_designer/loop/sim_user.py
       - backend/tests/loop/test_sim_user.py
-    scope: persona 提 issue 时按 issue_schema 的 USER 区填用户可见字段(复现/期望/实际 或 背景/目标/场景)，质量随 persona 变(专家详、blind 潦草)；sim_user 据此建 issue：body=USER 区 render、标签=[<type 猜测:bug/feature>, needs-triage, round-N]（round 由编排层透传）。不再打 ['bug'] 自由文本。TRIAGE 区留空待 triage agent 补。raw issue 不被 sim/dev 关闭。
-    acceptance: sim 产出的 issue 带 type + needs-triage + round-N 标签、body 是 USER 区分节；persona 填得潦草时字段可空(不报错，留 triage 处理)；round 缺省不加轮号(兼容旧测)；单测断言标签、body 分区、round 透传。
+    scope: sim_user 建 raw issue 结构化——标签=[暂定 type(bug/feature，_infer_kind 粗判，triage 会确认), needs-triage, round-N]（round 由 round_provider 透传）；body=persona 用户可见报告原文（用户看不到代码→只有用户视角症状，即天然的 USER 区内容）；TRIAGE 区字段留空待 triage agent 读码+轨迹补。不再只打 ['bug']。make_sim_run_session_fn 加 round_provider（None 兼容旧调用）。注：persona 把报告细分成 USER 区结构字段需改用户侧 prompt(user/sim)，超本 task 文件范围，留后续。
+    acceptance: sim 产出的 issue 带暂定 type + needs-triage + (给了 round_provider 时)round-N 标签；body=用户报告原文；round_provider 缺省不加轮号(兼容旧测)；_infer_kind 默认 bug、命中诉求词→feature；单测断言标签与 round 透传。
   - id: T3
     title: triage agent（新角色）：就地分类+定位+去重+驳回/needs-info
     status: pending
