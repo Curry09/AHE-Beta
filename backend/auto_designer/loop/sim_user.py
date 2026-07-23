@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.models import (
     FeelingScore,
@@ -23,7 +24,6 @@ from auto_designer.models import (
     Transcript,
     Turn,
 )
-from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.deps import ensure_deps
