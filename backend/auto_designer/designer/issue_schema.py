@@ -13,13 +13,14 @@ markdown（单一布局，前端 + 回读一套解析器）。加新 kind 只增
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 USER = "user"
 TRIAGE = "triage"
 
-# 优先级枚举（单一真源）。值由编排层按体感影响 + runtime_agg 频率**机制派生**（Spec-0025/T6），
-# 非 triage agent 填——故不列为 body 字段，只作标签枚举供 dispatch/前端用。
+# 优先级枚举（单一真源，高→低）。由 **triage agent** 按严重度 × 那局体感判定（Spec-0025/T3），
+# 以标签形式落库——不列为 body 字段，只作标签枚举供 dispatch / 前端徽标用。
 PRIORITIES = ("P0", "P1", "P2", "P3")
 
 # ---- triage 工作流标签（平台层单一真源，供 sim/triage/dev/web 共用）----
@@ -34,6 +35,62 @@ SUPERSEDED = "superseded"  # 被 RFC 取代的局部 issue（可领集合排除�
 def round_label(round_no: int) -> str:
     """轮号标签：`round-<N>`。用户 issue 盖它，供增量 triage / 观测曲线按轮计数。"""
     return f"round-{int(round_no)}"
+
+
+# ---- 标签 → 语义投影（平台层单一真源，供 web / metrics / dev / 前端共用）----
+# issue 的 kind / 轮号 / triage 状态 / 优先级 全部只由标签决定；这里集中做投影，避免各处各写一份。
+
+_ROUND_RE = re.compile(r"^round-(\d+)$")
+
+
+def issue_kind(labels: list[str]) -> str:
+    """标签 → issue kind：RFC 优先（凌驾 type），否则取首个 USER_KINDS 命中；都无则 'bug'（暂定兜底）。"""
+    ls = list(labels or [])
+    if RFC_LABEL in ls:
+        return "rfc"
+    for k in USER_KINDS:
+        if k in ls:
+            return k
+    return "bug"
+
+
+def round_of(labels: list[str]) -> int | None:
+    """标签 → 轮号（`round-N` 的 N）；无则 None。"""
+    for x in labels or []:
+        m = _ROUND_RE.match(str(x))
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def priority_of(labels: list[str]) -> str | None:
+    """标签 → 优先级（P0-P3）；无则 None。多个并存取最高（PRIORITIES 已按高→低）。"""
+    present = [p for p in PRIORITIES if p in (labels or [])]
+    return present[0] if present else None
+
+
+def triage_status(labels: list[str]) -> str | None:
+    """标签 → triage 状态（单值）：越决定性者胜——驳回/待补(终态关闭) > superseded(被 RFC 取代) >
+    triaged(可执行) > needs-triage(待处理)；都无则 None。"""
+    ls = list(labels or [])
+    for s in (REJECTED, NEEDS_INFO, SUPERSEDED, TRIAGED, NEEDS_TRIAGE):
+        if s in ls:
+            return s
+    return None
+
+
+def is_backlog_by_labels(labels: list[str]) -> bool:
+    """仅按标签判是否属「可执行 backlog」类：triaged 或 RFC，且未被 needs-triage/superseded/驳回排除。
+    不看开/关状态——供观测曲线按事件累计（关闭事件自会抵消）。"""
+    ls = set(labels or [])
+    if not (TRIAGED in ls or RFC_LABEL in ls):
+        return False
+    return not (ls & {NEEDS_TRIAGE, SUPERSEDED, REJECTED, NEEDS_INFO})
+
+
+def is_executable_backlog(*, labels: list[str], state: str) -> bool:
+    """某时刻是否算可执行 backlog：open 且 is_backlog_by_labels（dev 可领 / 曲线当前计数口径）。"""
+    return state == "open" and is_backlog_by_labels(labels)
 
 
 @dataclass(frozen=True)

@@ -81,9 +81,8 @@ def test_overview_with_sessions(tmp_path: Path) -> None:
     assert body["session_count"] == 2
     assert body["open_issue_count"] == 1
     assert len(body["feeling_trend"]) == 2
-    # issue_curve net_open 累计：第一局 opened=1 net=1，第二局 opened=2 net=3
-    nets = [row[2] for row in body["issue_curve"]]
-    assert nets == [1, 3]
+    # issue_curve 现为 backlog 口径（需 Gitea 全状态读能力）；FakeTracker 无 list_issues → 空序列。
+    assert body["issue_curve"] == []
 
 
 class _BrokenTracker:
@@ -292,8 +291,81 @@ def test_issues_full_states_via_observe_tracker(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=_ObserveTracker())
     body = client.get("/api/issues").json()
     assert body["connected"] is True
-    # 全状态 + 正文 + 时间戳原样透传；Spec-0020/T4 附加 covers/covered_by（bug 票恒 []/None）
-    assert body["issues"] == [{**_ISSUE_DTO, "covers": [], "covered_by": None}]
+    # 全状态 + 正文 + 时间戳原样透传；Spec-0025/T7 附加 kind/round/triage_status/priority/
+    # reject_reason 与 covers/covered_by（labels=[bug] 的普通闭票：kind=bug、其余无标签 → None/空）
+    assert body["issues"] == [
+        {
+            **_ISSUE_DTO,
+            "kind": "bug",
+            "round": None,
+            "triage_status": None,
+            "priority": None,
+            "reject_reason": None,
+            "covers": [],
+            "covered_by": None,
+        }
+    ]
+
+
+# ---- Spec-0025/T7：/api/issues 平台层派生字段（kind/round/triage_status/priority/驳回原因）----
+
+
+class _TriageStateTracker(FakeTracker):
+    """FakeTracker + 全状态读能力，返回带 triage 标签/时间戳/reason 的 issue，测 T7 派生字段。"""
+
+    def __init__(self, issues: list[dict]) -> None:
+        super().__init__()
+        self._all = issues
+
+    def list_issues(self, *, state: str = "all", limit: int = 100):
+        return list(self._all)
+
+
+def _dto(number: int, *, labels: list[str], state: str = "open", body: str = "", reason: str = ""):
+    return {
+        "number": number,
+        "title": f"issue {number}",
+        "body": body,
+        "labels": labels,
+        "state": state,
+        "created_at": "2026-06-01T00:00:00Z",
+        "closed_at": "2026-06-02T00:00:00Z" if state == "closed" else None,
+        "url": f"http://gitea/o/r/issues/{number}",
+        "reason": reason,
+    }
+
+
+def test_issues_triage_fields(tmp_path: Path) -> None:
+    tracker = _TriageStateTracker(
+        [
+            _dto(1, labels=["bug", "triaged", "P1", "round-2"]),
+            _dto(2, labels=["RFC", "P0"], body="综合\n\ncovers: #3"),
+            _dto(3, labels=["bug", "triaged", "superseded"], state="closed"),
+            _dto(4, labels=["feature", "rejected", "round-1"], state="closed", reason="超出 harness 范围"),
+            _dto(5, labels=["bug", "needs-triage", "round-3"]),
+        ]
+    )
+    client = _client(tmp_path, tracker=tracker)
+    issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}
+
+    # 1：已 triaged 的 bug，带优先级与轮号
+    assert (issues[1]["kind"], issues[1]["triage_status"]) == ("bug", "triaged")
+    assert (issues[1]["priority"], issues[1]["round"]) == ("P1", 2)
+    assert issues[1]["covered_by"] is None
+    # 2：RFC 凌驾 type（kind=rfc）、covers 声明、triage_status 不落在 triage 枚举里 → None
+    assert issues[2]["kind"] == "rfc"
+    assert issues[2]["covers"] == [3]
+    assert issues[2]["triage_status"] is None
+    # 3：被 RFC 取代——superseded 胜过 triaged；被 open RFC #2 覆盖
+    assert issues[3]["triage_status"] == "superseded"
+    assert issues[3]["covered_by"] == 2
+    # 4：驳回——带原因（reason 透出）
+    assert issues[4]["triage_status"] == "rejected"
+    assert issues[4]["reject_reason"] == "超出 harness 范围"
+    assert issues[4]["round"] == 1
+    # 5：未 triage
+    assert issues[5]["triage_status"] == "needs-triage"
+    assert issues[5]["priority"] is None
 
 
 # ---- Spec-0020/T4：/api/issues 覆盖关系字段 covers / covered_by ----

@@ -95,7 +95,7 @@ tasks:
     acceptance: d 段先 triage 后 synthesize、都在 b 前；两 agent 收到 round；roster 出 triager 数、无 pick_policy；预算按 kind 档 + RFC 最高；test 覆盖顺序/round/roster/预算档。
   - id: T7
     title: web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压)
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
