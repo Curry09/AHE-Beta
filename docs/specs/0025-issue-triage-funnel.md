@@ -227,10 +227,13 @@ issue 直接以自由文本进 backlog，dev 直啃 raw、易过拟合、难落�
 |---|---|---|---|
 | ⓪ 产品层 distill | persona_library.json / seeds.json（`run.py:316,321`，人经 CLI） | persona×seed 分布 | 否（人） |
 | a 用户 sim | persona + scenario + harness+manual + workspace（`sim_user.py:150-190`） | 体感+raw issue+轨迹（`:196-203`） | 是 |
-| d1 triage | needs-triage issue(含积压) + 只读 harness 代码 + `get_session_timeline` + runtime_agg | 就地 triaged / 关重复 / 驳回 | 是（新） |
-| d2 synthesize | triaged backlog(含积压) + 体感曲线(带 session_id,`designer.py:272`) + runtime_agg(`:184`) + 轨迹 | RFC + supersede 标记 | 是（原 designer 收窄） |
+| d1 triage（**纯 issue 规范化**，单条视野） | needs-triage issue(含积压) + 只读 harness 代码 + `get_session_timeline`(单局轨迹，**含那局体感分**) | 就地 triaged(确认 type+TRIAGE 字段+优先级) / 关重复 / 驳回 | 是（新） |
+| d2 synthesize（**PM + 架构师**，全局视野） | triaged backlog(全部，含积压) + **体感曲线**(评分+reason，带 session_id,`designer.py:272`) + **runtime_agg**(`:184`) + 轨迹 | RFC(深度需求分析→结构/框架改进) + supersede 标记 | 是（原 designer 收窄） |
 | b dev | 可领集合(triaged/RFC) + issue 正文 + 可写 harness 仓 | git commit/tag/push + 连带关闭 | 是 |
-| PM 优先级 | 体感影响 + runtime_agg 频率 | priority P0–P3 | 否（机制派生） |
+
+**分工要点**：triage 只看**单条 issue**（报告+代码+那局轨迹，**无**聚合 runtime_agg / 全局体感曲线）——
+优先级由那局体感锚定。synthesize 独占**全局视野**（全部规范化 issue + 体感全景 + runtime_agg），行 PM 之职
+深度分析用户需求、促成结构/框架级改进（产 RFC）。优先级已归 triage（见 T3），不再机制派生。
 
 ### schema 分区（T1）
 

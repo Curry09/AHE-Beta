@@ -27,7 +27,7 @@ class _StubTriager(Triager):
         self._canned = canned
         self.seen_pending: list = []
 
-    def _run_agent(self, *, pending: list, triaged: list, runtime: str) -> str:
+    def _run_agent(self, *, pending: list, triaged: list) -> str:
         self.seen_pending = pending
         return self._canned
 

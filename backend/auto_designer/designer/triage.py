@@ -46,7 +46,6 @@ from auto_designer.designer.issue_schema import (
 from auto_designer.designer.issue_schema import (
     validate as schema_validate,
 )
-from auto_designer.designer.runtime_agg import aggregate_runtime, format_runtime_agg
 from auto_designer.designer.session_timeline import bind_session_store
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
@@ -146,10 +145,9 @@ class Triager:
             self._emit(running=False, status="无待分诊 issue")
             return TriageOutcome()
         triaged = [i for i in backlog if TRIAGED in i.labels]
-        runtime = format_runtime_agg(aggregate_runtime(store=self._store, harness_repo=self._repo))
         self._emit(running=True, status=f"分诊中…（{len(pending)} 条待 triage）")
 
-        result_text = self._run_agent(pending=pending, triaged=triaged, runtime=runtime)
+        result_text = self._run_agent(pending=pending, triaged=triaged)
         dispositions = _parse_dispositions(result_text)
 
         by_number = {i.number: i for i in pending}
@@ -226,7 +224,7 @@ class Triager:
         except Exception:  # noqa: BLE001
             pass
 
-    def _run_agent(self, *, pending: list, triaged: list, runtime: str) -> str:
+    def _run_agent(self, *, pending: list, triaged: list) -> str:
         os.environ["SANDBOX_WORK_DIR"] = str(self._repo)  # 只读 grounding = harness 仓
         from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
@@ -236,14 +234,16 @@ class Triager:
 
             cfg.resolved_tracer = StepTracer(self._on_event)
         agent = Agent(config=cfg)
+        # 注意：triage 只做「issue 规范化」——只给它 raw issue + 只读代码 + 按需拉的单局轨迹（轨迹里含
+        # 那局的体感分，供判优先级）。**不给聚合 runtime_agg / 全局体感曲线**——那是 synthesize 的 PM 视角。
         msg = (
-            "逐条分诊下面「待 triage」的 raw 用户 issue：确认 kind、读 harness 源码 + 按 issue 号调 "
-            "get_session_timeline 拉真实轨迹定位、判重、或驳回/needs_info。产出见系统提示的输出契约。\n"
+            "逐条**规范化**下面「待 triage」的 raw 用户 issue：确认 kind、读 harness 源码 + 按 issue 号调 "
+            "get_session_timeline 拉该局真实轨迹（含那局体感分）定位、判重、或驳回/needs_info。"
+            "产出见系统提示的输出契约。\n"
             "**先 read_file/search_file_content 读懂相关 harness 机制再下结论**；对存疑 issue 调 "
             "get_session_timeline(issue_number=<号>) 看那局真实轨迹。\n\n"
             f"## 待 triage（{len(pending)} 条）\n{self._format_issues(pending)}\n\n"
             f"## 已 triaged（判重参照，{len(triaged)} 条）\n{self._format_issues(triaged)}\n\n"
-            f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组（每条待 triage issue 一项）。"
         )
         with bind_session_store(self._store):
