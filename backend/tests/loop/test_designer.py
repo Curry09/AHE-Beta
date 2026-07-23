@@ -75,10 +75,18 @@ def _designer(tmp_path: Path, tracker: FakeTracker, canned: str) -> _StubDesigne
 
 
 def _rfc_fields() -> dict:
-    return {"问题": "大任务撞预算", "根因": "无增量交付", "涉及 issue": "#多条", "方向": "加预算感知", "验收": "预算内给交付"}
+    return {
+        "问题": "大任务撞预算",
+        "根因": "无增量交付",
+        "涉及 issue": "#多条",
+        "方向": "加预算感知",
+        "验收": "预算内给交付",
+    }
 
 
-def _rfc_canned(covers: object = None, *, title: str = "结构：预算感知", fields: dict | None = None) -> str:
+def _rfc_canned(
+    covers: object = None, *, title: str = "结构：预算感知", fields: dict | None = None
+) -> str:
     item: dict = {"title": title, "fields": fields if fields is not None else _rfc_fields()}
     if covers is not None:
         item["covers"] = covers
@@ -110,7 +118,9 @@ def test_only_triaged_fed_not_needs_triage(tmp_path) -> None:
     tracker = FakeTracker()
     _triaged(tracker, "已triaged")
     tracker.create_issue(IssueDraft(title="待分诊", body="x", labels=["bug", "needs-triage"]))
-    tracker.create_issue(IssueDraft(title="被取代", body="x", labels=["bug", TRIAGED, "superseded"]))
+    tracker.create_issue(
+        IssueDraft(title="被取代", body="x", labels=["bug", TRIAGED, "superseded"])
+    )
     tracker.create_issue(IssueDraft(title="旧RFC", body="x", labels=[RFC_LABEL, TRIAGED]))
     designer = _designer(tmp_path, tracker, "[]")
     designer.propose_once()
@@ -170,7 +180,9 @@ def test_covers_skips_non_triaged_numbers(tmp_path) -> None:
     """covers 指向不在 triaged 集合的号（needs-triage/不存在）→ 静默跳过。"""
     tracker = FakeTracker()
     ok = _triaged(tracker, "有效")
-    raw = tracker.create_issue(IssueDraft(title="raw", body="x", labels=["bug", "needs-triage"])).number
+    raw = tracker.create_issue(
+        IssueDraft(title="raw", body="x", labels=["bug", "needs-triage"])
+    ).number
     outcome = _designer(tmp_path, tracker, _rfc_canned([ok, raw, 999])).propose_once()
     body = tracker.issue(outcome.proposal_numbers[0])["body"]
     assert f"covers: #{ok}" in body and f"#{raw}" not in body.split("covers:")[1]

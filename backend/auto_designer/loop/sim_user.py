@@ -134,7 +134,9 @@ def _issue_draft(res: SessionResult) -> IssueDraft:
     return _issue_draft_from_body(res.issue_artifact or "")
 
 
-def _flush_issues(tracker: IssueTracker, res: SessionResult, *, round_no: int | None = None) -> list:
+def _flush_issues(
+    tracker: IssueTracker, res: SessionResult, *, round_no: int | None = None
+) -> list:
     """中途 report_issue notes + 终结 issue_artifact 一并建单（顺序：先中途、后收场）。
 
     round_no 由编排层透传（Spec-0025/T6）：给每条 raw issue 盖 `round-N`，供增量 triage 与观测曲线。

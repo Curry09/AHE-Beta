@@ -299,8 +299,12 @@ def main() -> int:
 
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 开发者角色 ...")
     dev_agent_def = str(ROOT / "agent_defs" / "developer_agent")  # 工具型 dev agent 定义目录
-    designer_agent_def = str(ROOT / "agent_defs" / "designer")  # synthesize agent 定义目录（只读工具）
-    triager_agent_def = str(ROOT / "agent_defs" / "triage_agent")  # Spec-0025：triage agent 定义目录
+    designer_agent_def = str(
+        ROOT / "agent_defs" / "designer"
+    )  # synthesize agent 定义目录（只读工具）
+    triager_agent_def = str(
+        ROOT / "agent_defs" / "triage_agent"
+    )  # Spec-0025：triage agent 定义目录
 
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
     # persona 从 distill 卡库（persona_library.json）注入、场景从种子卡库（seeds.json）经

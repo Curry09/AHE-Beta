@@ -186,7 +186,9 @@ class Triager:
             if errs:  # TRIAGE 字段没填全 → 降级 needs_info（保证采纳的 issue 定位完整）
                 self._reject(issue, NEEDS_INFO, f"triage 定位不全：{'；'.join(errs)}", outcome)
                 return
-            priority = str(d.get("priority", "")).strip().upper()  # triage 按严重度×体感判，非法则不打
+            priority = (
+                str(d.get("priority", "")).strip().upper()
+            )  # triage 按严重度×体感判，非法则不打
             self._tracker.set_labels(num, _confirmed_labels(list(issue.labels), kind, priority))
             body = schema_render(kind=kind, fields=fields, section="triage")
             self._safe_comment(num, f"## Triage 定位\n\n{body}")

@@ -207,7 +207,10 @@ def test_set_labels_replaces_via_put() -> None:
     put = [c for c in t._session.calls if c[0] == "PUT" and c[1].endswith("/labels")]
     assert len(put) == 1
     assert put[0][2] == {"labels": [backend.labels["bug"], backend.labels["triaged"]]}
-    assert backend.issues[ref.number]["labels"] == [backend.labels["bug"], backend.labels["triaged"]]
+    assert backend.issues[ref.number]["labels"] == [
+        backend.labels["bug"],
+        backend.labels["triaged"],
+    ]
     assert "triaged" in backend.labels  # 新标签被 ensure 建出
 
 

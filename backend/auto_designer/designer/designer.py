@@ -284,7 +284,7 @@ class Designer:
             "对某条 issue 或某个体感点有疑惑时，调 `get_session_timeline`（issue_number=… 或 "
             "session_id=…）看该局落盘的 god-view 轨迹，再下结论；不要直接读 sessions/ 原始文件。\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组，每项一个 RFC——含 `title`、"
-            '`fields`（RFC 字段：问题/根因/涉及issue/方向/验收，中文 label 键）、可选 `covers`；无 RFC 则 `[]`。'
+            "`fields`（RFC 字段：问题/根因/涉及issue/方向/验收，中文 label 键）、可选 `covers`；无 RFC 则 `[]`。"
         )
         with bind_session_store(self._store):
             out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)

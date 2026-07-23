@@ -133,7 +133,14 @@ def test_accept_missing_triage_fields_downgrades_to_needs_info(tmp_path) -> None
     tracker = FakeTracker()
     n = _raw(tracker, "坏了")
     canned = json.dumps(
-        [{"issue": n, "disposition": "accept", "kind": "bug", "fields": {"根因区域": "只填了这个"}}],
+        [
+            {
+                "issue": n,
+                "disposition": "accept",
+                "kind": "bug",
+                "fields": {"根因区域": "只填了这个"},
+            }
+        ],
         ensure_ascii=False,
     )
     out = _triager(tmp_path, tracker, canned).triage_once()
@@ -222,7 +229,12 @@ def test_parse_dispositions_tolerates_prose_and_bad() -> None:
 
 def test_confirmed_labels_drops_old_type_and_workflow() -> None:
     got = _confirmed_labels(["bug", "needs-triage", "round-2", "custom"], "feature")
-    assert set(got) == {"feature", "triaged", "round-2", "custom"}  # 去 bug/needs-triage，留 round/custom
+    assert set(got) == {
+        "feature",
+        "triaged",
+        "round-2",
+        "custom",
+    }  # 去 bug/needs-triage，留 round/custom
 
 
 def test_outcome_dataclass_shape() -> None:

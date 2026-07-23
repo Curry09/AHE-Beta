@@ -146,7 +146,9 @@ class AgenticDeveloper:
 
     def work_one(self, skip: set[int] | None = None) -> DevOutcome:
         skip = skip or set()
-        eligible = [i for i in self._eligible(self._tracker.list_open_issues()) if i.number not in skip]
+        eligible = [
+            i for i in self._eligible(self._tracker.list_open_issues()) if i.number not in skip
+        ]
         if not eligible:
             self._emit(running=False, status="无可领 triaged/RFC issue")
             return DevOutcome()

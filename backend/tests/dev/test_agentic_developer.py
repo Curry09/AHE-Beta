@@ -203,7 +203,11 @@ def test_rfc_covers_closes_triaged(tmp_path) -> None:
     tracker.set_state(closed_early, "closed", "手动")
     # RFC 号最小 → 会被先领；它 covers t1/t2/closed_early/999
     rfc = tracker.create_issue(
-        IssueDraft(title="RFC", body=f"综合\n\ncovers: #{t1} #{t2} #{closed_early} #999", labels=[RFC_LABEL])
+        IssueDraft(
+            title="RFC",
+            body=f"综合\n\ncovers: #{t1} #{t2} #{closed_early} #999",
+            labels=[RFC_LABEL],
+        )
     ).number
     # 让 RFC 先被领（票号升序，RFC 是最后建的 → 手动 skip 掉前面的 triaged，只留 RFC 可领）
     dev = _dev(tracker, repo, tmp_path)
