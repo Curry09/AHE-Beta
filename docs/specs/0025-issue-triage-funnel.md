@@ -64,7 +64,7 @@ tasks:
     acceptance: RFC 带 RFC 标签 + 结构字段 + covers 关联的 triaged issue；被综合的 issue 打 superseded-by；无跨条主题时产 []；仍能调 get_session_timeline/read_file 定位；单测覆盖 RFC 产出、supersede 标记、空产出、covers。
   - id: T5
     title: dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
