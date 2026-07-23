@@ -1,6 +1,6 @@
 """设计师按需取用 session 上帝视角时间线。
 
-暂时原样投影落盘的 sim_trace（不做脱敏/抽象）；权威仍是 Session JSON。
+暂时原样投影落盘的 sim_trace（不做脱敏/抽象）；权威仍是 Session JSON（按需取用，非整包注入）。
 """
 
 from __future__ import annotations
