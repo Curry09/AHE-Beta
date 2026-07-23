@@ -341,7 +341,12 @@ def test_issues_triage_fields(tmp_path: Path) -> None:
             _dto(1, labels=["bug", "triaged", "P1", "round-2"]),
             _dto(2, labels=["RFC", "P0"], body="综合\n\ncovers: #3"),
             _dto(3, labels=["bug", "triaged", "superseded"], state="closed"),
-            _dto(4, labels=["feature", "rejected", "round-1"], state="closed", reason="超出 harness 范围"),
+            _dto(
+                4,
+                labels=["feature", "rejected", "round-1"],
+                state="closed",
+                reason="超出 harness 范围",
+            ),
             _dto(5, labels=["bug", "needs-triage", "round-3"]),
         ]
     )
