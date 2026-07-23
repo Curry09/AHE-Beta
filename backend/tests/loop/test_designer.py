@@ -113,6 +113,56 @@ def test_rfc_labeled_and_rendered_from_fields(tmp_path) -> None:
     assert [i.title for i in designer.seen_triaged] == ["超时1"]
 
 
+def test_run_with_timeout_propagates_session_store(tmp_path) -> None:
+    """bind_session_store 注入的 store 须能被 worker 线程里的 tool 读到（_run_with_timeout 用
+    copy_context 跨线程传 contextvars）。修复前 worker 线程是空 context → get_session_timeline
+    报「session store not bound」（线上实测 bug）。"""
+    from auto_designer.designer.designer import _run_with_timeout
+    from auto_designer.designer.session_timeline import bind_session_store, get_session_timeline
+    from auto_designer.user.session_store import SessionStore
+
+    store = SessionStore(tmp_path / "sessions")
+    with bind_session_store(store):
+        out = _run_with_timeout(lambda: get_session_timeline(session_id="nope"), 10)
+    assert out["ok"] is False
+    assert "not bound" not in out["error"]  # store 已跨线程绑定上
+    assert "not found" in out["error"]  # 到了「查不到该 session」这步 = 绑定成功
+
+
+def test_rfc_fields_label_whitespace_tolerant(tmp_path) -> None:
+    """真实 LLM 按 systemprompt 用无空格「涉及issue」填字段——须能映射到 related，否则 RFC 校验
+    永远失败被静默丢弃（线上实测 bug）。schema label 是「涉及 issue」（带空格），归一后应匹配上。"""
+    tracker = FakeTracker()
+    _triaged(tracker, "超时1")
+    fields = {
+        "问题": "多轮等待拖沓",
+        "根因": "单 agent 长循环",
+        "涉及issue": [],  # 无空格 + 空列表（正是线上 designer 的产物）
+        "方向": "更早交回中间成果",
+        "验收": "等待中能看到进展",
+    }
+    outcome = _designer(tmp_path, tracker, _rfc_canned(fields=fields)).propose_once()
+    assert outcome.count == 1  # 修复前这里是 0（related 映射不上 → 校验失败 → 跳过）
+    assert "### 涉及 issue" in tracker.issue(outcome.proposal_numbers[0])["body"]
+
+
+def test_pm_rfc_without_triaged_or_covers(tmp_path) -> None:
+    """synthesize 的 PM 职能：0 条 triaged 时也能凭体感+运行时产结构 RFC（covers 空、不 supersede
+    任何票）；这条 RFC 应正常落库、成为 dev 可领项（线上「dev 无可领 RFC」的根因之一）。"""
+    tracker = FakeTracker()  # 无 triaged
+    fields = {
+        "问题": "整轮超时才拿到结果",
+        "根因": "长循环 + 超时上限偏大",
+        "涉及issue": [],
+        "方向": "超时/中断后给可接续状态摘要",
+        "验收": "中断后能立即判断已完成/未完成",
+    }
+    outcome = _designer(tmp_path, tracker, _rfc_canned(fields=fields)).propose_once()
+    assert outcome.count == 1
+    rfc = tracker.issue(outcome.proposal_numbers[0])
+    assert RFC_LABEL in rfc["labels"] and "covers:" not in rfc["body"]
+
+
 def test_only_triaged_fed_not_needs_triage(tmp_path) -> None:
     """synthesize 的输入只含 triaged；needs-triage / superseded / RFC 自身都排除。"""
     tracker = FakeTracker()

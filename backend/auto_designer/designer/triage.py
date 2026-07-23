@@ -24,6 +24,7 @@ from pathlib import Path
 
 from auto_designer.designer.designer import (
     _iter_top_level_arrays,
+    _norm_label,
     _run_with_timeout,
     _unwrap_result,
 )
@@ -110,11 +111,12 @@ def _rejected_labels(current: list[str], label: str) -> list[str]:
 
 
 def _fields_by_label_to_key(kind: str, fields: dict) -> dict:
-    """agent 用中文 label 填字段 → 转成 schema key（root_cause/boundary/acceptance）。未知 label 忽略。"""
-    label_to_key = {f.label: f.key for f in schema_fields_of(kind=kind)}
+    """agent 用中文 label 填字段 → 转成 schema key（root_cause/boundary/acceptance）。未知 label 忽略。
+    按归一后的 label 匹配（去空白），容忍 LLM 的空格差异，避免字段映射不上致校验误判。"""
+    label_to_key = {_norm_label(f.label): f.key for f in schema_fields_of(kind=kind)}
     out: dict[str, str] = {}
     for k, v in fields.items():
-        key = label_to_key.get(str(k), str(k))  # 已是 key 则原样
+        key = label_to_key.get(_norm_label(k), str(k))  # 已是 key 则原样
         out[key] = v
     return out
 

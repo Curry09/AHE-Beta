@@ -11,6 +11,7 @@ Spec-0025/T4：designer 拆分后只保留 **synthesize** 这半——逐条分�
 
 from __future__ import annotations
 
+import contextvars
 import json
 import os
 import re
@@ -101,10 +102,17 @@ class _Proposal:
     covers: tuple[int, ...] = ()
 
 
+def _norm_label(s: object) -> str:
+    """label 归一：去掉所有空白后比较——容忍 LLM 把「涉及 issue」写成「涉及issue」这类空格差异，
+    否则字段映射不上、related 缺失致 RFC 校验永远失败、提案被静默丢弃。"""
+    return "".join(str(s).split())
+
+
 def _rfc_fields_by_label(fields: dict) -> dict:
-    """agent 用中文 label 填的 RFC 字段 → schema key（问题→problem 等）；未知 label 原样保留。"""
-    label_to_key = {f.label: f.key for f in _schema_fields_of(kind="rfc")}
-    return {label_to_key.get(str(k), str(k)): v for k, v in fields.items()}
+    """agent 用中文 label 填的 RFC 字段 → schema key（问题→problem 等）；未知 label 原样保留。
+    按归一后的 label 匹配（忽略空白差异）。"""
+    label_to_key = {_norm_label(f.label): f.key for f in _schema_fields_of(kind="rfc")}
+    return {label_to_key.get(_norm_label(k), str(k)): v for k, v in fields.items()}
 
 
 def _parse_covers(raw: object) -> tuple[int, ...]:
@@ -151,12 +159,18 @@ def _iter_top_level_arrays(s: str):
 
 
 def _run_with_timeout(call: Callable[[], object], timeout: int) -> object:
-    """daemon 线程跑 call，超时抛 TimeoutError（丢弃线程，不阻塞进程）。"""
+    """daemon 线程跑 call，超时抛 TimeoutError（丢弃线程，不阻塞进程）。
+
+    用 copy_context() 把主线程的 contextvars（含 bind_session_store 注入的 SessionStore）带进
+    worker 线程——新起线程默认是空 context，否则 agent 在 worker 线程里调 get_session_timeline 会
+    报「session store not bound」。
+    """
+    ctx = contextvars.copy_context()
     box: dict = {}
 
     def target() -> None:
         try:
-            box["out"] = call()
+            box["out"] = ctx.run(call)
         except Exception as exc:  # noqa: BLE001  透传给调用方
             box["err"] = exc
 
