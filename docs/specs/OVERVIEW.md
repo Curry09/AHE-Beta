@@ -165,7 +165,7 @@ Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 iss
 | 0024 | 0024/T3 | get_session_timeline tool（落盘原样） | done | T2 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/designer/test_session_timeline.py |
 | 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
 | 0025 | 0025/T2 | 用户 sim 产结构化 raw issue：暂定 type + needs-triage + 轮号 | done | T1 | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
-| 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | pending | T1, T2, T3a | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
+| 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | done | T1, T2, T3a | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
 | 0025 | 0025/T4 | synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC | pending | T3 | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
 | 0025 | 0025/T5 | dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck | pending | T4 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
 | 0025 | 0025/T6 | 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster | pending | T5 | backend/run.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
@@ -1148,7 +1148,7 @@ graph LR
     classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
-    class v_T3_1 st_pending;
+    class v_T3_1 st_done;
     class v_T3a_1 st_done;
     class v_T4_1 st_pending;
     class v_T5_1 st_pending;

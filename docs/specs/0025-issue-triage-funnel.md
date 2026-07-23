@@ -34,7 +34,7 @@ tasks:
     acceptance: sim 产出的 issue 带暂定 type + needs-triage + (给了 round_provider 时)round-N 标签；body=用户报告原文；round_provider 缺省不加轮号(兼容旧测)；_infer_kind 默认 bug、命中诉求词→feature；单测断言标签与 round 透传。
   - id: T3
     title: triage agent（新角色）：就地分类+定位+去重+驳回/needs-info
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -46,8 +46,8 @@ tasks:
     files:
       - backend/auto_designer/designer/triage.py
       - backend/tests/designer/test_triage.py
-    scope: 新建 Triager 驱动 + agent_defs/triage_agent/（agent.yaml+systemprompt+工具，工具含 read_file 只读 harness 代码 + get_session_timeline；沿用 workspace_jail 只读 harness 仓）。逐条处理带 needs-triage 的 issue（含上轮 carryover 里仍未 triage 的）：① 分类(确认/改 type 标签)；② 定位(读 harness 代码 + 按 issue 号调 get_session_timeline 拉 god-view 轨迹，填 TRIAGE 区字段:根因区域/边界/验收，经 issue_schema.validate)；③ 去重(与既有 triaged issue 比，重复→关掉链主 issue)；④ 驳回/needs-info(信息不足或超范围/平台类→打 rejected/needs-info 标签+写原因+关闭)。就地增补(去 needs-triage 标签、加 triaged)，不新建 design issue。优先级由体感+频率机制派生(不由 agent 拍)。
-    acceptance: needs-triage issue 经 triage 后带确认 type + triaged 标签、TRIAGE 区已填(经 validate)；重复→关并链主 issue；驳回/needs-info→关+原因+对应标签；定位确实调了 get_session_timeline / read_file(以 tool 事件断言)；单测覆盖四路(分类定位/去重/驳回/needs-info)+ 字段校验。
+    scope: 新建 Triager 驱动 + agent_defs/triage_agent/（agent.yaml+systemprompt+工具，工具含 read_file 只读 harness 代码 + get_session_timeline；沿用 workspace_jail 只读 harness 仓）。逐条处理带 needs-triage 的 issue（含上轮 carryover 里仍未 triage 的）：① 分类(确认/改 type 标签)；② 定位(读 harness 代码 + 按 issue 号调 get_session_timeline 拉 god-view 轨迹，按 kind 填对应 TRIAGE 区字段:bug=根因区域/边界/验收、feature=边界/交付物/验收，经 issue_schema.validate)；③ 定优先级(triage 按严重度×体感影响打 P0-P3 标签，非法则不打)；④ 去重(与既有 triaged issue 比，重复→关掉链主 issue)；⑤ 驳回/needs-info(信息不足或超范围/平台类→打 rejected/needs-info 标签+写原因+关闭)。就地增补(去 needs-triage 标签、加 triaged + kind + 优先级)，不新建 design issue。TRIAGE 字段没填全→降级 needs_info。
+    acceptance: needs-triage issue 经 triage 后带确认 type + triaged + 优先级标签、TRIAGE 区已填(按 kind 正确字段、经 validate)；feature 用 边界/交付物/验收；重复→关并链主 issue；驳回/needs-info→关+原因+对应标签；非法 priority 不打标签但仍采纳；单测覆盖五路 + 字段校验 + per-kind 字段 + 优先级。
   - id: T4
     title: synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC
     status: pending
@@ -91,8 +91,8 @@ tasks:
       - backend/auto_designer/loop/roster.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_roster.py
-    scope: orchestrator d 段拆两步——先跑 triager(全部 triager)、再跑 synthesizer(全部 designer)，都在 b 之前。round_no 透传给 sim(盖轮号)与两 agent。roster 增 triager 编制(N_TRIAGERS 默认 1)，删 load_dev_pick_policies(0020/T3)。run.py 构造 Triager + Designer(synthesize) 注入 orchestrator；预算 env 改按 kind(DEV_BUDGET_BUG/FEATURE/…/RFC)；priority 机制派生 helper（体感影响 + runtime_agg 频率 → P0-P3，不由 agent 填）。
-    acceptance: d 段先 triage 后 synthesize、都在 b 前；两 agent 收到 round；roster 出 triager 数、无 pick_policy；预算按 kind 档 + RFC 最高；priority 由信号派生；test 覆盖顺序/round/roster/预算档。
+    scope: orchestrator d 段拆两步——先跑 triager(全部 triager)、再跑 synthesizer(全部 designer)，都在 b 之前。round_no 透传给 sim(盖轮号)与两 agent。roster 增 triager 编制(N_TRIAGERS 默认 1)，删 load_dev_pick_policies(0020/T3)。run.py 构造 Triager + Designer(synthesize) 注入 orchestrator；预算 env 改按 kind(DEV_BUDGET_BUG/FEATURE/…/RFC)。（优先级已移到 triage agent 打 P0-P3 标签，见 T3，本 task 不再做机制派生。）
+    acceptance: d 段先 triage 后 synthesize、都在 b 前；两 agent 收到 round；roster 出 triager 数、无 pick_policy；预算按 kind 档 + RFC 最高；test 覆盖顺序/round/roster/预算档。
   - id: T7
     title: web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压)
     status: pending

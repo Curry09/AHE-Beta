@@ -1,0 +1,44 @@
+﻿type: agent
+name: triage_agent
+max_context_tokens: 128000
+system_prompt: ./systemprompt.md
+system_prompt_type: string
+# xml 妯″紡锛氭ā鍨嬩互 XML 杈撳嚭宸ュ叿璋冪敤锛宯exau 瑙ｆ瀽锛涗笉渚濊禆妯″瀷鍘熺敓 function calling锛屼换浣?chat 妯″瀷鍙敤銆?tool_call_mode: structured
+# 30锛氳璁捐鏂囦欢(涓や笁娆?+ 鍒ら噸 + 鏀跺熬鏈杩滃鐢紱缁欒冻浣欓噺璁┿€屾彁妗?[]銆嶉兘鑳藉共鍑€璧板埌 complete_task锛?# 涓嶅啀琚?max-iteration 鎺愶紙姝ゅ墠鎾炴弧澶氬洜璇宸ㄥぇ鐨勫師濮?session 杞ㄨ抗鎸夐〉缈烩€斺€旂幇宸插湪 systemprompt 纭锛夈€?max_iterations: 30
+
+middlewares:
+  # 宸ヤ綔鍖?jail锛歞esigner 鍙兘璇昏嚜宸辩殑 harness 浠擄紝鏂囦欢宸ュ叿瓒婄晫璇讳竴寰嬫嫆鈥斺€旀満鍒剁‖绂佽 trace
+  # 锛坉ata/sessions 浣撴劅+浼氳瘽銆乨ata/harness_runs 杩愯鍓湰锛夈€傛鍓?绂佽 trace"浠呴潬 systemprompt
+  # 涓€鍙ヨ瘽銆佹棤鏈哄埗鍏滃簳锛涢€愯鐪嬫煇浠诲姟杞ㄨ抗浼氭妸璇ヤ换鍔′笓灞炰骇鐗╁甫杩涙彁妗?= 杩囨嫙鍚堢殑婧愬ご銆傞€氱敤 jail 涓€骞?  # 鎸′綇浠撳浠讳綍璺緞锛坉ata/live 绛夛級锛屼笉姝㈢偣鍚?trace銆?  - import: auto_designer.dev.workspace_jail:WorkspaceJailMiddleware
+
+llm_config:
+  # 鍒嗚鑹查厤缃細鍒涙柊鑰?agent 鐢?DESIGNER_LLM_*銆?  model: ${env.DESIGNER_LLM_MODEL}
+  base_url: ${env.DESIGNER_LLM_BASE_URL}
+  api_key: ${env.DESIGNER_LLM_API_KEY}
+  max_tokens: 32768
+  timeout: 300
+  api_type: openai_chat_completion
+
+# 鏈湴 sandbox锛氬彧璇?harness 浠擄紙SANDBOX_WORK_DIR 鎸囧悜 harness 浠擄級鐢ㄤ簬璇荤幇鐘?grounding锛?# designer 涓嶆敼鏂囦欢銆佷笉纰?git锛屼粎 read_file / list_directory 鍙栬瘉 + complete_task 浜ゆ彁妗堛€?sandbox_config:
+  type: local
+
+tools:
+  - name: read_file
+    yaml_path: ./tools/read_file.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:read_file
+  - name: list_directory
+    yaml_path: ./tools/list_directory.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:list_directory
+  # grep锛氳璁″笀鏃?shell锛岄潬瀹冦€屽厛鎼滃悗璇汇€嶁€斺€旀寜鍏抽敭璇嶈烦鍒扮浉鍏冲嚱鏁板啀绮捐閭ｄ竴娈碉紝
+  # 鍒妸 entry.py 绛夊ぇ鏂囦欢鏁寸瘒閫氳鐑?iteration锛堟鍓嶆挒婊?max-iter 鐨勮€佹瘺鐥呬箣涓€锛夈€?  - name: search_file_content
+    yaml_path: ./tools/search_file_content.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:search_file_content
+  # 鎸夐渶鍙栦竴灞€鐢ㄦ埛妯℃嫙钀界洏鐨?god-view锛坰im_trace 鍘熸牱锛涙殏涓嶈劚鏁忥級锛?  # 缂栨帓渚ц SessionStore锛宩ail 浠嶇鐩存帴璇?sessions/銆?  - name: get_session_timeline
+    yaml_path: ./tools/get_session_timeline.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_session_timeline
+  - name: complete_task
+    yaml_path: ./tools/complete_task.tool.yaml
+    binding: nexau.archs.tool.builtin.session_tools:complete_task
+
+stop_tools: [complete_task]
+
