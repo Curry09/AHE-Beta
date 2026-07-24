@@ -307,6 +307,15 @@ def test_manual_driven_send_message_no_gap() -> None:
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert any(t.action == "send_message" and t.message == "/status" for t in waiting)
     assert any(t.phase != "waiting" and t.harness_output == "done" for t in res.turns)
+    # Spec-0024/T6：插话 utterance 标 queued；随后 reply 的 answers 指向 begin 那条而非插话
+    open_utt = next(t for t in res.turns if t.action == "send_task")
+    assert open_utt.utterance_id == "u1" and open_utt.delivery == "open"
+    queued = next(t for t in waiting if t.action == "send_message")
+    assert queued.utterance_id == "u2"
+    assert queued.delivery == "queued" and queued.queued_behind == "u1"
+    heard = next(t for t in res.turns if t.harness_output == "done")
+    assert heard.answers_utterance_id == "u1"
+    assert "fix DST" in heard.answers_said or heard.answers_said == open_utt.message
 
 
 def test_send_message_then_reply_triggers_main_not_nested_wait() -> None:

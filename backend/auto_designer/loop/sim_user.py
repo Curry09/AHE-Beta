@@ -92,6 +92,11 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
                     PersonaCallTrace.from_dict(c) if isinstance(c, dict) else c
                     for c in (t.persona_trace or [])
                 ],
+                utterance_id=getattr(t, "utterance_id", "") or "",
+                delivery=getattr(t, "delivery", "") or "",
+                queued_behind=getattr(t, "queued_behind", "") or "",
+                answers_utterance_id=getattr(t, "answers_utterance_id", "") or "",
+                answers_said=getattr(t, "answers_said", "") or "",
             )
             for t in res.turns
         ],

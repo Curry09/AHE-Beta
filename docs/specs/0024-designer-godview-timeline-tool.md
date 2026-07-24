@@ -3,7 +3,7 @@ number: "0024"
 title: 用户 god-view 落盘 + 设计师按需取用
 issue: 0
 slug: designer-godview-timeline-tool
-summary: Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
+summary: Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline，含 utterance↔answers 请求-回复配对）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
 tasks:
   - id: T1
     title: Session.sim_trace 落盘（TurnLog→SimTrace）
@@ -47,9 +47,7 @@ tasks:
     relates-to: []
     parallel: false
     files: []
-    scope: >-
-      引入 get_session_timeline(issue|session_id) 与 bind_session_store，打通 jail 下的按需取证通路。
-      初版工具输出曾为落盘原样透传；现行输出形态由 T4 投影、T5 注册 beat/step 承接（文件归属见 T4/T5，本 Task 保留 DAG 节点）。
+    scope: 引入 get_session_timeline(issue|session_id) 与 bind_session_store，打通 jail 下的按需取证通路。 初版工具输出曾为落盘原样透传；现行输出形态由 T4 投影、T5 注册 beat/step 承接（文件归属见 T4/T5，本 Task 保留 DAG 节点）。
     acceptance: 设计师可经 tool（而非读 sessions/）取到一局过程证据；未绑定 store/找不到返回 ok=false；jail 仍拒读 sessions。
   - id: T4
     title: get_session_timeline 使用事件投影（去仿真外壳）
@@ -83,6 +81,23 @@ tasks:
       - backend/auto_designer/designer/designer.py
     scope: 注册 get_harness_beat / get_harness_step；systemprompt 与 propose_once 任务文案约定渐进用法：先 get_session_timeline → 必要时 get_harness_beat(turn) → truncated 且确需时 get_harness_step(step_i)。jail 仍禁直接读 sessions/。
     acceptance: agent.yaml 含两 tool binding；prompt/任务文案写明三层取证；设计师可在 propose_once 中按需调用（探针可观测）；不要求默认每拍都下钻。
+  - id: T6
+    title: 请求-回复配对：heard.answers → utterance
+    status: done
+    priority: P1
+    tags: []
+    depends-on:
+      - T5
+    relates-to: []
+    parallel: false
+    files:
+      - backend/tests/user/sim/test_heartbeat.py
+    scope: >-
+      为每条用户→harness 外发指令分配 utterance_id；begin 开启的为当前 open；等待中 emit/send_message
+      标 delivery=queued + queued_behind=open；收到的 harness_output/heard 写 answers_utterance_id（及 answers_said 预览）。
+      不改 harness 线协议。实现落在既有 T1/T4/T5 文件集（loop/models/session_timeline/systemprompt/tool yaml）；
+      本组 files 只列新增占用的心跳单测。时间线与设计师 prompt 必须一眼能对上「这条 reply 答的是哪句」。
+    acceptance: 新局 sim_trace/timeline：外发有 utterance；queued 插话带 queued_behind；heard 带 answers 指向对应 utterance；插话后仍先收到的 reply 的 answers 指向 begin 那条而非插话；旧 session 缺字段兼容；单测覆盖配对与投影。
 ---
 
 # 0024 · 用户 god-view 落盘 + 设计师按需取用
@@ -93,7 +108,7 @@ tasks:
 
 把用户模拟的**上帝视角**随 `Session` **完整落盘**为 `sim_trace`（权威 raw，含 persona LLM 原片，供事后调试）。设计师**不**在首轮 prompt 整包注入，而是经工具**按需、渐进**取证：
 
-1. `get_session_timeline` → **使用事件时间线投影**（意图/过程判断/能力缺口/私有核实等；无 system/user/raw）；
+1. `get_session_timeline` → **使用事件时间线投影**（意图/过程判断/能力缺口/私有核实；**`utterance`↔`answers` 请求–回复配对**；无 system/user/raw）；
 2. `get_harness_beat(turn)` → 对准某一拍看 harness 内层 tool 序列（正文短切）与 `stop_kind`；
 3. `get_harness_step(step_i)` → 单步展开（硬顶字符）。
 
@@ -134,18 +149,30 @@ tasks:
 
 ### Task DAG
 
-`T1`（落盘）→ `T2`（index + 体感句柄）→ `T3`（tool 通路节点）→ `T4`（投影 + beat/step 函数）→ `T5`（beat/step 注册与 prompt）。现行代码以 T4/T5 文件集为准；T3 `files: []` 仅保留 DAG 语义（初版通路，输出形态已被 T4 取代）。
+`T1`（落盘）→ `T2`（index + 体感句柄）→ `T3`（tool 通路节点）→ `T4`（投影 + beat/step 函数）→ `T5`（beat/step 注册与 prompt）→ `T6`（utterance↔answers 配对）。
 
 ### 数据模型（落盘权威）
 
 | 类型 | 要点 |
 | --- | --- |
 | `PersonaCallTrace` | 单次 persona LLM 调用：role / system / user / raw / parsed / steps |
-| `SimTurn` | 单拍：turn / phase / perceive / action / message / harness_output / harness_steps / persona_trace / … |
+| `SimTurn` | 单拍：turn / phase / perceive / action / message / harness_output / harness_steps / persona_trace；T6 增 `utterance_id` / `delivery` / `queued_behind` / `answers_utterance_id` / `answers_said` |
 | `SimTrace` | `turns` + 可选 `persona_tail`（rate / file_issue）+ `end_reason` / `signals` |
-| `Session.sim_trace` | 全量落盘；旧 JSON 缺字段 → `None` |
+| `Session.sim_trace` | 全量落盘；旧 JSON 缺字段 → `None` / 空串 |
 
 采集：`persona_client` → `run_session` 打 role → `sim_user.result_to_sim_trace` → `SessionStore.save`。
+
+### 请求–回复配对（T6）
+
+不改 harness 线协议。sim 侧 `_UtteranceLedger`：
+
+| 时机 | 落盘 |
+| --- | --- |
+| 主环 EMIT 外发（begin） | `utterance_id=uN`，`delivery=open` |
+| 等待中 `send_message` / emit | 新 `utterance_id`，`delivery=queued`，`queued_behind=<当前 open>` |
+| 收到 reply / interrupt 回执 | 下一拍带 `harness_output` 的 Turn 写 `answers_utterance_id` + `answers_said`（关闭的那条 open） |
+
+时间线投影：`utterance` / `delivery` / `queued_behind` / `answers` / `answers_said`。插话 `queued` 后先到的 reply，`answers` 仍指向当时的 open（begin 那条），而非插话。
 
 ### 使用事件投影（T4 · `format_session_timeline`）
 
@@ -161,7 +188,10 @@ tasks:
 | `process_read` | on_track / off_track / unclear | waiting 判断存在时 |
 | `wanted` | 收敛前自由 intent | parsed.intent 非空 |
 | `did` / `said` | 最终动作 / 发出的消息 | 有则写 |
+| `utterance` | 本拍外发指令 id（`uN`） | EMIT 有正文 |
+| `delivery` / `queued_behind` | `open` 或 `queued`（及排在哪条 open 后） | T6；queued 仅等待插话 |
 | `heard` | harness 终态回复（限长） | harness_output 非空 |
+| `answers` / `answers_said` | 本条 heard 关闭的 utterance + 预览 | T6；有 heard 且可配对时 |
 | `saw_activity` | 活动条短标题（略过 tool_result 正文，最多末 8 条 tool） | 有 harness_steps |
 | `capability_gap` | `{wanted,did,available,note}` | 仅 `parsed.gap==true` |
 | `private_check` | 用户本机核实 steps（截断） | 显式 `verify_self` |
@@ -255,3 +285,4 @@ SWE-bench_Verified 真仓探针上，设计师可观测到：先读 `entry.py`/`
 - 跨局聚合：按 `stop_kind` / gap 模式聚类，生成 harness 问题假设列表。
 - 看板只读 API 复用同一 timeline / beat 格式。
 - step 支持字节偏移分页（仅当硬顶实测不够）。
+

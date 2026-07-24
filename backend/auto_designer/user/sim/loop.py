@@ -71,6 +71,55 @@ class TurnLog:
     harness_steps: list = field(default_factory=list)
     # 用户 agent 本决策触发的原始 LLM 调用（system/user/raw/steps）；先全量，后续再筛。
     persona_trace: list = field(default_factory=list)
+    # Spec-0024/T6：请求–回复配对（观测用；不改 harness 线协议）。
+    # utterance_id：本拍外发的用户指令句柄；delivery=open|queued；queued 时 queued_behind=当前 open。
+    # answers_*：本拍 harness_output 所应答的那条 utterance（及正文预览）。
+    utterance_id: str = ""
+    delivery: str = ""
+    queued_behind: str = ""
+    answers_utterance_id: str = ""
+    answers_said: str = ""
+
+
+@dataclass
+class _UtteranceLedger:
+    """局内用户→harness 指令账本：给每条外发编号，reply 挂回它所关闭的 open 指令。
+
+    Spec-0024/T6：persona 仍可能「看见内容才知真相」；落盘/设计师时间线必须显式配对。
+    """
+
+    _seq: int = 0
+    open_id: str | None = None
+    said: dict[str, str] = field(default_factory=dict)
+    pending_answers_id: str | None = None
+
+    def alloc(self, text: str) -> str:
+        self._seq += 1
+        uid = f"u{self._seq}"
+        self.said[uid] = text
+        return uid
+
+    def mark_open(self, uid: str) -> None:
+        self.open_id = uid
+
+    def clear_open(self) -> None:
+        """放弃当前 open（如 give_up），不产生 answers。"""
+        self.open_id = None
+
+    def close_open_as_answered(self) -> str | None:
+        """当前 open 收到 reply/interrupt 回执：记入 pending，供下一拍 TurnLog 写入 answers。"""
+        answered = self.open_id
+        self.pending_answers_id = answered
+        self.open_id = None
+        return answered
+
+    def consume_pending_answers(self) -> tuple[str, str]:
+        uid = self.pending_answers_id or ""
+        self.pending_answers_id = None
+        preview = (self.said.get(uid) or "") if uid else ""
+        if len(preview) > 120:
+            preview = preview[:120] + "…"
+        return uid, preview
 
 
 @dataclass
@@ -105,7 +154,9 @@ HARNESS_ERROR_PREFIX = "[harness error] "
 # 事件等待（用户等待中的主动权）：
 #   AwaitEvent = poll 直到 harness reply（唤醒主 loop）或到心跳阈值（一次性等待决策）。
 #   心跳是一次性动作（含 keep_waiting）——做完即结束，回到 AwaitEvent；不为「认领上一笔 send」
-#   在心跳里继续 poll。用户不知道下一笔 reply 属于哪一轮；真相只在 reply 到达主 decide 后看见。
+#   在心跳里继续 poll。
+#   persona 侧仍可能「看见 reply 内容才知发生了什么」；观测侧用 _UtteranceLedger 显式配对
+#   （Spec-0024/T6：heard.answers → utterance）。
 _HEARTBEAT_SEC = 90.0
 # 心跳唤醒次数硬上限（兜底防病态：模型一直 keep_waiting 而 harness 永不回）。到顶即强制放弃。
 _MAX_HEARTBEATS = 8
@@ -322,11 +373,13 @@ def _log_waiting(
     gap: bool,
     on_progress: Callable[[SessionResult], None] | None,
     persona_trace: list,
+    ledger: _UtteranceLedger,
 ) -> None:
     """把一次心跳唤醒的等待决策记为 phase='waiting' 的 TurnLog（观测用，不占 harness_output）。
 
     perceive 形如 [judgment|intent→action] notes；act 自报 gap 时追加 WAIT_GAP 信号。
     send_message 的正文写入 TurnLog.message（内通道）；其余动作为空。
+    Spec-0024/T6：send_message 分配 utterance，delivery=queued（排在当前 open 之后）。
     """
     note = perceive.strip()
     head = f"[{judgment}|{intent}→{action}]"
@@ -336,6 +389,13 @@ def _log_waiting(
         executor, channel = Executor.HARNESS.value, Channel.EMIT.value
     else:
         executor, channel = Executor.PERSONA_LOCAL.value, Channel.SILENT.value
+    utterance_id = ""
+    delivery = ""
+    queued_behind = ""
+    if action == "send_message" and message.strip():
+        utterance_id = ledger.alloc(message)
+        delivery = "queued"
+        queued_behind = ledger.open_id or ""
     result.turns.append(
         TurnLog(
             turn=state.turn,
@@ -352,6 +412,9 @@ def _log_waiting(
             harness_output="",
             harness_steps=[],
             persona_trace=list(persona_trace),
+            utterance_id=utterance_id,
+            delivery=delivery,
+            queued_behind=queued_behind,
         )
     )
     if gap:
@@ -469,6 +532,7 @@ def _heartbeat_once(
     progress: list[dict],
     progress_seen: int,
     heartbeats: int,
+    ledger: _UtteranceLedger,
 ) -> tuple[str, str, bool, int]:
     """一次性等待决策（timer 触发）。任意动作（含 keep_waiting）做完即结束本次心跳。
 
@@ -535,6 +599,7 @@ def _heartbeat_once(
         gap=gap,
         on_progress=on_progress,
         persona_trace=wait_calls,
+        ledger=ledger,
     )
     _note_waiting_memory(
         history,
@@ -572,10 +637,12 @@ def _await_harness(
     result: SessionResult,
     on_progress: Callable[[SessionResult], None] | None,
     prior_activity: list[dict],
+    ledger: _UtteranceLedger,
+    open_utterance_id: str,
 ) -> tuple[str, float, str | None, str | None]:
     """begin 后进入 AwaitEvent：reply → 交主 loop；timer → 一次性心跳后回到 AwaitEvent。
 
-    不写死「在等某一笔 send 的配对」：下一笔 reply 原样交给主 decide，由用户看见内容才知真相。
+    Spec-0024/T6：本轮 begin 对应 open_utterance_id；收到的 reply/interrupt 关闭该 open。
     心跳动作（含 keep_waiting / send_message）做完即结束本次心跳，不在心跳内 continue poll。
 
     返回 (harness_output, elapsed_sec, terminal_action, user_control)：
@@ -589,12 +656,14 @@ def _await_harness(
     try:
         harness.begin(message)
     except Exception as exc:  # noqa: BLE001
+        ledger.clear_open()
         return (
             f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}",
             time.monotonic() - t0,
             None,
             None,
         )
+    ledger.mark_open(open_utterance_id)
     heartbeats = 0
     progress_seen = 0
     while True:
@@ -602,6 +671,7 @@ def _await_harness(
         try:
             kind, val = harness.poll(_HEARTBEAT_SEC)
         except Exception as exc:  # noqa: BLE001
+            ledger.clear_open()
             return (
                 f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}",
                 time.monotonic() - t0,
@@ -610,7 +680,7 @@ def _await_harness(
             )
         if kind == "reply":
             clock.observe(begin_at + (time.monotonic() - t0))
-            # 主 loop 触发：不在此解释「这是哪一轮」，交主 decide 看内容。
+            ledger.close_open_as_answered()
             return str(val), time.monotonic() - t0, None, None
 
         # —— HeartbeatOnce（timer）——
@@ -634,6 +704,7 @@ def _await_harness(
             progress=progress,
             progress_seen=progress_seen,
             heartbeats=heartbeats,
+            ledger=ledger,
         )
         # 决策期间 reply 可能已进缓冲：动作执行前先确认；有则作废等待动作，交回主 loop。
         ready = _try_ready_reply(harness)
@@ -646,12 +717,14 @@ def _await_harness(
                 "back to the main loop to read the reply.",
             )
             clock.observe(begin_at + (time.monotonic() - t0))
+            ledger.close_open_as_answered()
             return ready, time.monotonic() - t0, None, None
         # 任意动作都结束本次心跳；下面只执行 I/O 副作用，然后要么 return 给主环，要么回 AwaitEvent。
         if action == "send_message":
             try:
                 harness.emit_message(wait_message)
             except Exception as exc:  # noqa: BLE001
+                ledger.clear_open()
                 return (
                     f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}",
                     time.monotonic() - t0,
@@ -663,6 +736,7 @@ def _await_harness(
             try:
                 ctrl_out = harness.control("interrupt")
             except Exception as exc:  # noqa: BLE001
+                ledger.clear_open()
                 return (
                     f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}",
                     time.monotonic() - t0,
@@ -670,10 +744,12 @@ def _await_harness(
                     None,
                 )
             clock.observe(begin_at + (time.monotonic() - t0))
+            ledger.close_open_as_answered()
             if isinstance(ctrl_out, str) and ctrl_out.startswith(HARNESS_ERROR_PREFIX):
                 return ctrl_out, time.monotonic() - t0, None, "interrupt"
             return str(ctrl_out), time.monotonic() - t0, None, "interrupt"
         if action == "give_up":
+            ledger.clear_open()
             return "", time.monotonic() - t0, "give_up", None
         # keep_waiting：动作已记录并可能耗心；回 AwaitEvent，等下一笔 reply 或下一跳 timer。
         continue
@@ -700,6 +776,7 @@ def run_session(
     harness_output = ""
     harness_steps: list = []  # 与 harness_output 配对的内层过程流
     prior_activity: list[dict] = []  # 上一轮已完成请求的活动条（过程记忆，供对照）
+    ledger = _UtteranceLedger()  # Spec-0024/T6：请求–回复配对
 
     while state.turn < MAX_TURNS:
         phase = Phase.OPENING if state.turn == 0 and not history else Phase.ACTIVE
@@ -746,6 +823,16 @@ def run_session(
         head = f"[{verdict}|{intent}→{action_id}]"
         perceive_logged = f"{head} {note}" if note else head
 
+        # Spec-0024/T6：本拍若带着上一笔 reply，挂上 answers；若本拍外发，分配 utterance。
+        answers_id, answers_said = ("", "")
+        if harness_output.strip():
+            answers_id, answers_said = ledger.consume_pending_answers()
+        utterance_id = ""
+        delivery = ""
+        if spec.channel is Channel.EMIT and message.strip():
+            utterance_id = ledger.alloc(message)
+            delivery = "open"
+
         result.pending_harness_output = None  # 该回复即将随本条 TurnLog 落日志, 不再悬挂
         result.pending_harness_steps = None
         result.turns.append(
@@ -764,6 +851,10 @@ def run_session(
                 harness_output=harness_output,
                 harness_steps=harness_steps,
                 persona_trace=decide_calls,
+                utterance_id=utterance_id,
+                delivery=delivery,
+                answers_utterance_id=answers_id,
+                answers_said=answers_said,
             )
         )
         if gap:
@@ -811,6 +902,8 @@ def run_session(
                 result=result,
                 on_progress=on_progress,
                 prior_activity=prior_activity,
+                ledger=ledger,
+                open_utterance_id=utterance_id,
             )
             if terminal_from_wait == "give_up":  # 等待决策放弃：走终止路径并结束
                 _finalize_terminal(
@@ -829,6 +922,10 @@ def run_session(
             elapsed = time.monotonic() - _t0
             if nxt is not None:
                 clock.observe(clock.now() + elapsed)
+                # 阻塞 route：reply 即关闭本拍刚分配的 open utterance
+                if utterance_id:
+                    ledger.mark_open(utterance_id)
+                    ledger.close_open_as_answered()
         if nxt is not None:
             # 时间感知·轻耗心：仅极端超时才自动扣一点耐心。
             # 仅对阻塞 route：AwaitEvent 路径的等待挫败已由 keep_waiting 一次性心跳建模，不双记。
@@ -852,7 +949,7 @@ def run_session(
                         history,
                         "harness activity: " + "; ".join(titles)[:240],
                     )
-            # 归因：仅 interrupt 记 Ctrl+C；普通 reply 不预设「这是对哪一笔 send 的应答」。
+            # Spec-0024/T6：answers 写在下一拍 TurnLog；history 仍给人读的短预览。
             if user_control:
                 clock.stamp(
                     history,

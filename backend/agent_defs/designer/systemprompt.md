@@ -29,7 +29,7 @@ harness 是**被进化对象**：用 nexau 框架搭的多轮对话式 code agen
 ## 取证边界（读什么、不读什么）
 - **可读**：harness 仓 + NexAU（只读）。机制类先 `RUNTIME.md`，框架 API 读 NexAU；`entry.py` 先搜后读。
 - **按需过程证据**：
-  - `get_session_timeline`——该局**使用事件时间线**（所见活动、心想/intent、做了什么、harness 回了什么；以及 process_read、capability_gap、private_check、silent_stop）。不含 LLM 提示词、不含常驻菜单表。
+  - `get_session_timeline`——该局**使用事件时间线**（所见活动、心想/intent、做了什么、harness 回了什么；以及 process_read、capability_gap、private_check、silent_stop）。外发指令带 `utterance`；等待中插话可能 `delivery=queued` + `queued_behind`；每条 `heard` 带 `answers`（应答哪条 `utterance`）与 `answers_said` 预览。不含 LLM 提示词、不含常驻菜单表。
   - `get_harness_beat(turn=…)`——**只在需要时**下钻某一拍：harness 内层 tool/tool_result 序列（正文截断）+ `stop_kind`。
   - `get_harness_step(turn=…, step_i=…)`——beat 里某步 `truncated=true` 且确需细看时，展开该步较长正文（硬顶字符，仍非无限日志）。勿把大段 stdout 焊进提案。
   先时间线，再拍，再单步；不要默认层层全拉。对照预算钮读 `agent.yaml` / `entry.py`。
