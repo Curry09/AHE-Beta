@@ -153,11 +153,17 @@ def _normalize_dispositions(draft_text: str, *, pending_numbers: set) -> list[di
     prompt = (
         "把下面的 triage 结论整理成严格符合 schema 的 dispositions（每条待分诊 issue 恰好一项）。\n"
         f"待分诊 issue 号：{sorted(pending_numbers)}。只对这些号产出，不多不少。\n"
-        "- accept：给 kind(bug/feature/chore/document) + priority(P0/P1/P2/P3，按严重度×体感) + fields。"
-        "fields 放该 kind 的 TRIAGE 字段（bug:根因区域/边界/验收；feature:边界/交付物/验收；chore:边界/验收；"
-        "document:验收）——把结论里的根因/定位放进 fields.根因区域，**不要**放进 reason。\n"
-        "- duplicate：给 of（主 issue 号）。\n"
-        "- reject / needs_info：给 reason。\n\n"
+        "**accept 的定位必须放进 fields 对象（键用该 kind 的中文 TRIAGE 字段名），每字段一句话；"
+        "reason 只用于 reject/needs_info，accept 绝不用 reason。** 各 kind 的 fields 键：\n"
+        '  bug → {"根因区域":"…","边界":"…","验收":"…"}\n'
+        '  feature → {"边界":"…","交付物":"…","验收":"…"}\n'
+        '  chore → {"边界":"…","验收":"…"}；document → {"验收":"…"}\n'
+        "该 kind 列出的字段**必须全给、一个都不能少**（缺任一会被降级为 needs_info）。\n"
+        "priority 只能是 P0/P1/P2/P3（按严重度×体感）。示例一条完整 accept：\n"
+        '  {"issue":12,"disposition":"accept","kind":"bug","priority":"P1",'
+        '"fields":{"根因区域":"entry.py 无预算感知","边界":"只改通用能力","验收":"同类任务预算内交付"}}\n'
+        '  duplicate：{"issue":13,"disposition":"duplicate","of":12}\n'
+        '  reject/needs_info：{"issue":14,"disposition":"needs_info","reason":"轨迹无有效信息，无法定位"}\n\n'
         f"triage 结论原文：\n{draft_text}"
     )
     try:
@@ -310,6 +316,8 @@ class Triager:
         elif disp == "duplicate":
             of = d.get("of") or d.get("duplicate_of")  # 兼容 of / duplicate_of
             note = str(d.get("note", "")).strip()
+            # 去 needs-triage（否则关闭的重复票前端仍显示"待 triage"）——重复也是一种已分诊结局。
+            self._tracker.set_labels(num, [x for x in issue.labels if x != NEEDS_TRIAGE])
             self._safe_comment(num, f"duplicate of #{of}{('：' + note) if note else ''}")
             self._safe_close(num, f"duplicate of #{of}")
             outcome.duplicate.append(num)

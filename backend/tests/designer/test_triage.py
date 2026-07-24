@@ -342,3 +342,6 @@ def test_is_duplicate_flag_without_disposition(tmp_path) -> None:
     )
     out = _triager(tmp_path, tracker, canned).triage_once()
     assert out.duplicate == [n]
+    snap = tracker.issue(n)
+    assert NEEDS_TRIAGE not in snap["labels"]  # 重复也是已分诊结局，去 needs-triage
+    assert snap["state"] == "closed"
