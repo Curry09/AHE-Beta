@@ -333,3 +333,28 @@ def test_clear_removes_all(tmp_path: Path) -> None:
     assert read_agents(data_dir=tmp_path) == []
     assert read_history(data_dir=tmp_path) == []
     assert read_live_run(data_dir=tmp_path)["running"] is False
+
+
+def test_triager_sorts_between_user_and_designer(tmp_path: Path) -> None:
+    # Spec-0026/T1：read_agents 按 _ROLE_ORDER 排序，triager 介于 user 与 designer 之间。
+    for role in ("developer", "designer", "triager", "user"):
+        update_agent(
+            data_dir=tmp_path, agent_id=role, role=role, label=role, running=True, status="x"
+        )
+    order = [a["role"] for a in read_agents(data_dir=tmp_path)]
+    assert order == ["user", "triager", "designer", "developer"]
+
+
+def test_meta_passthrough_and_sticky(tmp_path: Path) -> None:
+    # Spec-0026/T1：meta 只读透传；不传时沿用上一次（sticky）；老调用不传退化为 None 不崩。
+    meta = {"identity": "SR-001", "level": "expert", "domain": "data-eng", "goal": "建个库"}
+    update_agent(
+        data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="1", meta=meta
+    )
+    assert read_agents(data_dir=tmp_path)[0]["meta"] == meta
+    # 不传 meta -> 沿用上一次
+    update_agent(data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="2")
+    assert read_agents(data_dir=tmp_path)[0]["meta"] == meta
+    # 从不传 meta 的 agent -> None，不崩
+    update_agent(data_dir=tmp_path, agent_id="d", role="developer", label="l", running=True, status="x")
+    assert read_agents(data_dir=tmp_path)[1]["meta"] is None

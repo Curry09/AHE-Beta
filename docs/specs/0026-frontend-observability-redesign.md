@@ -7,7 +7,7 @@ summary: 观测看板前端从「纯黑底+白字、四栏、只显 SR-001 标�
 tasks:
   - id: T1
     title: 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []

@@ -23,8 +23,8 @@ from typing import Any
 _AGENTS_NAME = "agents.json"
 _RUN_NAME = "run.json"
 _HISTORY_NAME = "history.json"
-# role 展示顺序：用户 → 创新者 → 开发者（对齐闭环 a → d → b 的次序）。
-_ROLE_ORDER = {"user": 0, "designer": 1, "developer": 2}
+# role 展示顺序：用户 → 分诊 → 创新者 → 开发者（对齐闭环 a → d1(triage) → d2(synthesize) → b）。
+_ROLE_ORDER = {"user": 0, "triager": 1, "designer": 2, "developer": 3}
 # 过程流时间线长度上限：status 变化 + assistant 发言 + 逐工具调用/结果，一次 agent.run 可达数百条。
 _LOG_CAP = 500
 
@@ -81,9 +81,13 @@ def update_agent(
     turns: list[dict[str, Any]] | None = None,
     detail: str | None = None,
     round_no: int | None = None,
+    meta: dict[str, Any] | None = None,
 ) -> None:
     """更新某 agent 的活动槽（upsert）。turns 给会话型 agent，detail 给 dev/designer 最终报告，
-    round_no 标注该活动属于第几轮（前端按轮分组的依据）。"""
+    round_no 标注该活动属于第几轮（前端按轮分组的依据）。
+
+    meta（Spec-0026/T1）：可选只读展示载荷（如用户 agent 的 persona 摘要 identity/level/domain/goal）——
+    纯前端展示用，不参与任何决策；不传时沿用上一次（同 round 的 sticky 语义），老调用退化为 None 不崩。"""
     with _WRITE_LOCK:  # Spec-0017/T1：读-改-写全程持锁，并发 upsert 不同槽位不互相覆盖
         path = _live_file(data_dir=data_dir, name=_AGENTS_NAME)
         registry = _read_json(path=path, fallback={})
@@ -104,6 +108,7 @@ def update_agent(
             "running": running,
             "status": status,
             "round": round_no if round_no is not None else prev.get("round"),
+            "meta": meta if meta is not None else prev.get("meta"),
             "turns": turns or [],
             "detail": detail,
             "log": log,

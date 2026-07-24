@@ -328,6 +328,7 @@ def main() -> int:
     # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
     sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）
+    persona_meta: dict[str, dict[str, str]] = {}  # Spec-0026/T1：identity -> persona 摘要（看板展示用）
     for i, sp in enumerate(sim_persona_list):
         scenario = seeds[i % len(seeds)]
         mp = Persona(
@@ -339,6 +340,12 @@ def main() -> int:
         )
         fixed_set.append((mp, scenario))
         sim_personas[mp.identity] = sp
+        persona_meta[mp.identity] = {
+            "identity": mp.identity,
+            "level": mp.level,
+            "domain": mp.domain,
+            "goal": mp.goal,
+        }
 
     from auto_designer.loop.live import (
         append_agent_log,
@@ -395,6 +402,7 @@ def main() -> int:
             status=status,
             turns=turns,
             round_no=current["round"],
+            meta=persona_meta.get(identity),
         )
         if not running:
             archive_agent(
