@@ -74,7 +74,7 @@
 钉死 AwaitEvent 等待环（主 loop 吃 reply、心跳一次性、动作前 try_reply）；统一 [+Ns] history（已删 wait_cost）；废弃 decide/waiting 的 one\|two 与合并 builder；清死常量与无消费者 MAIN_GAP；探针对齐 0022 菜单。
 
 ### 0024 用户 god-view 落盘 + 设计师按需取用
-Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
+Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline，含 utterance↔answers 请求-回复配对）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
 
 ### 0025 issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev
 把 issue 流建成真实软件团队的 triage 漏斗，并把现有单一 designer 拆成两个 agent。用户 sim 产出 raw issue（用户端模板填用户可见字段、按 type 标签、needs-triage、盖轮号）；triage agent 就地分类(确认 type)+定位(读 harness 代码 + get_session_timeline 轨迹)+去重+驳回/needs-info；synthesize agent（原 designer 收窄）只做跨 issue 结构综合、产 RFC（独立标签，凌驾 type，consolidate/supersede 局部 issue、最高 dev 预算）。dev 每轮按容量(N dev)顺序领 triaged issue + RFC，未清空的积压到下一轮（backlog = 上轮 carryover + 本轮新 triaged）。预算按 kind 分档、去 0020 分池/retry/stuck。产品/方向层 = distill persona/seed 卡库（人经 CLI，⓪ 层，不设 agent）；PM 职能 = 优先级由体感+频率机制派生。
@@ -168,6 +168,7 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0024 | 0024/T3 | get_session_timeline tool 入口（按需取证通路） | done | T2 | — |
 | 0024 | 0024/T4 | get_session_timeline 使用事件投影（去仿真外壳） | done | T3 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_session_timeline.py |
 | 0024 | 0024/T5 | 设计师渐进下钻 tool 接线（beat/step） | done | T4 | backend/agent_defs/designer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/designer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/auto_designer/designer/designer.py |
+| 0024 | 0024/T6 | 请求-回复配对：heard.answers → utterance | done | T5 | backend/tests/user/sim/test_heartbeat.py |
 | 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
 | 0025 | 0025/T2 | 用户 sim 产结构化 raw issue：暂定 type + needs-triage + 轮号 | done | T1 | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
 | 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | done | T1, T2, T3a | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
@@ -177,11 +178,11 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0025 | 0025/T7 | web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压) | done | T4 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
 | 0025 | 0025/T8 | 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示 | done | T7 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/lib/issueMeta.ts<br>frontend/src/types.ts<br>frontend/src/api.ts |
 | 0025 | 0025/T3a | tracker 补 set_labels：整组替换已有 issue 标签 | done | T1 | backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
-| 0026 | 0026/T1 | 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要 | pending | — | backend/auto_designer/loop/live.py<br>backend/run.py<br>backend/tests/loop/test_live.py |
-| 0026 | 0026/T2 | 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS | pending | — | frontend/src/styles.css<br>frontend/src/hooks/useTheme.ts<br>frontend/src/components/ThemeToggle.tsx |
-| 0026 | 0026/T3 | 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线 | pending | T2 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/components/Charts.tsx |
-| 0026 | 0026/T4 | 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛 | pending | T1, T3 | frontend/src/components/AgentColumn.tsx<br>frontend/src/components/Card.tsx |
-| 0026 | 0026/T5 | 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块 | pending | T2, T3 | frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/SessionDetail.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/components/detail/CommitDetail.tsx<br>frontend/src/components/SidePanel.tsx |
+| 0026 | 0026/T1 | 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要 | done | — | backend/auto_designer/loop/live.py<br>backend/run.py<br>backend/tests/loop/test_live.py |
+| 0026 | 0026/T2 | 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS | done | — | frontend/src/styles.css<br>frontend/src/hooks/useTheme.ts<br>frontend/src/components/ThemeToggle.tsx |
+| 0026 | 0026/T3 | 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线 | done | T2 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/components/Charts.tsx |
+| 0026 | 0026/T4 | 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛 | done | T1, T3 | frontend/src/components/AgentColumn.tsx<br>frontend/src/components/Card.tsx |
+| 0026 | 0026/T5 | 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块 | done | T2, T3 | frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/SessionDetail.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/components/detail/CommitDetail.tsx<br>frontend/src/components/SidePanel.tsx |
 
 ## 跨 feature 关系图
 
@@ -316,6 +317,7 @@ graph LR
         n0024_T3["T3 get_session_timeline tool 入口（按需取证通路）"]
         n0024_T4["T4 get_session_timeline 使用事件投影（去仿真外壳）"]
         n0024_T5["T5 设计师渐进下钻 tool 接线（beat/step）"]
+        n0024_T6["T6 请求-回复配对：heard.answers → utterance"]
     end
     subgraph G0025[0025 issue-triage-funnel]
         n0025_T1["T1 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render"]
@@ -400,6 +402,7 @@ graph LR
     n0024_T3 --> n0024_T2
     n0024_T4 --> n0024_T3
     n0024_T5 --> n0024_T4
+    n0024_T6 --> n0024_T5
     n0025_T2 --> n0025_T1
     n0025_T3 --> n0025_T1
     n0025_T3 --> n0025_T2
@@ -511,7 +514,7 @@ graph LR
 | backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012, 0023 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022 |
 | backend/tests/user/sim/test_prompt.py | 0005, 0023 |
@@ -1119,10 +1122,12 @@ graph LR
     nT3["T3 get_session_timeline tool 入口（按需取证通路）"]
     nT4["T4 get_session_timeline 使用事件投影（去仿真外壳）"]
     nT5["T5 设计师渐进下钻 tool 接线（beat/step）"]
+    nT6["T6 请求-回复配对：heard.answers → utterance"]
     nT1 --> nT2
     nT2 --> nT3
     nT3 --> nT4
     nT4 --> nT5
+    nT5 --> nT6
 ```
 
 演化图：
@@ -1134,12 +1139,14 @@ graph LR
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
     v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```
 
 ### 0025 issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev（issue #0）
@@ -1217,10 +1224,10 @@ graph LR
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
     v_T5_1["T5 v1"]
-    classDef st_pending fill:#eeeeee;
-    class v_T1_1 st_pending;
-    class v_T2_1 st_pending;
-    class v_T3_1 st_pending;
-    class v_T4_1 st_pending;
-    class v_T5_1 st_pending;
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```

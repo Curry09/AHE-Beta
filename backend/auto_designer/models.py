@@ -216,6 +216,7 @@ class SimTurn:
     与 Transcript 不是 1:1——一条 SimTurn = 一次 persona 决策（含 waiting 心跳、silent 自观察），
     message / harness_output 是该决策时刻的对话片段，perceive / verdict / action 是心路。
     persona_trace：该决策触发的用户 agent LLM 原始调用（含 system/user，供 KV 复用分析）。
+    Spec-0024/T6：utterance_id / delivery / queued_behind / answers_* 做请求–回复显式配对。
     """
 
     turn: int
@@ -232,6 +233,11 @@ class SimTurn:
     harness_output: str = ""
     harness_steps: list[dict[str, Any]] = field(default_factory=list)
     persona_trace: list[PersonaCallTrace] = field(default_factory=list)
+    utterance_id: str = ""
+    delivery: str = ""
+    queued_behind: str = ""
+    answers_utterance_id: str = ""
+    answers_said: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -252,6 +258,17 @@ class SimTurn:
             d["harness_steps"] = list(self.harness_steps)
         if self.persona_trace:
             d["persona_trace"] = [c.to_dict() for c in self.persona_trace]
+        # Spec-0024/T6：缺省空串不落键，旧 JSON 兼容
+        if self.utterance_id:
+            d["utterance_id"] = self.utterance_id
+        if self.delivery:
+            d["delivery"] = self.delivery
+        if self.queued_behind:
+            d["queued_behind"] = self.queued_behind
+        if self.answers_utterance_id:
+            d["answers_utterance_id"] = self.answers_utterance_id
+        if self.answers_said:
+            d["answers_said"] = self.answers_said
         return d
 
     @classmethod
@@ -271,6 +288,11 @@ class SimTurn:
             harness_output=data.get("harness_output", ""),
             harness_steps=list(data.get("harness_steps", [])),
             persona_trace=[PersonaCallTrace.from_dict(c) for c in data.get("persona_trace", [])],
+            utterance_id=str(data.get("utterance_id") or ""),
+            delivery=str(data.get("delivery") or ""),
+            queued_behind=str(data.get("queued_behind") or ""),
+            answers_utterance_id=str(data.get("answers_utterance_id") or ""),
+            answers_said=str(data.get("answers_said") or ""),
         )
 
 
