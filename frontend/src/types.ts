@@ -1,6 +1,14 @@
 // 数据契约：字段名与 backend/auto_designer/web/api.py 的响应一一对应，两侧须同步修改。
 
-export type AgentRole = "user" | "designer" | "developer";
+export type AgentRole = "user" | "triager" | "designer" | "developer";
+
+// Spec-0026/T1：用户 agent 活动槽可带的 persona 摘要（只读展示，缺省 null）。
+export interface PersonaMeta {
+  identity: string;
+  level: string;
+  domain: string;
+  goal: string;
+}
 
 export interface Turn {
   role: "user" | "harness";
@@ -25,6 +33,7 @@ export interface Agent {
   running: boolean;
   status: string;
   round: number | null;
+  meta?: PersonaMeta | null; // Spec-0026：用户 agent 带 persona 摘要；其余角色/老后端为 null
   turns: Turn[];
   detail: string | null;
   log: LogEntry[];
@@ -77,6 +86,14 @@ export interface HistoryResponse {
   items: HistoryItem[];
 }
 
+// triage 状态（Spec-0025/T7 后端标签投影；老后端缺省 → 由 labels 客户端兜底推导）。
+export type TriageStatus =
+  | "needs-triage"
+  | "triaged"
+  | "rejected"
+  | "needs-info"
+  | "superseded";
+
 export interface Issue {
   number: number;
   title: string;
@@ -86,8 +103,13 @@ export interface Issue {
   created_at: string;
   closed_at: string | null;
   url: string;
-  // Spec-0020/T4 覆盖关系（老后端缺省 → 不渲染徽标）：
-  // covers = design 票声明覆盖的 bug 票号；covered_by = 被哪张 open design 票覆盖。
+  // Spec-0025/T7 平台层标签投影（老后端缺省 → 前端按 labels 兜底推导，见 lib/issueMeta）：
+  kind?: string; // bug/feature/chore/document 或 rfc（RFC 凌驾 type）
+  round?: number | null; // round-N 的 N
+  triage_status?: TriageStatus | null;
+  priority?: string | null; // P0-P3
+  reject_reason?: string | null; // 驳回/needs-info 原因（权威原因见详情评论）
+  // 覆盖关系：covers = RFC 声明覆盖的 triaged 票号；covered_by = 被哪张 open RFC 覆盖。
   covers?: number[];
   covered_by?: number | null;
 }
@@ -155,12 +177,22 @@ export interface SessionDetail {
 
 export interface Roster {
   user: number;
+  triager: number;
   designer: number;
   developer: number;
 }
 
 export interface ConfigResponse {
   roster: Roster;
+}
+
+// /api/overview：概览数字 + 两条曲线（Spec-0026/T3 Charts 消费）。
+// feeling_trend=[[created_at, score]]；issue_curve=[[timestamp, delta, backlog]]（0025/T7 可执行 backlog 口径）。
+export interface OverviewResponse {
+  open_issue_count: number;
+  session_count: number;
+  feeling_trend: [string, number][];
+  issue_curve: [string, number, number][];
 }
 
 // 看板选中态：点谁，第四栏就展示谁的完整信息。

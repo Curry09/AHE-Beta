@@ -80,6 +80,10 @@ class FakeGitea:
             n = int(path.rsplit("/", 1)[1])
             self.issues[n]["state"] = json["state"]
             return _Resp(200, {"number": n, "state": json["state"]})
+        if method == "PUT" and path.endswith("/labels"):  # Spec-0025/T3a：整组替换
+            n = int(path.rsplit("/", 2)[1])
+            self.issues[n]["labels"] = json["labels"]
+            return _Resp(200, {"number": n})
         return _Resp(404, text=f"no route {method} {path}")
 
 
@@ -190,6 +194,24 @@ def test_set_state_illegal_value() -> None:
     t = _tracker(FakeGitea())
     with pytest.raises(ValueError):
         t.set_state(1, "merged", "x")
+
+
+def test_set_labels_replaces_via_put() -> None:
+    """Spec-0025/T3a：整组替换——ensure 缺失标签拿 id → PUT labels（替换语义）。"""
+    backend = FakeGitea()
+    backend.labels = {"bug": 5, "needs-triage": 6}
+    t = _tracker(backend)
+    ref = t.create_issue(IssueDraft(title="t", body="b", labels=["bug", "needs-triage"]))
+    # triage 完成：去 needs-triage、加 triaged（triaged 是新标签 → 先 ensure）
+    t.set_labels(ref.number, ["bug", "triaged"])
+    put = [c for c in t._session.calls if c[0] == "PUT" and c[1].endswith("/labels")]
+    assert len(put) == 1
+    assert put[0][2] == {"labels": [backend.labels["bug"], backend.labels["triaged"]]}
+    assert backend.issues[ref.number]["labels"] == [
+        backend.labels["bug"],
+        backend.labels["triaged"],
+    ]
+    assert "triaged" in backend.labels  # 新标签被 ensure 建出
 
 
 def test_label_race_falls_back_to_get() -> None:

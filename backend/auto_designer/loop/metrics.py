@@ -1,15 +1,19 @@
-"""metrics（spec-0003/T6）：从本地 SessionStore 统计 issue 数量与体感随时间的曲线。
+"""metrics（spec-0003/T6，曲线口径 spec-0025/T7）：统计体感与 issue backlog 随时间的曲线。
 
-只读、不自建存储（避免与权威源双写漂移）。feeling_trend 取每局体感分与时间；issue_curve 取每局
-新产 issue 数与累计净值。benchmark 不进入任何 run_round 决策，仅作旁路观测，不在此投票。
+只读、不自建存储（避免与权威源双写漂移）。feeling_trend 取每局体感分与时间（本地 SessionStore）；
+issue_curve 取**可执行 backlog** 随时间（Gitea 全状态 issue 的开/关事件）。benchmark 不进入任何
+run_round 决策，仅作旁路观测，不在此投票。
 
-MVP 说明：本地 SessionStore 只记录每局「新产 issue 数」（n_issues），不记录 issue 关闭时间戳，
-故 issue_curve 给出 (created_at, opened, net_open=累计 opened)；带 closed 的完整开/关曲线需 Gitea
-带时间戳的 issue 列表，待 IssueTracker 扩读路径后补（held-out 观测不受影响）。
+issue_curve 口径（Spec-0025/T7）：只数「可执行 backlog」= 未关闭的 triaged issue + RFC，排除
+needs-triage（未处理）与 rejected / needs-info（已否）与 superseded（被 RFC 取代）。曲线的
+「积压不降」正是 CLAUDE.md 要看的退化信号（issue 长期不下降 = harness 在退化）。需 tracker 的全状态
+读能力（list_issues，带 created_at/closed_at/labels）；无则回退空序列（本地 SessionStore 不含标签/
+关闭时间，给不出 backlog 口径）。
 """
 
 from __future__ import annotations
 
+from auto_designer.designer.issue_schema import is_backlog_by_labels
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 
@@ -27,14 +31,37 @@ class Metrics:
         return [(e["created_at"], e["score"]) for e in rows]
 
     def issue_curve(self) -> list[tuple[str, int, int]]:
-        """issue 数~时间：[(created_at, opened, net_open)]，net_open 为累计 opened。空则空序列。"""
-        rows = sorted(self._store.index(), key=lambda e: e["created_at"])
+        """可执行 backlog ~ 时间：[(timestamp, delta, backlog)]，backlog 为该时刻累计未关闭的
+        triaged + RFC 数（含跨轮积压）。口径见模块 docstring（Spec-0025/T7）。
+
+        从 tracker 全状态 issue 的开/关事件累计：每条可执行 backlog issue 在 created_at 计 +1、
+        （若已关）在 closed_at 计 -1，按时间排序后滚动求和。用「当前/最终标签」判定它是否属可执行
+        backlog（MVP 近似：不重建历史标签轨迹）。tracker 无 list_issues 能力（Fake / 无 Gitea）或
+        读取失败 → 空序列（不抛）。
+        """
+        fetch_all = getattr(self._tracker, "list_issues", None)
+        if not callable(fetch_all):
+            return []
+        try:
+            issues = fetch_all(state="all")
+        except Exception:
+            return []
+        events: list[tuple[str, int]] = []
+        for it in issues:
+            if not is_backlog_by_labels(it.get("labels") or []):
+                continue
+            created = it.get("created_at") or ""
+            if created:
+                events.append((created, 1))
+            closed = it.get("closed_at")
+            if closed:
+                events.append((closed, -1))
+        events.sort(key=lambda e: e[0])
         curve: list[tuple[str, int, int]] = []
-        net = 0
-        for e in rows:
-            opened = e["n_issues"]
-            net += opened
-            curve.append((e["created_at"], opened, net))
+        backlog = 0
+        for ts, delta in events:
+            backlog += delta
+            curve.append((ts, delta, backlog))
         return curve
 
     def open_issue_count(self) -> int:

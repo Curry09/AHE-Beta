@@ -21,9 +21,11 @@ _（缺模块级 docstring）_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
-| `designer.py` | Designer：创新者 = 综合全局的 nexau agent（对偶于开发者的「局部补丁」）。 |
+| `designer.py` | Designer = synthesize agent：综合全局的 nexau agent（对偶于 triage 的逐条梳理、开发者的局部补丁）。 |
+| `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂设计师作机制层判别证据。 |
 | `session_timeline.py` | 设计师按需取用：从落盘 Session 投影「使用事件时间线」。 |
+| `triage.py` | Triager：issue triage / maintainer = 带只读工具的 nexau agent（对偶于 synthesize 的跨条综合）。 |
 
 ### auto_designer.dev
 
@@ -70,9 +72,9 @@ _（缺模块级 docstring）_
 | `checkpoint.py` | checkpoint 存取（spec-0004/T1）：把自包含 STATE_DIR 打包成可下载 artifact，反向还原。 |
 | `live.py` | 多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/。 |
 | `live_tracer.py` | StepTracer：把 nexau agent 运行中的过程流成看板可见的结构化事件。 |
-| `metrics.py` | metrics（spec-0003/T6）：从本地 SessionStore 统计 issue 数量与体感随时间的曲线。 |
+| `metrics.py` | metrics（spec-0003/T6，曲线口径 spec-0025/T7）：统计体感与 issue backlog 随时间的曲线。 |
 | `orchestrator.py` | 闭环编排 orchestrator：a（用户产 issue+体感）→ d（创新者综合全局产结构性提案，可选） |
-| `roster.py` | 角色编制（roster）：三类 agent 的数量，作为「后端编排」与「前端小镇房间」的单一真源。 |
+| `roster.py` | 角色编制（roster）：各类 agent 的数量，作为「后端编排」与「前端小镇房间」的单一真源。 |
 | `run_state.py` | run_state（spec-0004/T1）：编排游标 + 三侧中间态标记，作为「无法从产物观测」之外的兜底。 |
 | `runner.py` | 可恢复 harbor runner（spec-0004/T2）：作为一个 harbor task（方案 A，整条 run = 1 task）。 |
 | `sim_user.py` | 把 spec-0005 控制信封 sim 用户 agent 接进 spec-0003/0007 闭环。 |
@@ -153,8 +155,10 @@ graph LR
     nauto_designer["auto_designer"]
     nauto_designer_designer["auto_designer.designer"]
     nauto_designer_designer_designer["designer.designer"]
+    nauto_designer_designer_issue_schema["designer.issue_schema"]
     nauto_designer_designer_runtime_agg["designer.runtime_agg"]
     nauto_designer_designer_session_timeline["designer.session_timeline"]
+    nauto_designer_designer_triage["designer.triage"]
     nauto_designer_dev["auto_designer.dev"]
     nauto_designer_dev_agentic_developer["dev.agentic_developer"]
     nauto_designer_dev_commit_checkpoint["dev.commit_checkpoint"]
@@ -215,6 +219,7 @@ graph LR
     nauto_designer_user_sim_workspace["sim.workspace"]
     nauto_designer_web["auto_designer.web"]
     nauto_designer_web_api["web.api"]
+    nauto_designer_designer_designer --> nauto_designer_designer_issue_schema
     nauto_designer_designer_designer --> nauto_designer_designer_runtime_agg
     nauto_designer_designer_designer --> nauto_designer_designer_session_timeline
     nauto_designer_designer_designer --> nauto_designer_loop_live_tracer
@@ -225,12 +230,20 @@ graph LR
     nauto_designer_designer_runtime_agg --> nauto_designer_user_session_store
     nauto_designer_designer_session_timeline --> nauto_designer_models
     nauto_designer_designer_session_timeline --> nauto_designer_user_session_store
+    nauto_designer_designer_triage --> nauto_designer_designer_designer
+    nauto_designer_designer_triage --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_triage --> nauto_designer_designer_session_timeline
+    nauto_designer_designer_triage --> nauto_designer_loop_live_tracer
+    nauto_designer_designer_triage --> nauto_designer_tracker_base
+    nauto_designer_designer_triage --> nauto_designer_user_session_store
+    nauto_designer_dev_agentic_developer --> nauto_designer_designer_issue_schema
     nauto_designer_dev_agentic_developer --> nauto_designer_loop_live_tracer
     nauto_designer_dev_agentic_developer --> nauto_designer_tracker_base
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
     nauto_designer_harness_launcher --> nauto_designer_harness_interface
+    nauto_designer_loop_metrics --> nauto_designer_designer_issue_schema
     nauto_designer_loop_metrics --> nauto_designer_tracker_base
     nauto_designer_loop_metrics --> nauto_designer_user_session_store
     nauto_designer_loop_orchestrator --> nauto_designer_designer_designer
@@ -243,6 +256,7 @@ graph LR
     nauto_designer_loop_runner --> nauto_designer_loop_checkpoint
     nauto_designer_loop_runner --> nauto_designer_loop_orchestrator
     nauto_designer_loop_runner --> nauto_designer_loop_run_state
+    nauto_designer_loop_sim_user --> nauto_designer_designer_issue_schema
     nauto_designer_loop_sim_user --> nauto_designer_harness_interface
     nauto_designer_loop_sim_user --> nauto_designer_models
     nauto_designer_loop_sim_user --> nauto_designer_tracker_base
@@ -320,6 +334,7 @@ graph LR
     nauto_designer_user_sim_tools --> nauto_designer_user_sim_sandbox
     nauto_designer_user_sim_workspace --> nauto_designer_models
     nauto_designer_user_sim_workspace --> nauto_designer_user_sim_seed_source
+    nauto_designer_web_api --> nauto_designer_designer_issue_schema
     nauto_designer_web_api --> nauto_designer_loop_live
     nauto_designer_web_api --> nauto_designer_loop_metrics
     nauto_designer_web_api --> nauto_designer_loop_roster

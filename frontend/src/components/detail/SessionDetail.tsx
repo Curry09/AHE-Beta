@@ -42,14 +42,6 @@ export function SessionDetailView(props: {
           )}
           {session && (
             <>
-              <dt>persona</dt>
-              <dd>
-                {session.persona.identity} · {session.persona.level} · {session.persona.domain}
-              </dd>
-              <dt>目标</dt>
-              <dd>{session.persona.goal}</dd>
-              <dt>说话风格</dt>
-              <dd>{session.persona.speaking_style}</dd>
               <dt>时间</dt>
               <dd>{fmtDate(session.created_at)}</dd>
             </>
@@ -71,6 +63,23 @@ export function SessionDetailView(props: {
             </>
           )}
         </dl>
+        {session && (
+          <div className="block">
+            <div className="block-title">Persona</div>
+            <dl className="kv">
+              <dt>身份</dt>
+              <dd>{session.persona.identity}</dd>
+              <dt>水平 · 领域</dt>
+              <dd>
+                {session.persona.level} · {session.persona.domain}
+              </dd>
+              <dt>目标</dt>
+              <dd>{session.persona.goal}</dd>
+              <dt>说话风格</dt>
+              <dd>{session.persona.speaking_style}</dd>
+            </dl>
+          </div>
+        )}
         {session && (
           <div className="block">
             <div className="block-title">场景</div>

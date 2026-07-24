@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.models import (
     FeelingScore,
@@ -109,28 +110,49 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
     )
 
 
-def _issue_draft_from_body(body: str) -> IssueDraft:
-    """markdown/正文 → Gitea 建 issue 入参。sim issue 均失败/不满驱动，打 bug。
+def _infer_kind(body: str) -> str:
+    """Spec-0025/T2：粗判 issue kind（type 标签）。sim issue 绝大多数是失败/不满驱动 → bug；
+    出现明确"希望/能不能/增加/支持…"这类诉求词则猜 feature。**只是暂定**——triage agent 会确认/纠正。
+    """
+    text = (body or "").lower()
+    feature_hints = ("希望", "能不能", "增加", "支持", "feature", "would be nice", "add a", "wish")
+    return "feature" if any(h in text for h in feature_hints) else "bug"
 
-    标题取正文首行（即用户第一人称原话的开头），不加框架前缀。
+
+def _issue_draft_from_body(body: str, *, round_no: int | None = None) -> IssueDraft:
+    """raw 用户 issue → Gitea 建 issue 入参（Spec-0025/T2）。
+
+    body = 用户可见报告原文（persona 第一人称，用户看不到代码 → 只有用户视角症状）。标签三件套：
+    暂定 type(bug/feature，triage 会确认) + `needs-triage`(待 triage，dev 不领) + 可选 `round-N`。
+    标题取正文首行。TRIAGE 区字段（根因/边界/验收）留空待 triage agent 读码+轨迹补。
     """
     text = body or ""
     first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "simulated user issue")
-    return IssueDraft(title=first[:80], body=text, labels=["bug"])
+    labels = [_infer_kind(text), NEEDS_TRIAGE]
+    if round_no is not None:
+        labels.append(round_label(round_no))
+    return IssueDraft(title=first[:80], body=text, labels=labels)
 
 
 def _issue_draft(res: SessionResult) -> IssueDraft:
-    """兼容旧单测：仅从终结收场的 issue_artifact 建 draft。"""
+    """兼容旧单测：仅从终结收场的 issue_artifact 建 draft（无轮号）。"""
     return _issue_draft_from_body(res.issue_artifact or "")
 
 
-def _flush_issues(tracker: IssueTracker, res: SessionResult) -> list:
-    """中途 report_issue notes + 终结 issue_artifact 一并建单（顺序：先中途、后收场）。"""
+def _flush_issues(
+    tracker: IssueTracker, res: SessionResult, *, round_no: int | None = None
+) -> list:
+    """中途 report_issue notes + 终结 issue_artifact 一并建单（顺序：先中途、后收场）。
+
+    round_no 由编排层透传（Spec-0025/T6）：给每条 raw issue 盖 `round-N`，供增量 triage 与观测曲线。
+    """
     refs = []
     for body in res.issue_notes:
-        refs.append(tracker.create_issue(_issue_draft_from_body(body)))
+        refs.append(tracker.create_issue(_issue_draft_from_body(body, round_no=round_no)))
     if res.issue_artifact:
-        refs.append(tracker.create_issue(_issue_draft_from_body(res.issue_artifact)))
+        refs.append(
+            tracker.create_issue(_issue_draft_from_body(res.issue_artifact, round_no=round_no))
+        )
     return refs
 
 
@@ -141,6 +163,7 @@ def make_sim_run_session_fn(
     store: SessionStore,
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
+    round_provider: Callable[[], int | None] | None = None,
 ) -> Callable[..., Session]:
     """返回 Orchestrator 用的 run_session_fn。
 
@@ -150,6 +173,8 @@ def make_sim_run_session_fn(
     只新建外壳。
     sim_personas: 展示用 models.Persona.identity -> 9 维 sim persona（权威画像）。
     on_turn: 逐轮（含终止轮）+ 收尾各回调一次，供调用方发 agent 活动到看板。
+    round_provider: Spec-0025/T6——每局收尾建 issue 前调一次取当前轮号，给 raw issue 盖 `round-N`
+    标签（供增量 triage 与观测曲线）。None（或返回 None）则不盖轮号，兼容旧调用。
     """
 
     def run(
@@ -196,7 +221,8 @@ def make_sim_run_session_fn(
         finally:
             harness.close()  # 无论成败都释放 harness 子进程
 
-        issue_refs = _flush_issues(tracker, res)
+        round_no = round_provider() if round_provider is not None else None
+        issue_refs = _flush_issues(tracker, res, round_no=round_no)
         feel = res.feeling or res.feeling_derived
         session = Session(
             persona=persona,

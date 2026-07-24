@@ -58,6 +58,7 @@ class Orchestrator:
         developer_agents: list[AgenticDeveloper],
         run_session_fn: SessionRunner,
         initial_ref: str,
+        triagers: list | None = None,
         designers: list[Designer] | None = None,
         on_round_start: Callable[[int], None] | None = None,
         on_round_end: Callable[[int, str], None] | None = None,
@@ -68,7 +69,10 @@ class Orchestrator:
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
         self._fixed_set = fixed_set
         self._developers = developer_agents
-        # 创新者（可选）：在 a 之后、b 之前综合全局 backlog+体感产结构性提案，供开发者领取。
+        # Spec-0025/T6：d 段两 agent——先 triage（把本轮新 raw issue 规范化）、再 synthesize（在已
+        # triaged backlog 上产 RFC）。都在 b 之前，让 triaged issue + RFC 一起进 dev 可领集合。
+        self._triagers = triagers or []
+        # synthesize（可选）：在 a、triage 之后、b 之前综合全局产结构性 RFC，供开发者领取。
         self._designers = designers or []
         self._run_session = run_session_fn
         self._initial_ref = initial_ref  # 跟踪的主干分支名（trunk = "main"），每局解析其 HEAD SHA
@@ -129,11 +133,27 @@ class Orchestrator:
                         )
                         traceback.print_exc()
 
-        # d（创新者，可选）：综合本轮及历史全量 open issue backlog + 体感曲线，产结构性设计提案
-        #    （打 design 标签）写回 tracker。跑在 b 之前，让提案与用户产的 issue 一起进 backlog 供
-        #    开发者领取；designer 不碰 git、不改文件，只提方向。无 designer 时整段跳过（退化为今天行为）。
+        # d1（triage，Spec-0025/T6）：把本轮新产的 raw issue（+ 上轮 carryover 里仍 needs-triage 的）
+        #    逐条规范化（分类/定位/去重/驳回），就地增补为 triaged。跑在 synthesize 之前——让 synthesize
+        #    的输入是已 groomed 的 backlog。无 triager 时跳过。
+        #    单个 triager 崩溃（LLM/配置类意外）记日志跳过、不废整轮——否则整条闭环被一个 agent 拖死
+        #    且（看板看不到 triager 时）无从诊断。
+        for triager in self._triagers:
+            try:
+                triager.triage_once()
+            except Exception:  # noqa: BLE001
+                print("[orchestrator] triage 异常，跳过该 triager，本轮继续：")
+                traceback.print_exc()
+
+        # d2（synthesize，可选）：在**已 triaged** backlog（含跨轮积压）+ 体感曲线上综合产结构性 RFC
+        #    （打 RFC 标签）写回 tracker。跑在 b 之前，让 RFC 与 triaged issue 一起进 dev 可领集合；
+        #    synthesize 不碰 git、不改文件，只提方向。无 designer 时整段跳过。同理单个崩溃不废整轮。
         for designer in self._designers:
-            designer.propose_once()
+            try:
+                designer.propose_once()
+            except Exception:  # noqa: BLE001
+                print("[orchestrator] synthesize 异常，跳过该 designer，本轮继续：")
+                traceback.print_exc()
 
         # b：多个开发者 agent 依次各领一条不同 issue，自主改 harness 直推 main（无 branch/merge/门禁）。
         attempted: set[int] = set()

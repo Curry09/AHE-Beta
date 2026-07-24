@@ -7,6 +7,8 @@ issue_artifact 真落 tracker、SessionResult 转 models.Session 落 store、逐
 from __future__ import annotations
 
 from auto_designer.loop.sim_user import (
+    _infer_kind,
+    _issue_draft_from_body,
     make_sim_run_session_fn,
     result_to_sim_trace,
     result_to_turns,
@@ -386,3 +388,42 @@ def test_main_path_does_not_ensure_deps_in_sim_user(tmp_path, monkeypatch) -> No
 
     # 传入 workspace_dir（orchestrator 已 materialize+ensure）→ sim_user 不再碰这两者，不抛即通过。
     fn(mp, scenario, ScriptedHarness(), workspace_dir="/given/ws")
+
+
+# ---- Spec-0025/T2：raw issue 结构化——暂定 type + needs-triage + round 标签 ----
+
+
+def test_infer_kind_defaults_bug_and_detects_feature() -> None:
+    assert _infer_kind("装不上包，反复超时后放弃") == "bug"
+    assert _infer_kind("希望能增加一个批量导出功能") == "feature"
+    assert _infer_kind("would be nice to add a dark mode") == "feature"
+
+
+def test_raw_issue_labels_type_and_needs_triage() -> None:
+    draft = _issue_draft_from_body("unidecode 装不上，超时放弃")
+    assert "bug" in draft.labels  # 暂定 type（triage 会确认）
+    assert "needs-triage" in draft.labels  # 待 triage，dev 不领
+    assert not any(lb.startswith("round-") for lb in draft.labels)  # 无轮号时不加
+
+
+def test_raw_issue_stamps_round_when_given() -> None:
+    draft = _issue_draft_from_body("坏了", round_no=3)
+    assert "round-3" in draft.labels
+    assert "needs-triage" in draft.labels
+
+
+def test_round_provider_threads_round_into_issue(tmp_path) -> None:
+    sp = expert()
+    mp = _model_persona(sp)
+    tracker = FakeTracker()
+    store = SessionStore(tmp_path)
+    fn = make_sim_run_session_fn(
+        client_factory=ScriptedPersonaClient,
+        tracker=tracker,
+        store=store,
+        sim_personas={mp.identity: sp},
+        round_provider=lambda: 5,  # Spec-0025/T6 会传真轮号，这里固定 5
+    )
+    fn(mp, SeedScenario(description="task"), ScriptedHarness())
+    issues = tracker.list_open_issues()
+    assert issues and "round-5" in issues[0].labels and "needs-triage" in issues[0].labels

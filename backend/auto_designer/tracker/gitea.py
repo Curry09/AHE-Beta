@@ -122,6 +122,18 @@ class GiteaTracker:
         if reason:  # Gitea PATCH 不收 reason 字段，关闭理由以 comment 保留可追溯
             self.add_comment(number, reason)
 
+    def set_labels(self, number: int, labels: list[str]) -> None:
+        """Spec-0025/T3a：整组替换 issue 标签。ensure 拿 id → PUT /issues/{n}/labels（替换语义）。"""
+        missing = [n for n in labels if n not in self._label_ids]
+        if missing:
+            self.ensure_labels(missing)
+        label_ids = [self._label_ids[n] for n in labels]
+        self._request(
+            "PUT",
+            f"/repos/{self._owner}/{self._repo}/issues/{number}/labels",
+            {"labels": label_ids},
+        )
+
     # ---- 观测读路径（非 IssueTracker 协议，仅 GiteaTracker 提供）----
 
     def list_issues(self, *, state: str = "all", limit: int = 100) -> list[dict[str, Any]]:

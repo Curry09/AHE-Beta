@@ -241,7 +241,7 @@ def main() -> int:
         os.environ[f"LLM_{_suffix}"] = _val
     gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
 
-    from auto_designer.loop.roster import load_dev_pick_policies, load_roster
+    from auto_designer.loop.roster import load_roster
 
     # 编制（单一真源）：用户/设计师/开发者数量，前端房间容量经 /api/config 读同一份。
     roster = load_roster()
@@ -268,6 +268,7 @@ def main() -> int:
     os.environ["no_proxy"] = no_proxy
 
     from auto_designer.designer.designer import Designer
+    from auto_designer.designer.triage import Triager
     from auto_designer.dev.agentic_developer import AgenticDeveloper
     from auto_designer.distill.library import PersonaLibrary
     from auto_designer.harness.launcher import HarnessLauncher
@@ -298,7 +299,12 @@ def main() -> int:
 
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 开发者角色 ...")
     dev_agent_def = str(ROOT / "agent_defs" / "developer_agent")  # 工具型 dev agent 定义目录
-    designer_agent_def = str(ROOT / "agent_defs" / "designer")  # 创新者 agent 定义目录（只读工具）
+    designer_agent_def = str(
+        ROOT / "agent_defs" / "designer"
+    )  # synthesize agent 定义目录（只读工具）
+    triager_agent_def = str(
+        ROOT / "agent_defs" / "triage_agent"
+    )  # Spec-0025：triage agent 定义目录
 
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
     # persona 从 distill 卡库（persona_library.json）注入、场景从种子卡库（seeds.json）经
@@ -322,6 +328,9 @@ def main() -> int:
     # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
     sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）
+    persona_meta: dict[
+        str, dict[str, str]
+    ] = {}  # Spec-0026/T1：identity -> persona 摘要（看板展示用）
     for i, sp in enumerate(sim_persona_list):
         scenario = seeds[i % len(seeds)]
         mp = Persona(
@@ -333,6 +342,12 @@ def main() -> int:
         )
         fixed_set.append((mp, scenario))
         sim_personas[mp.identity] = sp
+        persona_meta[mp.identity] = {
+            "identity": mp.identity,
+            "level": mp.level,
+            "domain": mp.domain,
+            "goal": mp.goal,
+        }
 
     from auto_designer.loop.live import (
         append_agent_log,
@@ -389,6 +404,7 @@ def main() -> int:
             status=status,
             turns=turns,
             round_no=current["round"],
+            meta=persona_meta.get(identity),
         )
         if not running:
             archive_agent(
@@ -409,6 +425,8 @@ def main() -> int:
         store=store,
         sim_personas=sim_personas,
         on_turn=on_sim_turn,
+        # Spec-0025/T6：给每条 raw issue 盖当前轮号（供增量 triage 与观测曲线）。current 由 on_round_start 更新。
+        round_provider=lambda: current["round"] or None,
     )
 
     def make_dev_status(agent_id, label):  # 开发者 agent 活动回调（收尾时按轮归档）
@@ -438,13 +456,14 @@ def main() -> int:
 
         return cb
 
-    # Spec-0020/T3：dev 领取策略（前 N_BUG_FIRST_DEVS 个 bug 优先、其余设计票优先）+ 票种预算
-    # 两档（bug/design，env 可覆盖；重试升档在 dev 侧按 attempt 记录自动做）。
-    raw_bug = os.environ.get("DEV_BUDGET_BUG", "").strip()
-    raw_design = os.environ.get("DEV_BUDGET_DESIGN", "").strip()
-    budget_bug = int(raw_bug) if raw_bug.isdigit() and int(raw_bug) > 0 else 38
-    budget_design = int(raw_design) if raw_design.isdigit() and int(raw_design) > 0 else 60
-    dev_policies = load_dev_pick_policies(n_developers=roster["developer"])
+    # Spec-0025/T6：dev 预算按 kind 分档（RFC 最高），env 覆盖各档；无分池/重试（见 T5）。
+    from auto_designer.dev.agentic_developer import DEFAULT_BUDGETS  # noqa: PLC0415
+
+    def _budget(kind: str) -> int:
+        raw = os.environ.get(f"DEV_BUDGET_{kind.upper()}", "").strip()
+        return int(raw) if raw.isdigit() and int(raw) > 0 else DEFAULT_BUDGETS[kind]
+
+    budgets = {k: _budget(k) for k in DEFAULT_BUDGETS}
 
     developers = [  # roster 个工具型 dev agent：同轮各领一条不同 issue，自主改 harness + git 发版
         AgenticDeveloper(
@@ -453,11 +472,45 @@ def main() -> int:
             dev_agent_def,
             on_status=make_dev_status(f"dev-{i}", f"dev#{i + 1}"),
             on_event=make_event_logger(f"dev-{i}"),
-            pick_policy=dev_policies[i],
-            budget_bug=budget_bug,
-            budget_design=budget_design,
+            budgets=budgets,
         )
         for i in range(roster["developer"])
+    ]
+
+    def make_triager_status(agent_id, label):  # triage agent 活动回调（收尾按轮归档）
+        def cb(*, running, status, detail=None, **kw):
+            update_agent(
+                data_dir=DATA,
+                agent_id=agent_id,
+                role="triager",
+                label=label,
+                running=running,
+                status=status,
+                detail=detail,
+                round_no=current["round"],
+            )
+            if not running:
+                archive_agent(
+                    data_dir=DATA,
+                    agent_id=agent_id,
+                    round_no=current["round"],
+                    extra={"kind": "triager_run"},
+                )
+
+        return cb
+
+    triagers = [  # Spec-0025/T6：roster 个 triage agent——规范化本轮新 raw issue，跑在 synthesize 之前
+        Triager(
+            tracker,
+            store,
+            str(repo),
+            triager_agent_def,
+            on_status=make_triager_status(
+                f"triager-{i}", "triager" if roster["triager"] == 1 else f"triager#{i + 1}"
+            ),
+            on_event=make_event_logger(f"triager-{i}"),
+        )
+        for i in range(roster["triager"])
     ]
 
     def make_designer_status(agent_id, label):  # 创新者 agent 活动回调（收尾时按轮归档）
@@ -520,20 +573,20 @@ def main() -> int:
         developer_agents=developers,
         run_session_fn=user_run_session_fn,
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
-        designers=designers,  # 创新者接入闭环：a → d(designer) → b → c
+        triagers=triagers,  # Spec-0025/T6：d1 triage（规范化）跑在 synthesize 之前
+        designers=designers,  # synthesize 接入闭环：a → d1(triage) → d2(synthesize) → b → c
         on_round_start=on_round_start,  # 轮次运行态 → data/live/run.json（看板 /api/state）
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
         integrity_guard=integrity_guard,  # Spec-0021/T2
     )
 
-    n_bug_first = sum(1 for p in dev_policies if p == "bug_first")
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
-        f"{len(developers)} dev agent × {len(designers)} designer，"
-        f"a 段并发 {max_parallel_users}，dev 策略 bug_first×{n_bug_first} + "
-        f"design_first×{len(dev_policies) - n_bug_first}，"
-        f"预算 bug={budget_bug}/design={budget_design}，dev 直推 main，真模型）..."
+        f"{len(triagers)} triager × {len(designers)} synthesize × {len(developers)} dev，"
+        f"a 段并发 {max_parallel_users}，dev 预算 "
+        f"bug={budgets['bug']}/feature={budgets['feature']}/rfc={budgets['rfc']}，"
+        f"dev 直推 main，真模型）..."
     )
     try:
         refs = orch.run(TOTAL_ROUNDS)

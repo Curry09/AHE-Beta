@@ -12,11 +12,11 @@ import json
 from pathlib import Path
 
 from auto_designer.designer.designer import (
-    DESIGN_LABEL,
     Designer,
     DesignOutcome,
     _unwrap_result,
 )
+from auto_designer.designer.issue_schema import RFC_LABEL, TRIAGED
 from auto_designer.models import (
     FeelingScore,
     IssueDraft,
@@ -30,17 +30,17 @@ from auto_designer.user.session_store import SessionStore
 
 
 class _StubDesigner(Designer):
-    """覆盖 _run_agent：不跑真 nexau，回放一段固定 result，并记录喂进的信号。"""
+    """覆盖 _run_agent：不跑真 nexau，回放一段固定 result，并记录喂进的信号（Spec-0025/T4：triaged）。"""
 
     def __init__(self, *args, canned: str, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._canned = canned
-        self.seen_backlog: list = []
+        self.seen_triaged: list = []
         self.seen_trend: list = []
         self.seen_runtime: str = ""
 
-    def _run_agent(self, *, backlog: list, trend: list, runtime: str) -> str:
-        self.seen_backlog = backlog
+    def _run_agent(self, *, triaged: list, trend: list, runtime: str) -> str:
+        self.seen_triaged = triaged
         self.seen_trend = trend
         self.seen_runtime = runtime
         return self._canned
@@ -74,110 +74,175 @@ def _designer(tmp_path: Path, tracker: FakeTracker, canned: str) -> _StubDesigne
     )
 
 
-def test_proposals_become_design_labeled_issues(tmp_path) -> None:
+def _rfc_fields() -> dict:
+    return {
+        "问题": "大任务撞预算",
+        "根因": "无增量交付",
+        "涉及 issue": "#多条",
+        "方向": "加预算感知",
+        "验收": "预算内给交付",
+    }
+
+
+def _rfc_canned(
+    covers: object = None, *, title: str = "结构：预算感知", fields: dict | None = None
+) -> str:
+    item: dict = {"title": title, "fields": fields if fields is not None else _rfc_fields()}
+    if covers is not None:
+        item["covers"] = covers
+    return json.dumps([item], ensure_ascii=False)
+
+
+def _triaged(tracker: FakeTracker, title: str, kind: str = "bug") -> int:
+    return tracker.create_issue(IssueDraft(title=title, body="x", labels=[kind, TRIAGED])).number
+
+
+def test_rfc_labeled_and_rendered_from_fields(tmp_path) -> None:
     tracker = FakeTracker()
-    tracker.create_issue(IssueDraft(title="慢", body="ORM 慢", labels=["bug"]))  # 已有 backlog
-    canned = (
-        "分析后给出提案：\n```json\n"
-        '[{"title": "统一错误处理契约", "body": "多条 issue 指向缺乏统一兜底", "labels": ["design"]},'
-        '{"title": "澄清前置追问策略", "body": "体感偏低源于不追问", "labels": []}]\n'
-        "```\n以上。"
-    )
-    designer = _designer(tmp_path, tracker, canned)
+    _triaged(tracker, "超时1")  # 已 triaged backlog（synthesize 的输入）
+    designer = _designer(tmp_path, tracker, _rfc_canned())
 
     outcome = designer.propose_once()
 
-    assert isinstance(outcome, DesignOutcome)
-    assert outcome.count == 2
-    # 两条提案都落成 open issue，且都带 design 标签（第二条原本没 labels 也被补上）。
-    opened = {i.number: i for i in tracker.list_open_issues()}
-    for number in outcome.proposal_numbers:
-        assert DESIGN_LABEL in opened[number].labels
-    titles = {i.title for i in opened.values()}
-    assert {"统一错误处理契约", "澄清前置追问策略"} <= titles
-    # backlog + 体感曲线确实喂进了 agent（曲线现在带上体感 reason 那句「为什么」）。
-    assert [i.title for i in designer.seen_backlog] == ["慢"]
-    assert [s for _, s, _, _ in designer.seen_trend] == [2, 1]
-    assert [reason for _, _, reason, _ in designer.seen_trend] == ["等太久", "超时两次颗粒无收"]
-    assert all(sid for _, _, _, sid in designer.seen_trend)  # 带 session_id 供 timeline tool
-    # 运行时聚合也注入了（空 transcript 会话 → 0 harness 轮，但仍有窗口说明）。
-    assert "局会话" in designer.seen_runtime or "暂无会话数据" in designer.seen_runtime
+    assert isinstance(outcome, DesignOutcome) and outcome.count == 1
+    rfc = tracker.issue(outcome.proposal_numbers[0])
+    assert RFC_LABEL in rfc["labels"]  # RFC 标签
+    assert "### 问题\n\n大任务撞预算" in rfc["body"]  # 按 RFC schema 渲染
+    assert "### 方向\n\n加预算感知" in rfc["body"]
+    # 只喂 triaged 工作项（不喂 needs-triage/raw）
+    assert [i.title for i in designer.seen_triaged] == ["超时1"]
 
 
-def test_empty_or_invalid_result_yields_no_proposals(tmp_path) -> None:
+def test_run_with_timeout_propagates_session_store(tmp_path) -> None:
+    """bind_session_store 注入的 store 须能被 worker 线程里的 tool 读到（_run_with_timeout 用
+    copy_context 跨线程传 contextvars）。修复前 worker 线程是空 context → get_session_timeline
+    报「session store not bound」（线上实测 bug）。"""
+    from auto_designer.designer.designer import _run_with_timeout
+    from auto_designer.designer.session_timeline import bind_session_store, get_session_timeline
+    from auto_designer.user.session_store import SessionStore
+
+    store = SessionStore(tmp_path / "sessions")
+    with bind_session_store(store):
+        out = _run_with_timeout(lambda: get_session_timeline(session_id="nope"), 10)
+    assert out["ok"] is False
+    assert "not bound" not in out["error"]  # store 已跨线程绑定上
+    assert "not found" in out["error"]  # 到了「查不到该 session」这步 = 绑定成功
+
+
+def test_rfc_fields_label_whitespace_tolerant(tmp_path) -> None:
+    """真实 LLM 按 systemprompt 用无空格「涉及issue」填字段——须能映射到 related，否则 RFC 校验
+    永远失败被静默丢弃（线上实测 bug）。schema label 是「涉及 issue」（带空格），归一后应匹配上。"""
     tracker = FakeTracker()
+    _triaged(tracker, "超时1")
+    fields = {
+        "问题": "多轮等待拖沓",
+        "根因": "单 agent 长循环",
+        "涉及issue": [],  # 无空格 + 空列表（正是线上 designer 的产物）
+        "方向": "更早交回中间成果",
+        "验收": "等待中能看到进展",
+    }
+    outcome = _designer(tmp_path, tracker, _rfc_canned(fields=fields)).propose_once()
+    assert outcome.count == 1  # 修复前这里是 0（related 映射不上 → 校验失败 → 跳过）
+    assert "### 涉及 issue" in tracker.issue(outcome.proposal_numbers[0])["body"]
+
+
+def test_pm_rfc_without_triaged_or_covers(tmp_path) -> None:
+    """synthesize 的 PM 职能：0 条 triaged 时也能凭体感+运行时产结构 RFC（covers 空、不 supersede
+    任何票）；这条 RFC 应正常落库、成为 dev 可领项（线上「dev 无可领 RFC」的根因之一）。"""
+    tracker = FakeTracker()  # 无 triaged
+    fields = {
+        "问题": "整轮超时才拿到结果",
+        "根因": "长循环 + 超时上限偏大",
+        "涉及issue": [],
+        "方向": "超时/中断后给可接续状态摘要",
+        "验收": "中断后能立即判断已完成/未完成",
+    }
+    outcome = _designer(tmp_path, tracker, _rfc_canned(fields=fields)).propose_once()
+    assert outcome.count == 1
+    rfc = tracker.issue(outcome.proposal_numbers[0])
+    assert RFC_LABEL in rfc["labels"] and "covers:" not in rfc["body"]
+
+
+def test_only_triaged_fed_not_needs_triage(tmp_path) -> None:
+    """synthesize 的输入只含 triaged；needs-triage / superseded / RFC 自身都排除。"""
+    tracker = FakeTracker()
+    _triaged(tracker, "已triaged")
+    tracker.create_issue(IssueDraft(title="待分诊", body="x", labels=["bug", "needs-triage"]))
+    tracker.create_issue(
+        IssueDraft(title="被取代", body="x", labels=["bug", TRIAGED, "superseded"])
+    )
+    tracker.create_issue(IssueDraft(title="旧RFC", body="x", labels=[RFC_LABEL, TRIAGED]))
+    designer = _designer(tmp_path, tracker, "[]")
+    designer.propose_once()
+    assert [i.title for i in designer.seen_triaged] == ["已triaged"]
+
+
+def test_empty_or_invalid_result_yields_no_rfc(tmp_path) -> None:
+    tracker = FakeTracker()
+    _triaged(tracker, "t")
+    before = len(tracker.list_open_issues())
     for canned in ["[]", "没有值得提的结构性方向。", ""]:
         outcome = _designer(tmp_path, tracker, canned).propose_once()
         assert outcome.count == 0
-    assert tracker.list_open_issues() == []  # 全程未建任何 issue
+    assert len(tracker.list_open_issues()) == before  # 未建任何 RFC
 
 
-# ---- Spec-0020/T1：covers 覆盖关系——提案字段 → body 机器行 + 被覆盖 bug 挂链 ----
-
-
-def _covers_canned(covers: object) -> str:
-    return json.dumps(
-        [{"title": "整合根因", "body": "多 bug 同根因", "labels": [], "covers": covers}],
-        ensure_ascii=False,
-    )
-
-
-def test_covers_written_to_body_and_linked_on_bugs(tmp_path) -> None:
+def test_rfc_missing_fields_skipped(tmp_path) -> None:
+    """RFC 字段没填全 → 跳过（不产半成品）。"""
     tracker = FakeTracker()
-    b1 = tracker.create_issue(IssueDraft(title="bug甲", body="x", labels=["bug"])).number
-    b2 = tracker.create_issue(IssueDraft(title="bug乙", body="y", labels=["bug"])).number
-
-    outcome = _designer(tmp_path, tracker, _covers_canned([b1, b2])).propose_once()
-
-    assert outcome.count == 1
-    design_no = outcome.proposal_numbers[0]
-    body = tracker.issue(design_no)["body"]
-    assert f"covers: #{b1} #{b2}" in body  # 机器可读行（单一真源）
-    for n in (b1, b2):
-        assert f"covered-by: #{design_no}" in tracker.issue(n)["comments"]  # 挂链
-        assert tracker.issue(n)["state"] == "open"  # designer 无关票权：bug 仍 open
+    _triaged(tracker, "t")
+    canned = json.dumps([{"title": "半成品", "fields": {"问题": "只填了这个"}}], ensure_ascii=False)
+    outcome = _designer(tmp_path, tracker, canned).propose_once()
+    assert outcome.count == 0
+    assert not any(i.title == "半成品" for i in tracker.list_open_issues())
 
 
-def test_covers_absent_or_invalid_behaves_like_today(tmp_path) -> None:
-    """covers 缺省/空/整体非法时：body 无 covers 行、无任何 comment——与今天行为一致。"""
-    for covers in (None, [], "not-a-list", [0, -3, True, "7"]):
-        tracker = FakeTracker()
-        bug = tracker.create_issue(IssueDraft(title="bug", body="x", labels=["bug"])).number
-        canned = (
-            _covers_canned(covers)
-            if covers is not None
-            else json.dumps([{"title": "无覆盖", "body": "b", "labels": []}], ensure_ascii=False)
-        )
-        outcome = _designer(tmp_path, tracker, canned).propose_once()
-        assert outcome.count == 1
-        assert "covers:" not in tracker.issue(outcome.proposal_numbers[0])["body"]
-        assert tracker.issue(bug)["comments"] == []
+# ---- Spec-0025/T4：covers → 被综合的 triaged issue 打 superseded + 挂链 ----
 
 
-def test_covers_skips_closed_missing_and_design_numbers(tmp_path) -> None:
-    """covers 指向已 closed / 不存在 / design 票的号：静默跳过，只留合法 bug 号。"""
+def test_rfc_covers_marks_triaged_superseded(tmp_path) -> None:
     tracker = FakeTracker()
-    closed = tracker.create_issue(IssueDraft(title="已关", body="x", labels=["bug"])).number
-    tracker.set_state(closed, "closed", "done")
-    other_design = tracker.create_issue(
-        IssueDraft(title="设计", body="d", labels=["design"])
+    t1 = _triaged(tracker, "超时甲")
+    t2 = _triaged(tracker, "超时乙")
+
+    outcome = _designer(tmp_path, tracker, _rfc_canned([t1, t2])).propose_once()
+
+    rfc_no = outcome.proposal_numbers[0]
+    body = tracker.issue(rfc_no)["body"]
+    assert f"covers: #{t1} #{t2}" in body  # 机器可读行
+    for n in (t1, t2):
+        snap = tracker.issue(n)
+        assert "superseded" in snap["labels"]  # 被综合 → superseded（dev 不领）
+        assert TRIAGED in snap["labels"]  # 原标签保留
+        assert any(f"superseded by #{rfc_no}" in c for c in snap["comments"])
+        assert snap["state"] == "open"  # designer 不关它（dev 修 RFC 时连带关，T5）
+
+
+def test_covers_absent_no_supersede(tmp_path) -> None:
+    tracker = FakeTracker()
+    t1 = _triaged(tracker, "孤立")
+    outcome = _designer(tmp_path, tracker, _rfc_canned(None)).propose_once()
+    assert "covers:" not in tracker.issue(outcome.proposal_numbers[0])["body"]
+    assert "superseded" not in tracker.issue(t1)["labels"]
+
+
+def test_covers_skips_non_triaged_numbers(tmp_path) -> None:
+    """covers 指向不在 triaged 集合的号（needs-triage/不存在）→ 静默跳过。"""
+    tracker = FakeTracker()
+    ok = _triaged(tracker, "有效")
+    raw = tracker.create_issue(
+        IssueDraft(title="raw", body="x", labels=["bug", "needs-triage"])
     ).number
-    ok = tracker.create_issue(IssueDraft(title="有效bug", body="y", labels=["bug"])).number
-
-    covers = [closed, other_design, ok, 999]
-    outcome = _designer(tmp_path, tracker, _covers_canned(covers)).propose_once()
-
-    design_no = outcome.proposal_numbers[0]
-    body = tracker.issue(design_no)["body"]
-    assert f"covers: #{ok}" in body and f"#{closed}" not in body.split("covers:")[1]
-    assert tracker.issue(other_design)["comments"] == []  # design 票不被互指
-    assert f"covered-by: #{design_no}" in tracker.issue(ok)["comments"]
+    outcome = _designer(tmp_path, tracker, _rfc_canned([ok, raw, 999])).propose_once()
+    body = tracker.issue(outcome.proposal_numbers[0])["body"]
+    assert f"covers: #{ok}" in body and f"#{raw}" not in body.split("covers:")[1]
+    assert "superseded" not in tracker.issue(raw)["labels"]  # 非 triaged 不被取代
 
 
 def test_parse_covers_field_shapes() -> None:
     """_parse_proposals 对 covers 的宽进严出：去重、剔 bool/负数/字符串。"""
     text = json.dumps(
-        [{"title": "t", "body": "b", "covers": [5, 5, 6, True, -1, 0, "8"]}],
+        [{"title": "t", "fields": {}, "covers": [5, 5, 6, True, -1, 0, "8"]}],
         ensure_ascii=False,
     )
     (prop,) = Designer._parse_proposals(text)
@@ -213,7 +278,7 @@ def _envelope(result: object) -> str:
 
 
 def _titles(text: str) -> list[str]:
-    return [p.draft.title for p in Designer._parse_proposals(_unwrap_result(text))]
+    return [p.title for p in Designer._parse_proposals(_unwrap_result(text))]
 
 
 def test_unwrap_envelope_with_result_as_json_string() -> None:

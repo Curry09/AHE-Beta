@@ -43,11 +43,53 @@ def test_feeling_trend_sorted(tmp_path) -> None:
     assert [score for _, score in trend] == [4, 2]  # 按时间升序（day1=4, day3=2）
 
 
-def test_issue_curve_cumulative(tmp_path) -> None:
-    store = _store(tmp_path, [_session(3, 2, 1), _session(3, 1, 2), _session(3, 0, 3)])
-    m = Metrics(FakeTracker(), store)
-    curve = m.issue_curve()
-    assert [(opened, net) for _, opened, net in curve] == [(2, 2), (1, 3), (0, 3)]
+class _ObserveTracker(FakeTracker):
+    """FakeTracker + Gitea 全状态读能力（list_issues 带 labels/时间戳），测 backlog 曲线口径。"""
+
+    def __init__(self, issues: list[dict]) -> None:
+        super().__init__()
+        self._all = issues
+
+    def list_issues(self, *, state: str = "all", limit: int = 100):
+        assert state == "all"
+        return list(self._all)
+
+
+def _issue(number: int, labels: list[str], created: str, closed: str | None) -> dict:
+    return {
+        "number": number,
+        "labels": labels,
+        "state": "closed" if closed else "open",
+        "created_at": created,
+        "closed_at": closed,
+    }
+
+
+def test_issue_curve_executable_backlog(tmp_path) -> None:
+    # 只数可执行 backlog（triaged/RFC，排除 needs-triage/rejected/superseded），按开/关事件累计。
+    tracker = _ObserveTracker(
+        [
+            _issue(1, ["bug", "triaged"], "2026-06-01", None),  # +1 D1，一直挂着（积压）
+            _issue(2, ["feature", "triaged"], "2026-06-02", "2026-06-04"),  # +1 D2、-1 D4
+            _issue(3, ["RFC"], "2026-06-03", None),  # +1 D3（RFC 也是可执行 backlog）
+            _issue(4, ["bug", "needs-triage"], "2026-06-01", None),  # 排除：未 triage
+            _issue(5, ["bug", "rejected"], "2026-06-01", "2026-06-02"),  # 排除：已驳回
+            _issue(6, ["bug", "triaged", "superseded"], "2026-06-01", "2026-06-02"),  # 排除：被取代
+        ]
+    )
+    m = Metrics(tracker, SessionStore(tmp_path))
+    assert m.issue_curve() == [
+        ("2026-06-01", 1, 1),
+        ("2026-06-02", 1, 2),
+        ("2026-06-03", 1, 3),
+        ("2026-06-04", -1, 2),  # 积压不降回 0：#1、#3 仍挂着（退化信号）
+    ]
+
+
+def test_issue_curve_no_list_issues_capability(tmp_path) -> None:
+    # 无 Gitea 全状态读能力（Fake）→ 空序列（本地不含标签/关闭时间，给不出 backlog 口径）。
+    m = Metrics(FakeTracker(), _store(tmp_path, [_session(3, 2, 1)]))
+    assert m.issue_curve() == []
 
 
 def test_empty_store(tmp_path) -> None:

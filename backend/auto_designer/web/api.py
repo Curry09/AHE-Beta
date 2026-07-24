@@ -18,6 +18,15 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 from starlette.types import Scope
 
+from auto_designer.designer.issue_schema import (
+    NEEDS_INFO,
+    REJECTED,
+    RFC_LABEL,
+    issue_kind,
+    priority_of,
+    round_of,
+    triage_status,
+)
 from auto_designer.loop.live import read_agents, read_history, read_live_run
 from auto_designer.loop.metrics import Metrics
 from auto_designer.loop.roster import load_roster
@@ -63,8 +72,9 @@ def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
     }
 
 
-# Spec-0020/T4：design 票 body 里的覆盖声明机器行（spec-0020/T1 产出）：`covers: #5 #6`。
+# RFC 票 body 里的覆盖声明机器行（Spec-0025/T4 synthesize 产出）：`covers: #5 #6`。
 _COVERS_LINE_RE = re.compile(r"^covers:((?:\s*#\d+)+)\s*$", re.MULTILINE)
+# RFC 取代旧 design 标签；旧 design 票仍认（向后兼容既有 body 的 covers 行）。
 _DESIGN_LABEL = "design"
 
 
@@ -78,20 +88,34 @@ def _parse_covers_line(body: str) -> list[int]:
     return [int(x) for x in re.findall(r"#(\d+)", last)]
 
 
-def _annotate_covers(*, issues: list[dict]) -> None:
-    """就地附加覆盖关系字段（Spec-0020/T4，纯解析计算、无新存储）：
+def _annotate_issues(*, issues: list[dict]) -> None:
+    """就地给每条 issue 附平台层派生字段（Spec-0025/T7，纯标签/正文解析、无新存储）：
 
-    - `covers: list[int]`——design 票自身 body covers 行声明的票号（非 design 恒 []）；
-    - `covered_by: int | None`——被哪张 **open** design 票覆盖（多票覆盖取号最小者；
-      design 票关了覆盖关系随之消失——那批 bug 应已被连带关闭）。
+    - `kind`——bug/feature/chore/document 或 rfc（RFC 凌驾 type）；
+    - `round`——`round-N` 的 N（无则 None）；
+    - `triage_status`——needs-triage/triaged/rejected/needs-info/superseded（单值，无则 None）；
+    - `priority`——P0-P3（无则 None）；
+    - `reject_reason`——驳回/needs-info 原因；DTO 带 `reason`（关闭时的收尾语）时透出，
+      权威原因见详情端点的评论（`驳回：…` / `信息不足：…`）；
+    - `covers: list[int]`——RFC 票自身 covers 行声明的票号（非 RFC 恒 []）；
+    - `covered_by: int | None`——被哪张 **open** RFC 覆盖（多票取号最小；RFC 关了覆盖关系随之消失
+      ——被取代的 triaged issue 应已被连带关闭）。
     """
     covered_by: dict[int, int] = {}
     for it in issues:
         labels = it.get("labels") or []
-        is_design = _DESIGN_LABEL in labels
-        covers = _parse_covers_line(str(it.get("body") or "")) if is_design else []
+        is_rfc = RFC_LABEL in labels or _DESIGN_LABEL in labels  # 兼容旧 design 票
+        covers = _parse_covers_line(str(it.get("body") or "")) if is_rfc else []
+        status = triage_status(labels)
+        it["kind"] = issue_kind(labels)
+        it["round"] = round_of(labels)
+        it["triage_status"] = status
+        it["priority"] = priority_of(labels)
+        it["reject_reason"] = (
+            (it.get("reason") or None) if status in (REJECTED, NEEDS_INFO) else None
+        )
         it["covers"] = covers
-        if is_design and it.get("state") == "open":
+        if is_rfc and it.get("state") == "open":
             for n in covers:
                 if n not in covered_by or int(it["number"]) < covered_by[n]:
                     covered_by[n] = int(it["number"])
@@ -124,7 +148,7 @@ def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict
             ]
     except Exception:
         return {"connected": False, "board_url": board_url, "issues": []}
-    _annotate_covers(issues=issues)
+    _annotate_issues(issues=issues)
     return {"connected": True, "board_url": board_url, "issues": issues}
 
 

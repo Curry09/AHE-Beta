@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { getAgents, getCommits, getHistory, getIssues, getState } from "./api";
+import { getAgents, getCommits, getHistory, getIssues, getOverview, getState } from "./api";
 import { AgentColumn } from "./components/AgentColumn";
+import { Charts } from "./components/Charts";
 import { SidePanel } from "./components/SidePanel";
 import { TopBar } from "./components/TopBar";
 import { usePolling } from "./hooks/usePolling";
@@ -8,8 +9,10 @@ import type { AgentRole, Selection } from "./types";
 
 const POLL_MS = 3000;
 
+// 顺序对齐闭环 a → d1(triage) → d2(synthesize) → b。
 const ROLES: { role: AgentRole; name: string }[] = [
   { role: "user", name: "用户" },
+  { role: "triager", name: "分诊" },
   { role: "designer", name: "设计师" },
   { role: "developer", name: "开发者" },
 ];
@@ -39,6 +42,7 @@ export default function App() {
   const history = usePolling(getHistory, POLL_MS);
   const issues = usePolling(getIssues, POLL_MS);
   const commits = usePolling(getCommits, POLL_MS);
+  const overview = usePolling(getOverview, POLL_MS);
 
   const [showDone, setShowDone] = useState(
     () => new URLSearchParams(location.search).get("done") === "1",
@@ -81,6 +85,7 @@ export default function App() {
         rounds={rounds}
         onRound={(r) => setRound(r)}
       />
+      <Charts overview={overview} />
       <div className="board">
         {ROLES.map(({ role, name }) => (
           <AgentColumn
