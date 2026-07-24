@@ -1,11 +1,12 @@
 type: tool
 name: get_session_timeline
 description: >-
-  Fetch the stored god-view timeline (sim_trace) for one user-sim session, as
-  persisted — no desensitization yet. Use when an open issue or a feeling-curve
-  point is unclear. Prefer issue_number for backlog bugs; use session_id from
-  feeling-curve rows that show [session=...]. Do not read raw sessions/ files
-  yourself; this tool is the only allowed access.
+  Fetch a use-event timeline for one user-sim session: what the user saw
+  (activity), thought (notes / free intent), did (action + message), heard
+  (harness reply), plus rare god-view labels (process_read, capability_gap when
+  intent≠action, private_check, silent_stop). Not a raw LLM dump; no system/user
+  prompts. Prefer issue_number for backlog bugs; use session_id from feeling
+  curve [session=...]. Do not read sessions/ files yourself.
 
 input_schema:
   type: object
