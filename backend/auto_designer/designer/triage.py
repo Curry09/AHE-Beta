@@ -155,7 +155,10 @@ class Triager:
         by_number = {i.number: i for i in pending}
         outcome = TriageOutcome()
         for d in dispositions:
-            self._apply(d, by_number=by_number, outcome=outcome)
+            try:
+                self._apply(d, by_number=by_number, outcome=outcome)
+            except Exception:  # noqa: BLE001  单条落库失败（set_labels 等）不拖垮其余 disposition
+                pass
 
         self._emit(
             running=False,
