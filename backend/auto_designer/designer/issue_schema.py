@@ -179,7 +179,10 @@ def output_contract_schema() -> dict:
         "type": "object",
         "properties": {
             "issue": {"type": "integer"},
-            "disposition": {"type": "string", "enum": ["accept", "duplicate", "reject", "needs_info"]},
+            "disposition": {
+                "type": "string",
+                "enum": ["accept", "duplicate", "reject", "needs_info"],
+            },
             "kind": {"type": "string", "enum": list(USER_KINDS)},
             "priority": {"type": "string", "enum": list(PRIORITIES)},
             "fields": {

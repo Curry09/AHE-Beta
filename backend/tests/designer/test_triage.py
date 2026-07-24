@@ -120,15 +120,15 @@ def test_variant_schema_issue_number_and_flat_fields_processed(tmp_path) -> None
     out = _triager(tmp_path, tracker, canned).triage_once()
     assert out.accepted == [n]  # 修复前是 0（int(None) 直接 skip）
     snap = tracker.issue(n)
-    assert TRIAGED in snap["labels"] and "P1" in snap["labels"] and NEEDS_TRIAGE not in snap["labels"]
+    assert (
+        TRIAGED in snap["labels"] and "P1" in snap["labels"] and NEEDS_TRIAGE not in snap["labels"]
+    )
 
 
 def test_variant_schema_reject_and_duplicate_flags(tmp_path) -> None:
     """容错推断 disposition：reject=true→reject、duplicate_of 非空→duplicate（of 取 duplicate_of）。"""
     tracker = FakeTracker()
-    main = tracker.create_issue(
-        IssueDraft(title="主", body="x", labels=["bug", TRIAGED])
-    ).number
+    main = tracker.create_issue(IssueDraft(title="主", body="x", labels=["bug", TRIAGED])).number
     dup = _raw(tracker, "重复的")
     bad = _raw(tracker, "超范围的")
     canned = json.dumps(
@@ -337,7 +337,14 @@ def test_is_duplicate_flag_without_disposition(tmp_path) -> None:
     tracker = FakeTracker()
     n = _raw(tracker, "又一条同根因超时", kind="bug")
     canned = json.dumps(
-        [{"issue_number": n, "triage_decision": "duplicate", "is_duplicate": True, "duplicate_of": 999}],
+        [
+            {
+                "issue_number": n,
+                "triage_decision": "duplicate",
+                "is_duplicate": True,
+                "duplicate_of": 999,
+            }
+        ],
         ensure_ascii=False,
     )
     out = _triager(tmp_path, tracker, canned).triage_once()

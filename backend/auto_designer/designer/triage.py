@@ -191,13 +191,27 @@ def _normalize_dispositions(draft_text: str, *, pending_numbers: set) -> list[di
 
 # LLM 常见的 disposition 别名 → 归一到 driver 认得的四种（accept/duplicate/reject/needs_info）。
 _DISPOSITION_ALIASES = {
-    "accept": "accept", "accepted": "accept", "confirm": "accept", "confirmed": "accept",
-    "confirmed_bug": "accept", "confirmed_feature": "accept", "valid": "accept", "keep": "accept",
-    "duplicate": "duplicate", "dup": "duplicate", "is_duplicate": "duplicate",
-    "reject": "reject", "rejected": "reject", "invalid": "reject", "out_of_scope": "reject",
+    "accept": "accept",
+    "accepted": "accept",
+    "confirm": "accept",
+    "confirmed": "accept",
+    "confirmed_bug": "accept",
+    "confirmed_feature": "accept",
+    "valid": "accept",
+    "keep": "accept",
+    "duplicate": "duplicate",
+    "dup": "duplicate",
+    "is_duplicate": "duplicate",
+    "reject": "reject",
+    "rejected": "reject",
+    "invalid": "reject",
+    "out_of_scope": "reject",
     "wontfix": "reject",
-    "needs_info": "needs_info", "need_info": "needs_info", "needinfo": "needs_info",
-    "more_info": "needs_info", "insufficient_info": "needs_info",
+    "needs_info": "needs_info",
+    "need_info": "needs_info",
+    "needinfo": "needs_info",
+    "more_info": "needs_info",
+    "insufficient_info": "needs_info",
 }
 
 
@@ -262,7 +276,9 @@ class Triager:
         result_text = self._run_agent(pending=pending, triaged=triaged)
         # Spec-0025 根治：先经约束解码归一（json_schema 强制成合规 disposition，杜绝字段漂移/非法优先级）；
         # 归一失败（网关不支持/异常）才回退宽容解析 _parse_dispositions，绝不因归一失败丢整轮。
-        dispositions = _normalize_dispositions(result_text, pending_numbers={i.number for i in pending})
+        dispositions = _normalize_dispositions(
+            result_text, pending_numbers={i.number for i in pending}
+        )
         if dispositions is None:
             dispositions = _parse_dispositions(result_text)
 

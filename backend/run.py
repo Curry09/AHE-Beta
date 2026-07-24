@@ -328,7 +328,9 @@ def main() -> int:
     # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
     sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）
-    persona_meta: dict[str, dict[str, str]] = {}  # Spec-0026/T1：identity -> persona 摘要（看板展示用）
+    persona_meta: dict[
+        str, dict[str, str]
+    ] = {}  # Spec-0026/T1：identity -> persona 摘要（看板展示用）
     for i, sp in enumerate(sim_persona_list):
         scenario = seeds[i % len(seeds)]
         mp = Persona(

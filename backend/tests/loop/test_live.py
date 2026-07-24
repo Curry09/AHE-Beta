@@ -356,5 +356,7 @@ def test_meta_passthrough_and_sticky(tmp_path: Path) -> None:
     update_agent(data_dir=tmp_path, agent_id="u", role="user", label="l", running=True, status="2")
     assert read_agents(data_dir=tmp_path)[0]["meta"] == meta
     # 从不传 meta 的 agent -> None，不崩
-    update_agent(data_dir=tmp_path, agent_id="d", role="developer", label="l", running=True, status="x")
+    update_agent(
+        data_dir=tmp_path, agent_id="d", role="developer", label="l", running=True, status="x"
+    )
     assert read_agents(data_dir=tmp_path)[1]["meta"] is None
