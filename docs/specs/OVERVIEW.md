@@ -79,6 +79,9 @@ Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 iss
 ### 0025 issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev
 把 issue 流建成真实软件团队的 triage 漏斗，并把现有单一 designer 拆成两个 agent。用户 sim 产出 raw issue（用户端模板填用户可见字段、按 type 标签、needs-triage、盖轮号）；triage agent 就地分类(确认 type)+定位(读 harness 代码 + get_session_timeline 轨迹)+去重+驳回/needs-info；synthesize agent（原 designer 收窄）只做跨 issue 结构综合、产 RFC（独立标签，凌驾 type，consolidate/supersede 局部 issue、最高 dev 预算）。dev 每轮按容量(N dev)顺序领 triaged issue + RFC，未清空的积压到下一轮（backlog = 上轮 carryover + 本轮新 triaged）。预算按 kind 分档、去 0020 分池/retry/stuck。产品/方向层 = distill persona/seed 卡库（人经 CLI，⓪ 层，不设 agent）；PM 职能 = 优先级由体感+频率机制派生。
 
+### 0026 观测看板前端全面重构：浅/深主题可切换 + 分诊(triager)可见 + persona 展示 + 设计 token 化
+观测看板前端从「纯黑底+白字、四栏、只显 SR-001 标识」全面重构为一套有设计系统的界面：① 引入设计 token 层（颜色/间距/字阶/圆角/阴影/层级）+ 浅/深主题可切换（跟随系统、localStorage 持久）；② 看板补齐 triager（分诊）房间——闭环 a→d1(triage)→d2(synthesize)→b 五角色都可见，各角色一致的强调色；③ 用户卡展示 persona（identity + 水平/领域/目标），不只 SR-001；issue/commit 卡在 0025 徽标基础上排版收敛；④ 详情面板信息架构刷新 + persona 块；⑤ 体感/backlog 曲线可视化（消费既有 /api/overview）；⑥ 响应式（页面不横向滚动、宽内容内部滚动）+ 两主题对比度/焦点态。后端仅小改：live 补 triager 排序、用户 agent 活动载荷带 persona 摘要。纯只读观测，不改闭环语义、不引 benchmark。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -172,6 +175,11 @@ Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 iss
 | 0025 | 0025/T7 | web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压) | done | T4 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
 | 0025 | 0025/T8 | 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示 | done | T7 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/lib/issueMeta.ts<br>frontend/src/types.ts<br>frontend/src/api.ts |
 | 0025 | 0025/T3a | tracker 补 set_labels：整组替换已有 issue 标签 | done | T1 | backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
+| 0026 | 0026/T1 | 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要 | pending | — | backend/auto_designer/loop/live.py<br>backend/run.py<br>backend/tests/loop/test_live.py |
+| 0026 | 0026/T2 | 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS | pending | — | frontend/src/styles.css<br>frontend/src/hooks/useTheme.ts<br>frontend/src/components/ThemeToggle.tsx |
+| 0026 | 0026/T3 | 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线 | pending | T2 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/components/Charts.tsx |
+| 0026 | 0026/T4 | 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛 | pending | T1, T3 | frontend/src/components/AgentColumn.tsx<br>frontend/src/components/Card.tsx |
+| 0026 | 0026/T5 | 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块 | pending | T2, T3 | frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/SessionDetail.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/components/detail/CommitDetail.tsx<br>frontend/src/components/SidePanel.tsx |
 
 ## 跨 feature 关系图
 
@@ -316,6 +324,13 @@ graph LR
         n0025_T8["T8 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示"]
         n0025_T3a["T3a tracker 补 set_labels：整组替换已有 issue 标签"]
     end
+    subgraph G0026[0026 frontend-observability-redesign]
+        n0026_T1["T1 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要"]
+        n0026_T2["T2 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS"]
+        n0026_T3["T3 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线"]
+        n0026_T4["T4 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛"]
+        n0026_T5["T5 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -389,6 +404,11 @@ graph LR
     n0025_T7 --> n0025_T4
     n0025_T8 --> n0025_T7
     n0025_T3a --> n0025_T1
+    n0026_T3 --> n0026_T2
+    n0026_T4 --> n0026_T1
+    n0026_T4 --> n0026_T3
+    n0026_T5 --> n0026_T2
+    n0026_T5 --> n0026_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -447,6 +467,7 @@ graph LR
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023 |
+| backend/auto_designer/loop/live.py | 0017, 0026 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025 |
 | backend/auto_designer/loop/roster.py | 0020, 0025 |
@@ -469,11 +490,12 @@ graph LR
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/entry.py | 0003, 0013, 0022 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025 |
+| backend/tests/loop/test_live.py | 0017, 0026 |
 | backend/tests/loop/test_metrics.py | 0003, 0025 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025 |
 | backend/tests/loop/test_roster.py | 0020, 0025 |
@@ -493,9 +515,9 @@ graph LR
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
 | backend/tests/web/test_api.py | 0020, 0025 |
 | frontend/src/api.ts | 0020, 0025 |
-| frontend/src/components/SidePanel.tsx | 0020, 0025 |
-| frontend/src/components/detail/IssueDetail.tsx | 0020, 0025 |
-| frontend/src/types.ts | 0020, 0025 |
+| frontend/src/components/SidePanel.tsx | 0020, 0025, 0026 |
+| frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026 |
+| frontend/src/types.ts | 0020, 0025, 0026 |
 
 ## 各 feature 详情
 
@@ -1154,4 +1176,37 @@ graph LR
     class v_T6_1 st_done;
     class v_T7_1 st_done;
     class v_T8_1 st_done;
+```
+
+### 0026 观测看板前端全面重构：浅/深主题可切换 + 分诊(triager)可见 + persona 展示 + 设计 token 化（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要"]
+    nT2["T2 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS"]
+    nT3["T3 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线"]
+    nT4["T4 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛"]
+    nT5["T5 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块"]
+    nT2 --> nT3
+    nT1 --> nT4
+    nT3 --> nT4
+    nT2 --> nT5
+    nT3 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
 ```
