@@ -1,0 +1,33 @@
+type: tool
+name: get_harness_step
+description: >-
+  Expand ONE harness step body from a beat (after get_harness_beat). Pass the
+  same turn/session (or issue_number) plus step_i from the beat's steps[].i.
+  Returns a larger view of that tool/tool_result text (newlines kept) with a
+  hard character cap—still not unlimited logs. Use only when a clipped step
+  (truncated=true) is needed to attribute failure; do not paste huge stdout
+  into triage notes.
+
+input_schema:
+  type: object
+  properties:
+    turn:
+      type: integer
+      description: Same beat `t` as get_harness_beat / timeline.
+    step_i:
+      type: integer
+      description: Index from get_harness_beat steps[].i (raw harness_steps index).
+    issue_number:
+      type: integer
+      description: Issue number linked to the session.
+    session_id:
+      type: string
+      description: Session id; wins if both set.
+    occurrence:
+      type: integer
+      description: Same occurrence as get_harness_beat (default 0).
+  required:
+    - turn
+    - step_i
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

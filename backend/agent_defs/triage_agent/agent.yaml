@@ -42,10 +42,20 @@ tools:
   - name: search_file_content
     yaml_path: ./tools/search_file_content.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:search_file_content
-  # 按需取一局用户模拟落盘的 god-view（含那局体感分）；编排侧读 SessionStore，jail 仍禁直接读 sessions/。
+  # 按需取一局用户模拟落盘的 god-view 使用事件时间线（含那局体感分）；编排侧读 SessionStore，
+  # jail 仍禁直接读 sessions/。时间线太粗时用下面 beat/step 逐层下钻（spec-0024 T4/T5），
+  # 避免一次拉整包撑爆上下文。
   - name: get_session_timeline
     yaml_path: ./tools/get_session_timeline.tool.yaml
     binding: auto_designer.designer.session_timeline:get_session_timeline
+  # 下钻某一拍：harness 内层 tool 序列（截断）+ stop_kind；timeline 不够细时再用。
+  - name: get_harness_beat
+    yaml_path: ./tools/get_harness_beat.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_harness_beat
+  # 再展开某一步正文（硬顶字符）；beat 里 truncated=true 且确需细看时才调。
+  - name: get_harness_step
+    yaml_path: ./tools/get_harness_step.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_harness_step
   - name: complete_task
     yaml_path: ./tools/complete_task.tool.yaml
     binding: nexau.archs.tool.builtin.session_tools:complete_task

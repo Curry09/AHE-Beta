@@ -16,9 +16,12 @@
 2. **只读 harness 源码**——用 `read_file` / `search_file_content` 读 `agents/main.md`、`entry.py`、
    `agent.yaml`，看清超时/重试/迭代上限/交付方式这些机制钮，**定位根因在哪、改哪层**。**先搜后读**，
    别整篇通读大文件。
-3. **god-view 真实轨迹**——调 `get_session_timeline(issue_number=<号>)` 拉那局用户会话的落盘上帝视角
-   （它到底跑了啥、在哪超时、几步，**以及那局的体感分**——判优先级用得上）。**别尝试直接读 sessions/
-   原始文件**。这是你唯一的"那局体感"来源，你看不到跨会话的聚合。
+3. **god-view 真实轨迹**——先调 `get_session_timeline(issue_number=<号>)` 拉那局用户会话的**使用事件
+   时间线**（用户所见活动、心想/intent、做了啥、harness 回了啥，**以及那局的体感分**——判优先级用得上）。
+   某一拍超时/活动条太粗、归不出因时，再对该拍的 `t` 调 `get_harness_beat(turn=…)` 看 harness 内层
+   tool 序列 + stop_kind；某步 `truncated=true` 且确需正文，才 `get_harness_step(turn=…, step_i=…)`
+   展开。**逐层按需下钻，别一次拉整包**（大段 stdout 别焊进 issue）。**别尝试直接读 sessions/ 原始
+   文件**——这三件工具是唯一入口。这也是你唯一的"那局体感"来源，你看不到跨会话的聚合。
 
 ## 每条 issue 给一个 disposition（四选一）
 
