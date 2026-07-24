@@ -121,6 +121,47 @@ def _fields_by_label_to_key(kind: str, fields: dict) -> dict:
     return out
 
 
+# ---- 对齐 LLM 常见的 schema 漂移，防御式归一 ----
+# LLM 有时不照输出契约、自创「分析报告」式 schema（issue_number/status/duplicate_of/needs_info/reject、
+# 字段平铺在顶层而非放进 fields）。这里能救则救：救不了（如 accept 缺 TRIAGE 字段）再按 needs_info
+# 降级，至少让 issue 离开 needs-triage、结论可见，而不是第一行取 `issue` 拿 None 就把每条静默丢弃。
+
+
+def _issue_num(d: dict) -> object:
+    """取 issue 号：优先 `issue`，兼容 `issue_number` 别名。"""
+    v = d.get("issue")
+    return d.get("issue_number") if v is None else v
+
+
+def _disposition_of(d: dict) -> str:
+    """取 disposition：优先显式 `disposition`，缺失时按常见布尔/状态字段推断（都不匹配返回空 → 跳过）。"""
+    disp = str(d.get("disposition", "")).strip().lower()
+    if disp:
+        return disp
+    if d.get("duplicate_of"):
+        return "duplicate"
+    if d.get("reject") is True:
+        return "reject"
+    if d.get("needs_info") is True:
+        return "needs_info"
+    status = str(d.get("status", "")).strip().lower()
+    if status in ("confirmed_bug", "confirmed_feature", "confirmed", "accept", "accepted", "valid"):
+        return "accept"
+    return ""
+
+
+def _accept_fields(kind: str, d: dict) -> dict:
+    """取 accept 的 TRIAGE 字段：优先 `fields`；缺失时兼容 agent 把字段平铺在顶层（root_cause/边界/
+    验收…）——按该 kind 的 schema key/label 从顶层挑。仍缺的字段留空，交给 schema_validate 判降级。"""
+    raw = d.get("fields") or {}
+    if not raw:
+        known = {f.key for f in schema_fields_of(kind=kind)} | {
+            _norm_label(f.label) for f in schema_fields_of(kind=kind)
+        }
+        raw = {k: v for k, v in d.items() if k in known or _norm_label(k) in known}
+    return _fields_by_label_to_key(kind, raw)
+
+
 class Triager:
     """triage nexau agent 驱动器：分诊 needs-triage issue → 就地分类/定位/去重/驳回。"""
 
@@ -173,20 +214,20 @@ class Triager:
 
     def _apply(self, d: dict, *, by_number: dict, outcome: TriageOutcome) -> None:
         try:
-            num = int(d.get("issue"))
+            num = int(_issue_num(d))  # 兼容 issue / issue_number
         except (TypeError, ValueError):
             return
         issue = by_number.get(num)
         if issue is None:  # 不在本轮待分诊集合里 → 跳过（防越界改动）
             return
-        disp = str(d.get("disposition", "")).strip().lower()
+        disp = _disposition_of(d)  # 显式 disposition 或从布尔/status 推断
 
         if disp == "accept":
             kind = str(d.get("kind", "")).strip().lower()
             if kind not in USER_KINDS:  # 非法 kind → 当信息不足处理（下一轮重来）
                 self._reject(issue, NEEDS_INFO, f"triage 给了非法 kind {kind!r}", outcome)
                 return
-            fields = _fields_by_label_to_key(kind, d.get("fields") or {})
+            fields = _accept_fields(kind, d)  # fields 或平铺顶层的字段
             errs = schema_validate(kind=kind, fields=fields, section="triage")
             if errs:  # TRIAGE 字段没填全 → 降级 needs_info（保证采纳的 issue 定位完整）
                 self._reject(issue, NEEDS_INFO, f"triage 定位不全：{'；'.join(errs)}", outcome)
@@ -200,7 +241,7 @@ class Triager:
             outcome.accepted.append(num)
 
         elif disp == "duplicate":
-            of = d.get("of")
+            of = d.get("of") or d.get("duplicate_of")  # 兼容 of / duplicate_of
             note = str(d.get("note", "")).strip()
             self._safe_comment(num, f"duplicate of #{of}{('：' + note) if note else ''}")
             self._safe_close(num, f"duplicate of #{of}")

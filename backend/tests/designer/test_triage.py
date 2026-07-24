@@ -84,6 +84,56 @@ def test_accept_confirms_labels_and_comments_triage_fields(tmp_path) -> None:
     assert any("根因区域" in c and "entry.py 无预算感知" in c for c in snap["comments"])
 
 
+def test_variant_schema_issue_number_and_flat_fields_processed(tmp_path) -> None:
+    """线上实测：agent 不照契约、自创 issue_number/status + 字段平铺顶层。driver 应容错归一：
+    issue_number→issue、status=confirmed_bug→accept、平铺的根因区域/边界/验收→fields，仍能采纳。"""
+    tracker = FakeTracker()
+    n = _raw(tracker, "从零构建包超时", kind="bug")
+    canned = json.dumps(
+        [
+            {
+                "issue_number": n,  # 非 issue
+                "kind": "bug",
+                "status": "confirmed_bug",  # 非 disposition
+                "duplicate_of": None,
+                "needs_info": False,
+                "reject": False,
+                "priority": "P1",
+                # 字段平铺在顶层（非 fields）
+                "根因区域": "entry.py 无预算感知，大任务一轮做不完",
+                "边界": "只改 harness 通用能力",
+                "验收": "同类任务预算内给交付或明确进度",
+            }
+        ],
+        ensure_ascii=False,
+    )
+    out = _triager(tmp_path, tracker, canned).triage_once()
+    assert out.accepted == [n]  # 修复前是 0（int(None) 直接 skip）
+    snap = tracker.issue(n)
+    assert TRIAGED in snap["labels"] and "P1" in snap["labels"] and NEEDS_TRIAGE not in snap["labels"]
+
+
+def test_variant_schema_reject_and_duplicate_flags(tmp_path) -> None:
+    """容错推断 disposition：reject=true→reject、duplicate_of 非空→duplicate（of 取 duplicate_of）。"""
+    tracker = FakeTracker()
+    main = tracker.create_issue(
+        IssueDraft(title="主", body="x", labels=["bug", TRIAGED])
+    ).number
+    dup = _raw(tracker, "重复的")
+    bad = _raw(tracker, "超范围的")
+    canned = json.dumps(
+        [
+            {"issue_number": dup, "duplicate_of": main, "note": "同根因"},
+            {"issue_number": bad, "reject": True, "reason": "要改的是 launcher（编排层）"},
+        ],
+        ensure_ascii=False,
+    )
+    out = _triager(tmp_path, tracker, canned).triage_once()
+    assert out.duplicate == [dup] and out.rejected == [bad]
+    assert tracker.issue(dup)["state"] == "closed"
+    assert tracker.issue(bad)["state"] == "closed"
+
+
 def test_accept_feature_uses_feature_triage_fields(tmp_path) -> None:
     """feature 的 TRIAGE 字段是 边界/交付物/验收（非 bug 的根因区域）——填对即采纳。"""
     tracker = FakeTracker()

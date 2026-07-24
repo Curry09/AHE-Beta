@@ -62,3 +62,12 @@
 字段 key 用中文 label（按 kind 用对应字段名）。accept 必须给 `kind` + `priority` + 该 kind 的 TRIAGE
 字段（不能空、缺了会被退回）。对每条待分诊 issue 都要给一项，不要漏。无法判断时宁可 needs_info，
 别硬 accept。
+
+**严格照这个 schema，别自创字段名**（否则整条会被丢弃、issue 永远卡在 needs-triage）：
+- 用 `issue`（**不是** `issue_number`）、`disposition`（**不是** `status`/`confirmed_bug`/`reject`/
+  `needs_info`/`duplicate_of` 这些布尔或状态字段）。
+- `disposition` 只取四个值之一：`accept` / `duplicate` / `reject` / `needs_info`。
+- accept 的定位结论**放进 `fields`**（根因区域/边界/验收），**不要**平铺成 `root_cause`/
+  `suggested_fix`/`source_basis`/`timeline_evidence` 这类顶层散字段。
+- 你下钻得到的证据/推理是你的**内部工作**，请**浓缩**进 `fields` 的三项里，别把大段分析或原始 stdout
+  倒进输出。`result` 就是上面那个精简数组，不是分析报告。
