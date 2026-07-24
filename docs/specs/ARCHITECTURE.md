@@ -23,7 +23,7 @@ _（缺模块级 docstring）_
 | `__init__.py` | （缺文件级 docstring） |
 | `designer.py` | Designer：创新者 = 综合全局的 nexau agent（对偶于开发者的「局部补丁」）。 |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂设计师作机制层判别证据。 |
-| `session_timeline.py` | 设计师按需取用 session 上帝视角时间线。 |
+| `session_timeline.py` | 设计师按需取用：从落盘 Session 投影「使用事件时间线」。 |
 
 ### auto_designer.dev
 

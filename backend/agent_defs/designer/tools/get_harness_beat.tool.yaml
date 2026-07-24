@@ -1,0 +1,35 @@
+type: tool
+name: get_harness_beat
+description: >-
+  Drill into ONE user-sim beat (timeline field `t`) and list what the harness
+  agent did inside that reply: ordered tool / tool_result steps (bodies clipped),
+  final heard text, and stop_kind (max_iterations | wall_timeout | interrupt |
+  completed | empty). Use AFTER get_session_timeline when heard/saw_activity is
+  too coarse to attribute budget burn. Prefer session_id from the timeline;
+  issue_number also works. occurrence selects among multiple harness beats that
+  share the same turn number (default 0 = first with harness activity).
+  If a returned step has truncated=true and you still need its body, call
+  get_harness_step with the same turn and that step's i.
+
+input_schema:
+  type: object
+  properties:
+    turn:
+      type: integer
+      description: >-
+        Beat number from the projected timeline event field `t` (SimTurn.turn).
+    issue_number:
+      type: integer
+      description: Issue number linked to the session (same as get_session_timeline).
+    session_id:
+      type: string
+      description: Session id; if both set, session_id wins.
+    occurrence:
+      type: integer
+      description: >-
+        0-based index when several harness beats share the same turn
+        (waiting vs after_reply). Default 0.
+  required:
+    - turn
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

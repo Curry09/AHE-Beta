@@ -175,20 +175,23 @@ run.py（随 T3 一起改）与 test_sim_user / test_workspace 两个测试。
 prepared = []
 for persona, scenario in self._fixed_set:
     ws = materialize_workspace(scenario.workspace) if scenario.workspace else mkdtemp(...)
-    if scenario.workspace: ensure_deps(ws, scenario.workspace)
+    if scenario.workspace:
+        ensure_deps(ws, scenario.workspace)
     prepared.append((persona, scenario, ws))
+
 
 # 阶段二（并行）：launch + 会话
 def _one(persona, scenario, ws):
     harness = self._launcher.launch(sha, workspace_dir=ws)
     return self._run_session(persona, scenario, harness, workspace_dir=ws)
 
+
 with ThreadPoolExecutor(max_workers=min(len(prepared), self._max_parallel_users)) as pool:
     futs = {pool.submit(_one, p, s, ws): (p, s) for p, s, ws in prepared}
     for fut in as_completed(futs):
         try:
             fut.result()
-        except Exception:      # 0012 后会话内异常已转信号；此处只剩 launch 类意外
+        except Exception:  # 0012 后会话内异常已转信号；此处只剩 launch 类意外
             log.exception(...)  # 单会话失败不废整轮，其余会话照常汇齐
 ```
 

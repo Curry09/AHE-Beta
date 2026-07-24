@@ -26,8 +26,8 @@ from auto_designer.user.session_store import SessionStore
 
 # designer 的默认标签：结构性提案与用户 agent 产的 bug/feature 区分，便于观测（开发者领取不分流）。
 DESIGN_LABEL = "design"
-# 一次 propose_once 是多轮工具调用（读文件 + 综合），给足硬超时兜底防总挂死。
-_DESIGN_TIMEOUT = 900
+# 一次 propose_once 是多轮工具调用（读文件 + 综合 + 按需 timeline）；300 iter 时给足墙钟。
+_DESIGN_TIMEOUT = 3600
 # 拆信封的最大层数：实测 nexau 会把信封再 JSON 编码一层（故 ≥2），留一层余量；有界防畸形输入打转。
 _UNWRAP_MAX_DEPTH = 4
 
@@ -228,7 +228,9 @@ class Designer:
         trend: list[tuple[str, int, str]],
         runtime: str,
     ) -> str:
-        os.environ["SANDBOX_WORK_DIR"] = str(self._repo)  # 只读 grounding：sandbox = harness 仓
+        os.environ["SANDBOX_WORK_DIR"] = str(
+            self._repo.resolve()
+        )  # 只读 grounding：sandbox = harness 仓（绝对路径，防 cwd 漂移）
         from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
         cfg = AgentConfig.from_yaml(config_path=self._agent_def / "agent.yaml")
@@ -260,7 +262,9 @@ class Designer:
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
             f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
             "对某条 issue 或某个体感点有疑惑时，先调 `get_session_timeline`"
-            "（issue_number=… 或 session_id=…）看该局落盘的 sim_trace 上帝视角，再下结论；"
+            "（issue_number=… 或 session_id=…）看该局使用事件时间线；"
+            "若某拍超时/活动条不够归因，再对该拍 `t` 调 `get_harness_beat(turn=…)`；"
+            "某步 truncated 且确需正文再 `get_harness_step(turn=…, step_i=…)`；"
             "不要尝试直接读 sessions/ 原始文件。\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组"
             "（每项含 title/body/labels，可选 covers），无提案则 `[]`。"

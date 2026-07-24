@@ -142,15 +142,21 @@ run_round → 传播出 run()，finally 仍落 running=False。
 注入的 `GIT_ASKPASS` 仍静默交出 GitHub token，dry-run push 照样成功）：
 
 ```python
-os.environ.setdefault("GIT_SSH_COMMAND", "false")   # 掐 ssh 传输：GitHub git@… 推送失败
-os.environ["GIT_TERMINAL_PROMPT"] = "0"             # 禁终端交互凭证提示
+os.environ.setdefault("GIT_SSH_COMMAND", "false")  # 掐 ssh 传输：GitHub git@… 推送失败
+os.environ["GIT_TERMINAL_PROMPT"] = "0"  # 禁终端交互凭证提示
 # 清 askpass / ssh-agent 静默信道（GIT_TERMINAL_PROMPT 管不到 askpass）：
-for k in ("GIT_ASKPASS", "SSH_ASKPASS", "SSH_AUTH_SOCK",
-          "VSCODE_GIT_ASKPASS_NODE", "VSCODE_GIT_ASKPASS_MAIN",
-          "VSCODE_GIT_ASKPASS_EXTRA_ARGS", "VSCODE_GIT_IPC_HANDLE"):
+for k in (
+    "GIT_ASKPASS",
+    "SSH_ASKPASS",
+    "SSH_AUTH_SOCK",
+    "VSCODE_GIT_ASKPASS_NODE",
+    "VSCODE_GIT_ASKPASS_MAIN",
+    "VSCODE_GIT_ASKPASS_EXTRA_ARGS",
+    "VSCODE_GIT_IPC_HANDLE",
+):
     os.environ.pop(k, None)
 # 空值经 GIT_CONFIG_* 注入重置 credential.helper 列表（store/manager/keychain 也是静默信道）：
-n = int(os.environ.get("GIT_CONFIG_COUNT", "0") or "0")   # 追加，不覆盖既有注入
+n = int(os.environ.get("GIT_CONFIG_COUNT", "0") or "0")  # 追加，不覆盖既有注入
 os.environ["GIT_CONFIG_COUNT"] = str(n + 1)
 os.environ[f"GIT_CONFIG_KEY_{n}"] = "credential.helper"
 os.environ[f"GIT_CONFIG_VALUE_{n}"] = ""

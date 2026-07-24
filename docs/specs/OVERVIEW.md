@@ -74,7 +74,7 @@
 钉死 AwaitEvent 等待环（主 loop 吃 reply、心跳一次性、动作前 try_reply）；统一 [+Ns] history（已删 wait_cost）；废弃 decide/waiting 的 one\|two 与合并 builder；清死常量与无消费者 MAIN_GAP；探针对齐 0022 菜单。
 
 ### 0024 用户 god-view 落盘 + 设计师按需取用
-Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 issue_numbers；设计师经 get_session_timeline(issue\|session_id) 按需取落盘原样 JSON；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。脱敏加工与废弃 runtime_agg 另议。
+Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
 
 ## 全局看板
 
@@ -158,8 +158,10 @@ Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 iss
 | 0023 | 0023/T3 | 探针：去掉 two 臂与 peek-via-control 心智 | done | T1 | backend/scripts/probe_wait_progress.py<br>backend/scripts/probe_peek_decision_trace.py<br>backend/scripts/probe_persona_wait_matrix.py<br>backend/scripts/probe_ontrack_new_harness.py<br>backend/scripts/probe_wait_signals_to_evolution.py |
 | 0023 | 0023/T4 | launcher.try_reply 非阻塞契约（已落地） | done | — | backend/auto_designer/harness/launcher.py |
 | 0024 | 0024/T1 | Session.sim_trace 落盘（TurnLog→SimTrace） | done | — | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_models.py<br>backend/tests/loop/test_sim_user.py |
-| 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py<br>backend/tests/user/test_session_store.py |
-| 0024 | 0024/T3 | get_session_timeline tool（落盘原样） | done | T2 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/designer/test_session_timeline.py |
+| 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_designer.py<br>backend/tests/user/test_session_store.py |
+| 0024 | 0024/T3 | get_session_timeline tool 入口（按需取证通路） | done | T2 | — |
+| 0024 | 0024/T4 | get_session_timeline 使用事件投影（去仿真外壳） | done | T3 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_session_timeline.py |
+| 0024 | 0024/T5 | 设计师渐进下钻 tool 接线（beat/step） | done | T4 | backend/agent_defs/designer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/designer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/auto_designer/designer/designer.py |
 
 ## 跨 feature 关系图
 
@@ -291,7 +293,9 @@ graph LR
     subgraph G0024[0024 designer-godview-timeline-tool]
         n0024_T1["T1 Session.sim_trace 落盘（TurnLog→SimTrace）"]
         n0024_T2["T2 index 扩 issue_numbers + 体感曲线带 session_id"]
-        n0024_T3["T3 get_session_timeline tool（落盘原样）"]
+        n0024_T3["T3 get_session_timeline tool 入口（按需取证通路）"]
+        n0024_T4["T4 get_session_timeline 使用事件投影（去仿真外壳）"]
+        n0024_T5["T5 设计师渐进下钻 tool 接线（beat/step）"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -356,6 +360,8 @@ graph LR
     n0023_T3 --> n0023_T1
     n0024_T2 --> n0024_T1
     n0024_T3 --> n0024_T2
+    n0024_T4 --> n0024_T3
+    n0024_T5 --> n0024_T4
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1044,9 +1050,13 @@ graph LR
 graph LR
     nT1["T1 Session.sim_trace 落盘（TurnLog→SimTrace）"]
     nT2["T2 index 扩 issue_numbers + 体感曲线带 session_id"]
-    nT3["T3 get_session_timeline tool（落盘原样）"]
+    nT3["T3 get_session_timeline tool 入口（按需取证通路）"]
+    nT4["T4 get_session_timeline 使用事件投影（去仿真外壳）"]
+    nT5["T5 设计师渐进下钻 tool 接线（beat/step）"]
     nT1 --> nT2
     nT2 --> nT3
+    nT3 --> nT4
+    nT4 --> nT5
 ```
 
 演化图：
@@ -1056,8 +1066,12 @@ graph LR
     v_T1_1["T1 v1"]
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```
