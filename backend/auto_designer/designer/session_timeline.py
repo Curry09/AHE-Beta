@@ -213,8 +213,25 @@ def _project_turn(turn: SimTurn) -> dict[str, Any]:
         event["did"] = did
     if said:
         event["said"] = said
+    # Spec-0024/T6：外发指令句柄 + 排队态（一眼区分「插话尚未被当前 reply 消费」）
+    utt = (turn.utterance_id or "").strip()
+    if utt:
+        event["utterance"] = utt
+    delivery = (turn.delivery or "").strip()
+    if delivery:
+        event["delivery"] = delivery
+    behind = (turn.queued_behind or "").strip()
+    if behind:
+        event["queued_behind"] = behind
     if heard:
         event["heard"] = heard
+        # Spec-0024/T6：这条 harness 回复应答哪条用户指令
+        ans = (turn.answers_utterance_id or "").strip()
+        if ans:
+            event["answers"] = ans
+            preview = (turn.answers_said or "").strip()
+            if preview:
+                event["answers_said"] = preview
 
     # 静默打断：不进对话 transcript，只看 chat 会漏「用户按过停止」
     if did == "interrupt":

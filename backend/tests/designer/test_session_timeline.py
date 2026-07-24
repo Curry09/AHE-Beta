@@ -45,6 +45,8 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
             patience=5,
             trust="skeptical",
             harness_output="",
+            utterance_id="u1",
+            delivery="open",
             persona_trace=[
                 PersonaCallTrace(
                     role="main_act",
@@ -106,6 +108,24 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
             ],
         ),
         SimTurn(
+            turn=2,
+            phase="waiting",
+            action_space=["keep_waiting", "send_message", "interrupt", "give_up"],
+            perceive="[unclear|stop full suite→send_message] Don't run all tests.",
+            verdict="stuck",
+            action="send_message",
+            message="stop, don't run the full suite",
+            executor="harness",
+            channel="emit",
+            patience=3,
+            trust="skeptical",
+            harness_output="",
+            utterance_id="u2",
+            delivery="queued",
+            queued_behind="u1",
+            persona_trace=[],
+        ),
+        SimTurn(
             turn=3,
             phase="active",
             action_space=["accept", "give_up", "verify_self"],
@@ -118,6 +138,8 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
             patience=2,
             trust="skeptical",
             harness_output="Fixed in core.py and tests passed.",
+            answers_utterance_id="u1",
+            answers_said="please fix DST",
             persona_trace=[
                 PersonaCallTrace(
                     role="main_act",
@@ -154,6 +176,8 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
                 {"kind": "tool", "text": "run_shell: pytest -q"},
                 {"kind": "tool_result", "text": "still running forever " * 40},
             ],
+            utterance_id="u3",
+            delivery="open",
             persona_trace=[
                 PersonaCallTrace(
                     role="main_act",
@@ -234,9 +258,19 @@ def test_projection_keeps_precious_godview_drops_sim_machinery(tmp_path: Path) -
         "give_up",
     ]
 
+    # Spec-0024/T6：插话 queued 在 open 之后；随后 heard 仍 answers 指向 begin 那条
+    opening = next(e for e in events if e.get("did") == "send_task")
+    assert opening["utterance"] == "u1" and opening["delivery"] == "open"
+    queued = next(e for e in events if e.get("did") == "send_message")
+    assert queued["utterance"] == "u2"
+    assert queued["delivery"] == "queued" and queued["queued_behind"] == "u1"
+
     verify = next(e for e in events if e.get("did") == "verify_self")
     assert verify["private_check"]
     assert any("pytest" in c["detail"] for c in verify["private_check"])
+    assert verify["answers"] == "u1"
+    assert verify["answers_said"] == "please fix DST"
+    assert verify["answers"] != queued["utterance"]
 
     assert any(e.get("did") == "file_issue" for e in events)
     assert any(e.get("did") == "rate_experience" for e in events)

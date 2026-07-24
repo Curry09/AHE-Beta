@@ -74,7 +74,7 @@
 钉死 AwaitEvent 等待环（主 loop 吃 reply、心跳一次性、动作前 try_reply）；统一 [+Ns] history（已删 wait_cost）；废弃 decide/waiting 的 one\|two 与合并 builder；清死常量与无消费者 MAIN_GAP；探针对齐 0022 菜单。
 
 ### 0024 用户 god-view 落盘 + 设计师按需取用
-Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
+Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline，含 utterance↔answers 请求-回复配对）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
 
 ## 全局看板
 
@@ -162,6 +162,7 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0024 | 0024/T3 | get_session_timeline tool 入口（按需取证通路） | done | T2 | — |
 | 0024 | 0024/T4 | get_session_timeline 使用事件投影（去仿真外壳） | done | T3 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_session_timeline.py |
 | 0024 | 0024/T5 | 设计师渐进下钻 tool 接线（beat/step） | done | T4 | backend/agent_defs/designer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/designer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/auto_designer/designer/designer.py |
+| 0024 | 0024/T6 | 请求-回复配对：heard.answers → utterance | done | T5 | backend/tests/user/sim/test_heartbeat.py |
 
 ## 跨 feature 关系图
 
@@ -296,6 +297,7 @@ graph LR
         n0024_T3["T3 get_session_timeline tool 入口（按需取证通路）"]
         n0024_T4["T4 get_session_timeline 使用事件投影（去仿真外壳）"]
         n0024_T5["T5 设计师渐进下钻 tool 接线（beat/step）"]
+        n0024_T6["T6 请求-回复配对：heard.answers → utterance"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -362,6 +364,7 @@ graph LR
     n0024_T3 --> n0024_T2
     n0024_T4 --> n0024_T3
     n0024_T5 --> n0024_T4
+    n0024_T6 --> n0024_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -450,7 +453,7 @@ graph LR
 | backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/tracker/test_fake.py | 0001, 0020 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012, 0023 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022 |
 | backend/tests/user/sim/test_prompt.py | 0005, 0023 |
@@ -1053,10 +1056,12 @@ graph LR
     nT3["T3 get_session_timeline tool 入口（按需取证通路）"]
     nT4["T4 get_session_timeline 使用事件投影（去仿真外壳）"]
     nT5["T5 设计师渐进下钻 tool 接线（beat/step）"]
+    nT6["T6 请求-回复配对：heard.answers → utterance"]
     nT1 --> nT2
     nT2 --> nT3
     nT3 --> nT4
     nT4 --> nT5
+    nT5 --> nT6
 ```
 
 演化图：
@@ -1068,10 +1073,12 @@ graph LR
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
     v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```
