@@ -24,7 +24,7 @@ _（缺模块级 docstring）_
 | `designer.py` | Designer = synthesize agent：综合全局的 nexau agent（对偶于 triage 的逐条梳理、开发者的局部补丁）。 |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂设计师作机制层判别证据。 |
-| `session_timeline.py` | 设计师按需取用 session 上帝视角时间线。 |
+| `session_timeline.py` | 设计师按需取用：从落盘 Session 投影「使用事件时间线」。 |
 | `triage.py` | Triager：issue triage / maintainer = 带只读工具的 nexau agent（对偶于 synthesize 的跨条综合）。 |
 
 ### auto_designer.dev

@@ -90,11 +90,15 @@ def _persona() -> Persona:
 
 
 def _session(*, score: int, n_issues: int) -> Session:
-    refs = [IssueRef(number=i + 1, url=f"fake://issues/{i + 1}", state="open") for i in range(n_issues)]
+    refs = [
+        IssueRef(number=i + 1, url=f"fake://issues/{i + 1}", state="open") for i in range(n_issues)
+    ]
     return Session(
         persona=_persona(),
         scenario=SeedScenario(description="我有个 Django 接口很慢，帮我排查优化。" * 4),
-        transcript=Transcript(turns=[Turn(role="user", content="hi"), Turn(role="harness", content="yo")]),
+        transcript=Transcript(
+            turns=[Turn(role="user", content="hi"), Turn(role="harness", content="yo")]
+        ),
         feeling=FeelingScore(score=score, reason="还行"),
         issue_refs=refs,
     )
@@ -315,7 +319,14 @@ def test_sessions_list(tmp_path: Path) -> None:
     assert row["n_issues"] == 0
     assert row["persona_identity"] == "独立开发者"
     assert len(row["scenario"]) <= 80
-    assert set(row) == {"session_id", "created_at", "score", "n_issues", "persona_identity", "scenario"}
+    assert set(row) == {
+        "session_id",
+        "created_at",
+        "score",
+        "n_issues",
+        "persona_identity",
+        "scenario",
+    }
 
 
 def test_session_detail_ok(tmp_path: Path) -> None:
@@ -369,17 +380,18 @@ def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
 Inside `create_app`, before `return app`:
 
 ```python
-    @app.get("/api/sessions")
-    def sessions() -> list[dict[str, object]]:
-        rows = sorted(store.index(), key=lambda e: e["created_at"], reverse=True)
-        return [_summarize(store=store, row=row) for row in rows]
+@app.get("/api/sessions")
+def sessions() -> list[dict[str, object]]:
+    rows = sorted(store.index(), key=lambda e: e["created_at"], reverse=True)
+    return [_summarize(store=store, row=row) for row in rows]
 
-    @app.get("/api/sessions/{session_id}")
-    def session_detail(session_id: str) -> dict[str, object]:
-        try:
-            return store.load(session_id).to_dict()
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail=f"session not found: {session_id}")
+
+@app.get("/api/sessions/{session_id}")
+def session_detail(session_id: str) -> dict[str, object]:
+    try:
+        return store.load(session_id).to_dict()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"session not found: {session_id}")
 ```
 
 (Remove the now-duplicate `from fastapi import FastAPI` line; keep the combined import.)

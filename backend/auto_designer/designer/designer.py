@@ -34,8 +34,9 @@ from auto_designer.user.session_store import SessionStore
 # 产 RFC（凌驾 type 的结构综合提案），covers/supersede 它综合的局部 triaged issue。逐条分诊/格式化已
 # 移交 triage agent（designer/triage.py）。RFC_LABEL 取代旧的 design 标签。
 DESIGN_LABEL = RFC_LABEL  # 向后兼容别名（旧测/引用）；语义现为 RFC
-# 一次 propose_once 是多轮工具调用（读文件 + 综合），给足硬超时兜底防总挂死。
-_DESIGN_TIMEOUT = 900
+# 一次 propose_once 是多轮工具调用（读文件 + 综合 + 按需 timeline/beat/step 渐进下钻，spec-0024 T4/T5）；
+# 给足墙钟防总挂死。
+_DESIGN_TIMEOUT = 3600
 # 拆信封的最大层数：实测 nexau 会把信封再 JSON 编码一层（故 ≥2），留一层余量；有界防畸形输入打转。
 _UNWRAP_MAX_DEPTH = 4
 
@@ -268,7 +269,9 @@ class Designer:
         trend: list[tuple[str, int, str, str]],
         runtime: str,
     ) -> str:
-        os.environ["SANDBOX_WORK_DIR"] = str(self._repo)  # 只读 grounding：sandbox = harness 仓
+        os.environ["SANDBOX_WORK_DIR"] = str(
+            self._repo.resolve()
+        )  # 只读 grounding：sandbox = harness 仓（绝对路径，防 cwd 漂移）
         from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
         cfg = AgentConfig.from_yaml(config_path=self._agent_def / "agent.yaml")
@@ -298,8 +301,11 @@ class Designer:
             f"## 已 triaged backlog（{len(triaged)} 条）\n{self._format_backlog(triaged)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
             f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
-            "对某条 issue 或某个体感点有疑惑时，调 `get_session_timeline`（issue_number=… 或 "
-            "session_id=…）看该局落盘的 god-view 轨迹，再下结论；不要直接读 sessions/ 原始文件。\n\n"
+            "对某条 issue 或某个体感点有疑惑时，先调 `get_session_timeline`"
+            "（issue_number=… 或 session_id=…）看该局使用事件时间线；"
+            "若某拍超时/活动条不够归因，再对该拍 `t` 调 `get_harness_beat(turn=…)`；"
+            "某步 truncated 且确需正文再 `get_harness_step(turn=…, step_i=…)`；"
+            "不要尝试直接读 sessions/ 原始文件。\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组，每项一个 RFC——含 `title`、"
             f"`fields`（RFC 字段：{rfc_labels}，中文 label 键）、可选 `covers`；无 RFC 则 `[]`。"
         )

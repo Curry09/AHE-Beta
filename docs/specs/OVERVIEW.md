@@ -74,7 +74,7 @@
 钉死 AwaitEvent 等待环（主 loop 吃 reply、心跳一次性、动作前 try_reply）；统一 [+Ns] history（已删 wait_cost）；废弃 decide/waiting 的 one\|two 与合并 builder；清死常量与无消费者 MAIN_GAP；探针对齐 0022 菜单。
 
 ### 0024 用户 god-view 落盘 + 设计师按需取用
-Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 issue_numbers；设计师经 get_session_timeline(issue\|session_id) 按需取落盘原样 JSON；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。脱敏加工与废弃 runtime_agg 另议。
+Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
 
 ### 0025 issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev
 把 issue 流建成真实软件团队的 triage 漏斗，并把现有单一 designer 拆成两个 agent。用户 sim 产出 raw issue（用户端模板填用户可见字段、按 type 标签、needs-triage、盖轮号）；triage agent 就地分类(确认 type)+定位(读 harness 代码 + get_session_timeline 轨迹)+去重+驳回/needs-info；synthesize agent（原 designer 收窄）只做跨 issue 结构综合、产 RFC（独立标签，凌驾 type，consolidate/supersede 局部 issue、最高 dev 预算）。dev 每轮按容量(N dev)顺序领 triaged issue + RFC，未清空的积压到下一轮（backlog = 上轮 carryover + 本轮新 triaged）。预算按 kind 分档、去 0020 分池/retry/stuck。产品/方向层 = distill persona/seed 卡库（人经 CLI，⓪ 层，不设 agent）；PM 职能 = 优先级由体感+频率机制派生。
@@ -164,8 +164,10 @@ Session.sim_trace 持久化用户模拟上帝视角；SessionStore index 带 iss
 | 0023 | 0023/T3 | 探针：去掉 two 臂与 peek-via-control 心智 | done | T1 | backend/scripts/probe_wait_progress.py<br>backend/scripts/probe_peek_decision_trace.py<br>backend/scripts/probe_persona_wait_matrix.py<br>backend/scripts/probe_ontrack_new_harness.py<br>backend/scripts/probe_wait_signals_to_evolution.py |
 | 0023 | 0023/T4 | launcher.try_reply 非阻塞契约（已落地） | done | — | backend/auto_designer/harness/launcher.py |
 | 0024 | 0024/T1 | Session.sim_trace 落盘（TurnLog→SimTrace） | done | — | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_models.py<br>backend/tests/loop/test_sim_user.py |
-| 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py<br>backend/tests/user/test_session_store.py |
-| 0024 | 0024/T3 | get_session_timeline tool（落盘原样） | done | T2 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/designer/test_session_timeline.py |
+| 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_designer.py<br>backend/tests/user/test_session_store.py |
+| 0024 | 0024/T3 | get_session_timeline tool 入口（按需取证通路） | done | T2 | — |
+| 0024 | 0024/T4 | get_session_timeline 使用事件投影（去仿真外壳） | done | T3 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_session_timeline.py |
+| 0024 | 0024/T5 | 设计师渐进下钻 tool 接线（beat/step） | done | T4 | backend/agent_defs/designer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/designer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/auto_designer/designer/designer.py |
 | 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
 | 0025 | 0025/T2 | 用户 sim 产结构化 raw issue：暂定 type + needs-triage + 轮号 | done | T1 | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
 | 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | done | T1, T2, T3a | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
@@ -311,7 +313,9 @@ graph LR
     subgraph G0024[0024 designer-godview-timeline-tool]
         n0024_T1["T1 Session.sim_trace 落盘（TurnLog→SimTrace）"]
         n0024_T2["T2 index 扩 issue_numbers + 体感曲线带 session_id"]
-        n0024_T3["T3 get_session_timeline tool（落盘原样）"]
+        n0024_T3["T3 get_session_timeline tool 入口（按需取证通路）"]
+        n0024_T4["T4 get_session_timeline 使用事件投影（去仿真外壳）"]
+        n0024_T5["T5 设计师渐进下钻 tool 接线（beat/step）"]
     end
     subgraph G0025[0025 issue-triage-funnel]
         n0025_T1["T1 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render"]
@@ -394,6 +398,8 @@ graph LR
     n0023_T3 --> n0023_T1
     n0024_T2 --> n0024_T1
     n0024_T3 --> n0024_T2
+    n0024_T4 --> n0024_T3
+    n0024_T5 --> n0024_T4
     n0025_T2 --> n0025_T1
     n0025_T3 --> n0025_T1
     n0025_T3 --> n0025_T2
@@ -1110,9 +1116,13 @@ graph LR
 graph LR
     nT1["T1 Session.sim_trace 落盘（TurnLog→SimTrace）"]
     nT2["T2 index 扩 issue_numbers + 体感曲线带 session_id"]
-    nT3["T3 get_session_timeline tool（落盘原样）"]
+    nT3["T3 get_session_timeline tool 入口（按需取证通路）"]
+    nT4["T4 get_session_timeline 使用事件投影（去仿真外壳）"]
+    nT5["T5 设计师渐进下钻 tool 接线（beat/step）"]
     nT1 --> nT2
     nT2 --> nT3
+    nT3 --> nT4
+    nT4 --> nT5
 ```
 
 演化图：
@@ -1122,10 +1132,14 @@ graph LR
     v_T1_1["T1 v1"]
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```
 
 ### 0025 issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev（issue #0）

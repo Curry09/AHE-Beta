@@ -5,9 +5,9 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 30：读设计文件(两三次)+ 判重 + 收尾本该远够用；给足余量让「提案/[]」都能干净走到 complete_task，
-# 不再被 max-iteration 掐（此前撞满多因误读巨大的原始 session 轨迹按页翻——现已在 systemprompt 硬禁）。
-max_iterations: 30
+# 300：允许按需拉多局 timeline + 读 harness/NexAU 后仍能走到 complete_task；
+# 墙钟由 Designer._DESIGN_TIMEOUT 兜底。
+max_iterations: 300
 
 middlewares:
   # 工作区 jail：designer 只能读自己的 harness 仓，文件工具越界读一律拒——机制硬禁读 trace
@@ -42,11 +42,19 @@ tools:
   - name: search_file_content
     yaml_path: ./tools/search_file_content.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:search_file_content
-  # 按需取一局用户模拟落盘的 god-view（sim_trace 原样；暂不脱敏）；
+  # 按需取一局用户模拟的完整决策时间线（投影：无 LLM system/user 原片）；
   # 编排侧读 SessionStore，jail 仍禁直接读 sessions/。
   - name: get_session_timeline
     yaml_path: ./tools/get_session_timeline.tool.yaml
     binding: auto_designer.designer.session_timeline:get_session_timeline
+  # 下钻某一拍：harness 内层 tool 序列（截断）+ stop_kind；timeline 不够细时再用。
+  - name: get_harness_beat
+    yaml_path: ./tools/get_harness_beat.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_harness_beat
+  # 再展开某一步正文（硬顶字符）；beat 里 truncated=true 且确需细看时才调。
+  - name: get_harness_step
+    yaml_path: ./tools/get_harness_step.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_harness_step
   - name: complete_task
     yaml_path: ./tools/complete_task.tool.yaml
     binding: nexau.archs.tool.builtin.session_tools:complete_task
