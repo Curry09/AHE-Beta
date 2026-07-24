@@ -37,6 +37,7 @@ from auto_designer.designer.issue_schema import (
     SUPERSEDED,
     TRIAGED,
     USER_KINDS,
+    output_contract_schema,
 )
 from auto_designer.designer.issue_schema import (
     fields_of as schema_fields_of,
@@ -133,21 +134,83 @@ def _issue_num(d: dict) -> object:
     return d.get("issue_number") if v is None else v
 
 
+def _normalize_dispositions(draft_text: str, *, pending_numbers: set) -> list[dict] | None:
+    """约束解码归一（Spec-0025 根治）：把 triage agent 的自由结论，经 `response_format=json_schema`
+    （schema 由 issue_schema.output_contract_schema() 生成，单一真源）**强制**成 schema 合规的 disposition
+    数组——解码层杜绝 triage_decision/平铺字段/乱加字段/非 P0-P3 优先级。任何异常返回 None，调用方回退
+    到宽容解析 `_parse_dispositions`（不因归一失败丢整轮）。"""
+    if not draft_text.strip() or not pending_numbers:
+        return None
+    base_url = os.getenv("DESIGNER_LLM_BASE_URL")
+    api_key = os.getenv("DESIGNER_LLM_API_KEY")
+    model = os.getenv("DESIGNER_LLM_MODEL")
+    if not (base_url and api_key and model):
+        return None
+    try:
+        from openai import OpenAI  # noqa: PLC0415  运行时依赖，懒加载
+    except Exception:  # noqa: BLE001
+        return None
+    prompt = (
+        "把下面的 triage 结论整理成严格符合 schema 的 dispositions（每条待分诊 issue 恰好一项）。\n"
+        f"待分诊 issue 号：{sorted(pending_numbers)}。只对这些号产出，不多不少。\n"
+        "- accept：给 kind(bug/feature/chore/document) + priority(P0/P1/P2/P3，按严重度×体感) + fields。"
+        "fields 放该 kind 的 TRIAGE 字段（bug:根因区域/边界/验收；feature:边界/交付物/验收；chore:边界/验收；"
+        "document:验收）——把结论里的根因/定位放进 fields.根因区域，**不要**放进 reason。\n"
+        "- duplicate：给 of（主 issue 号）。\n"
+        "- reject / needs_info：给 reason。\n\n"
+        f"triage 结论原文：\n{draft_text}"
+    )
+    try:
+        client = OpenAI(base_url=base_url, api_key=api_key)
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=8000,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "triage_dispositions",
+                    "strict": True,
+                    "schema": output_contract_schema(),
+                },
+            },
+        )
+        content = resp.choices[0].message.content or ""
+        data = json.loads(content)
+        items = data.get("dispositions") if isinstance(data, dict) else data
+        return [d for d in (items or []) if isinstance(d, dict)]
+    except Exception:  # noqa: BLE001  网关不支持/网络/解析异常 → 回退宽容解析
+        return None
+
+
+# LLM 常见的 disposition 别名 → 归一到 driver 认得的四种（accept/duplicate/reject/needs_info）。
+_DISPOSITION_ALIASES = {
+    "accept": "accept", "accepted": "accept", "confirm": "accept", "confirmed": "accept",
+    "confirmed_bug": "accept", "confirmed_feature": "accept", "valid": "accept", "keep": "accept",
+    "duplicate": "duplicate", "dup": "duplicate", "is_duplicate": "duplicate",
+    "reject": "reject", "rejected": "reject", "invalid": "reject", "out_of_scope": "reject",
+    "wontfix": "reject",
+    "needs_info": "needs_info", "need_info": "needs_info", "needinfo": "needs_info",
+    "more_info": "needs_info", "insufficient_info": "needs_info",
+}
+
+
 def _disposition_of(d: dict) -> str:
-    """取 disposition：优先显式 `disposition`，缺失时按常见布尔/状态字段推断（都不匹配返回空 → 跳过）。"""
-    disp = str(d.get("disposition", "")).strip().lower()
-    if disp:
-        return disp
-    if d.get("duplicate_of"):
+    """取 disposition：优先显式的动作键（`disposition` / `triage_decision` / `decision` / `action`，
+    LLM 自创 schema 时常用后几者），归一到 accept/duplicate/reject/needs_info；缺失再按常见布尔/
+    状态字段推断（都不匹配返回空 → 跳过）。"""
+    for key in ("disposition", "triage_decision", "decision", "action"):
+        raw = str(d.get(key, "")).strip().lower().replace("-", "_")
+        if raw:
+            return _DISPOSITION_ALIASES.get(raw, raw)
+    if d.get("duplicate_of") or d.get("is_duplicate") is True:
         return "duplicate"
     if d.get("reject") is True:
         return "reject"
     if d.get("needs_info") is True:
         return "needs_info"
-    status = str(d.get("status", "")).strip().lower()
-    if status in ("confirmed_bug", "confirmed_feature", "confirmed", "accept", "accepted", "valid"):
-        return "accept"
-    return ""
+    status = str(d.get("status", "")).strip().lower().replace("-", "_")
+    return _DISPOSITION_ALIASES.get(status, "")
 
 
 def _accept_fields(kind: str, d: dict) -> dict:
@@ -191,7 +254,11 @@ class Triager:
         self._emit(running=True, status=f"分诊中…（{len(pending)} 条待 triage）")
 
         result_text = self._run_agent(pending=pending, triaged=triaged)
-        dispositions = _parse_dispositions(result_text)
+        # Spec-0025 根治：先经约束解码归一（json_schema 强制成合规 disposition，杜绝字段漂移/非法优先级）；
+        # 归一失败（网关不支持/异常）才回退宽容解析 _parse_dispositions，绝不因归一失败丢整轮。
+        dispositions = _normalize_dispositions(result_text, pending_numbers={i.number for i in pending})
+        if dispositions is None:
+            dispositions = _parse_dispositions(result_text)
 
         by_number = {i.number: i for i in pending}
         outcome = TriageOutcome()

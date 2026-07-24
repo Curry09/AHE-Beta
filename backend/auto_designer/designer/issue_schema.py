@@ -161,6 +161,46 @@ def fields_of(*, kind: str, section: str | None = None) -> tuple[Field, ...]:
     return tuple(f for f in schema if f.section == section)
 
 
+def output_contract_schema() -> dict:
+    """Spec-0025：triage agent 输出的 JSON Schema——供 response_format=json_schema 约束解码，让
+    **本 schema 成为 agent 输出契约的单一真源**（不再靠系统提示手抄 + 解析边界打补丁认漂）。
+
+    强制：顶层键只允许 issue/disposition/kind/priority/fields/of/reason（additionalProperties=false，
+    杜绝 triage_decision/平铺 root_cause/summary 这类自创字段）；disposition ∈ 四种、kind ∈ USER_KINDS、
+    priority ∈ P0-P3（enum 约束，"high" 这类吐不出来）；fields 的键 = 各 kind TRIAGE 字段的并集。
+    per-kind 必填与合法性仍由 driver 的 validate 二次把关（json_schema 只锁结构，不表达 kind 条件必填）。
+    """
+    triage_labels: list[str] = []
+    for k in USER_KINDS:
+        for f in fields_of(kind=k, section=TRIAGE):
+            if f.label not in triage_labels:
+                triage_labels.append(f.label)
+    item = {
+        "type": "object",
+        "properties": {
+            "issue": {"type": "integer"},
+            "disposition": {"type": "string", "enum": ["accept", "duplicate", "reject", "needs_info"]},
+            "kind": {"type": "string", "enum": list(USER_KINDS)},
+            "priority": {"type": "string", "enum": list(PRIORITIES)},
+            "fields": {
+                "type": "object",
+                "properties": {lbl: {"type": "string"} for lbl in triage_labels},
+                "additionalProperties": False,
+            },
+            "of": {"type": "integer"},
+            "reason": {"type": "string"},
+        },
+        "required": ["issue", "disposition"],
+        "additionalProperties": False,
+    }
+    return {
+        "type": "object",
+        "properties": {"dispositions": {"type": "array", "items": item}},
+        "required": ["dispositions"],
+        "additionalProperties": False,
+    }
+
+
 def validate(*, kind: str, fields: dict, section: str | None = None) -> list[str]:
     """校验：未知 kind / 缺必填 / 空值。section 限定只查某区（None 查全部）。返回错误列表（空=通过）。
 

@@ -7,6 +7,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+import auto_designer.designer.triage as _triage_mod
 from auto_designer.designer.issue_schema import NEEDS_INFO, NEEDS_TRIAGE, REJECTED, TRIAGED
 from auto_designer.designer.triage import (
     TriageOutcome,
@@ -17,6 +20,13 @@ from auto_designer.designer.triage import (
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.fake import FakeTracker
 from auto_designer.user.session_store import SessionStore
+
+
+@pytest.fixture(autouse=True)
+def _disable_constrained_normalize(monkeypatch):
+    """单测走宽容解析路径（测 driver + _disposition_of 归一）。约束解码归一需真 LLM，此处禁用保持
+    hermetic——它靠 response_format=json_schema，已在网关实测验证；driver 应用逻辑用 canned 回放覆盖。"""
+    monkeypatch.setattr(_triage_mod, "_normalize_dispositions", lambda *a, **k: None)
 
 
 class _StubTriager(Triager):
@@ -290,3 +300,45 @@ def test_confirmed_labels_drops_old_type_and_workflow() -> None:
 def test_outcome_dataclass_shape() -> None:
     o = TriageOutcome(accepted=[1], rejected=[2])
     assert o.handled == 2
+
+
+def test_triage_decision_key_recognized_as_accept(tmp_path) -> None:
+    """线上实测（用户报告）：agent 用 `triage_decision:"accept"`（非 disposition/status），
+    且 is_duplicate/duplicate_of 明确为否。修前 _disposition_of 认不出 → 静默丢弃、采纳恒 0；
+    修后应识别为 accept 并落库。"""
+    tracker = FakeTracker()
+    n = _raw(tracker, "从零实现 sqlparse 反复超时", kind="bug")
+    canned = json.dumps(
+        [
+            {
+                "issue_number": n,
+                "kind": "bug",
+                "triage_decision": "accept",  # ← 关键：非 disposition/status
+                "is_duplicate": False,
+                "duplicate_of": None,
+                "needs_info": False,
+                "priority": "high",
+                "根因区域": "entry.py 大任务缺预算感知，首轮耗尽 max_iterations",
+                "边界": "只改 harness 通用预算/交付节奏",
+                "验收": "同类大任务预算内产出可验证交付或明确进度",
+            }
+        ],
+        ensure_ascii=False,
+    )
+    out = _triager(tmp_path, tracker, canned).triage_once()
+
+    assert out.accepted == [n]  # 修前会是 []（disposition 认不出被跳过）
+    snap = tracker.issue(n)
+    assert TRIAGED in snap["labels"] and NEEDS_TRIAGE not in snap["labels"]
+
+
+def test_is_duplicate_flag_without_disposition(tmp_path) -> None:
+    """agent 用 is_duplicate:true + duplicate_of 表达重复（无显式 disposition）→ 识别为 duplicate。"""
+    tracker = FakeTracker()
+    n = _raw(tracker, "又一条同根因超时", kind="bug")
+    canned = json.dumps(
+        [{"issue_number": n, "triage_decision": "duplicate", "is_duplicate": True, "duplicate_of": 999}],
+        ensure_ascii=False,
+    )
+    out = _triager(tmp_path, tracker, canned).triage_once()
+    assert out.duplicate == [n]
