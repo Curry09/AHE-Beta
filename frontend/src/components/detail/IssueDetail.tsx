@@ -3,6 +3,7 @@ import { useFetch } from "../../hooks/useFetch";
 import { fmtDate } from "../../lib/format";
 import { issueKind, priorityOf, roundOf, triageStatus } from "../../lib/issueMeta";
 import type { IssueComment } from "../../types";
+import { Markdown } from "../Markdown";
 
 // triage 状态 → 中文标签（展示用）。
 const STATUS_LABEL: Record<string, string> = {
@@ -143,7 +144,7 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
             </dl>
             <div className="block">
               <div className="block-title">正文</div>
-              <div className="prose">{issue.body || "（无正文）"}</div>
+              {issue.body ? <Markdown>{issue.body}</Markdown> : <div className="prose">（无正文）</div>}
             </div>
             <div className="block">
               <div className="block-title">评论 · {data.comments.length}</div>
@@ -155,7 +156,7 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
                       {c.author}
                       <span className="when">{fmtDate(c.created_at)}</span>
                     </div>
-                    <div className="prose dim">{c.body}</div>
+                    <Markdown dim>{c.body}</Markdown>
                   </div>
                 ))}
               </div>
