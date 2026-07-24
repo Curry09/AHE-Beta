@@ -281,6 +281,9 @@ class Designer:
 
             cfg.resolved_tracer = StepTracer(self._on_event)
         agent = Agent(config=cfg)
+        # RFC 字段中文 label 清单直接从 schema 生成（单一真源）——避免 prompt 里手抄 label 与
+        # issue_schema 漂移（曾因「涉及 issue」写成「涉及issue」致字段映射不上、RFC 被静默丢弃）。
+        rfc_labels = "/".join(f.label for f in _schema_fields_of(kind="rfc"))
         msg = (
             "下面是**已 triaged 的工作项 backlog**（含跨轮积压）+ 体感曲线 + 运行时行为聚合。逐条的分类/"
             "定位已由 triage 做完；你的活是**跳出单条，找跨 issue 的结构性根因**，产 0..n 条 **RFC**"
@@ -298,7 +301,7 @@ class Designer:
             "对某条 issue 或某个体感点有疑惑时，调 `get_session_timeline`（issue_number=… 或 "
             "session_id=…）看该局落盘的 god-view 轨迹，再下结论；不要直接读 sessions/ 原始文件。\n\n"
             "最后用 complete_task 交回：result 里只放一个 JSON 数组，每项一个 RFC——含 `title`、"
-            "`fields`（RFC 字段：问题/根因/涉及issue/方向/验收，中文 label 键）、可选 `covers`；无 RFC 则 `[]`。"
+            f"`fields`（RFC 字段：{rfc_labels}，中文 label 键）、可选 `covers`；无 RFC 则 `[]`。"
         )
         with bind_session_store(self._store):
             out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
