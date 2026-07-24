@@ -1,4 +1,5 @@
 import type { RunState } from "../types";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function TopBar(props: {
   state: RunState | null;
@@ -50,6 +51,7 @@ export function TopBar(props: {
         </select>
       )}
       <div className="meta">{openCount === null ? "issues —" : `issues ${openCount} open`}</div>
+      <ThemeToggle />
     </header>
   );
 }

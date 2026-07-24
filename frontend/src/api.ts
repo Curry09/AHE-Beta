@@ -8,6 +8,7 @@ import type {
   HistoryResponse,
   IssueDetailResponse,
   IssuesResponse,
+  OverviewResponse,
   RunState,
   SessionDetail,
 } from "./types";
@@ -27,3 +28,4 @@ export const getCommits = () => get<CommitsResponse>("/commits");
 export const getCommit = (sha: string) => get<CommitDetailResponse>(`/commits/${sha}`);
 export const getConfig = () => get<ConfigResponse>("/config");
 export const getSession = (id: string) => get<SessionDetail>(`/sessions/${id}`);
+export const getOverview = () => get<OverviewResponse>("/overview");

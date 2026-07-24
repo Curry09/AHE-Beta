@@ -21,7 +21,7 @@ tasks:
     acceptance: read_agents 里 triager 排在 user 与 designer 之间；用户 agent 槽带 persona 摘要 meta；老调用不传 meta 时退化为 None 不崩；test_live 覆盖排序与 meta 透传。
   - id: T2
     title: 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -35,7 +35,7 @@ tasks:
     acceptance: 浅/深两套都成体系（对比度达标）；useTheme 切换即时生效、刷新保持；无写死颜色残留（关键类走 token）；页面不横向滚动；npm build 通过。
   - id: T3
     title: 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -51,7 +51,7 @@ tasks:
     acceptance: 前端出现分诊房间位；主题开关可用；两条曲线在浅/深主题下清晰不溢出；build 通过。
   - id: T4
     title: 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -66,7 +66,7 @@ tasks:
     acceptance: 分诊房间的 triager 活动/归档可见；用户卡显示 persona 三要素而非只有 SR-001，缺 meta 退化不崩；角色强调色成套；issue/commit 卡排版整齐；build 通过。
   - id: T5
     title: 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:

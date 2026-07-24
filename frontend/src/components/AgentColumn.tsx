@@ -2,6 +2,13 @@ import { Fragment, type ReactNode } from "react";
 import type { Agent, AgentRole, HistoryItem, Selection } from "../types";
 import { Card } from "./Card";
 
+// 用户卡副行：persona 的「水平 · 领域」（Spec-0026/T4）。缺 meta（老后端/非用户角色）→ 空，卡片退回只显 identity。
+function personaSubline(agent: Agent): string | undefined {
+  const m = agent.meta;
+  if (!m) return undefined;
+  return [m.level, m.domain].filter(Boolean).join(" · ") || undefined;
+}
+
 // 已完成工作项的 meta 行：按 kind 给出各角色最要紧的一眼信息。
 function historyMeta(item: HistoryItem): ReactNode {
   if (item.kind === "user_session") {
@@ -66,6 +73,8 @@ export function AgentColumn(props: {
             selected={selection?.type === "agent" && selection.agentId === a.agent_id}
             onClick={() => onSelect({ type: "agent", agentId: a.agent_id })}
             meta={a.round != null && a.round > 0 ? <span>第 {a.round} 轮</span> : undefined}
+            subline={personaSubline(a)}
+            titleAttr={a.meta?.goal ?? undefined}
           />
         ))}
         {agents.length === 0 && !showDone && <div className="empty">暂无活动</div>}
