@@ -32,3 +32,6 @@ backend/deploy/gitea/.env
 
 # 本地 LLM 凭证（复用 ljh，勿入库）
 backend/.env
+
+# dev agent 逃逸产物：编排仓下伪 origin bare 仓（见 spec-0021）
+**/.canonical_origin.git/

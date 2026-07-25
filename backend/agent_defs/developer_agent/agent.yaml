@@ -5,12 +5,9 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 迭代上限 38：既让"迭代预算"先于 _DEV_TIMEOUT(900s 墙钟) 触顶走中间件优雅收尾，又给足余量让
-# dev 干完 git（commit/tag/push）后还能调 complete_task 写报告——26 太紧（实测干完活正好被掐、报告只剩
-# [Max iteration]）；34 时实测「最后一口气才提交、没预算收尾 git 尾巴」，配合硬落地窗口前移到 8，放宽到 38。
-# Spec-0020/T2 起此值仅作缺省文档值：AgenticDeveloper._run_agent 按票种/重试在运行时覆盖
-# cfg.max_iterations（bug=38 / design=60 / 重试升档 ×1.5，DEV_BUDGET_* 可配），38 = bug 票初始档。
-max_iterations: 38
+# 迭代上限 120：文档缺省值（对齐 DEFAULT_BUDGETS["bug"]）。运行时由 AgenticDeveloper._run_agent
+# 按票种覆盖 cfg.max_iterations（bug/feature=120 / chore/document=100 / rfc=200，DEV_BUDGET_* 可配）。
+max_iterations: 120
 
 # 预算到点→逼收尾：临近 max_iterations 时注入"还剩 N 轮，别再开新工具调用，给结论性回复/总结"。
 # 把过去"墙钟硬砍、无产出"换成"优雅收尾"（要么把手头改动验证+提交，要么总结剩余作 follow-up）。

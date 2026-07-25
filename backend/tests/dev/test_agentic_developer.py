@@ -169,7 +169,7 @@ def test_default_budgets_when_not_given(tmp_path) -> None:
     _triaged(tracker, "feature票", kind="feature")
     dev = _dev(tracker, repo, tmp_path)  # 用 DEFAULT_BUDGETS
     dev.work_one()
-    assert dev.budgets == [60]  # feature 默认 60
+    assert dev.budgets == [120]  # feature 默认 120
 
 
 # ---- 收尾：回写 + 连带关闭 ----

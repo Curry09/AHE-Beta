@@ -141,7 +141,7 @@ class SessionResult:
     persona_tail: list = field(default_factory=list)
 
 
-MAX_TURNS = 12
+MAX_TURNS = 24
 
 # 阻塞 send 路径：墙钟超过此值额外耗一点耐心（防无限干等）。心跳路径用 history [+Ns] + 有条件耗心。
 _EXTREME_WAIT_SEC = 480.0

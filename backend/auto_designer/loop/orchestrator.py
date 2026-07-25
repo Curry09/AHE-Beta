@@ -17,7 +17,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Protocol
 
@@ -28,6 +28,9 @@ from auto_designer.harness.launcher import HarnessLauncher
 from auto_designer.models import Persona, SeedScenario
 from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.workspace import materialize as materialize_workspace
+
+type SessionPair = tuple[Persona, SeedScenario]
+type SessionPlan = Sequence[SessionPair] | Callable[[], Sequence[SessionPair]]
 
 
 class SessionRunner(Protocol):
@@ -54,7 +57,7 @@ class Orchestrator:
         self,
         launcher: HarnessLauncher,
         harness_repo: str,
-        fixed_set: list[tuple[Persona, SeedScenario]],
+        fixed_set: SessionPlan,
         developer_agents: list[AgenticDeveloper],
         run_session_fn: SessionRunner,
         initial_ref: str,
@@ -67,6 +70,7 @@ class Orchestrator:
     ) -> None:
         self._launcher = launcher
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
+        # 固定列表 = 每轮同一套；callable = 每轮重新抽（如有放回随机 persona×task）。
         self._fixed_set = fixed_set
         self._developers = developer_agents
         # Spec-0025/T6：d 段两 agent——先 triage（把本轮新 raw issue 规范化）、再 synthesize（在已
@@ -102,7 +106,7 @@ class Orchestrator:
         #    等共享资源，前移规避并发竞争）；阶段二线程池并行跑会话（launch + run_session 一整包，
         #    并发单元=整局会话，信封内部时序不动）。max_parallel_users=1 时行为与旧串行等价。
         prepared: list[tuple[Persona, SeedScenario, str]] = []
-        for persona, scenario in self._fixed_set:
+        for persona, scenario in self._session_plan():
             if scenario.workspace is not None:
                 workspace_dir = materialize_workspace(scenario.workspace)
                 # Spec-0009/T3：materialize 之后、launch 之前按 scenario.workspace.setup 备好依赖
@@ -156,16 +160,14 @@ class Orchestrator:
                 traceback.print_exc()
 
         # b：多个开发者 agent 依次各领一条不同 issue，自主改 harness 直推 main（无 branch/merge/门禁）。
+        # Spec-0021：每名 dev 干完立刻绊线——逃逸提交当场中止，不让后续 dev 继续污染。
         attempted: set[int] = set()
         for developer in self._developers:
             outcome = developer.work_one(attempted)
             if outcome.issue_number is not None:
                 attempted.add(outcome.issue_number)
-
-        # Spec-0021/T1：b 段后校验编排仓未被 dev agent 触碰（逃逸出沙箱改文件/提交/推送）。
-        # 抛 RepoIntegrityError 即中止本轮并传播出 run()——安全事件 fail-closed，不继续跑累积污染。
-        if self._integrity_guard is not None:
-            self._integrity_guard()
+            if self._integrity_guard is not None:
+                self._integrity_guard()
 
         # c：回灌 = dev 推进后 main 的最新 HEAD SHA（观测游标；无 dev 推进则与本轮起始 SHA 相同，闭环不中断）。
         return self._resolve_head(ref=self._initial_ref)
@@ -183,6 +185,11 @@ class Orchestrator:
             if self._on_round_end is not None:
                 self._on_round_end(i + 1, ref)
         return refs
+
+    def _session_plan(self) -> Sequence[SessionPair]:
+        """本轮要跑的 (persona, scenario) 列表；fixed_set 为 callable 时每轮重抽。"""
+        plan = self._fixed_set
+        return plan() if callable(plan) else plan
 
     def _resolve_head(self, *, ref: str) -> str:
         """解析 harness 仓某 ref（trunk 下恒为 main）的当前 HEAD commit SHA；非法 ref 抛 RuntimeError。"""

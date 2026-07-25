@@ -5,9 +5,9 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 30：读 harness 码（两三次）+ 判重 + 收尾本该远够用；给足余量让每条 disposition 都能干净走到
+# 60：读 harness 码（两三次）+ 判重 + 收尾本该远够用；给足余量让每条 disposition 都能干净走到
 # complete_task，不再被 max-iteration 掐（此前撞满多因误读巨大的原始 session 轨迹按页翻）。
-max_iterations: 30
+max_iterations: 60
 
 middlewares:
   # 工作区 jail：triage 只能读自己的 harness 仓，文件工具越界读一律拒——机制硬禁读 trace

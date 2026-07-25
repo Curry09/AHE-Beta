@@ -5,9 +5,9 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 300：允许按需拉多局 timeline + 读 harness/NexAU 后仍能走到 complete_task；
+# 600：允许按需拉多局 timeline + 读 harness/NexAU 后仍能走到 complete_task；
 # 墙钟由 Designer._DESIGN_TIMEOUT 兜底。
-max_iterations: 300
+max_iterations: 600
 
 middlewares:
   # 工作区 jail：designer 只能读自己的 harness 仓，文件工具越界读一律拒——机制硬禁读 trace

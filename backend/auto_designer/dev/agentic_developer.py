@@ -42,13 +42,13 @@ _DEV_TIMEOUT = 900
 _ATTEMPT_REASON_CAP = 400
 # RFC/design issue body 里的覆盖声明机器行（复用 0020）：`covers: #5 #6`，最后一条匹配为准。
 _COVERS_LINE_RE = re.compile(r"^covers:((?:\s*#\d+)+)\s*$", re.MULTILINE)
-# 各 kind 的默认迭代预算（比 0020 调大；RFC 结构性改动最重、最高档）。env 覆盖见 run.py（T6）。
+# 各 kind 的默认迭代预算（相对 0025 初值再翻倍；RFC 结构性改动最重、最高档）。env 覆盖见 run.py（T6）。
 DEFAULT_BUDGETS: dict[str, int] = {
-    "bug": 60,
-    "feature": 60,
-    "chore": 50,
-    "document": 50,
-    "rfc": 100,
+    "bug": 120,
+    "feature": 120,
+    "chore": 100,
+    "document": 100,
+    "rfc": 200,
 }
 
 StatusFn = Callable[..., None]
