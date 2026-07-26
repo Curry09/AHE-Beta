@@ -7,7 +7,7 @@ summary: 现状三个产结构化输出的 agent（用户 sim / triage / designe
 tasks:
   - id: T1
     title: issue_schema 收敛为契约单一真源 + 契约生成/共享校验模块
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []

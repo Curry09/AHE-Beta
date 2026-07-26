@@ -186,7 +186,7 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0026 | 0026/T3 | 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线 | done | T2 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/components/Charts.tsx |
 | 0026 | 0026/T4 | 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛 | done | T1, T3 | frontend/src/components/AgentColumn.tsx<br>frontend/src/components/Card.tsx |
 | 0026 | 0026/T5 | 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块 | done | T2, T3 | frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/SessionDetail.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/components/detail/CommitDetail.tsx<br>frontend/src/components/SidePanel.tsx |
-| 0027 | 0027/T1 | issue_schema 收敛为契约单一真源 + 契约生成/共享校验模块 | pending | — | backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/tests/designer/test_issue_schema.py<br>backend/tests/designer/test_agent_contract.py |
+| 0027 | 0027/T1 | issue_schema 收敛为契约单一真源 + 契约生成/共享校验模块 | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/tests/designer/test_issue_schema.py<br>backend/tests/designer/test_agent_contract.py |
 | 0027 | 0027/T2 | triage 改 submit-tool 原生结构化（去第二次 LLM 重排与别名归一） | pending | T1 | backend/auto_designer/designer/triage.py<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/tests/designer/test_triage.py |
 | 0027 | 0027/T3 | designer 改 submit-tool 原生结构化 + 统一 driver-apply | pending | T1 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/loop/test_designer.py |
 
@@ -1267,8 +1267,9 @@ graph LR
     v_T1_1["T1 v1"]
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
+    classDef st_done fill:#b7e4c7;
     classDef st_pending fill:#eeeeee;
-    class v_T1_1 st_pending;
+    class v_T1_1 st_done;
     class v_T2_1 st_pending;
     class v_T3_1 st_pending;
 ```

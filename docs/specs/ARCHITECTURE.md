@@ -21,6 +21,7 @@ _（缺模块级 docstring）_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
+| `agent_contract.py` | 由 issue_schema.SCHEMAS 生成各 producer 的 submit 工具 input_schema——契约与 schema 同源， |
 | `designer.py` | Designer = synthesize agent：综合全局的 nexau agent（对偶于 triage 的逐条梳理、开发者的局部补丁）。 |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂设计师作机制层判别证据。 |
@@ -154,6 +155,7 @@ _（缺模块级 docstring）_
 graph LR
     nauto_designer["auto_designer"]
     nauto_designer_designer["auto_designer.designer"]
+    nauto_designer_designer_agent_contract["designer.agent_contract"]
     nauto_designer_designer_designer["designer.designer"]
     nauto_designer_designer_issue_schema["designer.issue_schema"]
     nauto_designer_designer_runtime_agg["designer.runtime_agg"]
@@ -219,6 +221,7 @@ graph LR
     nauto_designer_user_sim_workspace["sim.workspace"]
     nauto_designer_web["auto_designer.web"]
     nauto_designer_web_api["web.api"]
+    nauto_designer_designer_agent_contract --> nauto_designer_designer_issue_schema
     nauto_designer_designer_designer --> nauto_designer_designer_issue_schema
     nauto_designer_designer_designer --> nauto_designer_designer_runtime_agg
     nauto_designer_designer_designer --> nauto_designer_designer_session_timeline

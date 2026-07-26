@@ -2,13 +2,16 @@
 """标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。
 
 **LLM 只填字段值，格式由 render 保证**——不靠 LLM 自觉对齐格式，也不靠 Gitea 表单（issue 全程走 API
-创建，Gitea 的 ISSUE_TEMPLATE 只作用于 Web UI，校验不到 API）。字段按 kind 声明，且分两区：
+创建，Gitea 的 ISSUE_TEMPLATE 只作用于 Web UI，校验不到 API）。
 
-- **USER 区**：用户可见字段，由用户 sim 的 persona 在提 issue 时填（它亲历会话、知道症状，但看不到代码）。
-- **TRIAGE 区**：需读 harness 代码 / god-view 轨迹才能定位的字段，由 triage agent 填。
+Spec-0027/T1 收敛：schema 只声明「规范化产物」字段——即 triage / synthesize agent 定位后填的字段
+（根因区域/边界/验收、RFC 的 问题/根因/…），是 dev 的 Definition of Ready。用户报的 issue **body 是
+自由文本**（真实 persona 不填模板），不再声明 USER 段模板（原 USER 段从未接线、已删）。契约的机器
+校验交给 nexau 工具层（见 designer/agent_contract.py 由本 SCHEMAS 生成 submit 工具 input_schema）。
 
-`validate(kind, fields, section)` 校验必填在；`render(kind, fields, section)` 渲染 `### <label>` 分节
-markdown（单一布局，前端 + 回读一套解析器）。加新 kind 只增 SCHEMAS 声明、不改 validate/render 逻辑。
+`validate(kind, fields)` 校验必填在；`render(kind, fields)` 渲染 `### <label>` 分节 markdown（供 triage
+挂 comment / RFC body）。`section` 参数随本次收敛退化为单一值，保留仅为向后兼容。加新 kind 只增
+SCHEMAS 声明、不改 validate/render 逻辑。
 """
 
 from __future__ import annotations
@@ -103,36 +106,27 @@ class Field:
     required: bool = True
 
 
-# 每 kind 的字段声明；元组顺序即 render 顺序。RFC 在标签层凌驾 type（consolidate 局部 issue），
-# 在 schema 层只是又一个 kind（有自己的结构字段，不套 bug 的复现模板）。
+# 每 kind 的字段声明；元组顺序即 render 顺序。Spec-0027/T1：只保留「规范化产物」字段（triage/RFC
+# agent 填的定位字段）——用户报的 issue body 是自由文本（真实用户不填模板），不再声明 USER 段模板。
+# 全部字段归 TRIAGE（section 维度随本次收敛已退化为单一值，保留仅为 validate/render 向后兼容）。
 SCHEMAS: dict[str, tuple[Field, ...]] = {
     "bug": (
-        Field("repro", "复现步骤", USER),
-        Field("expected", "期望行为", USER),
-        Field("actual", "实际行为", USER),
         Field("root_cause", "根因区域", TRIAGE),
         Field("boundary", "边界", TRIAGE),
         Field("acceptance", "验收", TRIAGE),
     ),
     "feature": (
-        Field("background", "背景", USER),
-        Field("goal", "目标", USER),
-        Field("scenario", "场景", USER),
         Field("boundary", "边界", TRIAGE),
         Field("deliverable", "交付物", TRIAGE),
         Field("acceptance", "验收", TRIAGE),
     ),
     # chore/document 起步字段精简（harness 进化场景里少见，先占位、可扩）。
     "chore": (
-        Field("goal", "目标", USER),
         Field("boundary", "边界", TRIAGE, required=False),
         Field("acceptance", "验收", TRIAGE),
     ),
-    "document": (
-        Field("goal", "目标", USER),
-        Field("acceptance", "验收", TRIAGE, required=False),
-    ),
-    # RFC：结构性综合提案（synthesize agent 产），字段独立、全在 triage 侧（由 agent 填）。
+    "document": (Field("acceptance", "验收", TRIAGE, required=False),),
+    # RFC：结构性综合提案（synthesize agent 产），字段独立、由 agent 填。
     "rfc": (
         Field("problem", "问题", TRIAGE),
         Field("root_cause", "根因", TRIAGE),
