@@ -88,8 +88,9 @@ tasks:
 ## Reference-level explanation
 
 - **T1 · issue_schema + agent_contract**：SCHEMAS 去 section 维度，只留规范化字段；新增 `agent_contract.py`：`dispositions_input_schema()` / `rfc_input_schema()` 由 SCHEMAS 生成 nexau 工具 input_schema（enum 锁 disposition 四值、kind∈USER_KINDS、priority∈P0-P3、fields 键=各 kind 字段并集）；`apply_records(...)` 共享降级/落库骨架（validate 二次把关 → 缺必填降级 needs_info / 非法 skip）。`validate`/`render` 保留（render 供 comment/body、validate 供二次把关）。
-- **T2 · triage**：`submit_triage.tool.yaml`(input_schema 引 agent_contract) + agent.yaml 注册为 stop tool；`triage.py` 删 `_normalize_dispositions`/`_parse_dispositions`/`_disposition_of`/`_issue_num`/`_accept_fields`，`triage_once` 改「取 submit 参数 → apply_records」；systemprompt 去手抄 JSON、改「调 submit_triage」。
-- **T3 · designer**：`submit_rfcs.tool.yaml` + agent.yaml stop tool；`designer.py` 删 `_parse_proposals`/`_unwrap_result` 的解析用途，`propose_once` 改「取 submit 参数 → apply_records → 落 RFC + supersede」；systemprompt 去手抄 fields。
+- **T2 · triage**：submit_triage 工具 input_schema = `agent_contract.dispositions_input_schema()`，设为 **stop tool**；binding `submit_triage(dispositions, agent_state=None)` **返回 `{"dispositions": dispositions}`**；`_run_agent` 返回 `agent.run` 的返回值，`triage_once` 对其 `json.loads` 取 `dispositions`（parse 失败 = no-op 兜底）；`_apply` 简化（nexau 已校验，直接读 `issue`/`disposition`/`fields`/`of`，删 `_normalize_dispositions`/`_parse_dispositions`/`_disposition_of`/`_issue_num`/`_accept_fields` 与 `output_contract_schema`）；**per-kind 必填仍由 driver `schema_validate(section=triage)` 二次把关**（json_schema 只锁 union 字段、不表达 per-kind 条件必填）；systemprompt 去手抄 JSON、改「调 submit_triage」；max_iterations 给足 + 保留「未调 submit → no-op」兜底。
+- **T3 · designer**：submit_rfcs 工具 input_schema = `agent_contract.rfc_input_schema()`，stop tool；binding 返回 `{"proposals": proposals}`；`propose_once` 对 `agent.run` 返回 `json.loads` 取 `proposals` → 落 RFC + supersede；删 `_parse_proposals`/`_unwrap_result` 解析用途；systemprompt 去手抄 fields。
+- **单一真源落法**（二选一，T2 先定）：① 程序化——`Tool.from_dict({...,"input_schema": agent_contract.X()}, binding=…)` + `agent.add_tool()`（真单源、无 yaml 副本，但 stop_tool 标记方式待 T2 实跑确认）；② 静态 `.tool.yaml`（**用 Write 工具写、UTF-8 安全**）+ drift-guard 测试断言 `yaml["input_schema"] == agent_contract.X()`（yaml 为受测守护的生成副本）。任一都保证契约与 SCHEMAS 同源。
 
 **DAG**：T1 → T2、T1 → T3（T2/T3 于 T1 后可并行）。文件按 task 单一归属、互不重叠。
 
@@ -116,9 +117,24 @@ tasks:
 
 ## Unresolved questions
 
-- nexau ToolValidationError 是否稳定地「回灌错误让模型重试」需 T2 实跑钉死；重试上限与失败兜底口径待定。
-- submit 工具的返回如何回传给 driver（工具 handler 捕获参数作结果 vs agent.run 返回中取）——T1 定接口。
-- `_norm_label`/`render`/`validate` 哪些随重构下线、哪些保留（render 供 comment/body 仍需），T1 收口。
+三个原 Unresolved 已在生产环境的 nexau 上**实证钉死**（供 T2/T3 直接照做，退路不必走）：
+
+1. **工具层强校验 = 有**（`archs/tool/tool.py` `Tool.validate_params` 里 `jsonschema.validate`）。实测：
+   非法 enum、缺必填、嵌套项非法 enum、嵌套项多余键（additionalProperties）→ **全拒**。**⚠️ 关键坑**：
+   `schema_params` 会先把**顶层**未声明键滤掉再校验 → **顶层多余键不拒**（静默丢）。故 payload 必须放
+   在**嵌套数组**里（`{dispositions:[item…]}`），item 级设 `additionalProperties:false + required + enum`
+   → 漂移字段（triage_decision 等）在 item 级被拒。**本 spec 的 agent_contract 生成的 schema 正是这个
+   形态**（T1 已就绪）。
+2. **校验失败会回灌重试**：这版 nexau **无 ToolValidationError 类**，校验失败抛 `ValueError("Invalid
+   parameters for tool …")`；executor 把工具异常 catch → 组 `ToolResultBlock(is_error=True)` → 喂回模型
+   → 下一轮重试。重试上限 = agent `max_iterations`（无专门计数器）。**故：max_iterations 给足 + 保留
+   「agent 没调 submit → 本轮 no-op/兜底」那道最小安全网**。⚠️ driver **别 import/catch
+   ToolValidationError**（不存在）；重试是 `agent.run` 内部自动的。
+3. **submit 参数走 stop-tool 返回**：`executor.py` stop tool 触发 → stop_tool_result → `agent.run()` 的
+   返回值（非字符串会被 JSON 序列化）。**接口**：submit 工具 binding **返回校验后的 params(dict)** →
+   成为 `agent.run` 返回 → driver 对返回值 `json.loads` 取 `dispositions`/`proposals`。原生路径、无 side-channel。
+
+仍待 T2/T3 收口：`_norm_label`/`render`/`validate` 哪些下线（render 供 comment/body 仍需保留）。
 
 ## Future possibilities
 
