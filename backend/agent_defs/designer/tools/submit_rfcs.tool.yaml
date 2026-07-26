@@ -1,0 +1,52 @@
+type: tool
+name: submit_rfcs
+description: >-
+  Submit your structural RFC proposals and finish. This is the ONLY way to finish
+  — call it exactly once, after you have investigated the triaged backlog, the
+  feeling trend and the runtime aggregate.
+
+  Pass `proposals`: 0..n items (empty list is the correct answer for most rounds —
+  don't force one). Each item needs `title` and `fields` (the RFC fields, Chinese
+  labels: 问题 / 根因 / 涉及 issue / 方向 / 验收). Optionally give `covers`: a list
+  of the triaged issue numbers this RFC subsumes (they will be marked superseded).
+
+  The parameters are schema-validated at call time; invalid values (missing field,
+  self-invented keys) are rejected and you must retry.
+# Spec-0027/T3：input_schema 是 agent_contract.rfc_input_schema() 的生成副本（受 drift-guard 测试守护：
+# test_designer.py::test_submit_rfcs_yaml_matches_contract 断言二者深度相等）。改 RFC 字段改
+# issue_schema.SCHEMAS 后需重新生成此块，否则测试会红。契约单一真源仍是 issue_schema.SCHEMAS。
+input_schema:
+  type: object
+  properties:
+    proposals:
+      type: array
+      items:
+        type: object
+        properties:
+          title:
+            type: string
+          fields:
+            type: object
+            properties:
+              问题:
+                type: string
+              根因:
+                type: string
+              涉及 issue:
+                type: string
+              方向:
+                type: string
+              验收:
+                type: string
+            additionalProperties: false
+          covers:
+            type: array
+            items:
+              type: integer
+        required:
+          - title
+          - fields
+        additionalProperties: false
+  required:
+    - proposals
+  additionalProperties: false

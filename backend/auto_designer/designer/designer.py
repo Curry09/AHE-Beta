@@ -14,7 +14,6 @@ from __future__ import annotations
 import contextvars
 import json
 import os
-import re
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -130,35 +129,6 @@ def _parse_covers(raw: object) -> tuple[int, ...]:
     return tuple(out)
 
 
-def _iter_top_level_arrays(s: str):
-    """扫描出所有**顶层**平衡的 [...] 片段，尊重字符串字面量与转义（防被内嵌 [] / 散文带偏）。"""
-    depth = 0
-    start = -1
-    in_str = False
-    esc = False
-    for i, ch in enumerate(s):
-        if in_str:
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = False
-            continue
-        if ch == '"':
-            in_str = True
-        elif ch == "[":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif ch == "]":
-            if depth > 0:
-                depth -= 1
-                if depth == 0 and start != -1:
-                    yield s[start : i + 1]
-                    start = -1
-
-
 def _run_with_timeout(call: Callable[[], object], timeout: int) -> object:
     """daemon 线程跑 call，超时抛 TimeoutError（丢弃线程，不阻塞进程）。
 
@@ -221,7 +191,7 @@ class Designer:
         self._emit(running=True, status=f"综合中…（{len(triaged)} 条 triaged）")
 
         result_text = self._run_agent(triaged=triaged, trend=trend, runtime=runtime)
-        proposals = self._parse_proposals(result_text)
+        proposals = self._proposals_from_submit(result_text)
 
         # covers 只认本轮 triaged 集合里的号（指向不存在/未 triaged/已 superseded 的号静默跳过）。
         by_number = {i.number: i for i in triaged}
@@ -284,9 +254,6 @@ class Designer:
 
             cfg.resolved_tracer = StepTracer(self._on_event)
         agent = Agent(config=cfg)
-        # RFC 字段中文 label 清单直接从 schema 生成（单一真源）——避免 prompt 里手抄 label 与
-        # issue_schema 漂移（曾因「涉及 issue」写成「涉及issue」致字段映射不上、RFC 被静默丢弃）。
-        rfc_labels = "/".join(f.label for f in _schema_fields_of(kind="rfc"))
         msg = (
             "下面是**已 triaged 的工作项 backlog**（含跨轮积压）+ 体感曲线 + 运行时行为聚合。逐条的分类/"
             "定位已由 triage 做完；你的活是**跳出单条，找跨 issue 的结构性根因**，产 0..n 条 **RFC**"
@@ -306,12 +273,17 @@ class Designer:
             "若某拍超时/活动条不够归因，再对该拍 `t` 调 `get_harness_beat(turn=…)`；"
             "某步 truncated 且确需正文再 `get_harness_step(turn=…, step_i=…)`；"
             "不要尝试直接读 sessions/ 原始文件。\n\n"
-            "最后用 complete_task 交回：result 里只放一个 JSON 数组，每项一个 RFC——含 `title`、"
-            f"`fields`（RFC 字段：{rfc_labels}，中文 label 键）、可选 `covers`；无 RFC 则 `[]`。"
+            "调查完毕后**调 `submit_rfcs` 一次**收尾：`proposals` 为本轮 0..n 条 RFC（宁缺毋滥，无跨条"
+            "主题就传空数组）；每条含 `title` + `fields`（RFC 字段，中文 label 键，字段清单以工具 schema "
+            "为准）+ 可选 `covers`（该 RFC 综合的 triaged 票号）。字段契约由工具 input_schema 强校验，"
+            "不必也不要在正文里手抄 schema。"
         )
         with bind_session_store(self._store):
             out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
-        return _unwrap_result(out)
+        # submit_rfcs 是 stop tool：其 binding 的返回值（proposals 的 JSON）即 agent.run 的返回；
+        # 直接透传给 _proposals_from_submit（不再经 complete_task 信封拆解）。非 str（nexau 有时再序列
+        # 化）时 dumps 成 str，交由解析层的有界 json.loads 处理。
+        return out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
         """体感随时间：[(created_at, score, reason, session_id)]，按时间升序。
@@ -349,36 +321,31 @@ class Designer:
         return "\n".join(lines)
 
     @staticmethod
-    def _parse_proposals(text: str) -> list[_Proposal]:
-        """从 agent 的 result 文本里抽出 JSON 数组并解析成 _Proposal 列表。
+    def _proposals_from_submit(text: str) -> list[_Proposal]:
+        """从 submit_rfcs 的返回（= agent.run 的返回值）解析出 _Proposal 列表。
 
-        容忍 ```json 代码块与前后散文。裸输出时**不再**用 find('[')→rfind(']') 一把抓
-        （那会被散文/字符串里的 [] 或多段数组带偏、抠出非法片段 → 静默吞掉提案，与 persona
-        _parse_json 曾踩的同类坑），改用尊重字符串转义的**平衡括号扫描**取最后一个能解析的顶层
-        数组。解析失败或非列表一律返回空列表（本轮无提案），不抛错——designer 出错不该拖垮闭环。
-        Spec-0020/T1：每项可带可选 covers: list[int]（该提案覆盖的 bug 票号），非法值静默丢弃。
+        Spec-0027/T3：submit_rfcs 是 stop tool，binding 返回 `{"proposals":[...]}` 的 JSON——nexau 已在
+        工具层用 input_schema 强校验（title/fields 必填、fields 键锁定、covers 为 int 数组、无自创字段），
+        故这里拿到的结构合规，driver 只需 `json.loads` 取用（取代旧括号扫描 `_parse_proposals`）。
+        兜底：agent 未调 submit / 解析失败 / 非预期形状 → 空列表（本轮 no-op），不抛错拖垮闭环。
+        兼容 nexau 可能对返回值再 JSON 编码一层（有界 json.loads 直到得到 dict）。
+        covers 仍走 `_parse_covers` 宽进严出（去重、剔非正整数）。
         """
-        if not text:
-            return []
-        fenced = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", text, re.DOTALL)
-        data: object | None = None
-        if fenced is not None:
+        node: object = text
+        for _ in range(_UNWRAP_MAX_DEPTH):
+            if not isinstance(node, str):
+                break
             try:
-                data = json.loads(fenced.group(1))
+                node = json.loads(node)
             except (ValueError, TypeError):
-                data = None
-        if data is None:
-            for chunk in _iter_top_level_arrays(text):  # 保留最后一个成功者
-                try:
-                    parsed = json.loads(chunk)
-                except (ValueError, TypeError):
-                    continue
-                if isinstance(parsed, list):
-                    data = parsed
-        if not isinstance(data, list):
+                return []
+        if not isinstance(node, dict):
+            return []
+        raw = node.get("proposals")
+        if not isinstance(raw, list):
             return []
         proposals: list[_Proposal] = []
-        for item in data:
+        for item in raw:
             if not isinstance(item, dict) or not item.get("title"):
                 continue
             fields = item.get("fields")

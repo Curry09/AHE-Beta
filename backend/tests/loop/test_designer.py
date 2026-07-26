@@ -1,9 +1,11 @@
 # 创新者侧：Designer 综合全局产结构性提案单测（stub nexau agent + FakeTracker + 临时 SessionStore）。
-"""验证 designer 驱动器：
+"""验证 designer 驱动器（Spec-0027/T3：submit-tool 原生结构化路径）：
 
-- agent 产出的 JSON 提案被落成带 `design` 标签的 open issue（供开发者领取）；
-- 提案 result 含代码块/前后散文时仍能鲁棒解析；空/非法 result 退化为「本轮无提案」不抛错；
-- backlog + 体感曲线确实喂进了 agent 的任务消息。
+- agent 经 submit_rfcs 吐 `{"proposals":[...]}`，driver json.loads 取用、落成带 `RFC` 标签的 open issue；
+- RFC 按 issue_schema 渲染；缺字段被跳过；空/未调 submit 退化为「本轮无提案」不抛错；
+- covers → 被综合的 triaged issue 打 superseded + 挂链；covers 宽进严出；
+- backlog（只喂 triaged）+ 体感曲线确实喂进了 agent；
+- submit_rfcs.tool.yaml 的 input_schema 与 agent_contract.rfc_input_schema() 同源（drift-guard）。
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from pathlib import Path
 from auto_designer.designer.designer import (
     Designer,
     DesignOutcome,
-    _unwrap_result,
+    _parse_covers,
 )
 from auto_designer.designer.issue_schema import RFC_LABEL, TRIAGED
 from auto_designer.models import (
@@ -30,7 +32,11 @@ from auto_designer.user.session_store import SessionStore
 
 
 class _StubDesigner(Designer):
-    """覆盖 _run_agent：不跑真 nexau，回放一段固定 result，并记录喂进的信号（Spec-0025/T4：triaged）。"""
+    """覆盖 _run_agent：不跑真 nexau，回放一段固定的 submit 返回，并记录喂进的信号。
+
+    submit_rfcs 是 stop tool，其 binding 返回 `json.dumps({"proposals":[...]})` 成为 agent.run 的返回；
+    故 stub 的 canned 即这串 JSON（与真实路径同形），driver 对其 _proposals_from_submit。
+    """
 
     def __init__(self, *args, canned: str, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -84,17 +90,40 @@ def _rfc_fields() -> dict:
     }
 
 
+def _submit(proposals: list) -> str:
+    """把 proposals 打成 submit_rfcs 的返回形状（stop tool binding 的输出）。"""
+    return json.dumps({"proposals": proposals}, ensure_ascii=False)
+
+
 def _rfc_canned(
     covers: object = None, *, title: str = "结构：预算感知", fields: dict | None = None
 ) -> str:
     item: dict = {"title": title, "fields": fields if fields is not None else _rfc_fields()}
     if covers is not None:
         item["covers"] = covers
-    return json.dumps([item], ensure_ascii=False)
+    return _submit([item])
 
 
 def _triaged(tracker: FakeTracker, title: str, kind: str = "bug") -> int:
     return tracker.create_issue(IssueDraft(title=title, body="x", labels=[kind, TRIAGED])).number
+
+
+def test_submit_rfcs_yaml_matches_contract() -> None:
+    """drift-guard：submit_rfcs.tool.yaml 的 input_schema 是 agent_contract.rfc_input_schema() 的
+    生成副本，必须与之深度相等（契约单一真源仍是 issue_schema.SCHEMAS）。"""
+    import yaml  # noqa: PLC0415  仅本测用
+
+    from auto_designer.designer.agent_contract import rfc_input_schema  # noqa: PLC0415
+
+    yaml_path = (
+        Path(__file__).resolve().parents[2]
+        / "agent_defs"
+        / "designer"
+        / "tools"
+        / "submit_rfcs.tool.yaml"
+    )
+    tool_def = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    assert tool_def["input_schema"] == rfc_input_schema()
 
 
 def test_rfc_labeled_and_rendered_from_fields(tmp_path) -> None:
@@ -130,8 +159,8 @@ def test_run_with_timeout_propagates_session_store(tmp_path) -> None:
 
 
 def test_rfc_fields_label_whitespace_tolerant(tmp_path) -> None:
-    """真实 LLM 按 systemprompt 用无空格「涉及issue」填字段——须能映射到 related，否则 RFC 校验
-    永远失败被静默丢弃（线上实测 bug）。schema label 是「涉及 issue」（带空格），归一后应匹配上。"""
+    """真实 LLM 可能用无空格「涉及issue」填字段——须能映射到 related，否则 RFC 校验永远失败被静默丢弃
+    （线上实测 bug）。schema label 是「涉及 issue」（带空格），归一后应匹配上。"""
     tracker = FakeTracker()
     _triaged(tracker, "超时1")
     fields = {
@@ -172,29 +201,64 @@ def test_only_triaged_fed_not_needs_triage(tmp_path) -> None:
         IssueDraft(title="被取代", body="x", labels=["bug", TRIAGED, "superseded"])
     )
     tracker.create_issue(IssueDraft(title="旧RFC", body="x", labels=[RFC_LABEL, TRIAGED]))
-    designer = _designer(tmp_path, tracker, "[]")
+    designer = _designer(tmp_path, tracker, _submit([]))
     designer.propose_once()
     assert [i.title for i in designer.seen_triaged] == ["已triaged"]
 
 
 def test_empty_or_invalid_result_yields_no_rfc(tmp_path) -> None:
+    """空 proposals / 非 JSON 散文（agent 未调 submit）/ 空串 → 本轮无提案、不抛错、不建任何 RFC。"""
     tracker = FakeTracker()
     _triaged(tracker, "t")
     before = len(tracker.list_open_issues())
-    for canned in ["[]", "没有值得提的结构性方向。", ""]:
+    for canned in [_submit([]), "没有值得提的结构性方向。", ""]:
         outcome = _designer(tmp_path, tracker, canned).propose_once()
         assert outcome.count == 0
     assert len(tracker.list_open_issues()) == before  # 未建任何 RFC
 
 
 def test_rfc_missing_fields_skipped(tmp_path) -> None:
-    """RFC 字段没填全 → 跳过（不产半成品）。"""
+    """RFC 字段没填全 → 跳过（不产半成品）。工具层已锁 fields 键，但 per-kind 必填仍由 driver
+    validate 二次把关。"""
     tracker = FakeTracker()
     _triaged(tracker, "t")
-    canned = json.dumps([{"title": "半成品", "fields": {"问题": "只填了这个"}}], ensure_ascii=False)
+    canned = _submit([{"title": "半成品", "fields": {"问题": "只填了这个"}}])
     outcome = _designer(tmp_path, tracker, canned).propose_once()
     assert outcome.count == 0
     assert not any(i.title == "半成品" for i in tracker.list_open_issues())
+
+
+def test_no_proposals_key_yields_no_rfc(tmp_path) -> None:
+    """submit 返回缺 proposals 键 / 非预期形状 → 空列表兜底（不抛错）。"""
+    tracker = FakeTracker()
+    _triaged(tracker, "t")
+    for canned in [json.dumps({}), json.dumps({"proposals": "not-a-list"}), json.dumps([])]:
+        outcome = _designer(tmp_path, tracker, canned).propose_once()
+        assert outcome.count == 0
+
+
+def test_multiple_proposals_all_landed(tmp_path) -> None:
+    """一次 submit 多条 proposals 全部落库。"""
+    tracker = FakeTracker()
+    _triaged(tracker, "t")
+    items = [
+        {"title": "结构A", "fields": _rfc_fields()},
+        {"title": "结构B", "fields": _rfc_fields()},
+    ]
+    outcome = _designer(tmp_path, tracker, _submit(items)).propose_once()
+    assert outcome.count == 2
+    titles = {tracker.issue(n)["title"] for n in outcome.proposal_numbers}
+    assert titles == {"结构A", "结构B"}
+
+
+def test_double_encoded_submit_tolerated(tmp_path) -> None:
+    """兼容 nexau 可能把 stop-tool 返回值再 JSON 编码一层（返回值是「JSON 的 JSON 字符串」）。"""
+    tracker = FakeTracker()
+    _triaged(tracker, "t")
+    once = _rfc_canned()
+    twice = json.dumps(once, ensure_ascii=False)  # 再编码一层
+    outcome = _designer(tmp_path, tracker, twice).propose_once()
+    assert outcome.count == 1
 
 
 # ---- Spec-0025/T4：covers → 被综合的 triaged issue 打 superseded + 挂链 ----
@@ -240,84 +304,7 @@ def test_covers_skips_non_triaged_numbers(tmp_path) -> None:
 
 
 def test_parse_covers_field_shapes() -> None:
-    """_parse_proposals 对 covers 的宽进严出：去重、剔 bool/负数/字符串。"""
-    text = json.dumps(
-        [{"title": "t", "fields": {}, "covers": [5, 5, 6, True, -1, 0, "8"]}],
-        ensure_ascii=False,
-    )
-    (prop,) = Designer._parse_proposals(text)
-    assert prop.covers == (5, 6)
-
-
-# ---- Spec-0018/T1：拆 complete_task 信封（提案被静默丢弃的回归） ----
-
-# 真实回归夹具：一次长跑里被静默丢弃的那条 designer 返回原文（逐字照抄，未做任何整形）。
-# 注意它是**双重编码**的——整段是一个 JSON 字符串，里面才是 complete_task 信封：
-# 只 json.loads 一次只得到 str（而非 dict），这正是「看似修好、实则没修」的陷阱所在。
-_REAL_ENVELOPE = (
-    r'"{\"success\": true, \"message\": \"Result submitted and task completed.\", '
-    r"\"status\": \"TASK_COMPLETED\", \"task_completed\": true, \"output\": {\"result\": "
-    r"\"[\\n  {\\n    \\\"title\\\": \\\"长编码任务的完成性预算与未完成交付\\\",\\n    "
-    r"\\\"body\\\": \\\"#19 与体感曲线中“首次超时但最终通过”的那次共同指向同一根因：当任务超过"
-    r"单轮稳定完成预算时，用户拿到的是中断/等待后的低信任状态，而不是可审查、可验证、可继续推进的"
-    r"产物。\\\",\\n    \\\"labels\\\": [\\n      \\\"structural\\\",\\n      "
-    r'\\\"reliability\\\"\\n    ]\\n  }\\n]\"}}"'
-)
-
-
-def _envelope(result: object) -> str:
-    """nexau complete_task 信封；实测还会被再 JSON 编码一层，故双重 dumps。"""
-    inner = {
-        "success": True,
-        "message": "Result submitted and task completed.",
-        "status": "TASK_COMPLETED",
-        "task_completed": True,
-        "output": {"result": result},
-    }
-    return json.dumps(json.dumps(inner, ensure_ascii=False), ensure_ascii=False)
-
-
-def _titles(text: str) -> list[str]:
-    return [p.title for p in Designer._parse_proposals(_unwrap_result(text))]
-
-
-def test_unwrap_envelope_with_result_as_json_string() -> None:
-    """信封里 result 是「JSON 数组的字符串」（agent 听话用 complete_task 交付的标准形状）。"""
-    drafts = json.dumps([{"title": "预算拖垮可用交付", "body": "b", "labels": ["design"]}])
-    assert _titles(_envelope(drafts)) == ["预算拖垮可用交付"]
-
-
-def test_unwrap_envelope_with_result_as_array_body() -> None:
-    """信封里 result 直接是数组本体（而非其字符串形式）——两种都要接。"""
-    assert _titles(_envelope([{"title": "等待不可见", "body": "b"}])) == ["等待不可见"]
-
-
-def test_unwrap_envelope_with_empty_result_yields_no_proposals() -> None:
-    """宁缺毋滥：信封里 result 为空数组 → 0 条提案，而非报错。"""
-    assert _titles(_envelope("[]")) == []
-
-
-def test_bare_array_path_unchanged() -> None:
-    """裸 JSON 数组（agent 不调 complete_task 时的形状）行为一字不变。"""
-    bare = json.dumps([{"title": "裸数组", "body": "b"}], ensure_ascii=False)
-    assert _titles(bare) == ["裸数组"]
-
-
-def test_fenced_and_prose_paths_unchanged() -> None:
-    """```json 围栏 + 前后散文两条既有路径行为不变。"""
-    fenced = '想了想：\n```json\n[{"title": "围栏", "body": "b"}]\n```\n以上。'
-    assert _titles(fenced) == ["围栏"]
-
-
-def test_malformed_envelope_falls_back_to_raw_text() -> None:
-    """畸形 / 非信封 JSON → 回落原文、不抛错（退回今天的行为，而非炸）。"""
-    assert _unwrap_result('{"success": true}') == '{"success": true}'  # dict 但无 output.result
-    assert _unwrap_result("就是一段散文，没有 JSON") == "就是一段散文，没有 JSON"
-    assert _unwrap_result(None) == "None"  # 非 str 兜底
-
-
-def test_real_long_run_envelope_regression() -> None:
-    """回归：长跑里被静默丢弃的那条真实返回原文——修前解析出 0 条，修后必须解析出提案。"""
-    assert Designer._parse_proposals(_REAL_ENVELOPE) == []  # 修前的行为：提案被信封吞掉
-    titles = _titles(_REAL_ENVELOPE)  # 修后：提案回来了
-    assert titles and "长编码任务的完成性预算与未完成交付" in titles[0]
+    """_parse_covers 的宽进严出：去重、剔 bool/负数/0/字符串（工具层已锁 int，这是额外防线）。"""
+    assert _parse_covers([5, 5, 6, True, -1, 0, "8"]) == (5, 6)
+    assert _parse_covers("not-a-list") == ()
+    assert _parse_covers(None) == ()

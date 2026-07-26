@@ -39,7 +39,7 @@ tasks:
     acceptance: triage 一轮仅 1 次 LLM 调用；dispositions 经 nexau 校验（漂移字段/非法 enum 吐不出）；driver 读工具参数落库；采纳/重复/驳回/needs_info 四路仍正确、缺字段仍降级 needs_info；test_triage 重写为 submit-tool 路径且绿。
   - id: T3
     title: designer 改 submit-tool 原生结构化 + 统一 driver-apply
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
