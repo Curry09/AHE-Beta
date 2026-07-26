@@ -6,7 +6,8 @@ system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
 # 30：读 harness 码（两三次）+ 判重 + 收尾本该远够用；给足余量让每条 disposition 都能干净走到
-# complete_task，不再被 max-iteration 掐（此前撞满多因误读巨大的原始 session 轨迹按页翻）。
+# submit_triage。⚠️ Spec-0027：input_schema 校验失败会回灌重试（executor 组 is_error→下一轮重来），
+# 重试上限即此 max_iterations（无专门计数器），故给足余量、别掐死重试。
 max_iterations: 30
 
 middlewares:
@@ -26,7 +27,7 @@ llm_config:
 
 # 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于读现状 grounding；
 # triage 不改文件、不碰 git，仅 read_file / list_directory / search_file_content 取证 +
-# get_session_timeline 拉单局轨迹 + complete_task 交 disposition。
+# get_session_timeline 拉单局轨迹 + submit_triage 交 disposition（原生结构化 stop tool）。
 sandbox_config:
   type: local
 
@@ -56,8 +57,11 @@ tools:
   - name: get_harness_step
     yaml_path: ./tools/get_harness_step.tool.yaml
     binding: auto_designer.designer.session_timeline:get_harness_step
-  - name: complete_task
-    yaml_path: ./tools/complete_task.tool.yaml
-    binding: nexau.archs.tool.builtin.session_tools:complete_task
+  # Spec-0027/T2：收尾 = submit_triage（原生结构化 stop tool）。input_schema 由 issue_schema 生成、
+  # nexau 在调用层强校验（漂移字段/非法 enum 吐不出 → 重试）；binding 回显参数成为 agent.run 返回，
+  # driver 直接读。取代旧 complete_task + 第二次 LLM 重排 + 别名归一。
+  - name: submit_triage
+    yaml_path: ./tools/submit_triage.tool.yaml
+    binding: auto_designer.designer.submit_tools:submit_triage
 
-stop_tools: [complete_task]
+stop_tools: [submit_triage]

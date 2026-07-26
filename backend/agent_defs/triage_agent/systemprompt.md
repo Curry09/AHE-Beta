@@ -42,32 +42,18 @@
   已被现状覆盖。填 `reason` 说清为什么。
 - **needs_info**：用户报告信息太少、读代码+轨迹也定位不出 → 填 `reason`（缺什么）。
 
-## 输出契约
+## 提交：调 `submit_triage`（收尾工具）
 
-用 `complete_task` 交回，`result` 里放**一个 JSON 数组**，每项对应一条待分诊 issue：
+调查完**每一条**待分诊 issue 后，用 `submit_triage` **一次性**提交结果——它是你唯一的收尾方式，
+参数 `dispositions` 是一个数组，**每条待分诊 issue 恰好一项**（别漏、别多）。每项：
 
-```json
-[
-  {"issue": 12, "disposition": "accept", "kind": "bug", "priority": "P1",
-   "fields": {"根因区域": "entry.py 无预算感知，大任务一轮做不完",
-              "边界": "只改 harness 通用能力，不写被测包代码",
-              "验收": "同类安装任务能在预算内给出可用交付或明确进度"},
-   "note": "读 entry.py 确认无增量交付；轨迹显示第 8 步 install 超时；该局体感=1 → P1"},
-  {"issue": 13, "disposition": "duplicate", "of": 12, "note": "同一超时根因"},
-  {"issue": 14, "disposition": "reject", "reason": "要改的是 launcher 心跳（编排层），非 harness 本体"},
-  {"issue": 15, "disposition": "needs_info", "reason": "只说'坏了'，轨迹也无有效信息，无法定位"}
-]
-```
+- 必给 `issue`（issue 号）+ `disposition`（accept / duplicate / reject / needs_info 四选一）。
+- `accept` 另给 `kind`（bug/feature/chore/document）、`priority`（P0-P3）、`fields`——按该 kind 填
+  对应 TRIAGE 字段（中文 label 作键：bug=根因区域/边界/验收，feature=边界/交付物/验收，等）。
+- `duplicate` 另给 `of`（主 issue 号）。
+- `reject` / `needs_info` 另给 `reason`（为什么驳回 / 缺什么信息）。
 
-字段 key 用中文 label（按 kind 用对应字段名）。accept 必须给 `kind` + `priority` + 该 kind 的 TRIAGE
-字段（不能空、缺了会被退回）。对每条待分诊 issue 都要给一项，不要漏。无法判断时宁可 needs_info，
-别硬 accept。
-
-**严格照这个 schema，别自创字段名**（否则整条会被丢弃、issue 永远卡在 needs-triage）：
-- 用 `issue`（**不是** `issue_number`）、`disposition`（**不是** `status`/`confirmed_bug`/`reject`/
-  `needs_info`/`duplicate_of` 这些布尔或状态字段）。
-- `disposition` 只取四个值之一：`accept` / `duplicate` / `reject` / `needs_info`。
-- accept 的定位结论**放进 `fields`**（根因区域/边界/验收），**不要**平铺成 `root_cause`/
-  `suggested_fix`/`source_basis`/`timeline_evidence` 这类顶层散字段。
-- 你下钻得到的证据/推理是你的**内部工作**，请**浓缩**进 `fields` 的三项里，别把大段分析或原始 stdout
-  倒进输出。`result` 就是上面那个精简数组，不是分析报告。
+工具在调用时会**按 schema 强校验**你的参数：非法 disposition、非 P0-P3 优先级、fields 里的未知字段、
+自创的顶层键（如 issue_number/status/triage_decision/平铺的 root_cause）——**都会被拒，你需要修正后
+重试**。所以照字段名给、别自创。你下钻得到的证据/推理是**内部工作**，请浓缩进 `fields` 的各项里，
+别把大段分析或原始 stdout 倒进参数。无法判断时宁可 needs_info，别硬 accept。

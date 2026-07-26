@@ -1,51 +1,57 @@
-# Spec-0025/T3：Triager 单测——四路 disposition（accept/duplicate/reject/needs_info）就地落库。
-"""stub agent（回放固定 disposition JSON）+ FakeTracker + 临时 SessionStore：验证 driver 把
-每条 disposition 正确落成标签/评论/关闭，不跑真 nexau。"""
+# Spec-0027/T2：Triager 单测——submit_triage 原生结构化路径 + 四路 disposition 就地落库。
+"""stub agent（回放 submit_triage 的回显 JSON `{"dispositions":[...]}`）+ FakeTracker + 临时
+SessionStore：验证 driver 把每条已校验 disposition 正确落成标签/评论/关闭，不跑真 nexau。
+
+nexau 在工具调用层已按 input_schema 强校验参数（漂移字段/非法 enum 吐不出 → 重试），故 driver 读到的
+永远是契约干净的 dispositions；这里的 canned 数据也都用契约字段（issue/disposition/kind/priority/
+fields/of/reason），不再有 issue_number/status/triage_decision/顶层平铺那类漂移（那些在工具层就被拒、
+到不了 driver）。"""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-import pytest
+import yaml
 
-import auto_designer.designer.triage as _triage_mod
+from auto_designer.designer.agent_contract import dispositions_input_schema
 from auto_designer.designer.issue_schema import NEEDS_INFO, NEEDS_TRIAGE, REJECTED, TRIAGED
-from auto_designer.designer.triage import (
-    TriageOutcome,
-    Triager,
-    _confirmed_labels,
-    _parse_dispositions,
-)
+from auto_designer.designer.triage import TriageOutcome, Triager, _confirmed_labels
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.fake import FakeTracker
 from auto_designer.user.session_store import SessionStore
 
 
-@pytest.fixture(autouse=True)
-def _disable_constrained_normalize(monkeypatch):
-    """单测走宽容解析路径（测 driver + _disposition_of 归一）。约束解码归一需真 LLM，此处禁用保持
-    hermetic——它靠 response_format=json_schema，已在网关实测验证；driver 应用逻辑用 canned 回放覆盖。"""
-    monkeypatch.setattr(_triage_mod, "_normalize_dispositions", lambda *a, **k: None)
-
-
 class _StubTriager(Triager):
-    """覆盖 _run_agent：不跑真 nexau，回放固定 disposition JSON，并记录喂进的待分诊集合。"""
+    """覆盖 _run_agent：不跑真 nexau，回放 submit_triage 的回显 JSON，并记录喂进的待分诊集合。
 
-    def __init__(self, *args, canned: str, **kwargs) -> None:
+    dispositions：契约干净的 disposition 列表 → 包成 `{"dispositions": [...]}`（模拟 binding 回显）。
+    raw：直接指定 agent.run 的返回文本（测「未调 submit / 非合规 JSON → 本轮 no-op」兜底）。
+    """
+
+    def __init__(self, *args, dispositions=None, raw=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._canned = canned
+        self._raw = (
+            raw
+            if raw is not None
+            else json.dumps({"dispositions": dispositions or []}, ensure_ascii=False)
+        )
         self.seen_pending: list = []
 
     def _run_agent(self, *, pending: list, triaged: list) -> str:
         self.seen_pending = pending
-        return self._canned
+        return self._raw
 
 
-def _triager(tmp_path: Path, tracker: FakeTracker, canned: str) -> _StubTriager:
+def _triager(tmp_path: Path, tracker: FakeTracker, *, dispositions=None, raw=None) -> _StubTriager:
     store = SessionStore(tmp_path / "sessions")
     return _StubTriager(
-        tracker, store, str(tmp_path / "harness"), str(tmp_path / "agent_def"), canned=canned
+        tracker,
+        store,
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent_def"),
+        dispositions=dispositions,
+        raw=raw,
     )
 
 
@@ -55,34 +61,52 @@ def _raw(tracker: FakeTracker, title: str, kind: str = "bug") -> int:
     ).number
 
 
+def test_submit_triage_yaml_matches_contract() -> None:
+    """drift-guard：submit_triage.tool.yaml 的 input_schema 与 agent_contract 生成的深度相等——
+    改字段只改 issue_schema.SCHEMAS 后需重新生成 yaml，否则此测试红（保单一真源）。"""
+    yaml_path = (
+        Path(__file__).resolve().parents[2]
+        / "agent_defs/triage_agent/tools/submit_triage.tool.yaml"
+    )
+    doc = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    assert doc["input_schema"] == dispositions_input_schema()
+
+
 def test_no_pending_is_noop(tmp_path) -> None:
     tracker = FakeTracker()
     tracker.create_issue(IssueDraft(title="已 triaged", body="x", labels=["bug", TRIAGED]))
-    out = _triager(tmp_path, tracker, "[]").triage_once()
+    out = _triager(tmp_path, tracker, dispositions=[]).triage_once()
     assert out.handled == 0
-    assert _triager(tmp_path, tracker, "[]").seen_pending == []  # 无 needs-triage → 不跑
+    assert _triager(tmp_path, tracker, dispositions=[]).seen_pending == []  # 无 needs-triage → 不跑
+
+
+def test_no_submit_is_noop(tmp_path) -> None:
+    """agent 未调 submit_triage（撞 max_iterations 等）→ agent.run 返回非合规 JSON → 本轮 no-op，
+    issue 仍留 needs-triage 待下轮重来（最小兜底，不抛错）。"""
+    tracker = FakeTracker()
+    n = _raw(tracker, "没提交")
+    out = _triager(tmp_path, tracker, raw="抱歉我没能完成分诊。").triage_once()
+    assert out.handled == 0
+    assert NEEDS_TRIAGE in tracker.issue(n)["labels"]  # 仍待分诊
 
 
 def test_accept_confirms_labels_and_comments_triage_fields(tmp_path) -> None:
     tracker = FakeTracker()
     n = _raw(tracker, "unidecode 超时", kind="bug")
-    canned = json.dumps(
-        [
-            {
-                "issue": n,
-                "disposition": "accept",
-                "kind": "bug",
-                "priority": "P1",
-                "fields": {
-                    "根因区域": "entry.py 无预算感知",
-                    "边界": "只改通用能力",
-                    "验收": "同类任务预算内给交付",
-                },
-            }
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
+    dispositions = [
+        {
+            "issue": n,
+            "disposition": "accept",
+            "kind": "bug",
+            "priority": "P1",
+            "fields": {
+                "根因区域": "entry.py 无预算感知",
+                "边界": "只改通用能力",
+                "验收": "同类任务预算内给交付",
+            },
+        }
+    ]
+    out = _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
 
     assert out.accepted == [n]
     snap = tracker.issue(n)
@@ -94,73 +118,20 @@ def test_accept_confirms_labels_and_comments_triage_fields(tmp_path) -> None:
     assert any("根因区域" in c and "entry.py 无预算感知" in c for c in snap["comments"])
 
 
-def test_variant_schema_issue_number_and_flat_fields_processed(tmp_path) -> None:
-    """线上实测：agent 不照契约、自创 issue_number/status + 字段平铺顶层。driver 应容错归一：
-    issue_number→issue、status=confirmed_bug→accept、平铺的根因区域/边界/验收→fields，仍能采纳。"""
-    tracker = FakeTracker()
-    n = _raw(tracker, "从零构建包超时", kind="bug")
-    canned = json.dumps(
-        [
-            {
-                "issue_number": n,  # 非 issue
-                "kind": "bug",
-                "status": "confirmed_bug",  # 非 disposition
-                "duplicate_of": None,
-                "needs_info": False,
-                "reject": False,
-                "priority": "P1",
-                # 字段平铺在顶层（非 fields）
-                "根因区域": "entry.py 无预算感知，大任务一轮做不完",
-                "边界": "只改 harness 通用能力",
-                "验收": "同类任务预算内给交付或明确进度",
-            }
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
-    assert out.accepted == [n]  # 修复前是 0（int(None) 直接 skip）
-    snap = tracker.issue(n)
-    assert (
-        TRIAGED in snap["labels"] and "P1" in snap["labels"] and NEEDS_TRIAGE not in snap["labels"]
-    )
-
-
-def test_variant_schema_reject_and_duplicate_flags(tmp_path) -> None:
-    """容错推断 disposition：reject=true→reject、duplicate_of 非空→duplicate（of 取 duplicate_of）。"""
-    tracker = FakeTracker()
-    main = tracker.create_issue(IssueDraft(title="主", body="x", labels=["bug", TRIAGED])).number
-    dup = _raw(tracker, "重复的")
-    bad = _raw(tracker, "超范围的")
-    canned = json.dumps(
-        [
-            {"issue_number": dup, "duplicate_of": main, "note": "同根因"},
-            {"issue_number": bad, "reject": True, "reason": "要改的是 launcher（编排层）"},
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
-    assert out.duplicate == [dup] and out.rejected == [bad]
-    assert tracker.issue(dup)["state"] == "closed"
-    assert tracker.issue(bad)["state"] == "closed"
-
-
 def test_accept_feature_uses_feature_triage_fields(tmp_path) -> None:
     """feature 的 TRIAGE 字段是 边界/交付物/验收（非 bug 的根因区域）——填对即采纳。"""
     tracker = FakeTracker()
     n = _raw(tracker, "希望批量导出", kind="feature")
-    canned = json.dumps(
-        [
-            {
-                "issue": n,
-                "disposition": "accept",
-                "kind": "feature",
-                "priority": "P2",
-                "fields": {"边界": "只加通用能力", "交付物": "导出接口", "验收": "能批量导出"},
-            }
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
+    dispositions = [
+        {
+            "issue": n,
+            "disposition": "accept",
+            "kind": "feature",
+            "priority": "P2",
+            "fields": {"边界": "只加通用能力", "交付物": "导出接口", "验收": "能批量导出"},
+        }
+    ]
+    out = _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
     assert out.accepted == [n]
     snap = tracker.issue(n)
     assert "feature" in snap["labels"] and "P2" in snap["labels"] and TRIAGED in snap["labels"]
@@ -168,22 +139,19 @@ def test_accept_feature_uses_feature_triage_fields(tmp_path) -> None:
 
 
 def test_accept_invalid_priority_not_labeled(tmp_path) -> None:
-    """priority 非法（不在 P0-P3）→ 不打优先级标签，但仍采纳（priority 是判断非硬闸）。"""
+    """priority 非 P0-P3（driver 二次把关）→ 不打优先级标签，但仍采纳（priority 是判断非硬闸）。"""
     tracker = FakeTracker()
     n = _raw(tracker, "超时")
-    canned = json.dumps(
-        [
-            {
-                "issue": n,
-                "disposition": "accept",
-                "kind": "bug",
-                "priority": "紧急",  # 非法
-                "fields": {"根因区域": "a", "边界": "b", "验收": "c"},
-            }
-        ],
-        ensure_ascii=False,
-    )
-    _triager(tmp_path, tracker, canned).triage_once()
+    dispositions = [
+        {
+            "issue": n,
+            "disposition": "accept",
+            "kind": "bug",
+            "priority": "紧急",  # driver 侧不认（工具层 enum 也会拒；此处测 driver 兜底）
+            "fields": {"根因区域": "a", "边界": "b", "验收": "c"},
+        }
+    ]
+    _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
     labels = tracker.issue(n)["labels"]
     assert TRIAGED in labels and not any(p in labels for p in ("P0", "P1", "P2", "P3"))
 
@@ -192,18 +160,15 @@ def test_accept_missing_triage_fields_downgrades_to_needs_info(tmp_path) -> None
     """采纳但 TRIAGE 字段没填全 → 降级 needs_info（保证采纳的 issue 定位完整）。"""
     tracker = FakeTracker()
     n = _raw(tracker, "坏了")
-    canned = json.dumps(
-        [
-            {
-                "issue": n,
-                "disposition": "accept",
-                "kind": "bug",
-                "fields": {"根因区域": "只填了这个"},
-            }
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
+    dispositions = [
+        {
+            "issue": n,
+            "disposition": "accept",
+            "kind": "bug",
+            "fields": {"根因区域": "只填了这个"},
+        }
+    ]
+    out = _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
     assert out.needs_info == [n] and out.accepted == []
     snap = tracker.issue(n)
     assert NEEDS_INFO in snap["labels"] and snap["state"] == "closed"
@@ -213,34 +178,38 @@ def test_accept_reclassifies_kind(tmp_path) -> None:
     """暂定 bug，triage 改判 feature → 旧 type 被替换。"""
     tracker = FakeTracker()
     n = _raw(tracker, "希望加个功能", kind="bug")
-    canned = json.dumps(
-        [
-            {
-                "issue": n,
-                "disposition": "accept",
-                "kind": "feature",
-                "fields": {"边界": "b", "交付物": "d", "验收": "a"},
-            }
-        ],
-        ensure_ascii=False,
-    )
-    _triager(tmp_path, tracker, canned).triage_once()
+    dispositions = [
+        {
+            "issue": n,
+            "disposition": "accept",
+            "kind": "feature",
+            "fields": {"边界": "b", "交付物": "d", "验收": "a"},
+        }
+    ]
+    _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
     labels = tracker.issue(n)["labels"]
     assert "feature" in labels and "bug" not in labels  # 改判、旧 type 去掉
+
+
+def test_accept_invalid_kind_downgrades_to_needs_info(tmp_path) -> None:
+    """kind 不在 USER_KINDS（driver 二次把关）→ 降级 needs_info。"""
+    tracker = FakeTracker()
+    n = _raw(tracker, "怪东西")
+    dispositions = [{"issue": n, "disposition": "accept", "kind": "rfc", "fields": {}}]
+    out = _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
+    assert out.needs_info == [n] and out.accepted == []
 
 
 def test_duplicate_closes_and_links(tmp_path) -> None:
     tracker = FakeTracker()
     main = tracker.create_issue(IssueDraft(title="主", body="x", labels=["bug", TRIAGED])).number
     dup = _raw(tracker, "重复的")
-    canned = json.dumps(
-        [{"issue": dup, "disposition": "duplicate", "of": main, "note": "同根因"}],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
+    dispositions = [{"issue": dup, "disposition": "duplicate", "of": main}]
+    out = _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
     assert out.duplicate == [dup]
     snap = tracker.issue(dup)
     assert snap["state"] == "closed"
+    assert NEEDS_TRIAGE not in snap["labels"]  # 重复也是已分诊结局，去 needs-triage
     assert any(f"duplicate of #{main}" in c for c in snap["comments"])
 
 
@@ -248,14 +217,11 @@ def test_reject_and_needs_info_close_with_reason(tmp_path) -> None:
     tracker = FakeTracker()
     rej = _raw(tracker, "要改 launcher")
     ni = _raw(tracker, "就说坏了")
-    canned = json.dumps(
-        [
-            {"issue": rej, "disposition": "reject", "reason": "属传输层，非 harness 本体"},
-            {"issue": ni, "disposition": "needs_info", "reason": "无有效复现"},
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
+    dispositions = [
+        {"issue": rej, "disposition": "reject", "reason": "属传输层，非 harness 本体"},
+        {"issue": ni, "disposition": "needs_info", "reason": "无有效复现"},
+    ]
+    out = _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
 
     assert out.rejected == [rej] and out.needs_info == [ni]
     rsnap = tracker.issue(rej)
@@ -269,22 +235,21 @@ def test_disposition_for_unknown_issue_skipped(tmp_path) -> None:
     """disposition 指向不在本轮待分诊集合的号 → 跳过，不越界改动。"""
     tracker = FakeTracker()
     n = _raw(tracker, "真的待分诊")
-    canned = json.dumps(
-        [
-            {"issue": 999, "disposition": "reject", "reason": "幽灵"},
-            {"issue": n, "disposition": "reject", "reason": "真的"},
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
+    dispositions = [
+        {"issue": 999, "disposition": "reject", "reason": "幽灵"},
+        {"issue": n, "disposition": "reject", "reason": "真的"},
+    ]
+    out = _triager(tmp_path, tracker, dispositions=dispositions).triage_once()
     assert out.rejected == [n]  # 只处理了真实待分诊那条
 
 
-def test_parse_dispositions_tolerates_prose_and_bad() -> None:
-    assert _parse_dispositions("") == []
-    assert _parse_dispositions("没有 JSON 的散文") == []
-    text = '想了想：\n[{"issue": 1, "disposition": "reject", "reason": "x"}]\n以上。'
-    assert _parse_dispositions(text) == [{"issue": 1, "disposition": "reject", "reason": "x"}]
+def test_unknown_disposition_left_pending(tmp_path) -> None:
+    """未知 disposition（不在四值内）→ 忽略，issue 仍 needs-triage 下轮再来。"""
+    tracker = FakeTracker()
+    n = _raw(tracker, "含糊结论")
+    out = _triager(tmp_path, tracker, dispositions=[{"issue": n, "disposition": "maybe"}]).triage_once()
+    assert out.handled == 0
+    assert NEEDS_TRIAGE in tracker.issue(n)["labels"]
 
 
 def test_confirmed_labels_drops_old_type_and_workflow() -> None:
@@ -300,55 +265,3 @@ def test_confirmed_labels_drops_old_type_and_workflow() -> None:
 def test_outcome_dataclass_shape() -> None:
     o = TriageOutcome(accepted=[1], rejected=[2])
     assert o.handled == 2
-
-
-def test_triage_decision_key_recognized_as_accept(tmp_path) -> None:
-    """线上实测（用户报告）：agent 用 `triage_decision:"accept"`（非 disposition/status），
-    且 is_duplicate/duplicate_of 明确为否。修前 _disposition_of 认不出 → 静默丢弃、采纳恒 0；
-    修后应识别为 accept 并落库。"""
-    tracker = FakeTracker()
-    n = _raw(tracker, "从零实现 sqlparse 反复超时", kind="bug")
-    canned = json.dumps(
-        [
-            {
-                "issue_number": n,
-                "kind": "bug",
-                "triage_decision": "accept",  # ← 关键：非 disposition/status
-                "is_duplicate": False,
-                "duplicate_of": None,
-                "needs_info": False,
-                "priority": "high",
-                "根因区域": "entry.py 大任务缺预算感知，首轮耗尽 max_iterations",
-                "边界": "只改 harness 通用预算/交付节奏",
-                "验收": "同类大任务预算内产出可验证交付或明确进度",
-            }
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
-
-    assert out.accepted == [n]  # 修前会是 []（disposition 认不出被跳过）
-    snap = tracker.issue(n)
-    assert TRIAGED in snap["labels"] and NEEDS_TRIAGE not in snap["labels"]
-
-
-def test_is_duplicate_flag_without_disposition(tmp_path) -> None:
-    """agent 用 is_duplicate:true + duplicate_of 表达重复（无显式 disposition）→ 识别为 duplicate。"""
-    tracker = FakeTracker()
-    n = _raw(tracker, "又一条同根因超时", kind="bug")
-    canned = json.dumps(
-        [
-            {
-                "issue_number": n,
-                "triage_decision": "duplicate",
-                "is_duplicate": True,
-                "duplicate_of": 999,
-            }
-        ],
-        ensure_ascii=False,
-    )
-    out = _triager(tmp_path, tracker, canned).triage_once()
-    assert out.duplicate == [n]
-    snap = tracker.issue(n)
-    assert NEEDS_TRIAGE not in snap["labels"]  # 重复也是已分诊结局，去 needs-triage
-    assert snap["state"] == "closed"

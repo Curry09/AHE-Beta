@@ -1,0 +1,73 @@
+type: tool
+name: submit_triage
+description: >-
+  Submit your triage result and finish. This is the ONLY way to finish — call it
+  exactly once, after you have investigated every needs-triage issue.
+
+  Pass `dispositions`: one item per needs-triage issue. Each item needs `issue`
+  (the number) and `disposition` (one of accept / duplicate / reject /
+  needs_info):
+  - accept: also give `kind` (bug/feature/chore/document), `priority` (P0-P3) and
+    `fields` (the kind's TRIAGE fields, Chinese labels).
+  - duplicate: also give `of` (the master issue number).
+  - reject / needs_info: also give `reason`.
+
+  The parameters are schema-validated at call time; invalid values (unknown
+  field, non-P0-P3 priority, self-invented keys) are rejected and you must retry.
+# Spec-0027/T2：input_schema 是 agent_contract.dispositions_input_schema() 的生成副本（受 drift-guard
+# 测试守护：test_triage.py::test_submit_triage_yaml_matches_contract 断言二者深度相等）。改字段改
+# SCHEMAS 后需重新生成此块，否则测试会红。契约的机器校验仍以 issue_schema.SCHEMAS 为单一真源。
+input_schema:
+  type: object
+  properties:
+    dispositions:
+      type: array
+      items:
+        type: object
+        properties:
+          issue:
+            type: integer
+          disposition:
+            type: string
+            enum:
+              - accept
+              - duplicate
+              - reject
+              - needs_info
+          kind:
+            type: string
+            enum:
+              - bug
+              - feature
+              - chore
+              - document
+          priority:
+            type: string
+            enum:
+              - P0
+              - P1
+              - P2
+              - P3
+          fields:
+            type: object
+            properties:
+              根因区域:
+                type: string
+              边界:
+                type: string
+              验收:
+                type: string
+              交付物:
+                type: string
+            additionalProperties: false
+          of:
+            type: integer
+          reason:
+            type: string
+        required:
+          - issue
+          - disposition
+        additionalProperties: false
+  required:
+    - dispositions
+  additionalProperties: false

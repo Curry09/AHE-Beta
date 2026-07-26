@@ -22,7 +22,7 @@ tasks:
     acceptance: issue_schema 无 USER 段死代码；agent_contract 能由 SCHEMAS 生成 triage/RFC 的 input_schema 且与 SCHEMAS 同源（改字段只改 SCHEMAS）；共享降级 helper 有单测；test_issue_schema/test_agent_contract 绿。
   - id: T2
     title: triage 改 submit-tool 原生结构化（去第二次 LLM 重排与别名归一）
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
