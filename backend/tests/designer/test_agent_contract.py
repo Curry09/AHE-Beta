@@ -14,13 +14,13 @@ def test_dispositions_schema_shape_and_enums() -> None:
     assert schema["additionalProperties"] is False
     item = schema["properties"]["dispositions"]["items"]
     props = item["properties"]
-    # disposition 只四值、kind∈USER_KINDS、priority∈P0-P3
-    assert props["disposition"]["enum"] == ["accept", "duplicate", "reject", "needs_info"]
+    # disposition 三值（Spec-0029：duplicate 退役、判重归 Owner）、kind∈USER_KINDS、priority∈P0-P3
+    assert props["disposition"]["enum"] == ["accept", "reject", "needs_info"]
     assert props["kind"]["enum"] == list(sc.USER_KINDS)
     assert props["priority"]["enum"] == list(sc.PRIORITIES)
     # 顶层只允许契约字段——杜绝 issue_number/status/平铺散字段
     assert item["additionalProperties"] is False
-    assert set(props) == {"issue", "disposition", "kind", "priority", "fields", "of", "reason"}
+    assert set(props) == {"issue", "disposition", "kind", "priority", "fields", "reason"}
     assert item["required"] == ["issue", "disposition"]
 
 

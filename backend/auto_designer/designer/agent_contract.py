@@ -39,10 +39,11 @@ def _triage_field_labels() -> list[str]:
 def dispositions_input_schema() -> dict:
     """triage submit_triage 工具的 input_schema。
 
-    每条 disposition：`issue`(int) + `disposition`(四值枚举) 必填；accept 另给 `kind`(∈USER_KINDS)、
-    `priority`(∈P0-P3)、`fields`(键∈规范化字段并集)；duplicate 给 `of`；reject/needs_info 给 `reason`。
-    additionalProperties=false 杜绝 issue_number/status/平铺 root_cause 这类自创字段；enum 让 "high"
-    这类非法优先级吐不出来。per-kind 条件必填仍由 driver 的 validate 二次把关（json_schema 不表达）。
+    每条 disposition：`issue`(int) + `disposition`(三值枚举，Spec-0029：duplicate 退役、判重归 Owner)
+    必填；accept 另给 `kind`(∈USER_KINDS)、`priority`(∈P0-P3 建议值)、`fields`(键∈规范化字段并集)；
+    reject/needs_info 给 `reason`。additionalProperties=false 杜绝 issue_number/status/平铺 root_cause
+    这类自创字段；enum 让 "high" 这类非法优先级吐不出来。per-kind 条件必填仍由 driver 的 validate
+    二次把关（json_schema 不表达）。
     """
     item = {
         "type": "object",
@@ -50,12 +51,11 @@ def dispositions_input_schema() -> dict:
             "issue": {"type": "integer"},
             "disposition": {
                 "type": "string",
-                "enum": ["accept", "duplicate", "reject", "needs_info"],
+                "enum": ["accept", "reject", "needs_info"],
             },
             "kind": {"type": "string", "enum": list(USER_KINDS)},
             "priority": {"type": "string", "enum": list(PRIORITIES)},
             "fields": _fields_object_schema(_triage_field_labels()),
-            "of": {"type": "integer"},
             "reason": {"type": "string"},
         },
         "required": ["issue", "disposition"],
