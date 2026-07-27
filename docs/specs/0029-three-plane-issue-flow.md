@@ -3,7 +3,7 @@ number: "0029"
 title: 三平面 issue 流：证据→提案→工作队列，唯一准入 Owner（白名单可领、生成器自由并行、去 gate 特殊通道）
 issue: 0
 slug: three-plane-issue-flow
-summary: 现行 issue 流的三大病根：①「谁有权把活放进 dev 队列」有三个写手（triage accept、synthesize 直建 RFC 且能 supersede 别人、gate promote），入场规则不统一——synthesize 产出免审进队、divergent 产出要过 gate，纯历史演化无原则可言；② 标签把「工作项资格 / 流程状态 / 属性」压成一个平面，dev 可领判定是一张随新状态不断增长的黑名单（每加 divergent、gate-dropped 都得记得改 dev 排除集）；③ 去重被塞在想并行的生成侧（triage 边规范化边判重），与并行天然打架——此前 triage 分片讨论卡壳的根因。本 spec 重构为三平面单一准入模型：平面1 证据（用户报告/体感/runtime，输入）→ 平面2 提案（proposal，一律不可领；triage/synthesize/divergent 都只是生成器，产出为非约束性提案，故可自由并行、重复无害）→ 唯一准入 Owner（每轮一次批量评审：admit→ready / merge 去重合并 / decline / hold；机械模式对字段齐全的单条修复案零 LLM 自动准入）→ 平面3 工作队列（ready 唯一可领白名单，dev 按 priority→age 拉取，done 级联关闭 covers 链）。配套：公共 agent 运行时抽出（消 triage/divergent 对 designer 私有符号的依赖）、gate/divergent 特殊通道与 superseded/gate-dropped 中间态退役、proposal/ready 队列深度背压告警（= CLAUDE.md 退化信号落地）。不动纯 trunk/直推 main/benchmark held-out/submit-tool 契约（0027 复用，Owner 仅新增 submit_admission）。
+summary: 现行 issue 流的三大病根：①「谁有权把活放进 dev 队列」有三个写手（triage accept、synthesize 直建 RFC 且能 supersede 别人、gate promote），入场规则不统一——synthesize 产出免审进队、divergent 产出要过 gate，纯历史演化无原则可言；② 标签把「工作项资格 / 流程状态 / 属性」压成一个平面，dev 可领判定是一张随新状态不断增长的黑名单（每加 divergent、gate-dropped 都得记得改 dev 排除集）；③ 去重被塞在想并行的生成侧（triage 边规范化边判重），与并行天然打架——此前 triage 分片讨论卡壳的根因。本 spec 重构为三平面单一准入模型：平面1 证据（用户报告/体感/runtime，输入）→ 平面2 提案（proposal，一律不可领；triage/synthesize/divergent 都只是生成器，产出为非约束性提案，故可自由并行、重复无害；且按证据源双轨分工——synthesize 吃规范化 backlog 找结构根因（delivery 轨），divergent 直吃原始会话行为挖未被提为 issue 的能力缺口（discovery 轨），去重靠构造而非 prompt 嘱咐）→ 唯一准入 Owner（每轮一次批量评审：admit→ready / merge 去重合并 / decline / hold；机械模式对字段齐全的单条修复案零 LLM 自动准入）→ 平面3 工作队列（ready 唯一可领白名单，dev 按 priority→age 拉取，done 级联关闭 covers 链）。配套：公共 agent 运行时抽出（消 triage/divergent 对 designer 私有符号的依赖）、gate/divergent 特殊通道与 superseded/gate-dropped 中间态退役、proposal/ready 队列深度背压告警（= CLAUDE.md 退化信号落地）。不动纯 trunk/直推 main/benchmark held-out/submit-tool 契约（0027 复用，Owner 仅新增 submit_admission）。
 tasks:
   - id: T1
     title: issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射
@@ -84,8 +84,8 @@ tasks:
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml
       - backend/tests/designer/test_divergent_gate.py
-    scope: 产出改落 PROPOSAL+FROM_DIVERGENT（DIVERGENT 老标签退役为读侧映射）；每轮硬顶 3 条保留。driver 切换 agent_runtime import，删对 Designer 内部（_proposals_from_submit/_DESIGN_TIMEOUT）的依赖（read_submit 通用化后直接用）。test_divergent_gate.py 拆分：divergent 生成部分留此改写，gate 三路测试删除（Owner 侧 T6 重建同等覆盖）。
-    acceptance: 候选为 proposal 平面 from-divergent、dev 不可领；对 designer.py 零 import；divergent 测试绿。
+    scope: 输入重定义为「会话第一手证据」（评审修订，双轨分化）——体感曲线（分+理由+session 句柄）作索引 + get_session_timeline/beat/step 按需下钻原始会话行为；开放 proposal/ready 紧凑索引仅作「勿重复」参照；**不再喂 triaged backlog 与 runtime_agg**（那是 synthesize 的收敛信号）。职责=从用户对话行为里挖「没被提为 issue、却反复自拟的规程/能力缺口」，systemprompt 对齐（其原文本就要求关注此类信号，输入终于喂对）。产出改落 PROPOSAL+FROM_DIVERGENT（DIVERGENT 老标签退役为读侧映射）；每轮硬顶 3 条保留。driver 切换 agent_runtime import，删对 Designer 内部（_proposals_from_submit/_DESIGN_TIMEOUT）的依赖。test_divergent_gate.py 拆分：divergent 生成部分留此改写，gate 三路测试删除（Owner 侧 T6 重建同等覆盖）。
+    acceptance: 输入不含 triaged backlog/runtime_agg、含体感索引与会话下钻；候选为 proposal 平面 from-divergent、dev 不可领；对 designer.py 零 import；divergent 测试绿。
   - id: T6
     title: Owner 唯一准入：机械+评审双模式批量裁决（admit/merge/decline/hold）
     status: pending
@@ -137,8 +137,8 @@ tasks:
       - backend/run.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_roster.py
-    scope: run_round 重排为 a → 生成段**两拍**——第一拍 triage 分片×N_TRIAGERS（pending 轮询切片、线程池并行；判重已移 Owner 故分片自由）、第二拍 synthesize ∥ divergent（线程池并行；跑在 triage 全部收尾之后，输入因此含**本轮**新升的 from-triage 提案，结构综合不滞后一轮）→ Owner.admit_once（恒 1）→ b dev → c；gate 段删除。roster 加 owner（默认 1；0=纯机械准入、不跑 LLM 评审段），退役 gate 语义。run.py 接线 Owner、背压告警：proposal 深度与 ready 深度超过阈值（env PROPOSAL_DEPTH_ALARM/READY_DEPTH_ALARM，缺省各 20）→ 状态回调+stdout 告警（不自动扩容，人工介入信号 = CLAUDE.md「issue 长期不降=退化」的落地）。单 agent 崩溃记日志跳过照旧。
-    acceptance: 段顺序断言（triage 全部完成 → synthesize/divergent → owner → dev）；triage 分片各自处理不重叠子集；synthesize 输入含本轮新升提案；owner=0 时评审段跳过、机械准入仍走；背压超阈值触发告警回调；test_orchestrator/test_roster 重写且绿（git 依赖用例走 CI）。
+    scope: run_round 重排为 a → 生成段**两拍**——第一拍 triage 分片×N_TRIAGERS ∥ divergent（线程池并行：triage 吃 report、divergent 吃会话证据，二者都只依赖 a 段产物、互不依赖；判重已移 Owner 故分片自由）、第二拍 synthesize（跑在 triage 全部收尾之后，输入含**本轮**新升的 from-triage 提案，结构综合不滞后一轮）→ Owner.admit_once（恒 1）→ b dev → c；gate 段删除。roster 加 owner（默认 1；0=纯机械准入、不跑 LLM 评审段），退役 gate 语义。run.py 接线 Owner、背压告警：proposal 深度与 ready 深度超过阈值（env PROPOSAL_DEPTH_ALARM/READY_DEPTH_ALARM，缺省各 20）→ 状态回调+stdout 告警（不自动扩容，人工介入信号 = CLAUDE.md「issue 长期不降=退化」的落地）。单 agent 崩溃记日志跳过照旧。
+    acceptance: 段顺序断言（triage∥divergent 全部完成 → synthesize → owner → dev）；triage 分片各自处理不重叠子集；synthesize 输入含本轮新升提案；owner=0 时评审段跳过、机械准入仍走；背压超阈值触发告警回调；test_orchestrator/test_roster 重写且绿（git 依赖用例走 CI）。
   - id: T9
     title: 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数
     status: pending
@@ -221,8 +221,8 @@ done（级联关闭该票 covers 的提案/报告）
 |---|---|---|---|
 | user sim | 用 harness，产证据 | N | 已并行 |
 | triager | 逐条调查报告→修复提案；**不判重** | N | **自由分片**（产出非约束，重复无害） |
-| synthesize | 跨条结构根因→结构提案 | 0..1 | 与其它生成器并行 |
-| divergent | 产品能力缺口→能力提案 | 0..N | 同上 |
+| synthesize | 在**规范化 backlog** 上跨条找结构根因→结构提案（delivery 轨） | 0..1 | 第二拍（等 triage 收尾） |
+| divergent | 在**原始会话行为**里挖没被提为 issue 的能力缺口→能力提案（discovery 轨） | 0..N | 第一拍（与 triage 并行，只吃 a 段证据） |
 | **Owner** | **唯一准入**：去重合并、冲突裁决、定优先级、admit/decline/hold | **恒 1** | 单点（全局视野；紧凑索引+背压保上下文有界） |
 | dev | 从 ready 拉活直推 main | N | 已并行 |
 
@@ -237,7 +237,7 @@ done（级联关闭该票 covers 的提案/报告）
 **生成器（T3/T4/T5）**：
 - triage：disposition 收敛三值（accept/reject/needs_info），**duplicate 退役**——不再喂判重参照，输入变小、单条视野更纯。accept 就地升 proposal（非 ready）。
 - synthesize：产 proposal(from-synthesize)+covers 行；**不再打 superseded**（supersede 是准入裁决，归 Owner）。
-- divergent：产 proposal(from-divergent)；专属 gate 通道消失。
+- divergent：**证据源换轨**——不再吃 triaged backlog/runtime_agg（那是 synthesize 的收敛信号），改吃体感索引+按需下钻的原始会话行为，找「用户没提为 issue、却反复自拟的工作方式」；产 proposal(from-divergent)；专属 gate 通道消失。两生成器从「同料不同语气」变为「双轨不同料」，重叠靠构造消除、偶发撞车由 Owner 合并兜底。
 - 三者 submit 契约照旧走 agent_contract 生成 + drift-guard（0027 机制复用）。
 
 **Owner（T6）**：`admit_once()` 两级裁决——①机械段（零 LLM）：from-triage 单条案、字段齐全、无标题近似冲突 → 自动 admit（保守：拿不准就进评审段）；②评审段（一次 LLM 批量）：结构/产品提案、冲突组。契约 `submit_admission`：`[{issue, decision: admit|merge|decline|hold, into?, priority?, reason?}]`，未列出默认 hold。admit 结构提案时对其 covers 的 proposal 统一 merge（覆盖裁决唯一落点）。
@@ -268,10 +268,12 @@ done（级联关闭该票 covers 的提案/报告）
 - **备选：保留 gate 只修不对称**（让 RFC 也过 gate）——治了不对称但去重仍在 triage、黑名单仍在、耦合仍在；不如收敛成一个 Owner。
 - **备选：Owner 全 LLM（无机械段）**——每轮平凡单条案也烧评审，浪费且慢；机械段是对「多数提案本来就该过」的承认。
 - **生成段两拍 vs 全并行**（评审修订）：全并行下 synthesize 看不到本轮 triage 新升的提案，结构综合要么滞后一轮（dev 先逐条修症状再被结构案覆盖，白烧 dev 预算）、要么倒退回吃 raw 报告；等 triage 收尾只多一拍墙钟，取两拍。「triage 提案被结构案覆盖」不是浪费——逐条的根因区域/优先级/证据正是聚类与合并裁决的依据（K8s 里 issue 也是先 triage 再被 umbrella/KEP 吸收）；且覆盖在 0029 里从 synthesize 单方面盖 superseded 变为 covers 建议 + Owner 裁决（可部分保留急修）。
+- **divergent 换证据源 vs 同料不同语气**（评审修订）：原设计里 synthesize/divergent 吃同一份信号、靠 prompt 姿态区分——结构上就是重复，且 divergent 要找的「用户没提为 issue、却用对话行为反复补出来的工作方式」**大多不在 issue backlog 里**（用户忍了/绕了，只在轨迹与体感理由留痕），其 systemprompt 的意图与输入设计互相拧着。改为按证据源分轨：synthesize 吃规范化 backlog（显式抱怨→结构收敛），divergent 吃原始会话行为（隐式 coping→能力发现）。去重从靠 prompt 嘱咐变为靠构造；divergent 不再依赖 triage、提前到第一拍并行。偶发撞车（同一 coping 也被提成 issue）由 Owner 合并兜底。
 
 ## Prior art
 
 - Kanban / Scrum：backlog grooming 与 Definition of Ready——提案自由、准入唯一，本 spec 的直接原型。
+- 双轨敏捷（dual-track agile / continuous discovery）：delivery 轨吃 backlog（工程收敛），discovery 轨做用户研究（看会话/访谈找机会）——synthesize/divergent 按证据源分轨的原型；PM 做产品发现靠观察用户怎么用，不靠刷 bug tracker。
 - K8s issue triage：needs-triage → SIG 分拣 → `triage/accepted`，milestone 准入另有把关——分拣（规范化）与准入（决定做什么）是两道门。
 - 竞争消费者/分区讨论（本组前序讨论）：并行与去重的冲突在生成侧无解，在准入侧自然消解——生成产非约束提案即可 at-least-once，幂等收敛由准入完成。
 - 0025 立 triage 漏斗、0027 立 submit-tool 契约、0028 引入 divergent/gate——本 spec 是三者的收敛与纠偏：保留 triage 的调查价值、0027 的契约机制、divergent 的探索职能，重排它们的权力边界。
