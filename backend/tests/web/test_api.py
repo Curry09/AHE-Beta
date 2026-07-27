@@ -511,9 +511,13 @@ def test_issues_plane_and_provenance_fields(tmp_path: Path) -> None:
         IssueDraft(title="提案", body="x", labels=["bug", sc.PROPOSAL, sc.FROM_TRIAGE, "P1"])
     ).number
     s = tracker.create_issue(
-        IssueDraft(title="结构案", body=f"x\n\ncovers: #{p}", labels=[sc.PROPOSAL, sc.FROM_SYNTHESIZE])
+        IssueDraft(
+            title="结构案", body=f"x\n\ncovers: #{p}", labels=[sc.PROPOSAL, sc.FROM_SYNTHESIZE]
+        )
     ).number
-    w = tracker.create_issue(IssueDraft(title="旧triaged", body="x", labels=["bug", sc.TRIAGED])).number
+    w = tracker.create_issue(
+        IssueDraft(title="旧triaged", body="x", labels=["bug", sc.TRIAGED])
+    ).number
 
     client = _client(tmp_path, tracker=tracker)
     issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}

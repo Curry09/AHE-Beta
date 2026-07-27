@@ -123,9 +123,7 @@ class Designer:
         parsed = self._proposals_from_submit(result_text)
 
         # covers 只是建议：过滤到当前 open 的 report/proposal 票号（合并裁决在 Owner 准入时）。
-        coverable = {
-            i.number for i in backlog if plane(i.labels) in (REPORT, PROPOSAL)
-        }
+        coverable = {i.number for i in backlog if plane(i.labels) in (REPORT, PROPOSAL)}
         numbers: list[int] = []
         if parsed:
             self._tracker.ensure_labels([PROPOSAL, FROM_SYNTHESIZE])

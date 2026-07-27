@@ -143,7 +143,9 @@ class AgenticDeveloper:
         if not eligible:
             self._emit(running=False, status="无可领 ready issue")
             return DevOutcome()
-        issue = eligible[0]  # priority→票号 取最该做的一条；多 dev 靠 attempted 防撞、其余积压到下轮
+        issue = eligible[
+            0
+        ]  # priority→票号 取最该做的一条；多 dev 靠 attempted 防撞、其余积压到下轮
         budget = self._budgets.get(_issue_kind(list(issue.labels)), self._budgets["bug"])
         next_tag = f"v{self._next_version()}"
         self._emit(

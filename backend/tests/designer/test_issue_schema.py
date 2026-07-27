@@ -31,7 +31,9 @@ def test_validate_unknown_kind() -> None:
 
 
 def test_validate_missing_required() -> None:
-    errs = sc.validate(kind="bug", fields={"root_cause": "entry.py 无预算感知"})  # 缺 boundary/acceptance
+    errs = sc.validate(
+        kind="bug", fields={"root_cause": "entry.py 无预算感知"}
+    )  # 缺 boundary/acceptance
     joined = " ".join(errs)
     assert "boundary" in joined and "acceptance" in joined
 

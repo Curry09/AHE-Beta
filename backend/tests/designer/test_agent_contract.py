@@ -27,16 +27,21 @@ def test_dispositions_schema_shape_and_enums() -> None:
 def test_dispositions_fields_keys_are_union_from_schemas() -> None:
     """fields 的合法键 = 全部 user kind 规范化字段 label 的并集（与 SCHEMAS 同源）。"""
     schema = ac.dispositions_input_schema()
-    field_keys = set(schema["properties"]["dispositions"]["items"]["properties"]["fields"]["properties"])
+    field_keys = set(
+        schema["properties"]["dispositions"]["items"]["properties"]["fields"]["properties"]
+    )
     expected: set[str] = set()
     for k in sc.USER_KINDS:
         expected |= {f.label for f in sc.fields_of(kind=k)}
     assert field_keys == expected
     assert "根因区域" in field_keys and "交付物" in field_keys  # bug/feature 的 triage 字段
     # fields 不允许多余键
-    assert schema["properties"]["dispositions"]["items"]["properties"]["fields"][
-        "additionalProperties"
-    ] is False
+    assert (
+        schema["properties"]["dispositions"]["items"]["properties"]["fields"][
+            "additionalProperties"
+        ]
+        is False
+    )
 
 
 def test_rfc_schema_shape_and_fields() -> None:

@@ -201,12 +201,16 @@ class Triager:
         if disp == "accept":
             kind = str(d.get("kind", "")).strip().lower()
             if kind not in USER_KINDS:  # 非法 kind → 当信息不足处理（下一轮重来）
-                self._decline(issue, "信息不足", f"triage 给了非法 kind {kind!r}", outcome.needs_info)
+                self._decline(
+                    issue, "信息不足", f"triage 给了非法 kind {kind!r}", outcome.needs_info
+                )
                 return
             fields = _fields_by_label_to_key(kind, d.get("fields") or {})
             errs = schema_validate(kind=kind, fields=fields, section="triage")
             if errs:  # 规范化字段没填全 → 降级 needs_info（保证升上去的提案定位完整）
-                self._decline(issue, "信息不足", f"triage 定位不全：{'；'.join(errs)}", outcome.needs_info)
+                self._decline(
+                    issue, "信息不足", f"triage 定位不全：{'；'.join(errs)}", outcome.needs_info
+                )
                 return
             priority = str(d.get("priority", "")).strip().upper()  # 建议值；Owner 准入时可改
             self._tracker.set_labels(num, _proposal_labels(list(issue.labels), kind, priority))

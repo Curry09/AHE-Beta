@@ -48,7 +48,11 @@ def _submit(dispositions: list) -> str:
 
 
 def _accept(n: int, *, kind: str = "bug", priority: str = "P1", fields: dict | None = None) -> dict:
-    default_fields = {"根因区域": "entry.py 无预算感知", "边界": "只改通用能力", "验收": "预算内交付"}
+    default_fields = {
+        "根因区域": "entry.py 无预算感知",
+        "边界": "只改通用能力",
+        "验收": "预算内交付",
+    }
     return {
         "issue": n,
         "disposition": "accept",

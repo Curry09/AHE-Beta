@@ -31,7 +31,9 @@ REPORT = "report"  # 平面1 证据：用户 sim 的原始报告（自由文本�
 PROPOSAL = "proposal"  # 平面2 提案：一律不可领；由生成器（triage/synthesize/divergent）产出
 READY = "ready"  # 平面3 工作队列：唯一可领白名单，Owner 准入后才有
 # 终态标签（关闭时替换平面标签落上；写侧保证平面标签与终态标签不并存）
-DECLINED = "declined"  # 被驳回关闭（triage reject/needs_info、Owner decline；原因记 comment/close reason）
+DECLINED = (
+    "declined"  # 被驳回关闭（triage reject/needs_info、Owner decline；原因记 comment/close reason）
+)
 MERGED = "merged"  # 被合并关闭（Owner merge；merged-into 机器行链主票）
 # provenance 标签（属性，不参与资格判定）：这条提案是谁产的
 FROM_TRIAGE = "from-triage"

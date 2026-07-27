@@ -55,7 +55,9 @@ def _owner(tmp_path: Path, tracker: FakeTracker, canned: str, **kw) -> _StubOwne
 
 def _triage_proposal(tracker: FakeTracker, title: str, *, prio: str = "P2") -> int:
     return tracker.create_issue(
-        IssueDraft(title=title, body="用户报告原文", labels=["bug", sc.PROPOSAL, sc.FROM_TRIAGE, prio])
+        IssueDraft(
+            title=title, body="用户报告原文", labels=["bug", sc.PROPOSAL, sc.FROM_TRIAGE, prio]
+        )
     ).number
 
 
@@ -178,7 +180,11 @@ def test_covers_untouched_when_structural_held(tmp_path: Path) -> None:
     tracker = FakeTracker()
     p1 = _triage_proposal(tracker, "症状甲：交接断裂")
     s = _synth_proposal(tracker, "结构：交接重构", covers=[p1])
-    o = _owner(tmp_path, tracker, _submit([{"issue": s, "decision": "hold"}, {"issue": p1, "decision": "hold"}]))
+    o = _owner(
+        tmp_path,
+        tracker,
+        _submit([{"issue": s, "decision": "hold"}, {"issue": p1, "decision": "hold"}]),
+    )
     out = o.admit_once()
     assert s in out.held and p1 in out.held and out.merged == []
     assert sc.PROPOSAL in tracker.issue(p1)["labels"]  # covers 未触发级联

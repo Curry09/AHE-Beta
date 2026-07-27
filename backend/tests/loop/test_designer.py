@@ -139,7 +139,9 @@ def test_inputs_are_ready_plus_proposal_index(tmp_path) -> None:
     """输入 = ready 工作队列 + 待准入提案索引（report/终态不喂）。"""
     tracker = FakeTracker()
     p = _proposal(tracker, "本轮新升提案")
-    r = tracker.create_issue(IssueDraft(title="ready 项", body="x", labels=["bug", sc.READY])).number
+    r = tracker.create_issue(
+        IssueDraft(title="ready 项", body="x", labels=["bug", sc.READY])
+    ).number
     tracker.create_issue(IssueDraft(title="raw report", body="x", labels=[sc.REPORT]))
     designer = _designer(tmp_path, tracker, _submit([]))
     designer.propose_once()
