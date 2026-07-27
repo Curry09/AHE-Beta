@@ -7,7 +7,7 @@ summary: 现行 issue 流的三大病根：①「谁有权把活放进 dev 队�
 tasks:
   - id: T1
     title: issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -20,7 +20,7 @@ tasks:
     acceptance: plane/is_ready 对新旧标签组合返回正确值；covers/merged-into 解析单测；老标签映射覆盖；既有 validate/render 测试不回归。
   - id: T2
     title: agent_runtime 公共运行时抽出：跑 agent + 读 submit 一处实现
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -33,7 +33,7 @@ tasks:
     acceptance: read_submit 对正常/再编码一层/散文/未调 submit 四路正确；run_with_timeout 跨线程传 contextvars 单测（复用现有断言式样）；norm_label 空白容忍。
   - id: T3
     title: triage 改纯规范化生成器：accept→就地升 proposal，判重职责移出
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -51,7 +51,7 @@ tasks:
     acceptance: accept 后 issue 为 proposal 平面（非 ready、dev 不可领）；三值路径正确；无 duplicate 路径残留；不再喂判重参照；test_triage 重写为三值+proposal 断言且绿。
   - id: T4
     title: synthesize 收窄为纯生成器：产 proposal(from-synthesize)，gate_once 退役
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -70,7 +70,7 @@ tasks:
     acceptance: 产出为 proposal 平面、带 from-synthesize 与 covers 行、不打 superseded；gate 符号零残留；test_designer 按新落库断言重写且绿。
   - id: T5
     title: divergent 对齐纯生成器：产 proposal(from-divergent)，专属通道退役
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
@@ -88,7 +88,7 @@ tasks:
     acceptance: 输入不含 triaged backlog/runtime_agg、含体感索引与会话下钻；候选为 proposal 平面 from-divergent、dev 不可领；对 designer.py 零 import；divergent 测试绿。
   - id: T6
     title: Owner 唯一准入：机械+评审双模式批量裁决（admit/merge/decline/hold）
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -106,7 +106,7 @@ tasks:
     acceptance: 机械段对合格单条案零 LLM 准入；评审段四路（admit/merge/decline/hold）落库正确、未列出默认 hold；merge 链主票、covers 统一收敛；drift-guard（yaml==admission_input_schema）；无候选跳过 LLM；test_owner 覆盖以上。
   - id: T7
     title: dev 白名单领取：ready-only + priority→age 排序 + 级联关闭
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -120,7 +120,7 @@ tasks:
     acceptance: 只领 ready；P0 插队生效、同级 FIFO；预算分档按新判定；_close_covered 零残留；test 重写且绿。
   - id: T8
     title: 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -141,7 +141,7 @@ tasks:
     acceptance: 段顺序断言（triage∥divergent 全部完成 → synthesize → owner → dev）；triage 分片各自处理不重叠子集；synthesize 输入含本轮新升提案；owner=0 时评审段跳过、机械准入仍走；背压超阈值触发告警回调；test_orchestrator/test_roster 重写且绿（git 依赖用例走 CI）。
   - id: T9
     title: 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
@@ -158,7 +158,7 @@ tasks:
     acceptance: plane/provenance/merged_into 字段正确（新旧标签都对）；曲线只数 ready；漏斗计数与阈值状态可读；test_api/test_metrics 覆盖。
   - id: T10
     title: 前端适配：三平面分组 + Owner 房间 + 漏斗与背压展示
-    status: pending
+    status: done
     priority: P3
     tags: []
     depends-on:
