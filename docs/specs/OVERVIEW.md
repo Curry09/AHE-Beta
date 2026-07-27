@@ -88,6 +88,9 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 ### 0028 divergent PM + gate：产品候选并行通道与晋升评审
 在 0025 triage 漏斗旁并行一条产品候选通道：divergent PM 与 synthesize 同信号并行落 divergent 不可领候选；Designer.gate_once 做语义晋升（promote→feature+triaged / hold / drop）。默认 N_DIVERGENTS=0 关闭；dev 领取硬排除 divergent。
 
+### 0029 三平面 issue 流：证据→提案→工作队列，唯一准入 Owner（白名单可领、生成器自由并行、去 gate 特殊通道）
+现行 issue 流的三大病根：①「谁有权把活放进 dev 队列」有三个写手（triage accept、synthesize 直建 RFC 且能 supersede 别人、gate promote），入场规则不统一——synthesize 产出免审进队、divergent 产出要过 gate，纯历史演化无原则可言；② 标签把「工作项资格 / 流程状态 / 属性」压成一个平面，dev 可领判定是一张随新状态不断增长的黑名单（每加 divergent、gate-dropped 都得记得改 dev 排除集）；③ 去重被塞在想并行的生成侧（triage 边规范化边判重），与并行天然打架——此前 triage 分片讨论卡壳的根因。本 spec 重构为三平面单一准入模型：平面1 证据（用户报告/体感/runtime，输入）→ 平面2 提案（proposal，一律不可领；triage/synthesize/divergent 都只是生成器，产出为非约束性提案，故可自由并行、重复无害）→ 唯一准入 Owner（每轮一次批量评审：admit→ready / merge 去重合并 / decline / hold；机械模式对字段齐全的单条修复案零 LLM 自动准入）→ 平面3 工作队列（ready 唯一可领白名单，dev 按 priority→age 拉取，done 级联关闭 covers 链）。配套：公共 agent 运行时抽出（消 triage/divergent 对 designer 私有符号的依赖）、gate/divergent 特殊通道与 superseded/gate-dropped 中间态退役、proposal/ready 队列深度背压告警（= CLAUDE.md 退化信号落地）。不动纯 trunk/直推 main/benchmark held-out/submit-tool 契约（0027 复用，Owner 仅新增 submit_admission）。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -197,6 +200,16 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0028 | 0028/T3 | Designer.gate_once：promote/hold/drop 语义晋升 | done | T1 | backend/auto_designer/designer/designer.py |
 | 0028 | 0028/T4 | 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关 | done | T2, T3 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/live.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_roster.py |
 | 0028 | 0028/T5 | dev 领取硬排除 divergent 候选 | done | T1 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
+| 0029 | 0029/T1 | issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射 | pending | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
+| 0029 | 0029/T2 | agent_runtime 公共运行时抽出：跑 agent + 读 submit 一处实现 | pending | — | backend/auto_designer/designer/agent_runtime.py<br>backend/tests/designer/test_agent_runtime.py |
+| 0029 | 0029/T3 | triage 改纯规范化生成器：accept→就地升 proposal，判重职责移出 | pending | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/tests/designer/test_triage.py |
+| 0029 | 0029/T4 | synthesize 收窄为纯生成器：产 proposal(from-synthesize)，gate_once 退役 | pending | T1, T2 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/designer/tools/submit_gate.tool.yaml<br>backend/tests/loop/test_designer.py |
+| 0029 | 0029/T5 | divergent 对齐纯生成器：产 proposal(from-divergent)，专属通道退役 | pending | T1, T2 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/tests/designer/test_divergent_gate.py |
+| 0029 | 0029/T6 | Owner 唯一准入：机械+评审双模式批量裁决（admit/merge/decline/hold） | pending | T1, T2 | backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/designer/submit_tools.py<br>backend/agent_defs/owner/<br>backend/tests/designer/test_owner.py |
+| 0029 | 0029/T7 | dev 白名单领取：ready-only + priority→age 排序 + 级联关闭 | pending | T1 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
+| 0029 | 0029/T8 | 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警 | pending | T3, T4, T5, T6, T7 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
+| 0029 | 0029/T9 | 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数 | pending | T6, T7 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
+| 0029 | 0029/T10 | 前端适配：三平面分组 + Owner 房间 + 漏斗与背压展示 | pending | T9 | frontend/src/types.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/App.tsx<br>frontend/src/api.ts |
 
 ## 跨 feature 关系图
 
@@ -363,6 +376,18 @@ graph LR
         n0028_T4["T4 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关"]
         n0028_T5["T5 dev 领取硬排除 divergent 候选"]
     end
+    subgraph G0029[0029 three-plane-issue-flow]
+        n0029_T1["T1 issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射"]
+        n0029_T2["T2 agent_runtime 公共运行时抽出：跑 agent + 读 submit 一处实现"]
+        n0029_T3["T3 triage 改纯规范化生成器：accept→就地升 proposal，判重职责移出"]
+        n0029_T4["T4 synthesize 收窄为纯生成器：产 proposal(from-synthesize)，gate_once 退役"]
+        n0029_T5["T5 divergent 对齐纯生成器：产 proposal(from-divergent)，专属通道退役"]
+        n0029_T6["T6 Owner 唯一准入：机械+评审双模式批量裁决（admit/merge/decline/hold）"]
+        n0029_T7["T7 dev 白名单领取：ready-only + priority→age 排序 + 级联关闭"]
+        n0029_T8["T8 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警"]
+        n0029_T9["T9 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数"]
+        n0029_T10["T10 前端适配：三平面分组 + Owner 房间 + 漏斗与背压展示"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -451,6 +476,23 @@ graph LR
     n0028_T4 --> n0028_T2
     n0028_T4 --> n0028_T3
     n0028_T5 --> n0028_T1
+    n0029_T3 --> n0029_T1
+    n0029_T3 --> n0029_T2
+    n0029_T4 --> n0029_T1
+    n0029_T4 --> n0029_T2
+    n0029_T5 --> n0029_T1
+    n0029_T5 --> n0029_T2
+    n0029_T6 --> n0029_T1
+    n0029_T6 --> n0029_T2
+    n0029_T7 --> n0029_T1
+    n0029_T8 --> n0029_T3
+    n0029_T8 --> n0029_T4
+    n0029_T8 --> n0029_T5
+    n0029_T8 --> n0029_T6
+    n0029_T8 --> n0029_T7
+    n0029_T9 --> n0029_T6
+    n0029_T9 --> n0029_T7
+    n0029_T10 --> n0029_T9
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -501,20 +543,26 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
-| backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027 |
-| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027 |
+| backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029 |
+| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029 |
+| backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028 |
-| backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028 |
-| backend/auto_designer/designer/triage.py | 0025, 0027 |
-| backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028 |
+| backend/agent_defs/triage_agent/agent.yaml | 0027, 0029 |
+| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029 |
+| backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029 |
+| backend/auto_designer/designer/agent_contract.py | 0027, 0029 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029 |
+| backend/auto_designer/designer/divergent.py | 0028, 0029 |
+| backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029 |
+| backend/auto_designer/designer/triage.py | 0025, 0027, 0029 |
+| backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028 |
-| backend/auto_designer/loop/metrics.py | 0003, 0025 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028 |
-| backend/auto_designer/loop/roster.py | 0020, 0025, 0028 |
+| backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029 |
+| backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024 |
@@ -530,21 +578,22 @@ graph LR
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
-| backend/auto_designer/web/api.py | 0020, 0025 |
+| backend/auto_designer/web/api.py | 0020, 0025, 0029 |
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/entry.py | 0003, 0013, 0022 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
-| backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028 |
-| backend/tests/designer/test_triage.py | 0025, 0027 |
-| backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028 |
+| backend/tests/designer/test_divergent_gate.py | 0028, 0029 |
+| backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029 |
+| backend/tests/designer/test_triage.py | 0025, 0027, 0029 |
+| backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029 |
 | backend/tests/loop/test_live.py | 0017, 0026 |
-| backend/tests/loop/test_metrics.py | 0003, 0025 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025 |
-| backend/tests/loop/test_roster.py | 0020, 0025, 0028 |
+| backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029 |
+| backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
@@ -559,11 +608,13 @@ graph LR
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
-| backend/tests/web/test_api.py | 0020, 0025 |
-| frontend/src/api.ts | 0020, 0025 |
-| frontend/src/components/SidePanel.tsx | 0020, 0025, 0026 |
-| frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026 |
-| frontend/src/types.ts | 0020, 0025, 0026 |
+| backend/tests/web/test_api.py | 0020, 0025, 0029 |
+| frontend/src/App.tsx | 0026, 0029 |
+| frontend/src/api.ts | 0020, 0025, 0029 |
+| frontend/src/components/SidePanel.tsx | 0020, 0025, 0026, 0029 |
+| frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026, 0029 |
+| frontend/src/lib/issueMeta.ts | 0025, 0029 |
+| frontend/src/types.ts | 0020, 0025, 0026, 0029 |
 
 ## 各 feature 详情
 
@@ -1324,4 +1375,64 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+```
+
+### 0029 三平面 issue 流：证据→提案→工作队列，唯一准入 Owner（白名单可领、生成器自由并行、去 gate 特殊通道）（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射"]
+    nT2["T2 agent_runtime 公共运行时抽出：跑 agent + 读 submit 一处实现"]
+    nT3["T3 triage 改纯规范化生成器：accept→就地升 proposal，判重职责移出"]
+    nT4["T4 synthesize 收窄为纯生成器：产 proposal(from-synthesize)，gate_once 退役"]
+    nT5["T5 divergent 对齐纯生成器：产 proposal(from-divergent)，专属通道退役"]
+    nT6["T6 Owner 唯一准入：机械+评审双模式批量裁决（admit/merge/decline/hold）"]
+    nT7["T7 dev 白名单领取：ready-only + priority→age 排序 + 级联关闭"]
+    nT8["T8 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警"]
+    nT9["T9 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数"]
+    nT10["T10 前端适配：三平面分组 + Owner 房间 + 漏斗与背压展示"]
+    nT1 --> nT3
+    nT2 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT1 --> nT5
+    nT2 --> nT5
+    nT1 --> nT6
+    nT2 --> nT6
+    nT1 --> nT7
+    nT3 --> nT8
+    nT4 --> nT8
+    nT5 --> nT8
+    nT6 --> nT8
+    nT7 --> nT8
+    nT6 --> nT9
+    nT7 --> nT9
+    nT9 --> nT10
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T10_1["T10 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    v_T7_1["T7 v1"]
+    v_T8_1["T8 v1"]
+    v_T9_1["T9 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T10_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_pending;
+    class v_T7_1 st_pending;
+    class v_T8_1 st_pending;
+    class v_T9_1 st_pending;
 ```
