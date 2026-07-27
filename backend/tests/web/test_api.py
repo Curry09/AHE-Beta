@@ -66,6 +66,7 @@ def test_overview_empty(tmp_path: Path) -> None:
         "session_count": 0,
         "feeling_trend": [],
         "issue_curve": [],
+        "funnel": {"report": 0, "proposal": 0, "ready": 0},  # Spec-0029/T9 三平面漏斗
     }
 
 
@@ -498,6 +499,30 @@ def test_history_grouped_source(tmp_path: Path) -> None:
     assert len(items) == 1
     assert items[0]["kind"] == "dev_run" and items[0]["round"] == 1
     assert items[0]["detail"] == "完整报告" and items[0]["log"]
+
+
+def test_issues_plane_and_provenance_fields(tmp_path: Path) -> None:
+    """Spec-0029/T9：每条 issue 附 plane（三平面投影，旧标签映射）与 provenance。"""
+    from auto_designer.designer import issue_schema as sc
+
+    tracker = FakeTracker()
+    r = tracker.create_issue(IssueDraft(title="报告", body="x", labels=["bug", sc.REPORT])).number
+    p = tracker.create_issue(
+        IssueDraft(title="提案", body="x", labels=["bug", sc.PROPOSAL, sc.FROM_TRIAGE, "P1"])
+    ).number
+    s = tracker.create_issue(
+        IssueDraft(title="结构案", body=f"x\n\ncovers: #{p}", labels=[sc.PROPOSAL, sc.FROM_SYNTHESIZE])
+    ).number
+    w = tracker.create_issue(IssueDraft(title="旧triaged", body="x", labels=["bug", sc.TRIAGED])).number
+
+    client = _client(tmp_path, tracker=tracker)
+    issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}
+
+    assert issues[r]["plane"] == sc.REPORT and issues[r]["provenance"] is None
+    assert issues[p]["plane"] == sc.PROPOSAL and issues[p]["provenance"] == sc.FROM_TRIAGE
+    assert issues[s]["provenance"] == sc.FROM_SYNTHESIZE and issues[s]["covers"] == [p]
+    assert issues[p]["covered_by"] == s  # 被 open 结构案覆盖
+    assert issues[w]["plane"] == sc.READY  # 旧标签读侧映射
 
 
 def test_issues_tracker_error(tmp_path: Path) -> None:

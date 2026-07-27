@@ -98,6 +98,21 @@ def test_empty_store(tmp_path) -> None:
     assert m.issue_curve() == []
 
 
+def test_funnel_counts_by_plane(tmp_path) -> None:
+    """Spec-0029/T9：三平面漏斗——open 票按 plane 计数（新旧标签统一经 plane 投影）。"""
+    from auto_designer.designer import issue_schema as sc
+
+    tracker = FakeTracker()
+    tracker.create_issue(IssueDraft(title="r1", body="x", labels=[sc.REPORT]))
+    tracker.create_issue(IssueDraft(title="r2-old", body="x", labels=[sc.NEEDS_TRIAGE]))  # 旧映射
+    tracker.create_issue(IssueDraft(title="p1", body="x", labels=[sc.PROPOSAL, sc.FROM_TRIAGE]))
+    tracker.create_issue(IssueDraft(title="w1", body="x", labels=[sc.READY]))
+    closed = tracker.create_issue(IssueDraft(title="w2", body="x", labels=[sc.READY])).number
+    tracker.set_state(closed, "closed", "done")  # 已关不计
+    m = Metrics(tracker, SessionStore(tmp_path))
+    assert m.funnel() == {"report": 2, "proposal": 1, "ready": 1}
+
+
 def test_open_issue_count(tmp_path) -> None:
     tracker = FakeTracker()
     tracker.create_issue(IssueDraft(title="a", body="b"))
