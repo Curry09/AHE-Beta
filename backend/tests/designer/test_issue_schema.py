@@ -88,3 +88,64 @@ def test_divergent_and_gate_dropped_status_and_backlog() -> None:
     assert not sc.is_backlog_by_labels([sc.DIVERGENT, "feature"])
     assert not sc.is_backlog_by_labels([sc.GATE_DROPPED])
     assert sc.is_backlog_by_labels([sc.TRIAGED, "feature"])  # promote 后
+
+
+# ---- Spec-0029/T1：三平面投影 + is_ready 白名单 + covers/merged-into 机器行 ----
+
+
+def test_plane_new_labels() -> None:
+    assert sc.plane([sc.REPORT, "bug", "round-1"]) == sc.REPORT
+    assert sc.plane([sc.PROPOSAL, sc.FROM_TRIAGE, "bug", "P1"]) == sc.PROPOSAL
+    assert sc.plane([sc.READY, "feature", "P0"]) == sc.READY
+    assert sc.plane(["bug"]) is None  # 无平面标签
+    assert sc.plane([]) is None
+
+
+def test_plane_terminal_labels_are_no_plane() -> None:
+    # 新终态 + 老终态：都不在任何平面
+    for t in (sc.DECLINED, sc.MERGED, sc.REJECTED, sc.NEEDS_INFO, sc.GATE_DROPPED, sc.SUPERSEDED):
+        assert sc.plane([t, "bug"]) is None
+    # 旧 triaged+superseded 组合是终态（对齐旧「越决定性者胜」）
+    assert sc.plane([sc.TRIAGED, sc.SUPERSEDED]) is None
+
+
+def test_plane_old_label_mapping() -> None:
+    # 旧数据读侧映射：needs-triage→report、triaged|RFC→ready、divergent→proposal
+    assert sc.plane([sc.NEEDS_TRIAGE, "bug"]) == sc.REPORT
+    assert sc.plane([sc.TRIAGED, "bug", "P1"]) == sc.READY
+    assert sc.plane([sc.RFC_LABEL]) == sc.READY
+    assert sc.plane([sc.DIVERGENT, "feature"]) == sc.PROPOSAL
+
+
+def test_is_ready_whitelist() -> None:
+    assert sc.is_ready(labels=[sc.READY, "bug"], state="open")
+    assert not sc.is_ready(labels=[sc.READY, "bug"], state="closed")  # 已关不可领
+    assert not sc.is_ready(labels=[sc.PROPOSAL, "bug"], state="open")  # 提案不可领
+    assert not sc.is_ready(labels=[sc.REPORT], state="open")
+    assert sc.is_ready(labels=[sc.TRIAGED, "bug"], state="open")  # 旧数据映射后可领
+    # fail-closed：未知/新增流程标签默认不可领
+    assert not sc.is_ready(labels=["some-future-label"], state="open")
+
+
+def test_covers_line_roundtrip() -> None:
+    line = sc.format_covers_line([12, 15])
+    assert line == "covers: #12 #15"
+    assert sc.parse_covers_line(f"正文\n\n{line}\n") == [12, 15]
+    assert sc.parse_covers_line("无机器行") == []
+    assert sc.format_covers_line([]) == ""  # 空列表不写行
+    # 多条取最后一条
+    assert sc.parse_covers_line("covers: #1\n中间\ncovers: #2 #3") == [2, 3]
+
+
+def test_merged_into_roundtrip() -> None:
+    line = sc.format_merged_into(7)
+    assert line == "merged-into: #7"
+    assert sc.parse_merged_into(f"gate 决定合并\n{line}") == 7
+    assert sc.parse_merged_into("无") is None
+
+
+def test_provenance_of() -> None:
+    assert sc.provenance_of([sc.PROPOSAL, sc.FROM_TRIAGE]) == sc.FROM_TRIAGE
+    assert sc.provenance_of([sc.PROPOSAL, sc.FROM_SYNTHESIZE]) == sc.FROM_SYNTHESIZE
+    assert sc.provenance_of([sc.PROPOSAL, sc.FROM_DIVERGENT]) == sc.FROM_DIVERGENT
+    assert sc.provenance_of(["bug"]) is None

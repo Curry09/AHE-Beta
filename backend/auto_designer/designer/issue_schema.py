@@ -26,16 +26,27 @@ TRIAGE = "triage"
 # 以标签形式落库——不列为 body 字段，只作标签枚举供 dispatch / 前端徽标用。
 PRIORITIES = ("P0", "P1", "P2", "P3")
 
-# ---- triage 工作流标签（平台层单一真源，供 sim/triage/dev/web 共用）----
-NEEDS_TRIAGE = "needs-triage"  # 用户 sim 新产、待 triage（可领集合排除）
-TRIAGED = "triaged"  # triage 完成、dev 可领
-REJECTED = "rejected"  # triage 驳回（带原因关闭，可领集合排除）
-NEEDS_INFO = "needs-info"  # triage 判信息不足（带原因关闭，可领集合排除）
-RFC_LABEL = "RFC"  # synthesize agent 产的结构综合提案（凌驾 type，dev 可领、最高预算）
-SUPERSEDED = "superseded"  # 被 RFC 取代的局部 issue（可领集合排除；具体 #号记 comment）
-# divergent PM 产的产品候选：open 但不可领；经 synthesize 的 gate_once 晋升后才变 triaged/feature。
-DIVERGENT = "divergent"
-GATE_DROPPED = "gate-dropped"  # gate 丢弃的候选（关闭）
+# ---- 三平面标签（Spec-0029/T1：资格只看这三个词，写侧新数据只产它们）----
+REPORT = "report"  # 平面1 证据：用户 sim 的原始报告（自由文本），谁都不能领
+PROPOSAL = "proposal"  # 平面2 提案：一律不可领；由生成器（triage/synthesize/divergent）产出
+READY = "ready"  # 平面3 工作队列：唯一可领白名单，Owner 准入后才有
+# 终态标签（关闭时替换平面标签落上；写侧保证平面标签与终态标签不并存）
+DECLINED = "declined"  # 被驳回关闭（triage reject/needs_info、Owner decline；原因记 comment/close reason）
+MERGED = "merged"  # 被合并关闭（Owner merge；merged-into 机器行链主票）
+# provenance 标签（属性，不参与资格判定）：这条提案是谁产的
+FROM_TRIAGE = "from-triage"
+FROM_SYNTHESIZE = "from-synthesize"
+FROM_DIVERGENT = "from-divergent"
+
+# ---- 旧工作流标签（Spec-0025/0028 写侧已退役；保留常量供读侧映射旧数据，见 plane()）----
+NEEDS_TRIAGE = "needs-triage"  # 旧：用户 sim 新产、待 triage → 映射 report
+TRIAGED = "triaged"  # 旧：triage 完成、dev 可领 → 映射 ready
+REJECTED = "rejected"  # 旧：triage 驳回关闭 → 终态
+NEEDS_INFO = "needs-info"  # 旧：信息不足关闭 → 终态
+RFC_LABEL = "RFC"  # 旧：结构综合提案、dev 可领 → 映射 ready
+SUPERSEDED = "superseded"  # 旧：被 RFC 取代 → 终态
+DIVERGENT = "divergent"  # 旧：产品候选不可领 → 映射 proposal
+GATE_DROPPED = "gate-dropped"  # 旧：gate 丢弃关闭 → 终态
 
 
 def round_label(round_no: int) -> str:
@@ -85,18 +96,96 @@ def triage_status(labels: list[str]) -> str | None:
     return None
 
 
-def is_backlog_by_labels(labels: list[str]) -> bool:
-    """仅按标签判是否属「可执行 backlog」类：triaged 或 RFC，且未被 needs-triage/superseded/驳回/
-    divergent 候选排除。不看开/关状态——供观测曲线按事件累计（关闭事件自会抵消）。"""
+# ---- 三平面投影（Spec-0029/T1：资格判定的单一真源）----
+
+# 终态标签（新老并集）：命中即不在任何平面。
+_TERMINAL_LABELS = frozenset({DECLINED, MERGED, REJECTED, NEEDS_INFO, GATE_DROPPED, SUPERSEDED})
+
+
+def plane(labels: list[str]) -> str | None:
+    """标签 → 所在平面（report/proposal/ready 三值）；终态或无平面标签返回 None。
+
+    新平面标签优先（写侧新数据只产它们）；旧数据经读侧映射：needs-triage→report、
+    triaged|RFC→ready、divergent→proposal；终态（新老）先于旧映射判定（对齐旧 triage_status
+    的「越决定性者胜」——旧 triaged+superseded 组合是终态、不是 ready）。
+    """
     ls = set(labels or [])
-    if not (TRIAGED in ls or RFC_LABEL in ls):
-        return False
-    return not (ls & {NEEDS_TRIAGE, SUPERSEDED, REJECTED, NEEDS_INFO, DIVERGENT, GATE_DROPPED})
+    if READY in ls:
+        return READY
+    if PROPOSAL in ls:
+        return PROPOSAL
+    if REPORT in ls:
+        return REPORT
+    if ls & _TERMINAL_LABELS:
+        return None
+    if DIVERGENT in ls:
+        return PROPOSAL
+    if TRIAGED in ls or RFC_LABEL in ls:
+        return READY
+    if NEEDS_TRIAGE in ls:
+        return REPORT
+    return None
+
+
+def is_ready(*, labels: list[str], state: str) -> bool:
+    """dev 可领判定（唯一白名单）：open 且在 ready 平面。新增任何流程标签都默认不可领（fail-closed）。"""
+    return state == "open" and plane(labels) == READY
+
+
+def is_backlog_by_labels(labels: list[str]) -> bool:
+    """仅按标签判是否属「可执行 backlog」类 = 在 ready 平面（经 plane 投影，新旧标签统一口径）。
+    不看开/关状态——供观测曲线按事件累计（关闭事件自会抵消）。"""
+    return plane(labels) == READY
 
 
 def is_executable_backlog(*, labels: list[str], state: str) -> bool:
-    """某时刻是否算可执行 backlog：open 且 is_backlog_by_labels（dev 可领 / 曲线当前计数口径）。"""
-    return state == "open" and is_backlog_by_labels(labels)
+    """某时刻是否算可执行 backlog：open 且在 ready 平面（dev 可领 / 曲线当前计数口径）。"""
+    return is_ready(labels=labels, state=state)
+
+
+def provenance_of(labels: list[str]) -> str | None:
+    """标签 → 提案来源（from-triage/from-synthesize/from-divergent）；无则 None。"""
+    for p in (FROM_TRIAGE, FROM_SYNTHESIZE, FROM_DIVERGENT):
+        if p in (labels or []):
+            return p
+    return None
+
+
+# ---- covers / merged-into 机器行（单一真源解析；消费方：Owner 级联、web 徽标、前端链展示）----
+
+# covers 行（提案 body 里的覆盖声明，创建时写、之后不改写）：`covers: #5 #6`，多条取最后一条。
+_COVERS_LINE_RE = re.compile(r"^covers:((?:\s*#\d+)+)\s*$", re.MULTILINE)
+# merged-into 行（被合并票的 comment / close reason）：`merged-into: #7`，多条取最后一条。
+_MERGED_INTO_RE = re.compile(r"^merged-into:\s*#(\d+)\s*$", re.MULTILINE)
+
+
+def parse_covers_line(body: str) -> list[int]:
+    """body → covers 行声明的票号列表（无该行返回空；多条取最后一条）。"""
+    last: str | None = None
+    for m in _COVERS_LINE_RE.finditer(body or ""):
+        last = m.group(1)
+    if last is None:
+        return []
+    return [int(x) for x in re.findall(r"#(\d+)", last)]
+
+
+def format_covers_line(numbers: list[int]) -> str:
+    """票号列表 → covers 机器行。空列表返回空串（不写行）。"""
+    nums = [int(n) for n in numbers or []]
+    return f"covers: {' '.join(f'#{n}' for n in nums)}" if nums else ""
+
+
+def parse_merged_into(text: str) -> int | None:
+    """comment/close reason 文本 → merged-into 指向的主票号；无则 None（多条取最后一条）。"""
+    last: int | None = None
+    for m in _MERGED_INTO_RE.finditer(text or ""):
+        last = int(m.group(1))
+    return last
+
+
+def format_merged_into(number: int) -> str:
+    """主票号 → merged-into 机器行。"""
+    return f"merged-into: #{int(number)}"
 
 
 @dataclass(frozen=True)
