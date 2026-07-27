@@ -66,7 +66,7 @@ tasks:
       - backend/agent_defs/designer/tools/submit_rfcs.tool.yaml
       - backend/agent_defs/designer/tools/submit_gate.tool.yaml
       - backend/tests/loop/test_designer.py
-    scope: propose_once 产出改落 PROPOSAL+FROM_SYNTHESIZE（不再直建 RFC 标签、不再打 superseded——covers 关系保留为 body 机器行，supersede 裁决权移交 Owner）；输入改为 ready backlog+proposal 紧凑索引+体感+runtime。gate_once/GateOutcome/_gate_from_submit/submit_gate 全部退役（准入职责归 Owner/T6）：designer agent.yaml 删 submit_gate、stop_tools 收回 [submit_rfcs]，submit_gate.tool.yaml 删除；systemprompt 删 gate 模式注记。driver 切换 agent_runtime import，删本文件内 run_with_timeout/_unwrap_result 旧副本。submit_rfcs 工具名保留（口语「RFC」= 结构提案），仅落库标签变化。
+    scope: propose_once 产出改落 PROPOSAL+FROM_SYNTHESIZE（不再直建 RFC 标签、不再打 superseded——covers 关系保留为 body 机器行，仅是**建议**，合并裁决权移交 Owner）；输入改为 ready backlog+proposal 紧凑索引+体感+runtime（编排保证跑在本轮 triage 之后，紧凑索引含本轮新升的 from-triage 提案）。gate_once/GateOutcome/_gate_from_submit/submit_gate 全部退役（准入职责归 Owner/T6）：designer agent.yaml 删 submit_gate、stop_tools 收回 [submit_rfcs]，submit_gate.tool.yaml 删除；systemprompt 删 gate 模式注记。driver 切换 agent_runtime import，删本文件内 run_with_timeout/_unwrap_result 旧副本。submit_rfcs 工具名保留（口语「RFC」= 结构提案），仅落库标签变化。
     acceptance: 产出为 proposal 平面、带 from-synthesize 与 covers 行、不打 superseded；gate 符号零残留；test_designer 按新落库断言重写且绿。
   - id: T5
     title: divergent 对齐纯生成器：产 proposal(from-divergent)，专属通道退役
@@ -102,7 +102,7 @@ tasks:
       - backend/auto_designer/designer/submit_tools.py
       - backend/agent_defs/owner/
       - backend/tests/designer/test_owner.py
-    scope: 新建 Owner driver（owner.py）：admit_once() 每轮一次批量准入。输入=全部 open proposal（紧凑索引：号/标题/kind/provenance/建议优先级/covers，正文按需 get_session_timeline 下钻）+ready backlog+体感曲线。两级裁决：①机械段（零 LLM）——from-triage 的单条修复案、TRIAGE 字段齐全、与既有 ready/本批提案无标题近似冲突（norm 后简单相似度）→ 自动 admit；②评审段（一次 LLM 批量）——其余（结构/产品提案、冲突组、机械段拿不准的）走 owner agent，submit_admission 收尾。决策落库：admit→去 PROPOSAL 加 READY+终优先级；merge→关闭+merged-into 机器行链主票；decline→DECLINED+原因关闭；hold→保持 proposal（未列出默认 hold）。covers 裁决也在此：admit 结构提案时对其 covers 的 proposal 统一 merge。agent_contract 增 admission_input_schema()（decision 四值 enum、into/priority/reason），gate_input_schema 删除；submit_tools 增 submit_admission、删 submit_gate。agent_defs/owner/ 新建（只读工具+timeline 下钻+submit_admission，systemprompt=准入职责与判据）。
+    scope: 新建 Owner driver（owner.py）：admit_once() 每轮一次批量准入。输入=全部 open proposal（紧凑索引：号/标题/kind/provenance/建议优先级/covers，正文按需 get_session_timeline 下钻）+ready backlog+体感曲线。两级裁决：①机械段（零 LLM）——from-triage 的单条修复案、TRIAGE 字段齐全、与既有 ready/本批提案无标题近似冲突（norm 后简单相似度）→ 自动 admit；②评审段（一次 LLM 批量）——其余（结构/产品提案、冲突组、机械段拿不准的）走 owner agent，submit_admission 收尾。决策落库：admit→去 PROPOSAL 加 READY+终优先级；merge→关闭+merged-into 机器行链主票；decline→DECLINED+原因关闭；hold→保持 proposal（未列出默认 hold）。covers 裁决也在此：admit 结构提案时其 covers 的 proposal **默认 merge 归并，但 Owner 可裁量部分保留**——如其中的 P0 急修可单独 admit 与结构案并行推进（先止血、结构改造随后），取代旧 superseded 的全有全无。agent_contract 增 admission_input_schema()（decision 四值 enum、into/priority/reason），gate_input_schema 删除；submit_tools 增 submit_admission、删 submit_gate。agent_defs/owner/ 新建（只读工具+timeline 下钻+submit_admission，systemprompt=准入职责与判据）。
     acceptance: 机械段对合格单条案零 LLM 准入；评审段四路（admit/merge/decline/hold）落库正确、未列出默认 hold；merge 链主票、covers 统一收敛；drift-guard（yaml==admission_input_schema）；无候选跳过 LLM；test_owner 覆盖以上。
   - id: T7
     title: dev 白名单领取：ready-only + priority→age 排序 + 级联关闭
@@ -137,8 +137,8 @@ tasks:
       - backend/run.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_roster.py
-    scope: run_round 重排为 a → 生成段（单线程池并行：triage 分片×N_TRIAGERS（pending 轮询切片，判重已移 Owner 故分片自由）∥ synthesize ∥ divergent）→ Owner.admit_once（恒 1，d3' 段）→ b dev → c；gate 段删除。roster 加 owner（默认 1；0=纯机械准入、不跑 LLM 评审段），退役 gate 语义。run.py 接线 Owner、背压告警：proposal 深度与 ready 深度超过阈值（env PROPOSAL_DEPTH_ALARM/READY_DEPTH_ALARM，缺省各 20）→ 状态回调+stdout 告警（不自动扩容，人工介入信号 = CLAUDE.md「issue 长期不降=退化」的落地）。单 agent 崩溃记日志跳过照旧。
-    acceptance: 段顺序断言（生成段并行完成→owner→dev）；triage 分片各自处理不重叠子集；owner=0 时评审段跳过、机械准入仍走；背压超阈值触发告警回调；test_orchestrator/test_roster 重写且绿（git 依赖用例走 CI）。
+    scope: run_round 重排为 a → 生成段**两拍**——第一拍 triage 分片×N_TRIAGERS（pending 轮询切片、线程池并行；判重已移 Owner 故分片自由）、第二拍 synthesize ∥ divergent（线程池并行；跑在 triage 全部收尾之后，输入因此含**本轮**新升的 from-triage 提案，结构综合不滞后一轮）→ Owner.admit_once（恒 1）→ b dev → c；gate 段删除。roster 加 owner（默认 1；0=纯机械准入、不跑 LLM 评审段），退役 gate 语义。run.py 接线 Owner、背压告警：proposal 深度与 ready 深度超过阈值（env PROPOSAL_DEPTH_ALARM/READY_DEPTH_ALARM，缺省各 20）→ 状态回调+stdout 告警（不自动扩容，人工介入信号 = CLAUDE.md「issue 长期不降=退化」的落地）。单 agent 崩溃记日志跳过照旧。
+    acceptance: 段顺序断言（triage 全部完成 → synthesize/divergent → owner → dev）；triage 分片各自处理不重叠子集；synthesize 输入含本轮新升提案；owner=0 时评审段跳过、机械准入仍走；背压超阈值触发告警回调；test_orchestrator/test_roster 重写且绿（git 依赖用例走 CI）。
   - id: T9
     title: 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数
     status: pending
@@ -244,7 +244,7 @@ done（级联关闭该票 covers 的提案/报告）
 
 **dev（T7）**：白名单 `is_ready`；排序 priority→票号；done 级联关闭 covers 链（单层）。
 
-**编排与背压（T8）**：`a → [triage×N 分片 ∥ synthesize ∥ divergent]（一个线程池）→ Owner(1) → dev → c`；gate 段删除。roster 加 owner（1；0=纯机械准入）。背压：proposal/ready 深度超阈值（env，缺省 20）→ 告警回调+stdout，**不自动扩容**——这是 CLAUDE.md「issue 长期不降=退化」观测指标的可执行化。
+**编排与背压（T8）**：`a → 生成段两拍[先 triage×N 分片并行；再 synthesize ∥ divergent] → Owner(1) → dev → c`；gate 段删除。两拍而非全并行：synthesize 必须看到**本轮**新升的 from-triage 提案（否则结构综合滞后一轮、dev 先逐条修症状），而它等 triage 收尾只多一拍墙钟——值得。真正值钱的并行（triage 分片之间、synthesize∥divergent 之间）都保留。roster 加 owner（1；0=纯机械准入）。背压：proposal/ready 深度超阈值（env，缺省 20）→ 告警回调+stdout，**不自动扩容**——这是 CLAUDE.md「issue 长期不降=退化」观测指标的可执行化。
 
 **观测（T9/T10）**：issue 附 plane/provenance/merged_into；曲线=ready 深度；漏斗四段计数（report/proposal/ready/done）+ 背压状态；前端三平面分组 + Owner 房间 + 告警条。
 
@@ -267,6 +267,7 @@ done（级联关闭该票 covers 的提案/报告）
 - **白名单 vs 黑名单**：黑名单随状态数增长且要求「每个新状态记得去改 dev」；白名单一个词、新状态默认安全（fail-closed）。
 - **备选：保留 gate 只修不对称**（让 RFC 也过 gate）——治了不对称但去重仍在 triage、黑名单仍在、耦合仍在；不如收敛成一个 Owner。
 - **备选：Owner 全 LLM（无机械段）**——每轮平凡单条案也烧评审，浪费且慢；机械段是对「多数提案本来就该过」的承认。
+- **生成段两拍 vs 全并行**（评审修订）：全并行下 synthesize 看不到本轮 triage 新升的提案，结构综合要么滞后一轮（dev 先逐条修症状再被结构案覆盖，白烧 dev 预算）、要么倒退回吃 raw 报告；等 triage 收尾只多一拍墙钟，取两拍。「triage 提案被结构案覆盖」不是浪费——逐条的根因区域/优先级/证据正是聚类与合并裁决的依据（K8s 里 issue 也是先 triage 再被 umbrella/KEP 吸收）；且覆盖在 0029 里从 synthesize 单方面盖 superseded 变为 covers 建议 + Owner 裁决（可部分保留急修）。
 
 ## Prior art
 
