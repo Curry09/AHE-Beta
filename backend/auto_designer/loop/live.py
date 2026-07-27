@@ -23,8 +23,16 @@ from typing import Any
 _AGENTS_NAME = "agents.json"
 _RUN_NAME = "run.json"
 _HISTORY_NAME = "history.json"
-# role 展示顺序：用户 → 分诊 → 创新者 → 开发者（对齐闭环 a → d1(triage) → d2(synthesize) → b）。
-_ROLE_ORDER = {"user": 0, "triager": 1, "designer": 2, "developer": 3}
+# role 展示顺序：用户 → 分诊 → divergent → synthesize → owner → 开发者
+# （对齐三平面闭环 a → 第一拍(triage∥divergent) → 第二拍(synthesize) → Owner 准入 → b，Spec-0029）。
+_ROLE_ORDER = {
+    "user": 0,
+    "triager": 1,
+    "divergent": 2,
+    "designer": 3,
+    "owner": 4,
+    "developer": 5,
+}
 # 过程流时间线长度上限：status 变化 + assistant 发言 + 逐工具调用/结果，一次 agent.run 可达数百条。
 _LOG_CAP = 500
 

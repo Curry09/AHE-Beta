@@ -21,11 +21,16 @@ _（缺模块级 docstring）_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
-| `designer.py` | Designer = synthesize agent：综合全局的 nexau agent（对偶于 triage 的逐条梳理、开发者的局部补丁）。 |
+| `agent_contract.py` | 由 issue_schema.SCHEMAS 生成各 producer 的 submit 工具 input_schema——契约与 schema 同源， |
+| `agent_runtime.py` | 四个 driver（triage / synthesize / divergent / owner）此前各抄一份的公共逻辑收拢于此： |
+| `designer.py` | Designer = synthesize agent：综合全局的 nexau agent（delivery 轨；对偶于 triage 的逐条规范化、 |
+| `divergent.py` | Divergent PM 驱动器：与 synthesize **不同料**的另一轨（Spec-0029 双轨分工）。 |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
+| `owner.py` | Owner 驱动器：三平面模型的唯一准入口（backlog grooming / Definition of Ready 的执行者）。 |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂设计师作机制层判别证据。 |
 | `session_timeline.py` | 设计师按需取用：从落盘 Session 投影「使用事件时间线」。 |
-| `triage.py` | Triager：issue triage / maintainer = 带只读工具的 nexau agent（对偶于 synthesize 的跨条综合）。 |
+| `submit_tools.py` | submit 工具的 binding。 |
+| `triage.py` | Triager：issue triage / maintainer = 带只读工具的 nexau agent。 |
 
 ### auto_designer.dev
 
@@ -73,7 +78,7 @@ _（缺模块级 docstring）_
 | `live.py` | 多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/。 |
 | `live_tracer.py` | StepTracer：把 nexau agent 运行中的过程流成看板可见的结构化事件。 |
 | `metrics.py` | metrics（spec-0003/T6，曲线口径 spec-0025/T7）：统计体感与 issue backlog 随时间的曲线。 |
-| `orchestrator.py` | 闭环编排 orchestrator：a（用户产 issue+体感）→ d（创新者综合全局产结构性提案，可选） |
+| `orchestrator.py` | 闭环编排 orchestrator：a（用户产 report+体感）→ 生成段两拍（第一拍 triage 分片∥divergent、 |
 | `roster.py` | 角色编制（roster）：各类 agent 的数量，作为「后端编排」与「前端小镇房间」的单一真源。 |
 | `run_state.py` | run_state（spec-0004/T1）：编排游标 + 三侧中间态标记，作为「无法从产物观测」之外的兜底。 |
 | `runner.py` | 可恢复 harbor runner（spec-0004/T2）：作为一个 harbor task（方案 A，整条 run = 1 task）。 |
@@ -154,10 +159,15 @@ _（缺模块级 docstring）_
 graph LR
     nauto_designer["auto_designer"]
     nauto_designer_designer["auto_designer.designer"]
+    nauto_designer_designer_agent_contract["designer.agent_contract"]
+    nauto_designer_designer_agent_runtime["designer.agent_runtime"]
     nauto_designer_designer_designer["designer.designer"]
+    nauto_designer_designer_divergent["designer.divergent"]
     nauto_designer_designer_issue_schema["designer.issue_schema"]
+    nauto_designer_designer_owner["designer.owner"]
     nauto_designer_designer_runtime_agg["designer.runtime_agg"]
     nauto_designer_designer_session_timeline["designer.session_timeline"]
+    nauto_designer_designer_submit_tools["designer.submit_tools"]
     nauto_designer_designer_triage["designer.triage"]
     nauto_designer_dev["auto_designer.dev"]
     nauto_designer_dev_agentic_developer["dev.agentic_developer"]
@@ -219,21 +229,31 @@ graph LR
     nauto_designer_user_sim_workspace["sim.workspace"]
     nauto_designer_web["auto_designer.web"]
     nauto_designer_web_api["web.api"]
+    nauto_designer_designer_agent_contract --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_agent_runtime --> nauto_designer_designer_session_timeline
+    nauto_designer_designer_agent_runtime --> nauto_designer_loop_live_tracer
+    nauto_designer_designer_agent_runtime --> nauto_designer_user_session_store
+    nauto_designer_designer_designer --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_designer --> nauto_designer_designer_issue_schema
     nauto_designer_designer_designer --> nauto_designer_designer_runtime_agg
-    nauto_designer_designer_designer --> nauto_designer_designer_session_timeline
-    nauto_designer_designer_designer --> nauto_designer_loop_live_tracer
     nauto_designer_designer_designer --> nauto_designer_models
     nauto_designer_designer_designer --> nauto_designer_tracker_base
     nauto_designer_designer_designer --> nauto_designer_user_session_store
+    nauto_designer_designer_divergent --> nauto_designer_designer_agent_runtime
+    nauto_designer_designer_divergent --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_divergent --> nauto_designer_models
+    nauto_designer_designer_divergent --> nauto_designer_tracker_base
+    nauto_designer_designer_divergent --> nauto_designer_user_session_store
+    nauto_designer_designer_owner --> nauto_designer_designer_agent_runtime
+    nauto_designer_designer_owner --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_owner --> nauto_designer_tracker_base
+    nauto_designer_designer_owner --> nauto_designer_user_session_store
     nauto_designer_designer_runtime_agg --> nauto_designer_models
     nauto_designer_designer_runtime_agg --> nauto_designer_user_session_store
     nauto_designer_designer_session_timeline --> nauto_designer_models
     nauto_designer_designer_session_timeline --> nauto_designer_user_session_store
-    nauto_designer_designer_triage --> nauto_designer_designer_designer
+    nauto_designer_designer_triage --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_triage --> nauto_designer_designer_issue_schema
-    nauto_designer_designer_triage --> nauto_designer_designer_session_timeline
-    nauto_designer_designer_triage --> nauto_designer_loop_live_tracer
     nauto_designer_designer_triage --> nauto_designer_tracker_base
     nauto_designer_designer_triage --> nauto_designer_user_session_store
     nauto_designer_dev_agentic_developer --> nauto_designer_designer_issue_schema
@@ -247,6 +267,7 @@ graph LR
     nauto_designer_loop_metrics --> nauto_designer_tracker_base
     nauto_designer_loop_metrics --> nauto_designer_user_session_store
     nauto_designer_loop_orchestrator --> nauto_designer_designer_designer
+    nauto_designer_loop_orchestrator --> nauto_designer_designer_divergent
     nauto_designer_loop_orchestrator --> nauto_designer_dev_agentic_developer
     nauto_designer_loop_orchestrator --> nauto_designer_harness_interface
     nauto_designer_loop_orchestrator --> nauto_designer_harness_launcher

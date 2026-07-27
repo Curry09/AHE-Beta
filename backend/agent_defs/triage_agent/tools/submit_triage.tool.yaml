@@ -1,0 +1,73 @@
+type: tool
+name: submit_triage
+description: >-
+  Submit your triage result and finish. This is the ONLY way to finish — call it
+  exactly once, after you have investigated every report in your batch.
+
+  Pass `dispositions`: one item per report. Each item needs `issue` (the number)
+  and `disposition` (one of accept / reject / needs_info):
+  - accept: also give `kind` (bug/feature/chore/document), `priority` (P0-P3,
+    a suggestion — the admission reviewer may adjust) and `fields` (the kind's
+    normalized fields, Chinese labels). The ticket becomes a proposal — NOT
+    dev-pickable until admitted.
+  - reject / needs_info: also give `reason`.
+
+  Do NOT try to deduplicate across reports — judge each on its own; duplicates
+  are merged later at admission review.
+
+  The parameters are schema-validated at call time; invalid values (unknown
+  field, non-P0-P3 priority, self-invented keys) are rejected and you must retry.
+# Spec-0029/T3：input_schema 是 agent_contract.dispositions_input_schema() 的生成副本（受 drift-guard
+# 测试守护：test_triage.py::test_submit_triage_yaml_matches_contract 断言二者深度相等）。三值
+# disposition（duplicate 退役、判重归 Owner）。改字段改 SCHEMAS 后需重新生成此块，否则测试会红。
+input_schema:
+  type: object
+  properties:
+    dispositions:
+      type: array
+      items:
+        type: object
+        properties:
+          issue:
+            type: integer
+          disposition:
+            type: string
+            enum:
+              - accept
+              - reject
+              - needs_info
+          kind:
+            type: string
+            enum:
+              - bug
+              - feature
+              - chore
+              - document
+          priority:
+            type: string
+            enum:
+              - P0
+              - P1
+              - P2
+              - P3
+          fields:
+            type: object
+            properties:
+              根因区域:
+                type: string
+              边界:
+                type: string
+              验收:
+                type: string
+              交付物:
+                type: string
+            additionalProperties: false
+          reason:
+            type: string
+        required:
+          - issue
+          - disposition
+        additionalProperties: false
+  required:
+    - dispositions
+  additionalProperties: false

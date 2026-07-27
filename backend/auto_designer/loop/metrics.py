@@ -13,7 +13,13 @@ needs-triage（未处理）与 rejected / needs-info（已否）与 superseded�
 
 from __future__ import annotations
 
-from auto_designer.designer.issue_schema import is_backlog_by_labels
+from auto_designer.designer.issue_schema import (
+    PROPOSAL,
+    READY,
+    REPORT,
+    is_backlog_by_labels,
+    plane,
+)
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 
@@ -67,3 +73,21 @@ class Metrics:
     def open_issue_count(self) -> int:
         """当前 open issue 数（从 tracker 读路径取一个即时点，供观测）。"""
         return len(self._tracker.list_open_issues())
+
+    def funnel(self) -> dict[str, int]:
+        """三平面漏斗当前量（Spec-0029/T9）：open 票按 plane 计数 report/proposal/ready。
+
+        proposal 深度对应「准入太严或生成太滥」、ready 深度对应「dev 消化不动=退化信号」——
+        与 run.py 背压告警同口径。tracker 读失败返回全 0（观测降级不抛）。
+        """
+        counts = {"report": 0, "proposal": 0, "ready": 0}
+        try:
+            open_issues = self._tracker.list_open_issues()
+        except Exception:  # noqa: BLE001
+            return counts
+        keymap = {REPORT: "report", PROPOSAL: "proposal", READY: "ready"}
+        for i in open_issues:
+            key = keymap.get(plane(i.labels))
+            if key is not None:
+                counts[key] += 1
+        return counts

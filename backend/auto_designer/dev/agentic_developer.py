@@ -26,11 +26,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from auto_designer.designer.issue_schema import (
-    NEEDS_TRIAGE,
+    FROM_SYNTHESIZE,
+    PRIORITIES,
     RFC_LABEL,
-    SUPERSEDED,
-    TRIAGED,
     USER_KINDS,
+    is_ready,
+    priority_of,
 )
 from auto_designer.tracker.base import IssueTracker
 
@@ -40,9 +41,7 @@ _DEV_TIMEOUT = 900
 
 # 结果回写进 comment 的截断长度（未推进时的失败原因，报错串可读即可）。
 _ATTEMPT_REASON_CAP = 400
-# RFC/design issue body 里的覆盖声明机器行（复用 0020）：`covers: #5 #6`，最后一条匹配为准。
-_COVERS_LINE_RE = re.compile(r"^covers:((?:\s*#\d+)+)\s*$", re.MULTILINE)
-# 各 kind 的默认迭代预算（相对 0025 初值再翻倍；RFC 结构性改动最重、最高档）。env 覆盖见 run.py（T6）。
+# 各 kind 的默认迭代预算（结构提案改动最重、最高档）。env 覆盖见 run.py。
 DEFAULT_BUDGETS: dict[str, int] = {
     "bug": 120,
     "feature": 120,
@@ -55,23 +54,14 @@ StatusFn = Callable[..., None]
 
 
 def _issue_kind(labels: list[str]) -> str:
-    """从标签认 issue 的 kind：RFC 优先，否则取 type 标签，都没有兜底 bug。"""
-    if RFC_LABEL in labels:
+    """从标签认 issue 的预算档：结构提案（from-synthesize，或旧 RFC 标签）最高档，
+    否则取 type 标签，都没有兜底 bug。"""
+    if FROM_SYNTHESIZE in labels or RFC_LABEL in labels:
         return "rfc"
     for k in USER_KINDS:
         if k in labels:
             return k
     return "bug"
-
-
-def _parse_covers_line(body: str) -> tuple[int, ...]:
-    """design 票 body → 其 covers 行声明的票号（无该行返回空；多条取最后一条）。"""
-    last: str | None = None
-    for m in _COVERS_LINE_RE.finditer(body or ""):
-        last = m.group(1)
-    if last is None:
-        return ()
-    return tuple(int(x) for x in re.findall(r"#(\d+)", last))
 
 
 @dataclass
@@ -130,19 +120,20 @@ class AgenticDeveloper:
         self._budgets = {**DEFAULT_BUDGETS, **(budgets or {})}
 
     def _eligible(self, issues: list) -> list:
-        """可领集合：triaged 或 RFC 标签；排除 needs-triage（未分诊）/superseded（被 RFC 取代）。
+        """可领集合 = **白名单** is_ready（Spec-0029/T7：ready 平面唯一入口，旧 triaged/RFC 数据经
+        plane 映射同样命中；任何新增流程标签默认不可领，fail-closed）。
 
-        rejected/needs-info 已被 triage 关闭、不在 open 集。按票号升序（公平、老优先），
-        carryover 自然发生——未被领的仍 open，下轮再领。
+        排序：priority（P0>P1>P2>P3>无）→ 票号（同优先级内 FIFO 老优先、防饿死）。carryover 自然
+        发生——未被领的仍 open，下轮再领。
         """
-        ok = [
-            i
-            for i in issues
-            if (TRIAGED in i.labels or RFC_LABEL in i.labels)
-            and SUPERSEDED not in i.labels
-            and NEEDS_TRIAGE not in i.labels
-        ]
-        return sorted(ok, key=lambda i: i.number)
+        ok = [i for i in issues if is_ready(labels=i.labels, state="open")]
+
+        def sort_key(i) -> tuple[int, int]:
+            p = priority_of(i.labels)
+            rank = PRIORITIES.index(p) if p in PRIORITIES else len(PRIORITIES)
+            return (rank, i.number)
+
+        return sorted(ok, key=sort_key)
 
     def work_one(self, skip: set[int] | None = None) -> DevOutcome:
         skip = skip or set()
@@ -150,9 +141,11 @@ class AgenticDeveloper:
             i for i in self._eligible(self._tracker.list_open_issues()) if i.number not in skip
         ]
         if not eligible:
-            self._emit(running=False, status="无可领 triaged/RFC issue")
+            self._emit(running=False, status="无可领 ready issue")
             return DevOutcome()
-        issue = eligible[0]  # 按票号升序取最老一条；多 dev 靠 attempted 防撞、其余积压到下轮
+        issue = eligible[
+            0
+        ]  # priority→票号 取最该做的一条；多 dev 靠 attempted 防撞、其余积压到下轮
         budget = self._budgets.get(_issue_kind(list(issue.labels)), self._budgets["bug"])
         next_tag = f"v{self._next_version()}"
         self._emit(
@@ -191,9 +184,8 @@ class AgenticDeveloper:
                     self._tracker.add_comment(issue.number, result_text)
                 except Exception:  # noqa: BLE001  回写失败不影响已推进的 main
                     pass
-            # Spec-0025/T5：带 covers 行（RFC）→ 连带关闭它综合的 triaged issue（一级；triaged 即用户
-            # 原 issue 就地规范化而来、其下无独立 raw 层）。普通 triaged bug/feature 无 covers、只关自己。
-            self._close_covered(issue=issue, tag=str(tag))
+            # Spec-0029/T7：dev 只关自己的票——covers 级联已前移至 Owner 准入时 merge（被覆盖票在
+            # admit 时即关闭并链回主票），dev 与 tracker 的耦合降到「领票 + 关自己」。
         else:
             # 未推进：留失败原因 comment（不做重试升档；下轮该票仍 open、会被再领）。
             reason = (result_text or "").strip() or "无报告（agent 异常或超时）"
@@ -213,27 +205,6 @@ class AgenticDeveloper:
             detail=result_text or None,  # 最终报告全文（详情面板展示，不截断）
         )
         return DevOutcome(issue_number=issue.number, tag=tag, committed=committed)
-
-    def _close_covered(self, *, issue: object, tag: str) -> None:
-        """带 covers 行的 issue（RFC）推进 main → 连带关闭其 covers 声明、且仍 open 的 issue（单票失败跳过）。"""
-        covers = _parse_covers_line(issue.body)  # type: ignore[attr-defined]
-        if not covers:
-            return
-        try:
-            open_now = {i.number for i in self._tracker.list_open_issues()}
-        except Exception:  # noqa: BLE001  读失败放弃连带关闭（bug 留 open 可下轮处理，无害）
-            return
-        for n in covers:
-            if n not in open_now:
-                continue
-            try:
-                self._tracker.set_state(
-                    n,
-                    "closed",
-                    f"covered by #{issue.number} → {tag}",  # type: ignore[attr-defined]
-                )
-            except Exception:  # noqa: BLE001  单票关闭失败不影响其余
-                continue
 
     def _run_agent(self, *, issue_number: int, title: str, body: str, tag: str, budget: int) -> str:
         os.environ["SANDBOX_WORK_DIR"] = str(

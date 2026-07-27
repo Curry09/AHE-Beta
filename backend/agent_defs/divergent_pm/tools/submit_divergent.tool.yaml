@@ -1,0 +1,52 @@
+type: tool
+name: submit_divergent
+description: >-
+  Submit your divergent product candidates and finish. This is the ONLY way to
+  finish — call it exactly once, after mining the same signal as synthesize for
+  user-perceivable product opportunities.
+
+  Pass `proposals`: 0..n incremental candidates (empty list is fine — don't force
+  one, and don't re-skin existing RFCs or open divergent candidates). Each item
+  needs `title` and `fields` (the RFC fields, Chinese labels: 问题 / 根因 /
+  涉及 issue / 方向 / 验收). Optionally give `covers` (int list). Candidates are
+  landed with the `divergent` label — NOT dev-pickable until the gate promotes them.
+
+  The parameters are schema-validated at call time; invalid values (missing field,
+  self-invented keys) are rejected and you must retry.
+# Spec-0028：input_schema = agent_contract.rfc_input_schema() 的生成副本（divergent 候选形态即 RFC 提案），
+# 受 drift-guard 测试守护。改 RFC 字段改 issue_schema.SCHEMAS 后需重生成此块。
+input_schema:
+  type: object
+  properties:
+    proposals:
+      type: array
+      items:
+        type: object
+        properties:
+          title:
+            type: string
+          fields:
+            type: object
+            properties:
+              问题:
+                type: string
+              根因:
+                type: string
+              涉及 issue:
+                type: string
+              方向:
+                type: string
+              验收:
+                type: string
+            additionalProperties: false
+          covers:
+            type: array
+            items:
+              type: integer
+        required:
+          - title
+          - fields
+        additionalProperties: false
+  required:
+    - proposals
+  additionalProperties: false

@@ -5,9 +5,9 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 600：允许按需拉多局 timeline + 读 harness/NexAU 后仍能走到 complete_task；
-# 墙钟由 Designer._DESIGN_TIMEOUT 兜底。
-max_iterations: 600
+# 300：允许按需拉多局 timeline + 读 harness/NexAU、且 submit_rfcs 参数被拒后仍有余量重试后收尾；
+# 墙钟由 Designer._DESIGN_TIMEOUT 兜底。max_iterations 也是 submit 校验失败的重试上限（≥30）。
+max_iterations: 300
 
 middlewares:
   # 工作区 jail：designer 只能读自己的 harness 仓，文件工具越界读一律拒——机制硬禁读 trace
@@ -26,7 +26,7 @@ llm_config:
   api_type: openai_chat_completion
 
 # 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于读现状 grounding；
-# designer 不改文件、不碰 git，仅 read_file / list_directory 取证 + complete_task 交提案。
+# designer 不改文件、不碰 git，仅 read_file / list_directory 取证 + submit_rfcs 交提案。
 sandbox_config:
   type: local
 
@@ -55,8 +55,12 @@ tools:
   - name: get_harness_step
     yaml_path: ./tools/get_harness_step.tool.yaml
     binding: auto_designer.designer.session_timeline:get_harness_step
-  - name: complete_task
-    yaml_path: ./tools/complete_task.tool.yaml
-    binding: nexau.archs.tool.builtin.session_tools:complete_task
+  # 收尾工具：agent 以工具参数原生吐结构化 RFC（input_schema 由 agent_contract.rfc_input_schema()
+  # 生成、受 drift-guard 测试守护）；nexau 在调用层强校验，漂移/缺字段被拒→重试。stop tool 的返回值
+  # （proposals 的 JSON）成为 agent.run 的返回，driver json.loads 取用——取代旧 complete_task 信封 +
+  # 括号扫描解析（Spec-0027/T3）。
+  - name: submit_rfcs
+    yaml_path: ./tools/submit_rfcs.tool.yaml
+    binding: auto_designer.designer.submit_tools:submit_rfcs
 
-stop_tools: [complete_task]
+stop_tools: [submit_rfcs]

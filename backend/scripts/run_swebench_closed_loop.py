@@ -210,7 +210,8 @@ def main() -> int:
         print(f"   - {meta['difficulty']:16}  {meta['repo']:28}  {iid}")
     print(
         f"⓪.5 roster：user×{roster['user']} · triager×{roster['triager']} · "
-        f"designer×{roster['designer']} · developer×{roster['developer']}"
+        f"designer×{roster['designer']} · divergent×{roster.get('divergent', 0)} · "
+        f"developer×{roster['developer']}"
     )
 
     print("① 种 harness 本地仓 ...")
@@ -414,6 +415,46 @@ def main() -> int:
         for i in range(roster["designer"])
     ]
 
+    def make_divergent_status(agent_id: str, label: str):
+        def cb(*, running, status, detail=None, proposals=None):
+            update_agent(
+                data_dir=run_mod.DATA,
+                agent_id=agent_id,
+                role="divergent",
+                label=label,
+                running=running,
+                status=status,
+                detail=detail,
+                round_no=current["round"],
+            )
+            if not running:
+                archive_agent(
+                    data_dir=run_mod.DATA,
+                    agent_id=agent_id,
+                    round_no=current["round"],
+                    extra={"kind": "divergent_run", "proposals": proposals or []},
+                )
+
+        return cb
+
+    from auto_designer.designer.divergent import Divergent  # noqa: PLC0415
+
+    divergents = [
+        Divergent(
+            tracker,
+            store,
+            str(repo),
+            str(ROOT / "agent_defs" / "divergent_pm"),
+            on_status=make_divergent_status(
+                f"divergent-{i}",
+                "divergent" if roster["divergent"] == 1 else f"divergent#{i + 1}",
+            ),
+            on_event=make_event_logger(f"divergent-{i}"),
+            round_provider=lambda: current["round"] or None,
+        )
+        for i in range(roster.get("divergent", 0))
+    ]
+
     raw_parallel = os.environ.get("MAX_PARALLEL_USERS", "").strip()
     max_parallel_users = int(raw_parallel) if raw_parallel.isdigit() else SESSIONS_PER_ROUND
     max_parallel_users = max(1, max_parallel_users)
@@ -432,6 +473,7 @@ def main() -> int:
         initial_ref="main",
         triagers=triagers,
         designers=designers,
+        divergents=divergents,
         on_round_start=on_round_start,
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,
@@ -440,7 +482,8 @@ def main() -> int:
 
     print(
         f"④ 跑 {run_mod.TOTAL_ROUNDS} 轮闭环（每轮 {SESSIONS_PER_ROUND} session · "
-        f"{len(triagers)} triager × {len(designers)} synthesize × {len(developers)} dev，"
+        f"{len(triagers)} triager × {len(designers)} synthesize × {len(divergents)} divergent × "
+        f"{len(developers)} dev，"
         f"a 段并发 {max_parallel_users}，预算 "
         f"bug={budgets['bug']}/feature={budgets['feature']}/rfc={budgets['rfc']}）..."
     )

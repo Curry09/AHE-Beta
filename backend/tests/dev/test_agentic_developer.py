@@ -1,11 +1,10 @@
-# Spec-0025/T5：AgenticDeveloper 简化——领 triaged/RFC、按容量积压、预算按 kind、去分池/retry/stuck。
-"""验证开发者侧（配合 triage 漏斗）：
+# Spec-0029/T7：AgenticDeveloper——ready 白名单领取、priority→票龄排序、只关自己（无级联）。
+"""验证开发者侧（三平面模型）：
 
-- 只领**可领集合**（triaged 或 RFC 标签；排除 needs-triage/superseded）；按票号升序取最老一条；
-- 每 work_one 领一条，超容量的未领 issue 保持 open（carryover）；skip 防多 dev 撞同一条；
-- 预算按 kind 分档（bug/feature/RFC，RFC 最高）；无重试升档；
-- 推进 main（新 vK tag）后关票 + 回写报告；带 covers 行（RFC）连带关闭其覆盖的 triaged issue；
-- 无分池/attempt/stuck 相关行为。
+- 可领集合 = **白名单** is_ready（proposal/report 不可领；旧 triaged/RFC 数据经映射仍可领）；
+- 排序 priority（P0 插队）→ 票号（同级 FIFO）；每 work_one 领一条、carryover；skip 防撞；
+- 预算按档（from-synthesize/旧 RFC 最高档）；
+- 推进 main（新 vK tag）后关票 + 回写报告；**不再级联关闭 covers**（级联已前移至 Owner 准入）。
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from auto_designer.designer.issue_schema import NEEDS_TRIAGE, RFC_LABEL, SUPERSEDED, TRIAGED
+from auto_designer.designer import issue_schema as sc
 from auto_designer.dev.agentic_developer import AgenticDeveloper, DevOutcome
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.fake import FakeTracker
@@ -43,7 +42,7 @@ def _seed_repo(tmp_path: Path) -> Path:
 
 
 class _DirectPushDev(AgenticDeveloper):
-    """覆盖 _run_agent：用真 git 模拟 agent 的 checkout→改→commit→tag 直推；记录 budget 与领到的 issue。"""
+    """覆盖 _run_agent：用真 git 模拟 agent 的 checkout→改→commit→tag 直推；记录 budget。"""
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -69,47 +68,66 @@ class _NoTagDev(AgenticDeveloper):
         return "改了但没提交没打 tag"
 
 
-def _triaged(tracker: FakeTracker, title: str, kind: str = "bug") -> int:
-    return tracker.create_issue(IssueDraft(title=title, body="x", labels=[kind, TRIAGED])).number
+def _ready(tracker: FakeTracker, title: str, *, kind: str = "bug", prio: str | None = None) -> int:
+    labels = [kind, sc.READY]
+    if prio:
+        labels.append(prio)
+    return tracker.create_issue(IssueDraft(title=title, body="x", labels=labels)).number
 
 
 def _dev(tracker, repo, tmp_path, cls=_DirectPushDev, **kw):
     return cls(tracker, str(repo), str(tmp_path / "agent_def"), **kw)
 
 
-# ---- 领取：只领 triaged/RFC、按票号升序、carryover ----
+# ---- 领取：白名单 ready、priority→票号、carryover ----
 
 
-def test_direct_push_triaged_issue(tmp_path) -> None:
+def test_direct_push_ready_issue(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     head_before = _git(repo, "rev-parse", "main")
     tracker = FakeTracker()
-    n = _triaged(tracker, "慢查询")
+    n = _ready(tracker, "慢查询")
 
     outcome = _dev(tracker, repo, tmp_path).work_one()
 
     assert _git(repo, "rev-parse", "main") != head_before  # 直推 main、HEAD 前进
-    assert _git(repo, "branch", "--format=%(refname:short)").split() == ["main"]  # 无新分支
     assert "v1" in _git(repo, "tag").split()
     assert outcome == DevOutcome(issue_number=n, tag="v1", committed=True)
     assert tracker.issue(n)["state"] == "closed"
 
 
-def test_eligible_excludes_needs_triage_and_superseded(tmp_path) -> None:
+def test_whitelist_excludes_report_and_proposal(tmp_path) -> None:
+    """白名单：report/proposal（含结构/产品提案）都不可领——只有 ready。"""
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    tracker.create_issue(IssueDraft(title="待分诊", body="x", labels=["bug", NEEDS_TRIAGE]))
-    tracker.create_issue(IssueDraft(title="被取代", body="x", labels=["bug", TRIAGED, SUPERSEDED]))
-    ok = _triaged(tracker, "可领")
+    tracker.create_issue(IssueDraft(title="raw report", body="x", labels=["bug", sc.REPORT]))
+    tracker.create_issue(
+        IssueDraft(title="待准入提案", body="x", labels=["bug", sc.PROPOSAL, sc.FROM_TRIAGE])
+    )
+    tracker.create_issue(
+        IssueDraft(title="结构提案", body="x", labels=[sc.PROPOSAL, sc.FROM_SYNTHESIZE])
+    )
+    ok = _ready(tracker, "可领")
 
     outcome = _dev(tracker, repo, tmp_path).work_one()
-    assert outcome.issue_number == ok  # 只领 triaged 且非 superseded 那条
+    assert outcome.issue_number == ok
+
+
+def test_whitelist_accepts_old_triaged_and_rfc_labels(tmp_path) -> None:
+    """旧数据（triaged / RFC 标签）经 plane 映射仍可领（读侧兼容）。"""
+    repo = _seed_repo(tmp_path)
+    tracker = FakeTracker()
+    old = tracker.create_issue(
+        IssueDraft(title="旧 triaged", body="x", labels=["bug", sc.TRIAGED])
+    ).number
+    outcome = _dev(tracker, repo, tmp_path).work_one()
+    assert outcome.issue_number == old
 
 
 def test_no_eligible_returns_empty(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    tracker.create_issue(IssueDraft(title="raw", body="x", labels=["bug", NEEDS_TRIAGE]))
+    tracker.create_issue(IssueDraft(title="raw", body="x", labels=["bug", sc.REPORT]))
     calls: list = []
 
     class _NoAgent(AgenticDeveloper):
@@ -121,64 +139,83 @@ def test_no_eligible_returns_empty(tmp_path) -> None:
     assert out == DevOutcome() and calls == []  # 无可领 → 不跑 agent
 
 
-def test_picks_oldest_by_number_and_carryover(tmp_path) -> None:
+def test_priority_jumps_queue_then_fifo(tmp_path) -> None:
+    """排序：P0 插队（哪怕票号更大）；同优先级按票号 FIFO。"""
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    first = _triaged(tracker, "老")
-    second = _triaged(tracker, "新")
+    _ready(tracker, "无优先级老票")
+    p2 = _ready(tracker, "P2 票", prio="P2")
+    p0 = _ready(tracker, "P0 急修", prio="P0")
 
     dev = _dev(tracker, repo, tmp_path)
-    assert dev.work_one().issue_number == first  # 升序取最老
-    # 超容量：一次只领一条，第二条仍 open（carryover 到下轮）
-    assert tracker.issue(second)["state"] == "open"
-    # 下一轮（新 dev）领到积压的第二条
+    assert dev.work_one().issue_number == p0  # P0 插队
+    assert _dev(tracker, repo, tmp_path).work_one().issue_number == p2  # 次之 P2
+
+
+def test_same_priority_fifo_and_carryover(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    tracker = FakeTracker()
+    first = _ready(tracker, "老")
+    second = _ready(tracker, "新")
+
+    dev = _dev(tracker, repo, tmp_path)
+    assert dev.work_one().issue_number == first  # 同级 FIFO
+    assert tracker.issue(second)["state"] == "open"  # carryover
     assert _dev(tracker, repo, tmp_path).work_one().issue_number == second
 
 
 def test_skip_prevents_collision(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    a = _triaged(tracker, "a")
-    b = _triaged(tracker, "b")
+    a = _ready(tracker, "a")
+    b = _ready(tracker, "b")
     dev = _dev(tracker, repo, tmp_path)
     out = dev.work_one(skip={a})  # 模拟 dev#1 已领 a
     assert out.issue_number == b
 
 
-# ---- 预算按 kind 分档（RFC 最高），无重试升档 ----
+# ---- 预算按档（结构提案最高），无重试升档 ----
 
 
-def test_budget_by_kind(tmp_path) -> None:
+def test_budget_by_kind_and_provenance(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    _triaged(tracker, "bug票", kind="bug")
+    _ready(tracker, "bug票", kind="bug")
     dev = _dev(tracker, repo, tmp_path, budgets={"bug": 60, "feature": 70, "rfc": 100})
     dev.work_one()
     assert dev.budgets == [60]
 
     tracker2 = FakeTracker()
-    tracker2.create_issue(IssueDraft(title="RFC票", body="s", labels=[RFC_LABEL]))
+    tracker2.create_issue(
+        IssueDraft(title="结构提案已准入", body="s", labels=[sc.READY, sc.FROM_SYNTHESIZE])
+    )
     dev2 = _dev(tracker2, repo, tmp_path, budgets={"bug": 60, "rfc": 100})
     dev2.work_one()
-    assert dev2.budgets == [100]  # RFC 最高档
+    assert dev2.budgets == [100]  # from-synthesize 最高档
+
+    tracker3 = FakeTracker()
+    tracker3.create_issue(IssueDraft(title="旧RFC票", body="s", labels=[sc.RFC_LABEL]))
+    dev3 = _dev(tracker3, repo, tmp_path, budgets={"bug": 60, "rfc": 100})
+    dev3.work_one()
+    assert dev3.budgets == [100]  # 旧 RFC 标签同档
 
 
 def test_default_budgets_when_not_given(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    _triaged(tracker, "feature票", kind="feature")
+    _ready(tracker, "feature票", kind="feature")
     dev = _dev(tracker, repo, tmp_path)  # 用 DEFAULT_BUDGETS
     dev.work_one()
     assert dev.budgets == [120]  # feature 默认 120
 
 
-# ---- 收尾：回写 + 连带关闭 ----
+# ---- 收尾：回写 + 只关自己 ----
 
 
 def test_success_writes_report_comment(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    n = _triaged(tracker, "会成功")
+    n = _ready(tracker, "会成功")
     _dev(tracker, repo, tmp_path).work_one()
     assert "done v1" in tracker.issue(n)["comments"]
 
@@ -186,34 +223,26 @@ def test_success_writes_report_comment(tmp_path) -> None:
 def test_no_tag_not_committed_and_stays_open(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    n = _triaged(tracker, "会失败")
+    n = _ready(tracker, "会失败")
     out = _dev(tracker, repo, tmp_path, cls=_NoTagDev).work_one()
     assert out.committed is False and out.tag is None
-    assert tracker.issue(n)["state"] == "open"  # 未推进 → 仍 open（下轮再领，无 stuck）
+    assert tracker.issue(n)["state"] == "open"  # 未推进 → 仍 open（下轮再领）
     assert any(c.startswith("[dev] 本轮未推进") for c in tracker.issue(n)["comments"])
 
 
-def test_rfc_covers_closes_triaged(tmp_path) -> None:
-    """RFC 推进 main → 连带关闭它 covers 的 triaged issue（一级）。"""
+def test_done_does_not_cascade_covers(tmp_path) -> None:
+    """Spec-0029/T7：dev 只关自己的票——covers 级联已前移至 Owner 准入，dev 侧零级联。"""
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
-    t1 = _triaged(tracker, "被综合甲")
-    t2 = _triaged(tracker, "被综合乙")
-    closed_early = _triaged(tracker, "早已关")
-    tracker.set_state(closed_early, "closed", "手动")
-    # RFC 号最小 → 会被先领；它 covers t1/t2/closed_early/999
-    rfc = tracker.create_issue(
+    other = _ready(tracker, "另一条独立 ready")
+    s = tracker.create_issue(
         IssueDraft(
-            title="RFC",
-            body=f"综合\n\ncovers: #{t1} #{t2} #{closed_early} #999",
-            labels=[RFC_LABEL],
+            title="结构提案已准入",
+            body=f"### 问题\n\nx\n\ncovers: #{other}",
+            labels=[sc.READY, sc.FROM_SYNTHESIZE, "P0"],
         )
     ).number
-    # 让 RFC 先被领（票号升序，RFC 是最后建的 → 手动 skip 掉前面的 triaged，只留 RFC 可领）
-    dev = _dev(tracker, repo, tmp_path)
-    out = dev.work_one(skip={t1, t2})
-    assert out.issue_number == rfc and out.committed is True
-    for n in (t1, t2):
-        assert tracker.issue(n)["state"] == "closed"
-        assert f"covered by #{rfc}" in tracker.issue(n)["reason"]
-    assert tracker.issue(closed_early)["reason"] == "手动"  # 已关的不重复动
+    out = _dev(tracker, repo, tmp_path).work_one()
+    assert out.issue_number == s and out.committed is True  # P0 先领
+    assert tracker.issue(s)["state"] == "closed"  # 关自己
+    assert tracker.issue(other)["state"] == "open"  # covers 的票不动（级联不在 dev）

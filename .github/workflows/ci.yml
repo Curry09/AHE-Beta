@@ -47,7 +47,7 @@ jobs:
       - name: Pytest
         run: |
           uv venv
-          uv pip install pytest requests ruamel.yaml jsonschema fastapi httpx
+          uv pip install pytest requests ruamel.yaml jsonschema fastapi httpx pyyaml
           if [ -d backend/tests ] && [ -n "$(find backend/tests -name 'test_*.py' -print -quit)" ]; then
             .venv/bin/pytest backend/tests/ -v
           else

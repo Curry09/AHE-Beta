@@ -18,6 +18,8 @@ dependencies = [
 dev = [
     "ruff>=0.9.0",
     "pytest>=8.0.0",
+    # drift-guard 测试解析 agent_defs 的 *.tool.yaml（对照 agent_contract 生成的 input_schema）
+    "pyyaml>=6.0",
 ]
 
 # 本仓暂不作为可安装包；uv 只装依赖。

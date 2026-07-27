@@ -9,13 +9,17 @@ import type { AgentRole, Selection } from "./types";
 
 const POLL_MS = 3000;
 
-// 顺序对齐闭环 a → d1(triage) → d2(synthesize) → b。
+// 顺序对齐三平面闭环 a → 第一拍(triage∥divergent) → 第二拍(synthesize) → Owner 准入 → b（Spec-0029）。
+// divergent 默认编制 0 → 该房间仅在有活动/归档时显示，避免常驻空列。
 const ROLES: { role: AgentRole; name: string }[] = [
   { role: "user", name: "用户" },
   { role: "triager", name: "分诊" },
+  { role: "divergent", name: "发散" },
   { role: "designer", name: "设计师" },
+  { role: "owner", name: "准入" },
   { role: "developer", name: "开发者" },
 ];
+const OPTIONAL_ROLES: AgentRole[] = ["divergent"];
 
 // 看板状态 ↔ URL 查询串（?done=1&round=2&sel=issue:7）：刷新/分享不丢上下文。
 function parseSelection(raw: string | null): Selection | null {
@@ -87,7 +91,12 @@ export default function App() {
       />
       <Charts overview={overview} />
       <div className="board">
-        {ROLES.map(({ role, name }) => (
+        {ROLES.filter(
+          ({ role }) =>
+            !OPTIONAL_ROLES.includes(role) ||
+            (agents?.agents ?? []).some((a) => a.role === role) ||
+            items.some((it) => it.role === role),
+        ).map(({ role, name }) => (
           <AgentColumn
             key={role}
             role={role}
@@ -109,6 +118,7 @@ export default function App() {
           history={items}
           issues={issues}
           commits={commits}
+          funnel={overview?.funnel ?? null}
         />
       </div>
     </div>

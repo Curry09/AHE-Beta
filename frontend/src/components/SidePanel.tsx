@@ -11,11 +11,12 @@ import type {
 import { fmtDate } from "../lib/format";
 import {
   ageDays,
-  isRfc,
   issueKind,
+  planeOf,
   priorityOf,
+  provenanceOf,
   roundOf,
-  triageStatus,
+  terminalOf,
 } from "../lib/issueMeta";
 import { AgentRunDetail } from "./detail/AgentRunDetail";
 import { CommitDetailView } from "./detail/CommitDetail";
@@ -30,8 +31,9 @@ export function SidePanel(props: {
   history: HistoryItem[];
   issues: IssuesResponse | null;
   commits: CommitsResponse | null;
+  funnel?: { report: number; proposal: number; ready: number } | null;
 }) {
-  const { selection, onSelect, agents, history, issues, commits } = props;
+  const { selection, onSelect, agents, history, issues, commits, funnel } = props;
   const commitList: Commit[] = commits?.commits ?? [];
   const back = () => onSelect(null);
 
@@ -112,8 +114,9 @@ export function SidePanel(props: {
             {issues?.connected && issues.issues.length === 0 && (
               <div className="empty">暂无 issue</div>
             )}
-            {/* Spec-0025/T8：按 triage 状态 / type 分组——RFC 区突出、可执行 backlog、待 triage、
-                其它、已驳回/取代。各组仅在非空时出现。 */}
+            {/* Spec-0029/T10：三平面漏斗条（report→proposal→ready 当前量；超软阈值高亮示警）。 */}
+            {funnel && <FunnelBar funnel={funnel} />}
+            {/* Spec-0029/T10：按三平面分组——报告 / 提案(带来源徽标) / Ready / 已关闭终态。 */}
             <IssueGroups issues={issues?.issues ?? []} onSelect={onSelect} />
 
             <div className="side-section-head">
@@ -161,28 +164,49 @@ const PRIORITY_COLOR: Record<string, string> = {
   P3: "var(--text-faint)",
 };
 
-// 把 issue 分到五组：RFC / 可执行 backlog / 待 triage / 其它 / 已驳回·取代。组内按票号升序。
+// 背压软阈值（与后端 run.py 缺省一致；仅前端示警高亮，权威告警在后端 stdout/状态）。
+const DEPTH_SOFT_ALARM = 20;
+
+function FunnelBar({ funnel }: { funnel: { report: number; proposal: number; ready: number } }) {
+  const seg = (label: string, n: number, warn: boolean) => (
+    <span
+      className="chip"
+      style={warn ? { color: "var(--red)", fontWeight: 600 } : undefined}
+      title={warn ? `${label} 深度 ${n} 超软阈值 ${DEPTH_SOFT_ALARM}（背压示警）` : `${label} 当前量`}
+    >
+      {label} {n}
+    </span>
+  );
+  return (
+    <div className="side-section-head" title="三平面漏斗：报告 → 提案 → Ready">
+      {seg("报告", funnel.report, false)}
+      <span style={{ color: "var(--text-faint)" }}>→</span>
+      {seg("提案", funnel.proposal, funnel.proposal > DEPTH_SOFT_ALARM)}
+      <span style={{ color: "var(--text-faint)" }}>→</span>
+      {seg("Ready", funnel.ready, funnel.ready > DEPTH_SOFT_ALARM)}
+    </div>
+  );
+}
+
+// 把 issue 分到四组（三平面 + 已关闭终态）。组内按票号升序。
 function groupIssues(issues: Issue[]) {
-  const rfc: Issue[] = [];
-  const backlog: Issue[] = [];
-  const untriaged: Issue[] = [];
-  const rejected: Issue[] = [];
-  const other: Issue[] = [];
+  const report: Issue[] = [];
+  const proposal: Issue[] = [];
+  const ready: Issue[] = [];
+  const closed: Issue[] = [];
   for (const it of issues) {
-    const st = triageStatus(it);
-    if (isRfc(it)) rfc.push(it);
-    else if (st === "rejected" || st === "needs-info" || st === "superseded") rejected.push(it);
-    else if (st === "triaged") backlog.push(it);
-    else if (st === "needs-triage") untriaged.push(it);
-    else other.push(it);
+    const p = it.state === "open" ? planeOf(it) : null;
+    if (p === "report") report.push(it);
+    else if (p === "proposal") proposal.push(it);
+    else if (p === "ready") ready.push(it);
+    else closed.push(it);  // 已关闭（done/merged/declined 等终态）或无平面
   }
   const byNum = (a: Issue, b: Issue) => a.number - b.number;
   return {
-    rfc: rfc.sort(byNum),
-    backlog: backlog.sort(byNum),
-    untriaged: untriaged.sort(byNum),
-    other: other.sort(byNum),
-    rejected: rejected.sort(byNum),
+    report: report.sort(byNum),
+    proposal: proposal.sort(byNum),
+    ready: ready.sort(byNum),
+    closed: closed.sort(byNum),
   };
 }
 
@@ -191,11 +215,10 @@ function IssueGroups(props: { issues: Issue[]; onSelect: (sel: Selection) => voi
   const { onSelect } = props;
   return (
     <>
-      <IssueGroup title="RFC · 结构提案" issues={g.rfc} onSelect={onSelect} highlight />
-      <IssueGroup title="Backlog · 可执行" issues={g.backlog} onSelect={onSelect} />
-      <IssueGroup title="待 triage" issues={g.untriaged} onSelect={onSelect} />
-      <IssueGroup title="其它" issues={g.other} onSelect={onSelect} />
-      <IssueGroup title="已驳回 · 取代" issues={g.rejected} onSelect={onSelect} dim />
+      <IssueGroup title="Ready · 可领" issues={g.ready} onSelect={onSelect} highlight />
+      <IssueGroup title="提案 · 待准入" issues={g.proposal} onSelect={onSelect} />
+      <IssueGroup title="报告 · 待分诊" issues={g.report} onSelect={onSelect} />
+      <IssueGroup title="已关闭" issues={g.closed} onSelect={onSelect} dim />
     </>
   );
 }
@@ -225,13 +248,22 @@ function IssueGroup(props: {
   );
 }
 
+// 提案来源徽标文案（provenance → 短名）。
+const PROVENANCE_BADGE: Record<string, string> = {
+  "from-triage": "分诊",
+  "from-synthesize": "结构",
+  "from-divergent": "发散",
+};
+
 function IssueRow(props: { issue: Issue; onSelect: (sel: Selection) => void }) {
   const { issue, onSelect } = props;
   const kind = issueKind(issue);
   const prio = priorityOf(issue);
   const round = roundOf(issue);
-  const st = triageStatus(issue);
-  const age = st === "triaged" && issue.state === "open" ? ageDays(issue.created_at) : null;
+  const prov = provenanceOf(issue);
+  const terminal = terminalOf(issue);
+  const age =
+    planeOf(issue) === "ready" && issue.state === "open" ? ageDays(issue.created_at) : null;
   return (
     <button
       className={`row ${issue.state}`}
@@ -242,6 +274,11 @@ function IssueRow(props: { issue: Issue; onSelect: (sel: Selection) => void }) {
       <span className="chip" title={`kind: ${kind}`}>
         {kind}
       </span>
+      {prov && (
+        <span className="chip tag" title={`提案来源：${prov}`}>
+          {PROVENANCE_BADGE[prov] ?? prov}
+        </span>
+      )}
       {prio && (
         <span className="chip" style={{ color: PRIORITY_COLOR[prio] }} title={`优先级 ${prio}`}>
           {prio}
@@ -257,20 +294,20 @@ function IssueRow(props: { issue: Issue; onSelect: (sel: Selection) => void }) {
           {age}d
         </span>
       )}
-      {/* RFC 显覆盖清单；被 RFC 覆盖显 ⊂ #N；被取代/驳回给标注 */}
+      {/* 结构提案显覆盖建议清单；被覆盖显 ⊂ #N；merged/declined 等终态给标注 */}
       {(issue.covers?.length ?? 0) > 0 && (
-        <span className="chip tag" title="该 RFC 综合/取代的 issue">
+        <span className="chip tag" title="该提案建议覆盖的票（合并由准入裁决）">
           覆盖 {issue.covers!.map((n) => `#${n}`).join(" ")}
         </span>
       )}
       {issue.covered_by != null && (
-        <span className="chip" title={`已被 RFC #${issue.covered_by} 覆盖`}>
+        <span className="chip" title={`被 #${issue.covered_by} 的 covers 引用`}>
           ⊂ #{issue.covered_by}
         </span>
       )}
-      {st === "superseded" && (
-        <span className="chip" title="被 RFC 取代">
-          取代
+      {(terminal === "merged" || terminal === "superseded" || terminal === "gate-dropped") && (
+        <span className="chip" title="已被合并/取代到主票">
+          合并
         </span>
       )}
       {issue.reject_reason && (

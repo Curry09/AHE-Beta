@@ -419,31 +419,37 @@ def test_no_guard_is_backward_compatible(tmp_path) -> None:
     assert _orch(repo, [], [_Dev([], DevOutcome())]).run_round("c") == head
 
 
-# Spec-0025/T6：d 段两 agent——triage 先于 synthesize，两者都在 b 之前。
+# Spec-0029/T8：生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入 → b。
 
 
 class _Phase:
-    """记录自己被调用的时刻（往共享 events 里打一条）。"""
+    """记录自己被调用的时刻（往共享 events 里打一条）；shard 也记录（分片断言用）。"""
 
     def __init__(self, events: list, name: str) -> None:
         self._events = events
         self._name = name
 
-    def triage_once(self):
-        self._events.append(("d", self._name))
+    def triage_once(self, pending=None, shard=None):
+        self._events.append(("d", self._name, shard))
 
     def propose_once(self):
-        self._events.append(("d", self._name))
+        self._events.append(("d", self._name, None))
+
+    def admit_once(self):
+        self._events.append(("d", self._name, None))
 
 
-def test_triage_runs_before_synthesize_before_dev(tmp_path) -> None:
+def test_beats_order_triage_divergent_then_synth_then_owner_then_dev(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []
-    triager = _Phase(events, "triage")
+    t0 = _Phase(events, "triage0")
+    t1 = _Phase(events, "triage1")
+    div = _Phase(events, "divergent")
     synth = _Phase(events, "synth")
+    owner = _Phase(events, "owner")
 
     def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
-        events.append(("session", None))
+        events.append(("session", None, None))
 
     orch = Orchestrator(
         launcher=_Launcher(events),
@@ -452,14 +458,42 @@ def test_triage_runs_before_synthesize_before_dev(tmp_path) -> None:
         developer_agents=[_Dev(events, DevOutcome())],
         run_session_fn=run_session_fn,
         initial_ref="main",
-        triagers=[triager],
+        triagers=[t0, t1],
         designers=[synth],
+        divergents=[div],
+        owner=owner,
     )
     orch.run_round("c")
 
-    # a（session）→ d1 triage → d2 synth → b（dev），严格此序
     kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d", "dev")]
-    assert kinds == ["session", "triage", "synth", "dev"]
+    # a → 第一拍（triage×2∥divergent，组内顺序不定）→ 第二拍 synth → owner → dev
+    assert kinds[0] == "session"
+    assert set(kinds[1:4]) == {"triage0", "triage1", "divergent"}
+    assert kinds[4:] == ["synth", "owner", "dev"]
+    # 分片参数：第 k 个 triager 拿 (k, n)
+    shards = {e[1]: e[2] for e in events if e[0] == "d" and e[1].startswith("triage")}
+    assert shards == {"triage0": (0, 2), "triage1": (1, 2)}
+
+
+def test_no_owner_skips_admission(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    events: list = []
+
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", None, None))
+
+    orch = Orchestrator(
+        launcher=_Launcher(events),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        developer_agents=[_Dev(events, DevOutcome())],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+        triagers=[_Phase(events, "triage")],
+    )
+    orch.run_round("c")  # owner=None 不炸、准入段跳过
+    kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d", "dev")]
+    assert kinds == ["session", "triage", "dev"]
 
 
 def test_callable_session_plan_redraws_each_round(tmp_path) -> None:

@@ -1,0 +1,27 @@
+type: tool
+name: get_session_timeline
+description: >-
+  Fetch a use-event timeline for one user-sim session: what the user saw
+  (activity), thought (notes / free intent), did (action + message), heard
+  (harness reply), plus rare god-view labels (process_read, capability_gap when
+  intent≠action, private_check, silent_stop). Each outbound user instruction has
+  `utterance`; mid-wait emits may be `delivery=queued` + `queued_behind`; each
+  `heard` carries `answers` (+ `answers_said` preview) naming which utterance that
+  reply closes. Not a raw LLM dump; no system/user prompts. Prefer issue_number
+  for backlog bugs; use session_id from feeling curve [session=...]. Do not read
+  sessions/ files yourself.
+
+input_schema:
+  type: object
+  properties:
+    issue_number:
+      type: integer
+      description: >-
+        Open (or historical) issue number to resolve to the session that filed it.
+    session_id:
+      type: string
+      description: >-
+        Session id from the feeling curve line ([session=...]). If both are set,
+        session_id wins.
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#
