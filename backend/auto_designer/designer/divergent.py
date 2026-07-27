@@ -1,34 +1,37 @@
-# divergent PM：与 synthesize 并行，从交互挖产品候选（不可领）；经 gate 晋升后才进 dev。
-"""Divergent PM 驱动器：同构 synthesize 信号，产出带 `divergent` 标签的候选 issue。
+# Spec-0029/T5：divergent PM = discovery 轨生成器——从原始会话行为挖没被提为 issue 的能力缺口。
+"""Divergent PM 驱动器：与 synthesize **不同料**的另一轨（Spec-0029 双轨分工）。
 
-候选 **不进** 可领 backlog（无 triaged/RFC）。同一轮末由 Designer.gate_once 做语义晋升评审
-（promote → feature+triaged；hold → 保持；drop → 关闭）。
+synthesize（delivery 轨）吃规范化 backlog 找结构根因；divergent（discovery 轨）**直吃会话第一手
+证据**——体感曲线（分+理由+session 句柄）作索引、get_session_timeline/beat/step 按需下钻原始会话
+行为，找「用户没提为 issue、却用对话行为反复补出来的工作方式」（自拟规程、绕路、反复手动交接）。
+不吃 triaged backlog / runtime_agg（那是 delivery 轨信号）；开放提案/ready 紧凑索引仅作「勿重复」
+参照。产出落 proposal 平面 + from-divergent（不可领；进 ready 由 Owner 准入裁决），每轮硬顶 3 条。
+不依赖 triage 产出 → 编排上与 triage 同拍并行（Spec-0029/T8 第一拍）。
 """
 
 from __future__ import annotations
 
-import json
-import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from auto_designer.designer.designer import (
-    _DESIGN_TIMEOUT,
-    Designer,
-    _run_with_timeout,
+from auto_designer.designer.agent_runtime import norm_label, read_submit, run_agent_def
+from auto_designer.designer.issue_schema import (
+    FROM_DIVERGENT,
+    PROPOSAL,
+    READY,
+    plane,
+    round_label,
 )
-from auto_designer.designer.issue_schema import DIVERGENT, round_label
 from auto_designer.designer.issue_schema import fields_of as _schema_fields_of
 from auto_designer.designer.issue_schema import render as _schema_render
 from auto_designer.designer.issue_schema import validate as _schema_validate
-from auto_designer.designer.runtime_agg import aggregate_runtime, format_runtime_agg
-from auto_designer.designer.session_timeline import bind_session_store
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 
-# 每轮硬顶，防灌单（gate 再做跨轮去重/晋升）。
+_DIVERGENT_TIMEOUT = 3600
+# 每轮硬顶，防灌单（跨轮去重/合并由 Owner 准入做）。
 _MAX_CANDIDATES = 3
 
 StatusFn = Callable[..., None]
@@ -45,8 +48,13 @@ class DivergentOutcome:
         return len(self.proposal_numbers)
 
 
+def _rfc_fields_by_label(fields: dict) -> dict:
+    label_to_key = {norm_label(f.label): f.key for f in _schema_fields_of(kind="rfc")}
+    return {label_to_key.get(norm_label(k), str(k)): v for k, v in fields.items()}
+
+
 class Divergent:
-    """发散 PM：产 divergent 候选，不碰 git、不改 harness 文件。"""
+    """发散 PM：从会话行为产能力候选（proposal 平面），不碰 git、不改 harness 文件。"""
 
     def __init__(
         self,
@@ -67,97 +75,72 @@ class Divergent:
         self._round_provider = round_provider
 
     def propose_once(self) -> DivergentOutcome:
+        # 「勿重复」参照：当前 open 的提案 + ready 项（紧凑索引，不喂正文细节）。
         backlog = self._tracker.list_open_issues()
-        # 给模型看的「已 groomed」与 synthesize 一致；另附当前仍 open 的 divergent 候选（跨轮积压）。
-        from auto_designer.designer.issue_schema import RFC_LABEL, SUPERSEDED, TRIAGED
-
-        triaged = [
-            i
-            for i in backlog
-            if TRIAGED in i.labels and RFC_LABEL not in i.labels and SUPERSEDED not in i.labels
-        ]
-        pending = [i for i in backlog if DIVERGENT in i.labels]
-        rfcs = [i for i in backlog if RFC_LABEL in i.labels]
+        reference = [i for i in backlog if plane(i.labels) in (PROPOSAL, READY)]
         trend = self._feeling_trend()
-        runtime = format_runtime_agg(aggregate_runtime(store=self._store, harness_repo=self._repo))
         self._emit(
             running=True,
-            status=f"发散中…（triaged={len(triaged)} · 积压候选={len(pending)}）",
+            status=f"发散中…（会话={len(trend)} 局 · 参照={len(reference)} 条）",
         )
 
-        result_text = self._run_agent(
-            triaged=triaged,
-            pending=pending,
-            rfcs=rfcs,
-            trend=trend,
-            runtime=runtime,
-        )
-        # Spec-0028：divergent 走 submit_divergent（stop tool，同 RFC proposal shape）——复用 designer
-        # 的 submit 解析器读 `{"proposals":[...]}`；取代旧 complete_task 信封 + 括号扫描。
-        proposals = Designer._proposals_from_submit(result_text)[:_MAX_CANDIDATES]
+        result_text = self._run_agent(trend=trend, reference=reference)
+        raw = read_submit(result_text, "proposals") or []
+        parsed = raw[:_MAX_CANDIDATES]
 
         numbers: list[int] = []
-        if proposals:
-            self._tracker.ensure_labels([DIVERGENT])
+        if parsed:
+            self._tracker.ensure_labels([PROPOSAL, FROM_DIVERGENT])
         round_no = self._round_provider() if self._round_provider is not None else None
-        for prop in proposals:
-            fields = _rfc_fields_by_label(prop.fields)
-            if _schema_validate(kind="rfc", fields=fields, section="triage"):
+        for item in parsed:
+            if not item.get("title"):
                 continue
+            fields = _rfc_fields_by_label(
+                item.get("fields") if isinstance(item.get("fields"), dict) else {}
+            )
+            if _schema_validate(kind="rfc", fields=fields, section="triage"):
+                continue  # 字段没填全 → 跳过（不落半成品候选）
             body = _schema_render(kind="rfc", fields=fields)
-            labels = [DIVERGENT]
+            labels = [PROPOSAL, FROM_DIVERGENT]
             if isinstance(round_no, int) and round_no > 0:
                 labels.append(round_label(round_no))
             ref = self._tracker.create_issue(
-                IssueDraft(title=str(prop.title), body=body, labels=labels)
+                IssueDraft(title=str(item["title"]), body=body, labels=labels)
             )
             numbers.append(ref.number)
 
         self._emit(
             running=False,
-            status=(f"落了 {len(numbers)} 条 divergent 候选" if numbers else "本轮无产品候选"),
+            status=(f"落了 {len(numbers)} 条能力候选（待准入）" if numbers else "本轮无产品候选"),
             proposals=numbers,
             detail=(result_text or None),
         )
         return DivergentOutcome(proposal_numbers=numbers)
 
-    def _run_agent(
-        self,
-        *,
-        triaged: list,
-        pending: list,
-        rfcs: list,
-        trend: list[tuple[str, int, str, str]],
-        runtime: str,
-    ) -> str:
-        os.environ["SANDBOX_WORK_DIR"] = str(self._repo.resolve())
-        from nexau import Agent, AgentConfig  # noqa: PLC0415
-
-        cfg = AgentConfig.from_yaml(config_path=self._agent_def / "agent.yaml")
-        if self._on_event is not None:
-            from auto_designer.loop.live_tracer import StepTracer  # noqa: PLC0415
-
-            cfg.resolved_tracer = StepTracer(self._on_event)
-        agent = Agent(config=cfg)
+    def _run_agent(self, *, trend: list[tuple[str, int, str, str]], reference: list) -> str:
         rfc_labels = "/".join(f.label for f in _schema_fields_of(kind="rfc"))
         msg = (
-            "下面是与 synthesize **同一份**信号。你是 divergent PM：挖用户可感知的产品机会；"
-            f"本轮最多提 {_MAX_CANDIDATES} 条**增量**候选（相对已积压 divergent / 已有 RFC 勿重复）。\n"
-            "先按需读 MANUAL / 时间线核对，再调 submit_divergent 收尾。\n\n"
-            f"## 已 triaged backlog（{len(triaged)} 条）\n{self._format_issues(triaged)}\n\n"
-            f"## 已 open RFC（{len(rfcs)} 条，勿再提同施力点）\n{self._format_issues(rfcs)}\n\n"
-            f"## 仍 open 的 divergent 候选（{len(pending)} 条，跨轮积压；勿换皮重复）\n"
-            f"{self._format_issues(pending)}\n\n"
-            f"## 体感曲线\n{self._format_trend(trend)}\n\n"
-            f"## 运行时行为聚合\n{runtime}\n\n"
-            "对疑惑点先 `get_session_timeline`，必要时再 beat/step；勿直接读 sessions/ 文件。\n\n"
+            "你是 divergent PM（discovery 轨）：**从原始会话行为里**挖用户可感知的产品能力机会——"
+            "尤其是用户没提为 issue、却用对话行为反复补出来的工作方式（自拟规程、绕路、手动交接）。\n"
+            "**你的第一手证据是会话本身**：下面的体感曲线是索引（分+理由+session 句柄），对可疑的局"
+            "调 `get_session_timeline(session_id=…)` 看使用事件时间线（用户追问/纠正/自拟流程都在这），"
+            "某拍看不清再 `get_harness_beat(turn=…)`、必要时 `get_harness_step(turn=…, step_i=…)`；"
+            "可只读 harness 仓对照「现状能力 vs 用户契约」。勿直接读 sessions/ 文件。\n"
+            f"本轮最多提 {_MAX_CANDIDATES} 条**增量**候选；下面的参照列表是已有提案/工作项，"
+            "**勿换皮重复其施力点**。禁止无信号空想：每条候选必须能指回具体 session 的行为证据。\n\n"
+            f"## 体感曲线（索引：时间, 1-4 分, 理由, session 句柄）\n{self._format_trend(trend)}\n\n"
+            f"## 已有提案/工作项（勿重复参照，{len(reference)} 条）\n{self._format_issues(reference)}\n\n"
             "调查完毕后**调 `submit_divergent` 一次**收尾：`proposals` 为 0..n 条候选（无则空数组），"
-            f"每条含 `title` + `fields`（{rfc_labels}）+ 可选 `covers`。字段契约由工具 input_schema 强校验。"
+            f"每条含 `title` + `fields`（{rfc_labels}）。字段契约由工具 input_schema 强校验。"
         )
-        with bind_session_store(self._store):
-            out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
-        # submit_divergent 是 stop tool：binding 返回 `{"proposals":[...]}` 的 JSON 即 agent.run 的返回。
-        return out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+        return run_agent_def(
+            self._agent_def,
+            msg,
+            store=self._store,
+            repo=self._repo,
+            timeout=_DIVERGENT_TIMEOUT,
+            on_event=self._on_event,
+        )
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
         rows = sorted(self._store.index(), key=lambda e: e["created_at"])
@@ -175,9 +158,8 @@ class Divergent:
     def _format_issues(issues: list) -> str:
         if not issues:
             return "（空）"
-        return "\n".join(
-            f"- #{i.number} [{','.join(i.labels)}] {i.title}\n  {i.body}" for i in issues
-        )
+        # 紧凑索引：只给号/标签/标题（正文不喂——参照用，防上下文膨胀）。
+        return "\n".join(f"- #{i.number} [{','.join(i.labels)}] {i.title}" for i in issues)
 
     @staticmethod
     def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:
@@ -193,12 +175,3 @@ class Divergent:
     def _emit(self, *, running: bool, status: str, **kw: object) -> None:
         if self._on_status is not None:
             self._on_status(running=running, status=status, **kw)
-
-
-def _norm_label(s: object) -> str:
-    return "".join(str(s).split())
-
-
-def _rfc_fields_by_label(fields: dict) -> dict:
-    label_to_key = {_norm_label(f.label): f.key for f in _schema_fields_of(kind="rfc")}
-    return {label_to_key.get(_norm_label(k), str(k)): v for k, v in fields.items()}

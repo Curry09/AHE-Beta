@@ -1,16 +1,15 @@
-"""divergent 落候选 + designer.gate_once 晋升（stub agent，不跑真 LLM）。"""
+# Spec-0029/T5：divergent = discovery 轨生成器单测（stub agent，不跑真 LLM）。
+"""验证 divergent：吃会话证据（体感索引）+ 勿重复参照（紧凑索引），产 proposal+from-divergent
+（不可领）；每轮硬顶 3 条；字段不全跳过；drift-guard（submit_divergent yaml == rfc_input_schema）。
+旧 gate 三路测试已随 gate_once 退役删除——准入裁决测试见 test_owner.py（Spec-0029/T6）。"""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from auto_designer.designer.designer import Designer, GateOutcome
+from auto_designer.designer import issue_schema as sc
 from auto_designer.designer.divergent import Divergent, DivergentOutcome
-from auto_designer.designer.issue_schema import (
-    DIVERGENT,
-    RFC_LABEL,
-    TRIAGED,
-)
 from auto_designer.models import (
     FeelingScore,
     IssueDraft,
@@ -48,135 +47,33 @@ def _rfc_fields() -> dict:
     }
 
 
+def _submit(proposals: list) -> str:
+    return json.dumps({"proposals": proposals}, ensure_ascii=False)
+
+
 class _StubDivergent(Divergent):
     def __init__(self, *args, canned: str, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._canned = canned
+        self.seen_trend: list = []
+        self.seen_reference: list = []
 
-    def _run_agent(self, **_kwargs) -> str:
+    def _run_agent(self, *, trend: list, reference: list) -> str:
+        self.seen_trend = trend
+        self.seen_reference = reference
         return self._canned
 
 
-class _StubGateDesigner(Designer):
-    def __init__(self, *args, canned: str, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._canned = canned
-        self.gate_calls = 0
-
-    def _run_agent(self, **_kwargs) -> str:
-        return "[]"
-
-    def _run_gate_agent(self, **_kwargs) -> str:
-        self.gate_calls += 1
-        return self._canned
-
-
-def test_divergent_creates_unclaimable_candidates(tmp_path: Path) -> None:
-    tracker = FakeTracker()
+def _divergent(tmp_path: Path, tracker: FakeTracker, canned: str, **kw) -> _StubDivergent:
     store = SessionStore(tmp_path / "sessions")
     _seed_session(store)
-    import json
-
-    # Spec-0028：divergent 走 submit_divergent（stop tool）→ 返回 {"proposals":[...]}（同 RFC shape）。
-    canned = json.dumps(
-        {"proposals": [{"title": "状态交接产品化", "fields": _rfc_fields()}]},
-        ensure_ascii=False,
+    return _StubDivergent(
+        tracker, store, str(tmp_path / "harness"), str(tmp_path / "agent"), canned=canned, **kw
     )
-    d = _StubDivergent(
-        tracker,
-        store,
-        str(tmp_path / "harness"),
-        str(tmp_path / "agent"),
-        canned=canned,
-        round_provider=lambda: 2,
-    )
-    out = d.propose_once()
-    assert isinstance(out, DivergentOutcome)
-    assert out.count == 1
-    issues = tracker.list_open_issues()
-    assert len(issues) == 1
-    assert DIVERGENT in issues[0].labels
-    assert "round-2" in issues[0].labels
-    assert TRIAGED not in issues[0].labels
-    assert RFC_LABEL not in issues[0].labels
-
-
-def test_gate_promote_hold_drop(tmp_path: Path) -> None:
-    import json
-
-    tracker = FakeTracker()
-    store = SessionStore(tmp_path / "sessions")
-    _seed_session(store)
-    a = tracker.create_issue(
-        IssueDraft(title="cand-a", body="x", labels=[DIVERGENT, "round-1"])
-    )
-    b = tracker.create_issue(
-        IssueDraft(title="cand-b", body="y", labels=[DIVERGENT, "round-1"])
-    )
-    c = tracker.create_issue(
-        IssueDraft(title="cand-c", body="z", labels=[DIVERGENT, "round-2"])
-    )
-    # Spec-0028：gate 走 submit_gate（stop tool）→ 返回 {"gate_decisions":[...]}。
-    canned = json.dumps(
-        {
-            "gate_decisions": [
-                {"issue": a.number, "disposition": "promote", "note": "两轮仍出现"},
-                {"issue": b.number, "disposition": "hold", "note": "再看一轮"},
-                {"issue": c.number, "disposition": "drop", "note": "已被 RFC 覆盖"},
-            ]
-        },
-        ensure_ascii=False,
-    )
-    g = _StubGateDesigner(
-        tracker, store, str(tmp_path / "harness"), str(tmp_path / "agent"), canned=canned
-    )
-    out = g.gate_once()
-    assert isinstance(out, GateOutcome)
-    assert out.promoted == [a.number]
-    assert b.number in out.held
-    assert out.dropped == [c.number]
-
-    open_issues = {i.number: i for i in tracker.list_open_issues()}
-    assert a.number in open_issues
-    assert DIVERGENT not in open_issues[a.number].labels
-    assert TRIAGED in open_issues[a.number].labels
-    assert "feature" in open_issues[a.number].labels
-    assert b.number in open_issues
-    assert DIVERGENT in open_issues[b.number].labels
-    assert c.number not in open_issues  # dropped closed
-
-
-def test_gate_skips_llm_when_no_candidates(tmp_path: Path) -> None:
-    tracker = FakeTracker()
-    store = SessionStore(tmp_path / "sessions")
-    g = _StubGateDesigner(
-        tracker, store, str(tmp_path / "harness"), str(tmp_path / "agent"), canned="[]"
-    )
-    out = g.gate_once()
-    assert out.promoted == out.held == out.dropped == []
-    assert g.gate_calls == 0
-
-
-def test_submit_gate_yaml_matches_contract() -> None:
-    """drift-guard：submit_gate.tool.yaml 的 input_schema 是 agent_contract.gate_input_schema() 的
-    生成副本，必须深度相等（Spec-0028）。"""
-    import yaml
-
-    from auto_designer.designer.agent_contract import gate_input_schema
-
-    p = (
-        Path(__file__).resolve().parents[2]
-        / "agent_defs"
-        / "designer"
-        / "tools"
-        / "submit_gate.tool.yaml"
-    )
-    assert yaml.safe_load(p.read_text(encoding="utf-8"))["input_schema"] == gate_input_schema()
 
 
 def test_submit_divergent_yaml_matches_contract() -> None:
-    """drift-guard：submit_divergent.tool.yaml 的 input_schema = agent_contract.rfc_input_schema()
-    （divergent 候选形态即 RFC 提案，Spec-0028）。"""
+    """drift-guard：submit_divergent.tool.yaml 的 input_schema = rfc_input_schema()（同 RFC shape）。"""
     import yaml
 
     from auto_designer.designer.agent_contract import rfc_input_schema
@@ -191,91 +88,52 @@ def test_submit_divergent_yaml_matches_contract() -> None:
     assert yaml.safe_load(p.read_text(encoding="utf-8"))["input_schema"] == rfc_input_schema()
 
 
-def test_orchestrator_order_includes_divergent_and_gate(tmp_path: Path) -> None:
-    """d 段顺序：triage → (synth∥divergent) → gate → b。"""
-    import subprocess
+def test_divergent_creates_unclaimable_proposal(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    canned = _submit([{"title": "状态交接产品化", "fields": _rfc_fields()}])
+    d = _divergent(tmp_path, tracker, canned, round_provider=lambda: 2)
+    out = d.propose_once()
+    assert isinstance(out, DivergentOutcome) and out.count == 1
+    issues = tracker.list_open_issues()
+    assert len(issues) == 1
+    labels = issues[0].labels
+    assert sc.PROPOSAL in labels and sc.FROM_DIVERGENT in labels
+    assert "round-2" in labels
+    assert sc.plane(labels) == sc.PROPOSAL
+    assert not sc.is_ready(labels=labels, state="open")  # 不可领，待 Owner 准入
 
-    from auto_designer.dev.agentic_developer import DevOutcome
-    from auto_designer.loop.orchestrator import Orchestrator
-    from auto_designer.models import Persona, SeedScenario
 
-    repo = tmp_path / "harness"
-    repo.mkdir()
-    subprocess.run(["git", "init", "-b", "main", str(repo)], check=True, capture_output=True)
-    (repo / "f").write_text("v0\n", encoding="utf-8")
-    subprocess.run(
-        ["git", "-C", str(repo), "-c", "user.email=t@x", "-c", "user.name=t", "add", "."],
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo),
-            "-c",
-            "user.email=t@x",
-            "-c",
-            "user.name=t",
-            "commit",
-            "-m",
-            "seed",
-        ],
-        check=True,
-        capture_output=True,
-    )
+def test_divergent_inputs_are_session_first(tmp_path: Path) -> None:
+    """输入 = 体感索引 + 勿重复参照（open 提案/ready），不吃 triaged backlog/runtime_agg。"""
+    tracker = FakeTracker()
+    ref1 = tracker.create_issue(
+        IssueDraft(title="已有提案", body="x", labels=[sc.PROPOSAL, sc.FROM_TRIAGE])
+    ).number
+    ref2 = tracker.create_issue(IssueDraft(title="ready 项", body="x", labels=[sc.READY])).number
+    tracker.create_issue(IssueDraft(title="raw report", body="x", labels=[sc.REPORT]))  # 不作参照
+    d = _divergent(tmp_path, tracker, _submit([]))
+    d.propose_once()
+    assert len(d.seen_trend) == 1  # 体感索引喂进
+    assert {i.number for i in d.seen_reference} == {ref1, ref2}  # 参照只含提案/ready
 
-    events: list[str] = []
 
-    class _L:
-        def launch(self, ref, workspace_dir=None):
-            return ("h", ref)
+def test_divergent_caps_at_three(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    many = [{"title": f"候选{i}", "fields": _rfc_fields()} for i in range(5)]
+    out = _divergent(tmp_path, tracker, _submit(many)).propose_once()
+    assert out.count == 3  # 每轮硬顶
 
-    class _T:
-        def triage_once(self):
-            events.append("triage")
 
-    class _D:
-        def propose_once(self):
-            events.append("synthesize")
+def test_divergent_incomplete_fields_skipped(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    out = _divergent(
+        tmp_path, tracker, _submit([{"title": "半成品", "fields": {"问题": "只填了这个"}}])
+    ).propose_once()
+    assert out.count == 0
+    assert tracker.list_open_issues() == []
 
-        def gate_once(self):
-            events.append("gate")
-            return GateOutcome()
 
-    class _V:
-        def propose_once(self):
-            events.append("divergent")
-            return DivergentOutcome()
-
-    class _Dev:
-        def work_one(self, skip=None):
-            events.append("dev")
-            return DevOutcome()
-
-    def run_session(persona, scenario, harness, *, workspace_dir=None):
-        events.append("session")
-
-    orch = Orchestrator(
-        launcher=_L(),
-        harness_repo=str(repo),
-        fixed_set=[
-            (
-                Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s"),
-                SeedScenario(description="s"),
-            )
-        ],
-        developer_agents=[_Dev()],
-        run_session_fn=run_session,
-        initial_ref="main",
-        triagers=[_T()],
-        designers=[_D()],
-        divergents=[_V()],
-    )
-    orch.run_round("main")
-    # session then triage; synth∥divergent 顺序不定；gate 在二者之后；dev 最后
-    assert events[0] == "session"
-    assert events[1] == "triage"
-    assert set(events[2:4]) == {"synthesize", "divergent"}
-    assert events[4] == "gate"
-    assert events[5] == "dev"
+def test_divergent_no_submit_is_noop(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    out = _divergent(tmp_path, tracker, "散文，没调 submit").propose_once()
+    assert out.count == 0
