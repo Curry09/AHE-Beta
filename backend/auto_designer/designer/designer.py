@@ -20,7 +20,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from auto_designer.designer.issue_schema import RFC_LABEL, SUPERSEDED, TRIAGED
+from auto_designer.designer.issue_schema import (
+    DIVERGENT,
+    GATE_DROPPED,
+    RFC_LABEL,
+    SUPERSEDED,
+    TRIAGED,
+)
 from auto_designer.designer.issue_schema import fields_of as _schema_fields_of
 from auto_designer.designer.issue_schema import render as _schema_render
 from auto_designer.designer.issue_schema import validate as _schema_validate
@@ -94,6 +100,15 @@ class DesignOutcome:
         return len(self.proposal_numbers)
 
 
+@dataclass
+class GateOutcome:
+    """一次 gate_once：晋升 / 暂缓 / 丢弃的票号。"""
+
+    promoted: list[int] = field(default_factory=list)
+    held: list[int] = field(default_factory=list)
+    dropped: list[int] = field(default_factory=list)
+
+
 @dataclass(frozen=True)
 class _Proposal:
     """一条解析后的 RFC 提案（Spec-0025/T4）：标题 + RFC 字段(中文 label 键) + 覆盖的 triaged 票号。"""
@@ -128,6 +143,44 @@ def _parse_covers(raw: object) -> tuple[int, ...]:
         if x not in out:
             out.append(x)
     return tuple(out)
+
+
+def _parse_gate_decisions(text: str) -> list[dict]:
+    """gate result → [{issue, disposition, note}, ...]；解析失败返回 []。"""
+    if not text:
+        return []
+    data: object | None = None
+    fenced = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", text, re.DOTALL)
+    if fenced is not None:
+        try:
+            data = json.loads(fenced.group(1))
+        except (ValueError, TypeError):
+            data = None
+    if data is None:
+        for chunk in _iter_top_level_arrays(text):
+            try:
+                parsed = json.loads(chunk)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(parsed, list):
+                data = parsed
+    if not isinstance(data, list):
+        return []
+    out: list[dict] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        num = item.get("issue")
+        if isinstance(num, bool) or not isinstance(num, int) or num <= 0:
+            continue
+        out.append(
+            {
+                "issue": num,
+                "disposition": str(item.get("disposition") or "hold"),
+                "note": str(item.get("note") or ""),
+            }
+        )
+    return out
 
 
 def _iter_top_level_arrays(s: str):
@@ -252,6 +305,115 @@ class Designer:
             detail=(result_text or None),  # 最终报告全文（详情面板展示，不截断）
         )
         return DesignOutcome(proposal_numbers=numbers)
+
+    def gate_once(self) -> GateOutcome:
+        """晋升评审（逻辑角色 Promoter）：审 open divergent 候选 → promote|hold|drop。
+
+        实现上复用本 designer agent（换任务消息），不新建 agent 定义。无候选时跳过 LLM。
+        promote：去掉 divergent，加上 feature + triaged（进可领集合）；hold：保持；drop：关闭。
+        """
+        backlog = self._tracker.list_open_issues()
+        candidates = [i for i in backlog if DIVERGENT in i.labels]
+        if not candidates:
+            self._emit(running=False, status="无 divergent 候选，跳过 gate")
+            return GateOutcome()
+
+        rfcs = [i for i in backlog if RFC_LABEL in i.labels]
+        trend = self._feeling_trend()
+        self._emit(running=True, status=f"gate 评审中…（{len(candidates)} 条候选）")
+        result_text = self._run_gate_agent(candidates=candidates, rfcs=rfcs, trend=trend)
+        decisions = _parse_gate_decisions(result_text)
+
+        by_number = {i.number: i for i in candidates}
+        promoted: list[int] = []
+        held: list[int] = []
+        dropped: list[int] = []
+        self._tracker.ensure_labels([DIVERGENT, GATE_DROPPED, "feature", TRIAGED])
+
+        seen: set[int] = set()
+        for dec in decisions:
+            num = dec.get("issue")
+            if not isinstance(num, int) or num not in by_number or num in seen:
+                continue
+            seen.add(num)
+            issue = by_number[num]
+            disp = str(dec.get("disposition", "")).strip().lower()
+            note = str(dec.get("note") or "").strip()
+            try:
+                if disp == "promote":
+                    # 去 divergent，保留 round-* 与其它；加 feature + triaged
+                    keep = [x for x in issue.labels if x != DIVERGENT]
+                    new_labels = list(dict.fromkeys([*keep, "feature", TRIAGED]))
+                    self._tracker.set_labels(num, new_labels)
+                    if note:
+                        self._tracker.add_comment(num, f"gate: promote — {note}")
+                    else:
+                        self._tracker.add_comment(num, "gate: promote → feature+triaged")
+                    promoted.append(num)
+                elif disp == "drop":
+                    keep = [x for x in issue.labels if x != DIVERGENT]
+                    self._tracker.set_labels(num, list(dict.fromkeys([*keep, GATE_DROPPED])))
+                    self._tracker.set_state(num, "closed", note or "gate: drop")
+                    dropped.append(num)
+                else:  # hold 或未知 → hold
+                    if note:
+                        self._tracker.add_comment(num, f"gate: hold — {note}")
+                    held.append(num)
+            except Exception:  # noqa: BLE001
+                pass
+
+        # 未出现在决策里的候选默认 hold（不丢）
+        for i in candidates:
+            if i.number not in seen:
+                held.append(i.number)
+
+        self._emit(
+            running=False,
+            status=(
+                f"gate：晋升 {len(promoted)} · 暂缓 {len(held)} · 丢弃 {len(dropped)}"
+            ),
+            proposals=promoted,
+            detail=(result_text or None),
+        )
+        return GateOutcome(promoted=promoted, held=held, dropped=dropped)
+
+    def _run_gate_agent(
+        self,
+        *,
+        candidates: list,
+        rfcs: list,
+        trend: list[tuple[str, int, str, str]],
+    ) -> str:
+        os.environ["SANDBOX_WORK_DIR"] = str(self._repo.resolve())
+        from nexau import Agent, AgentConfig  # noqa: PLC0415
+
+        cfg = AgentConfig.from_yaml(config_path=self._agent_def / "agent.yaml")
+        # 晋升评审用短预算即可
+        cfg.max_iterations = min(int(getattr(cfg, "max_iterations", 600) or 600), 80)
+        if self._on_event is not None:
+            from auto_designer.loop.live_tracer import StepTracer  # noqa: PLC0415
+
+            cfg.resolved_tracer = StepTracer(self._on_event)
+        agent = Agent(config=cfg)
+        msg = (
+            "你现在切换为 **晋升评审（gate / Promoter）** 模式：覆盖 synthesize 的「出 RFC」任务。"
+            "只评审下列 divergent 候选是否晋升进可领 backlog。\n\n"
+            "## 判定（语义，勿死抠字面）\n"
+            "- **promote**：近轮体感/追问仍反复出现同类用户自拟规程，且现有 open RFC **未覆盖**"
+            "同一用户可感知施力点（纯 runtime 调参 ≠ 已覆盖产品面）。\n"
+            "- **hold**：信号还薄、或刚出现一轮、或与某 RFC 部分重叠待观察。\n"
+            "- **drop**：已被 RFC/现状实质覆盖、或明显过拟合某题、或无法用本轮信号辩护。\n"
+            "每条候选都必须给 disposition；不确定则 hold。\n\n"
+            f"## divergent 候选（{len(candidates)}）\n{self._format_backlog(candidates)}\n\n"
+            f"## 已 open RFC（{len(rfcs)}）\n{self._format_backlog(rfcs)}\n\n"
+            f"## 体感曲线\n{self._format_trend(trend)}\n\n"
+            "可按需 `get_session_timeline` 核对；勿直接读 sessions/。\n\n"
+            "complete_task：result 只放 JSON 数组，每项："
+            '`{"issue": <票号>, "disposition": "promote"|"hold"|"drop", "note": "<一句理由>"}`。'
+        )
+        with bind_session_store(self._store):
+            out = _run_with_timeout(lambda: agent.run(message=msg), _DESIGN_TIMEOUT)
+        return _unwrap_result(out)
 
     def _mark_superseded(self, *, issue, rfc_number: int) -> None:
         """把被 RFC 综合的 triaged issue 标 superseded（保留原标签）+ 挂链，从 dev 可领集合排除。"""

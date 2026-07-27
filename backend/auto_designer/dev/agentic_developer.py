@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from auto_designer.designer.issue_schema import (
+    DIVERGENT,
     NEEDS_TRIAGE,
     RFC_LABEL,
     SUPERSEDED,
@@ -130,7 +131,7 @@ class AgenticDeveloper:
         self._budgets = {**DEFAULT_BUDGETS, **(budgets or {})}
 
     def _eligible(self, issues: list) -> list:
-        """可领集合：triaged 或 RFC 标签；排除 needs-triage（未分诊）/superseded（被 RFC 取代）。
+        """可领集合：triaged 或 RFC 标签；排除 needs-triage / superseded / divergent 候选。
 
         rejected/needs-info 已被 triage 关闭、不在 open 集。按票号升序（公平、老优先），
         carryover 自然发生——未被领的仍 open，下轮再领。
@@ -141,6 +142,7 @@ class AgenticDeveloper:
             if (TRIAGED in i.labels or RFC_LABEL in i.labels)
             and SUPERSEDED not in i.labels
             and NEEDS_TRIAGE not in i.labels
+            and DIVERGENT not in i.labels
         ]
         return sorted(ok, key=lambda i: i.number)
 

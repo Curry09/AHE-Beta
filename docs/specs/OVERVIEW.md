@@ -82,6 +82,9 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 ### 0026 观测看板前端全面重构：浅/深主题可切换 + 分诊(triager)可见 + persona 展示 + 设计 token 化
 观测看板前端从「纯黑底+白字、四栏、只显 SR-001 标识」全面重构为一套有设计系统的界面：① 引入设计 token 层（颜色/间距/字阶/圆角/阴影/层级）+ 浅/深主题可切换（跟随系统、localStorage 持久）；② 看板补齐 triager（分诊）房间——闭环 a→d1(triage)→d2(synthesize)→b 五角色都可见，各角色一致的强调色；③ 用户卡展示 persona（identity + 水平/领域/目标），不只 SR-001；issue/commit 卡在 0025 徽标基础上排版收敛；④ 详情面板信息架构刷新 + persona 块；⑤ 体感/backlog 曲线可视化（消费既有 /api/overview）；⑥ 响应式（页面不横向滚动、宽内容内部滚动）+ 两主题对比度/焦点态。后端仅小改：live 补 triager 排序、用户 agent 活动载荷带 persona 摘要。纯只读观测，不改闭环语义、不引 benchmark。
 
+### 0027 divergent PM + gate：产品候选并行通道与晋升评审
+在 0025 triage 漏斗旁并行一条产品候选通道：divergent PM 与 synthesize 同信号并行落 divergent 不可领候选；Designer.gate_once 做语义晋升（promote→feature+triaged / hold / drop）。默认 N_DIVERGENTS=0 关闭；dev 领取硬排除 divergent。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -183,6 +186,11 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0026 | 0026/T3 | 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线 | done | T2 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/components/Charts.tsx |
 | 0026 | 0026/T4 | 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛 | done | T1, T3 | frontend/src/components/AgentColumn.tsx<br>frontend/src/components/Card.tsx |
 | 0026 | 0026/T5 | 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块 | done | T2, T3 | frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/SessionDetail.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/components/detail/CommitDetail.tsx<br>frontend/src/components/SidePanel.tsx |
+| 0027 | 0027/T1 | issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径 | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
+| 0027 | 0027/T2 | Divergent 驱动器 + agent_defs/divergent_pm：落不可领产品候选 | done | T1 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/<br>backend/scripts/preview_divergent_pm_rounds.py<br>backend/scripts/preview_gate_on_divergent.py<br>backend/tests/designer/test_divergent_gate.py |
+| 0027 | 0027/T3 | Designer.gate_once：promote/hold/drop 语义晋升 | done | T1 | backend/auto_designer/designer/designer.py |
+| 0027 | 0027/T4 | 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关 | done | T2, T3 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/live.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_roster.py |
+| 0027 | 0027/T5 | dev 领取硬排除 divergent 候选 | done | T1 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
 
 ## 跨 feature 关系图
 
@@ -337,6 +345,13 @@ graph LR
         n0026_T4["T4 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛"]
         n0026_T5["T5 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块"]
     end
+    subgraph G0027[0027 divergent-pm-gate]
+        n0027_T1["T1 issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径"]
+        n0027_T2["T2 Divergent 驱动器 + agent_defs/divergent_pm：落不可领产品候选"]
+        n0027_T3["T3 Designer.gate_once：promote/hold/drop 语义晋升"]
+        n0027_T4["T4 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关"]
+        n0027_T5["T5 dev 领取硬排除 divergent 候选"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -418,6 +433,11 @@ graph LR
     n0026_T4 --> n0026_T3
     n0026_T5 --> n0026_T2
     n0026_T5 --> n0026_T3
+    n0027_T2 --> n0027_T1
+    n0027_T3 --> n0027_T1
+    n0027_T4 --> n0027_T2
+    n0027_T4 --> n0027_T3
+    n0027_T5 --> n0027_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -472,14 +492,15 @@ graph LR
 | backend/agent_defs/designer/systemprompt.md | 0016, 0024 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025 |
-| backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027 |
+| backend/auto_designer/designer/issue_schema.py | 0025, 0027 |
+| backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0027 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023 |
-| backend/auto_designer/loop/live.py | 0017, 0026 |
+| backend/auto_designer/loop/live.py | 0017, 0026, 0027 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025 |
-| backend/auto_designer/loop/roster.py | 0020, 0025 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0027 |
+| backend/auto_designer/loop/roster.py | 0020, 0025, 0027 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024 |
@@ -499,15 +520,16 @@ graph LR
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/entry.py | 0003, 0013, 0022 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0027 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
-| backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025 |
+| backend/tests/designer/test_issue_schema.py | 0025, 0027 |
+| backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0027 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025 |
 | backend/tests/loop/test_live.py | 0017, 0026 |
 | backend/tests/loop/test_metrics.py | 0003, 0025 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025 |
-| backend/tests/loop/test_roster.py | 0020, 0025 |
+| backend/tests/loop/test_roster.py | 0020, 0025, 0027 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
@@ -1213,6 +1235,39 @@ graph LR
     nT3 --> nT4
     nT2 --> nT5
     nT3 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+```
+
+### 0027 divergent PM + gate：产品候选并行通道与晋升评审（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径"]
+    nT2["T2 Divergent 驱动器 + agent_defs/divergent_pm：落不可领产品候选"]
+    nT3["T3 Designer.gate_once：promote/hold/drop 语义晋升"]
+    nT4["T4 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关"]
+    nT5["T5 dev 领取硬排除 divergent 候选"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT4
+    nT3 --> nT4
+    nT1 --> nT5
 ```
 
 演化图：

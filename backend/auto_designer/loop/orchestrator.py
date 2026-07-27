@@ -1,6 +1,6 @@
 # Spec-0007/T2：去 release 链 + 会话级 main SHA 快照回灌。
-"""闭环编排 orchestrator：a（用户产 issue+体感）→ d（创新者综合全局产结构性提案，可选）
-→ b（开发者 agent 直推 main）→ c（回灌 main SHA）。
+"""闭环编排 orchestrator：a（用户产 issue+体感）→ d1 triage → d2 (synthesize∥divergent)
+→ d3 gate → b（开发者直推 main）→ c（回灌 main SHA）。
 
 纯 trunk（单 main）：去掉 release_ref 链——run_round 不再把 outcome.tag 链式回灌。每局会话开始解析
 harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA checkout → 单会话内 harness 不在
@@ -10,6 +10,9 @@ harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA c
 无体感门禁：开发者 agent（带 git 工具）领 issue 后自己改 harness、commit、打 vK tag、push main，直接
 推进（体感退化为观测、benchmark held-out，坏 commit 靠后续多轮迭代回正——梯度下降式）。多 dev 串行各领
 不同 issue。各部件依赖注入，便于 mock 整轮。
+
+divergent（可选）：与 synthesize 并行落 `divergent` 候选（不可领）；gate 复用 designer.gate_once
+做语义晋升（promote→feature+triaged）。
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Protocol
 
 from auto_designer.designer.designer import Designer
+from auto_designer.designer.divergent import Divergent
 from auto_designer.dev.agentic_developer import AgenticDeveloper
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
@@ -63,6 +67,7 @@ class Orchestrator:
         initial_ref: str,
         triagers: list | None = None,
         designers: list[Designer] | None = None,
+        divergents: list[Divergent] | None = None,
         on_round_start: Callable[[int], None] | None = None,
         on_round_end: Callable[[int, str], None] | None = None,
         max_parallel_users: int = 1,
@@ -73,11 +78,11 @@ class Orchestrator:
         # 固定列表 = 每轮同一套；callable = 每轮重新抽（如有放回随机 persona×task）。
         self._fixed_set = fixed_set
         self._developers = developer_agents
-        # Spec-0025/T6：d 段两 agent——先 triage（把本轮新 raw issue 规范化）、再 synthesize（在已
-        # triaged backlog 上产 RFC）。都在 b 之前，让 triaged issue + RFC 一起进 dev 可领集合。
+        # d 段：triage → (synthesize ∥ divergent) → gate → b。
+        # divergent 只落不可领候选；gate 复用 designer.gate_once 做晋升评审。
         self._triagers = triagers or []
-        # synthesize（可选）：在 a、triage 之后、b 之前综合全局产结构性 RFC，供开发者领取。
         self._designers = designers or []
+        self._divergents = divergents or []
         self._run_session = run_session_fn
         self._initial_ref = initial_ref  # 跟踪的主干分支名（trunk = "main"），每局解析其 HEAD SHA
         # 轮次观测回调（可选）：round 从 1 起；end 时携带本轮 main 最新 SHA。看板运行态由此得知轮数。
@@ -85,6 +90,7 @@ class Orchestrator:
         self._on_round_end = on_round_end
         # Spec-0017/T3：a 段用户会话并发度（并发单元=整局会话）。默认 1 = 与旧串行行为等价；
         # d/b 段始终串行（同仓 push + 全局 env 的固有约束，见 spec-0017 Non-goal）。
+        # 注：synthesize∥divergent 在同轮内线程池并行（只读 harness + 写 tracker），不碰 git push。
         self._max_parallel_users = max(1, max_parallel_users)
         # Spec-0021/T1：编排仓完整性绊线（可选）。b 段后调用，dev agent 逃逸出沙箱改动编排仓即抛错
         # 中止本轮（fail-closed）。None 则跳过，退化为今天行为。
@@ -107,13 +113,22 @@ class Orchestrator:
         #    并发单元=整局会话，信封内部时序不动）。max_parallel_users=1 时行为与旧串行等价。
         prepared: list[tuple[Persona, SeedScenario, str]] = []
         for persona, scenario in self._session_plan():
-            if scenario.workspace is not None:
-                workspace_dir = materialize_workspace(scenario.workspace)
-                # Spec-0009/T3：materialize 之后、launch 之前按 scenario.workspace.setup 备好依赖
-                # （约定建 per-workspace .venv）——两侧共享的这个目录开跑前就绪。
-                ensure_deps(workspace_dir, scenario.workspace)
-            else:
-                workspace_dir = tempfile.mkdtemp(prefix="shared_ws_")
+            try:
+                if scenario.workspace is not None:
+                    workspace_dir = materialize_workspace(scenario.workspace)
+                    # Spec-0009/T3：materialize 之后、launch 之前按 scenario.workspace.setup 备好依赖
+                    # （约定建 per-workspace .venv）——两侧共享的这个目录开跑前就绪。
+                    ensure_deps(workspace_dir, scenario.workspace)
+                else:
+                    workspace_dir = tempfile.mkdtemp(prefix="shared_ws_")
+            except Exception:  # noqa: BLE001
+                # 单局 clone/setup 失败（如老仓 pip 装不上）不废整轮——记日志跳过，其余会话继续。
+                print(
+                    f"[orchestrator] 备工作区失败（persona={persona.identity}），"
+                    "跳过该局，同轮其余会话继续："
+                )
+                traceback.print_exc()
+                continue
             prepared.append((persona, scenario, workspace_dir))
 
         def _one_session(persona: Persona, scenario: SeedScenario, workspace_dir: str) -> None:
@@ -149,14 +164,30 @@ class Orchestrator:
                 print("[orchestrator] triage 异常，跳过该 triager，本轮继续：")
                 traceback.print_exc()
 
-        # d2（synthesize，可选）：在**已 triaged** backlog（含跨轮积压）+ 体感曲线上综合产结构性 RFC
-        #    （打 RFC 标签）写回 tracker。跑在 b 之前，让 RFC 与 triaged issue 一起进 dev 可领集合；
-        #    synthesize 不碰 git、不改文件，只提方向。无 designer 时整段跳过。同理单个崩溃不废整轮。
+        # d2：synthesize ∥ divergent（并行）；再 d3 gate（designer.gate_once）。
+        # synthesize 产 RFC；divergent 产不可领候选；gate 语义晋升后 feature+triaged 才可领。
+        parallel_jobs: list[tuple[str, Callable[[], object]]] = []
+        for designer in self._designers:
+            parallel_jobs.append(("synthesize", designer.propose_once))
+        for divergent in self._divergents:
+            parallel_jobs.append(("divergent", divergent.propose_once))
+        if parallel_jobs:
+            with ThreadPoolExecutor(max_workers=len(parallel_jobs)) as pool:
+                futures = {pool.submit(fn): name for name, fn in parallel_jobs}
+                for fut in as_completed(futures):
+                    name = futures[fut]
+                    try:
+                        fut.result()
+                    except Exception:  # noqa: BLE001
+                        print(f"[orchestrator] {name} 异常，跳过，本轮继续：")
+                        traceback.print_exc()
+
+        # d3 gate：复用 designer 做晋升评审（无 designer 则候选积压到下轮）。
         for designer in self._designers:
             try:
-                designer.propose_once()
+                designer.gate_once()
             except Exception:  # noqa: BLE001
-                print("[orchestrator] synthesize 异常，跳过该 designer，本轮继续：")
+                print("[orchestrator] gate 异常，跳过该 designer，本轮继续：")
                 traceback.print_exc()
 
         # b：多个开发者 agent 依次各领一条不同 issue，自主改 harness 直推 main（无 branch/merge/门禁）。

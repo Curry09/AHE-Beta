@@ -305,6 +305,9 @@ def main() -> int:
     triager_agent_def = str(
         ROOT / "agent_defs" / "triage_agent"
     )  # Spec-0025：triage agent 定义目录
+    divergent_agent_def = str(
+        ROOT / "agent_defs" / "divergent_pm"
+    )  # divergent PM（产品候选，经 gate 晋升）
 
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
     # persona 从 distill 卡库（persona_library.json）注入、场景从种子卡库（seeds.json）经
@@ -549,6 +552,46 @@ def main() -> int:
         for i in range(roster["designer"])
     ]
 
+    def make_divergent_status(agent_id, label):
+        def cb(*, running, status, detail=None, proposals=None):
+            update_agent(
+                data_dir=DATA,
+                agent_id=agent_id,
+                role="divergent",
+                label=label,
+                running=running,
+                status=status,
+                detail=detail,
+                round_no=current["round"],
+            )
+            if not running:
+                archive_agent(
+                    data_dir=DATA,
+                    agent_id=agent_id,
+                    round_no=current["round"],
+                    extra={"kind": "divergent_run", "proposals": proposals or []},
+                )
+
+        return cb
+
+    from auto_designer.designer.divergent import Divergent  # noqa: PLC0415
+
+    divergents = [
+        Divergent(
+            tracker,
+            store,
+            str(repo),
+            divergent_agent_def,
+            on_status=make_divergent_status(
+                f"divergent-{i}",
+                "divergent" if roster["divergent"] == 1 else f"divergent#{i + 1}",
+            ),
+            on_event=make_event_logger(f"divergent-{i}"),
+            round_provider=lambda: current["round"] or None,
+        )
+        for i in range(roster["divergent"])
+    ]
+
     # Spec-0017/T3：a 段并发度。默认 = roster 用户数（全并行），MAX_PARALLEL_USERS 环境变量
     # 可下调（设 1 即回到串行）。覆盖面（每轮跑几个 persona，PERSONA_LIMIT/roster）与并发度
     # （同时跑几个）是两个独立旋钮。
@@ -574,7 +617,8 @@ def main() -> int:
         run_session_fn=user_run_session_fn,
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
         triagers=triagers,  # Spec-0025/T6：d1 triage（规范化）跑在 synthesize 之前
-        designers=designers,  # synthesize 接入闭环：a → d1(triage) → d2(synthesize) → b → c
+        designers=designers,  # synthesize + gate
+        divergents=divergents,  # 与 synthesize 并行落候选
         on_round_start=on_round_start,  # 轮次运行态 → data/live/run.json（看板 /api/state）
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
@@ -583,7 +627,8 @@ def main() -> int:
 
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
-        f"{len(triagers)} triager × {len(designers)} synthesize × {len(developers)} dev，"
+        f"{len(triagers)} triager × {len(designers)} synthesize × {len(divergents)} divergent × "
+        f"{len(developers)} dev，"
         f"a 段并发 {max_parallel_users}，dev 预算 "
         f"bug={budgets['bug']}/feature={budgets['feature']}/rfc={budgets['rfc']}，"
         f"dev 直推 main，真模型）..."
