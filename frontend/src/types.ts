@@ -60,7 +60,13 @@ export interface RunState {
 }
 
 // 按轮归档的已完成工作项（data/live/history.json）
-export type HistoryKind = "user_session" | "designer_run" | "dev_run";
+export type HistoryKind =
+  | "user_session"
+  | "triager_run"
+  | "designer_run"
+  | "divergent_run"
+  | "owner_run"
+  | "dev_run";
 
 export interface HistoryItem {
   kind: HistoryKind;

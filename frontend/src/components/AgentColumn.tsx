@@ -26,6 +26,10 @@ function historyMeta(item: HistoryItem): ReactNode {
       </>
     );
   }
+  // Spec-0029：triager 的结果已在 status 行（升提案/驳回计数），meta 不重复；owner 显准入数。
+  if (item.kind === "triager_run") return null;
+  if (item.kind === "owner_run") return <span>{(item.proposals ?? []).length} 条准入</span>;
+  if (item.kind === "divergent_run") return <span>{(item.proposals ?? []).length} 条候选</span>;
   return <span>{(item.proposals ?? []).length} 条提案</span>;
 }
 
