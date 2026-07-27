@@ -1,0 +1,41 @@
+type: tool
+name: submit_gate
+description: >-
+  Submit your promotion review of the divergent product candidates and finish.
+  This is the ONLY way to finish the gate task — call it exactly once.
+
+  Pass `gate_decisions`: one item per candidate you decided on. Each item needs
+  `issue` (the candidate's number) and `disposition` — one of `promote` (it's a
+  real, dev-ready product need → becomes feature+triaged), `hold` (keep it as a
+  candidate for now), or `drop` (not worth pursuing → closed). Optionally give a
+  short `note`. Candidates you omit default to `hold`.
+
+  The parameters are schema-validated at call time; invalid values (unknown
+  disposition, self-invented keys) are rejected and you must retry.
+# Spec-0028：input_schema 是 agent_contract.gate_input_schema() 的生成副本（受 drift-guard 测试守护：
+# test_divergent_gate.py 断言二者深度相等）。改契约改 agent_contract 后需重生成此块，否则测试会红。
+input_schema:
+  type: object
+  properties:
+    gate_decisions:
+      type: array
+      items:
+        type: object
+        properties:
+          issue:
+            type: integer
+          disposition:
+            type: string
+            enum:
+              - promote
+              - hold
+              - drop
+          note:
+            type: string
+        required:
+          - issue
+          - disposition
+        additionalProperties: false
+  required:
+    - gate_decisions
+  additionalProperties: false

@@ -79,3 +79,12 @@ def test_render_unknown_kind_raises() -> None:
         raise AssertionError("应抛 ValueError")
     except ValueError:
         pass
+
+
+def test_divergent_and_gate_dropped_status_and_backlog() -> None:
+    # Spec-0027/T1：候选不可领；丢弃终态；promote 后可进 backlog。
+    assert sc.triage_status([sc.DIVERGENT, "round-1"]) == sc.DIVERGENT
+    assert sc.triage_status([sc.GATE_DROPPED, sc.DIVERGENT]) == sc.GATE_DROPPED
+    assert not sc.is_backlog_by_labels([sc.DIVERGENT, "feature"])
+    assert not sc.is_backlog_by_labels([sc.GATE_DROPPED])
+    assert sc.is_backlog_by_labels([sc.TRIAGED, "feature"])  # promote 后

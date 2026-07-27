@@ -31,3 +31,20 @@ def submit_rfcs(*, proposals: list | None = None, **kwargs: Any) -> str:
     无自创字段）。额外的 nexau 注入参数（agent_state / global_storage / ctx 等）由 **kwargs 吸收。
     """
     return json.dumps({"proposals": proposals or []}, ensure_ascii=False)
+
+
+def submit_divergent(*, proposals: list | None = None, **kwargs: Any) -> str:
+    """divergent PM 收尾工具（Spec-0028）：回显已校验的候选 proposals（成为 agent.run 的返回值）。
+
+    与 submit_rfcs 同 shape（title + fields[RFC 字段] + 可选 covers）——divergent 候选形态即 RFC 提案，
+    只是 driver 落库时打 `divergent` 标签、不进可领 backlog。
+    """
+    return json.dumps({"proposals": proposals or []}, ensure_ascii=False)
+
+
+def submit_gate(*, gate_decisions: list | None = None, **kwargs: Any) -> str:
+    """gate（晋升评审）收尾工具（Spec-0028）：回显已校验的 gate_decisions（成为 agent.run 的返回值）。
+
+    每条已由 input_schema 校验（issue + disposition[promote/hold/drop] 必填、可选 note、无自创字段）。
+    """
+    return json.dumps({"gate_decisions": gate_decisions or []}, ensure_ascii=False)

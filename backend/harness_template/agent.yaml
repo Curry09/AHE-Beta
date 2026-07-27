@@ -7,7 +7,7 @@ system_prompt: ./agents/main.md
 system_prompt_type: string
 # structured：模型以 XML 输出工具调用、由 nexau 解析，不依赖原生 function calling（任何 chat 模型可用）。
 tool_call_mode: structured
-max_iterations: 30
+max_iterations: 100
 
 llm_config:
   model: ${env.LLM_MODEL}

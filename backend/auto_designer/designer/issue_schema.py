@@ -33,6 +33,9 @@ REJECTED = "rejected"  # triage 驳回（带原因关闭，可领集合排除）
 NEEDS_INFO = "needs-info"  # triage 判信息不足（带原因关闭，可领集合排除）
 RFC_LABEL = "RFC"  # synthesize agent 产的结构综合提案（凌驾 type，dev 可领、最高预算）
 SUPERSEDED = "superseded"  # 被 RFC 取代的局部 issue（可领集合排除；具体 #号记 comment）
+# divergent PM 产的产品候选：open 但不可领；经 synthesize 的 gate_once 晋升后才变 triaged/feature。
+DIVERGENT = "divergent"
+GATE_DROPPED = "gate-dropped"  # gate 丢弃的候选（关闭）
 
 
 def round_label(round_no: int) -> str:
@@ -73,22 +76,22 @@ def priority_of(labels: list[str]) -> str | None:
 
 
 def triage_status(labels: list[str]) -> str | None:
-    """标签 → triage 状态（单值）：越决定性者胜——驳回/待补(终态关闭) > superseded(被 RFC 取代) >
-    triaged(可执行) > needs-triage(待处理)；都无则 None。"""
+    """标签 → triage 状态（单值）：越决定性者胜——驳回/待补/gate 丢弃(终态关闭) > superseded >
+    divergent(候选不可领) > triaged(可执行) > needs-triage(待处理)；都无则 None。"""
     ls = list(labels or [])
-    for s in (REJECTED, NEEDS_INFO, SUPERSEDED, TRIAGED, NEEDS_TRIAGE):
+    for s in (REJECTED, NEEDS_INFO, GATE_DROPPED, SUPERSEDED, DIVERGENT, TRIAGED, NEEDS_TRIAGE):
         if s in ls:
             return s
     return None
 
 
 def is_backlog_by_labels(labels: list[str]) -> bool:
-    """仅按标签判是否属「可执行 backlog」类：triaged 或 RFC，且未被 needs-triage/superseded/驳回排除。
-    不看开/关状态——供观测曲线按事件累计（关闭事件自会抵消）。"""
+    """仅按标签判是否属「可执行 backlog」类：triaged 或 RFC，且未被 needs-triage/superseded/驳回/
+    divergent 候选排除。不看开/关状态——供观测曲线按事件累计（关闭事件自会抵消）。"""
     ls = set(labels or [])
     if not (TRIAGED in ls or RFC_LABEL in ls):
         return False
-    return not (ls & {NEEDS_TRIAGE, SUPERSEDED, REJECTED, NEEDS_INFO})
+    return not (ls & {NEEDS_TRIAGE, SUPERSEDED, REJECTED, NEEDS_INFO, DIVERGENT, GATE_DROPPED})
 
 
 def is_executable_backlog(*, labels: list[str], state: str) -> bool:

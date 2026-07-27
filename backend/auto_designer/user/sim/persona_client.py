@@ -560,7 +560,7 @@ class AgenticPersonaClient:
         self,
         llm,
         *,
-        max_inner_steps: int = 4,
+        max_inner_steps: int = 8,
         timeout: float = 10.0,
         sandbox_factory=None,
     ) -> None:

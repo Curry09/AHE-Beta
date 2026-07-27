@@ -13,7 +13,13 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from auto_designer.designer.issue_schema import NEEDS_TRIAGE, RFC_LABEL, SUPERSEDED, TRIAGED
+from auto_designer.designer.issue_schema import (
+    DIVERGENT,
+    NEEDS_TRIAGE,
+    RFC_LABEL,
+    SUPERSEDED,
+    TRIAGED,
+)
 from auto_designer.dev.agentic_developer import AgenticDeveloper, DevOutcome
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.fake import FakeTracker
@@ -106,6 +112,21 @@ def test_eligible_excludes_needs_triage_and_superseded(tmp_path) -> None:
     assert outcome.issue_number == ok  # 只领 triaged 且非 superseded 那条
 
 
+def test_eligible_excludes_divergent(tmp_path) -> None:
+    # Spec-0027/T5：divergent 候选即使误带 triaged 也不可领；promote 后可领。
+    repo = _seed_repo(tmp_path)
+    tracker = FakeTracker()
+    tracker.create_issue(
+        IssueDraft(title="候选", body="x", labels=[DIVERGENT, TRIAGED, "feature"])
+    )
+    ok = tracker.create_issue(
+        IssueDraft(title="已晋升", body="x", labels=[TRIAGED, "feature"])
+    ).number
+
+    outcome = _dev(tracker, repo, tmp_path).work_one()
+    assert outcome.issue_number == ok
+
+
 def test_no_eligible_returns_empty(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     tracker = FakeTracker()
@@ -169,7 +190,7 @@ def test_default_budgets_when_not_given(tmp_path) -> None:
     _triaged(tracker, "feature票", kind="feature")
     dev = _dev(tracker, repo, tmp_path)  # 用 DEFAULT_BUDGETS
     dev.work_one()
-    assert dev.budgets == [60]  # feature 默认 60
+    assert dev.budgets == [120]  # feature 默认 120
 
 
 # ---- 收尾：回写 + 连带关闭 ----

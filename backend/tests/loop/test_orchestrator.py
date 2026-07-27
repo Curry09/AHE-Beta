@@ -460,3 +460,29 @@ def test_triage_runs_before_synthesize_before_dev(tmp_path) -> None:
     # a（session）→ d1 triage → d2 synth → b（dev），严格此序
     kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d", "dev")]
     assert kinds == ["session", "triage", "synth", "dev"]
+
+
+def test_callable_session_plan_redraws_each_round(tmp_path) -> None:
+    """fixed_set 为 callable 时每轮重抽 session 计划。"""
+    repo = _seed_repo(tmp_path)
+    events: list = []
+    calls = {"n": 0}
+
+    def plan():
+        calls["n"] += 1
+        return [(_persona(), SeedScenario(description=f"r{calls['n']}"))]
+
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", scenario.description))
+
+    orch = Orchestrator(
+        launcher=_Launcher(events),
+        harness_repo=str(repo),
+        fixed_set=plan,
+        developer_agents=[_Dev(events, DevOutcome())],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+    )
+    orch.run(2)
+    assert calls["n"] == 2
+    assert [e[1] for e in events if e[0] == "session"] == ["r1", "r2"]

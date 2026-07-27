@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from auto_designer.designer.issue_schema import (
+    DIVERGENT,
     NEEDS_TRIAGE,
     RFC_LABEL,
     SUPERSEDED,
@@ -42,13 +43,13 @@ _DEV_TIMEOUT = 900
 _ATTEMPT_REASON_CAP = 400
 # RFC/design issue body 里的覆盖声明机器行（复用 0020）：`covers: #5 #6`，最后一条匹配为准。
 _COVERS_LINE_RE = re.compile(r"^covers:((?:\s*#\d+)+)\s*$", re.MULTILINE)
-# 各 kind 的默认迭代预算（比 0020 调大；RFC 结构性改动最重、最高档）。env 覆盖见 run.py（T6）。
+# 各 kind 的默认迭代预算（相对 0025 初值再翻倍；RFC 结构性改动最重、最高档）。env 覆盖见 run.py（T6）。
 DEFAULT_BUDGETS: dict[str, int] = {
-    "bug": 60,
-    "feature": 60,
-    "chore": 50,
-    "document": 50,
-    "rfc": 100,
+    "bug": 120,
+    "feature": 120,
+    "chore": 100,
+    "document": 100,
+    "rfc": 200,
 }
 
 StatusFn = Callable[..., None]
@@ -130,7 +131,7 @@ class AgenticDeveloper:
         self._budgets = {**DEFAULT_BUDGETS, **(budgets or {})}
 
     def _eligible(self, issues: list) -> list:
-        """可领集合：triaged 或 RFC 标签；排除 needs-triage（未分诊）/superseded（被 RFC 取代）。
+        """可领集合：triaged 或 RFC 标签；排除 needs-triage / superseded / divergent 候选。
 
         rejected/needs-info 已被 triage 关闭、不在 open 集。按票号升序（公平、老优先），
         carryover 自然发生——未被领的仍 open，下轮再领。
@@ -141,6 +142,7 @@ class AgenticDeveloper:
             if (TRIAGED in i.labels or RFC_LABEL in i.labels)
             and SUPERSEDED not in i.labels
             and NEEDS_TRIAGE not in i.labels
+            and DIVERGENT not in i.labels
         ]
         return sorted(ok, key=lambda i: i.number)
 

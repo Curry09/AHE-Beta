@@ -1,0 +1,64 @@
+type: agent
+name: divergent_pm
+max_context_tokens: 128000
+system_prompt: ./systemprompt.md
+system_prompt_type: string
+# xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
+tool_call_mode: structured
+# 正式接线默认 120（发散+读 MANUAL/timeline）；预览脚本可用 DIVERGENT_PREVIEW_ITERS 覆盖。
+max_iterations: 120
+
+middlewares:
+  # 工作区 jail：designer 只能读自己的 harness 仓，文件工具越界读一律拒——机制硬禁读 trace
+  # （data/sessions 体感+会话、data/harness_runs 运行副本）。此前"禁读 trace"仅靠 systemprompt
+  # 一句话、无机制兜底；逐行看某任务轨迹会把该任务专属产物带进提案 = 过拟合的源头。通用 jail 一并
+  # 挡住仓外任何路径（data/live 等），不止点名 trace。
+  - import: auto_designer.dev.workspace_jail:WorkspaceJailMiddleware
+
+llm_config:
+  # 分角色配置：创新者 agent 用 DESIGNER_LLM_*。
+  model: ${env.DESIGNER_LLM_MODEL}
+  base_url: ${env.DESIGNER_LLM_BASE_URL}
+  api_key: ${env.DESIGNER_LLM_API_KEY}
+  max_tokens: 32768
+  timeout: 300
+  api_type: openai_chat_completion
+
+# 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于读现状 grounding；
+# designer 不改文件、不碰 git，仅 read_file / list_directory 取证 + complete_task 交提案。
+sandbox_config:
+  type: local
+
+tools:
+  - name: read_file
+    yaml_path: ./tools/read_file.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:read_file
+  - name: list_directory
+    yaml_path: ./tools/list_directory.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:list_directory
+  # grep：设计师无 shell，靠它「先搜后读」——按关键词跳到相关函数再精读那一段，
+  # 别把 entry.py 等大文件整篇通读烧 iteration（此前撞满 max-iter 的老毛病之一）。
+  - name: search_file_content
+    yaml_path: ./tools/search_file_content.tool.yaml
+    binding: nexau.archs.tool.builtin.file_tools:search_file_content
+  # 按需取一局用户模拟的完整决策时间线（投影：无 LLM system/user 原片）；
+  # 编排侧读 SessionStore，jail 仍禁直接读 sessions/。
+  - name: get_session_timeline
+    yaml_path: ./tools/get_session_timeline.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_session_timeline
+  # 下钻某一拍：harness 内层 tool 序列（截断）+ stop_kind；timeline 不够细时再用。
+  - name: get_harness_beat
+    yaml_path: ./tools/get_harness_beat.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_harness_beat
+  # 再展开某一步正文（硬顶字符）；beat 里 truncated=true 且确需细看时才调。
+  - name: get_harness_step
+    yaml_path: ./tools/get_harness_step.tool.yaml
+    binding: auto_designer.designer.session_timeline:get_harness_step
+  # Spec-0028：收尾工具——agent 以工具参数原生吐结构化候选（input_schema = agent_contract
+  # .rfc_input_schema() 的生成副本，受 drift-guard 守护）；nexau 在调用层强校验，漂移/缺字段被拒→重试。
+  # stop tool 的返回值（proposals 的 JSON）成为 agent.run 的返回，driver json.loads 取用。
+  - name: submit_divergent
+    yaml_path: ./tools/submit_divergent.tool.yaml
+    binding: auto_designer.designer.submit_tools:submit_divergent
+
+stop_tools: [submit_divergent]

@@ -92,3 +92,27 @@ def rfc_input_schema() -> dict:
         "required": ["proposals"],
         "additionalProperties": False,
     }
+
+
+def gate_input_schema() -> dict:
+    """gate（晋升评审）submit_gate 工具的 input_schema（Spec-0028）。
+
+    每条决策：`issue`(int) + `disposition`(promote/hold/drop 枚举) 必填，可选 `note`(str)。
+    additionalProperties=false 杜绝自创字段；enum 锁三值。未出现在数组里的候选由 driver 默认 hold。
+    """
+    item = {
+        "type": "object",
+        "properties": {
+            "issue": {"type": "integer"},
+            "disposition": {"type": "string", "enum": ["promote", "hold", "drop"]},
+            "note": {"type": "string"},
+        },
+        "required": ["issue", "disposition"],
+        "additionalProperties": False,
+    }
+    return {
+        "type": "object",
+        "properties": {"gate_decisions": {"type": "array", "items": item}},
+        "required": ["gate_decisions"],
+        "additionalProperties": False,
+    }
