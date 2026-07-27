@@ -307,7 +307,8 @@ def main() -> int:
     )  # Spec-0025：triage agent 定义目录
     divergent_agent_def = str(
         ROOT / "agent_defs" / "divergent_pm"
-    )  # divergent PM（产品候选，经 gate 晋升）
+    )  # divergent PM（discovery 轨，产出经 Owner 准入）
+    owner_agent_def = str(ROOT / "agent_defs" / "owner")  # Spec-0029：唯一准入评审
 
     # 用户侧 = spec-0005 控制信封 sim：9 维 sim persona 为权威画像，反向派生展示用 models.Persona。
     # persona 从 distill 卡库（persona_library.json）注入、场景从种子卡库（seeds.json）经
@@ -370,6 +371,35 @@ def main() -> int:
         current["round"] = k
         update_live_run(data_dir=DATA, running=True, round_no=k, total_rounds=TOTAL_ROUNDS)
 
+    # Spec-0029/T8：背压阈值（proposal/ready 队列深度）。超阈值只告警、不自动扩容——这是
+    # CLAUDE.md「issue 长期不降=退化」观测指标的可执行化，处置（调轮次/加 dev/收紧准入）由人定。
+    def _alarm_threshold(env_key: str) -> int:
+        raw = os.environ.get(env_key, "").strip()
+        return int(raw) if raw.isdigit() and int(raw) > 0 else 20
+
+    proposal_alarm = _alarm_threshold("PROPOSAL_DEPTH_ALARM")
+    ready_alarm = _alarm_threshold("READY_DEPTH_ALARM")
+
+    def _check_backpressure(round_no):
+        from auto_designer.designer.issue_schema import PROPOSAL, READY, plane  # noqa: PLC0415
+
+        try:
+            open_issues = tracker.list_open_issues()
+        except Exception:  # noqa: BLE001  读失败不拦轮次
+            return
+        p_depth = sum(1 for i in open_issues if plane(i.labels) == PROPOSAL)
+        r_depth = sum(1 for i in open_issues if plane(i.labels) == READY)
+        if p_depth > proposal_alarm:
+            print(
+                f"[背压告警] 第 {round_no} 轮末 proposal 深度 {p_depth} > {proposal_alarm}："
+                "准入太严或生成太滥，请人工介入（调 hold 口径 / 减生成器）。"
+            )
+        if r_depth > ready_alarm:
+            print(
+                f"[背压告警] 第 {round_no} 轮末 ready 深度 {r_depth} > {ready_alarm}："
+                "dev 消化不动（积压不降=退化信号），请人工介入（加 dev / 收紧准入）。"
+            )
+
     def on_round_end(k, sha):
         round_shas.append(sha)
         update_live_run(
@@ -379,6 +409,7 @@ def main() -> int:
             total_rounds=TOTAL_ROUNDS,
             round_shas=round_shas,
         )
+        _check_backpressure(k)
 
     def make_event_logger(
         agent_id,
@@ -592,6 +623,41 @@ def main() -> int:
         for i in range(roster["divergent"])
     ]
 
+    def make_owner_status(agent_id, label):  # Spec-0029：准入评审活动回调（收尾按轮归档）
+        def cb(*, running, status, detail=None, proposals=None):
+            update_agent(
+                data_dir=DATA,
+                agent_id=agent_id,
+                role="owner",
+                label=label,
+                running=running,
+                status=status,
+                detail=detail,
+                round_no=current["round"],
+            )
+            if not running:
+                archive_agent(
+                    data_dir=DATA,
+                    agent_id=agent_id,
+                    round_no=current["round"],
+                    extra={"kind": "owner_run", "proposals": proposals or []},
+                )
+
+        return cb
+
+    from auto_designer.designer.owner import Owner  # noqa: PLC0415
+
+    # Owner 恒 1 实例（唯一准入）；roster owner=0 → review=False 纯机械准入（评审段零 LLM）。
+    owner = Owner(
+        tracker,
+        store,
+        str(repo),
+        owner_agent_def,
+        on_status=make_owner_status("owner-0", "owner"),
+        on_event=make_event_logger("owner-0"),
+        review=roster["owner"] >= 1,
+    )
+
     # Spec-0017/T3：a 段并发度。默认 = roster 用户数（全并行），MAX_PARALLEL_USERS 环境变量
     # 可下调（设 1 即回到串行）。覆盖面（每轮跑几个 persona，PERSONA_LIMIT/roster）与并发度
     # （同时跑几个）是两个独立旋钮。
@@ -616,9 +682,10 @@ def main() -> int:
         developer_agents=developers,
         run_session_fn=user_run_session_fn,
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
-        triagers=triagers,  # Spec-0025/T6：d1 triage（规范化）跑在 synthesize 之前
-        designers=designers,  # synthesize + gate
-        divergents=divergents,  # 与 synthesize 并行落候选
+        triagers=triagers,  # Spec-0029：第一拍分片并行（第 k 个处理 pending[k::n]）
+        designers=designers,  # 第二拍 synthesize（吃本轮新升提案）
+        divergents=divergents,  # 第一拍与 triage 并行（discovery 轨，吃会话证据）
+        owner=owner,  # Spec-0029：唯一准入（proposal → ready/merged/declined/hold）
         on_round_start=on_round_start,  # 轮次运行态 → data/live/run.json（看板 /api/state）
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
@@ -627,11 +694,11 @@ def main() -> int:
 
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
-        f"{len(triagers)} triager × {len(designers)} synthesize × {len(divergents)} divergent × "
-        f"{len(developers)} dev，"
+        f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {len(designers)} synthesize "
+        f"→ owner({'评审' if roster['owner'] >= 1 else '纯机械'}) × {len(developers)} dev，"
         f"a 段并发 {max_parallel_users}，dev 预算 "
         f"bug={budgets['bug']}/feature={budgets['feature']}/rfc={budgets['rfc']}，"
-        f"dev 直推 main，真模型）..."
+        f"背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，dev 直推 main，真模型）..."
     )
     try:
         refs = orch.run(TOTAL_ROUNDS)

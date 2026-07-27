@@ -138,12 +138,20 @@ class Triager:
         self._on_status = on_status
         self._on_event = on_event
 
-    def triage_once(self, pending: list | None = None) -> TriageOutcome:
+    def triage_once(
+        self, pending: list | None = None, shard: tuple[int, int] | None = None
+    ) -> TriageOutcome:
         """处理一批 report。pending=None 时自取全部 report 平面的票（含旧 needs-triage 数据）；
-        编排层分片并行时传入本片子集（Spec-0029/T8：判重已移 Owner，分片自由）。"""
+        shard=(k, n) 时只取按票号排序后的 pending[k::n]（Spec-0029/T8 编排层分片并行——判重已移
+        Owner、产出为非约束提案，分片自由、各片不相交）。也可直接传 pending 子集。"""
         if pending is None:
             backlog = self._tracker.list_open_issues()
-            pending = [i for i in backlog if plane(i.labels) == REPORT]
+            pending = sorted(
+                (i for i in backlog if plane(i.labels) == REPORT), key=lambda i: i.number
+            )
+            if shard is not None:
+                k, n = shard
+                pending = pending[k :: max(1, n)]
         if not pending:
             self._emit(running=False, status="无待分诊 report")
             return TriageOutcome()

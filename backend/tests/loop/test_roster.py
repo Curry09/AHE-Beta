@@ -1,39 +1,53 @@
-# Spec-0025/T6：roster 编制解析——含 triager（issue 规范化角色）与 divergent。
-"""验证 load_roster：默认 user3/triager1/designer1/divergent0/developer3；各 N_* 覆盖。"""
+# Spec-0029/T8：roster 编制解析——含 triager 分片数 / divergent / owner（唯一准入开关）。
+"""验证 load_roster：默认 user3/triager1/designer1/divergent0/owner1/developer3；各 N_* 覆盖。"""
 
 from __future__ import annotations
 
 from auto_designer.loop.roster import DEFAULT_ROSTER, load_roster
 
+_ALL_ENVS = (
+    "N_USERS",
+    "N_TRIAGERS",
+    "N_DESIGNERS",
+    "N_DIVERGENTS",
+    "N_OWNERS",
+    "N_DEVELOPERS",
+)
+
 
 def test_defaults(monkeypatch) -> None:
-    for k in ("N_USERS", "N_TRIAGERS", "N_DESIGNERS", "N_DIVERGENTS", "N_DEVELOPERS"):
+    for k in _ALL_ENVS:
         monkeypatch.delenv(k, raising=False)
     assert load_roster() == {
         "user": 3,
         "triager": 1,
         "designer": 1,
         "divergent": 0,
+        "owner": 1,
         "developer": 3,
     }
-    assert DEFAULT_ROSTER["triager"] == 1
-    assert DEFAULT_ROSTER["divergent"] == 0
+    assert DEFAULT_ROSTER["owner"] == 1
 
 
 def test_triager_override(monkeypatch) -> None:
     monkeypatch.setenv("N_TRIAGERS", "2")
-    assert load_roster()["triager"] == 2
+    assert load_roster()["triager"] == 2  # 分片数
+
+
+def test_zero_owner_means_mechanical_only(monkeypatch) -> None:
+    monkeypatch.setenv("N_OWNERS", "0")
+    assert load_roster()["owner"] == 0  # 0 合法：评审段跳过、纯机械准入
 
 
 def test_zero_triagers_allowed(monkeypatch) -> None:
     monkeypatch.setenv("N_TRIAGERS", "0")
-    assert load_roster()["triager"] == 0  # 0 合法（关掉 triage 段）
+    assert load_roster()["triager"] == 0
 
 
 def test_invalid_falls_back(monkeypatch) -> None:
     for raw in ("abc", "-1", "1.5"):
-        monkeypatch.setenv("N_TRIAGERS", raw)
-        assert load_roster()["triager"] == 1  # 非法/负值回落默认
+        monkeypatch.setenv("N_OWNERS", raw)
+        assert load_roster()["owner"] == 1  # 非法/负值回落默认
 
 
 def test_all_roles_overridable(monkeypatch) -> None:

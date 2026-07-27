@@ -1,6 +1,6 @@
-# Spec-0007/T2：去 release 链 + 会话级 main SHA 快照回灌。
-"""闭环编排 orchestrator：a（用户产 issue+体感）→ d1 triage → d2 (synthesize∥divergent)
-→ d3 gate → b（开发者直推 main）→ c（回灌 main SHA）。
+# Spec-0029/T8：三平面编排——生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入 → dev。
+"""闭环编排 orchestrator：a（用户产 report+体感）→ 生成段两拍（第一拍 triage 分片∥divergent、
+第二拍 synthesize）→ Owner 唯一准入 → b（开发者领 ready 直推 main）→ c（回灌 main SHA）。
 
 纯 trunk（单 main）：去掉 release_ref 链——run_round 不再把 outcome.tag 链式回灌。每局会话开始解析
 harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA checkout → 单会话内 harness 不在
@@ -11,8 +11,9 @@ harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA c
 推进（体感退化为观测、benchmark held-out，坏 commit 靠后续多轮迭代回正——梯度下降式）。多 dev 串行各领
 不同 issue。各部件依赖注入，便于 mock 整轮。
 
-divergent（可选）：与 synthesize 并行落 `divergent` 候选（不可领）；gate 复用 designer.gate_once
-做语义晋升（promote→feature+triaged）。
+生成段两拍（Spec-0029）：triage 分片与 divergent 都只依赖 a 段产物（report / 会话证据）→ 同拍并行；
+synthesize 要看本轮新升的 from-triage 提案 → 第二拍。生成器产出全为不可领 proposal（重复无害、
+分片自由），去重/合并/准入统一由 Owner 每轮一次批量裁决——gate 特殊通道已退役。
 """
 
 from __future__ import annotations
@@ -68,6 +69,7 @@ class Orchestrator:
         triagers: list | None = None,
         designers: list[Designer] | None = None,
         divergents: list[Divergent] | None = None,
+        owner: object | None = None,
         on_round_start: Callable[[int], None] | None = None,
         on_round_end: Callable[[int, str], None] | None = None,
         max_parallel_users: int = 1,
@@ -78,11 +80,12 @@ class Orchestrator:
         # 固定列表 = 每轮同一套；callable = 每轮重新抽（如有放回随机 persona×task）。
         self._fixed_set = fixed_set
         self._developers = developer_agents
-        # d 段：triage → (synthesize ∥ divergent) → gate → b。
-        # divergent 只落不可领候选；gate 复用 designer.gate_once 做晋升评审。
+        # 生成段两拍：第一拍 triage 分片 ∥ divergent；第二拍 synthesize；然后 Owner 唯一准入。
         self._triagers = triagers or []
         self._designers = designers or []
         self._divergents = divergents or []
+        # Owner（Spec-0029/T6，恒 1）：None = 跳过准入段（提案积压，向后兼容旧测/无 Owner 场景）。
+        self._owner = owner
         self._run_session = run_session_fn
         self._initial_ref = initial_ref  # 跟踪的主干分支名（trunk = "main"），每局解析其 HEAD SHA
         # 轮次观测回调（可选）：round 从 1 起；end 时携带本轮 main 最新 SHA。看板运行态由此得知轮数。
@@ -152,42 +155,37 @@ class Orchestrator:
                         )
                         traceback.print_exc()
 
-        # d1（triage，Spec-0025/T6）：把本轮新产的 raw issue（+ 上轮 carryover 里仍 needs-triage 的）
-        #    逐条规范化（分类/定位/去重/驳回），就地增补为 triaged。跑在 synthesize 之前——让 synthesize
-        #    的输入是已 groomed 的 backlog。无 triager 时跳过。
-        #    单个 triager 崩溃（LLM/配置类意外）记日志跳过、不废整轮——否则整条闭环被一个 agent 拖死
-        #    且（看板看不到 triager 时）无从诊断。
-        for triager in self._triagers:
-            try:
-                triager.triage_once()
-            except Exception:  # noqa: BLE001
-                print("[orchestrator] triage 异常，跳过该 triager，本轮继续：")
-                traceback.print_exc()
-
-        # d2：synthesize ∥ divergent（并行）；再 d3 gate（designer.gate_once）。
-        # synthesize 产 RFC；divergent 产不可领候选；gate 语义晋升后 feature+triaged 才可领。
-        parallel_jobs: list[tuple[str, Callable[[], object]]] = []
-        for designer in self._designers:
-            parallel_jobs.append(("synthesize", designer.propose_once))
+        # 生成段·第一拍（Spec-0029/T8）：triage 分片 ∥ divergent，同一线程池并行。
+        # 二者都只依赖 a 段产物（triage 吃 report、divergent 吃会话证据）、互不依赖；产出全为不可领
+        # proposal（重复无害，判重归 Owner）→ 分片自由（第 k 个 triager 处理 pending[k::n]）。
+        # 单个生成器崩溃记日志跳过、不废整轮。
+        beat1: list[tuple[str, Callable[[], object]]] = []
+        n_triagers = len(self._triagers)
+        for idx, triager in enumerate(self._triagers):
+            beat1.append(
+                (
+                    f"triage[{idx}]",
+                    (lambda t=triager, k=idx: t.triage_once(shard=(k, n_triagers))),
+                )
+            )
         for divergent in self._divergents:
-            parallel_jobs.append(("divergent", divergent.propose_once))
-        if parallel_jobs:
-            with ThreadPoolExecutor(max_workers=len(parallel_jobs)) as pool:
-                futures = {pool.submit(fn): name for name, fn in parallel_jobs}
-                for fut in as_completed(futures):
-                    name = futures[fut]
-                    try:
-                        fut.result()
-                    except Exception:  # noqa: BLE001
-                        print(f"[orchestrator] {name} 异常，跳过，本轮继续：")
-                        traceback.print_exc()
+            beat1.append(("divergent", divergent.propose_once))
+        self._run_parallel(beat1)
 
-        # d3 gate：复用 designer 做晋升评审（无 designer 则候选积压到下轮）。
-        for designer in self._designers:
+        # 生成段·第二拍：synthesize（跑在 triage 全部收尾之后——要看本轮新升的 from-triage 提案，
+        # 结构综合不滞后一轮）。通常 0..1 个；多个也并行无妨（产出仍是提案）。
+        beat2: list[tuple[str, Callable[[], object]]] = [
+            ("synthesize", designer.propose_once) for designer in self._designers
+        ]
+        self._run_parallel(beat2)
+
+        # Owner 唯一准入（Spec-0029/T6）：每轮一次批量裁决 proposal → ready/merged/declined/hold。
+        # 崩溃记日志跳过（提案留存、下轮再审），不废整轮。
+        if self._owner is not None:
             try:
-                designer.gate_once()
+                self._owner.admit_once()
             except Exception:  # noqa: BLE001
-                print("[orchestrator] gate 异常，跳过该 designer，本轮继续：")
+                print("[orchestrator] owner 准入异常，跳过，本轮继续：")
                 traceback.print_exc()
 
         # b：多个开发者 agent 依次各领一条不同 issue，自主改 harness 直推 main（无 branch/merge/门禁）。
@@ -221,6 +219,21 @@ class Orchestrator:
         """本轮要跑的 (persona, scenario) 列表；fixed_set 为 callable 时每轮重抽。"""
         plan = self._fixed_set
         return plan() if callable(plan) else plan
+
+    @staticmethod
+    def _run_parallel(jobs: list[tuple[str, Callable[[], object]]]) -> None:
+        """线程池并行跑一拍生成器；单个崩溃记 traceback 跳过（产物是非约束提案，丢一路不废整轮）。"""
+        if not jobs:
+            return
+        with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+            futures = {pool.submit(fn): name for name, fn in jobs}
+            for fut in as_completed(futures):
+                name = futures[fut]
+                try:
+                    fut.result()
+                except Exception:  # noqa: BLE001
+                    print(f"[orchestrator] {name} 异常，跳过，本轮继续：")
+                    traceback.print_exc()
 
     def _resolve_head(self, *, ref: str) -> str:
         """解析 harness 仓某 ref（trunk 下恒为 main）的当前 HEAD commit SHA；非法 ref 抛 RuntimeError。"""
