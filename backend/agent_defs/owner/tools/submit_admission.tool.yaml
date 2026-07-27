@@ -1,0 +1,59 @@
+type: tool
+name: submit_admission
+description: >-
+  Submit your admission review of the pending proposals and finish. This is the
+  ONLY way to finish — call it exactly once.
+
+  Pass `decisions`: one item per proposal you decided on. Each item needs
+  `issue` (the proposal's number) and `decision` — one of `admit` (dev-ready →
+  enters the ready queue; optionally give final `priority` P0-P3, overriding the
+  triage suggestion), `merge` (same root cause / same lever as another ticket →
+  give `into` = the master ticket number; this proposal is closed and linked),
+  `decline` (not worth doing → give `reason`; closed), or `hold` (signal still
+  thin → stays a proposal for the next round). Proposals you omit default to
+  `hold`.
+
+  Deduplication is YOUR job: merge look-alike proposals into the most complete
+  one. A structural proposal's covers line is only the generator's suggestion —
+  when you admit it, its covered proposals are merged into it by default; to
+  keep an urgent one (e.g. a P0 hotfix) as independent work, explicitly admit it.
+
+  The parameters are schema-validated at call time; invalid values (unknown
+  decision, self-invented keys) are rejected and you must retry.
+# Spec-0029/T6：input_schema 是 agent_contract.admission_input_schema() 的生成副本（受 drift-guard
+# 测试守护：test_owner.py 断言二者深度相等）。改契约改 agent_contract 后需重生成此块。
+input_schema:
+  type: object
+  properties:
+    decisions:
+      type: array
+      items:
+        type: object
+        properties:
+          issue:
+            type: integer
+          decision:
+            type: string
+            enum:
+              - admit
+              - merge
+              - decline
+              - hold
+          into:
+            type: integer
+          priority:
+            type: string
+            enum:
+              - P0
+              - P1
+              - P2
+              - P3
+          reason:
+            type: string
+        required:
+          - issue
+          - decision
+        additionalProperties: false
+  required:
+    - decisions
+  additionalProperties: false

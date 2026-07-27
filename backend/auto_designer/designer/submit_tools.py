@@ -42,9 +42,10 @@ def submit_divergent(*, proposals: list | None = None, **kwargs: Any) -> str:
     return json.dumps({"proposals": proposals or []}, ensure_ascii=False)
 
 
-def submit_gate(*, gate_decisions: list | None = None, **kwargs: Any) -> str:
-    """gate（晋升评审）收尾工具（Spec-0028）：回显已校验的 gate_decisions（成为 agent.run 的返回值）。
+def submit_admission(*, decisions: list | None = None, **kwargs: Any) -> str:
+    """Owner（准入评审）收尾工具（Spec-0029/T6）：回显已校验的 decisions（成为 agent.run 的返回值）。
 
-    每条已由 input_schema 校验（issue + disposition[promote/hold/drop] 必填、可选 note、无自创字段）。
+    每条已由 input_schema 校验（issue + decision[admit/merge/decline/hold] 必填、merge 给 into、
+    admit 可给 priority、无自创字段）。未列出的提案由 driver 默认 hold。
     """
-    return json.dumps({"gate_decisions": gate_decisions or []}, ensure_ascii=False)
+    return json.dumps({"decisions": decisions or []}, ensure_ascii=False)

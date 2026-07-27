@@ -94,25 +94,28 @@ def rfc_input_schema() -> dict:
     }
 
 
-def gate_input_schema() -> dict:
-    """gate（晋升评审）submit_gate 工具的 input_schema（Spec-0028）。
+def admission_input_schema() -> dict:
+    """Owner submit_admission 工具的 input_schema（Spec-0029/T6，取代旧 gate_input_schema）。
 
-    每条决策：`issue`(int) + `disposition`(promote/hold/drop 枚举) 必填，可选 `note`(str)。
-    additionalProperties=false 杜绝自创字段；enum 锁三值。未出现在数组里的候选由 driver 默认 hold。
+    每条决策：`issue`(int) + `decision`(admit/merge/decline/hold 四值枚举) 必填；merge 给 `into`
+    （主票号）；admit 可给 `priority`(∈P0-P3，覆盖 triage 建议值)；decline/hold 可给 `reason`。
+    additionalProperties=false 杜绝自创字段。未出现在数组里的提案由 driver 默认 hold。
     """
     item = {
         "type": "object",
         "properties": {
             "issue": {"type": "integer"},
-            "disposition": {"type": "string", "enum": ["promote", "hold", "drop"]},
-            "note": {"type": "string"},
+            "decision": {"type": "string", "enum": ["admit", "merge", "decline", "hold"]},
+            "into": {"type": "integer"},
+            "priority": {"type": "string", "enum": list(PRIORITIES)},
+            "reason": {"type": "string"},
         },
-        "required": ["issue", "disposition"],
+        "required": ["issue", "decision"],
         "additionalProperties": False,
     }
     return {
         "type": "object",
-        "properties": {"gate_decisions": {"type": "array", "items": item}},
-        "required": ["gate_decisions"],
+        "properties": {"decisions": {"type": "array", "items": item}},
+        "required": ["decisions"],
         "additionalProperties": False,
     }
