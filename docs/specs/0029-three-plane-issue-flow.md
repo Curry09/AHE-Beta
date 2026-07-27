@@ -3,7 +3,7 @@ number: "0029"
 title: 三平面 issue 流：证据→提案→工作队列，唯一准入 Owner（白名单可领、生成器自由并行、去 gate 特殊通道）
 issue: 0
 slug: three-plane-issue-flow
-summary: 现行 issue 流的三大病根：①「谁有权把活放进 dev 队列」有三个写手（triage accept、synthesize 直建 RFC 且能 supersede 别人、gate promote），入场规则不统一——synthesize 产出免审进队、divergent 产出要过 gate，纯历史演化无原则可言；② 标签把「工作项资格 / 流程状态 / 属性」压成一个平面，dev 可领判定是一张随新状态不断增长的黑名单（每加 divergent、gate-dropped 都得记得改 dev 排除集）；③ 去重被塞在想并行的生成侧（triage 边规范化边判重），与并行天然打架——此前 triage 分片讨论卡壳的根因。本 spec 重构为三平面单一准入模型：平面1 证据（用户报告/体感/runtime，输入）→ 平面2 提案（proposal，一律不可领；triage/synthesize/divergent 都只是生成器，产出为非约束性提案，故可自由并行、重复无害；且按证据源双轨分工——synthesize 吃规范化 backlog 找结构根因（delivery 轨），divergent 直吃原始会话行为挖未被提为 issue 的能力缺口（discovery 轨），去重靠构造而非 prompt 嘱咐）→ 唯一准入 Owner（每轮一次批量评审：admit→ready / merge 去重合并 / decline / hold；机械模式对字段齐全的单条修复案零 LLM 自动准入）→ 平面3 工作队列（ready 唯一可领白名单，dev 按 priority→age 拉取，done 级联关闭 covers 链）。配套：公共 agent 运行时抽出（消 triage/divergent 对 designer 私有符号的依赖）、gate/divergent 特殊通道与 superseded/gate-dropped 中间态退役、proposal/ready 队列深度背压告警（= CLAUDE.md 退化信号落地）。不动纯 trunk/直推 main/benchmark held-out/submit-tool 契约（0027 复用，Owner 仅新增 submit_admission）。
+summary: 现行 issue 流的三大病根：①「谁有权把活放进 dev 队列」有三个写手（triage accept、synthesize 直建 RFC 且能 supersede 别人、gate promote），入场规则不统一——synthesize 产出免审进队、divergent 产出要过 gate，纯历史演化无原则可言；② 标签把「工作项资格 / 流程状态 / 属性」压成一个平面，dev 可领判定是一张随新状态不断增长的黑名单（每加 divergent、gate-dropped 都得记得改 dev 排除集）；③ 去重被塞在想并行的生成侧（triage 边规范化边判重），与并行天然打架——此前 triage 分片讨论卡壳的根因。本 spec 重构为三平面单一准入模型：平面1 证据（用户报告/体感/runtime，输入）→ 平面2 提案（proposal，一律不可领；triage/synthesize/divergent 都只是生成器，产出为非约束性提案，故可自由并行、重复无害；且按证据源双轨分工——synthesize 吃规范化 backlog 找结构根因（delivery 轨），divergent 直吃原始会话行为挖未被提为 issue 的能力缺口（discovery 轨），去重靠构造而非 prompt 嘱咐）→ 唯一准入 Owner（每轮一次批量评审：admit→ready / merge 去重合并 / decline / hold；机械模式对字段齐全的单条修复案零 LLM 自动准入）→ 平面3 工作队列（ready 唯一可领白名单，dev 按 priority→age 拉取、只关自己的票——covers 级联在 Owner 准入时以 merge 完成）。配套：公共 agent 运行时抽出（消 triage/divergent 对 designer 私有符号的依赖）、gate/divergent 特殊通道与 superseded/gate-dropped 中间态退役、proposal/ready 队列深度背压告警（= CLAUDE.md 退化信号落地）。不动纯 trunk/直推 main/benchmark held-out/submit-tool 契约（0027 复用，Owner 仅新增 submit_admission）。
 tasks:
   - id: T1
     title: issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射
@@ -102,7 +102,7 @@ tasks:
       - backend/auto_designer/designer/submit_tools.py
       - backend/agent_defs/owner/
       - backend/tests/designer/test_owner.py
-    scope: 新建 Owner driver（owner.py）：admit_once() 每轮一次批量准入。输入=全部 open proposal（紧凑索引：号/标题/kind/provenance/建议优先级/covers，正文按需 get_session_timeline 下钻）+ready backlog+体感曲线。两级裁决：①机械段（零 LLM）——from-triage 的单条修复案、TRIAGE 字段齐全、与既有 ready/本批提案无标题近似冲突（norm 后简单相似度）→ 自动 admit；②评审段（一次 LLM 批量）——其余（结构/产品提案、冲突组、机械段拿不准的）走 owner agent，submit_admission 收尾。决策落库：admit→去 PROPOSAL 加 READY+终优先级；merge→关闭+merged-into 机器行链主票；decline→DECLINED+原因关闭；hold→保持 proposal（未列出默认 hold）。covers 裁决也在此：admit 结构提案时其 covers 的 proposal **默认 merge 归并，但 Owner 可裁量部分保留**——如其中的 P0 急修可单独 admit 与结构案并行推进（先止血、结构改造随后），取代旧 superseded 的全有全无。agent_contract 增 admission_input_schema()（decision 四值 enum、into/priority/reason），gate_input_schema 删除；submit_tools 增 submit_admission、删 submit_gate。agent_defs/owner/ 新建（只读工具+timeline 下钻+submit_admission，systemprompt=准入职责与判据）。
+    scope: 新建 Owner driver（owner.py）：admit_once() 每轮一次批量准入。输入=全部 open proposal（紧凑索引：号/标题/kind/provenance/建议优先级/covers，正文按需 get_session_timeline 下钻）+ready backlog+体感曲线。两级裁决：①机械段（零 LLM）——from-triage 的单条修复案、TRIAGE 字段齐全、与既有 ready/本批提案无标题近似冲突（norm 后简单相似度）→ 自动 admit；②评审段（一次 LLM 批量）——其余（结构/产品提案、冲突组、机械段拿不准的）走 owner agent，submit_admission 收尾。决策落库：admit→去 PROPOSAL 加 READY+终优先级；merge→关闭+merged-into 机器行链主票；decline→DECLINED+原因关闭；hold→保持 proposal。covers 级联的**唯一落点在此**（取代旧「dev 完成 RFC 时 _close_covered」）：裁决优先级=**显式决策 > covers 默认 merge > 全局默认 hold**——先应用全部显式决策，再对每条已 admit 的结构案，将其 covers 里仍 open 且未被本批显式裁决的 report/proposal 票默认 merge（当场关闭+merged-into 链到主票；ready/已关票不动）；Owner 显式 admit 某条被覆盖的急修（如 P0）即保留为独立 ready 与结构案并行推进；结构案被 hold/decline 则其 covers 不触发任何级联；多条结构案同批覆盖同一票按票号序确定性处理（先者得）。covers 机器行创建后不改写，裁决结果由各被覆盖票自身状态记录。agent_contract 增 admission_input_schema()（decision 四值 enum、into/priority/reason），gate_input_schema 删除；submit_tools 增 submit_admission、删 submit_gate。agent_defs/owner/ 新建（只读工具+timeline 下钻+submit_admission，systemprompt=准入职责与判据）。
     acceptance: 机械段对合格单条案零 LLM 准入；评审段四路（admit/merge/decline/hold）落库正确、未列出默认 hold；merge 链主票、covers 统一收敛；drift-guard（yaml==admission_input_schema）；无候选跳过 LLM；test_owner 覆盖以上。
   - id: T7
     title: dev 白名单领取：ready-only + priority→age 排序 + 级联关闭
@@ -116,8 +116,8 @@ tasks:
     files:
       - backend/auto_designer/dev/agentic_developer.py
       - backend/tests/dev/test_agentic_developer.py
-    scope: _eligible 从黑名单改白名单 is_ready（issue_schema 单一真源）；排序从纯票号 FIFO 改 priority（P0>P1>P2>P3>无）→ 票号（同优先级内 FIFO 防饿死）；预算按 kind 分档保留（结构提案 from-synthesize 最高档，取代原 RFC 档判定）；resolved→close+comment+级联关闭 covers 链（单层，机器行来自 issue_schema 解析）。
-    acceptance: 只领 ready；P0 插队生效、同级 FIFO；预算分档按新判定；级联关闭 covers 的 proposal；test 重写且绿。
+    scope: _eligible 从黑名单改白名单 is_ready（issue_schema 单一真源）；排序从纯票号 FIFO 改 priority（P0>P1>P2>P3>无）→ 票号（同优先级内 FIFO 防饿死）；预算按 kind 分档保留（结构提案 from-synthesize 最高档，取代原 RFC 档判定）；resolved→close+comment，**只关自己的票**——covers 级联已前移至 Owner 准入时 merge（被覆盖票在 admit 时即关闭链主），dev 侧 _close_covered 退役，dev 与 tracker 的耦合降到「领票+关自己」。
+    acceptance: 只领 ready；P0 插队生效、同级 FIFO；预算分档按新判定；_close_covered 零残留；test 重写且绿。
   - id: T8
     title: 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警
     status: pending
@@ -182,7 +182,7 @@ tasks:
 
 ## Summary
 
-把 issue 流从「多写手、黑名单、语气分工」重构为**三平面单一准入**：证据（用户报告/体感/runtime）→ **提案**（proposal，一律不可领；triage / synthesize / divergent 全部降格为生成器，产出是非约束性提案，因此可自由并行、重复无害）→ **唯一准入 Owner**（每轮一次批量裁决：admit / merge / decline / hold；对字段齐全的单条修复案走零 LLM 机械准入）→ **工作队列**（`ready` 唯一可领白名单，dev 按优先级→票龄拉取，done 级联关闭 covers 链）。配套抽出公共 agent 运行时消除 driver 间私有依赖、退役 gate 特殊通道与 superseded/gate-dropped/divergent 中间标签、增加 proposal/ready 队列深度背压告警。
+把 issue 流从「多写手、黑名单、语气分工」重构为**三平面单一准入**：证据（用户报告/体感/runtime）→ **提案**（proposal，一律不可领；triage / synthesize / divergent 全部降格为生成器，产出是非约束性提案，因此可自由并行、重复无害）→ **唯一准入 Owner**（每轮一次批量裁决：admit / merge / decline / hold；对字段齐全的单条修复案走零 LLM 机械准入）→ **工作队列**（`ready` 唯一可领白名单，dev 按优先级→票龄拉取、只关自己的票——covers 级联在 Owner 准入时以 merge 完成，dev 侧 _close_covered 退役）。配套抽出公共 agent 运行时消除 driver 间私有依赖、退役 gate 特殊通道与 superseded/gate-dropped/divergent 中间标签、增加 proposal/ready 队列深度背压告警。
 
 ## Motivation
 
@@ -212,7 +212,7 @@ proposal 平面（不可领）  ←──── synthesize / divergent 也在此
 ready 平面（唯一可领白名单）
   │ dev 按 priority→票龄拉取，直推 main
   ▼
-done（级联关闭该票 covers 的提案/报告）
+done（只关自己的票——被覆盖票已在 Owner 准入时 merge 关闭并链回主票）
 ```
 
 角色宪章（每个一句话）：
@@ -242,7 +242,7 @@ done（级联关闭该票 covers 的提案/报告）
 
 **Owner（T6）**：`admit_once()` 两级裁决——①机械段（零 LLM）：from-triage 单条案、字段齐全、无标题近似冲突 → 自动 admit（保守：拿不准就进评审段）；②评审段（一次 LLM 批量）：结构/产品提案、冲突组。契约 `submit_admission`：`[{issue, decision: admit|merge|decline|hold, into?, priority?, reason?}]`，未列出默认 hold。admit 结构提案时对其 covers 的 proposal 统一 merge（覆盖裁决唯一落点）。
 
-**dev（T7）**：白名单 `is_ready`；排序 priority→票号；done 级联关闭 covers 链（单层）。
+**dev（T7）**：白名单 `is_ready`；排序 priority→票号；done 只关自己的票（covers 级联已在准入时由 Owner merge 完成，`_close_covered` 退役）。**covers 生命周期**：创建时写机器行（过滤到存在且 open 的票号，之后不改写）→ 准入时按「显式>默认 merge>hold」级联 → done 无级联 → 修不好则下轮新 report 自我纠正（无 reopen 机制，梯度下降式回正）。
 
 **编排与背压（T8）**：`a → 生成段两拍[先 triage×N 分片并行；再 synthesize ∥ divergent] → Owner(1) → dev → c`；gate 段删除。两拍而非全并行：synthesize 必须看到**本轮**新升的 from-triage 提案（否则结构综合滞后一轮、dev 先逐条修症状），而它等 triage 收尾只多一拍墙钟——值得。真正值钱的并行（triage 分片之间、synthesize∥divergent 之间）都保留。roster 加 owner（1；0=纯机械准入）。背压：proposal/ready 深度超阈值（env，缺省 20）→ 告警回调+stdout，**不自动扩容**——这是 CLAUDE.md「issue 长期不降=退化」观测指标的可执行化。
 
