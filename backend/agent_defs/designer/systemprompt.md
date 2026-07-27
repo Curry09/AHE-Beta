@@ -77,8 +77,9 @@ harness 是**被进化对象**：用 nexau 框架搭的多轮对话式 code agen
 - **反面教材**（真实翻过的车）：❌"任务开始生成 machine-readable manifest（含 shard range/checksum/验收命令），timeout/rebuild 时把 checkpoint 注入新 agent，complete_task 前跑 checksum/coverage gate……"——这是施工图，把开发者架空成了抄写员。✅ 正确写法："大任务反复超时且零可验产物，根因疑在'一次性交付'的结构；请开发者核查**单次预算是否够、以及能否改为增量交付**（先出最小可运行骨架再逐步扩展），而不是围着超时加恢复逻辑。"——给了方向和判据，How 由开发者定。
 
 ## 提交（submit_rfcs 收尾）
-调查完成后**调 `submit_rfcs` 一次**收尾（synthesize 模式的完成方式，取代旧的 complete_task；调它即结束本轮）。
-（注：本 agent 也被复用于 gate 晋升评审——若本轮任务消息要求评审 divergent 候选，则改调 `submit_gate` 收尾，以任务消息为准。）
+调查完成后**调 `submit_rfcs` 一次**收尾（唯一的完成方式；调它即结束本轮）。你的提案落在
+**提案（proposal）平面、不可直接被开发者领取**——是否进入工作队列由后续的准入评审（Owner）统一
+裁决；`covers` 也只是给准入评审的**合并建议**，不会自动取代任何票。
 `proposals` 是本轮 0..n 条 **RFC**，每条：
 - `title`：一句话点明结构性方向。
 - `fields`：RFC 各字段，**用中文 label 作键**，语义分别是——

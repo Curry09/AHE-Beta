@@ -62,11 +62,5 @@ tools:
   - name: submit_rfcs
     yaml_path: ./tools/submit_rfcs.tool.yaml
     binding: auto_designer.designer.submit_tools:submit_rfcs
-  # Spec-0028：gate（晋升评审）复用本 designer agent（换任务消息），用此收尾工具原生吐 gate_decisions
-  # （input_schema 由 agent_contract.gate_input_schema() 生成）。synthesize 走 submit_rfcs、gate 走
-  # submit_gate——两者都是 stop tool，agent 按任务调其一，driver 按返回的键分派。
-  - name: submit_gate
-    yaml_path: ./tools/submit_gate.tool.yaml
-    binding: auto_designer.designer.submit_tools:submit_gate
 
-stop_tools: [submit_rfcs, submit_gate]
+stop_tools: [submit_rfcs]
