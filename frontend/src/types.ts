@@ -1,6 +1,10 @@
 // 数据契约：字段名与 backend/auto_designer/web/api.py 的响应一一对应，两侧须同步修改。
 
-export type AgentRole = "user" | "triager" | "designer" | "developer";
+export type AgentRole = "user" | "triager" | "divergent" | "designer" | "owner" | "developer";
+
+// Spec-0029：三平面投影与提案来源（后端 /api/issues 附带；老后端缺省由 issueMeta 按 labels 兜底）。
+export type Plane = "report" | "proposal" | "ready";
+export type Provenance = "from-triage" | "from-synthesize" | "from-divergent";
 
 // Spec-0026/T1：用户 agent 活动槽可带的 persona 摘要（只读展示，缺省 null）。
 export interface PersonaMeta {
@@ -103,12 +107,14 @@ export interface Issue {
   created_at: string;
   closed_at: string | null;
   url: string;
-  // Spec-0025/T7 平台层标签投影（老后端缺省 → 前端按 labels 兜底推导，见 lib/issueMeta）：
+  // Spec-0025/T7 + 0029/T9 平台层标签投影（老后端缺省 → 前端按 labels 兜底推导，见 lib/issueMeta）：
   kind?: string; // bug/feature/chore/document 或 rfc（RFC 凌驾 type）
   round?: number | null; // round-N 的 N
   triage_status?: TriageStatus | null;
   priority?: string | null; // P0-P3
-  reject_reason?: string | null; // 驳回/needs-info 原因（权威原因见详情评论）
+  reject_reason?: string | null; // 驳回/decline 原因（权威原因见详情评论）
+  plane?: Plane | null; // Spec-0029：三平面投影（report/proposal/ready；终态为 null）
+  provenance?: Provenance | null; // Spec-0029：提案来源（from-triage/from-synthesize/from-divergent）
   // 覆盖关系：covers = RFC 声明覆盖的 triaged 票号；covered_by = 被哪张 open RFC 覆盖。
   covers?: number[];
   covered_by?: number | null;
@@ -180,6 +186,8 @@ export interface Roster {
   triager: number;
   designer: number;
   developer: number;
+  divergent?: number; // Spec-0028+：discovery 轨生成器（默认 0）
+  owner?: number; // Spec-0029：唯一准入（0=纯机械）
 }
 
 export interface ConfigResponse {
@@ -193,6 +201,8 @@ export interface OverviewResponse {
   session_count: number;
   feeling_trend: [string, number][];
   issue_curve: [string, number, number][];
+  // Spec-0029/T9：三平面漏斗当前量（老后端缺省 → 不渲染漏斗条）。
+  funnel?: { report: number; proposal: number; ready: number };
 }
 
 // 看板选中态：点谁，第四栏就展示谁的完整信息。

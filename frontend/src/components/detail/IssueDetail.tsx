@@ -1,7 +1,15 @@
 import { getIssue } from "../../api";
 import { useFetch } from "../../hooks/useFetch";
 import { fmtDate } from "../../lib/format";
-import { issueKind, priorityOf, roundOf, triageStatus } from "../../lib/issueMeta";
+import {
+  issueKind,
+  planeOf,
+  priorityOf,
+  provenanceOf,
+  roundOf,
+  terminalOf,
+  triageStatus,
+} from "../../lib/issueMeta";
 import type { IssueComment } from "../../types";
 import { Markdown } from "../Markdown";
 
@@ -38,11 +46,20 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
   const issue = data?.issue ?? null;
   const covers = issue ? parseCovers(issue.body) : [];
   const coveredBy = coveredByFrom(data?.comments ?? []);
-  // 详情端点不附平台层派生字段（那是 /api/issues 列表口径）——这里按 labels 客户端推导（Spec-0025/T8）。
+  // 详情端点不附平台层派生字段（那是 /api/issues 列表口径）——这里按 labels 客户端推导。
   const kind = issue ? issueKind(issue) : "";
   const status = issue ? triageStatus(issue) : null;
   const prio = issue ? priorityOf(issue) : null;
   const round = issue ? roundOf(issue) : null;
+  // Spec-0029/T10：三平面/来源/终态。
+  const pl = issue ? planeOf(issue) : null;
+  const prov = issue ? provenanceOf(issue) : null;
+  const terminal = issue ? terminalOf(issue) : null;
+  const planeLabel: Record<string, string> = {
+    report: "报告（待分诊）",
+    proposal: "提案（待准入）",
+    ready: "Ready（可领）",
+  };
 
   return (
     <div className="detail">
@@ -67,6 +84,24 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
               <dd>
                 <span className="chip">{kind}</span>
               </dd>
+              {(pl || terminal) && (
+                <>
+                  <dt>平面</dt>
+                  <dd>
+                    <span className="chip">
+                      {pl ? (planeLabel[pl] ?? pl) : `终态（${terminal}）`}
+                    </span>
+                  </dd>
+                </>
+              )}
+              {prov && (
+                <>
+                  <dt>来源</dt>
+                  <dd>
+                    <span className="chip">{prov}</span>
+                  </dd>
+                </>
+              )}
               {status && (
                 <>
                   <dt>triage 状态</dt>
