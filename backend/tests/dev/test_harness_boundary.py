@@ -38,15 +38,33 @@ def test_violations_flags_only_out_of_bounds() -> None:
         "entry.py",  # 本体
         "agents/main.md",  # 本体子路径
         "tools/x.tool.yaml",
-        "MANUAL.md",
+        "HELP.md",
+        "RUNTIME.md",
+        ".env.example",
+        "requirements.txt",
+        "scripts/check.sh",
         ".gitignore",
         "tests/test_entry.py",  # 合法：harness 自身的回归测试
         "__pycache__/entry.cpython-312.pyc",  # 噪声 → 忽略
+        "README.md",  # 越界：已退场文档
+        "USER.md",  # 越界：已退场文档
+        "INTERFACE.md",  # 越界：接口文档归平台侧
+        "MANUAL.md",  # 越界：已退场 legacy 文档
         "unicode_ascii/core.py",  # 越界：任务代码
         "pyproject.toml",  # 越界：项目脚手架
+        ".env",  # 越界：真实密钥文件
         "test_toplevel.py",  # 越界：顶层散落测试（须进 tests/）
     ]
-    assert violations(staged) == ["unicode_ascii/core.py", "pyproject.toml", "test_toplevel.py"]
+    assert violations(staged) == [
+        "README.md",
+        "USER.md",
+        "INTERFACE.md",
+        "MANUAL.md",
+        "unicode_ascii/core.py",
+        "pyproject.toml",
+        ".env",
+        "test_toplevel.py",
+    ]
 
 
 def test_violations_empty_for_pure_harness() -> None:
@@ -58,20 +76,34 @@ def test_violations_empty_for_pure_harness() -> None:
 
 def test_allowed_top_is_harness_skeleton() -> None:
     assert ALLOWED_TOP == {
-        "MANUAL.md",
+        "HELP.md",
         "RUNTIME.md",
+        ".env.example",
+        "requirements.txt",
         "agent.yaml",
         "params.yaml",
         "entry.py",
         "agents",
         "tools",
+        "scripts",
         "tests",
         ".gitignore",
     }
 
 
-def test_violations_allows_runtime_md() -> None:
-    assert violations(["RUNTIME.md"]) == []
+def test_violations_allows_product_docs_scripts_and_env_example() -> None:
+    assert (
+        violations(
+            [
+                "HELP.md",
+                "RUNTIME.md",
+                ".env.example",
+                "requirements.txt",
+                "scripts/run.sh",
+            ]
+        )
+        == []
+    )
 
 
 def test_render_hook_is_executable_python() -> None:
@@ -95,11 +127,22 @@ def test_hook_blocks_out_of_bounds_commit(tmp_path: Path) -> None:
     assert _git(repo, "log", "--oneline").stdout.count("\n") == 1
 
 
+def test_hook_blocks_retired_docs(tmp_path: Path) -> None:
+    repo = _seed_repo(tmp_path)
+    for name in ("README.md", "USER.md", "INTERFACE.md", "MANUAL.md"):
+        (repo / name).write_text("retired\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    res = _git(repo, "commit", "-m", "docs: reintroduce retired docs")
+    assert res.returncode != 0
+    assert "README.md" in res.stderr and "INTERFACE.md" in res.stderr
+
+
 def test_hook_allows_harness_only_commit(tmp_path: Path) -> None:
     # 合法：只改 harness 本体（新增 agents/ 定义、改 entry.py）→ 放行。
     repo = _seed_repo(tmp_path)
     (repo / "agents").mkdir()
     (repo / "agents" / "main.md").write_text("# harness\n", encoding="utf-8")
+    (repo / "HELP.md").write_text("# help\n", encoding="utf-8")
     (repo / "entry.py").write_text("print('v1')\n", encoding="utf-8")
     _git(repo, "add", "-A")
     res = _git(repo, "commit", "-m", "feat: improve harness scaffolding")

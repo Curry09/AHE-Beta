@@ -114,13 +114,13 @@ def test_reply_timeout_rebuilds_and_returns_continuable(entry: ModuleType) -> No
     assert seen == [stale]
 
 
-def test_snapshot_and_seed_history_roundtrip(entry: ModuleType) -> None:
-    """_snapshot_history / _seed_history：rebuild 接线用的纯辅助，不依赖真 nexau。"""
+def test_snapshot_and_restore_history_roundtrip(entry: ModuleType) -> None:
+    """_snapshot_history / _restore_history：rebuild 接线用的纯辅助，不依赖真 nexau。"""
     src = _Agent([])
     src.history = [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}]
     snap = entry._snapshot_history(src)
     dst = _Agent([])
-    entry._seed_history(dst, snap)
+    entry._restore_history(dst, snap)
     assert dst.history == src.history
 
 

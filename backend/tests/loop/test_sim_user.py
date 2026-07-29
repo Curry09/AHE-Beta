@@ -198,6 +198,58 @@ def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
     assert all(sid is None for _, sid in seen[:-1])
 
 
+def test_sim_adapter_wraps_harness_in_connector(tmp_path, monkeypatch) -> None:
+    """sim_user 只经平台 connector 接入 harness，发给 harness 的仍是 human-like 文本。"""
+    sp = expert()
+    mp = _model_persona(sp)
+    seen = []
+
+    class _SpyConnector:
+        def __init__(self, harness) -> None:
+            self._harness = harness
+            self.sent: list[str] = []
+            self.help_text = getattr(harness, "help_text", "")
+            seen.append(self)
+
+        def send(self, message: str) -> str:
+            return self.send_user_message(message)
+
+        def send_user_message(self, text: str) -> str:
+            self.sent.append(text)
+            return self._harness.send(text)
+
+        def reset(self) -> None:
+            self._harness.reset()
+
+        def close(self) -> None:
+            self._harness.close()
+
+    monkeypatch.setattr("auto_designer.loop.sim_user.HarnessConnector", _SpyConnector)
+    fn = make_sim_run_session_fn(
+        client_factory=ScriptedPersonaClient,
+        tracker=FakeTracker(),
+        store=SessionStore(tmp_path),
+        sim_personas={mp.identity: sp},
+        round_provider=lambda: 9,
+    )
+
+    fn(mp, SeedScenario(description="task"), ScriptedHarness())
+
+    assert len(seen) == 1
+    assert seen[0].sent
+    joined = "\n".join(seen[0].sent).lower()
+    forbidden_platform_terms = (
+        "round-9",
+        "persona",
+        "sim_trace",
+        "feeling",
+        "triage",
+        "needs-triage",
+    )
+    for term in forbidden_platform_terms:
+        assert term not in joined
+
+
 def test_sim_adapter_no_issue_when_not_filed(tmp_path) -> None:
     sp = expert()
     mp = _model_persona(sp)

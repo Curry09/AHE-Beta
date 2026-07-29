@@ -1,0 +1,4 @@
+# Runtime dependency for the assistant harness.
+# A managed environment may provide this dependency already; this file documents
+# what the harness needs when run directly.
+nexau

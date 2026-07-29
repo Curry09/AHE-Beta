@@ -1,13 +1,12 @@
-"""harness v0 入口（spec-0003/T1 种子）：单个 nexau 的逐轮 stdio JSONL 服务。
+"""Terminal coding assistant runtime.
 
-被进化对象。launcher 把它当黑盒可启动程序：从 stdin 逐行读 {"message": str}，
-向 stdout 逐行写 {"reply": str}（JSONL，一读一写严格配对）。内部如何编排（这里是单 nexau，
-将来可演化为多 nexau）对 launcher 不可见——开发者 agent 后续就是在改本仓内容。
+The process reads one JSON object per line from stdin and writes JSON objects to stdout.
+It builds a NexAU Agent from this directory's agent.yaml and uses SANDBOX_WORK_DIR as
+the workspace for shell commands. The internal agent topology is an implementation detail.
 
-真实运行：按本目录 agent.yaml（最简「只有 bash」的工具型 agent，系统提示 = agents/main.md，
-LLM_* 走 ${env}）构造 nexau Agent。进程级固定 session_id；超时/强打断时 rebuild 换新
-agent_id 避锁，并显式回灌 history（见 RUNTIME.md）。bash 在 SANDBOX_WORK_DIR 工作区执行。
-需要 nexau 可 import 且 LLM_MODEL/LLM_BASE_URL/LLM_API_KEY 已注入。
+Runtime notes: LLM_* environment variables configure the model endpoint. The process keeps
+a stable session_id; timeout or hard interrupt recovery may rebuild the internal agent_id
+and restore conversation history. See RUNTIME.md for operational boundaries.
 """
 
 from __future__ import annotations
@@ -46,8 +45,11 @@ _TIMEOUT_REPLY = (
     "工作区里可能已有部分改动，请以磁盘实况为准并告诉我下一步怎么处理。"
 )
 _HARNESS_USER_ID = "harness_user"
+_V1 = "stdio-jsonl-v1"
+_OUTPUT_PROTOCOL = os.environ.get("HARNESS_STDIO_PROTOCOL", "legacy")
 
-# 内部分发：message 首词匹配 slash（如 /exit|/quit）→ 定型 reply 后退出；其余走 agent。
+# 内部分发：message 首词匹配 slash（如 /help /exit /quit）；其余走 agent。
+_HELP_PATH = _HERE / "HELP.md"
 _EXIT_COMMANDS = frozenset({"/exit", "/quit"})
 _EXIT_REPLY = (
     "[exited] Session closed at your request. Send a new message in a new session to start again."
@@ -62,17 +64,28 @@ class _Interrupted(Exception):
         self.rebuild = rebuild
 
 
-def _slash_command(message: str) -> str | None:
-    """按 message 正文识别内置 slash 功能；命中则返回定型 reply，否则 None（走正常 agent）。
+def _read_help() -> str:
+    """Return the user-facing help text shown by /help."""
+    try:
+        text = _HELP_PATH.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return "Harness help is unavailable: HELP.md is missing."
+    return text or "Harness help is empty."
 
-    示范：功能识别在 harness 内部、通道仍是 message。仅认首词精确匹配（大小写不敏感）。
+
+def _slash_command(message: str) -> tuple[str, bool] | None:
+    """按 message 正文识别内置 slash 功能；返回 (reply, should_exit) 或 None。
+
+    功能识别在 harness 内部、通道仍是 message。仅认首词精确匹配（大小写不敏感）。
     """
     text = (message or "").strip()
     if not text:
         return None
     head = text.split(None, 1)[0].lower()
+    if head == "/help":
+        return _read_help(), False
     if head in _EXIT_COMMANDS:
-        return _EXIT_REPLY
+        return _EXIT_REPLY, True
     return None
 
 
@@ -90,8 +103,8 @@ def _force_stop(agent) -> bool:
     return False
 
 
-# 内层过程流各类文本上限（对齐 auto_designer StepTracer）：工具入参/输出可能带整文件内容，
-# 摘要后进时间线；assistant 是过程主体，给宽上限只防极端失控。
+# 内层过程流各类文本上限：工具入参/输出可能带整文件内容，摘要后进时间线；
+# assistant 是过程主体，给宽上限只防极端失控。
 _TOOL_TEXT_CAP = 200
 _TOOL_RESULT_CAP = 500
 _ASSISTANT_TEXT_CAP = 20_000
@@ -99,16 +112,32 @@ _ASSISTANT_TEXT_CAP = 20_000
 _stdout_lock = threading.Lock()
 
 
+def _wire_out(event_type: str, **payload) -> dict:
+    """输出帧：目标 stdio-jsonl-v1 或 legacy wire。"""
+    if _OUTPUT_PROTOCOL == _V1:
+        return {"type": event_type, **payload}
+    if event_type == "progress":
+        return {"progress": {"kind": payload.get("kind"), "text": payload.get("text")}}
+    if event_type == "reply":
+        out = {"reply": payload.get("text", "")}
+        if payload.get("steps"):
+            out["steps"] = payload["steps"]
+        return out
+    if event_type == "error":
+        return {"error": payload}
+    return {event_type: payload}
+
+
 def _emit_progress(*, kind: str, text: str) -> None:
     """向用户侧吐一条 Codex 式活动摘要（终态 reply 之前的旁路行）。
 
-    只发 tool / tool_error——短、可扫；assistant 全文不进进度条（那是过程流，给观测层）。
+    只发 tool / tool_error——短、可扫；assistant 全文不进进度条（那是内部诊断流）。
     失败一律静默：进度丢了不该拖垮 agent。
     """
     if kind not in ("tool", "tool_error"):
         return
     try:
-        line = json.dumps({"progress": {"kind": kind, "text": text}}, ensure_ascii=False)
+        line = json.dumps(_wire_out("progress", kind=kind, text=text), ensure_ascii=False)
         with _stdout_lock:
             sys.stdout.write(line + "\n")
             sys.stdout.flush()
@@ -177,7 +206,7 @@ def _snapshot_history(agent) -> list:
         return []
 
 
-def _seed_history(agent, messages) -> None:
+def _restore_history(agent, messages) -> None:
     """把快照种进新 agent，使下一轮 run 带着旧上下文（换了 agent_id 后存储 key 不同，必须显式回灌）。"""
     if not messages:
         return
@@ -191,12 +220,12 @@ def _build_agent(collector, session_id, agent_id):
     """按本目录 agent.yaml 构造工具型 nexau Agent（只挂 bash + complete_task）。
 
     session_id 进程内固定；agent_id 标识锁键——rebuild 时必须换新 agent_id 避自锁。
-    挂 collector 作 tracer：内层每步收进 collector.steps，经协议 steps 吐给观测层。
+    挂 collector 作 tracer：内层每步收进 collector.steps，经协议 steps 提供给调用方。
     """
     from nexau import Agent, AgentConfig
 
     cfg = AgentConfig.from_yaml(config_path=_HERE / "agent.yaml")
-    cfg.resolved_tracer = collector  # 内层过程流 → collector.steps（观测用，不影响回复）
+    cfg.resolved_tracer = collector  # 内层过程流 → collector.steps（诊断用，不影响回复）
     return Agent(
         config=cfg,
         session_id=session_id,
@@ -234,9 +263,9 @@ def _unwrap_reply(text: str) -> str:
 def _make_step_collector():
     """构造把 nexau span 收成 {kind,text} 过程流的 tracer（自包含，只依赖 nexau）。
 
-    镜像 auto_designer 的 StepTracer：LLM end→assistant，TOOL start→tool，
-    TOOL end→tool_result/tool_error。每次 agent.run 前 reset()，run 后读 steps —— 即该轮
-    harness 内层迭代的完整过程；经协议 steps 字段吐给观测层（persona 只吃 reply，看不到 steps）。
+    LLM end→assistant，TOOL start→tool，TOOL end→tool_result/tool_error。每次
+    agent.run 前 reset()，run 后读 steps —— 即该轮 harness 内层迭代的完整过程；
+    经协议 steps 字段提供给调用方。用户可见答案仍只来自 reply。
     收集失败一律静默，绝不拖垮 agent 主流程。
     """
     from nexau import BaseTracer, Span, SpanType
@@ -294,7 +323,7 @@ def _make_step_collector():
                 if t:
                     self.steps.append({"kind": kind, "text": t})
                     _emit_progress(kind=kind, text=t)  # 等待中可见的活动条（旁路）
-            except Exception:  # noqa: BLE001  观测层失败不影响 agent
+            except Exception:  # noqa: BLE001  诊断流失败不影响 agent
                 pass
 
         def start_span(self, name, span_type, inputs=None, parent_span=None, attributes=None):
@@ -373,7 +402,15 @@ def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue) -> None:
             continue
         if not isinstance(obj, dict):
             continue
-        if "control" in obj:
+        typ = obj.get("type")
+        if typ == "shutdown":
+            msg_q.put(_EOF)
+            return
+        if typ == "interrupt":
+            ctrl_q.put({"control": "interrupt"})
+        elif typ == "message" and isinstance(obj.get("text"), str):
+            msg_q.put(obj["text"])
+        elif "control" in obj:
             ctrl_q.put(obj)
         elif "message" in obj:
             msg_q.put(obj["message"])
@@ -396,7 +433,7 @@ def main() -> None:
             session_id,
             f"harness_{uuid.uuid4().hex[:8]}",
         )
-        _seed_history(fresh, snap)
+        _restore_history(fresh, snap)
         return fresh
 
     agent = _build_agent(collector, session_id, "harness")
@@ -409,21 +446,24 @@ def main() -> None:
             break
         while not ctrl_q.empty():  # 丢弃上一轮遗留的过期 control，避免误打断本轮
             ctrl_q.get_nowait()
-        # slash 内部分发：命中则回 reply 后结束进程。
-        slash_reply = _slash_command(message)
-        if slash_reply is not None:
+        # slash 内部分发：/help 回 reply 后继续；/exit|/quit 回 reply 后结束进程。
+        slash = _slash_command(message)
+        if slash is not None:
+            slash_reply, should_exit = slash
             with _stdout_lock:
-                sys.stdout.write(json.dumps({"reply": slash_reply}, ensure_ascii=False) + "\n")
+                sys.stdout.write(
+                    json.dumps(_wire_out("reply", text=slash_reply), ensure_ascii=False) + "\n"
+                )
                 sys.stdout.flush()
-            break
+            if should_exit:
+                break
+            continue
         collector.reset()  # 只收本轮内层过程
         agent, raw = _reply(agent, message, rebuild, ctrl_q)
         history_snapshot = _snapshot_history(agent) or history_snapshot
         reply = _unwrap_reply(raw)  # 拆信封：用户只看最终答案
-        payload: dict = {"reply": reply}
-        steps = list(collector.steps)  # 完整内层迭代 → 观测层（persona 不吃）
-        if steps:
-            payload["steps"] = steps
+        steps = list(collector.steps)  # 完整内层迭代 → 诊断元数据；用户答案只看 reply
+        payload = _wire_out("reply", text=reply, steps=steps)
         with _stdout_lock:  # 与 progress 旁路互斥，保证终态行完整
             sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
             sys.stdout.flush()

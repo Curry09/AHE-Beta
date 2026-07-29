@@ -1,8 +1,8 @@
 # Spec-0007：dev 侧硬提交边界，堵「任务代码焊进 harness 仓」的过拟合泄漏。
-"""harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品——
-`entry.py`（启动器）、`agents/`（角色定义）、`tools/`（工具声明）、`MANUAL.md`（用户手册）、
-`RUNTIME.md`（NexAU 运行时/owner 契约）、`params.yaml`/`agent.yaml`（配置）、
-`tests/`（harness 自身的回归测试），外加仓基建 `.gitignore`。
+"""harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品。
+
+允许的是 harness 产品区域：入口、agent/tool 配置、HELP/RUNTIME、运行脚本、自测与配置模板。
+拒绝的是用户任务项目、真实密钥、项目脚手架和未知顶层目录。
 
 真实闭环里观测到：用户 agent 把「跑不动某个 benchmark 任务（如 unidecode）」当 bug 提 issue，
 dev agent 领到后照字面 `mkdir -p unicode_ascii/tables; cat > pyproject.toml …` 把**被测项目本体**
@@ -19,23 +19,48 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-# harness 本体允许出现在仓根的顶层路径（目录或文件）。其余一律视为越界（任务代码/被测项目脚手架）。
-# `tests/` 收 harness **自身**的回归测试：任务代码本就被本闸挡在仓外，`tests/` 里能有意义测的
-# 只可能是 harness 本体（entry.py 超时/打断行为等），故放开不会重开泄漏口；顶层散落的 test_*.py
-# 仍拒，逼测试统一进 tests/。禁的是被测项目的测试（其项目代码根本进不来，此类测试无处可测、prompt 亦禁）。
-ALLOWED_TOP: frozenset[str] = frozenset(
+# harness 本体允许出现在仓根的顶层文件。
+ALLOWED_ROOT_FILES: frozenset[str] = frozenset(
     {
-        "MANUAL.md",
-        "RUNTIME.md",  # owner/dev：NexAU 运行时契约（用户仍只看 MANUAL.md）
+        "HELP.md",
+        "RUNTIME.md",
+        ".env.example",
+        "requirements.txt",
         "agent.yaml",
         "params.yaml",
         "entry.py",
-        "agents",
-        "tools",
-        "tests",
         ".gitignore",
     }
 )
+
+# harness 本体允许出现在仓根的顶层目录。
+ALLOWED_ROOT_DIRS: frozenset[str] = frozenset(
+    {
+        "agents",
+        "tools",
+        "scripts",
+        "tests",
+    }
+)
+
+# 明确拒绝的顶层文件/目录：真实密钥、任务项目脚手架、已退场文档名。
+DENIED_TOP: frozenset[str] = frozenset(
+    {
+        ".env",
+        "pyproject.toml",
+        "package.json",
+        "setup.py",
+        "setup.cfg",
+        "src",
+        "README.md",
+        "USER.md",
+        "MANUAL.md",
+        "INTERFACE.md",
+    }
+)
+
+# 向后兼容导出：部分测试/调用方只关心“可作为顶层的集合”。
+ALLOWED_TOP: frozenset[str] = ALLOWED_ROOT_FILES | ALLOWED_ROOT_DIRS
 
 
 def _is_ignorable(path: str) -> bool:
@@ -45,26 +70,33 @@ def _is_ignorable(path: str) -> bool:
 
 
 def violations(staged_paths: Iterable[str]) -> list[str]:
-    """给定暂存文件相对路径集，返回其中越界（顶层不在白名单）的路径；空列表 = 全合法。"""
+    """给定暂存文件相对路径集，返回其中越界（不属于 harness 产品区域）的路径。"""
     bad: list[str] = []
     for raw in staged_paths:
         path = raw.strip()
         if not path or _is_ignorable(path):
             continue
-        if path.split("/", 1)[0] not in ALLOWED_TOP:
+        top = path.split("/", 1)[0]
+        if top in DENIED_TOP:
             bad.append(path)
+            continue
+        if top in ALLOWED_ROOT_FILES or top in ALLOWED_ROOT_DIRS:
+            continue
+        bad.append(path)
     return bad
 
 
 # pre-commit 钩子脚本：自包含（只依赖 python3 stdlib + git），不 import 本包——harness 仓是独立仓，
-# 钩子在其内跑，PYTHONPATH 未必含 auto_designer。白名单从 ALLOWED_TOP 注入，逻辑与 violations() 同源。
+# 钩子在其内跑，PYTHONPATH 未必含 auto_designer。白名单从本模块注入，逻辑与 violations() 同源。
 _HOOK_TEMPLATE = """#!/usr/bin/env python3
 # auto-designer harness boundary gate（由 auto_designer.dev.harness_boundary 生成，勿手改）。
 # 拒绝把 harness 本体之外的文件（某个具体任务的项目代码）提交进 harness 仓——保通用工具不被过拟合。
 import subprocess
 import sys
 
-ALLOWED = {allowed}
+ALLOWED_FILES = {allowed_files}
+ALLOWED_DIRS = {allowed_dirs}
+DENIED = {denied}
 
 
 def _ignorable(path):
@@ -75,16 +107,21 @@ def _ignorable(path):
 staged = subprocess.run(
     ["git", "diff", "--cached", "--name-only"], capture_output=True, text=True
 ).stdout.split("\\n")
-bad = [p.strip() for p in staged if p.strip() and not _ignorable(p.strip())
-       and p.strip().split("/", 1)[0] not in ALLOWED]
+bad = []
+for p in staged:
+    path = p.strip()
+    if not path or _ignorable(path):
+        continue
+    top = path.split("/", 1)[0]
+    if top in DENIED or (top not in ALLOWED_FILES and top not in ALLOWED_DIRS):
+        bad.append(path)
 if bad:
     sys.stderr.write(
-        "\\n[harness-boundary] 提交被拒。harness 是通用编码助手，仓里只允许它自身的制品："
-        "entry.py / agents/ / tools/ / MANUAL.md / RUNTIME.md / params.yaml / agent.yaml，"
-        "以及 harness 自身的 tests/（放 harness 本体的回归测试，如 entry.py 超时/打断行为）。\\n"
-        "严禁把某个具体任务的项目代码（被测项目本体、pyproject.toml、新建包等）焊进来——那是过拟合、"
-        "且白耗迭代。测试请放 tests/ 下（顶层散落的 test_*.py 也会被拒）。请删除下列越界文件，"
-        "只提交对 harness *能力* 的改动：\\n  "
+        "\\n[harness-boundary] 提交被拒。harness 是通用编码助手，仓里只允许它自身的产品制品："
+        "entry.py / agent.yaml / params.yaml / HELP.md / RUNTIME.md / requirements.txt / "
+        ".env.example / agents/ / tools/ / scripts/ / tests/。\\n"
+        "严禁把某个具体任务的项目代码、项目脚手架、真实密钥或已退场文档名（README/USER/MANUAL/INTERFACE）"
+        "提交进 harness 仓。请删除下列越界文件，只提交对 harness *能力* 的改动：\\n  "
         + "\\n  ".join(bad)
         + "\\n"
     )
@@ -93,8 +130,12 @@ if bad:
 
 
 def render_hook() -> str:
-    """渲染 pre-commit 钩子脚本文本（白名单内联为 python set 字面量，与 ALLOWED_TOP 同步）。"""
-    return _HOOK_TEMPLATE.format(allowed=set(ALLOWED_TOP))
+    """渲染 pre-commit 钩子脚本文本（边界集合内联为 python set 字面量）。"""
+    return _HOOK_TEMPLATE.format(
+        allowed_files=set(ALLOWED_ROOT_FILES),
+        allowed_dirs=set(ALLOWED_ROOT_DIRS),
+        denied=set(DENIED_TOP),
+    )
 
 
 def install_pre_commit(repo: Path) -> None:
