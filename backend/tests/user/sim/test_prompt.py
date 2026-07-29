@@ -78,7 +78,6 @@ def test_build_system_excludes_global_platform_contract() -> None:
 def test_main_three_builders_have_sections() -> None:
     p = _persona()
     state = init_state(p)
-    state.pending_self_obs = "I ran it; no error."
     hist = ["[+0s] you -> harness: hi"]
     judge = build_main_judge_turn("do X", hist, "some output", ["accept"], state)
     intent = build_main_intent_turn(
@@ -95,7 +94,7 @@ def test_main_three_builders_have_sections() -> None:
         intent="accept if good",
     )
     for user in (judge, intent, act):
-        for tag in ("<task>", "<history>", "<harness_output>", "<mood>", "<self_observation>"):
+        for tag in ("<task>", "<history>", "<harness_output>", "<mood>"):
             assert tag in user
         assert "<wait_cost>" not in user
     early_forbidden = ("<action_space>", "# MENU", '"action":', '"message":', '"gap":')
@@ -231,13 +230,13 @@ def test_scripted_client_opening_sends_task() -> None:
             "t",
             [],
             "",
-            ["send_task"],
+            ["send_message"],
             state,
             verdict="unsure",
             intent="start",
         ),
     )
-    assert ret["action"] == "send_task"
+    assert ret["action"] == "send_message"
 
 
 def test_scripted_client_rate_experience_returns_score() -> None:
@@ -266,7 +265,7 @@ def test_scripted_client_exhausted_files_issue() -> None:
 def test_scripted_client_capability_fork() -> None:
     state_full = init_state(_persona())
     ho = "$ ran it: 2024-07-01 09:00:00+08:00 (no error)\nWorks now."
-    space = ["accept", "request_evidence", "give_feedback"]
+    space = ["accept", "send_message", "send_message"]
 
     def _act(d1: D1Eval) -> dict:
         return ScriptedPersonaClient().respond(

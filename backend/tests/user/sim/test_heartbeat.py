@@ -229,7 +229,7 @@ def test_resolve_intent_is_open_text() -> None:
 def test_three_mode_keep_waiting_logs_and_calls() -> None:
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done at last!")])
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[{"action": "keep_waiting", "gap": False}],
         judging=[{"judgment": "on_track", "perceive": "still working"}],
         intents=[{"intent": "give it more time"}],
@@ -279,7 +279,7 @@ def test_open_intent_gap_comes_from_act_not_enum() -> None:
     """想看进度却只能干等：act 自报 gap=true → WAIT_GAP；不再靠封闭 intent 枚举对表。"""
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[{"action": "keep_waiting", "gap": True}],
         judging=[{"judgment": "unclear", "perceive": "quiet after tools"}],
         intents=[{"intent": "I want to know where it is — help text has no /status"}],
@@ -304,7 +304,7 @@ def test_help_text_driven_send_message_no_gap() -> None:
         help_text="# Help\nWhile waiting you may send `/status` as a normal message.\n",
     )
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[
             {"action": "send_message", "message": "/status", "gap": False},
             {"action": "keep_waiting", "gap": False},
@@ -333,7 +333,7 @@ def test_help_text_driven_send_message_no_gap() -> None:
     assert any(t.action == "send_message" and t.message == "/status" for t in waiting)
     assert any(t.phase != "waiting" and t.harness_output == "done" for t in res.turns)
     # Spec-0024/T6：插话 utterance 标 queued；随后 reply 的 answers 指向 begin 那条而非插话
-    open_utt = next(t for t in res.turns if t.action == "send_task")
+    open_utt = next(t for t in res.turns if t.action == "send_message")
     assert open_utt.utterance_id == "u1" and open_utt.delivery == "open"
     queued = next(t for t in waiting if t.action == "send_message")
     assert queued.utterance_id == "u2"
@@ -350,7 +350,7 @@ def test_send_message_then_reply_triggers_main_not_nested_wait() -> None:
         help_text="# Help\n/btw <msg> is a side question while work continues.\n",
     )
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[
             {"action": "send_message", "message": "/btw are you still on pytest?", "gap": False},
             {"action": "keep_waiting", "gap": False},
@@ -389,7 +389,7 @@ def test_reply_ready_after_heartbeat_aborts_give_up() -> None:
     """心跳 LLM 期间 reply 已进缓冲：动作前检出 → 不作废会话，交主 loop，并写入 history。"""
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "arrived while deciding")])
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[{"action": "give_up", "gap": False}],
         judging=[{"judgment": "unclear", "perceive": "tired of waiting"}],
         intents=[{"intent": "walk away"}],
@@ -412,7 +412,7 @@ def test_reply_ready_after_heartbeat_aborts_give_up() -> None:
 def test_reply_ready_after_heartbeat_aborts_interrupt() -> None:
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done without interrupt")])
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[{"action": "interrupt", "gap": False}],
         judging=[{"judgment": "off_track", "perceive": "wrong"}],
         intents=[{"intent": "Ctrl+C"}],
@@ -432,7 +432,7 @@ def test_keep_waiting_is_one_shot_reply_wakes_main() -> None:
     """keep_waiting 也结束本次心跳；随后 reply 触发主 loop，不会连着再做一次等待决策。"""
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done at last!")])
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[
             {"action": "keep_waiting", "gap": False},
             {"action": "interrupt", "gap": False},  # 不应被消费
@@ -460,7 +460,7 @@ def test_keep_waiting_decay_follows_persona_coef() -> None:
     def _waiting_patience_after_one_keep(d43: D43Correct) -> int:
         harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
         client = WaitStubClient(
-            actions=["send_task", "accept"],
+            actions=["send_message", "accept"],
             acts=[{"action": "keep_waiting", "gap": False}],
             verdict="satisfied",
         )
@@ -476,7 +476,7 @@ def test_keep_waiting_decay_follows_persona_coef() -> None:
 def test_interrupt_routes_and_attribution() -> None:
     harness = HeartbeatHarness([("pending", 120.0)])
     client = WaitStubClient(
-        actions=["send_task", "give_up"],
+        actions=["send_message", "give_up"],
         acts=[{"action": "interrupt", "gap": False}],
         judging=[{"judgment": "off_track", "perceive": "wrong work"}],
         intents=[{"intent": "Ctrl+C stop this"}],
@@ -496,7 +496,7 @@ def test_interrupt_routes_and_attribution() -> None:
 def test_give_up_during_wait_abandons_with_issue() -> None:
     harness = HeartbeatHarness([("pending", 300.0)])
     client = WaitStubClient(
-        actions=["send_task"],
+        actions=["send_message"],
         acts=[{"action": "give_up", "message": "forget it", "gap": False}],
         judging=[{"judgment": "unclear", "perceive": "nothing"}],
         intents=[{"intent": "walk away from this"}],
@@ -512,7 +512,7 @@ def test_give_up_during_wait_abandons_with_issue() -> None:
 def test_pathological_keep_waiting_is_bounded() -> None:
     harness = HeartbeatHarness([("pending", 90.0)])
     client = WaitStubClient(
-        actions=["send_task"],
+        actions=["send_message"],
         acts=[{"action": "keep_waiting", "gap": False}],
         verdict="stuck",
     )
@@ -540,7 +540,7 @@ def test_on_track_progress_skips_patience_tax() -> None:
         progress_on_poll=progress_on_poll,
     )
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[{"action": "keep_waiting", "gap": False}, {"action": "keep_waiting", "gap": False}],
         judging=[
             {"judgment": "on_track", "perceive": "read"},
@@ -568,7 +568,7 @@ def test_stale_progress_taxes_patience_and_can_gap() -> None:
         progress_on_poll=[same, same, same],
     )
     client = WaitStubClient(
-        actions=["send_task", "accept"],
+        actions=["send_message", "accept"],
         acts=[
             {"action": "keep_waiting", "gap": False},
             {"action": "keep_waiting", "gap": True},
@@ -614,7 +614,7 @@ def test_prior_activity_carried() -> None:
         ],
     )
     client = WaitStubClient(
-        actions=["send_task", "ask_harness_run", "accept"],
+        actions=["send_message", "send_message", "accept"],
         acts=[
             {"action": "keep_waiting", "gap": False},
             {"action": "interrupt", "gap": False},

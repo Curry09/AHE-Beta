@@ -9,12 +9,13 @@ loop.py
   ④ resolve      自由产出归类 + 越权投影 + channel 校验  (action_space.resolve)
   ⑤ 状态写回      只吃主观 verdict                        (state.apply_verdict)
   ⑥ 终止判定      Effect.TERMINATE -> 记 end_reason 并 break
-  ⑦ 路由          EMIT -> 驱动 harness 出下一轮; verify_self -> 注入私有自观察
+  ⑦ 路由          EMIT -> 驱动 harness 出下一轮；终止动作 -> 收场
 
 本轮纯主观(不实现客观真值线):
 - harness 只回文本, 无 gold / exit_code; bug 体现在文本里, 由 persona 凭能力识别。
 - 状态与体感全程只依赖主观 verdict / trust, 不读任何客观真值。
-- verify_self: 框架把最近一次 harness 文本原样注入 self_observation(不过滤/不伪造); 能力分叉由 prompt(G1) 承载。
+- 用户自己的读文件/跑命令/看 diff 等核实发生在 AgenticPersonaClient 的私有内层工具循环，
+  作为 judge 阶段形成 perceive/verdict 的证据；不是外层 action。
 - 感知不在框架侧过滤: harness 文本原样喂入 persona LLM, 由 prompt(G1)+persona 档位约束"只在能力内感知"。
 """
 
@@ -310,10 +311,6 @@ def _main_decide(
 def route(action_id: str, message: str, state: State, harness, observable: str) -> str | None:
     """按 executor×channel 分派, 返回下一轮的 harness 文本(无则 None)。"""
     spec = CATALOG[action_id]
-
-    if spec.executor is Executor.FRAMEWORK:  # verify_self: 注入原始观察(不过滤/不伪造)
-        state.pending_self_obs = observable or ""
-        return None
 
     if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE:
         if not message.strip():
@@ -803,8 +800,6 @@ def run_session(
             appraise_task=phase is Phase.OPENING,
             result=result,
         )
-        state.pending_self_obs = None  # 用后即焚: self_observation 已被消费
-
         # 开局：据 persona 主观任务量读数，在耐心基线上叠加一次性小浮动（同一个人接不同任务耐心不同）。
         if phase is Phase.OPENING:
             apply_task_load(state, str(ret.get("task_load", "normal")))
@@ -969,7 +964,7 @@ def run_session(
             result.pending_harness_steps = harness_steps
             if on_progress is not None:
                 on_progress(result)
-        # verify_self: harness_output 不变, 但 self_obs 已注入下一轮
+        # 本轮若未产生下一条 harness 输出（例如模型空转），保持上一条可见输出供下一轮继续判断。
 
     # 收尾: 汇总纯主观的行为信号
     _collect_signals(result, persona)

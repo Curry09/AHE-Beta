@@ -127,13 +127,8 @@ def _private_checks(turn: SimTurn) -> list[dict[str, str]]:
     """私有核实：用户自己跑/读、不发给 harness 的步骤。
 
     现实 chat 日志几乎看不到「用户本机 pytest」；仿真能采到，对验收门/过信根因很关键。
+    私有核实是 judge/intent/act 内层 agentic 行为，不再对应一个外层 verify_self 动作。
     """
-    if turn.action != "verify_self" and not any(
-        (c.parsed or {}).get("action") == "verify_self" for c in turn.persona_trace
-    ):
-        # 仍可能在 agentic 内层用了 tool 却最终没选 verify_self——只在显式 verify_self 时暴露，
-        # 避免把每次决策的内层试探都当成「用户私有核实」。
-        return []
     out: list[dict[str, str]] = []
     for call in turn.persona_trace:
         for step in call.steps or []:

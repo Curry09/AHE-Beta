@@ -42,8 +42,8 @@ SimTurnHook = Callable[..., None]
 def result_to_turns(res: SessionResult) -> list[Turn]:
     """SessionResult → models.Turn 序列：每轮先 harness 文本、后 user 消息（空则跳过）。
 
-    `TurnLog.harness_output` 是「本轮 persona 看到的*上一轮* harness 回复」快照，会跨非-EMIT
-    轮（verify_self 等 silent 轮不重发 harness）重复携带同一值。故按「相邻去重」只在 harness
+    `TurnLog.harness_output` 是「本轮 persona 看到的*上一轮* harness 回复」快照，可能跨空转
+    轮重复携带同一值。故按「相邻去重」只在 harness
     回复真正变化（= 有新一轮回复）时记一条 harness 轮，否则同一条 completion 会被展开成多条、
     与 user 消息错位（曾使落盘 transcript 现 `user, harness×N, user` 的假象）。
     """

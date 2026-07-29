@@ -124,7 +124,7 @@ def test_blind_degrades_to_text_only() -> None:
                 {
                     "perceive": "skim",
                     "verdict": "unsure",
-                    "action": "give_feedback",
+                    "action": "send_message",
                     "message": "hmm",
                 }
             )
@@ -140,7 +140,7 @@ def test_blind_degrades_to_text_only() -> None:
 
     out = c.respond("SYS", "<task>x</task>")
     assert created == []  # blind 无工具，不进入工具循环
-    assert out["action"] == "give_feedback"
+    assert out["action"] == "send_message"
 
 
 # --------------------------------------------------------------------------
@@ -193,7 +193,7 @@ def test_invalid_json_retry_recovers() -> None:
 def test_integration_run_session_unaffected() -> None:
     persona = _persona(D1Eval.COMPETENT)
     ws = materialize(WorkspaceSpec(fixture="billing-split"))
-    llm = FakeToolLLM()  # 默认每轮给 accept；OPENING 会被投影为 send_task，下一轮 accept 终止
+    llm = FakeToolLLM()  # 默认每轮给 accept；OPENING 会被投影为 send_message，下一轮 accept 终止
     c = AgenticPersonaClient(llm)  # 真 Sandbox over ws
     c.bind_session(persona, ws)
 
@@ -208,11 +208,11 @@ def test_integration_run_session_unaffected() -> None:
 def test_scripted_client_still_works() -> None:
     user = (
         "<harness_output>\n(empty)\n</harness_output>\n\n"
-        "<action_space>\n['send_task']\n</action_space>\n\n"
+        "<action_space>\n['send_message']\n</action_space>\n\n"
         "<mood>\npatience=full, trust=balanced\n</mood>"
     )
     out = ScriptedPersonaClient().respond("sys", user)
-    assert out["action"] == "send_task"
+    assert out["action"] == "send_message"
 
 
 # --------------------------------------------------------------------------
@@ -227,7 +227,7 @@ def test_report_issue_tool_continues_and_drains() -> None:
                 {
                     "perceive": "noted the bug, still trying",
                     "verdict": "failed_blame_harness",
-                    "action": "give_feedback",
+                    "action": "send_message",
                     "message": "try again please",
                 }
             ),
@@ -237,7 +237,7 @@ def test_report_issue_tool_continues_and_drains() -> None:
     c.bind_session(_persona(D1Eval.COMPETENT), "/ws")
 
     out = c.respond("SYS", "<task>x</task>")
-    assert out["action"] == "give_feedback"  # 未因开单而终止
+    assert out["action"] == "send_message"  # 未因开单而终止
     notes = c.drain_issue_notes()
     assert notes == ["split is off by a cent"]
     assert c.drain_issue_notes() == []  # 已清空
@@ -292,7 +292,7 @@ def test_run_session_collects_mid_session_issue_notes() -> None:
             json.dumps({"intent": "start the task"}),
             json.dumps(
                 {
-                    "action": "send_task",
+                    "action": "send_message",
                     "message": "please implement X",
                     "gap": False,
                 }

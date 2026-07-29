@@ -250,20 +250,14 @@ class ScriptedPersonaClient:
     @staticmethod
     def _intent_from_action(action: str, message: str) -> str:
         hints = {
-            "send_task": "start the task with the harness",
-            "refine_request": "refine what I asked for",
-            "give_feedback": "push back on what it produced",
-            "verify_self": "check the result myself",
-            "ask_harness_run": "have the harness run and show me",
-            "request_evidence": "demand stronger evidence",
-            "grant_autorun": "let it run more freely",
+            "send_message": "send a message to the harness",
             "accept": "accept and move on",
             "accept_with_reservations": "accept but leave a reservation",
             "give_up": "walk away",
             "file_issue": "file an issue and stop",
         }
         base = hints.get(action, f"do {action or 'something'}")
-        if message.strip() and action not in ("accept", "verify_self"):
+        if message.strip() and action != "accept":
             return f"{base}: {message.strip()[:80]}"
         return base
 
@@ -286,7 +280,7 @@ class ScriptedPersonaClient:
             out = {
                 "perceive": "Nothing from the harness yet; starting the task.",
                 "verdict": "unsure",
-                "action": "send_task" if "send_task" in space else "free",
+                "action": "send_message" if "send_message" in space else "free",
                 "message": "Please add to_user_tz(dt, tz_name) to timeutils; it must "
                 "handle DST correctly. We mainly use Asia/Shanghai and "
                 "America/New_York. Run a quick check including a DST case.",
@@ -324,19 +318,19 @@ class ScriptedPersonaClient:
             return {
                 "perceive": perceive,
                 "verdict": "failed_blame_harness",
-                "action": "give_feedback" if "give_feedback" in space else "free",
+                "action": "send_message" if "send_message" in space else "free",
                 "message": "That failed: the API it calls doesn't exist. Please fix it "
                 "with standard pytz and run the New York DST check again.",
             }
 
-        # 第一次只贴代码、未真跑 -> 倾向核查(让 harness 跑 / 自验)
+        # 第一次只贴代码、未真跑 -> 倾向让 harness 给出运行证据。
         if "localize_safe" in ho or "done" in ho or "looks correct" in ho:
-            if "ask_harness_run" in space:
+            if "send_message" in space:
                 return {
                     "perceive": "Looks plausible and it claims DST is handled, but I "
                     "can't verify localize_safe from the text alone.",
                     "verdict": "unsure",
-                    "action": "ask_harness_run",
+                    "action": "send_message",
                     "message": "Please actually run it once, especially the NY DST boundary.",
                 }
 
@@ -348,11 +342,7 @@ class ScriptedPersonaClient:
                     "perceive": "It 'runs' but dt.replace(tzinfo=tz) does NOT handle "
                     "DST transitions correctly — the spring-forward case is wrong.",
                     "verdict": "failed_blame_harness",
-                    "action": (
-                        "request_evidence"
-                        if "request_evidence" in space
-                        else ("give_feedback" if "give_feedback" in space else "free")
-                    ),
+                    "action": "send_message" if "send_message" in space else "free",
                     "message": "Running without error isn't enough. dt.replace doesn't "
                     "handle DST. Show me the 2024-03-10 02:30 America/New_York "
                     "case with pytz localize/normalize.",
@@ -370,7 +360,7 @@ class ScriptedPersonaClient:
         return {
             "perceive": "Still not convinced it's correct.",
             "verdict": "unsure",
-            "action": "give_feedback" if "give_feedback" in space else "free",
+            "action": "send_message" if "send_message" in space else "free",
             "message": "Not quite there yet — please try again.",
         }
 

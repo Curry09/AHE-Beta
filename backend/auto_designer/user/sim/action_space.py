@@ -3,9 +3,7 @@ action_space.py
 动作空间派生 + 能力掩码 + 自由产出的事后校验 + 路由。
 
 派生公式（框架只钉唯一的结构边界，所有"判断"交给有判断力的模型）:
-  本轮动作空间 = 局面合法集(phase)                          # 唯一结构边界: OPENING 还没东西可评→只能发任务
-               ∩ 能力掩码(D1)                              # persona 保真: 做不做得到(盲评不读 diff)
-               ∩ 授权尺度(D6)                              # persona 保真: 被不被允许(只读不给自动跑)
+  本轮动作空间 = 局面合法集(phase)                          # 外部对话动作统一为 send_message
                ∪ (ACTIVE ? {accept, accept_with_reservations, file_issue, give_up})  # 四个终止全放开，模型自判
 
 为何终止动作(含 accept)不再被框架门控:
@@ -30,61 +28,16 @@ from .actions import (
     Effect,
     Phase,
 )
-from .dimensions import (
-    D1Eval,
-    D6Authz,
-    Persona,
-)
+from .dimensions import Persona
 from .state import State
 
 # --------------------------------------------------------------------------
 # 局面合法集
 # --------------------------------------------------------------------------
 LEGAL_BY_PHASE: dict[Phase, set[str]] = {
-    Phase.OPENING: {"send_task"},
-    Phase.ACTIVE: {
-        "refine_request",
-        "give_feedback",
-        "verify_self",
-        "ask_harness_run",
-        "request_evidence",
-        "grant_autorun",
-    },
+    Phase.OPENING: {"send_message"},
+    Phase.ACTIVE: {"send_message"},
 }
-
-
-# --------------------------------------------------------------------------
-# 能力掩码: D1 决定哪些核查动作可用
-# --------------------------------------------------------------------------
-def cap_mask(p: Persona) -> dict[str, bool]:
-    d1 = p.d1
-    return {
-        "read_code": d1 != D1Eval.BLIND,
-        "run_once": d1 in (D1Eval.SHALLOW, D1Eval.COMPETENT, D1Eval.EXPERT),
-        "run_tests": d1 in (D1Eval.COMPETENT, D1Eval.EXPERT),
-        "review_diff": d1 in (D1Eval.COMPETENT, D1Eval.EXPERT),
-    }
-
-
-def _cap_filter(space: set[str], mask: dict[str, bool]) -> set[str]:
-    out = set(space)
-    # verify_self 需要至少能 read_code 或 run_once
-    if not (mask["read_code"] or mask["run_once"]):
-        out.discard("verify_self")
-    # request_evidence(要 diff / 测试报告) 需要 review_diff 或 run_tests
-    if not (mask["review_diff"] or mask["run_tests"]):
-        out.discard("request_evidence")
-    return out
-
-
-def _authz_filter(space: set[str], authz: D6Authz) -> set[str]:
-    out = set(space)
-    if authz == D6Authz.READ_ONLY:
-        out.discard("ask_harness_run")
-        out.discard("grant_autorun")
-    elif authz == D6Authz.WRITE_NO_RUN:
-        out.discard("grant_autorun")  # 可写不可跑 -> 不放开全自动
-    return out
 
 
 # --------------------------------------------------------------------------
@@ -95,12 +48,10 @@ def derive_action_space(
     persona: Persona,
     state: State,  # noqa: ARG001  接口保留：状态不再锁动作（耐心/产物皆交模型判断），签名沿用备后用
 ) -> list[str]:
-    legal = set(LEGAL_BY_PHASE[phase])
-    space = _cap_filter(legal, cap_mask(persona))
-    space = _authz_filter(space, persona.d6)
+    space = set(LEGAL_BY_PHASE[phase])
 
     if phase == Phase.ACTIVE:
-        # 进了 ACTIVE（= 已发过任务、至少有一条 harness 回合，哪怕是 [harness error]），四个终止动作
+        # 进了 ACTIVE（= 已发过消息、至少有一条 harness 回合，哪怕是 [harness error]），四个终止动作
         # 全放开，由模型按 persona 性格(D43_CLAUSE) + <mood> 自判：验收 / 带保留验收 / 走人 / 开单。
         # 框架不替它判断"能不能验收"——包括 harness 崩溃/超时：错误照样喂它感知，有判断力的用户面对
         # 崩溃自然开单/走人而非验收（R4 的假验收纯是当时"只有 accept 一个出口"的漏斗所迫，已补齐）。
@@ -120,9 +71,8 @@ def classify_free_action(message: str, space: list[str], persona: Persona) -> st
     (见 loop 里 resolve 前的 classify_action 接缝); 这里只在自评缺席/失败时兜底: 一律落到安全的
     **非终止**动作(优先反馈), 绝不从 prose 推断 accept/file_issue/give_up 这类终止意图。
     """
-    for prefer in ("give_feedback", "refine_request", "ask_harness_run"):
-        if prefer in space:
-            return prefer
+    if "send_message" in space:
+        return "send_message"
     non_terminal = [a for a in space if CATALOG[a].effect is not Effect.TERMINATE]
     return sorted(non_terminal)[0] if non_terminal else space[0]
 
@@ -137,8 +87,8 @@ def project_to_legal(action_id: str, space: list[str]) -> str:
         # "不满想升级"误记成"满意接受", 双重污染体感/issue 信号。降级为继续反馈, 把终止权
         # 交回闸门(耐心 or 诊断): 下一轮闸门开了, persona 自然会真正落地 file_issue/give_up。
         if want is Effect.TERMINATE and action_id != "accept":
-            if "give_feedback" in space:
-                return "give_feedback"
+            if "send_message" in space:
+                return "send_message"
             non_term = [a for a in space if CATALOG[a].effect is not Effect.TERMINATE]
             if non_term:
                 return sorted(non_term)[0]

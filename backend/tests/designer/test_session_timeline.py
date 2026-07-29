@@ -35,10 +35,10 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
         SimTurn(
             turn=1,
             phase="opening",
-            action_space=["send_task"],
+            action_space=["send_message"],
             perceive="Nothing yet; starting the DST task.",
             verdict="unsure",
-            action="send_task",
+            action="send_message",
             message="please fix DST",
             executor="harness",
             channel="emit",
@@ -53,7 +53,7 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
                     system="MUST NOT LEAK SYSTEM",
                     user="MUST NOT LEAK USER",
                     raw="{}",
-                    parsed={"action": "send_task", "message": "please fix DST"},
+                    parsed={"action": "send_message", "message": "please fix DST"},
                 )
             ],
         ),
@@ -128,13 +128,13 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
         SimTurn(
             turn=3,
             phase="active",
-            action_space=["accept", "give_up", "verify_self"],
-            perceive="Looks done; I'll verify myself.",
-            verdict="unsure",
-            action="verify_self",
-            message="",
+            action_space=["accept", "give_up", "send_message"],
+            perceive="Looks done; I checked it privately.",
+            verdict="satisfied",
+            action="accept",
+            message="Looks good.",
             executor="persona_local",
-            channel="silent",
+            channel="emit",
             patience=2,
             trust="skeptical",
             harness_output="Fixed in core.py and tests passed.",
@@ -142,11 +142,14 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
             answers_said="please fix DST",
             persona_trace=[
                 PersonaCallTrace(
-                    role="main_act",
+                    role="main_judge",
                     system="NO",
                     user="NO",
                     raw="{}",
-                    parsed={"action": "verify_self", "message": ""},
+                    parsed={
+                        "perceive": "I ran pytest privately; it passed",
+                        "verdict": "satisfied",
+                    },
                     steps=[
                         {
                             "kind": "tool",
@@ -160,10 +163,10 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
         SimTurn(
             turn=4,
             phase="active",
-            action_space=["refine_request", "give_up"],
+            action_space=["send_message", "give_up"],
             perceive="It burned the budget again.",
             verdict="stuck",
-            action="refine_request",
+            action="send_message",
             message="Please continue from the diff.",
             executor="harness",
             channel="emit",
@@ -185,7 +188,7 @@ def _session_rich(*, issue_n: int | None = 7) -> Session:
                     user="NO",
                     raw="{}",
                     parsed={
-                        "action": "refine_request",
+                        "action": "send_message",
                         "message": "Please continue from the diff.",
                     },
                 )
@@ -259,18 +262,21 @@ def test_projection_keeps_precious_godview_drops_sim_machinery(tmp_path: Path) -
     ]
 
     # Spec-0024/T6：插话 queued 在 open 之后；随后 heard 仍 answers 指向 begin 那条
-    opening = next(e for e in events if e.get("did") == "send_task")
-    assert opening["utterance"] == "u1" and opening["delivery"] == "open"
-    queued = next(e for e in events if e.get("did") == "send_message")
-    assert queued["utterance"] == "u2"
+    opening = next(
+        e for e in events if e.get("did") == "send_message" and e.get("utterance") == "u1"
+    )
+    assert opening["delivery"] == "open"
+    queued = next(
+        e for e in events if e.get("did") == "send_message" and e.get("utterance") == "u2"
+    )
     assert queued["delivery"] == "queued" and queued["queued_behind"] == "u1"
 
-    verify = next(e for e in events if e.get("did") == "verify_self")
-    assert verify["private_check"]
-    assert any("pytest" in c["detail"] for c in verify["private_check"])
-    assert verify["answers"] == "u1"
-    assert verify["answers_said"] == "please fix DST"
-    assert verify["answers"] != queued["utterance"]
+    accepted = next(e for e in events if e.get("did") == "accept")
+    assert accepted["private_check"]
+    assert any("pytest" in c["detail"] for c in accepted["private_check"])
+    assert accepted["answers"] == "u1"
+    assert accepted["answers_said"] == "please fix DST"
+    assert accepted["answers"] != queued["utterance"]
 
     assert any(e.get("did") == "file_issue" for e in events)
     assert any(e.get("did") == "rate_experience" for e in events)
@@ -285,7 +291,7 @@ def test_tool_by_issue_and_session(tmp_path: Path) -> None:
         by_sid = get_session_timeline(session_id=sess.session_id)
     assert by_issue["ok"] and by_sid["ok"]
     payload = json.loads(by_issue["timeline"])
-    assert payload["timeline"]["events"][0]["did"] == "send_task"
+    assert payload["timeline"]["events"][0]["did"] == "send_message"
     with bind_session_store(store):
         assert get_session_timeline(issue_number=999)["ok"] is False
 
@@ -301,7 +307,7 @@ def test_harness_beat_drilldown_clips_and_classifies(tmp_path: Path) -> None:
     assert by_issue["ok"] is True
     assert by_issue["stop_kind"] == "max_iterations"
     assert "Maximum iteration" in by_issue["heard"]
-    assert by_issue["user_did"] == "refine_request"
+    assert by_issue["user_did"] == "send_message"
     assert by_issue["n_steps_raw"] == 4
     assert by_issue["n_steps_returned"] == 4
     # tool_result 截断，不全量 stdout
