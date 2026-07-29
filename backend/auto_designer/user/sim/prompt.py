@@ -4,7 +4,7 @@ prompt.py
 
 KV cache 友好的排序(从不变到善变):
   system = BASE_USER_SYSTEM + BLOCK_P <- 跨/内 session 稳定前缀, cache 命中区
-  user   = <task><history><harness_output><self_observation><mood>
+  user   = <task><history><harness_output><mood>
            act 阶段才额外带 <action_space>，避免 judge/intent 先看菜单倒推意图。
 状态数值不进 system; mood 只给离散标签, 放在 user 尾部。
 """
@@ -150,8 +150,6 @@ def _main_context_parts(
         parts.append(f"<harness_help>\n{help_text.strip()}\n</harness_help>")
     parts.append(f"<history>\n{hist}\n</history>")
     parts.append(f"<harness_output>\n{ho}\n</harness_output>")
-    if state.pending_self_obs:
-        parts.append(f"<self_observation>\n{state.pending_self_obs}\n</self_observation>")
     if include_action_space:
         parts.append(f"<action_space>\n{action_space}\n</action_space>")
     parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
@@ -184,8 +182,15 @@ def build_main_judge_turn(
     parts.append(
         "# JUDGE — how things stand NOW (not what you will do next)\n"
         "First write what you genuinely perceived in your own words, including the limits "
-        "of what you can tell from the visible evidence. Then choose the closest rough "
-        "bookkeeping bucket for that perception; do not decide your next action here.\n"
+        "of what you can tell from the visible evidence. If your basis is not enough for "
+        "the verdict you are about to give, and you have private tools that can cheaply "
+        "check the relevant fact in your workspace (for example a file diff, a claimed "
+        "edit, or a focused command/test), use those tools NOW before returning this "
+        "judge JSON. Private checking belongs in this judge step, not in the later act "
+        "step. If you choose not to check, be explicit in perceive that you are relying "
+        "only on the harness report or that the check is not worth it for this persona. "
+        "Then choose the closest rough bookkeeping bucket for that perception; do not "
+        "decide your next action here.\n"
         "Buckets:\n"
         "- satisfied: you personally think this is good enough.\n"
         "- failed_blame_harness: you think the assistant/tool caused the failure.\n"
@@ -265,14 +270,17 @@ def build_main_act_turn(
     parts.append(f"<intent>\n{intent.strip() or '(none)'}\n</intent>")
     parts.append(
         "# MENU — only ids in <action_space> exist right now\n"
-        "This is the convergence step: map <intent> to the closest id, or use "
+        "This is the convergence step: map <intent> to an EXTERNAL move, or use "
         'action:"free" with a message if no id really fits (the framework may classify it).\n'
         "Local action semantics:\n"
-        "- verify_self: private; inspect/run on your own if you have tools; the harness hears nothing.\n"
-        "- ask_harness_run / request_evidence / give_feedback / refine_request / grant_autorun: "
-        "send the exact line in message.\n"
+        "- send_message: send the exact line in message to the harness. Use this for any "
+        "follow-up, clarification, feedback, evidence request, or request that the harness run "
+        "something.\n"
         "- accept / accept_with_reservations / give_up / file_issue: terminal outcomes; keep "
         "message short and in your voice.\n"
+        "There is NO action for private investigation here. Any private reading, diff review, "
+        "or command/test run you did yourself must already have happened before this act step "
+        "and should appear in your judgment evidence.\n"
         "Before any accept-like terminal outcome, make sure you actually have a basis in "
         "<history>, <harness_output>, or private tool results; do not accept an error, timeout, "
         "empty output, or unverified claim as if it worked.\n"
@@ -280,7 +288,7 @@ def build_main_act_turn(
         "otherwise gap=false. Honor <mood>.\n"
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"action": "<id from <action_space>, or free>", '
-        '"message": "<exact line to the harness; empty for verify_self>", '
+        '"message": "<exact line to the harness if action==send_message; else short/empty>", '
         '"gap": <true if fallback; else false>}'
     )
     parts.append("</main_act>")

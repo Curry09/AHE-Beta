@@ -50,20 +50,20 @@ def _turn(
 
 
 def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
-    """harness_output 是「本轮 persona 看到的上轮回复」快照，会跨非-EMIT 轮重复携带。
+    """harness_output 是「本轮 persona 看到的上轮回复」快照，可能跨无新回复轮重复携带。
 
-    silent 轮（verify_self 等）不重发 harness，却各自快照同一条 completion；result_to_turns
-    必须按「真有新 harness 回复」去重，否则同一条被展开成多条 harness 轮、与 user 错位。
+    result_to_turns 必须按「真有新 harness 回复」去重，否则同一条被展开成多条 harness 轮、
+    与 user 错位。
     """
     completion = '{"result": "done: split_bill implemented"}'
     res = SessionResult(
         persona_id="P-0991",
         end_reason="accepted",
         turns=[
-            _turn(0, "send_task", "emit", "Please inspect billing/core.py ...", ""),
-            _turn(1, "verify_self", "silent", "", completion),  # 快照同一 completion
-            _turn(2, "verify_self", "silent", "", completion),
-            _turn(3, "verify_self", "silent", "", completion),
+            _turn(0, "send_message", "emit", "Please inspect billing/core.py ...", ""),
+            _turn(1, "silent_reflect", "silent", "", completion),  # 快照同一 completion
+            _turn(2, "silent_reflect", "silent", "", completion),
+            _turn(3, "silent_reflect", "silent", "", completion),
             _turn(4, "accept", "emit", "Looks good, thanks.", completion),
         ],
     )
@@ -86,7 +86,7 @@ def test_result_to_sim_trace_keeps_perceive_alongside_dialogue() -> None:
         turns=[
             _turn(
                 0,
-                "send_task",
+                "send_message",
                 "emit",
                 "fix DST",
                 "",
@@ -124,7 +124,7 @@ def test_result_to_turns_includes_pending_harness_reply() -> None:
     res = SessionResult(
         persona_id="P-0991",
         end_reason="max_turns",
-        turns=[_turn(1, "send_task", "emit", "Implement the interpreter ...", "")],
+        turns=[_turn(1, "send_message", "emit", "Implement the interpreter ...", "")],
         pending_harness_output="done: interpreter implemented",
     )
     turns = result_to_turns(res)
@@ -134,7 +134,7 @@ def test_result_to_turns_includes_pending_harness_reply() -> None:
     ]
 
     # 悬挂内容与最后一条已入日志的 harness 快照相同 → 视为同一条，不重复
-    res.turns.append(_turn(2, "give_feedback", "emit", "again", "done: interpreter implemented"))
+    res.turns.append(_turn(2, "send_message", "emit", "again", "done: interpreter implemented"))
     roles = [t.role for t in result_to_turns(res)]
     assert roles == ["user", "harness", "user"]
 

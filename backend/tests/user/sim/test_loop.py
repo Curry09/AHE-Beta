@@ -106,7 +106,7 @@ class _ClassifyingClient(_RecordingClient):
 def test_harness_text_fed_raw_without_perception_filter() -> None:
     # 低能力档(原型会用 perceive_filter 抹掉源码行)；删除过滤后, 源码应原样喂入 LLM。
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
-    client = _RecordingClient(["send_task", "give_feedback", "accept"], verdict="unsure")
+    client = _RecordingClient(["send_message", "send_message", "accept"], verdict="unsure")
     run_session(p, client, ScriptedHarness(), TASK)
     after_harness = next(u for u in client.seen if "pytz.localize_safe(dt, tz)" in u)
     assert "you don't read the diff line by line" not in after_harness  # 无过滤占位串
@@ -115,7 +115,7 @@ def test_harness_text_fed_raw_without_perception_filter() -> None:
 def test_main_decide_is_judge_intent_act_isomorphic() -> None:
     """主 loop 默认 three：judge → intent → act；perceive 带 [verdict|intent→action]。"""
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
-    client = _RecordingClient(["send_task", "accept"], verdict="satisfied")
+    client = _RecordingClient(["send_message", "accept"], verdict="satisfied")
     res = run_session(p, client, ScriptedHarness(), TASK)
     tags = []
     for u in client.seen:
@@ -147,21 +147,19 @@ def test_free_action_classification_still_converges_after_open_intent() -> None:
     assert res.end_reason == "accepted"
     assert client.classifications
     assert client.classifications[0][0]["action"] == "free"
-    assert "send_task" in client.classifications[0][1]
+    assert "send_message" in client.classifications[0][1]
     judge_prompts = [u for u in client.seen if "<main_judge>" in u]
     intent_prompts = [u for u in client.seen if "<main_intent>" in u]
     assert all("<action_space>" not in u for u in judge_prompts)
     assert all("<action_space>" not in u for u in intent_prompts)
 
 
-def test_verify_self_injects_raw_observation() -> None:
-    # verify_self 注入「原始」最近 harness 文本, 不再按子串伪造「崩了/没报错」。
+def test_main_action_space_has_no_private_verify_action() -> None:
     p = _persona(D1Eval.EXPERT, D43Correct.FEEDBACK)
-    client = _RecordingClient(["send_task", "verify_self", "accept"], verdict="unsure")
-    run_session(p, client, ScriptedHarness(), TASK)
-    after_verify = next(u for u in client.seen if "<self_observation>" in u)
-    assert "pytz.localize_safe(dt, tz)" in after_verify  # 原始观察(含代码)
-    assert "I ran it once" not in after_verify  # 无伪造串
+    client = _RecordingClient(["send_message", "accept"], verdict="unsure")
+    res = run_session(p, client, ScriptedHarness(), TASK)
+    assert all("verify_self" not in t.action_space for t in res.turns)
+    assert all("<self_observation>" not in u for u in client.seen)
 
 
 def test_runs_one_session_returns_result() -> None:
@@ -169,12 +167,12 @@ def test_runs_one_session_returns_result() -> None:
     res = run_session(p, ScriptedPersonaClient(), ScriptedHarness(), TASK)
     assert isinstance(res, SessionResult)
     assert res.persona_id == "P"
-    assert res.turns and res.turns[0].action == "send_task"
+    assert res.turns and res.turns[0].action == "send_message"
 
 
 def test_self_terminates_at_chosen_turn() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
-    client = _StubClient(["send_task", "accept"], verdict="satisfied")
+    client = _StubClient(["send_message", "accept"], verdict="satisfied")
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.end_reason == "accepted"
     assert len(res.turns) == 2
@@ -184,7 +182,7 @@ def test_on_progress_pushes_pending_harness_reply_immediately() -> None:
     """harness 回复到手即推观测层：send 返回后、persona 下一轮响应前，多触发一次
     on_progress 且快照悬挂该回复；下一条 TurnLog 落日志时悬挂清空（回复已随日志携带）。"""
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
-    client = _StubClient(["send_task", "accept"], verdict="satisfied")
+    client = _StubClient(["send_message", "accept"], verdict="satisfied")
     snaps: list[tuple[int, str | None]] = []
     run_session(
         p,
@@ -202,7 +200,7 @@ def test_on_progress_pushes_pending_harness_reply_immediately() -> None:
 def test_help_text_is_threaded_into_persona_prompt() -> None:
     # 帮助文本经 run_session(help_text=) 穿透到每轮 persona 看到的 user turn（能力预期锚点）。
     p = _persona(D1Eval.EXPERT, D43Correct.FEEDBACK)
-    client = _RecordingClient(["send_task", "accept"], verdict="satisfied")
+    client = _RecordingClient(["send_message", "accept"], verdict="satisfied")
     run_session(p, client, ScriptedHarness(), TASK, help_text="# Help\nno live progress; no /btw.")
     assert client.seen and all("<harness_help>" in u for u in client.seen)
     assert any("no live progress" in u for u in client.seen)
@@ -225,7 +223,7 @@ class _AppraisingClient(_RecordingClient):
 def test_opening_appraisal_floats_starting_patience() -> None:
     # FEEDBACK 基线 5；开局报 epic(+2) -> 起始耐心 7，落在首轮 TurnLog。
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
-    client = _AppraisingClient(["send_task", "give_feedback"], task_load="epic")
+    client = _AppraisingClient(["send_message", "send_message"], task_load="epic")
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.turns[0].patience == 7  # 5 + epic(+2)，unsure 不再动耐心
     # 评估指令只在开局出现，后续轮不再要 task_load 字段
@@ -236,14 +234,14 @@ def test_opening_appraisal_floats_starting_patience() -> None:
 def test_opening_appraisal_quick_lowers_patience() -> None:
     # GIVE_UP 基线 3；开局报 quick(-1) -> 起始耐心 2。
     p = _persona(D1Eval.SHALLOW, D43Correct.GIVE_UP)
-    client = _AppraisingClient(["send_task", "give_feedback"], task_load="quick")
+    client = _AppraisingClient(["send_message", "send_message"], task_load="quick")
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.turns[0].patience == 2  # 3 + quick(-1)
 
 
 def test_max_turns_cutoff() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
-    client = _StubClient(["send_task", "give_feedback"], verdict="unsure")  # 永不终止
+    client = _StubClient(["send_message", "send_message"], verdict="unsure")  # 永不终止
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.end_reason == "max_turns"
     assert len(res.turns) == MAX_TURNS
@@ -251,7 +249,7 @@ def test_max_turns_cutoff() -> None:
 
 def test_two_track_feeling_falls_back_to_derived() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
-    client = _StubClient(["send_task", "accept"], verdict="satisfied", rating={"oops": 1})
+    client = _StubClient(["send_message", "accept"], verdict="satisfied", rating={"oops": 1})
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert isinstance(res.feeling, FeelingScore) and isinstance(res.feeling_derived, FeelingScore)
     assert res.feeling == res.feeling_derived  # LLM 解析失败 -> 回落派生分
@@ -290,7 +288,9 @@ def test_give_up_also_leaves_exit_issue() -> None:
     # 否则 FEEDBACK/GIVE_UP 型气跑后 backlog 收不到任何信号。end_reason 仍是 abandoned。
     p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
     # EXPERT 连坐实 harness 失败 2 次触发诊断门, give_up 解锁; 第 3 轮走人。
-    client = _StubClient(["send_task", "give_feedback", "give_up"], verdict="failed_blame_harness")
+    client = _StubClient(
+        ["send_message", "send_message", "give_up"], verdict="failed_blame_harness"
+    )
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.end_reason == "abandoned"  # 机制不变: 仍是放弃
     assert res.issue_artifact is not None  # 但额外留下退出 issue
@@ -308,7 +308,7 @@ def test_harness_error_surfaced_and_negative_exit_available_immediately() -> Non
     # file_issue)开局即可用——有判断力的用户面对崩溃自然走人/开单而非验收（R4 漏斗已补齐）。
     # 这里 persona 首轮见崩溃即 give_up：会话以 abandoned 收场并留一条退出 issue，不会被逼进 accept。
     p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
-    client = _StubClient(["send_task", "give_up"], verdict="stuck")
+    client = _StubClient(["send_message", "give_up"], verdict="stuck")
     res = run_session(p, client, _RaisingHarness(), TASK)
     assert res.end_reason == "abandoned"  # 走人，而非假验收
     assert res.issue_artifact is not None  # 留下"为什么把我逼走"的退出 issue

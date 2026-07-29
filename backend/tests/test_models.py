@@ -47,7 +47,7 @@ def _session() -> Session:
                 SimTurn(
                     turn=0,
                     phase="active",
-                    action_space=["send_task"],
+                    action_space=["send_message"],
                     perceive="还是偶发",
                     verdict="failed_blame_harness",
                     action="file_issue",

@@ -108,7 +108,7 @@ tasks:
 
 把用户模拟的**上帝视角**随 `Session` **完整落盘**为 `sim_trace`（权威 raw，含 persona LLM 原片，供事后调试）。设计师**不**在首轮 prompt 整包注入，而是经工具**按需、渐进**取证：
 
-1. `get_session_timeline` → **使用事件时间线投影**（意图/过程判断/能力缺口/私有核实；**`utterance`↔`answers` 请求–回复配对**；无 system/user/raw）；
+1. `get_session_timeline` → **使用事件时间线投影**（意图/过程判断/能力缺口/私有核实；私有核实来自 persona 内层 tool steps，而非外层 `verify_self`；**`utterance`↔`answers` 请求–回复配对**；无 system/user/raw）；
 2. `get_harness_beat(turn)` → 对准某一拍看 harness 内层 tool 序列（正文短切）与 `stop_kind`；
 3. `get_harness_step(step_i)` → 单步展开（硬顶字符）。
 
@@ -194,7 +194,7 @@ tasks:
 | `answers` / `answers_said` | 本条 heard 关闭的 utterance + 预览 | T6；有 heard 且可配对时 |
 | `saw_activity` | 活动条短标题（略过 tool_result 正文，最多末 8 条 tool） | 有 harness_steps |
 | `capability_gap` | `{wanted,did,available,note}` | 仅 `parsed.gap==true` |
-| `private_check` | 用户本机核实 steps（截断） | 显式 `verify_self` |
+| `private_check` | 用户本机核实 steps（截断） | persona_trace 中出现 private tool/tool_result/tool_error；不依赖外层 `verify_self` |
 | `silent_stop` | `true` | `did==interrupt` |
 | `issue_text` / `feeling` | 局末出口 | persona_tail |
 

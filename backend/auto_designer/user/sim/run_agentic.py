@@ -63,7 +63,7 @@ class _ExpertToolLLM:
                 {
                     "perceive": "Nothing delivered yet.",
                     "verdict": "unsure",
-                    "action": "send_task",
+                    "action": "send_message",
                     "message": "Add split_bill(total, n) to billing/core.py and actually run it "
                     "on a few cases, including 3 people, before calling it done.",
                 }
@@ -93,9 +93,10 @@ class _ExpertToolLLM:
 
     @staticmethod
     def _neg_action(space: str) -> str:
-        for a in ("file_issue", "request_evidence", "give_feedback"):
-            if a in space:
-                return a
+        if "file_issue" in space:
+            return "file_issue"
+        if "send_message" in space:
+            return "send_message"
         return "free"
 
 

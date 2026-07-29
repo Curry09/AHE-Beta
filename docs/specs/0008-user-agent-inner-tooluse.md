@@ -146,10 +146,9 @@ materialize，经 launcher 把 SANDBOX_WORK_DIR 注入 harness 子进程、同�
 追加可选 workspace_dir 接线，退化路径对纯文本场景与直连调用零破坏），不再另立上游 spec。两侧无并发写竞争靠逐轮
 stdio 串行天然保证。
 
-**与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎零改动。`web_search` 工具、skill
+**与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎保持 judge→intent→act 控制信封，但外层动作只表达对 harness/会话的外部动作。`web_search` 工具、skill
 真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不
-bug/benchmark 特定」红线约束，对接 0006 蒸馏）；是否清理已渐冗余的外层 `verify_self`/`pending_self_obs`、是否给
-内层喂显式状态信号、git 工作区来源、与 0003/T2 `nexau_runtime` 的 tool-calling 形态并轨，集中记在各 Task
+bug/benchmark 特定」红线约束，对接 0006 蒸馏）。外层 `verify_self`/`pending_self_obs` 已退役：读文件、跑命令、看 diff、验证测试输出等私有查验均是内层 AgenticPersonaClient 行为，主要用于 judge 阶段形成 grounded `perceive/verdict`；若用户需要 harness 提供证据，则通过外层 `send_message` 发自然语言请求。是否给内层喂显式状态信号、git 工作区来源、与 0003/T2 `nexau_runtime` 的 tool-calling 形态并轨，集中记在各 Task
 open-questions，归后续 Task/组。
 
 ## Motivation
@@ -172,9 +171,9 @@ T1 打地基：给 SeedScenario 加一个可选 workspace 字段，让 seed 场�
 
 有了工作区，T2 造出内层 agent 的「手」：三个原子工具 read_file / run_shell / write_file（外加 web_search 占位、本轮不实现），以及一个最小 sandbox 执行环境（tempfile + subprocess），以 T1 materialize 出的工作区目录为 cwd。工具集按 persona 的 D1 维度机械门控（tool_stack(D1)）：能力低的人物拿不到 write_file，从机制上挡住「自写测试套件」这类高能力动作。
 
-与 T1/T2 并行的 T3 负责把内层 system prompt 的核实语义从「义务」改为「可选、有成本」：核实是 persona 的角色内动作，只在起疑且值得时才查，默认不查（真人含专家都不会每次都跑）。BLOCK-G 写清工具的「可选核实」框架，BLOCK-P 按 D1（能不能查/会用哪些工具）与 D3/trust（会不会查、阈值多严）刻画核实倾向；并立 skill 占位接口（select_skills，D2 驱动）让专家 persona 能挂领域 playbook（本轮只占位、纯 prompt 引导）。
+与 T1/T2 并行的 T3 负责把内层 system prompt 的核实语义从「义务」改为「可选、有成本」：核实是 persona 的角色内动作，只在起疑且值得时才查，默认不查（真人含专家都不会每次都跑）。BLOCK-G 写清工具的「可选核实」框架，BLOCK-P 按 D1（能不能查/会用哪些工具）与 D3/trust（会不会查、阈值多严）刻画核实倾向；并立 skill 占位接口（select_skills，D2 驱动）让专家 persona 能挂领域 playbook（本轮只占位、纯 prompt 引导）。在 0031 收敛后，judge prompt 会明确：若当前 verdict 依据不足且低成本可查，私有查验应在 judge 内层工具循环中完成；不再把查验推迟为 act 阶段的 `verify_self`。
 
-T4 是收口任务：把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient——内层 LLM 拿 T3 装配的 system 与 T2 的工具集，在 T1 落地的共享工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。控制反转只局部发生在这一个接缝内，外层控制信封（0005/T5 run_session、动作空间、状态机、体感、终止）原样不动。
+T4 是收口任务：把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient——内层 LLM 拿 T3 装配的 system 与 T2 的工具集，在 T1 落地的共享工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。控制反转只局部发生在这一个接缝内，外层控制信封（0005/T5 run_session、动作空间、状态机、体感、终止）保持分层：act 阶段只选择 `send_message` 或终止动作，私有查验不再作为外层 action。
 
 ## Reference-level explanation
 
@@ -225,7 +224,7 @@ test_tools.py：(a) read/write/run 在 sandbox 内正常工作；(b) 路径逃�
 
 ### Prompt 行为框架与 skill 占位（T3）
 
-CAN（能力，机械）：T2 tool_stack(D1) 决定暴露哪些工具——prompt 只如实描述，不靠它门控。WILL（意愿，prompt）：BLOCK-P 用 D3（验收严格度）+ trust/consecutive_blame 状态渲染倾向句，例如低 trust/高 D3 → 更倾向核实，反之直接接受。核实定性为「可选成本动作」：默认走主观判断，只有起疑且收益值得才动用工具。skill 注入点在 T4 内层循环的 system 段，本任务只立接口与装配位；skill 片段是通用方法论（如「先复现再定位」），严禁含具体 bug/答案。clauses 把这些做成可单测的纯函数（输入 persona+state，输出文本片段）。
+CAN（能力，机械）：T2 tool_stack(D1) 决定暴露哪些工具——prompt 只如实描述，不靠它门控。WILL（意愿，prompt）：BLOCK-P 用 D3（验收严格度）+ trust/consecutive_blame 状态渲染倾向句，例如低 trust/高 D3 → 更倾向核实，反之直接接受。核实定性为「可选成本动作」：默认走主观判断，只有起疑且收益值得才动用工具。阶段归属：私有核实服务 judge 的 `perceive/verdict`；act 阶段没有 private verification action，只能 `send_message` 要 harness 给证据/继续运行，或选择终止。skill 注入点在 T4 内层循环的 system 段，本任务只立接口与装配位；skill 片段是通用方法论（如「先复现再定位」），严禁含具体 bug/答案。clauses 把这些做成可单测的纯函数（输入 persona+state，输出文本片段）。
 
 **接口**
 

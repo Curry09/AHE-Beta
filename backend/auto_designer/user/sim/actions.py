@@ -54,16 +54,9 @@ class ActionSpec:
 # 动作目录 (五属性钉死)
 # --------------------------------------------------------------------------
 CATALOG: dict[str, ActionSpec] = {
-    "send_task": ActionSpec("send_task", Executor.HARNESS, Channel.EMIT, Effect.ADVANCE),
-    "refine_request": ActionSpec("refine_request", Executor.HARNESS, Channel.EMIT, Effect.ADVANCE),
-    "give_feedback": ActionSpec("give_feedback", Executor.HARNESS, Channel.EMIT, Effect.ADVANCE),
-    # —— 核查: 这里就是 run_once 拆出来的两个, 归属彻底分离 ——
-    "verify_self": ActionSpec("verify_self", Executor.FRAMEWORK, Channel.SILENT, Effect.VERIFY),
-    "ask_harness_run": ActionSpec("ask_harness_run", Executor.HARNESS, Channel.EMIT, Effect.VERIFY),
-    "request_evidence": ActionSpec(
-        "request_evidence", Executor.HARNESS, Channel.EMIT, Effect.VERIFY
-    ),
-    "grant_autorun": ActionSpec("grant_autorun", Executor.HARNESS, Channel.EMIT, Effect.ADVANCE),
+    # 与 harness 的所有外部交互统一成一条自然语言消息；“查验/读文件/跑命令”是
+    # 用户 agent 的私有内层行为，不是外层 action。
+    "send_message": ActionSpec("send_message", Executor.HARNESS, Channel.EMIT, Effect.ADVANCE),
     # —— 终止 ——
     "accept": ActionSpec(
         "accept", Executor.PERSONA_LOCAL, Channel.EMIT, Effect.TERMINATE, "accepted"
