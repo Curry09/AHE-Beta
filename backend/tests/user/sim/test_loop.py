@@ -91,6 +91,18 @@ class _RecordingClient(_StubClient):
         return super().respond(system, user)
 
 
+class _ClassifyingClient(_RecordingClient):
+    """act 返回 free 时，模拟同一 persona 的后处理归类；记录 allowed ids 只在此处可见。"""
+
+    def __init__(self, actions: list[str], verdict: str = "unsure") -> None:
+        super().__init__(actions, verdict=verdict)
+        self.classifications: list[tuple[dict, list[str]]] = []
+
+    def classify_action(self, system: str, ret: dict, space: list[str]) -> str:  # noqa: ARG002
+        self.classifications.append((dict(ret), list(space)))
+        return space[0] if space else "free"
+
+
 def test_harness_text_fed_raw_without_perception_filter() -> None:
     # 低能力档(原型会用 perceive_filter 抹掉源码行)；删除过滤后, 源码应原样喂入 LLM。
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
@@ -117,8 +129,29 @@ def test_main_decide_is_judge_intent_act_isomorphic() -> None:
     assert tags.count("judge") >= 2
     assert tags.count("intent") >= 2
     assert tags.count("act") >= 2
+    judge_prompts = [u for u in client.seen if "<main_judge>" in u]
+    intent_prompts = [u for u in client.seen if "<main_intent>" in u]
+    act_prompts = [u for u in client.seen if "<main_act>" in u]
+    assert all("<action_space>" not in u for u in judge_prompts)
+    assert all("<action_space>" not in u for u in intent_prompts)
+    assert all("<action_space>" in u for u in act_prompts)
     active = [t for t in res.turns if t.phase in ("opening", "active")]
     assert any("|" in t.perceive and "→" in t.perceive for t in active)
+
+
+def test_free_action_classification_still_converges_after_open_intent() -> None:
+    p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
+    client = _ClassifyingClient(["free", "accept"], verdict="satisfied")
+    res = run_session(p, client, ScriptedHarness(), TASK)
+
+    assert res.end_reason == "accepted"
+    assert client.classifications
+    assert client.classifications[0][0]["action"] == "free"
+    assert "send_task" in client.classifications[0][1]
+    judge_prompts = [u for u in client.seen if "<main_judge>" in u]
+    intent_prompts = [u for u in client.seen if "<main_intent>" in u]
+    assert all("<action_space>" not in u for u in judge_prompts)
+    assert all("<action_space>" not in u for u in intent_prompts)
 
 
 def test_verify_self_injects_raw_observation() -> None:

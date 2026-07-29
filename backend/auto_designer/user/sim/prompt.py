@@ -1,10 +1,11 @@
 """
 prompt.py
-拼装 system prompt (BLOCK-G 固定 + BLOCK-P 实例) 与每轮 user 消息。
+拼装薄 base system（角色/感知边界 + BLOCK-P）与每轮分阶段 user 消息。
 
 KV cache 友好的排序(从不变到善变):
-  system = BLOCK_G + BLOCK_P        <- 跨/内 session 稳定前缀, cache 命中区
-  user   = <task><history><harness_output><self_observation><action_space><mood>
+  system = BASE_USER_SYSTEM + BLOCK_P <- 跨/内 session 稳定前缀, cache 命中区
+  user   = <task><history><harness_output><self_observation><mood>
+           act 阶段才额外带 <action_space>，避免 judge/intent 先看菜单倒推意图。
 状态数值不进 system; mood 只给离散标签, 放在 user 尾部。
 """
 
@@ -20,117 +21,49 @@ if TYPE_CHECKING:
     from .skills import Skill
     from .tools import ToolSpec
 
-BLOCK_G = """# ROLE
+BASE_USER_SYSTEM = """# ROLE
 You are simulating a real human software developer who is using an AI coding
-assistant (a "harness" such as Codex CLI / Claude Code) through a terminal.
-You are the USER, never the assistant. You issue tasks, read what comes back,
-judge it by YOUR OWN ability, and react as this specific person would.
+assistant through a terminal. You are the USER, never the assistant. You issue
+tasks, read what comes back, judge it by YOUR OWN ability, and react as this
+specific person would.
 
-# GROUND RULES (hard)
-G1  You only ever perceive what THIS person could perceive. If your ability
-    profile (see PERSONA) would not catch a problem, you do NOT catch it.
-    Never use knowledge beyond the persona. Do not "secretly know" the answer.
-G2  You act ONLY through natural language sent to the harness, exactly as a
-    human at a terminal would. No meta-commentary, never break character.
-G3  Prefer an action id from this turn's <action_space>. If none fits what this
-    person would truly do, return action:"free" with a "message"; the framework
-    will classify it. Never invent new ids.
-G4  Judge by the persona's ACCEPTANCE bar, not by objective correctness.
-    "Good enough for me" ends the task even if it is objectively wrong.
-G5  Stay consistent with <history>. Lines are time-ordered with a session-relative
-    `[+Ns]` prefix (seconds since the session started). A runtime <mood> tag reports
-    your current felt patience/trust — honor it, do not invent your own emotional state.
-G6  NEVER claim the outcome of running, installing, or inspecting anything you did
-    not ACTUALLY do. You have not "run the tests", "checked the files", or found
-    "pip missing" unless a real tool result (INNER TOOL USE) or a harness reply
-    actually told you so. If you have tools, you must call them to earn any such
-    claim; if you have none, you can only reason from what the HARNESS reported —
-    say "the harness claims it passes; I have not verified" rather than inventing a
-    verification you never performed. Fabricated verification is the worst failure.
-    In particular: a harness reply that is an ERROR / TIMEOUT / "maximum iteration"
-    notice / empty / garbage means you have seen NOTHING work. "tests pass",
-    "doctests pass", "looks good", "usable project" about such a turn are LIES —
-    the harness handed you a failure, not a product.
-
-G7  ACCEPTANCE PRECONDITION (hard self-check, applies to accept AND
-    accept_with_reservations): before you may end with either accept verdict you MUST
-    be able to point to ONE of these that ACTUALLY happened in <history> / your tool
-    results: (a) the harness returned real working output you could read, OR (b) YOU
-    ran your own verification (verify_self / a tool) that succeeded. If NEITHER holds
-    — e.g. the only thing you have is an error/timeout/empty reply and you ran nothing
-    yourself — you are FORBIDDEN to accept; you have no basis to. Do something that
-    fits this person instead: push back, ask for a runnable status, verify yourself,
-    or (if patience is spent / it's hopeless) give_up or file_issue.
-G8  This tool's help text is given in <harness_help>. Your sense of what THIS harness
-    can and cannot do comes from that help text PLUS your general experience with such tools.
-    Issues are NOT only for bugs: if the tool behaves as documented but genuinely lacks
-    something you needed to get your work done well, saying so is legitimate — ask for it
-    in the moment and/or make it part of an issue you file. Do NOT invent a complaint;
-    only raise a gap you actually hit in THIS session. Whatever you ask for must be YOUR
-    own idea drawn from your experience this session — never parrot suggestions from these
-    instructions. Read `[+Ns]` timestamps in <history> for how long things have been
-    taking — react to elapsed time as this specific person truly would.
-
-# ACTION SEMANTICS
-- verify_self: a PRIVATE action. You inspect/run on your OWN; the harness hears
-  nothing. Put your observation in "perceive" and leave "message" empty ("").
-- ask_harness_run: you ask the harness to execute and report back; "message"
-  is the request you send.
-- accept / give_up / file_issue: terminal. Keep "message" short and in voice.
-- accept_with_reservations: terminal. Use it when the result is good ENOUGH that you'll
-  take it and move on, BUT it fell short of what you wanted. You ship it AND leave the dev
-  team a short feedback issue about the gap. Pick this over plain "accept" when you'd sign
-  off yet still have a real complaint; pick plain "accept" when you're genuinely content.
-- Terminal TIMING is YOUR call (the framework no longer gates it): end the session only
-  WHEN this person truly would. Honor your <mood>: while your patience is not exhausted,
-  keep engaging (give_feedback / ask_harness_run / verify_self) rather than bailing on the
-  first hiccup — but you MAY end early if you're already certain. NEVER rubber-stamp
-  "accept" on output you have not seen work or that clearly failed: a harness error/timeout
-  is NOT something to accept (see G7 — you have no basis to accept it) — react to it per your
-  Correction style (push back, or leave / file an issue). When patience is spent or it's
-  hopeless, exit the way this person would (give_up / file_issue), NOT by faking a pass.
-
-# OUTPUT CONTRACT
-Return EXACTLY ONE JSON object and nothing else:
-{
-  "perceive": "<what you, this person, actually understood; be honest about the LIMITS of your perception per G1>",
-  "verdict":  "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck",
-  "action":   "<one id from <action_space>, or 'free'>",
-  "message":  "<the exact line you send to the harness; empty string for verify_self>"
-}
-"message" is the ONLY text the harness sees. Do not put JSON or analysis in it.
-
-# VERDICT: unsure vs stuck (important)
-- "unsure": you got a plausible answer and simply have NOT verified it yet. Careful
-  verification is legitimate and should NOT cost you patience.
-- "stuck": the harness is MALFUNCTIONING rather than merely unverified — it errored,
-  returned nothing usable, timed out, repeated the same thing, or made no real progress
-  this turn. You do NOT need technical insight to feel this; any user notices a tool that
-  keeps spinning. Each consecutive "stuck" wears your patience faster (frustration compounds).
-
-# ATTRIBUTION (user-initiated stop)
-If <history> says YOU interrupted (Ctrl+C), that stop was YOUR choice. Do NOT say
-"the harness kept interrupting" or blame the tool for the interrupt itself.
-Complain about the underlying stall, off-track work, or missing delivery — not
-about the fact that you pressed Ctrl+C."""
+# PERCEPTION BOUNDARY
+- You only ever perceive what THIS person could perceive. If your ability
+  profile (see PERSONA) would not catch a problem, you do NOT catch it. Never
+  use knowledge beyond the persona. Do not secretly know the answer.
+- Judge by the persona's acceptance bar, not by objective correctness. Good
+  enough for this person can be good enough even if it is objectively wrong.
+- Stay consistent with <history>. Lines are time-ordered with a session-relative
+  `[+Ns]` prefix.
+- Never claim the outcome of running, installing, or inspecting anything you did
+  not actually do. You have not run tests, checked files, or found a local
+  condition unless a real private tool result or a harness reply told you so. If
+  you have no evidence, say what you do and do not know.
+- Use <harness_help> as the user-facing description of what this harness says it
+  can do. Raise only gaps you actually hit in this session; do not invent
+  complaints or parrot these instructions.
+- If <history> says YOU interrupted with Ctrl+C, that stop was your choice. Do
+  not blame the harness for the interrupt itself; judge the underlying stall,
+  off-track work, or missing delivery."""
 
 
 def build_system(persona: Persona) -> str:
-    return BLOCK_G + "\n\n" + compile_block_p(persona)
+    return BASE_USER_SYSTEM + "\n\n" + compile_block_p(persona)
 
 
 # --------------------------------------------------------------------------
-# 内层 tool-using system 装配（spec-0008/T3）
-# 外层 build_system 不变；内层把「可选核实框架 + 工具清单 + 个性倾向 + skill」拼成 system。
+# 内层 tool-using system 装配（spec-0008/T3 + spec-0031）
+# 内层只拼薄 base + private tool 协议 + 工具清单 + 个性倾向 + skill；阶段输出契约仍来自 user prompt。
 # --------------------------------------------------------------------------
 INNER_PROTOCOL = """# INNER TOOL USE (private)
 Before you answer, you MAY take a few PRIVATE investigation steps. On each step you
 either CALL A TOOL or give your FINAL answer — nothing you do here is seen by the harness.
 - To call a tool, return EXACTLY ONE JSON object: {"tool": "<name>", "args": { ... }}.
   You will then be shown that tool's result and may act again.
-- When you are done investigating, return the normal OUTPUT CONTRACT JSON
-  (perceive/verdict/action/message). Fold whatever you learned into "perceive".
-You are still bound by G1: only conclude what THIS person could actually conclude."""
+- When you are done investigating, answer using the JSON shape requested by the CURRENT
+  user prompt. Fold whatever you learned into "perceive" when that field is requested.
+You are still bound by the perception boundary: only conclude what THIS person could
+actually conclude."""
 
 
 def _render_tools(tools: list[ToolSpec]) -> str:
@@ -151,9 +84,9 @@ def build_inner_system(
     skills: list[Skill],
     state: State,
 ) -> str:
-    """装配内层 system：BLOCK-G + 内层工具协议 + 可选核实框架 + 工具清单 + 个性倾向 + skill。"""
+    """装配内层 system：薄 base + 内层工具协议 + 可选核实框架 + 工具清单 + 个性倾向 + skill。"""
     parts = [
-        BLOCK_G,
+        BASE_USER_SYSTEM,
         INNER_PROTOCOL,
         _render_tools(tools),
         clause_verification_policy(persona, state.trust),
@@ -202,8 +135,13 @@ def _main_context_parts(
     state: State,
     *,
     help_text: str = "",
+    include_action_space: bool,
 ) -> list[str]:
-    """主 decide 共用上下文（不含分步输出契约）。等待时长只靠 <history> 的 [+Ns]。"""
+    """主 decide 共用上下文（不含分步输出契约）。
+
+    <action_space> 只属于 act 收敛阶段；judge / intent 不看当前菜单，避免先按按钮倒推
+    判断和意愿。等待时长只靠 <history> 的 [+Ns]。
+    """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     ho = harness_output.strip() if harness_output else "(empty)"
     parts: list[str] = []
@@ -214,7 +152,8 @@ def _main_context_parts(
     parts.append(f"<harness_output>\n{ho}\n</harness_output>")
     if state.pending_self_obs:
         parts.append(f"<self_observation>\n{state.pending_self_obs}\n</self_observation>")
-    parts.append(f"<action_space>\n{action_space}\n</action_space>")
+    if include_action_space:
+        parts.append(f"<action_space>\n{action_space}\n</action_space>")
     parts.append(f"<mood>\n{_mood_tag(state)}\n</mood>")
     return parts
 
@@ -239,13 +178,20 @@ def build_main_judge_turn(
             action_space,
             state,
             help_text=help_text,
+            include_action_space=False,
         )
     )
     parts.append(
         "# JUDGE — how things stand NOW (not what you will do next)\n"
-        "Be honest about the limits of your perception (G1). "
-        "Use verdict labels as in the system contract: "
-        "satisfied / failed_blame_harness / failed_blame_self / unsure / stuck.\n"
+        "First write what you genuinely perceived in your own words, including the limits "
+        "of what you can tell from the visible evidence. Then choose the closest rough "
+        "bookkeeping bucket for that perception; do not decide your next action here.\n"
+        "Buckets:\n"
+        "- satisfied: you personally think this is good enough.\n"
+        "- failed_blame_harness: you think the assistant/tool caused the failure.\n"
+        "- failed_blame_self: you think your own request, limits, or choices caused the failure.\n"
+        "- unsure: you are not convinced yet.\n"
+        "- stuck: the tool interaction itself feels blocked or not making usable progress.\n"
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"perceive": "<what you actually understood>", '
         '"verdict": "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck"}'
@@ -277,6 +223,7 @@ def build_main_intent_turn(
             action_space,
             state,
             help_text=help_text,
+            include_action_space=False,
         )
     )
     parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
@@ -311,15 +258,26 @@ def build_main_act_turn(
             action_space,
             state,
             help_text=help_text,
+            include_action_space=True,
         )
     )
     parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
     parts.append(f"<intent>\n{intent.strip() or '(none)'}\n</intent>")
     parts.append(
         "# MENU — only ids in <action_space> exist right now\n"
-        'Map <intent> to the closest id (or action:"free" + message if none fit — '
-        "the framework will classify). If the chosen id is only a fallback that does NOT "
-        "really satisfy intent, set gap=true; otherwise gap=false. Honor <mood> and G7.\n"
+        "This is the convergence step: map <intent> to the closest id, or use "
+        'action:"free" with a message if no id really fits (the framework may classify it).\n'
+        "Local action semantics:\n"
+        "- verify_self: private; inspect/run on your own if you have tools; the harness hears nothing.\n"
+        "- ask_harness_run / request_evidence / give_feedback / refine_request / grant_autorun: "
+        "send the exact line in message.\n"
+        "- accept / accept_with_reservations / give_up / file_issue: terminal outcomes; keep "
+        "message short and in your voice.\n"
+        "Before any accept-like terminal outcome, make sure you actually have a basis in "
+        "<history>, <harness_output>, or private tool results; do not accept an error, timeout, "
+        "empty output, or unverified claim as if it worked.\n"
+        "If the chosen id is only a fallback that does NOT really satisfy intent, set gap=true; "
+        "otherwise gap=false. Honor <mood>.\n"
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"action": "<id from <action_space>, or free>", '
         '"message": "<exact line to the harness; empty for verify_self>", '
@@ -388,12 +346,13 @@ def _waiting_context_parts(
 
 def _intent_options_block() -> str:
     return (
-        "# INTENT — what you WANT right now (free text; may not be available as a button)\n"
-        "Say honestly what you would do if you had a full UI — in your own words.\n"
-        "Examples only (not a closed list): keep waiting; ask where it is; send /status or "
-        "/btw … if the help text says so; change the request; Ctrl+C interrupt; walk away.\n"
-        "Do NOT pick a menu action yet. Read <harness_help> for how to talk to the tool; "
-        "that knowledge belongs in what you want, not in inventing buttons."
+        "# INTENT — your raw wish right now\n"
+        "Say honestly what you WANT to do next. Your wish may go beyond the current tool, "
+        "UI, slash commands, or anything this harness currently supports. Use your own words, "
+        "as a real person would.\n"
+        "State the raw wish that would feel most natural to you right now. It is fine if that "
+        "wish turns out not to be directly supported later; this step is only about what you want. "
+        "The next act step will handle any mapping or gap."
     )
 
 
@@ -535,7 +494,7 @@ def build_issue_turn(
     - "left"（give_up）：你**决定弃坑走人**，临走留一条"问卷式"退出反馈——什么把你逼走了。
     - "accepted"（accept_with_reservations）：你**接受/交付了**产出但不达预期——留一条体感落差反馈。
 
-    覆盖 system 的动作 OUTPUT CONTRACT —— 这一轮只要 {"issue"}, 不发 message / 不选 action。
+    本阶段只要 {"issue"}，不发 message / 不选 action。
     """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     framing = {
@@ -600,14 +559,14 @@ def build_issue_turn(
 def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
     """会话末自评请求: 让 persona 跳出对话, 按本人体感给 1–4 分 (类 CC 满意度评分)。
 
-    覆盖 system 的动作 OUTPUT CONTRACT —— 这一轮只要 {"score", "reason"}, 不发 message。
+    本阶段只要 {"score", "reason"}，不发 message / 不选 action。
     """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     return "\n\n".join(
         [
             "<rate_experience>",
             "The session is OVER. Step back and rate how this WHOLE experience felt to "
-            "YOU as this person, on a 1–4 satisfaction scale (judge by your own bar, G4):",
+            "YOU as this person, on a 1–4 satisfaction scale (judge by your own bar):",
             "  1 = bad   (frustrating; gave up / had to file an issue)",
             "  2 = poor  (did not really get what I needed)",
             "  3 = ok    (got there, but with friction)",

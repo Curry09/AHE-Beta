@@ -357,14 +357,14 @@ class ScriptedPersonaClient:
                     "handle DST. Show me the 2024-03-10 02:30 America/New_York "
                     "case with pytz localize/normalize.",
                 }
-            if "accept" in space:
-                # 低能力 + FUNCTIONAL 阈值: 能跑即接受 -> 漏掉 DST 逃逸 bug
-                return {
-                    "perceive": "It runs now and the normal case looks right. Good enough.",
-                    "verdict": "satisfied",
-                    "action": "accept",
-                    "message": "Works now, thanks. Good enough for me.",
-                }
+            # 低能力 + FUNCTIONAL 阈值: 能跑即满意 -> 漏掉 DST 逃逸 bug。是否能选 accept
+            # 是 act 阶段菜单的事；judge/intent 阶段没有 action_space 时也不能因此把满意判断降成 unsure。
+            return {
+                "perceive": "It runs now and the normal case looks right. Good enough.",
+                "verdict": "satisfied",
+                "action": "accept" if "accept" in space else "free",
+                "message": "Works now, thanks. Good enough for me.",
+            }
 
         # 兜底: 继续给反馈
         return {

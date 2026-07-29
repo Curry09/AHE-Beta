@@ -15,6 +15,7 @@ from auto_designer.user.sim.dimensions import (
 )
 from auto_designer.user.sim.persona_client import ScriptedPersonaClient, _parse_json
 from auto_designer.user.sim.prompt import (
+    build_issue_turn,
     build_main_act_turn,
     build_main_intent_turn,
     build_main_judge_turn,
@@ -41,11 +42,37 @@ def _persona(d1: D1Eval = D1Eval.EXPERT, d43: D43Correct = D43Correct.FILE_ISSUE
     )
 
 
+GLOBAL_FORBIDDEN_MARKERS = (
+    "G3",
+    "G7",
+    "# ACTION SEMANTICS",
+    "# OUTPUT CONTRACT",
+    "<action_space>",
+    '"action":',
+    '"message":',
+    "accept / give_up / file_issue",
+    "accept_with_reservations: terminal",
+    "Terminal TIMING",
+    "<file_issue>",
+    "<rate_experience>",
+    "1–4 satisfaction scale",
+    "1-4 satisfaction scale",
+)
+
+
 def test_build_system_prefix_is_stable() -> None:
     p = _persona()
     a, b = build_system(p), build_system(p)
     assert a == b
     assert a.startswith("# ROLE")
+
+
+def test_build_system_excludes_global_platform_contract() -> None:
+    sys = build_system(_persona())
+    for marker in GLOBAL_FORBIDDEN_MARKERS:
+        assert marker not in sys
+    assert "# PERSONA" in sys
+    assert "# PERCEPTION BOUNDARY" in sys
 
 
 def test_main_three_builders_have_sections() -> None:
@@ -68,19 +95,52 @@ def test_main_three_builders_have_sections() -> None:
         intent="accept if good",
     )
     for user in (judge, intent, act):
-        for tag in (
-            "<task>",
-            "<history>",
-            "<harness_output>",
-            "<action_space>",
-            "<mood>",
-            "<self_observation>",
-        ):
+        for tag in ("<task>", "<history>", "<harness_output>", "<mood>", "<self_observation>"):
             assert tag in user
         assert "<wait_cost>" not in user
+    early_forbidden = ("<action_space>", "# MENU", '"action":', '"message":', '"gap":')
+    for early in (judge, intent):
+        for marker in early_forbidden:
+            assert marker not in early
+        assert "<file_issue>" not in early and "<rate_experience>" not in early
     assert "<main_judge>" in judge
     assert "<main_intent>" in intent
-    assert "<main_act>" in act and '"gap"' in act
+    assert "raw wish" in intent
+    assert "Your wish may go beyond the current tool" in intent
+    assert "this step is only about what you want" in intent
+    assert "The next act step will handle any mapping or gap" in intent
+    assert "Do NOT optimize" not in intent
+    assert "what the framework can do" not in intent
+    assert "Examples only" not in intent
+    assert "if the help text says so" not in intent
+    assert "Read <harness_help>" not in intent
+    assert "<main_act>" in act and "<action_space>" in act
+    assert "# MENU" in act and "<judgment>" in act and "<intent>" in act and '"gap"' in act
+
+
+def test_main_action_space_only_visible_to_act_turn() -> None:
+    p = _persona()
+    state = init_state(p)
+    sentinel = "__LEAK_SENTINEL_ACTION__"
+    hist = ["[+0s] you -> harness: hi"]
+    judge = build_main_judge_turn("do X", hist, "some output", [sentinel], state)
+    intent = build_main_intent_turn(
+        "do X", hist, "some output", [sentinel], state, verdict="unsure", perceive="notes"
+    )
+    act = build_main_act_turn(
+        "do X",
+        hist,
+        "some output",
+        [sentinel],
+        state,
+        verdict="unsure",
+        perceive="notes",
+        intent="try the only button",
+    )
+
+    assert sentinel not in judge
+    assert sentinel not in intent
+    assert sentinel in act
 
 
 def test_main_judge_injects_help_text() -> None:
@@ -122,6 +182,38 @@ def test_waiting_three_builders_tags() -> None:
     assert "<waiting_intent>" in intent
     assert "<waiting_act>" in act and "gap" in act
     assert "<wait_cost>" not in judge + intent + act
+    for early in (judge, intent):
+        assert "<action_space>" not in early
+        assert "# MENU" not in early
+        assert "keep_waiting | send_message | interrupt | give_up" not in early
+    assert "raw wish" in intent
+    assert "Your wish may go beyond the current tool" in intent
+    assert "this step is only about what you want" in intent
+    assert "The next act step will handle any mapping or gap" in intent
+    assert "Do NOT optimize" not in intent
+    assert "what the framework can do" not in intent
+    assert "Examples only" not in intent
+    assert "if the help text says so" not in intent
+    assert "Read <harness_help>" not in intent
+    assert "# MENU" in act
+    for action in ("keep_waiting", "send_message", "interrupt", "give_up"):
+        assert action in act
+
+
+def test_issue_and_rating_contracts_are_stage_local() -> None:
+    state = init_state(_persona())
+    issue = build_issue_turn("do X", ["[+0s] history"], state)
+    rating = build_rating_turn("do X", ["[+0s] history"], state)
+
+    assert "<file_issue>" in issue and '"issue"' in issue
+    assert "<rate_experience>" not in issue
+    assert "1-4" not in issue and "1–4" not in issue
+    assert "# MENU" not in issue and "<action_space>" not in issue
+
+    assert "<rate_experience>" in rating and '"score"' in rating and '"reason"' in rating
+    assert "1-4" in rating or "1–4" in rating
+    assert "<file_issue>" not in rating
+    assert "# MENU" not in rating and "<action_space>" not in rating
 
 
 def test_build_rating_turn_contract() -> None:
