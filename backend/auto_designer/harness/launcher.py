@@ -5,7 +5,7 @@
   stdin  {"message": str} | {"control": str}
   stdout 可选多行旁路（任意非 reply 的 JSON 对象：progress / status / 其它）→
          最后一行 {"reply": str, "steps"?: [...]} 结束本轮
-控制名对 launcher 不透明（手册是能力真相源）：终结型 control（如 interrupt）最终吐 reply；
+控制名对 launcher 不透明（HELP.md 是能力真相源）：终结型 control（如 interrupt）最终吐 reply；
 旁路型（如 status/peek）只吐非 reply 行、本轮继续。接收端放宽——未知旁路字段不报错。
 harness 内部 1 或 N 个 nexau 如何编排对 launcher 不可见（黑盒）。
 """
@@ -76,15 +76,23 @@ def _is_control_ack_sideband(payload: dict) -> bool:
 class _HarnessHandle:
     """子进程句柄，实现 HarnessInterface。一句柄一子进程一会话。"""
 
-    def __init__(self, entry: list[str], cwd: Path, env: dict[str, str], manual: str) -> None:
+    def __init__(
+        self,
+        entry: list[str],
+        cwd: Path,
+        env: dict[str, str],
+        help_text: str,
+        protocol: str = "legacy",
+    ) -> None:
         self._entry = entry
         self._cwd = cwd
         self._env = {**os.environ, **env}
+        self._protocol = protocol
         self._proc: subprocess.Popen[str] | None = None
         self._closed = False
-        # 该版本 harness 的用户手册（MANUAL.md 全文，checkout 时读入）：面向用户的能力契约，
-        # 用户 agent 据此形成对本工具"能干嘛/缺什么"的预期。缺文件则为空串。
-        self.manual = manual
+        # 该版本 harness 的帮助文本（HELP.md）：面向用户的能力契约，
+        # 调用方据此形成对本工具"能干嘛/缺什么"的预期。缺文件则为空串。
+        self.help_text = help_text
         # 最近一次 send 的 harness 内层过程流（{kind,text} 序列）：协议 reply 之外的观测旁路，
         # persona 只吃 send 返回的 reply、看不到 steps。调用方 send 后立即 getattr 读取。
         self.last_steps: list[dict] = []
@@ -157,6 +165,21 @@ class _HarnessHandle:
         self._proc.stdin.write(json.dumps(obj, ensure_ascii=False) + "\n")
         self._proc.stdin.flush()
 
+    def _message_frame(self, message: str) -> dict:
+        if self._protocol == "stdio-jsonl-v1":
+            return {"type": "message", "text": message}
+        return {"message": message}
+
+    def _interrupt_frame(self) -> dict:
+        if self._protocol == "stdio-jsonl-v1":
+            return {"type": "interrupt"}
+        return {"control": "interrupt"}
+
+    def _shutdown_frame(self) -> dict:
+        if self._protocol == "stdio-jsonl-v1":
+            return {"type": "shutdown"}
+        return {"control": "shutdown"}
+
     def begin(self, message: str) -> None:
         """启动一轮 send（写入 message），不阻塞等待。配合 poll 使用。"""
         if self._closed or self._proc is None:
@@ -167,7 +190,7 @@ class _HarnessHandle:
         self.last_steps = []
         self.last_progress = []
         self.last_sideband = []
-        self._write({"message": message})
+        self._write(self._message_frame(message))
         self._t0 = time.monotonic()
         self._inflight = True
 
@@ -180,11 +203,18 @@ class _HarnessHandle:
             raise RuntimeError("harness 句柄已关闭，不可再 send")
         if not self._inflight:
             raise RuntimeError("没有进行中的 send，应使用 begin/send，不可 emit_message")
-        self._write({"message": message})
+        self._write(self._message_frame(message))
 
     def _ingest_sideband(self, payload: dict) -> None:
         """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
         self.last_sideband.append(payload)
+        if payload.get("type") == "progress":
+            text = payload.get("text")
+            if isinstance(text, str) and text:
+                self.last_progress.append(
+                    {"kind": str(payload.get("kind") or "progress"), "text": text}
+                )
+                return
         if "progress" in payload:
             prog = payload.get("progress")
             if isinstance(prog, dict) and prog:
@@ -235,6 +265,15 @@ class _HarnessHandle:
             if not isinstance(payload, dict):
                 self._inflight = False
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
+            if payload.get("type") == "error":
+                self._inflight = False
+                msg = payload.get("message") or payload.get("text") or payload
+                raise RuntimeError(f"harness error: {msg}")
+            if payload.get("type") == "reply":
+                self._inflight = False
+                steps = payload.get("steps")
+                self.last_steps = steps if isinstance(steps, list) else []
+                return ("reply", payload.get("text", ""))
             if "reply" in payload:
                 self._inflight = False
                 steps = payload.get("steps")
@@ -269,6 +308,15 @@ class _HarnessHandle:
             if not isinstance(payload, dict):
                 self._inflight = False
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
+            if payload.get("type") == "error":
+                self._inflight = False
+                msg = payload.get("message") or payload.get("text") or payload
+                raise RuntimeError(f"harness error: {msg}")
+            if payload.get("type") == "reply":
+                self._inflight = False
+                steps = payload.get("steps")
+                self.last_steps = steps if isinstance(steps, list) else []
+                return str(payload.get("text", ""))
             if "reply" in payload:
                 self._inflight = False
                 steps = payload.get("steps")
@@ -289,7 +337,7 @@ class _HarnessHandle:
         if not self._inflight:
             raise RuntimeError("没有进行中的 send，控制消息无处作用")
         before = len(self.last_sideband)
-        self._write({"control": name})
+        self._write(self._interrupt_frame() if name == "interrupt" else {"control": name})
         while True:
             kind, val = self.poll(_POLL_INTERVAL)
             if kind == "reply":
@@ -311,6 +359,15 @@ class _HarnessHandle:
             raise RuntimeError("harness 句柄已关闭，不可 reset")
         self._terminate()
         self._start()  # 重启 entry = 开新一局（复位语义收在 launcher 一侧）
+
+    def shutdown(self) -> None:
+        """按 human-facing interface 结束进程；v1 先发 shutdown，随后兜底回收进程组。"""
+        if not self._closed and self._proc is not None and self._proc.stdin is not None:
+            try:
+                self._write(self._shutdown_frame())
+            except (BrokenPipeError, OSError, AssertionError):
+                pass
+        self.close()
 
     def close(self) -> None:
         self._terminate()
@@ -363,19 +420,26 @@ class HarnessLauncher:
             argv[0] = sys.executable  # 用 launcher 的解释器跑 harness（其 venv 才有 nexau 等依赖）
         cwd = dest / params["cwd"] if params.get("cwd") else dest
         env = {str(k): str(v) for k, v in (params.get("env") or {}).items()}
+        protocol = str(params.get("protocol") or params.get("interface") or "legacy")
+        if protocol not in ("legacy", "stdio-jsonl-v1"):
+            raise ValueError(f"params.yaml 的 protocol/interface 不支持：{protocol!r}")
+        if protocol == "stdio-jsonl-v1":
+            env.setdefault("HARNESS_STDIO_PROTOCOL", protocol)
         if workspace_dir is not None:
             # Spec-0008/T1 v2：与用户 agent 共享同一工作区——把它注入 harness 的 SANDBOX_WORK_DIR，
             # harness entry 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；覆盖 params.yaml 同名键。
             env["SANDBOX_WORK_DIR"] = str(workspace_dir)
-        return _HarnessHandle(entry=argv, cwd=cwd, env=env, manual=self._read_manual(dest))
+        return _HarnessHandle(
+            entry=argv, cwd=cwd, env=env, help_text=self._read_help_text(dest), protocol=protocol
+        )
 
     @staticmethod
-    def _read_manual(dest: Path) -> str:
-        """读该版本 harness 的用户手册（MANUAL.md，位于 checkout 根）。缺失即空串（老版本无手册）。"""
-        manual_path = dest / "MANUAL.md"
-        if not manual_path.is_file():
+    def _read_help_text(dest: Path) -> str:
+        """读该版本 harness 的帮助文本（HELP.md）；缺失即空串。"""
+        help_path = dest / "HELP.md"
+        if not help_path.is_file():
             return ""
-        return manual_path.read_text(encoding="utf-8", errors="replace")
+        return help_path.read_text(encoding="utf-8", errors="replace")
 
     def _resolve_sha(self, *, ref: str) -> str:
         """把 ref（分支/tag/SHA）解析成确定的 commit SHA；非法 ref 抛 RuntimeError。"""

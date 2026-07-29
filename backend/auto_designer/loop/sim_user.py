@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
+from auto_designer.harness.connector import HarnessConnector
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.models import (
     FeelingScore,
@@ -206,20 +207,21 @@ def make_sim_run_session_fn(
             if on_turn is not None:
                 on_turn(persona.identity, sim_persona, partial, True, session_id=None)
 
-        harness.reset()  # 开局责任归编排层
+        connector = HarnessConnector(harness)
+        connector.reset()  # 开局责任归编排层；connector 只做平台侧适配，不把平台元数据传入 harness
         try:
             res = sim_run_session(
                 sim_persona,
                 client,
-                harness,
+                connector,
                 scenario.description,
-                # 该版本 harness 的用户手册：让 persona 的能力预期锚定"这工具文档说的"，
-                # 而非空泛先验；缺省空串（老后端无 manual 属性）。
-                manual=getattr(harness, "manual", ""),
+                # 该版本 harness 的帮助文本：让 persona 的能力预期锚定"这工具文档说的"，
+                # 而非空泛先验；缺省空串（后端无 help_text 属性时为空）。
+                help_text=connector.help_text,
                 on_progress=progress,
             )
         finally:
-            harness.close()  # 无论成败都释放 harness 子进程
+            connector.close()  # 无论成败都释放 harness 子进程
 
         round_no = round_provider() if round_provider is not None else None
         issue_refs = _flush_issues(tracker, res, round_no=round_no)

@@ -17,9 +17,9 @@ _PLACEHOLDER = "[fake-harness] no reply configured"
 class HarnessInterface(Protocol):
     """与 harness 的黑盒多轮对话协议（结构化子类型）。
 
-    可选鸭子属性 `manual: str`（该版本 harness 的用户手册 MANUAL.md 全文）：真实 launcher 句柄与
-    FakeHarness 都带它，但**不列入协议成员**——runtime_checkable 会把数据成员纳入 isinstance 校验，
-    列进来会让没有该属性的老桩失配。读方一律 `getattr(harness, "manual", "")` 兜底，老后端也安全。
+    可选鸭子属性 `help_text: str`（该版本 harness 的 HELP.md 全文）：真实 launcher
+    句柄与 FakeHarness 都带它，但**不列入协议成员**——runtime_checkable 会把数据成员纳入 isinstance 校验，
+    列进来会让没有该属性的老桩失配。读方一律 `getattr(harness, "help_text", "")` 兜底，老后端也安全。
     """
 
     def send(self, message: str) -> str:
@@ -53,7 +53,7 @@ class FakeHarness:
         self._cursor = 0
         self._sent: list[str] = []
         self._closed = False
-        self.manual = ""  # 测试后端默认无手册；需要时调用方直接赋值
+        self.help_text = ""  # 测试后端默认无帮助文本；需要时调用方直接赋值
 
     @property
     def sent(self) -> list[str]:

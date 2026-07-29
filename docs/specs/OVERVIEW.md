@@ -91,6 +91,9 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 ### 0029 三平面 issue 流：证据→提案→工作队列，唯一准入 Owner（白名单可领、生成器自由并行、去 gate 特殊通道）
 现行 issue 流的三大病根：①「谁有权把活放进 dev 队列」有三个写手（triage accept、synthesize 直建 RFC 且能 supersede 别人、gate promote），入场规则不统一——synthesize 产出免审进队、divergent 产出要过 gate，纯历史演化无原则可言；② 标签把「工作项资格 / 流程状态 / 属性」压成一个平面，dev 可领判定是一张随新状态不断增长的黑名单（每加 divergent、gate-dropped 都得记得改 dev 排除集）；③ 去重被塞在想并行的生成侧（triage 边规范化边判重），与并行天然打架——此前 triage 分片讨论卡壳的根因。本 spec 重构为三平面单一准入模型：平面1 证据（用户报告/体感/runtime，输入）→ 平面2 提案（proposal，一律不可领；triage/synthesize/divergent 都只是生成器，产出为非约束性提案，故可自由并行、重复无害；且按证据源双轨分工——synthesize 吃规范化 backlog 找结构根因（delivery 轨），divergent 直吃原始会话行为挖未被提为 issue 的能力缺口（discovery 轨），去重靠构造而非 prompt 嘱咐）→ 唯一准入 Owner（每轮一次批量评审：admit→ready / merge 去重合并 / decline / hold；机械模式对字段齐全的单条修复案零 LLM 自动准入）→ 平面3 工作队列（ready 唯一可领白名单，dev 按 priority→age 拉取、只关自己的票——covers 级联在 Owner 准入时以 merge 完成）。配套：公共 agent 运行时抽出（消 triage/divergent 对 designer 私有符号的依赖）、gate/divergent 特殊通道与 superseded/gate-dropped 中间态退役、proposal/ready 队列深度背压告警（= CLAUDE.md 退化信号落地）。不动纯 trunk/直推 main/benchmark held-out/submit-tool 契约（0027 复用，Owner 仅新增 submit_admission）。
 
+### 0030 harness 产品化边界：/help 用户说明、平台侧接口与 connector 适配
+把 harness 收敛为真人可运行产品：harness 模板内只保留 HELP.md 作为 /help 内容源、RUNTIME.md 作为维护说明；README/USER/MANUAL 不再作为模板文档，INTERFACE 归 auto-designer 平台侧；connector 适配 sim-user 到真人接口；launcher/template 支持 stdio-jsonl-v1 并兼容 legacy。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -210,6 +213,12 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0029 | 0029/T8 | 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警 | done | T3, T4, T5, T6, T7 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
 | 0029 | 0029/T9 | 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数 | done | T6, T7 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
 | 0029 | 0029/T10 | 前端适配：三平面分组 + Owner 房间 + 漏斗与背压展示 | done | T9 | frontend/src/types.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/App.tsx<br>frontend/src/api.ts |
+| 0030 | 0030/T1 | 写 0030 活快照 | done | — | docs/specs/0030-harness-product-interface.md |
+| 0030 | 0030/T2 | harness_template 精简为 HELP/RUNTIME/scripts/deps | done | — | backend/harness_template/HELP.md<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/.env.example<br>backend/harness_template/requirements.txt<br>backend/harness_template/scripts/run.sh<br>backend/harness_template/scripts/smoke.sh<br>backend/harness_template/scripts/check.sh |
+| 0030 | 0030/T3 | /help slash 与模板自测 | done | T2 | backend/harness_template/entry.py<br>backend/harness_template/agents/main.md<br>backend/harness_template/tests/test_smoke.py |
+| 0030 | 0030/T4 | 边界白名单改为产品区域而非历史文件名 | done | T2 | backend/auto_designer/dev/harness_boundary.py<br>backend/tests/dev/test_harness_boundary.py |
+| 0030 | 0030/T5 | 平台读取 HELP.md 与收尾闸门同步 | done | T2 | backend/auto_designer/dev/completion_gate.py<br>backend/tests/dev/test_completion_gate.py<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/agent_defs/developer_agent/agent.yaml |
+| 0030 | 0030/T6 | connector 与 stdio-jsonl-v1 协议适配 | done | T5 | backend/auto_designer/harness/connector.py<br>backend/tests/harness/test_connector.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py<br>backend/harness_template/params.yaml<br>backend/auto_designer/harness/INTERFACE.md |
 
 ## 跨 feature 关系图
 
@@ -388,6 +397,14 @@ graph LR
         n0029_T9["T9 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数"]
         n0029_T10["T10 前端适配：三平面分组 + Owner 房间 + 漏斗与背压展示"]
     end
+    subgraph G0030[0030 harness-product-interface]
+        n0030_T1["T1 写 0030 活快照"]
+        n0030_T2["T2 harness_template 精简为 HELP/RUNTIME/scripts/deps"]
+        n0030_T3["T3 /help slash 与模板自测"]
+        n0030_T4["T4 边界白名单改为产品区域而非历史文件名"]
+        n0030_T5["T5 平台读取 HELP.md 与收尾闸门同步"]
+        n0030_T6["T6 connector 与 stdio-jsonl-v1 协议适配"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -493,6 +510,10 @@ graph LR
     n0029_T9 --> n0029_T6
     n0029_T9 --> n0029_T7
     n0029_T10 --> n0029_T9
+    n0030_T3 --> n0030_T2
+    n0030_T4 --> n0030_T2
+    n0030_T5 --> n0030_T2
+    n0030_T6 --> n0030_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -547,7 +568,8 @@ graph LR
 | backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029 |
 | backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
-| backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014 |
+| backend/agent_defs/developer_agent/agent.yaml | 0014, 0030 |
+| backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014, 0030 |
 | backend/agent_defs/triage_agent/agent.yaml | 0027, 0029 |
 | backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029 |
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029 |
@@ -557,21 +579,23 @@ graph LR
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029 |
 | backend/auto_designer/designer/triage.py | 0025, 0027, 0029 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029 |
+| backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
+| backend/auto_designer/dev/harness_boundary.py | 0015, 0030 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024 |
 | backend/auto_designer/tracker/base.py | 0001, 0025 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
@@ -580,27 +604,32 @@ graph LR
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/auto_designer/web/api.py | 0020, 0025, 0029 |
 | backend/harness_template/MANUAL.md | 0013, 0022 |
-| backend/harness_template/entry.py | 0003, 0013, 0022 |
-| backend/harness_template/tests/test_smoke.py | 0013, 0022 |
+| backend/harness_template/RUNTIME.md | 0022, 0030 |
+| backend/harness_template/agents/main.md | 0003, 0030 |
+| backend/harness_template/entry.py | 0003, 0013, 0022, 0030 |
+| backend/harness_template/params.yaml | 0003, 0030 |
+| backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030 |
 | backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029 |
 | backend/tests/designer/test_triage.py | 0025, 0027, 0029 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029 |
-| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022 |
+| backend/tests/dev/test_completion_gate.py | 0014, 0030 |
+| backend/tests/dev/test_harness_boundary.py | 0015, 0030 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029 |
 | backend/tests/loop/test_live.py | 0017, 0026 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
-| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025 |
+| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012, 0023 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022 |
 | backend/tests/user/sim/test_prompt.py | 0005, 0023 |
@@ -1435,4 +1464,39 @@ graph LR
     class v_T7_1 st_done;
     class v_T8_1 st_done;
     class v_T9_1 st_done;
+```
+
+### 0030 harness 产品化边界：/help 用户说明、平台侧接口与 connector 适配（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 写 0030 活快照"]
+    nT2["T2 harness_template 精简为 HELP/RUNTIME/scripts/deps"]
+    nT3["T3 /help slash 与模板自测"]
+    nT4["T4 边界白名单改为产品区域而非历史文件名"]
+    nT5["T5 平台读取 HELP.md 与收尾闸门同步"]
+    nT6["T6 connector 与 stdio-jsonl-v1 协议适配"]
+    nT2 --> nT3
+    nT2 --> nT4
+    nT2 --> nT5
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```

@@ -165,8 +165,10 @@ WAITING_ACTIONS = ["keep_waiting", "send_message", "interrupt", "give_up"]
 
 
 def _supports_heartbeat(harness) -> bool:
-    """真实子进程句柄：begin/poll + 内 emit_message + 外 control(interrupt)；Fake/Scripted 无需心跳。"""
-    return all(hasattr(harness, m) for m in ("begin", "poll", "control", "emit_message"))
+    """真实子进程句柄：begin/poll + 内 emit_message + 外 interrupt/shutdown；Fake/Scripted 无需心跳。"""
+    return all(
+        hasattr(harness, m) for m in ("begin", "poll", "interrupt", "shutdown", "emit_message")
+    )
 
 
 def _take_persona_calls(client: PersonaClient, role: str) -> list[dict]:
@@ -233,7 +235,7 @@ def _main_decide(
     harness_output: str,
     space: list,
     state: State,
-    manual: str,
+    help_text: str,
     appraise_task: bool,
     result: SessionResult,
 ) -> tuple[dict, list[dict], str, bool]:
@@ -251,7 +253,7 @@ def _main_decide(
             harness_output,
             space,
             state,
-            manual=manual,
+            help_text=help_text,
             appraise_task=appraise_task,
         ),
     )
@@ -267,7 +269,7 @@ def _main_decide(
             harness_output,
             space,
             state,
-            manual=manual,
+            help_text=help_text,
             verdict=verdict,
             perceive=perceive,
         ),
@@ -283,7 +285,7 @@ def _main_decide(
             harness_output,
             space,
             state,
-            manual=manual,
+            help_text=help_text,
             verdict=verdict,
             perceive=perceive,
             intent=intent,
@@ -524,7 +526,7 @@ def _heartbeat_once(
     clock: _SessionClock,
     state: State,
     coef: Coef,
-    manual: str,
+    help_text: str,
     result: SessionResult,
     on_progress: Callable[[SessionResult], None] | None,
     prior_activity: list[dict],
@@ -546,7 +548,7 @@ def _heartbeat_once(
         task=task,
         history_lines=history,
         state=state,
-        manual=manual,
+        help_text=help_text,
         waited_sec=waited_sec,
         progress=progress,
         prior_activity=prior_activity,
@@ -633,7 +635,7 @@ def _await_harness(
     clock: _SessionClock,
     state: State,
     coef: Coef,
-    manual: str,
+    help_text: str,
     result: SessionResult,
     on_progress: Callable[[SessionResult], None] | None,
     prior_activity: list[dict],
@@ -696,7 +698,7 @@ def _await_harness(
             clock=clock,
             state=state,
             coef=coef,
-            manual=manual,
+            help_text=help_text,
             result=result,
             on_progress=on_progress,
             prior_activity=prior_activity,
@@ -734,7 +736,7 @@ def _await_harness(
             continue  # 回 AwaitEvent：下一笔 reply 唤醒主 loop，不再嵌套心跳决策
         if action == "interrupt":
             try:
-                ctrl_out = harness.control("interrupt")
+                ctrl_out = harness.interrupt()
             except Exception as exc:  # noqa: BLE001
                 ledger.clear_open()
                 return (
@@ -747,8 +749,12 @@ def _await_harness(
             ledger.close_open_as_answered()
             if isinstance(ctrl_out, str) and ctrl_out.startswith(HARNESS_ERROR_PREFIX):
                 return ctrl_out, time.monotonic() - t0, None, "interrupt"
-            return str(ctrl_out), time.monotonic() - t0, None, "interrupt"
+            return str(ctrl_out or ""), time.monotonic() - t0, None, "interrupt"
         if action == "give_up":
+            try:
+                harness.shutdown()
+            except Exception:  # noqa: BLE001  give_up 是终止意图，关闭失败不应阻塞会话收场
+                pass
             ledger.clear_open()
             return "", time.monotonic() - t0, "give_up", None
         # keep_waiting：动作已记录并可能耗心；回 AwaitEvent，等下一笔 reply 或下一跳 timer。
@@ -761,7 +767,7 @@ def run_session(
     harness,
     task: str,
     *,
-    manual: str = "",
+    help_text: str = "",
     on_progress: Callable[[SessionResult], None] | None = None,
 ) -> SessionResult:
     # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
@@ -793,7 +799,7 @@ def run_session(
             harness_output=harness_output,
             space=space,
             state=state,
-            manual=manual,
+            help_text=help_text,
             appraise_task=phase is Phase.OPENING,
             result=result,
         )
@@ -898,7 +904,7 @@ def run_session(
                 clock=clock,
                 state=state,
                 coef=coef,
-                manual=manual,
+                help_text=help_text,
                 result=result,
                 on_progress=on_progress,
                 prior_activity=prior_activity,

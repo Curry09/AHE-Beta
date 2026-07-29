@@ -42,7 +42,7 @@ _（缺模块级 docstring）_
 | `agentic_developer.py` | agentic_developer：开发者 = 带 git 工具的 nexau agent（取代确定性 DeveloperAgent）。 |
 | `commit_checkpoint.py` | CommitCheckpointMiddleware：用机制（而非软提示）保证 dev 尽早落一个已提交的增量。 |
 | `completion_gate.py` | CompletionGateMiddleware：收尾闸门——保证 dev 收尾时是一次"完整提交"。 |
-| `harness_boundary.py` | harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品—— |
+| `harness_boundary.py` | harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品。 |
 | `repo_guard.py` | repo_guard：编排仓完整性快照与校验。 |
 | `workspace_jail.py` | WorkspaceJailMiddleware：dev/designer 以 harness 仓为可写工作区；NexAU 源码与运行时产物只读放行。 |
 
@@ -64,6 +64,7 @@ _（缺模块级 docstring）_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
+| `connector.py` | Platform-side connector from simulated users to the harness human-facing interface. |
 | `interface.py` | harness 多轮对话契约 HarnessInterface + 测试后端 FakeHarness（spec-0001/T2）。 |
 | `launcher.py` | harness launcher（spec-0003/T1）：把某版 harness 程序接成 spec-0001 的 HarnessInterface。 |
 
@@ -181,6 +182,7 @@ graph LR
     nauto_designer_distill_seed_adapter["distill.seed_adapter"]
     nauto_designer_distill_seed_library["distill.seed_library"]
     nauto_designer_harness["auto_designer.harness"]
+    nauto_designer_harness_connector["harness.connector"]
     nauto_designer_harness_interface["harness.interface"]
     nauto_designer_harness_launcher["harness.launcher"]
     nauto_designer_loop["auto_designer.loop"]
@@ -262,6 +264,7 @@ graph LR
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
+    nauto_designer_harness_connector --> nauto_designer_harness_interface
     nauto_designer_harness_launcher --> nauto_designer_harness_interface
     nauto_designer_loop_metrics --> nauto_designer_designer_issue_schema
     nauto_designer_loop_metrics --> nauto_designer_tracker_base
@@ -278,6 +281,7 @@ graph LR
     nauto_designer_loop_runner --> nauto_designer_loop_orchestrator
     nauto_designer_loop_runner --> nauto_designer_loop_run_state
     nauto_designer_loop_sim_user --> nauto_designer_designer_issue_schema
+    nauto_designer_loop_sim_user --> nauto_designer_harness_connector
     nauto_designer_loop_sim_user --> nauto_designer_harness_interface
     nauto_designer_loop_sim_user --> nauto_designer_models
     nauto_designer_loop_sim_user --> nauto_designer_tracker_base

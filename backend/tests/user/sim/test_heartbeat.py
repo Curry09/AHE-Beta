@@ -46,19 +46,21 @@ class HeartbeatHarness:
         self,
         poll_script: list[tuple[str, object]],
         interrupt_reply: str = "[interrupted] stopped; session kept.",
-        manual: str = "# Manual\nCtrl+C interrupts. You may send messages while waiting.",
+        help_text: str = "# Help\nCtrl+C interrupts. You may send messages while waiting.",
         progress_on_poll: list[list[dict]] | None = None,
     ) -> None:
         self._poll_script = list(poll_script)
         self._pi = 0
         self.interrupt_reply = interrupt_reply
-        self.manual = manual
+        self.help_text = help_text
         self.last_steps: list[dict] = []
         self.last_progress: list[dict] = []
         self._progress_on_poll = progress_on_poll
         self.begun: list[str] = []
         self.emitted: list[str] = []
         self.controls: list[str] = []
+        self.interrupts = 0
+        self.shutdowns = 0
         self._inflight = False
 
     @property
@@ -95,6 +97,15 @@ class HeartbeatHarness:
         self._pi += 1
         self._inflight = False
         return str(val)
+
+    def interrupt(self) -> str:
+        self.interrupts += 1
+        self._inflight = False
+        return self.interrupt_reply
+
+    def shutdown(self) -> None:
+        self.shutdowns += 1
+        self._inflight = False
 
     def control(self, name: str) -> str:
         self.controls.append(name)
@@ -205,8 +216,8 @@ def test_resolve_waiting_maps_and_guards() -> None:
 
 
 def test_resolve_intent_is_open_text() -> None:
-    assert _resolve_intent({"intent": "I want to see /status from the manual"}) == (
-        "I want to see /status from the manual"
+    assert _resolve_intent({"intent": "I want to see /status from the help text"}) == (
+        "I want to see /status from the help text"
     )
     assert _resolve_intent({"intent": "hang on", "intent_detail": "looks busy"}) == (
         "hang on (looks busy)"
@@ -224,7 +235,7 @@ def test_three_mode_keep_waiting_logs_and_calls() -> None:
         intents=[{"intent": "give it more time"}],
         verdict="satisfied",
     )
-    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert len(waiting) == 1
     assert waiting[0].action == "keep_waiting"
@@ -257,7 +268,7 @@ def test_open_intent_gap_comes_from_act_not_enum() -> None:
         actions=["send_task", "accept"],
         acts=[{"action": "keep_waiting", "gap": True}],
         judging=[{"judgment": "unclear", "perceive": "quiet after tools"}],
-        intents=[{"intent": "I want to know where it is — manual has no /status"}],
+        intents=[{"intent": "I want to know where it is — help text has no /status"}],
         verdict="satisfied",
     )
     res = run_session(
@@ -265,18 +276,18 @@ def test_open_intent_gap_comes_from_act_not_enum() -> None:
         client,
         harness,
         TASK,
-        manual=harness.manual,
+        help_text=harness.help_text,
     )
     assert any(s.startswith("WAIT_GAP: intent=I want to know where it is") for s in res.signals)
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert "→keep_waiting]" in waiting[0].perceive
 
 
-def test_manual_driven_send_message_no_gap() -> None:
-    """手册写了 /status → send_message；若决策后仍无现成 reply，则 emit；否则见 abort 测试。"""
+def test_help_text_driven_send_message_no_gap() -> None:
+    """帮助文本写了 /status → send_message；若决策后仍无现成 reply，则 emit；否则见 abort 测试。"""
     harness = HeartbeatHarness(
         [("pending", 90.0), ("pending", 180.0), ("reply", "done")],
-        manual="# Manual\nWhile waiting you may send `/status` as a normal message.\n",
+        help_text="# Help\nWhile waiting you may send `/status` as a normal message.\n",
     )
     client = WaitStubClient(
         actions=["send_task", "accept"],
@@ -289,7 +300,7 @@ def test_manual_driven_send_message_no_gap() -> None:
             {"judgment": "on_track", "perceive": "still good"},
         ],
         intents=[
-            {"intent": "send /status like the manual says"},
+            {"intent": "send /status like the help text says"},
             {"intent": "keep going"},
         ],
         verdict="satisfied",
@@ -299,7 +310,7 @@ def test_manual_driven_send_message_no_gap() -> None:
         client,
         harness,
         TASK,
-        manual=harness.manual,
+        help_text=harness.help_text,
     )
     assert harness.emitted == ["/status"]
     assert harness.controls == []
@@ -322,7 +333,7 @@ def test_send_message_then_reply_triggers_main_not_nested_wait() -> None:
     """插话成功 emit 后回 AwaitEvent；下一跳若已是 reply 则交主 loop（不再嵌套等待决策）。"""
     harness = HeartbeatHarness(
         [("pending", 60.0), ("pending", 120.0), ("reply", "all done")],
-        manual="# Manual\n/btw <msg> is a side question while work continues.\n",
+        help_text="# Help\n/btw <msg> is a side question while work continues.\n",
     )
     client = WaitStubClient(
         actions=["send_task", "accept"],
@@ -348,7 +359,7 @@ def test_send_message_then_reply_triggers_main_not_nested_wait() -> None:
         client,
         harness,
         TASK,
-        manual=harness.manual,
+        help_text=harness.help_text,
     )
     assert harness.emitted == ["/btw are you still on pytest?"]
     assert harness.controls == []
@@ -370,7 +381,7 @@ def test_reply_ready_after_heartbeat_aborts_give_up() -> None:
         intents=[{"intent": "walk away"}],
         verdict="satisfied",
     )
-    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
     assert res.end_reason == "accepted"  # 未 abandon
     assert harness.controls == []
     assert harness.emitted == []
@@ -393,7 +404,7 @@ def test_reply_ready_after_heartbeat_aborts_interrupt() -> None:
         intents=[{"intent": "Ctrl+C"}],
         verdict="satisfied",
     )
-    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
     assert harness.controls == []  # 未真正 interrupt
     assert any(
         t.phase != "waiting" and t.harness_output == "done without interrupt" for t in res.turns
@@ -419,7 +430,7 @@ def test_keep_waiting_is_one_shot_reply_wakes_main() -> None:
         intents=[{"intent": "give it more time"}, {"intent": "stop"}],
         verdict="satisfied",
     )
-    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert len(waiting) == 1
     assert waiting[0].action == "keep_waiting"
@@ -439,7 +450,7 @@ def test_keep_waiting_decay_follows_persona_coef() -> None:
             acts=[{"action": "keep_waiting", "gap": False}],
             verdict="satisfied",
         )
-        res = run_session(_persona(d43=d43), client, harness, TASK, manual=harness.manual)
+        res = run_session(_persona(d43=d43), client, harness, TASK, help_text=harness.help_text)
         wt = [t for t in res.turns if t.phase == "waiting"]
         assert len(wt) == 1
         return wt[0].patience
@@ -457,8 +468,9 @@ def test_interrupt_routes_and_attribution() -> None:
         intents=[{"intent": "Ctrl+C stop this"}],
         verdict="stuck",
     )
-    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
-    assert harness.controls == ["interrupt"]
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
+    assert harness.interrupts == 1
+    assert harness.controls == []
     assert harness.emitted == []
     assert any("[interrupted]" in t.harness_output for t in res.turns if t.harness_output)
     assert any("Ctrl+C stop this→interrupt" in t.perceive for t in res.turns)
@@ -476,8 +488,9 @@ def test_give_up_during_wait_abandons_with_issue() -> None:
         intents=[{"intent": "walk away from this"}],
         verdict="stuck",
     )
-    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
     assert res.end_reason == "abandoned"
+    assert harness.shutdowns == 1
     assert res.issue_artifact is not None
     assert any(t.phase == "waiting" and t.action == "give_up" for t in res.turns)
 
@@ -489,7 +502,7 @@ def test_pathological_keep_waiting_is_bounded() -> None:
         acts=[{"action": "keep_waiting", "gap": False}],
         verdict="stuck",
     )
-    res = run_session(_persona(), client, harness, TASK, manual=harness.manual)
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
     assert res.end_reason == "abandoned"
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert 0 < len(waiting) <= _MAX_HEARTBEATS
@@ -527,7 +540,7 @@ def test_on_track_progress_skips_patience_tax() -> None:
         client,
         harness,
         TASK,
-        manual=harness.manual,
+        help_text=harness.help_text,
     )
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert waiting[0].patience == 5
@@ -561,7 +574,7 @@ def test_stale_progress_taxes_patience_and_can_gap() -> None:
         client,
         harness,
         TASK,
-        manual=harness.manual,
+        help_text=harness.help_text,
     )
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert waiting[0].patience == 5
@@ -599,8 +612,9 @@ def test_prior_activity_carried() -> None:
         intents=[{"intent": "keep waiting"}, {"intent": "interrupt this"}],
         verdict="unsure",
     )
-    run_session(_persona(), client, harness, TASK, manual=harness.manual)
+    run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
     assert len(client.judge_prompts) >= 2
     assert "<prior_activity>" in client.judge_prompts[1]
     assert "rm -rf" in client.judge_prompts[1]
-    assert harness.controls == ["interrupt"]
+    assert harness.interrupts == 1
+    assert harness.controls == []

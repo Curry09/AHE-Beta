@@ -47,6 +47,54 @@ _ENV_ECHO_ENTRY = (
     '    sys.stdout.write(json.dumps({"reply": os.environ.get("SANDBOX_WORK_DIR", "(unset)")})'
     ' + "\\n"); sys.stdout.flush()\n'
 )
+_V1_ENTRY = """\
+import json, sys
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    obj = json.loads(line)
+    if obj.get("type") == "message":
+        sys.stdout.write(json.dumps({"type": "progress", "kind": "tool", "text": "v1-progress"}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "reply", "text": "v1:" + obj["text"], "steps": [{"kind": "tool", "text": "v1"}]}) + "\\n")
+        sys.stdout.flush()
+    elif obj.get("type") == "interrupt":
+        sys.stdout.write(json.dumps({"type": "reply", "text": "[v1-interrupted]"}) + "\\n")
+        sys.stdout.flush()
+"""
+_V1_ERROR_ENTRY = """\
+import json, sys
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    json.loads(line)
+    sys.stdout.write(json.dumps({"type": "error", "message": "boom", "recoverable": False}) + "\\n")
+    sys.stdout.flush()
+"""
+_V1_INTERRUPT_ENTRY = """\
+import json, sys, threading, time
+busy = {"on": False}
+
+def work():
+    while busy["on"]:
+        sys.stdout.write(json.dumps({"type": "progress", "kind": "tool", "text": "working"}) + "\\n")
+        sys.stdout.flush()
+        time.sleep(0.15)
+
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    obj = json.loads(line)
+    if obj.get("type") == "message":
+        busy["on"] = True
+        threading.Thread(target=work, daemon=True).start()
+    elif obj.get("type") == "interrupt":
+        busy["on"] = False
+        sys.stdout.write(json.dumps({"type": "reply", "text": "[v1-interrupted]"}) + "\\n")
+        sys.stdout.flush()
+"""
 
 
 def _commit_all(repo: str, message: str) -> None:
@@ -290,23 +338,85 @@ def test_launch_without_workspace_dir_leaves_sandbox_work_dir_unset(tmp_path, mo
         h.close()
 
 
-# 用户手册：checkout 时读 MANUAL.md 全文挂到句柄，供用户 agent 形成能力预期。
-def test_launch_exposes_manual_from_repo(tmp_path) -> None:
-    launcher = _launcher(tmp_path, _COUNTER_ENTRY)
-    repo = launcher._harness_repo
-    (Path(repo) / "MANUAL.md").write_text("# Manual\nno live progress.\n", encoding="utf-8")
-    _commit_all(repo, "add manual")
+def test_v1_protocol_sends_type_message_and_reads_type_reply_progress(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _V1_ENTRY)
+    repo = Path(launcher._harness_repo)
+    (repo / "params.yaml").write_text(
+        "entry:\n  - python\n  - fake_entry.py\nprotocol: stdio-jsonl-v1\n", encoding="utf-8"
+    )
+    _commit_all(repo, "enable v1 protocol")
     h = launcher.launch("main")
     try:
-        assert "no live progress" in h.manual
+        assert h.send("hello") == "v1:hello"
+        assert h.last_progress == [{"kind": "tool", "text": "v1-progress"}]
+        assert h.last_steps == [{"kind": "tool", "text": "v1"}]
     finally:
         h.close()
 
 
-def test_launch_manual_empty_when_absent(tmp_path) -> None:
-    h = _launcher(tmp_path, _COUNTER_ENTRY).launch("main")  # repo 无 MANUAL.md
+def test_v1_protocol_interrupt_uses_type_interrupt(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _V1_INTERRUPT_ENTRY)
+    repo = Path(launcher._harness_repo)
+    (repo / "params.yaml").write_text(
+        "entry:\n  - python\n  - fake_entry.py\nprotocol: stdio-jsonl-v1\n", encoding="utf-8"
+    )
+    _commit_all(repo, "enable v1 protocol")
+    h = launcher.launch("main")
     try:
-        assert h.manual == ""
+        h.begin("long")
+        assert h.control("interrupt") == "[v1-interrupted]"
+    finally:
+        h.close()
+
+
+def test_v1_protocol_error_raises(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _V1_ERROR_ENTRY)
+    repo = Path(launcher._harness_repo)
+    (repo / "params.yaml").write_text(
+        "entry:\n  - python\n  - fake_entry.py\nprotocol: stdio-jsonl-v1\n", encoding="utf-8"
+    )
+    _commit_all(repo, "enable v1 protocol")
+    h = launcher.launch("main")
+    try:
+        with pytest.raises(RuntimeError, match="boom"):
+            h.send("x")
+    finally:
+        h.close()
+
+
+def test_unknown_protocol_raises(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _COUNTER_ENTRY)
+    repo = Path(launcher._harness_repo)
+    (repo / "params.yaml").write_text(
+        "entry:\n  - python\n  - fake_entry.py\nprotocol: nope\n", encoding="utf-8"
+    )
+    _commit_all(repo, "unsupported protocol")
+    with pytest.raises(ValueError, match="protocol"):
+        launcher.launch("main")
+
+
+# 帮助文本：checkout 时只读 HELP.md 全文挂到句柄。
+def test_launch_exposes_help_md_from_repo(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _COUNTER_ENTRY)
+    repo = launcher._harness_repo
+    (Path(repo) / "HELP.md").write_text("# Help\nlive progress supported.\n", encoding="utf-8")
+    _commit_all(repo, "add help")
+    h = launcher.launch("main")
+    try:
+        assert "live progress supported" in h.help_text
+    finally:
+        h.close()
+
+
+def test_launch_help_text_empty_when_help_absent(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _COUNTER_ENTRY)
+    repo = launcher._harness_repo
+    (Path(repo) / "USER.md").write_text("# User\nlegacy only.\n", encoding="utf-8")
+    (Path(repo) / "MANUAL.md").write_text("# Retired\nlegacy only.\n", encoding="utf-8")
+    _commit_all(repo, "add retired docs")
+    h = launcher.launch("main")
+    try:
+        assert h.help_text == ""
     finally:
         h.close()
 

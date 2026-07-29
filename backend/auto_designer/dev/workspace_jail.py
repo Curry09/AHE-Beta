@@ -107,7 +107,7 @@ def _strip_heredoc_bodies(command: str) -> str:
     """去掉 heredoc 正文（`<<MARKER` 之后到闭合 `MARKER` 行之间的内容），保留命令/重定向行本身。
 
     旧实现「命令一含 `<<` 即整条跳过 token 扫描」把重定向目标（`cat > /仓外/x <<EOF`）也放行了，
-    成了绕过 jail 往仓外写文件的口子（实测被 dev 用来把 harness 内容写进自己的 def MANUAL.md）。
+    成了绕过 jail 往仓外写文件的口子（实测被 dev 用来把 harness 内容写进仓外文件）。
     这里只剥正文、保留含 `<<MARKER` 的首行，让后续 token 扫描照样能抓到那个越界重定向目标。
     """
     lines = command.splitlines()

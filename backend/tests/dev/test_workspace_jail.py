@@ -87,14 +87,14 @@ def test_shell_offender_flags_heredoc_redirect_escape(tmp_path: Path) -> None:
     work = (tmp_path / "harness_repo").resolve()
     work.mkdir()
     roots = [work]
-    outside = tmp_path / "developer_agent" / "MANUAL.md"
+    outside = tmp_path / "developer_agent" / "HELP.md"
     # 越界重定向目标（含 heredoc）：旧实现整条放行、成绕过口；现在必须拒
     cmd_abs = f"cat > {outside} <<'EOF'\nsome harness content\nEOF"
     assert _shell_offender(work, cmd_abs, roots) is not None
     cmd_rel = "cat > ../../evil.md <<EOF\nx\nEOF"
     assert _shell_offender(work, cmd_rel, roots) is not None
     # 仓内重定向目标（含 heredoc）放行——写自己仓内文件合法
-    cmd_in = "cat > MANUAL.md <<EOF\nharness manual body\nEOF"
+    cmd_in = "cat > HELP.md <<EOF\nharness help body\nEOF"
     assert _shell_offender(work, cmd_in, roots) is None
     # heredoc 正文里出现 `../` / 绝对路径只是**内容**，不该误伤（重定向目标在仓内）
     cmd_body_noise = "cat > notes.md <<EOF\nsee ../../data/x and /etc/passwd\nEOF"

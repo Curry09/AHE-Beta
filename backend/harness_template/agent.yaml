@@ -1,5 +1,5 @@
-# harness v0 的 nexau agent 定义：最简「只有 bash」的工具型 agent，结构对齐 developer_agent。
-# 被进化对象起点——开发者 agent 后续会改本文件与 agents/main.md（甚至演化为多 agent）。
+# NexAU agent definition for the terminal coding assistant.
+# Keep this file focused on runtime configuration; product behavior belongs in agents/main.md.
 type: agent
 name: harness
 max_context_tokens: 128000

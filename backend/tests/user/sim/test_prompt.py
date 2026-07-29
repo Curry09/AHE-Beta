@@ -83,7 +83,7 @@ def test_main_three_builders_have_sections() -> None:
     assert "<main_act>" in act and '"gap"' in act
 
 
-def test_main_judge_injects_manual() -> None:
+def test_main_judge_injects_help_text() -> None:
     p = _persona()
     state = init_state(p)
     user = build_main_judge_turn(
@@ -92,15 +92,15 @@ def test_main_judge_injects_manual() -> None:
         "out",
         ["accept"],
         state,
-        manual="# Manual\nno live progress; no /btw.",
+        help_text="# Help\nno live progress; no /btw.",
     )
-    assert "<harness_manual>" in user and "no live progress" in user
+    assert "<harness_help>" in user and "no live progress" in user
 
 
-def test_main_judge_omits_manual_when_absent() -> None:
+def test_main_judge_omits_help_text_when_absent() -> None:
     p = _persona()
     user = build_main_judge_turn("do X", [], "out", ["accept"], init_state(p))
-    assert "<harness_manual>" not in user
+    assert "<harness_help>" not in user
 
 
 def test_waiting_three_builders_tags() -> None:

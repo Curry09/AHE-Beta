@@ -166,12 +166,12 @@ def test_on_progress_pushes_pending_harness_reply_immediately() -> None:
     assert snaps[2] == (2, None)
 
 
-def test_manual_is_threaded_into_persona_prompt() -> None:
-    # 手册经 run_session(manual=) 穿透到每轮 persona 看到的 user turn（能力预期锚点）。
+def test_help_text_is_threaded_into_persona_prompt() -> None:
+    # 帮助文本经 run_session(help_text=) 穿透到每轮 persona 看到的 user turn（能力预期锚点）。
     p = _persona(D1Eval.EXPERT, D43Correct.FEEDBACK)
     client = _RecordingClient(["send_task", "accept"], verdict="satisfied")
-    run_session(p, client, ScriptedHarness(), TASK, manual="# Manual\nno live progress; no /btw.")
-    assert client.seen and all("<harness_manual>" in u for u in client.seen)
+    run_session(p, client, ScriptedHarness(), TASK, help_text="# Help\nno live progress; no /btw.")
+    assert client.seen and all("<harness_help>" in u for u in client.seen)
     assert any("no live progress" in u for u in client.seen)
 
 

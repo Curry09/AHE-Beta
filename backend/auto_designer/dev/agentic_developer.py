@@ -230,7 +230,7 @@ class AgenticDeveloper:
             "（必须做完 git 才 complete_task）。\n"
             f"issue #{issue_number}：{title}\n{body}\n\n"
             "边界（硬约束）：你改的是**通用编码助手 harness 本体**"
-            "（entry.py / agents/ / tools/ / MANUAL.md / params.yaml），不是某个具体任务。issue 若在"
+            "（entry.py / agents/ / tools/ / HELP.md / RUNTIME.md / params.yaml），不是某个具体任务。issue 若在"
             "抱怨「某任务没做成」（装不上某个包、跑不动某项目），那是 harness 的**能力缺口**——只改进"
             "通用能力（如让它更会搭脚手架、读报错、装依赖、控超时），**绝不把被测项目代码写进 harness 仓**"
             "（新建包、pyproject.toml、任务 tests/ 等；仓已装 pre-commit 边界钩子，越界提交会被拒、白费迭代）。\n"

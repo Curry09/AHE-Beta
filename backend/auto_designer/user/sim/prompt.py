@@ -61,8 +61,8 @@ G7  ACCEPTANCE PRECONDITION (hard self-check, applies to accept AND
     yourself — you are FORBIDDEN to accept; you have no basis to. Do something that
     fits this person instead: push back, ask for a runnable status, verify yourself,
     or (if patience is spent / it's hopeless) give_up or file_issue.
-G8  This tool's user manual is given in <harness_manual>. Your sense of what THIS harness
-    can and cannot do comes from that manual PLUS your general experience with such tools.
+G8  This tool's help text is given in <harness_help>. Your sense of what THIS harness
+    can and cannot do comes from that help text PLUS your general experience with such tools.
     Issues are NOT only for bugs: if the tool behaves as documented but genuinely lacks
     something you needed to get your work done well, saying so is legitimate — ask for it
     in the moment and/or make it part of an issue you file. Do NOT invent a complaint;
@@ -201,15 +201,15 @@ def _main_context_parts(
     action_space: list[str],
     state: State,
     *,
-    manual: str = "",
+    help_text: str = "",
 ) -> list[str]:
     """主 decide 共用上下文（不含分步输出契约）。等待时长只靠 <history> 的 [+Ns]。"""
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     ho = harness_output.strip() if harness_output else "(empty)"
     parts: list[str] = []
     parts.append(f"<task>\n{task}\n</task>")
-    if manual.strip():
-        parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
+    if help_text.strip():
+        parts.append(f"<harness_help>\n{help_text.strip()}\n</harness_help>")
     parts.append(f"<history>\n{hist}\n</history>")
     parts.append(f"<harness_output>\n{ho}\n</harness_output>")
     if state.pending_self_obs:
@@ -226,7 +226,7 @@ def build_main_judge_turn(
     action_space: list[str],
     state: State,
     *,
-    manual: str = "",
+    help_text: str = "",
     appraise_task: bool = False,
 ) -> str:
     """主 loop · Judge：只评现状（perceive + verdict）；意愿留给 intent。"""
@@ -238,7 +238,7 @@ def build_main_judge_turn(
             harness_output,
             action_space,
             state,
-            manual=manual,
+            help_text=help_text,
         )
     )
     parts.append(
@@ -263,7 +263,7 @@ def build_main_intent_turn(
     action_space: list[str],
     state: State,
     *,
-    manual: str = "",
+    help_text: str = "",
     verdict: str,
     perceive: str = "",
 ) -> str:
@@ -276,7 +276,7 @@ def build_main_intent_turn(
             harness_output,
             action_space,
             state,
-            manual=manual,
+            help_text=help_text,
         )
     )
     parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
@@ -296,7 +296,7 @@ def build_main_act_turn(
     action_space: list[str],
     state: State,
     *,
-    manual: str = "",
+    help_text: str = "",
     verdict: str,
     perceive: str = "",
     intent: str,
@@ -310,7 +310,7 @@ def build_main_act_turn(
             harness_output,
             action_space,
             state,
-            manual=manual,
+            help_text=help_text,
         )
     )
     parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
@@ -351,16 +351,16 @@ def _waiting_context_parts(
     history_lines: list[str],
     state: State,
     *,
-    manual: str,
+    help_text: str,
     waited_sec: float,
     progress: list | None,
     prior_activity: list | None,
 ) -> list[str]:
-    """等待轮共用上下文：手册 / 任务 / 历史 / 活动条 / 墙钟 / mood。不含输出契约。"""
+    """等待轮共用上下文：帮助文本 / 任务 / 历史 / 活动条 / 墙钟 / mood。不含输出契约。"""
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     parts: list[str] = []
-    if manual.strip():
-        parts.append(f"<harness_manual>\n{manual.strip()}\n</harness_manual>")
+    if help_text.strip():
+        parts.append(f"<harness_help>\n{help_text.strip()}\n</harness_help>")
     parts.append(f"<task>\n{task}\n</task>")
     parts.append(f"<history>\n{hist}\n</history>")
     prior_body = _activity_bullets(prior_activity)
@@ -391,8 +391,8 @@ def _intent_options_block() -> str:
         "# INTENT — what you WANT right now (free text; may not be available as a button)\n"
         "Say honestly what you would do if you had a full UI — in your own words.\n"
         "Examples only (not a closed list): keep waiting; ask where it is; send /status or "
-        "/btw … if the manual says so; change the request; Ctrl+C interrupt; walk away.\n"
-        "Do NOT pick a menu action yet. Read <harness_manual> for how to talk to the tool; "
+        "/btw … if the help text says so; change the request; Ctrl+C interrupt; walk away.\n"
+        "Do NOT pick a menu action yet. Read <harness_help> for how to talk to the tool; "
         "that knowledge belongs in what you want, not in inventing buttons."
     )
 
@@ -402,7 +402,7 @@ def build_waiting_judge_turn(
     history_lines: list[str],
     state: State,
     *,
-    manual: str = "",
+    help_text: str = "",
     waited_sec: float = 0.0,
     progress: list | None = None,
     prior_activity: list | None = None,
@@ -414,7 +414,7 @@ def build_waiting_judge_turn(
             task,
             history_lines,
             state,
-            manual=manual,
+            help_text=help_text,
             waited_sec=waited_sec,
             progress=progress,
             prior_activity=prior_activity,
@@ -442,7 +442,7 @@ def build_waiting_intent_turn(
     history_lines: list[str],
     state: State,
     *,
-    manual: str = "",
+    help_text: str = "",
     waited_sec: float = 0.0,
     progress: list | None = None,
     prior_activity: list | None = None,
@@ -456,7 +456,7 @@ def build_waiting_intent_turn(
             task,
             history_lines,
             state,
-            manual=manual,
+            help_text=help_text,
             waited_sec=waited_sec,
             progress=progress,
             prior_activity=prior_activity,
@@ -477,7 +477,7 @@ def build_waiting_act_turn(
     history_lines: list[str],
     state: State,
     *,
-    manual: str = "",
+    help_text: str = "",
     waited_sec: float = 0.0,
     progress: list | None = None,
     prior_activity: list | None = None,
@@ -492,7 +492,7 @@ def build_waiting_act_turn(
             task,
             history_lines,
             state,
-            manual=manual,
+            help_text=help_text,
             waited_sec=waited_sec,
             progress=progress,
             prior_activity=prior_activity,
@@ -504,7 +504,7 @@ def build_waiting_act_turn(
         "# MENU — only these actions exist right now (this is where wishes converge)\n"
         "- keep_waiting: leave it running.\n"
         "- send_message: send another message while it is still running "
-        "(inside the harness — ordinary text or slash forms from <harness_manual>, "
+        "(inside the harness — ordinary text or slash forms from <harness_help>, "
         "e.g. /btw … /status; whether it handles that message is the harness's job).\n"
         "- interrupt: stop the current run like Ctrl+C (outside the chat).\n"
         "- give_up: abandon and walk away.\n"

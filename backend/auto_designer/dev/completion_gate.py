@@ -1,7 +1,7 @@
 """CompletionGateMiddleware：收尾闸门——保证 dev 收尾时是一次"完整提交"。
 
-痛点（实测）：dev 改了对外可观察行为（entry.py 冒出进度事件）却不同步用户手册
-（3 轮里 2 轮没更 MANUAL.md）；自验用的冒烟测试跑完即弃、0/3 落库；更糟的是只测 helper、
+痛点（实测）：dev 改了对外可观察行为（entry.py 冒出进度事件）却不同步用户帮助
+（3 轮里 2 轮没更 HELP.md）；自验用的冒烟测试跑完即弃、0/3 落库；更糟的是只测 helper、
 主路径 `main` 里「先用后赋」仍可绿测提交（WAIT 进化探针：evidence 接线 NameError）。
 
 机制：拦在 stop tool（complete_task）上。当 dev 想收尾时，在 after_model 里检查 harness 仓
@@ -10,7 +10,7 @@
 
 - 硬闸（必须满足才放行）：
   ① 工作区必须干净（无未提交/未推送改动）；
-  ② 本轮若改了对外可观察行为（entry.py）却没在提交里同步 MANUAL.md → 拦，
+  ② 本轮若改了对外可观察行为（entry.py）却没在提交里同步 HELP.md → 拦，
      除非它在 complete_task 报告里显式声明"本次无对外可见变化"；
   ③ 本轮改了 entry.py 时，对 HEAD 上 `main` / `_run_supervised` 做 AST「局部先用后赋」扫描
      （挡住把 helper 测绿但主路径 NameError 的提交）。
@@ -39,7 +39,7 @@ from nexau.core.messages import Message, Role, TextBlock
 
 logger = logging.getLogger(__name__)
 
-# 声明"本次无对外可见变化"的豁免语（命中任一即放行手册硬闸）。
+# 声明"本次无对外可见变化"的豁免语（命中任一即放行帮助硬闸）。
 _NO_VISIBLE_MARKERS = (
     "无对外可见变化",
     "无对外可见的变化",
@@ -198,14 +198,14 @@ def _tests_mention_timing(text: str) -> bool:
 
 
 class CompletionGateMiddleware(Middleware):
-    """在 complete_task 收尾处强制"完整提交（含手册）+ 接线健全 + 尽量落库测试"。"""
+    """在 complete_task 收尾处强制"完整提交（含帮助）+ 接线健全 + 尽量落库测试"。"""
 
     def __init__(
         self,
         *,
         stop_tool: str = "complete_task",
         observable_paths: tuple[str, ...] = ("entry.py",),
-        manual_path: str = "MANUAL.md",
+        help_path: str = "HELP.md",
         max_blocks: int = 8,
         soft_gate_min_remaining: int = 6,
         wiring_funcs: frozenset[str] = _WIRING_FUNCS,
@@ -214,15 +214,15 @@ class CompletionGateMiddleware(Middleware):
 
         Args:
             stop_tool: 收尾工具名（命中即触发检查）。
-            observable_paths: 视为"对外可观察行为"的文件（改了它们就要同步手册）。
-            manual_path: 用户手册文件名。
+            observable_paths: 视为"对外可观察行为"的文件（改了它们就要同步帮助）。
+            help_path: 用户帮助文件名（当前为 HELP.md）。
             max_blocks: 累计拦截次数上限，防病态死循环耗预算。
             soft_gate_min_remaining: 剩余预算不足此值时不再催软闸（落地测试 / heartbeat 契约）。
             wiring_funcs: 对本轮改动的 entry.py 做先用后赋扫描的函数名集合。
         """
         self.stop_tool = stop_tool
         self.observable_paths = observable_paths
-        self.manual_path = manual_path
+        self.help_path = help_path
         self.max_blocks = max_blocks
         self.soft_gate_min_remaining = soft_gate_min_remaining
         self.wiring_funcs = wiring_funcs
@@ -316,12 +316,12 @@ class CompletionGateMiddleware(Middleware):
 
         committed = self._committed_names()
         observable_changed = any(p in committed for p in self.observable_paths)
-        manual_synced = self.manual_path in committed
+        help_synced = self.help_path in committed
         declared_no_visible = any(m in report for m in _NO_VISIBLE_MARKERS)
-        if observable_changed and not manual_synced and not declared_no_visible:
+        if observable_changed and not help_synced and not declared_no_visible:
             problems.append(
-                f"[手册同步] 本轮改了对外可观察行为（{', '.join(sorted(committed & set(self.observable_paths)))}）"
-                f"却没更新并提交 {self.manual_path}——请把新增的可见行为写进手册并提交；"
+                f"[帮助同步] 本轮改了对外可观察行为（{', '.join(sorted(committed & set(self.observable_paths)))}）"
+                f"却没更新并提交 {self.help_path}——请把新增的可见行为写进帮助并提交；"
                 "若本次确无对外可见变化，在 complete_task 报告里显式写明「本次无对外可见变化」再收尾。"
             )
 
