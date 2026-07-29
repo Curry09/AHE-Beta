@@ -244,11 +244,25 @@ def test_three_mode_keep_waiting_logs_and_calls() -> None:
     assert len(client.judge_prompts) == 1
     assert len(client.intent_prompts) == 1
     assert len(client.act_prompts) == 1
+    for early in (client.judge_prompts[0], client.intent_prompts[0]):
+        assert "<action_space>" not in early
+        assert "# MENU" not in early
     assert "<intent>" in client.act_prompts[0]
-    assert "free-text" in client.intent_prompts[0] or "own words" in client.intent_prompts[0]
+    assert "# MENU" in client.act_prompts[0]
+    for action in WAITING_ACTIONS:
+        assert action in client.act_prompts[0]
+    intent_prompt = client.intent_prompts[0]
+    assert "raw wish" in intent_prompt
+    assert "Your wish may go beyond the current tool" in intent_prompt
+    assert "this step is only about what you want" in intent_prompt
+    assert "The next act step will handle any mapping or gap" in intent_prompt
+    assert "Do NOT optimize" not in intent_prompt
+    assert "what the framework can do" not in intent_prompt
+    assert "if the help text says so" not in intent_prompt
+    assert "Read <harness_help>" not in intent_prompt
     assert any(t.harness_output == "done at last!" for t in res.turns)
     # 主 decide 的 <history>：统一 [+Ns] 时间轴 + 心跳记忆
-    main_prompts = [p for p in client.all_prompts if "<action_space>" in p and "accept" in p]
+    main_prompts = [p for p in client.all_prompts if "<main_act>" in p and "accept" in p]
     assert any(
         "[+90s] waiting:" in p
         and "judged on_track" in p
@@ -438,7 +452,7 @@ def test_keep_waiting_is_one_shot_reply_wakes_main() -> None:
     assert harness.controls == []
     assert any(t.phase != "waiting" and t.harness_output == "done at last!" for t in res.turns)
     # 心跳记忆进 history，主 decide 能看见思考+动作+墙钟
-    hist_bearing = [p for p in client.all_prompts if "<history>" in p and "<action_space>" in p]
+    hist_bearing = [p for p in client.all_prompts if "<history>" in p and "<main_act>" in p]
     assert any("[+90s] waiting:" in p and "keep_waiting" in p for p in hist_bearing)
 
 

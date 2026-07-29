@@ -94,6 +94,9 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 ### 0030 harness 产品化边界：/help 用户说明、平台侧接口与 connector 适配
 把 harness 收敛为真人可运行产品：harness 模板内只保留 HELP.md 作为 /help 内容源、RUNTIME.md 作为维护说明；README/USER/MANUAL 不再作为模板文档，INTERFACE 归 auto-designer 平台侧；connector 适配 sim-user 到真人接口；launcher/template 支持 stdio-jsonl-v1 并兼容 legacy。
 
+### 0031 用户模拟阶段契约下沉：薄 base system 与 prompt 去平台手册化
+把用户模拟的全局 BLOCK_G 拆成薄 base system 与阶段局部 contract：judge/intent 不再继承动作、终止、issue、rating 等平台操作手册；act/issue/rating/waiting 各自只在本阶段暴露必要 contract，保留用户模型自标注 verdict，不引入后处理分类器。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -219,6 +222,10 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0030 | 0030/T4 | 边界白名单改为产品区域而非历史文件名 | done | T2 | backend/auto_designer/dev/harness_boundary.py<br>backend/tests/dev/test_harness_boundary.py |
 | 0030 | 0030/T5 | 平台读取 HELP.md 与收尾闸门同步 | done | T2 | backend/auto_designer/dev/completion_gate.py<br>backend/tests/dev/test_completion_gate.py<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/agent_defs/developer_agent/agent.yaml |
 | 0030 | 0030/T6 | connector 与 stdio-jsonl-v1 协议适配 | done | T5 | backend/auto_designer/harness/connector.py<br>backend/tests/harness/test_connector.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py<br>backend/harness_template/params.yaml<br>backend/auto_designer/harness/INTERFACE.md |
+| 0031 | 0031/T1 | 写 0031 活快照 | done | — | docs/specs/0031-user-sim-stage-contracts.md |
+| 0031 | 0031/T2 | 拆 prompt：薄 base system 与阶段局部 contract | done | T1 | backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_prompt.py<br>backend/tests/user/sim/test_inner_prompt.py |
+| 0031 | 0031/T3 | loop 集成防回归：主/心跳三跳只按阶段暴露契约 | done | T2 | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py |
+| 0031 | 0031/T4 | persona_client 与 agentic 路径适配阶段契约 | done | T2 | backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_persona_client_agentic.py |
 
 ## 跨 feature 关系图
 
@@ -405,6 +412,12 @@ graph LR
         n0030_T5["T5 平台读取 HELP.md 与收尾闸门同步"]
         n0030_T6["T6 connector 与 stdio-jsonl-v1 协议适配"]
     end
+    subgraph G0031[0031 user-sim-stage-contracts]
+        n0031_T1["T1 写 0031 活快照"]
+        n0031_T2["T2 拆 prompt：薄 base system 与阶段局部 contract"]
+        n0031_T3["T3 loop 集成防回归：主/心跳三跳只按阶段暴露契约"]
+        n0031_T4["T4 persona_client 与 agentic 路径适配阶段契约"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -514,6 +527,9 @@ graph LR
     n0030_T4 --> n0030_T2
     n0030_T5 --> n0030_T2
     n0030_T6 --> n0030_T5
+    n0031_T2 --> n0031_T1
+    n0031_T3 --> n0031_T2
+    n0031_T4 --> n0031_T2
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -595,9 +611,9 @@ graph LR
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024 |
-| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022 |
@@ -629,10 +645,11 @@ graph LR
 | backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030 |
-| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023 |
-| backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022 |
-| backend/tests/user/sim/test_prompt.py | 0005, 0023 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031 |
+| backend/tests/user/sim/test_inner_prompt.py | 0008, 0031 |
+| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031 |
+| backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031 |
+| backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031 |
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
@@ -1499,4 +1516,32 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0031 用户模拟阶段契约下沉：薄 base system 与 prompt 去平台手册化（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 写 0031 活快照"]
+    nT2["T2 拆 prompt：薄 base system 与阶段局部 contract"]
+    nT3["T3 loop 集成防回归：主/心跳三跳只按阶段暴露契约"]
+    nT4["T4 persona_client 与 agentic 路径适配阶段契约"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT2 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
 ```

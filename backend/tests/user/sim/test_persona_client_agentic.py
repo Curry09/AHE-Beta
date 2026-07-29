@@ -309,3 +309,11 @@ def test_run_session_collects_mid_session_issue_notes() -> None:
     assert res.end_reason == "accepted"
     assert res.issue_notes == ["docs are wrong about /status"]
     assert any(s.startswith("ISSUE_TOOL: report_issue") for s in res.signals)
+    traces = [call for turn in res.turns for call in turn.persona_trace]
+    judge_users = [call["user"] for call in traces if call.get("role") == "main_judge"]
+    intent_users = [call["user"] for call in traces if call.get("role") == "main_intent"]
+    act_users = [call["user"] for call in traces if call.get("role") == "main_act"]
+    assert judge_users and intent_users and act_users
+    assert all("<action_space>" not in user for user in judge_users)
+    assert all("<action_space>" not in user for user in intent_users)
+    assert all("<action_space>" in user for user in act_users)

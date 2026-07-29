@@ -251,7 +251,7 @@ def _main_decide(
             task,
             history,
             harness_output,
-            space,
+            [],  # judge 不看当前动作菜单；只在 act 收敛阶段暴露真实 action_space
             state,
             help_text=help_text,
             appraise_task=appraise_task,
@@ -267,7 +267,7 @@ def _main_decide(
             task,
             history,
             harness_output,
-            space,
+            [],  # intent 仍是开放意愿，不看当前动作菜单
             state,
             help_text=help_text,
             verdict=verdict,

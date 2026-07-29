@@ -109,3 +109,26 @@ def test_build_inner_system_includes_skills_when_present() -> None:
     sys = build_inner_system(p, tool_stack(p), select_skills(p), State())
     assert "# SKILLS" in sys and "reproduce-first" in sys
     assert "# INNER TOOL USE" in sys  # 内层协议段在
+
+
+def test_build_inner_system_excludes_global_action_contract() -> None:
+    p = _persona(D1Eval.EXPERT, depth=D2Depth.SENIOR)
+    sys = build_inner_system(p, tool_stack(p), select_skills(p), State())
+    for marker in (
+        "G3",
+        "G7",
+        "# ACTION SEMANTICS",
+        "# OUTPUT CONTRACT",
+        "<action_space>",
+        "accept / give_up / file_issue",
+        "accept_with_reservations: terminal",
+        "Terminal TIMING",
+        "<file_issue>",
+        "<rate_experience>",
+        "1–4 satisfaction scale",
+        "1-4 satisfaction scale",
+    ):
+        assert marker not in sys
+    assert "# INNER TOOL USE" in sys
+    assert "# TOOLS" in sys
+    assert "# PERSONA" in sys
