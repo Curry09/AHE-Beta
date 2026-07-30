@@ -73,11 +73,32 @@ for label in "${LABELS[@]}"; do
   fi
 done
 
-# 产出连接信息契约 .env（GITEA_URL 无尾斜杠、无 /api/v1 后缀）。
+# ⑥ Actions runner 注册 token（Spec-0032/T6）：已有则复用；生成失败不阻断（Actions 未开时降级提示）。
+if [[ -f "$ENV_FILE" ]] && grep -q '^RUNNER_TOKEN=' "$ENV_FILE"; then
+  RUNNER_TOKEN="$(grep '^RUNNER_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+  echo "[bootstrap] 复用 .env 中已有 RUNNER_TOKEN"
+else
+  echo "[bootstrap] 生成 Actions runner 注册 token ..."
+  RUNNER_TOKEN="$($COMPOSE exec -T -u git gitea gitea actions generate-runner-token 2>/dev/null | tr -d '[:space:]' || true)"
+  if [[ -z "$RUNNER_TOKEN" ]]; then
+    echo "[bootstrap] runner token 生成失败（Actions 未启用或版本过旧）——CI 冒烟降级不可用，vigil 请保持 ci=skip" >&2
+  fi
+fi
+
+# 产出连接信息契约 .env（GITEA_URL 无尾斜杠、无 /api/v1 后缀）。RUNNER_TOKEN 兼作 compose 插值
+# （act-runner 服务读它注册；同目录 .env 由 docker compose 自动加载）。
 cat > "$ENV_FILE" <<EOF
 GITEA_URL=$GITEA_URL
 OWNER=$OWNER
 REPO=$REPO
 TOKEN=$TOKEN
+RUNNER_TOKEN=${RUNNER_TOKEN:-}
 EOF
 echo "[bootstrap] 完成，连接信息写入 $ENV_FILE"
+
+# ⑦ 起 runner（幂等；首次注册凭 RUNNER_TOKEN，之后凭 runner_data 卷内凭据）。
+if [[ -n "${RUNNER_TOKEN:-}" ]]; then
+  echo "[bootstrap] 启动 Actions runner ..."
+  $COMPOSE up -d act-runner
+  echo "[bootstrap] runner 就绪后可把交付面 ci 闸开为 agent（VIGIL_CI_STAGE=agent，见 backend/run.py）"
+fi

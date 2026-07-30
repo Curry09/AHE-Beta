@@ -1,4 +1,4 @@
-# 本地 Gitea（spec-0002/T1）：单服务 + sqlite，最小运维面。
+# 本地 Gitea（spec-0002/T1；spec-0032/T6 加 Actions + runner）：sqlite，最小运维面。
 # 固定端口（T2/T3 依赖稳定 URL，禁止随机端口）。数据挂命名卷持久化。
 services:
   gitea:
@@ -16,11 +16,33 @@ services:
       # 自用单实例：关注册、关邮箱验证，降低初始化摩擦。
       - GITEA__service__DISABLE_REGISTRATION=true
       - GITEA__service__REQUIRE_SIGNIN_VIEW=false
+      # Spec-0032/T6：开 Gitea Actions——harness 仓最小冒烟 CI 的承载（vigil 的 ci 闸读 commit status）。
+      - GITEA__actions__ENABLED=true
     volumes:
       - gitea_data:/data
     ports:
       - "3000:3000"   # HTTP（固定）
       - "2222:22"     # SSH（可选）
 
+  # Spec-0032/T6：Actions runner。注册 token 由 bootstrap.sh 生成并写进本目录 .env 的 RUNNER_TOKEN
+  # （compose 自动读同目录 .env 做插值），首次注册后凭据落 runner_data 卷、重启免重注册。
+  # 标签把 ubuntu-latest 映射到轻量 python 镜像——冒烟只需 python 标准库（compileall），不拉重镜像。
+  act-runner:
+    image: gitea/act_runner:0.2.11
+    container_name: auto-designer-act-runner
+    restart: unless-stopped
+    depends_on:
+      - gitea
+    environment:
+      - GITEA_INSTANCE_URL=http://gitea:3000
+      - GITEA_RUNNER_REGISTRATION_TOKEN=${RUNNER_TOKEN:-}
+      - GITEA_RUNNER_NAME=auto-designer-runner
+      - GITEA_RUNNER_LABELS=ubuntu-latest:docker://python:3.12-bookworm
+    volumes:
+      - runner_data:/data
+      # 任务容器由 runner 起在宿主 docker 上（docker-in-docker 之外的标准做法）。
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   gitea_data:
+  runner_data:

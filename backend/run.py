@@ -227,14 +227,15 @@ def _reset_to_initial(repo: Path, tracker) -> None:
 
 # Spec-0032/T5：交付面 stages 定稿（写进 harness 仓 .openagents/openagents.yml 的单一出处）。
 # triage=skip：准入已由 Owner 在需求面完成（三平面唯一准入不动摇）；rfc=skip：harness 仓无 spec
-# 工具链（起步，OpenAgents 侧会显式告警，可接受）；ci=skip：T6 的 Gitea Actions 冒烟就位后改
-# agent——vigil 判定表「零 check=永等 CI」，没有 CI 前开 ci 闸会把全部票卡到看门狗；e2e=skip 二期；
-# review/merge=agent：工程质量闸全自动（review 在，不触 OpenAgents「不许零闸」守卫）。
+# 工具链（起步，OpenAgents 侧会显式告警，可接受）；ci 缺省 skip、经 VIGIL_CI_STAGE=agent 开启——
+# vigil 判定表「零 check=永等 CI」，须先验证 T6 的 act_runner 真在跑（bootstrap.sh 有提示），再开
+# ci 闸，否则全部票卡到看门狗；e2e=skip 二期；review/merge=agent：工程质量闸全自动（review 在，
+# 不触 OpenAgents「不许零闸」守卫）。
 _VIGIL_STAGES: dict[str, str] = {
     "triage": "skip",
     "rfc": "skip",
     "conflict": "agent",
-    "ci": "skip",
+    "ci": "skip",  # write_openagents_config 按 VIGIL_CI_STAGE 覆盖
     "e2e": "skip",
     "review": "agent",
     "merge": "agent",
@@ -251,7 +252,12 @@ def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
     """
     config_dir = repo / ".openagents"
     config_dir.mkdir(parents=True, exist_ok=True)
-    stages = "\n".join(f"  {stage}: {owner}" for stage, owner in _VIGIL_STAGES.items())
+    # Spec-0032/T6：ci 闸随基建就位切换——act_runner 验证在跑后置 VIGIL_CI_STAGE=agent 开启。
+    effective = dict(_VIGIL_STAGES)
+    ci_stage = os.environ.get("VIGIL_CI_STAGE", "").strip().lower()
+    if ci_stage in ("agent", "human", "skip"):
+        effective["ci"] = ci_stage
+    stages = "\n".join(f"  {stage}: {owner}" for stage, owner in effective.items())
     text = (
         "# 由 backend/run.py 每次 run 生成（Spec-0032/T5），勿手工编辑——改 run.py 的定稿常量。\n"
         "version: 1\n"

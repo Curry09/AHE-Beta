@@ -1,0 +1,21 @@
+# Spec-0032/T6：harness 仓最小冒烟 CI——交付面 PR 门禁的工程质量闸（绝不跑 benchmark / 不调 LLM）。
+# 只验「harness 结构没被改崩」：全仓可编译 + 关键制品在位。跑在 deploy/gitea 的 act_runner 上
+# （ubuntu-latest → python:3.12 容器，纯标准库，零外部依赖安装）。
+name: smoke
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 结构冒烟（编译 + 制品在位）
+        run: |
+          python -m compileall -q .
+          test -f entry.py
+          test -f params.yaml
+          test -d agents
+          echo "smoke ok"

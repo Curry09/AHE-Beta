@@ -49,6 +49,20 @@ def test_write_openagents_config_matches_stage_finalization(tmp_path: Path) -> N
     assert "secret-token" not in path.read_text(encoding="utf-8")
 
 
+def test_ci_stage_env_override(tmp_path: Path, monkeypatch) -> None:
+    # Spec-0032/T6：act_runner 验证在跑后，VIGIL_CI_STAGE=agent 开启 ci 闸；非法值忽略回落 skip。
+    monkeypatch.setenv("VIGIL_CI_STAGE", "agent")
+    data = YAML(typ="safe").load(
+        run.write_openagents_config(repo=tmp_path, gitea=_GITEA).read_text(encoding="utf-8")
+    )
+    assert data["stages"]["ci"] == "agent"
+    monkeypatch.setenv("VIGIL_CI_STAGE", "banana")
+    data = YAML(typ="safe").load(
+        run.write_openagents_config(repo=tmp_path, gitea=_GITEA).read_text(encoding="utf-8")
+    )
+    assert data["stages"]["ci"] == "skip"
+
+
 def test_write_openagents_config_is_idempotent(tmp_path: Path) -> None:
     first = run.write_openagents_config(repo=tmp_path, gitea=_GITEA).read_text(encoding="utf-8")
     second = run.write_openagents_config(repo=tmp_path, gitea=_GITEA).read_text(encoding="utf-8")
