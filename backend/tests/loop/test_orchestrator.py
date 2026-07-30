@@ -150,7 +150,9 @@ def _seed_with_origin(tmp_path: Path) -> tuple[Path, Path]:
     （vigil worker）向 origin 推进 main——本地 repo 不知情，恰是 spec-0032 后的真实拓扑。"""
     repo = _seed_repo(tmp_path)
     bare = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "--bare", "-b", "main", str(bare)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "init", "--bare", "-b", "main", str(bare)], check=True, capture_output=True
+    )
     _git(repo, "remote", "add", "origin", str(bare))
     _git(repo, "push", "-u", "origin", "main")
     writer = tmp_path / "writer"

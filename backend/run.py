@@ -339,7 +339,9 @@ def _vigil_internal_gitea_url() -> str:
 def _ensure_vigil_container_prereqs() -> None:
     """container 模式预检（fail-loud）：docker 可用 + 镜像已构建 + claude 凭证就位。"""
     if shutil.which("docker") is None:
-        raise SystemExit("PATH 上找不到 docker（VIGIL_MODE=container 需要；或 VIGIL_MODE=subprocess 联调）")
+        raise SystemExit(
+            "PATH 上找不到 docker（VIGIL_MODE=container 需要；或 VIGIL_MODE=subprocess 联调）"
+        )
     inspect = subprocess.run(
         ["docker", "image", "inspect", _VIGIL_IMAGE], capture_output=True, text=True
     )

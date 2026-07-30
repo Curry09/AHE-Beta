@@ -249,7 +249,14 @@ class Orchestrator:
                 )
         for candidate in (f"refs/remotes/origin/{ref}", ref):
             result = subprocess.run(
-                ["git", "-C", self._harness_repo, "rev-parse", "--verify", f"{candidate}^{{commit}}"],
+                [
+                    "git",
+                    "-C",
+                    self._harness_repo,
+                    "rev-parse",
+                    "--verify",
+                    f"{candidate}^{{commit}}",
+                ],
                 capture_output=True,
                 text=True,
             )
