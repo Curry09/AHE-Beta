@@ -332,7 +332,9 @@ def main() -> int:
 
     _isolate_git_credentials()  # Spec-0021/T2：进程级 git 凭证隔离（多信道封堵，见函数注释）
 
-    llm_env = _load_env(ROOT / ".env")  # {USER,DESIGNER,HARNESS}_LLM_*（DEV_LLM_* 随 dev 退役不再消费）
+    llm_env = _load_env(
+        ROOT / ".env"
+    )  # {USER,DESIGNER,HARNESS}_LLM_*（DEV_LLM_* 随 dev 退役不再消费）
     os.environ.update(llm_env)
     # 分角色 LLM 配置：编排角色各用 {USER,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、无公共
     # 回落——agent.yaml 的 ${env.DESIGNER_LLM_*} 与 user 侧 ApiPersonaClient 直接读各自角色变量。

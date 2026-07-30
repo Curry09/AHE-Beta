@@ -28,6 +28,7 @@ def _parse_closing_refs(*, body: str) -> list[int]:
     """PR 正文 → closing 关键字引用的 issue 号列表（去重保序）。"""
     return list(dict.fromkeys(int(m) for m in _CLOSING_REF_RE.findall(body or "")))
 
+
 # 每次 HTTP 请求的硬超时（秒）：无超时的请求一旦挂死会把整条闭环卡住（主线程 poll() 永等）。
 _REQUEST_TIMEOUT = 30
 
