@@ -1,4 +1,4 @@
-# spec-0009/T3：依赖供给（ensure_deps 执行 setup）+ Sandbox 探测 .venv 注入 PATH。
+# spec-0009/T3：依赖供给（ensure_deps 执行 setup）；Sandbox 只共享 cwd/ambient env。
 """无网络单测——setup 用 mkdir/echo 等 stdlib-only 命令模拟「备环境」，不真跑 pip。"""
 
 from __future__ import annotations
@@ -44,15 +44,20 @@ def test_setup_idempotent_reentry(tmp_path: Path) -> None:
     assert (tmp_path / ".venv" / "bin").is_dir()
 
 
-def test_sandbox_injects_venv_when_present(tmp_path: Path) -> None:
-    """工作区含 .venv/bin → run 注入 VIRTUAL_ENV 且 PATH 前置该 bin。"""
-    (tmp_path / ".venv" / "bin").mkdir(parents=True)
-    sb = Sandbox(workspace=str(tmp_path))
-    venv = str((tmp_path / ".venv").resolve())
-    bindir = str((tmp_path / ".venv" / "bin").resolve())
+def test_sandbox_does_not_inject_venv_when_present(tmp_path: Path) -> None:
+    """工作区含 .venv/bin 也不自动改 VIRTUAL_ENV/PATH；环境选择需显式命令。"""
+    bindir = tmp_path / ".venv" / "bin"
+    bindir.mkdir(parents=True)
+    fake_python = bindir / "python"
+    fake_python.write_text("#!/bin/sh\necho fake-venv-python\n", encoding="utf-8")
+    fake_python.chmod(0o755)
 
-    assert sb.run("echo $VIRTUAL_ENV")["stdout"].strip() == venv
-    assert sb.run("echo $PATH")["stdout"].strip().split(":", 1)[0] == bindir
+    sb = Sandbox(workspace=str(tmp_path))
+    assert sb.run("echo $VIRTUAL_ENV")["stdout"].strip() == ""
+    assert str(bindir.resolve()) not in sb.run("echo $PATH")["stdout"]
+
+    explicit = sb.run(".venv/bin/python")
+    assert explicit["stdout"].strip() == "fake-venv-python"
 
 
 def test_sandbox_no_venv_does_not_inject(tmp_path: Path) -> None:
