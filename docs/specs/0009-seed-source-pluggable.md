@@ -58,8 +58,8 @@ tasks:
       - backend/auto_designer/user/sim/sandbox.py
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/loop/sim_user.py
-    scope: '1) `deps.py`（新）：`ensure_deps(workspace_dir: str, spec: WorkspaceSpec) -> None`——`spec.setup` 非空时，在 `workspace_dir` 为 cwd 逐条执行 setup 命令（subprocess，带超时/输出捕获），失败即抛并附命令与 stderr。约定 setup 命令自建 per-workspace `.venv` 并把依赖装进去（如 `python -m venv .venv` → `.venv/bin/pip install -e .` / 装 pytest+whatever）；`ensure_deps` 本身不硬编码建 venv 逻辑，只忠实执行 setup（奥卡姆：机制留在数据里）。幂等：`.venv` 已就位可跳过重建（由 setup 命令或一个 marker 判定）。2) `sandbox.py`（0008/T2，跨组）：`run_shell` 探测 `<workspace>/.venv/bin`，存在则注入 `VIRTUAL_ENV` 并把它前置进 `PATH`，使 `python`/`pytest` 解析到 venv；无 `.venv` 时行为不变（退化为今天的 ambient）。3) `orchestrator.py`（0007/0008，跨组）：在共享工作区 materialize *之后、launch 之前* 调 `ensure_deps(workspace_dir, scenario.workspace)`，使 harness 与用户 agent 两侧共享的同一目录在开跑前依赖已就位。4) `sim_user.py`（0005/0007，跨组）：其 `run()` 的直连回落路径（未收到 orchestrator 传入 `workspace_dir` 但 `scenario.workspace` 非空时自行 `materialize_workspace`）在 materialize *之后、bind_session 之前* 也对称调 `ensure_deps(ws, scenario.workspace)`，与 orchestrator 主路径同构——确保这条生产接缝「建了工作区即备好依赖」，不静默缺依赖。orchestrator 已传 `workspace_dir` 的主路径依赖已由 orchestrator 就位，sim_user 不重复调。**非目标**（留后续）：容器/hermetic 隔离与网络策略；跨会话 venv 缓存/复用（本轮每局现装）；lockfile/版本求解；从需求文档自动推导 setup 命令（本轮 setup 由场景作者/未来 adapter 显式给出）；harness 子进程内 bash 使用该 venv（harness 为 0003 黑盒，其 bash 是否走 workspace venv 留 open-question）。'
-    acceptance: "`spec.setup` 为空时 `ensure_deps` 空操作、不建 `.venv`、Sandbox 行为与今天一致（既有场景零回归）。给定一个 `setup` 会建 `.venv` 并 pip 装入某包的 spec：`ensure_deps` 后 `<workspace>/.venv` 存在且该包可被 venv 的 python import。`Sandbox(workspace=dir)` 在 `<dir>/.venv` 存在时，`run_shell(\"python -c 'import <pkg>'\")` 成功、`run_shell` 内 `python` 解析到 `.venv`（PATH/VIRTUAL_ENV 注入生效）；无 `.venv` 时退化 ambient。orchestrator 在 materialize 之后、launch 之前调 `ensure_deps`（`scenario.workspace` 为 None 时不调）。不经 orchestrator 的 sim_user 直连回落路径（未传 `workspace_dir` 但 `scenario.workspace` 非空）在自行 materialize 之后、bind_session 之前也调 `ensure_deps`（且顺序：materialize 在前）；传入 `workspace_dir` 的主路径不在 sim_user 内重复调 `ensure_deps`。setup 命令失败时 `ensure_deps` 抛错并携带足够诊断（命令+stderr）。端到端（可选、需网络）：以 funcy 式 setup 备好 `pytest`+`whatever` 后，Sandbox 内 `pytest` 能 import `whatever`。"
+    scope: '1) `deps.py`（新）：`ensure_deps(workspace_dir: str, spec: WorkspaceSpec) -> None`——`spec.setup` 非空时，在 `workspace_dir` 为 cwd 逐条执行 setup 命令（subprocess，带超时/输出捕获），失败即抛并附命令与 stderr。setup 命令可自建 per-workspace `.venv` 并把依赖装进去（如 `python -m venv .venv` → `.venv/bin/pip install -e .` / 装 pytest+whatever）；`ensure_deps` 本身不硬编码建 venv 逻辑，只忠实执行 setup（奥卡姆：机制留在数据里）。幂等：`.venv` 已就位可跳过重建（由 setup 命令或一个 marker 判定）。2) `sandbox.py`（0008/T2，跨组）：`run_shell` 只切换 cwd 并继承宿主 ambient env，不再自动探测/激活 `<workspace>/.venv/bin`；如果 harness 或用户要使用某个虚拟环境，必须显式运行 `.venv/bin/python ...` / `source .venv/bin/activate && ...`，从而两侧默认执行环境一致、环境选择由 harness/用户行为自然发生。3) `orchestrator.py`（0007/0008，跨组）：在共享工作区 materialize *之后、launch 之前* 调 `ensure_deps(workspace_dir, scenario.workspace)`，使依赖准备动作（若场景声明了 setup）发生在两侧共享目录中。4) `sim_user.py`（0005/0007，跨组）：其 `run()` 的直连回落路径（未收到 orchestrator 传入 `workspace_dir` 但 `scenario.workspace` 非空时自行 `materialize_workspace`）在 materialize *之后、bind_session 之前* 也对称调 `ensure_deps(ws, scenario.workspace)`，与 orchestrator 主路径同构。orchestrator 已传 `workspace_dir` 的主路径依赖已由 orchestrator 就位，sim_user 不重复调。**非目标**（留后续）：容器/hermetic 隔离与网络策略；跨会话 venv 缓存/复用（本轮每局现装）；lockfile/版本求解；从需求文档自动推导 setup 命令（本轮 setup 由场景作者/未来 adapter 显式给出）；替 harness 隐式选择/激活环境。'
+    acceptance: "`spec.setup` 为空时 `ensure_deps` 空操作、不建 `.venv`、Sandbox 行为与今天一致（既有场景零回归）。给定一个 `setup` 会建 `.venv` 并 pip 装入某包的 spec：`ensure_deps` 后 `<workspace>/.venv` 存在且该包可被 `.venv/bin/python` 显式 import。`Sandbox(workspace=dir)` 在 `<dir>/.venv` 存在时，`run_shell(\"python ...\")` 不自动解析到 `.venv`，仍继承 ambient；显式 `run_shell(\".venv/bin/python ...\")` 才使用该 venv。orchestrator 在 materialize 之后、launch 之前调 `ensure_deps`（`scenario.workspace` 为 None 时不调）。不经 orchestrator 的 sim_user 直连回落路径（未传 `workspace_dir` 但 `scenario.workspace` 非空）在自行 materialize 之后、bind_session 之前也调 `ensure_deps`（且顺序：materialize 在前）；传入 `workspace_dir` 的主路径不在 sim_user 内重复调 `ensure_deps`。setup 命令失败时 `ensure_deps` 抛错并携带足够诊断（命令+stderr）。端到端（可选、需网络）：以 funcy 式 setup 备好 `pytest`+`whatever` 后，Sandbox 可通过显式 `.venv/bin/python` import `whatever`。"
   - id: T4
     title: git 源（clone repo@commit 成快照工作区）
     status: done
@@ -103,10 +103,9 @@ SeedSource.provision(spec, dest) -> workspace_dir
    ├─ kind="empty":         新建空目录，可选写需求文档     （T2，可加性证明）
    └─ kind="git":           clone repo + checkout <commit> （T4，真实 repo 快照）
    ▼
-依赖供给：ensure_deps(dir, spec) 执行 spec.setup 备 per-workspace .venv （T3）
-   │  → 消费侧 Sandbox.run_shell 探测 .venv 自动用之（python/pytest 命中依赖）
-   ▼
-消费港口不变：workspace.materialize() 薄壳委托 → sim_user 桥接 → Sandbox(workspace=dir) 当 cwd（0008 原样）
+依赖供给：ensure_deps(dir, spec) 执行 spec.setup（可备 per-workspace .venv） （T3）
+    ▼
+消费港口不变：workspace.materialize() 薄壳委托 → sim_user 桥接 → Sandbox(workspace=dir) 当 cwd；默认只共享 cwd + ambient env，显式 `.venv/bin/python ...` 才用 venv
 ```
 
 ## Motivation
@@ -123,7 +122,7 @@ SeedSource.provision(spec, dest) -> workspace_dir
 
 在此接缝上接入两个纯本地源验证可加性、再接入一个远程源覆盖真实 repo。T2 的 `empty` 新建一个隔离空工作区目录，`params` 含 `doc` 时把其文本写成一个需求说明文件，覆盖 NL2Repo 式「仅一份说明文档、从空仓起步」的场景。T4 的 `git` 把 `repo` clone 到隔离工作区目录并 `git checkout <commit>`，得到「某仓库停在某 commit」的干净快照，兑现 0009 当初为「未来 SWE-bench / Terminal-Bench」预留的扩展点——真实 repo 任务（SWE-bench 的 `base_commit` 未修复态、funcy@某版本等）的起点正是这一快照，而现有两源（`local-fixture` 只拷 vendored 目录、`empty` 只给空目录）立不起来。二者共享同一约束：接入各自**只新增一个 `sources/*.py` 模块**（`empty.py` / `git.py`），靠 T1 的子包自动发现注册，`seed_source.py` / `models.py` / `workspace.py` 与消费侧（sim_user / Sandbox）零改动；`doc`/`repo`/`commit`/`ref`/`depth` 等参数全部落在既有 `WorkspaceSpec.params` 上，不扩 schema。`git` 源每局 fresh（每 round 重 clone/checkout 一份，隔离避免跨局串状态，与 local-fixture 每局重拷同理）。
 
-供给侧最后一环由 T3 补上：把 `WorkspaceSpec.setup`（0008 起仅占位、从不执行）真正落地——一个源 provision 出工作区目录后，按 `setup` 命令在该目录里备好依赖环境（约定为 per-workspace `.venv` + pip 安装），并让消费侧 `Sandbox` 的 `run_shell` 自动使用该 venv。由此带第三方依赖的任务（如 NL2Repo 的 funcy 需 `pytest`/`whatever`）不再卡在「stdlib-only 假设」上——工作区从「有文件」升级为「按其声明依赖可跑」。新增 `deps.py`（setup 执行器）+ 在共享工作区落地点（orchestrator，materialize 之后、launch 之前）调用它，并让 `Sandbox` 探测 `.venv` 注入 PATH。不改 T1/T2/T4 任何文件、不扩 `WorkspaceSpec` schema（复用既有 `setup`）。
+供给侧最后一环由 T3 补上：把 `WorkspaceSpec.setup`（0008 起仅占位、从不执行）真正落地——一个源 provision 出工作区目录后，按 `setup` 命令在该目录里备好依赖环境（可约定为 per-workspace `.venv` + pip 安装）。由此工作区从「有文件」升级为「声明过的 setup 已执行」。新增 `deps.py`（setup 执行器）+ 在共享工作区落地点（orchestrator，materialize 之后、launch 之前）调用它。消费侧不隐式激活任何 venv；harness 或用户若要用 setup 产物，应通过显式命令（如 `.venv/bin/python -m pytest ...`）自然使用。不改 T1/T2/T4 任何文件、不扩 `WorkspaceSpec` schema（复用既有 `setup`）。
 
 ## Reference-level explanation
 
@@ -168,10 +167,10 @@ deps.ensure_deps(workspace_dir, spec)            （T3，执行 spec.setup 备�
 两侧共享 workspace_dir 开跑：
    ├─ harness 子进程（SANDBOX_WORK_DIR=workspace_dir，0008/T1v2）
    └─ 用户 agent Sandbox(workspace=workspace_dir)（0008/T2）
-            └─ run_shell 探测 .venv → 注入 VIRTUAL_ENV + PATH 前置 → python/pytest 用 venv
+            └─ run_shell 只切 cwd、继承 ambient；显式 `.venv/bin/python ...` 才使用 venv
 ```
 
-Hook 落在 orchestrator 而非 provision 内：与 0008/T1v2 让 materialize 上移 orchestrator 同因——工作区要被 harness 与用户 agent 两侧共享，依赖必须在 launch *之前* 就位、且落在两侧同指的那个目录上，orchestrator 是唯一同时掌握 materialize 结果与 launch 时机的层。这也让 T3 只碰跨组的 orchestrator/sandbox，不动 T1/T2/T4 的 provision/materialize 文件（组内 files disjoint）。复用既有 `setup: list[str]` 而非给 `WorkspaceSpec` 加结构化 deps 字段：0008/T1 已预留该钩子，MVP 直接激活即可，不扩 schema（不碰 T1 的 models.py）；venv 约定活在数据（命令）里而非代码里。per-workspace `.venv` 而非装进 ambient：每局隔离、可清理、不污染宿主/其它会话，代价是每局现装有耗时（缓存留 open-question）。Sandbox 探测 `.venv` 而非要求 agent 显式调 `.venv/bin/python`：让「工作区带 venv」对内层 LLM 透明——它照常 `run_shell("pytest ...")` 即命中 venv。退化与兼容：`spec.setup` 为空（含所有既有 fixture/empty/git 场景）时 `ensure_deps` 空操作、无 `.venv` 生成、Sandbox 走 ambient——对既有行为零改动。
+Hook 落在 orchestrator 而非 provision 内：与 0008/T1v2 让 materialize 上移 orchestrator 同因——工作区要被 harness 与用户 agent 两侧共享，依赖准备若由场景声明，必须在 launch *之前* 落在两侧同指的那个目录上，orchestrator 是唯一同时掌握 materialize 结果与 launch 时机的层。这也让 T3 只碰跨组的 orchestrator/sandbox，不动 T1/T2/T4 的 provision/materialize 文件（组内 files disjoint）。复用既有 `setup: list[str]` 而非给 `WorkspaceSpec` 加结构化 deps 字段：0008/T1 已预留该钩子，MVP 直接激活即可，不扩 schema（不碰 T1 的 models.py）；venv 约定活在数据（命令）里而非代码里。per-workspace `.venv` 可由 setup 创建，代价是每局现装有耗时（缓存留 open-question）；但 Sandbox 不再隐式探测/激活 `.venv`，以免用户私有工具和 harness shell 的默认环境不一致。若 harness 或用户要用该 venv，应显式运行 `.venv/bin/python ...` 或等价激活命令，这让环境选择成为任务内可观察行为。退化与兼容：`spec.setup` 为空（含所有既有 fixture/empty/git 场景）时 `ensure_deps` 空操作、无 `.venv` 生成、Sandbox 走 ambient——对既有行为零改动。
 
 ### 接口
 
@@ -183,7 +182,7 @@ Hook 落在 orchestrator 而非 provision 内：与 0008/T1v2 让 materialize �
 - `GitSource`（`sources/git.py`）：`kind="git"`；`provision` 从 `params` 读 `repo`/`commit`（必填）、`ref`/`depth`（可选），clone + checkout 后返回目录绝对路径；`repo`/`commit` 缺失或 clone/checkout 失败时抛错并携带诊断（缺失字段名、失败命令 + stderr）。经 `@register("git")` 入注册表，调用方仍走顶层 `provision(spec)`。
 - `workspace.materialize(spec, dest_root=None) -> str`：保留为委托 `provision` 的兼容壳（不弃用，缓冲后续）。
 - `deps.ensure_deps(workspace_dir: str, spec: WorkspaceSpec) -> None`（`user/sim/deps.py`）：`spec.setup` 空则直接返回；否则以 `workspace_dir` 为 cwd 逐条 subprocess 执行，非零退出抛异常（附命令、returncode、截断 stderr）；可选带总超时。
-- `Sandbox`（`user/sim/sandbox.py`，0008/T2）：新增私有 env 组装——`run_shell` 执行前，若 `<workspace>/.venv/bin` 存在则设 `VIRTUAL_ENV=<workspace>/.venv` 且 `PATH=<workspace>/.venv/bin:$PATH`。对外接口签名不变。
+- `Sandbox`（`user/sim/sandbox.py`，0008/T2）：`run_shell` 只切 cwd 并继承 ambient env，不自动探测/激活 `<workspace>/.venv/bin`。对外接口签名不变。
 - `orchestrator.run_round`（0007/0008，跨组）：在 `workspace_dir = materialize_workspace(...)` 之后、`launch(..., workspace_dir=workspace_dir)` 之前插入 `ensure_deps(workspace_dir, scenario.workspace)`（`scenario.workspace` 为 None 时跳过）。
 - `sim_user.run`（0005/0007，跨组）：直连回落分支（`workspace_dir` 为 None 且 `scenario.workspace` 非空）在 `ws = materialize_workspace(scenario.workspace)` 之后、`bind_session` 之前插入 `ensure_deps(ws, scenario.workspace)`，与 orchestrator 主路径对称；orchestrator 已传 `workspace_dir` 的路径不在 sim_user 内重复 ensure（依赖已由 orchestrator 就位）。故 ensure_deps 的落点覆盖两处：orchestrator 主路径 + sim_user 直连回落。
 - 不新增/不修改 `WorkspaceSpec` 字段（`empty`/`git` 均复用 `params`，T3 复用 `setup`）；不改 `SeedSource`/`provision`/`materialize` 签名；不改 harness stdio 协议。
@@ -193,7 +192,7 @@ Hook 落在 orchestrator 而非 provision 内：与 0008/T1v2 让 materialize �
 
 - **test_seed_source.py**（T1）：`provision` 按 kind 分派正确；未知 kind 抛 `ValueError` 且消息列出已注册 kind；自动发现——不手动 import `local_fixture`，import `seed_source` 后 `available_kinds()` 含 `local-fixture`；local-fixture 平价——对 `billing-split` 落地目录存在、含 `billing/core.py`、stdlib 可执行，两次 provision 隔离，fixture 不存在报错；`WorkspaceSpec` kind/params 缺省与 to_dict/from_dict 往返、旧 dict 兼容。更新 test_workspace.py：补 `materialize` 薄壳与 `provision` 等价、既有 materialize 断言在新路径下仍通过。
 - **test_seed_source_empty.py**（T2）：`provision(kind="empty")` 落地隔离空目录、存在且为空；带 `doc` → 目录含说明文件且内容一致，`doc_name` 覆盖生效；两次 provision 隔离；可加性证据——本测试不 import `empty` 模块本身、仅 import `seed_source`，断言 `available_kinds()` 含 `empty`（证明仅靠落模块即被自动发现）；序列化——`WorkspaceSpec(kind="empty", params={...})` to_dict/from_dict 往返一致。
-- **test_deps.py**（T3）：`setup` 为空 → `ensure_deps` 空操作、目录无 `.venv`；setup 建 `.venv` + 装一个纯本地可控包（用离线/本地 wheel 或标准库脚本模拟，避免 CI 走网络）→ `.venv` 存在且目标可 import；setup 某命令非零退出 → 抛错且消息含该命令与 stderr；幂等——`.venv` 已在时重复调不重复重建/不报错。配套 sandbox 测试：工作区含 `.venv/bin` 时 `run_shell` 的 `python` 命中 venv（造一个假 `.venv/bin/python` 或断言注入的 PATH/VIRTUAL_ENV）；无 `.venv` 时不注入。orchestrator 测试（跨组 test_orchestrator.py）：materialize 之后、launch 之前调用 `ensure_deps`（spy 断言顺序），`scenario.workspace` 为 None 时不调。sim_user 测试（跨组 test_sim_user.py）：不传 `workspace_dir`、`scenario.workspace` 非空 → 回落分支自行 materialize 后调 `ensure_deps`（spy 断言顺序：materialize 在前）；传入 `workspace_dir` 的主路径不在 sim_user 内调 `ensure_deps`（反向断言）。皆离线、不走网络；CI 约束：默认用例不依赖真实 pip 网络，需网络的 funcy 端到端标记为可选/手动。
+- **test_deps.py**（T3）：`setup` 为空 → `ensure_deps` 空操作、目录无 `.venv`；setup 建 `.venv` + 装一个纯本地可控包（用离线/本地 wheel 或标准库脚本模拟，避免 CI 走网络）→ `.venv` 存在且目标可 import；setup 某命令非零退出 → 抛错且消息含该命令与 stderr；幂等——`.venv` 已在时重复调不重复重建/不报错。配套 sandbox 测试：工作区含 `.venv/bin` 时 `run_shell("python ...")` 仍不自动命中 venv；只有显式 `.venv/bin/python ...` 才使用 venv。orchestrator 测试（跨组 test_orchestrator.py）：materialize 之后、launch 之前调用 `ensure_deps`（spy 断言顺序），`scenario.workspace` 为 None 时不调。sim_user 测试（跨组 test_sim_user.py）：不传 `workspace_dir`、`scenario.workspace` 非空 → 回落分支自行 materialize 后调 `ensure_deps`（spy 断言顺序：materialize 在前）；传入 `workspace_dir` 的主路径不在 sim_user 内调 `ensure_deps`（反向断言）。皆离线、不走网络；CI 约束：默认用例不依赖真实 pip 网络，需网络的 funcy 端到端标记为可选/手动。
 - **test_git_source.py**（T4，皆离线、不走网络）：本地临时 git 仓——`git init` + 造两个 commit（记 C1、C2），以其路径为 `repo`；`provision(kind="git", params={repo, commit=C1})` 后断言工作树恢复到 C1（`git rev-parse HEAD` == C1、C1 特有文件在/C2 新增文件不在）；目录隔离——两次 provision 落不同目录、互不污染；缺 `commit`（及缺 `repo`）→ 抛错且消息含缺失字段名，clone/checkout 失败（如不存在的 commit 或坏 repo 路径）→ 抛错且携带失败命令 + stderr；可加性/分派——本测试不 import `git` 模块本身、仅 import `seed_source`，断言 `available_kinds()` 含 `git` 且顶层 `provision` 按 `kind="git"` 分派到 `GitSource`；序列化——`WorkspaceSpec(kind="git", params={repo, commit})` to_dict/from_dict 往返一致。真实远端 clone 的端到端标记为可选/手动，不在默认 CI 用例内。
 
 ### 文件分配（单一 writer 所有权）与依赖 DAG
@@ -217,7 +216,7 @@ Hook 落在 orchestrator 而非 provision 内：与 0008/T1v2 让 materialize �
 
 第二、第三源的选型服务于不同验证目标。第二源选 `empty` 而非直接做 git/容器源：以最低成本（零新基建，仍是本地目录）验证接缝是否解耦；代价是未覆盖「重型供给」路径——这是有意为之，重型运行时句柄仍为本组非目标、留下游 spec；用通用 `params.doc`/`doc_name` 而非给 `empty` 引入专属 schema，保持 `WorkspaceSpec` 不随每个源膨胀，代价是 `params` 弱类型，靠 source 内部自校验与测试约束。第三源选通用 `git` 而非直接做 SWE-bench 专用源：通用 clone@commit 可复用于所有「基于某仓库某快照」的任务族，把 benchmark 专属字段映射隔离到独立 adapter，代价是本任务不产出可直接消费 SWE-bench 数据集的端到端链路（adapter 归后续）；同样用通用 `params.repo`/`commit` 而非专属强类型 schema，与 empty 同构。`git` 的 clone 选每局现做而非缓存/共享 bare 镜像：换来确定、隔离、可清理的干净快照，代价是耗时 + 需网络可达 git 源——跨局 clone 缓存/本地镜像复用留后续。`git` 只解决「把某仓库某快照落成工作区」，环境强度仍靠 T3 的 `setup`（venv+pip）；挑版本/系统依赖/需官方镜像的实例不保证可跑——属容器/hermetic 既有非目标，本任务不越界造重型运行时。
 
-依赖供给（T3）选择激活既有 `setup` 而非新造 provisioner 框架：奥卡姆，最小改动打通依赖路径，代价是 setup 是弱类型 shell 命令、靠场景作者写对（无 lockfile 求解）。每局现装 venv：环境确定、隔离、可清理，代价是耗时与网络依赖（pip 需可达源）——跨会话缓存/预热留 open-question，不在 MVP。只让用户 agent 侧 Sandbox 用 venv、暂不管 harness bash：把改动限制在可控的消费侧，不侵入 0003 harness 黑盒，代价是若某任务要 harness 也按 venv 跑，需后续让 harness entry 也识别 workspace `.venv`（open-question）。非安全/非 hermetic：sandbox 仍是 cwd+超时的最小隔离，venv 只解决「依赖可见」，不解决「恶意代码/网络隔离」——沿用 0008/T2 威胁模型，强隔离留下游。Hook 落在「materialize 工作区的每个生产接缝」而非仅 orchestrator：主路径由 orchestrator 在共享工作区 materialize 后 ensure；sim_user 的直连回落（未经 orchestrator 但仍自行 materialize）同样在 materialize 后对称 ensure_deps——保证任何「建了工作区」的生产路径都不会静默缺依赖（修订：早期版本把回落路径不调 ensure_deps 记为可接受 tradeoff，实践中它是一条会静默缺依赖的生产接缝，故收敛为对称调用）。代价是两处落点需各自维护对称性；只有纯工具/独立 smoke 脚本（不走这两条生产接缝、自行 materialize）才需自理 `ensure_deps`（可接受，属工具侧）。
+依赖供给（T3）选择激活既有 `setup` 而非新造 provisioner 框架：奥卡姆，最小改动打通依赖路径，代价是 setup 是弱类型 shell 命令、靠场景作者写对（无 lockfile 求解）。每局现装 venv：环境确定、隔离、可清理，代价是耗时与网络依赖（pip 需可达源）——跨会话缓存/预热留 open-question，不在 MVP。不让用户 agent 侧 Sandbox 自动用 venv：把默认执行环境保持为与 harness 一致的 ambient + 同 cwd。若某任务要用 venv，harness/用户都应显式调用 `.venv/bin/python ...`，环境选择成为任务内可观察行为，而不是平台接缝隐式行为。非安全/非 hermetic：sandbox 仍是 cwd+超时的最小隔离，venv 只解决「依赖可见」，不解决「恶意代码/网络隔离」——沿用 0008/T2 威胁模型，强隔离留下游。Hook 落在「materialize 工作区的每个生产接缝」而非仅 orchestrator：主路径由 orchestrator 在共享工作区 materialize 后 ensure；sim_user 的直连回落（未经 orchestrator 但仍自行 materialize）同样在 materialize 后对称 ensure_deps——保证任何「建了工作区」的生产路径都不会静默缺依赖（修订：早期版本把回落路径不调 ensure_deps 记为可接受 tradeoff，实践中它是一条会静默缺依赖的生产接缝，故收敛为对称调用）。代价是两处落点需各自维护对称性；只有纯工具/独立 smoke 脚本（不走这两条生产接缝、自行 materialize）才需自理 `ensure_deps`（可接受，属工具侧）。
 
 ## Prior art
 
@@ -225,7 +224,7 @@ Hook 落在 orchestrator 而非 provision 内：与 0008/T1v2 让 materialize �
 
 ## Unresolved questions
 
-依赖供给的运行细节（源于 T3）：跨会话 venv 缓存/预热尚未做——每局现装耗时且需网络，是否按 (deps 指纹) 缓存复用一份 venv、或预构建镜像层；harness 子进程 bash 是否也应使用 workspace `.venv`（当前仅用户 agent 侧 Sandbox 用），需 0003 harness entry 识别 workspace venv，涉及跨仓改动；无网络/受限环境下的依赖供给（离线镜像、vendored wheels）尚未覆盖；setup 命令的来源——从需求文档（如 funcy `start.md` 的依赖清单）自动生成，还是由场景/adapter 手写，前者需一个「文档→setup」的推导步骤，归后续；依赖安装失败时的策略——整局判失败，还是降级为「无该依赖的受限核实」，尚未定。
+依赖供给的运行细节（源于 T3）：跨会话 venv 缓存/预热尚未做——每局现装耗时且需网络，是否按 (deps 指纹) 缓存复用一份 venv、或预构建镜像层；是否提供更强的环境描述/复现约定（例如 harness 最终回复必须说明使用 ambient python 还是 `.venv/bin/python`）；无网络/受限环境下的依赖供给（离线镜像、vendored wheels）尚未覆盖；setup 命令的来源——从需求文档（如 funcy `start.md` 的依赖清单）自动生成，还是由场景/adapter 手写，前者需一个「文档→setup」的推导步骤，归后续；依赖安装失败时的策略——整局判失败，还是降级为「无该依赖的受限核实」，尚未定。
 
 消费港口是否需要升级（源于 T1）：后续更重型的源（容器化的 SWE-bench / Terminal-Bench）是否需把消费港口从「工作区目录」升级为「可运行句柄 {cwd, run(cmd), cleanup}」，以便 Provider 与（将来的）客观评测共享同一运行时能力——本组港口保持「目录 + 本地 shell」不变，是否升级、何时升级留下游评估，目的是让重型源接入时尽量不返工港口。
 

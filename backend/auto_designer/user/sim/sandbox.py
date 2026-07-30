@@ -9,7 +9,6 @@ shell 执行与路径解析。所有路径相对 cwd 解析、禁止逃逸子树
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import tempfile
@@ -36,25 +35,18 @@ class Sandbox:
         return str(target)
 
     def _env(self) -> dict[str, str] | None:
-        """spec-0009/T3：工作区带 `.venv` 时返回注入 VIRTUAL_ENV + PATH 前置的环境。
+        """返回私有工具执行环境。
 
-        <cwd>/.venv/bin 存在则让 python/pytest 解析到该 venv（对内层 LLM 透明——照常
-        run_shell("pytest ...") 即命中）；无 `.venv` 返回 None（继承宿主，退化为今天的
-        ambient 行为，对 0008 既有场景零改动）。
+        保持与 harness shell 的默认环境一致：只共享 cwd，不自动激活 workspace 下的
+        `.venv`。如果 harness 创建或使用了某个虚拟环境，它应通过显式命令（例如
+        `.venv/bin/python -m pytest ...`）体现，用户私有工具也用同样命令复现。
         """
-        bindir = Path(self.cwd) / ".venv" / "bin"
-        if not bindir.is_dir():
-            return None
-        env = dict(os.environ)
-        env["VIRTUAL_ENV"] = str(bindir.parent)
-        env["PATH"] = f"{bindir}{os.pathsep}{env.get('PATH', '')}"
-        env.pop("PYTHONHOME", None)  # venv 与 PYTHONHOME 互斥，清掉以免污染解析
-        return env
+        return None
 
     def run(self, cmd: str, timeout: float = 10.0) -> dict:
         """在 cwd 下跑一条 shell 命令。返回 {ok, stdout, stderr, returncode}；超时 ok=False。
 
-        工作区带 `.venv` 时（spec-0009/T3）注入其 PATH/VIRTUAL_ENV，使命令命中该 venv。
+        命令继承宿主环境并只切换 cwd；不隐式选择/激活 workspace `.venv`。
         """
         try:
             proc = subprocess.run(
