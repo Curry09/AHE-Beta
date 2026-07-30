@@ -69,6 +69,13 @@ def test_write_openagents_config_is_idempotent(tmp_path: Path) -> None:
     assert first == second
 
 
+def test_remote_tag_refs_skips_peeled_entries() -> None:
+    # Spec-0032 实证修复#2：附注 tag 的 peeled 行（^{}）不是真 ref，push 删除会以 128 崩掉复位流程。
+    ls = "aaa\trefs/tags/v1\nbbb\trefs/tags/v1^{}\nccc\trefs/tags/v2\nddd\trefs/heads/main\n"
+    assert run._remote_tag_refs(ls) == ["refs/tags/v1", "refs/tags/v2"]
+    assert run._remote_tag_refs("") == []
+
+
 def test_ensure_openagents_cli_missing_fails_loud(monkeypatch) -> None:
     monkeypatch.setattr(run.shutil, "which", lambda name: None)
     with pytest.raises(SystemExit, match="openagents"):

@@ -177,9 +177,7 @@ def _seed_harness_repo() -> Path:
     subprocess.run(
         ["git", "init", "-b", "main", str(HARNESS_REPO)], check=True, capture_output=True
     )
-    # 提交边界硬闸：装 pre-commit 钩子，交付面 agent 想把 harness 本体外的任务代码提交进来会被直接拒
-    # （git worktree 共享 hooks，vigil 的 per-issue worktree 同受此闸约束）。
-    # 顺手清掉模板复制带来的字节码缓存、写 .gitignore，让 v0 seed 只含 harness 制品（钩子放行）。
+    # 清掉模板复制带来的字节码缓存、写 .gitignore，让 v0 seed 只含 harness 制品。
     # Spec-0032/T5：.openagents/ 是 vigil 的本地运行态（队列 db/claims/配置），随 rmtree 每 run 归零，
     # 且永不入库。
     from auto_designer.dev.harness_boundary import install_pre_commit  # noqa: PLC0415
@@ -189,10 +187,29 @@ def _seed_harness_repo() -> Path:
     (HARNESS_REPO / ".gitignore").write_text(
         "__pycache__/\n*.pyc\n.openagents/\n", encoding="utf-8"
     )
-    install_pre_commit(HARNESS_REPO)
     _git(HARNESS_REPO, "add", ".")
     _git(HARNESS_REPO, "commit", "-m", "seed: harness v0")
+    # 提交边界硬闸：装 pre-commit 钩子，交付面 agent 想把 harness 本体外的任务代码提交进来会被直接拒
+    # （git worktree 共享 hooks，vigil 的 per-issue worktree 同受此闸约束）。
+    # Spec-0032 实证修复#1：钩子装在 seed 提交**之后**——seed 含平台制品 .gitea/（CI 定义），它**故意
+    # 不入白名单**（CI 是随 seed 下发的平台制品，dev 不得改写自己的质量闸）；先提交（可信模板）后装闸，
+    # 此后所有 dev 提交照常受钩。服务端兜底见 smoke.yml 的边界检查步（--no-verify 也绕不开）。
+    install_pre_commit(HARNESS_REPO)
     return HARNESS_REPO
+
+
+def _remote_tag_refs(ls_output: str) -> list[str]:
+    """`git ls-remote --tags` 输出 → 可删除的真 tag ref 列表。
+
+    Spec-0032 实证修复#2：附注 tag 会输出两行——`refs/tags/v1` 与 peeled 行 `refs/tags/v1^{}`；
+    后者是解引用展示、不是真 ref，`push origin :refs/tags/v1^{}` 会以 128 崩掉复位流程，须跳过。
+    """
+    refs: list[str] = []
+    for line in ls_output.splitlines():
+        ref = line.split("\t")[-1]
+        if ref.startswith("refs/tags/") and not ref.endswith("^{}"):
+            refs.append(ref)
+    return refs
 
 
 def _reset_to_initial(repo: Path, tracker) -> None:
@@ -209,10 +226,8 @@ def _reset_to_initial(repo: Path, tracker) -> None:
         capture_output=True,
         text=True,
     ).stdout
-    for line in ls.splitlines():
-        ref = line.split("\t")[-1]
-        if ref.startswith("refs/tags/"):
-            _git(repo, "push", "origin", f":{ref}")  # 删远端 tag
+    for ref in _remote_tag_refs(ls):
+        _git(repo, "push", "origin", f":{ref}")  # 删远端 tag（legacy vK 清扫）
     for issue in tracker.list_open_issues():
         try:
             tracker.set_state(issue.number, "closed", "reset to initial before clean run")

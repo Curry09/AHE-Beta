@@ -34,6 +34,9 @@ ALLOWED_ROOT_FILES: frozenset[str] = frozenset(
 )
 
 # harness 本体允许出现在仓根的顶层目录。
+# 注（Spec-0032 实证修复#1）：`.gitea/`（CI workflow 定义）**故意不在白名单**——它是随 seed 下发的
+# 平台制品，dev/交付面 agent 不得改写自己的质量闸。seed 提交在装钩子之前完成（run.py._seed_harness_repo
+# 的顺序保证），故种子自身不受此拦；服务端兜底见 harness_template/.gitea/workflows/smoke.yml 的边界检查步。
 ALLOWED_ROOT_DIRS: frozenset[str] = frozenset(
     {
         "agents",
