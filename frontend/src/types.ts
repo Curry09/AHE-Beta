@@ -1,6 +1,7 @@
 // 数据契约：字段名与 backend/auto_designer/web/api.py 的响应一一对应，两侧须同步修改。
 
 export type AgentRole = "user" | "triager" | "divergent" | "designer" | "owner" | "developer";
+export type ViewMode = "dashboard" | "building";
 
 // Spec-0029：三平面投影与提案来源（后端 /api/issues 附带；老后端缺省由 issueMeta 按 labels 兜底）。
 export type Plane = "report" | "proposal" | "ready";
@@ -171,6 +172,38 @@ export interface CommitDetailResponse {
   commit: CommitDetail | null;
 }
 
+export interface PersonaCallTrace {
+  role: string;
+  system: string;
+  user: string;
+  raw: string;
+  parsed: Record<string, unknown>;
+  steps?: LogEntry[];
+}
+
+export interface SimTurn {
+  turn: number;
+  phase: string;
+  perceive: string;
+  verdict: string;
+  action: string;
+  message: string;
+  executor: string;
+  channel: string;
+  patience: number;
+  trust: string;
+  harness_output?: string;
+  persona_trace?: PersonaCallTrace[];
+}
+
+export interface SimTrace {
+  persona_id: string;
+  end_reason: string;
+  turns: SimTurn[];
+  signals: string[];
+  persona_tail?: PersonaCallTrace[];
+}
+
 export interface SessionDetail {
   session_id: string;
   created_at: string;
@@ -185,6 +218,7 @@ export interface SessionDetail {
   transcript: { turns: Turn[] };
   feeling: { score: number; reason: string };
   issue_refs: { number: number; url: string; state: string }[];
+  sim_trace?: SimTrace | null;
 }
 
 export interface Roster {
