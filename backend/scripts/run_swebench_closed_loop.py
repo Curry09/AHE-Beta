@@ -434,13 +434,12 @@ def main() -> int:
         integrity_guard=integrity_guard,
     )
 
-    # Spec-0032/T5：交付面接线与 run.py 同源——预检 CLI → 写配置 → 常驻 vigil（finally 收尾停）。
-    run_mod.ensure_openagents_cli()
-    run_mod.write_openagents_config(repo=repo, gitea=gitea)
-    vigil_proc, vigil_log = run_mod.start_vigil(
+    # Spec-0032/T5 + 0033/T2：交付面接线与 run.py 同源——start_vigil 按 VIGIL_MODE 自带预检/
+    # 配置落盘/生命周期（finally 收尾停）。
+    vigil = run_mod.start_vigil(
         repo=repo,
         parallel=roster["developer"],
-        gitea_token=gitea["TOKEN"],
+        gitea=gitea,
         log_path=run_mod.DATA / "vigil.log",
     )
 
@@ -453,7 +452,7 @@ def main() -> int:
     try:
         refs = orch.run(run_mod.TOTAL_ROUNDS)
     finally:
-        run_mod.stop_vigil(vigil_proc, vigil_log)
+        run_mod.stop_vigil(vigil)
         update_live_run(
             data_dir=run_mod.DATA,
             running=False,

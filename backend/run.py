@@ -295,7 +295,7 @@ def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
 
 
 def ensure_openagents_cli() -> None:
-    """交付面 CLI 预检：`openagents` 必须在 PATH（与 HARNESS_LLM_* 缺失同级 fail-loud）。"""
+    """交付面 CLI 预检（subprocess 模式）：`openagents` 必须在 PATH。"""
     if shutil.which("openagents") is None:
         raise SystemExit(
             "PATH 上找不到 `openagents`（交付面 CLI）——"
@@ -303,15 +303,92 @@ def ensure_openagents_cli() -> None:
         )
 
 
-def start_vigil(
-    *, repo: Path, parallel: int, gitea_token: str, log_path: Path
-) -> tuple[subprocess.Popen, object]:
-    """启动交付面常驻进程 `openagents vigil --parallel K`（cwd=harness 仓，日志落 log_path）。
+# Spec-0033/T2：交付面运行形态。container（缺省）= 围堵盒：零宿主挂载自 clone、internal 网络 +
+# egress 代理 allowlist；subprocess = 宿主直跑，无任何围堵，仅限人盯着日志的一次性联调。
+_VIGIL_IMAGE = "auto-designer-vigil:latest"
+_VIGIL_CONTAINER = "auto-designer-vigil"
+_VIGIL_NETWORK = "auto-designer-vigil-net"  # deploy/gitea compose 里的 internal 网络（按名引用）
+_VIGIL_PROXY_URL = "http://egress-proxy:3128"  # 盒内唯一外网通道（allowlist 见 egress-proxy.conf）
+_VIGIL_CONFIG_STAGING = DATA / "vigil_config"  # 容器模式的配置 staging（只读挂载进 /config）
+# claude 凭证二选一（Spec-0033）：API 计费 / 订阅长效 token（宿主 `claude setup-token` 生成）。
+_CLAUDE_CRED_ENVS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
 
-    返回 (proc, log_handle)：调用方 finally 里 stop_vigil 收尾。GITEA_TOKEN 只经子进程 env 传递
-    （配置文件不落 token）。level-triggered：票何时出现何时接，与需求面轮次无需同步。
+
+class VigilHandle:
+    """交付面运行句柄：mode + 托管进程（subprocess=vigil 本体；container=docker logs 跟随器）+ 日志句柄。"""
+
+    def __init__(self, *, mode: str, proc: subprocess.Popen, log_handle: object) -> None:
+        self.mode = mode
+        self.proc = proc
+        self.log_handle = log_handle
+
+
+def vigil_mode() -> str:
+    """VIGIL_MODE 解析：container（缺省）/ subprocess（显式 opt-in）；其余值 fail-loud。"""
+    raw = os.environ.get("VIGIL_MODE", "").strip().lower() or "container"
+    if raw not in ("container", "subprocess"):
+        raise SystemExit(f"VIGIL_MODE 非法：{raw!r}（可选 container / subprocess）")
+    return raw
+
+
+def _vigil_internal_gitea_url() -> str:
+    """容器视角的 Gitea 地址（同网络服务名）；宿主 .env 的 localhost 地址仅编排面自用。"""
+    return os.environ.get("VIGIL_GITEA_INTERNAL_URL", "").strip() or "http://gitea:3000"
+
+
+def _ensure_vigil_container_prereqs() -> None:
+    """container 模式预检（fail-loud）：docker 可用 + 镜像已构建 + claude 凭证就位。"""
+    if shutil.which("docker") is None:
+        raise SystemExit("PATH 上找不到 docker（VIGIL_MODE=container 需要；或 VIGIL_MODE=subprocess 联调）")
+    inspect = subprocess.run(
+        ["docker", "image", "inspect", _VIGIL_IMAGE], capture_output=True, text=True
+    )
+    if inspect.returncode != 0:
+        raise SystemExit(
+            f"缺 vigil 镜像 {_VIGIL_IMAGE}——先构建：backend/deploy/vigil/build.sh <OpenAgents 仓路径>"
+        )
+    if not any(os.environ.get(key, "").strip() for key in _CLAUDE_CRED_ENVS):
+        raise SystemExit(
+            "缺 claude 凭证：设 ANTHROPIC_API_KEY（API 计费）或 CLAUDE_CODE_OAUTH_TOKEN"
+            "（订阅计费，宿主 `claude setup-token` 生成）之一（Spec-0033）"
+        )
+
+
+def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: Path) -> VigilHandle:
+    """按 VIGIL_MODE 起交付面（含各模式预检与配置落盘），返回句柄供 finally stop_vigil 收尾。
+
+    container（缺省）：配置写 staging 只读挂载进盒，harness 仓由容器 entrypoint 自 clone（零宿主
+    挂载——两面唯一媒介是 Gitea，宿主仓与交付面脱钩）；凭证只经容器 env。subprocess：既有行为
+    （配置写进宿主仓、Popen 直跑），无围堵、带醒目告警。
     """
+    mode = vigil_mode()
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    if mode == "subprocess":
+        print(
+            "[vigil] ⚠ subprocess 模式无围堵（嵌套 agent 可读宿主全文件系统、出网无限制）——"
+            "仅限盯屏联调，长跑闭环用 container 模式（Spec-0033）"
+        )
+        ensure_openagents_cli()
+        write_openagents_config(repo=repo, gitea=gitea)
+        return _start_vigil_subprocess(
+            repo=repo, parallel=parallel, gitea_token=gitea["TOKEN"], log_path=log_path
+        )
+    _ensure_vigil_container_prereqs()
+    staging = _VIGIL_CONFIG_STAGING
+    # 同一份配置、两个可达性域的唯一分叉点：容器内 base_url 用内网服务名地址。
+    write_openagents_config(repo=staging, gitea={**gitea, "GITEA_URL": _vigil_internal_gitea_url()})
+    return _start_vigil_container(
+        parallel=parallel, gitea=gitea, staging=staging, log_path=log_path
+    )
+
+
+def _start_vigil_subprocess(
+    *, repo: Path, parallel: int, gitea_token: str, log_path: Path
+) -> VigilHandle:
+    """宿主直跑：`openagents vigil --parallel K`（cwd=harness 仓，日志落 log_path）。
+
+    GITEA_TOKEN 只经子进程 env 传递（配置文件不落 token）。level-triggered：票何时出现何时接。
+    """
     log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随 vigil 进程，stop 时关闭
     env = {**os.environ, "GITEA_TOKEN": gitea_token}
     proc = subprocess.Popen(
@@ -321,21 +398,60 @@ def start_vigil(
         stdout=log_handle,
         stderr=subprocess.STDOUT,
     )
-    return proc, log_handle
+    return VigilHandle(mode="subprocess", proc=proc, log_handle=log_handle)
 
 
-def stop_vigil(proc: subprocess.Popen, log_handle: object) -> None:
-    """停交付面：terminate → 宽限 10s → kill 兜底；日志句柄收尾关闭。"""
+def _start_vigil_container(
+    *, parallel: int, gitea: dict[str, str], staging: Path, log_path: Path
+) -> VigilHandle:
+    """围堵盒：docker run -d --rm 起 vigil 容器，日志经 `docker logs -f` 跟随进 log_path。
+
+    挂载面只有两处只读：staging 配置（/config）与 entrypoint 脚本；凭证（Gitea token / claude
+    凭证）只经容器 env 注入（宿主侧 docker inspect 可见——宿主本就是信任边界内侧）。clone 地址
+    与代理均为盒内网络名（vigil-net internal，直连外网物理不通）。
+    """
+    repo_url = _gitea_remote_url({**gitea, "GITEA_URL": _vigil_internal_gitea_url()})
+    args = [
+        "docker", "run", "-d", "--rm",
+        "--name", _VIGIL_CONTAINER,
+        "--network", _VIGIL_NETWORK,
+        "-v", f"{(staging / '.openagents').resolve()}:/config:ro",
+        "-v", f"{(ROOT / 'deploy' / 'vigil' / 'entrypoint.sh').resolve()}:/entrypoint.sh:ro",
+        "-e", f"GITEA_TOKEN={gitea['TOKEN']}",
+        "-e", f"VIGIL_REPO_URL={repo_url}",
+        "-e", f"VIGIL_PARALLEL={max(1, parallel)}",
+        "-e", f"HTTPS_PROXY={_VIGIL_PROXY_URL}",
+        "-e", "NO_PROXY=gitea,localhost,127.0.0.1",
+    ]  # fmt: skip
+    for key in (*_CLAUDE_CRED_ENVS, "ANTHROPIC_BASE_URL"):
+        value = os.environ.get(key, "").strip()
+        if value:
+            args += ["-e", f"{key}={value}"]
+    args += [_VIGIL_IMAGE, "bash", "/entrypoint.sh"]
+    started = subprocess.run(args, capture_output=True, text=True)
+    if started.returncode != 0:
+        raise SystemExit(f"vigil 容器启动失败：{started.stderr.strip()[:300]}")
+    log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随容器，stop 时关闭
+    logs = subprocess.Popen(
+        ["docker", "logs", "-f", _VIGIL_CONTAINER], stdout=log_handle, stderr=subprocess.STDOUT
+    )
+    return VigilHandle(mode="container", proc=logs, log_handle=log_handle)
+
+
+def stop_vigil(handle: VigilHandle) -> None:
+    """停交付面：container 先 `docker rm -f`（--rm 自清理兜底）；随后收托管进程与日志句柄。"""
     try:
-        proc.terminate()
+        if handle.mode == "container":
+            subprocess.run(["docker", "rm", "-f", _VIGIL_CONTAINER], capture_output=True, text=True)
+        handle.proc.terminate()
         try:
-            proc.wait(timeout=10)
+            handle.proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=5)
+            handle.proc.kill()
+            handle.proc.wait(timeout=5)
     finally:
         try:
-            log_handle.close()  # type: ignore[attr-defined]
+            handle.log_handle.close()  # type: ignore[attr-defined]
         except Exception:  # noqa: BLE001  关日志失败不影响收尾
             pass
 
@@ -766,14 +882,13 @@ def main() -> int:
         integrity_guard=integrity_guard,  # Spec-0021/T2
     )
 
-    # Spec-0032/T5：交付面接线——预检 CLI → 写声明式配置 → 起常驻 vigil（level-triggered，与轮次解耦）。
-    print("③.5 起交付面 vigil（OpenAgents）...")
-    ensure_openagents_cli()
-    write_openagents_config(repo=repo, gitea=gitea)
-    vigil_proc, vigil_log = start_vigil(
+    # Spec-0032/T5 + 0033/T2：交付面接线——start_vigil 按 VIGIL_MODE 自带预检/配置落盘/生命周期
+    # （container 缺省=围堵盒零挂载自 clone；subprocess=盯屏联调）。level-triggered，与轮次解耦。
+    print(f"③.5 起交付面 vigil（OpenAgents，mode={vigil_mode()}）...")
+    vigil = start_vigil(
         repo=repo,
         parallel=roster["developer"],
-        gitea_token=gitea["TOKEN"],
+        gitea=gitea,
         log_path=DATA / "vigil.log",
     )
 
@@ -789,7 +904,7 @@ def main() -> int:
         refs = orch.run(TOTAL_ROUNDS)
     finally:
         # 无论正常结束还是中途炸掉：先停交付面（不再吃新票），再把运行态落 running=False。
-        stop_vigil(vigil_proc, vigil_log)
+        stop_vigil(vigil)
         update_live_run(
             data_dir=DATA,
             running=False,
