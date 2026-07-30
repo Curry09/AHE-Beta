@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 from typing import Any
 
@@ -17,6 +18,16 @@ from auto_designer.models import ISSUE_STATES, IssueDraft, IssueRef, OpenIssue
 
 # 新建 label 的默认颜色（标签语义集 {bug,feature} 由 T1 预置；此处仅兜底建缺失项）。
 _DEFAULT_LABEL_COLOR = "#ededed"
+
+# Spec-0032/T7：PR 正文 closing 关键字（closes/fixes/resolves #N）→ 关联 issue 号（观测展示用；
+# 真正的关票由 Gitea 服务端在合并时按同一语义执行）。
+_CLOSING_REF_RE = re.compile(r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)", re.I)
+
+
+def _parse_closing_refs(*, body: str) -> list[int]:
+    """PR 正文 → closing 关键字引用的 issue 号列表（去重保序）。"""
+    return list(dict.fromkeys(int(m) for m in _CLOSING_REF_RE.findall(body or "")))
+
 
 # 每次 HTTP 请求的硬超时（秒）：无超时的请求一旦挂死会把整条闭环卡住（主线程 poll() 永等）。
 _REQUEST_TIMEOUT = 30
@@ -223,6 +234,38 @@ class GiteaTracker:
             "closed_at": item.get("closed_at") or None,
             "url": item.get("html_url") or "",
         }
+
+    def list_pulls(self, *, state: str = "open", limit: int = 20) -> list[dict[str, Any]]:
+        """列 PR（Spec-0032/T7 交付面观测读路径）：号/标题/三态 state/head 分支/mergeable/labels。
+
+        纯观测、不改任何状态。Gitea 的 PR state 只有 open/closed、merged 是并列布尔——此处归一为
+        open/closed/merged 三态（与交付面语义一致）。closing 关键字关联的 issue 号从正文解析出
+        `closes_issues` 供前端画「票 → PR」链。
+        """
+        data = self._request(
+            "GET",
+            f"/repos/{self._owner}/{self._repo}/pulls"
+            f"?state={state}&sort=recentupdate&limit={limit}",
+            None,
+        )
+        out: list[dict[str, Any]] = []
+        for item in data or []:
+            merged = item.get("merged") is True
+            out.append(
+                {
+                    "number": item.get("number") or 0,
+                    "title": item.get("title") or "",
+                    "state": "merged" if merged else (item.get("state") or "open"),
+                    "head_branch": ((item.get("head") or {}).get("ref")) or "",
+                    "mergeable": item.get("mergeable"),
+                    "labels": [lbl.get("name") or "" for lbl in (item.get("labels") or [])],
+                    "closes_issues": _parse_closing_refs(body=str(item.get("body") or "")),
+                    "url": item.get("html_url") or "",
+                    "created_at": item.get("created_at") or "",
+                    "updated_at": item.get("updated_at") or "",
+                }
+            )
+        return out
 
     def list_recent_commits(self, *, limit: int = 15) -> list[dict[str, Any]]:
         """列 harness 仓 main 最近 commit（带 vK tag 标注），供观测看板「main 分支更新」。

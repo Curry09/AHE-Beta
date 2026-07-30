@@ -65,13 +65,6 @@ class _CrashingHarness:
         pass
 
 
-class _NoopDev:
-    def work_one(self, skip=None):
-        from auto_designer.dev.agentic_developer import DevOutcome
-
-        return DevOutcome()
-
-
 def _rig(tmp_path: Path, n_users: int):
     """组一套真实用户侧栈：返回 (fixed_set, run_session_fn, store, tracker, data_dir, done)。
 
@@ -130,7 +123,6 @@ def test_eight_parallel_sessions_land_completely(tmp_path) -> None:
         launcher=_ScriptedLauncher(),
         harness_repo=str(repo),
         fixed_set=fixed_set,
-        developer_agents=[_NoopDev()],
         run_session_fn=fn,
         initial_ref="main",
         max_parallel_users=4,
@@ -168,7 +160,6 @@ def test_slow_session_does_not_block_fast_ones(tmp_path) -> None:
         launcher=_ScriptedLauncher(),
         harness_repo=str(repo),
         fixed_set=fixed_set,
-        developer_agents=[_NoopDev()],
         run_session_fn=fn,
         initial_ref="main",
         max_parallel_users=4,
@@ -202,7 +193,6 @@ def test_crashing_harness_still_lands_as_signal_among_healthy_peers(tmp_path) ->
         launcher=_MixedLauncher(),
         harness_repo=str(repo),
         fixed_set=fixed_set,
-        developer_agents=[_NoopDev()],
         run_session_fn=fn,
         initial_ref="main",
         max_parallel_users=1,  # 串行时序使「第 1 次 launch = U00」确定；信号路径与并发度无关

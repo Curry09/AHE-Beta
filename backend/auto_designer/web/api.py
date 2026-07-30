@@ -167,6 +167,29 @@ def _commit_detail(*, tracker: IssueTracker | None, sha: str) -> dict[str, objec
     return {"connected": True, "commit": commit}
 
 
+# Spec-0032/T7：交付面「卡人」标签（OpenAgents 的 needs-human 终态）——无人值守环里唯一要人清的死票。
+_NEEDS_HUMAN = "needs-human"
+
+
+def _delivery(*, tracker: IssueTracker | None) -> dict[str, object]:
+    """交付面观测（Spec-0032/T7）：open PR 列表 + needs-human 积压计数（PR 与 issue 双源）。
+
+    tracker 无 list_pulls 观测能力（Fake）或读失败时 connected=False（前端降级为占位，不抛 500）。
+    """
+    fetch = getattr(tracker, "list_pulls", None)
+    if tracker is None or not callable(fetch):
+        return {"connected": False, "pulls": [], "needs_human": 0}
+    try:
+        pulls = fetch(state="open")
+        open_issues = tracker.list_open_issues()
+    except Exception:
+        return {"connected": False, "pulls": [], "needs_human": 0}
+    needs_human = sum(1 for p in pulls if _NEEDS_HUMAN in (p.get("labels") or [])) + sum(
+        1 for i in open_issues if _NEEDS_HUMAN in (i.labels or [])
+    )
+    return {"connected": True, "pulls": pulls, "needs_human": needs_human}
+
+
 def _list_commits(*, tracker: IssueTracker | None, commits_url: str | None) -> dict[str, object]:
     """main 分支更新：列 harness 仓最近 commit + vK tag。tracker 无该读能力（Fake）或读取失败时
     connected=False（前端降级为占位，不抛 500）。"""
@@ -215,6 +238,11 @@ def create_app(
     @app.get("/api/issues")
     def issues() -> dict[str, object]:
         return _list_issues(tracker=tracker, board_url=board_url)
+
+    @app.get("/api/delivery")
+    def delivery() -> dict[str, object]:
+        # Spec-0032/T7：交付面观测——open PR + needs-human 积压（vigil 的工作切面，只读）。
+        return _delivery(tracker=tracker)
 
     @app.get("/api/issues/{number}")
     def issue_detail(number: int) -> dict[str, object]:

@@ -39,7 +39,6 @@ _（缺模块级 docstring）_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
-| `agentic_developer.py` | agentic_developer：开发者 = 带 git 工具的 nexau agent（取代确定性 DeveloperAgent）。 |
 | `commit_checkpoint.py` | CommitCheckpointMiddleware：用机制（而非软提示）保证 dev 尽早落一个已提交的增量。 |
 | `completion_gate.py` | CompletionGateMiddleware：收尾闸门——保证 dev 收尾时是一次"完整提交"。 |
 | `harness_boundary.py` | harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品。 |
@@ -79,7 +78,7 @@ _（缺模块级 docstring）_
 | `live.py` | 多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/。 |
 | `live_tracer.py` | StepTracer：把 nexau agent 运行中的过程流成看板可见的结构化事件。 |
 | `metrics.py` | metrics（spec-0003/T6，曲线口径 spec-0025/T7）：统计体感与 issue backlog 随时间的曲线。 |
-| `orchestrator.py` | 闭环编排 orchestrator：a（用户产 report+体感）→ 生成段两拍（第一拍 triage 分片∥divergent、 |
+| `orchestrator.py` | 闭环编排 orchestrator（需求面）：a（用户产 report+体感）→ 生成段两拍（第一拍 triage 分片∥ |
 | `roster.py` | 角色编制（roster）：各类 agent 的数量，作为「后端编排」与「前端小镇房间」的单一真源。 |
 | `run_state.py` | run_state（spec-0004/T1）：编排游标 + 三侧中间态标记，作为「无法从产物观测」之外的兜底。 |
 | `runner.py` | 可恢复 harbor runner（spec-0004/T2）：作为一个 harbor task（方案 A，整条 run = 1 task）。 |
@@ -171,7 +170,6 @@ graph LR
     nauto_designer_designer_submit_tools["designer.submit_tools"]
     nauto_designer_designer_triage["designer.triage"]
     nauto_designer_dev["auto_designer.dev"]
-    nauto_designer_dev_agentic_developer["dev.agentic_developer"]
     nauto_designer_dev_commit_checkpoint["dev.commit_checkpoint"]
     nauto_designer_dev_completion_gate["dev.completion_gate"]
     nauto_designer_dev_harness_boundary["dev.harness_boundary"]
@@ -258,9 +256,6 @@ graph LR
     nauto_designer_designer_triage --> nauto_designer_designer_issue_schema
     nauto_designer_designer_triage --> nauto_designer_tracker_base
     nauto_designer_designer_triage --> nauto_designer_user_session_store
-    nauto_designer_dev_agentic_developer --> nauto_designer_designer_issue_schema
-    nauto_designer_dev_agentic_developer --> nauto_designer_loop_live_tracer
-    nauto_designer_dev_agentic_developer --> nauto_designer_tracker_base
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
@@ -271,7 +266,6 @@ graph LR
     nauto_designer_loop_metrics --> nauto_designer_user_session_store
     nauto_designer_loop_orchestrator --> nauto_designer_designer_designer
     nauto_designer_loop_orchestrator --> nauto_designer_designer_divergent
-    nauto_designer_loop_orchestrator --> nauto_designer_dev_agentic_developer
     nauto_designer_loop_orchestrator --> nauto_designer_harness_interface
     nauto_designer_loop_orchestrator --> nauto_designer_harness_launcher
     nauto_designer_loop_orchestrator --> nauto_designer_models

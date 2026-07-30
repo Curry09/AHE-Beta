@@ -23,7 +23,7 @@
 
 - **a｜用户侧**：user agent 按 persona 和种子场景使用 harness，产生一段使用过程（包含追问、绕路、卡顿、放弃等情况）。输出两类信号：① 体感评分（类似 cc 的 1-4 评分，作训练信号）；② issue（bug 或需求，来自使用中的具体问题点）。
 
-- **b｜开发者侧**：纯 trunk（单 main）、无门禁。开发者 agent 是带 git 工具的 nexau agent，领一条 open issue 后自己在 harness 仓 `checkout main → 改 agents/main.md → commit → 打 vK tag → push origin main + tag`，直接推进主干（去掉了 fix 分支、merge、release 与体感门禁）。体感退化为观测、benchmark held-out，坏 commit 靠后续多轮迭代回正（梯度下降式）。
+- **b｜开发者侧（交付面，spec-0032 现行）**：由 OpenAgents vigil（独立 CLI 常驻进程）承担。需求面 Owner 准入的票带 `openagents` 交接令牌，vigil 发现后走「盖 ready → curator 排依赖 → worktree/分支 → 实现 → 评审循环 → PR → conflict/CI/review 闸 → 合并进 main」。CI/评审是**工程质量闸**（harness 仓结构冒烟，绝不跑 benchmark），与已去掉的体感门禁维度不同；体感仍纯观测、benchmark 全程 held-out。坏改动在 PR 处被打回、不落 main。
 
 - **c｜闭环**：发版后的新 harness 回到用户侧，循环。
 
@@ -42,25 +42,28 @@
 
 ## 架构（MVP）
 
-### 单一运行时：nexau
-MVP 仅接入 nexau 一种 agent 运行时；claude code / codex 兼容留待后续。所有角色均为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」，固定角色定义置于 `agent_defs/`：
-- **用户 agent**：扮演用户，多轮使用 harness，产出体感与 issue。
-- **开发者 agent**：带 git 工具的 nexau agent，领 issue 后自己改 harness 制品并直推 main（commit + vK tag + push）。
+### 运行时：需求面 nexau + 交付面 OpenAgents（spec-0032）
+需求面角色为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」，固定角色定义置于 `agent_defs/`：
+- **用户 agent**：扮演用户，多轮使用 harness，产出体感与 issue（report 平面）。
+- **triager / synthesize / divergent**：生成器，产不可领 proposal（spec-0029 三平面）。
+- **Owner**：唯一准入——admit 打 `openagents` 交接令牌 / merge / decline / hold，covers 级联在此。
 
-> 纯 trunk 无门禁模型下不再有独立的「测试 agent / 体感门禁」角色——体感只作观测，benchmark 全程 held-out。
+交付面 = OpenAgents vigil：以独立 CLI 接入（uv tool 钉版本，不 vendor 不 import，run.py 托管子进程生命周期），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。
+
+> 无体感门禁角色——体感只作观测，benchmark 全程 held-out。
 
 ### 被进化对象：harness 作为可启动程序
 harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对话契约」：启动后接收用户消息、返回回复；内部为 1 个或 N 个 nexau、如何编排，由其自身入口脚本决定（支持多 agent harness）。
 - 用户侧仅通过 `HarnessInterface`(send/reset/close) 与之交互，不感知内部结构。
 - harness 自带入口 `entry`，自行依赖 nexau，不复用本仓 `nexau_runtime`，保持独立（后续可替换为 CC/codex）。
-- harness 源码为**独立 git 仓，托管于 Gitea**：单分支主干（main），开发者 agent 直接在 main 上 commit + push，`vK` tag 仅作观测锚点（非发版门禁产物）。`harness_template/` 为 v0 种子，用于初始化该仓。
+- harness 源码为**独立 git 仓，托管于 Gitea**：主干 main + 交付面的 per-issue 分支/PR（vigil 管理），merge commit 即观测锚点（vK tag 体系已退役）。`harness_template/` 为 v0 种子（含 `.gitea/workflows/smoke.yml` 结构冒烟 CI），用于初始化该仓。
 
 ### 状态去向
-- **issue → Gitea**：用户 agent 经 `IssueTracker` 接口提交，由 Gitea 负责发号/状态/标签/comment；开发者侧按 open issue 顺序领取（纯 trunk 模型不再按 bug/feature 标签分流到不同分支）。
+- **issue/PR → Gitea**：用户 agent 经 `IssueTracker` 接口提交，由 Gitea 负责发号/状态/标签/comment；交付面 vigil 按 `openagents`→`ready` 标签接手，PR 也落同一 Gitea 仓（看板经 /api/delivery 观测）。
 - **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
 
 ### 闭环
-`loop/orchestrator` 串联 a（用户会话产 issue+体感）→ b（开发者 agent 直推 main）→ c（回灌 main 最新 SHA，纯观测游标，trunk 永远跟 live main）；`loop/metrics` 记录 issue 数量随时间的曲线。
+`loop/orchestrator` 跑需求面：a（用户会话产 report+体感）→ 生成两拍（triage 分片∥divergent → synthesize）→ Owner 准入 → c（回灌 main 最新 SHA，纯观测游标，trunk 永远跟 live main）。交付面 vigil 在进程外 level-triggered 消化 ready 票、合并推进 main；`loop/metrics` 记录 issue 曲线与三平面漏斗。
 
 ### 目录结构
 前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 占位待建，项目级文档/工具与配置留根。
@@ -71,14 +74,14 @@ backend/                 # 后端（编排框架）
     nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
     harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
     user/                # user_agent.py + session.py(run_session) + session_store.py
-    tracker/             # base.py(IssueTracker接口) + gitea.py + fake.py
-    dev/                 # agentic_developer.py（带 git 工具的 nexau 开发者，直推 main，无门禁）
+    tracker/             # base.py(IssueTracker接口) + gitea.py(含 PR 观测读路径) + fake.py
+    dev/                 # 边界/围堵原语：harness_boundary + workspace_jail + repo_guard 等（agentic_developer 已随 spec-0032 退役）
     loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
-    web/                 # 只读观测看板 FastAPI（/api/overview /api/sessions /api/sessions/{id}）
+    web/                 # 只读观测看板 FastAPI（/api/overview /api/delivery /api/sessions ...）
   tests/                 # 测试（pytest testpaths=backend/tests）
-  agent_defs/            # 角色 nexau 定义（数据）：user_agent/ developer_agent/（test_agent/ 为纯 trunk 前残留，已不接线）
-  harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml
-  deploy/gitea/          # 基建：docker-compose.yml(Gitea+sqlite) + bootstrap.sh
+  agent_defs/            # 需求面角色 nexau 定义（数据）：user_agent/ triage_agent/ designer/ divergent_pm/ owner/
+  harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml + .gitea/workflows/smoke.yml
+  deploy/gitea/          # 基建：docker-compose.yml(Gitea+sqlite+act_runner) + bootstrap.sh
   scripts/               # bootstrap_harness.py + check-spec-number-conflicts.py
 frontend/                # 前端：React+Vite+TS 只读观测看板（消费 backend web API）
 docs/specs/              # 设计 specs（spec-driven-development 源，项目级）
@@ -92,7 +95,8 @@ backend/data/            # 运行产物(.gitignore)：sessions/ harness_runs/
 - **spec-0002 Gitea 接入与基建**：docker(sqlite)+token+标签方案、GiteaTracker、harness 仓初始化。
 - **spec-0003 开发者侧与闭环（初版，已被 0005/0007 取代）**：harness launcher、developer_agent、test_agent（体感门禁）、release（合并+tag）、orchestrator+metrics。
 - **spec-0004 Harbor 运行与可恢复 checkpoint**：所有 agent 在单沙盒一波跑（方案 A，整条 run = 1 个 harbor task），每轮边界吐增量 checkpoint artifact、喂回即从断点幂等续跑；checkpoint 维护用户侧/开发者侧/编排中间态。harbor 只包外层 rollout 生命周期，逐轮真人对话仍走 spec-0001 自立协议。
-- **spec-0005 / spec-0007 纯 trunk 开发者侧（现行）**：开发者侧改为带 git 工具的 nexau agent 直推 main，去掉 fix 分支/merge/release/体感门禁；体感退化为观测、benchmark held-out，坏 commit 靠多轮迭代回正。闭环回灌简化为「main 最新 SHA」纯观测游标。
+- **spec-0005 / spec-0007 纯 trunk 开发者侧（已被 0032 取代）**：开发者侧改为带 git 工具的 nexau agent 直推 main，去掉 fix 分支/merge/release/体感门禁；体感退化为观测、benchmark held-out。闭环回灌简化为「main 最新 SHA」纯观测游标（此语义沿用至今）。
+- **spec-0032 开发者侧换轨 OpenAgents（现行）**：需求面/交付面二分——Owner 准入打 `openagents` 交接令牌，OpenAgents vigil（独立 CLI 常驻，forge/Gitea driver 见其 spec-0074）接管 ready→分支/PR→CI/评审→合并；nexau 直推 dev 退役，PR 门禁为工程质量闸（held-out 约束不变）。
 
 ## 设计理念
 1. **奥卡姆剃刀**：如无必要，勿增实体。保证代码和架构的最小化、最简洁，先搭最小可用版本（MVP）再迭代。

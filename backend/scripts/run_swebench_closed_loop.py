@@ -122,7 +122,6 @@ def _to_scenario(meta: dict):
 def main() -> int:
     from auto_designer.designer.designer import Designer
     from auto_designer.designer.triage import Triager
-    from auto_designer.dev.agentic_developer import DEFAULT_BUDGETS, AgenticDeveloper
     from auto_designer.dev.repo_guard import snapshot_repo, verify_unchanged
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.live import (
@@ -299,50 +298,6 @@ def main() -> int:
         round_provider=lambda: current["round"] or None,
     )
 
-    def make_dev_status(agent_id: str, label: str):
-        def cb(*, running, status, issue_number=None, detail=None, tag=None, committed=False):
-            update_agent(
-                data_dir=run_mod.DATA,
-                agent_id=agent_id,
-                role="developer",
-                label=label,
-                running=running,
-                status=status,
-                detail=detail,
-                round_no=current["round"],
-            )
-            if not running and issue_number is not None:
-                archive_agent(
-                    data_dir=run_mod.DATA,
-                    agent_id=agent_id,
-                    round_no=current["round"],
-                    extra={
-                        "kind": "dev_run",
-                        "issue_number": issue_number,
-                        "tag": tag,
-                        "committed": committed,
-                    },
-                )
-
-        return cb
-
-    def _budget(kind: str) -> int:
-        raw = os.environ.get(f"DEV_BUDGET_{kind.upper()}", "").strip()
-        return int(raw) if raw.isdigit() and int(raw) > 0 else DEFAULT_BUDGETS[kind]
-
-    budgets = {k: _budget(k) for k in DEFAULT_BUDGETS}
-    developers = [
-        AgenticDeveloper(
-            tracker,
-            str(repo),
-            str(ROOT / "agent_defs" / "developer_agent"),
-            on_status=make_dev_status(f"dev-{i}", f"dev#{i + 1}"),
-            on_event=make_event_logger(f"dev-{i}"),
-            budgets=budgets,
-        )
-        for i in range(roster["developer"])
-    ]
-
     def make_triager_status(agent_id: str, label: str):
         def cb(*, running, status, detail=None, **kw):
             update_agent(
@@ -468,7 +423,6 @@ def main() -> int:
         launcher=launcher,
         harness_repo=str(repo),
         fixed_set=session_plan,
-        developer_agents=developers,
         run_session_fn=user_run_session_fn,
         initial_ref="main",
         triagers=triagers,
@@ -480,16 +434,26 @@ def main() -> int:
         integrity_guard=integrity_guard,
     )
 
+    # Spec-0032/T5：交付面接线与 run.py 同源——预检 CLI → 写配置 → 常驻 vigil（finally 收尾停）。
+    run_mod.ensure_openagents_cli()
+    run_mod.write_openagents_config(repo=repo, gitea=gitea)
+    vigil_proc, vigil_log = run_mod.start_vigil(
+        repo=repo,
+        parallel=roster["developer"],
+        gitea_token=gitea["TOKEN"],
+        log_path=run_mod.DATA / "vigil.log",
+    )
+
     print(
         f"④ 跑 {run_mod.TOTAL_ROUNDS} 轮闭环（每轮 {SESSIONS_PER_ROUND} session · "
-        f"{len(triagers)} triager × {len(designers)} synthesize × {len(divergents)} divergent × "
-        f"{len(developers)} dev，"
-        f"a 段并发 {max_parallel_users}，预算 "
-        f"bug={budgets['bug']}/feature={budgets['feature']}/rfc={budgets['rfc']}）..."
+        f"{len(triagers)} triager × {len(designers)} synthesize × {len(divergents)} divergent；"
+        f"交付面 vigil --parallel {roster['developer']} 常驻，"
+        f"a 段并发 {max_parallel_users}）..."
     )
     try:
         refs = orch.run(run_mod.TOTAL_ROUNDS)
     finally:
+        run_mod.stop_vigil(vigil_proc, vigil_log)
         update_live_run(
             data_dir=run_mod.DATA,
             running=False,
@@ -511,8 +475,6 @@ def main() -> int:
     print("issue 曲线 (t, opened, net_open):", m.issue_curve())
     print("本地仓分支:", end=" ")
     subprocess.run(["git", "-C", str(repo), "branch", "--format=%(refname:short)"])
-    print("tags:", end=" ")
-    subprocess.run(["git", "-C", str(repo), "tag"])
     return 0
 
 

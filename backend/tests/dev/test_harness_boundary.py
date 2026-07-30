@@ -91,6 +91,12 @@ def test_allowed_top_is_harness_skeleton() -> None:
     }
 
 
+def test_gitea_ci_dir_stays_out_of_whitelist() -> None:
+    """Spec-0032 实证修复#1：.gitea/（CI 定义）是随 seed 下发的平台制品，**故意不在白名单**——
+    dev/交付面 agent 不得改写自己的质量闸（seed 提交先于装钩子，见 run.py._seed_harness_repo）。"""
+    assert violations([".gitea/workflows/smoke.yml"]) == [".gitea/workflows/smoke.yml"]
+
+
 def test_violations_allows_product_docs_scripts_and_env_example() -> None:
     assert (
         violations(

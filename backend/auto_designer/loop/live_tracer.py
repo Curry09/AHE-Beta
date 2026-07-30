@@ -9,7 +9,7 @@ live 注册表的 log 时间线——dev/designer 的黑盒 agent.run 由此变�
 - TOOL start → kind="tool"：🔧 工具名 + 入参摘要
 - TOOL end   → kind="tool_result"：工具输出摘要；失败则 kind="tool_error"（❌）
 
-依赖 nexau，调用方（agentic_developer/designer）须在运行期懒加载本模块。
+依赖 nexau，调用方（designer/triage/owner 等 agent driver）须在运行期懒加载本模块。
 """
 
 from __future__ import annotations

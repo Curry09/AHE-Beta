@@ -535,3 +535,56 @@ def test_issues_tracker_error(tmp_path: Path) -> None:
     body = client.get("/api/issues").json()
     assert body["connected"] is False
     assert body["issues"] == []
+
+
+# Spec-0032/T7：交付面观测端点 /api/delivery——open PR + needs-human 积压（PR 与 issue 双源）。
+
+
+class _PullTracker(FakeTracker):
+    """带 list_pulls 观测能力的 Fake（形状对齐 GiteaTracker.list_pulls 的 DTO）。"""
+
+    def __init__(self, pulls: list[dict]) -> None:
+        super().__init__()
+        self._pulls = pulls
+
+    def list_pulls(self, *, state: str = "open", limit: int = 20) -> list[dict]:
+        return [p for p in self._pulls if state in ("all", p.get("state"))][:limit]
+
+
+def _pull(number: int, *, labels: list[str] | None = None, state: str = "open") -> dict:
+    return {
+        "number": number,
+        "title": f"pr {number}",
+        "state": state,
+        "head_branch": f"openagents/issue-{number}",
+        "mergeable": True,
+        "labels": labels or [],
+        "closes_issues": [number],
+        "url": "",
+        "created_at": "",
+        "updated_at": "",
+    }
+
+
+def test_delivery_lists_pulls_and_counts_needs_human(tmp_path: Path) -> None:
+    tracker = _PullTracker([_pull(5), _pull(6, labels=["needs-human"])])
+    tracker.create_issue(IssueDraft(title="卡人的票", body="x", labels=["needs-human"]))
+    store = SessionStore(tmp_path / "sessions")
+    client = TestClient(create_app(store=store, tracker=tracker))
+
+    body = client.get("/api/delivery").json()
+    assert body["connected"] is True
+    assert [p["number"] for p in body["pulls"]] == [5, 6]
+    assert body["needs_human"] == 2  # PR#6 + 那张 issue（双源计数）
+
+
+def test_delivery_degrades_without_capability(tmp_path: Path) -> None:
+    # FakeTracker 无 list_pulls 观测能力 → connected=False（前端降级占位，不抛 500）。
+    client = _client(tmp_path, tracker=FakeTracker())
+    body = client.get("/api/delivery").json()
+    assert body == {"connected": False, "pulls": [], "needs_human": 0}
+
+
+def test_delivery_no_tracker(tmp_path: Path) -> None:
+    client = _client(tmp_path, tracker=None)
+    assert client.get("/api/delivery").json()["connected"] is False

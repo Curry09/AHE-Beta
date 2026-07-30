@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { getAgents, getCommits, getHistory, getIssues, getOverview, getState } from "./api";
+import {
+  getAgents,
+  getCommits,
+  getDelivery,
+  getHistory,
+  getIssues,
+  getOverview,
+  getState,
+} from "./api";
 import { AgentColumn } from "./components/AgentColumn";
 import { Charts } from "./components/Charts";
 import { SidePanel } from "./components/SidePanel";
@@ -9,8 +17,10 @@ import type { AgentRole, Selection } from "./types";
 
 const POLL_MS = 3000;
 
-// 顺序对齐三平面闭环 a → 第一拍(triage∥divergent) → 第二拍(synthesize) → Owner 准入 → b（Spec-0029）。
+// 顺序对齐需求面 a → 第一拍(triage∥divergent) → 第二拍(synthesize) → Owner 准入（Spec-0029/0032）。
 // divergent 默认编制 0 → 该房间仅在有活动/归档时显示，避免常驻空列。
+// Spec-0032/T7：开发者列退役（交付面在进程外 vigil）——列位保留给历史归档回看（旧 run 的 dev_run），
+// 新交付进度看侧栏「交付面 · PR」面板。
 const ROLES: { role: AgentRole; name: string }[] = [
   { role: "user", name: "用户" },
   { role: "triager", name: "分诊" },
@@ -19,7 +29,7 @@ const ROLES: { role: AgentRole; name: string }[] = [
   { role: "owner", name: "准入" },
   { role: "developer", name: "开发者" },
 ];
-const OPTIONAL_ROLES: AgentRole[] = ["divergent"];
+const OPTIONAL_ROLES: AgentRole[] = ["divergent", "developer"];
 
 // 看板状态 ↔ URL 查询串（?done=1&round=2&sel=issue:7）：刷新/分享不丢上下文。
 function parseSelection(raw: string | null): Selection | null {
@@ -47,6 +57,7 @@ export default function App() {
   const issues = usePolling(getIssues, POLL_MS);
   const commits = usePolling(getCommits, POLL_MS);
   const overview = usePolling(getOverview, POLL_MS);
+  const delivery = usePolling(getDelivery, POLL_MS); // Spec-0032/T7：交付面（PR + needs-human）
 
   const [showDone, setShowDone] = useState(
     () => new URLSearchParams(location.search).get("done") === "1",
@@ -119,6 +130,7 @@ export default function App() {
           issues={issues}
           commits={commits}
           funnel={overview?.funnel ?? null}
+          delivery={delivery}
         />
       </div>
     </div>

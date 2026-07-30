@@ -1,18 +1,22 @@
-"""真实端到端跑一轮闭环（a→b→c）。
+"""真实端到端跑闭环（需求面 round-based + 交付面常驻 vigil）。
 
 接线：用户侧 = spec-0005 控制信封 sim（内层 tool-use AgenticPersonaClient，LLM 由
      ApiPersonaClient.complete 供给，模型走 backend/.env 的 USER_LLM_*）；
-     开发者侧 = 真 nexau dev agent + 真 Gitea（issue，走 backend/deploy/gitea/.env）
-     + 本地 git 仓承载 harness 代码。
+     交付面 = OpenAgents vigil（Spec-0032：独立 CLI 常驻子进程，本进程托管生命周期）——
+     Owner 准入打 `openagents` 交接令牌，vigil 发现→盖 ready→分支/PR→评审→合并进 main；
+     issue/PR 全在真 Gitea（backend/deploy/gitea/.env），harness 代码承载于本地 git 仓 + Gitea origin。
 本地规模：persona 从 distill 卡库(persona_library.json)注入、场景从种子卡库(seeds.json)经
-     distill seed_adapter 注入（held-out 判分制品在注入边界剥离），
-     × 2 dev agent，跑 5 轮；跑前复位到最初状态。
-Spec-0007：纯 trunk（单 main），dev 直推 main、无门禁；每局解析 main HEAD SHA 作会话级快照。
+     distill seed_adapter 注入（held-out 判分制品在注入边界剥离）；跑前复位到最初状态。
+Spec-0007/0032：纯 trunk（单 main）语义不变；每局解析 main HEAD SHA 作会话级快照；回灌 = live main
+     纯观测游标（推进者现在是 vigil 的 merge）。vK tag 体系退役（观测锚点 = merge commit）。
 
 前置：
-  1) backend/.env 有四组独立配置 {USER,DEV,DESIGNER,HARNESS}_LLM_{MODEL,BASE_URL,API_KEY}
-     （前三=编排角色，HARNESS=被进化的产品本体，run.py 据其导出 harness 子进程读的 plain LLM_*）
+  1) backend/.env 有三组独立配置 {USER,DESIGNER,HARNESS}_LLM_{MODEL,BASE_URL,API_KEY}
+     （前二=编排角色，HARNESS=被进化的产品本体，run.py 据其导出 harness 子进程读的 plain LLM_*）
   2) Gitea 已起并 bootstrap，backend/deploy/gitea/.env 有 GITEA_URL/OWNER/REPO/TOKEN
+  3) 交付面 CLI：`openagents` 在 PATH（uv tool install --from <OpenAgents 仓>@<pin> openagents，
+     含 forge/Gitea driver 的版本）+ 已登录的 `claude` CLI（vigil 的 coding 后端）。
+     平台注记：vigil 依赖 fcntl.flock，交付面仅 Linux/macOS 可跑（Windows 本地只跑单测）。
 运行：./run.sh  （或直接 PYTHONPATH=backend .venv/bin/python backend/run.py）
   persona / 种子卡库两个「给定输入」经 CLI 参数注入，默认指向 backend/persona_library.json
   与 backend/seeds.json：
@@ -173,17 +177,39 @@ def _seed_harness_repo() -> Path:
     subprocess.run(
         ["git", "init", "-b", "main", str(HARNESS_REPO)], check=True, capture_output=True
     )
-    # 提交边界硬闸：装 pre-commit 钩子，dev 之后想把 harness 本体外的任务代码提交进来会被直接拒。
-    # 顺手清掉模板复制带来的字节码缓存、写 .gitignore，让 v0 seed 只含 harness 制品（钩子放行）。
+    # 清掉模板复制带来的字节码缓存、写 .gitignore，让 v0 seed 只含 harness 制品。
+    # Spec-0032/T5：.openagents/ 是 vigil 的本地运行态（队列 db/claims/配置），随 rmtree 每 run 归零，
+    # 且永不入库。
     from auto_designer.dev.harness_boundary import install_pre_commit  # noqa: PLC0415
 
     for pyc in HARNESS_REPO.rglob("__pycache__"):
         shutil.rmtree(pyc, ignore_errors=True)
-    (HARNESS_REPO / ".gitignore").write_text("__pycache__/\n*.pyc\n", encoding="utf-8")
-    install_pre_commit(HARNESS_REPO)
+    (HARNESS_REPO / ".gitignore").write_text(
+        "__pycache__/\n*.pyc\n.openagents/\n", encoding="utf-8"
+    )
     _git(HARNESS_REPO, "add", ".")
     _git(HARNESS_REPO, "commit", "-m", "seed: harness v0")
+    # 提交边界硬闸：装 pre-commit 钩子，交付面 agent 想把 harness 本体外的任务代码提交进来会被直接拒
+    # （git worktree 共享 hooks，vigil 的 per-issue worktree 同受此闸约束）。
+    # Spec-0032 实证修复#1：钩子装在 seed 提交**之后**——seed 含平台制品 .gitea/（CI 定义），它**故意
+    # 不入白名单**（CI 是随 seed 下发的平台制品，dev 不得改写自己的质量闸）；先提交（可信模板）后装闸，
+    # 此后所有 dev 提交照常受钩。服务端兜底见 smoke.yml 的边界检查步（--no-verify 也绕不开）。
+    install_pre_commit(HARNESS_REPO)
     return HARNESS_REPO
+
+
+def _remote_tag_refs(ls_output: str) -> list[str]:
+    """`git ls-remote --tags` 输出 → 可删除的真 tag ref 列表。
+
+    Spec-0032 实证修复#2：附注 tag 会输出两行——`refs/tags/v1` 与 peeled 行 `refs/tags/v1^{}`；
+    后者是解引用展示、不是真 ref，`push origin :refs/tags/v1^{}` 会以 128 崩掉复位流程，须跳过。
+    """
+    refs: list[str] = []
+    for line in ls_output.splitlines():
+        ref = line.split("\t")[-1]
+        if ref.startswith("refs/tags/") and not ref.endswith("^{}"):
+            refs.append(ref)
+    return refs
 
 
 def _reset_to_initial(repo: Path, tracker) -> None:
@@ -200,10 +226,8 @@ def _reset_to_initial(repo: Path, tracker) -> None:
         capture_output=True,
         text=True,
     ).stdout
-    for line in ls.splitlines():
-        ref = line.split("\t")[-1]
-        if ref.startswith("refs/tags/"):
-            _git(repo, "push", "origin", f":{ref}")  # 删远端 tag
+    for ref in _remote_tag_refs(ls):
+        _git(repo, "push", "origin", f":{ref}")  # 删远端 tag（legacy vK 清扫）
     for issue in tracker.list_open_issues():
         try:
             tracker.set_state(issue.number, "closed", "reset to initial before clean run")
@@ -216,6 +240,106 @@ def _reset_to_initial(repo: Path, tracker) -> None:
     clear_live(data_dir=DATA)
 
 
+# Spec-0032/T5：交付面 stages 定稿（写进 harness 仓 .openagents/openagents.yml 的单一出处）。
+# triage=skip：准入已由 Owner 在需求面完成（三平面唯一准入不动摇）；rfc=skip：harness 仓无 spec
+# 工具链（起步，OpenAgents 侧会显式告警，可接受）；ci 缺省 skip、经 VIGIL_CI_STAGE=agent 开启——
+# vigil 判定表「零 check=永等 CI」，须先验证 T6 的 act_runner 真在跑（bootstrap.sh 有提示），再开
+# ci 闸，否则全部票卡到看门狗；e2e=skip 二期；review/merge=agent：工程质量闸全自动（review 在，
+# 不触 OpenAgents「不许零闸」守卫）。
+_VIGIL_STAGES: dict[str, str] = {
+    "triage": "skip",
+    "rfc": "skip",
+    "conflict": "agent",
+    "ci": "skip",  # write_openagents_config 按 VIGIL_CI_STAGE 覆盖
+    "e2e": "skip",
+    "review": "agent",
+    "merge": "agent",
+}
+# vigil 轮询间隔（秒）：比 OpenAgents 默认 60s 更紧凑——本地 Gitea 无速率压力，缩短准入→领活时延。
+_VIGIL_INTERVAL = 30
+
+
+def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
+    """把交付面声明式配置写进 harness 仓 `.openagents/openagents.yml`（Spec-0032/T5）。
+
+    forge=gitea + 连接四元组（token 本体不落盘，只声明 token_env=GITEA_TOKEN，由 vigil 子进程
+    env 提供）；stages 见 _VIGIL_STAGES；labels=[openagents]（Owner 准入的交接令牌 = vigil 发现标签）。
+    """
+    config_dir = repo / ".openagents"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    # Spec-0032/T6：ci 闸随基建就位切换——act_runner 验证在跑后置 VIGIL_CI_STAGE=agent 开启。
+    effective = dict(_VIGIL_STAGES)
+    ci_stage = os.environ.get("VIGIL_CI_STAGE", "").strip().lower()
+    if ci_stage in ("agent", "human", "skip"):
+        effective["ci"] = ci_stage
+    stages = "\n".join(f"  {stage}: {owner}" for stage, owner in effective.items())
+    text = (
+        "# 由 backend/run.py 每次 run 生成（Spec-0032/T5），勿手工编辑——改 run.py 的定稿常量。\n"
+        "version: 1\n"
+        "forge: gitea\n"
+        "gitea:\n"
+        f"  base_url: {gitea['GITEA_URL']}\n"
+        f"  owner: {gitea['OWNER']}\n"
+        f"  repo: {gitea['REPO']}\n"
+        "  token_env: GITEA_TOKEN\n"
+        f"stages:\n{stages}\n"
+        "release: manual\n"
+        "defaults:\n"
+        f"  interval: {_VIGIL_INTERVAL}\n"
+        "  base: main\n"
+        "  labels: [openagents]\n"
+    )
+    path = config_dir / "openagents.yml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def ensure_openagents_cli() -> None:
+    """交付面 CLI 预检：`openagents` 必须在 PATH（与 HARNESS_LLM_* 缺失同级 fail-loud）。"""
+    if shutil.which("openagents") is None:
+        raise SystemExit(
+            "PATH 上找不到 `openagents`（交付面 CLI）——"
+            "uv tool install --from <OpenAgents 仓>@<含 forge/Gitea driver 的版本> openagents"
+        )
+
+
+def start_vigil(
+    *, repo: Path, parallel: int, gitea_token: str, log_path: Path
+) -> tuple[subprocess.Popen, object]:
+    """启动交付面常驻进程 `openagents vigil --parallel K`（cwd=harness 仓，日志落 log_path）。
+
+    返回 (proc, log_handle)：调用方 finally 里 stop_vigil 收尾。GITEA_TOKEN 只经子进程 env 传递
+    （配置文件不落 token）。level-triggered：票何时出现何时接，与需求面轮次无需同步。
+    """
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随 vigil 进程，stop 时关闭
+    env = {**os.environ, "GITEA_TOKEN": gitea_token}
+    proc = subprocess.Popen(
+        ["openagents", "vigil", "--parallel", str(max(1, parallel))],
+        cwd=str(repo),
+        env=env,
+        stdout=log_handle,
+        stderr=subprocess.STDOUT,
+    )
+    return proc, log_handle
+
+
+def stop_vigil(proc: subprocess.Popen, log_handle: object) -> None:
+    """停交付面：terminate → 宽限 10s → kill 兜底；日志句柄收尾关闭。"""
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+    finally:
+        try:
+            log_handle.close()  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001  关日志失败不影响收尾
+            pass
+
+
 def main() -> int:
     from urllib.parse import urlparse
 
@@ -223,11 +347,13 @@ def main() -> int:
 
     _isolate_git_credentials()  # Spec-0021/T2：进程级 git 凭证隔离（多信道封堵，见函数注释）
 
-    llm_env = _load_env(ROOT / ".env")  # {USER,DEV,DESIGNER,HARNESS}_LLM_*
+    llm_env = _load_env(
+        ROOT / ".env"
+    )  # {USER,DESIGNER,HARNESS}_LLM_*（DEV_LLM_* 随 dev 退役不再消费）
     os.environ.update(llm_env)
-    # 分角色 LLM 配置：三种编排角色各用 {USER,DEV,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、
-    # 无公共回落——agent.yaml 的 ${env.DEV_LLM_*} / ${env.DESIGNER_LLM_*} 与 user 侧 ApiPersonaClient
-    # 直接读各自角色变量（.env 各组均已填全）。
+    # 分角色 LLM 配置：编排角色各用 {USER,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、无公共
+    # 回落——agent.yaml 的 ${env.DESIGNER_LLM_*} 与 user 侧 ApiPersonaClient 直接读各自角色变量。
+    # 交付面（vigil）的 coding 后端是 claude CLI，凭证走宿主 claude 登录态，不经 .env。
     # 被进化的产品本体 harness 是第 4 个独立实体：其（可移植的）agent.yaml 只认 plain LLM_*，不知我们
     # 的角色命名。在此把 HARNESS_LLM_* 写实到 plain LLM_*，让 launcher 起的 harness 子进程（继承
     # os.environ）拿到自己的模型凭证。缺 HARNESS_LLM_* 即报错，绝不静默回落到别的角色。
@@ -248,7 +374,7 @@ def main() -> int:
     user_limit = PERSONA_LIMIT if PERSONA_LIMIT is not None else roster["user"]
     print(
         f"⓪.5 编制 roster：用户×{roster['user']} · 设计师×{roster['designer']} · "
-        f"开发者×{roster['developer']}（前端房间容量与此一致）"
+        f"交付面并发×{roster['developer']}（vigil --parallel；前端房间容量与此一致）"
     )
 
     # 环境里的 HTTP(S)_PROXY 抽风（实测代理连不上，直连网关稳定 200）：放行本地 Gitea + 模型网关，
@@ -256,7 +382,6 @@ def main() -> int:
     bypass = ["localhost", "127.0.0.1"]
     for url in (
         os.environ.get("USER_LLM_BASE_URL"),
-        os.environ.get("DEV_LLM_BASE_URL"),
         os.environ.get("DESIGNER_LLM_BASE_URL"),
         gitea.get("GITEA_URL"),
     ):
@@ -269,7 +394,6 @@ def main() -> int:
 
     from auto_designer.designer.designer import Designer
     from auto_designer.designer.triage import Triager
-    from auto_designer.dev.agentic_developer import AgenticDeveloper
     from auto_designer.distill.library import PersonaLibrary
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.metrics import Metrics
@@ -297,8 +421,7 @@ def main() -> int:
     store = SessionStore(DATA / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
-    print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 开发者角色 ...")
-    dev_agent_def = str(ROOT / "agent_defs" / "developer_agent")  # 工具型 dev agent 定义目录
+    print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 生成/准入角色 ...")
     designer_agent_def = str(
         ROOT / "agent_defs" / "designer"
     )  # synthesize agent 定义目录（只读工具）
@@ -462,54 +585,6 @@ def main() -> int:
         # Spec-0025/T6：给每条 raw issue 盖当前轮号（供增量 triage 与观测曲线）。current 由 on_round_start 更新。
         round_provider=lambda: current["round"] or None,
     )
-
-    def make_dev_status(agent_id, label):  # 开发者 agent 活动回调（收尾时按轮归档）
-        def cb(*, running, status, issue_number=None, detail=None, tag=None, committed=False):
-            update_agent(
-                data_dir=DATA,
-                agent_id=agent_id,
-                role="developer",
-                label=label,
-                running=running,
-                status=status,
-                detail=detail,
-                round_no=current["round"],
-            )
-            if not running and issue_number is not None:  # 「无可领 issue」不算工作项，不归档
-                archive_agent(
-                    data_dir=DATA,
-                    agent_id=agent_id,
-                    round_no=current["round"],
-                    extra={
-                        "kind": "dev_run",
-                        "issue_number": issue_number,
-                        "tag": tag,
-                        "committed": committed,
-                    },
-                )
-
-        return cb
-
-    # Spec-0025/T6：dev 预算按 kind 分档（RFC 最高），env 覆盖各档；无分池/重试（见 T5）。
-    from auto_designer.dev.agentic_developer import DEFAULT_BUDGETS  # noqa: PLC0415
-
-    def _budget(kind: str) -> int:
-        raw = os.environ.get(f"DEV_BUDGET_{kind.upper()}", "").strip()
-        return int(raw) if raw.isdigit() and int(raw) > 0 else DEFAULT_BUDGETS[kind]
-
-    budgets = {k: _budget(k) for k in DEFAULT_BUDGETS}
-
-    developers = [  # roster 个工具型 dev agent：同轮各领一条不同 issue，自主改 harness + git 发版
-        AgenticDeveloper(
-            tracker,
-            str(repo),
-            dev_agent_def,
-            on_status=make_dev_status(f"dev-{i}", f"dev#{i + 1}"),
-            on_event=make_event_logger(f"dev-{i}"),
-            budgets=budgets,
-        )
-        for i in range(roster["developer"])
-    ]
 
     def make_triager_status(agent_id, label):  # triage agent 活动回调（收尾按轮归档）
         def cb(*, running, status, detail=None, **kw):
@@ -679,7 +754,6 @@ def main() -> int:
         launcher=launcher,
         harness_repo=str(repo),  # Spec-0007/T4：每局解析 main HEAD SHA 用
         fixed_set=fixed_set,
-        developer_agents=developers,
         run_session_fn=user_run_session_fn,
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
         triagers=triagers,  # Spec-0029：第一拍分片并行（第 k 个处理 pending[k::n]）
@@ -692,18 +766,30 @@ def main() -> int:
         integrity_guard=integrity_guard,  # Spec-0021/T2
     )
 
+    # Spec-0032/T5：交付面接线——预检 CLI → 写声明式配置 → 起常驻 vigil（level-triggered，与轮次解耦）。
+    print("③.5 起交付面 vigil（OpenAgents）...")
+    ensure_openagents_cli()
+    write_openagents_config(repo=repo, gitea=gitea)
+    vigil_proc, vigil_log = start_vigil(
+        repo=repo,
+        parallel=roster["developer"],
+        gitea_token=gitea["TOKEN"],
+        log_path=DATA / "vigil.log",
+    )
+
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
         f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {len(designers)} synthesize "
-        f"→ owner({'评审' if roster['owner'] >= 1 else '纯机械'}) × {len(developers)} dev，"
-        f"a 段并发 {max_parallel_users}，dev 预算 "
-        f"bug={budgets['bug']}/feature={budgets['feature']}/rfc={budgets['rfc']}，"
-        f"背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，dev 直推 main，真模型）..."
+        f"→ owner({'评审' if roster['owner'] >= 1 else '纯机械'})；交付面 vigil --parallel "
+        f"{roster['developer']} 常驻（PR 门禁：review+merge=agent，日志 data/vigil.log），"
+        f"a 段并发 {max_parallel_users}，背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，"
+        "真模型）..."
     )
     try:
         refs = orch.run(TOTAL_ROUNDS)
     finally:
-        # 无论正常结束还是中途炸掉，运行态都落 running=False，看板不悬挂「运行中」。
+        # 无论正常结束还是中途炸掉：先停交付面（不再吃新票），再把运行态落 running=False。
+        stop_vigil(vigil_proc, vigil_log)
         update_live_run(
             data_dir=DATA,
             running=False,
@@ -713,15 +799,13 @@ def main() -> int:
         )
 
     print("\n=== 结果 ===")
-    print("各轮 main HEAD SHA:", refs)  # Spec-0007/T4：观测游标（main 最新 SHA），非 release 链
+    print("各轮 main HEAD SHA:", refs)  # Spec-0007/T4：观测游标（main 最新 SHA）
     m = Metrics(tracker, store)
     print("当前 open issue 数:", m.open_issue_count())
     print("体感趋势:", m.feeling_trend())
     print("issue 曲线 (t, opened, net_open):", m.issue_curve())
     print("本地仓分支:", end=" ")
     subprocess.run(["git", "-C", str(repo), "branch", "--format=%(refname:short)"])
-    print("tags:", end=" ")
-    subprocess.run(["git", "-C", str(repo), "tag"])
     return 0
 
 

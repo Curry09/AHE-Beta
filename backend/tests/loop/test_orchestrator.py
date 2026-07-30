@@ -1,9 +1,9 @@
-# Spec-0007/T2：Orchestrator 纯 trunk 编排单测——会话级 main SHA 快照 + 去 release 链。
-"""mock launcher/developer + 临时 git 仓：
+# Spec-0032/T4：Orchestrator 需求面编排单测——会话级 main SHA 快照 + 生成两拍 + Owner 准入；dev 拍退役。
+"""mock launcher + 临时 git 仓：
 
-- 每局 launch 的 ref 解析自 harness 仓 main 当前 HEAD SHA（非 release_ref 链）；
-- 无 dev 推进时下一局仍取 main 最新（SHA 不变）；dev 推进 main 后下一局解析到前进的 SHA；
-- b 段开发者依次领不同 issue（skip 透传），不再据 outcome.tag 链式回灌。
+- 每局 launch 的 ref 解析自 harness 仓 main 当前 HEAD SHA；
+- 交付面（进程外 vigil）推进 main 由「会话中直接 commit 模拟」——c 步回灌读到前进的 live SHA；
+- 生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入 → 绊线，无 b 段 dev 拍。
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.dev.agentic_developer import DevOutcome
 from auto_designer.loop.orchestrator import Orchestrator
 from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
 
@@ -39,6 +38,12 @@ def _seed_repo(tmp_path: Path) -> Path:
     return repo
 
 
+def _advance_main(repo: Path, n: int) -> None:
+    """模拟交付面（进程外 vigil merge）推进 main：直接落一个 commit。"""
+    (repo / "f").write_text(f"advanced {n}\n", encoding="utf-8")
+    _git(repo, "commit", "-am", f"delivery advance {n}")
+
+
 def _persona() -> Persona:
     return Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s")
 
@@ -52,26 +57,7 @@ class _Launcher:
         return ("harness", ref)
 
 
-class _Dev:
-    """假开发者：记录调用与收到的 skip；可选地真改 main（模拟直推推进 HEAD）。"""
-
-    def __init__(self, events: list, outcome: DevOutcome, repo: Path | None = None, label="dev"):
-        self._events = events
-        self._outcome = outcome
-        self._repo = repo
-        self._label = label
-        self._n = 0
-
-    def work_one(self, skip: set[int] | None = None) -> DevOutcome:
-        self._events.append((self._label, frozenset(skip or set())))
-        if self._repo is not None:  # 模拟 dev 直推 main：每次唯一改动推进 HEAD
-            self._n += 1
-            (self._repo / "f").write_text(f"advanced {self._n}\n", encoding="utf-8")
-            _git(self._repo, "commit", "-am", f"dev advance main {self._n}")
-        return self._outcome
-
-
-def _orch(repo, events, developers, fixed_k=1):
+def _orch(repo, events, fixed_k=1, **kw):
     def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
         events.append(("session", harness[1]))
 
@@ -79,9 +65,9 @@ def _orch(repo, events, developers, fixed_k=1):
         launcher=_Launcher(events),
         harness_repo=str(repo),
         fixed_set=[(_persona(), SeedScenario(description=f"s{i}")) for i in range(fixed_k)],
-        developer_agents=developers,
         run_session_fn=run_session_fn,
         initial_ref="main",
+        **kw,
     )
 
 
@@ -89,92 +75,84 @@ def test_round_launches_main_head_sha(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     head = _git(repo, "rev-parse", "main")
     events: list = []
-    dev = _Dev(events, DevOutcome(issue_number=1, tag="v2", committed=True))  # 不真改仓
-    orch = _orch(repo, events, [dev], fixed_k=2)
+    orch = _orch(repo, events, fixed_k=2)
 
     out = orch.run_round("ignored-cursor")  # 传入游标被忽略，解析 live main
-    assert out == head  # 无真实推进 → 回灌仍是当前 main HEAD
+    assert out == head  # 无交付面推进 → 回灌仍是当前 main HEAD
     # a 段两局都按 main HEAD SHA launch（非 release_ref/tag）
-    assert events[:4] == [
+    assert events == [
         ("launch", head),
         ("session", head),
         ("launch", head),
         ("session", head),
     ]
-    assert events[4][0] == "dev"  # b 段在 a 段之后
 
 
-def test_no_dev_keeps_main_latest(tmp_path) -> None:
+def test_no_delivery_keeps_main_latest(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     head = _git(repo, "rev-parse", "main")
-    events: list = []
-    orch = _orch(repo, events, [_Dev(events, DevOutcome())])  # 无 issue/未推进
+    orch = _orch(repo, [])
     assert orch.run_round("c") == head  # 下一局仍取 main 最新（未变）
 
 
-def test_dev_advances_main_sha_forward(tmp_path) -> None:
+def test_external_delivery_advances_cursor(tmp_path) -> None:
+    """交付面在轮中推进 main（进程外 vigil merge 的等价模拟）→ c 步回灌读到前进的 SHA。"""
     repo = _seed_repo(tmp_path)
     head_before = _git(repo, "rev-parse", "main")
     events: list = []
-    dev = _Dev(events, DevOutcome(issue_number=1, tag="v2", committed=True), repo=repo)
-    orch = _orch(repo, events, [dev])
 
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", harness[1]))
+        _advance_main(repo, 1)  # 会话期间交付面合并落 main
+
+    orch = Orchestrator(
+        launcher=_Launcher(events),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+    )
     out = orch.run_round("c")
-    # a 段按起始 SHA launch（dev 推进发生在会话之后）
-    assert ("launch", head_before) in events
-    # 回灌 = dev 推进后的新 main HEAD，SHA 前进
-    assert out == _git(repo, "rev-parse", "main") != head_before
-
-
-def test_two_devs_skip_chains_assigned_issues(tmp_path) -> None:
-    repo = _seed_repo(tmp_path)
-    events: list = []
-    dev1 = _Dev(events, DevOutcome(issue_number=1, tag="v2", committed=True), label="dev1")
-    dev2 = _Dev(events, DevOutcome(issue_number=2, tag="v3", committed=True), label="dev2")
-    orch = _orch(repo, events, [dev1, dev2])
-    orch.run_round("c")
-    dev2_call = next(e for e in events if e[0] == "dev2")
-    assert 1 in dev2_call[1]  # dev2 收到的 skip 含 dev1 已认领的 issue 1
+    assert ("launch", head_before) in events  # a 段按起始 SHA launch（会话级快照）
+    assert out == _git(repo, "rev-parse", "main") != head_before  # 回灌 = 前进后的 live main
 
 
 def test_run_resolves_live_main_each_round(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []
-    dev = _Dev(events, DevOutcome(issue_number=1, tag="v", committed=True), repo=repo)
-    orch = _orch(repo, events, [dev])
+    counter = {"n": 0}
 
+    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
+        events.append(("session", harness[1]))
+        counter["n"] += 1
+        _advance_main(repo, counter["n"])  # 每轮交付面各推进一次
+
+    orch = Orchestrator(
+        launcher=_Launcher(events),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        run_session_fn=run_session_fn,
+        initial_ref="main",
+    )
     refs = orch.run(3)
-    launched = [e[1] for e in events if isinstance(e, tuple) and e[0] == "launch"]
+    launched = [e[1] for e in events if e[0] == "launch"]
     assert len(launched) == 3  # 三轮各一次 launch
-    # 每轮 dev 推进 main，回灌的各轮末 SHA 互不相同（无 release 链，全靠 live main 递进）
-    assert len(set(refs)) == 3
-    # 第 k+1 轮按第 k 轮回灌的 SHA launch（next 局取到上轮 dev 推进后的 main）
+    assert len(set(refs)) == 3  # 每轮回灌 SHA 前进、互不相同
+    # 第 k+1 轮按第 k 轮回灌的 SHA launch（next 局取到上轮交付面推进后的 main）
     assert launched[1:] == refs[:2]
 
 
 def test_run_nonpositive_raises(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     with pytest.raises(ValueError):
-        _orch(repo, [], [_Dev([], DevOutcome())]).run(0)
+        _orch(repo, []).run(0)
 
 
-def test_b_phase_error_propagates(tmp_path) -> None:
-    repo = _seed_repo(tmp_path)
-    events: list = []
-
-    class _BoomDev:
-        def work_one(self, skip=None):
-            raise RuntimeError("dev 崩了")
-
-    with pytest.raises(RuntimeError):
-        _orch(repo, events, [_BoomDev()]).run_round("c")
+# Spec-0017/T3：a 段并行化——线程池并发跑会话、单会话异常不废整轮。
 
 
-# Spec-0017/T3：a 段并行化——线程池并发跑会话、单会话异常不废整轮、汇齐后才进 d/b 段。
-
-
-def test_parallel_sessions_all_run_and_devs_wait(tmp_path) -> None:
-    """max_parallel_users=4 并发 8 局：全部会话都跑到，且 b 段在 a 段全部汇齐后才开始。"""
+def test_parallel_sessions_all_run(tmp_path) -> None:
+    """max_parallel_users=4 并发 8 局：全部会话都跑到。"""
     import threading
 
     repo = _seed_repo(tmp_path)
@@ -191,7 +169,6 @@ def test_parallel_sessions_all_run_and_devs_wait(tmp_path) -> None:
         launcher=_Launcher([]),
         harness_repo=str(repo),
         fixed_set=[(_persona(), SeedScenario(description=f"s{i}")) for i in range(8)],
-        developer_agents=[_Dev(events, DevOutcome(issue_number=1, tag="v", committed=True))],
         run_session_fn=run_session_fn,
         initial_ref="main",
         max_parallel_users=4,
@@ -201,11 +178,10 @@ def test_parallel_sessions_all_run_and_devs_wait(tmp_path) -> None:
     sessions = [e for e in events if e[0] == "session"]
     assert len(sessions) == 8  # 8 局全部跑到
     assert {d for _, d in sessions} == {f"s{i}" for i in range(8)}
-    assert events.index(("dev", frozenset())) == len(events) - 1  # dev 在全部会话之后
 
 
 def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
-    """单会话抛异常（launch/落盘类意外）：记日志跳过，其余会话正常完成、d/b 段照常。"""
+    """单会话抛异常（launch/落盘类意外）：记日志跳过，其余会话正常完成。"""
     repo = _seed_repo(tmp_path)
     events: list = []
 
@@ -219,7 +195,6 @@ def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
         launcher=_Launcher([]),
         harness_repo=str(repo),
         fixed_set=[(_persona(), SeedScenario(description=f"s{i}")) for i in range(3)],
-        developer_agents=[_Dev(events, DevOutcome())],
         run_session_fn=run_session_fn,
         initial_ref="main",
         max_parallel_users=2,
@@ -228,7 +203,6 @@ def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
 
     assert out == head
     assert {d for k, d in events if k == "session"} == {"s0", "s2"}  # 其余会话都完成
-    assert any(k == "dev" for k, *_ in events)  # b 段照常执行
 
 
 def test_parallel_default_is_serial_equivalent(tmp_path) -> None:
@@ -236,11 +210,10 @@ def test_parallel_default_is_serial_equivalent(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     head = _git(repo, "rev-parse", "main")
     events: list = []
-    dev = _Dev(events, DevOutcome(issue_number=1, tag="v2", committed=True))
-    orch = _orch(repo, events, [dev], fixed_k=2)  # _orch 不传 max_parallel_users → 默认 1
+    orch = _orch(repo, events, fixed_k=2)  # _orch 不传 max_parallel_users → 默认 1
 
     orch.run_round("c")
-    assert events[:4] == [
+    assert events == [
         ("launch", head),
         ("session", head),
         ("launch", head),
@@ -278,7 +251,6 @@ def test_round_materializes_shared_workspace_before_launch(tmp_path, monkeypatch
                 SeedScenario(description="s", workspace=WorkspaceSpec(fixture="billing-split")),
             )
         ],
-        developer_agents=[_Dev(events, DevOutcome())],
         run_session_fn=run_session_fn,
         initial_ref="main",
     )
@@ -312,7 +284,6 @@ def test_round_ensures_deps_after_materialize_before_launch(tmp_path, monkeypatc
         fixed_set=[
             (_persona(), SeedScenario(description="s", workspace=WorkspaceSpec(fixture="funcy"))),
         ],
-        developer_agents=[_Dev(events, DevOutcome())],
         run_session_fn=run_session_fn,
         initial_ref="main",
     )
@@ -332,7 +303,7 @@ def test_round_no_workspace_skips_ensure_deps(tmp_path, monkeypatch) -> None:
         "auto_designer.loop.orchestrator.ensure_deps",
         lambda ws, spec: (_ for _ in ()).throw(AssertionError("不应 ensure_deps")),
     )
-    orch = _orch(repo, [], [_Dev([], DevOutcome())])  # fixed_set 场景无 workspace
+    orch = _orch(repo, [])  # fixed_set 场景无 workspace
     orch.run_round("c")  # 不抛即通过
 
 
@@ -354,7 +325,6 @@ def test_round_no_workspace_uses_shared_scratch(tmp_path, monkeypatch) -> None:
         launcher=_WsLauncher(events),
         harness_repo=str(repo),
         fixed_set=[(_persona(), SeedScenario(description="s"))],  # workspace=None
-        developer_agents=[_Dev(events, DevOutcome())],
         run_session_fn=run_session_fn,
         initial_ref="main",
     )
@@ -365,49 +335,33 @@ def test_round_no_workspace_uses_shared_scratch(tmp_path, monkeypatch) -> None:
     assert launch_ws is not None and launch_ws == session_ws  # harness 与用户 agent 同一目录
 
 
-# Spec-0021/T1：编排仓完整性绊线——b 段后调用；guard 抛出中止本轮并传播（fail-closed）。
+# Spec-0021/T1（Spec-0032/T4 调整）：编排仓完整性绊线——每轮末调用一次；抛出即中止本轮（fail-closed）。
 
 
-def _orch_with_guard(repo, events, developers, guard):
-    def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
-        events.append(("session", harness[1]))
-
-    return Orchestrator(
-        launcher=_Launcher(events),
-        harness_repo=str(repo),
-        fixed_set=[(_persona(), SeedScenario(description="s"))],
-        developer_agents=developers,
-        run_session_fn=run_session_fn,
-        initial_ref="main",
-        integrity_guard=guard,
-    )
-
-
-def test_integrity_guard_called_after_b_phase(tmp_path) -> None:
+def test_integrity_guard_called_once_at_round_end(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []
 
     def guard() -> None:
         events.append(("guard", None))
 
-    orch = _orch_with_guard(repo, events, [_Dev(events, DevOutcome())], guard)
+    orch = _orch(repo, events, integrity_guard=guard)
     orch.run_round("c")
 
-    # guard 在 b 段（dev）之后、返回前恰调一次
+    # guard 在会话之后、返回前恰调一次
     assert [k for k, *_ in events].count("guard") == 1
-    assert events.index(("guard", None)) > max(i for i, e in enumerate(events) if e[0] == "dev")
+    assert events[-1] == ("guard", None)
 
 
 def test_integrity_guard_raise_aborts_round(tmp_path) -> None:
     from auto_designer.dev.repo_guard import RepoIntegrityError
 
     repo = _seed_repo(tmp_path)
-    events: list = []
 
     def guard() -> None:
         raise RepoIntegrityError("编排仓被动了")
 
-    orch = _orch_with_guard(repo, events, [_Dev(events, DevOutcome())], guard)
+    orch = _orch(repo, [], integrity_guard=guard)
     with pytest.raises(RepoIntegrityError):  # 安全事件 fail-closed，向上传播中止
         orch.run_round("c")
 
@@ -416,10 +370,10 @@ def test_no_guard_is_backward_compatible(tmp_path) -> None:
     """不传 integrity_guard → 行为与今天完全一致（退化）。"""
     repo = _seed_repo(tmp_path)
     head = _git(repo, "rev-parse", "main")
-    assert _orch(repo, [], [_Dev([], DevOutcome())]).run_round("c") == head
+    assert _orch(repo, []).run_round("c") == head
 
 
-# Spec-0029/T8：生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入 → b。
+# Spec-0029/T8（Spec-0032/T4 调整）：生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入收尾。
 
 
 class _Phase:
@@ -439,7 +393,7 @@ class _Phase:
         self._events.append(("d", self._name, None))
 
 
-def test_beats_order_triage_divergent_then_synth_then_owner_then_dev(tmp_path) -> None:
+def test_beats_order_triage_divergent_then_synth_then_owner(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []
     t0 = _Phase(events, "triage0")
@@ -455,7 +409,6 @@ def test_beats_order_triage_divergent_then_synth_then_owner_then_dev(tmp_path) -
         launcher=_Launcher(events),
         harness_repo=str(repo),
         fixed_set=[(_persona(), SeedScenario(description="s"))],
-        developer_agents=[_Dev(events, DevOutcome())],
         run_session_fn=run_session_fn,
         initial_ref="main",
         triagers=[t0, t1],
@@ -465,11 +418,11 @@ def test_beats_order_triage_divergent_then_synth_then_owner_then_dev(tmp_path) -
     )
     orch.run_round("c")
 
-    kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d", "dev")]
-    # a → 第一拍（triage×2∥divergent，组内顺序不定）→ 第二拍 synth → owner → dev
+    kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d")]
+    # a → 第一拍（triage×2∥divergent，组内顺序不定）→ 第二拍 synth → owner 收尾（无 dev 拍）
     assert kinds[0] == "session"
     assert set(kinds[1:4]) == {"triage0", "triage1", "divergent"}
-    assert kinds[4:] == ["synth", "owner", "dev"]
+    assert kinds[4:] == ["synth", "owner"]
     # 分片参数：第 k 个 triager 拿 (k, n)
     shards = {e[1]: e[2] for e in events if e[0] == "d" and e[1].startswith("triage")}
     assert shards == {"triage0": (0, 2), "triage1": (1, 2)}
@@ -486,14 +439,13 @@ def test_no_owner_skips_admission(tmp_path) -> None:
         launcher=_Launcher(events),
         harness_repo=str(repo),
         fixed_set=[(_persona(), SeedScenario(description="s"))],
-        developer_agents=[_Dev(events, DevOutcome())],
         run_session_fn=run_session_fn,
         initial_ref="main",
         triagers=[_Phase(events, "triage")],
     )
     orch.run_round("c")  # owner=None 不炸、准入段跳过
-    kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d", "dev")]
-    assert kinds == ["session", "triage", "dev"]
+    kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d")]
+    assert kinds == ["session", "triage"]
 
 
 def test_callable_session_plan_redraws_each_round(tmp_path) -> None:
@@ -513,7 +465,6 @@ def test_callable_session_plan_redraws_each_round(tmp_path) -> None:
         launcher=_Launcher(events),
         harness_repo=str(repo),
         fixed_set=plan,
-        developer_agents=[_Dev(events, DevOutcome())],
         run_session_fn=run_session_fn,
         initial_ref="main",
     )

@@ -1,0 +1,43 @@
+# Spec-0032/T6：harness 仓最小冒烟 CI——交付面 PR 门禁的工程质量闸（绝不跑 benchmark / 不调 LLM）。
+# 只验「harness 结构没被改崩」：全仓可编译 + 关键制品在位。跑在 deploy/gitea 的 act_runner 上
+# （ubuntu-latest → python:3.12 容器，纯标准库，零外部依赖安装）。
+name: smoke
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 结构冒烟（编译 + 制品在位）
+        # 实证修复：用 python3（runner 镜像 catthehacker/ubuntu:act-latest 的 python 入口名）。
+        run: |
+          python3 -m compileall -q .
+          test -f entry.py
+          test -f params.yaml
+          test -d agents
+          echo "smoke ok"
+      - name: 边界检查（服务端硬化——pre-commit 可被 --no-verify 绕，此处绕不开）
+        run: |
+          python3 - <<'EOF'
+          # 仓内只允许 harness 自身制品（Spec-0032 实证修复#1 的服务端兜底）。
+          # 白名单与 auto-designer 的 dev/harness_boundary.py 同源——harness 仓独立、无法 import，
+          # 改动需两处同步；.gitea 在此放行（本 workflow 就住在里面，写权限由 pre-commit 拒）。
+          import os
+          import sys
+
+          allowed = {
+              "HELP.md", "RUNTIME.md", ".env.example", "requirements.txt", "agent.yaml",
+              "params.yaml", "entry.py", ".gitignore", ".gitea",
+              "agents", "tools", "scripts", "tests",
+          }
+          ignorable = {".git", "__pycache__"}
+          bad = sorted(p for p in os.listdir(".") if p not in allowed and p not in ignorable)
+          if bad:
+              print("[boundary] 越界顶层路径（任务代码/脚手架不得进 harness 仓）：", bad)
+              sys.exit(1)
+          print("boundary ok")
+          EOF
