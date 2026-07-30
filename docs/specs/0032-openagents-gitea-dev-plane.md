@@ -7,7 +7,7 @@ summary: 现行开发者侧是过渡实现（spec-0025/T5 自述）：nexau dev 
 tasks:
   - id: T1
     title: OpenAgents 仓：forge 分发层——alias-import 接缝 + 配置段 + merger 提示词参数化
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -30,7 +30,7 @@ tasks:
     acceptance: forge 缺省回落 github、既有测试全绿（存量零回归）；`forge=gitea` 时 forge.* 解析到 gitea driver；merger PROMPT 无 gh 字面量；hermetic 测试不触网。
   - id: T2
     title: OpenAgents 仓：Gitea REST driver——github.py 同名公共面对 Gitea /api/v1
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -44,7 +44,7 @@ tasks:
     acceptance: 假 HTTP 层 hermetic 测试覆盖全部公共面函数的请求形状与响应解析；语义映射逐条有测试（含 mergeable 三态收敛、WIP 前缀往返、zero-status 与 zero-check 等价）；对本仓 deploy/gitea 起的真 Gitea 1.22 手工冒烟一轮（建 issue→打 label→开 PR→merge→issue 自动关）。
   - id: T3
     title: 准入交接：Owner 改打 openagents 发现标签，plane READY 收编 {ready, openagents}
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -59,7 +59,7 @@ tasks:
     acceptance: admit 后 issue 带 openagents 且 plane==READY；vigil 盖 ready 后 plane 仍 READY（幂等）；covers 级联回归测试不变绿；老标签映射不回归。
   - id: T4
     title: dev 侧退役：AgenticDeveloper/developer_agent 删除，orchestrator 去 dev 拍
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -72,14 +72,17 @@ tasks:
       - backend/agent_defs/developer_agent/systemprompt.md
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/loop/roster.py
+      - backend/auto_designer/loop/live_tracer.py
+      - backend/scripts/probe_wait_signals_to_evolution.py
       - backend/tests/dev/test_agentic_developer.py
       - backend/tests/loop/test_orchestrator.py
+      - backend/tests/loop/test_parallel_sessions.py
       - backend/tests/loop/test_roster.py
     scope: 删除 dev/agentic_developer.py 与 agent_defs/developer_agent/ 整目录（职责落入 OpenAgents implementer+deliver+merger）。orchestrator：ctor 去 developer_agents 参数，run_round 删 dev 串行拍；c 步回灌保持「main 最新 HEAD SHA 纯观测游标」原样（spec-0007 语义，谁推进 main 都兼容——本方案后推进者是 vigil 的 merge）。roster：developer 数改语义为「交付面并发 K」（映射 vigil --parallel，默认 1），键名保留 developer 以兼容 env N_DEVELOPERS。测试同步：test_agentic_developer 删除，orchestrator 测试改为断言无 dev 拍且 c 步读 SHA，roster 测试改新语义。
     acceptance: 全量后端测试绿；orchestrator run_round 仅含 a 两拍生成 + Owner 准入 + c 步；仓内无 AgenticDeveloper 引用残留（grep 零命中）。
   - id: T5
     title: vigil 接线：run.py 写 openagents.yml、管 vigil 子进程生命周期、vK tag 退役
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -89,12 +92,13 @@ tasks:
     parallel: false
     files:
       - backend/run.py
+      - backend/scripts/run_swebench_closed_loop.py
       - backend/tests/test_run_vigil.py
     scope: run.py：种子推送后在 HARNESS_REPO 写 `.openagents/openagents.yml`（forge=gitea + deploy/gitea 的 base_url/owner/repo/token_env、stages 定稿 triage=skip / rfc=skip(起步，显式告警可接受) / conflict=agent / ci=skip(T6 就位后改 agent) / e2e=skip / review=agent / merge=agent、labels=[openagents]、interval=30、release=manual）；以 subprocess.Popen 启动 `openagents vigil --parallel K`（cwd=HARNESS_REPO，K=roster developer 数，stdout/stderr 落 data/vigil.log），run 退出时 terminate+wait 兜底 kill。openagents 以独立 CLI 接入（uv tool install 钉版本，不 vendor 不 import，见正文 §4.3 部署形态），run.py 启动前预检 `openagents` 命令存在。vigil 的本地状态（.openagents/ 下 sqlite 队列、claims flock、runtime-state）随 _seed_harness_repo 的 rmtree 每次 run 自然重置，无跨 run 脏状态。退役 vK tag 全链路：dev 预算 env（DEV_BUDGET_*）、_next_version/ls-remote tags 逻辑、banner 文案更新。平台注记：vigil 依赖 fcntl.flock，交付面仅 Linux/macOS 可跑（生产环境 Linux 满足）；Windows 本地只跑单测。凭证注记：交付面 coding 后端是 claude CLI（OpenAgents claude_code backend），DEV_LLM_* 不再消费，宿主需登录 claude CLI；Gitea token 经 GITEA_TOKEN env 传给 vigil 子进程。
     acceptance: 单测（mock Popen）断言 yml 内容与 stages 定稿一致、vigil 启停与日志路径正确、异常退出有兜底；banner/预算 env 无 vK 残留；Linux 生产环境手工冒烟一轮闭环（Owner admit → vigil 开 PR → merge → c 步游标前移）。
   - id: T6
     title: harness 仓最小 CI：Gitea Actions runner + 冒烟 workflow
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
@@ -105,11 +109,11 @@ tasks:
       - backend/deploy/gitea/docker-compose.yml
       - backend/deploy/gitea/bootstrap.sh
       - backend/harness_template/.gitea/workflows/smoke.yml
-    scope: docker-compose 开 GITEA__actions__ENABLED=true 并加 act_runner 服务（注册 token 走 bootstrap.sh）；harness_template 随种子带 .gitea/workflows/smoke.yml——最小冒烟：起 entry 子进程、发一条固定消息、断言回一行合法 JSON reply（不跑 benchmark、不调真 LLM，用 stub 模型 env）。就位后把 T5 写的 openagents.yml `ci` 改 agent（vigil 判定表第⑦条「零 check=永等 CI」——没有本任务时 ci 必须 skip，否则全部票卡到看门狗）。
-    acceptance: push 到 Gitea 后 commit status 可见且 smoke 绿；红 CI 的 PR 被 vigil 派 implementer 打回（fix-ci 路径手工验证一次）；ci:agent 配置随本任务落地。
+    scope: docker-compose 开 GITEA__actions__ENABLED=true 并加 act_runner 服务（注册 token 走 bootstrap.sh）；harness_template 随种子带 .gitea/workflows/smoke.yml——最小冒烟：起 entry 子进程、发一条固定消息、断言回一行合法 JSON reply（不跑 benchmark、不调真 LLM，用 stub 模型 env）。ci 闸经 env `VIGIL_CI_STAGE=agent` 切换开启（缺省 skip——vigil 判定表第⑦条「零 check=永等 CI」，须先在部署环境实证 act_runner 真在跑再开，bootstrap.sh 有提示；比「随任务硬切 agent」多一步实证，防止 runner 未就绪时全部票卡到看门狗）。
+    acceptance: push 到 Gitea 后 commit status 可见且 smoke 绿；红 CI 的 PR 被 vigil 派 implementer 打回（fix-ci 路径手工验证一次）；VIGIL_CI_STAGE 覆盖有单测；部署实证后置 agent。
   - id: T7
     title: 交付面观测：GiteaTracker PR 读路径 + web API + 前端交付面视图
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
@@ -121,6 +125,8 @@ tasks:
       - backend/auto_designer/web/api.py
       - backend/tests/web/test_api.py
       - frontend/src/types.ts
+      - frontend/src/api.ts
+      - frontend/src/lib/issueMeta.ts
       - frontend/src/App.tsx
       - frontend/src/components/SidePanel.tsx
       - frontend/src/components/DeliveryPanel.tsx
@@ -128,7 +134,7 @@ tasks:
     acceptance: api 测试覆盖 delivery 段形状；前端 tsc+build 绿；needs-human>0 时面板有显式告警态。
   - id: T8
     title: 文档收尾：CLAUDE.md 架构段与 spec 制品再生成
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
