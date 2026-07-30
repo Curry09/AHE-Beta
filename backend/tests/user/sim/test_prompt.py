@@ -195,6 +195,9 @@ def test_waiting_three_builders_tags() -> None:
     assert "if the help text says so" not in intent
     assert "Read <harness_help>" not in intent
     assert "# MENU" in act
+    assert "/status" not in act and "/btw" not in act
+    assert "not listed in <harness_help> is just raw text" in act
+    assert "report_issue" in act
     for action in ("keep_waiting", "send_message", "interrupt", "give_up"):
         assert action in act
 
