@@ -15,8 +15,14 @@ from auto_designer.user.sim.dimensions import (
 )
 from auto_designer.user.sim.feeling import FeelingScore
 from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.loop import MAX_TURNS, SessionResult, run_session
+from auto_designer.user.sim.loop import (
+    MAX_TURNS,
+    SessionResult,
+    _record_private_evidence,
+    run_session,
+)
 from auto_designer.user.sim.persona_client import ScriptedPersonaClient
+from auto_designer.user.sim.state import State
 
 
 def _persona(d1: D1Eval, d43: D43Correct, pid: str = "P") -> Persona:
@@ -160,6 +166,36 @@ def test_main_action_space_has_no_private_verify_action() -> None:
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert all("verify_self" not in t.action_space for t in res.turns)
     assert all("<self_observation>" not in u for u in client.seen)
+
+
+def test_private_tool_steps_become_bounded_evidence_memory() -> None:
+    state = State()
+    calls = [
+        {
+            "role": "main_judge",
+            "parsed": {
+                "perceive": "I inspected the diff and saw DataArray.integrate now accepts coord."
+            },
+            "steps": [
+                {"kind": "tool", "text": '{"ignored": "bad prefix"}'},
+                {
+                    "kind": "tool",
+                    "text": 'read_file {"path": "xarray/core/dataarray.py"}',
+                },
+                {
+                    "kind": "tool_result",
+                    "text": '{"ok": true, "content": "very long file body"}',
+                },
+            ],
+        }
+    ]
+    _record_private_evidence(state=state, calls=calls, phase="active")
+    assert state.private_evidence is not None
+    assert len(state.private_evidence) == 1
+    evidence = state.private_evidence[0]
+    assert evidence.startswith("[E1 after_reply/judge]")
+    assert "read_file `xarray/core/dataarray.py`" in evidence
+    assert "DataArray.integrate now accepts coord" in evidence
 
 
 def test_runs_one_session_returns_result() -> None:

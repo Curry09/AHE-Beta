@@ -127,6 +127,14 @@ _TASK_APPRAISAL = (
 )
 
 
+def _private_evidence_block(state: State) -> str:
+    """用户自己的 private tool 证据短记忆；空则不注入。"""
+    items = list(state.private_evidence or [])
+    if not items:
+        return ""
+    return "<private_evidence>\n" + "\n\n".join(items[-8:]) + "\n</private_evidence>"
+
+
 def _main_context_parts(
     task: str,
     history_lines: list[str],
@@ -149,6 +157,9 @@ def _main_context_parts(
     if help_text.strip():
         parts.append(f"<harness_help>\n{help_text.strip()}\n</harness_help>")
     parts.append(f"<history>\n{hist}\n</history>")
+    private_evidence = _private_evidence_block(state)
+    if private_evidence:
+        parts.append(private_evidence)
     parts.append(f"<harness_output>\n{ho}\n</harness_output>")
     if include_action_space:
         parts.append(f"<action_space>\n{action_space}\n</action_space>")
@@ -329,6 +340,9 @@ def _waiting_context_parts(
         parts.append(f"<harness_help>\n{help_text.strip()}\n</harness_help>")
     parts.append(f"<task>\n{task}\n</task>")
     parts.append(f"<history>\n{hist}\n</history>")
+    private_evidence = _private_evidence_block(state)
+    if private_evidence:
+        parts.append(private_evidence)
     prior_body = _activity_bullets(prior_activity)
     if prior_body:
         parts.append(f"<prior_activity>\n{prior_body}\n</prior_activity>")

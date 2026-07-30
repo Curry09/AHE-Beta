@@ -3,7 +3,7 @@ number: "0031"
 title: 用户模拟阶段契约下沉：薄 base system 与 prompt 去平台手册化
 issue: 0
 slug: user-sim-stage-contracts
-summary: 把用户模拟的全局 BLOCK_G 拆成薄 base system 与阶段局部 contract：judge/intent 不再继承动作、终止、issue、rating 等平台操作手册；act 只收敛外部动作（send_message + 终止），私有查验属于 judge 内层 agentic 行为；保留用户模型自标注 verdict，不引入后处理分类器。
+summary: 把用户模拟的全局 BLOCK_G 拆成薄 base system 与阶段局部 contract：judge/intent 不再继承动作、终止、issue、rating 等平台操作手册；act 只收敛外部动作（send_message + 终止），私有查验属于用户内层 agentic 行为，并以 private_evidence 摘要作为跨轮用户记忆；保留用户模型自标注 verdict，不引入后处理分类器。
 tasks:
   - id: T1
     title: 写 0031 活快照
@@ -45,8 +45,8 @@ tasks:
       - backend/auto_designer/user/sim/loop.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/user/sim/test_heartbeat.py
-    scope: 保持主 loop 与心跳 loop 的 judge→intent→act 时序不变，按新的 prompt 分层补集成 guard：judge/intent 的实际 LLM user prompt 不出现动作 schema、菜单、terminal 指导；act prompt 才出现动作 contract；主流程动作空间移除 legacy verify_self，并把所有 harness-facing 外部交互收敛为 send_message。若 prompt contract 拆分需要调整 _main_decide/_heartbeat_once 的传参或历史筛选，集中在本 Task 处理。
-    acceptance: test_loop/test_heartbeat 证明运行时投喂遵守阶段边界；主 loop 与心跳 loop 仍能完成 send_message/accept、等待 keep_waiting/send_message/interrupt/give_up 路径；act 收敛有意识：action=free、resolve_action、classify_action fallback 路径不崩，外层 action_space 不含 verify_self/ask_harness_run/request_evidence/give_feedback/refine_request/grant_autorun；不引入后处理 verdict 分类器；原 loop/heartbeat 测试全绿。
+    scope: 保持主 loop 与心跳 loop 的 judge→intent→act 时序不变，按新的 prompt 分层补集成 guard：judge/intent 的实际 LLM user prompt 不出现动作 schema、菜单、terminal 指导；act prompt 才出现动作 contract；主流程动作空间移除 legacy verify_self，并把所有 harness-facing 外部交互收敛为 send_message；将任意阶段 private tool-use 摘要为 private_evidence，作为用户自己的跨轮记忆同时喂给 main/waiting 的 judge/intent/act。若 prompt contract 拆分需要调整 _main_decide/_heartbeat_once 的传参或历史筛选，集中在本 Task 处理。
+    acceptance: test_loop/test_heartbeat 证明运行时投喂遵守阶段边界；主 loop 与心跳 loop 仍能完成 send_message/accept、等待 keep_waiting/send_message/interrupt/give_up 路径；act 收敛有意识：action=free、resolve_action、classify_action fallback 路径不崩，外层 action_space 不含 verify_self/ask_harness_run/request_evidence/give_feedback/refine_request/grant_autorun；private_evidence 只由 private tool steps + parsed.perceive 摘要生成、带 E# phase/stage 标签、长度有界，并在后续 main/waiting prompt 可见；不引入后处理 verdict 分类器；原 loop/heartbeat 测试全绿。
   - id: T4
     title: persona_client 与 agentic 路径适配阶段契约
     status: done
@@ -72,6 +72,8 @@ tasks:
 本组把用户模拟 prompt 从「全局平台操作手册」改为「薄 base system + 阶段局部 contract」。`build_system()` 不再把动作空间、动作语义、终止规则、issue 写作、rating 评分、JSON action schema 等平台契约塞进所有阶段；base system 只保留用户角色、persona、感知边界、禁止隐藏真相与保持会话一致性。主流程与等待流程仍保持 judge → intent → act 三跳，但每跳只暴露本阶段必要信息：judge 只产 `perceive + verdict/judgment`，intent 只产开放意愿，act 才看到菜单与 action/message/gap schema。issue 与 rating 的契约只在对应收尾 prompt 中出现。
 
 主流程 act 阶段只收敛**外部交互动作**：对 harness 的所有继续沟通统一为 `send_message`，本地终止为 `accept` / `accept_with_reservations` / `file_issue` / `give_up`。旧外层 `verify_self` 退役；读文件、跑命令、看 diff、验证测试输出等私有查验是用户 agent 的内层 agentic 行为，主要服务 judge 阶段形成 `perceive + verdict`，不是 act 菜单按钮。judge 若认为当前 verdict 依据不足且 persona 有私有工具、低成本可查，应在本阶段调用工具；若不查，应在 `perceive` 中说明自己依赖 harness report 或认为不值得查。
+
+私有查验还是用户自己的动作，必须形成会话内记忆。任意 main/waiting 阶段的内层工具调用结束后，框架从 tool 动作和该阶段 `parsed.perceive` 生成有界 `<private_evidence>` 摘要，例如 `[E2 after_reply/judge] Private tools: read_file ...; Conclusion: ...`。该块喂给后续 main/waiting 的 judge/intent/act，帮助用户记住自己已经私下查过什么、观察到什么，以及哪些证据冲突仍未解决；它不发给 harness，不替代 `sim_trace` raw steps，也不包含完整 stdout / 文件全文 / benchmark oracle。
 
 本组保留「用户模型同出自然语言与粗标签」的现有形态：judge 阶段仍由同一个用户模型输出 `perceive` 与 `verdict`，不引入后处理分类器；但 `verdict` 被定位为对自己自然语言判断的粗粒度 bookkeeping bucket，而不是平台状态机指令。`<mood>` 人话化、waiting history 人话化、`report_issue` 工具阶段过滤、progress sanitizer 与 legacy user-agent prompt 清理暂不纳入实现范围，列为待定项。
 
@@ -126,12 +128,12 @@ Agentic 内层 tool-use 仍然保留 private tool 协议与工具列表，但不
 | 层 | 内容 | 禁止内容 |
 |----|------|----------|
 | Base system | 用户角色、persona、感知边界、禁止隐藏真相、禁止伪造验证、历史一致性 | action ids、terminal 语义、`<action_space>`、issue/rating contract、阶段输出 schema |
-| Main judge | 当前任务/历史/输出/mood；`perceive + verdict` 本阶段 schema；必要时内层 private tool 查验 | action/message/gap schema、菜单、终止建议、issue 指导 |
-| Main intent | judgment + 原始愿望 schema：不考虑当前 harness 是否支持 | 动作菜单、按钮 id、终止规则、help-text-gated 可用性判断 |
-| Main act | `<action_space>`、外部动作语义（`send_message` + 终止）、`action/message/gap` schema | 评分 rubric、issue 写作规则、private investigation action |
-| Waiting judge | 等待时长、progress/prior_activity、mood；`perceive + judgment` schema | waiting 菜单、action schema |
-| Waiting intent | waiting judgment + 原始愿望 schema：可说出希望存在但当前未必支持的互动 | waiting 菜单、action schema、help-text-gated 可用性判断 |
-| Waiting act | waiting 菜单与 `action/message/gap` schema | issue/rating contract |
+| Main judge | 当前任务/历史/输出/private_evidence/mood；`perceive + verdict` 本阶段 schema；必要时内层 private tool 查验 | action/message/gap schema、菜单、终止建议、issue 指导 |
+| Main intent | judgment + private_evidence + 原始愿望 schema：不考虑当前 harness 是否支持 | 动作菜单、按钮 id、终止规则、help-text-gated 可用性判断 |
+| Main act | `<action_space>`、private_evidence、外部动作语义（`send_message` + 终止）、`action/message/gap` schema | 评分 rubric、issue 写作规则、private investigation action |
+| Waiting judge | 等待时长、progress/prior_activity/private_evidence/mood；`perceive + judgment` schema | waiting 菜单、action schema |
+| Waiting intent | waiting judgment + private_evidence + 原始愿望 schema：可说出希望存在但当前未必支持的互动 | waiting 菜单、action schema、help-text-gated 可用性判断 |
+| Waiting act | private_evidence + waiting 菜单与 `action/message/gap` schema | issue/rating contract |
 | Issue | 第一人称 issue 写作要求 | action_space、rating rubric |
 | Rating | 1–4 体感评分 rubric | action menu、issue 写作规则 |
 
@@ -170,6 +172,30 @@ waiting judge 同理保留：
 judge / intent 更发散后，act 阶段承担唯一的动作收敛职责。实现不得新增 verdict 后处理分类器，但必须保持既有动作收敛链可用：act prompt 明确给出菜单与 `gap`；`action:"free"` 可继续走 `classify_action(system, ret, space)`（若 client 支持）；最终仍由 `resolve_action(ret, space, persona)` 负责越权投影、channel/message 一致性与安全兜底。测试需覆盖 free / resolve / 原主流程路径仍可完成，不因上游 intent 更开放而崩。
 
 主流程 act 只表达外部交互：`send_message` 表示向 harness 发任意自然语言正文，覆盖原 `send_task` / `refine_request` / `give_feedback` / `ask_harness_run` / `request_evidence` / `grant_autorun` 等标签化变体；`accept` / `accept_with_reservations` / `file_issue` / `give_up` 表示本地收场。`verify_self` 不再是合法外层动作；如果用户需要自己查文件、diff 或测试，应该已经在 judge 内层工具循环中完成，并作为 `perceive` 的证据。
+
+### Private evidence memory
+
+`private_evidence` 是用户自己的会话内私有证据记忆，不是 harness transcript，也不是设计师 timeline 的 raw dump。来源限定为本会话 `persona_trace.steps` 中的 private `tool` / `tool_result` / `tool_error`，并结合同一次调用的 `parsed.perceive` 生成短结论。
+
+格式约定：
+
+```text
+<private_evidence>
+[E1 opening/judge]
+Private tools: run_shell `pwd && ls -la`.
+Conclusion: The workspace is empty; no implementation or tests exist yet.
+
+[E2 after_reply/judge]
+Private tools: read_file `xarray/core/dataarray.py`; read_file `xarray/core/dataset.py`.
+Conclusion: DataArray.integrate now accepts `coord` and delegates to Dataset.integrate(coord, ...).
+
+[E3 during_wait/act]
+Private tools: run_shell `git status --short`.
+Observed: returncode=0; stdout: M money.py
+</private_evidence>
+```
+
+规则：`E#` 是私有证据序号，独立于外层 `turn` 编号；位置标签使用 `opening|after_reply|during_wait` + `judge|intent|act`，避免 waiting loop 与 main turn 混淆。只记录实际发生过的 private tool-use；harness progress/prior_activity 不进入此块。每条证据最多一小段，优先写 tool 动作和 `parsed.perceive` 的 1-2 句结论；stdout / 文件全文只截断成短 `Observed`。保留最近若干条并限制总字符数，避免上下文膨胀。该块同时喂给 main/waiting 的 judge、intent、act，让三阶段都能感知用户自己已经查过什么。
 
 ### Inner tool-use system
 

@@ -95,7 +95,7 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 把 harness 收敛为真人可运行产品：harness 模板内只保留 HELP.md 作为 /help 内容源、RUNTIME.md 作为维护说明；README/USER/MANUAL 不再作为模板文档，INTERFACE 归 auto-designer 平台侧；connector 适配 sim-user 到真人接口；launcher/template 支持 stdio-jsonl-v1 并兼容 legacy。
 
 ### 0031 用户模拟阶段契约下沉：薄 base system 与 prompt 去平台手册化
-把用户模拟的全局 BLOCK_G 拆成薄 base system 与阶段局部 contract：judge/intent 不再继承动作、终止、issue、rating 等平台操作手册；act 只收敛外部动作（send_message + 终止），私有查验属于 judge 内层 agentic 行为；保留用户模型自标注 verdict，不引入后处理分类器。
+把用户模拟的全局 BLOCK_G 拆成薄 base system 与阶段局部 contract：judge/intent 不再继承动作、终止、issue、rating 等平台操作手册；act 只收敛外部动作（send_message + 终止），私有查验属于用户内层 agentic 行为，并以 private_evidence 摘要作为跨轮用户记忆；保留用户模型自标注 verdict，不引入后处理分类器。
 
 ## 全局看板
 
