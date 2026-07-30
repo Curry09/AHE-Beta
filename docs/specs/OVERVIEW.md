@@ -100,6 +100,9 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 ### 0032 开发者侧换轨 OpenAgents：需求面/交付面二分 + Gitea forge 适配
 现行开发者侧是过渡实现（spec-0025/T5 自述）：nexau dev 领 ready 票后直推 main，无分支/PR/评审/CI，坏 commit 只能靠后续多轮迭代回正；且多 dev 因同仓 push 互斥只能串行。OpenAgents（RFC 驱动多 agent 交付框架，独立仓）已把「issue→分支/worktree→spec→PR→CI→评审→合并」的交付闭环打磨成一个 level-triggered 守夜人（vigil），其执行面入口恰好与我方三平面（spec-0029）的终点同名同义——双方都以 `ready` label 为唯一工作队列白名单。本 spec 把接缝切在准入这一刀上：auto-designer 保留需求面（用户模拟→证据→提案→Owner 唯一准入），OpenAgents 接管交付面（ready→PR→合并），两系统仅通过 issue 标签与 main SHA 交互、零代码耦合。职责裁决：OpenAgents 的 triager/admitter 停用（准入职责已归 Owner，`stages.triage=skip`）、curator/drafter/implementer/reviewer/deliver/merger/replier 接管交付面；我方 AgenticDeveloper + developer_agent 整体退役，orchestrator 删 dev 拍（c 步回灌 main SHA 语义不变，天然兼容 PR 合并模型）。平台约束：本仓基建在本地 Gitea（spec-0002），而 OpenAgents 的 utils/github.py 全绑 gh CLI——故 OpenAgents 仓新增 forge 分发层（alias-import 零 call-site 改动）+ Gitea REST driver（checks→commit status、blocked_by→issue dependencies、draft→WIP 前缀、merge/update→Gitea pulls API 等语义映射）。直推 trunk 升级为 PR 门禁不违反 held-out 约束：CI/评审是工程质量闸（harness 仓冒烟，绝不跑 benchmark），体感仍纯观测、benchmark 全程 held-out。vK tag 体系退役，观测锚点=merge commit。
 
+### 0033 交付面容器化围堵：vigil 专用容器（零宿主挂载、容器内自 clone）+ 出口代理 allowlist + 观测游标改跟 origin/main
+spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypassPermissions），nexau 时代的进程内 workspace_jail 够不着它——WSL/宿主裸跑时嵌套 agent 可读整个文件系统（编排仓、data/sessions 过拟合信道）且出网无限制，现存兜底（凭证隔离/boundary 钩子/repo_guard 绊线）只管「改了什么、推到哪」，不管「看了什么」。本 spec 把 spec-0021/0022 定下的「进程内 jail 靠不住 → 环境级围堵（无凭证 + 网络出口 allowlist）」完整落地：vigil 跑进专用容器（openagents + claude CLI + git），工作目录为**容器内自 clone 的 harness 仓**——零宿主挂载，「只能看到 harness 仓」从软件承诺变成文件系统边界；网络上 vigil 容器只挂 internal 网络（可达 gitea），外网经 egress 代理 allowlist（仅放行 Anthropic API 域）。可行性关键：两面（需求面/交付面）的唯一交互媒介本来就是 Gitea（issue 标签 + push/merge + main SHA），vigil 不需要宿主文件系统的任何东西；容器每 run 重建 = clone 与 .openagents 运行态自动归零（原 rmtree 重置语义保留）。连带修一个现存 bug：spec-0032 后推进 main 的是 Gitea 上的 server-side merge，而 orchestrator c 步与 launcher 读的是**本地** harness 仓的 main——本地永远停在 seed，游标不前进、用户永远跑 v0；_resolve_head 改为先 fetch origin 再解析 origin/main（无 origin 时退化本地，兼容既有测试与 Fake 场景）。宿主 subprocess 直跑模式保留为显式 opt-in（VIGIL_MODE=subprocess，仅限盯屏联调），容器为缺省。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -237,6 +240,10 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 | 0032 | 0032/T6 | harness 仓最小 CI：Gitea Actions runner + 冒烟 workflow | done | T5 | backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/bootstrap.sh<br>backend/harness_template/.gitea/workflows/smoke.yml |
 | 0032 | 0032/T7 | 交付面观测：GiteaTracker PR 读路径 + web API + 前端交付面视图 | done | T5 | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py<br>frontend/src/types.ts<br>frontend/src/api.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/App.tsx<br>frontend/src/components/SidePanel.tsx<br>frontend/src/components/DeliveryPanel.tsx |
 | 0032 | 0032/T8 | 文档收尾：CLAUDE.md 架构段与 spec 制品再生成 | done | T5 | CLAUDE.md |
+| 0033 | 0033/T1 | vigil 容器与网络基建：Dockerfile/entrypoint/build + internal 网络 + egress 代理 allowlist | pending | — | backend/deploy/vigil/Dockerfile<br>backend/deploy/vigil/entrypoint.sh<br>backend/deploy/vigil/build.sh<br>backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/egress-proxy.conf |
+| 0033 | 0033/T2 | run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in | pending | T1 | backend/run.py<br>backend/tests/test_run_vigil.py |
+| 0033 | 0033/T3 | 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地） | pending | — | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py |
+| 0033 | 0033/T4 | 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph | pending | T2 | CLAUDE.md |
 
 ## 跨 feature 关系图
 
@@ -439,6 +446,12 @@ graph LR
         n0032_T7["T7 交付面观测：GiteaTracker PR 读路径 + web API + 前端交付面视图"]
         n0032_T8["T8 文档收尾：CLAUDE.md 架构段与 spec 制品再生成"]
     end
+    subgraph G0033[0033 vigil-container-containment]
+        n0033_T1["T1 vigil 容器与网络基建：Dockerfile/entrypoint/build + internal 网络 + egress 代理 allowlist"]
+        n0033_T2["T2 run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in"]
+        n0033_T3["T3 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地）"]
+        n0033_T4["T4 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -558,6 +571,8 @@ graph LR
     n0032_T6 --> n0032_T5
     n0032_T7 --> n0032_T5
     n0032_T8 --> n0032_T5
+    n0033_T2 --> n0033_T1
+    n0033_T4 --> n0033_T2
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -608,6 +623,7 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
+| CLAUDE.md | 0032, 0033 |
 | backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029 |
 | backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029 |
 | backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029 |
@@ -630,7 +646,7 @@ graph LR
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030 |
@@ -649,14 +665,14 @@ graph LR
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032 |
 | backend/deploy/gitea/bootstrap.sh | 0002, 0032 |
-| backend/deploy/gitea/docker-compose.yml | 0002, 0032 |
+| backend/deploy/gitea/docker-compose.yml | 0002, 0032, 0033 |
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/RUNTIME.md | 0022, 0030 |
 | backend/harness_template/agents/main.md | 0003, 0030 |
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030 |
 | backend/harness_template/params.yaml | 0003, 0030 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/run_swebench_closed_loop.py | 0028, 0032 |
@@ -671,13 +687,14 @@ graph LR
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029 |
 | backend/tests/loop/test_live.py | 0017, 0026 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033 |
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
+| backend/tests/test_run_vigil.py | 0032, 0033 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
 | backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031 |
@@ -1623,4 +1640,31 @@ graph LR
     class v_T6_1 st_done;
     class v_T7_1 st_done;
     class v_T8_1 st_done;
+```
+
+### 0033 交付面容器化围堵：vigil 专用容器（零宿主挂载、容器内自 clone）+ 出口代理 allowlist + 观测游标改跟 origin/main（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 vigil 容器与网络基建：Dockerfile/entrypoint/build + internal 网络 + egress 代理 allowlist"]
+    nT2["T2 run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in"]
+    nT3["T3 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地）"]
+    nT4["T4 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph"]
+    nT1 --> nT2
+    nT2 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
 ```
