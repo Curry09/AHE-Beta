@@ -48,7 +48,7 @@
 - **triager / synthesize / divergent**：生成器，产不可领 proposal（spec-0029 三平面）。
 - **Owner**：唯一准入——admit 打 `openagents` 交接令牌 / merge / decline / hold，covers 级联在此。
 
-交付面 = OpenAgents vigil：以独立 CLI 接入（uv tool 钉版本，不 vendor 不 import，run.py 托管子进程生命周期），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。
+交付面 = OpenAgents vigil：以独立 CLI 接入（不 vendor 不 import），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。运行形态（spec-0033）：**容器围堵为缺省**——vigil 跑在专用容器（deploy/vigil 镜像，容器内自 clone harness 仓、零宿主挂载），网络只挂 internal vigil-net、外网经 egress 代理 allowlist（仅 Anthropic API），claude 凭证（ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN）与 Gitea token 只经容器 env；`VIGIL_MODE=subprocess` 为无围堵的宿主直跑，仅限盯屏联调。
 
 > 无体感门禁角色——体感只作观测，benchmark 全程 held-out。
 
@@ -81,7 +81,8 @@ backend/                 # 后端（编排框架）
   tests/                 # 测试（pytest testpaths=backend/tests）
   agent_defs/            # 需求面角色 nexau 定义（数据）：user_agent/ triage_agent/ designer/ divergent_pm/ owner/
   harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml + .gitea/workflows/smoke.yml
-  deploy/gitea/          # 基建：docker-compose.yml(Gitea+sqlite+act_runner) + bootstrap.sh
+  deploy/gitea/          # 基建：docker-compose.yml(Gitea+act_runner+egress-proxy+双网络) + bootstrap.sh
+  deploy/vigil/          # 交付面围堵盒（spec-0033）：Dockerfile + entrypoint.sh(自 clone) + build.sh
   scripts/               # bootstrap_harness.py + check-spec-number-conflicts.py
 frontend/                # 前端：React+Vite+TS 只读观测看板（消费 backend web API）
 docs/specs/              # 设计 specs（spec-driven-development 源，项目级）
@@ -97,6 +98,7 @@ backend/data/            # 运行产物(.gitignore)：sessions/ harness_runs/
 - **spec-0004 Harbor 运行与可恢复 checkpoint**：所有 agent 在单沙盒一波跑（方案 A，整条 run = 1 个 harbor task），每轮边界吐增量 checkpoint artifact、喂回即从断点幂等续跑；checkpoint 维护用户侧/开发者侧/编排中间态。harbor 只包外层 rollout 生命周期，逐轮真人对话仍走 spec-0001 自立协议。
 - **spec-0005 / spec-0007 纯 trunk 开发者侧（已被 0032 取代）**：开发者侧改为带 git 工具的 nexau agent 直推 main，去掉 fix 分支/merge/release/体感门禁；体感退化为观测、benchmark held-out。闭环回灌简化为「main 最新 SHA」纯观测游标（此语义沿用至今）。
 - **spec-0032 开发者侧换轨 OpenAgents（现行）**：需求面/交付面二分——Owner 准入打 `openagents` 交接令牌，OpenAgents vigil（独立 CLI 常驻，forge/Gitea driver 见其 spec-0074）接管 ready→分支/PR→CI/评审→合并；nexau 直推 dev 退役，PR 门禁为工程质量闸（held-out 约束不变）。
+- **spec-0033 交付面容器化围堵（现行）**：vigil 关进专用容器（零宿主挂载、容器内自 clone——两面唯一媒介本就是 Gitea），internal 网络 + egress 代理 allowlist，落地 spec-0021/0022「无凭证+出口 allowlist」；观测游标改跟 origin/main（server-side merge 后本地 main 非真身）。
 
 ## 设计理念
 1. **奥卡姆剃刀**：如无必要，勿增实体。保证代码和架构的最小化、最简洁，先搭最小可用版本（MVP）再迭代。

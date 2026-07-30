@@ -240,10 +240,10 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0032 | 0032/T6 | harness 仓最小 CI：Gitea Actions runner + 冒烟 workflow | done | T5 | backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/bootstrap.sh<br>backend/harness_template/.gitea/workflows/smoke.yml |
 | 0032 | 0032/T7 | 交付面观测：GiteaTracker PR 读路径 + web API + 前端交付面视图 | done | T5 | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py<br>frontend/src/types.ts<br>frontend/src/api.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/App.tsx<br>frontend/src/components/SidePanel.tsx<br>frontend/src/components/DeliveryPanel.tsx |
 | 0032 | 0032/T8 | 文档收尾：CLAUDE.md 架构段与 spec 制品再生成 | done | T5 | CLAUDE.md |
-| 0033 | 0033/T1 | vigil 容器与网络基建：Dockerfile/entrypoint/build + internal 网络 + egress 代理 allowlist | pending | — | backend/deploy/vigil/Dockerfile<br>backend/deploy/vigil/entrypoint.sh<br>backend/deploy/vigil/build.sh<br>backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/egress-proxy.conf |
-| 0033 | 0033/T2 | run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in | pending | T1 | backend/run.py<br>backend/tests/test_run_vigil.py |
-| 0033 | 0033/T3 | 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地） | pending | — | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py |
-| 0033 | 0033/T4 | 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph | pending | T2 | CLAUDE.md |
+| 0033 | 0033/T1 | vigil 容器与网络基建：Dockerfile/entrypoint/build + internal 网络 + egress 代理 allowlist | done | — | backend/deploy/vigil/Dockerfile<br>backend/deploy/vigil/entrypoint.sh<br>backend/deploy/vigil/build.sh<br>backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/egress-proxy.conf |
+| 0033 | 0033/T2 | run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in | done | T1 | backend/run.py<br>backend/tests/test_run_vigil.py |
+| 0033 | 0033/T3 | 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地） | done | — | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py |
+| 0033 | 0033/T4 | 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph | done | T2 | CLAUDE.md |
 
 ## 跨 feature 关系图
 
@@ -1662,9 +1662,9 @@ graph LR
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
-    classDef st_pending fill:#eeeeee;
-    class v_T1_1 st_pending;
-    class v_T2_1 st_pending;
-    class v_T3_1 st_pending;
-    class v_T4_1 st_pending;
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
 ```

@@ -7,7 +7,7 @@ summary: spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI
 tasks:
   - id: T1
     title: vigil 容器与网络基建：Dockerfile/entrypoint/build + internal 网络 + egress 代理 allowlist
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -23,7 +23,7 @@ tasks:
     acceptance: build.sh 在带 OpenAgents checkout 的机器上构建成功；容器内 openagents/claude/git 可执行；vigil-net 上 vigil 容器可达 gitea 3000、直连外网被拒、经代理仅 allowlist 域可达（生产机实证）；compose config 校验通过。
   - id: T2
     title: run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -37,7 +37,7 @@ tasks:
     acceptance: 两模式的 start/stop/config 落点/预检各有单测（mock subprocess/docker，不触真容器）；container 模式下 HARNESS_REPO 内不再出现 .openagents/；token/key 只经 env 不落盘断言保留；生产机容器模式端到端跑通一轮（承接 spec-0032/T5 的冒烟验收）。
   - id: T3
     title: 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地）
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -50,7 +50,7 @@ tasks:
     acceptance: 新增测试：本地仓 + bare origin，外部向 origin 推进 main（模拟 vigil merge）→ run_round 回灌 SHA 前进且 launcher 收到的 launch ref 为新 SHA；无 origin 的既有测试全部不回归（退化路径）；fetch 失败（origin 不可达）不抛、返回本地 SHA。
   - id: T4
     title: 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
