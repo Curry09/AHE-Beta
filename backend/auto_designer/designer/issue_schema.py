@@ -30,6 +30,10 @@ PRIORITIES = ("P0", "P1", "P2", "P3")
 REPORT = "report"  # 平面1 证据：用户 sim 的原始报告（自由文本），谁都不能领
 PROPOSAL = "proposal"  # 平面2 提案：一律不可领；由生成器（triage/synthesize/divergent）产出
 READY = "ready"  # 平面3 工作队列：唯一可领白名单，Owner 准入后才有
+# Spec-0032/T3：交付面交接令牌（OpenAgents vigil 的发现标签）。Owner 准入改打它而非直接打 ready——
+# vigil `_intake` 对已带 ready 的票直接跳过、curator 依赖排序只在「本轮有新准入」时触发，Owner 直打
+# ready 会把 curator 饿死；vigil 发现本标签后自己盖 ready（幂等）。读侧把它与 ready 同视为 READY 平面。
+OPENAGENTS = "openagents"
 # 终态标签（关闭时替换平面标签落上；写侧保证平面标签与终态标签不并存）
 DECLINED = (
     "declined"  # 被驳回关闭（triage reject/needs_info、Owner decline；原因记 comment/close reason）
@@ -110,9 +114,13 @@ def plane(labels: list[str]) -> str | None:
     新平面标签优先（写侧新数据只产它们）；旧数据经读侧映射：needs-triage→report、
     triaged|RFC→ready、divergent→proposal；终态（新老）先于旧映射判定（对齐旧 triage_status
     的「越决定性者胜」——旧 triaged+superseded 组合是终态、不是 ready）。
+
+    Spec-0032/T3：`openagents`（Owner 准入的交付面交接令牌）与 `ready`（vigil 盖的执行面令牌）
+    同属 READY 平面——准入一落地即计入工作队列，vigil 随后盖 ready 幂等无感（metrics funnel /
+    背压告警 / 前端分组随本投影自动正确）。
     """
     ls = set(labels or [])
-    if READY in ls:
+    if READY in ls or OPENAGENTS in ls:
         return READY
     if PROPOSAL in ls:
         return PROPOSAL

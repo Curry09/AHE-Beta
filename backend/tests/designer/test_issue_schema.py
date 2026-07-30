@@ -103,6 +103,17 @@ def test_plane_new_labels() -> None:
     assert sc.plane([]) is None
 
 
+def test_plane_openagents_handoff_is_ready() -> None:
+    # Spec-0032/T3：openagents（Owner 准入交接令牌）与 ready 同属 READY 平面；
+    # vigil 盖 ready 后两标签并存仍是 READY（幂等）。
+    assert sc.plane([sc.OPENAGENTS, "bug", "P1"]) == sc.READY
+    assert sc.plane([sc.OPENAGENTS, sc.READY, "bug"]) == sc.READY
+    assert sc.is_ready(labels=[sc.OPENAGENTS], state="open")
+    assert not sc.is_ready(labels=[sc.OPENAGENTS], state="closed")
+    # 与 ready 同序：新平面标签优先于终态判定（写侧关闭时本会摘掉平面标签，此处仅锁定优先级一致）
+    assert sc.plane([sc.OPENAGENTS, sc.MERGED]) == sc.READY
+
+
 def test_plane_terminal_labels_are_no_plane() -> None:
     # 新终态 + 老终态：都不在任何平面
     for t in (sc.DECLINED, sc.MERGED, sc.REJECTED, sc.NEEDS_INFO, sc.GATE_DROPPED, sc.SUPERSEDED):

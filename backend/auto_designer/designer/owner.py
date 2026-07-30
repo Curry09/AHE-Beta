@@ -10,7 +10,8 @@
   收尾（nexau 工具层强校验）。
 
 决策落库（裁决优先级 = **显式决策 > covers 默认 merge > 全局默认 hold**）：
-- admit   → 去 proposal 加 ready（+终优先级，可覆盖 triage 建议值）。
+- admit   → 去 proposal 加 `openagents` 交付面交接令牌（+终优先级，可覆盖 triage 建议值）；
+  vigil 发现后自己盖 ready 并排依赖边（Spec-0032/T3，plane 读侧两标签同属 READY 平面）。
 - merge   → 关闭 + `merged-into: #主票` 机器行（重复归并的唯一落点）。
 - decline → declined + 原因 + 关闭。
 - hold    → 保持 proposal，下轮再审（未列出的提案默认 hold）。
@@ -32,6 +33,7 @@ from auto_designer.designer.issue_schema import (
     FROM_TRIAGE,
     MERGED,
     NEEDS_TRIAGE,
+    OPENAGENTS,
     PRIORITIES,
     PROPOSAL,
     READY,
@@ -65,18 +67,23 @@ class AdmitOutcome:
 
 
 def _ready_labels(current: list[str], priority: str | None) -> list[str]:
-    """admit：去平面/旧工作流标签，加 ready；priority 合法时替换旧 P*（终优先级），否则保留原值。"""
+    """admit：去平面/旧工作流标签，加 `openagents` 交接令牌；priority 合法时替换旧 P*（终优先级）。
+
+    Spec-0032/T3：Owner 准入不再直接打 ready——`openagents` 是交付面（vigil）的发现标签，vigil
+    `_intake` 发现后自己盖 ready 并触发 curator 依赖排序；Owner 直打 ready 会让 vigil 跳过该票、
+    curator 永不运行（准入语义不变：plane() 把两标签同视为 READY 平面）。
+    """
     drop = {PROPOSAL, REPORT, NEEDS_TRIAGE, TRIAGED}
     keep = [x for x in current if x not in drop]
     if priority in PRIORITIES:
         keep = [x for x in keep if x not in PRIORITIES]
         keep.append(priority)
-    return list(dict.fromkeys([*keep, READY]))
+    return list(dict.fromkeys([*keep, OPENAGENTS]))
 
 
 def _terminal_labels(current: list[str], terminal: str) -> list[str]:
-    """merge/decline：去平面标签，加终态标签。"""
-    drop = {PROPOSAL, REPORT, NEEDS_TRIAGE, TRIAGED, READY}
+    """merge/decline：去平面标签（含交付面令牌），加终态标签。"""
+    drop = {PROPOSAL, REPORT, NEEDS_TRIAGE, TRIAGED, READY, OPENAGENTS}
     keep = [x for x in current if x not in drop]
     return list(dict.fromkeys([*keep, terminal]))
 

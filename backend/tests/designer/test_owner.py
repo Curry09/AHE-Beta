@@ -109,6 +109,7 @@ def test_mechanical_admits_clean_triage_singleton_without_llm(tmp_path: Path) ->
     assert o.agent_calls == 0  # 全机械 → 零 LLM
     snap = tracker.issue(n)
     assert sc.is_ready(labels=snap["labels"], state=snap["state"])
+    assert sc.OPENAGENTS in snap["labels"] and sc.PROPOSAL not in snap["labels"]  # 交接令牌落库
     assert "P2" in snap["labels"]  # 建议优先级沿用为终值
 
 
@@ -138,7 +139,9 @@ def test_review_admit_with_priority_override(tmp_path: Path) -> None:
     out = o.admit_once()
     assert out.admitted == [s]
     labels = tracker.issue(s)["labels"]
-    assert sc.READY in labels and "P0" in labels
+    # Spec-0032/T3：admit 打的是交付面交接令牌 openagents（vigil 发现后自己盖 ready），非直接 ready。
+    assert sc.OPENAGENTS in labels and sc.READY not in labels and "P0" in labels
+    assert sc.plane(labels) == sc.READY  # 读侧仍在 READY 平面（funnel/背压/前端口径不变）
 
 
 def test_review_decline_and_unlisted_hold(tmp_path: Path) -> None:
