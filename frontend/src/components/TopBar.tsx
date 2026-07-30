@@ -1,16 +1,18 @@
-import type { RunState } from "../types";
+import type { RunState, ViewMode } from "../types";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function TopBar(props: {
   state: RunState | null;
   openCount: number | null;
+  view: ViewMode;
+  onView: (v: ViewMode) => void;
   showDone: boolean;
   onShowDone: (v: boolean) => void;
   round: "all" | number;
   rounds: number[];
   onRound: (r: "all" | number) => void;
 }) {
-  const { state, openCount, showDone, onShowDone, round, rounds, onRound } = props;
+  const { state, openCount, view, onView, showDone, onShowDone, round, rounds, onRound } = props;
   const running = state?.running ?? false;
   const chip = state
     ? state.round > 0
@@ -28,6 +30,22 @@ export function TopBar(props: {
         {running ? `运行中 · ${chip}` : chip}
       </div>
       <div className="spacer" />
+      <div className="seg" role="group" aria-label="视图切换">
+        <button
+          className={view === "dashboard" ? "active" : ""}
+          aria-pressed={view === "dashboard"}
+          onClick={() => onView("dashboard")}
+        >
+          看板
+        </button>
+        <button
+          className={view === "building" ? "active" : ""}
+          aria-pressed={view === "building"}
+          onClick={() => onView("building")}
+        >
+          大楼
+        </button>
+      </div>
       <div className="seg" role="group" aria-label="状态筛选">
         <button className={showDone ? "" : "active"} onClick={() => onShowDone(false)}>
           运行中

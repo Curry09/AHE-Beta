@@ -103,6 +103,9 @@ Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——�
 ### 0033 交付面容器化围堵：vigil 专用容器（零宿主挂载、容器内自 clone）+ 出口代理 allowlist + 观测游标改跟 origin/main
 spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypassPermissions），nexau 时代的进程内 workspace_jail 够不着它——WSL/宿主裸跑时嵌套 agent 可读整个文件系统（编排仓、data/sessions 过拟合信道）且出网无限制，现存兜底（凭证隔离/boundary 钩子/repo_guard 绊线）只管「改了什么、推到哪」，不管「看了什么」。本 spec 把 spec-0021/0022 定下的「进程内 jail 靠不住 → 环境级围堵（无凭证 + 网络出口 allowlist）」完整落地：vigil 跑进专用容器（openagents + claude CLI + git），工作目录为**容器内自 clone 的 harness 仓**——零宿主挂载，「只能看到 harness 仓」从软件承诺变成文件系统边界；网络上 vigil 容器只挂 internal 网络（可达 gitea），外网经 egress 代理 allowlist（仅放行 Anthropic API 域）。可行性关键：两面（需求面/交付面）的唯一交互媒介本来就是 Gitea（issue 标签 + push/merge + main SHA），vigil 不需要宿主文件系统的任何东西；容器每 run 重建 = clone 与 .openagents 运行态自动归零（原 rmtree 重置语义保留）。连带修一个现存 bug：spec-0032 后推进 main 的是 Gitea 上的 server-side merge，而 orchestrator c 步与 launcher 读的是**本地** harness 仓的 main——本地永远停在 seed，游标不前进、用户永远跑 v0；_resolve_head 改为先 fetch origin 再解析 origin/main（无 origin 时退化本地，兼容既有测试与 Fake 场景）。宿主 subprocess 直跑模式保留为显式 opt-in（VIGIL_MODE=subprocess，仅限盯屏联调），容器为缺省。
 
+### 0034 前端 Agent Company 大楼视图与用户心智轨迹
+在现有列式观测看板之外补回 Agent Company 大楼视图：按用户/分诊/发散/设计/准入/交付面楼层展示 live/归档 agent，保留 SidePanel 详情与交付面 PR 面板；用户会话详情新增可折叠的 Judge/Intent/Act 心智轨迹，展示 sim_trace 而不改后端 API。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -244,6 +247,10 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0033 | 0033/T2 | run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in | done | T1 | backend/run.py<br>backend/tests/test_run_vigil.py |
 | 0033 | 0033/T3 | 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地） | done | — | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py |
 | 0033 | 0033/T4 | 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph | done | T2 | CLAUDE.md |
+| 0034 | 0034/T1 | 写 0034 活快照 | done | — | docs/specs/0034-frontend-agent-company-building.md |
+| 0034 | 0034/T2 | 大楼视图接入：BuildingView + 楼层工作区 + 顶栏切换 | done | T1 | frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/components/BuildingView.tsx<br>frontend/src/components/building/BuildingTower.tsx<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.ts<br>frontend/src/types.ts |
+| 0034 | 0034/T3 | 大楼样式与角色色：发散/准入可读性修复 | done | T2 | frontend/src/styles.css |
+| 0034 | 0034/T4 | 用户心智轨迹：SessionDetail 展示 sim_trace 三阶段 | done | T2, T3 | frontend/src/components/detail/SessionDetail.tsx |
 
 ## 跨 feature 关系图
 
@@ -452,6 +459,12 @@ graph LR
         n0033_T3["T3 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地）"]
         n0033_T4["T4 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph"]
     end
+    subgraph G0034[0034 frontend-agent-company-building]
+        n0034_T1["T1 写 0034 活快照"]
+        n0034_T2["T2 大楼视图接入：BuildingView + 楼层工作区 + 顶栏切换"]
+        n0034_T3["T3 大楼样式与角色色：发散/准入可读性修复"]
+        n0034_T4["T4 用户心智轨迹：SessionDetail 展示 sim_trace 三阶段"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -573,6 +586,10 @@ graph LR
     n0032_T8 --> n0032_T5
     n0033_T2 --> n0033_T1
     n0033_T4 --> n0033_T2
+    n0034_T2 --> n0034_T1
+    n0034_T3 --> n0034_T2
+    n0034_T4 --> n0034_T2
+    n0034_T4 --> n0034_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -707,12 +724,15 @@ graph LR
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032 |
-| frontend/src/App.tsx | 0026, 0029, 0032 |
+| frontend/src/App.tsx | 0026, 0029, 0032, 0034 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032 |
 | frontend/src/components/SidePanel.tsx | 0020, 0025, 0026, 0029, 0032 |
+| frontend/src/components/TopBar.tsx | 0026, 0034 |
 | frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026, 0029 |
+| frontend/src/components/detail/SessionDetail.tsx | 0026, 0034 |
 | frontend/src/lib/issueMeta.ts | 0025, 0029, 0032 |
-| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032 |
+| frontend/src/styles.css | 0026, 0034 |
+| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034 |
 
 ## 各 feature 详情
 
@@ -1652,6 +1672,35 @@ graph LR
     nT4["T4 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph"]
     nT1 --> nT2
     nT2 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+```
+
+### 0034 前端 Agent Company 大楼视图与用户心智轨迹（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 写 0034 活快照"]
+    nT2["T2 大楼视图接入：BuildingView + 楼层工作区 + 顶栏切换"]
+    nT3["T3 大楼样式与角色色：发散/准入可读性修复"]
+    nT4["T4 用户心智轨迹：SessionDetail 展示 sim_trace 三阶段"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT2 --> nT4
+    nT3 --> nT4
 ```
 
 演化图：

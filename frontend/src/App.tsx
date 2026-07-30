@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getAgents,
   getCommits,
+  getConfig,
   getDelivery,
   getHistory,
   getIssues,
@@ -9,11 +10,12 @@ import {
   getState,
 } from "./api";
 import { AgentColumn } from "./components/AgentColumn";
+import { BuildingView } from "./components/BuildingView";
 import { Charts } from "./components/Charts";
 import { SidePanel } from "./components/SidePanel";
 import { TopBar } from "./components/TopBar";
 import { usePolling } from "./hooks/usePolling";
-import type { AgentRole, Selection } from "./types";
+import type { AgentRole, Selection, ViewMode } from "./types";
 
 const POLL_MS = 3000;
 
@@ -27,9 +29,10 @@ const ROLES: { role: AgentRole; name: string }[] = [
   { role: "divergent", name: "发散" },
   { role: "designer", name: "设计师" },
   { role: "owner", name: "准入" },
-  { role: "developer", name: "开发者" },
+  { role: "developer", name: "交付面" },
 ];
 const OPTIONAL_ROLES: AgentRole[] = ["divergent", "developer"];
+const ROLE_KEYS = ROLES.map(({ role }) => role);
 
 // 看板状态 ↔ URL 查询串（?done=1&round=2&sel=issue:7）：刷新/分享不丢上下文。
 function parseSelection(raw: string | null): Selection | null {
@@ -50,15 +53,30 @@ function selectionToParam(sel: Selection): string {
   return `commit:${sel.sha}`;
 }
 
+function parseView(raw: string | null): ViewMode {
+  return raw === "building" ? "building" : "dashboard";
+}
+
+function parseFloor(raw: string | null): AgentRole {
+  return ROLE_KEYS.includes(raw as AgentRole) ? (raw as AgentRole) : "developer";
+}
+
 export default function App() {
   const agents = usePolling(getAgents, POLL_MS);
   const state = usePolling(getState, POLL_MS);
   const history = usePolling(getHistory, POLL_MS);
   const issues = usePolling(getIssues, POLL_MS);
   const commits = usePolling(getCommits, POLL_MS);
+  const config = usePolling(getConfig, POLL_MS);
   const overview = usePolling(getOverview, POLL_MS);
   const delivery = usePolling(getDelivery, POLL_MS); // Spec-0032/T7：交付面（PR + needs-human）
 
+  const [view, setView] = useState<ViewMode>(() =>
+    parseView(new URLSearchParams(location.search).get("view")),
+  );
+  const [selectedFloor, setSelectedFloor] = useState<AgentRole>(() =>
+    parseFloor(new URLSearchParams(location.search).get("floor")),
+  );
   const [showDone, setShowDone] = useState(
     () => new URLSearchParams(location.search).get("done") === "1",
   );
@@ -72,12 +90,16 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams();
+    if (view === "building") {
+      params.set("view", "building");
+      params.set("floor", selectedFloor);
+    }
     if (showDone) params.set("done", "1");
     if (round !== "all") params.set("round", String(round));
     if (selection) params.set("sel", selectionToParam(selection));
     const qs = params.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : location.pathname);
-  }, [showDone, round, selection]);
+  }, [view, selectedFloor, showDone, round, selection]);
 
   const items = useMemo(() => history?.items ?? [], [history]);
   // 可选轮次 = 归档里出现过的轮 ∪ 当前轮（运行中还没归档也能选）。
@@ -86,6 +108,13 @@ export default function App() {
     if (state && state.round > 0) set.add(state.round);
     return [...set].sort((a, b) => b - a);
   }, [items, state]);
+  const historyEntries = useMemo(
+    () =>
+      items
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => round === "all" || item.round === round),
+    [items, round],
+  );
 
   const openCount = issues ? issues.issues.filter((i) => i.state === "open").length : null;
 
@@ -94,6 +123,8 @@ export default function App() {
       <TopBar
         state={state}
         openCount={openCount}
+        view={view}
+        onView={(v) => setView(v)}
         showDone={showDone}
         onShowDone={(v) => setShowDone(v)}
         round={round}
@@ -101,38 +132,62 @@ export default function App() {
         onRound={(r) => setRound(r)}
       />
       <Charts overview={overview} />
-      <div className="board">
-        {ROLES.filter(
-          ({ role }) =>
-            !OPTIONAL_ROLES.includes(role) ||
-            (agents?.agents ?? []).some((a) => a.role === role) ||
-            items.some((it) => it.role === role),
-        ).map(({ role, name }) => (
-          <AgentColumn
-            key={role}
-            role={role}
-            name={name}
-            agents={(agents?.agents ?? []).filter((a) => a.role === role)}
-            history={items
-              .map((item, index) => ({ item, index }))
-              .filter(({ item }) => item.role === role)
-              .filter(({ item }) => round === "all" || item.round === round)}
+      {view === "building" ? (
+        <div className="building-layout">
+          <BuildingView
+            roles={ROLES}
+            agents={agents?.agents ?? []}
+            history={historyEntries}
+            allHistory={items.map((item, index) => ({ item, index }))}
+            roster={config?.roster ?? null}
             showDone={showDone}
-            selection={selection}
+            round={round}
+            selectedFloor={selectedFloor}
+            onSelectFloor={(role) => setSelectedFloor(role)}
             onSelect={(sel) => setSelection(sel)}
           />
-        ))}
-        <SidePanel
-          selection={selection}
-          onSelect={(sel) => setSelection(sel)}
-          agents={agents?.agents ?? []}
-          history={items}
-          issues={issues}
-          commits={commits}
-          funnel={overview?.funnel ?? null}
-          delivery={delivery}
-        />
-      </div>
+          <SidePanel
+            selection={selection}
+            onSelect={(sel) => setSelection(sel)}
+            agents={agents?.agents ?? []}
+            history={items}
+            issues={issues}
+            commits={commits}
+            funnel={overview?.funnel ?? null}
+            delivery={delivery}
+          />
+        </div>
+      ) : (
+        <div className="board">
+          {ROLES.filter(
+            ({ role }) =>
+              !OPTIONAL_ROLES.includes(role) ||
+              (agents?.agents ?? []).some((a) => a.role === role) ||
+              items.some((it) => it.role === role),
+          ).map(({ role, name }) => (
+            <AgentColumn
+              key={role}
+              role={role}
+              name={name}
+              agents={(agents?.agents ?? []).filter((a) => a.role === role)}
+              history={historyEntries.filter(({ item }) => item.role === role)}
+              showDone={showDone}
+              selection={selection}
+              onSelect={(sel) => setSelection(sel)}
+            />
+          ))}
+          <SidePanel
+            selection={selection}
+            onSelect={(sel) => setSelection(sel)}
+            agents={agents?.agents ?? []}
+            history={items}
+            issues={issues}
+            commits={commits}
+            funnel={overview?.funnel ?? null}
+            delivery={delivery}
+          />
+        </div>
+      )}
     </div>
   );
 }
