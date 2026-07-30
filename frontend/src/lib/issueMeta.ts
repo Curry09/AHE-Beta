@@ -54,7 +54,8 @@ export function isRfc(issue: Issue): boolean {
 export function planeOf(issue: Issue): Plane | null {
   if (issue.plane !== undefined) return issue.plane ?? null;
   const ls = new Set(issue.labels ?? []);
-  if (ls.has("ready")) return "ready";
+  // Spec-0032：openagents（Owner 准入交接令牌）与 ready 同属 READY 平面（vigil 盖 ready 前的窗口）。
+  if (ls.has("ready") || ls.has("openagents")) return "ready";
   if (ls.has("proposal")) return "proposal";
   if (ls.has("report")) return "report";
   if (TERMINAL.some((t) => ls.has(t))) return null;

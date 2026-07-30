@@ -5,6 +5,7 @@ import type {
   CommitDetailResponse,
   CommitsResponse,
   ConfigResponse,
+  DeliveryResponse,
   HistoryResponse,
   IssueDetailResponse,
   IssuesResponse,
@@ -29,3 +30,4 @@ export const getCommit = (sha: string) => get<CommitDetailResponse>(`/commits/${
 export const getConfig = () => get<ConfigResponse>("/config");
 export const getSession = (id: string) => get<SessionDetail>(`/sessions/${id}`);
 export const getOverview = () => get<OverviewResponse>("/overview");
+export const getDelivery = () => get<DeliveryResponse>("/delivery"); // Spec-0032/T7：交付面观测

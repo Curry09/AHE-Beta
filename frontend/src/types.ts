@@ -211,6 +211,26 @@ export interface OverviewResponse {
   funnel?: { report: number; proposal: number; ready: number };
 }
 
+// Spec-0032/T7：交付面观测（/api/delivery）——open PR + needs-human 积压（vigil 的工作切面，只读）。
+export interface Pull {
+  number: number;
+  title: string;
+  state: "open" | "closed" | "merged";
+  head_branch: string;
+  mergeable: boolean | null;
+  labels: string[];
+  closes_issues: number[];
+  url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeliveryResponse {
+  connected: boolean;
+  pulls: Pull[];
+  needs_human: number;
+}
+
 // 看板选中态：点谁，第四栏就展示谁的完整信息。
 export type Selection =
   | { type: "agent"; agentId: string }

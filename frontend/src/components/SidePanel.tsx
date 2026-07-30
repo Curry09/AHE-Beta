@@ -3,6 +3,7 @@ import type {
   Agent,
   Commit,
   CommitsResponse,
+  DeliveryResponse,
   HistoryItem,
   Issue,
   IssuesResponse,
@@ -19,6 +20,7 @@ import {
   terminalOf,
 } from "../lib/issueMeta";
 import { AgentRunDetail } from "./detail/AgentRunDetail";
+import { DeliveryPanel } from "./DeliveryPanel";
 import { CommitDetailView } from "./detail/CommitDetail";
 import { IssueDetailView } from "./detail/IssueDetail";
 import { SessionDetailView } from "./detail/SessionDetail";
@@ -32,8 +34,9 @@ export function SidePanel(props: {
   issues: IssuesResponse | null;
   commits: CommitsResponse | null;
   funnel?: { report: number; proposal: number; ready: number } | null;
+  delivery?: DeliveryResponse | null; // Spec-0032/T7：交付面（PR + needs-human）
 }) {
-  const { selection, onSelect, agents, history, issues, commits, funnel } = props;
+  const { selection, onSelect, agents, history, issues, commits, funnel, delivery } = props;
   const commitList: Commit[] = commits?.commits ?? [];
   const back = () => onSelect(null);
 
@@ -118,6 +121,9 @@ export function SidePanel(props: {
             {funnel && <FunnelBar funnel={funnel} />}
             {/* Spec-0029/T10：按三平面分组——报告 / 提案(带来源徽标) / Ready / 已关闭终态。 */}
             <IssueGroups issues={issues?.issues ?? []} onSelect={onSelect} />
+
+            {/* Spec-0032/T7：交付面——open PR + needs-human 积压（vigil 的工作切面）。 */}
+            <DeliveryPanel delivery={delivery ?? null} />
 
             <div className="side-section-head">
               Main
