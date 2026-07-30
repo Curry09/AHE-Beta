@@ -142,6 +142,47 @@ def test_run_resolves_live_main_each_round(tmp_path) -> None:
     assert launched[1:] == refs[:2]
 
 
+# Spec-0033/T3：游标改跟 origin/main——server-side merge 后本地 main 不再是真身。
+
+
+def _seed_with_origin(tmp_path: Path) -> tuple[Path, Path]:
+    """本地 harness 仓 + bare origin：返回 (repo, writer)。writer 是另一份 clone，模拟交付面
+    （vigil worker）向 origin 推进 main——本地 repo 不知情，恰是 spec-0032 后的真实拓扑。"""
+    repo = _seed_repo(tmp_path)
+    bare = tmp_path / "origin.git"
+    subprocess.run(
+        ["git", "init", "--bare", "-b", "main", str(bare)], check=True, capture_output=True
+    )
+    _git(repo, "remote", "add", "origin", str(bare))
+    _git(repo, "push", "-u", "origin", "main")
+    writer = tmp_path / "writer"
+    subprocess.run(["git", "clone", str(bare), str(writer)], check=True, capture_output=True)
+    return repo, writer
+
+
+def test_cursor_follows_origin_main_after_remote_merge(tmp_path) -> None:
+    """交付面在 origin 上推进 main（本地仓不知情）→ 游标解析到新 SHA，launcher 也按新 SHA 起。"""
+    repo, writer = _seed_with_origin(tmp_path)
+    (writer / "f").write_text("merged by vigil\n", encoding="utf-8")
+    _git(writer, "commit", "-am", "delivery merge on origin")
+    _git(writer, "push", "origin", "main")
+    remote_head = _git(writer, "rev-parse", "main")
+
+    events: list = []
+    orch = _orch(repo, events)
+    out = orch.run_round("c")
+    assert out == remote_head  # 游标 = origin/main（非停滞的本地 seed）
+    assert ("launch", remote_head) in events  # fetch 已取回对象，launcher 按新 SHA 起
+
+
+def test_cursor_falls_back_to_local_when_origin_unreachable(tmp_path) -> None:
+    """origin 不可达（离线）→ 告警不抛，退化解析本地 main（游标停滞但闭环不废）。"""
+    repo = _seed_repo(tmp_path)
+    _git(repo, "remote", "add", "origin", str(tmp_path / "no-such-remote.git"))
+    head = _git(repo, "rev-parse", "main")
+    assert _orch(repo, []).run_round("c") == head
+
+
 def test_run_nonpositive_raises(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     with pytest.raises(ValueError):

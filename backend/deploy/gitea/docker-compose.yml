@@ -22,6 +22,9 @@ services:
       - gitea_data:/data
     networks:
       - ci
+      # Spec-0033/T1：同时挂交付面 internal 网络——vigil 容器经 vigil-net 直达 gitea:3000
+      # （issue/push/merge），host 端口映射照旧走 ci 网络，不受 internal 影响。
+      - vigil_net
     ports:
       - "3000:3000"   # HTTP（固定）
       - "2222:22"     # SSH（可选）
@@ -55,10 +58,28 @@ services:
     networks:
       - ci
 
+  # Spec-0033/T1：交付面出口代理——vigil 容器唯一的外网通道（allowlist 见 egress-proxy.conf，
+  # 仅放行 Anthropic API 域）。双网络：vigil-net 面向 vigil，ci 网络出外网（NAT）。
+  # 镜像 tag 生产实证后钉具体版本（与 gitea/act_runner 同一钉版纪律）。
+  egress-proxy:
+    image: ubuntu/squid:latest
+    container_name: auto-designer-egress-proxy
+    restart: unless-stopped
+    volumes:
+      - ./egress-proxy.conf:/etc/squid/squid.conf:ro
+    networks:
+      - ci
+      - vigil_net
+
 networks:
   # 显式命名（不吃 compose 项目名前缀）：runner-config.yaml 里 container.network 要按名引用。
   ci:
     name: auto-designer-ci
+  # Spec-0033/T1：交付面 internal 网络——无 NAT，vigil 容器直连外网物理不通（出口只剩 egress-proxy）；
+  # run.py 起 vigil 容器时按名（auto-designer-vigil-net）挂入。
+  vigil_net:
+    name: auto-designer-vigil-net
+    internal: true
 
 volumes:
   gitea_data:
