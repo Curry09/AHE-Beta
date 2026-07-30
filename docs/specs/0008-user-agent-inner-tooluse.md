@@ -175,6 +175,8 @@ T1 打地基：给 SeedScenario 加一个可选 workspace 字段，让 seed 场�
 
 T4 是收口任务：把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient——内层 LLM 拿 T3 装配的 system 与 T2 的工具集，在 T1 落地的共享工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。控制反转只局部发生在这一个接缝内，外层控制信封（0005/T5 run_session、动作空间、状态机、体感、终止）保持分层：act 阶段只选择 `send_message` 或终止动作，私有查验不再作为外层 action。
 
+T4 的私有工具结果还要生成轻量会话记忆：每次 respond 中出现 tool/tool_result/tool_error 时，框架将工具动作与该阶段 `parsed.perceive` 的短结论整理为 `private_evidence`，供后续 main/waiting judge/intent/act 读取。这样用户会记住自己已经私下读过哪些文件、跑过哪些命令、观察到哪些事实或冲突；完整 raw 输出仍只在 sim_trace 中落盘，不回灌进 prompt。
+
 ## Reference-level explanation
 
 以下按四个技术层展开：工作区与注入链（T1）→ 原子工具与 sandbox（T2，依赖 T1 提供的 cwd）→ prompt 行为框架与 skill 占位（T3，与 T1/T2 并行）→ 内层循环 AgenticPersonaClient（T4，收口，依赖前三者）。
@@ -243,7 +245,7 @@ test_inner_prompt.py：(a) 各 D1 档位工具清单文案正确；(b) clause_ve
 
 ### 内层循环：AgenticPersonaClient（T4）
 
-循环：respond(system,user) → tool_stack(D1)+build_inner_system → 内层多轮 [LLM→tool_call→Sandbox.run→observe]，有步数/超时上限兜底 → LLM 产出最终 JSON（与现协议同字段）→ 校验后返回。会话级上下文：persona 与工作区由 sim_user 桥接经 bind_session(persona, workspace_dir) 在每局开始绑定（run_session 不传 persona、签名不动）；respond 用绑定的 workspace 建 Sandbox(workspace=dir)。该 dir 即 T1 v2 落地的 harness/用户 agent 共享目录——harness 子进程已把改动写进来，内层 LLM 直接 read_file/run_shell 读/跑这些真实改动核实，verdict grounded 在真实执行结果（共享 FS，非从文本 advisory 抠代码）；harness 仅给文本未写盘的迫不得已情形下，write_file 作为兜底能力把文本代码落地再核（涌现，非写死）。失败兜底：LLM 不产出合法 JSON / 工具异常 / 超步数时，退化为一次主观判断（保证永远返回合法输出，外层不崩）。无工具的 blind persona、或未 bind_session（无 workspace）时自然退化为纯文本判断（等价旧行为）。
+循环：respond(system,user) → tool_stack(D1)+build_inner_system → 内层多轮 [LLM→tool_call→Sandbox.run→observe]，有步数/超时上限兜底 → LLM 产出最终 JSON（与现协议同字段）→ 校验后返回。会话级上下文：persona 与工作区由 sim_user 桥接经 bind_session(persona, workspace_dir) 在每局开始绑定（run_session 不传 persona、签名不动）；respond 用绑定的 workspace 建 Sandbox(workspace=dir)。该 dir 即 T1 v2 落地的 harness/用户 agent 共享目录——harness 子进程已把改动写进来，内层 LLM 直接 read_file/run_shell 读/跑这些真实改动核实，verdict grounded 在真实执行结果（共享 FS，非从文本 advisory 抠代码）；harness 仅给文本未写盘的迫不得已情形下，write_file 作为兜底能力把文本代码落地再核（涌现，非写死）。失败兜底：LLM 不产出合法 JSON / 工具异常 / 超步数时，退化为一次主观判断（保证永远返回合法输出，外层不崩）。无工具的 blind persona、或未 bind_session（无 workspace）时自然退化为纯文本判断（等价旧行为）。respond 若经历 private tool-use，应把工具动作和最终 `perceive` 摘要交给外层记录为 private_evidence；该摘要是用户记忆，不是对 harness 的消息，也不是完整 raw trace。
 
 **接口**
 

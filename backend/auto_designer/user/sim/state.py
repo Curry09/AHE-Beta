@@ -38,6 +38,8 @@ class State:
     turn: int = 0
     patience: int = 4  # 跨轮耐心计数器, <=0 解锁终止
     trust: TrustStance = TrustStance.BALANCED
+    private_evidence: list[str] | None = None  # 用户自己用 private tools 查到的跨轮短记忆
+    private_evidence_seq: int = 0
     consec_blame: int = 0  # 连续判定 harness 失败的次数; 驱动"诊断式"升级(非耐心消耗)
     consec_stuck: int = 0  # 连续 stuck 次数; 仅作耐心加性递增衰减的倍率(非终止门)
 

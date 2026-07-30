@@ -109,8 +109,9 @@ tasks:
 把用户模拟的**上帝视角**随 `Session` **完整落盘**为 `sim_trace`（权威 raw，含 persona LLM 原片，供事后调试）。设计师**不**在首轮 prompt 整包注入，而是经工具**按需、渐进**取证：
 
 1. `get_session_timeline` → **使用事件时间线投影**（意图/过程判断/能力缺口/私有核实；私有核实来自 persona 内层 tool steps，而非外层 `verify_self`；**`utterance`↔`answers` 请求–回复配对**；无 system/user/raw）；
-2. `get_harness_beat(turn)` → 对准某一拍看 harness 内层 tool 序列（正文短切）与 `stop_kind`；
-3. `get_harness_step(step_i)` → 单步展开（硬顶字符）。
+2. `<private_evidence>` → 用户模拟自身的跨轮私有证据记忆（同样源自 persona 内层 tool steps，但只给后续 user-sim prompt，不是 timeline raw dump）；
+3. `get_harness_beat(turn)` → 对准某一拍看 harness 内层 tool 序列（正文短切）与 `stop_kind`；
+4. `get_harness_step(step_i)` → 单步展开（硬顶字符）。
 
 体感曲线带 `[session=…]` 句柄。Jail（0015）继续禁止直接读 `sessions/`。`runtime_agg` 本组不废弃。
 
@@ -199,6 +200,8 @@ tasks:
 | `issue_text` / `feeling` | 局末出口 | persona_tail |
 
 **刻意不投影**：system/user/raw、persona_id、常驻 action_space 全表、patience/trust、waiting_* role 名、fake:// URL、stdout 全量、机器信号串原样甩出。
+
+`private_check` 与 `<private_evidence>` 源头相同但用途不同：前者是 timeline 给设计师/审计看的使用事件投影；后者是 user-sim 自己的会话内记忆，格式为 `[E# phase/stage] Private tools ... Conclusion/Observed ...`，会回灌到后续 main/waiting 的 judge/intent/act prompt。二者都不得包含完整 stdout/文件全文或 benchmark oracle；完整 raw 仍只在 `Session.sim_trace.persona_trace.steps` 中保存。
 
 ### 渐进下钻契约
 

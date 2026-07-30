@@ -162,6 +162,22 @@ def test_main_judge_omits_help_text_when_absent() -> None:
     assert "<harness_help>" not in user
 
 
+def test_private_evidence_is_threaded_into_main_and_waiting_prompts() -> None:
+    p = _persona()
+    state = init_state(p)
+    state.private_evidence = [
+        "[E1 after_reply/judge]\n"
+        "Private tools: read_file `xarray/core/dataarray.py`.\n"
+        "Conclusion: DataArray.integrate now accepts coord."
+    ]
+    main = build_main_judge_turn("do X", [], "out", ["accept"], state)
+    waiting = build_waiting_judge_turn("do X", [], state, waited_sec=90.0)
+    for user in (main, waiting):
+        assert "<private_evidence>" in user
+        assert "[E1 after_reply/judge]" in user
+        assert "DataArray.integrate now accepts coord" in user
+
+
 def test_waiting_three_builders_tags() -> None:
     state = init_state(_persona())
     judge = build_waiting_judge_turn("t", [], state, waited_sec=90.0)

@@ -21,6 +21,8 @@ loop.py
 
 from __future__ import annotations
 
+import json
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -182,6 +184,103 @@ def _take_persona_calls(client: PersonaClient, role: str) -> list[dict]:
     return out
 
 
+_PRIVATE_EVIDENCE_MAX_ITEMS = 8
+_PRIVATE_EVIDENCE_MAX_ITEM_CHARS = 650
+_PRIVATE_EVIDENCE_MAX_CMD_CHARS = 160
+
+
+def _phase_stage_label(*, phase: str, role: str) -> str:
+    stage = role.rsplit("_", 1)[-1] if "_" in role else role
+    if phase == "waiting":
+        where = "during_wait"
+    elif phase == "opening":
+        where = "opening"
+    else:
+        where = "after_reply"
+    return f"{where}/{stage}"
+
+
+def _one_line(text: object, *, limit: int) -> str:
+    out = " ".join(str(text or "").split())
+    if len(out) > limit:
+        return out[: max(0, limit - 3)] + "..."
+    return out
+
+
+def _tool_action_summary(text: str) -> str:
+    raw_full = _one_line(text, limit=4000)
+    m = re.match(r"^(\w+)\s+(\{.*\})$", raw_full)
+    if not m:
+        return _one_line(text, limit=_PRIVATE_EVIDENCE_MAX_CMD_CHARS)
+    name, arg_s = m.groups()
+    try:
+        args = json.loads(arg_s)
+    except json.JSONDecodeError:
+        return _one_line(text, limit=_PRIVATE_EVIDENCE_MAX_CMD_CHARS)
+    if name in {"read_file", "write_file"} and args.get("path"):
+        return f"{name} `{_one_line(args['path'], limit=90)}`"
+    if name == "run_shell" and args.get("cmd"):
+        return f"run_shell `{_one_line(args['cmd'], limit=120)}`"
+    if name == "report_issue" and args.get("body"):
+        return "report_issue `<body>`"
+    return _one_line(text, limit=_PRIVATE_EVIDENCE_MAX_CMD_CHARS)
+
+
+def _tool_result_summary(text: str) -> str:
+    try:
+        obj = json.loads(str(text or ""))
+    except json.JSONDecodeError:
+        return _one_line(text, limit=220)
+    bits: list[str] = []
+    if "returncode" in obj:
+        bits.append(f"returncode={obj.get('returncode')}")
+    for key in ("stdout", "stderr", "error", "content"):
+        val = obj.get(key)
+        if isinstance(val, str) and val.strip():
+            bits.append(f"{key}: {_one_line(val, limit=180)}")
+            break
+    return "; ".join(bits)[:240]
+
+
+def _record_private_evidence(*, state: State, calls: list[dict], phase: str) -> None:
+    """把本轮 private tool-use 压成用户自己的跨轮短记忆。"""
+    for call in calls:
+        steps = [
+            s
+            for s in (call.get("steps") or [])
+            if isinstance(s, dict) and s.get("kind") in {"tool", "tool_result", "tool_error"}
+        ]
+        if not steps:
+            continue
+        tools = [
+            _tool_action_summary(str(s.get("text") or "")) for s in steps if s.get("kind") == "tool"
+        ]
+        results = [
+            _tool_result_summary(str(s.get("text") or ""))
+            for s in steps
+            if s.get("kind") in {"tool_result", "tool_error"}
+        ]
+        parsed = call.get("parsed") if isinstance(call.get("parsed"), dict) else {}
+        perceive = _one_line(parsed.get("perceive", ""), limit=360)
+        state.private_evidence_seq += 1
+        label = _phase_stage_label(phase=phase, role=str(call.get("role") or "unknown"))
+        lines = [f"[E{state.private_evidence_seq} {label}]"]
+        if tools:
+            lines.append("Private tools: " + "; ".join(tools[:4]) + ".")
+        if perceive:
+            lines.append("Conclusion: " + perceive)
+        elif results:
+            lines.append("Observed: " + results[0])
+        item = "\n".join(lines)
+        if len(item) > _PRIVATE_EVIDENCE_MAX_ITEM_CHARS:
+            item = item[: _PRIVATE_EVIDENCE_MAX_ITEM_CHARS - 3] + "..."
+        if state.private_evidence is None:
+            state.private_evidence = []
+        state.private_evidence.append(item)
+        if len(state.private_evidence) > _PRIVATE_EVIDENCE_MAX_ITEMS:
+            del state.private_evidence[:-_PRIVATE_EVIDENCE_MAX_ITEMS]
+
+
 def _resolve_gap(ret: dict) -> bool:
     """act 自报 gap；非法缺省 → False。"""
     gap_raw = ret.get("gap")
@@ -239,6 +338,7 @@ def _main_decide(
     help_text: str,
     appraise_task: bool,
     result: SessionResult,
+    phase: str,
 ) -> tuple[dict, list[dict], str, bool]:
     """主 loop 同构决策：judge → intent → act（Spec-0023：仅 three）。
 
@@ -258,7 +358,9 @@ def _main_decide(
             appraise_task=appraise_task,
         ),
     )
-    calls.extend(_take_persona_calls(client, "main_judge"))
+    new_calls = _take_persona_calls(client, "main_judge")
+    calls.extend(new_calls)
+    _record_private_evidence(state=state, calls=new_calls, phase=phase)
     perceive = str(jret.get("perceive", ""))
     verdict = str(jret.get("verdict", "unsure"))
     task_load = jret.get("task_load")
@@ -275,7 +377,9 @@ def _main_decide(
             perceive=perceive,
         ),
     )
-    calls.extend(_take_persona_calls(client, "main_intent"))
+    new_calls = _take_persona_calls(client, "main_intent")
+    calls.extend(new_calls)
+    _record_private_evidence(state=state, calls=new_calls, phase=phase)
     intent = _resolve_intent(iret)
 
     aret = client.respond(
@@ -292,7 +396,9 @@ def _main_decide(
             intent=intent,
         ),
     )
-    calls.extend(_take_persona_calls(client, "main_act"))
+    new_calls = _take_persona_calls(client, "main_act")
+    calls.extend(new_calls)
+    _record_private_evidence(state=state, calls=new_calls, phase=phase)
     _drain_issue_notes(client, result)
     gap = _resolve_gap(aret)
     merged = {
@@ -552,6 +658,7 @@ def _heartbeat_once(
     )
     jret = client.respond(system, build_waiting_judge_turn(**ctx))
     wait_calls = _take_persona_calls(client, "waiting_judge")
+    _record_private_evidence(state=state, calls=wait_calls, phase="waiting")
     judgment = _resolve_judgment(jret)
     perceive = str(jret.get("perceive", ""))
     iret = client.respond(
@@ -562,7 +669,9 @@ def _heartbeat_once(
             perceive=perceive,
         ),
     )
-    wait_calls.extend(_take_persona_calls(client, "waiting_intent"))
+    new_calls = _take_persona_calls(client, "waiting_intent")
+    wait_calls.extend(new_calls)
+    _record_private_evidence(state=state, calls=new_calls, phase="waiting")
     intent = _resolve_intent(iret)
     aret = client.respond(
         system,
@@ -573,7 +682,9 @@ def _heartbeat_once(
             intent=intent,
         ),
     )
-    wait_calls.extend(_take_persona_calls(client, "waiting_act"))
+    new_calls = _take_persona_calls(client, "waiting_act")
+    wait_calls.extend(new_calls)
+    _record_private_evidence(state=state, calls=new_calls, phase="waiting")
     _drain_issue_notes(client, result)
     action, wait_message, gap = _resolve_waiting(aret)
     if heartbeats >= _MAX_HEARTBEATS:
@@ -799,6 +910,7 @@ def run_session(
             help_text=help_text,
             appraise_task=phase is Phase.OPENING,
             result=result,
+            phase=phase.value,
         )
         # 开局：据 persona 主观任务量读数，在耐心基线上叠加一次性小浮动（同一个人接不同任务耐心不同）。
         if phase is Phase.OPENING:
