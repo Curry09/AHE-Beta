@@ -226,12 +226,33 @@ class Orchestrator:
                     traceback.print_exc()
 
     def _resolve_head(self, *, ref: str) -> str:
-        """解析 harness 仓某 ref（trunk 下恒为 main）的当前 HEAD commit SHA；非法 ref 抛 RuntimeError。"""
-        result = subprocess.run(
-            ["git", "-C", self._harness_repo, "rev-parse", "--verify", f"{ref}^{{commit}}"],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"解析 main ref {ref!r} 失败：{result.stderr[:200]}")
-        return result.stdout.strip()
+        """解析 harness 仓某 ref（trunk 下恒为 main）的当前 HEAD commit SHA；非法 ref 抛 RuntimeError。
+
+        Spec-0033/T3：先 fetch origin 再**优先解析 origin/<ref>**——spec-0032 后推进 main 的是 Gitea
+        上的 server-side merge，本地 main 停在 seed 不再是真身；fetch 同时把远端对象取回本地，launcher
+        按该 SHA checkout 才解析得到。无 origin（Fake/单仓测试）或 fetch 失败（离线）→ 退化本地 <ref>，
+        行为与旧实现等价；fetch 失败只告警不抛——观测游标宁可停滞也不废轮。
+        """
+        remotes = subprocess.run(
+            ["git", "-C", self._harness_repo, "remote"], capture_output=True, text=True
+        ).stdout.split()
+        if "origin" in remotes:
+            fetched = subprocess.run(
+                ["git", "-C", self._harness_repo, "fetch", "origin", ref],
+                capture_output=True,
+                text=True,
+            )
+            if fetched.returncode != 0:
+                print(
+                    f"[orchestrator] fetch origin {ref} 失败（游标可能停滞）："
+                    f"{fetched.stderr.strip()[:200]}"
+                )
+        for candidate in (f"refs/remotes/origin/{ref}", ref):
+            result = subprocess.run(
+                ["git", "-C", self._harness_repo, "rev-parse", "--verify", f"{candidate}^{{commit}}"],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        raise RuntimeError(f"解析 main ref {ref!r} 失败：{result.stderr[:200]}")
