@@ -1,5 +1,5 @@
-# Spec-0029/T8：roster 编制解析——含 triager 分片数 / divergent / owner（唯一准入开关）。
-"""验证 load_roster：默认 user3/triager1/designer1/divergent0/owner1/developer3；各 N_* 覆盖。"""
+# Spec-0029/T8（Spec-0032/T4 调整）：roster 编制解析——developer 语义改为交付面并发 K。
+"""验证 load_roster：默认 user3/triager1/designer1/divergent0/owner1/developer1；各 N_* 覆盖。"""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def test_defaults(monkeypatch) -> None:
         "designer": 1,
         "divergent": 0,
         "owner": 1,
-        "developer": 3,
+        "developer": 1,  # Spec-0032：交付面并发 K（vigil --parallel），保守默认串行
     }
     assert DEFAULT_ROSTER["owner"] == 1
 

@@ -1,19 +1,18 @@
-# Spec-0029/T8：三平面编排——生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入 → dev。
-"""闭环编排 orchestrator：a（用户产 report+体感）→ 生成段两拍（第一拍 triage 分片∥divergent、
-第二拍 synthesize）→ Owner 唯一准入 → b（开发者领 ready 直推 main）→ c（回灌 main SHA）。
+# Spec-0032/T4：需求面编排——生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入；dev 拍退役。
+"""闭环编排 orchestrator（需求面）：a（用户产 report+体感）→ 生成段两拍（第一拍 triage 分片∥
+divergent、第二拍 synthesize）→ Owner 唯一准入（打 openagents 交接令牌）→ c（回灌 main SHA）。
 
-纯 trunk（单 main）：去掉 release_ref 链——run_round 不再把 outcome.tag 链式回灌。每局会话开始解析
-harness 仓 **main 当前 HEAD SHA**、按该 SHA launch（launcher 已按 SHA checkout → 单会话内 harness 不在
-脚下变 = 会话级快照）。dev 直推 main 后，下一局自然解析到更新后的 main HEAD（对用户永远「最新 main」）。
-回灌语义从「release 链」简化为「main 最新 SHA」（纯观测游标，不据此 pin——trunk 永远跟 live main）。
+交付面（Spec-0032）不在本进程内：Owner 准入的票由 OpenAgents vigil（常驻子进程，run.py 托管）
+level-triggered 接手——分支/PR/CI/评审/合并全在交付面完成，票何时出现何时接，两面无需同步。
+本编排因此不再有 b 段 dev 拍；c 步语义原样（spec-0007）：回灌 = harness 仓 main 当前 HEAD SHA
+纯观测游标，谁推进 main 都兼容（现在的推进者是 vigil 的 merge）。
 
-无体感门禁：开发者 agent（带 git 工具）领 issue 后自己改 harness、commit、打 vK tag、push main，直接
-推进（体感退化为观测、benchmark held-out，坏 commit 靠后续多轮迭代回正——梯度下降式）。多 dev 串行各领
-不同 issue。各部件依赖注入，便于 mock 整轮。
+纯 trunk 语义不变：每局会话开始解析 main 当前 HEAD SHA、按该 SHA launch（会话级快照，harness 不在
+脚下变）；交付面 merge 落 main 后，下一局自然解析到前进的 HEAD（对用户永远「最新 main」）。
 
 生成段两拍（Spec-0029）：triage 分片与 divergent 都只依赖 a 段产物（report / 会话证据）→ 同拍并行；
 synthesize 要看本轮新升的 from-triage 提案 → 第二拍。生成器产出全为不可领 proposal（重复无害、
-分片自由），去重/合并/准入统一由 Owner 每轮一次批量裁决——gate 特殊通道已退役。
+分片自由），去重/合并/准入统一由 Owner 每轮一次批量裁决。
 """
 
 from __future__ import annotations
@@ -27,7 +26,6 @@ from typing import Protocol
 
 from auto_designer.designer.designer import Designer
 from auto_designer.designer.divergent import Divergent
-from auto_designer.dev.agentic_developer import AgenticDeveloper
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
 from auto_designer.models import Persona, SeedScenario
@@ -63,7 +61,6 @@ class Orchestrator:
         launcher: HarnessLauncher,
         harness_repo: str,
         fixed_set: SessionPlan,
-        developer_agents: list[AgenticDeveloper],
         run_session_fn: SessionRunner,
         initial_ref: str,
         triagers: list | None = None,
@@ -79,7 +76,6 @@ class Orchestrator:
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
         # 固定列表 = 每轮同一套；callable = 每轮重新抽（如有放回随机 persona×task）。
         self._fixed_set = fixed_set
-        self._developers = developer_agents
         # 生成段两拍：第一拍 triage 分片 ∥ divergent；第二拍 synthesize；然后 Owner 唯一准入。
         self._triagers = triagers or []
         self._designers = designers or []
@@ -91,12 +87,11 @@ class Orchestrator:
         # 轮次观测回调（可选）：round 从 1 起；end 时携带本轮 main 最新 SHA。看板运行态由此得知轮数。
         self._on_round_start = on_round_start
         self._on_round_end = on_round_end
-        # Spec-0017/T3：a 段用户会话并发度（并发单元=整局会话）。默认 1 = 与旧串行行为等价；
-        # d/b 段始终串行（同仓 push + 全局 env 的固有约束，见 spec-0017 Non-goal）。
-        # 注：synthesize∥divergent 在同轮内线程池并行（只读 harness + 写 tracker），不碰 git push。
+        # Spec-0017/T3：a 段用户会话并发度（并发单元=整局会话）。默认 1 = 与旧串行行为等价。
+        # 注：生成段在同轮内线程池并行（只读 harness + 写 tracker），不碰 git push。
         self._max_parallel_users = max(1, max_parallel_users)
-        # Spec-0021/T1：编排仓完整性绊线（可选）。b 段后调用，dev agent 逃逸出沙箱改动编排仓即抛错
-        # 中止本轮（fail-closed）。None 则跳过，退化为今天行为。
+        # Spec-0021/T1：编排仓完整性绊线（可选）。每轮末调用一次——本进程内 agent（生成器/Owner）
+        # 或同机交付面 agent 逃逸改动编排仓即抛错中止本轮（fail-closed）。None 则跳过。
         self._integrity_guard = integrity_guard
 
     def run_round(self, ref: str) -> str:
@@ -188,17 +183,12 @@ class Orchestrator:
                 print("[orchestrator] owner 准入异常，跳过，本轮继续：")
                 traceback.print_exc()
 
-        # b：多个开发者 agent 依次各领一条不同 issue，自主改 harness 直推 main（无 branch/merge/门禁）。
-        # Spec-0021：每名 dev 干完立刻绊线——逃逸提交当场中止，不让后续 dev 继续污染。
-        attempted: set[int] = set()
-        for developer in self._developers:
-            outcome = developer.work_one(attempted)
-            if outcome.issue_number is not None:
-                attempted.add(outcome.issue_number)
-            if self._integrity_guard is not None:
-                self._integrity_guard()
+        # 交付面（Spec-0032/T4）：不在本进程——Owner 打的 openagents 交接令牌由常驻 vigil 发现并
+        # 推进到 PR/合并。这里只剩每轮一次的编排仓完整性绊线（Spec-0021，fail-closed）。
+        if self._integrity_guard is not None:
+            self._integrity_guard()
 
-        # c：回灌 = dev 推进后 main 的最新 HEAD SHA（观测游标；无 dev 推进则与本轮起始 SHA 相同，闭环不中断）。
+        # c：回灌 = main 当前最新 HEAD SHA（纯观测游标；交付面尚未合并时与本轮起始 SHA 相同，闭环不中断）。
         return self._resolve_head(ref=self._initial_ref)
 
     def run(self, n_rounds: int) -> list[str]:

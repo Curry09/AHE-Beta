@@ -1,9 +1,13 @@
 """角色编制（roster）：各类 agent 的数量，作为「后端编排」与「前端小镇房间」的单一真源。
 
 后端 run.py 据此决定跑几个用户会话 / 几个 triager 分片 / 几个 synthesize / 几个 divergent /
-owner 评审开关 / 几个开发者；前端经 /api/config 读同一份，房间容量与后端一致。默认 用户3 ·
-triager1 · 设计师1 · divergent0 · owner1 · 开发者3，可用环境变量 N_USERS/N_TRIAGERS/N_DESIGNERS/
+owner 评审开关 / 交付面并发；前端经 /api/config 读同一份，房间容量与后端一致。默认 用户3 ·
+triager1 · 设计师1 · divergent0 · owner1 · developer1，可用环境变量 N_USERS/N_TRIAGERS/N_DESIGNERS/
 N_DIVERGENTS/N_OWNERS/N_DEVELOPERS 覆盖（非负整数）。
+
+Spec-0032/T4：developer 语义从「进程内 nexau dev 个数」改为「交付面并发 K」——直通 OpenAgents
+`vigil --parallel K`（K 个 worker 各领一个 subject，worktree 隔离真并行；K=1 即串行）。键名与
+env 名保留以兼容既有配置面。
 """
 
 from __future__ import annotations
@@ -17,7 +21,7 @@ DEFAULT_ROSTER: dict[str, int] = {
     "designer": 1,
     "divergent": 0,  # 默认关；N_DIVERGENTS=1 开启发散 PM（discovery 轨，产出经 Owner 准入）
     "owner": 1,  # Spec-0029：唯一准入，恒 0/1——0=纯机械准入（评审段跳过），≥1 按 1 算
-    "developer": 3,
+    "developer": 1,  # Spec-0032：交付面并发 K（vigil --parallel）；保守默认串行
 }
 
 # role -> 覆盖用环境变量名。
