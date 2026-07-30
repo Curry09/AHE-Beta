@@ -33,7 +33,7 @@ tasks:
     files:
       - backend/run.py
       - backend/tests/test_run_vigil.py
-    scope: VIGIL_MODE env（container 缺省 / subprocess 显式 opt-in 且打醒目告警「无围堵，仅限盯屏联调」）。container 模式：start_vigil 改为 docker run -d --rm --name auto-designer-vigil --network vigil-net、只读挂载 staging 配置目录到 /config、env 注入 GITEA_TOKEN/ANTHROPIC_API_KEY（及可选 ANTHROPIC_BASE_URL、HTTPS_PROXY=egress-proxy）/并发 K/内网仓地址；日志经 docker logs -f 子进程落 data/vigil.log；stop_vigil = docker rm -f（--rm 兜底自清理）。write_openagents_config 改写到 staging 目录（不再写进 HARNESS_REPO——容器内自 clone，宿主仓与交付面脱钩），gitea.base_url 用内网地址（VIGIL_GITEA_INTERNAL_URL 缺省 http gitea 3000），host 侧 .env 的 localhost 地址仅编排面自用。预检从「PATH 有 openagents」按模式分叉：container 模式改查 docker 可用 + 镜像存在（缺镜像给 build.sh 提示）。subprocess 模式保留既有行为（含写配置进 HARNESS_REPO）。
+    scope: VIGIL_MODE env（container 缺省 / subprocess 显式 opt-in 且打醒目告警「无围堵，仅限盯屏联调」）。container 模式：start_vigil 改为 docker run -d --rm --name auto-designer-vigil --network vigil-net、只读挂载 staging 配置目录到 /config、env 注入 GITEA_TOKEN + claude 凭证二选一（ANTHROPIC_API_KEY（API 计费，可配 ANTHROPIC_BASE_URL——须为 Anthropic 协议端点）或 CLAUDE_CODE_OAUTH_TOKEN（订阅计费，宿主 claude setup-token 生成的长效 headless token））+ HTTPS_PROXY=egress-proxy + 并发 K + 内网仓地址；两者皆缺时预检 fail-loud；日志经 docker logs -f 子进程落 data/vigil.log；stop_vigil = docker rm -f（--rm 兜底自清理）。write_openagents_config 改写到 staging 目录（不再写进 HARNESS_REPO——容器内自 clone，宿主仓与交付面脱钩），gitea.base_url 用内网地址（VIGIL_GITEA_INTERNAL_URL 缺省 http gitea 3000），host 侧 .env 的 localhost 地址仅编排面自用。预检从「PATH 有 openagents」按模式分叉：container 模式改查 docker 可用 + 镜像存在（缺镜像给 build.sh 提示）。subprocess 模式保留既有行为（含写配置进 HARNESS_REPO）。
     acceptance: 两模式的 start/stop/config 落点/预检各有单测（mock subprocess/docker，不触真容器）；container 模式下 HARNESS_REPO 内不再出现 .openagents/；token/key 只经 env 不落盘断言保留；生产机容器模式端到端跑通一轮（承接 spec-0032/T5 的冒烟验收）。
   - id: T3
     title: 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地）
@@ -100,7 +100,7 @@ vigil 需要的只是「一个 harness 仓的 git 工作目录」——容器 en
                                             └──► egress-proxy ──allowlist──► api.anthropic.com（仅此）
 ```
 
-`bypassPermissions` 在这个盒子里开着也无所谓——能读的只有它本来就该改的仓，能连的只有它本来就该连的两个端点。凭证面：容器内只有 harness 仓的 Gitea token + Anthropic API key（皆 env 注入，不落盘），宿主的 claude 登录态/gh 凭证不进容器。
+`bypassPermissions` 在这个盒子里开着也无所谓——能读的只有它本来就该改的仓，能连的只有它本来就该连的两个端点。凭证面：容器内只有 harness 仓的 Gitea token + claude 凭证（`ANTHROPIC_API_KEY`（API 计费）或 `CLAUDE_CODE_OAUTH_TOKEN`（订阅计费，宿主 `claude setup-token` 生成）二选一，皆 env 注入不落盘、专用可轮换），宿主的 `~/.claude` 登录态与 gh 凭证不进容器。
 
 ### 使用纪律
 
@@ -126,6 +126,7 @@ vigil 需要的只是「一个 harness 仓的 git 工作目录」——容器 en
 - **零挂载 vs 挂载宿主仓**：见 Guide——媒介是 Gitea，挂载徒增 rmtree 竞态与路径耦合，且围堵上挂载点就是逃逸面。
 - **弃案：`.claude/settings.json` 软闸（allow/deny 工具白名单）**：便宜但仍是 claude 自我执行的进程内约束，与被 0021 实证击穿的 jail 同一信任模型；用户裁决直接做硬闸。容器就位后如仍想叠加纵深，可作后续可选层。
 - **弃案：给 vigil-net 直接开外网、跳过代理**：allowlist 就没了——出口白名单正是 0022 两条硬需求之一，不可省。
+- **弃案：挂载宿主 `~/.claude` 解决 claude 登录**：把整个个人账号登录态交进围堵盒——egress 拦得住外传，却拦不住 agent 把读到的 token 写进 commit/PR 正文经 Gitea「抄」出盒；且 claude 需写该目录（token 刷新），容器与宿主登录态互相污染。围堵原则：只给非给不可的、且每样可单独作废——env 注入的专用 key/长效 token 满足，个人登录态不满足。
 - **fetch 放 orchestrator 而非 launcher**：游标解析是 c 步唯一入口（launcher 只按给定 SHA checkout），在源头取回对象一处修完两个消费者。
 
 ## Prior art
