@@ -156,6 +156,7 @@ def _container_rig(monkeypatch, tmp_path: Path) -> dict:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAGENTS_PERMISSION_MODE", raising=False)
     monkeypatch.setattr(run, "_VIGIL_CONFIG_STAGING", tmp_path / "staging")
     monkeypatch.setattr(run.shutil, "which", lambda name: f"/usr/bin/{name}")
 
@@ -188,12 +189,24 @@ def test_container_start_shapes_docker_run(tmp_path: Path, monkeypatch) -> None:
     assert "GITEA_TOKEN=secret-token" in joined  # 凭证只经容器 env
     assert "ANTHROPIC_API_KEY=sk-test" in joined
     assert f"HTTPS_PROXY={run._VIGIL_PROXY_URL}" in joined  # 出网只走 egress 代理
+    # 盒内 claude 必须 bypass（否则 headless git 被权限门拒）；围堵由容器承担。
+    assert "OPENAGENTS_PERMISSION_MODE=bypassPermissions" in joined
     assert "VIGIL_PARALLEL=2" in joined
     # clone 地址是容器内网视角（服务名），带凭证、不落任何宿主盘文件。
     assert "VIGIL_REPO_URL=http://harness:secret-token@gitea:3000/harness/harness.git" in joined
     assert calls["popen"][:3] == ["docker", "logs", "-f"]  # 日志跟随器
     # 宿主仓不被写入（零挂载：配置只进 staging）。
     assert not (tmp_path / "unused-host-repo" / ".openagents").exists()
+
+
+def test_container_permission_mode_host_overridable(tmp_path: Path, monkeypatch) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("OPENAGENTS_PERMISSION_MODE", "acceptEdits")
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    docker_run = next(argv for argv in calls["runs"] if argv[:2] == ["docker", "run"])
+    assert "OPENAGENTS_PERMISSION_MODE=acceptEdits" in " ".join(docker_run)
 
 
 def test_container_config_uses_internal_gitea_url(tmp_path: Path, monkeypatch) -> None:

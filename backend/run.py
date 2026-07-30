@@ -426,6 +426,14 @@ def _start_vigil_container(
         "-e", f"VIGIL_PARALLEL={max(1, parallel)}",
         "-e", f"HTTPS_PROXY={_VIGIL_PROXY_URL}",
         "-e", "NO_PROXY=gitea,localhost,127.0.0.1",
+        # 容器即 jail（实证修复）：claude 缺省 acceptEdits 只放行文件编辑，headless 下 git commit/push
+        # 被拒 → deliver 卡死挂 needs-human。盒内用 bypassPermissions（围堵由容器承担，见 spec-0033
+        # §Guide）；宿主同名 env 可覆盖。注意 claude 拒绝 root 下 bypass——镜像以非 root 用户 vigil 跑。
+        "-e",
+        (
+            "OPENAGENTS_PERMISSION_MODE="
+            f"{os.environ.get('OPENAGENTS_PERMISSION_MODE', '').strip() or 'bypassPermissions'}"
+        ),
     ]  # fmt: skip
     for key in (*_CLAUDE_CRED_ENVS, "ANTHROPIC_BASE_URL"):
         value = os.environ.get(key, "").strip()
