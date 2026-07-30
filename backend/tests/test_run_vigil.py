@@ -123,7 +123,10 @@ def test_container_prereqs_require_claude_credential(monkeypatch) -> None:
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(SystemExit, match="claude 凭证"):
         run._ensure_vigil_container_prereqs()
-    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "long-lived")  # 订阅 token 也算（二选一）
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "long-lived")  # 订阅 token 也算
+    run._ensure_vigil_container_prereqs()  # 不抛
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "bearer-x")  # 网关 Bearer 也算（三选一）
     run._ensure_vigil_container_prereqs()  # 不抛
 
 
@@ -151,6 +154,7 @@ def _container_rig(monkeypatch, tmp_path: Path) -> dict:
     calls: dict = {"runs": []}
     monkeypatch.setenv("VIGIL_MODE", "container")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     monkeypatch.setattr(run, "_VIGIL_CONFIG_STAGING", tmp_path / "staging")
     monkeypatch.setattr(run.shutil, "which", lambda name: f"/usr/bin/{name}")

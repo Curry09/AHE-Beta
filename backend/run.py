@@ -310,8 +310,9 @@ _VIGIL_CONTAINER = "auto-designer-vigil"
 _VIGIL_NETWORK = "auto-designer-vigil-net"  # deploy/gitea compose 里的 internal 网络（按名引用）
 _VIGIL_PROXY_URL = "http://egress-proxy:3128"  # 盒内唯一外网通道（allowlist 见 egress-proxy.conf）
 _VIGIL_CONFIG_STAGING = DATA / "vigil_config"  # 容器模式的配置 staging（只读挂载进 /config）
-# claude 凭证二选一（Spec-0033）：API 计费 / 订阅长效 token（宿主 `claude setup-token` 生成）。
-_CLAUDE_CRED_ENVS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
+# claude 凭证三选一（Spec-0033）：API key / 网关 Bearer token（配 ANTHROPIC_BASE_URL，须为
+# Anthropic 协议端点，且网关域要加进 egress-proxy.conf 白名单）/ 订阅长效 token（claude setup-token）。
+_CLAUDE_CRED_ENVS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")
 
 
 class VigilHandle:
@@ -351,7 +352,8 @@ def _ensure_vigil_container_prereqs() -> None:
         )
     if not any(os.environ.get(key, "").strip() for key in _CLAUDE_CRED_ENVS):
         raise SystemExit(
-            "缺 claude 凭证：设 ANTHROPIC_API_KEY（API 计费）或 CLAUDE_CODE_OAUTH_TOKEN"
+            "缺 claude 凭证：设 ANTHROPIC_API_KEY（API 计费）/ ANTHROPIC_AUTH_TOKEN（网关 Bearer，"
+            "配 ANTHROPIC_BASE_URL，网关域需加进 egress-proxy.conf 白名单）/ CLAUDE_CODE_OAUTH_TOKEN"
             "（订阅计费，宿主 `claude setup-token` 生成）之一（Spec-0033）"
         )
 
