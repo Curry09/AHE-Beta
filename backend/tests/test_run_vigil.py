@@ -157,6 +157,8 @@ def _container_rig(monkeypatch, tmp_path: Path) -> dict:
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     monkeypatch.delenv("OPENAGENTS_PERMISSION_MODE", raising=False)
+    for key in run._CLAUDE_CONFIG_ENVS:  # 清宿主可能设的 base_url/模型，避免污染断言
+        monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(run, "_VIGIL_CONFIG_STAGING", tmp_path / "staging")
     monkeypatch.setattr(run.shutil, "which", lambda name: f"/usr/bin/{name}")
 
@@ -197,6 +199,29 @@ def test_container_start_shapes_docker_run(tmp_path: Path, monkeypatch) -> None:
     assert calls["popen"][:3] == ["docker", "logs", "-f"]  # 日志跟随器
     # 宿主仓不被写入（零挂载：配置只进 staging）。
     assert not (tmp_path / "unused-host-repo" / ".openagents").exists()
+
+
+def test_container_passes_through_claude_config_envs(tmp_path: Path, monkeypatch) -> None:
+    # 第三方 Anthropic 协议网关：base_url + 模型覆盖（含小/快模型）须透传进容器，缺则 claude 走官方默认。
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://gw.example.top")
+    monkeypatch.setenv("ANTHROPIC_MODEL", "vendor/Model-Pro")
+    monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "vendor/Model-Pro")
+    run.start_vigil(repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log")
+    joined = " ".join(next(a for a in calls["runs"] if a[:2] == ["docker", "run"]))
+    assert "ANTHROPIC_BASE_URL=https://gw.example.top" in joined
+    assert "ANTHROPIC_MODEL=vendor/Model-Pro" in joined
+    assert "ANTHROPIC_SMALL_FAST_MODEL=vendor/Model-Pro" in joined
+
+
+def test_container_omits_unset_claude_config_envs(tmp_path: Path, monkeypatch) -> None:
+    # 未设的配置 env 不透传（官方 claude 场景零噪声，不注入空值）。
+    calls = _container_rig(monkeypatch, tmp_path)
+    for key in run._CLAUDE_CONFIG_ENVS:
+        monkeypatch.delenv(key, raising=False)
+    run.start_vigil(repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log")
+    joined = " ".join(next(a for a in calls["runs"] if a[:2] == ["docker", "run"]))
+    assert "ANTHROPIC_MODEL" not in joined and "ANTHROPIC_BASE_URL" not in joined
 
 
 def test_container_permission_mode_host_overridable(tmp_path: Path, monkeypatch) -> None:

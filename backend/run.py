@@ -313,6 +313,15 @@ _VIGIL_CONFIG_STAGING = DATA / "vigil_config"  # 容器模式的配置 staging�
 # claude 凭证三选一（Spec-0033）：API key / 网关 Bearer token（配 ANTHROPIC_BASE_URL，须为
 # Anthropic 协议端点，且网关域要加进 egress-proxy.conf 白名单）/ 订阅长效 token（claude setup-token）。
 _CLAUDE_CRED_ENVS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")
+# claude 非凭证配置 env（存在才透传进容器）：base_url（自建/第三方 Anthropic 协议网关）+ 模型覆盖。
+# 接非官方网关（如 OpenAI 兼容网关的 Anthropic 端点）时，模型名不是 claude-* 而是网关自己的 model id，
+# 必须经 ANTHROPIC_MODEL 覆盖；claude 有一档"小/快模型"轻调用（缺省 haiku），网关无此模型时也要用
+# ANTHROPIC_SMALL_FAST_MODEL 指到同一个，否则那档调用会 404。
+_CLAUDE_CONFIG_ENVS = (
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_MODEL",
+    "ANTHROPIC_SMALL_FAST_MODEL",
+)
 
 
 class VigilHandle:
@@ -435,7 +444,7 @@ def _start_vigil_container(
             f"{os.environ.get('OPENAGENTS_PERMISSION_MODE', '').strip() or 'bypassPermissions'}"
         ),
     ]  # fmt: skip
-    for key in (*_CLAUDE_CRED_ENVS, "ANTHROPIC_BASE_URL"):
+    for key in (*_CLAUDE_CRED_ENVS, *_CLAUDE_CONFIG_ENVS):
         value = os.environ.get(key, "").strip()
         if value:
             args += ["-e", f"{key}={value}"]
