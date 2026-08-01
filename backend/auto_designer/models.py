@@ -232,6 +232,7 @@ class SimTurn:
     trust: str
     harness_output: str = ""
     harness_steps: list[dict[str, Any]] = field(default_factory=list)
+    harness_events: list[dict[str, Any]] = field(default_factory=list)
     persona_trace: list[PersonaCallTrace] = field(default_factory=list)
     utterance_id: str = ""
     delivery: str = ""
@@ -256,6 +257,8 @@ class SimTurn:
         }
         if self.harness_steps:
             d["harness_steps"] = list(self.harness_steps)
+        if self.harness_events:
+            d["harness_events"] = list(self.harness_events)
         if self.persona_trace:
             d["persona_trace"] = [c.to_dict() for c in self.persona_trace]
         # Spec-0024/T6：缺省空串不落键，旧 JSON 兼容
@@ -287,6 +290,7 @@ class SimTurn:
             trust=data.get("trust", ""),
             harness_output=data.get("harness_output", ""),
             harness_steps=list(data.get("harness_steps", [])),
+            harness_events=list(data.get("harness_events", [])),
             persona_trace=[PersonaCallTrace.from_dict(c) for c in data.get("persona_trace", [])],
             utterance_id=str(data.get("utterance_id") or ""),
             delivery=str(data.get("delivery") or ""),

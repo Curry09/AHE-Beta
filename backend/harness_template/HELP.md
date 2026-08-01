@@ -34,7 +34,8 @@ The assistant runs file and shell operations in `SANDBOX_WORK_DIR`. Treat that d
 ## Behavior
 
 - One request is handled at a time.
-- Progress lines are status updates, not the final answer.
+- If you send another message while a request is still running, it is queued and the assistant shows a visible status line. The queued message is handled after the current response.
+- Progress and status lines are updates, not the final answer.
 - The final reply states what changed, what was checked, and any remaining blocker.
 - Interrupting stops the current request and preserves the session for a follow-up.
 

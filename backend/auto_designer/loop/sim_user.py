@@ -90,6 +90,7 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
                 trust=t.trust,
                 harness_output=t.harness_output,
                 harness_steps=list(t.harness_steps or []),
+                harness_events=list(getattr(t, "harness_events", []) or []),
                 persona_trace=[
                     PersonaCallTrace.from_dict(c) if isinstance(c, dict) else c
                     for c in (t.persona_trace or [])

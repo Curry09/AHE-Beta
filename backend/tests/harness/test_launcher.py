@@ -350,8 +350,37 @@ def test_v1_protocol_sends_type_message_and_reads_type_reply_progress(tmp_path) 
         assert h.send("hello") == "v1:hello"
         assert h.last_progress == [{"kind": "tool", "text": "v1-progress"}]
         assert h.last_steps == [{"kind": "tool", "text": "v1"}]
+        events = h.drain_visible_events()
+        assert [e["type"] for e in events] == ["progress", "reply"]
+        assert [e["text"] for e in events] == ["v1-progress", "v1:hello"]
+        assert all(e["source"] == "harness_stdout" for e in events)
+        assert h.drain_visible_events() == []
     finally:
         h.close()
+
+_POST_REPLY_STATUS_ENTRY = """\
+import json, sys
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    sys.stdout.write(json.dumps({"reply": "done"}) + "\\n")
+    sys.stdout.flush()
+    sys.stdout.write(json.dumps({"status": {"note": "handling queued"}}) + "\\n")
+    sys.stdout.flush()
+"""
+
+
+def test_post_reply_status_is_drained_as_visible_event(tmp_path) -> None:
+    h = _launcher(tmp_path, _POST_REPLY_STATUS_ENTRY).launch("main")
+    try:
+        assert h.send("a") == "done"
+        events = h.drain_visible_events()
+        assert [e["type"] for e in events] == ["reply", "status"]
+        assert "handling queued" in events[1]["text"]
+    finally:
+        h.close()
+
 
 
 def test_v1_protocol_interrupt_uses_type_interrupt(tmp_path) -> None:

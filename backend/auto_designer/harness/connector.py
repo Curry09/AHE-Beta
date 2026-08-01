@@ -13,9 +13,17 @@ from typing import Any
 
 from auto_designer.harness.interface import HarnessInterface
 
-_HEARTBEAT_METHODS = frozenset({"begin", "poll", "try_reply", "emit_message"})
+_HEARTBEAT_METHODS = frozenset({"begin", "poll", "try_reply", "emit_message", "drain_visible_events"})
 _OBSERVATION_ATTRS = frozenset(
-    {"in_flight", "last_progress", "last_steps", "last_sideband", "help_text"}
+    {
+        "in_flight",
+        "last_progress",
+        "last_steps",
+        "last_sideband",
+        "last_visible_events",
+        "visible_events",
+        "help_text",
+    }
 )
 
 

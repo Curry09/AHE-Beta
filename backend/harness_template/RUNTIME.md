@@ -18,6 +18,7 @@ The harness repository is not the user's project. Do not copy the user's project
 - `entry.py` is the process entrypoint declared by `params.yaml`.
 - The process reads JSON Lines from stdin and writes JSON Lines to stdout.
 - The process handles one request at a time.
+- If another message arrives while a request is running, the process emits a visible queued status and handles that message after the current response. Starting a queued message also emits a visible status line.
 - `/help` is recognized as ordinary message text, returns `HELP.md`, and keeps the session open.
 - `/exit` and `/quit` are recognized as ordinary message text and close the session.
 

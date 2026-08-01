@@ -135,6 +135,18 @@ def _private_evidence_block(state: State) -> str:
     return "<private_evidence>\n" + "\n\n".join(items[-8:]) + "\n</private_evidence>"
 
 
+def _harness_events_block(events: list | None) -> str:
+    lines: list[str] = []
+    for event in list(events or [])[-12:]:
+        if not isinstance(event, dict):
+            continue
+        typ = str(event.get("type") or "event").strip() or "event"
+        text = str(event.get("text") or "").strip()
+        if text:
+            lines.append(f"- {typ}: {text[:500]}")
+    return "\n".join(lines)
+
+
 def _main_context_parts(
     task: str,
     history_lines: list[str],
@@ -143,6 +155,7 @@ def _main_context_parts(
     state: State,
     *,
     help_text: str = "",
+    harness_events: list | None = None,
     include_action_space: bool,
 ) -> list[str]:
     """主 decide 共用上下文（不含分步输出契约）。
@@ -157,6 +170,16 @@ def _main_context_parts(
     if help_text.strip():
         parts.append(f"<harness_help>\n{help_text.strip()}\n</harness_help>")
     parts.append(f"<history>\n{hist}\n</history>")
+    events_text = _harness_events_block(harness_events)
+    if events_text:
+        parts.append(
+            "<harness_visible_events>\n"
+            "These are raw harness stdout events shown in client-observed order; they are not "
+            "client-inferred request/reply matching. Use them with <history> to judge what the "
+            "harness appears to be doing.\n"
+            f"{events_text}\n"
+            "</harness_visible_events>"
+        )
     private_evidence = _private_evidence_block(state)
     if private_evidence:
         parts.append(private_evidence)
@@ -175,6 +198,7 @@ def build_main_judge_turn(
     state: State,
     *,
     help_text: str = "",
+    harness_events: list | None = None,
     appraise_task: bool = False,
 ) -> str:
     """主 loop · Judge：只评现状（perceive + verdict）；意愿留给 intent。"""
@@ -187,6 +211,7 @@ def build_main_judge_turn(
             action_space,
             state,
             help_text=help_text,
+            harness_events=harness_events,
             include_action_space=False,
         )
     )
@@ -226,6 +251,7 @@ def build_main_intent_turn(
     state: State,
     *,
     help_text: str = "",
+    harness_events: list | None = None,
     verdict: str,
     perceive: str = "",
 ) -> str:
@@ -260,6 +286,7 @@ def build_main_act_turn(
     state: State,
     *,
     help_text: str = "",
+    harness_events: list | None = None,
     verdict: str,
     perceive: str = "",
     intent: str,
@@ -286,7 +313,12 @@ def build_main_act_turn(
         "Local action semantics:\n"
         "- send_message: send the exact line in message to the harness. Use this for any "
         "follow-up, clarification, feedback, evidence request, or request that the harness run "
-        "something.\n"
+        "something; if the harness is busy, this message may be read later.\n"
+        "- keep_waiting: send nothing and wait for the next harness output. Use it when "
+        "you want to see what the harness produces next before adding another message.\n"
+        "- interrupt: immediately stop current or ongoing harness work, without waiting for "
+        "the harness to read another message. Use it when you need the current work to stop "
+        "before you send the next correction.\n"
         "- accept / accept_with_reservations / give_up / file_issue: terminal outcomes; keep "
         "message short and in your voice.\n"
         "There is NO action for private investigation here. Any private reading, diff review, "

@@ -145,6 +145,17 @@ def _emit_progress(*, kind: str, text: str) -> None:
         pass
 
 
+def _emit_status(text: str) -> None:
+    """向用户侧吐 harness 自身的可见状态；只描述正在做什么，不做 request/reply 配对。"""
+    try:
+        line = json.dumps(_wire_out("status", text=text), ensure_ascii=False)
+        with _stdout_lock:
+            sys.stdout.write(line + "\n")
+            sys.stdout.flush()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _run_supervised(agent, message, timeout, ctrl_q):
     """跑一次 agent.run，同时守望硬超时与用户打断（control 队列）。
 
@@ -387,11 +398,12 @@ def _reply(agent, message: str, rebuild, ctrl_q=None):
 _EOF = object()  # stdin 读线程读到 EOF 时投递的哨兵
 
 
-def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue) -> None:
+def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue, busy: threading.Event) -> None:
     """后台逐行读 stdin，按类型分发：{"message":..} → msg_q，{"control":..} → ctrl_q。
 
     独立线程读，才能在某轮 agent.run 阻塞进行中仍收到 {"control":"interrupt"} 并即时打断
-    （主线程正忙于该轮、无法自己读 stdin）。非法行/无 message 的行静默跳过；EOF 投 _EOF 收尾。"""
+    （主线程正忙于该轮、无法自己读 stdin）。busy 时收到新 message 会先输出 queued 状态，
+    让用户知道输入没有被静默吞掉，而是等待当前处理结束后进入队列。非法行/无 message 的行静默跳过；EOF 投 _EOF 收尾。"""
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -409,11 +421,23 @@ def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue) -> None:
         if typ == "interrupt":
             ctrl_q.put({"control": "interrupt"})
         elif typ == "message" and isinstance(obj.get("text"), str):
-            msg_q.put(obj["text"])
+            was_queued = busy.is_set()
+            if was_queued:
+                _emit_status(
+                    "[queued] I am still working on the previous request; "
+                    "this message has been queued and will be handled after the current response."
+                )
+            msg_q.put({"text": obj["text"], "queued": was_queued})
         elif "control" in obj:
             ctrl_q.put(obj)
         elif "message" in obj:
-            msg_q.put(obj["message"])
+            was_queued = busy.is_set()
+            if was_queued:
+                _emit_status(
+                    "[queued] I am still working on the previous request; "
+                    "this message has been queued and will be handled after the current response."
+                )
+            msg_q.put({"text": obj["message"], "queued": was_queued})
     msg_q.put(_EOF)
 
 
@@ -439,11 +463,18 @@ def main() -> None:
     agent = _build_agent(collector, session_id, "harness")
     msg_q: queue.Queue = queue.Queue()
     ctrl_q: queue.Queue = queue.Queue()
-    threading.Thread(target=_stdin_reader, args=(msg_q, ctrl_q), daemon=True).start()
+    busy = threading.Event()
+    threading.Thread(target=_stdin_reader, args=(msg_q, ctrl_q, busy), daemon=True).start()
     while True:
-        message = msg_q.get()
-        if message is _EOF:  # stdin 关闭：正常收尾退出
+        item = msg_q.get()
+        if item is _EOF:  # stdin 关闭：正常收尾退出
             break
+        if isinstance(item, dict):
+            message = str(item.get("text") or "")
+            was_queued = bool(item.get("queued"))
+        else:
+            message = str(item)
+            was_queued = False
         while not ctrl_q.empty():  # 丢弃上一轮遗留的过期 control，避免误打断本轮
             ctrl_q.get_nowait()
         # slash 内部分发：/help 回 reply 后继续；/exit|/quit 回 reply 后结束进程。
@@ -458,8 +489,15 @@ def main() -> None:
             if should_exit:
                 break
             continue
+        if was_queued:
+            preview = message.strip().splitlines()[0][:160] or "(empty message)"
+            _emit_status(f"[status] Now handling queued message: {preview}")
         collector.reset()  # 只收本轮内层过程
-        agent, raw = _reply(agent, message, rebuild, ctrl_q)
+        busy.set()
+        try:
+            agent, raw = _reply(agent, message, rebuild, ctrl_q)
+        finally:
+            busy.clear()
         history_snapshot = _snapshot_history(agent) or history_snapshot
         reply = _unwrap_reply(raw)  # 拆信封：用户只看最终答案
         steps = list(collector.steps)  # 完整内层迭代 → 诊断元数据；用户答案只看 reply
