@@ -58,7 +58,9 @@ CATALOG: dict[str, ActionSpec] = {
     # 用户 agent 的私有内层行为，不是外层 action。
     "send_message": ActionSpec("send_message", Executor.HARNESS, Channel.EMIT, Effect.ADVANCE),
     # 用户也可像真实 CLI 一样不追加新消息而继续等待，或打断仍在运行/排队的 harness 工作。
-    "keep_waiting": ActionSpec("keep_waiting", Executor.PERSONA_LOCAL, Channel.SILENT, Effect.ADVANCE),
+    "keep_waiting": ActionSpec(
+        "keep_waiting", Executor.PERSONA_LOCAL, Channel.SILENT, Effect.ADVANCE
+    ),
     "interrupt": ActionSpec("interrupt", Executor.HARNESS, Channel.SILENT, Effect.ADVANCE),
     # —— 终止 ——
     "accept": ActionSpec(

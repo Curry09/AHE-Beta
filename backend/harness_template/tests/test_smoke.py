@@ -74,7 +74,6 @@ class HarnessSmokeTest(unittest.TestCase):
         self.assertTrue(entry._TIMEOUT_REPLY.startswith("[timeout]"))
         self.assertIn("会话上下文已保留", entry._TIMEOUT_REPLY)
 
-
     def test_status_wire_out_is_user_visible_event(self) -> None:
         entry = importlib.import_module("entry")
         event = entry._wire_out("status", text="[queued] waiting")

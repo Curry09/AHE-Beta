@@ -358,6 +358,7 @@ def test_v1_protocol_sends_type_message_and_reads_type_reply_progress(tmp_path) 
     finally:
         h.close()
 
+
 _POST_REPLY_STATUS_ENTRY = """\
 import json, sys
 for line in sys.stdin:
@@ -380,7 +381,6 @@ def test_post_reply_status_is_drained_as_visible_event(tmp_path) -> None:
         assert "handling queued" in events[1]["text"]
     finally:
         h.close()
-
 
 
 def test_v1_protocol_interrupt_uses_type_interrupt(tmp_path) -> None:
