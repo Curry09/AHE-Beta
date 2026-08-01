@@ -9,11 +9,19 @@ Run from the harness repository root with:
 
 from __future__ import annotations
 
+import contextlib
 import importlib
+import io
+import json
+import queue
+import sys
+import threading
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 class HarnessSmokeTest(unittest.TestCase):
@@ -65,6 +73,33 @@ class HarnessSmokeTest(unittest.TestCase):
         entry = importlib.import_module("entry")
         self.assertTrue(entry._TIMEOUT_REPLY.startswith("[timeout]"))
         self.assertIn("会话上下文已保留", entry._TIMEOUT_REPLY)
+
+    def test_status_wire_out_is_user_visible_event(self) -> None:
+        entry = importlib.import_module("entry")
+        event = entry._wire_out("status", text="[queued] waiting")
+        self.assertIn("status", event)
+        self.assertIn("[queued]", json.dumps(event, ensure_ascii=False))
+
+    def test_busy_message_emits_queued_status_and_marks_queue_item(self) -> None:
+        entry = importlib.import_module("entry")
+        msg_q: queue.Queue = queue.Queue()
+        ctrl_q: queue.Queue = queue.Queue()
+        busy = threading.Event()
+        busy.set()
+        old_stdin = sys.stdin
+        sys.stdin = io.StringIO(json.dumps({"type": "message", "text": "second"}) + "\n")
+        stdout = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(stdout):
+                entry._stdin_reader(msg_q, ctrl_q, busy)
+        finally:
+            sys.stdin = old_stdin
+        item = msg_q.get_nowait()
+        self.assertEqual(item["text"], "second")
+        self.assertTrue(item["queued"])
+        out = stdout.getvalue()
+        self.assertIn("queued", out)
+        self.assertIn("previous request", out)
 
     def test_product_docs_present_and_split_by_audience(self) -> None:
         for rel in ("HELP.md", "RUNTIME.md", ".env.example", "requirements.txt"):

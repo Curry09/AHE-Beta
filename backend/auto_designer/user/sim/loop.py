@@ -72,6 +72,9 @@ class TurnLog:
     # 与 harness_output 配对：该轮 persona 所看回复的 harness 内层过程流（{kind,text} 序列）。
     # 观测层展开时才用；persona 只感知 harness_output（最终答案），不吃 steps。
     harness_steps: list = field(default_factory=list)
+    # 自上次用户决策以来的 harness stdout 可见事件（reply/progress/status/ack/error）；
+    # 按观察顺序保留，不做 request/reply 配对推断。
+    harness_events: list = field(default_factory=list)
     # 用户 agent 本决策触发的原始 LLM 调用（system/user/raw/steps）；先全量，后续再筛。
     persona_trace: list = field(default_factory=list)
     # Spec-0024/T6：请求–回复配对（观测用；不改 harness 线协议）。
@@ -140,6 +143,7 @@ class SessionResult:
     # harness_output 落日志, 这里先行暴露给观测层实时展示; 下一条 TurnLog 追加时清空)
     pending_harness_output: str | None = None
     pending_harness_steps: list | None = None  # 与 pending_harness_output 配对的内层过程流
+    pending_harness_events: list | None = None  # 与 pending_harness_output 同窗口的 stdout 可见事件
     # 局末不挂某一 Turn 的用户 agent 调用（file_issue 正文 / 体感评分）。
     persona_tail: list = field(default_factory=list)
 
@@ -333,6 +337,7 @@ def _main_decide(
     task: str,
     history: list[str],
     harness_output: str,
+    harness_events: list,
     space: list,
     state: State,
     help_text: str,
@@ -355,6 +360,7 @@ def _main_decide(
             [],  # judge 不看当前动作菜单；只在 act 收敛阶段暴露真实 action_space
             state,
             help_text=help_text,
+            harness_events=harness_events,
             appraise_task=appraise_task,
         ),
     )
@@ -373,6 +379,7 @@ def _main_decide(
             [],  # intent 仍是开放意愿，不看当前动作菜单
             state,
             help_text=help_text,
+            harness_events=harness_events,
             verdict=verdict,
             perceive=perceive,
         ),
@@ -391,6 +398,7 @@ def _main_decide(
             space,
             state,
             help_text=help_text,
+            harness_events=harness_events,
             verdict=verdict,
             perceive=perceive,
             intent=intent,
@@ -417,6 +425,25 @@ def _main_decide(
 def route(action_id: str, message: str, state: State, harness, observable: str) -> str | None:
     """按 executor×channel 分派, 返回下一轮的 harness 文本(无则 None)。"""
     spec = CATALOG[action_id]
+
+    if action_id == "keep_waiting":
+        # 主 loop 也允许像真实 CLI 一样「先别追加消息，继续等」。若 harness 仍有
+        # in-flight 事件流就等下一条 reply；若已空闲，则本动作是安全 no-op，交回下一轮判断。
+        if getattr(harness, "in_flight", False) and hasattr(harness, "poll"):
+            try:
+                kind, val = harness.poll(_HEARTBEAT_SEC)
+            except Exception as exc:  # noqa: BLE001
+                return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
+            if kind == "reply":
+                return str(val)
+        return None
+
+    if action_id == "interrupt":
+        try:
+            ctrl_out = harness.interrupt()
+        except Exception as exc:  # noqa: BLE001
+            return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
+        return str(ctrl_out or "[interrupt] no running harness work to stop")
 
     if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE:
         if not message.strip():
@@ -889,6 +916,7 @@ def run_session(
     clock = _SessionClock()
     harness_output = ""
     harness_steps: list = []  # 与 harness_output 配对的内层过程流
+    harness_events: list = []  # 上一轮 stdout 可见事件流，供下一次主决策感知
     prior_activity: list[dict] = []  # 上一轮已完成请求的活动条（过程记忆，供对照）
     ledger = _UtteranceLedger()  # Spec-0024/T6：请求–回复配对
 
@@ -905,6 +933,7 @@ def run_session(
             task=task,
             history=history,
             harness_output=harness_output,
+            harness_events=harness_events,
             space=space,
             state=state,
             help_text=help_text,
@@ -948,6 +977,7 @@ def run_session(
 
         result.pending_harness_output = None  # 该回复即将随本条 TurnLog 落日志, 不再悬挂
         result.pending_harness_steps = None
+        result.pending_harness_events = None
         result.turns.append(
             TurnLog(
                 turn=state.turn,
@@ -963,6 +993,7 @@ def run_session(
                 trust=state.trust.value,
                 harness_output=harness_output,
                 harness_steps=harness_steps,
+                harness_events=list(harness_events or []),
                 persona_trace=decide_calls,
                 utterance_id=utterance_id,
                 delivery=delivery,
@@ -1049,6 +1080,11 @@ def run_session(
             # Fake/Scripted harness 无此属性 → []。route 只在 EMIT 轮真调 send，此处取值即本轮回复的。
             steps = getattr(harness, "last_steps", None)
             harness_steps = list(steps) if isinstance(steps, list) else []
+            drain_events = getattr(harness, "drain_visible_events", None)
+            if callable(drain_events):
+                harness_events = list(drain_events())
+            else:
+                harness_events = []
             # 活动条写入过程记忆：下次等待时可对照（不宣称「这是哪一轮的活动」归属）。
             prior_activity = _activity_from_harness(harness)
             if prior_activity:
@@ -1074,6 +1110,7 @@ def run_session(
             # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
             result.pending_harness_output = nxt
             result.pending_harness_steps = harness_steps
+            result.pending_harness_events = list(harness_events or [])
             if on_progress is not None:
                 on_progress(result)
         # 本轮若未产生下一条 harness 输出（例如模型空转），保持上一条可见输出供下一轮继续判断。

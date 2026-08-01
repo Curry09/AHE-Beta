@@ -46,7 +46,8 @@ def test_active_external_actions_are_unified_across_capability_and_authz() -> No
     blind_read_only = _persona(d1=D1Eval.BLIND, d5=D5Autonomy.ADVISORY)
     se = derive_action_space(Phase.ACTIVE, expert, init_state(expert))
     sb = derive_action_space(Phase.ACTIVE, blind_read_only, init_state(blind_read_only))
-    assert "send_message" in se and "send_message" in sb
+    assert {"interrupt", "keep_waiting", "send_message"} <= set(se)
+    assert {"interrupt", "keep_waiting", "send_message"} <= set(sb)
     for legacy in (
         "verify_self",
         "request_evidence",
@@ -107,6 +108,7 @@ def test_opening_is_the_only_structural_gate_against_accepting_nothing() -> None
     assert opening == ["send_message"]
     active = derive_action_space(Phase.ACTIVE, p, init_state(p))
     assert "accept" in active and "file_issue" in active
+    assert "keep_waiting" in active and "interrupt" in active
 
 
 def test_negative_terminal_never_projects_to_accept() -> None:

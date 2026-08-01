@@ -44,6 +44,7 @@ _SEND_ABS_CAP = 1800.0
 # 读线程 EOF / 进程退出时投进行队列的哨兵（与真实 stdout 行区分）。
 _EOF = object()
 _SIDEBAND_PREVIEW_CAP = 500
+_POST_REPLY_DRAIN_SEC = 0.2
 
 
 def _sideband_preview(payload: dict) -> str:
@@ -101,6 +102,10 @@ class _HarnessHandle:
         self.last_progress: list[dict] = []
         # 本轮全部非 reply 旁路原文（progress/status/其它）；control() 用它判断旁路型控制已响应。
         self.last_sideband: list[dict] = []
+        # 本轮 stdout 用户可见事件流（reply/progress/status/error/ack 等），按观察顺序保留；
+        # 不做 request/reply 配对推断，只记录 harness stdout 自身说了什么。
+        self.last_visible_events: list[dict] = []
+        self.visible_events: list[dict] = []
         # 心跳/续等：进程级读线程把 stdout 行丢进队列；poll 在超时内 drain——
         # 旁路累积，reply 行结束本轮。
         self._line_q: queue.Queue = queue.Queue()
@@ -113,6 +118,23 @@ class _HarnessHandle:
     def in_flight(self) -> bool:
         """本轮 send 是否仍在进行（尚无终态 reply）。旁路型 control 之后仍为 True。"""
         return self._inflight
+
+    def _record_visible_event(self, event_type: str, text: str, raw: dict) -> None:
+        event = {
+            "type": event_type,
+            "text": str(text or ""),
+            "source": "harness_stdout",
+            "observed_at": time.monotonic(),
+            "raw": dict(raw),
+        }
+        self.last_visible_events.append(event)
+        self.visible_events.append(event)
+
+    def drain_visible_events(self) -> list[dict]:
+        """取出本轮新 stdout 可见事件；不解释、不配对，只按观察顺序返回。"""
+        events = list(self.last_visible_events)
+        self.last_visible_events.clear()
+        return events
 
     def _start(self) -> None:
         # 命令不存在 / entry 崩溃 → Popen 抛错，由 launch 上抛（附 entry 信息）。
@@ -190,6 +212,7 @@ class _HarnessHandle:
         self.last_steps = []
         self.last_progress = []
         self.last_sideband = []
+        self.last_visible_events = []
         self._write(self._message_frame(message))
         self._t0 = time.monotonic()
         self._inflight = True
@@ -208,6 +231,15 @@ class _HarnessHandle:
     def _ingest_sideband(self, payload: dict) -> None:
         """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
         self.last_sideband.append(payload)
+        event_type = str(payload.get("type") or ("status" if "status" in payload else "sideband"))
+        event_text = ""
+        if isinstance(payload.get("text"), str):
+            event_text = str(payload.get("text") or "")
+        elif isinstance(payload.get("progress"), dict):
+            event_text = str((payload.get("progress") or {}).get("text") or "")
+        if not event_text:
+            event_text = _sideband_preview(payload)
+        self._record_visible_event(event_type, event_text, payload)
         if payload.get("type") == "progress":
             text = payload.get("text")
             if isinstance(text, str) and text:
@@ -222,6 +254,34 @@ class _HarnessHandle:
                 return
         kind = "status" if "status" in payload else "sideband"
         self.last_progress.append({"kind": kind, "text": _sideband_preview(payload)})
+
+    def _post_reply_drain(self) -> None:
+        """短暂收下紧跟终态 reply 的旁路事件；不等待下一条终态 reply。"""
+        deadline = time.monotonic() + _POST_REPLY_DRAIN_SEC
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            try:
+                item = self._line_q.get(timeout=min(0.02, remaining))
+            except queue.Empty:
+                return
+            if item is _EOF:
+                self._line_q.put(item)
+                return
+            line = str(item)
+            try:
+                payload = json.loads(line)
+            except (json.JSONDecodeError, TypeError):
+                self._line_q.put(line)
+                return
+            if not isinstance(payload, dict):
+                self._line_q.put(line)
+                return
+            if payload.get("type") in {"reply", "error"} or "reply" in payload:
+                self._line_q.put(line)
+                return
+            self._ingest_sideband(payload)
 
     def poll(self, timeout: float) -> tuple[str, object]:
         """在 timeout 秒内等当前这轮回复。
@@ -268,17 +328,24 @@ class _HarnessHandle:
             if payload.get("type") == "error":
                 self._inflight = False
                 msg = payload.get("message") or payload.get("text") or payload
+                self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
             if payload.get("type") == "reply":
                 self._inflight = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
-                return ("reply", payload.get("text", ""))
+                text = str(payload.get("text", ""))
+                self._record_visible_event("reply", text, payload)
+                self._post_reply_drain()
+                return ("reply", text)
             if "reply" in payload:
                 self._inflight = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
-                return ("reply", payload["reply"])
+                text = str(payload["reply"])
+                self._record_visible_event("reply", text, payload)
+                self._post_reply_drain()
+                return ("reply", text)
             # 任意非 reply JSON 旁路（progress / status / 未来字段）——放宽接收，不报错。
             self._ingest_sideband(payload)
             continue
@@ -311,17 +378,24 @@ class _HarnessHandle:
             if payload.get("type") == "error":
                 self._inflight = False
                 msg = payload.get("message") or payload.get("text") or payload
+                self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
             if payload.get("type") == "reply":
                 self._inflight = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
-                return str(payload.get("text", ""))
+                text = str(payload.get("text", ""))
+                self._record_visible_event("reply", text, payload)
+                self._post_reply_drain()
+                return text
             if "reply" in payload:
                 self._inflight = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
-                return str(payload["reply"])
+                text = str(payload["reply"])
+                self._record_visible_event("reply", text, payload)
+                self._post_reply_drain()
+                return text
             self._ingest_sideband(payload)
 
     def control(self, name: str) -> str:

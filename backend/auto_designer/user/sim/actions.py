@@ -54,9 +54,14 @@ class ActionSpec:
 # 动作目录 (五属性钉死)
 # --------------------------------------------------------------------------
 CATALOG: dict[str, ActionSpec] = {
-    # 与 harness 的所有外部交互统一成一条自然语言消息；“查验/读文件/跑命令”是
+    # 与 harness 的外部交互以自然语言消息为主；“查验/读文件/跑命令”是
     # 用户 agent 的私有内层行为，不是外层 action。
     "send_message": ActionSpec("send_message", Executor.HARNESS, Channel.EMIT, Effect.ADVANCE),
+    # 用户也可像真实 CLI 一样不追加新消息而继续等待，或打断仍在运行/排队的 harness 工作。
+    "keep_waiting": ActionSpec(
+        "keep_waiting", Executor.PERSONA_LOCAL, Channel.SILENT, Effect.ADVANCE
+    ),
+    "interrupt": ActionSpec("interrupt", Executor.HARNESS, Channel.SILENT, Effect.ADVANCE),
     # —— 终止 ——
     "accept": ActionSpec(
         "accept", Executor.PERSONA_LOCAL, Channel.EMIT, Effect.TERMINATE, "accepted"

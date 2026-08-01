@@ -207,7 +207,9 @@ def test_container_passes_through_claude_config_envs(tmp_path: Path, monkeypatch
     monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://gw.example.top")
     monkeypatch.setenv("ANTHROPIC_MODEL", "vendor/Model-Pro")
     monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "vendor/Model-Pro")
-    run.start_vigil(repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log")
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
     joined = " ".join(next(a for a in calls["runs"] if a[:2] == ["docker", "run"]))
     assert "ANTHROPIC_BASE_URL=https://gw.example.top" in joined
     assert "ANTHROPIC_MODEL=vendor/Model-Pro" in joined
@@ -219,7 +221,9 @@ def test_container_omits_unset_claude_config_envs(tmp_path: Path, monkeypatch) -
     calls = _container_rig(monkeypatch, tmp_path)
     for key in run._CLAUDE_CONFIG_ENVS:
         monkeypatch.delenv(key, raising=False)
-    run.start_vigil(repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log")
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
     joined = " ".join(next(a for a in calls["runs"] if a[:2] == ["docker", "run"]))
     assert "ANTHROPIC_MODEL" not in joined and "ANTHROPIC_BASE_URL" not in joined
 

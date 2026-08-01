@@ -36,7 +36,7 @@ from .state import State
 # --------------------------------------------------------------------------
 LEGAL_BY_PHASE: dict[Phase, set[str]] = {
     Phase.OPENING: {"send_message"},
-    Phase.ACTIVE: {"send_message"},
+    Phase.ACTIVE: {"interrupt", "keep_waiting", "send_message"},
 }
 
 
