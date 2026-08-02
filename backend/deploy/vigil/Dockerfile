@@ -19,6 +19,15 @@ COPY . /opt/openagents-src
 RUN pip install --no-cache-dir /opt/openagents-src \
     && openagents --help >/dev/null
 
+# 交付面工程质量工具链：ruff + pytest。reviewer/implementer/deliver agent 的提示词把「ruff check
+# 通过 + pytest 通过」列为自验/评审判据（OpenAgents 约定），在容器里实跑 `python -m ruff check .` /
+# `python -m pytest -q`——缺工具则报 "No module named ruff/pytest" → 评审掷骰子（有时误判 REWORK、
+# doc-only 的正确 PR 也被打回 → 卡到 needs-human，生产实证）。它们是交付面工具链、与 git/claude 同级，
+# **必须 build 时烘进镜像**——egress 只放行 Anthropic API，运行时 pip 到不了 PyPI（见 deploy/gitea
+# egress-proxy.conf）。harness 的自测是 unittest 且 entry 懒加载 nexau，故 pytest 收 test_smoke 无需 nexau。
+RUN pip install --no-cache-dir "ruff>=0.9.0" "pytest>=8.0.0" \
+    && ruff --version && pytest --version
+
 # 非 root 运行用户（uid 固定 1000，方便挂载物权限对齐）；/work 为 clone 落点（entrypoint 使用）。
 RUN useradd -m -u 1000 -s /bin/bash vigil && mkdir -p /work && chown vigil:vigil /work
 USER vigil
