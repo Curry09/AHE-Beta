@@ -21,8 +21,7 @@ class _ShutdownHarness(FakeHarness):
 class _HeartbeatHarness(FakeHarness):
     def __init__(self) -> None:
         super().__init__(script=["reply"])
-        self.begun: list[str] = []
-        self.emitted: list[str] = []
+        self.writes: list[str] = []
         self.controls: list[str] = []
         self.last_progress = [{"kind": "tool", "text": "working"}]
         self.last_steps = [{"kind": "tool", "text": "read"}]
@@ -33,18 +32,21 @@ class _HeartbeatHarness(FakeHarness):
     def in_flight(self) -> bool:
         return self._inflight
 
-    def begin(self, message: str) -> None:
-        self.begun.append(message)
+    def write_message(self, message: str) -> None:
+        self.writes.append(message)
         self._inflight = True
+
+    def begin(self, message: str) -> None:
+        self.write_message(message)
+
+    def emit_message(self, message: str) -> None:
+        self.write_message(message)
 
     def poll(self, timeout: float) -> tuple[str, object]:
         return ("pending", timeout)
 
     def try_reply(self) -> str | None:
         return None
-
-    def emit_message(self, message: str) -> None:
-        self.emitted.append(message)
 
     def control(self, name: str) -> str:
         self.controls.append(name)
@@ -77,24 +79,23 @@ def test_connector_help_text_comes_from_wrapped_harness() -> None:
     assert HarnessConnector(wrapped).help_text == "User guide"
 
 
-def test_connector_exposes_optional_heartbeat_surface_only_when_wrapped_has_it() -> None:
+def test_connector_exposes_unified_write_and_optional_poll() -> None:
     plain = HarnessConnector(FakeHarness())
-    assert not hasattr(plain, "begin")
+    assert hasattr(plain, "write_message")  # connector always exposes unified write
     assert not hasattr(plain, "poll")
 
     advanced = _HeartbeatHarness()
     connector = HarnessConnector(advanced)
-    connector.begin("work")
-    connector.emit_message("more detail")
+    connector.write_message("work")
+    connector.write_message("more detail")
 
-    assert hasattr(connector, "begin")
+    assert hasattr(connector, "poll")
     assert not hasattr(connector, "control")
     assert connector.in_flight is True
     assert connector.poll(0.1) == ("pending", 0.1)
     assert connector.try_reply() is None
     assert connector.last_progress == [{"kind": "tool", "text": "working"}]
-    assert advanced.begun == ["work"]
-    assert advanced.emitted == ["more detail"]
+    assert advanced.writes == ["work", "more detail"]
 
 
 def test_connector_interrupt_uses_control_when_available() -> None:

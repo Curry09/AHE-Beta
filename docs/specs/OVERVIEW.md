@@ -109,6 +109,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0035 stdout 可见 harness 状态与主 loop 等待/打断动作
 用 stdout 可见事件修复用户对回复轮次滞后的弱感知：接缝层不做 request/reply 配对，只按 harness 输出顺序展示 reply/progress/status；主 loop 常驻 keep_waiting/interrupt；v0 harness busy 输入需如实输出 queued/status，帮助用户与设计师感知当前正在处理什么。
 
+### 0036 接缝层统一 stdin 写入口：去 begin/emit 二分，reply 软唤醒
+接缝层 begin/emit_message 二分泄漏「正式轮次 vs 加塞」语义，并把读 stdout 绑在 in_flight 上，导致 reply 后 keep_waiting 空转。本组改为：用户消息统一一个写入口（始终写 stdin，类 CC 输入框）；堵/排队由 harness 决定；平台以 type=reply 为软唤醒（等下一条 reply 或超时），poll 不依赖写路径旗标；interrupt 仍为外通道。改动面集中在 launcher/loop/connector 与测试，不改 harness 线协议形状。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -259,6 +262,10 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0035 | 0035/T3 | 接缝层可见事件：扩充用户感知为 stdout 事件流 | done | T1 | backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/connector.py<br>backend/auto_designer/models.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_connector.py |
 | 0035 | 0035/T4 | v0 harness：busy 输入 queued/status 可见性 | done | T1 | backend/harness_template/entry.py<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/HELP.md<br>backend/harness_template/tests/test_smoke.py |
 | 0035 | 0035/T5 | divergent PM 用户可见契约观察 lens | done | T1 | backend/agent_defs/divergent_pm/systemprompt.md |
+| 0036 | 0036/T1 | 写 0036 活快照 | done | — | docs/specs/0036-unify-harness-stdin-write.md |
+| 0036 | 0036/T2 | launcher：统一写入口 + poll 不绑写旗标 | done | T1 | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
+| 0036 | 0036/T3 | loop：主/心跳发消息走统一写；keep_waiting→poll | done | T1, T2 | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py |
+| 0036 | 0036/T4 | connector 与 INTERFACE 对齐统一写 | done | T2 | backend/auto_designer/harness/connector.py<br>backend/auto_designer/harness/INTERFACE.md<br>backend/tests/harness/test_connector.py |
 
 ## 跨 feature 关系图
 
@@ -480,6 +487,12 @@ graph LR
         n0035_T4["T4 v0 harness：busy 输入 queued/status 可见性"]
         n0035_T5["T5 divergent PM 用户可见契约观察 lens"]
     end
+    subgraph G0036[0036 unify-harness-stdin-write]
+        n0036_T1["T1 写 0036 活快照"]
+        n0036_T2["T2 launcher：统一写入口 + poll 不绑写旗标"]
+        n0036_T3["T3 loop：主/心跳发消息走统一写；keep_waiting→poll"]
+        n0036_T4["T4 connector 与 INTERFACE 对齐统一写"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -609,6 +622,10 @@ graph LR
     n0035_T3 --> n0035_T1
     n0035_T4 --> n0035_T1
     n0035_T5 --> n0035_T1
+    n0036_T2 --> n0036_T1
+    n0036_T3 --> n0036_T1
+    n0036_T3 --> n0036_T2
+    n0036_T4 --> n0036_T2
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -679,9 +696,10 @@ graph LR
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
 | backend/auto_designer/dev/harness_boundary.py | 0015, 0030 |
-| backend/auto_designer/harness/connector.py | 0030, 0035 |
+| backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
+| backend/auto_designer/harness/connector.py | 0030, 0035, 0036 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033 |
@@ -696,7 +714,7 @@ graph LR
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
@@ -724,8 +742,8 @@ graph LR
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/dev/test_completion_gate.py | 0014, 0030 |
 | backend/tests/dev/test_harness_boundary.py | 0015, 0030 |
-| backend/tests/harness/test_connector.py | 0030, 0035 |
-| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035 |
+| backend/tests/harness/test_connector.py | 0030, 0035, 0036 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029 |
 | backend/tests/loop/test_live.py | 0017, 0026 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
@@ -740,9 +758,9 @@ graph LR
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036 |
 | backend/tests/user/sim/test_inner_prompt.py | 0008, 0031 |
-| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031 |
+| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031 |
 | backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031 |
 | backend/tests/user/sim/test_state.py | 0005, 0012 |
@@ -1774,4 +1792,33 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+```
+
+### 0036 接缝层统一 stdin 写入口：去 begin/emit 二分，reply 软唤醒（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 写 0036 活快照"]
+    nT2["T2 launcher：统一写入口 + poll 不绑写旗标"]
+    nT3["T3 loop：主/心跳发消息走统一写；keep_waiting→poll"]
+    nT4["T4 connector 与 INTERFACE 对齐统一写"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT2 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
 ```

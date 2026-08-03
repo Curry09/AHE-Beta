@@ -1,12 +1,10 @@
 """harness launcher（spec-0003/T1）：把某版 harness 程序接成 spec-0001 的 HarnessInterface。
 
 按 git ref 把 harness 仓 checkout 到 data/harness_runs/<ref>/，起子进程跑其自带 entry，
-按逐轮 stdio JSONL 协议适配为 send/reset/close：
-  stdin  {"message": str} | {"control": str}
-  stdout 可选多行旁路（任意非 reply 的 JSON 对象：progress / status / 其它）→
-         最后一行 {"reply": str, "steps"?: [...]} 结束本轮
-控制名对 launcher 不透明（HELP.md 是能力真相源）：终结型 control（如 interrupt）最终吐 reply；
-旁路型（如 status/peek）只吐非 reply 行、本轮继续。接收端放宽——未知旁路字段不报错。
+按 stdio JSONL 协议适配为 send/reset/close（Spec-0036）：
+  stdin  用户消息统一 write_message；外通道 interrupt/shutdown
+  stdout progress/status 等旁路照记；type=reply 为软唤醒（poll 不绑写旗标）
+控制名对 launcher 不透明（HELP.md 是能力真相源）。接收端放宽——未知旁路字段不报错。
 harness 内部 1 或 N 个 nexau 如何编排对 launcher 不可见（黑盒）。
 """
 
@@ -107,17 +105,19 @@ class _HarnessHandle:
         self.last_visible_events: list[dict] = []
         self.visible_events: list[dict] = []
         # 心跳/续等：进程级读线程把 stdout 行丢进队列；poll 在超时内 drain——
-        # 旁路累积，reply 行结束本轮。
+        # 旁路累积，reply 为软唤醒（Spec-0036；不绑写路径）。
         self._line_q: queue.Queue = queue.Queue()
         self._reader: threading.Thread | None = None
         self._t0 = 0.0
-        self._inflight = False
+        # 软状态：自上次 write_message 起是否仍在等一条 reply（供 interrupt/abs-cap/try_reply）。
+        # 不约束写、不约束 poll（Spec-0036）。
+        self._awaiting_reply = False
         self._start()
 
     @property
     def in_flight(self) -> bool:
-        """本轮 send 是否仍在进行（尚无终态 reply）。旁路型 control 之后仍为 True。"""
-        return self._inflight
+        """兼容旧名：是否自上次写消息起仍在等 reply（软状态，不挡写/读）。"""
+        return self._awaiting_reply
 
     def _record_visible_event(self, event_type: str, text: str, raw: dict) -> None:
         event = {
@@ -202,31 +202,25 @@ class _HarnessHandle:
             return {"type": "shutdown"}
         return {"control": "shutdown"}
 
-    def begin(self, message: str) -> None:
-        """启动一轮 send（写入 message），不阻塞等待。配合 poll 使用。"""
-        if self._closed or self._proc is None:
-            raise RuntimeError("harness 句柄已关闭，不可再 send")
-        if self._inflight:
-            raise RuntimeError("上一轮 send 尚未收完回复，不可并发 begin")
-        assert self._proc.stdin is not None and self._proc.stdout is not None
-        self.last_steps = []
-        self.last_progress = []
-        self.last_sideband = []
-        self.last_visible_events = []
-        self._write(self._message_frame(message))
-        self._t0 = time.monotonic()
-        self._inflight = True
+    def write_message(self, message: str) -> None:
+        """统一写入口（Spec-0036）：向 harness stdin 写入一条用户消息。
 
-    def emit_message(self, message: str) -> None:
-        """in-flight 再塞一条 message（内通道）。不改变 in_flight；harness 接不接是它的事。
-
-        与 begin 不同：不开启新一轮、不清空 progress/sideband。用于等待中插话（如 /btw）。
+        不区分「正式轮次 / 加塞」；堵/排队由 harness 决定。可连续多次调用。
         """
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可再 send")
-        if not self._inflight:
-            raise RuntimeError("没有进行中的 send，应使用 begin/send，不可 emit_message")
+        assert self._proc.stdin is not None and self._proc.stdout is not None
         self._write(self._message_frame(message))
+        self._t0 = time.monotonic()
+        self._awaiting_reply = True
+
+    def begin(self, message: str) -> None:
+        """Deprecated alias of write_message（Spec-0036）。"""
+        self.write_message(message)
+
+    def emit_message(self, message: str) -> None:
+        """Deprecated alias of write_message（Spec-0036）。"""
+        self.write_message(message)
 
     def _ingest_sideband(self, payload: dict) -> None:
         """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
@@ -284,54 +278,61 @@ class _HarnessHandle:
             self._ingest_sideband(payload)
 
     def poll(self, timeout: float) -> tuple[str, object]:
-        """在 timeout 秒内等当前这轮回复。
+        """在 timeout 秒内等下一条 type=reply（软唤醒，Spec-0036）。
 
-        返回 ("reply", reply_text) 若已收到；("pending", waited_sec) 若仍在跑（旁路行会先
-        累积进 last_sideband / last_progress）。进程还活着就是合法长任务、绝不按墙钟盲杀；只有
-        「进程已退出却没回完整 reply」（崩溃留孤儿占管道）才判死锁上抛；另设极宽松绝对上限防真活锁。"""
-        if not self._inflight:
-            raise RuntimeError("没有进行中的 send，不可 poll")
-        deadline = time.monotonic() + max(0.0, timeout)
+        不要求写路径旗标。返回 ("reply", text) 或 ("pending", waited_sec)。
+        progress/status 等旁路照记并继续等。进程已死却无完整行则上抛；
+        自上次 write 起的极宽松绝对上限仅在仍 awaiting_reply 时防活锁。
+        """
+        if self._closed or self._proc is None:
+            raise RuntimeError("harness 句柄已关闭，不可 poll")
+        t_poll0 = time.monotonic()
+        deadline = t_poll0 + max(0.0, timeout)
         while True:
-            waited = time.monotonic() - self._t0
-            if waited >= _SEND_ABS_CAP:
-                self._kill_group(signal.SIGKILL)
-                self._inflight = False
-                raise RuntimeError(
-                    f"harness 单轮回复超绝对上限 >{_SEND_ABS_CAP:.0f}s（疑似活锁，已杀进程组）"
-                )
+            if self._awaiting_reply and self._t0 > 0:
+                waited_abs = time.monotonic() - self._t0
+                if waited_abs >= _SEND_ABS_CAP:
+                    self._kill_group(signal.SIGKILL)
+                    self._awaiting_reply = False
+                    raise RuntimeError(
+                        f"harness 单轮回复超绝对上限 >{_SEND_ABS_CAP:.0f}s（疑似活锁，已杀进程组）"
+                    )
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                return ("pending", waited)
+                base = self._t0 if self._awaiting_reply and self._t0 > 0 else t_poll0
+                return ("pending", time.monotonic() - base)
             try:
                 item = self._line_q.get(timeout=min(_POLL_INTERVAL, remaining))
             except queue.Empty:
                 if self._proc is not None and self._proc.poll() is not None:
-                    self._kill_group(signal.SIGKILL)
-                    self._inflight = False
-                    raise RuntimeError(
-                        "harness 子进程已退出但未回完整行（崩溃/孤儿占管道）"
-                    ) from None
+                    # 进程已退出：若队列已空且仍在等 reply，判崩溃；否则当作无更多输出。
+                    if self._awaiting_reply:
+                        self._kill_group(signal.SIGKILL)
+                        self._awaiting_reply = False
+                        raise RuntimeError(
+                            "harness 子进程已退出但未回完整行（崩溃/孤儿占管道）"
+                        ) from None
+                    return ("pending", time.monotonic() - t_poll0)
                 continue
             if item is _EOF:
-                self._inflight = False
+                self._awaiting_reply = False
                 raise RuntimeError("harness 子进程已退出（stdout EOF）")
             line = str(item)
             try:
                 payload = json.loads(line)
             except (json.JSONDecodeError, TypeError) as exc:
-                self._inflight = False
+                self._awaiting_reply = False
                 raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
             if not isinstance(payload, dict):
-                self._inflight = False
+                self._awaiting_reply = False
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
             if payload.get("type") == "error":
-                self._inflight = False
+                self._awaiting_reply = False
                 msg = payload.get("message") or payload.get("text") or payload
                 self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
             if payload.get("type") == "reply":
-                self._inflight = False
+                self._awaiting_reply = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload.get("text", ""))
@@ -339,24 +340,23 @@ class _HarnessHandle:
                 self._post_reply_drain()
                 return ("reply", text)
             if "reply" in payload:
-                self._inflight = False
+                self._awaiting_reply = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload["reply"])
                 self._record_visible_event("reply", text, payload)
                 self._post_reply_drain()
                 return ("reply", text)
-            # 任意非 reply JSON 旁路（progress / status / 未来字段）——放宽接收，不报错。
             self._ingest_sideband(payload)
             continue
 
     def try_reply(self) -> str | None:
-        """非阻塞：若终态 reply 已在 stdout 缓冲中，取出并结束本轮 inflight。
+        """非阻塞：若 reply 已在 stdout 缓冲中则取出（软唤醒，不要求写旗标）。
 
         供心跳决策之后、执行动作之前调用：LLM 思考期间到的 reply 不应再被 give_up/interrupt 吞掉。
-        旁路行照常吞进 last_progress；队列空则返回 None（仍 in flight）。
+        旁路行照常吞进 last_progress；队列空则返回 None。
         """
-        if not self._inflight:
+        if self._closed or self._proc is None:
             return None
         while True:
             try:
@@ -364,24 +364,24 @@ class _HarnessHandle:
             except queue.Empty:
                 return None
             if item is _EOF:
-                self._inflight = False
+                self._awaiting_reply = False
                 raise RuntimeError("harness 子进程已退出（stdout EOF）")
             line = str(item)
             try:
                 payload = json.loads(line)
             except (json.JSONDecodeError, TypeError) as exc:
-                self._inflight = False
+                self._awaiting_reply = False
                 raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
             if not isinstance(payload, dict):
-                self._inflight = False
+                self._awaiting_reply = False
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
             if payload.get("type") == "error":
-                self._inflight = False
+                self._awaiting_reply = False
                 msg = payload.get("message") or payload.get("text") or payload
                 self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
             if payload.get("type") == "reply":
-                self._inflight = False
+                self._awaiting_reply = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload.get("text", ""))
@@ -389,7 +389,7 @@ class _HarnessHandle:
                 self._post_reply_drain()
                 return text
             if "reply" in payload:
-                self._inflight = False
+                self._awaiting_reply = False
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload["reply"])
@@ -401,17 +401,16 @@ class _HarnessHandle:
     def control(self, name: str) -> str:
         """外通道：向 harness 发控制（用户侧主路径是 interrupt ≈ Ctrl+C）。
 
-        必须在某轮 send 进行中（begin 后、reply 前）。
-        - interrupt（及同类终结型）：最终吐 reply，本轮结束，返回 reply 文本。
-        - 若 harness 仍对其它名吐旁路 ack：本轮继续，返回旁路预览（兼容旧 wire；用户 sim 不再经此发 peek/status——那些属内通道 message）。
-        发 control 后仍可能夹杂工具 progress——那些不算对本控制的应答，继续等。
+        - interrupt（及同类终结型）：最终吐 reply，返回 reply 文本。
+        - 若 harness 仍对其它名吐旁路 ack：返回旁路预览（兼容旧 wire）。
+        不要求写路径旗标（Spec-0036）；进程须仍打开。
         """
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可发控制消息")
-        if not self._inflight:
-            raise RuntimeError("没有进行中的 send，控制消息无处作用")
         before = len(self.last_sideband)
         self._write(self._interrupt_frame() if name == "interrupt" else {"control": name})
+        self._t0 = time.monotonic()
+        self._awaiting_reply = True
         while True:
             kind, val = self.poll(_POLL_INTERVAL)
             if kind == "reply":
@@ -421,8 +420,8 @@ class _HarnessHandle:
                     return _sideband_preview(payload)
 
     def send(self, message: str) -> str:
-        """阻塞版：begin + 等到收完整段回复（供不需要心跳的调用方 / 向后兼容）。"""
-        self.begin(message)
+        """阻塞版：write_message + 等到下一条 reply（Spec-0036）。"""
+        self.write_message(message)
         while True:
             kind, val = self.poll(_SEND_ABS_CAP)
             if kind == "reply":
@@ -448,7 +447,7 @@ class _HarnessHandle:
         self._closed = True  # 幂等
 
     def _terminate(self) -> None:
-        self._inflight = False  # 复位/关闭时作废在途轮，之后可重新 begin
+        self._awaiting_reply = False
         if self._proc is None:
             return
         # 顺序：先杀整组 → wait/兜底 SIGKILL → join 读线程 → 再关流、置空 _proc。

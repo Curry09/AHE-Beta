@@ -172,10 +172,19 @@ WAITING_ACTIONS = ["keep_waiting", "send_message", "interrupt", "give_up"]
 
 
 def _supports_heartbeat(harness) -> bool:
-    """真实子进程句柄：begin/poll + 内 emit_message + 外 interrupt/shutdown；Fake/Scripted 无需心跳。"""
-    return all(
-        hasattr(harness, m) for m in ("begin", "poll", "interrupt", "shutdown", "emit_message")
-    )
+    """真实子进程句柄：统一写 + poll + 外 interrupt/shutdown；Fake/Scripted 无需心跳。"""
+    has_write = hasattr(harness, "write_message") or hasattr(harness, "begin")
+    return has_write and all(hasattr(harness, m) for m in ("poll", "interrupt", "shutdown"))
+
+
+def _write_harness_message(harness, message: str) -> None:
+    """统一 stdin 写（Spec-0036）：优先 write_message，兼容旧 begin/emit_message 别名。"""
+    for name in ("write_message", "begin", "emit_message"):
+        fn = getattr(harness, name, None)
+        if callable(fn):
+            fn(message)
+            return
+    raise AttributeError("harness has no write_message/begin/emit_message")
 
 
 def _take_persona_calls(client: PersonaClient, role: str) -> list[dict]:
@@ -427,15 +436,15 @@ def route(action_id: str, message: str, state: State, harness, observable: str) 
     spec = CATALOG[action_id]
 
     if action_id == "keep_waiting":
-        # 主 loop 也允许像真实 CLI 一样「先别追加消息，继续等」。若 harness 仍有
-        # in-flight 事件流就等下一条 reply；若已空闲，则本动作是安全 no-op，交回下一轮判断。
-        if getattr(harness, "in_flight", False) and hasattr(harness, "poll"):
-            try:
-                kind, val = harness.poll(_HEARTBEAT_SEC)
-            except Exception as exc:  # noqa: BLE001
-                return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
-            if kind == "reply":
-                return str(val)
+        # 主 loop「再等」：poll 等下一条 reply（软唤醒，不绑写旗标；Spec-0036）。
+        if not hasattr(harness, "poll"):
+            return None
+        try:
+            kind, val = harness.poll(_HEARTBEAT_SEC)
+        except Exception as exc:  # noqa: BLE001
+            return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
+        if kind == "reply":
+            return str(val)
         return None
 
     if action_id == "interrupt":
@@ -777,9 +786,10 @@ def _await_harness(
     ledger: _UtteranceLedger,
     open_utterance_id: str,
 ) -> tuple[str, float, str | None, str | None]:
-    """begin 后进入 AwaitEvent：reply → 交主 loop；timer → 一次性心跳后回到 AwaitEvent。
+    """写消息后进入 AwaitEvent：reply → 交主 loop；timer → 一次性心跳后回到 AwaitEvent。
 
-    Spec-0024/T6：本轮 begin 对应 open_utterance_id；收到的 reply/interrupt 关闭该 open。
+    Spec-0024/T6：本轮写对应 open_utterance_id；收到的 reply/interrupt 关闭该 open。
+    Spec-0036：写走统一 write_message（兼容 begin/emit 别名）。
     心跳动作（含 keep_waiting / send_message）做完即结束本次心跳，不在心跳内 continue poll。
 
     返回 (harness_output, elapsed_sec, terminal_action, user_control)：
@@ -791,7 +801,7 @@ def _await_harness(
     t0 = time.monotonic()
     begin_at = clock.now()
     try:
-        harness.begin(message)
+        _write_harness_message(harness, message)
     except Exception as exc:  # noqa: BLE001
         ledger.clear_open()
         return (
@@ -859,7 +869,7 @@ def _await_harness(
         # 任意动作都结束本次心跳；下面只执行 I/O 副作用，然后要么 return 给主环，要么回 AwaitEvent。
         if action == "send_message":
             try:
-                harness.emit_message(wait_message)
+                _write_harness_message(harness, wait_message)
             except Exception as exc:  # noqa: BLE001
                 ledger.clear_open()
                 return (
@@ -1070,6 +1080,13 @@ def run_session(
                 if utterance_id:
                     ledger.mark_open(utterance_id)
                     ledger.close_open_as_answered()
+            elif action_id == "keep_waiting":
+                # 再等无新 reply：仍把等待期吞到的旁路事件交给下一轮感知（避免空转丢 status）。
+                drain_only = getattr(harness, "drain_visible_events", None)
+                if callable(drain_only):
+                    ev_only = list(drain_only())
+                    if ev_only:
+                        harness_events = ev_only
         if nxt is not None:
             # 时间感知·轻耗心：仅极端超时才自动扣一点耐心。
             # 仅对阻塞 route：AwaitEvent 路径的等待挫败已由 keep_waiting 一次性心跳建模，不双记。

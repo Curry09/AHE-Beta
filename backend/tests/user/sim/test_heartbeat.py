@@ -40,7 +40,7 @@ def _persona(d1: D1Eval = D1Eval.EXPERT, d43: D43Correct = D43Correct.GIVE_UP) -
 
 
 class HeartbeatHarness:
-    """begin/poll/control/emit_message —— 满足 _supports_heartbeat。"""
+    """write_message/poll/interrupt/shutdown —— 满足 _supports_heartbeat（Spec-0036）。"""
 
     def __init__(
         self,
@@ -67,15 +67,20 @@ class HeartbeatHarness:
     def in_flight(self) -> bool:
         return self._inflight
 
+    def write_message(self, message: str) -> None:
+        """统一写：首条记 begun，等待中再写记 emitted（测观测用，语义同一通道）。"""
+        if not self._inflight:
+            self.begun.append(message)
+            self._inflight = True
+            self.last_progress = []
+        else:
+            self.emitted.append(message)
+
     def begin(self, message: str) -> None:
-        self.begun.append(message)
-        self._inflight = True
-        self.last_progress = []
+        self.write_message(message)
 
     def emit_message(self, message: str) -> None:
-        if not self._inflight:
-            raise RuntimeError("not in flight")
-        self.emitted.append(message)
+        self.write_message(message)
 
     def poll(self, timeout: float) -> tuple[str, object]:  # noqa: ARG002
         item = self._poll_script[min(self._pi, len(self._poll_script) - 1)]
