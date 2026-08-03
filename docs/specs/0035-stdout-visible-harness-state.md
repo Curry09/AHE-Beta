@@ -68,6 +68,19 @@ tasks:
       - backend/harness_template/tests/test_smoke.py
     scope: 初始 harness 在 busy 期间收到新 message 时通过 stdout 如实输出 queued ack；当前回复结束后开始处理 queued message 时输出 status/progress，描述正在处理/运行什么；不宣称 request/reply 配对，不要求 /btw 同轮语义。
     acceptance: busy 输入不再静默排队；stdout 可见 [queued]/status 事件；开始处理 queued message 时有可见状态；smoke 覆盖 queued ack/status；RUNTIME/HELP 说明 busy 输入行为。
+  - id: T5
+    title: divergent PM 用户可见契约观察 lens
+    status: done
+    priority: P2
+    tags: []
+    depends-on:
+      - T1
+    relates-to: []
+    parallel: false
+    files:
+      - backend/agent_defs/divergent_pm/systemprompt.md
+    scope: 给 divergent PM 增加中性分层分析框架：先区分上下文、证据、解释与候选；用户可见契约作为观察 lens，不预设问题或方案；优先跨会话/跨 persona 或强证据模式，避免换名重复候选。
+    acceptance: 相关 designer/PM 测试通过；对同一批 user-only sessions 的自然 PM 回放能产出可追溯 session 证据的候选；不直接喂 soft gap evidence。
 ---
 
 # 0035 · stdout 可见 harness 状态与主 loop 等待/打断动作
@@ -224,6 +237,12 @@ Running: black .
 
 v0 不需要实现 `/btw` 同轮旁路问答，也不需要输出 request/reply 配对；它只需要避免 busy 输入静默排队，让用户能看到 harness 当前正在做什么。
 
+### Discovery-side consumption
+
+stdout 可见事件与主 loop 等待/打断动作会改变 PM 可观察到的会话证据形态。divergent PM 因此补一层中性的发现 lens，但不直接喂 soft gap 结论：分析会话时先区分上下文、证据、解释与候选；上下文包括用户画像与目标、任务与环境约束，证据包括用户行为、harness 可见输出、harness 实际执行轨迹，解释阶段比较证据是否一致并识别跨会话稳定模式，候选阶段只在证据足够且指向可改进产品行为时形成提案。
+
+用户可见契约仅作为组织观察的 lens，覆盖请求接收/排队、状态可见性、控制/steering、验证证据、恢复连续性、完成交接、可发现性与能力边界；该 lens 不预设这些方面一定存在问题，也不预设具体方案。候选应优先来自跨会话重复、跨 persona 重复，或单局影响强且证据清楚的模式，并描述可独立验证的产品行为变化，避免换名重复。
+
 ### DAG / file allocation
 
 ```mermaid
@@ -232,9 +251,11 @@ graph LR
   T2[T2 用户主 loop 动作]
   T3[T3 接缝层 stdout 事件]
   T4[T4 v0 harness busy status]
+  T5[T5 divergent PM lens]
   T1 --> T2
   T1 --> T3
   T1 --> T4
+  T1 --> T5
 ```
 
 | Task | 职责 | files |
@@ -243,6 +264,7 @@ graph LR
 | T2 | 主 loop 常驻 `keep_waiting` / `interrupt`，动作语义与 route | `user/sim/actions.py`, `action_space.py`, `prompt.py`, `loop.py`, user sim tests |
 | T3 | 接缝层收集 stdout 可见事件流，不做配对推断 | `harness/launcher.py`, `connector.py`, `models.py`, harness tests |
 | T4 | v0 harness busy 输入 queued/status 可见性 | `harness_template/entry.py`, `RUNTIME.md`, `HELP.md`, smoke tests |
+| T5 | divergent PM 分层发现 lens | `backend/agent_defs/divergent_pm/systemprompt.md` |
 
 ### 验证路径
 
@@ -264,6 +286,7 @@ graph LR
 - 用户可见事件流比单 `harness_output` 更长，prompt 与前端展示需要控制摘要长度。
 - `keep_waiting` 常驻 ACTIVE 后，少数场景可能空等；route 必须把 idle wait 作为安全 no-op 或短等待处理。
 - stdout status 的质量由 harness 决定；若 harness 不输出状态，用户仍只能从 reply 文本判断。这是保留进化空间的代价。
+- divergent PM 的用户可见契约 lens 可能改变候选分布：更稳定地发现恢复/完成/交接类机会，但也可能弱化 focused verification 等执行策略类机会；需要多轮观察。
 
 ## Rationale and alternatives
 
@@ -282,6 +305,10 @@ stdout 是 harness 对用户的真实界面。真实 CLI 用户不是只看到 f
 ### 为什么 v0 需要 busy status
 
 理论上 harness 可自发进化出 busy 输入可见性，但如果种子静默排队，用户和设计师会长期只看到「证据不足 / 回答含糊」，不容易定位到状态不可知性。busy 输入可见性是最小 CLI 产品起点：用户在工具忙时继续输入，工具至少应告诉用户该输入已收到、排队或正在处理。
+
+### 为什么给 divergent PM 加 lens 而不是喂 soft gap evidence
+
+人工整理 soft gap evidence 能证明 PM 能理解这类证据，但会把注意力预先筛到某类行为。T5 只给 PM 一个中性的分层观察方法和用户可见契约 lens，不给具体结论、功能名或命令名；PM 仍需从体感曲线和 timeline 工具中自行下钻、比较证据并决定是否形成候选。
 
 ## Prior art
 

@@ -258,6 +258,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0035 | 0035/T2 | 用户主 loop：常驻等待与打断动作 | done | T1 | backend/auto_designer/user/sim/actions.py<br>backend/auto_designer/user/sim/action_space.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_action_space.py<br>backend/tests/user/sim/test_heartbeat.py |
 | 0035 | 0035/T3 | 接缝层可见事件：扩充用户感知为 stdout 事件流 | done | T1 | backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/connector.py<br>backend/auto_designer/models.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_connector.py |
 | 0035 | 0035/T4 | v0 harness：busy 输入 queued/status 可见性 | done | T1 | backend/harness_template/entry.py<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/HELP.md<br>backend/harness_template/tests/test_smoke.py |
+| 0035 | 0035/T5 | divergent PM 用户可见契约观察 lens | done | T1 | backend/agent_defs/divergent_pm/systemprompt.md |
 
 ## 跨 feature 关系图
 
@@ -477,6 +478,7 @@ graph LR
         n0035_T2["T2 用户主 loop：常驻等待与打断动作"]
         n0035_T3["T3 接缝层可见事件：扩充用户感知为 stdout 事件流"]
         n0035_T4["T4 v0 harness：busy 输入 queued/status 可见性"]
+        n0035_T5["T5 divergent PM 用户可见契约观察 lens"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -606,6 +608,7 @@ graph LR
     n0035_T2 --> n0035_T1
     n0035_T3 --> n0035_T1
     n0035_T4 --> n0035_T1
+    n0035_T5 --> n0035_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -663,6 +666,7 @@ graph LR
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/agent.yaml | 0014, 0030, 0032 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014, 0030, 0032 |
+| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035 |
 | backend/agent_defs/triage_agent/agent.yaml | 0027, 0029 |
 | backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029 |
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029 |
@@ -1748,9 +1752,11 @@ graph LR
     nT2["T2 用户主 loop：常驻等待与打断动作"]
     nT3["T3 接缝层可见事件：扩充用户感知为 stdout 事件流"]
     nT4["T4 v0 harness：busy 输入 queued/status 可见性"]
+    nT5["T5 divergent PM 用户可见契约观察 lens"]
     nT1 --> nT2
     nT1 --> nT3
     nT1 --> nT4
+    nT1 --> nT5
 ```
 
 演化图：
@@ -1761,9 +1767,11 @@ graph LR
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```
