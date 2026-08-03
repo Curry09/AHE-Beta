@@ -383,6 +383,51 @@ def test_post_reply_status_is_drained_as_visible_event(tmp_path) -> None:
         h.close()
 
 
+_FOLLOWUP_REPLY_ENTRY = """\
+import json, sys, time
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    sys.stdout.write(json.dumps({"reply": "first"}) + "\\n")
+    sys.stdout.flush()
+    time.sleep(0.05)
+    sys.stdout.write(json.dumps({"status": {"note": "handling queued"}}) + "\\n")
+    sys.stdout.flush()
+    time.sleep(0.05)
+    sys.stdout.write(json.dumps({"reply": "second-queued"}) + "\\n")
+    sys.stdout.flush()
+"""
+
+
+def test_poll_after_reply_gets_followup(tmp_path) -> None:
+    """reply 后仍能 poll 到后续 queued 工作的 reply（主 loop keep_waiting；Spec-0036）。"""
+    h = _launcher(tmp_path, _FOLLOWUP_REPLY_ENTRY).launch("main")
+    try:
+        h.write_message("a")
+        kind, val = h.poll(2.0)
+        assert kind == "reply"
+        assert val == "first"
+        assert h.in_flight is False
+        kind2, val2 = h.poll(2.0)
+        assert kind2 == "reply"
+        assert val2 == "second-queued"
+        assert h.in_flight is False
+    finally:
+        h.close()
+
+
+def test_poll_timeout_when_idle(tmp_path) -> None:
+    h = _launcher(tmp_path, _POST_REPLY_STATUS_ENTRY).launch("main")
+    try:
+        assert h.send("a") == "done"
+        assert h.in_flight is False
+        kind, _ = h.poll(0.3)
+        assert kind == "pending"
+    finally:
+        h.close()
+
+
 def test_v1_protocol_interrupt_uses_type_interrupt(tmp_path) -> None:
     launcher = _launcher(tmp_path, _V1_INTERRUPT_ENTRY)
     repo = Path(launcher._harness_repo)
@@ -585,14 +630,15 @@ for line in sys.stdin:
 """
 
 
-def test_emit_message_while_inflight_does_not_clear_inflight(tmp_path) -> None:
+def test_write_message_while_awaiting_keeps_soft_flag(tmp_path) -> None:
+    """统一写：等待中再写仍合法；软 awaiting 旗标保持（Spec-0036）。"""
     h = _launcher(tmp_path, _MIDFLIGHT_MSG_ENTRY).launch("main")
     try:
-        h.begin("first")
+        h.write_message("first")
         h.poll(0.2)
         assert h.in_flight is True
-        h.emit_message("/btw still going?")
-        assert h.in_flight is True  # 内通道插话不结束本轮
+        h.write_message("/btw still going?")
+        assert h.in_flight is True
         kind, _ = h.poll(0.2)
         assert kind == "pending"
         assert h.control("interrupt").startswith("[interrupted]")
@@ -601,27 +647,27 @@ def test_emit_message_while_inflight_does_not_clear_inflight(tmp_path) -> None:
         h.close()
 
 
-def test_emit_message_without_inflight_raises(tmp_path) -> None:
-    h = _launcher(tmp_path, _COUNTER_ENTRY).launch("main")
+def test_double_write_message_allowed(tmp_path) -> None:
+    """连续两次写 message 无需中间虚构轮次锁（Spec-0036）。"""
+    h = _launcher(tmp_path, _MIDFLIGHT_MSG_ENTRY).launch("main")
     try:
-        try:
-            h.emit_message("nope")
-            raise AssertionError("expected RuntimeError")
-        except RuntimeError as exc:
-            assert "没有进行中的 send" in str(exc)
+        h.write_message("first")
+        h.write_message("second")  # 不再要求中间 reply
+        assert h.in_flight is True
+        assert h.control("interrupt").startswith("[interrupted]")
     finally:
         h.close()
 
 
-def test_begin_while_inflight_still_raises(tmp_path) -> None:
-    h = _launcher(tmp_path, _MIDFLIGHT_MSG_ENTRY).launch("main")
+def test_write_message_alias_begin_and_emit(tmp_path) -> None:
+    """begin/emit_message 为 write_message 的 deprecated 别名。"""
+    h = _launcher(tmp_path, _COUNTER_ENTRY).launch("main")
     try:
-        h.begin("first")
-        try:
-            h.begin("second")
-            raise AssertionError("expected RuntimeError")
-        except RuntimeError as exc:
-            assert "尚未收完" in str(exc)
-        h.control("interrupt")
+        h.begin("a")
+        assert h.poll(2.0)[0] == "reply"
+        h.emit_message("b")
+        kind, val = h.poll(2.0)
+        assert kind == "reply"
+        assert val == "2:b"
     finally:
         h.close()

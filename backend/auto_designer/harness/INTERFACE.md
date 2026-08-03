@@ -39,8 +39,24 @@ Old harness refs may still use:
 
 The launcher supports both formats. New templates should declare `protocol: stdio-jsonl-v1` in `params.yaml`.
 
+## Platform seam API (Spec-0036)
+
+User messages share **one stdin write**:
+
+- `write_message(text)` — always writes a message frame; queueing/busy behavior is harness-owned.
+- `begin` / `emit_message` — deprecated aliases of `write_message` (no “official round vs mid-flight” split).
+
+Soft wake on stdout:
+
+- `poll(timeout)` — records `progress` / `status` and keeps waiting; returns on `type=reply` (or legacy `reply` field), or `pending` on timeout. **Not** gated by a write-path flag.
+- Blocking `send(text)` = `write_message` + poll until reply.
+
+Outer channel (unchanged from Spec-0022):
+
+- `interrupt` / `shutdown` — not ordinary messages.
+
 ## Ownership
 
 - Harness: product behavior and `/help` content.
-- Connector: simulated-user action adaptation.
+- Connector: simulated-user action adaptation; exposes unified `write_message` + optional poll/drain.
 - Launcher: checkout, process lifecycle, stdio encoding/decoding.

@@ -13,8 +13,17 @@ from typing import Any
 
 from auto_designer.harness.interface import HarnessInterface
 
+# Optional streaming surface (Spec-0036): unified write + reply soft-wake poll.
+# begin/emit_message remain as deprecated aliases forwarded via __getattr__.
 _HEARTBEAT_METHODS = frozenset(
-    {"begin", "poll", "try_reply", "emit_message", "drain_visible_events"}
+    {
+        "write_message",
+        "begin",
+        "poll",
+        "try_reply",
+        "emit_message",
+        "drain_visible_events",
+    }
 )
 _OBSERVATION_ATTRS = frozenset(
     {
@@ -56,6 +65,18 @@ class HarnessConnector:
         metadata remains outside this call.
         """
         return self._harness.send(text)
+
+    def write_message(self, message: str) -> None:
+        """Unified stdin write (Spec-0036): one message frame, no begin/emit split.
+
+        Prefers harness.write_message; falls back to deprecated begin/emit_message.
+        """
+        for name in ("write_message", "begin", "emit_message"):
+            fn = getattr(self._harness, name, None)
+            if callable(fn):
+                fn(message)
+                return
+        raise AttributeError("wrapped harness has no write_message/begin/emit_message")
 
     def interrupt(self) -> str | None:
         """Adapter entry for a simulated user's interrupt action.

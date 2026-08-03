@@ -19,10 +19,11 @@ from auto_designer.user.sim.loop import (
     MAX_TURNS,
     SessionResult,
     _record_private_evidence,
+    route,
     run_session,
 )
 from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.state import State
+from auto_designer.user.sim.state import State, init_state
 
 
 def _persona(d1: D1Eval, d43: D43Correct, pid: str = "P") -> Persona:
@@ -337,6 +338,33 @@ class _RaisingHarness:
 
     def send(self, message: str) -> str:  # noqa: ARG002
         raise TimeoutError("agent.run 超时 >240s")
+
+
+def test_route_keep_waiting_polls_followup_when_not_awaiting() -> None:
+    """主 loop keep_waiting：reply 后仍应通过 poll 拿到后续输出（Spec-0036）。"""
+
+    class _FollowupHarness:
+        in_flight = False
+
+        def poll(self, timeout: float) -> tuple[str, object]:  # noqa: ARG002
+            return ("reply", "second-queued")
+
+    p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
+    state = init_state(p)
+    got = route("keep_waiting", "", state, _FollowupHarness(), "first")
+    assert got == "second-queued"
+
+
+def test_route_keep_waiting_idle_returns_none() -> None:
+    class _IdleHarness:
+        in_flight = False
+
+        def poll(self, timeout: float) -> tuple[str, object]:  # noqa: ARG002
+            return ("pending", timeout)
+
+    p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
+    state = init_state(p)
+    assert route("keep_waiting", "", state, _IdleHarness(), "first") is None
 
 
 def test_harness_error_surfaced_and_negative_exit_available_immediately() -> None:

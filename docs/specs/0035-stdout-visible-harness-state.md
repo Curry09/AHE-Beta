@@ -331,4 +331,5 @@ stdout 是 harness 对用户的真实界面。真实 CLI 用户不是只看到 f
 - harness 未来若自愿输出 `reply_to` / `relates_to`，接缝层可原样展示为 harness 声明的产品语义，但不作为平台推断。
 - 设计师 timeline 可聚合「用户因 stdout 跑偏而 interrupt」「用户因 stdout 正在验证而 keep_waiting」等体验信号。
 - 前端会话详情以事件流方式展示 harness stdout，帮助人类观察用户为什么等待、打断或追问。
+- 接缝层统一写入口（去 begin/emit 二分）、以 `type=reply` 为软唤醒：见后续 spec「unify-harness-stdin-write」。
 
