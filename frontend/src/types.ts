@@ -1,7 +1,7 @@
 // 数据契约：字段名与 backend/auto_designer/web/api.py 的响应一一对应，两侧须同步修改。
 
 export type AgentRole = "user" | "triager" | "divergent" | "designer" | "owner" | "developer";
-export type ViewMode = "dashboard" | "building";
+export type ViewMode = "dashboard" | "building" | "openagents";
 
 // Spec-0029：三平面投影与提案来源（后端 /api/issues 附带；老后端缺省由 issueMeta 按 labels 兜底）。
 export type Plane = "report" | "proposal" | "ready";

@@ -45,18 +45,17 @@ export function TopBar(props: {
         >
           大楼
         </button>
-      </div>
-      <div className="seg" role="group" aria-label="状态筛选">
-        <button className={showDone ? "" : "active"} onClick={() => onShowDone(false)}>
-          运行中
+        <button
+          className={view === "openagents" ? "active" : ""}
+          aria-pressed={view === "openagents"}
+          onClick={() => onView("openagents")}
+        >
+          OpenAgents
         </button>
-        <button className={showDone ? "active" : ""} onClick={() => onShowDone(true)}>
-          + 已完成
-        </button>
       </div>
-      {showDone && (
+      {view === "openagents" ? (
         <select
-          aria-label="轮次筛选"
+          aria-label="OpenAgents 轮次筛选"
           value={round === "all" ? "all" : String(round)}
           onChange={(e) => onRound(e.target.value === "all" ? "all" : Number(e.target.value))}
         >
@@ -67,6 +66,31 @@ export function TopBar(props: {
             </option>
           ))}
         </select>
+      ) : (
+        <>
+          <div className="seg" role="group" aria-label="状态筛选">
+            <button className={showDone ? "" : "active"} onClick={() => onShowDone(false)}>
+              运行中
+            </button>
+            <button className={showDone ? "active" : ""} onClick={() => onShowDone(true)}>
+              + 已完成
+            </button>
+          </div>
+          {showDone && (
+            <select
+              aria-label="轮次筛选"
+              value={round === "all" ? "all" : String(round)}
+              onChange={(e) => onRound(e.target.value === "all" ? "all" : Number(e.target.value))}
+            >
+              <option value="all">全部轮次</option>
+              {rounds.map((r) => (
+                <option key={r} value={r}>
+                  第 {r} 轮
+                </option>
+              ))}
+            </select>
+          )}
+        </>
       )}
       <div className="meta">{openCount === null ? "issues —" : `issues ${openCount} open`}</div>
       <ThemeToggle />
