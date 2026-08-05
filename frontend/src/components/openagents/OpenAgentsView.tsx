@@ -114,7 +114,7 @@ export function OpenAgentsView(props: {
             title="PR"
             subtitle="branch / review / merge"
             count={snapshot.pulls.length}
-            source={snapshot.sources.delivery}
+            source={snapshot.stationSources.pulls}
             empty="暂无 open PR。"
           >
             {snapshot.pulls.map((item) => (
@@ -123,7 +123,7 @@ export function OpenAgentsView(props: {
           </Station>
           <GateStation
             issueSource={snapshot.sources.issues}
-            deliverySource={snapshot.sources.delivery}
+            deliverySource={snapshot.stationSources.pulls}
             issues={snapshot.needsHumanIssues}
             pulls={snapshot.needsHumanPulls}
             conflicts={snapshot.conflictPulls}
@@ -133,7 +133,7 @@ export function OpenAgentsView(props: {
             title="main"
             subtitle="commit / round anchor"
             count={snapshot.commits.length}
-            source={snapshot.sources.commits}
+            source={snapshot.stationSources.commits}
             empty="暂无 main commit。"
           >
             {snapshot.commits.map((item) => (
@@ -200,8 +200,8 @@ function Station(props: {
 
 function SourceEmpty(props: { source: SourceState; empty: string }) {
   if (props.source.status === "loading") return <div className="empty">{props.source.label}</div>;
-  if (props.source.status === "disconnected") {
-    return <div className="disconnected">未连接 Gitea，当前数据源不可用。</div>;
+  if (props.source.status === "disconnected" || props.source.status === "unavailable") {
+    return <div className="disconnected">{props.source.label}</div>;
   }
   return <div className="empty">{props.empty}</div>;
 }
@@ -267,8 +267,9 @@ function GateStation(props: {
   onSelect: (sel: Selection) => void;
 }) {
   const loading = props.issueSource.status === "loading" || props.deliverySource.status === "loading";
-  const disconnected =
-    props.issueSource.status === "disconnected" && props.deliverySource.status === "disconnected";
+  const unavailableSources = [props.issueSource, props.deliverySource].filter(
+    (source) => source.status === "disconnected" || source.status === "unavailable",
+  );
   const count = props.issues.length + props.pulls.length + props.conflicts.length;
   return (
     <section className="warehouse-station gate-station">
@@ -281,8 +282,12 @@ function GateStation(props: {
       </div>
       <div className="warehouse-station-body">
         {count === 0 && loading ? <div className="empty">读取 needs-human / conflict…</div> : null}
-        {count === 0 && disconnected ? <div className="disconnected">未连接 Gitea，当前数据源不可用。</div> : null}
-        {count === 0 && !loading && !disconnected ? (
+        {count === 0 && unavailableSources.length > 0 ? (
+          <div className="disconnected">
+            {[...new Set(unavailableSources.map((source) => source.label))].join("；")}
+          </div>
+        ) : null}
+        {count === 0 && !loading && unavailableSources.length === 0 ? (
           <div className="empty">暂无 needs-human / conflict。</div>
         ) : null}
         {props.pulls.length > 0 && <GateGroup title="PR needs-human" pulls={props.pulls} />}

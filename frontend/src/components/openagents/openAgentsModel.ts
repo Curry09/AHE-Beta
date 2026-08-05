@@ -9,7 +9,7 @@ import type {
   RunState,
 } from "../../types";
 
-export type SourceStatus = "loading" | "disconnected" | "ready";
+export type SourceStatus = "loading" | "disconnected" | "unavailable" | "ready";
 
 export interface SourceState {
   status: SourceStatus;
@@ -41,6 +41,10 @@ export interface OpenAgentsSnapshot {
     delivery: SourceState;
     commits: SourceState;
     state: SourceState;
+  };
+  stationSources: {
+    pulls: SourceState;
+    commits: SourceState;
   };
   currentRound: string;
   latestRoundSha: string | null;
@@ -76,8 +80,8 @@ function hasLabel(labels: string[], label: string): boolean {
 
 function issueStage(issue: Issue): IssueCardModel["stage"] | null {
   const labels = issue.labels ?? [];
-  if (hasLabel(labels, "openagents")) return "openagents";
   if (hasLabel(labels, "ready")) return "ready";
+  if (hasLabel(labels, "openagents")) return "openagents";
   return planeOf(issue) === "ready" ? "ready-plane" : null;
 }
 
@@ -154,6 +158,35 @@ function inSelectedRound(issue: Issue, selectedRound: "all" | number): boolean {
   return selectedRound === "all" || roundOf(issue) === selectedRound;
 }
 
+function filteredPullSource(
+  delivery: DeliveryResponse | null,
+  issues: IssuesResponse | null,
+  selectedRound: "all" | number,
+): SourceState {
+  const source = apiSource(delivery, "/api/delivery");
+  if (source.status !== "ready" || selectedRound === "all") return source;
+  if (issues === null) return { status: "loading", label: "读取 issue 轮次关联…" };
+  if (!issues.connected) {
+    return { status: "unavailable", label: "issue 轮次关联不可用" };
+  }
+  return source;
+}
+
+function filteredCommitSource(
+  commits: CommitsResponse | null,
+  state: RunState | null,
+  selectedRound: "all" | number,
+  roundSha: string | null,
+): SourceState {
+  const source = apiSource(commits, "/api/commits");
+  if (source.status !== "ready" || selectedRound === "all") return source;
+  if (state === null) return { status: "loading", label: "读取 round SHA…" };
+  if (roundSha === null) {
+    return { status: "unavailable", label: `第 ${selectedRound} 轮缺少 round SHA` };
+  }
+  return source;
+}
+
 export function buildOpenAgentsSnapshot(params: {
   issues: IssuesResponse | null;
   delivery: DeliveryResponse | null;
@@ -177,11 +210,13 @@ export function buildOpenAgentsSnapshot(params: {
 
   const allPullItems = delivery?.connected ? delivery.pulls : [];
   const pullItems =
-    selectedRound === "all" || !issues?.connected
+    selectedRound === "all"
       ? allPullItems
-      : allPullItems.filter((pull) =>
-          pull.closes_issues.some((issueNumber) => selectedIssueNumbers.has(issueNumber)),
-        );
+      : issues?.connected
+        ? allPullItems.filter((pull) =>
+            pull.closes_issues.some((issueNumber) => selectedIssueNumbers.has(issueNumber)),
+          )
+        : [];
   const pulls = pullItems.map(pullCard).sort(comparePullCards);
   const needsHumanPulls = pulls.filter((pull) => pull.status === "needs-human");
   const conflictPulls = pulls.filter((pull) => pull.status === "conflict");
@@ -190,13 +225,17 @@ export function buildOpenAgentsSnapshot(params: {
   const shaForSelectedRound = selectedRoundSha(state, selectedRound);
   const allCommitItems = commits?.connected ? commits.commits : [];
   const commitItems =
-    selectedRound === "all" || shaForSelectedRound === null
+    selectedRound === "all"
       ? allCommitItems
-      : allCommitItems.filter((commit) => isRoundAnchor(commit, [shaForSelectedRound]));
+      : shaForSelectedRound === null
+        ? []
+        : allCommitItems.filter((commit) => isRoundAnchor(commit, [shaForSelectedRound]));
   const commitCards = commitItems.map((commit) => ({
     commit,
     roundAnchor: isRoundAnchor(commit, selectedRound === "all" ? roundShas : [shaForSelectedRound ?? ""]),
   }));
+  const pullSource = filteredPullSource(delivery, issues, selectedRound);
+  const commitSource = filteredCommitSource(commits, state, selectedRound, shaForSelectedRound);
 
   return {
     sources: {
@@ -204,6 +243,10 @@ export function buildOpenAgentsSnapshot(params: {
       delivery: apiSource(delivery, "/api/delivery"),
       commits: apiSource(commits, "/api/commits"),
       state: stateSource(state),
+    },
+    stationSources: {
+      pulls: pullSource,
+      commits: commitSource,
     },
     currentRound: currentRoundLabel(state, selectedRound),
     latestRoundSha: shaForSelectedRound,
@@ -213,15 +256,15 @@ export function buildOpenAgentsSnapshot(params: {
     needsHumanPulls,
     conflictPulls,
     kpis: {
-      handoff: issues === null ? null : readyIssues.length,
-      pulls: delivery === null ? null : pulls.length,
+      handoff: issues?.connected ? readyIssues.length : null,
+      pulls: pullSource.status === "ready" ? pulls.length : null,
       needsHuman:
-        delivery === null
+        !delivery?.connected || (selectedRound !== "all" && !issues?.connected)
           ? null
           : selectedRound === "all"
             ? delivery.needs_human
             : needsHumanPulls.length + needsHumanIssues.length,
-      commits: commits === null ? null : commitCards.length,
+      commits: commitSource.status === "ready" ? commitCards.length : null,
     },
     commits: commitCards,
   };
