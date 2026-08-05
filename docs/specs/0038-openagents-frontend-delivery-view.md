@@ -63,8 +63,8 @@ tasks:
       - frontend/src/components/building/FloorWorkspace.tsx
       - frontend/src/components/building/buildingModel.ts
       - frontend/src/styles.css
-    scope: 将大楼总览扩展为园区：需求面主楼保持现有楼层与尺寸，OpenAgents 作为主楼右侧的独立交付厂房，两栋建筑在投影上保留明确间距，不互相遮挡；厂房外立面不枚举内部角色或流程。主楼屋顶以 H 标识停机坪，交付边界与厂房之间以小型货运无人机/运输机及航线表达交接关系；飞机仅在有真实 openagents 待交接票时运动。厂房整体为可聚焦、可点击入口，进入 view=openagents 并保留 round。正式文案忠于项目术语，使用「交付边界」「Owner 准入」「OpenAgents vigil 接管」等表达，不使用空运、航站台、出货等隐喻替代系统语义。
-    acceptance: 默认主楼尺寸与楼层交互不被厂房挤窄，主楼与厂房轮廓之间无视觉遮挡；主楼屋顶有清晰但不过度抢眼的 H 停机坪标识；厂房整体支持鼠标与键盘进入 OpenAgents 独立页；厂房只显示 OpenAgents 名称、连接/阻塞状态及 handoff/ready/PR 聚合数字，不标内部角色；飞机动画只由真实 openagents 待交接票驱动并尊重 prefers-reduced-motion；交付面工区图标由卡车改为小型运输机，副标题改为「交付边界 · Owner 准入与 OpenAgents vigil 接管」；顶部 OpenAgents 入口仍可直接进入；build 通过。
+    scope: 将大楼总览扩展为园区：需求面主楼保持现有楼层与尺寸，OpenAgents 作为主楼右侧的独立交付厂房，两栋建筑落在同一个 2.5D 沙盘底座上并在投影上保留明确间距，不互相遮挡；本阶段只建立地块、边界与道路层级，不增加树木、路灯等环境物件。厂房外立面不枚举内部角色或流程。主楼屋顶以 H 标识停机坪，交付边界与厂房之间以小型货运无人机/运输机及航线表达交接关系；飞机仅在有真实 openagents 待交接票时运动。厂房整体为可聚焦、可点击入口，进入 view=openagents 并保留 round。正式文案忠于项目术语，使用「交付边界」「Owner 准入」「OpenAgents vigil 接管」等表达，不使用空运、航站台、出货等隐喻替代系统语义。
+    acceptance: 默认主楼尺寸与楼层交互不被厂房挤窄，主楼与厂房轮廓之间无视觉遮挡；两栋建筑共享有厚度、边界和内部通路的 2.5D 地块，阴影落在底座上而非悬浮于空白背景；不增加树木等环境装饰；主楼屋顶有清晰但不过度抢眼的 H 停机坪标识；厂房整体支持鼠标与键盘进入 OpenAgents 独立页；厂房只显示 OpenAgents 名称、连接/阻塞状态及 handoff/ready/PR 聚合数字，不标内部角色；飞机动画只由真实 openagents 待交接票驱动并尊重 prefers-reduced-motion；交付面工区图标由卡车改为小型运输机，副标题改为「交付边界 · Owner 准入与 OpenAgents vigil 接管」；顶部 OpenAgents 入口仍可直接进入；build 通过。
 ---
 
 # 0038 · OpenAgents 交付面独立页面与园区入口
@@ -77,7 +77,7 @@ tasks:
 
 当前已落地的是独立页面：顶部增加 `OpenAgents` 页签，URL 为 `?view=openagents`，支持 `round=N` 轮次过滤，右侧复用现有 SidePanel 查看 issue/commit 详情。页面不新增后端 API，不读取 OpenAgents 内部 `.openagents` 状态文件，也不提供 approve/retry/merge 等写操作。
 
-大楼结合采用园区方案：现有 Agent Company 作为需求面主楼，OpenAgents 作为右侧独立交付厂房，两栋建筑不互相遮挡。厂房不展开内部角色或执行流程，整体点击进入独立 OpenAgents 页；主楼屋顶以 H 标识停机坪，交付边界与厂房之间以小型货运无人机/运输机表达交接关系，但界面文案仍使用项目真实术语。
+大楼结合采用园区沙盘方案：现有 Agent Company 作为需求面主楼，OpenAgents 作为右侧独立交付厂房，两栋建筑落在同一个有厚度、边界和内部通路的 2.5D 地块上且不互相遮挡。首版底座不增加树木等环境物件。厂房不展开内部角色或执行流程，整体点击进入独立 OpenAgents 页；主楼屋顶以 H 标识停机坪，交付边界与厂房之间以小型货运无人机/运输机表达交接关系，但界面文案仍使用项目真实术语。
 
 ## Motivation
 
@@ -144,7 +144,7 @@ openagents → ready → PR → needs-human / conflict → main
 
 **页面与样式（T3）**：`frontend/src/components/openagents/OpenAgentsView.tsx` 渲染数据源状态、KPI、轮次状态条、流程站点和空态。`frontend/src/styles.css` 增加 OpenAgents 页面样式，沿用现有 CSS token、深浅主题、chip/empty/disconnected 等视觉语言。页面内可保留轻量流程/流水线视觉，但文案必须使用 OpenAgents/Gitea 状态词。
 
-**园区结合（T4）**：`BuildingTower` 在不改变主楼几何尺寸的前提下扩展场景画布，在主楼右侧留出净空后绘制 OpenAgents 厂房。厂房整体是 `view=openagents` 的入口，显示 handoff、ready、PR 与连接/needs-human 状态，不展示 OpenAgents 内部角色。主楼屋顶绘制 H 停机坪标识，并在交付边界与厂房之间绘制小型货运无人机/运输机航线；仅当存在带 `openagents` 且尚未带 `ready` 的 open issue 时播放运动。`buildingModel` 与 `FloorWorkspace` 将原卡车图标和物流隐喻改为「交付边界 · Owner 准入与 OpenAgents vigil 接管」。
+**园区结合（T4）**：`BuildingTower` 在不改变主楼几何尺寸的前提下扩展场景画布，以带侧边厚度的等距地块承托主楼和 OpenAgents 厂房，并用克制的内部通路连接两个建筑入口；不放树木等环境装饰。厂房整体是 `view=openagents` 的入口，显示 handoff、ready、PR 与连接/needs-human 状态，不展示 OpenAgents 内部角色。主楼屋顶绘制 H 停机坪标识，并在交付边界与厂房之间绘制小型货运无人机/运输机航线；仅当存在带 `openagents` 且尚未带 `ready` 的 open issue 时播放运动。`buildingModel` 与 `FloorWorkspace` 将原卡车图标和物流隐喻改为「交付边界 · Owner 准入与 OpenAgents vigil 接管」。
 
 ## Drawbacks
 
