@@ -11,6 +11,7 @@ from auto_designer.user.sim.dimensions import (
     D42Supervise,
     D43Correct,
     Persona,
+    TimeTemperament,
     finalize_persona,
 )
 from auto_designer.user.sim.feeling import FeelingScore
@@ -26,7 +27,13 @@ from auto_designer.user.sim.persona_client import ScriptedPersonaClient
 from auto_designer.user.sim.state import State, init_state
 
 
-def _persona(d1: D1Eval, d43: D43Correct, pid: str = "P") -> Persona:
+def _persona(
+    d1: D1Eval,
+    d43: D43Correct,
+    pid: str = "P",
+    *,
+    tempo: TimeTemperament = TimeTemperament.STEADY,
+) -> Persona:
     return finalize_persona(
         Persona(
             persona_id=pid,
@@ -36,6 +43,7 @@ def _persona(d1: D1Eval, d43: D43Correct, pid: str = "P") -> Persona:
             d42=D42Supervise.PHASE_CHECK,
             d43=d43,
             d5=D5Autonomy.COLLABORATIVE,
+            tempo=tempo,
         )
     )
 
@@ -258,7 +266,7 @@ class _AppraisingClient(_RecordingClient):
 
 
 def test_opening_appraisal_floats_starting_patience() -> None:
-    # FEEDBACK 基线 5；开局报 epic(+2) -> 起始耐心 7，落在首轮 TurnLog。
+    # STEADY 基线 5；开局报 epic(+2) -> 起始耐心 7，落在首轮 TurnLog。
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _AppraisingClient(["send_message", "send_message"], task_load="epic")
     res = run_session(p, client, ScriptedHarness(), TASK)
@@ -269,8 +277,8 @@ def test_opening_appraisal_floats_starting_patience() -> None:
 
 
 def test_opening_appraisal_quick_lowers_patience() -> None:
-    # GIVE_UP 基线 3；开局报 quick(-1) -> 起始耐心 2。
-    p = _persona(D1Eval.SHALLOW, D43Correct.GIVE_UP)
+    # IMPATIENT 基线 3；开局报 quick(-1) -> 起始耐心 2（与 d43 无关）。
+    p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK, tempo=TimeTemperament.IMPATIENT)
     client = _AppraisingClient(["send_message", "send_message"], task_load="quick")
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.turns[0].patience == 2  # 3 + quick(-1)

@@ -1,4 +1,4 @@
-"""spec-0006/T2：card_to_persona 注入 sim —— grounded 覆盖派生（含 Karpathy 例 C）。"""
+"""spec-0006/T2 + Spec-0037/T4：card_to_persona 注入 sim —— grounded 覆盖派生；D7→tempo。"""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from auto_designer.user.sim.dimensions import (
     D41Grain,
     D42Supervise,
     D43Correct,
+    TimeTemperament,
     TrustStance,
     derive_d3,
     derive_trust,
@@ -62,6 +63,11 @@ def _karpathy_card() -> dict:
                 "source": "grounded",
                 "confidence": "medium",
             },
+            "D7_time_temperament": {
+                "value": "patient",
+                "source": "grounded",
+                "confidence": "medium",
+            },
         },
     }
 
@@ -88,6 +94,14 @@ def test_sampled_axes_mapped_and_surface_aliases_shallow() -> None:
     assert p.d42 is D42Supervise.FIRE_FORGET  # hands-off
     assert p.d43 is D43Correct.RESEND  # retry
     assert p.d5 is D5Autonomy.AGENTIC  # agentic
+    assert p.tempo is TimeTemperament.PATIENT
+
+
+def test_missing_tempo_defaults_to_steady() -> None:
+    card = _karpathy_card()
+    del card["dimensions"]["D7_time_temperament"]
+    p = card_to_persona(card)
+    assert p.tempo is TimeTemperament.STEADY
 
 
 def test_ungrounded_derived_axes_fall_back_to_finalize() -> None:
@@ -108,6 +122,14 @@ def test_illegal_enum_raises() -> None:
     card = _karpathy_card()
     card["dimensions"]["D1_evaluation_capability"]["value"] = "wizard"
     with pytest.raises(ValueError, match="非法枚举值"):
+        card_to_persona(card)
+
+
+def test_illegal_tempo_raises() -> None:
+    """Spec-0037/T4: 非法 D7 报错（缺字段才回落 steady）。"""
+    card = _karpathy_card()
+    card["dimensions"]["D7_time_temperament"]["value"] = "zen"
+    with pytest.raises(ValueError, match="D7_time_temperament"):
         card_to_persona(card)
 
 

@@ -1,4 +1,7 @@
-"""心跳：开放 intent → act 收敛；内=send_message / 外=interrupt+give_up；act 自报 gap。"""
+"""心跳：开放 intent → act 收敛；内=send_message / 外=interrupt+give_up；act 自报 gap。
+
+Spec-0037/T2: 耐心跟 tempo；过程卷入可加 stuck_extra；不把产品键焊进人轴。
+"""
 
 from __future__ import annotations
 
@@ -11,6 +14,7 @@ from auto_designer.user.sim.dimensions import (
     D42Supervise,
     D43Correct,
     Persona,
+    TimeTemperament,
     finalize_persona,
 )
 from auto_designer.user.sim.loop import (
@@ -25,7 +29,12 @@ from auto_designer.user.sim.loop import (
 TASK = "Build a big thing that takes a long time."
 
 
-def _persona(d1: D1Eval = D1Eval.EXPERT, d43: D43Correct = D43Correct.GIVE_UP) -> Persona:
+def _persona(
+    d1: D1Eval = D1Eval.EXPERT,
+    d43: D43Correct = D43Correct.GIVE_UP,
+    *,
+    tempo: TimeTemperament = TimeTemperament.STEADY,
+) -> Persona:
     return finalize_persona(
         Persona(
             persona_id="P",
@@ -35,6 +44,7 @@ def _persona(d1: D1Eval = D1Eval.EXPERT, d43: D43Correct = D43Correct.GIVE_UP) -
             d42=D42Supervise.PHASE_CHECK,
             d43=d43,
             d5=D5Autonomy.COLLABORATIVE,
+            tempo=tempo,
         )
     )
 
@@ -461,21 +471,40 @@ def test_keep_waiting_is_one_shot_reply_wakes_main() -> None:
     assert any("[+90s] waiting:" in p and "keep_waiting" in p for p in hist_bearing)
 
 
-def test_keep_waiting_decay_follows_persona_coef() -> None:
-    def _waiting_patience_after_one_keep(d43: D43Correct) -> int:
+def test_keep_waiting_decay_follows_tempo_coef() -> None:
+    def _waiting_patience_after_one_keep(tempo: TimeTemperament) -> int:
         harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
         client = WaitStubClient(
             actions=["send_message", "accept"],
             acts=[{"action": "keep_waiting", "gap": False}],
             verdict="satisfied",
         )
-        res = run_session(_persona(d43=d43), client, harness, TASK, help_text=harness.help_text)
+        res = run_session(
+            _persona(tempo=tempo), client, harness, TASK, help_text=harness.help_text
+        )
         wt = [t for t in res.turns if t.phase == "waiting"]
         assert len(wt) == 1
         return wt[0].patience
 
-    assert _waiting_patience_after_one_keep(D43Correct.FEEDBACK) == 4
-    assert _waiting_patience_after_one_keep(D43Correct.GIVE_UP) == 1
+    # STEADY 基线 5、decay 1 → keep 后 4；IMPATIENT 基线 3、decay 2 → keep 后 1
+    assert _waiting_patience_after_one_keep(TimeTemperament.STEADY) == 4
+    assert _waiting_patience_after_one_keep(TimeTemperament.IMPATIENT) == 1
+    # 正交：同 tempo 下 d43 不再改 waiting 耐心
+    harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
+    client = WaitStubClient(
+        actions=["send_message", "accept"],
+        acts=[{"action": "keep_waiting", "gap": False}],
+        verdict="satisfied",
+    )
+    res = run_session(
+        _persona(d43=D43Correct.GIVE_UP, tempo=TimeTemperament.STEADY),
+        client,
+        harness,
+        TASK,
+        help_text=harness.help_text,
+    )
+    wt = [t for t in res.turns if t.phase == "waiting"]
+    assert wt[0].patience == 4
 
 
 def test_interrupt_routes_and_attribution() -> None:

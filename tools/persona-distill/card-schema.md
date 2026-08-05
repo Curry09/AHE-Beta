@@ -1,20 +1,24 @@
 # Persona Card Schema — 唯一公共契约 (hub)
 
+<!-- Spec-0037/T3: D7 time_temperament + supervision/on_offtrack 语义注记；与 0006/T1 轮辐契约并存演进 -->
+
 > 本文件是 persona 蒸馏侧的 **唯一 source-agnostic 公共契约**。所有「薄抽取 skill」（spoke，
-> 如 `extract-selfreport-persona/`、未来的 `extract-github-persona/` / `extract-so-persona/`）
+> 如 `extract-selfreport-persona/`、`extract-github-persona/` / `extract-stackoverflow-persona/`）
 > 只描述「从某类来源提取 + ground 哪几维」，**枚举 / 词表 / 卡形状 / 注入分布 / 真实性门原则一律引用本文件**，
 > 彼此不依赖。契约改一处，全员生效；加新来源只是新增一个薄 skill，不碰别人。
 >
-> 对应 spec：`docs/specs/0006-persona-pipeline/`（T1 采集、T2 注入 sim）。
-> 卡 → sim 9 维 `dimensions.Persona` 的注入映射归 `0006/T2`（`card_to_persona`），不在本契约内。
+> 对应 spec：`docs/specs/0006-persona-pipeline.md`（T1 采集、T2 注入 sim）；人轴语义演进见
+> `docs/specs/0037-persona-time-temperament-reframe.md`（D7 / 过程卷入 / 质量失败 ⊥ 等待）。
+> 卡 → sim `dimensions.Persona` 的注入映射归 `0006/T2` + `0037/T4`（`card_to_persona`），不在本契约内。
 
 ## 铁律
 
 1. **轮辐式**：本文件是 hub，抽取 skill 是 spoke。spoke 只依赖本契约，**spoke 之间彼此不依赖**
    （杜绝 skill→skill 引用与多副本 schema 漂移）。
 2. **证据或弃**：每个 grounded 维度都要能追到一条 `evidence_quotes`；ground 不了就 inject，并降置信。
-3. **维度正交**：六维相互独立，**永远不要从一维派生另一维**。一个 `expert` 同时 `over-trust` /
-   `Accept-All` 是真实且常见的（见 selfreport reference 例 C / Karpathy）；不要让高 D1 把 D2/D4 拉向严谨。
+3. **维度正交**：D1–D7 相互独立，**永远不要从一维派生另一维**（含 `on_offtrack` ⊥ `time_temperament`）。
+   一个 `expert` 同时 `over-trust` / `Accept-All` 是真实且常见的（见 selfreport reference 例 C /
+   Karpathy）；不要让高 D1 把 D2/D4 拉向严谨。
 4. **不引入 benchmark / 轨迹派生字段**：卡只装「从真实数据采集到的画像」，不得掺入任何 benchmark 分数、
    轨迹特征或下游 sim 的派生量（保证训练信号真实、与测试目标不互污染）。
 
@@ -37,7 +41,8 @@
     },
     "D4_trust_model":           {"value": "...", "source": "...", "basis": "...", "confidence": "..."},
     "D5_domain":                {"area": "...", "depth": "...", "stack": ["..."], "weak": ["..."], "source": "...", "basis": "...", "confidence": "..."},
-    "D6_autonomy_expectation":  {"value": "...", "source": "...", "basis": "...", "confidence": "..."}
+    "D6_autonomy_expectation":  {"value": "...", "source": "...", "basis": "...", "confidence": "..."},
+    "D7_time_temperament":      {"value": "...", "source": "...", "basis": "...", "confidence": "..."}
   },
   "provenance": {
     "layers": ["L0", "..."],            // 可选：观测型来源的取证层（GitHub）
@@ -75,12 +80,18 @@ D2 acceptance_bar.primary: ship-fast | functional | modern-correct | type-safety
    acceptance_bar.flags  ⊆ {tests, types, scope, security, style, a11y, perf}
 D3 interaction_style.delegation  : vibe-dump | loose | spec-driven
    interaction_style.supervision : hands-off | reviews | micromanage
+     （语义=过程卷入：对助手进行中可见感的需要；不是产品按钮）
    interaction_style.on_offtrack : abandon | retry | correct | fix-self | file-issue
+     （语义=质量失败后的策略；不驱动等待耐心）
 D4 trust_model           : over-trust | balanced | skeptical
 D5 domain.depth          : shallow | working | deep
 D6 autonomy_expectation  : advisory | collaborative | agentic
+D7 time_temperament      : patient | steady | impatient
+     （对等待/空转的耐受；与 on_offtrack 正交）
 era.value                : pre_vibe | post_vibe        (按发布日期切分，约 2025-10)
 ```
+
+> 授权尺度（只读/可写/可跑）**不进卡库**：那是会话/产品策略，由 sim 从自主性期望半派生。
 
 ### D5.area 受控词表 (controlled vocabulary)
 
@@ -107,7 +118,10 @@ systems-runtime | security | mobile | cross-stack
 - `on_offtrack`：abandon 20% / retry 20% / correct 30% / fix-self 15% / file-issue 15%
 - `trust_model`：over-trust 30% / balanced 45% / skeptical 25%
 - `autonomy_expectation`（D6）：advisory 35% / collaborative 40% / agentic 25%
+- `time_temperament`（D7）：patient 25% / steady 50% / impatient 25%
 - `D5.weak`：按 `area` 注入 0–2 个合理弱项或 `[]`。
+
+**正交强制**：`on_offtrack` 与 `time_temperament` 必须独立采样——禁止「abandon 必配 impatient」或「file-issue 必配 patient」的按档锁死。
 
 有弱先验时可偏置采样（自称 vibecoder → over-trust + vibe-dump；库维护者 → skeptical + spec-driven）。
 比例为起始默认，可按目标用户分布调。
@@ -141,9 +155,10 @@ systems-runtime | security | mobile | cross-stack
 
 ## 符合性规则 (conformance)
 
-1. 单值维（D1/D4/D6 + D3 三子轴）用键 `value`；D2 用 `primary`+`flags`；D5 用 `area/depth/stack/weak`。
+1. 单值维（D1/D4/D6/D7 + D3 三子轴）用键 `value`；D2 用 `primary`+`flags`；D5 用 `area/depth/stack/weak`。
 2. `D5.area` ∈ 上方受控词表，且为**单一 token**。
 3. `source: grounded` 的维度必须有至少一条对应 `evidence_quotes`。
 4. `source: injected` 的维度 `confidence` 必须为 `low`。
 5. 卡记录**不得**含任何 benchmark / 轨迹派生字段。
 6. 遇未知键：读侧前向兼容（忽略不报错），便于 schema 演化。
+7. `D7_time_temperament` 缺省时注入侧回落 `steady`（旧卡兼容）；新卡应显式写出。

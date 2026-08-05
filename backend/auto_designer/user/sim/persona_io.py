@@ -1,14 +1,15 @@
-"""persona_io.py（spec-0006/T2）：把 persona 卡注入控制信封 sim。
+"""persona_io.py（spec-0006/T2 + Spec-0037/T4）：把 persona 卡注入控制信封 sim。
 
-card_to_persona 是「采集（6 维行为卡，0006/T1）」与「sim 引擎（9 维 dimensions.Persona，0005）」
+card_to_persona 是「采集（行为卡，0006/T1）」与「sim 引擎（dimensions.Persona）」
 之间的唯一桥接层：按字段把卡翻成 sim 维度，**卡里 grounded 的验收(D2)/信任(D4) 直接写入 sim 的派生维
-d3/trust 并不被 derive_* 改写（覆盖派生）**，卡未 ground 的派生维交 finalize_persona 派生填齐。
+d3/trust 并不被 derive_* 改写（覆盖派生）**；时间气质 D7 写入 tempo（缺省 steady）；
+卡未 ground 的派生维交 finalize_persona 派生填齐。D6Authz 不进卡库，始终半派生。
 
 为何需要覆盖派生：sim 的 d3/trust 原是「从 D1/D2 派生」，若一律 finalize，会把卡里真实 ground 的
 信任/验收改写成合成值——例如 expert×over-trust 的 Karpathy（selfreport 例 C）会被模拟成 skeptical×rigorous
 的反面，直接污染训练信号的真实性。卡形状契约见 tools/persona-distill/card-schema.md。
 
-非法/缺失枚举值显式报错（不静默兜底），把采集质量问题暴露在注入边界。
+非法/缺失枚举值显式报错（不静默兜底），把采集质量问题暴露在注入边界；唯 D7 缺省兼容旧卡。
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from auto_designer.user.sim.dimensions import (
     D42Supervise,
     D43Correct,
     Persona,
+    TimeTemperament,
     TrustStance,
     finalize_persona,
 )
@@ -79,6 +81,11 @@ _AUTONOMY: dict[str, D5Autonomy] = {
     "collaborative": D5Autonomy.COLLABORATIVE,
     "agentic": D5Autonomy.AGENTIC,
 }
+_TEMPO: dict[str, TimeTemperament] = {
+    "patient": TimeTemperament.PATIENT,
+    "steady": TimeTemperament.STEADY,
+    "impatient": TimeTemperament.IMPATIENT,
+}
 
 
 def _require(container: dict, key: str, where: str) -> object:
@@ -94,11 +101,13 @@ def _map_enum(table: dict, raw: object, where: str):
 
 
 def card_to_persona(record: dict) -> Persona:
-    """把一条 6 维行为卡映射为 sim 的 dimensions.Persona。
+    """把一条行为卡映射为 sim 的 dimensions.Persona。
 
-    采样维（D1/D5/D3 交互/D6 自主 → d1/d2/d41/d42/d43/d5）总是从卡直接写入；
+    采样维（能力/交互/自主/时间气质）总是从卡直接写入；
     派生维 d3(来自卡 D2)/trust(来自卡 D4) 仅在卡 source=grounded 时直接写入（覆盖派生），
     否则留 None 交 finalize_persona 派生；D6Authz 卡无来源，始终由 finalize 派生。
+
+    D7_time_temperament 缺省时回落 steady（旧卡前向兼容，不当作失败）。
     """
     persona_id = _require(record, "id", "card")
     dims = _require(record, "dimensions", "card")
@@ -128,6 +137,12 @@ def card_to_persona(record: dict) -> Persona:
     d6auto = _require(dims, "D6_autonomy_expectation", "dimensions")
     d5 = _map_enum(_AUTONOMY, _require(d6auto, "value", "D6_autonomy_expectation"), "D6.value")
 
+    # D7 时间气质：新轴；旧卡缺字段 → steady（兼容，不报错）
+    tempo = TimeTemperament.STEADY
+    tempo_block = dims.get("D7_time_temperament")
+    if isinstance(tempo_block, dict) and "value" in tempo_block:
+        tempo = _map_enum(_TEMPO, tempo_block["value"], "D7_time_temperament.value")
+
     # --- 派生维：仅 grounded 时覆盖写入，否则留 None 交 finalize ---
     d2bar = _require(dims, "D2_acceptance_bar", "dimensions")
     d3: D3Accept | None = None
@@ -147,6 +162,7 @@ def card_to_persona(record: dict) -> Persona:
         d42=d42,
         d43=d43,
         d5=d5,
+        tempo=tempo,
         d3=d3,
         trust=trust,  # grounded 则透传；None 则 finalize 派生（D6Authz 始终派生）
     )

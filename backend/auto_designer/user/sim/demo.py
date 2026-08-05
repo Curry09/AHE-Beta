@@ -1,8 +1,10 @@
 """
 demo.py
-跑两个 persona 走同一条 harness 轨迹, 并排看信号如何随能力分叉。
-  P-0473  SHALLOW + FEEDBACK(耗尽则放弃)   -> 预期: 漏掉 DST 逃逸 bug, accept
-  P-0991  EXPERT  + FILE_ISSUE             -> 预期: 识破, 耐心耗尽 -> file_issue
+对照两组正交轴：
+  1) 能力分叉（浅层 vs 专家）——体感/验收差异
+  2) 时间气质分叉（同失败策略下 impatient vs patient）——等待耐心差异
+
+Spec-0037/T2: demo 打印 tempo / patience0 / stuck_extra，展示正交。
 
 运行(无需 API key, 用离线脚本后端):
   python3 -m auto_designer.user.sim.demo
@@ -20,6 +22,7 @@ from .dimensions import (
     D42Supervise,
     D43Correct,
     Persona,
+    TimeTemperament,
     finalize_persona,
 )
 from .harness_adapter import ScriptedHarness
@@ -34,29 +37,57 @@ TASK = (
 
 
 def make_personas():
-    p0473 = finalize_persona(
+    # 能力分叉：浅层易浅接受；专家易识破并 file_issue
+    shallow = finalize_persona(
         Persona(
-            persona_id="P-0473",
+            persona_id="P-shallow-steady",
             d1=D1Eval.SHALLOW,
             d2=D2Domain(stack=("python",), depth=D2Depth.PROFICIENT, weak=("timezone", "pytz")),
             d41=D41Grain.HALF_CONTEXT,
             d42=D42Supervise.PHASE_CHECK,
             d43=D43Correct.FEEDBACK,
             d5=D5Autonomy.COLLABORATIVE,
+            tempo=TimeTemperament.STEADY,
         )
     )
-    p0991 = finalize_persona(
+    expert = finalize_persona(
         Persona(
-            persona_id="P-0991",
+            persona_id="P-expert-steady",
             d1=D1Eval.EXPERT,
             d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR, weak=()),
             d41=D41Grain.SPEC_LEVEL,
             d42=D42Supervise.EVERY_STEP,
             d43=D43Correct.FILE_ISSUE,
             d5=D5Autonomy.COLLABORATIVE,
+            tempo=TimeTemperament.STEADY,
         )
     )
-    return [p0473, p0991]
+    # 正交证明：同为 FEEDBACK，仅 tempo 不同（脚本后端不会走长等待，但 state 初值可见）
+    impatient = finalize_persona(
+        Persona(
+            persona_id="P-feedback-impatient",
+            d1=D1Eval.SHALLOW,
+            d2=D2Domain(stack=("python",), depth=D2Depth.PROFICIENT),
+            d41=D41Grain.HALF_CONTEXT,
+            d42=D42Supervise.FIRE_FORGET,
+            d43=D43Correct.FEEDBACK,
+            d5=D5Autonomy.COLLABORATIVE,
+            tempo=TimeTemperament.IMPATIENT,
+        )
+    )
+    patient_giver = finalize_persona(
+        Persona(
+            persona_id="P-giveup-patient",
+            d1=D1Eval.SHALLOW,
+            d2=D2Domain(stack=("python",), depth=D2Depth.PROFICIENT),
+            d41=D41Grain.HALF_CONTEXT,
+            d42=D42Supervise.FIRE_FORGET,
+            d43=D43Correct.GIVE_UP,
+            d5=D5Autonomy.COLLABORATIVE,
+            tempo=TimeTemperament.PATIENT,
+        )
+    )
+    return [shallow, expert, impatient, patient_giver]
 
 
 def print_result(res):
@@ -88,9 +119,19 @@ def print_result(res):
 
 
 def main():
+    from .state import init_state, make_coef
+
     client = make_client()
     for persona in make_personas():
-        harness = ScriptedHarness()  # 每个 persona 用全新 harness 轨迹
+        st = init_state(persona)
+        coef = make_coef(persona)
+        print(
+            f"[init] {persona.persona_id}: tempo={persona.tempo.value} "
+            f"d43={persona.d43.value} patience0={st.patience} "
+            f"decay={coef.patience_decay} stuck_extra={coef.stuck_extra}"
+        )
+        print(f"  process involvement clause id: {persona.d42.value}")
+        harness = ScriptedHarness()
         res = run_session(persona, client, harness, TASK)
         print_result(res)
 

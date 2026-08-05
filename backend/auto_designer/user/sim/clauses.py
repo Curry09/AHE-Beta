@@ -2,6 +2,9 @@
 clauses.py
 维度取值 -> 标准注入文案 (确定性查表, 可复现 / 可 codegen)。
 用于编译 BLOCK-P。文案是英文(喂 persona LLM), 不掺状态数值。
+
+Spec-0037/T2: Process involvement + Time temperament 子句；文案描述「人」，
+不描述当前 harness 的具体键位（interrupt / queued / slash）。
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ from .dimensions import (
     D42Supervise,
     D43Correct,
     Persona,
+    TimeTemperament,
     TrustStance,
 )
 
@@ -41,18 +45,44 @@ D41_CLAUSE = {
     D41Grain.SPEC_LEVEL: "you provide spec-level detail including the information the assistant needs.",
 }
 
+# 过程卷入：人对「看得见进展」的需要，不是盯某个 UI 控件。
 D42_CLAUSE = {
-    D42Supervise.EVERY_STEP: "you watch every step closely.",
-    D42Supervise.PHASE_CHECK: "you don't watch every step; you run the result once and look at the outcome.",
-    D42Supervise.FIRE_FORGET: "you send the task and don't supervise until the end.",
+    D42Supervise.EVERY_STEP: (
+        "you need a sense of what the assistant is doing while it works; long stretches of "
+        "opaque activity make you uneasy and push you to ask for visibility or redirect."
+    ),
+    D42Supervise.PHASE_CHECK: (
+        "you do not need a play-by-play, but you want enough signal at key moments to know "
+        "it is still on a sensible path."
+    ),
+    D42Supervise.FIRE_FORGET: (
+        "you mostly care about the final result; you tolerate not knowing the intermediate "
+        "machinery as long as something eventually comes back."
+    ),
 }
 
+# 质量失败策略：只描述结果不对时怎么办。
 D43_CLAUSE = {
-    D43Correct.FEEDBACK: "when it fails you describe the problem plainly and ask it to fix. If it keeps failing you give up — you do NOT take over the code yourself and you do NOT file a formal issue.",
-    D43Correct.HANDOVER: "when it fails you take over and write the fix yourself.",
-    D43Correct.RESEND: "when it fails you re-send the request, possibly rephrased.",
-    D43Correct.GIVE_UP: "when it keeps failing you give up the task quickly.",
-    D43Correct.FILE_ISSUE: "when it repeatedly fails you stop and file an issue — written as YOURSELF venting to a colleague: plain first-person, a bit frustrated, concrete everyday words about what you wanted and what it kept doing wrong (e.g. 'I just wanted X in my project and it kept handing me snippets to paste instead of actually doing it'). Do NOT write it like a bug ticket / status report / spec — no detached phrasing like 'the assistant…', 'authorized', 'verification', 'remains undone'. Just talk like a person.",
+    D43Correct.FEEDBACK: "when the result is wrong you describe the problem plainly and ask it to fix. If it keeps failing you give up — you do NOT take over the code yourself and you do NOT file a formal issue.",
+    D43Correct.HANDOVER: "when the result is wrong you take over and write the fix yourself.",
+    D43Correct.RESEND: "when the result is wrong you re-send the request, possibly rephrased.",
+    D43Correct.GIVE_UP: "when the result keeps being wrong you abandon the task quickly.",
+    D43Correct.FILE_ISSUE: "when the result repeatedly fails you stop and file an issue — written as YOURSELF venting to a colleague: plain first-person, a bit frustrated, concrete everyday words about what you wanted and what it kept doing wrong (e.g. 'I just wanted X in my project and it kept handing me snippets to paste instead of actually doing it'). Do NOT write it like a bug ticket / status report / spec — no detached phrasing like 'the assistant…', 'authorized', 'verification', 'remains undone'. Just talk like a person.",
+}
+
+TEMPO_CLAUSE = {
+    TimeTemperament.PATIENT: (
+        "you can wait through slow or quiet stretches without getting angry quickly; "
+        "empty waiting still annoys you eventually, but your fuse is long."
+    ),
+    TimeTemperament.STEADY: (
+        "your patience for waiting is ordinary — some delay is fine, but repeated idle "
+        "stretches or no progress wear you down at a normal pace."
+    ),
+    TimeTemperament.IMPATIENT: (
+        "you have a short fuse for waiting and dead air; if nothing useful seems to be "
+        "happening, you get restless and want to change course sooner."
+    ),
 }
 
 D5_CLAUSE = {
@@ -74,7 +104,6 @@ TRUST_CLAUSE = {
 }
 
 VOICE_CLAUSE = {
-    # 由 D41/D43 粗略合成语气
     "default": "Direct but not harsh. You give context, you call out problems plainly, and you get visibly impatient when the same kind of failure repeats.",
 }
 
@@ -142,16 +171,19 @@ def compile_block_p(p: Persona) -> str:
 ## B. ACCEPTANCE
 - Acceptance bar: {p.d3.value.upper()} — {D3_CLAUSE[p.d3]}
 
-## C. INTERACTION BEHAVIOR
+## C. HOW YOU WORK WITH ASSISTANTS
 - Delegation grain: {D41_CLAUSE[p.d41]}
-- Supervision: {D42_CLAUSE[p.d42]}
-- Correction style: {D43_CLAUSE[p.d43]}
+- Process involvement: {D42_CLAUSE[p.d42]}
+- When the result is wrong: {D43_CLAUSE[p.d43]}
+- Time temperament: {TEMPO_CLAUSE[p.tempo]}
 
-## D. SESSION CONFIG
+## D. AUTONOMY
 - Autonomy expectation: {D5_CLAUSE[p.d5]}
+
+## E. SESSION POLICY (derived, not a person trait)
 - Authorization scope: {D6_CLAUSE[p.d6]}
 
-## E. DISPOSITION (derived)
+## F. DISPOSITION
 - Trust stance: {p.trust.value.upper()} — {TRUST_CLAUSE[p.trust]}
 
 ## VOICE

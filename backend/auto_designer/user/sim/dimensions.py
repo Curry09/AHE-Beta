@@ -2,16 +2,21 @@
 dimensions.py
 Persona 维度定义 + 取值枚举 + 派生函数。
 
-9 维框架（5 层）:
-  A 能力底座: D1 评估能力, D2 领域&深度
-  B 验收:     D3 验收阈值            (派生 D1×D2)
-  C 交互行为: D4_1 委派粒度, D4_2 监督强度, D4_3 纠偏策略
-  D 会话配置: D5 自主性期望, D6 授权尺度  (D6 半派生)
-  E 派生:     trust 信任模型          (派生 D1×D2)
+Spec-0037/T2: tempo 时间气质；过程卷入语义；D6Authz 标为会话策略（非卡库人轴）。
 
-设计铁律:
+人的真源（卡库可改）与会话派生分层：
+  A 能力底座: D1 评估能力, D2 领域&深度
+  B 验收:     D3 验收阈值            (可由 D1×D2 派生；卡 grounded 时覆盖)
+  C 相处方式: D4_1 委派粒度, D4_2 过程卷入, D4_3 质量失败策略, tempo 时间气质
+  D 自主期望: D5 自主性期望
+  E 会话策略: D6 授权尺度            (非卡库人轴；由自主性+任务风险半派生)
+  F 信任:     trust                  (可由 D1×D2 派生；卡 grounded 时覆盖)
+
+铁律:
 - persona 是静态系数（会话开始定死），不在循环中变化。
+- 质量失败策略 ⊥ 时间气质：较真但能等、随手接受但等两分钟就炸，都真实。
 - 维度 -> 文案 / 配置 是确定性映射（见 clauses.py），可复现、可 codegen。
+- 不把当前 harness UX（interrupt / queued / slash）焊进维度枚举。
 """
 
 from __future__ import annotations
@@ -58,7 +63,7 @@ class D3Accept(StrEnum):
 
 
 # --------------------------------------------------------------------------
-# C. 交互行为 (自由采样)
+# C. 相处方式 (自由采样)
 # --------------------------------------------------------------------------
 class D41Grain(StrEnum):
     ONE_LINER = "one_liner"  # 甩一句
@@ -67,12 +72,19 @@ class D41Grain(StrEnum):
 
 
 class D42Supervise(StrEnum):
-    EVERY_STEP = "every_step"  # 盯每步
-    PHASE_CHECK = "phase_check"  # 阶段抽查
-    FIRE_FORGET = "fire_forget"  # 发完不管
+    """过程卷入（原名 supervision）：对「助手在干什么」需要多少可见感。
+
+    枚举字符串保留兼容旧测试/卡映射；语义是人的过程焦虑，不是产品按钮。
+    """
+
+    EVERY_STEP = "every_step"  # 高卷入: 过程不可见就不安
+    PHASE_CHECK = "phase_check"  # 中卷入: 关键节点要有把握
+    FIRE_FORGET = "fire_forget"  # 低卷入: 只要结果
 
 
 class D43Correct(StrEnum):
+    """质量失败后的策略（只答「结果不对时怎么办」；不驱动等待耐心）。"""
+
     FEEDBACK = "feedback"  # 给反馈让它改
     HANDOVER = "handover"  # 接管自己写
     RESEND = "resend"  # 重发请求
@@ -80,8 +92,16 @@ class D43Correct(StrEnum):
     FILE_ISSUE = "file_issue"  # 上报结构化 issue
 
 
+class TimeTemperament(StrEnum):
+    """时间气质：对等待与空转的耐受（与质量失败策略正交）。"""
+
+    PATIENT = "patient"
+    STEADY = "steady"
+    IMPATIENT = "impatient"
+
+
 # --------------------------------------------------------------------------
-# D. 会话配置
+# D. 自主期望
 # --------------------------------------------------------------------------
 class D5Autonomy(StrEnum):
     ADVISORY = "advisory"
@@ -89,14 +109,19 @@ class D5Autonomy(StrEnum):
     AGENTIC = "agentic"
 
 
+# --------------------------------------------------------------------------
+# E. 会话策略（非卡库人轴）
+# --------------------------------------------------------------------------
 class D6Authz(StrEnum):
+    """授权尺度：会话/产品策略，由自主性期望半派生；不进卡库。"""
+
     READ_ONLY = "read_only"  # 只读
     WRITE_NO_RUN = "write_no_run"  # 可写不可跑
     FULL_AUTO = "full_auto"  # 全自动(可写可跑)
 
 
 # --------------------------------------------------------------------------
-# E. 派生: 信任模型
+# F. 信任
 # --------------------------------------------------------------------------
 class TrustStance(StrEnum):
     BLIND = "blind"  # 盲信
@@ -110,13 +135,14 @@ class TrustStance(StrEnum):
 @dataclass(frozen=True)
 class Persona:
     persona_id: str
-    # 自由采样
+    # 自由采样（人轴）
     d1: D1Eval
     d2: D2Domain
     d41: D41Grain
     d42: D42Supervise
     d43: D43Correct
     d5: D5Autonomy
+    tempo: TimeTemperament = TimeTemperament.STEADY
     # 派生 / 半派生：默认 None 表示「未提供，待 finalize_persona 派生填齐」。
     # 若调用方（如 0006/T2 注入层）显式给了 grounded 值，finalize 不再改写（fallback-only）。
     d3: D3Accept | None = None
@@ -155,7 +181,7 @@ def derive_trust(d1: D1Eval, d2: D2Domain) -> TrustStance:
 
 
 def derive_d6(d5: D5Autonomy, task_risk: str = "low") -> D6Authz:
-    """授权尺度 半派生: 由自主性期望 + 任务风险共同决定。"""
+    """授权尺度 半派生: 由自主性期望 + 任务风险共同决定（会话策略，非卡库）。"""
     base = {
         D5Autonomy.ADVISORY: D6Authz.READ_ONLY,
         D5Autonomy.COLLABORATIVE: D6Authz.WRITE_NO_RUN,
@@ -190,6 +216,7 @@ def finalize_persona(p: Persona, task_risk: str = "low") -> Persona:
         d42=p.d42,
         d43=p.d43,
         d5=p.d5,
+        tempo=p.tempo,
         d3=p.d3 if p.d3 is not None else derive_d3(p.d1, p.d2),
         d6=p.d6 if p.d6 is not None else derive_d6(p.d5, task_risk),
         trust=p.trust if p.trust is not None else derive_trust(p.d1, p.d2),

@@ -2,17 +2,21 @@
 state.py
 状态层 —— 跨轮记忆带。三层认知主干每轮读它/写它。
 
+Spec-0037/T2: 耐心初值与衰减跟 tempo；stuck_extra 跟过程卷入（d42）；与 d43 正交。
+
 铁律:
   状态更新只吃 *主观 verdict*(persona 感知到的)。情绪只对"自己感知到的事"反应。
   本轮纯主观: 不存在任何客观真值入口(无 gold / outcome / GAP)。
 persona 是系数(决定变化速率/力度), state 是被积分的量。
+
+耐心由时间气质（tempo）驱动，不再由质量失败策略（d43）驱动——二者正交。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .dimensions import D1Eval, D43Correct, Persona, TrustStance
+from .dimensions import D1Eval, D42Supervise, Persona, TimeTemperament, TrustStance
 
 # 主观判断枚举(LLM 在 OUTPUT CONTRACT 里产出)
 VERDICTS = {
@@ -31,6 +35,8 @@ class Coef:
     patience_decay: int = 1
     trust_decay: int = 1
     trust_recover: int = 1
+    # stuck 额外倍率：高过程卷入在「像卡住/看不懂进展」时掉耐心更快
+    stuck_extra: int = 0
 
 
 @dataclass
@@ -58,29 +64,35 @@ def _int_to_trust(i: int) -> TrustStance:
 
 
 def make_coef(p: Persona) -> Coef:
-    """persona -> 状态演化系数。"""
-    # 急躁/低容错倾向 -> 耐心掉得快
-    patience_decay = 2 if p.d43 in (D43Correct.GIVE_UP, D43Correct.RESEND) else 1
-    # 越懂行, 看穿错误后信任崩得越快(反直觉但真实)
+    """persona -> 状态演化系数。耐心衰减跟 tempo；信任崩塌跟评估能力。"""
+    patience_decay = {
+        TimeTemperament.PATIENT: 1,
+        TimeTemperament.STEADY: 1,
+        TimeTemperament.IMPATIENT: 2,
+    }[p.tempo]
     trust_decay = 2 if p.d1 in (D1Eval.COMPETENT, D1Eval.EXPERT) else 1
-    trust_recover = 1
-    return Coef(patience_decay, trust_decay, trust_recover)
+    # 高过程卷入：主观 stuck 时多扣一点（仍不绑定具体产品键）
+    stuck_extra = 1 if p.d42 is D42Supervise.EVERY_STEP else 0
+    return Coef(
+        patience_decay=patience_decay,
+        trust_decay=trust_decay,
+        trust_recover=1,
+        stuck_extra=stuck_extra,
+    )
 
 
 def init_state(p: Persona) -> State:
-    patience_base = {  # D4.3 给耐心基线
-        D43Correct.GIVE_UP: 3,
-        D43Correct.RESEND: 4,
-        D43Correct.FEEDBACK: 5,
-        D43Correct.HANDOVER: 6,
-        D43Correct.FILE_ISSUE: 6,
-    }.get(p.d43, 4)
+    patience_base = {
+        TimeTemperament.IMPATIENT: 3,
+        TimeTemperament.STEADY: 5,
+        TimeTemperament.PATIENT: 7,
+    }[p.tempo]
     return State(turn=0, patience=patience_base, trust=p.trust)
 
 
 # 任务量 -> 起始耐心浮动：同一个人接不同任务，耐心不一样。大/开放式/有野心的活儿预期要真功夫，
 # 愿意多等、多来回（起始耐心更高）；该秒回的小任务则对任何摩擦零容忍（起始耐心更低）。
-# 范围压得很小（-1…+2），只做基线上的微浮动，不盖过 D4.3 性格给的耐心档位。
+# 范围压得很小（-1…+2），只做基线上的微浮动，不盖过 tempo 性格给的耐心档位。
 TASK_LOAD_DELTA: dict[str, int] = {
     "quick": -1,  # 琐碎/理应秒回
     "normal": 0,  # 常规任务
@@ -122,9 +134,9 @@ def apply_verdict(state: State, verdict: str, coef: Coef) -> State:
     elif verdict == "stuck":
         # harness 故障/空转/复读/无进展：受挫掉耐心，且连续越久掉得越狠(加性递增，符合"越拖越火")。
         # 全归于耐心——不另开升级门，最终仍走 patience<=0 解锁终止(能力无关：任何用户都察觉得到卡住)。
-        # 加性递增：首次 stuck 扣 3，之后每多连一次 +1（3→4→5→6…）。
+        # 加性递增：首次 stuck 扣 3+stuck_extra，之后每多连一次 +1。
         state.consec_stuck += 1
-        state.patience -= state.consec_stuck + 2
+        state.patience -= state.consec_stuck + 2 + coef.stuck_extra
         state.consec_blame = 0  # stuck 非"坐实能力缺口"式的 blame -> 诊断计数清零
 
     state.trust = _int_to_trust(t)

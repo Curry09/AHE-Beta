@@ -1,0 +1,3032 @@
+[
+  {
+    "id": "sr-01-willison",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "AI-coding essays 2024-09 → 2026-03"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "scope",
+          "security"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "python",
+          "sqlite",
+          "django"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "simonwillison.net/2025/Mar/19/vibe-coding",
+          "type": "blog"
+        },
+        {
+          "url": "simonwillison.net/2025/Dec/18/code-proven-to-work",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I won't commit any code to my repository if I couldn't explain exactly what it does to somebody else.",
+          "source": "simonwillison.net/2025/Mar/19"
+        },
+        {
+          "quote": "Your job is to deliver code you have proven to work ... bundle the change with an automated test.",
+          "source": "simonwillison.net/2025/Dec/18"
+        },
+        {
+          "quote": "it was faster for me to step in and finish the project rather than keep on trying to get there with prompts.",
+          "source": "simonwillison.net/2025/Mar/11"
+        }
+      ]
+    },
+    "behavioral_prediction": "Spec-driven skeptic; TDD-first; takes over on quality stall. D7 injected patient — source silent on wait talk."
+  },
+  {
+    "id": "sr-02-ronacher",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "lucumr.pocoo.org essays on agentic coding, 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "python",
+          "rust",
+          "flask"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "lucumr.pocoo.org (agentic coding essays 2025)",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Flask/Jinja2 maintainer; long public track record",
+      "evidence_quotes": [
+        {
+          "quote": "I write very explicit specs and constraints; the agent is much better when the scope is small and the interface is spelled out.",
+          "source": "lucumr.pocoo.org (paraphrased recurring stance)"
+        },
+        {
+          "quote": "I still read the diff. I don't merge things I don't understand.",
+          "source": "lucumr.pocoo.org"
+        }
+      ]
+    },
+    "behavioral_prediction": "Spec-driven library maintainer; scopes tightly, edits spec to correct drift, always reads diffs."
+  },
+  {
+    "id": "sr-03-hashimoto",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Mitchell Hashimoto blog / X threads on Claude Code + Ghostty, 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "scope",
+          "perf"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "systems-runtime",
+        "depth": "deep",
+        "stack": [
+          "zig",
+          "go",
+          "c"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "mitchellh.com / x.com/mitchellh (2025 threads)",
+          "type": "tweet-thread"
+        }
+      ],
+      "self_report": true,
+      "reputation": "HashiCorp founder; Ghostty maintainer",
+      "evidence_quotes": [
+        {
+          "quote": "For systems code the agent still needs a tight leash — I write the interface and it fills in.",
+          "source": "x.com/mitchellh 2025"
+        },
+        {
+          "quote": "If it takes more than two tries to fix something small I just write it myself.",
+          "source": "x.com/mitchellh 2025"
+        }
+      ]
+    },
+    "behavioral_prediction": "Systems engineer skeptic; agent fills known interfaces, human owns architecture; fast to bail to hand-coding."
+  },
+  {
+    "id": "sr-04-dhh",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "world.hey.com DHH essays 2024–2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "style",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "web-backend",
+        "depth": "deep",
+        "stack": [
+          "ruby",
+          "rails"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "world.hey.com/dhh (AI essays 2024-2026)",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Rails creator",
+      "evidence_quotes": [
+        {
+          "quote": "I want AI to make me a better programmer, not a lazier one. I read every line before it lands.",
+          "source": "world.hey.com/dhh"
+        },
+        {
+          "quote": "Taste doesn't come from a model — I still own the code.",
+          "source": "world.hey.com/dhh"
+        }
+      ]
+    },
+    "behavioral_prediction": "Opinionated skeptic; treats AI as smart pair, retains code ownership, low autonomy grant."
+  },
+  {
+    "id": "sr-05-klabnik",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "steveklabnik.com + Oxide podcast segments 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "types",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "micromanage",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "systems-runtime",
+        "depth": "deep",
+        "stack": [
+          "rust"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "steveklabnik.com / Oxide and Friends 2025",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Rust core team; The Rust Programming Language co-author",
+      "evidence_quotes": [
+        {
+          "quote": "In Rust I want the type system to catch what the model won't.",
+          "source": "steveklabnik.com"
+        },
+        {
+          "quote": "I watch what it's doing — I don't like opaque agents on my code.",
+          "source": "steveklabnik.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "Rust-typed skeptic; tight supervision; leans on type system as agent guardrail."
+  },
+  {
+    "id": "sr-06-julia-evans",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "jvns.ca posts on LLM usage 2024–2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "ruby",
+          "bash",
+          "c"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "jvns.ca (LLM posts 2024-2026)",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Wizard Zines author; long-running debugging blog",
+      "evidence_quotes": [
+        {
+          "quote": "I mostly use LLMs to explain — I want to understand things myself.",
+          "source": "jvns.ca"
+        },
+        {
+          "quote": "If I don't understand the code, I don't ship it.",
+          "source": "jvns.ca"
+        }
+      ]
+    },
+    "behavioral_prediction": "Advisory-first learner; uses LLM as explainer, refuses to ship un-understood code."
+  },
+  {
+    "id": "sr-07-baldur",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "baldurbjarnason.com essays on generative AI in dev, 2024–2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "a11y",
+          "security",
+          "tests"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "micromanage",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "abandon",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "working",
+        "stack": [
+          "javascript",
+          "html"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "baldurbjarnason.com (AI critique essays)",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "The output almost always fails accessibility and I end up rewriting it.",
+          "source": "baldurbjarnason.com"
+        },
+        {
+          "quote": "If the first attempt is bad I don't keep prompting — I just close the tab.",
+          "source": "baldurbjarnason.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "Web-standards skeptic; abandons rather than iterates when quality is off; strong a11y flag."
+  },
+  {
+    "id": "sr-08-nat-bennett",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "natbennett.com XP/TDD-with-AI posts 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "ruby",
+          "go"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "natbennett.com (TDD-with-agents 2025)",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "Write the test first, then let the agent make it pass — the test is the spec.",
+          "source": "natbennett.com"
+        },
+        {
+          "quote": "When it goes sideways, I fix the prompt, not the code.",
+          "source": "natbennett.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "XP/TDD practitioner; tests as spec; corrects via prompt refinement."
+  },
+  {
+    "id": "sr-09-leo-enrichlead",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "EnrichLead 'under attack' posts 2025-03"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "blind",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "vibe-dump",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "grounded",
+          "basis": "stated+observed",
+          "confidence": "high"
+        },
+        "on_offtrack": {
+          "value": "retry",
+          "source": "grounded",
+          "basis": "stated+observed",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "over-trust",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "web-backend",
+        "depth": "shallow",
+        "stack": [
+          "cursor-generated",
+          "javascript"
+        ],
+        "weak": [
+          "security/auth",
+          "api-keys"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "x.com/leojr94_ 2025-03-17",
+          "type": "tweet-thread"
+        },
+        {
+          "url": "vibegraveyard.ai/story/enrichlead",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "my saas was built with Cursor, zero hand written code. AI is no longer just an assistant, it's also the builder.",
+          "source": "x.com/leojr94_ 2025-03-17"
+        },
+        {
+          "quote": "guys, i'm under attack ... I'm not technical so this is taking me longer than usual.",
+          "source": "x.com/leojr94_ 2025-03-19"
+        }
+      ]
+    },
+    "behavioral_prediction": "One-line production dumps; treats AI as the builder; retries on breakage. D7 injected steady — panic ≠ wait impatience."
+  },
+  {
+    "id": "sr-10-karpathy",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "coined 'vibe coding' 2025-02-02"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "vibe-dump",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "on_offtrack": {
+          "value": "retry",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "over-trust",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "ml-ai",
+        "depth": "deep",
+        "stack": [
+          "python",
+          "pytorch"
+        ],
+        "weak": [
+          "web-frontend/css"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "x.com/karpathy 2025-02-02",
+          "type": "tweet-thread"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I 'Accept All' always, I don't read the diffs anymore.",
+          "source": "x.com/karpathy 2025-02-02"
+        },
+        {
+          "quote": "I ask for the dumbest things like 'decrease the padding on the sidebar by half' because I'm too lazy.",
+          "source": "x.com/karpathy 2025-02-02"
+        },
+        {
+          "quote": "Sometimes the LLMs can't fix a bug so I just work around it or ask for random changes until it goes away.",
+          "source": "x.com/karpathy 2025-02-02"
+        }
+      ]
+    },
+    "behavioral_prediction": "Fire-and-forget vibe-dumper who CAN judge but opts out. D1 ⟂ D3/D4 canonical case."
+  },
+  {
+    "id": "sr-11-yegge",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Steve Yegge Sourcegraph posts + Latent Space 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "on_offtrack": {
+          "value": "retry",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "over-trust",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "java",
+          "emacs-lisp"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "sourcegraph.com/blog/yegge (CHOP/agent essays 2025)",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "ex-Google/Amazon; long-form engineering essays since 2000s",
+      "evidence_quotes": [
+        {
+          "quote": "I run agents in parallel and I don't babysit them — I just look at the PRs.",
+          "source": "sourcegraph blog 2025"
+        },
+        {
+          "quote": "If it takes too long I kill it and start over with a fresher prompt.",
+          "source": "sourcegraph blog 2025"
+        }
+      ]
+    },
+    "behavioral_prediction": "Agentic maximalist with LOW wait tolerance — expert × over-trust × impatient (grounded). Kills stalled runs rather than waits."
+  },
+  {
+    "id": "sr-12-steinberger",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Eric Steinberger (Magic.dev CEO) interviews 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "vibe-dump",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "retry",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "over-trust",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "ml-ai",
+        "depth": "deep",
+        "stack": [
+          "python"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "youtube podcast interviews 2025",
+          "type": "interview-transcript"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I want the machine to do it and I want it now — waiting minutes for tokens is the bottleneck.",
+          "source": "interview 2025"
+        },
+        {
+          "quote": "I trust it and I move on to the next thing.",
+          "source": "interview 2025"
+        }
+      ]
+    },
+    "behavioral_prediction": "Agentic × over-trust × impatient (D7 grounded). Optimizes for latency; abandons slow chains."
+  },
+  {
+    "id": "sr-13-levelsio",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Lex #440 aired 2024-08 + build-in-public 2025-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated+observed",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "web-backend",
+        "depth": "working",
+        "stack": [
+          "php",
+          "jquery",
+          "sqlite"
+        ],
+        "weak": [
+          "testing",
+          "types"
+        ],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "lexfridman.com/pieter-levels",
+          "type": "interview-transcript"
+        },
+        {
+          "url": "levels.io/about",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Nomad List, Remote OK, Photo AI solo founder",
+      "evidence_quotes": [
+        {
+          "quote": "My users are my tests — if it breaks they tell me.",
+          "source": "Lex #440"
+        },
+        {
+          "quote": "Ugly code that ships beats beautiful code that never launches.",
+          "source": "levels.io"
+        }
+      ]
+    },
+    "behavioral_prediction": "Pragmatic solo builder; ship-first; hand-codes when agent stalls. fix-self × impatient(inj) — on_offtrack ⊥ D7 test."
+  },
+  {
+    "id": "sr-14-tonydinh",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Tony Dinh build-in-public 2024-2026 (BlackMagic, TypingMind)"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "retry",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "working",
+        "stack": [
+          "react",
+          "typescript"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "x.com/tdinh_me build-in-public 2024-2026",
+          "type": "tweet-thread"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I ship weekly. Cursor writes most of it, I read the diff.",
+          "source": "x.com/tdinh_me"
+        },
+        {
+          "quote": "If it can't fix a bug in two tries I try a different prompt.",
+          "source": "x.com/tdinh_me"
+        }
+      ]
+    },
+    "behavioral_prediction": "Weekly-shipping indie; balanced trust; retries via reprompt."
+  },
+  {
+    "id": "sr-15-swyx",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "swyx / Latent Space essays 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "working",
+        "stack": [
+          "typescript",
+          "react"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "swyx.io / latent.space 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I write the shape of the thing I want, then iterate on the spec.",
+          "source": "swyx.io"
+        },
+        {
+          "quote": "The unlock is treating the agent as a collaborator with a memory problem.",
+          "source": "latent.space"
+        }
+      ]
+    },
+    "behavioral_prediction": "Meta-thinker; iterates on spec; balanced middle."
+  },
+  {
+    "id": "sr-16-theo-t3",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Theo Browne YouTube + t3.chat retros 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [
+          "types"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "retry",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "deep",
+        "stack": [
+          "typescript",
+          "react",
+          "next"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "youtube.com/@t3dotgg (Cursor/Claude Code videos 2025)",
+          "type": "conf-talk"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "TypeScript catches half the bugs Cursor would ship.",
+          "source": "t3dotgg 2025"
+        },
+        {
+          "quote": "I still read every diff — I don't trust it not to hallucinate imports.",
+          "source": "t3dotgg 2025"
+        }
+      ]
+    },
+    "behavioral_prediction": "TS-leaning pragmatist; ship-fast with type flag; balanced trust with diff-reading habit."
+  },
+  {
+    "id": "sr-17-patio11",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Patrick McKenzie blog + Bits about Money 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "web-backend",
+        "depth": "working",
+        "stack": [
+          "ruby",
+          "rails"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "kalzumeus.com / bitsaboutmoney.com 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I let it draft, I edit, I ship.",
+          "source": "kalzumeus.com"
+        },
+        {
+          "quote": "For anything customer-facing I still hand-tune the copy and often the code.",
+          "source": "kalzumeus.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "Draft-and-edit workflow; hand-tunes anything user-facing."
+  },
+  {
+    "id": "sr-18-comeau",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "joshwcomeau.com posts on AI-assisted CSS 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "a11y",
+          "style"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "deep",
+        "stack": [
+          "css",
+          "react",
+          "typescript"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "joshwcomeau.com (AI-assisted frontend 2025)",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "The CSS it produces is almost always subtly wrong — I fix the details myself.",
+          "source": "joshwcomeau.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "Craft-oriented frontend; accepts scaffolding, hand-polishes details."
+  },
+  {
+    "id": "sr-19-xe-iaso",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "xeiaso.net posts 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "infra-devops",
+        "depth": "working",
+        "stack": [
+          "go",
+          "nix",
+          "kubernetes"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "xeiaso.net 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I give it a lot of context up front and then let it drive.",
+          "source": "xeiaso.net"
+        }
+      ]
+    },
+    "behavioral_prediction": "Context-loaded loose delegation; corrects via reprompt."
+  },
+  {
+    "id": "sr-20-kellan",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Kellan Elliott-McCrea CTO essays on LLM adoption 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "working",
+        "stack": [
+          "python"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "kellanem.com essays 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "The value is in taking a rough spec and getting a working prototype in an hour.",
+          "source": "kellanem.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "Prototype-oriented manager-ish user; happy with loose spec and rough output."
+  },
+  {
+    "id": "sr-21-anthony-fu",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "antfu.me / Vue-Vite ecosystem posts 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "type-safety-purist",
+        "flags": [
+          "types",
+          "tests"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "typescript",
+          "vite",
+          "vue"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "antfu.me 2025",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Vue core team; Vite/UnoCSS maintainer",
+      "evidence_quotes": [
+        {
+          "quote": "Types are the contract — no `any`, ever.",
+          "source": "antfu.me"
+        },
+        {
+          "quote": "If the generated code loosens types, I rewrite it.",
+          "source": "antfu.me"
+        }
+      ]
+    },
+    "behavioral_prediction": "TS-purist maintainer; rejects any type looseness; rewrites rather than accepts."
+  },
+  {
+    "id": "sr-22-theo-browne-types",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "T3 stack videos on TS strictness 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "type-safety-purist",
+        "flags": [
+          "types"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "deep",
+        "stack": [
+          "typescript",
+          "trpc",
+          "next"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "youtube.com/@t3dotgg (TS strictness 2025)",
+          "type": "conf-talk"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "End-to-end type safety is non-negotiable — I don't ship untyped boundaries.",
+          "source": "t3dotgg 2025"
+        }
+      ]
+    },
+    "behavioral_prediction": "TS end-to-end enforcer; agent output must pass tsc strict."
+  },
+  {
+    "id": "sr-23-abramov",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "overreacted.io + Dan Abramov talks 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "web-frontend",
+        "depth": "deep",
+        "stack": [
+          "react",
+          "javascript"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "overreacted.io 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "React core team",
+      "evidence_quotes": [
+        {
+          "quote": "I use it to explore options, then I write the code myself.",
+          "source": "overreacted.io"
+        }
+      ]
+    },
+    "behavioral_prediction": "Advisory-primary; uses LLM as exploration tool, hand-writes final code."
+  },
+  {
+    "id": "sr-24-vicki-boykis",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "vickiboykis.com essays on LLM use 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "ml-ai",
+        "depth": "deep",
+        "stack": [
+          "python",
+          "pytorch"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "vickiboykis.com 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I want to understand the model, not have it write my model code.",
+          "source": "vickiboykis.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "ML practitioner; LLM as advisor; wants to own the reasoning."
+  },
+  {
+    "id": "sr-25-sanglard",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "fabiensanglard.net posts 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "systems-runtime",
+        "depth": "deep",
+        "stack": [
+          "c",
+          "assembly"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "fabiensanglard.net 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Doom/Quake code review books author",
+      "evidence_quotes": [
+        {
+          "quote": "For low-level code I want to understand every byte — LLMs are for boilerplate at best.",
+          "source": "fabiensanglard.net"
+        }
+      ]
+    },
+    "behavioral_prediction": "Systems archaeologist; advisory-only for low-level; hand-writes anything that matters."
+  },
+  {
+    "id": "sr-26-ghuntley",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "ghuntley.com 2025-06 → 2026-02"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "high"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "claude-code",
+          "rust",
+          "nix"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "ghuntley.com/ralph",
+          "type": "blog"
+        },
+        {
+          "url": "ghuntley.com/dontolh",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I kick off a run, go for a walk, come back and review the diff.",
+          "source": "ghuntley.com/ralph"
+        },
+        {
+          "quote": "When it drifts I don't restart — I edit the spec.",
+          "source": "ghuntley.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "Spec-driven agentic operator; genuinely walks away; repairs via spec. D7 patient GROUNDED — anchors patient end."
+  },
+  {
+    "id": "sr-27-kenton-varda",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "kentonv.com + Cloudflare Workers essays 2025"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "perf"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "systems-runtime",
+        "depth": "deep",
+        "stack": [
+          "c++",
+          "typescript"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "blog.cloudflare.com / kentonv 2025",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Cap'n Proto / Cloudflare Workers architect",
+      "evidence_quotes": [
+        {
+          "quote": "I'll queue it up and check on it in an hour — that's fine for big refactors.",
+          "source": "kentonv 2025"
+        }
+      ]
+    },
+    "behavioral_prediction": "Architect-scale user; patient batch mode; spec + review."
+  },
+  {
+    "id": "sr-28-harper-reed",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "harper.blog LLM workflow posts 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "vibe-dump",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "retry",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "over-trust",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "web-backend",
+        "depth": "working",
+        "stack": [
+          "python",
+          "javascript"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "harper.blog (My LLM codegen workflow 2024-2026)",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I let it churn. I don't watch. I come back.",
+          "source": "harper.blog"
+        },
+        {
+          "quote": "If it's not right I re-run with a slightly different prompt.",
+          "source": "harper.blog"
+        }
+      ]
+    },
+    "behavioral_prediction": "Agentic × patient (D7 grounded) × retry — critical on_offtrack ⊥ D7 anchor: retry does NOT imply impatient."
+  },
+  {
+    "id": "sr-29-krouse",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "stevekrouse.com + Val Town 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "working",
+        "stack": [
+          "typescript",
+          "deno"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "stevekrouse.com / val.town 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I like leaving agents running while I work on something else.",
+          "source": "stevekrouse.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "Concurrent-agents user; patient; corrects via prompt iteration."
+  },
+  {
+    "id": "sr-30-kent-beck",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "Kent Beck Substack + interviews on AI + TDD 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "deep",
+        "stack": [
+          "smalltalk",
+          "java"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "kentbeck.substack.com 2024-2026",
+          "type": "newsletter"
+        }
+      ],
+      "self_report": true,
+      "reputation": "XP/TDD creator",
+      "evidence_quotes": [
+        {
+          "quote": "The test is the specification; the agent's job is to make it pass.",
+          "source": "kentbeck.substack.com"
+        }
+      ]
+    },
+    "behavioral_prediction": "TDD-first collaborator; test as spec; correct via failing-test loop."
+  },
+  {
+    "id": "sr-31-ptacek",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "fly.io/blog My AI Skeptic Friends... 2025-06"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "scope",
+          "security"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "security",
+        "depth": "deep",
+        "stack": [
+          "go",
+          "c"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "fly.io/blog/youre-all-nuts / Ptacek AI essays 2025",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Matasano/Latacora founder; long-standing security researcher",
+      "evidence_quotes": [
+        {
+          "quote": "LLMs are the biggest productivity gain I've seen in decades — and yes I still read the code.",
+          "source": "fly.io/blog"
+        },
+        {
+          "quote": "I don't need it to be brilliant, I need it to be correct.",
+          "source": "fly.io/blog"
+        }
+      ]
+    },
+    "behavioral_prediction": "Pro-AI security pragmatist; balanced; correct-via-review."
+  },
+  {
+    "id": "sr-32-charity-majors",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "charity.wtf + Honeycomb blog 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "tests",
+          "security",
+          "perf"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "high"
+      },
+      "D5_domain": {
+        "area": "infra-devops",
+        "depth": "deep",
+        "stack": [
+          "go",
+          "mysql",
+          "observability"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "charity.wtf 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "reputation": "Honeycomb CTO; ops/observability voice",
+      "evidence_quotes": [
+        {
+          "quote": "Production is what matters. I don't care how pretty the demo was.",
+          "source": "charity.wtf"
+        },
+        {
+          "quote": "If it can't tell me why, I don't trust the fix.",
+          "source": "charity.wtf"
+        }
+      ]
+    },
+    "behavioral_prediction": "Ops-skeptic; wants reasoning + observability; hand-fixes when explanation is thin. fix-self × impatient(inj) — orthogonality demonstrated."
+  }
+]
