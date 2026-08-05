@@ -53,12 +53,11 @@ def test_init_state_patience_base_by_tempo_not_d43() -> None:
     assert init_state(_persona(tempo=TimeTemperament.STEADY)).patience == 5
     assert init_state(_persona(tempo=TimeTemperament.PATIENT)).patience == 7
     # 正交：give_up 不再压低耐心基线
-    assert init_state(
-        _persona(d43=D43Correct.GIVE_UP, tempo=TimeTemperament.PATIENT)
-    ).patience == 7
-    assert init_state(
-        _persona(d43=D43Correct.FILE_ISSUE, tempo=TimeTemperament.IMPATIENT)
-    ).patience == 3
+    assert init_state(_persona(d43=D43Correct.GIVE_UP, tempo=TimeTemperament.PATIENT)).patience == 7
+    assert (
+        init_state(_persona(d43=D43Correct.FILE_ISSUE, tempo=TimeTemperament.IMPATIENT)).patience
+        == 3
+    )
 
 
 def test_apply_task_load_floats_around_base() -> None:

@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import sys
 import time
 from pathlib import Path
 from urllib.parse import urlparse
@@ -156,7 +155,9 @@ def _run_one(
     from auto_designer.distill.library import PersonaLibrary
     from auto_designer.harness.connector import HarnessConnector
     from auto_designer.harness.launcher import HarnessLauncher
-    from auto_designer.models import FeelingScore, Persona as DisplayPersona, SeedScenario, Session, Transcript, WorkspaceSpec
+    from auto_designer.loop.sim_user import result_to_sim_trace, result_to_turns
+    from auto_designer.models import FeelingScore, SeedScenario, Session, Transcript, WorkspaceSpec
+    from auto_designer.models import Persona as DisplayPersona
     from auto_designer.user.session_store import SessionStore
     from auto_designer.user.sim.deps import ensure_deps
     from auto_designer.user.sim.loop import run_session as sim_run_session
@@ -164,7 +165,6 @@ def _run_one(
     from auto_designer.user.sim.persona_io import card_to_persona
     from auto_designer.user.sim.state import init_state, make_coef
     from auto_designer.user.sim.workspace import materialize as materialize_workspace
-    from auto_designer.loop.sim_user import result_to_sim_trace, result_to_turns
 
     lib = PersonaLibrary(ROOT / "persona_library.json")
     persona_card = next((c for c in lib.load() if c.get("id") == persona_id), None)
@@ -262,8 +262,7 @@ def _run_one(
     print("=== RESULT ===", flush=True)
     print(f"instance={meta['instance_id']} end_reason={res.end_reason}", flush=True)
     print(
-        f"feeling={feel.score if feel else None} "
-        f"reason={(feel.reason if feel else '')[:240]!r}",
+        f"feeling={feel.score if feel else None} reason={(feel.reason if feel else '')[:240]!r}",
         flush=True,
     )
     print(
@@ -277,8 +276,7 @@ def _run_one(
         patience = getattr(t, "patience", "")
         out = (getattr(t, "harness_output", None) or "")[:120]
         print(
-            f"  turn{i}: phase={phase} action={act} patience={patience} "
-            f"out[:120]={out!r}",
+            f"  turn{i}: phase={phase} action={act} patience={patience} out[:120]={out!r}",
             flush=True,
         )
 

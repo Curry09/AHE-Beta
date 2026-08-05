@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from auto_designer.user.sim.clauses import compile_block_p  # noqa: E402
 from auto_designer.user.sim.dimensions import (  # noqa: E402
     D1Eval,
     D2Depth,
@@ -29,7 +30,6 @@ from auto_designer.user.sim.dimensions import (  # noqa: E402
     TimeTemperament,
     finalize_persona,
 )
-from auto_designer.user.sim.clauses import compile_block_p  # noqa: E402
 from auto_designer.user.sim.harness_adapter import ScriptedHarness  # noqa: E402
 from auto_designer.user.sim.loop import run_session  # noqa: E402
 from auto_designer.user.sim.persona_client import ScriptedPersonaClient  # noqa: E402
@@ -208,8 +208,10 @@ def probe_scripted_session() -> list[str]:
         ),
     ):
         res = run_session(p, client, ScriptedHarness(), "Add to_user_tz; handle DST.")
-        print(f"  {p.persona_id}: end={res.end_reason} turns={len(res.turns)} "
-              f"feeling={res.feeling_derived.score if res.feeling_derived else None}")
+        print(
+            f"  {p.persona_id}: end={res.end_reason} turns={len(res.turns)} "
+            f"feeling={res.feeling_derived.score if res.feeling_derived else None}"
+        )
         if not res.turns:
             bugs.append(f"empty_session:{p.persona_id}")
     if not bugs:

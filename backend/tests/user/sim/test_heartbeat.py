@@ -479,9 +479,7 @@ def test_keep_waiting_decay_follows_tempo_coef() -> None:
             acts=[{"action": "keep_waiting", "gap": False}],
             verdict="satisfied",
         )
-        res = run_session(
-            _persona(tempo=tempo), client, harness, TASK, help_text=harness.help_text
-        )
+        res = run_session(_persona(tempo=tempo), client, harness, TASK, help_text=harness.help_text)
         wt = [t for t in res.turns if t.phase == "waiting"]
         assert len(wt) == 1
         return wt[0].patience
