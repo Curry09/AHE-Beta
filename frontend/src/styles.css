@@ -727,6 +727,23 @@ a:focus-visible,
   stroke-width: 1.5;
 }
 
+.tower-helipad-pad {
+  fill: color-mix(in srgb, var(--surface) 88%, var(--surface-2));
+  stroke: color-mix(in srgb, var(--amber) 68%, var(--border-strong));
+  stroke-width: 2;
+}
+
+.tower-helipad-mark {
+  fill: var(--amber);
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 800;
+  text-anchor: middle;
+  paint-order: stroke fill;
+  stroke: color-mix(in srgb, var(--surface) 82%, transparent);
+  stroke-width: 2px;
+}
+
 .campus-flight-path {
   fill: none;
   stroke: color-mix(in srgb, var(--sky) 42%, var(--border-strong));
@@ -761,7 +778,7 @@ a:focus-visible,
   }
   52%,
   68% {
-    transform: translate(125px, 175px) rotate(5deg);
+    transform: translate(230px, 175px) rotate(5deg);
   }
 }
 

@@ -2,7 +2,7 @@ import type { KeyboardEvent } from "react";
 import type { AgentRole } from "../../types";
 import type { BuildingMode, FloorModel } from "./buildingModel";
 
-const FACADE_X = 42;
+const FACADE_X = 20;
 const FACADE_Y = 86;
 const FACADE_W = 310;
 const FLOOR_H = 64;
@@ -10,7 +10,7 @@ const DEPTH_X = 72;
 const DEPTH_Y = -44;
 const LABEL_W = 160;
 const WINDOW_GAP = 8;
-const FACTORY_X = 390;
+const FACTORY_X = 470;
 const FACTORY_Y = 260;
 const FACTORY_W = 190;
 const FACTORY_H = 130;
@@ -126,16 +126,9 @@ export function BuildingTower(props: {
           />
           <path
             className={`campus-flight-path${factory.moving ? " active" : ""}`}
-            d={`M ${FACADE_X + FACADE_W + 28} ${FACADE_Y - 25} Q 455 115 505 ${FACTORY_Y + FACTORY_DEPTH_Y - 8}`}
+            d={`M ${FACADE_X + FACADE_W + 28} ${FACADE_Y - 25} Q 500 110 585 ${FACTORY_Y + FACTORY_DEPTH_Y - 8}`}
             aria-hidden="true"
           />
-          <g
-            className={`campus-aircraft${factory.moving ? " moving" : ""}`}
-            transform={`translate(${FACADE_X + FACADE_W + 20} ${FACADE_Y - 38})`}
-            aria-hidden="true"
-          >
-            <text x="0" y="0">🛩️</text>
-          </g>
           <g
             className={`openagents-factory status-${factory.status}`}
             role="button"
@@ -204,6 +197,22 @@ export function BuildingTower(props: {
             aria-hidden="true"
           />
           <polygon className="tower-roof" points={roof} aria-hidden="true" />
+          <g className="tower-helipad" aria-hidden="true">
+            <ellipse
+              className="tower-helipad-pad"
+              cx={FACADE_X + FACADE_W / 2 + DEPTH_X / 2}
+              cy={FACADE_Y + DEPTH_Y / 2}
+              rx="42"
+              ry="20"
+            />
+            <text
+              className="tower-helipad-mark"
+              x={FACADE_X + FACADE_W / 2 + DEPTH_X / 2}
+              y={FACADE_Y + DEPTH_Y / 2 + 5}
+            >
+              H
+            </text>
+          </g>
 
           {floors.map((floor, index) => {
             const y = FACADE_Y + index * FLOOR_H;
@@ -279,6 +288,13 @@ export function BuildingTower(props: {
               </g>
             );
           })}
+          <g
+            className={`campus-aircraft${factory.moving ? " moving" : ""}`}
+            transform={`translate(${FACADE_X + FACADE_W + 20} ${FACADE_Y - 38})`}
+            aria-hidden="true"
+          >
+            <text x="0" y="0">🛩️</text>
+          </g>
         </svg>
       </div>
     </div>
