@@ -58,5 +58,6 @@ def test_split_bill_bug_shows_in_text_only_when_probed() -> None:
 
 def test_demo_runs_offline_without_key() -> None:
     personas = demo.make_personas()
-    assert len(personas) == 2
-    demo.main()  # 离线脚本后端跑通两 persona, 不应抛异常
+    # Spec-0037/T2: 能力分叉 2 + tempo⊥d43 分叉 2
+    assert len(personas) == 4
+    demo.main()  # 离线脚本后端跑通，不应抛异常
