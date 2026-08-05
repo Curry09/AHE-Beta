@@ -1,5 +1,7 @@
 # Reference: GitHub Persona Extraction
 
+<!-- Spec-0037/T5: D7 默认 inject；禁从 PR 速度派生 impatient；枚举只引用 hub -->
+
 GitHub 足迹的取证方法（按维）、trace-floor + 跨层一致性真实性门、态度轴注入、endpoint 速查、
 三个范例、招募 profile。实际抽取时读本文件。
 
@@ -9,7 +11,7 @@ GitHub 足迹的取证方法（按维）、trace-floor + 跨层一致性真实�
 ## 1. 按维从 GitHub 足迹 ground
 
 GitHub 是 `observed` 源：能 ground 的维带 `basis: "observed"`。**它只可靠观测得到 D1/D5**；
-态度轴（D2/D4/D6 + 多数 D3）默认 `injected`（见 §3）。
+态度轴（D2/D4/D6/D7 + 多数 D3）默认 `injected`（见 §3）。
 
 ### D1 evaluation_capability — *强（可验证）*
 `blind | surface | competent | expert`（枚举见 card-schema.md）
@@ -36,11 +38,20 @@ GitHub 是 `observed` 源：能 ground 的维带 `basis: "observed"`。**它只�
 
 ### D3 interaction_style — *弱 → 多为 injected*
 `delegation ∈ {vibe-dump|loose|spec-driven}`，`supervision ∈ {hands-off|reviews|micromanage}`，`on_offtrack ∈ {abandon|retry|correct|fix-self|file-issue}`
+（语义：supervision=过程卷入；on_offtrack=质量失败策略，**不驱动等待耐心**——见 card-schema.md。）
 - **delegation：** 可从 issue 写法**弱观测**（极简一句 → `vibe-dump`；模板化带 repro → 偏 `spec-driven`）；
   有清晰痕迹→ `grounded` / `observed`（confidence 保守），否则 inject。
 - **on_offtrack：** `fix-self` 唯当**本人真的提交了修复 PR**（真实行为，`observed`）；`file-issue` 唯当
-  真写了结构化 bug 报告。否则 inject。
-- **supervision：** GitHub 观测不到「他如何监督 **agent**」→ 默认 `injected` / `low`。
+  真写了结构化 bug 报告。否则 inject。**不要**把「提交很快」读成 impatient——那是 D7。
+- **supervision：** GitHub 观测不到「他对 **agent 进行中**要不要可见感」→ 默认 `injected` / `low`。
+
+### D7 time_temperament — *无 → 默认 injected*
+`patient | steady | impatient`
+- **默认 `injected` / `low`。** 足迹几乎看不到「干等多久受得了」。
+- **禁止**从 PR/commit 频率、issue 关闭速度、贡献量反推 `impatient` 或 `patient`。
+- **禁止**与 on_offtrack 锁死（fix-self ≠ patient；abandon ≠ impatient）。走契约注入分布，独立采样。
+- **例外：** 仅当有本人一手等待陈述（极罕，如 issue 里明说「我等半小时就放弃」）才 `grounded` / `stated`。
+  等待气质真人锚由 `extract-selfreport-persona` 提供。
 
 ### D4 trust_model — *无 → 默认 injected*
 `over-trust | balanced | skeptical`
@@ -70,14 +81,16 @@ GitHub 是 `observed` 源：能 ground 的维带 `basis: "observed"`。**它只�
 也永不靠注入补齐把 `insufficient_evidence`→`authentic`。
 **volume 检查**：大计数（1000+ PR）是污染提示；唯当深实质**单域一致**才过；跨不相干栈的高量 → `contaminated`。
 
-## 3. 态度轴注入（本源默认——D2/D4/D6 + 多数 D3）
+## 3. 态度轴注入（本源默认——D2/D4/D6/D7 + 多数 D3）
 
-GitHub 观测不到态度轴。当某轴确实沉默时，从 **card-schema.md「受控注入分布」逐卡独立采样**
+GitHub 观测不到态度轴与等待气质。当某轴确实沉默时，从 **card-schema.md「受控注入分布」逐卡独立采样**
 （与已 grounded 的 D1/D5 正交），置 `source: "injected"` / `confidence: "low"`（注入维**不带 basis**）。
 
-- 具体比例（delegation / supervision / on_offtrack / trust_model / autonomy / D5.weak）见 card-schema.md，
-  不在此重列（轮辐式：契约是唯一真源）。
-- 有弱先验时偏置采样（自称 vibecoder → over-trust + vibe-dump；库维护者 → 偏 spec-driven）——但**仍标 injected**。
+- 具体比例（delegation / supervision / on_offtrack / trust_model / autonomy / **time_temperament** / D5.weak）
+  见 card-schema.md，不在此重列（轮辐式：契约是唯一真源）。
+- **正交强制**：`on_offtrack` ⊥ `time_temperament`——禁止「fix-self 必配 patient」或「abandon 必配 impatient」。
+- 有弱先验时偏置采样（自称 vibecoder → over-trust + vibe-dump；库维护者 → 偏 spec-driven）——但**仍标 injected**；
+  **弱先验不得用于 D7**（无可靠足迹信号）。
 - **采样，不按档锁死（强制）**：逐卡真实抽一次，不是从 D1 确定性映射。若每张 `surface` 卡都成
   `ship-fast+over-trust+hands-off`，就是锁死了——重抽。批后目测分布是否塌缩。
 
@@ -101,7 +114,8 @@ GET /search/issues?q=author:{u}+type:pr&sort=created        # L4 PR 实质 → D
 release-please；105 issue 带精确 TS repro；246 PR 含手动 CVE backport）。**一致 → authentic。**
 D1/D5 由足迹 grounded(`observed`)；D2 有一条**一手验收陈述** quote → grounded(`stated`, medium)；
 on_offtrack=fix-self 由**真实提交的 PR** grounded(`observed`)；delegation 由 issue 写法弱观测；
-**D4 信任 / D6 自主 / supervision 无一手证据 → injected(`low`)**（旧版从 CVE 卫生推 skeptical 的写法已删）。
+**D4 信任 / D6 自主 / supervision / D7 等待气质 无一手证据 → injected(`low`)**（旧版从 CVE 卫生推 skeptical 的写法已删）。
+D7 与 fix-self **独立**——勿因本人修 PR 就标 patient。
 
 ```json
 {
@@ -118,7 +132,8 @@ on_offtrack=fix-self 由**真实提交的 PR** grounded(`observed`)；delegation
     },
     "D4_trust_model": {"value": "balanced", "source": "injected", "confidence": "low"},
     "D5_domain": {"area": "dev-tooling", "depth": "deep", "stack": ["typescript","node"], "weak": ["timezones/DST"], "source": "grounded", "basis": "observed", "confidence": "high"},
-    "D6_autonomy_expectation": {"value": "collaborative", "source": "injected", "confidence": "low"}
+    "D6_autonomy_expectation": {"value": "collaborative", "source": "injected", "confidence": "low"},
+    "D7_time_temperament": {"value": "steady", "source": "injected", "confidence": "low"}
   },
   "provenance": {
     "layers": ["L0","L1","L2","L3","L4"],
@@ -128,7 +143,7 @@ on_offtrack=fix-self 由**真实提交的 PR** grounded(`observed`)；delegation
       {"quote": "I'm willing to submit a PR", "source": "github.com/.../issues/MMMMM"}
     ]
   },
-  "behavioral_prediction": "Gives precise constrained tasks, submits his own fix when the agent stalls; 低体感 on any/implicit-magic (his one STATED standard). 其信任/自主为注入先验，非观测所得——真人信任锚须由 selfreport 提供。"
+  "behavioral_prediction": "Gives precise constrained tasks, submits his own fix when the agent stalls; 低体感 on any/implicit-magic (his one STATED standard). 其信任/自主/等待气质为注入先验，非观测所得——真人信任与 D7 锚须由 selfreport 提供。"
 }
 ```
 
@@ -169,12 +184,12 @@ ipython traceback，无诊断）。低于 trace-floor → 一致性检查无从�
 | 来源 | spoke | observed vs stated | 可靠 grounds | 最适合 |
 |------|-------|--------------------|--------------|--------|
 | **GitHub footprint** | **extract-github（本 skill）** | **observed** | **D1, D5** | builder personas，expert/competent 端；D1×D5 覆盖网格 |
-| Stack Overflow | extract-stackoverflow（观测型 spoke） | observed | D1, D5（+ delegation 弱观测） | blind/surface 求助者 |
-| blogs / interviews / talks | extract-selfreport（自述型 spoke） | stated | D2, D3, D4, D6 | 态度/交互锚；刻度校准；**唯一能 ground D4** |
+| Stack Overflow | extract-stackoverflow-persona | observed | D1, D5（+ delegation 弱观测） | blind/surface 求助者 |
+| blogs / interviews / talks | extract-selfreport-persona | stated | D2, D3, D4, D6, D7 | 态度/交互/等待气质锚；**唯一能可靠 ground D4 与 D7** |
 | dev surveys (SO/JetBrains) | (weights) | aggregate | distribution | 采样权重 |
 
-三类抽取 spoke 互补：没有单一源 ground 全六轴，但**每轴都被至少一个源观测或自述 ground**。
-关键分工：**观测型源（GitHub/SO）ground 能力/领域，自述型源 ground 态度**——别指望观测型给出真态度。
+三类抽取 spoke 互补：没有单一源 ground 全轴，但**每轴都被至少一个源观测或自述 ground**。
+关键分工：**观测型源（GitHub/SO）ground 能力/领域，自述型源 ground 态度与等待气质**——别指望观测型给出真 D7。
 
 ## 7. 招募 profile（可插拔——L0 前挑）
 
@@ -202,5 +217,6 @@ ipython traceback，无诊断）。低于 trace-floor → 一致性检查无从�
 - **格覆盖**：要紧的格是 `D1 tier × D5 domain`（在目标 `priority_domains` 内）。每个在意的格需 **≥ ~3–5 卡**
   才让其体感均值是信号。GitHub 占 `competent`/`expert` 行；SO 占 `blind`/`surface` 行。
 - **边际平衡**：任一轴无单值主导（若 80% 卡是 `infra-devops` 或 `surface`，覆盖已聚簇 → 补薄格）。
-- **克隆检查**：批后查注入轴（D2/D3/D4/D6）。若某档塌到一种组合（每张 `surface` = 同一组合），即锁死 → 重抽（§3）。
+- **克隆检查**：批后查注入轴（D2/D3/D4/D6/D7）。若某档塌到一种组合（每张 `surface` = 同一组合，或
+  `abandon` 总配 `impatient`），即锁死 → 重抽（§3）。
 - **可用 ≠ 计数**：可用是联合门——计数达标 **且** 边际平衡 **且** 过克隆检查。

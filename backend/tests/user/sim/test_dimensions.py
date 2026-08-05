@@ -1,4 +1,4 @@
-"""spec-0005/T1：Persona 9 维派生与文案查表。"""
+"""spec-0005/T1 + Spec-0037/T2：Persona 9 维派生与文案查表（含 tempo / 过程卷入）。"""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from auto_designer.user.sim.dimensions import (
     D42Supervise,
     D43Correct,
     Persona,
+    TimeTemperament,
     TrustStance,
     derive_d3,
     derive_d6,
@@ -92,20 +93,45 @@ def test_derive_trust_and_d6() -> None:
 def test_compile_block_p_covers_every_value_no_keyerror() -> None:
     for d1 in D1Eval:
         for d43 in D43Correct:
-            p = finalize_persona(
-                Persona(
-                    persona_id="P",
-                    d1=d1,
-                    d2=D2Domain(),
-                    d41=D41Grain.ONE_LINER,
-                    d42=D42Supervise.FIRE_FORGET,
-                    d43=d43,
-                    d5=D5Autonomy.COLLABORATIVE,
+            for tempo in TimeTemperament:
+                p = finalize_persona(
+                    Persona(
+                        persona_id="P",
+                        d1=d1,
+                        d2=D2Domain(),
+                        d41=D41Grain.ONE_LINER,
+                        d42=D42Supervise.FIRE_FORGET,
+                        d43=d43,
+                        d5=D5Autonomy.COLLABORATIVE,
+                        tempo=tempo,
+                    )
                 )
-            )
-            block = compile_block_p(p)
-            assert "P" in block and "PERSONA" in block
-            assert p.d1.value.upper() in block
+                block = compile_block_p(p)
+                assert "P" in block and "PERSONA" in block
+                assert p.d1.value.upper() in block
+                assert "Process involvement" in block
+                assert "Time temperament" in block
+                assert "SESSION POLICY" in block
+
+
+def test_compile_block_p_process_involvement_not_button_language() -> None:
+    p = finalize_persona(
+        Persona(
+            persona_id="P",
+            d1=D1Eval.COMPETENT,
+            d2=D2Domain(),
+            d41=D41Grain.HALF_CONTEXT,
+            d42=D42Supervise.EVERY_STEP,
+            d43=D43Correct.FEEDBACK,
+            d5=D5Autonomy.COLLABORATIVE,
+            tempo=TimeTemperament.IMPATIENT,
+        )
+    )
+    block = compile_block_p(p)
+    assert "opaque activity" in block
+    assert "short fuse for waiting" in block
+    assert "interrupt" not in block.lower()
+    assert "queued" not in block.lower()
 
 
 def test_persona_is_frozen() -> None:

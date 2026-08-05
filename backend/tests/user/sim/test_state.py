@@ -1,4 +1,4 @@
-"""spec-0005/T2：patience/trust 状态机仅吃主观 verdict。"""
+"""spec-0005/T2 + Spec-0037/T2：patience/trust 状态机仅吃主观 verdict；耐心跟 tempo 正交于 d43。"""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from auto_designer.user.sim.dimensions import (
     D42Supervise,
     D43Correct,
     Persona,
+    TimeTemperament,
     TrustStance,
     finalize_persona,
 )
@@ -25,29 +26,42 @@ from auto_designer.user.sim.state import (
 )
 
 
-def _persona(d1: D1Eval = D1Eval.SHALLOW, d43: D43Correct = D43Correct.FEEDBACK) -> Persona:
+def _persona(
+    *,
+    d1: D1Eval = D1Eval.SHALLOW,
+    d43: D43Correct = D43Correct.FEEDBACK,
+    tempo: TimeTemperament = TimeTemperament.STEADY,
+    d42: D42Supervise = D42Supervise.PHASE_CHECK,
+) -> Persona:
     return finalize_persona(
         Persona(
             persona_id="P",
             d1=d1,
             d2=D2Domain(stack=("python",), depth=D2Depth.PROFICIENT),
             d41=D41Grain.HALF_CONTEXT,
-            d42=D42Supervise.PHASE_CHECK,
+            d42=d42,
             d43=d43,
             d5=D5Autonomy.COLLABORATIVE,
+            tempo=tempo,
         )
     )
 
 
-def test_init_state_patience_base_by_d43() -> None:
-    assert init_state(_persona(d43=D43Correct.GIVE_UP)).patience == 3
-    assert init_state(_persona(d43=D43Correct.FEEDBACK)).patience == 5
-    assert init_state(_persona(d43=D43Correct.FILE_ISSUE)).patience == 6
+def test_init_state_patience_base_by_tempo_not_d43() -> None:
+    # 同一失败策略、不同时间气质 → 耐心不同
+    assert init_state(_persona(tempo=TimeTemperament.IMPATIENT)).patience == 3
+    assert init_state(_persona(tempo=TimeTemperament.STEADY)).patience == 5
+    assert init_state(_persona(tempo=TimeTemperament.PATIENT)).patience == 7
+    # 正交：give_up 不再压低耐心基线
+    assert init_state(_persona(d43=D43Correct.GIVE_UP, tempo=TimeTemperament.PATIENT)).patience == 7
+    assert (
+        init_state(_persona(d43=D43Correct.FILE_ISSUE, tempo=TimeTemperament.IMPATIENT)).patience
+        == 3
+    )
 
 
 def test_apply_task_load_floats_around_base() -> None:
-    # 同一个人（FEEDBACK 基线 5）接不同分量任务，起始耐心不同：大任务加、小任务减、常规不动。
-    p = _persona(d43=D43Correct.FEEDBACK)
+    p = _persona(tempo=TimeTemperament.STEADY)  # 基线 5
     assert apply_task_load(init_state(p), "normal").patience == 5
     assert apply_task_load(init_state(p), "quick").patience == 4
     assert apply_task_load(init_state(p), "big").patience == 6
@@ -56,56 +70,67 @@ def test_apply_task_load_floats_around_base() -> None:
 
 
 def test_apply_task_load_unknown_is_noop_and_floor() -> None:
-    p = _persona(d43=D43Correct.GIVE_UP)  # 基线 3
-    assert apply_task_load(init_state(p), "wat").patience == 3  # 未知读数不动基线
+    p = _persona(tempo=TimeTemperament.IMPATIENT)  # 基线 3
+    assert apply_task_load(init_state(p), "wat").patience == 3
     s = init_state(p)
     s.patience = 1
-    assert apply_task_load(s, "quick").patience == 1  # quick=-1 但钳到 >=1，别一开局就可终止
+    assert apply_task_load(s, "quick").patience == 1
 
 
-def test_make_coef_reflects_persona() -> None:
-    assert make_coef(_persona(d43=D43Correct.GIVE_UP)).patience_decay == 2
+def test_make_coef_reflects_tempo_and_eval() -> None:
+    assert make_coef(_persona(tempo=TimeTemperament.IMPATIENT)).patience_decay == 2
+    assert make_coef(_persona(tempo=TimeTemperament.STEADY)).patience_decay == 1
+    assert make_coef(_persona(d43=D43Correct.GIVE_UP)).patience_decay == 1  # d43 不再驱动衰减
     assert make_coef(_persona(d1=D1Eval.EXPERT)).trust_decay == 2
     assert make_coef(_persona(d1=D1Eval.SHALLOW)).trust_decay == 1
+    assert make_coef(_persona(d42=D42Supervise.EVERY_STEP)).stuck_extra == 1
+    assert make_coef(_persona(d42=D42Supervise.FIRE_FORGET)).stuck_extra == 0
 
 
 def test_apply_verdict_transitions() -> None:
-    p = _persona()  # SHALLOW + FEEDBACK -> trust BALANCED, decays = 1
+    p = _persona()  # SHALLOW + STEADY -> trust BALANCED, patience 5, decays = 1
     coef = make_coef(p)
 
     s = init_state(p)
     apply_verdict(s, "satisfied", coef)
-    assert s.turn == 1 and s.trust is TrustStance.BLIND  # 满意 -> 信任上升
+    assert s.turn == 1 and s.trust is TrustStance.BLIND
 
     s = init_state(p)
     apply_verdict(s, "failed_blame_harness", coef)
-    assert s.patience == 4 and s.trust is TrustStance.SKEPTICAL  # 怪 harness -> 耐心↓信任↓
+    assert s.patience == 4 and s.trust is TrustStance.SKEPTICAL
 
     s = init_state(p)
     apply_verdict(s, "failed_blame_self", coef)
-    assert s.patience == 4 and s.trust is TrustStance.BALANCED  # 怪自己 -> 耐心↓但信任不变
+    assert s.patience == 4 and s.trust is TrustStance.BALANCED
 
     s = init_state(p)
     apply_verdict(s, "unsure", coef)
-    assert s.patience == 5 and s.trust is TrustStance.BALANCED  # 存疑 -> 不耗耐心
+    assert s.patience == 5 and s.trust is TrustStance.BALANCED
 
     s = init_state(p)
     apply_verdict(s, "stuck", coef)
-    # 卡住 -> 耐心↓(首次扣 consec_stuck+2 = 3), 信任不动(纯归耐心)
     assert s.patience == 2 and s.trust is TrustStance.BALANCED
 
 
 def test_apply_verdict_stuck_escalates_additively() -> None:
-    p = _persona()  # FEEDBACK -> patience 基线 5, patience_decay = 1
+    p = _persona()
     coef = make_coef(p)
 
     s = init_state(p)
-    apply_verdict(s, "stuck", coef)  # 第1次: -(1+2)=3 -> 2
+    apply_verdict(s, "stuck", coef)  # -(1+2)=3 -> 2
     assert s.patience == 2 and s.consec_stuck == 1
-    apply_verdict(s, "stuck", coef)  # 第2次: -(2+2)=4 -> -2
+    apply_verdict(s, "stuck", coef)  # -(2+2)=4 -> -2
     assert s.patience == -2 and s.consec_stuck == 2
-    apply_verdict(s, "stuck", coef)  # 第3次: -(3+2)=5 -> -7 (已解锁终止)
+    apply_verdict(s, "stuck", coef)
     assert s.patience == -7 and s.consec_stuck == 3
+
+
+def test_high_involvement_adds_stuck_extra() -> None:
+    p = _persona(d42=D42Supervise.EVERY_STEP)
+    coef = make_coef(p)
+    s = init_state(p)
+    apply_verdict(s, "stuck", coef)  # -(1+2+1)=4 -> 1
+    assert s.patience == 1
 
 
 def test_stuck_streak_resets_on_non_stuck() -> None:
@@ -113,10 +138,10 @@ def test_stuck_streak_resets_on_non_stuck() -> None:
     coef = make_coef(p)
     s = init_state(p)
 
-    apply_verdict(s, "stuck", coef)  # 5 -> 2 (扣 3), consec_stuck=1
-    apply_verdict(s, "satisfied", coef)  # 非 stuck -> 递增清零(satisfied 不动耐心)
+    apply_verdict(s, "stuck", coef)
+    apply_verdict(s, "satisfied", coef)
     assert s.consec_stuck == 0
-    apply_verdict(s, "stuck", coef)  # 重新从首次起: -(1+2)=3 -> -1
+    apply_verdict(s, "stuck", coef)
     assert s.patience == -1 and s.consec_stuck == 1
 
 
@@ -133,15 +158,15 @@ def test_consec_blame_counts_only_consecutive_harness_failures() -> None:
 
     apply_verdict(s, "failed_blame_harness", coef)
     apply_verdict(s, "failed_blame_harness", coef)
-    assert s.consec_blame == 2  # 连续坐实 harness 失败 -> 累计
+    assert s.consec_blame == 2
 
-    apply_verdict(s, "unsure", coef)  # 非连续 -> 清零("连续"严格语义)
+    apply_verdict(s, "unsure", coef)
     assert s.consec_blame == 0
 
     apply_verdict(s, "failed_blame_harness", coef)
-    apply_verdict(s, "failed_blame_self", coef)  # 怪自己不算 harness 能力缺口 -> 清零
+    apply_verdict(s, "failed_blame_self", coef)
     assert s.consec_blame == 0
 
     apply_verdict(s, "failed_blame_harness", coef)
-    apply_verdict(s, "satisfied", coef)  # 满意 -> 清零
+    apply_verdict(s, "satisfied", coef)
     assert s.consec_blame == 0

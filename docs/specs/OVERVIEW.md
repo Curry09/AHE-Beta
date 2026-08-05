@@ -112,6 +112,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0036 接缝层统一 stdin 写入口：去 begin/emit 二分，reply 软唤醒
 接缝层 begin/emit_message 二分泄漏「正式轮次 vs 加塞」语义，并把读 stdout 绑在 in_flight 上，导致 reply 后 keep_waiting 空转。本组改为：用户消息统一一个写入口（始终写 stdin，类 CC 输入框）；堵/排队由 harness 决定；平台以 type=reply 为软唤醒（等下一条 reply 或超时），poll 不依赖写路径旗标；interrupt 仍为外通道。改动面集中在 launcher/loop/connector 与测试，不改 harness 线协议形状。
 
+### 0037 人轴重构：时间气质 ⊥ 质量失败 · 过程卷入 · 蒸馏 spoke 对齐
+接缝接近真人 CLI 后，等待体感差在「人」轴：旧设计把耐心焊在质量失败策略(d43)上、supervision 仍是回合制盯梢。本组新增 tempo(卡 D7)驱动耐心，d43 只答结果错了怎么办，supervision 改为过程卷入，D6Authz 标为会话策略不进卡；hub 加 D7 与正交注入；注入缺省 steady；三个蒸馏 spoke 对齐 ground/inject。不另起翻译模块，投影仍走 judge→intent→act；不把 interrupt/queued/slash 焊进人轴。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -266,6 +269,12 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0036 | 0036/T2 | launcher：统一写入口 + poll 不绑写旗标 | done | T1 | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 | 0036 | 0036/T3 | loop：主/心跳发消息走统一写；keep_waiting→poll | done | T1, T2 | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py |
 | 0036 | 0036/T4 | connector 与 INTERFACE 对齐统一写 | done | T2 | backend/auto_designer/harness/connector.py<br>backend/auto_designer/harness/INTERFACE.md<br>backend/tests/harness/test_connector.py |
+| 0037 | 0037/T1 | 写 0037 活快照 | done | — | docs/specs/0037-persona-time-temperament-reframe.md |
+| 0037 | 0037/T2 | sim：tempo 驱动耐心 · 过程卷入语义 · D6Authz 会话策略 | done | T1 | backend/auto_designer/user/sim/dimensions.py<br>backend/auto_designer/user/sim/state.py<br>backend/auto_designer/user/sim/clauses.py<br>backend/auto_designer/user/sim/demo.py<br>backend/tests/user/sim/test_dimensions.py<br>backend/tests/user/sim/test_state.py<br>backend/tests/user/sim/test_heartbeat.py |
+| 0037 | 0037/T3 | hub：card-schema 增 D7 与语义注记 | done | T1 | tools/persona-distill/card-schema.md |
+| 0037 | 0037/T4 | 注入：card_to_persona 读 D7→tempo | done | T1, T2, T3 | backend/auto_designer/user/sim/persona_io.py<br>backend/tests/user/sim/test_persona_io.py |
+| 0037 | 0037/T5 | 蒸馏 spoke 对齐 D7 与人轴语义 | done | T1, T3 | tools/persona-distill/extract-selfreport-persona/SKILL.md<br>tools/persona-distill/extract-selfreport-persona/reference.md<br>tools/persona-distill/extract-github-persona/SKILL.md<br>tools/persona-distill/extract-github-persona/reference.md<br>tools/persona-distill/extract-stackoverflow-persona/SKILL.md<br>tools/persona-distill/extract-stackoverflow-persona/reference.md |
+| 0037 | 0037/T6 | 探针：tempo / 过程卷入 / d43 正交可观测 | done | T2, T4 | backend/scripts/probe_persona_reframe.py<br>backend/scripts/probe_swebench_persona.py<br>backend/scripts/probe_d43_quality_fail.py |
 
 ## 跨 feature 关系图
 
@@ -493,6 +502,14 @@ graph LR
         n0036_T3["T3 loop：主/心跳发消息走统一写；keep_waiting→poll"]
         n0036_T4["T4 connector 与 INTERFACE 对齐统一写"]
     end
+    subgraph G0037[0037 persona-time-temperament-reframe]
+        n0037_T1["T1 写 0037 活快照"]
+        n0037_T2["T2 sim：tempo 驱动耐心 · 过程卷入语义 · D6Authz 会话策略"]
+        n0037_T3["T3 hub：card-schema 增 D7 与语义注记"]
+        n0037_T4["T4 注入：card_to_persona 读 D7→tempo"]
+        n0037_T5["T5 蒸馏 spoke 对齐 D7 与人轴语义"]
+        n0037_T6["T6 探针：tempo / 过程卷入 / d43 正交可观测"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -626,6 +643,15 @@ graph LR
     n0036_T3 --> n0036_T1
     n0036_T3 --> n0036_T2
     n0036_T4 --> n0036_T2
+    n0037_T2 --> n0037_T1
+    n0037_T3 --> n0037_T1
+    n0037_T4 --> n0037_T1
+    n0037_T4 --> n0037_T2
+    n0037_T4 --> n0037_T3
+    n0037_T5 --> n0037_T1
+    n0037_T5 --> n0037_T3
+    n0037_T6 --> n0037_T2
+    n0037_T6 --> n0037_T4
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -670,6 +696,8 @@ graph LR
     n0023_T3 -.note.-> n0022_T1
     n0023_T4 -.extends.-> n0022_T1
     n0023_T4 -.note.-> n0019_T1
+    n0037_T5 -.extends.-> n0006_T1
+    n0037_T5 -.extends.-> n0006_T3
 ```
 
 ## 文件冲突报告
@@ -713,12 +741,15 @@ graph LR
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035 |
-| backend/auto_designer/user/sim/clauses.py | 0005, 0008 |
+| backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037 |
+| backend/auto_designer/user/sim/demo.py | 0005, 0037 |
+| backend/auto_designer/user/sim/dimensions.py | 0005, 0037 |
 | backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031 |
+| backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
-| backend/auto_designer/user/sim/state.py | 0005, 0012 |
+| backend/auto_designer/user/sim/state.py | 0005, 0012, 0037 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
 | backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032 |
@@ -758,12 +789,14 @@ graph LR
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036 |
+| backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037 |
 | backend/tests/user/sim/test_inner_prompt.py | 0008, 0031 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031 |
+| backend/tests/user/sim/test_persona_io.py | 0006, 0037 |
 | backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031 |
-| backend/tests/user/sim/test_state.py | 0005, 0012 |
+| backend/tests/user/sim/test_state.py | 0005, 0012, 0037 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
@@ -777,6 +810,13 @@ graph LR
 | frontend/src/lib/issueMeta.ts | 0025, 0029, 0032 |
 | frontend/src/styles.css | 0026, 0034 |
 | frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034 |
+| tools/persona-distill/card-schema.md | 0006, 0037 |
+| tools/persona-distill/extract-github-persona/SKILL.md | 0006, 0037 |
+| tools/persona-distill/extract-github-persona/reference.md | 0006, 0037 |
+| tools/persona-distill/extract-selfreport-persona/SKILL.md | 0006, 0037 |
+| tools/persona-distill/extract-selfreport-persona/reference.md | 0006, 0037 |
+| tools/persona-distill/extract-stackoverflow-persona/SKILL.md | 0006, 0037 |
+| tools/persona-distill/extract-stackoverflow-persona/reference.md | 0006, 0037 |
 
 ## 各 feature 详情
 
@@ -1821,4 +1861,44 @@ graph LR
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
+```
+
+### 0037 人轴重构：时间气质 ⊥ 质量失败 · 过程卷入 · 蒸馏 spoke 对齐（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 写 0037 活快照"]
+    nT2["T2 sim：tempo 驱动耐心 · 过程卷入语义 · D6Authz 会话策略"]
+    nT3["T3 hub：card-schema 增 D7 与语义注记"]
+    nT4["T4 注入：card_to_persona 读 D7→tempo"]
+    nT5["T5 蒸馏 spoke 对齐 D7 与人轴语义"]
+    nT6["T6 探针：tempo / 过程卷入 / d43 正交可观测"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+    nT1 --> nT5
+    nT3 --> nT5
+    nT2 --> nT6
+    nT4 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```

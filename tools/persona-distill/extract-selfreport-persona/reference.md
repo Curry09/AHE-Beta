@@ -1,5 +1,7 @@
 # Reference: Self-Report Persona Extraction
 
+<!-- Spec-0037/T5: D7 ground/inject + on_offtrack ⊥ time_temperament；枚举仍只引用 hub -->
+
 来源类型词表、按维从自述 ground 的方法、performative/promotional 真实性门、`stated`→confidence 规则、
 发现配方、四个范例。实际抽取时读本文件。
 
@@ -17,11 +19,11 @@ newsletter          | 作者自己的 newsletter 期号
 ```
 
 全部必须**第一人称**（"这是 *我* 怎么…"）。第三方写他 = `second-hand` → 拒（找一手）。拉全文：
-访谈逐字稿和长博客是工作流细节所在——略读 diff-reading / 卡住时 / 什么算完成 的段落，别只看标题。
+访谈逐字稿和长博客是工作流细节所在——略读过程可见 / 质量失败时 / 等待耐受 / 什么算完成 的段落，别只看标题。
 
 ## 2. 按维从自述 ground
 
-self-report **反转**了观测源的 ground 图：态度/交互轴在这里是 *强* 项。从显式陈述映射、逐字引用。
+self-report **反转**了观测源的 ground 图：态度/交互轴（含等待气质 D7）在这里是 *强* 项。从显式陈述映射、逐字引用。
 
 ### D2 acceptance_bar — *强*（这就是体感函数）
 `primary ∈ {ship-fast | functional | modern-correct | type-safety-purist}`，`flags ⊆ {tests,types,scope,security,style,a11y,perf}`
@@ -31,9 +33,24 @@ self-report **反转**了观测源的 ground 图：态度/交互轴在这里是 
 
 ### D3 interaction_style — *强*
 `delegation ∈ {vibe-dump|loose|spec-driven}`，`supervision ∈ {hands-off|reviews|micromanage}`，`on_offtrack ∈ {abandon|retry|correct|fix-self|file-issue}`
+（枚举见 card-schema.md；语义注记以契约为准。）
 - delegation："把侧栏 padding 减半" / 一句话出 app → `vibe-dump`；"写个函数，入 X 出 Y"、"我指定技术栈" → `spec-driven`。
-- supervision："我总是 Accept All，不读 diff" → `hands-off`；"审所有生成代码"、"红绿 TDD" → `reviews`。
-- on_offtrack："要它随便改到问题消失" → `retry`；"我自己上手收尾更快" → `fix-self`；放弃/关掉 → `abandon`。
+- **supervision = 过程卷入**（对助手进行中可见感的需要；不是产品按钮）：
+  "丢出去就不管、黑盒也行" → `hands-off`；"要看它在干什么 / 阶段性对齐" → `reviews`；
+  "每一步都要盯着、opaque 就不安" → `micromanage`。
+  （旧说法「读不读 diff」可作过程卷入的旁证，但**不要**把 interrupt/queued/slash 焊进此轴。）
+- **on_offtrack = 质量失败策略**（交付结果不行时怎么办；**不驱动等待耐心**）：
+  "要它随便改到问题消失" → `retry`；"我自己上手收尾更快" → `fix-self`；放弃/关掉任务 → `abandon`。
+  **禁止**把「等不住 / 催进度」写进 on_offtrack——那是 D7。
+
+### D7 time_temperament — *强（有等待原话时）*
+`patient | steady | impatient`（枚举见 card-schema.md）
+- 对**等待/空转**的耐受，与 on_offtrack **正交**（契约强制独立采样）。
+- "去倒杯咖啡 / 让它跑着我干别的 / Overnight 也行" → `patient`；
+  "默认能等一会儿，没进度再看" → `steady`；
+  "干等两分钟就炸、坐立不安、必须看见动" → `impatient`。
+- **无等待/空转原话 → inject**（走契约分布），不要从 on_offtrack 或 supervision 派生。
+- 较真但能等（`fix-self`/`file-issue` × `patient`）、随手接受但等不住（`retry` × `impatient`）皆真实——分别 ground 两维。
 
 ### D4 trust_model — *强*
 `over-trust | balanced | skeptical`
@@ -80,8 +97,10 @@ self-report **反转**了观测源的 ground 图：态度/交互轴在这里是 
 
 ## 5. 注入（少见——仅对确实沉默的轴）
 
-self-report 通常直接 ground D2/D3/D4/D6，故注入应是例外（这正是用本源的理由）。若某来源确实从不触某轴，
-从 card-schema.md 注入分布抽，置 `source: "injected"` / `confidence: "low"`——且**逐卡采样，不按档锁死**。
+self-report 通常直接 ground D2/D3/D4/D6/D7，故注入应是例外（这正是用本源的理由）。若某来源确实从不触某轴
+（D7 在许多帖里沉默——人们少谈「等多久」），从 card-schema.md 注入分布抽，置 `source: "injected"` /
+`confidence: "low"`——且**逐卡采样，不按档锁死**。**强制**：沉默的 `on_offtrack` 与 `time_temperament`
+独立抽——禁止「abandon 必配 impatient」或「file-issue 必配 patient」。
 
 ## 6. 发现 / 招募（不可规模化那步，做成可重复）
 
@@ -102,14 +121,14 @@ self-report 通常直接 ground D2/D3/D4/D6，故注入应是例外（这正是�
 
 | 来源 | spoke | observed vs stated | grounds | 最适合 |
 |------|-------|--------------------|---------|--------|
-| GitHub footprint | extract-github（未来薄 skill） | observed | D1, D2, D5 | builder personas，expert/competent 端 |
-| Stack Overflow | extract-so（未来薄 skill） | observed | D1, D3, D5 | blind/surface 求助者 |
-| **blogs / interviews / talks** | **extract-selfreport（本 skill）** | **stated** | **D2, D3, D4, D6** | **态度/交互锚；刻度校准** |
+| GitHub footprint | extract-github-persona | observed | D1, D5（+ 弱 D3） | builder personas，expert/competent 端 |
+| Stack Overflow | extract-stackoverflow-persona | observed | D1, D5（+ delegation 弱） | blind/surface 求助者 |
+| **blogs / interviews / talks** | **extract-selfreport（本 skill）** | **stated** | **D2, D3, D4, D6, D7** | **态度/交互/等待气质锚；刻度校准** |
 | dev surveys (SO/JetBrains) | (weights) | aggregate | distribution | 采样权重 |
 | dev.to / HN bulk | (sampler A) | mixed | candidates | 广度 / 比例 |
 
-三类抽取 spoke 互补：没有单一源 ground 全六轴，但**每轴都被至少一个源观测或自述 ground**，
-而 self-report 是唯一能 ground 信任轴(D4) 的。
+三类抽取 spoke 互补：没有单一源 ground 全轴，但**每轴都被至少一个源观测或自述 ground**；
+self-report 是唯一能可靠 ground 信任轴(D4) 与等待气质(D7) 的主源。观测型源的 D7 默认 inject。
 
 ## 8. 范例（真实，取自公开第一人称源）
 
@@ -131,7 +150,8 @@ Simon Willison，跨年个人博客 + 2026 大会炉边。显式具体工作流�
     },
     "D4_trust_model": {"value": "skeptical", "source": "grounded", "basis": "stated+observed", "confidence": "high"},
     "D5_domain": {"area": "dev-tooling", "depth": "deep", "stack": ["python","sqlite","django"], "weak": [], "source": "grounded", "basis": "stated+observed", "confidence": "high"},
-    "D6_autonomy_expectation": {"value": "collaborative", "source": "grounded", "basis": "stated", "confidence": "medium"}
+    "D6_autonomy_expectation": {"value": "collaborative", "source": "grounded", "basis": "stated", "confidence": "medium"},
+    "D7_time_temperament": {"value": "patient", "source": "injected", "confidence": "low"}
   },
   "provenance": {
     "sources": [
@@ -147,7 +167,7 @@ Simon Willison，跨年个人博客 + 2026 大会炉边。显式具体工作流�
       {"quote": "it was faster for me to step in and finish the project rather than keep on trying to get there with prompts.", "source": "simonwillison.net/2025/Mar/11/using-llms-for-code"}
     ]
   },
-  "behavioral_prediction": "Spec-driven skeptic: precise instructions + 'use red-green TDD', reviews every diff, takes over when it stalls. 体感 driven by whether the change ships WITH a passing test he can explain; files sharp reproducible issues; rejects untested output outright."
+  "behavioral_prediction": "Spec-driven skeptic: precise instructions + 'use red-green TDD', high process involvement, takes over on quality stall (on_offtrack=fix-self). D7 injected patient — source silent on wait temperament; demonstrates fix-self ⟂ waiting (not welded to impatient)."
 }
 ```
 
@@ -169,7 +189,8 @@ Leo Acevedo / EnrichLead，2025 年 3 月第一人称帖 + 公开复盘。
     },
     "D4_trust_model": {"value": "over-trust", "source": "grounded", "basis": "stated", "confidence": "high"},
     "D5_domain": {"area": "web-backend", "depth": "shallow", "stack": ["cursor-generated","javascript"], "weak": ["security/auth","api-keys"], "source": "grounded", "basis": "stated+observed", "confidence": "high"},
-    "D6_autonomy_expectation": {"value": "agentic", "source": "grounded", "basis": "stated", "confidence": "high"}
+    "D6_autonomy_expectation": {"value": "agentic", "source": "grounded", "basis": "stated", "confidence": "high"},
+    "D7_time_temperament": {"value": "steady", "source": "injected", "confidence": "low"}
   },
   "provenance": {
     "sources": [
@@ -183,7 +204,7 @@ Leo Acevedo / EnrichLead，2025 年 3 月第一人称帖 + 公开复盘。
       {"quote": "When he tried to use Cursor to fix the problems, the AI 'kept breaking other parts of the code.'", "source": "vibegraveyard.ai/.../enrichlead"}
     ]
   },
-  "behavioral_prediction": "One-line production-grade dumps, zero review, treats AI as 'the builder'. 体感 high as long as 'it works tho' (even while insecure / fabricating data); cannot detect or articulate real problems; on failure emits panicked vague reports ('random things happening'), not structured issues; abandons when unfixable."
+  "behavioral_prediction": "One-line production-grade dumps, low process involvement, treats AI as 'the builder'. 体感 high as long as 'it works tho'; on quality failure retries then panics/abandons. D7 injected steady — do NOT derive impatient from panic-about-breakage (that's quality/capability, not wait temperament)."
 }
 ```
 
@@ -208,7 +229,8 @@ vibe 模式的 Karpathy（"vibe coding"一词的出处推文）。能力 `expert
     },
     "D4_trust_model": {"value": "over-trust", "source": "grounded", "basis": "stated", "confidence": "high"},
     "D5_domain": {"area": "ml-ai", "depth": "deep", "stack": ["python","pytorch"], "weak": ["web-frontend/css"], "source": "grounded", "basis": "stated", "confidence": "medium"},
-    "D6_autonomy_expectation": {"value": "agentic", "source": "grounded", "basis": "stated", "confidence": "medium"}
+    "D6_autonomy_expectation": {"value": "agentic", "source": "grounded", "basis": "stated", "confidence": "medium"},
+    "D7_time_temperament": {"value": "impatient", "source": "injected", "confidence": "low"}
   },
   "provenance": {
     "sources": [{"url": "x.com/karpathy 2025-02-02 (transcribed via simonwillison.net / pragmaticengineer.com)", "type": "tweet-thread"}],
@@ -219,10 +241,9 @@ vibe 模式的 Karpathy（"vibe coding"一词的出处推文）。能力 `expert
       {"quote": "Sometimes the LLMs can't fix a bug so I just work around it or ask for random changes until it goes away. It's not too bad for throwaway weekend projects.", "source": "x.com/karpathy 2025-02-02"}
     ]
   },
-  "behavioral_prediction": "Fire-and-forget vibe-dumper who CAN judge but opts out: one-line requests, accepts everything unread, retries/works-around on failure. 体感 high while it 'mostly works' and ships fast; gives vague feedback despite expert capability. Demonstrates D1 ⟂ D3/D4."
+  "behavioral_prediction": "Fire-and-forget vibe-dumper who CAN judge but opts out: one-line requests, low process involvement, retries on quality failure. D7 injected impatient — independent of on_offtrack=retry; demonstrates D1 ⟂ D3/D4 and on_offtrack ⟂ D7."
 }
 ```
-
 ### D — 被拒，promotional（不入库）
 一个"vibe-coding 教练"博客，每篇都漏斗到付费课程；"工作流"是编号销售漏斗（"我的 5 步法 10x"），
 无具体 diff/test/卡住 细节，重 CTA。激励驱动且无细节。

@@ -44,7 +44,9 @@ DATA = ROOT / "data"
 _SANDBOX_ROOT = DATA / "harness_sandbox"
 HARNESS_REPO = _SANDBOX_ROOT / "harness_repo"
 # 两个「给定输入」的默认卡库路径；均可经 CLI 参数（见 _parse_args）/ run.sh 覆盖注入。
-DEFAULT_PERSONA_LIBRARY = ROOT / "persona_library.json"  # distill 产物：6 张锚卡
+DEFAULT_PERSONA_LIBRARY = (
+    ROOT / "persona_library.json"
+)  # distill 合并库（sr-* + gh-*）；分库见 persona_library_{selfreport,github}.json
 DEFAULT_SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；经 seed_adapter 注入）
 
 # 每轮跑几个 persona（None=用满卡库全部）。默认由 roster（编制）的用户数决定，与前端房间容量一致；

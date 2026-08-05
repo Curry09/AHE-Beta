@@ -1,0 +1,1691 @@
+[
+  {
+    "id": "gh-db-01-db528f7b6a83",
+    "authenticity": "authentic",
+    "era": {
+      "first_seen": "2019-12",
+      "last_seen": "2023-06",
+      "active_years": 5
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "micromanage",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "injected",
+          "confidence": "low"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "databases",
+        "depth": "working",
+        "stack": [
+          "SQLAlchemy",
+          "ORM",
+          "Python",
+          "asyncpg",
+          "mypy"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "The current documentation looks funny",
+          "source": "https://github.com/sqlalchemy/sqlalchemy/pull/7363"
+        },
+        {
+          "quote": "Change orm.future to future.orm",
+          "source": "https://github.com/sqlalchemy/sqlalchemy/pull/5240"
+        },
+        {
+          "quote": "Add github workflow to generate wheel",
+          "source": "https://github.com/sqlalchemy/sqlalchemy/pull/5241"
+        }
+      ]
+    },
+    "behavioral_prediction": "As a long-term SQLAlchemy maintainer, will focus review on API correctness and doc accuracy; prefers small, self-contained patches and expects PRs to link an issue with a reproducer before touching ORM internals."
+  },
+  {
+    "id": "gh-db-02-7d33ad66e1f3",
+    "authenticity": "authentic",
+    "era": {
+      "first_seen": "2026-04",
+      "last_seen": "2026-05",
+      "active_years": 1
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "databases",
+        "depth": "working",
+        "stack": [
+          "psycopg",
+          "PostgreSQL",
+          "Python",
+          "asyncio",
+          "threading"
+        ],
+        "weak": [
+          "Cython-internals"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "race in the construction of the sync ConnectionPool lock",
+          "source": "https://github.com/psycopg/psycopg/pull/1301"
+        },
+        {
+          "quote": "A jitter test fails. I hope that is just flakiness and not something I completely don't understand right now",
+          "source": "https://github.com/psycopg/psycopg/pull/1301"
+        },
+        {
+          "quote": "force-pushed the fix/sync-pool-open-race branch 6 times",
+          "source": "https://github.com/psycopg/psycopg/pull/1301"
+        }
+      ]
+    },
+    "behavioral_prediction": "Will diagnose a concurrency issue, ship a minimal fix, and iterate quickly (multiple force-pushes) on maintainer feedback; likely to disappear from the repo once their one blocker is resolved."
+  },
+  {
+    "id": "gh-db-03-fc97fa9de41e",
+    "authenticity": "authentic",
+    "era": {
+      "first_seen": "2026-07",
+      "last_seen": "2026-07",
+      "active_years": 1
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "injected",
+          "confidence": "low"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "databases",
+        "depth": "working",
+        "stack": [
+          "redis-py",
+          "Redis Sentinel",
+          "Python",
+          "dramatiq",
+          "connection pooling"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "SentinelConnectionPool permanently loses a pool slot on every master switch",
+          "source": "https://github.com/redis/redis-py/issues/4187"
+        },
+        {
+          "quote": "This took down a dramatiq worker in production",
+          "source": "https://github.com/redis/redis-py/issues/4187"
+        },
+        {
+          "quote": "Happy to open a PR with the fix and a regression test if that shape is agreeable.",
+          "source": "https://github.com/redis/redis-py/issues/4187"
+        }
+      ]
+    },
+    "behavioral_prediction": "Will file a single, source-cited bug with a self-contained MRE and a suggested one-line invariant fix, then wait for maintainer buy-in before writing the PR rather than pushing code speculatively."
+  },
+  {
+    "id": "gh-de-01-2e53b0ad3dd4",
+    "authenticity": "authentic",
+    "era": {
+      "first_activity": "pre-2020",
+      "latest_activity": "2026-08"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "data-eng",
+        "depth": "deep",
+        "stack": [
+          "python",
+          "airflow-core",
+          "task-sdk",
+          "sqlalchemy",
+          "fastapi",
+          "asset-scheduling",
+          "java-sdk"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "The listener hooks are now deferred until the end of the endpoint instead of executed inline during asset event creation.",
+          "source": "https://github.com/apache/airflow/pull/70951"
+        },
+        {
+          "quote": "A slow listener, multiplied across a large fan-out of asset events, could hold that lock for minutes, causing statement timeouts.",
+          "source": "https://github.com/apache/airflow/pull/70951"
+        },
+        {
+          "quote": "Fix exhausted iterator reuse bug",
+          "source": "https://github.com/apache/airflow/pull/70951"
+        }
+      ]
+    },
+    "behavioral_prediction": "Diagnoses lock/transaction contention from first principles, writes minimal targeted fix plus regression test, iterates through reviewer nits by force-pushing focused follow-up commits rather than one giant PR."
+  },
+  {
+    "id": "gh-de-02-429f202610b6",
+    "authenticity": "authentic",
+    "era": {
+      "first_activity": "2026",
+      "latest_activity": "2026-07"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "data-eng",
+        "depth": "working",
+        "stack": [
+          "python",
+          "dbt-core",
+          "databricks-adapter",
+          "jsonschema",
+          "sql-modeling"
+        ],
+        "weak": [
+          "dbt-core-internals-outside-config"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "dbt-core's jsonschema config validation flags valid dbt-databricks config keys as unknown, emitting a spurious CustomKeyInConfigDeprecation",
+          "source": "https://github.com/dbt-labs/dbt-core/pull/15305"
+        },
+        {
+          "quote": "New TestDatabricksConfigKeys covers both the model-config and dbt_project.yml paths; verified it fails when the allow-list entry is removed.",
+          "source": "https://github.com/dbt-labs/dbt-core/pull/15305"
+        },
+        {
+          "quote": "Apply black formatting to Databricks config key tests",
+          "source": "https://github.com/dbt-labs/dbt-core/pull/15305"
+        }
+      ]
+    },
+    "behavioral_prediction": "Scopes fix to the specific adapter surface, ships a targeted allow-list with unit tests, patiently rebases across long review gaps and force-pushes to address reviewer style nits without arguing."
+  },
+  {
+    "id": "gh-de-03-82e3b11d3c73",
+    "authenticity": "authentic",
+    "era": {
+      "first_activity": "2026",
+      "latest_activity": "2026-07"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "file-issue",
+          "source": "injected",
+          "confidence": "low"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "data-eng",
+        "depth": "working",
+        "stack": [
+          "python",
+          "dagster",
+          "sqlalchemy",
+          "postgres",
+          "connection-pooling",
+          "dagster-dbt"
+        ],
+        "weak": [
+          "dagster-internals-beyond-storage"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "PostgresEventLogStorage.has_table passes a fresh connection into the dialect and never closes it, so every call abandons a pool checkout",
+          "source": "https://github.com/dagster-io/dagster/issues/34058"
+        },
+        {
+          "quote": "a 129-test dbt test exhausted an event-log engine at pool_size=5, max_overflow=10",
+          "source": "https://github.com/dagster-io/dagster/issues/34058"
+        },
+        {
+          "quote": "Using _connect() also picks up retry_pg_connection_fn, which the raw self._engine.connect() skips today. Happy to open a PR if you'd like it in this shape.",
+          "source": "https://github.com/dagster-io/dagster/issues/34058"
+        }
+      ]
+    },
+    "behavioral_prediction": "Files a highly-diagnosed bug report with minimal offline repro and a suggested patch, but waits for maintainer signal before opening a PR; if ignored, likely drops the issue rather than pushing."
+  },
+  {
+    "id": "gh-infra-01-588982b15698",
+    "authenticity": "authentic",
+    "era": {
+      "first_seen": "pre-2020",
+      "last_seen": "2026-08"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "micromanage",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "infra-devops",
+        "depth": "deep",
+        "stack": [
+          "ansible",
+          "ansible-test",
+          "python",
+          "jinja2",
+          "async-fact-gathering",
+          "CI/backport-tooling"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "This is fallout from #87090, because I changed the implicit timeout from 10 seconds to 5, thinking it was internal.",
+          "source": "https://github.com/ansible/ansible/pull/87314"
+        },
+        {
+          "quote": "The empty bullet point looks like broken documentation",
+          "source": "https://github.com/ansible/ansible/pull/87340"
+        },
+        {
+          "quote": "The underlying issue is that when no gather_timeout is provided, parallel fact gathering uses an undocumented, arbitrary value",
+          "source": "https://github.com/ansible/ansible/pull/87314"
+        }
+      ]
+    },
+    "behavioral_prediction": "Owns her regressions: when a prior change causes fallout she opens the follow-up PR herself, names the offending commit, and files a separate PR for the underlying design defect rather than papering over it."
+  },
+  {
+    "id": "gh-infra-02-732a2f335a83",
+    "authenticity": "authentic",
+    "era": {
+      "first_seen": "2025",
+      "last_seen": "2026-07"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "infra-devops",
+        "depth": "working",
+        "stack": [
+          "terraform",
+          "go",
+          "aws-sdk-go-v2",
+          "api-gateway",
+          "terraform-provider-aws-testing"
+        ],
+        "weak": [
+          "provider-docs-conventions",
+          "changelog-format"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "Added waiters to the CUD functions of aws_api_gateway_rest_api",
+          "source": "https://github.com/hashicorp/terraform-provider-aws/pull/49205"
+        },
+        {
+          "quote": "Also needs timeouts section in documentation and an associated enhancement CHANGELOG entry.",
+          "source": "https://github.com/hashicorp/terraform-provider-aws/pull/49205"
+        },
+        {
+          "quote": "Added timeouts to documentation and changelog",
+          "source": "https://github.com/hashicorp/terraform-provider-aws/pull/49205"
+        }
+      ]
+    },
+    "behavioral_prediction": "Ships the resource behavior first (waiters + a passing acceptance test), then fixes up the required docs/changelog and label metadata after a maintainer explicitly asks; will amend commits in place rather than opening a follow-up PR."
+  },
+  {
+    "id": "gh-infra-03-4ad0d00a46cf",
+    "authenticity": "authentic",
+    "era": {
+      "first_seen": "2026-07",
+      "last_seen": "2026-07"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "file-issue",
+          "source": "injected",
+          "confidence": "low"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "infra-devops",
+        "depth": "working",
+        "stack": [
+          "prometheus",
+          "promql",
+          "go",
+          "numerical-edge-cases"
+        ],
+        "weak": [
+          "end-to-end-fix-shipping"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "When to_nearest is 0, the computation 1.0 / toNearest produces +Inf, and the final result becomes NaN for every sample",
+          "source": "https://github.com/prometheus/prometheus/issues/19198"
+        },
+        {
+          "quote": "The set of multiples of -2 is identical to the set of multiples of 2, so the sign of to_nearest should not affect the result.",
+          "source": "https://github.com/prometheus/prometheus/issues/19198"
+        },
+        {
+          "quote": "No validation is performed on toNearest. A negative value inverts the floor operation, and zero causes division by zero leading to NaN.",
+          "source": "https://github.com/prometheus/prometheus/issues/19198"
+        }
+      ]
+    },
+    "behavioral_prediction": "Files precise, root-cause-level bug reports with the exact offending code snippet and a minimal reproducer, but stops at the report and does not open a follow-up PR; expects the maintainer to pick up the fix."
+  },
+  {
+    "id": "gh-ml-01-65ead9d9e921",
+    "authenticity": "authentic",
+    "era": {
+      "value": "2026",
+      "basis": "PRs merged in 2026-07 window"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "ml-ai",
+        "depth": "deep",
+        "stack": [
+          "scikit-learn",
+          "Cython",
+          "coordinate-descent",
+          "LassoCV",
+          "ElasticNet",
+          "linear_model"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "For LassoCV, ElasticNetCV and so on, the validation of X is bad. Currently it forces X to be F ordered",
+          "source": "https://github.com/scikit-learn/scikit-learn/pull/34613"
+        },
+        {
+          "quote": "This PR avoids the first conversion to F.",
+          "source": "https://github.com/scikit-learn/scikit-learn/pull/34613"
+        },
+        {
+          "quote": "This PR adds precomputing of residuals: R = y - X @ coef, squared column norms of X",
+          "source": "https://github.com/scikit-learn/scikit-learn/pull/34572"
+        },
+        {
+          "quote": "This corresponds to a -54%, -37% and -12% fit time reduction.",
+          "source": "https://github.com/scikit-learn/scikit-learn/pull/34572"
+        },
+        {
+          "quote": "I ended up with b50b4ff to align the docstring of the CD routines. Downside: much larger diff.",
+          "source": "https://github.com/scikit-learn/scikit-learn/pull/34572"
+        }
+      ]
+    },
+    "behavioral_prediction": "Will demand precise numerical justification (benchmarks, memory-layout reasoning) before accepting agent-written changes to solvers; self-patches follow-up nits promptly when reviewers flag them."
+  },
+  {
+    "id": "gh-ml-02-2d8b9361d11f",
+    "authenticity": "authentic",
+    "era": {
+      "value": "2026",
+      "basis": "PR merged 2026-08-03"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "ml-ai",
+        "depth": "working",
+        "stack": [
+          "transformers",
+          "torch.autocast",
+          "bfloat16",
+          "multimodal",
+          "kosmos2",
+          "index_put_"
+        ],
+        "weak": [
+          "large-scale training"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "Kosmos2TextTransformer.forward_embedding and Kosmos2_5TextTransformer.forward move the vision features to the text device but not to the text dtype",
+          "source": "https://github.com/huggingface/transformers/pull/47691"
+        },
+        {
+          "quote": "index_put_, and that operator does not type promote",
+          "source": "https://github.com/huggingface/transformers/pull/47691"
+        },
+        {
+          "quote": "Passing the dtype alongside the device is what idefics2, idefics3 and modernvbert already do at the same merge point.",
+          "source": "https://github.com/huggingface/transformers/pull/47691"
+        },
+        {
+          "quote": "Both models were driven through a bfloat16 autocast forward pass on CPU, built from their existing ModelTesters, before and after the change",
+          "source": "https://github.com/huggingface/transformers/pull/47691"
+        },
+        {
+          "quote": "AI tools were used while producing this change.",
+          "source": "https://github.com/huggingface/transformers/pull/47691"
+        }
+      ]
+    },
+    "behavioral_prediction": "Delegates specific dtype/device fixes to agents but insists on before/after runtime verification and cross-model consistency; discloses AI assistance transparently."
+  },
+  {
+    "id": "gh-ml-03-5df6e44f943b",
+    "authenticity": "authentic",
+    "era": {
+      "value": "2026",
+      "basis": "issue opened 2026-07-23"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "ship-fast",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "file-issue",
+          "source": "injected",
+          "confidence": "low"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "ml-ai",
+        "depth": "working",
+        "stack": [
+          "keras",
+          "keras.ops.image",
+          "extract_patches",
+          "conv_transpose",
+          "channels_first"
+        ],
+        "weak": [
+          "core-backend-internals"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "#22951 added keras.ops.image.reconstruct_patches as the inverse of extract_patches",
+          "source": "https://github.com/keras-team/keras/issues/23318"
+        },
+        {
+          "quote": "Auto-infer output_size for padding=\"valid\"",
+          "source": "https://github.com/keras-team/keras/issues/23318"
+        },
+        {
+          "quote": "Overlapping patches (strides < size) with a reduction argument",
+          "source": "https://github.com/keras-team/keras/issues/23318"
+        },
+        {
+          "quote": "this needs a conv_transpose-based path rather than the current pure data-movement implementation",
+          "source": "https://github.com/keras-team/keras/issues/23318"
+        },
+        {
+          "quote": "Happy to adjust scope or ordering based on feedback.",
+          "source": "https://github.com/keras-team/keras/issues/23318"
+        }
+      ]
+    },
+    "behavioral_prediction": "Files well-scoped, ordered follow-up issues; defers to maintainers on scope changes rather than pushing back, and prefers to break work into small PRs."
+  },
+  {
+    "id": "gh-sci-01-6cafa6c10442",
+    "authenticity": "authentic",
+    "era": {
+      "value": "pre_vibe",
+      "basis": "long-time sympy collaborator with hundreds of merged PRs spanning years; footprint predates recent LLM-coding wave"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "types"
+        ],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "scientific-computing",
+        "depth": "deep",
+        "stack": [
+          "sympy",
+          "polys",
+          "core.evalf",
+          "assumptions",
+          "mpmath",
+          "python-typing"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "Preserve Kind singleton identity under concurrent construction",
+          "source": "https://github.com/sympy/sympy/pull/30090"
+        },
+        {
+          "quote": "Exclude root-analysis tests with pathological threaded scaling",
+          "source": "https://github.com/sympy/sympy/pull/30093"
+        }
+      ]
+    },
+    "behavioral_prediction": "Will inspect diffs at the API/invariant level, push back on non-atomic or evaluation-order-sensitive changes, and re-author instead of iterating with the agent when corrections are small."
+  },
+  {
+    "id": "gh-sci-02-738ce5595d63",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "recent occasional astropy contributor; small documentation-scoped PR footprint"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "scientific-computing",
+        "depth": "working",
+        "stack": [
+          "astropy",
+          "python",
+          "pre-commit"
+        ],
+        "weak": [
+          "astropy-internals"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "Add the missing python -m pip install pre-commit command to install pre-commit. This failed when I tried to install it.",
+          "source": "https://github.com/astropy/astropy/pull/20197"
+        }
+      ]
+    },
+    "behavioral_prediction": "Reports the papercut they hit, applies a minimal fix, and defers structural/style questions to maintainers rather than expanding scope."
+  },
+  {
+    "id": "gh-sci-03-3a200275ad87",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "issue filed 2026 with numpy 2.4 / pandas 3.x forward-looking flag; no PR footprint on repo"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "perf"
+        ],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "vibe-dump",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "file-issue",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "scientific-computing",
+        "depth": "working",
+        "stack": [
+          "xarray",
+          "pandas",
+          "numpy",
+          "pyarrow"
+        ],
+        "weak": [
+          "xarray-internals"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "Constructing a Variable (or Dataset / DataArray) from an object-dtype numpy array of strings takes ~0.1ms per 10M elements under pandas' default settings, but ~500-620ms with pd.options.future.infer_string = True",
+          "source": "https://github.com/pydata/xarray/issues/11470"
+        }
+      ]
+    },
+    "behavioral_prediction": "Provides a crisp MRE plus root-cause trace, expects maintainer to own the fix, and does not follow through with a PR."
+  },
+  {
+    "id": "gh-viz-01-882b786c2c47",
+    "authenticity": "authentic",
+    "era": {
+      "value": "pre_vibe",
+      "basis": "matplotlib contributor with 3,400+ merged PRs across many years; long-established footprint predates LLM-coding wave"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "expert",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "data-viz",
+        "depth": "deep",
+        "stack": [
+          "matplotlib",
+          "mathtext",
+          "backend-agg",
+          "backend-pdf",
+          "text-metrics",
+          "python-typing"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "Support millimeters as figsize unit.",
+          "source": "https://github.com/matplotlib/matplotlib/pull/32124"
+        },
+        {
+          "quote": "Improve MaxNLocator, AutoLocator signatures.",
+          "source": "https://github.com/matplotlib/matplotlib/pull/31788"
+        }
+      ]
+    },
+    "behavioral_prediction": "Reviews at API/invariant grain, pushes back on non-atomic diffs or backend-specific regressions, and rewrites small fixes himself rather than iterating with an agent."
+  },
+  {
+    "id": "gh-viz-02-d19c1d9d4a3a",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "single seaborn PR in 2026 with polished description and multi-command pytest verification, characteristic of assisted workflow"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "tests"
+        ],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "loose",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "fix-self",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "data-viz",
+        "depth": "working",
+        "stack": [
+          "seaborn",
+          "matplotlib",
+          "numpy",
+          "pytest"
+        ],
+        "weak": [
+          "seaborn-internals"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "advisory",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "impatient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "This updates the weighted-histogram auto-bin warning guard so it only compares bins with \"auto\" when bins is a string.",
+          "source": "https://github.com/mwaskom/seaborn/pull/3944"
+        }
+      ]
+    },
+    "behavioral_prediction": "Ships a narrow bug fix with pytest evidence attached, but relies on maintainers to arbitrate scope and style rather than expanding the change."
+  },
+  {
+    "id": "gh-viz-03-4fd081054e66",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "issue explicitly notes 'investigation and write-up below were done by an AI (Claude)'; late-2026 filing"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D2_acceptance_bar": {
+        "primary": "modern-correct",
+        "flags": [
+          "perf"
+        ],
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "vibe-dump",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "supervision": {
+          "value": "hands-off",
+          "source": "injected",
+          "confidence": "low"
+        },
+        "on_offtrack": {
+          "value": "file-issue",
+          "source": "grounded",
+          "basis": "observed",
+          "confidence": "high"
+        }
+      },
+      "D4_trust_model": {
+        "value": "skeptical",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D5_domain": {
+        "area": "data-viz",
+        "depth": "working",
+        "stack": [
+          "bokeh",
+          "panel",
+          "python",
+          "chrome-devtools"
+        ],
+        "weak": [
+          "bokehjs-internals"
+        ],
+        "source": "grounded",
+        "basis": "observed",
+        "confidence": "medium"
+      },
+      "D6_autonomy_expectation": {
+        "value": "agentic",
+        "source": "injected",
+        "confidence": "low"
+      },
+      "D7_time_temperament": {
+        "value": "patient",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "layers": [
+        "L0",
+        "L1",
+        "L3",
+        "L4"
+      ],
+      "evidence_quotes": [
+        {
+          "quote": "Models removed from the model graph are never released, so the client heap grows on every layout replacement",
+          "source": "https://github.com/bokeh/bokeh/issues/15290"
+        }
+      ]
+    },
+    "behavioral_prediction": "Ships a rigorous AI-assisted MRE with heap measurements and a hypothesis, disclaims domain expertise, and expects a maintainer to own the fix."
+  }
+]

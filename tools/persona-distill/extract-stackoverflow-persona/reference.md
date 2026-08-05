@@ -1,5 +1,7 @@
 # Reference: Stack Overflow Persona Extraction
 
+<!-- Spec-0037/T5: D7 默认 inject；禁从「发完消失」锁死 impatient；枚举只引用 hub -->
+
 Stack Exchange API 事实、targeting 配方、反转真实性门、态度轴注入、两个范例。实际抽取时读本文件。
 
 维度**枚举、`D5.area` 受控词表、注入分布、卡形状、真实性裁决词表**一律在唯一公共契约
@@ -53,23 +55,27 @@ rep 是弱信号，不足以 high；basis `observed`。
 - **delegation**：生代码+error dump、"就让它能跑" → `vibe-dump`；部分上下文 → `loose`；带 expected/actual 的
   干净 MRE → `spec-driven`（此处罕见，真的话可以）。delegation 从**实际问题文本**观测 → `grounded` /
   `basis: "observed"`（confidence 保守，单帖），不由档决定。
-- **supervision / on_offtrack**：回应澄清评论/迭代 → `reviews` / `retry`；发完就消失 → `hands-off` / `abandon`。
-  **无评论线程 → `injected`。** `file-issue`（卡住时写结构化报告）在 blind/surface 端**罕见**——只在问题本身
-  读起来像刻意 bug 报告时才给。
+- **supervision（过程卷入） / on_offtrack（质量失败策略）**：回应澄清评论/迭代 → `reviews` / `retry`；
+  发完就消失 → `hands-off` / `abandon`。**无评论线程 → `injected`。** `file-issue` 在 blind/surface 端**罕见**——
+  只在问题本身读起来像刻意 bug 报告时才给。
+- **on_offtrack ≠ 等待耐心。** 「发完消失」是质量失败/放弃路径的弱信号，**不是** D7=`impatient` 的证据。
 
-## 5. 态度轴注入（本源默认——D2/D4/D6）
+## 4b. D7 time_temperament — *无 → 默认 injected*
 
-求助者极少暴露验收线或信任模型。从 **card-schema.md「受控注入分布」逐卡采样**，置 `source: "injected"` /
-`confidence: "low"`（注入维**不带 basis**）：
+`patient | steady | impatient`。求助帖几乎从不陈述「干等多久受得了」。**默认 inject**（契约分布），
+与 on_offtrack **独立采样**——禁止「abandon 必配 impatient」。等待气质真人锚交给 selfreport。
 
-- 具体比例见 card-schema.md（不在此重列——轮辐式：契约是唯一真源）。
-- **SO 弱先验（blind-leaning）**：低端人群可偏置采样——接受第一个能跑的答案 → 偏 over-trust；
-  "帮我全自动化不用我管" → 偏 agentic；"怎么写 X" → 偏 advisory。但**仍标 injected / low**。
-- **D5.stack** 从 `tags` grounded（具体 tag → stack 数组），非注入。
-- **D5.weak** 低端多 `[]`（blind 用户整栈皆浅，单个"弱子域"少加信号）；仅当问题露明显盲点才注 1 个。
-- **采样，不按档锁死（强制）**：逐卡独立抽，别让每张 `surface` 都成 `functional+balanced+reviews+retry`、
-  每张 `blind` 都成 `ship-fast+over-trust+hands-off`。批后查 spread；某注入维在一档塌成单值即锁死了——重抽。
-  （SO 的自选择偏差使雷同刻板卡风险**最高**，见 SKILL.md 局限段——克隆检查在这里尤为关键。）
+## 5. 态度轴注入（本源默认——D2/D4/D6/D7）
+
+求助者极少暴露验收线、信任模型或等待气质。从 **card-schema.md「受控注入分布」逐卡采样**，置
+`source: "injected"` / `confidence: "low"`（注入维**不带 basis**）：
+
+- 具体比例见 card-schema.md（不在此重列——轮辐式：契约是唯一真源），含 **time_temperament**。
+- **正交强制**：`on_offtrack` ⊥ `time_temperament`。
+- **SO 弱先验（blind-leaning）**：低端可偏置 over-trust / advisory 等——但**仍标 injected / low**；
+  **弱先验不得用于 D7**。
+- **D5.stack** 从 `tags` grounded；**D5.weak** 低端多 `[]`。
+- **采样，不按档锁死（强制）**：逐卡独立抽；批后查 spread（含 D7）。SO 自选择偏差使刻板卡风险**最高**。
 
 ## 6. 反转真实性门（SO 特异）
 
@@ -98,7 +104,8 @@ SO 特异：`era.basis` = `owner.creation_date`；`evidence_quotes` = 问题 bod
 rep 1、账号 2025-12、tags `[python, pandas]`，问题贴 `KeyError` traceback 问"为啥不行"无隔离。
 一张卡填 **blind + post_vibe + data-analysis** 缺口。D1 blind grounded(`observed`) 但**封顶 medium**
 （单帖 + rep=1 是弱信号）；D5 grounded(`observed`)；delegation grounded(`observed`) 从问题文本；
-**D2/D4/D6/supervision/on_offtrack 注入(`low`)**（无 basis）。
+**D2/D4/D6/D7/supervision/on_offtrack 注入(`low`)**（无 basis）。范例故意用 `on_offtrack=abandon` ×
+`D7=patient`（注入），示范二者正交——勿焊成 abandon+impatient。
 
 ```json
 {
@@ -115,7 +122,8 @@ rep 1、账号 2025-12、tags `[python, pandas]`，问题贴 `KeyError` tracebac
     },
     "D4_trust_model": {"value": "over-trust", "source": "injected", "confidence": "low"},
     "D5_domain": {"area": "data-analysis", "depth": "shallow", "stack": ["python","pandas"], "weak": [], "source": "grounded", "basis": "observed", "confidence": "high"},
-    "D6_autonomy_expectation": {"value": "advisory", "source": "injected", "confidence": "low"}
+    "D6_autonomy_expectation": {"value": "advisory", "source": "injected", "confidence": "low"},
+    "D7_time_temperament": {"value": "patient", "source": "injected", "confidence": "low"}
   },
   "provenance": {
     "layers": ["SO-profile","SO-questions"],
@@ -124,7 +132,7 @@ rep 1、账号 2025-12、tags `[python, pandas]`，问题贴 `KeyError` tracebac
       {"quote": "i get KeyError and i dont know why it doesnt work, here is my code", "source": "stackoverflow.com/q/NNNNNN"}
     ]
   },
-  "behavioral_prediction": "Pastes the error and asks 'why doesn't it work'; can't judge a fix, runs whatever the agent gives and accepts it if it stops erroring. 其信任/验收/自主为注入先验，非观测所得。"
+  "behavioral_prediction": "Pastes the error and asks 'why doesn't it work'; can't judge a fix, runs whatever the agent gives and accepts it if it stops erroring. 其信任/验收/自主/等待气质为注入先验；abandon ⟂ patient 示范正交。"
 }
 ```
 

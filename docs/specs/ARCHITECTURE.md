@@ -121,7 +121,7 @@ _auto_designer.user.sim —— persona 驱动的 harness 用户模拟器(控制�
 | `harness_adapter.py` | harness_adapter.py |
 | `loop.py` | loop.py |
 | `persona_client.py` | persona_client.py |
-| `persona_io.py` | persona_io.py（spec-0006/T2）：把 persona 卡注入控制信封 sim。 |
+| `persona_io.py` | persona_io.py（spec-0006/T2 + Spec-0037/T4）：把 persona 卡注入控制信封 sim。 |
 | `prompt.py` | prompt.py |
 | `run_agentic.py` | run_agentic.py — 实测内层 tool-using 用户 agent 是否真去操作工作区（spec-0008）。 |
 | `run_live.py` | run_live.py |
@@ -303,6 +303,7 @@ graph LR
     nauto_designer_user_sim_demo --> nauto_designer_user_sim_harness_adapter
     nauto_designer_user_sim_demo --> nauto_designer_user_sim_loop
     nauto_designer_user_sim_demo --> nauto_designer_user_sim_persona_client
+    nauto_designer_user_sim_demo --> nauto_designer_user_sim_state
     nauto_designer_user_sim_deps --> nauto_designer_models
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_action_space
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_actions
