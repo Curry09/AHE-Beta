@@ -31,8 +31,8 @@ tasks:
     files:
       - frontend/src/components/openagents/openAgentsModel.ts
       - frontend/src/lib/issueMeta.ts
-    scope: 新增纯前端聚合模型，复用现有 issueMeta 派生逻辑，把 /api/issues、/api/delivery、/api/commits、/api/state 汇总为 OpenAgents snapshot：openagents/ready issue、PR、needs-human、conflict、main commits、round sha 与 KPI。支持 round=all 或指定轮次过滤；不引入 mock，不新增后端 API。
-    acceptance: null/connected=false/empty 三类状态都可安全处理；指定轮次时 issue 按 round-N 过滤、PR 按 closes_issues 关联过滤、commit 按 round_shas anchor 过滤；TypeScript build 通过。
+    scope: 新增纯前端聚合模型，复用现有 issueMeta 派生逻辑，把 /api/issues、/api/delivery、/api/commits、/api/state 汇总为 OpenAgents snapshot：openagents/ready issue、PR、needs-human、conflict、main commits、round sha 与 KPI。阶段判定遵循交接协议：同时带 openagents 与 ready 时归入 ready（vigil 已 intake），仅带 openagents 时归入 openagents。支持 round=all 或指定轮次过滤；不引入 mock，不新增后端 API。
+    acceptance: null/connected=false/empty 三类状态都可安全且可区分处理，断连数据源的 KPI 显示未知而非 0；指定轮次时 issue 按 round-N 过滤、PR 按 closes_issues 关联过滤、commit 按 round_shas anchor 过滤；指定轮次所需的 issue 关联或 round SHA 不可用时不得回退展示全量数据；TypeScript build 通过。
   - id: T3
     title: OpenAgents 独立页面 UI 与样式
     status: done
@@ -131,11 +131,14 @@ openagents → ready → PR → needs-human / conflict → main
 
 聚合口径：
 
-- ready issues：open issue 且 labels 含 `openagents` / `ready`，或 `planeOf(issue) === "ready"`。
+- openagents issues：open issue 且 labels 含 `openagents`、不含 `ready`，表示 Owner 已交接但 vigil 尚未 intake。
+- ready issues：open issue 且 labels 含 `ready`，或不含 `openagents` 但 `planeOf(issue) === "ready"`；若同时含 `openagents` 与 `ready`，`ready` 优先，表示 vigil 已 intake。
 - needs-human issues：open issue 且 labels 含 `needs-human`。
 - PR：`/api/delivery.pulls`，指定轮次时按 `closes_issues` 与该轮 issue 集合关联过滤。
 - conflict PR：`pull.mergeable === false`。
 - main commits：`/api/commits`，指定轮次时只保留命中对应 round SHA 的 commit。
+
+`null` 表示仍在读取，`connected=false` 表示数据源不可用，已连接但数组为空才表示真实的 0/空态。指定轮次依赖 issue 关联来筛 PR、依赖 round SHA 来筛 commit；任一过滤依据不可用时，对应结果保持空且显示数据源/轮次不可用，不得降级成全量 PR 或 commit。
 
 **页面与样式（T3）**：`frontend/src/components/openagents/OpenAgentsView.tsx` 渲染数据源状态、KPI、轮次状态条、流程站点和空态。`frontend/src/styles.css` 增加 OpenAgents 页面样式，沿用现有 CSS token、深浅主题、chip/empty/disconnected 等视觉语言。页面内可保留轻量流程/流水线视觉，但文案必须使用 OpenAgents/Gitea 状态词。
 
