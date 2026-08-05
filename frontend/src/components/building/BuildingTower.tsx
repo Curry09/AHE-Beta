@@ -107,6 +107,18 @@ export function BuildingTower(props: {
     [FACTORY_X + FACTORY_W + FACTORY_DEPTH_X, FACTORY_Y + FACTORY_H + FACTORY_DEPTH_Y],
     [FACTORY_X + FACTORY_W, FACTORY_Y + FACTORY_H],
   ]);
+  const towerHelipad = points([
+    [145, 70],
+    [225, 70],
+    [260, 49],
+    [180, 49],
+  ]);
+  const factoryHelipad = points([
+    [535, 251],
+    [590, 251],
+    [612, 238],
+    [557, 238],
+  ]);
   const campusTop = points([
     [8, 405],
     [570, 322],
@@ -175,7 +187,7 @@ export function BuildingTower(props: {
           />
           <path
             className={`campus-flight-path${factory.moving ? " active" : ""}`}
-            d={`M ${FACADE_X + FACADE_W + 28} ${FACADE_Y - 25} Q 500 110 585 ${FACTORY_Y + FACTORY_DEPTH_Y - 8}`}
+            d="M 247 55 C 325 8 410 12 462 82 C 515 150 553 205 575 242"
             aria-hidden="true"
           />
           <g
@@ -197,6 +209,10 @@ export function BuildingTower(props: {
               aria-hidden="true"
             />
             <polygon className="factory-roof" points={factoryRoof} aria-hidden="true" />
+            <polygon className="tower-helipad-pad" points={factoryHelipad} aria-hidden="true" />
+            <text className="tower-helipad-mark factory-helipad-mark" x="574" y="249" aria-hidden="true">
+              H
+            </text>
             <rect
               className="factory-sign"
               x={FACTORY_X + 18}
@@ -247,18 +263,8 @@ export function BuildingTower(props: {
           />
           <polygon className="tower-roof" points={roof} aria-hidden="true" />
           <g className="tower-helipad" aria-hidden="true">
-            <ellipse
-              className="tower-helipad-pad"
-              cx={FACADE_X + FACADE_W / 2 + DEPTH_X / 2}
-              cy={FACADE_Y + DEPTH_Y / 2}
-              rx="42"
-              ry="20"
-            />
-            <text
-              className="tower-helipad-mark"
-              x={FACADE_X + FACADE_W / 2 + DEPTH_X / 2}
-              y={FACADE_Y + DEPTH_Y / 2 + 5}
-            >
+            <polygon className="tower-helipad-pad" points={towerHelipad} />
+            <text className="tower-helipad-mark" x="202" y="65">
               H
             </text>
           </g>
@@ -339,10 +345,12 @@ export function BuildingTower(props: {
           })}
           <g
             className={`campus-aircraft${factory.moving ? " moving" : ""}`}
-            transform={`translate(${FACADE_X + FACADE_W + 20} ${FACADE_Y - 38})`}
+            transform="translate(247 55)"
             aria-hidden="true"
           >
-            <text x="0" y="0">🛩️</text>
+            <g className="campus-aircraft-body">
+              <path d="M 0 -10 L 4 -3 L 15 0 L 15 4 L 4 3 L 1 11 L -3 11 L -2 3 L -14 5 L -16 2 L -3 -2 L -3 -9 Z" />
+            </g>
           </g>
         </svg>
       </div>

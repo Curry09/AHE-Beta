@@ -781,20 +781,25 @@ a:focus-visible,
 }
 
 .tower-helipad-pad {
-  fill: color-mix(in srgb, var(--surface) 88%, var(--surface-2));
-  stroke: color-mix(in srgb, var(--amber) 68%, var(--border-strong));
-  stroke-width: 2;
+  fill: color-mix(in srgb, var(--surface) 72%, transparent);
+  stroke: color-mix(in srgb, var(--amber) 58%, var(--border-strong));
+  stroke-width: 1.5;
 }
 
 .tower-helipad-mark {
   fill: var(--amber);
   font-family: var(--mono);
-  font-size: 24px;
+  font-size: 14px;
   font-weight: 800;
   text-anchor: middle;
   paint-order: stroke fill;
   stroke: color-mix(in srgb, var(--surface) 82%, transparent);
-  stroke-width: 2px;
+  stroke-width: 1.5px;
+}
+
+.factory-helipad-mark {
+  font-size: 9px;
+  stroke-width: 1px;
 }
 
 .campus-flight-path {
@@ -814,24 +819,46 @@ a:focus-visible,
   pointer-events: none;
 }
 
-.campus-aircraft text {
-  font-size: 22px;
+.campus-aircraft-body {
+  transform-origin: 0 0;
   filter: drop-shadow(0 4px 5px rgba(24, 39, 65, 0.2));
 }
 
-.campus-aircraft.moving text {
-  animation: campus-aircraft-transfer 6s ease-in-out infinite;
+.campus-aircraft-body path {
+  fill: color-mix(in srgb, var(--sky) 78%, var(--accent));
+  stroke: color-mix(in srgb, var(--text) 52%, var(--sky));
+  stroke-width: 1;
+}
+
+.campus-aircraft.moving .campus-aircraft-body {
+  animation: campus-aircraft-transfer 7s ease-in-out infinite;
 }
 
 @keyframes campus-aircraft-transfer {
   0%,
-  16%,
-  100% {
-    transform: translate(0, 0) rotate(-4deg);
+  5% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(-24deg) scale(0.86);
   }
-  52%,
-  68% {
-    transform: translate(230px, 175px) rotate(5deg);
+  12% {
+    opacity: 1;
+    transform: translate(8px, -5px) rotate(-20deg) scale(0.9);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(110px, -38px) rotate(8deg);
+  }
+  64% {
+    opacity: 1;
+    transform: translate(215px, 28px) rotate(29deg);
+  }
+  90% {
+    opacity: 1;
+    transform: translate(310px, 160px) rotate(49deg) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(328px, 187px) rotate(55deg) scale(0.84);
   }
 }
 
@@ -932,7 +959,7 @@ a:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .campus-aircraft.moving text {
+  .campus-aircraft.moving .campus-aircraft-body {
     animation: none;
   }
 }
