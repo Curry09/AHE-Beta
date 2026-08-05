@@ -173,9 +173,12 @@ export default function App() {
             roster={config?.roster ?? null}
             showDone={showDone}
             round={round}
+            issues={issues}
+            delivery={delivery}
             selectedFloor={selectedFloor}
             onSelectFloor={(role) => setSelectedFloor(role)}
             onSelect={(sel) => setSelection(sel)}
+            onOpenAgents={() => setView("openagents")}
           />
           <SidePanel
             selection={selection}

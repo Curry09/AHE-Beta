@@ -14,7 +14,7 @@ const WORKSPACE_KIND: Record<AgentRole, { label: string; hint: string }> = {
   designer: { label: "DESIGN STUDIO", hint: "白板 / 方案墙" },
   divergent: { label: "DIVERGENT ROOM", hint: "灵感板 / 候选池" },
   owner: { label: "OWNER GATE", hint: "准入台 / Ready 队列" },
-  developer: { label: "DELIVERY", hint: "OpenAgents / PR 流" },
+  developer: { label: "DELIVERY BOUNDARY", hint: "openagents 交接令牌" },
 };
 
 export function FloorWorkspace(props: {

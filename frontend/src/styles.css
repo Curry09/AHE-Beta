@@ -727,6 +727,146 @@ a:focus-visible,
   stroke-width: 1.5;
 }
 
+.campus-flight-path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--sky) 42%, var(--border-strong));
+  stroke-width: 1.5;
+  stroke-dasharray: 6 7;
+  opacity: 0.55;
+}
+
+.campus-flight-path.active {
+  stroke: color-mix(in srgb, var(--sky) 78%, var(--accent));
+  opacity: 0.9;
+}
+
+.campus-aircraft {
+  pointer-events: none;
+}
+
+.campus-aircraft text {
+  font-size: 22px;
+  filter: drop-shadow(0 4px 5px rgba(24, 39, 65, 0.2));
+}
+
+.campus-aircraft.moving text {
+  animation: campus-aircraft-transfer 6s ease-in-out infinite;
+}
+
+@keyframes campus-aircraft-transfer {
+  0%,
+  16%,
+  100% {
+    transform: translate(0, 0) rotate(-4deg);
+  }
+  52%,
+  68% {
+    transform: translate(125px, 175px) rotate(5deg);
+  }
+}
+
+.openagents-factory {
+  --factory-status-color: var(--green);
+  cursor: pointer;
+  outline: none;
+}
+
+.openagents-factory.status-loading {
+  --factory-status-color: var(--text-faint);
+}
+
+.openagents-factory.status-disconnected {
+  --factory-status-color: var(--red);
+}
+
+.openagents-factory.status-blocked {
+  --factory-status-color: var(--amber);
+}
+
+.factory-facade {
+  fill: color-mix(in srgb, var(--surface-2) 80%, var(--surface));
+  stroke: color-mix(in srgb, var(--factory-status-color) 35%, var(--border-strong));
+  stroke-width: 1.5;
+  transition: fill 0.16s ease, stroke 0.16s ease, filter 0.16s ease;
+}
+
+.factory-side {
+  fill: color-mix(in srgb, var(--surface-2) 72%, var(--border));
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.factory-roof {
+  fill: color-mix(in srgb, var(--factory-status-color) 8%, var(--surface-2));
+  stroke: color-mix(in srgb, var(--factory-status-color) 32%, var(--border-strong));
+  stroke-width: 1.5;
+}
+
+.factory-sign {
+  fill: color-mix(in srgb, var(--text) 88%, var(--surface));
+  stroke: color-mix(in srgb, var(--factory-status-color) 38%, var(--border));
+}
+
+.factory-name,
+.factory-metrics,
+.factory-status,
+.factory-enter {
+  pointer-events: none;
+  user-select: none;
+}
+
+.factory-name {
+  fill: var(--surface);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+  text-anchor: middle;
+  letter-spacing: 0.02em;
+}
+
+.factory-metrics {
+  fill: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 7.5px;
+  text-anchor: middle;
+}
+
+.factory-status {
+  fill: var(--factory-status-color);
+  font-family: var(--mono);
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+.factory-enter {
+  fill: var(--text-dim);
+  font-size: 8px;
+  text-anchor: end;
+}
+
+.factory-status-light {
+  fill: var(--factory-status-color);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--factory-status-color) 50%, transparent));
+}
+
+.factory-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.openagents-factory:hover .factory-facade,
+.openagents-factory:focus-visible .factory-facade {
+  fill: color-mix(in srgb, var(--factory-status-color) 10%, var(--surface));
+  stroke: color-mix(in srgb, var(--factory-status-color) 70%, var(--border-strong));
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--factory-status-color) 26%, transparent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campus-aircraft.moving text {
+    animation: none;
+  }
+}
+
 .tower-floor {
   --floor-role-color: var(--accent);
   cursor: pointer;

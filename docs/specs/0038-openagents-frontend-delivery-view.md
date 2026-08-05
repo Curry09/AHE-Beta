@@ -1,6 +1,6 @@
 ---
 number: "0038"
-title: OpenAgents 交付面独立页面与大楼结合预研
+title: OpenAgents 交付面独立页面与园区入口
 issue: 0
 slug: openagents-frontend-delivery-view
 summary: 前端新增 OpenAgents 独立交付面页面，并将 Agent Company 大楼扩展为需求面主楼与 OpenAgents 交付厂房组成的园区；二者以小型货运无人机/运输机表达交接关系，厂房整体点击进入独立交付页。
@@ -49,7 +49,7 @@ tasks:
     acceptance: ?view=openagents 可查看独立页面；页面展示数据源状态、轮次状态、流程站点与空态；无真实数据时不显示假卡片；needs-human/conflict 有文字标签；npm run build 通过。
   - id: T4
     title: 大楼结合：园区/厂房关系重设计
-    status: pending
+    status: done
     priority: P2
     tags: []
     depends-on:
@@ -67,7 +67,7 @@ tasks:
     acceptance: 默认主楼尺寸与楼层交互不被厂房挤窄；厂房整体支持鼠标与键盘进入 OpenAgents 独立页；厂房只显示 OpenAgents 名称、连接/阻塞状态及 handoff/ready/PR 聚合数字，不标内部角色；飞机动画只由真实 openagents 待交接票驱动并尊重 prefers-reduced-motion；交付面工区图标由卡车改为小型运输机，副标题改为「交付边界 · Owner 准入与 OpenAgents vigil 接管」；顶部 OpenAgents 入口仍可直接进入；build 通过。
 ---
 
-# 0038 · OpenAgents 交付面独立页面与大楼结合预研
+# 0038 · OpenAgents 交付面独立页面与园区入口
 
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
