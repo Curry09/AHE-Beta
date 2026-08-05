@@ -700,7 +700,60 @@ a:focus-visible,
 }
 
 .tower-plaza {
-  fill: color-mix(in srgb, var(--text) 12%, transparent);
+  fill: color-mix(in srgb, var(--text) 16%, transparent);
+  filter: blur(3px);
+}
+
+.campus-base-top {
+  fill: color-mix(in srgb, var(--surface-2) 78%, var(--surface));
+  stroke: color-mix(in srgb, var(--border-strong) 78%, var(--text-faint));
+  stroke-width: 1.5;
+}
+
+.campus-base-front {
+  fill: color-mix(in srgb, var(--surface-2) 68%, var(--border));
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.campus-base-left {
+  fill: color-mix(in srgb, var(--surface-2) 58%, var(--border));
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.campus-base-grid {
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+.campus-grid-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--border-strong) 38%, transparent);
+  stroke-width: 0.8;
+}
+
+.campus-boundary {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text-faint) 45%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 4 5;
+  pointer-events: none;
+}
+
+.campus-road {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text-dim) 16%, var(--surface));
+  stroke-width: 30;
+  stroke-linecap: round;
+}
+
+.campus-road-center {
+  fill: none;
+  stroke: color-mix(in srgb, var(--amber) 46%, var(--surface));
+  stroke-width: 1.5;
+  stroke-dasharray: 8 8;
+  stroke-linecap: round;
 }
 
 .tower-side-base {

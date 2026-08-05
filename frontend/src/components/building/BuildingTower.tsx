@@ -107,6 +107,30 @@ export function BuildingTower(props: {
     [FACTORY_X + FACTORY_W + FACTORY_DEPTH_X, FACTORY_Y + FACTORY_H + FACTORY_DEPTH_Y],
     [FACTORY_X + FACTORY_W, FACTORY_Y + FACTORY_H],
   ]);
+  const campusTop = points([
+    [8, 405],
+    [570, 322],
+    [722, 415],
+    [150, 510],
+  ]);
+  const campusFront = points([
+    [150, 510],
+    [722, 415],
+    [722, 434],
+    [150, 531],
+  ]);
+  const campusLeft = points([
+    [8, 405],
+    [150, 510],
+    [150, 531],
+    [8, 425],
+  ]);
+  const campusBoundary = points([
+    [22, 408],
+    [566, 329],
+    [705, 416],
+    [153, 503],
+  ]);
 
   return (
     <div className="building-overview" aria-label="大楼总览">
@@ -117,12 +141,37 @@ export function BuildingTower(props: {
           role="list"
           aria-label="楼层列表"
         >
+          <defs>
+            <pattern id="campus-grid" width="28" height="28" patternUnits="userSpaceOnUse">
+              <path className="campus-grid-line" d="M 28 0 L 0 0 0 28" />
+            </pattern>
+          </defs>
           <ellipse
             className="tower-plaza"
-            cx={(FACADE_X + FACTORY_X + FACTORY_W + FACTORY_DEPTH_X) / 2}
-            cy={FACADE_Y + facadeH + 42}
-            rx={(FACTORY_X + FACTORY_W + FACTORY_DEPTH_X - FACADE_X) / 2 + 30}
-            ry="32"
+            cx="365"
+            cy={viewH - 25}
+            rx="342"
+            ry="22"
+          />
+          <polygon className="campus-base-front" points={campusFront} aria-hidden="true" />
+          <polygon className="campus-base-left" points={campusLeft} aria-hidden="true" />
+          <polygon className="campus-base-top" points={campusTop} aria-hidden="true" />
+          <polygon
+            className="campus-base-grid"
+            points={campusTop}
+            fill="url(#campus-grid)"
+            aria-hidden="true"
+          />
+          <polygon className="campus-boundary" points={campusBoundary} aria-hidden="true" />
+          <path
+            className="campus-road"
+            d="M 255 478 Q 385 442 510 390"
+            aria-hidden="true"
+          />
+          <path
+            className="campus-road-center"
+            d="M 255 478 Q 385 442 510 390"
+            aria-hidden="true"
           />
           <path
             className={`campus-flight-path${factory.moving ? " active" : ""}`}
