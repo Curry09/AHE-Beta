@@ -284,6 +284,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0038 | 0038/T4 | OpenAgents 独立页面 UI | done | T2, T3 | frontend/src/components/openagents/OpenAgentsView.tsx |
 | 0038 | 0038/T5 | 园区厂房语义、状态聚合与交付边界 | done | T2, T3 | frontend/src/components/BuildingView.tsx<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.ts |
 | 0038 | 0038/T6 | 园区沙盘、厂房入口与双停机坪航线 | done | T4, T5 | frontend/src/components/building/BuildingTower.tsx<br>frontend/src/styles.css |
+| 0038 | 0038/T7 | OpenAgents 聚合模型回归测试 | pending | T3, T5 | frontend/package.json<br>frontend/package-lock.json<br>frontend/src/components/openagents/openAgentsModel.test.ts |
 
 ## 跨 feature 关系图
 
@@ -526,6 +527,7 @@ graph LR
         n0038_T4["T4 OpenAgents 独立页面 UI"]
         n0038_T5["T5 园区厂房语义、状态聚合与交付边界"]
         n0038_T6["T6 园区沙盘、厂房入口与双停机坪航线"]
+        n0038_T7["T7 OpenAgents 聚合模型回归测试"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -677,6 +679,8 @@ graph LR
     n0038_T5 --> n0038_T3
     n0038_T6 --> n0038_T4
     n0038_T6 --> n0038_T5
+    n0038_T7 --> n0038_T3
+    n0038_T7 --> n0038_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1942,6 +1946,7 @@ graph LR
     nT4["T4 OpenAgents 独立页面 UI"]
     nT5["T5 园区厂房语义、状态聚合与交付边界"]
     nT6["T6 园区沙盘、厂房入口与双停机坪航线"]
+    nT7["T7 OpenAgents 聚合模型回归测试"]
     nT1 --> nT2
     nT1 --> nT3
     nT2 --> nT4
@@ -1950,6 +1955,8 @@ graph LR
     nT3 --> nT5
     nT4 --> nT6
     nT5 --> nT6
+    nT3 --> nT7
+    nT5 --> nT7
 ```
 
 演化图：
@@ -1962,11 +1969,14 @@ graph LR
     v_T4_1["T4 v1"]
     v_T5_1["T5 v1"]
     v_T6_1["T6 v1"]
+    v_T7_1["T7 v1"]
     classDef st_done fill:#b7e4c7;
+    classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+    class v_T7_1 st_pending;
 ```

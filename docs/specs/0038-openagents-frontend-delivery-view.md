@@ -43,8 +43,8 @@ tasks:
     parallel: true
     files:
       - frontend/src/components/openagents/openAgentsModel.ts
-    scope: 新增纯前端模型，把既有 issues/delivery/commits/state DTO 汇总为 source 状态、handoff/ready issue、PR、needs-human/conflict、main commit、round SHA 与 KPI；只消费 issueMeta 既有派生函数，不改其所有权；ready 标签优先于 openagents；指定轮次缺关联依据时返回 unavailable，不泄漏全量。
-    acceptance: null/connected=false/empty 三类状态都可安全且可区分处理，断连数据源的 KPI 显示未知而非 0；指定轮次时 issue 按 round-N 过滤、PR 按 closes_issues 关联过滤、commit 按 round_shas anchor 过滤；指定轮次所需的 issue 关联或 round SHA 不可用时不得回退展示全量数据；TypeScript build 通过。
+    scope: 新增纯前端模型，把既有 issues/delivery/commits/state DTO 汇总为 source 状态、handoff/ready issue、PR、needs-human/conflict、main commit、round SHA 与 KPI；只消费 issueMeta 既有派生函数，不改其所有权；ready 标签优先于 openagents；handoff KPI 只计尚未 ready 的 openagents issue；needs-human 与 conflict 为可重叠 PR 状态；指定轮次缺关联依据时返回 unavailable，不泄漏全量。
+    acceptance: null/connected=false/empty 三类状态都可安全且可区分处理，断连数据源的 KPI 显示未知而非 0；handoff KPI 不含 ready/ready-plane；同时 needs-human 且 mergeable=false 的 PR 同时进入两个 gate 子集；指定轮次时 issue 按 round-N 过滤、PR 按 closes_issues 关联过滤、commit 按 round_shas anchor 过滤；指定轮次所需的 issue 关联或 round SHA 不可用时不得回退展示全量数据；TypeScript build 通过。
   - id: T4
     title: OpenAgents 独立页面 UI
     status: done
@@ -73,8 +73,8 @@ tasks:
       - frontend/src/components/BuildingView.tsx
       - frontend/src/components/building/FloorWorkspace.tsx
       - frontend/src/components/building/buildingModel.ts
-    scope: 将 BuildingView 标题改为 Agent Campus，按当前 issues/delivery 派生厂房 loading/disconnected/blocked/ready、handoff/ready/PR/needs-human 与飞机 moving 状态；交付面工区改为「交付边界 · Owner 准入与 OpenAgents vigil 接管」并消费 T2 提供的厂房跳转。
-    acceptance: 厂房聚合只使用真实 open issue 与 delivery 数据；openagents 且非 ready 计 handoff 并驱动 moving，ready 单独计数，needs-human 驱动 blocked；断连显示未知而非 0；交付工区不再使用卡车/出货文案。
+    scope: 将 BuildingView 标题改为 Agent Campus，按当前 issues/delivery 派生厂房 loading/disconnected/blocked/ready、handoff/ready/PR/needs-human 与飞机 moving 状态；交付面工区改为「交付边界 · Owner 准入与 OpenAgents vigil 接管」，使用 OA 字标而非交通工具 emoji，并消费 T2 提供的厂房跳转。
+    acceptance: 厂房聚合只使用真实 open issue 与 delivery 数据；openagents 且非 ready 计 handoff 并驱动 moving，ready 单独计数，needs-human 驱动 blocked；断连显示未知而非 0；交付工区不再使用卡车/出货文案或飞机 emoji。
   - id: T6
     title: 园区沙盘、厂房入口与双停机坪航线
     status: done
@@ -90,6 +90,22 @@ tasks:
       - frontend/src/styles.css
     scope: BuildingTower 绘制共享 2.5D 地块、厚度、边界、内部通路、需求面主楼和可点击 OpenAgents 厂房；两栋楼保持净空；屋顶各有透视 H 停机坪，三次贝塞尔航线配原生 SVG 运输机；styles.css 独占本组全部 OpenAgents 页面与园区样式，不增加树木等环境装饰。
     acceptance: 两栋建筑落在同一底座且不遮挡；厂房整体支持鼠标/键盘进入独立页并显示真实聚合；双 H 贴合屋顶透视；航线平滑拱起，SVG 飞机只在 moving 时动画且尊重 prefers-reduced-motion；无 emoji 飞机、无 mock、无环境装饰；浅深主题可读；npm run build 通过。
+  - id: T7
+    title: OpenAgents 聚合模型回归测试
+    status: pending
+    priority: P1
+    tags: []
+    depends-on:
+      - T3
+      - T5
+    relates-to: []
+    parallel: false
+    files:
+      - frontend/package.json
+      - frontend/package-lock.json
+      - frontend/src/components/openagents/openAgentsModel.test.ts
+    scope: 引入 Vitest 与 npm test 脚本，为 handoff/ready 标签优先级、needs-human+conflict 重叠、断连 KPI、指定轮次 PR/commit 不泄漏全量等纯模型契约补 hermetic 单测。
+    acceptance: npm test 通过；至少覆盖 handoff KPI 只计 openagents、双状态 PR 同时进入两个 gate 子集、issues 断连时指定轮次 PR unavailable 且为空、缺 round SHA 时 commit unavailable 且为空；npm run build 仍通过。
 ---
 
 # 0038 · OpenAgents 交付面独立页面与园区入口
@@ -207,7 +223,7 @@ App
 - 四个原始数据源状态；
 - PR/commit 两个经过轮次依赖检查的 station source；
 - handoff/ready/needs-human issue cards；
-- PR cards 与 needs-human/conflict 子集；
+- PR cards 与可重叠的 needs-human/conflict 子集；
 - main commit cards 与 round anchor；
 - handoff、PR、needs-human、commit KPI；
 - 当前轮次文案与 round SHA。
@@ -227,6 +243,8 @@ issue 阶段判定遵循交接协议：
 1. 有 `ready` → ready；即使同时保留 `openagents`，也表示 vigil 已 intake。
 2. 否则有 `openagents` → handoff。
 3. 否则 `planeOf(issue) === "ready"` → legacy ready-plane。
+
+handoff KPI 只统计第 2 类，不包含 ready 或 ready-plane。PR 的 needs-human 与 conflict 是两个独立维度：同一 PR 同时带 `needs-human` 且 `mergeable=false` 时，必须同时进入两个 gate 子集，不能用单一状态优先级丢掉 conflict。
 
 指定轮次时：
 
@@ -269,6 +287,8 @@ openagents | ready | PR | needs-human / conflict | main
 DELIVERY BOUNDARY / openagents 交接令牌
 ```
 
+交付面工区使用 `OA` 字标，不使用卡车或飞机 emoji；园区航线上的运输机由 T6 的 SVG path 单独表达。
+
 ### 沙盘与航线
 
 `BuildingTower` 在一个 SVG scene 中按从后到前的顺序绘制：
@@ -295,6 +315,7 @@ graph LR
   T4[T4 独立交付页 UI]
   T5[T5 园区语义与状态]
   T6[T6 沙盘与视觉系统]
+  T7[T7 聚合模型回归测试]
   T1 --> T2
   T1 --> T3
   T2 --> T4
@@ -303,6 +324,8 @@ graph LR
   T3 --> T5
   T4 --> T6
   T5 --> T6
+  T3 --> T7
+  T5 --> T7
 ```
 
 | Task | 职责 | 独占文件 |
@@ -313,6 +336,7 @@ graph LR
 | T4 | 独立交付页 UI 组件 | `OpenAgentsView.tsx` |
 | T5 | 厂房 live 状态与交付边界文案 | `BuildingView.tsx`, `FloorWorkspace.tsx`, `buildingModel.ts` |
 | T6 | BuildingTower SVG 与本组全部样式 | `BuildingTower.tsx`, `styles.css` |
+| T7 | 聚合模型 hermetic 回归测试与测试入口 | `package.json`, `package-lock.json`, `openAgentsModel.test.ts` |
 
 组内文件所有权互斥。`issueMeta.ts`、`SidePanel.tsx` 和 API client 只是既有依赖，不列入本组任务所有权。
 
@@ -333,6 +357,7 @@ graph LR
 
 ```bash
 tools/spec-driven-development/spec validate
+npm --prefix frontend test
 npm --prefix frontend run build
 ```
 
