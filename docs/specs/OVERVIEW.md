@@ -284,7 +284,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0038 | 0038/T4 | OpenAgents 独立页面 UI | done | T2, T3 | frontend/src/components/openagents/OpenAgentsView.tsx |
 | 0038 | 0038/T5 | 园区厂房语义、状态聚合与交付边界 | done | T2, T3 | frontend/src/components/BuildingView.tsx<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.ts |
 | 0038 | 0038/T6 | 园区沙盘、厂房入口与双停机坪航线 | done | T4, T5 | frontend/src/components/building/BuildingTower.tsx<br>frontend/src/styles.css |
-| 0038 | 0038/T7 | OpenAgents 聚合模型回归测试 | pending | T3, T5 | frontend/package.json<br>frontend/package-lock.json<br>frontend/src/components/openagents/openAgentsModel.test.ts |
+| 0038 | 0038/T7 | OpenAgents 聚合模型回归测试 | done | T3, T5 | frontend/package.json<br>frontend/package-lock.json<br>frontend/src/components/openagents/openAgentsModel.test.ts |
 
 ## 跨 feature 关系图
 
@@ -1971,12 +1971,11 @@ graph LR
     v_T6_1["T6 v1"]
     v_T7_1["T7 v1"]
     classDef st_done fill:#b7e4c7;
-    classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
-    class v_T7_1 st_pending;
+    class v_T7_1 st_done;
 ```

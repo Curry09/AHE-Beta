@@ -27,7 +27,9 @@ export interface IssueCardModel {
 
 export interface PullCardModel {
   pull: Pull;
-  status: "needs-human" | "conflict" | "mergeable" | "unknown";
+  status: "needs-human-conflict" | "needs-human" | "conflict" | "mergeable" | "unknown";
+  needsHuman: boolean;
+  conflict: boolean;
 }
 
 export interface CommitCardModel {
@@ -113,15 +115,23 @@ function compareIssueCards(a: IssueCardModel, b: IssueCardModel): number {
   return b.issue.number - a.issue.number;
 }
 
-function pullStatus(pull: Pull): PullCardModel["status"] {
-  if (hasLabel(pull.labels ?? [], "needs-human")) return "needs-human";
-  if (pull.mergeable === false) return "conflict";
+function pullStatus(pull: Pull, needsHuman: boolean, conflict: boolean): PullCardModel["status"] {
+  if (needsHuman && conflict) return "needs-human-conflict";
+  if (needsHuman) return "needs-human";
+  if (conflict) return "conflict";
   if (pull.mergeable === true) return "mergeable";
   return "unknown";
 }
 
 function pullCard(pull: Pull): PullCardModel {
-  return { pull, status: pullStatus(pull) };
+  const needsHuman = hasLabel(pull.labels ?? [], "needs-human");
+  const conflict = pull.mergeable === false;
+  return {
+    pull,
+    status: pullStatus(pull, needsHuman, conflict),
+    needsHuman,
+    conflict,
+  };
 }
 
 function comparePullCards(a: PullCardModel, b: PullCardModel): number {
@@ -218,8 +228,8 @@ export function buildOpenAgentsSnapshot(params: {
           )
         : [];
   const pulls = pullItems.map(pullCard).sort(comparePullCards);
-  const needsHumanPulls = pulls.filter((pull) => pull.status === "needs-human");
-  const conflictPulls = pulls.filter((pull) => pull.status === "conflict");
+  const needsHumanPulls = pulls.filter((pull) => pull.needsHuman);
+  const conflictPulls = pulls.filter((pull) => pull.conflict);
 
   const roundShas = state?.round_shas ?? [];
   const shaForSelectedRound = selectedRoundSha(state, selectedRound);
@@ -256,7 +266,10 @@ export function buildOpenAgentsSnapshot(params: {
     needsHumanPulls,
     conflictPulls,
     kpis: {
-      handoff: issues?.connected ? readyIssues.length : null,
+      handoff:
+        issues?.connected
+          ? readyIssues.filter((issue) => issue.stage === "openagents").length
+          : null,
       pulls: pullSource.status === "ready" ? pulls.length : null,
       needsHuman:
         !delivery?.connected || (selectedRound !== "all" && !issues?.connected)

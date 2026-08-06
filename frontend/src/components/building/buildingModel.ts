@@ -28,7 +28,7 @@ export const ROLE_COPY: Record<AgentRole, { icon: string; subtitle: string }> = 
   designer: { icon: "🎨", subtitle: "设计工区 · 结构综合与 RFC" },
   divergent: { icon: "💡", subtitle: "发散 PM · 产品候选孵化" },
   owner: { icon: "🚪", subtitle: "准入门 · proposal → ready 裁决" },
-  developer: { icon: "🛩️", subtitle: "交付边界 · Owner 准入与 OpenAgents vigil 接管" },
+  developer: { icon: "OA", subtitle: "交付边界 · Owner 准入与 OpenAgents vigil 接管" },
 };
 
 function latestRound(history: HistoryEntry[]): number | null {

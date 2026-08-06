@@ -92,7 +92,7 @@ tasks:
     acceptance: 两栋建筑落在同一底座且不遮挡；厂房整体支持鼠标/键盘进入独立页并显示真实聚合；双 H 贴合屋顶透视；航线平滑拱起，SVG 飞机只在 moving 时动画且尊重 prefers-reduced-motion；无 emoji 飞机、无 mock、无环境装饰；浅深主题可读；npm run build 通过。
   - id: T7
     title: OpenAgents 聚合模型回归测试
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:

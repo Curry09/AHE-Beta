@@ -53,7 +53,7 @@ export function OpenAgentsView(props: {
       </section>
 
       <section className="openagents-kpis warehouse-signboard" aria-label="OpenAgents 状态">
-        <Kpi label="openagents / ready" value={snapshot.kpis.handoff} hint="ready plane issues" />
+        <Kpi label="openagents handoff" value={snapshot.kpis.handoff} hint="awaiting vigil intake" />
         <Kpi label="PR" value={snapshot.kpis.pulls} hint="/api/delivery open PR" />
         <Kpi label="needs-human" value={snapshot.kpis.needsHuman} hint="PR + issue" tone="danger" />
         <Kpi label="main commits" value={snapshot.kpis.commits} hint="recent commits" />
@@ -270,7 +270,10 @@ function GateStation(props: {
   const unavailableSources = [props.issueSource, props.deliverySource].filter(
     (source) => source.status === "disconnected" || source.status === "unavailable",
   );
-  const count = props.issues.length + props.pulls.length + props.conflicts.length;
+  const blockedPullCount = new Set(
+    [...props.pulls, ...props.conflicts].map((item) => item.pull.number),
+  ).size;
+  const count = props.issues.length + blockedPullCount;
   return (
     <section className="warehouse-station gate-station">
       <div className="warehouse-station-head">
@@ -346,6 +349,7 @@ function stageLabel(stage: IssueCardModel["stage"]): string {
 }
 
 function pullStatusLabel(status: PullCardModel["status"]): string {
+  if (status === "needs-human-conflict") return "needs-human + conflict";
   if (status === "needs-human") return "needs-human";
   if (status === "conflict") return "conflict";
   if (status === "mergeable") return "mergeable";
@@ -353,6 +357,7 @@ function pullStatusLabel(status: PullCardModel["status"]): string {
 }
 
 function pullChipClass(status: PullCardModel["status"]): string {
+  if (status === "needs-human-conflict") return "danger";
   if (status === "needs-human") return "danger";
   if (status === "conflict") return "warn";
   if (status === "mergeable") return "open";
