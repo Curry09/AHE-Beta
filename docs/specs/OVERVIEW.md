@@ -115,6 +115,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0037 人轴重构：时间气质 ⊥ 质量失败 · 过程卷入 · 蒸馏 spoke 对齐
 接缝接近真人 CLI 后，等待体感差在「人」轴：旧设计把耐心焊在质量失败策略(d43)上、supervision 仍是回合制盯梢。本组新增 tempo(卡 D7)驱动耐心，d43 只答结果错了怎么办，supervision 改为过程卷入，D6Authz 标为会话策略不进卡；hub 加 D7 与正交注入；注入缺省 steady；三个蒸馏 spoke 对齐 ground/inject。不另起翻译模块，投影仍走 judge→intent→act；不把 interrupt/queued/slash 焊进人轴。
 
+### 0038 OpenAgents 交付面独立页面与园区入口
+前端新增 OpenAgents 独立交付面页面，并将 Agent Company 大楼扩展为需求面主楼与 OpenAgents 交付厂房组成的园区；二者以小型货运无人机/运输机表达交接关系，厂房整体点击进入独立交付页。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -275,6 +278,13 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0037 | 0037/T4 | 注入：card_to_persona 读 D7→tempo | done | T1, T2, T3 | backend/auto_designer/user/sim/persona_io.py<br>backend/tests/user/sim/test_persona_io.py |
 | 0037 | 0037/T5 | 蒸馏 spoke 对齐 D7 与人轴语义 | done | T1, T3 | tools/persona-distill/extract-selfreport-persona/SKILL.md<br>tools/persona-distill/extract-selfreport-persona/reference.md<br>tools/persona-distill/extract-github-persona/SKILL.md<br>tools/persona-distill/extract-github-persona/reference.md<br>tools/persona-distill/extract-stackoverflow-persona/SKILL.md<br>tools/persona-distill/extract-stackoverflow-persona/reference.md |
 | 0037 | 0037/T6 | 探针：tempo / 过程卷入 / d43 正交可观测 | done | T2, T4 | backend/scripts/probe_persona_reframe.py<br>backend/scripts/probe_swebench_persona.py<br>backend/scripts/probe_d43_quality_fail.py |
+| 0038 | 0038/T1 | 写 0038 活快照 | done | — | docs/specs/0038-openagents-frontend-delivery-view.md |
+| 0038 | 0038/T2 | OpenAgents 入口、URL 状态与页面装配 | done | T1 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx |
+| 0038 | 0038/T3 | OpenAgents 数据聚合模型 | done | T1 | frontend/src/components/openagents/openAgentsModel.ts |
+| 0038 | 0038/T4 | OpenAgents 独立页面 UI | done | T2, T3 | frontend/src/components/openagents/OpenAgentsView.tsx |
+| 0038 | 0038/T5 | 园区厂房语义、状态聚合与交付边界 | done | T2, T3 | frontend/src/components/BuildingView.tsx<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.ts |
+| 0038 | 0038/T6 | 园区沙盘、厂房入口与双停机坪航线 | done | T4, T5 | frontend/src/components/building/BuildingTower.tsx<br>frontend/src/styles.css |
+| 0038 | 0038/T7 | OpenAgents 聚合模型回归测试 | done | T3, T5 | frontend/package.json<br>frontend/package-lock.json<br>frontend/src/components/openagents/openAgentsModel.test.ts |
 
 ## 跨 feature 关系图
 
@@ -510,6 +520,15 @@ graph LR
         n0037_T5["T5 蒸馏 spoke 对齐 D7 与人轴语义"]
         n0037_T6["T6 探针：tempo / 过程卷入 / d43 正交可观测"]
     end
+    subgraph G0038[0038 openagents-frontend-delivery-view]
+        n0038_T1["T1 写 0038 活快照"]
+        n0038_T2["T2 OpenAgents 入口、URL 状态与页面装配"]
+        n0038_T3["T3 OpenAgents 数据聚合模型"]
+        n0038_T4["T4 OpenAgents 独立页面 UI"]
+        n0038_T5["T5 园区厂房语义、状态聚合与交付边界"]
+        n0038_T6["T6 园区沙盘、厂房入口与双停机坪航线"]
+        n0038_T7["T7 OpenAgents 聚合模型回归测试"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -652,6 +671,16 @@ graph LR
     n0037_T5 --> n0037_T3
     n0037_T6 --> n0037_T2
     n0037_T6 --> n0037_T4
+    n0038_T2 --> n0038_T1
+    n0038_T3 --> n0038_T1
+    n0038_T4 --> n0038_T2
+    n0038_T4 --> n0038_T3
+    n0038_T5 --> n0038_T2
+    n0038_T5 --> n0038_T3
+    n0038_T6 --> n0038_T4
+    n0038_T6 --> n0038_T5
+    n0038_T7 --> n0038_T3
+    n0038_T7 --> n0038_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -801,15 +830,19 @@ graph LR
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032 |
-| frontend/src/App.tsx | 0026, 0029, 0032, 0034 |
+| frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032 |
+| frontend/src/components/BuildingView.tsx | 0034, 0038 |
 | frontend/src/components/SidePanel.tsx | 0020, 0025, 0026, 0029, 0032 |
-| frontend/src/components/TopBar.tsx | 0026, 0034 |
+| frontend/src/components/TopBar.tsx | 0026, 0034, 0038 |
+| frontend/src/components/building/BuildingTower.tsx | 0034, 0038 |
+| frontend/src/components/building/FloorWorkspace.tsx | 0034, 0038 |
+| frontend/src/components/building/buildingModel.ts | 0034, 0038 |
 | frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026, 0029 |
 | frontend/src/components/detail/SessionDetail.tsx | 0026, 0034 |
 | frontend/src/lib/issueMeta.ts | 0025, 0029, 0032 |
-| frontend/src/styles.css | 0026, 0034 |
-| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034 |
+| frontend/src/styles.css | 0026, 0034, 0038 |
+| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038 |
 | tools/persona-distill/card-schema.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/SKILL.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/reference.md | 0006, 0037 |
@@ -1901,4 +1934,48 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0038 OpenAgents 交付面独立页面与园区入口（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 写 0038 活快照"]
+    nT2["T2 OpenAgents 入口、URL 状态与页面装配"]
+    nT3["T3 OpenAgents 数据聚合模型"]
+    nT4["T4 OpenAgents 独立页面 UI"]
+    nT5["T5 园区厂房语义、状态聚合与交付边界"]
+    nT6["T6 园区沙盘、厂房入口与双停机坪航线"]
+    nT7["T7 OpenAgents 聚合模型回归测试"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT4
+    nT3 --> nT4
+    nT2 --> nT5
+    nT3 --> nT5
+    nT4 --> nT6
+    nT5 --> nT6
+    nT3 --> nT7
+    nT5 --> nT7
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    v_T7_1["T7 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
+    class v_T7_1 st_done;
 ```

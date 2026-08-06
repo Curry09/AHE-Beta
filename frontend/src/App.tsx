@@ -14,7 +14,9 @@ import { BuildingView } from "./components/BuildingView";
 import { Charts } from "./components/Charts";
 import { SidePanel } from "./components/SidePanel";
 import { TopBar } from "./components/TopBar";
+import { OpenAgentsView } from "./components/openagents/OpenAgentsView";
 import { usePolling } from "./hooks/usePolling";
+import { roundOf } from "./lib/issueMeta";
 import type { AgentRole, Selection, ViewMode } from "./types";
 
 const POLL_MS = 3000;
@@ -54,7 +56,8 @@ function selectionToParam(sel: Selection): string {
 }
 
 function parseView(raw: string | null): ViewMode {
-  return raw === "building" ? "building" : "dashboard";
+  if (raw === "building" || raw === "openagents") return raw;
+  return "dashboard";
 }
 
 function parseFloor(raw: string | null): AgentRole {
@@ -93,8 +96,10 @@ export default function App() {
     if (view === "building") {
       params.set("view", "building");
       params.set("floor", selectedFloor);
+    } else if (view === "openagents") {
+      params.set("view", "openagents");
     }
-    if (showDone) params.set("done", "1");
+    if (view !== "openagents" && showDone) params.set("done", "1");
     if (round !== "all") params.set("round", String(round));
     if (selection) params.set("sel", selectionToParam(selection));
     const qs = params.toString();
@@ -105,9 +110,13 @@ export default function App() {
   // 可选轮次 = 归档里出现过的轮 ∪ 当前轮（运行中还没归档也能选）。
   const rounds = useMemo(() => {
     const set = new Set<number>(items.map((it) => it.round));
+    for (const issue of issues?.issues ?? []) {
+      const issueRound = roundOf(issue);
+      if (issueRound !== null) set.add(issueRound);
+    }
     if (state && state.round > 0) set.add(state.round);
     return [...set].sort((a, b) => b - a);
-  }, [items, state]);
+  }, [items, issues, state]);
   const historyEntries = useMemo(
     () =>
       items
@@ -132,7 +141,29 @@ export default function App() {
         onRound={(r) => setRound(r)}
       />
       <Charts overview={overview} />
-      {view === "building" ? (
+      {view === "openagents" ? (
+        <div className="openagents-layout">
+          <OpenAgentsView
+            issues={issues}
+            delivery={delivery}
+            commits={commits}
+            state={state}
+            overview={overview}
+            round={round}
+            onSelect={(sel) => setSelection(sel)}
+          />
+          <SidePanel
+            selection={selection}
+            onSelect={(sel) => setSelection(sel)}
+            agents={agents?.agents ?? []}
+            history={items}
+            issues={issues}
+            commits={commits}
+            funnel={overview?.funnel ?? null}
+            delivery={delivery}
+          />
+        </div>
+      ) : view === "building" ? (
         <div className="building-layout">
           <BuildingView
             roles={ROLES}
@@ -142,9 +173,12 @@ export default function App() {
             roster={config?.roster ?? null}
             showDone={showDone}
             round={round}
+            issues={issues}
+            delivery={delivery}
             selectedFloor={selectedFloor}
             onSelectFloor={(role) => setSelectedFloor(role)}
             onSelect={(sel) => setSelection(sel)}
+            onOpenAgents={() => setView("openagents")}
           />
           <SidePanel
             selection={selection}
