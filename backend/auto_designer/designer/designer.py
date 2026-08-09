@@ -24,6 +24,7 @@ from auto_designer.designer.issue_schema import (
     RFC_LABEL,
     format_covers_line,
     plane,
+    round_label,
 )
 from auto_designer.designer.issue_schema import fields_of as _schema_fields_of
 from auto_designer.designer.issue_schema import render as _schema_render
@@ -93,6 +94,7 @@ class Designer:
         agent_def_dir: str,
         on_status: StatusFn | None = None,
         on_event: Callable[[str, str], None] | None = None,
+        round_provider: Callable[[], int | None] | None = None,
     ) -> None:
         self._tracker = tracker
         self._store = store  # 体感曲线数据源（本地 SessionStore 索引）
@@ -102,6 +104,7 @@ class Designer:
         self._on_event = (
             on_event  # 过程流回调 (kind, text)：assistant 发言/工具调用/结果，看板时间线用
         )
+        self._round_provider = round_provider
 
     def propose_once(self) -> DesignOutcome:
         backlog = self._tracker.list_open_issues()
@@ -125,8 +128,12 @@ class Designer:
         # covers 只是建议：过滤到当前 open 的 report/proposal 票号（合并裁决在 Owner 准入时）。
         coverable = {i.number for i in backlog if plane(i.labels) in (REPORT, PROPOSAL)}
         numbers: list[int] = []
+        round_no = self._round_provider() if self._round_provider is not None else None
+        round_name = round_label(round_no) if type(round_no) is int and round_no > 0 else None
         if parsed:
-            self._tracker.ensure_labels([PROPOSAL, FROM_SYNTHESIZE])
+            self._tracker.ensure_labels(
+                [PROPOSAL, FROM_SYNTHESIZE] + ([round_name] if round_name else [])
+            )
         for prop in parsed:
             fields = _rfc_fields_by_label(prop.fields)
             if _schema_validate(kind="rfc", fields=fields, section="triage"):
@@ -137,8 +144,9 @@ class Designer:
             if covers_line:
                 # 机器行 = 覆盖建议的单一真源（消费方：Owner 准入级联、web 徽标）。创建后不改写。
                 body = f"{body}\n\n{covers_line}"
+            labels = [PROPOSAL, FROM_SYNTHESIZE] + ([round_name] if round_name else [])
             ref = self._tracker.create_issue(
-                IssueDraft(title=str(prop.title), body=body, labels=[PROPOSAL, FROM_SYNTHESIZE])
+                IssueDraft(title=str(prop.title), body=body, labels=labels)
             )
             numbers.append(ref.number)
 

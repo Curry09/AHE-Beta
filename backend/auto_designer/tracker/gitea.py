@@ -31,6 +31,7 @@ def _parse_closing_refs(*, body: str) -> list[int]:
 
 # 每次 HTTP 请求的硬超时（秒）：无超时的请求一旦挂死会把整条闭环卡住（主线程 poll() 永等）。
 _REQUEST_TIMEOUT = 30
+_TIMELINE_PAGE_SIZE = 50
 
 
 class GiteaError(RuntimeError):
@@ -175,6 +176,29 @@ class GiteaTracker:
             for item in (data or [])
         ]
 
+    def list_timeline(self, *, number: int) -> list[dict[str, Any]]:
+        """分页读取 issue timeline，并归一 label add/remove 方向及调试所需原始字段。
+
+        Gitea 1.22 的 label event 用非空 ``body`` 表示 add、空 body 表示 remove。未知事件保留，
+        但 operation 标成 unknown，交给纯观测层 fail-visible 地忽略，绝不猜测方向。
+        """
+        events: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            rows = self._request(
+                "GET",
+                f"/repos/{self._owner}/{self._repo}/issues/{number}/timeline"
+                f"?page={page}&limit={_TIMELINE_PAGE_SIZE}",
+                None,
+            )
+            if not isinstance(rows, list):
+                raise GiteaError(0, "list_timeline", "响应不是数组")
+            events.extend(self._timeline_event(item) for item in rows if isinstance(item, dict))
+            if len(rows) < _TIMELINE_PAGE_SIZE:
+                break
+            page += 1
+        return events
+
     def get_commit_detail(self, *, sha: str) -> dict[str, Any]:
         """取单个 commit 全量：message 全文 + 作者/时间 + 文件级增删统计 + 原始 diff 文本。
 
@@ -233,6 +257,26 @@ class GiteaTracker:
             "created_at": item.get("created_at") or "",
             "closed_at": item.get("closed_at") or None,
             "url": item.get("html_url") or "",
+        }
+
+    @staticmethod
+    def _timeline_event(item: dict[str, Any]) -> dict[str, Any]:
+        """Gitea timeline item → forge-neutral、JSON 可序列化的只读事件。"""
+        event_type = str(item.get("type") or "")
+        body = item.get("body")
+        operation = "unknown"
+        if event_type == "label":
+            operation = "add" if body not in (None, "") else "remove"
+        label = item.get("label") or {}
+        actor = item.get("user") or item.get("actor") or {}
+        return {
+            "id": item.get("id"),
+            "created_at": item.get("created_at") or "",
+            "actor": actor.get("login") or "",
+            "type": event_type,
+            "label": label.get("name") or "",
+            "operation": operation,
+            "body": "" if body is None else str(body),
         }
 
     def list_pulls(self, *, state: str = "open", limit: int = 20) -> list[dict[str, Any]]:

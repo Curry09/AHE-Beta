@@ -426,13 +426,51 @@ def test_issue_detail_with_comments(tmp_path: Path) -> None:
     assert body["connected"] is True
     assert body["issue"]["title"] == "harness 卡顿"
     assert body["comments"][0]["author"] == "developer"
+    assert body["timeline"]["available"] is False
 
 
 def test_issue_detail_no_capability_degrades(tmp_path: Path) -> None:
     # FakeTracker 无 get_issue/list_comments → connected=False（不抛 500）。
     client = _client(tmp_path, tracker=FakeTracker())
     body = client.get("/api/issues/1").json()
-    assert body == {"connected": False, "issue": None, "comments": []}
+    assert body["connected"] is False
+    assert body["issue"] is None and body["comments"] == []
+    assert body["timeline"]["available"] is False
+
+
+def test_issue_detail_timeline_connected_and_failure_isolated(tmp_path: Path) -> None:
+    class _TimelineTracker(_ObserveTracker):
+        def list_timeline(self, *, number: int):
+            return [
+                {
+                    "id": 1,
+                    "type": "label",
+                    "body": "1",
+                    "label": "ready",
+                    "operation": "add",
+                    "actor": "designer",
+                    "created_at": "2026-06-01T00:00:00Z",
+                }
+            ]
+
+        def get_issue(self, *, number: int):
+            issue = super().get_issue(number=number)
+            issue["labels"] = ["ready"]
+            issue["created_at"] = "2026-06-01T00:00:00Z"
+            return issue
+
+    connected = _client(tmp_path, tracker=_TimelineTracker()).get("/api/issues/7").json()
+    assert connected["timeline"]["available"] is True
+    assert connected["timeline"]["current"]["plane"] == "ready"
+
+    class _BrokenTimeline(_TimelineTracker):
+        def list_timeline(self, *, number: int):
+            raise RuntimeError("timeline down")
+
+    degraded = _client(tmp_path, tracker=_BrokenTimeline()).get("/api/issues/7").json()
+    assert degraded["connected"] is True
+    assert degraded["issue"]["title"] == "harness 卡顿"
+    assert degraded["timeline"]["available"] is False
 
 
 def test_issue_detail_404(tmp_path: Path) -> None:
