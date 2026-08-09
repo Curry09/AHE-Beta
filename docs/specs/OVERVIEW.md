@@ -291,7 +291,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0039 | 0039/T1 | 固化规格与跨仓验收边界 | done | — | docs/specs/0039-issue-state-timeline.md |
 | 0039 | 0039/T2 | 读取并折叠 Gitea issue timeline | done | T1 | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/web/issue_timeline.py<br>backend/tests/tracker/test_gitea_timeline.py |
 | 0039 | 0039/T3 | 扩展 issue 详情 timeline API | done | T2 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
-| 0039 | 0039/T4 | 为 Designer 综合票写入轮次标签 | done | T1 | backend/auto_designer/designer/designer.py<br>backend/run.py<br>backend/tests/loop/test_designer.py |
+| 0039 | 0039/T4 | 为 Designer 综合票写入轮次标签 | done | T1 | backend/auto_designer/designer/designer.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_designer.py |
 | 0039 | 0039/T5 | 建立前端标签维度与时间线展示模型 | done | T3 | frontend/src/types.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/components/detail/issueTimelineModel.ts<br>frontend/src/components/detail/issueTimelineModel.test.ts |
 | 0039 | 0039/T6 | 展示 issue 状态演进并完成跨仓验收 | done | T4, T5 | frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/styles.css<br>backend/scripts/e2e-spec-0039-issue-state-timeline.sh |
 
@@ -817,7 +817,7 @@ graph LR
 | backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032 |
+| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
 | backend/tests/designer/test_owner.py | 0029, 0032 |

@@ -42,7 +42,13 @@ SWEBENCH_PARQUET = Path(
     )
 )
 PERSONA_LIB = Path(os.environ.get("PERSONA_LIBRARY", str(ROOT / "persona_library.json")))
-PERSONA_IDS = ["SR-001", "SR-002", "SR-003", "SR-004", "SR-005"]
+PERSONA_IDS = [
+    "sr-01-willison",
+    "sr-02-ronacher",
+    "sr-03-hashimoto",
+    "sr-04-dhh",
+    "sr-05-klabnik",
+]
 # 难度 4×<15min + 4×15m-1h + 2×1-4h；10 个不同仓，避开 django 过密。
 INSTANCE_IDS = [
     "pallets__flask-5014",
@@ -366,6 +372,7 @@ def main() -> int:
                 f"designer-{i}", "designer" if roster["designer"] == 1 else f"designer#{i + 1}"
             ),
             on_event=make_event_logger(f"designer-{i}"),
+            round_provider=lambda: current["round"] or None,
         )
         for i in range(roster["designer"])
     ]
@@ -410,6 +417,40 @@ def main() -> int:
         for i in range(roster.get("divergent", 0))
     ]
 
+    def make_owner_status(agent_id: str, label: str):
+        def cb(*, running, status, detail=None, proposals=None):
+            update_agent(
+                data_dir=run_mod.DATA,
+                agent_id=agent_id,
+                role="owner",
+                label=label,
+                running=running,
+                status=status,
+                detail=detail,
+                round_no=current["round"],
+            )
+            if not running:
+                archive_agent(
+                    data_dir=run_mod.DATA,
+                    agent_id=agent_id,
+                    round_no=current["round"],
+                    extra={"kind": "owner_run", "proposals": proposals or []},
+                )
+
+        return cb
+
+    from auto_designer.designer.owner import Owner  # noqa: PLC0415
+
+    owner = Owner(
+        tracker,
+        store,
+        str(repo),
+        str(ROOT / "agent_defs" / "owner"),
+        on_status=make_owner_status("owner-0", "owner"),
+        on_event=make_event_logger("owner-0"),
+        review=roster["owner"] >= 1,
+    )
+
     raw_parallel = os.environ.get("MAX_PARALLEL_USERS", "").strip()
     max_parallel_users = int(raw_parallel) if raw_parallel.isdigit() else SESSIONS_PER_ROUND
     max_parallel_users = max(1, max_parallel_users)
@@ -428,6 +469,7 @@ def main() -> int:
         triagers=triagers,
         designers=designers,
         divergents=divergents,
+        owner=owner,
         on_round_start=on_round_start,
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,
@@ -446,6 +488,7 @@ def main() -> int:
     print(
         f"④ 跑 {run_mod.TOTAL_ROUNDS} 轮闭环（每轮 {SESSIONS_PER_ROUND} session · "
         f"{len(triagers)} triager × {len(designers)} synthesize × {len(divergents)} divergent；"
+        f"owner({'评审' if roster['owner'] >= 1 else '纯机械'}) · "
         f"交付面 vigil --parallel {roster['developer']} 常驻，"
         f"a 段并发 {max_parallel_users}）..."
     )

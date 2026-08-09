@@ -58,9 +58,10 @@ tasks:
     files:
       - backend/auto_designer/designer/designer.py
       - backend/run.py
+      - backend/scripts/run_swebench_closed_loop.py
       - backend/tests/loop/test_designer.py
-    scope: 为 Designer 注入 live round_provider，创建 from-synthesize proposal 时追加合法 round-N。
-    acceptance: 正整数轮次被写入；空值与非法值保持兼容且不猜测；既有来源标签不变。
+    scope: 为 Designer 注入 live round_provider，创建 from-synthesize proposal 时追加合法 round-N；主入口与 SWE-bench 专用入口保持同一接线，专用入口同时保留 Owner 准入链。
+    acceptance: 正整数轮次被写入；空值与非法值保持兼容且不猜测；既有来源标签不变；SWE-bench 专用入口产出轮次标签并经 Owner 进入交付面。
   - id: T5
     title: 建立前端标签维度与时间线展示模型
     status: done
