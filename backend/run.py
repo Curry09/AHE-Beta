@@ -793,6 +793,7 @@ def main() -> int:
                 f"designer-{i}", "designer" if roster["designer"] == 1 else f"designer#{i + 1}"
             ),
             on_event=make_event_logger(f"designer-{i}"),
+            round_provider=lambda: current["round"] or None,
         )
         for i in range(roster["designer"])
     ]

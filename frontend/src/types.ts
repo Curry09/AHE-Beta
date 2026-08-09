@@ -139,10 +139,67 @@ export interface IssueComment {
   created_at: string;
 }
 
+export interface IssueTimelineState {
+  labels: string[];
+  plane: Plane | null;
+  provenance: Provenance | null;
+  priority: string | null;
+  round: number | null;
+  handoff: boolean;
+  delivery_active: boolean;
+  blocked: boolean;
+  terminal: string | null;
+  conflicts: string[];
+}
+
+export interface IssueTimelineEvent {
+  id: string | number | null;
+  created_at: string;
+  actor: string;
+  type: string;
+  label: string;
+  operation: "add" | "remove" | "unknown";
+  body: string;
+}
+
+export interface IssueTimelineTransition {
+  id: string;
+  created_at: string;
+  actor: string;
+  title: string;
+  added: string[];
+  removed: string[];
+  before: IssueTimelineState;
+  after: IssueTimelineState;
+  anomaly_ids: string[];
+}
+
+export interface IssueTimelineAnomaly {
+  id: string;
+  code: string;
+  severity: "warning" | "critical" | string;
+  message: string;
+  transition_id: string | null;
+  dimensions: string[];
+}
+
+export interface IssueTimeline {
+  available: boolean;
+  reason: string | null;
+  complete: boolean;
+  events: IssueTimelineEvent[];
+  transitions: IssueTimelineTransition[];
+  current: IssueTimelineState | null;
+  historical: IssueTimelineState | null;
+  last_known: Partial<Pick<IssueTimelineState, "plane" | "provenance" | "priority" | "round">>;
+  anomalies: IssueTimelineAnomaly[];
+}
+
 export interface IssueDetailResponse {
   connected: boolean;
   issue: Issue | null;
   comments: IssueComment[];
+  timeline?: IssueTimeline;
 }
 
 export interface Commit {

@@ -12,6 +12,7 @@ import {
 } from "../../lib/issueMeta";
 import type { IssueComment } from "../../types";
 import { Markdown } from "../Markdown";
+import { buildIssueTimelineView } from "./issueTimelineModel";
 
 // triage 状态 → 中文标签（展示用）。
 const STATUS_LABEL: Record<string, string> = {
@@ -55,6 +56,14 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
   const pl = issue ? planeOf(issue) : null;
   const prov = issue ? provenanceOf(issue) : null;
   const terminal = issue ? terminalOf(issue) : null;
+  const timelineView = issue ? buildIssueTimelineView(issue, data?.timeline) : null;
+  const delivery = issue?.labels.includes("needs-human")
+    ? "阻塞 · needs-human"
+    : issue?.labels.includes("ready")
+      ? "执行中 · ready"
+      : issue?.labels.includes("openagents")
+        ? "待 intake · openagents"
+        : "—";
   const planeLabel: Record<string, string> = {
     report: "报告（待分诊）",
     proposal: "提案（待准入）",
@@ -79,63 +88,121 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
         )}
         {data && issue && (
           <>
-            <dl className="kv">
-              <dt>kind</dt>
-              <dd>
-                <span className="chip">{kind}</span>
-              </dd>
-              {(pl || terminal) && (
-                <>
-                  <dt>平面</dt>
-                  <dd>
-                    <span className="chip">
-                      {pl ? (planeLabel[pl] ?? pl) : `终态（${terminal}）`}
+            <div className="issue-dimensions" aria-label="issue 当前状态维度">
+              <div className="issue-dimension">
+                <span>平面</span>
+                <strong>{pl ? (planeLabel[pl] ?? pl) : terminal ? `终态 · ${terminal}` : "—"}</strong>
+              </div>
+              <div className="issue-dimension">
+                <span>来源</span>
+                <strong>{prov ?? "—"}</strong>
+              </div>
+              <div className="issue-dimension">
+                <span>优先级</span>
+                <strong>{prio ?? "—"}</strong>
+              </div>
+              <div className="issue-dimension">
+                <span>产生轮次</span>
+                <strong>{round == null ? "—" : `round-${round}`}</strong>
+              </div>
+              <div className="issue-dimension">
+                <span>交付</span>
+                <strong>{delivery}</strong>
+              </div>
+              <div className="issue-dimension">
+                <span>类型 / 分诊</span>
+                <strong>{status ? `${kind} · ${STATUS_LABEL[status] ?? status}` : kind}</strong>
+              </div>
+            </div>
+
+            {timelineView && timelineView.anomalies.length > 0 && (
+              <div className="timeline-alerts" role="alert">
+                <div className="block-title">状态完整性告警 · {timelineView.anomalies.length}</div>
+                {timelineView.anomalies.map((anomaly) => (
+                  <div key={anomaly.id} className={`timeline-alert ${anomaly.severity}`}>
+                    <strong>{anomaly.code}</strong>
+                    <span>{anomaly.message}</span>
+                  </div>
+                ))}
+                {Object.values(timelineView.lastKnown).some((value) => value != null) && (
+                  <div className="timeline-compare">
+                    <span>
+                      历史最后已知：{timelineView.lastKnown.plane ?? "—"} ·{" "}
+                      {timelineView.lastKnown.provenance ?? "—"} ·{" "}
+                      {timelineView.lastKnown.priority ?? "—"} ·{" "}
+                      {timelineView.lastKnown.round == null
+                        ? "—"
+                        : `round-${timelineView.lastKnown.round}`}
                     </span>
-                  </dd>
-                </>
+                    <span>
+                      当前 Gitea：{pl ?? terminal ?? "无平面"} · {prov ?? "无来源"} ·{" "}
+                      {prio ?? "无优先级"} · {round == null ? "无轮次" : `round-${round}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="block issue-timeline-block">
+              <div className="block-title">
+                状态演进
+                {timelineView?.available && !timelineView.complete && (
+                  <span className="timeline-confidence">历史不完整</span>
+                )}
+              </div>
+              {!timelineView?.available && (
+                <div className="timeline-unavailable">
+                  标签时间线不可用：{timelineView?.unavailableReason ?? "未知原因"}
+                </div>
               )}
-              {prov && (
-                <>
-                  <dt>来源</dt>
-                  <dd>
-                    <span className="chip">{prov}</span>
-                  </dd>
-                </>
+              {timelineView?.available && timelineView.transitions.length === 0 && (
+                <div className="empty">尚未观测到标签迁移</div>
               )}
-              {status && (
-                <>
-                  <dt>triage 状态</dt>
-                  <dd>
-                    <span className="chip">{STATUS_LABEL[status] ?? status}</span>
-                  </dd>
-                </>
+              {timelineView?.available && timelineView.transitions.length > 0 && (
+                <div className="issue-timeline">
+                  {timelineView.transitions.map((transition) => {
+                    const raw = data.timeline?.transitions.find((item) => item.id === transition.id);
+                    return (
+                      <div key={transition.id} className={`timeline-step ${transition.severity}`}>
+                        <div className="timeline-marker" />
+                        <div className="timeline-step-body">
+                          <div className="timeline-step-head">
+                            <strong>{transition.title}</strong>
+                            <span>{fmtDate(transition.createdAt)}</span>
+                            <span>{transition.actor || "未知操作者"}</span>
+                          </div>
+                          <div className="timeline-state-change">
+                            <span>{transition.from}</span>
+                            <b>→</b>
+                            <span>{transition.to}</span>
+                          </div>
+                          <div className="timeline-label-change">
+                            {transition.added.map((label) => (
+                              <code key={`add-${label}`} className="label-add">
+                                +{label}
+                              </code>
+                            ))}
+                            {transition.removed.map((label) => (
+                              <code key={`remove-${label}`} className="label-remove">
+                                -{label}
+                              </code>
+                            ))}
+                          </div>
+                          {raw && (
+                            <details className="timeline-debug">
+                              <summary>状态快照</summary>
+                              <pre>{JSON.stringify({ before: raw.before, after: raw.after }, null, 2)}</pre>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-              {prio && (
-                <>
-                  <dt>优先级</dt>
-                  <dd>
-                    <span className="chip">{prio}</span>
-                  </dd>
-                </>
-              )}
-              {round != null && (
-                <>
-                  <dt>轮次</dt>
-                  <dd>round-{round}</dd>
-                </>
-              )}
-              {issue.labels.length > 0 && (
-                <>
-                  <dt>labels</dt>
-                  <dd>
-                    {issue.labels.map((l) => (
-                      <span key={l} className="chip" style={{ marginRight: 4 }}>
-                        {l}
-                      </span>
-                    ))}
-                  </dd>
-                </>
-              )}
+            </div>
+
+            <dl className="kv issue-secondary-meta">
               {coveredBy != null && (
                 <>
                   <dt>覆盖于</dt>
@@ -196,6 +263,36 @@ export function IssueDetailView(props: { number: number; onBack: () => void }) {
                 ))}
               </div>
             </div>
+            <details className="block issue-debug">
+              <summary>Debug · 原始标签与事件</summary>
+              <div className="debug-label-groups">
+                {(timelineView?.groups ?? []).map((group) => (
+                  <div key={group.key}>
+                    <span>{group.label}</span>
+                    <div>
+                      {group.labels.map((label) => (
+                        <code key={label}>{label}</code>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {(data.timeline?.events.length ?? 0) > 0 && (
+                <div className="raw-events">
+                  {data.timeline?.events.map((event, index) => (
+                    <div key={`${event.id ?? "event"}-${index}`}>
+                      <span>{fmtDate(event.created_at)}</span>
+                      <span>{event.actor || "—"}</span>
+                      <code>
+                        {event.operation === "unknown"
+                          ? event.type
+                          : `${event.operation === "add" ? "+" : "-"}${event.label}`}
+                      </code>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </details>
           </>
         )}
       </div>

@@ -152,6 +152,7 @@ _（缺模块级 docstring）_
 |----|----|
 | `__init__.py` | （缺文件级 docstring） |
 | `api.py` | 前端观测看板的只读 HTTP 层（FastAPI）。 |
+| `issue_timeline.py` | Spec-0039/T2：把 Gitea label timeline 折叠为可回放的 issue 状态与完整性异常。 |
 
 ## 依赖关系图（import）
 
@@ -229,6 +230,7 @@ graph LR
     nauto_designer_user_sim_workspace["sim.workspace"]
     nauto_designer_web["auto_designer.web"]
     nauto_designer_web_api["web.api"]
+    nauto_designer_web_issue_timeline["web.issue_timeline"]
     nauto_designer_designer_agent_contract --> nauto_designer_designer_issue_schema
     nauto_designer_designer_agent_runtime --> nauto_designer_designer_session_timeline
     nauto_designer_designer_agent_runtime --> nauto_designer_loop_live_tracer
@@ -361,4 +363,6 @@ graph LR
     nauto_designer_web_api --> nauto_designer_tracker_base
     nauto_designer_web_api --> nauto_designer_tracker_gitea
     nauto_designer_web_api --> nauto_designer_user_session_store
+    nauto_designer_web_api --> nauto_designer_web_issue_timeline
+    nauto_designer_web_issue_timeline --> nauto_designer_designer_issue_schema
 ```

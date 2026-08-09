@@ -118,6 +118,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0038 OpenAgents 交付面独立页面与园区入口
 前端新增 OpenAgents 独立交付面页面，并将 Agent Company 大楼扩展为需求面主楼与 OpenAgents 交付厂房组成的园区；二者以小型货运无人机/运输机表达交接关系，厂房整体点击进入独立交付页。
 
+### 0039 Issue 标签维度与状态演进时间线
+将 Gitea 标签事件归一为可回放的 issue 状态演进，在详情页按平面、来源、优先级、轮次与交付阻塞分维展示，并检测标签替换造成的元数据丢失。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -285,6 +288,12 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0038 | 0038/T5 | 园区厂房语义、状态聚合与交付边界 | done | T2, T3 | frontend/src/components/BuildingView.tsx<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.ts |
 | 0038 | 0038/T6 | 园区沙盘、厂房入口与双停机坪航线 | done | T4, T5 | frontend/src/components/building/BuildingTower.tsx<br>frontend/src/styles.css |
 | 0038 | 0038/T7 | OpenAgents 聚合模型回归测试 | done | T3, T5 | frontend/package.json<br>frontend/package-lock.json<br>frontend/src/components/openagents/openAgentsModel.test.ts |
+| 0039 | 0039/T1 | 固化规格与跨仓验收边界 | done | — | docs/specs/0039-issue-state-timeline.md |
+| 0039 | 0039/T2 | 读取并折叠 Gitea issue timeline | done | T1 | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/web/issue_timeline.py<br>backend/tests/tracker/test_gitea_timeline.py |
+| 0039 | 0039/T3 | 扩展 issue 详情 timeline API | done | T2 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
+| 0039 | 0039/T4 | 为 Designer 综合票写入轮次标签 | done | T1 | backend/auto_designer/designer/designer.py<br>backend/run.py<br>backend/tests/loop/test_designer.py |
+| 0039 | 0039/T5 | 建立前端标签维度与时间线展示模型 | done | T3 | frontend/src/types.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/components/detail/issueTimelineModel.ts<br>frontend/src/components/detail/issueTimelineModel.test.ts |
+| 0039 | 0039/T6 | 展示 issue 状态演进并完成跨仓验收 | done | T4, T5 | frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/styles.css<br>backend/scripts/e2e-spec-0039-issue-state-timeline.sh |
 
 ## 跨 feature 关系图
 
@@ -529,6 +538,14 @@ graph LR
         n0038_T6["T6 园区沙盘、厂房入口与双停机坪航线"]
         n0038_T7["T7 OpenAgents 聚合模型回归测试"]
     end
+    subgraph G0039[0039 issue-state-timeline]
+        n0039_T1["T1 固化规格与跨仓验收边界"]
+        n0039_T2["T2 读取并折叠 Gitea issue timeline"]
+        n0039_T3["T3 扩展 issue 详情 timeline API"]
+        n0039_T4["T4 为 Designer 综合票写入轮次标签"]
+        n0039_T5["T5 建立前端标签维度与时间线展示模型"]
+        n0039_T6["T6 展示 issue 状态演进并完成跨仓验收"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -681,6 +698,12 @@ graph LR
     n0038_T6 --> n0038_T5
     n0038_T7 --> n0038_T3
     n0038_T7 --> n0038_T5
+    n0039_T2 --> n0039_T1
+    n0039_T3 --> n0039_T2
+    n0039_T4 --> n0039_T1
+    n0039_T5 --> n0039_T3
+    n0039_T6 --> n0039_T4
+    n0039_T6 --> n0039_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -745,7 +768,7 @@ graph LR
 | backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029 |
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029 |
 | backend/auto_designer/designer/agent_contract.py | 0027, 0029 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039 |
 | backend/auto_designer/designer/divergent.py | 0028, 0029 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
 | backend/auto_designer/designer/owner.py | 0029, 0032 |
@@ -766,7 +789,7 @@ graph LR
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035 |
 | backend/auto_designer/tracker/base.py | 0001, 0025 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025 |
-| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032 |
+| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035 |
@@ -781,7 +804,7 @@ graph LR
 | backend/auto_designer/user/sim/state.py | 0005, 0012, 0037 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
-| backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032 |
+| backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032, 0039 |
 | backend/deploy/gitea/bootstrap.sh | 0002, 0032 |
 | backend/deploy/gitea/docker-compose.yml | 0002, 0032, 0033 |
 | backend/harness_template/HELP.md | 0030, 0035 |
@@ -791,7 +814,7 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035 |
 | backend/harness_template/params.yaml | 0003, 0030 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/run_swebench_closed_loop.py | 0028, 0032 |
@@ -804,7 +827,7 @@ graph LR
 | backend/tests/dev/test_harness_boundary.py | 0015, 0030 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039 |
 | backend/tests/loop/test_live.py | 0017, 0026 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033 |
@@ -829,7 +852,7 @@ graph LR
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
-| backend/tests/web/test_api.py | 0020, 0025, 0029, 0032 |
+| backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039 |
 | frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032 |
 | frontend/src/components/BuildingView.tsx | 0034, 0038 |
@@ -838,11 +861,11 @@ graph LR
 | frontend/src/components/building/BuildingTower.tsx | 0034, 0038 |
 | frontend/src/components/building/FloorWorkspace.tsx | 0034, 0038 |
 | frontend/src/components/building/buildingModel.ts | 0034, 0038 |
-| frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026, 0029 |
+| frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026, 0029, 0039 |
 | frontend/src/components/detail/SessionDetail.tsx | 0026, 0034 |
-| frontend/src/lib/issueMeta.ts | 0025, 0029, 0032 |
-| frontend/src/styles.css | 0026, 0034, 0038 |
-| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038 |
+| frontend/src/lib/issueMeta.ts | 0025, 0029, 0032, 0039 |
+| frontend/src/styles.css | 0026, 0034, 0038, 0039 |
+| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038, 0039 |
 | tools/persona-distill/card-schema.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/SKILL.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/reference.md | 0006, 0037 |
@@ -1978,4 +2001,41 @@ graph LR
     class v_T5_1 st_done;
     class v_T6_1 st_done;
     class v_T7_1 st_done;
+```
+
+### 0039 Issue 标签维度与状态演进时间线（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 固化规格与跨仓验收边界"]
+    nT2["T2 读取并折叠 Gitea issue timeline"]
+    nT3["T3 扩展 issue 详情 timeline API"]
+    nT4["T4 为 Designer 综合票写入轮次标签"]
+    nT5["T5 建立前端标签维度与时间线展示模型"]
+    nT6["T6 展示 issue 状态演进并完成跨仓验收"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT1 --> nT4
+    nT3 --> nT5
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```

@@ -34,6 +34,7 @@ from auto_designer.loop.metrics import Metrics
 from auto_designer.loop.roster import load_roster
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
+from auto_designer.web.issue_timeline import build_issue_timeline, unavailable_timeline
 
 
 class _SPAStaticFiles(StaticFiles):
@@ -138,19 +139,38 @@ def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict
 
 
 def _issue_detail(*, tracker: IssueTracker | None, number: int) -> dict[str, object]:
-    """单条 issue 全量 + 评论时间线。不存在抛 404；无观测能力/读失败 connected=False。"""
+    """单条 issue 全量 + 评论 + 标签演进。timeline 单独失败不拖断 issue/comments。"""
     get_issue = getattr(tracker, "get_issue", None)
     list_comments = getattr(tracker, "list_comments", None)
     if tracker is None or not callable(get_issue) or not callable(list_comments):
-        return {"connected": False, "issue": None, "comments": []}
+        return {
+            "connected": False,
+            "issue": None,
+            "comments": [],
+            "timeline": unavailable_timeline(reason="issue detail capability unavailable"),
+        }
     try:
         issue = get_issue(number=number)
         comments = list_comments(number=number)
     except Exception as exc:
         if getattr(exc, "status", None) == 404:
             raise HTTPException(status_code=404, detail=f"issue not found: #{number}") from None
-        return {"connected": False, "issue": None, "comments": []}
-    return {"connected": True, "issue": issue, "comments": comments}
+        return {
+            "connected": False,
+            "issue": None,
+            "comments": [],
+            "timeline": unavailable_timeline(reason="issue detail read failed"),
+        }
+
+    list_timeline = getattr(tracker, "list_timeline", None)
+    if not callable(list_timeline):
+        timeline = unavailable_timeline()
+    else:
+        try:
+            timeline = build_issue_timeline(issue=issue, events=list_timeline(number=number))
+        except Exception as exc:
+            timeline = unavailable_timeline(reason=f"timeline read failed: {type(exc).__name__}")
+    return {"connected": True, "issue": issue, "comments": comments, "timeline": timeline}
 
 
 def _commit_detail(*, tracker: IssueTracker | None, sha: str) -> dict[str, object]:

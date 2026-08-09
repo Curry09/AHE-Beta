@@ -60,7 +60,13 @@ def _seed_session(store: SessionStore, *, score: int, reason: str = "r") -> None
     )
 
 
-def _designer(tmp_path: Path, tracker: FakeTracker, canned: str) -> _StubDesigner:
+def _designer(
+    tmp_path: Path,
+    tracker: FakeTracker,
+    canned: str,
+    *,
+    round_provider=None,
+) -> _StubDesigner:
     store = SessionStore(tmp_path / "sessions")
     _seed_session(store, score=2, reason="等太久")
     _seed_session(store, score=1, reason="超时两次颗粒无收")
@@ -70,6 +76,7 @@ def _designer(tmp_path: Path, tracker: FakeTracker, canned: str) -> _StubDesigne
         str(tmp_path / "harness"),
         str(tmp_path / "agent_def"),
         canned=canned,
+        round_provider=round_provider,
     )
 
 
@@ -133,6 +140,23 @@ def test_structural_proposal_lands_unclaimable(tmp_path) -> None:
     assert not sc.is_ready(labels=rfc["labels"], state="open")
     assert "### 问题\n\n大任务撞预算" in rfc["body"]  # 按 RFC schema 渲染
     assert "### 方向\n\n加预算感知" in rfc["body"]
+
+
+def test_structural_proposal_carries_live_round_label(tmp_path) -> None:
+    tracker = FakeTracker()
+    outcome = _designer(tmp_path, tracker, _rfc_canned(), round_provider=lambda: 4).propose_once()
+
+    assert "round-4" in tracker.issue(outcome.proposal_numbers[0])["labels"]
+
+
+def test_structural_proposal_does_not_guess_invalid_round(tmp_path) -> None:
+    for value in (None, 0, -1, True):
+        tracker = FakeTracker()
+        outcome = _designer(
+            tmp_path, tracker, _rfc_canned(), round_provider=lambda value=value: value
+        ).propose_once()
+        labels = tracker.issue(outcome.proposal_numbers[0])["labels"]
+        assert not any(label.startswith("round-") for label in labels)
 
 
 def test_inputs_are_ready_plus_proposal_index(tmp_path) -> None:
