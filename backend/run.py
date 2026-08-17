@@ -191,11 +191,9 @@ def _seed_harness_repo() -> Path:
     )
     _git(HARNESS_REPO, "add", ".")
     _git(HARNESS_REPO, "commit", "-m", "seed: harness v0")
-    # 提交边界硬闸：装 pre-commit 钩子，交付面 agent 想把 harness 本体外的任务代码提交进来会被直接拒
-    # （git worktree 共享 hooks，vigil 的 per-issue worktree 同受此闸约束）。
-    # Spec-0032 实证修复#1：钩子装在 seed 提交**之后**——seed 含平台制品 .gitea/（CI 定义），它**故意
-    # 不入白名单**（CI 是随 seed 下发的平台制品，dev 不得改写自己的质量闸）；先提交（可信模板）后装闸，
-    # 此后所有 dev 提交照常受钩。服务端兜底见 smoke.yml 的边界检查步（--no-verify 也绕不开）。
+    # 提交边界硬闸：装 pre-commit 钩子。容器围堵后改为拒绝清单（密钥 / .openagents），不再用顶层
+    # 白名单锁死产品形状（docs/specs、结构性演进要放行）。git worktree 共享 hooks。
+    # 钩子装在 seed 提交之后。服务端兜底见 smoke.yml 的边界检查步（--no-verify 也绕不开）。
     install_pre_commit(HARNESS_REPO)
     return HARNESS_REPO
 
@@ -243,14 +241,14 @@ def _reset_to_initial(repo: Path, tracker) -> None:
 
 
 # Spec-0032/T5：交付面 stages 定稿（写进 harness 仓 .openagents/openagents.yml 的单一出处）。
-# triage=skip：准入已由 Owner 在需求面完成（三平面唯一准入不动摇）；rfc=skip：harness 仓无 spec
-# 工具链（起步，OpenAgents 侧会显式告警，可接受）；ci 缺省 skip、经 VIGIL_CI_STAGE=agent 开启——
-# vigil 判定表「零 check=永等 CI」，须先验证 T6 的 act_runner 真在跑（bootstrap.sh 有提示），再开
-# ci 闸，否则全部票卡到看门狗；e2e=skip 二期；review/merge=agent：工程质量闸全自动（review 在，
-# 不触 OpenAgents「不许零闸」守卫）。
+# Spec-0040/T1：rfc 从 skip 改为 agent——solve 先 drafter 落 docs/specs，再 implement
+# （spec CLI 在 vigil 镜像内，不进 harness 仓）。triage=skip：准入已由 Owner 完成；
+# ci 缺省 skip、经 VIGIL_CI_STAGE=agent 开启——vigil 判定表「零 check=永等 CI」，须先验证
+# act_runner 真在跑再开 ci 闸，否则全部票卡到看门狗；e2e=skip 二期；
+# review/merge=agent：工程质量闸全自动（review 在，不触 OpenAgents「不许零闸」守卫）。
 _VIGIL_STAGES: dict[str, str] = {
     "triage": "skip",
-    "rfc": "skip",
+    "rfc": "agent",
     "conflict": "agent",
     "ci": "skip",  # write_openagents_config 按 VIGIL_CI_STAGE 覆盖
     "e2e": "skip",
@@ -327,12 +325,19 @@ _CLAUDE_CONFIG_ENVS = (
 
 
 class VigilHandle:
-    """交付面运行句柄：mode + 托管进程（subprocess=vigil 本体；container=docker logs 跟随器）+ 日志句柄。"""
+    """交付面运行句柄：mode + 托管进程（subprocess=vigil 本体；container=docker logs 跟随器）+ 日志句柄。
 
-    def __init__(self, *, mode: str, proc: subprocess.Popen, log_handle: object) -> None:
+    keep_alive：需求面收尾是否拆掉 vigil。Spec-0040/T1：缺省常驻（交付面与 round 解耦）；
+    仅 VIGIL_KEEP_ALIVE=0/false/no/off 时 stop_vigil 才 docker rm / 杀 subprocess。
+    """
+
+    def __init__(
+        self, *, mode: str, proc: subprocess.Popen, log_handle: object, keep_alive: bool
+    ) -> None:
         self.mode = mode
         self.proc = proc
         self.log_handle = log_handle
+        self.keep_alive = keep_alive
 
 
 def vigil_mode() -> str:
@@ -341,6 +346,15 @@ def vigil_mode() -> str:
     if raw not in ("container", "subprocess"):
         raise SystemExit(f"VIGIL_MODE 非法：{raw!r}（可选 container / subprocess）")
     return raw
+
+
+def vigil_keep_alive() -> bool:
+    """Return whether vigil should survive the demand-side finally.
+
+    Spec-0040/T1：缺省常驻。仅显式 0/false/no/off 时需求面收尾才拆掉 vigil。
+    """
+    raw = os.environ.get("VIGIL_KEEP_ALIVE", "").strip().lower()
+    return raw not in ("0", "false", "no", "off")
 
 
 def _vigil_internal_gitea_url() -> str:
@@ -377,6 +391,7 @@ def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: P
     （配置写进宿主仓、Popen 直跑），无围堵、带醒目告警。
     """
     mode = vigil_mode()
+    keep_alive = vigil_keep_alive()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     if mode == "subprocess":
         print(
@@ -386,19 +401,27 @@ def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: P
         ensure_openagents_cli()
         write_openagents_config(repo=repo, gitea=gitea)
         return _start_vigil_subprocess(
-            repo=repo, parallel=parallel, gitea_token=gitea["TOKEN"], log_path=log_path
+            repo=repo,
+            parallel=parallel,
+            gitea_token=gitea["TOKEN"],
+            log_path=log_path,
+            keep_alive=keep_alive,
         )
     _ensure_vigil_container_prereqs()
     staging = _VIGIL_CONFIG_STAGING
     # 同一份配置、两个可达性域的唯一分叉点：容器内 base_url 用内网服务名地址。
     write_openagents_config(repo=staging, gitea={**gitea, "GITEA_URL": _vigil_internal_gitea_url()})
     return _start_vigil_container(
-        parallel=parallel, gitea=gitea, staging=staging, log_path=log_path
+        parallel=parallel,
+        gitea=gitea,
+        staging=staging,
+        log_path=log_path,
+        keep_alive=keep_alive,
     )
 
 
 def _start_vigil_subprocess(
-    *, repo: Path, parallel: int, gitea_token: str, log_path: Path
+    *, repo: Path, parallel: int, gitea_token: str, log_path: Path, keep_alive: bool
 ) -> VigilHandle:
     """宿主直跑：`openagents vigil --parallel K`（cwd=harness 仓，日志落 log_path）。
 
@@ -413,18 +436,42 @@ def _start_vigil_subprocess(
         stdout=log_handle,
         stderr=subprocess.STDOUT,
     )
-    return VigilHandle(mode="subprocess", proc=proc, log_handle=log_handle)
+    return VigilHandle(mode="subprocess", proc=proc, log_handle=log_handle, keep_alive=keep_alive)
+
+
+def _container_is_running(*, name: str) -> bool:
+    """`docker inspect` 报 Running=true 才算已在跑（不存在 / 已退出都是 false）。"""
+    inspect = subprocess.run(
+        ["docker", "inspect", "-f", "{{.State.Running}}", name],
+        capture_output=True,
+        text=True,
+    )
+    return inspect.returncode == 0 and inspect.stdout.strip().lower() == "true"
+
+
+def _attach_container_logs(*, log_path: Path, keep_alive: bool) -> VigilHandle:
+    """把 `docker logs -f` 接到 log_path；不负责 docker run（新建与复用共用）。"""
+    log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随跟随器，stop 时关闭
+    logs = subprocess.Popen(
+        ["docker", "logs", "-f", _VIGIL_CONTAINER], stdout=log_handle, stderr=subprocess.STDOUT
+    )
+    return VigilHandle(mode="container", proc=logs, log_handle=log_handle, keep_alive=keep_alive)
 
 
 def _start_vigil_container(
-    *, parallel: int, gitea: dict[str, str], staging: Path, log_path: Path
+    *, parallel: int, gitea: dict[str, str], staging: Path, log_path: Path, keep_alive: bool
 ) -> VigilHandle:
     """围堵盒：docker run -d --rm 起 vigil 容器，日志经 `docker logs -f` 跟随进 log_path。
 
     挂载面只有两处只读：staging 配置（/config）与 entrypoint 脚本；凭证（Gitea token / claude
     凭证）只经容器 env 注入（宿主侧 docker inspect 可见——宿主本就是信任边界内侧）。clone 地址
     与代理均为盒内网络名（vigil-net internal，直连外网物理不通）。
+
+    容器已在跑（需求面上一轮 keep-alive 留下的）→ 只挂日志跟随器，不 docker run（同名会撞车）。
     """
+    if _container_is_running(name=_VIGIL_CONTAINER):
+        print(f"[vigil] 容器 {_VIGIL_CONTAINER} 已在跑，复用（不 docker run）")
+        return _attach_container_logs(log_path=log_path, keep_alive=keep_alive)
     repo_url = _gitea_remote_url({**gitea, "GITEA_URL": _vigil_internal_gitea_url()})
     args = [
         "docker", "run", "-d", "--rm",
@@ -454,24 +501,32 @@ def _start_vigil_container(
     started = subprocess.run(args, capture_output=True, text=True)
     if started.returncode != 0:
         raise SystemExit(f"vigil 容器启动失败：{started.stderr.strip()[:300]}")
-    log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随容器，stop 时关闭
-    logs = subprocess.Popen(
-        ["docker", "logs", "-f", _VIGIL_CONTAINER], stdout=log_handle, stderr=subprocess.STDOUT
-    )
-    return VigilHandle(mode="container", proc=logs, log_handle=log_handle)
+    return _attach_container_logs(log_path=log_path, keep_alive=keep_alive)
+
+
+def _stop_managed_proc(*, proc: subprocess.Popen) -> None:
+    """停托管进程（container=日志跟随器；subprocess=vigil 本体）。超时则 kill。"""
+    proc.terminate()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=5)
 
 
 def stop_vigil(handle: VigilHandle) -> None:
-    """停交付面：container 先 `docker rm -f`（--rm 自清理兜底）；随后收托管进程与日志句柄。"""
+    """Stop the delivery-plane process according to keep_alive.
+
+    Spec-0040/T1：keep_alive 时 container 只拆日志跟随器、不 docker rm；subprocess 不杀 vigil 本体。
+    """
     try:
+        if handle.keep_alive:
+            if handle.mode == "container":
+                _stop_managed_proc(proc=handle.proc)
+            return
         if handle.mode == "container":
             subprocess.run(["docker", "rm", "-f", _VIGIL_CONTAINER], capture_output=True, text=True)
-        handle.proc.terminate()
-        try:
-            handle.proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            handle.proc.kill()
-            handle.proc.wait(timeout=5)
+        _stop_managed_proc(proc=handle.proc)
     finally:
         try:
             handle.log_handle.close()  # type: ignore[attr-defined]
@@ -927,7 +982,8 @@ def main() -> int:
     try:
         refs = orch.run(TOTAL_ROUNDS)
     finally:
-        # 无论正常结束还是中途炸掉：先停交付面（不再吃新票），再把运行态落 running=False。
+        # Spec-0040/T1：需求面收尾缺省 keep-alive（只拆日志跟随器，交付面继续消化 ready 票）。
+        # VIGIL_KEEP_ALIVE=0 才 docker rm / 杀 subprocess。
         stop_vigil(vigil)
         update_live_run(
             data_dir=DATA,

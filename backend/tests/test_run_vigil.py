@@ -1,6 +1,8 @@
-# Spec-0032/T5 + 0033/T2：vigil 接线单测——配置落盘、双模式预检与启停（mock docker/Popen，不触真容器）。
+# Spec-0032/T5 + 0033/T2 + 0040/T1：vigil 接线单测——配置落盘、rfc=agent、keep-alive、
+# 双模式预检与启停（mock docker/Popen，不触真容器）。
 """验证 run.py 的交付面接线：openagents.yml 内容与 stages 定稿一致、token 不落盘、
-VIGIL_MODE 双模式（container 缺省围堵盒 / subprocess 显式联调）各自的预检、启停与 env 注入。"""
+VIGIL_MODE 双模式（container 缺省围堵盒 / subprocess 显式联调）各自的预检、启停与 env 注入。
+Spec-0040/T1：stages.rfc=agent；VIGIL_KEEP_ALIVE 缺省常驻。"""
 
 from __future__ import annotations
 
@@ -41,10 +43,10 @@ def test_write_openagents_config_matches_stage_finalization(tmp_path: Path) -> N
         "repo": "harness",
         "token_env": "GITEA_TOKEN",
     }
-    # stages 定稿（Spec-0032 §4.4）：triage/rfc/ci/e2e=skip、conflict/review/merge=agent。
+    # Spec-0040/T1：stages 定稿 triage/ci/e2e=skip、rfc/conflict/review/merge=agent。
     assert data["stages"] == {
         "triage": "skip",
-        "rfc": "skip",
+        "rfc": "agent",
         "conflict": "agent",
         "ci": "skip",
         "e2e": "skip",
@@ -89,6 +91,21 @@ def test_remote_tag_refs_skips_peeled_entries() -> None:
 def test_vigil_mode_defaults_to_container(monkeypatch) -> None:
     monkeypatch.delenv("VIGIL_MODE", raising=False)
     assert run.vigil_mode() == "container"  # 围堵形态是缺省（Spec-0033）
+
+
+def test_vigil_keep_alive_defaults_on(monkeypatch) -> None:
+    monkeypatch.delenv("VIGIL_KEEP_ALIVE", raising=False)
+    assert run.vigil_keep_alive() is True
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "0")
+    assert run.vigil_keep_alive() is False
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "false")
+    assert run.vigil_keep_alive() is False
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "no")
+    assert run.vigil_keep_alive() is False
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "off")
+    assert run.vigil_keep_alive() is False
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "1")
+    assert run.vigil_keep_alive() is True
 
 
 def test_vigil_mode_invalid_fails_loud(monkeypatch) -> None:
@@ -259,12 +276,43 @@ def test_container_internal_url_overridable(tmp_path: Path, monkeypatch) -> None
 
 def test_container_stop_removes_container(tmp_path: Path, monkeypatch) -> None:
     calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "0")
     handle = run.start_vigil(
         repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
     )
     run.stop_vigil(handle)
     assert ["docker", "rm", "-f", run._VIGIL_CONTAINER] in calls["runs"]
     assert calls.get("terminated") and calls.get("waited")
+
+
+def test_container_keep_alive_does_not_remove_container(tmp_path: Path, monkeypatch) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.delenv("VIGIL_KEEP_ALIVE", raising=False)
+    handle = run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    assert handle.keep_alive is True
+    run.stop_vigil(handle)
+    assert ["docker", "rm", "-f", run._VIGIL_CONTAINER] not in calls["runs"]
+    assert calls.get("terminated") and calls.get("waited")  # 只拆日志跟随器
+
+
+def test_container_reuses_running_instance(tmp_path: Path, monkeypatch) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+
+    def _fake_run(argv, **kw):
+        calls["runs"].append(list(argv))
+        if list(argv)[:3] == ["docker", "inspect", "-f"]:
+            return subprocess.CompletedProcess(argv, 0, "true\n", "")
+        return subprocess.CompletedProcess(argv, 0, "container-id", "")
+
+    monkeypatch.setattr(run.subprocess, "run", _fake_run)
+    handle = run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    assert handle.mode == "container"
+    assert not any(argv[:2] == ["docker", "run"] for argv in calls["runs"])
+    assert calls["popen"][:3] == ["docker", "logs", "-f"]
 
 
 # --------------------------------------------------------------------------------------------------
@@ -275,6 +323,7 @@ def test_container_stop_removes_container(tmp_path: Path, monkeypatch) -> None:
 def test_subprocess_start_spawns_with_token_env_and_cwd(tmp_path: Path, monkeypatch) -> None:
     calls: dict = {}
     monkeypatch.setenv("VIGIL_MODE", "subprocess")
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "0")
     monkeypatch.setattr(run.shutil, "which", lambda name: "/usr/bin/openagents")
 
     def _fake_popen(argv, *, cwd, env, stdout, stderr):
@@ -297,6 +346,26 @@ def test_subprocess_start_spawns_with_token_env_and_cwd(tmp_path: Path, monkeypa
     assert calls.get("terminated") and calls.get("waited")
 
 
+def test_subprocess_keep_alive_does_not_kill_proc(tmp_path: Path, monkeypatch) -> None:
+    calls: dict = {}
+    monkeypatch.setenv("VIGIL_MODE", "subprocess")
+    monkeypatch.delenv("VIGIL_KEEP_ALIVE", raising=False)
+    monkeypatch.setattr(run.shutil, "which", lambda name: "/usr/bin/openagents")
+
+    def _fake_popen(argv, *, cwd, env, stdout, stderr):
+        calls.update(argv=list(argv), cwd=cwd, env=env)
+        return _FakeProc(calls)
+
+    monkeypatch.setattr(run.subprocess, "Popen", _fake_popen)
+    repo = tmp_path / "harness-repo"
+    repo.mkdir()
+    handle = run.start_vigil(
+        repo=repo, parallel=1, gitea=_GITEA, log_path=tmp_path / "data" / "vigil.log"
+    )
+    run.stop_vigil(handle)
+    assert not calls.get("terminated")
+
+
 def test_stop_vigil_kills_on_timeout(tmp_path: Path) -> None:
     events = []
 
@@ -317,5 +386,7 @@ def test_stop_vigil_kills_on_timeout(tmp_path: Path) -> None:
         def close(self):
             events.append("log-closed")
 
-    run.stop_vigil(run.VigilHandle(mode="subprocess", proc=_Stuck(), log_handle=_Log()))
+    run.stop_vigil(
+        run.VigilHandle(mode="subprocess", proc=_Stuck(), log_handle=_Log(), keep_alive=False)
+    )
     assert events == ["terminate", "wait-timeout", "killed", "wait-after-kill", "log-closed"]
