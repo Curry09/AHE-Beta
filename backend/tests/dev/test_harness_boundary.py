@@ -1,4 +1,7 @@
-"""harness 提交边界闸单测：violations 判定 + 安装后的 pre-commit 钩子真拦越界提交/放行合法提交。"""
+"""harness 提交边界闸单测：violations 判定 + 安装后的 pre-commit 钩子真拦密钥/放行结构演进。
+
+Spec-0040/T2: 拒绝清单放行 docs/specs 与结构性演进，拒绝 .env 与 .openagents。
+"""
 
 from __future__ import annotations
 
@@ -6,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 from auto_designer.dev.harness_boundary import (
-    ALLOWED_TOP,
+    DENIED_TOP,
     install_pre_commit,
     render_hook,
     violations,
@@ -29,122 +32,95 @@ def _seed_repo(tmp_path: Path) -> Path:
     install_pre_commit(repo)
     (repo / "entry.py").write_text("print('v0')\n", encoding="utf-8")
     assert _git(repo, "add", ".").returncode == 0
-    assert _git(repo, "commit", "-m", "seed").returncode == 0  # 本体文件 → 钩子放行
+    assert _git(repo, "commit", "-m", "seed").returncode == 0
     return repo
 
 
-def test_violations_flags_only_out_of_bounds() -> None:
+def test_violations_flags_only_secrets_and_runtime() -> None:
     staged = [
-        "entry.py",  # 本体
-        "agents/main.md",  # 本体子路径
-        "tools/x.tool.yaml",
-        "HELP.md",
-        "RUNTIME.md",
-        ".env.example",
-        "requirements.txt",
-        "scripts/check.sh",
-        ".gitignore",
-        "tests/test_entry.py",  # 合法：harness 自身的回归测试
-        "__pycache__/entry.cpython-312.pyc",  # 噪声 → 忽略
-        "README.md",  # 越界：已退场文档
-        "USER.md",  # 越界：已退场文档
-        "INTERFACE.md",  # 越界：接口文档归平台侧
-        "MANUAL.md",  # 越界：已退场 legacy 文档
-        "unicode_ascii/core.py",  # 越界：任务代码
-        "pyproject.toml",  # 越界：项目脚手架
-        ".env",  # 越界：真实密钥文件
-        "test_toplevel.py",  # 越界：顶层散落测试（须进 tests/）
+        "entry.py",
+        "agents/main.md",
+        "docs/specs/0001-version-command.md",  # RFC 施工规格：放行
+        "docs/specs/OVERVIEW.md",
+        "pyproject.toml",  # 结构性演进：放行
+        "README.md",
+        "src/harness/cli.py",
+        "unicode_ascii/core.py",  # 容器围堵后不再当越界（agent 看不见宿主任务仓）
+        "test_toplevel.py",
+        ".gitea/workflows/smoke.yml",
+        "__pycache__/entry.cpython-312.pyc",
+        ".env",
+        ".env.local",
+        "secrets/.env.production",
+        ".env.example",  # 模板：放行
+        ".openagents/vigil-queue.db",
     ]
     assert violations(staged) == [
-        "README.md",
-        "USER.md",
-        "INTERFACE.md",
-        "MANUAL.md",
-        "unicode_ascii/core.py",
-        "pyproject.toml",
         ".env",
-        "test_toplevel.py",
+        ".env.local",
+        "secrets/.env.production",
+        ".openagents/vigil-queue.db",
     ]
 
 
-def test_violations_empty_for_pure_harness() -> None:
+def test_violations_empty_for_product_and_rfc() -> None:
     assert violations(["entry.py", "agents/main.md", "params.yaml", "agent.yaml"]) == []
-    assert violations(["tests/test_smoke.py", "tests/helpers/util.py"]) == []  # harness 自测放行
+    assert violations(["tests/test_smoke.py", "docs/specs/0001-x.md", "HELP.md"]) == []
     assert violations([]) == []
-    assert violations(["  ", ""]) == []  # 空/空白路径不算
+    assert violations(["  ", ""]) == []
 
 
-def test_allowed_top_is_harness_skeleton() -> None:
-    assert ALLOWED_TOP == {
-        "HELP.md",
-        "RUNTIME.md",
-        ".env.example",
-        "requirements.txt",
-        "agent.yaml",
-        "params.yaml",
-        "entry.py",
-        "agents",
-        "tools",
-        "scripts",
-        "tests",
-        ".gitignore",
-    }
+def test_denied_top_is_runtime_only() -> None:
+    assert DENIED_TOP == {".openagents"}
 
 
-def test_gitea_ci_dir_stays_out_of_whitelist() -> None:
-    """Spec-0032 实证修复#1：.gitea/（CI 定义）是随 seed 下发的平台制品，**故意不在白名单**——
-    dev/交付面 agent 不得改写自己的质量闸（seed 提交先于装钩子，见 run.py._seed_harness_repo）。"""
-    assert violations([".gitea/workflows/smoke.yml"]) == [".gitea/workflows/smoke.yml"]
-
-
-def test_violations_allows_product_docs_scripts_and_env_example() -> None:
-    assert (
-        violations(
-            [
-                "HELP.md",
-                "RUNTIME.md",
-                ".env.example",
-                "requirements.txt",
-                "scripts/run.sh",
-            ]
-        )
-        == []
-    )
+def test_gitea_ci_dir_is_allowed() -> None:
+    """CI 定义随仓演进（rfc/结构改动可能要改 smoke）；存在性由 runner 跑，不再预提交拒写。"""
+    assert violations([".gitea/workflows/smoke.yml"]) == []
 
 
 def test_render_hook_is_executable_python() -> None:
     src = render_hook()
     assert src.startswith("#!/usr/bin/env python3")
-    compile(src, "<hook>", "exec")  # 生成的钩子须是合法 python
+    compile(src, "<hook>", "exec")
 
 
-def test_hook_blocks_out_of_bounds_commit(tmp_path: Path) -> None:
-    # 机制硬门：dev 把被测项目代码写进 harness 仓 → git commit 被 pre-commit 钩子拒绝。
+def test_hook_blocks_env_secret(tmp_path: Path) -> None:
     repo = _seed_repo(tmp_path)
-    (repo / "unicode_ascii").mkdir()
-    (repo / "unicode_ascii" / "core.py").write_text("x = 1\n", encoding="utf-8")
-    (repo / "pyproject.toml").write_text("[project]\nname='u'\n", encoding="utf-8")
-    _git(repo, "add", "-A")
-    res = _git(repo, "commit", "-m", "fix: build unidecode")
-    assert res.returncode != 0  # 越界 → 拒绝
+    (repo / ".env").write_text("TOKEN=secret\n", encoding="utf-8")
+    _git(repo, "add", "-A", "-f")
+    res = _git(repo, "commit", "-m", "chore: leak env")
+    assert res.returncode != 0
     assert "harness-boundary" in res.stderr
-    assert "unicode_ascii/core.py" in res.stderr and "pyproject.toml" in res.stderr
-    # 提交确实没落下（HEAD 仍是 seed，工作区脏文件仍在）
+    assert ".env" in res.stderr
     assert _git(repo, "log", "--oneline").stdout.count("\n") == 1
 
 
-def test_hook_blocks_retired_docs(tmp_path: Path) -> None:
+def test_hook_blocks_openagents_runtime(tmp_path: Path) -> None:
     repo = _seed_repo(tmp_path)
-    for name in ("README.md", "USER.md", "INTERFACE.md", "MANUAL.md"):
-        (repo / name).write_text("retired\n", encoding="utf-8")
-    _git(repo, "add", "-A")
-    res = _git(repo, "commit", "-m", "docs: reintroduce retired docs")
+    runtime = repo / ".openagents"
+    runtime.mkdir()
+    (runtime / "vigil-queue.db").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A", "-f")
+    res = _git(repo, "commit", "-m", "chore: commit vigil state")
     assert res.returncode != 0
-    assert "README.md" in res.stderr and "INTERFACE.md" in res.stderr
+    assert ".openagents/vigil-queue.db" in res.stderr
+
+
+def test_hook_allows_rfc_docs_and_structural_dirs(tmp_path: Path) -> None:
+    repo = _seed_repo(tmp_path)
+    specs = repo / "docs" / "specs"
+    specs.mkdir(parents=True)
+    (specs / "0001-version-command.md").write_text("# spec\n", encoding="utf-8")
+    (repo / "pyproject.toml").write_text("[project]\nname='harness'\n", encoding="utf-8")
+    (repo / "README.md").write_text("# harness\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    res = _git(repo, "commit", "-m", "spec: add rfc docs")
+    assert res.returncode == 0
+    assert _git(repo, "log", "--oneline").stdout.count("\n") == 2
 
 
 def test_hook_allows_harness_only_commit(tmp_path: Path) -> None:
-    # 合法：只改 harness 本体（新增 agents/ 定义、改 entry.py）→ 放行。
     repo = _seed_repo(tmp_path)
     (repo / "agents").mkdir()
     (repo / "agents" / "main.md").write_text("# harness\n", encoding="utf-8")
@@ -156,36 +132,20 @@ def test_hook_allows_harness_only_commit(tmp_path: Path) -> None:
     assert _git(repo, "log", "--oneline").stdout.count("\n") == 2
 
 
-def test_hook_allows_harness_self_test(tmp_path: Path) -> None:
-    # 合法：harness 自身的回归测试放 tests/ → 放行（区别于被测任务的项目代码）。
+def test_hook_allows_env_example(tmp_path: Path) -> None:
     repo = _seed_repo(tmp_path)
-    (repo / "tests").mkdir()
-    (repo / "tests" / "test_smoke.py").write_text(
-        "def test_ok():\n    assert True\n", encoding="utf-8"
-    )
+    (repo / ".env.example").write_text("TOKEN=\n", encoding="utf-8")
     _git(repo, "add", "-A")
-    res = _git(repo, "commit", "-m", "test: add harness smoke")
+    res = _git(repo, "commit", "-m", "docs: env template")
     assert res.returncode == 0
-    assert _git(repo, "log", "--oneline").stdout.count("\n") == 2
-
-
-def test_hook_blocks_toplevel_test_file(tmp_path: Path) -> None:
-    # 顶层散落 test_*.py 仍拒——逼测试统一进 tests/（顶层段不在白名单）。
-    repo = _seed_repo(tmp_path)
-    (repo / "test_toplevel.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
-    _git(repo, "add", "-A")
-    res = _git(repo, "commit", "-m", "test: stray toplevel test")
-    assert res.returncode != 0
-    assert "test_toplevel.py" in res.stderr
 
 
 def test_hook_ignores_pyc_noise(tmp_path: Path) -> None:
-    # 字节码缓存混进暂存区不该拖垮合法提交（钩子跳过 pyc/__pycache__）。
     repo = _seed_repo(tmp_path)
     cache = repo / "__pycache__"
     cache.mkdir()
     (cache / "entry.cpython-312.pyc").write_bytes(b"\x00")
     (repo / "entry.py").write_text("print('v2')\n", encoding="utf-8")
-    _git(repo, "add", "-A", "-f")  # -f 越过 .gitignore 强塞 pyc 进暂存
+    _git(repo, "add", "-A", "-f")
     res = _git(repo, "commit", "-m", "feat: tweak")
-    assert res.returncode == 0  # pyc 被忽略、entry.py 合法 → 放行
+    assert res.returncode == 0

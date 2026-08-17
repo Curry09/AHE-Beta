@@ -121,6 +121,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0039 Issue 标签维度与状态演进时间线
 将 Gitea 标签事件归一为可回放的 issue 状态演进，在详情页按平面、来源、优先级、轮次与交付阻塞分维展示，并检测标签替换造成的元数据丢失。
 
+### 0040 交付面打开 RFC：drafter 落 docs/specs + 提交边界改拒绝清单
+把交付面 stages.rfc 从 skip 改为 agent，让 drafter 在 harness 仓落下施工规格；提交边界从顶层白名单改为拒绝清单（只拦密钥与 vigil 运行态），否则 RFC 写下的 docs/ 会被 smoke 打死。自定义 Anthropic 协议网关域名必须进 egress allowlist。OpenAgents 侧 implement 首轮优先跟 worktree 已有 specs（本仓只镜像描述）。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -294,6 +297,11 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0039 | 0039/T4 | 为 Designer 综合票写入轮次标签 | done | T1 | backend/auto_designer/designer/designer.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_designer.py |
 | 0039 | 0039/T5 | 建立前端标签维度与时间线展示模型 | done | T3 | frontend/src/types.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/components/detail/issueTimelineModel.ts<br>frontend/src/components/detail/issueTimelineModel.test.ts |
 | 0039 | 0039/T6 | 展示 issue 状态演进并完成跨仓验收 | done | T4, T5 | frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/styles.css<br>backend/scripts/e2e-spec-0039-issue-state-timeline.sh |
+| 0040 | 0040/T1 | stages.rfc=agent 定稿 + vigil 缺省 keep-alive | done | — | backend/run.py<br>backend/tests/test_run_vigil.py<br>backend/scripts/run_swebench_closed_loop.py |
+| 0040 | 0040/T2 | 提交边界从白名单改为拒绝清单 | done | — | backend/auto_designer/dev/harness_boundary.py<br>backend/tests/dev/test_harness_boundary.py |
+| 0040 | 0040/T3 | smoke 拒绝清单与种子 docs/specs 落点 | done | T2 | backend/harness_template/.gitea/workflows/smoke.yml<br>backend/harness_template/docs/specs/README.md |
+| 0040 | 0040/T4 | 自定义 Anthropic 网关域进 egress allowlist | done | — | backend/deploy/gitea/egress-proxy.conf |
+| 0040 | 0040/T5 | OpenAgents 镜像：implement 首轮优先 worktree specs | done | T1 | OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/agents/implementer.py |
 
 ## 跨 feature 关系图
 
@@ -546,6 +554,13 @@ graph LR
         n0039_T5["T5 建立前端标签维度与时间线展示模型"]
         n0039_T6["T6 展示 issue 状态演进并完成跨仓验收"]
     end
+    subgraph G0040[0040 rfc-stage-and-commit-denylist]
+        n0040_T1["T1 stages.rfc=agent 定稿 + vigil 缺省 keep-alive"]
+        n0040_T2["T2 提交边界从白名单改为拒绝清单"]
+        n0040_T3["T3 smoke 拒绝清单与种子 docs/specs 落点"]
+        n0040_T4["T4 自定义 Anthropic 网关域进 egress allowlist"]
+        n0040_T5["T5 OpenAgents 镜像：implement 首轮优先 worktree specs"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -704,6 +719,8 @@ graph LR
     n0039_T5 --> n0039_T3
     n0039_T6 --> n0039_T4
     n0039_T6 --> n0039_T5
+    n0040_T3 --> n0040_T2
+    n0040_T5 --> n0040_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -757,6 +774,7 @@ graph LR
 | 文件 | 涉及组 |
 |----|----|
 | CLAUDE.md | 0032, 0033 |
+| OpenAgents/openagents/recipes/vigil.py | 0032, 0040 |
 | backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029 |
 | backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029 |
 | backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029 |
@@ -775,7 +793,7 @@ graph LR
 | backend/auto_designer/designer/triage.py | 0025, 0027, 0029 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
-| backend/auto_designer/dev/harness_boundary.py | 0015, 0030 |
+| backend/auto_designer/dev/harness_boundary.py | 0015, 0030, 0040 |
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
 | backend/auto_designer/harness/connector.py | 0030, 0035, 0036 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
@@ -807,6 +825,8 @@ graph LR
 | backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032, 0039 |
 | backend/deploy/gitea/bootstrap.sh | 0002, 0032 |
 | backend/deploy/gitea/docker-compose.yml | 0002, 0032, 0033 |
+| backend/deploy/gitea/egress-proxy.conf | 0033, 0040 |
+| backend/harness_template/.gitea/workflows/smoke.yml | 0032, 0040 |
 | backend/harness_template/HELP.md | 0030, 0035 |
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/RUNTIME.md | 0022, 0030, 0035 |
@@ -814,17 +834,17 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035 |
 | backend/harness_template/params.yaml | 0003, 0030 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039 |
+| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
 | backend/tests/designer/test_owner.py | 0029, 0032 |
 | backend/tests/designer/test_triage.py | 0025, 0027, 0029 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/dev/test_completion_gate.py | 0014, 0030 |
-| backend/tests/dev/test_harness_boundary.py | 0015, 0030 |
+| backend/tests/dev/test_harness_boundary.py | 0015, 0030, 0040 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039 |
@@ -837,7 +857,7 @@ graph LR
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
-| backend/tests/test_run_vigil.py | 0032, 0033 |
+| backend/tests/test_run_vigil.py | 0032, 0033, 0040 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035 |
@@ -2038,4 +2058,34 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0040 交付面打开 RFC：drafter 落 docs/specs + 提交边界改拒绝清单（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 stages.rfc=agent 定稿 + vigil 缺省 keep-alive"]
+    nT2["T2 提交边界从白名单改为拒绝清单"]
+    nT3["T3 smoke 拒绝清单与种子 docs/specs 落点"]
+    nT4["T4 自定义 Anthropic 网关域进 egress allowlist"]
+    nT5["T5 OpenAgents 镜像：implement 首轮优先 worktree specs"]
+    nT2 --> nT3
+    nT1 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```

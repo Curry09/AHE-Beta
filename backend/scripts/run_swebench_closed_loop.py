@@ -476,8 +476,8 @@ def main() -> int:
         integrity_guard=integrity_guard,
     )
 
-    # Spec-0032/T5 + 0033/T2：交付面接线与 run.py 同源——start_vigil 按 VIGIL_MODE 自带预检/
-    # 配置落盘/生命周期（finally 收尾停）。
+    # Spec-0032/T5 + 0033/T2 + 0040/T1：交付面接线与 run.py 同源——start_vigil 按 VIGIL_MODE
+    # 自带预检/配置落盘/生命周期（缺省 keep-alive，需求面收尾不拆 vigil）。
     vigil = run_mod.start_vigil(
         repo=repo,
         parallel=roster["developer"],

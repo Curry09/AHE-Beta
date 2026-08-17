@@ -1,17 +1,16 @@
-# Spec-0007：dev 侧硬提交边界，堵「任务代码焊进 harness 仓」的过拟合泄漏。
-"""harness 提交边界闸：harness 是**通用编码助手**，仓里只该有它自身的制品。
+# Spec-0007 / 0033 / 0040/T2：dev 侧提交边界。围堵已升到容器后，本闸从白名单改为拒绝清单。
+"""harness 提交边界闸：拦住密钥和 vigil 运行态，不再用顶层白名单锁死产品形状。
 
-允许的是 harness 产品区域：入口、agent/tool 配置、HELP/RUNTIME、运行脚本、自测与配置模板。
-拒绝的是用户任务项目、真实密钥、项目脚手架和未知顶层目录。
+Spec-0040/T2: 拒绝清单只拦密钥与 vigil 运行态。
 
-真实闭环里观测到：用户 agent 把「跑不动某个 benchmark 任务（如 unidecode）」当 bug 提 issue，
-dev agent 领到后照字面 `mkdir -p unicode_ascii/tables; cat > pyproject.toml …` 把**被测项目本体**
-一行行写进 harness 仓并提交——通用工具被焊死成某个具体任务，正是要极力避免的过拟合；同时 dev 把整轮
-迭代耗在建/装/测这个包上（实测 issue #69 用掉 23 次 shell 调用），直接爆迭代次数。
+原先白名单（只许 entry.py / agents / tests …）是防「把某个 benchmark 任务焊进 harness」。
+spec-0033 之后交付面默认关在容器里、零宿主挂载，过拟合信道（编排仓 / data/sessions）已经看不见；
+RFC（docs/specs/）和结构性演进（新目录、pyproject、README）反而是交付面该做的事。白名单会把
+这些合法改动在 CI 上打死（实证：rfc:agent 写下 docs/ 后 smoke 3 秒红、合并不了）。
 
-对策是仓层面的**硬门**：装一个 git `pre-commit` 钩子，暂存区里出现 harness 本体之外的路径就拒绝提交、
-打印原因，逼 dev 删掉任务代码、只提交对 harness 能力的改动。不靠 prompt 自觉、agent 绕不过
-（除非显式 `--no-verify`，dev 指令不会那么做）。
+仍拒绝：真实密钥（``.env`` / ``.env.*``，``.env.example`` 除外）和 ``.openagents/``（vigil 运行态，
+随容器重建，不应入库）。其余顶层路径放行。不靠 prompt 自觉；``--no-verify`` 仍可能绕过钩子，
+服务端兜底见 harness_template/.gitea/workflows/smoke.yml（拒绝清单须与本模块同步）。
 """
 
 from __future__ import annotations
@@ -19,92 +18,70 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-# harness 本体允许出现在仓根的顶层文件。
-ALLOWED_ROOT_FILES: frozenset[str] = frozenset(
-    {
-        "HELP.md",
-        "RUNTIME.md",
-        ".env.example",
-        "requirements.txt",
-        "agent.yaml",
-        "params.yaml",
-        "entry.py",
-        ".gitignore",
-    }
-)
-
-# harness 本体允许出现在仓根的顶层目录。
-# 注（Spec-0032 实证修复#1）：`.gitea/`（CI workflow 定义）**故意不在白名单**——它是随 seed 下发的
-# 平台制品，dev/交付面 agent 不得改写自己的质量闸。seed 提交在装钩子之前完成（run.py._seed_harness_repo
-# 的顺序保证），故种子自身不受此拦；服务端兜底见 harness_template/.gitea/workflows/smoke.yml 的边界检查步。
-ALLOWED_ROOT_DIRS: frozenset[str] = frozenset(
-    {
-        "agents",
-        "tools",
-        "scripts",
-        "tests",
-    }
-)
-
-# 明确拒绝的顶层文件/目录：真实密钥、任务项目脚手架、已退场文档名。
-DENIED_TOP: frozenset[str] = frozenset(
-    {
-        ".env",
-        "pyproject.toml",
-        "package.json",
-        "setup.py",
-        "setup.cfg",
-        "src",
-        "README.md",
-        "USER.md",
-        "MANUAL.md",
-        "INTERFACE.md",
-    }
-)
-
-# 向后兼容导出：部分测试/调用方只关心“可作为顶层的集合”。
-ALLOWED_TOP: frozenset[str] = ALLOWED_ROOT_FILES | ALLOWED_ROOT_DIRS
+# Spec-0040/T2：顶层目录/文件拒绝清单（精确匹配第一段）。``.env`` 另走文件名规则，不进本集合。
+DENIED_TOP: frozenset[str] = frozenset({".openagents"})
 
 
-def _is_ignorable(path: str) -> bool:
+def _is_ignorable(*, path: str) -> bool:
     """构建噪声（字节码缓存），不算越界也不该进版本库——钩子跳过，别为它拒绝整次提交。"""
     top = path.split("/", 1)[0]
     return top == "__pycache__" or path.endswith(".pyc") or "/__pycache__/" in path
 
 
+def _is_denied(*, path: str) -> bool:
+    """Return whether a relative path is on the denylist.
+
+    Spec-0040/T2：运行态目录，或除 .env.example 外的 .env / .env.* 密钥文件。
+    """
+    top = path.split("/", 1)[0]
+    if top in DENIED_TOP:
+        return True
+    for part in path.split("/"):
+        if part == ".env.example":
+            continue
+        if part == ".env" or part.startswith(".env."):
+            return True
+    return False
+
+
 def violations(staged_paths: Iterable[str]) -> list[str]:
-    """给定暂存文件相对路径集，返回其中越界（不属于 harness 产品区域）的路径。"""
+    """给定暂存文件相对路径集，返回其中越界（密钥 / vigil 运行态）的路径。"""
     bad: list[str] = []
     for raw in staged_paths:
         path = raw.strip()
-        if not path or _is_ignorable(path):
+        if not path or _is_ignorable(path=path):
             continue
-        top = path.split("/", 1)[0]
-        if top in DENIED_TOP:
+        if _is_denied(path=path):
             bad.append(path)
-            continue
-        if top in ALLOWED_ROOT_FILES or top in ALLOWED_ROOT_DIRS:
-            continue
-        bad.append(path)
     return bad
 
 
 # pre-commit 钩子脚本：自包含（只依赖 python3 stdlib + git），不 import 本包——harness 仓是独立仓，
-# 钩子在其内跑，PYTHONPATH 未必含 auto_designer。白名单从本模块注入，逻辑与 violations() 同源。
+# 钩子在其内跑，PYTHONPATH 未必含 auto_designer。拒绝清单从本模块注入，逻辑与 violations() 同源。
 _HOOK_TEMPLATE = """#!/usr/bin/env python3
 # auto-designer harness boundary gate（由 auto_designer.dev.harness_boundary 生成，勿手改）。
-# 拒绝把 harness 本体之外的文件（某个具体任务的项目代码）提交进 harness 仓——保通用工具不被过拟合。
+# 只拒密钥与 vigil 运行态；其余顶层路径放行（docs/specs、结构性演进）。容器围堵后不再用白名单。
 import subprocess
 import sys
 
-ALLOWED_FILES = {allowed_files}
-ALLOWED_DIRS = {allowed_dirs}
-DENIED = {denied}
+DENIED_TOP = {denied_top}
 
 
 def _ignorable(path):
     top = path.split("/", 1)[0]
     return top == "__pycache__" or path.endswith(".pyc") or "/__pycache__/" in path
+
+
+def _denied(path):
+    top = path.split("/", 1)[0]
+    if top in DENIED_TOP:
+        return True
+    for part in path.split("/"):
+        if part == ".env.example":
+            continue
+        if part == ".env" or part.startswith(".env."):
+            return True
+    return False
 
 
 staged = subprocess.run(
@@ -113,18 +90,14 @@ staged = subprocess.run(
 bad = []
 for p in staged:
     path = p.strip()
-    if not path or _ignorable(path):
+    if not path or _ignorable(path) or not _denied(path):
         continue
-    top = path.split("/", 1)[0]
-    if top in DENIED or (top not in ALLOWED_FILES and top not in ALLOWED_DIRS):
-        bad.append(path)
+    bad.append(path)
 if bad:
     sys.stderr.write(
-        "\\n[harness-boundary] 提交被拒。harness 是通用编码助手，仓里只允许它自身的产品制品："
-        "entry.py / agent.yaml / params.yaml / HELP.md / RUNTIME.md / requirements.txt / "
-        ".env.example / agents/ / tools/ / scripts/ / tests/。\\n"
-        "严禁把某个具体任务的项目代码、项目脚手架、真实密钥或已退场文档名（README/USER/MANUAL/INTERFACE）"
-        "提交进 harness 仓。请删除下列越界文件，只提交对 harness *能力* 的改动：\\n  "
+        "\\n[harness-boundary] 提交被拒。只拦真实密钥（.env / .env.*，.env.example 除外）"
+        "和 .openagents/（vigil 运行态）。docs/、新目录、产品文件都允许。"
+        "请删掉下列文件后再提交：\\n  "
         + "\\n  ".join(bad)
         + "\\n"
     )
@@ -133,12 +106,8 @@ if bad:
 
 
 def render_hook() -> str:
-    """渲染 pre-commit 钩子脚本文本（边界集合内联为 python set 字面量）。"""
-    return _HOOK_TEMPLATE.format(
-        allowed_files=set(ALLOWED_ROOT_FILES),
-        allowed_dirs=set(ALLOWED_ROOT_DIRS),
-        denied=set(DENIED_TOP),
-    )
+    """渲染 pre-commit 钩子脚本文本（拒绝清单内联为 python set 字面量）。"""
+    return _HOOK_TEMPLATE.format(denied_top=set(DENIED_TOP))
 
 
 def install_pre_commit(repo: Path) -> None:
