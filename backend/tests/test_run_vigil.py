@@ -27,6 +27,21 @@ def _load_yaml(path: Path):
     return YAML(typ="safe").load(path.read_text(encoding="utf-8"))
 
 
+def test_repository_env_only_supplies_missing_process_values(monkeypatch) -> None:
+    monkeypatch.setenv("DESIGNER_LLM_MODEL", "explicit-model")
+    monkeypatch.delenv("USER_LLM_MODEL", raising=False)
+
+    run._apply_env_defaults(
+        {
+            "DESIGNER_LLM_MODEL": "repository-model",
+            "USER_LLM_MODEL": "repository-user-model",
+        }
+    )
+
+    assert run.os.environ["DESIGNER_LLM_MODEL"] == "explicit-model"
+    assert run.os.environ["USER_LLM_MODEL"] == "repository-user-model"
+
+
 # --------------------------------------------------------------------------------------------------
 # 声明式配置落盘（两模式共用 write_openagents_config）。
 # --------------------------------------------------------------------------------------------------
@@ -205,6 +220,7 @@ def test_container_start_shapes_docker_run(tmp_path: Path, monkeypatch) -> None:
     assert handle.mode == "container"
     assert f"--network {run._VIGIL_NETWORK}" in joined  # internal 网络（直连外网物理不通）
     assert "/config:ro" in joined and "/entrypoint.sh:ro" in joined  # 仅两处只读挂载
+    assert "nexau" not in joined.lower()  # NexAU 烘入镜像，不扩大宿主挂载面
     assert "GITEA_TOKEN=secret-token" in joined  # 凭证只经容器 env
     assert "ANTHROPIC_API_KEY=sk-test" in joined
     assert f"HTTPS_PROXY={run._VIGIL_PROXY_URL}" in joined  # 出网只走 egress 代理

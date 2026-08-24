@@ -217,7 +217,8 @@ def main() -> int:
 
     run_mod._isolate_git_credentials()
     llm_env = run_mod._load_env(ROOT / ".env")
-    os.environ.update(llm_env)
+    # 启动命令显式注入的配置优先于仓内 .env，便于临时切换网关/模型且不把密钥写盘。
+    run_mod._apply_env_defaults(llm_env)
     for suffix in ("MODEL", "BASE_URL", "API_KEY"):
         val = os.environ.get(f"HARNESS_LLM_{suffix}")
         if not val:

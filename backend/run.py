@@ -86,6 +86,12 @@ def _load_env(path: Path) -> dict[str, str]:
     return out
 
 
+def _apply_env_defaults(values: dict[str, str]) -> None:
+    """Apply repository defaults without overriding explicit process configuration."""
+    for key, value in values.items():
+        os.environ.setdefault(key, value)
+
+
 def _load_seeds(path: Path) -> list:
     """从种子卡库(seeds.json)经 distill seed_adapter 注入为 SeedScenario 列表。
 
@@ -373,7 +379,8 @@ def _ensure_vigil_container_prereqs() -> None:
     )
     if inspect.returncode != 0:
         raise SystemExit(
-            f"缺 vigil 镜像 {_VIGIL_IMAGE}——先构建：backend/deploy/vigil/build.sh <OpenAgents 仓路径>"
+            f"缺 vigil 镜像 {_VIGIL_IMAGE}——先构建：backend/deploy/vigil/build.sh "
+            "<OpenAgents 仓路径> <NexAU 仓路径>"
         )
     if not any(os.environ.get(key, "").strip() for key in _CLAUDE_CRED_ENVS):
         raise SystemExit(
@@ -483,7 +490,11 @@ def _start_vigil_container(
         "-e", f"VIGIL_REPO_URL={repo_url}",
         "-e", f"VIGIL_PARALLEL={max(1, parallel)}",
         "-e", f"HTTPS_PROXY={_VIGIL_PROXY_URL}",
+        "-e", f"HTTP_PROXY={_VIGIL_PROXY_URL}",
+        "-e", f"https_proxy={_VIGIL_PROXY_URL}",
+        "-e", f"http_proxy={_VIGIL_PROXY_URL}",
         "-e", "NO_PROXY=gitea,localhost,127.0.0.1",
+        "-e", "no_proxy=gitea,localhost,127.0.0.1",
         # 容器即 jail（实证修复）：claude 缺省 acceptEdits 只放行文件编辑，headless 下 git commit/push
         # 被拒 → deliver 卡死挂 needs-human。盒内用 bypassPermissions（围堵由容器承担，见 spec-0033
         # §Guide）；宿主同名 env 可覆盖。注意 claude 拒绝 root 下 bypass——镜像以非 root 用户 vigil 跑。
@@ -544,7 +555,8 @@ def main() -> int:
     llm_env = _load_env(
         ROOT / ".env"
     )  # {USER,DESIGNER,HARNESS}_LLM_*（DEV_LLM_* 随 dev 退役不再消费）
-    os.environ.update(llm_env)
+    # 启动命令显式注入的配置优先于仓内 .env，便于临时切换网关/模型且不把密钥写盘。
+    _apply_env_defaults(llm_env)
     # 分角色 LLM 配置：编排角色各用 {USER,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、无公共
     # 回落——agent.yaml 的 ${env.DESIGNER_LLM_*} 与 user 侧 ApiPersonaClient 直接读各自角色变量。
     # 交付面（vigil）的 coding 后端是 claude CLI，凭证走宿主 claude 登录态，不经 .env。

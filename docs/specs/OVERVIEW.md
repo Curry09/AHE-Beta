@@ -136,6 +136,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0044 可复用 SWE-bench Seed 工作区供给
 以显式 manifest、可恢复构建状态、prebuilt 与 storage-only Docker 镜像，为并发用户会话提供隔离且可审计的预构建工作区；闭环按题归属并保留 git 回退路径。
 
+### 0045 Vigil Harness-aware 开发工具链
+以显式 OpenAgents/NexAU 双 checkout pin 构建非 root vigil 镜像，提供 harness 内部编排所需的真实源码与测试工具；构建期依赖、Claude 版本、代理与运行配置均显式可审计。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -337,6 +340,10 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0044 | 0044/T3 | Storage-only Docker seed 供给 | done | T1, T2 | backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/build.sh<br>backend/tests/user/sim/test_docker_seed_source.py |
 | 0044 | 0044/T4 | 可恢复批量构建与镜像校验 | done | T1, T2, T3 | backend/scripts/build_swebench_seed_workspaces.py<br>backend/scripts/validate_swebench_seed_image.py<br>backend/tests/test_swebench_seed_builder.py |
 | 0044 | 0044/T5 | 闭环题池选择与稳定实例归属 | done | T1, T2, T3 | backend/scripts/run_swebench_closed_loop.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/test_run_swebench_closed_loop.py |
+| 0045 | 0045/T1 | 工具链边界与双 pin 契约 | done | — | docs/specs/0045-vigil-harness-aware-toolchain.md |
+| 0045 | 0045/T2 | 双 checkout 镜像与只读 NexAU 工具链 | done | T1 | backend/deploy/vigil/Dockerfile |
+| 0045 | 0045/T3 | 显式构建镜像源、版本与代理配置 | done | T2 | backend/deploy/vigil/build.sh<br>backend/tests/test_vigil_build.py |
+| 0045 | 0045/T4 | 运行入口接线与配置优先级 | done | T2 | backend/run.py<br>backend/tests/test_run_vigil.py |
 
 ## 跨 feature 关系图
 
@@ -627,6 +634,12 @@ graph LR
         n0044_T4["T4 可恢复批量构建与镜像校验"]
         n0044_T5["T5 闭环题池选择与稳定实例归属"]
     end
+    subgraph G0045[0045 vigil-harness-aware-toolchain]
+        n0045_T1["T1 工具链边界与双 pin 契约"]
+        n0045_T2["T2 双 checkout 镜像与只读 NexAU 工具链"]
+        n0045_T3["T3 显式构建镜像源、版本与代理配置"]
+        n0045_T4["T4 运行入口接线与配置优先级"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -827,6 +840,9 @@ graph LR
     n0044_T5 --> n0044_T1
     n0044_T5 --> n0044_T2
     n0044_T5 --> n0044_T3
+    n0045_T2 --> n0045_T1
+    n0045_T3 --> n0045_T2
+    n0045_T4 --> n0045_T2
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -939,6 +955,8 @@ graph LR
 | backend/deploy/gitea/bootstrap.sh | 0002, 0032 |
 | backend/deploy/gitea/docker-compose.yml | 0002, 0032, 0033 |
 | backend/deploy/gitea/egress-proxy.conf | 0033, 0040 |
+| backend/deploy/vigil/Dockerfile | 0033, 0045 |
+| backend/deploy/vigil/build.sh | 0033, 0045 |
 | backend/deploy/vigil/entrypoint.sh | 0033, 0041 |
 | backend/harness_template/.gitea/workflows/smoke.yml | 0032, 0040 |
 | backend/harness_template/HELP.md | 0030, 0035 |
@@ -948,7 +966,7 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041 |
 | backend/harness_template/params.yaml | 0003, 0030 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
@@ -975,7 +993,7 @@ graph LR
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
-| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041 |
+| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035 |
@@ -2368,4 +2386,32 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+```
+
+### 0045 Vigil Harness-aware 开发工具链（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 工具链边界与双 pin 契约"]
+    nT2["T2 双 checkout 镜像与只读 NexAU 工具链"]
+    nT3["T3 显式构建镜像源、版本与代理配置"]
+    nT4["T4 运行入口接线与配置优先级"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT2 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
 ```
