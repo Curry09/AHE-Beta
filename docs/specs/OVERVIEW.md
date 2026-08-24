@@ -133,6 +133,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0043 需求面角色认知契约：专属产物语言与行为质量门
 在共享证据之上为 Triage、产品 PM、Synthesize 与 Owner 建立不同的认知任务、角色专属产物契约和可执行质量门，防止多角色退化为同一种技术分析 Agent。
 
+### 0044 可复用 SWE-bench Seed 工作区供给
+以显式 manifest、可恢复构建状态、prebuilt 与 storage-only Docker 镜像，为并发用户会话提供隔离且可审计的预构建工作区；闭环按题归属并保留 git 回退路径。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -329,6 +332,11 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0043 | 0043/T4 | Synthesize 提案关系综合契约 | done | T1, T2, T3 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/tests/loop/test_designer.py |
 | 0043 | 0043/T5 | Owner 投资判断与组合质量门 | done | T1, T4 | backend/auto_designer/designer/owner.py<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/tests/designer/test_owner.py |
 | 0043 | 0043/T6 | 跨角色行为评测与真实回放验收 | done | T2, T3, T4, T5 | backend/tests/designer/test_role_contract_flow.py<br>backend/scripts/replay_design_from_sessions.py<br>backend/scripts/evaluate_role_traces.py |
+| 0044 | 0044/T1 | Manifest 与供给契约 | done | — | docs/specs/0044-swebench-seed-workspace-supply.md<br>backend/swebench_pools/medium_hard_16.json |
+| 0044 | 0044/T2 | Prebuilt 隔离复制与虚拟环境迁移 | done | T1 | backend/auto_designer/user/sim/sources/prebuilt.py<br>backend/tests/user/sim/test_prebuilt_source.py |
+| 0044 | 0044/T3 | Storage-only Docker seed 供给 | done | T1, T2 | backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/build.sh<br>backend/tests/user/sim/test_docker_seed_source.py |
+| 0044 | 0044/T4 | 可恢复批量构建与镜像校验 | done | T1, T2, T3 | backend/scripts/build_swebench_seed_workspaces.py<br>backend/scripts/validate_swebench_seed_image.py<br>backend/tests/test_swebench_seed_builder.py |
+| 0044 | 0044/T5 | 闭环题池选择与稳定实例归属 | done | T1, T2, T3 | backend/scripts/run_swebench_closed_loop.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/test_run_swebench_closed_loop.py |
 
 ## 跨 feature 关系图
 
@@ -612,6 +620,13 @@ graph LR
         n0043_T5["T5 Owner 投资判断与组合质量门"]
         n0043_T6["T6 跨角色行为评测与真实回放验收"]
     end
+    subgraph G0044[0044 swebench-seed-workspace-supply]
+        n0044_T1["T1 Manifest 与供给契约"]
+        n0044_T2["T2 Prebuilt 隔离复制与虚拟环境迁移"]
+        n0044_T3["T3 Storage-only Docker seed 供给"]
+        n0044_T4["T4 可恢复批量构建与镜像校验"]
+        n0044_T5["T5 闭环题池选择与稳定实例归属"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -803,6 +818,15 @@ graph LR
     n0043_T6 --> n0043_T3
     n0043_T6 --> n0043_T4
     n0043_T6 --> n0043_T5
+    n0044_T2 --> n0044_T1
+    n0044_T3 --> n0044_T1
+    n0044_T3 --> n0044_T2
+    n0044_T4 --> n0044_T1
+    n0044_T4 --> n0044_T2
+    n0044_T4 --> n0044_T3
+    n0044_T5 --> n0044_T1
+    n0044_T5 --> n0044_T2
+    n0044_T5 --> n0044_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -892,7 +916,7 @@ graph LR
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042 |
@@ -928,7 +952,7 @@ graph LR
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040 |
+| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044 |
 | backend/tests/designer/test_agent_contract.py | 0027, 0043 |
 | backend/tests/designer/test_agent_runtime.py | 0029, 0041 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043 |
@@ -948,7 +972,7 @@ graph LR
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
-| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041 |
+| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041 |
@@ -2307,4 +2331,41 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0044 可复用 SWE-bench Seed 工作区供给（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 Manifest 与供给契约"]
+    nT2["T2 Prebuilt 隔离复制与虚拟环境迁移"]
+    nT3["T3 Storage-only Docker seed 供给"]
+    nT4["T4 可恢复批量构建与镜像校验"]
+    nT5["T5 闭环题池选择与稳定实例归属"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+    nT1 --> nT5
+    nT2 --> nT5
+    nT3 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```

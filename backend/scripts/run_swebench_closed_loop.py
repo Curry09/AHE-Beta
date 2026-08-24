@@ -15,8 +15,11 @@
   PERSONA_LIBRARY      默认 backend/persona_library.json
   SESSION_SEED         随机种子（默认 20260725），保证可复现
   SESSIONS_PER_ROUND   每轮会话数（默认 10）
+  SWEBENCH_ALL_ONCE    真值时每轮覆盖题池各一次，persona 轮转；忽略 SESSIONS_PER_ROUND
   TOTAL_ROUNDS         闭环轮数（默认 5）
   MAX_PARALLEL_USERS   a 段并发（默认 = SESSIONS_PER_ROUND）
+  SWEBENCH_INSTANCE_FILE  JSON 题池 manifest（instances[].instance_id）
+  SWEBENCH_INSTANCE    只跑指定题（须在内置题池中；省流量冒烟测试用）
 """
 
 from __future__ import annotations
@@ -50,7 +53,7 @@ PERSONA_IDS = [
     "sr-05-klabnik",
 ]
 # 难度 4×<15min + 4×15m-1h + 2×1-4h；10 个不同仓，避开 django 过密。
-INSTANCE_IDS = [
+_DEFAULT_INSTANCE_IDS = [
     "pallets__flask-5014",
     "psf__requests-1142",
     "pytest-dev__pytest-7982",
@@ -62,7 +65,37 @@ INSTANCE_IDS = [
     "pydata__xarray-3993",
     "sphinx-doc__sphinx-8548",
 ]
-SESSIONS_PER_ROUND = int(os.environ.get("SESSIONS_PER_ROUND", "10") or "10")
+_instance_file_raw = os.environ.get("SWEBENCH_INSTANCE_FILE", "").strip()
+if _instance_file_raw:
+    _instance_file = Path(_instance_file_raw).expanduser().resolve()
+    _instance_doc = json.loads(_instance_file.read_text(encoding="utf-8"))
+    _pool_instance_ids = [str(item["instance_id"]) for item in _instance_doc["instances"]]
+    if not _pool_instance_ids or len(_pool_instance_ids) != len(set(_pool_instance_ids)):
+        raise SystemExit(f"SWEBENCH_INSTANCE_FILE 题目须非空且唯一：{_instance_file}")
+else:
+    _pool_instance_ids = _DEFAULT_INSTANCE_IDS
+
+def _select_instance_ids(pool: list[str], selected: str) -> list[str]:
+    if selected and selected not in pool:
+        raise SystemExit(
+            f"SWEBENCH_INSTANCE 不在当前题池：{selected!r}；可选：{pool}"
+        )
+    return [selected] if selected else list(pool)
+
+
+_selected_instance = os.environ.get("SWEBENCH_INSTANCE", "").strip()
+INSTANCE_IDS = _select_instance_ids(_pool_instance_ids, _selected_instance)
+ALL_ONCE = os.environ.get("SWEBENCH_ALL_ONCE", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+SESSIONS_PER_ROUND = (
+    len(INSTANCE_IDS)
+    if ALL_ONCE
+    else int(os.environ.get("SESSIONS_PER_ROUND", "10") or "10")
+)
 SESSION_SEED = int(os.environ.get("SESSION_SEED", "20260725") or "20260725")
 
 os.environ.setdefault("TOTAL_ROUNDS", "5")
@@ -73,7 +106,7 @@ run_mod.TOTAL_ROUNDS = int(os.environ.get("TOTAL_ROUNDS", "5") or "5")
 def _setup_cmd() -> list[str]:
     return [
         "python -m venv .venv",
-        ".venv/bin/python -m pip install -U pip setuptools wheel",
+        ".venv/bin/python -m pip install -U pip 'setuptools<81' wheel",
         ".venv/bin/python -m pip install -e .",
     ]
 
@@ -112,6 +145,26 @@ def _load_instances() -> dict[str, dict]:
 def _to_scenario(meta: dict):
     from auto_designer.models import SeedScenario, WorkspaceSpec
 
+    seed_root_raw = os.environ.get("SWEBENCH_SEED_ROOT", "").strip()
+    if seed_root_raw:
+        prepared = Path(seed_root_raw).expanduser().resolve() / "workspace" / meta["instance_id"] / "repo"
+        if prepared.is_dir() and (prepared / ".venv" / "bin" / "python").is_file():
+            return SeedScenario(
+                description=meta["problem_statement"],
+                workspace=WorkspaceSpec(
+                    kind="prebuilt",
+                    params={"source": str(prepared), "instance_id": meta["instance_id"]},
+                ),
+            )
+    seed_image = os.environ.get("SWEBENCH_SEED_IMAGE", "").strip()
+    if seed_image:
+        return SeedScenario(
+            description=meta["problem_statement"],
+            workspace=WorkspaceSpec(
+                kind="docker-seed",
+                params={"image": seed_image, "instance_id": meta["instance_id"]},
+            ),
+        )
     return SeedScenario(
         description=meta["problem_statement"],
         workspace=WorkspaceSpec(
@@ -119,10 +172,26 @@ def _to_scenario(meta: dict):
             params={
                 "repo": f"https://github.com/{meta['repo']}.git",
                 "commit": meta["base_commit"],
+                "instance_id": meta["instance_id"],
             },
             setup=_setup_cmd(),
         ),
     )
+
+
+def _session_picks(rng: random.Random, *, round_index: int) -> list[tuple[str, str]]:
+    if ALL_ONCE:
+        instance_order = list(INSTANCE_IDS)
+        rng.shuffle(instance_order)
+        persona_offset = round_index % len(PERSONA_IDS)
+        return [
+            (PERSONA_IDS[(persona_offset + index) % len(PERSONA_IDS)], instance_id)
+            for index, instance_id in enumerate(instance_order)
+        ]
+    return [
+        (rng.choice(PERSONA_IDS), rng.choice(INSTANCE_IDS))
+        for _ in range(SESSIONS_PER_ROUND)
+    ]
 
 
 def main() -> int:
@@ -200,16 +269,15 @@ def main() -> int:
     pair_log: list[list[tuple[str, str]]] = []
 
     def session_plan():
-        picks = [
-            (rng.choice(PERSONA_IDS), rng.choice(INSTANCE_IDS)) for _ in range(SESSIONS_PER_ROUND)
-        ]
+        picks = _session_picks(rng, round_index=len(pair_log))
         pair_log.append(list(picks))
         print(f"  session plan ({len(picks)}): {picks}")
         return [(display[pid], scenarios[iid]) for pid, iid in picks]
 
     print(
         f"⓪ SWE-bench 闭环：persona×{len(PERSONA_IDS)} · instance×{len(INSTANCE_IDS)} · "
-        f"每轮有放回 {SESSIONS_PER_ROUND} 对 · 共 {run_mod.TOTAL_ROUNDS} 轮 · seed={SESSION_SEED}"
+        f"每轮{'无放回全覆盖' if ALL_ONCE else '有放回'} {SESSIONS_PER_ROUND} 对 · "
+        f"共 {run_mod.TOTAL_ROUNDS} 轮 · seed={SESSION_SEED}"
     )
     for iid, meta in instances.items():
         print(f"   - {meta['difficulty']:16}  {meta['repo']:28}  {iid}")

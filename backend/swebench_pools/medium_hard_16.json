@@ -1,0 +1,86 @@
+{
+  "name": "medium-hard-16",
+  "description": "Balanced SWE-bench Verified pool: 6 medium and 10 hard tasks across 11 repositories.",
+  "instances": [
+    {
+      "instance_id": "astropy__astropy-12907",
+      "difficulty": "15 min - 1 hour",
+      "theme": "scientific-modeling"
+    },
+    {
+      "instance_id": "astropy__astropy-13579",
+      "difficulty": "1-4 hours",
+      "theme": "coordinates-wcs"
+    },
+    {
+      "instance_id": "django__django-13344",
+      "difficulty": "1-4 hours",
+      "theme": "web-asgi-middleware"
+    },
+    {
+      "instance_id": "django__django-15957",
+      "difficulty": "1-4 hours",
+      "theme": "orm-prefetch"
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-20826",
+      "difficulty": "15 min - 1 hour",
+      "theme": "plotting-shared-axes"
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-25960",
+      "difficulty": "15 min - 1 hour",
+      "theme": "plotting-layout"
+    },
+    {
+      "instance_id": "mwaskom__seaborn-3187",
+      "difficulty": "15 min - 1 hour",
+      "theme": "visualization-formatting"
+    },
+    {
+      "instance_id": "psf__requests-6028",
+      "difficulty": "15 min - 1 hour",
+      "theme": "http-proxy-auth"
+    },
+    {
+      "instance_id": "pylint-dev__pylint-4551",
+      "difficulty": "1-4 hours",
+      "theme": "static-analysis-type-hints"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-10051",
+      "difficulty": "15 min - 1 hour",
+      "theme": "testing-logging"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5787",
+      "difficulty": "1-4 hours",
+      "theme": "testing-exception-serialization"
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-25102",
+      "difficulty": "1-4 hours",
+      "theme": "ml-dataframe-dtypes"
+    },
+    {
+      "instance_id": "pydata__xarray-3993",
+      "difficulty": "1-4 hours",
+      "theme": "array-api-consistency"
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-9461",
+      "difficulty": "1-4 hours",
+      "theme": "documentation-descriptors"
+    },
+    {
+      "instance_id": "sympy__sympy-17630",
+      "difficulty": "1-4 hours",
+      "theme": "symbolic-block-matrices"
+    },
+    {
+      "instance_id": "sympy__sympy-18199",
+      "difficulty": "1-4 hours",
+      "theme": "number-theory-modular-roots"
+    }
+  ]
+}

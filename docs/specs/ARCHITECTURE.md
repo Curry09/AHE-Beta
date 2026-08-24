@@ -143,9 +143,11 @@ _SeedSource 实现子包（spec-0009/T1）。_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | SeedSource 实现子包（spec-0009/T1）。 |
+| `docker_seed.py` | Docker seed image source. |
 | `empty.py` | empty SeedSource（spec-0009/T2）。 |
 | `git.py` | git SeedSource（spec-0009/T4）。 |
 | `local_fixture.py` | local-fixture SeedSource（spec-0009/T1）。 |
+| `prebuilt.py` | Prebuilt SeedSource: copy a prepared workspace and relocate its venv. |
 
 ### auto_designer.web
 
@@ -228,9 +230,11 @@ graph LR
     nauto_designer_user_sim_seed_source["sim.seed_source"]
     nauto_designer_user_sim_skills["sim.skills"]
     nauto_designer_user_sim_sources["sim.sources"]
+    nauto_designer_user_sim_sources_docker_seed["sources.docker_seed"]
     nauto_designer_user_sim_sources_empty["sources.empty"]
     nauto_designer_user_sim_sources_git["sources.git"]
     nauto_designer_user_sim_sources_local_fixture["sources.local_fixture"]
+    nauto_designer_user_sim_sources_prebuilt["sources.prebuilt"]
     nauto_designer_user_sim_state["sim.state"]
     nauto_designer_user_sim_tools["sim.tools"]
     nauto_designer_user_sim_workspace["sim.workspace"]
@@ -366,6 +370,9 @@ graph LR
     nauto_designer_user_sim_seed_source --> nauto_designer_user_sim
     nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_sources
     nauto_designer_user_sim_skills --> nauto_designer_user_sim_dimensions
+    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_models
+    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_seed_source
+    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_sources_prebuilt
     nauto_designer_user_sim_sources_empty --> nauto_designer_models
     nauto_designer_user_sim_sources_empty --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_git --> nauto_designer_models
@@ -373,6 +380,8 @@ graph LR
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_models
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_workspace
+    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_models
+    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_state --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_tools --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_tools --> nauto_designer_user_sim_sandbox
