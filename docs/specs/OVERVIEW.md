@@ -139,6 +139,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0045 Vigil Harness-aware 开发工具链
 以显式 OpenAgents/NexAU 双 checkout pin 构建非 root vigil 镜像，提供 harness 内部编排所需的真实源码与测试工具；构建期依赖、Claude 版本、代理与运行配置均显式可审计。
 
+### 0046 冻结设计产物到 OpenAgents 的隔离验证交接
+将冻结需求面 summary 或只读 Gitea 快照复制到全新验证仓库，选择性保留交付令牌并生成不可覆盖 manifest；随后以显式 Anthropic-compatible 网关配置启动隔离 vigil，保证实验可复用且不污染来源。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -344,6 +347,10 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0045 | 0045/T2 | 双 checkout 镜像与只读 NexAU 工具链 | done | T1 | backend/deploy/vigil/Dockerfile |
 | 0045 | 0045/T3 | 显式构建镜像源、版本与代理配置 | done | T2 | backend/deploy/vigil/build.sh<br>backend/tests/test_vigil_build.py |
 | 0045 | 0045/T4 | 运行入口接线与配置优先级 | done | T2 | backend/run.py<br>backend/tests/test_run_vigil.py |
+| 0046 | 0046/T1 | Fresh-target 与不可变 Manifest 契约 | done | — | docs/specs/0046-frozen-openagents-validation-handoff.md |
+| 0046 | 0046/T2 | 冻结 Summary 物化为验证仓库 | done | T1 | backend/scripts/prepare_openagents_from_summary.py<br>backend/tests/test_prepare_openagents_from_summary.py |
+| 0046 | 0046/T3 | 只读 Gitea 快照的选择性交付复制 | done | T1 | backend/scripts/prepare_openagents_validation.py<br>backend/tests/test_prepare_openagents_validation.py |
+| 0046 | 0046/T4 | 隔离 Vigil 启动与网关协议转换 | done | T1, T3 | backend/scripts/run_openagents_validation.py<br>backend/tests/test_run_openagents_validation.py |
 
 ## 跨 feature 关系图
 
@@ -640,6 +647,12 @@ graph LR
         n0045_T3["T3 显式构建镜像源、版本与代理配置"]
         n0045_T4["T4 运行入口接线与配置优先级"]
     end
+    subgraph G0046[0046 frozen-openagents-validation-handoff]
+        n0046_T1["T1 Fresh-target 与不可变 Manifest 契约"]
+        n0046_T2["T2 冻结 Summary 物化为验证仓库"]
+        n0046_T3["T3 只读 Gitea 快照的选择性交付复制"]
+        n0046_T4["T4 隔离 Vigil 启动与网关协议转换"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -843,6 +856,10 @@ graph LR
     n0045_T2 --> n0045_T1
     n0045_T3 --> n0045_T2
     n0045_T4 --> n0045_T2
+    n0046_T2 --> n0046_T1
+    n0046_T3 --> n0046_T1
+    n0046_T4 --> n0046_T1
+    n0046_T4 --> n0046_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -2399,6 +2416,35 @@ graph LR
     nT1 --> nT2
     nT2 --> nT3
     nT2 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+```
+
+### 0046 冻结设计产物到 OpenAgents 的隔离验证交接（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 Fresh-target 与不可变 Manifest 契约"]
+    nT2["T2 冻结 Summary 物化为验证仓库"]
+    nT3["T3 只读 Gitea 快照的选择性交付复制"]
+    nT4["T4 隔离 Vigil 启动与网关协议转换"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT1 --> nT4
+    nT3 --> nT4
 ```
 
 演化图：
