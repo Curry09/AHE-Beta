@@ -67,6 +67,10 @@ def _designer(
     *,
     round_provider=None,
 ) -> _StubDesigner:
+    # A synthesis fixture needs an actual cross-proposal set.
+    if '"proposals": []' not in canned and "散文" not in canned and canned:
+        while len([i for i in tracker.list_open_issues() if sc.plane(i.labels) in (sc.PROPOSAL, sc.READY)]) < 2:
+            _proposal(tracker, "辅助来源")
     store = SessionStore(tmp_path / "sessions")
     _seed_session(store, score=2, reason="等太久")
     _seed_session(store, score=1, reason="超时两次颗粒无收")
@@ -80,13 +84,15 @@ def _designer(
     )
 
 
-def _rfc_fields() -> dict:
+def _synthesis_artifact() -> dict:
     return {
-        "问题": "大任务撞预算",
-        "根因": "无增量交付",
-        "涉及 issue": "#多条",
-        "方向": "加预算感知",
-        "验收": "预算内给交付",
+        "source_proposals": [1, 2],
+        "relationship": "两个提案是同一体验张力的阶段表现",
+        "common_tension": "长任务缺少可预期的反馈边界",
+        "structural_direction": "统一进展表达和中间交付机制",
+        "expected_leverage": "同时降低等待不确定性与失败返工",
+        "solution_level": "structural_mechanism",
+        "abstraction_rationale": "只描述跨提案共同机制",
     }
 
 
@@ -97,7 +103,7 @@ def _submit(proposals: list) -> str:
 def _rfc_canned(
     covers: object = None, *, title: str = "结构：预算感知", fields: dict | None = None
 ) -> str:
-    item: dict = {"title": title, "fields": fields if fields is not None else _rfc_fields()}
+    item: dict = {"title": title, **(fields if fields is not None else _synthesis_artifact())}
     if covers is not None:
         item["covers"] = covers
     return _submit([item])
@@ -113,7 +119,7 @@ def test_submit_rfcs_yaml_matches_contract() -> None:
     """drift-guard：submit_rfcs.tool.yaml 的 input_schema 与 rfc_input_schema() 深度相等。"""
     import yaml
 
-    from auto_designer.designer.agent_contract import rfc_input_schema
+    from auto_designer.designer.agent_contract import synthesis_input_schema
 
     yaml_path = (
         Path(__file__).resolve().parents[2]
@@ -123,7 +129,7 @@ def test_submit_rfcs_yaml_matches_contract() -> None:
         / "submit_rfcs.tool.yaml"
     )
     tool_def = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    assert tool_def["input_schema"] == rfc_input_schema()
+    assert tool_def["input_schema"] == synthesis_input_schema()
 
 
 def test_structural_proposal_lands_unclaimable(tmp_path) -> None:
@@ -138,8 +144,8 @@ def test_structural_proposal_lands_unclaimable(tmp_path) -> None:
     assert sc.PROPOSAL in rfc["labels"] and sc.FROM_SYNTHESIZE in rfc["labels"]
     assert sc.plane(rfc["labels"]) == sc.PROPOSAL  # 不可领，待 Owner 准入
     assert not sc.is_ready(labels=rfc["labels"], state="open")
-    assert "### 问题\n\n大任务撞预算" in rfc["body"]  # 按 RFC schema 渲染
-    assert "### 方向\n\n加预算感知" in rfc["body"]
+    assert "## 结构关系" in rfc["body"]
+    assert "## 结构方向" in rfc["body"]
 
 
 def test_structural_proposal_carries_live_round_label(tmp_path) -> None:
@@ -207,24 +213,17 @@ def test_covers_absent_no_line(tmp_path) -> None:
     assert "covers:" not in tracker.issue(outcome.proposal_numbers[0])["body"]
 
 
-def test_rfc_fields_label_whitespace_tolerant(tmp_path) -> None:
-    """LLM 用无空格「涉及issue」填字段——归一后应映射到 related，不被静默丢弃。"""
+def test_synthesis_renders_explicit_sources(tmp_path) -> None:
     tracker = FakeTracker()
-    fields = {
-        "问题": "多轮等待拖沓",
-        "根因": "单 agent 长循环",
-        "涉及issue": "session=x",  # 无空格
-        "方向": "更早交回中间成果",
-        "验收": "等待中能看到进展",
-    }
+    fields = _synthesis_artifact()
     outcome = _designer(tmp_path, tracker, _rfc_canned(fields=fields)).propose_once()
     assert outcome.count == 1
-    assert "### 涉及 issue" in tracker.issue(outcome.proposal_numbers[0])["body"]
+    assert "## 来源提案" in tracker.issue(outcome.proposal_numbers[0])["body"]
 
 
 def test_incomplete_fields_skipped(tmp_path) -> None:
     tracker = FakeTracker()
-    canned = _submit([{"title": "半成品", "fields": {"问题": "只填了这个"}}])
+    canned = _submit([{"title": "半成品", "source_proposals": [1]}])
     outcome = _designer(tmp_path, tracker, canned).propose_once()
     assert outcome.count == 0
 
@@ -236,11 +235,10 @@ def test_empty_or_no_submit_yields_no_proposal(tmp_path) -> None:
         assert outcome.count == 0
 
 
-def test_pm_proposal_without_covers(tmp_path) -> None:
-    """0 条既有票时也能凭体感+runtime 产结构提案（covers 空）。"""
+def test_synthesis_requires_cross_proposal_sources(tmp_path) -> None:
     tracker = FakeTracker()
-    outcome = _designer(tmp_path, tracker, _rfc_canned()).propose_once()
-    assert outcome.count == 1
+    outcome = _designer(tmp_path, tracker, _submit([{"title": "单源", **{**_synthesis_artifact(), "source_proposals": [1]}}])).propose_once()
+    assert outcome.count == 0
 
 
 def test_parse_covers_field_shapes() -> None:

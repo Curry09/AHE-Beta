@@ -5,9 +5,8 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 30：读 harness 码（两三次）+ 判重 + 收尾本该远够用；给足余量让每条 disposition 都能干净走到
-# submit_triage。⚠️ Spec-0027：input_schema 校验失败会回灌重试（executor 组 is_error→下一轮重来），
-# 重试上限即此 max_iterations（无专门计数器），故给足余量、别掐死重试。
+# 预算覆盖单条报告的渐进取证与 submit schema 校验失败后的重试；
+# schema 错误由执行器回传给下一轮修正，重试上限由 max_iterations 统一约束。
 max_iterations: 30
 
 middlewares:
@@ -38,8 +37,7 @@ tools:
   - name: list_directory
     yaml_path: ./tools/list_directory.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:list_directory
-  # grep：triage 无 shell，靠它「先搜后读」——按关键词跳到相关函数再精读那一段，
-  # 别把 entry.py 等大文件整篇通读烧 iteration。
+  # 在无 shell 环境中先定位相关内容，再按需读取必要片段。
   - name: search_file_content
     yaml_path: ./tools/search_file_content.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:search_file_content

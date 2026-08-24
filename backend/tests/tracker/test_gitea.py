@@ -9,7 +9,7 @@ import requests
 
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.base import IssueTracker
-from auto_designer.tracker.gitea import GiteaError, GiteaTracker
+from auto_designer.tracker.gitea import GiteaError, GiteaTracker, IssueMigrationError
 
 
 class _Resp:
@@ -69,17 +69,34 @@ class FakeGitea:
         if method == "POST" and path.endswith("/issues"):
             n = self._next_issue
             self._next_issue += 1
-            self.issues[n] = {"state": "open", "labels": json["labels"]}
+            self.issues[n] = {
+                "number": n,
+                "title": json["title"],
+                "body": json.get("body", ""),
+                "state": "open",
+                "labels": json["labels"],
+            }
             return _Resp(
                 201,
                 {"number": n, "html_url": f"http://gitea/issues/{n}", "state": "open"},
             )
         if method == "POST" and path.endswith("/comments"):
             return _Resp(201, {"id": 1})
+        if method == "GET" and "/issues/" in path:
+            n = int(path.rsplit("/", 1)[1])
+            issue = dict(self.issues[n])
+            by_id = {label_id: name for name, label_id in self.labels.items()}
+            issue["labels"] = [
+                {"id": label_id, "name": by_id[label_id]}
+                for label_id in issue["labels"]
+            ]
+            return _Resp(200, issue)
         if method == "PATCH" and "/issues/" in path:
             n = int(path.rsplit("/", 1)[1])
-            self.issues[n]["state"] = json["state"]
-            return _Resp(200, {"number": n, "state": json["state"]})
+            # Gitea 1.22 EditIssueOption 不含 labels；未知字段被忽略。
+            accepted = {key: value for key, value in json.items() if key in {"title", "body", "state"}}
+            self.issues[n].update(accepted)
+            return _Resp(200, {"number": n, **accepted})
         if method == "PUT" and path.endswith("/labels"):  # Spec-0025/T3a：整组替换
             n = int(path.rsplit("/", 2)[1])
             self.issues[n]["labels"] = json["labels"]
@@ -188,6 +205,115 @@ def test_add_comment_and_set_state() -> None:
     # set_state 带 reason 额外发一条 comment
     comment_calls = [c for c in t._session.calls if c[1].endswith("/comments")]
     assert len(comment_calls) == 2
+
+
+def test_update_issue_uses_edit_then_label_endpoint() -> None:
+    backend = FakeGitea()
+    backend.labels = {"proposal": 7}
+    t = _tracker(backend)
+    ref = t.create_issue(IssueDraft(title="raw", body="raw"))
+    t.update_issue(ref.number, title="normalized", body="fields", labels=["proposal"])
+    patches = [call for call in t._session.calls if call[0] == "PATCH"]
+    assert patches[-1][2] == {"title": "normalized", "body": "fields"}
+    label_puts = [call for call in t._session.calls if call[0] == "PUT"]
+    assert label_puts[-1][2] == {"labels": [7]}
+    assert backend.issues[ref.number]["labels"] == [7]
+
+
+def test_transition_issue_uses_label_endpoint_then_state_patch() -> None:
+    backend = FakeGitea()
+    backend.labels = {"declined": 9}
+    t = _tracker(backend)
+    ref = t.create_issue(IssueDraft(title="t", body="b"))
+    t.transition_issue(ref.number, state="closed", labels=["declined"])
+    patch = [call for call in t._session.calls if call[0] == "PATCH"][-1]
+    assert patch[2] == {"state": "closed"}
+    label_put = [call for call in t._session.calls if call[0] == "PUT"][-1]
+    assert label_put[2] == {"labels": [9]}
+
+
+def test_update_issue_rolls_back_body_when_label_update_fails() -> None:
+    class FailFirstLabelPut(FakeGitea):
+        failed = False
+
+        def __call__(self, method: str, url: str, json: Any) -> _Resp:
+            path = url.split("/api/v1", 1)[1]
+            if method == "PUT" and path.endswith("/labels") and not self.failed:
+                self.failed = True
+                return _Resp(500, text="label write failed")
+            return super().__call__(method, url, json)
+
+    backend = FailFirstLabelPut()
+    backend.labels = {"report": 1, "proposal": 2}
+    tracker = _tracker(backend)
+    ref = tracker.create_issue(IssueDraft(title="raw title", body="raw body", labels=["report"]))
+
+    with pytest.raises(IssueMigrationError, match="label write failed"):
+        tracker.update_issue(
+            ref.number,
+            title="normalized title",
+            body="normalized body",
+            labels=["proposal"],
+        )
+
+    assert backend.issues[ref.number] == {
+        "number": ref.number,
+        "title": "raw title",
+        "body": "raw body",
+        "state": "open",
+        "labels": [1],
+    }
+
+
+def test_transition_issue_rolls_back_labels_when_state_update_fails() -> None:
+    class FailFirstStatePatch(FakeGitea):
+        failed = False
+
+        def __call__(self, method: str, url: str, json: Any) -> _Resp:
+            path = url.split("/api/v1", 1)[1]
+            if (
+                method == "PATCH"
+                and "/issues/" in path
+                and json == {"state": "closed"}
+                and not self.failed
+            ):
+                self.failed = True
+                return _Resp(500, text="state write failed")
+            return super().__call__(method, url, json)
+
+    backend = FailFirstStatePatch()
+    backend.labels = {"proposal": 1, "merged": 2}
+    tracker = _tracker(backend)
+    ref = tracker.create_issue(IssueDraft(title="proposal", body="body", labels=["proposal"]))
+
+    with pytest.raises(IssueMigrationError, match="state write failed"):
+        tracker.transition_issue(ref.number, state="closed", labels=["merged"])
+
+    assert backend.issues[ref.number]["state"] == "open"
+    assert backend.issues[ref.number]["labels"] == [1]
+
+
+def test_update_issue_verifies_postcondition_when_backend_silently_ignores_labels() -> None:
+    class IgnoreLabelPut(FakeGitea):
+        def __call__(self, method: str, url: str, json: Any) -> _Resp:
+            path = url.split("/api/v1", 1)[1]
+            if method == "PUT" and path.endswith("/labels"):
+                return _Resp(200, {"number": 1})
+            return super().__call__(method, url, json)
+
+    backend = IgnoreLabelPut()
+    backend.labels = {"report": 1, "proposal": 2}
+    tracker = _tracker(backend)
+    ref = tracker.create_issue(IssueDraft(title="raw", body="evidence", labels=["report"]))
+
+    with pytest.raises(IssueMigrationError) as caught:
+        tracker.update_issue(ref.number, title="normalized", body="fields", labels=["proposal"])
+
+    assert caught.value.number == ref.number
+    assert caught.value.operation == "update_issue"
+    assert caught.value.observed is not None
+    assert backend.issues[ref.number]["title"] == "raw"
+    assert backend.issues[ref.number]["body"] == "evidence"
 
 
 def test_set_state_illegal_value() -> None:

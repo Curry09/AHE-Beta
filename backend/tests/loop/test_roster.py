@@ -34,9 +34,9 @@ def test_triager_override(monkeypatch) -> None:
     assert load_roster()["triager"] == 2  # 分片数
 
 
-def test_zero_owner_means_mechanical_only(monkeypatch) -> None:
+def test_zero_owner_disables_admission_review(monkeypatch) -> None:
     monkeypatch.setenv("N_OWNERS", "0")
-    assert load_roster()["owner"] == 0  # 0 合法：评审段跳过、纯机械准入
+    assert load_roster()["owner"] == 0  # 0 合法：模型评审跳过、全部提案 hold
 
 
 def test_zero_triagers_allowed(monkeypatch) -> None:

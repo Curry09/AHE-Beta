@@ -54,4 +54,4 @@ def test_load_missing_prompt_raises(tmp_path) -> None:
 def test_shipped_user_agent_def_loads() -> None:
     root = Path(__file__).resolve().parents[1] / "agent_defs" / "user_agent"
     agent = load(str(root))
-    assert "用户 agent" in agent.prompt
+    assert "User Simulator（用户模拟）" in agent.prompt

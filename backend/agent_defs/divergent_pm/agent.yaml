@@ -5,14 +5,11 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 正式接线默认 120（发散+读 MANUAL/timeline）；预览脚本可用 DIVERGENT_PREVIEW_ITERS 覆盖。
+# 预算覆盖体验索引分析、渐进式会话取证以及 submit schema 校验失败后的重试。
 max_iterations: 120
 
 middlewares:
-  # 工作区 jail：designer 只能读自己的 harness 仓，文件工具越界读一律拒——机制硬禁读 trace
-  # （data/sessions 体感+会话、data/harness_runs 运行副本）。此前"禁读 trace"仅靠 systemprompt
-  # 一句话、无机制兜底；逐行看某任务轨迹会把该任务专属产物带进提案 = 过拟合的源头。通用 jail 一并
-  # 挡住仓外任何路径（data/live 等），不止点名 trace。
+  # 工作区 jail 将源码读取限制在 harness 仓；会话证据只能经投影工具渐进获取。
   - import: auto_designer.dev.workspace_jail:WorkspaceJailMiddleware
 
 llm_config:
@@ -24,8 +21,8 @@ llm_config:
   timeout: 300
   api_type: openai_chat_completion
 
-# 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于读现状 grounding；
-# designer 不改文件、不碰 git，仅 read_file / list_directory 取证 + complete_task 交提案。
+# 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于验证产品现状；
+# 产品 PM 不修改文件或 Git 状态。
 sandbox_config:
   type: local
 
@@ -36,8 +33,7 @@ tools:
   - name: list_directory
     yaml_path: ./tools/list_directory.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:list_directory
-  # grep：设计师无 shell，靠它「先搜后读」——按关键词跳到相关函数再精读那一段，
-  # 别把 entry.py 等大文件整篇通读烧 iteration（此前撞满 max-iter 的老毛病之一）。
+  # 在无 shell 环境中先定位相关内容，再按需读取必要片段。
   - name: search_file_content
     yaml_path: ./tools/search_file_content.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:search_file_content

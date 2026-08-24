@@ -58,6 +58,26 @@ def test_set_labels_replaces() -> None:
         t.set_labels(999, ["x"])
 
 
+def test_update_issue_replaces_title_body_and_labels_together() -> None:
+    t = FakeTracker()
+    r = t.create_issue(_draft())
+    t.update_issue(r.number, title="normalized", body="fields", labels=["proposal"])
+    snap = t.issue(r.number)
+    assert (snap["title"], snap["body"], snap["labels"]) == (
+        "normalized",
+        "fields",
+        ["proposal"],
+    )
+
+
+def test_transition_issue_replaces_state_and_labels_together() -> None:
+    t = FakeTracker()
+    r = t.create_issue(_draft())
+    t.transition_issue(r.number, state="closed", labels=["declined"])
+    snap = t.issue(r.number)
+    assert snap["state"] == "closed" and snap["labels"] == ["declined"]
+
+
 def test_set_state_round_trip() -> None:
     t = FakeTracker()
     r = t.create_issue(_draft())

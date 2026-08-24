@@ -40,3 +40,13 @@ class IssueTracker(Protocol):
         替换语义（非增量）——调用方自己算好目标标签集。未知标签先 ensure 存在。number 不存在抛 KeyError。
         """
         ...
+
+    def update_issue(
+        self, number: int, *, title: str, body: str, labels: list[str]
+    ) -> None:
+        """以一个可重试语义操作替换标题、正文和标签；后端分步实现必须失败回滚。"""
+        ...
+
+    def transition_issue(self, number: int, *, state: str, labels: list[str]) -> None:
+        """以一个可重试语义操作替换状态与标签；后端分步实现必须失败回滚。"""
+        ...

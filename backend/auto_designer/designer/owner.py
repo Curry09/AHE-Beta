@@ -2,12 +2,9 @@
 """Owner 驱动器：三平面模型的唯一准入口（backlog grooming / Definition of Ready 的执行者）。
 
 生成器（triage/synthesize/divergent）产的提案一律不可领；进 ready 与否、重复合并、覆盖裁决、
-终优先级——全部集中在此（生成侧因此解耦、可自由并行）。每轮一次 `admit_once()`，两级裁决：
-
-- **机械段（零 LLM）**：from-triage 的单条修复案（字段已在 triage 升级时校验过）、与既有 ready/
-  本批其它提案**无标题近似冲突** → 自动 admit。拿不准（有冲突嫌疑）就进评审段——宁审勿误放。
-- **评审段（一次批量 LLM）**：其余（结构/产品提案、冲突组）走 owner agent，`submit_admission`
-  收尾（nexau 工具层强校验）。
+终优先级——全部集中在此（生成侧因此解耦、可自由并行）。每轮一次 `admit_once()`，全部提案
+统一进入一次批量 Owner 模型评审，并以 `submit_admission` 收尾（nexau 工具层强校验）。来源标签
+只表示证据来源，不构成准入资格；尤其 `from-triage` 不得绕过全局产品边界和结构判重。
 
 决策落库（裁决优先级 = **显式决策 > covers 默认 merge > 全局默认 hold**）：
 - admit   → 去 proposal 加 `openagents` 交付面交接令牌（+终优先级，可覆盖 triage 建议值）；
@@ -24,13 +21,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from difflib import SequenceMatcher
 from pathlib import Path
 
-from auto_designer.designer.agent_runtime import norm_label, read_submit, run_agent_def
+from auto_designer.designer.agent_runtime import read_submit, run_agent_def
 from auto_designer.designer.issue_schema import (
     DECLINED,
-    FROM_TRIAGE,
     MERGED,
     NEEDS_TRIAGE,
     OPENAGENTS,
@@ -42,16 +37,13 @@ from auto_designer.designer.issue_schema import (
     format_merged_into,
     parse_covers_line,
     plane,
-    priority_of,
-    provenance_of,
 )
+from auto_designer.designer.proposal_view import format_proposal_list
+from auto_designer.designer.role_contract import validate_owner
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 
 _ADMIT_TIMEOUT = 1800
-# 机械段冲突判定的标题相似度阈值（norm 后 SequenceMatcher ratio）。保守取低值：宁进评审勿误放行。
-_TITLE_CONFLICT_RATIO = 0.6
-
 StatusFn = Callable[..., None]
 
 
@@ -63,7 +55,11 @@ class AdmitOutcome:
     merged: list[int] = field(default_factory=list)
     declined: list[int] = field(default_factory=list)
     held: list[int] = field(default_factory=list)
-    mechanical: list[int] = field(default_factory=list)  # admitted 的子集：机械段零 LLM 放行的
+    # 向后兼容旧 API；全量模型审核后该字段恒为空。
+    mechanical: list[int] = field(default_factory=list)
+    invalid: dict[int, str] = field(default_factory=dict)
+    failed: dict[int, str] = field(default_factory=dict)
+    artifacts: list[dict] = field(default_factory=list)
 
 
 def _ready_labels(current: list[str], priority: str | None) -> list[str]:
@@ -88,16 +84,8 @@ def _terminal_labels(current: list[str], terminal: str) -> list[str]:
     return list(dict.fromkeys([*keep, terminal]))
 
 
-def _titles_conflict(a: str, b: str) -> bool:
-    """标题近似判定（机械段冲突检测）：norm 后 SequenceMatcher ratio ≥ 阈值。"""
-    na, nb = norm_label(a), norm_label(b)
-    if not na or not nb:
-        return False
-    return SequenceMatcher(None, na, nb).ratio() >= _TITLE_CONFLICT_RATIO
-
-
 class Owner:
-    """准入评审驱动器：机械 + 评审双模式批量裁决。恒 1 实例（全局视野的单点）。"""
+    """准入评审驱动器：全量模型批量裁决。恒 1 实例（全局视野的单点）。"""
 
     def __init__(
         self,
@@ -115,7 +103,7 @@ class Owner:
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
         self._on_event = on_event
-        # review=False = 纯机械准入（roster owner=0 的降级模式）：评审段跳过、其余提案 hold。
+        # review=False = 禁用准入：不调用模型，所有提案 hold。不存在机械放行旁路。
         self._review = review
 
     def admit_once(self) -> AdmitOutcome:
@@ -130,21 +118,15 @@ class Owner:
         outcome = AdmitOutcome()
         by_number = {i.number: i for i in backlog}
 
-        # ---- 机械段（零 LLM）：from-triage 单条案 + 无标题近似冲突 → 自动 admit ----
-        mechanical, review_needed = self._split_mechanical(proposals=proposals, ready=ready)
-        for issue in mechanical:
-            self._admit(issue, priority=None, note="admission: 机械准入（单条修复案、无冲突）")
-            outcome.admitted.append(issue.number)
-            outcome.mechanical.append(issue.number)
-
-        # ---- 评审段（一次批量 LLM）：结构/产品提案、冲突组 ----
+        # 全部来源统一进入一次批量模型评审；from-triage 也不例外。
+        review_needed = proposals
         decisions: list[dict] = []
         if review_needed and self._review:
             result_text = self._run_agent(
                 proposals=review_needed, ready=ready, trend=self._feeling_trend()
             )
             decisions = read_submit(result_text, "decisions") or []
-        # review=False 或 agent 未 submit：review_needed 全部默认 hold（提案留存下轮再审）。
+        # review=False 或 agent 未 submit：全部默认 hold（提案留存下轮再审）。
 
         reviewable = {i.number for i in review_needed}
         explicit: dict[int, dict] = {}
@@ -153,36 +135,65 @@ class Owner:
                 num = int(d.get("issue"))
             except (TypeError, ValueError):
                 continue
-            if num in reviewable and num not in explicit:  # 只裁本批评审集合；重复决策先者得
+            outcome.artifacts.append(dict(d))
+            violations = validate_owner(d, review_batch=reviewable)
+            if violations:
+                if num in reviewable:
+                    outcome.invalid[num] = ",".join(v.code for v in violations)
+                continue
+            if num not in explicit:  # 只裁本批评审集合；重复决策先者得
                 explicit[num] = d
 
+        # merge target 必须是既有 ready item，或本批显式 admit 的 proposal。
+        existing_ready = {i.number for i in ready}
+        valid_merge_targets = existing_ready | {
+            num
+            for num, decision in explicit.items()
+            if str(decision.get("decision", "")).strip() == "admit"
+        }
+
         # pass 1：显式决策
-        for num, d in explicit.items():
+        decision_order = {"admit": 0, "merge": 1, "decline": 2, "hold": 3}
+        for num, d in sorted(
+            explicit.items(),
+            key=lambda item: decision_order.get(str(item[1].get("decision", "")).strip(), 4),
+        ):
             issue = by_number[num]
             decision = str(d.get("decision", "")).strip()
             try:
                 if decision == "admit":
                     prio = str(d.get("priority", "")).strip().upper() or None
                     self._admit(issue, priority=prio, note="admission: admit")
+                    self._safe_comment(num, self._decision_note(d))
                     outcome.admitted.append(num)
                 elif decision == "merge":
                     into = d.get("into")
                     target = by_number.get(into) if isinstance(into, int) else None
-                    if target is None or target.number == num:
-                        outcome.held.append(num)  # into 非法 → hold（不瞎并）
+                    if (
+                        target is None
+                        or target.number == num
+                        or target.number not in valid_merge_targets
+                        or target.number not in existing_ready | set(outcome.admitted)
+                    ):
+                        outcome.held.append(num)
+                        outcome.invalid[num] = "merge target 必须是既有 ready item 或本批 admit 提案"
                         continue
                     self._merge(issue, into=target.number)
+                    self._safe_comment(num, self._decision_note(d))
                     outcome.merged.append(num)
                 elif decision == "decline":
                     self._decline(issue, reason=str(d.get("reason", "")).strip())
+                    self._safe_comment(num, self._decision_note(d))
                     outcome.declined.append(num)
                 else:  # hold 或未知
                     outcome.held.append(num)
-            except Exception:  # noqa: BLE001  单条落库失败不拖垮其余
-                pass
+            except Exception as exc:  # noqa: BLE001  单条失败隔离，但必须进入结构化结果
+                outcome.failed[num] = f"{type(exc).__name__}: {exc}"
+                if num not in outcome.held:
+                    outcome.held.append(num)
 
         # pass 2：covers 默认级联（唯一落点）——对每条已 admit 的提案按票号序确定性处理。
-        decided = set(explicit) | {i.number for i in mechanical}
+        decided = set(explicit)
         for num in sorted(outcome.admitted):
             admitted_issue = by_number.get(num)
             if admitted_issue is None:
@@ -197,8 +208,8 @@ class Owner:
                     self._merge(t, into=num)
                     outcome.merged.append(t.number)
                     decided.add(t.number)
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    outcome.failed[t.number] = f"{type(exc).__name__}: {exc}"
 
         # pass 3：其余评审集合默认 hold（不落库动作，只计数）
         for i in review_needed:
@@ -213,67 +224,34 @@ class Owner:
         self._emit(
             running=False,
             status=(
-                f"准入：admit {len(outcome.admitted)}（机械 {len(outcome.mechanical)}）· "
+                f"准入：admit {len(outcome.admitted)} · "
                 f"merge {len(outcome.merged)} · decline {len(outcome.declined)} · "
-                f"hold {len(outcome.held)}"
+                f"hold {len(outcome.held)} · failed {len(outcome.failed)}"
             ),
             proposals=outcome.admitted,
         )
         return outcome
-
-    def _split_mechanical(self, *, proposals: list, ready: list) -> tuple[list, list]:
-        """机械段拆分：from-triage 单条案（字段已由 triage 校验）、与 ready/本批其余提案无标题
-        近似冲突、且**未被本批任何提案 covers** → 机械 admit；其余（结构/产品提案、冲突嫌疑、
-        被覆盖候选）→ 评审段。被 covers 的必须进评审——否则机械段抢先放行后，结构案 admit 时的
-        默认级联合并就够不着它了（dev 会先修症状再被结构案覆盖）。"""
-        covered_in_batch: set[int] = set()
-        for p in proposals:
-            covered_in_batch.update(parse_covers_line(p.body))
-        mechanical: list = []
-        review_needed: list = []
-        for p in proposals:
-            if provenance_of(p.labels) != FROM_TRIAGE or p.number in covered_in_batch:
-                review_needed.append(p)
-                continue
-            others = [x for x in proposals if x.number != p.number] + list(ready)
-            if any(_titles_conflict(p.title, o.title) for o in others):
-                review_needed.append(p)  # 冲突嫌疑 → 宁审勿误放
-            else:
-                mechanical.append(p)
-        return mechanical, review_needed
 
     def _admit(self, issue, *, priority: str | None, note: str) -> None:
         self._tracker.set_labels(issue.number, _ready_labels(list(issue.labels), priority))
         self._safe_comment(issue.number, note)
 
     def _merge(self, issue, *, into: int) -> None:
-        self._tracker.set_labels(issue.number, _terminal_labels(list(issue.labels), MERGED))
+        self._tracker.transition_issue(
+            issue.number, state="closed", labels=_terminal_labels(list(issue.labels), MERGED)
+        )
         self._safe_comment(issue.number, format_merged_into(into))
-        self._safe_close(issue.number, f"merged into #{into}")
 
     def _decline(self, issue, *, reason: str) -> None:
-        self._tracker.set_labels(issue.number, _terminal_labels(list(issue.labels), DECLINED))
+        self._tracker.transition_issue(
+            issue.number, state="closed", labels=_terminal_labels(list(issue.labels), DECLINED)
+        )
         self._safe_comment(issue.number, f"decline：{reason or '（未给原因）'}")
-        self._safe_close(issue.number, f"decline：{reason}")
 
     def _run_agent(
         self, *, proposals: list, ready: list, trend: list[tuple[str, int, str, str]]
     ) -> str:
-        msg = (
-            "你是**准入评审（Owner）**：唯一有权把提案放进 ready 工作队列的人。逐条裁决下面的待评审"
-            "提案——每条给 admit（值得开工，可给终优先级 P0-P3）/ merge（与某票同施力点，给 into=主票号）"
-            "/ decline（不值得做，给 reason）/ hold（信号还薄，留下轮）。**去重合并是你的核心职责**："
-            "多条提案同根因/同施力点就 merge 到最完整的那条；结构提案的 covers 行是生成器的合并建议，"
-            "由你裁决（admit 结构案后，其 covers 的提案默认会被并入——若其中有急修值得独立推进，"
-            "显式 admit 它即可保留）。宁 hold 勿滥 admit；decline 要给得出的理由。\n\n"
-            f"## 待评审提案（{len(proposals)} 条）\n{self._format_index(proposals)}\n\n"
-            f"## 已在 ready 的工作项（{len(ready)} 条，判重参照）\n{self._format_index(ready)}\n\n"
-            f"## 体感曲线\n{self._format_trend(trend)}\n\n"
-            "对存疑提案可 `get_session_timeline`（issue_number=… / session_id=…）核对证据，必要时 "
-            "beat/step 下钻；勿直接读 sessions/ 文件。\n\n"
-            "裁决完**调 `submit_admission` 一次**收尾：`decisions` 每条待评审提案一项（未列出的默认 "
-            "hold）。字段/枚举由工具 input_schema 强校验。"
-        )
+        msg = self._review_message(proposals=proposals, ready=ready, trend=trend)
         return run_agent_def(
             self._agent_def,
             msg,
@@ -282,6 +260,25 @@ class Owner:
             role="owner",
             timeout=_ADMIT_TIMEOUT,
             on_event=self._on_event,
+        )
+
+    def _review_message(
+        self, *, proposals: list, ready: list, trend: list[tuple[str, int, str, str]]
+    ) -> str:
+        return (
+            "你是投资与组合治理 Owner。以下是本批开放 ProposalView、既有 ready item 和体验趋势。"
+            "逐条作出 admit、merge、decline 或 hold 决策，并校准优先级与产品边界。相同价值方向应合并到信息"
+            "更完整的合法目标；`covers`"
+            "仅是 merge 建议，显式 decision 优先。\n"
+            "从价值、证据、范围、重叠、交付风险五个维度留下判断。不重新执行 Triage 的报告诊断、PM 的"
+            "产品发现或 Synthesize 的结构设计，也不根据来源自动准入。\n\n"
+            f"## 待评审提案（{len(proposals)} 条）\n{self._format_index(proposals)}\n\n"
+            f"## 已在 ready 的工作项（{len(ready)} 条，判重参照）\n{self._format_index(ready)}\n\n"
+            f"## 体感曲线\n{self._format_trend(trend)}\n\n"
+            "评审只依据 ProposalView 与组合上下文；证据不足就 hold，不回到原始会话重新诊断。\n\n"
+            "评审完成后调用 `submit_admission` 一次：`decisions` 每条待评审提案一项，并填写五维评估"
+            "，同时填写 product_boundary 与 abstraction_quality（未列出的默认 "
+            "hold）。字段/枚举由工具 input_schema 强校验。"
         )
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
@@ -298,17 +295,8 @@ class Owner:
 
     @staticmethod
     def _format_index(issues: list) -> str:
-        """紧凑索引：号/标签/标题 + covers 行（正文不喂——存疑用 timeline 下钻，限住上下文）。"""
-        if not issues:
-            return "（空）"
-        lines = []
-        for i in issues:
-            covers = parse_covers_line(i.body)
-            covers_bit = f"  covers={covers}" if covers else ""
-            prio = priority_of(i.labels)
-            prio_bit = f" 建议{prio}" if prio else ""
-            lines.append(f"- #{i.number} [{','.join(i.labels)}]{prio_bit} {i.title}{covers_bit}")
-        return "\n".join(lines)
+        """准入索引使用所有下游角色共享的 canonical ProposalView。"""
+        return format_proposal_list(issues)
 
     @staticmethod
     def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:
@@ -323,15 +311,28 @@ class Owner:
 
     def _safe_comment(self, number: int, body: str) -> None:
         try:
-            self._tracker.add_comment(number, body)
+            # Cross-system provenance contract: OpenAgents treats comments with
+            # this machine identity as automation output, so Owner decisions do
+            # not enter its human-reply queue.  Apply it to every Owner comment,
+            # rather than matching individual decision text downstream.
+            marker = "<!-- openagents:agent=auto-designer -->"
+            signed = body if marker in body else f"{body}\n\n{marker}"
+            self._tracker.add_comment(number, signed)
         except Exception:  # noqa: BLE001
             pass
 
-    def _safe_close(self, number: int, reason: str) -> None:
-        try:
-            self._tracker.set_state(number, "closed", reason)
-        except Exception:  # noqa: BLE001
-            pass
+    @staticmethod
+    def _decision_note(decision: dict) -> str:
+        return "\n".join(
+            [
+                "## Owner 组合评审",
+                f"- 价值：{decision.get('value_assessment', '')}",
+                f"- 证据：{decision.get('evidence_assessment', '')}",
+                f"- 范围：{decision.get('scope_assessment', '')}",
+                f"- 重叠：{decision.get('overlap_assessment', '')}",
+                f"- 交付风险：{decision.get('delivery_risk', '')}",
+            ]
+        )
 
     def _emit(self, *, running: bool, status: str, **kw: object) -> None:
         if self._on_status is not None:

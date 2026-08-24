@@ -24,14 +24,16 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `__init__.py` | Product discovery, proposal synthesis, and admission decision roles. |
 | `agent_contract.py` | 由 issue_schema.SCHEMAS 生成各 producer 的 submit 工具 input_schema——契约与 schema 同源， |
 | `agent_runtime.py` | 四个 driver（triage / synthesize / divergent / owner）此前各抄一份的公共逻辑收拢于此： |
-| `designer.py` | Designer = synthesize agent：综合全局的 nexau agent（delivery 轨；对偶于 triage 的逐条规范化、 |
-| `divergent.py` | Divergent PM 驱动器：与 synthesize **不同料**的另一轨（Spec-0029 双轨分工）。 |
+| `designer.py` | Synthesize 驱动器。 |
+| `divergent.py` | Divergent（能力发现）驱动器。 |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
 | `owner.py` | Owner 驱动器：三平面模型的唯一准入口（backlog grooming / Definition of Ready 的执行者）。 |
+| `proposal_view.py` | Canonical normalized proposal projection shared by all downstream roles. |
+| `role_contract.py` | Spec-0043: task-independent cognitive contracts for demand-side roles. |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂设计师作机制层判别证据。 |
 | `session_timeline.py` | 设计师按需取用：从落盘 Session 投影「使用事件时间线」。 |
 | `submit_tools.py` | submit 工具的 binding。 |
-| `triage.py` | Triager：issue triage / maintainer = 带只读工具的 nexau agent。 |
+| `triage.py` | Triage（报告规范化）驱动器。 |
 
 ### auto_designer.dev
 
@@ -167,6 +169,8 @@ graph LR
     nauto_designer_designer_divergent["designer.divergent"]
     nauto_designer_designer_issue_schema["designer.issue_schema"]
     nauto_designer_designer_owner["designer.owner"]
+    nauto_designer_designer_proposal_view["designer.proposal_view"]
+    nauto_designer_designer_role_contract["designer.role_contract"]
     nauto_designer_designer_runtime_agg["designer.runtime_agg"]
     nauto_designer_designer_session_timeline["designer.session_timeline"]
     nauto_designer_designer_submit_tools["designer.submit_tools"]
@@ -240,26 +244,35 @@ graph LR
     nauto_designer_designer_agent_runtime --> nauto_designer_user_session_store
     nauto_designer_designer_designer --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_designer --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_designer --> nauto_designer_designer_proposal_view
+    nauto_designer_designer_designer --> nauto_designer_designer_role_contract
     nauto_designer_designer_designer --> nauto_designer_designer_runtime_agg
     nauto_designer_designer_designer --> nauto_designer_models
     nauto_designer_designer_designer --> nauto_designer_tracker_base
     nauto_designer_designer_designer --> nauto_designer_user_session_store
     nauto_designer_designer_divergent --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_divergent --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_divergent --> nauto_designer_designer_proposal_view
+    nauto_designer_designer_divergent --> nauto_designer_designer_role_contract
     nauto_designer_designer_divergent --> nauto_designer_models
     nauto_designer_designer_divergent --> nauto_designer_tracker_base
     nauto_designer_designer_divergent --> nauto_designer_user_session_store
     nauto_designer_designer_owner --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_owner --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_owner --> nauto_designer_designer_proposal_view
+    nauto_designer_designer_owner --> nauto_designer_designer_role_contract
     nauto_designer_designer_owner --> nauto_designer_tracker_base
     nauto_designer_designer_owner --> nauto_designer_user_session_store
+    nauto_designer_designer_proposal_view --> nauto_designer_designer_issue_schema
     nauto_designer_designer_runtime_agg --> nauto_designer_models
     nauto_designer_designer_runtime_agg --> nauto_designer_user_session_store
     nauto_designer_designer_session_timeline --> nauto_designer_models
     nauto_designer_designer_session_timeline --> nauto_designer_user_session_store
     nauto_designer_designer_triage --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_triage --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_triage --> nauto_designer_designer_role_contract
     nauto_designer_designer_triage --> nauto_designer_tracker_base
+    nauto_designer_designer_triage --> nauto_designer_usage
     nauto_designer_designer_triage --> nauto_designer_user_session_store
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library

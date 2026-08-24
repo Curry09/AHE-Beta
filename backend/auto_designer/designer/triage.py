@@ -1,19 +1,9 @@
-# Spec-0029/T3：triage = 纯规范化生成器——逐条调查 report，就地升为 proposal 或 decline。
-"""Triager：issue triage / maintainer = 带只读工具的 nexau agent。
+# Spec-0042/T3：Triage 将单条 report 规范化为 proposal 或终态结论。
+"""Triage（报告规范化）驱动器。
 
-用户提的是 report（自由文本、用户视角症状）。triage agent 逐条处理 report 平面的票，用**三管齐下
-的 grounding**（用户报告 + 只读 harness 代码 + get_session_timeline/beat/step 渐进下钻）给每条一个
-disposition（三值）：
-
-- accept     → 确认 kind + 填规范化字段（根因区域/边界/验收，经 issue_schema 校验）+ 建议优先级
-               → **就地升 proposal**（去 report、加 proposal+from-triage+kind+P*）；字段渲染挂 comment。
-               提案不可领——进 ready 与否由 Owner 准入裁决（Spec-0029/T6）。
-- reject     → 超范围/无效 → declined + 原因 + 关闭。
-- needs_info → 信息太少、读码+轨迹也定位不出 → declined + 原因 + 关闭。
-
-**不判重**（Spec-0029：判重全权归 Owner——triage 回归单条视野，不再喂「已 triaged 判重参照」，
-生成侧因此可自由分片并行，重复提案由 Owner 在准入时合并）。agent 出草稿（submit_triage 原生结构化，
-nexau 工具层强校验）、driver 落库——与 synthesize/divergent/Owner 同构、解耦。
+输入由原始 report、只读 harness 源码和渐进式会话证据组成。accept 将同一票原子更新为任务无关的
+proposal，并把原始报告保存在审计评论中；reject 与 needs_info 转入 declined 终态。跨提案判重和
+准入分别由 Owner 执行。
 """
 
 from __future__ import annotations
@@ -51,7 +41,9 @@ from auto_designer.designer.issue_schema import (
 from auto_designer.designer.issue_schema import (
     validate as schema_validate,
 )
+from auto_designer.designer.role_contract import validate_triage
 from auto_designer.tracker.base import IssueTracker
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
 
 _TRIAGE_TIMEOUT = 900
@@ -86,6 +78,9 @@ class TriageOutcome:
     accepted: list[int] = field(default_factory=list)
     rejected: list[int] = field(default_factory=list)
     needs_info: list[int] = field(default_factory=list)
+    failed: dict[int, str] = field(default_factory=dict)
+    warnings: dict[int, list[str]] = field(default_factory=dict)
+    artifacts: dict[int, dict] = field(default_factory=dict)
 
     @property
     def handled(self) -> int:
@@ -117,6 +112,11 @@ def _fields_by_label_to_key(kind: str, fields: dict) -> dict:
         key = label_to_key.get(norm_label(k), str(k))  # 已是 key 则原样
         out[key] = v
     return out
+
+
+def _proposal_body(*, normalized: str) -> str:
+    """proposal 默认上下文只含规范化结论；具体案例从评论/timeline 渐进取证。"""
+    return f"## Triage 规范化提案（实施对象：harness）\n\n{normalized.strip()}"
 
 
 class Triager:
@@ -157,35 +157,50 @@ class Triager:
             return TriageOutcome()
         self._emit(running=True, status=f"分诊中…（{len(pending)} 条 report）")
 
-        result_text = self._run_agent(pending=pending)
-        # submit_triage（stop tool）原生结构化：nexau 已按 input_schema 强校验（三值 enum、fields 键
-        # 锁定、无自创字段），binding 回显成为 agent.run 的返回。未调 submit → None → 本轮 no-op 兜底。
-        dispositions = read_submit(result_text, "dispositions")
-        if dispositions is None:
-            self._emit(
-                running=False,
-                status="本轮未收到有效 submit_triage（no-op）",
-                detail=result_text or None,
-            )
-            return TriageOutcome()
-
-        by_number = {i.number: i for i in pending}
         outcome = TriageOutcome()
-        for d in dispositions:
-            try:
-                self._apply(d, by_number=by_number, outcome=outcome)
-            except Exception:  # noqa: BLE001  单条落库失败（set_labels 等）不拖垮其余 disposition
-                pass
+        details: list[str] = []
+        # 每个 report 拥有独立模型上下文；相邻报告不能污染问题定义或证据判断。
+        for issue in pending:
+            session_id = self._session_id_for_issue(issue.number)
+            with bind_usage_context(
+                session_id=session_id or "unavailable",
+                interaction_id=session_id or f"report-{issue.number}",
+                agent_id=f"triage-report-{issue.number}",
+            ):
+                result_text = self._run_agent(pending=[issue])
+            details.append(result_text or "")
+            dispositions = read_submit(result_text, "dispositions")
+            if dispositions is None:
+                outcome.failed[issue.number] = "missing-submit"
+                continue
+            for d in dispositions:
+                violations = validate_triage(d, report_number=issue.number)
+                if violations:
+                    outcome.warnings.setdefault(issue.number, []).extend(v.code for v in violations)
+                    outcome.failed[issue.number] = ",".join(v.code for v in violations)
+                    continue
+                try:
+                    outcome.artifacts[issue.number] = dict(d)
+                    self._apply(d, by_number={issue.number: issue}, outcome=outcome)
+                except Exception as exc:  # noqa: BLE001
+                    outcome.failed[issue.number] = f"{type(exc).__name__}: {exc}"
 
         self._emit(
             running=False,
             status=(
                 f"分诊 {outcome.handled} 条：升提案 {len(outcome.accepted)}、"
-                f"驳回 {len(outcome.rejected)}、待补 {len(outcome.needs_info)}"
+                f"驳回 {len(outcome.rejected)}、待补 {len(outcome.needs_info)}、"
+                f"失败 {len(outcome.failed)}"
             ),
-            detail=result_text or None,
+            detail="\n".join(details) or None,
         )
         return outcome
+
+    def _session_id_for_issue(self, issue_number: int) -> str | None:
+        for entry in self._store.index():
+            if issue_number in [int(number) for number in entry.get("issue_numbers", [])]:
+                return str(entry.get("session_id") or "") or None
+        return None
 
     def _apply(self, d: dict, *, by_number: dict, outcome: TriageOutcome) -> None:
         # d 已由 nexau input_schema 校验（issue/disposition 必填、三值 enum、fields 键锁定）。
@@ -206,6 +221,12 @@ class Triager:
                 )
                 return
             fields = _fields_by_label_to_key(kind, d.get("fields") or {})
+            proposal_title = str(d.get("proposal_title", "")).strip()
+            if not proposal_title:
+                self._decline(
+                    issue, "信息不足", "triage 未给任务无关 proposal_title", outcome.needs_info
+                )
+                return
             errs = schema_validate(kind=kind, fields=fields, section="triage")
             if errs:  # 规范化字段没填全 → 降级 needs_info（保证升上去的提案定位完整）
                 self._decline(
@@ -213,9 +234,20 @@ class Triager:
                 )
                 return
             priority = str(d.get("priority", "")).strip().upper()  # 建议值；Owner 准入时可改
-            self._tracker.set_labels(num, _proposal_labels(list(issue.labels), kind, priority))
             body = schema_render(kind=kind, fields=fields, section="triage")
-            self._safe_comment(num, f"## Triage 定位\n\n{body}")
+            # 原始证据先归档；核心 title/body/labels 由 tracker 单次更新，避免半迁移 proposal。
+            if not self._safe_comment(
+                num,
+                f"## 原始用户报告（案例证据，非实现对象）\n\n"
+                f"**原始标题：** {issue.title}\n\n{issue.body or '（空）'}",
+            ):
+                outcome.warnings.setdefault(num, []).append("原始报告审计评论写入失败")
+            self._tracker.update_issue(
+                num,
+                title=proposal_title,
+                body=_proposal_body(normalized=body),
+                labels=_proposal_labels(list(issue.labels), kind, priority),
+            )
             outcome.accepted.append(num)
 
         elif disp == "reject":
@@ -226,35 +258,31 @@ class Triager:
 
     def _decline(self, issue, head: str, reason: str, bucket: list[int]) -> None:
         """declined 终态 + 写原因 + 关闭。"""
-        self._tracker.set_labels(issue.number, _declined_labels(list(issue.labels)))
+        self._tracker.transition_issue(
+            issue.number,
+            state="closed",
+            labels=_declined_labels(list(issue.labels)),
+        )
         self._safe_comment(issue.number, f"{head}：{reason or '（未给原因）'}")
-        self._safe_close(issue.number, f"{head}：{reason}")
         bucket.append(issue.number)
 
-    def _safe_comment(self, number: int, body: str) -> None:
+    def _safe_comment(self, number: int, body: str) -> bool:
         try:
             self._tracker.add_comment(number, body)
         except Exception:  # noqa: BLE001  单条挂链失败不拖垮其余
-            pass
-
-    def _safe_close(self, number: int, reason: str) -> None:
-        try:
-            self._tracker.set_state(number, "closed", reason)
-        except Exception:  # noqa: BLE001
-            pass
+            return False
+        return True
 
     def _run_agent(self, *, pending: list) -> str:
         # triage 只做「单条规范化」：只给它本批 report + 只读代码 + 按需拉的单局轨迹（含那局体感分，
         # 供建议优先级）。不喂判重参照/聚合 runtime_agg/全局体感曲线——判重归 Owner、全局归 synthesize。
         msg = (
-            "逐条**规范化**下面的 raw 用户 report：确认 kind、读 harness 源码 + 按 issue 号调 "
-            "get_session_timeline 拉该局真实轨迹（含那局体感分）定位、给建议优先级，或驳回/needs_info。\n"
-            "**先 read_file/search_file_content 读懂相关 harness 机制再下结论**；对存疑 report 先调 "
-            "get_session_timeline(issue_number=<号>) 看那局使用事件时间线，某拍归不出因再 "
-            "get_harness_beat(turn=…)、某步 truncated 且确需正文再 get_harness_step(turn=…, step_i=…)"
-            "逐层下钻——别一次拉整包。**不用判重**（重复由准入评审合并），每条独立下结论。\n\n"
+            "以下是本批待处理的原始报告。逐条确认 kind，按需读取 harness 源码，并以 issue 号检索"
+            "对应会话证据。证据不足时依次使用 timeline、beat、step，不直接读取 sessions 文件。\n"
+            "accept 必须提供任务无关的 proposal_title 和完整规范化字段；reject 或 needs_info 必须说明"
+            "理由。每条报告独立处理，跨提案判重由 Owner 负责。\n\n"
             f"## 待分诊 report（{len(pending)} 条）\n{self._format_issues(pending)}\n\n"
-            "调查完后调 submit_triage 提交 dispositions（每条 report 恰好一项）——它是唯一收尾方式。"
+            "完成调查后调用 submit_triage 一次，dispositions 只能包含当前这一条 report。"
         )
         return run_agent_def(
             self._agent_def,

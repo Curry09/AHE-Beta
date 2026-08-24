@@ -40,7 +40,8 @@ def dispositions_input_schema() -> dict:
     """triage submit_triage 工具的 input_schema。
 
     每条 disposition：`issue`(int) + `disposition`(三值枚举，Spec-0029：duplicate 退役、判重归 Owner)
-    必填；accept 另给 `kind`(∈USER_KINDS)、`priority`(∈P0-P3 建议值)、`fields`(键∈规范化字段并集)；
+    必填；accept 另给 `kind`(∈USER_KINDS)、`priority`(∈P0-P3 建议值)、任务无关的
+    `proposal_title`、`fields`(键∈规范化字段并集)；
     reject/needs_info 给 `reason`。additionalProperties=false 杜绝 issue_number/status/平铺 root_cause
     这类自创字段；enum 让 "high" 这类非法优先级吐不出来。per-kind 条件必填仍由 driver 的 validate
     二次把关（json_schema 不表达）。
@@ -55,10 +56,27 @@ def dispositions_input_schema() -> dict:
             },
             "kind": {"type": "string", "enum": list(USER_KINDS)},
             "priority": {"type": "string", "enum": list(PRIORITIES)},
+            "proposal_title": {"type": "string"},
             "fields": _fields_object_schema(_triage_field_labels()),
             "reason": {"type": "string"},
+            "artifact": {
+                "type": "object",
+                "properties": {
+                    "reported_problem": {"type": "string"},
+                    "user_impact": {"type": "string"},
+                    "scope_boundary": {"type": "string"},
+                    "evidence": {"type": "array", "items": {"type": "string"}},
+                    "uncertainties": {"type": "array", "items": {"type": "string"}},
+                    "implementation_target": {
+                        "type": "string", "enum": ["harness", "outside_harness", "uncertain"]
+                    },
+                },
+                "required": ["reported_problem", "user_impact", "scope_boundary", "evidence",
+                             "uncertainties", "implementation_target"],
+                "additionalProperties": False,
+            },
         },
-        "required": ["issue", "disposition"],
+        "required": ["issue", "disposition", "artifact"],
         "additionalProperties": False,
     }
     return {
@@ -94,6 +112,57 @@ def rfc_input_schema() -> dict:
     }
 
 
+def pm_input_schema() -> dict:
+    """Product PM: infer product meaning/opportunity from user behaviour."""
+    item = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "user_goal": {"type": "string"},
+            "observed_behaviors": {"type": "array", "items": {"type": "string"}},
+            "experience_tension": {"type": "string"},
+            "product_opportunity": {"type": "string"},
+            "desired_outcome": {"type": "string"},
+            "evidence_sessions": {"type": "array", "items": {"type": "string"}},
+            "related_proposals": {"type": "array", "items": {"type": "integer"}},
+            "solution_level": {"type": "string", "enum": ["product_capability", "implementation_design"]},
+            "abstraction_rationale": {"type": "string"},
+        },
+        "required": [
+            "title", "user_goal", "observed_behaviors", "experience_tension",
+            "product_opportunity", "desired_outcome", "evidence_sessions", "solution_level",
+            "abstraction_rationale",
+        ],
+        "additionalProperties": False,
+    }
+    return {"type": "object", "properties": {"proposals": {"type": "array", "items": item}},
+            "required": ["proposals"], "additionalProperties": False}
+
+
+def synthesis_input_schema() -> dict:
+    """Synthesize: explain relationships and common mechanisms across proposals."""
+    item = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "source_proposals": {"type": "array", "items": {"type": "integer"}},
+            "relationship": {"type": "string"},
+            "common_tension": {"type": "string"},
+            "structural_direction": {"type": "string"},
+            "expected_leverage": {"type": "string"},
+            "covers": {"type": "array", "items": {"type": "integer"}},
+            "solution_level": {"type": "string", "enum": ["structural_mechanism", "implementation_design"]},
+            "abstraction_rationale": {"type": "string"},
+        },
+        "required": ["title", "source_proposals", "relationship", "common_tension",
+                     "structural_direction", "expected_leverage", "solution_level",
+                     "abstraction_rationale"],
+        "additionalProperties": False,
+    }
+    return {"type": "object", "properties": {"proposals": {"type": "array", "items": item}},
+            "required": ["proposals"], "additionalProperties": False}
+
+
 def admission_input_schema() -> dict:
     """Owner submit_admission 工具的 input_schema（Spec-0029/T6，取代旧 gate_input_schema）。
 
@@ -109,8 +178,21 @@ def admission_input_schema() -> dict:
             "into": {"type": "integer"},
             "priority": {"type": "string", "enum": list(PRIORITIES)},
             "reason": {"type": "string"},
+            "value_assessment": {"type": "string"},
+            "evidence_assessment": {"type": "string"},
+            "scope_assessment": {"type": "string"},
+            "overlap_assessment": {"type": "string"},
+            "delivery_risk": {"type": "string"},
+            "product_boundary": {
+                "type": "string", "enum": ["in_scope", "out_of_scope", "uncertain"]
+            },
+            "abstraction_quality": {
+                "type": "string", "enum": ["appropriate", "too_implementation_specific", "uncertain"]
+            },
         },
-        "required": ["issue", "decision"],
+        "required": ["issue", "decision", "value_assessment", "evidence_assessment",
+                     "scope_assessment", "overlap_assessment", "delivery_risk",
+                     "product_boundary", "abstraction_quality"],
         "additionalProperties": False,
     }
     return {

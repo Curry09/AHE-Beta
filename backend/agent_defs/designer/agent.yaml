@@ -5,8 +5,8 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 300：允许按需拉多局 timeline + 读 harness/NexAU、且 submit_rfcs 参数被拒后仍有余量重试后收尾；
-# 墙钟由 Designer._DESIGN_TIMEOUT 兜底。max_iterations 也是 submit 校验失败的重试上限（≥30）。
+# 预算覆盖 ProposalView 关系分析、按需读取 harness 源码以及 submit schema 校验失败后的重试；
+# 墙钟由 Designer._DESIGN_TIMEOUT 兜底。
 max_iterations: 300
 
 middlewares:
@@ -37,24 +37,10 @@ tools:
   - name: list_directory
     yaml_path: ./tools/list_directory.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:list_directory
-  # grep：设计师无 shell，靠它「先搜后读」——按关键词跳到相关函数再精读那一段，
-  # 别把 entry.py 等大文件整篇通读烧 iteration（此前撞满 max-iter 的老毛病之一）。
+  # 在无 shell 环境中先定位相关内容，再按需读取必要片段。
   - name: search_file_content
     yaml_path: ./tools/search_file_content.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:search_file_content
-  # 按需取一局用户模拟的完整决策时间线（投影：无 LLM system/user 原片）；
-  # 编排侧读 SessionStore，jail 仍禁直接读 sessions/。
-  - name: get_session_timeline
-    yaml_path: ./tools/get_session_timeline.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_session_timeline
-  # 下钻某一拍：harness 内层 tool 序列（截断）+ stop_kind；timeline 不够细时再用。
-  - name: get_harness_beat
-    yaml_path: ./tools/get_harness_beat.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_harness_beat
-  # 再展开某一步正文（硬顶字符）；beat 里 truncated=true 且确需细看时才调。
-  - name: get_harness_step
-    yaml_path: ./tools/get_harness_step.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_harness_step
   # 收尾工具：agent 以工具参数原生吐结构化 RFC（input_schema 由 agent_contract.rfc_input_schema()
   # 生成、受 drift-guard 测试守护）；nexau 在调用层强校验，漂移/缺字段被拒→重试。stop tool 的返回值
   # （proposals 的 JSON）成为 agent.run 的返回，driver json.loads 取用——取代旧 complete_task 信封 +

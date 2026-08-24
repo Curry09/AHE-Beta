@@ -1,6 +1,6 @@
-# Spec-0029/T6：Owner 准入单测——机械/评审双模式、四路裁决、covers 默认级联（stub agent）。
-"""FakeTracker + 临时 SessionStore：验证唯一准入口的裁决落库——机械段零 LLM 放行、评审段
-admit/merge/decline/hold、显式决策 > covers 默认 merge > 默认 hold、review=False 降级。"""
+# Spec-0029/T6：Owner 准入单测——全量模型评审、四路裁决、covers 默认级联（stub agent）。
+"""FakeTracker + 临时 SessionStore：验证唯一准入口的裁决落库——所有来源统一评审、
+admit/merge/decline/hold、显式决策 > covers 默认 merge > 默认 hold、review=False 全 hold。"""
 
 from __future__ import annotations
 
@@ -72,6 +72,14 @@ def _synth_proposal(tracker: FakeTracker, title: str, covers: list[int] | None =
 
 
 def _submit(decisions: list) -> str:
+    for decision in decisions:
+        decision.setdefault("value_assessment", "价值明确")
+        decision.setdefault("evidence_assessment", "证据充分")
+        decision.setdefault("scope_assessment", "范围内聚")
+        decision.setdefault("overlap_assessment", "已检查重叠")
+        decision.setdefault("delivery_risk", "风险可控")
+        decision.setdefault("product_boundary", "in_scope")
+        decision.setdefault("abstraction_quality", "appropriate")
     return json.dumps({"decisions": decisions}, ensure_ascii=False)
 
 
@@ -91,6 +99,15 @@ def test_submit_admission_yaml_matches_contract() -> None:
     assert yaml.safe_load(p.read_text(encoding="utf-8"))["input_schema"] == admission_input_schema()
 
 
+def test_owner_agent_exposes_only_admission_tool() -> None:
+    """Owner evaluates supplied artifacts and cannot reopen source/session investigation."""
+    import yaml
+
+    path = Path(__file__).resolve().parents[2] / "agent_defs" / "owner" / "agent.yaml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert [tool["name"] for tool in config["tools"]] == ["submit_admission"]
+
+
 def test_no_proposals_is_noop(tmp_path: Path) -> None:
     tracker = FakeTracker()
     tracker.create_issue(IssueDraft(title="ready 项", body="x", labels=[sc.READY]))
@@ -100,21 +117,24 @@ def test_no_proposals_is_noop(tmp_path: Path) -> None:
     assert o.agent_calls == 0
 
 
-def test_mechanical_admits_clean_triage_singleton_without_llm(tmp_path: Path) -> None:
+def test_clean_triage_singleton_requires_explicit_model_admission(tmp_path: Path) -> None:
     tracker = FakeTracker()
     n = _triage_proposal(tracker, "unidecode 安装超时")
-    o = _owner(tmp_path, tracker, _submit([]))
+    o = _owner(tmp_path, tracker, _submit([{"issue": n, "decision": "admit"}]))
     out = o.admit_once()
-    assert out.admitted == [n] and out.mechanical == [n]
-    assert o.agent_calls == 0  # 全机械 → 零 LLM
+    assert out.admitted == [n] and out.mechanical == []
+    assert o.agent_calls == 1
+    assert [i.number for i in o.seen_review] == [n]
     snap = tracker.issue(n)
     assert sc.is_ready(labels=snap["labels"], state=snap["state"])
     assert sc.OPENAGENTS in snap["labels"] and sc.PROPOSAL not in snap["labels"]  # 交接令牌落库
     assert "P2" in snap["labels"]  # 建议优先级沿用为终值
+    assert snap["comments"]
+    assert all("<!-- openagents:agent=auto-designer -->" in body for body in snap["comments"])
 
 
-def test_mechanical_conflict_goes_to_review(tmp_path: Path) -> None:
-    """标题近似的两条 from-triage 提案 → 冲突嫌疑，进评审段（宁审勿误放）。"""
+def test_all_triage_proposals_go_to_one_batch_review(tmp_path: Path) -> None:
+    """无论标题是否近似，from-triage 都必须进入同一次全局评审。"""
     tracker = FakeTracker()
     a = _triage_proposal(tracker, "导出按钮点了没反应")
     b = _triage_proposal(tracker, "导出按钮点了没有反应")
@@ -201,16 +221,87 @@ def test_invalid_merge_target_holds(tmp_path: Path) -> None:
     assert p in out.held and out.merged == []
 
 
-def test_review_disabled_mechanical_still_works(tmp_path: Path) -> None:
-    """review=False（roster owner=0 降级）：机械段照常放行，评审集合全 hold、零 LLM。"""
+def test_merge_target_cannot_be_held_or_declined_proposal(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    source = _synth_proposal(tracker, "待合并")
+    held = _synth_proposal(tracker, "暂缓目标")
+    declined = _synth_proposal(tracker, "拒绝目标")
+    o = _owner(
+        tmp_path,
+        tracker,
+        _submit(
+            [
+                {"issue": source, "decision": "merge", "into": held},
+                {"issue": held, "decision": "hold"},
+                {"issue": declined, "decision": "decline", "reason": "无价值"},
+            ]
+        ),
+    )
+    out = o.admit_once()
+    assert source in out.held and source in out.invalid
+    assert sc.PROPOSAL in tracker.issue(source)["labels"]
+
+
+def test_owner_core_write_failure_is_reported(tmp_path: Path) -> None:
+    class BrokenTransitionTracker(FakeTracker):
+        def transition_issue(self, number: int, *, state: str, labels: list[str]) -> None:
+            raise RuntimeError("transition failed")
+
+    tracker = BrokenTransitionTracker()
+    p = _synth_proposal(tracker, "拒绝时写入失败")
+    o = _owner(
+        tmp_path,
+        tracker,
+        _submit([{"issue": p, "decision": "decline", "reason": "无价值"}]),
+    )
+    out = o.admit_once()
+    assert p in out.failed and p in out.held
+    assert sc.PROPOSAL in tracker.issue(p)["labels"]
+
+
+def test_review_disabled_holds_every_proposal(tmp_path: Path) -> None:
+    """review=False（roster owner=0）：不存在机械旁路，全部 hold、零 LLM。"""
     tracker = FakeTracker()
     clean = _triage_proposal(tracker, "干净单条案")
     s = _synth_proposal(tracker, "结构提案")
     o = _owner(tmp_path, tracker, _submit([{"issue": s, "decision": "admit"}]), review=False)
     out = o.admit_once()
-    assert out.admitted == [clean] and out.mechanical == [clean]
-    assert s in out.held
+    assert out.admitted == [] and out.mechanical == []
+    assert set(out.held) == {clean, s}
     assert o.agent_calls == 0
+
+
+def test_review_prompt_keeps_owner_lightweight(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    p = _triage_proposal(tracker, "某具体任务中的失败")
+    o = _owner(tmp_path, tracker, _submit([]))
+    issue = tracker.list_open_issues()[0]
+    msg = o._review_message(proposals=[issue], ready=[], trend=[])
+    assert "投资与组合治理" in msg
+    assert "重叠" in msg
+    assert "不重新执行 Triage" in msg
+    assert "必须使用仓库工具核验" not in msg
+    assert f"#{p}" in msg
+
+
+def test_owner_receives_normalized_body_for_every_proposal_source(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    p = tracker.create_issue(
+        IssueDraft(
+            title="精确指令下探索范围失控",
+            body=(
+                "## Triage 规范化提案（实施对象：harness）\n\n"
+                "### 根因区域\n\nagents/main.md 在精确指令下仍无界探索\n\n"
+                "### 边界\n\n只改通用 harness 行为"
+            ),
+            labels=["bug", sc.PROPOSAL, sc.FROM_TRIAGE, "P2"],
+        )
+    ).number
+    issue = tracker.list_open_issues()[0]
+    rendered = Owner._format_index([issue])
+    assert "agents/main.md 在精确指令下仍无界探索" in rendered
+    assert "只改通用 harness 行为" in rendered
+    assert f"#{p}" in rendered
 
 
 def test_no_submit_holds_review_set(tmp_path: Path) -> None:

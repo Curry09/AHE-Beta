@@ -1,20 +1,18 @@
 type: tool
 name: submit_rfcs
 description: >-
-  Submit your structural RFC proposals and finish. This is the ONLY way to finish
-  — call it exactly once, after you have investigated the triaged backlog, the
-  feeling trend and the runtime aggregate.
+  Submit structural proposals and finish. Call this compatibility-named tool
+  exactly once after reviewing ProposalView, experience trends, and runtime data.
 
-  Pass `proposals`: 0..n items (empty list is the correct answer for most rounds —
-  don't force one). Each item needs `title` and `fields` (the RFC fields, Chinese
-  labels: 问题 / 根因 / 涉及 issue / 方向 / 验收). Optionally give `covers`: a list
-  of the triaged issue numbers this RFC subsumes (they will be marked superseded).
+  Pass `proposals`: 0..n cross-proposal syntheses. Each item names at least two
+  source proposals and explains their relationship, common tension, structural
+  direction, and expected leverage. Optionally
+  provide `covers` as merge recommendations for Owner. This call does not admit,
+  merge, close, or otherwise transition existing proposals.
 
   The parameters are schema-validated at call time; invalid values (missing field,
   self-invented keys) are rejected and you must retry.
-# Spec-0027/T3：input_schema 是 agent_contract.rfc_input_schema() 的生成副本（受 drift-guard 测试守护：
-# test_designer.py::test_submit_rfcs_yaml_matches_contract 断言二者深度相等）。改 RFC 字段改
-# issue_schema.SCHEMAS 后需重新生成此块，否则测试会红。契约单一真源仍是 issue_schema.SCHEMAS。
+# Spec-0043: generated from agent_contract.synthesis_input_schema().
 input_schema:
   type: object
   properties:
@@ -25,27 +23,36 @@ input_schema:
         properties:
           title:
             type: string
-          fields:
-            type: object
-            properties:
-              问题:
-                type: string
-              根因:
-                type: string
-              涉及 issue:
-                type: string
-              方向:
-                type: string
-              验收:
-                type: string
-            additionalProperties: false
+          source_proposals:
+            type: array
+            items:
+              type: integer
+          relationship:
+            type: string
+          common_tension:
+            type: string
+          structural_direction:
+            type: string
+          expected_leverage:
+            type: string
           covers:
             type: array
             items:
               type: integer
+          solution_level:
+            type: string
+            enum: [structural_mechanism, implementation_design]
+          abstraction_rationale:
+            type: string
         required:
           - title
-          - fields
+          - source_proposals
+          - relationship
+          - common_tension
+          - structural_direction
+          - expected_leverage
+          - solution_level
+          - abstraction_rationale
         additionalProperties: false
   required:
     - proposals

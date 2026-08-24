@@ -43,6 +43,29 @@ class GiteaError(RuntimeError):
         self.endpoint = endpoint
 
 
+class IssueMigrationError(RuntimeError):
+    """A semantic issue migration did not reach its requested post-state."""
+
+    def __init__(
+        self,
+        *,
+        number: int,
+        operation: str,
+        primary: BaseException | str,
+        rollback: BaseException | str | None,
+        observed: dict[str, Any] | None,
+    ) -> None:
+        detail = f"issue #{number} {operation} failed: {primary}"
+        if rollback is not None:
+            detail += f"; rollback: {rollback}"
+        super().__init__(detail)
+        self.number = number
+        self.operation = operation
+        self.primary = primary
+        self.rollback = rollback
+        self.observed = observed
+
+
 class GiteaTracker:
     """IssueTracker 协议的 Gitea 实现。与 FakeTracker 对 run_session 等价、可互换。"""
 
@@ -145,6 +168,99 @@ class GiteaTracker:
             f"/repos/{self._owner}/{self._repo}/issues/{number}/labels",
             {"labels": label_ids},
         )
+
+    def update_issue(
+        self, number: int, *, title: str, body: str, labels: list[str]
+    ) -> None:
+        """安全迁移提案主体；Gitea 1.22 不支持在 EditIssue 中更新 labels。"""
+        before = self.get_issue(number=number)
+        self._request(
+            "PATCH",
+            f"/repos/{self._owner}/{self._repo}/issues/{number}",
+            {"title": title, "body": body},
+        )
+        try:
+            self.set_labels(number, labels)
+            observed = self.get_issue(number=number)
+            if not self._matches(
+                observed, title=title, body=body, labels=labels, state=None
+            ):
+                raise ValueError("postcondition mismatch")
+        except Exception as exc:
+            rollback_error: BaseException | None = None
+            try:
+                current = self.get_issue(number=number)
+                if current.get("title") != title or current.get("body") != body:
+                    raise RuntimeError("rollback skipped because issue content changed concurrently")
+                self._request(
+                    "PATCH",
+                    f"/repos/{self._owner}/{self._repo}/issues/{number}",
+                    {"title": before["title"], "body": before["body"]},
+                )
+            except Exception as rollback_exc:
+                rollback_error = rollback_exc
+            raise IssueMigrationError(
+                number=number,
+                operation="update_issue",
+                primary=exc,
+                rollback=rollback_error,
+                observed=self._observed_issue(number=number),
+            ) from exc
+
+    def transition_issue(self, number: int, *, state: str, labels: list[str]) -> None:
+        if state not in ISSUE_STATES:
+            raise ValueError(f"非法 state：{state!r}（须属 {ISSUE_STATES}）")
+        before = self.get_issue(number=number)
+        self.set_labels(number, labels)
+        try:
+            self._request(
+                "PATCH",
+                f"/repos/{self._owner}/{self._repo}/issues/{number}",
+                {"state": state},
+            )
+            observed = self.get_issue(number=number)
+            if not self._matches(
+                observed, title=None, body=None, labels=labels, state=state
+            ):
+                raise ValueError("postcondition mismatch")
+        except Exception as exc:
+            rollback_error: BaseException | None = None
+            try:
+                current = self.get_issue(number=number)
+                if set(current.get("labels") or []) != set(labels):
+                    raise RuntimeError("rollback skipped because issue labels changed concurrently")
+                self.set_labels(number, list(before["labels"]))
+            except Exception as rollback_exc:
+                rollback_error = rollback_exc
+            raise IssueMigrationError(
+                number=number,
+                operation="transition_issue",
+                primary=exc,
+                rollback=rollback_error,
+                observed=self._observed_issue(number=number),
+            ) from exc
+
+    @staticmethod
+    def _matches(
+        observed: dict[str, Any],
+        *,
+        title: str | None,
+        body: str | None,
+        labels: list[str],
+        state: str | None,
+    ) -> bool:
+        return (
+            (title is None or observed.get("title") == title)
+            and (body is None or observed.get("body") == body)
+            and set(observed.get("labels") or []) == set(labels)
+            and (state is None or observed.get("state") == state)
+        )
+
+    def _observed_issue(self, *, number: int) -> dict[str, Any] | None:
+        try:
+            return self.get_issue(number=number)
+        except Exception:  # noqa: BLE001 - error object remains useful when observation also fails
+            return None
 
     # ---- 观测读路径（非 IssueTracker 协议，仅 GiteaTracker 提供）----
 

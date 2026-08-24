@@ -43,7 +43,7 @@ _STORE: ContextVar[SessionStore | None] = ContextVar("designer_session_store", d
 # nexau 工具回调常在别的线程，ContextVar 不会自动拷贝；bind 时同步写这份兜底。
 _STORE_FALLBACK: SessionStore | None = None
 
-# 活动条 / 私有核实 / harness 回复：限长，防把具体命令 stdout 焊进提案。
+# 活动条、私有核实和 harness 回复均限长，避免具体命令输出进入默认提案上下文。
 _ACTIVITY_MAX = 8
 _ACTIVITY_TEXT = 160
 _HEARD_MAX = 1200
@@ -384,7 +384,7 @@ def get_session_timeline(
 # 为何要单独 tool（而非塞进 timeline）：
 # - 默认时间线只给 heard + 短 saw_activity，够判「超时/意图」；灌全量 steps 会再炸上下文。
 # - 归因「预算烧在探索还是卡在交付前」时，需要**对准某一拍**看 tool 序列——按需细看。
-# - 仍不做 LLM 原片；tool_result 截断，防把某次 stdout 焊进提案。
+# - 不提供完整 LLM 原始记录；tool_result 截断，避免单次命令输出进入提案。
 
 _BEAT_TOOL_TEXT = 220
 _BEAT_RESULT_TEXT = 280

@@ -176,6 +176,9 @@ tasks:
     acceptance: mock 下三平面分组正确、Owner 房间可见、漏斗与告警条渲染；缺字段退化；npm build 通过。
 ---
 
+> 历史规范提示：本文件保留 0029 落地时的决策与术语。需求面当前角色契约、Owner 评审方式、Triage
+> 落库语义及 covers 生命周期以 Spec 0042 为准；不得从本文恢复机械准入或旧状态迁移。
+
 # 0029 · 三平面 issue 流：证据→提案→工作队列，唯一准入 Owner
 
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->

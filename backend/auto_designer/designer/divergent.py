@@ -1,12 +1,8 @@
-# Spec-0029/T5：divergent PM = discovery 轨生成器——从原始会话行为挖没被提为 issue 的能力缺口。
-"""Divergent PM 驱动器：与 synthesize **不同料**的另一轨（Spec-0029 双轨分工）。
+# Spec-0042/T5：Divergent 从会话行为证据识别产品能力缺口。
+"""Divergent（能力发现）驱动器。
 
-synthesize（delivery 轨）吃规范化 backlog 找结构根因；divergent（discovery 轨）**直吃会话第一手
-证据**——体感曲线（分+理由+session 句柄）作索引、get_session_timeline/beat/step 按需下钻原始会话
-行为，找「用户没提为 issue、却用对话行为反复补出来的工作方式」（自拟规程、绕路、反复手动交接）。
-不吃 triaged backlog / runtime_agg（那是 delivery 轨信号）；开放提案/ready 紧凑索引仅作「勿重复」
-参照。产出落 proposal 平面 + from-divergent（不可领；进 ready 由 Owner 准入裁决），每轮硬顶 3 条。
-不依赖 triage 产出 → 编排上与 triage 同拍并行（Spec-0029/T8 第一拍）。
+体验趋势提供检索索引，会话 timeline/beat/step 提供按需证据。开放 proposal 与 ready item 只作为
+重复方向参照。输出写入 proposal 平面并标记 from-divergent；Owner 负责最终准入与合并。
 """
 
 from __future__ import annotations
@@ -15,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from auto_designer.designer.agent_runtime import norm_label, read_submit, run_agent_def
+from auto_designer.designer.agent_runtime import read_submit, run_agent_def
 from auto_designer.designer.issue_schema import (
     FROM_DIVERGENT,
     PROPOSAL,
@@ -23,15 +19,14 @@ from auto_designer.designer.issue_schema import (
     plane,
     round_label,
 )
-from auto_designer.designer.issue_schema import fields_of as _schema_fields_of
-from auto_designer.designer.issue_schema import render as _schema_render
-from auto_designer.designer.issue_schema import validate as _schema_validate
+from auto_designer.designer.proposal_view import format_proposal_reference_list
+from auto_designer.designer.role_contract import render_pm_artifact, validate_pm
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 
 _DIVERGENT_TIMEOUT = 3600
-# 每轮硬顶，防灌单（跨轮去重/合并由 Owner 准入做）。
+# 单轮候选上限；跨轮去重与合并由 Owner 执行。
 _MAX_CANDIDATES = 3
 
 StatusFn = Callable[..., None]
@@ -42,19 +37,15 @@ class DivergentOutcome:
     """一次 propose_once：新落的候选票号。"""
 
     proposal_numbers: list[int] = field(default_factory=list)
+    artifacts: list[dict] = field(default_factory=list)
 
     @property
     def count(self) -> int:
         return len(self.proposal_numbers)
 
 
-def _rfc_fields_by_label(fields: dict) -> dict:
-    label_to_key = {norm_label(f.label): f.key for f in _schema_fields_of(kind="rfc")}
-    return {label_to_key.get(norm_label(k), str(k)): v for k, v in fields.items()}
-
-
 class Divergent:
-    """发散 PM：从会话行为产能力候选（proposal 平面），不碰 git、不改 harness 文件。"""
+    """从会话行为形成能力 proposal，不修改代码或工作流状态。"""
 
     def __init__(
         self,
@@ -75,7 +66,7 @@ class Divergent:
         self._round_provider = round_provider
 
     def propose_once(self) -> DivergentOutcome:
-        # 「勿重复」参照：当前 open 的提案 + ready 项（紧凑索引，不喂正文细节）。
+        # 全量参照用于理解产品现状；是否重叠由 Owner 裁决，不是 PM 的生成门。
         backlog = self._tracker.list_open_issues()
         reference = [i for i in backlog if plane(i.labels) in (PROPOSAL, READY)]
         trend = self._feeling_trend()
@@ -92,15 +83,13 @@ class Divergent:
         if parsed:
             self._tracker.ensure_labels([PROPOSAL, FROM_DIVERGENT])
         round_no = self._round_provider() if self._round_provider is not None else None
+        known_sessions = {sid for _, _, _, sid in trend if sid}
         for item in parsed:
             if not item.get("title"):
                 continue
-            fields = _rfc_fields_by_label(
-                item.get("fields") if isinstance(item.get("fields"), dict) else {}
-            )
-            if _schema_validate(kind="rfc", fields=fields, section="triage"):
-                continue  # 字段没填全 → 跳过（不落半成品候选）
-            body = _schema_render(kind="rfc", fields=fields)
+            if validate_pm(item, known_sessions=known_sessions):
+                continue
+            body = render_pm_artifact(item)
             labels = [PROPOSAL, FROM_DIVERGENT]
             if isinstance(round_no, int) and round_no > 0:
                 labels.append(round_label(round_no))
@@ -115,23 +104,22 @@ class Divergent:
             proposals=numbers,
             detail=(result_text or None),
         )
-        return DivergentOutcome(proposal_numbers=numbers)
+        return DivergentOutcome(proposal_numbers=numbers, artifacts=[dict(item) for item in parsed])
 
     def _run_agent(self, *, trend: list[tuple[str, int, str, str]], reference: list) -> str:
-        rfc_labels = "/".join(f.label for f in _schema_fields_of(kind="rfc"))
         msg = (
-            "你是 divergent PM（discovery 轨）：**从原始会话行为里**挖用户可感知的产品能力机会——"
-            "尤其是用户没提为 issue、却用对话行为反复补出来的工作方式（自拟规程、绕路、手动交接）。\n"
-            "**你的第一手证据是会话本身**：下面的体感曲线是索引（分+理由+session 句柄），对可疑的局"
-            "调 `get_session_timeline(session_id=…)` 看使用事件时间线（用户追问/纠正/自拟流程都在这），"
-            "某拍看不清再 `get_harness_beat(turn=…)`、必要时 `get_harness_step(turn=…, step_i=…)`；"
-            "可只读 harness 仓对照「现状能力 vs 用户契约」。勿直接读 sessions/ 文件。\n"
-            f"本轮最多提 {_MAX_CANDIDATES} 条**增量**候选；下面的参照列表是已有提案/工作项，"
-            "**勿换皮重复其施力点**。禁止无信号空想：每条候选必须能指回具体 session 的行为证据。\n\n"
+            "你是产品 PM。以下是全部可见的用户体验索引以及开放 proposal、ready item。先理解用户"
+            "试图完成什么、行为反映了什么体验矛盾，再提出产品机会。已有提案是产品现状上下文，"
+            "重叠不构成生成失败，合并取舍由 Owner 负责。"
+            "再以 session 标识调用 get_session_timeline 核实；仅在必要时继续调用 beat 和 step。"
+            "不得直接读取 sessions 文件。\n"
+            f"本轮最多提交 {_MAX_CANDIDATES} 条产品洞察。每条必须能追溯到具体会话证据。\n\n"
             f"## 体感曲线（索引：时间, 1-4 分, 理由, session 句柄）\n{self._format_trend(trend)}\n\n"
-            f"## 已有提案/工作项（勿重复参照，{len(reference)} 条）\n{self._format_issues(reference)}\n\n"
-            "调查完毕后**调 `submit_divergent` 一次**收尾：`proposals` 为 0..n 条候选（无则空数组），"
-            f"每条含 `title` + `fields`（{rfc_labels}）。字段契约由工具 input_schema 强校验。"
+            f"## 已有 proposal / ready item（{len(reference)} 条）\n{self._format_issues(reference)}\n\n"
+            "调查完成后调用 `submit_divergent` 一次：`proposals` 为 0..n 条（无则空数组），"
+            "每条分别说明 user_goal、observed_behaviors、experience_tension、product_opportunity、"
+            "desired_outcome、evidence_sessions、solution_level、abstraction_rationale，可选"
+            " related_proposals。字段契约由工具强校验。"
         )
         return run_agent_def(
             self._agent_def,
@@ -157,10 +145,7 @@ class Divergent:
 
     @staticmethod
     def _format_issues(issues: list) -> str:
-        if not issues:
-            return "（空）"
-        # 紧凑索引：只给号/标签/标题（正文不喂——参照用，防上下文膨胀）。
-        return "\n".join(f"- #{i.number} [{','.join(i.labels)}] {i.title}" for i in issues)
+        return format_proposal_reference_list(issues)
 
     @staticmethod
     def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:

@@ -20,7 +20,7 @@ DEFAULT_ROSTER: dict[str, int] = {
     "triager": 1,  # Spec-0029：分片数——第 k 个 triager 处理 pending[k::n]，真并行
     "designer": 1,
     "divergent": 0,  # 默认关；N_DIVERGENTS=1 开启发散 PM（discovery 轨，产出经 Owner 准入）
-    "owner": 1,  # Spec-0029：唯一准入，恒 0/1——0=纯机械准入（评审段跳过），≥1 按 1 算
+    "owner": 1,  # Spec-0029：唯一准入，恒 0/1——0=禁用准入（全部 hold），≥1 按 1 算
     "developer": 1,  # Spec-0032：交付面并发 K（vigil --parallel）；保守默认串行
 }
 

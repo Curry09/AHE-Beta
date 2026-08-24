@@ -5,7 +5,7 @@ system_prompt: ./systemprompt.md
 system_prompt_type: string
 # xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
 tool_call_mode: structured
-# 准入评审是短任务：读紧凑索引 + 少量按需下钻 + 一次 submit；80 步远够。
+# 准入评审只读取运行时提供的结构化评审批次，并以一次 submit 完成裁决。
 max_iterations: 80
 
 middlewares:
@@ -22,31 +22,11 @@ llm_config:
   timeout: 300
   api_type: openai_chat_completion
 
-# 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于核对现状；
-# owner 不改文件、不碰 git，仅读证 + submit_admission 交裁决。
+# Owner 不访问源码或会话存储；sandbox 配置仅保持 agent 运行环境与其他需求面角色一致。
 sandbox_config:
   type: local
 
 tools:
-  - name: read_file
-    yaml_path: ./tools/read_file.tool.yaml
-    binding: nexau.archs.tool.builtin.file_tools:read_file
-  - name: list_directory
-    yaml_path: ./tools/list_directory.tool.yaml
-    binding: nexau.archs.tool.builtin.file_tools:list_directory
-  - name: search_file_content
-    yaml_path: ./tools/search_file_content.tool.yaml
-    binding: nexau.archs.tool.builtin.file_tools:search_file_content
-  # 按需取一局用户模拟的使用事件时间线；存疑提案的证据核对入口，jail 仍禁直接读 sessions/。
-  - name: get_session_timeline
-    yaml_path: ./tools/get_session_timeline.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_session_timeline
-  - name: get_harness_beat
-    yaml_path: ./tools/get_harness_beat.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_harness_beat
-  - name: get_harness_step
-    yaml_path: ./tools/get_harness_step.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_harness_step
   # 收尾工具：input_schema = agent_contract.admission_input_schema() 的生成副本（drift-guard 守护）；
   # nexau 在调用层强校验，stop tool 的返回值（decisions JSON）成为 agent.run 的返回。
   - name: submit_admission

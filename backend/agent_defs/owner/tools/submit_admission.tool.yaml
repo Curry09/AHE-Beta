@@ -1,22 +1,15 @@
 type: tool
 name: submit_admission
 description: >-
-  Submit your admission review of the pending proposals and finish. This is the
-  ONLY way to finish — call it exactly once.
+  Submit the admission decisions for the current review batch and finish. Call
+  this tool exactly once after completing the portfolio assessment.
 
-  Pass `decisions`: one item per proposal you decided on. Each item needs
-  `issue` (the proposal's number) and `decision` — one of `admit` (dev-ready →
-  enters the ready queue; optionally give final `priority` P0-P3, overriding the
-  triage suggestion), `merge` (same root cause / same lever as another ticket →
-  give `into` = the master ticket number; this proposal is closed and linked),
-  `decline` (not worth doing → give `reason`; closed), or `hold` (signal still
-  thin → stays a proposal for the next round). Proposals you omit default to
-  `hold`.
-
-  Deduplication is YOUR job: merge look-alike proposals into the most complete
-  one. A structural proposal's covers line is only the generator's suggestion —
-  when you admit it, its covered proposals are merged into it by default; to
-  keep an urgent one (e.g. a P0 hotfix) as independent work, explicitly admit it.
+  Pass `decisions`: zero or one item per proposal. Each item needs `issue`, one
+  decision from admit / merge / decline / hold, the required value, evidence,
+  scope, overlap, and delivery-risk assessments, plus `product_boundary` and
+  `abstraction_quality`. `admit` may provide final `priority`; `merge` requires
+  `into`; `decline` requires `reason`. Omitted proposals remain undecided and are
+  handled by the driver as hold.
 
   The parameters are schema-validated at call time; invalid values (unknown
   decision, self-invented keys) are rejected and you must retry.
@@ -50,9 +43,32 @@ input_schema:
               - P3
           reason:
             type: string
+          value_assessment:
+            type: string
+          evidence_assessment:
+            type: string
+          scope_assessment:
+            type: string
+          overlap_assessment:
+            type: string
+          delivery_risk:
+            type: string
+          product_boundary:
+            type: string
+            enum: [in_scope, out_of_scope, uncertain]
+          abstraction_quality:
+            type: string
+            enum: [appropriate, too_implementation_specific, uncertain]
         required:
           - issue
           - decision
+          - value_assessment
+          - evidence_assessment
+          - scope_assessment
+          - overlap_assessment
+          - delivery_risk
+          - product_boundary
+          - abstraction_quality
         additionalProperties: false
   required:
     - decisions

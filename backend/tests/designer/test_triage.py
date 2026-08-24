@@ -58,7 +58,16 @@ def _accept(n: int, *, kind: str = "bug", priority: str = "P1", fields: dict | N
         "disposition": "accept",
         "kind": kind,
         "priority": priority,
+        "proposal_title": "精确任务执行缺少预算感知",
         "fields": fields if fields is not None else default_fields,
+        "artifact": {
+            "reported_problem": "任务执行超出预算",
+            "user_impact": "用户未获得可用交付",
+            "scope_boundary": "通用 harness 执行行为",
+            "evidence": [f"report:#{n}"],
+            "uncertainties": [],
+            "implementation_target": "harness",
+        },
     }
 
 
@@ -108,7 +117,12 @@ def test_accept_promotes_report_to_proposal(tmp_path) -> None:
     # 提案不可领（进 ready 由 Owner 裁决）
     assert not sc.is_ready(labels=snap["labels"], state=snap["state"])
     assert sc.plane(snap["labels"]) == sc.PROPOSAL
-    assert any("根因区域" in c and "entry.py 无预算感知" in c for c in snap["comments"])
+    assert snap["body"].startswith("## Triage 规范化提案（实施对象：harness）")
+    assert "entry.py 无预算感知" in snap["body"]
+    assert snap["title"] == "精确任务执行缺少预算感知"
+    assert "原始用户报告" not in snap["body"]
+    assert any("原始标题" in c and "unidecode 超时" in c and "x" in c for c in snap["comments"])
+    assert "根因区域" in snap["body"] and "entry.py 无预算感知" in snap["body"]
 
 
 def test_accept_old_needs_triage_data_also_works(tmp_path) -> None:
@@ -154,6 +168,15 @@ def test_accept_missing_fields_downgrades_to_needs_info(tmp_path) -> None:
     assert sc.DECLINED in snap["labels"] and snap["state"] == "closed"
 
 
+def test_accept_missing_normalized_title_downgrades_to_needs_info(tmp_path) -> None:
+    tracker = FakeTracker()
+    n = _report(tracker, "某被测对象的具体问题")
+    disposition = _accept(n)
+    disposition.pop("proposal_title")
+    out = _triager(tmp_path, tracker, _submit([disposition])).triage_once()
+    assert out.needs_info == [n] and out.accepted == []
+
+
 def test_accept_invalid_kind_downgrades(tmp_path) -> None:
     tracker = FakeTracker()
     n = _report(tracker, "怪 kind")
@@ -187,6 +210,33 @@ def test_no_submit_is_noop(tmp_path) -> None:
     out = _triager(tmp_path, tracker, "我跑完了但没提交").triage_once()
     assert out.handled == 0
     assert sc.REPORT in tracker.issue(n)["labels"]  # 未被动过
+
+
+def test_core_update_failure_is_reported_and_report_remains(tmp_path: Path) -> None:
+    class BrokenUpdateTracker(FakeTracker):
+        def update_issue(self, number: int, *, title: str, body: str, labels: list[str]) -> None:
+            raise RuntimeError("write failed")
+
+    tracker = BrokenUpdateTracker()
+    n = _report(tracker, "具体案例")
+    out = _triager(tmp_path, tracker, _submit([_accept(n)])).triage_once()
+    assert n in out.failed and "write failed" in out.failed[n]
+    assert out.accepted == []
+    snap = tracker.issue(n)
+    assert sc.REPORT in snap["labels"] and snap["title"] == "具体案例" and snap["body"] == "x"
+
+
+def test_audit_comment_failure_is_warning_but_proposal_is_created(tmp_path: Path) -> None:
+    class BrokenCommentTracker(FakeTracker):
+        def add_comment(self, number: int, body: str) -> None:
+            raise RuntimeError("comment failed")
+
+    tracker = BrokenCommentTracker()
+    n = _report(tracker, "具体案例")
+    out = _triager(tmp_path, tracker, _submit([_accept(n)])).triage_once()
+    assert out.accepted == [n]
+    assert out.warnings[n] == ["原始报告审计评论写入失败"]
+    assert sc.PROPOSAL in tracker.issue(n)["labels"]
 
 
 def test_out_of_batch_issue_skipped(tmp_path) -> None:

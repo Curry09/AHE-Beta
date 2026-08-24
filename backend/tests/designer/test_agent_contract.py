@@ -20,8 +20,17 @@ def test_dispositions_schema_shape_and_enums() -> None:
     assert props["priority"]["enum"] == list(sc.PRIORITIES)
     # 顶层只允许契约字段——杜绝 issue_number/status/平铺散字段
     assert item["additionalProperties"] is False
-    assert set(props) == {"issue", "disposition", "kind", "priority", "fields", "reason"}
-    assert item["required"] == ["issue", "disposition"]
+    assert set(props) == {
+        "issue",
+        "disposition",
+        "kind",
+        "priority",
+        "proposal_title",
+        "fields",
+            "reason",
+            "artifact",
+        }
+    assert item["required"] == ["issue", "disposition", "artifact"]
 
 
 def test_dispositions_fields_keys_are_union_from_schemas() -> None:

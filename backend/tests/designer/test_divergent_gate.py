@@ -37,13 +37,16 @@ def _seed_session(store: SessionStore, *, score: int = 3) -> None:
     )
 
 
-def _rfc_fields() -> dict:
+def _pm_artifact() -> dict:
     return {
-        "问题": "用户反复用聊天补状态交接",
-        "根因": "产品面缺少可触发的状态契约",
-        "涉及 issue": "session=abc",
-        "方向": "默认行为 + 显式触发",
-        "验收": "timeout 后追问状态轮次下降",
+        "user_goal": "持续掌握长任务进展",
+        "observed_behaviors": ["超时后反复追问状态"],
+        "experience_tension": "系统在工作但用户无法判断是否仍值得等待",
+        "product_opportunity": "提供连续、可理解的进展反馈",
+        "desired_outcome": "用户无需用追问恢复确定感",
+        "evidence_sessions": ["SESSION_ID"],
+        "solution_level": "product_capability",
+        "abstraction_rationale": "只描述用户可感知能力与结果",
     }
 
 
@@ -67,6 +70,7 @@ class _StubDivergent(Divergent):
 def _divergent(tmp_path: Path, tracker: FakeTracker, canned: str, **kw) -> _StubDivergent:
     store = SessionStore(tmp_path / "sessions")
     _seed_session(store)
+    canned = canned.replace("SESSION_ID", str(store.index()[0]["session_id"]))
     return _StubDivergent(
         tracker, store, str(tmp_path / "harness"), str(tmp_path / "agent"), canned=canned, **kw
     )
@@ -76,7 +80,7 @@ def test_submit_divergent_yaml_matches_contract() -> None:
     """drift-guard：submit_divergent.tool.yaml 的 input_schema = rfc_input_schema()（同 RFC shape）。"""
     import yaml
 
-    from auto_designer.designer.agent_contract import rfc_input_schema
+    from auto_designer.designer.agent_contract import pm_input_schema
 
     p = (
         Path(__file__).resolve().parents[2]
@@ -85,12 +89,12 @@ def test_submit_divergent_yaml_matches_contract() -> None:
         / "tools"
         / "submit_divergent.tool.yaml"
     )
-    assert yaml.safe_load(p.read_text(encoding="utf-8"))["input_schema"] == rfc_input_schema()
+    assert yaml.safe_load(p.read_text(encoding="utf-8"))["input_schema"] == pm_input_schema()
 
 
 def test_divergent_creates_unclaimable_proposal(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    canned = _submit([{"title": "状态交接产品化", "fields": _rfc_fields()}])
+    canned = _submit([{"title": "状态交接产品化", **_pm_artifact()}])
     d = _divergent(tmp_path, tracker, canned, round_provider=lambda: 2)
     out = d.propose_once()
     assert isinstance(out, DivergentOutcome) and out.count == 1
@@ -117,9 +121,23 @@ def test_divergent_inputs_are_session_first(tmp_path: Path) -> None:
     assert {i.number for i in d.seen_reference} == {ref1, ref2}  # 参照只含提案/ready
 
 
+def test_divergent_dedupe_reference_is_compact() -> None:
+    tracker = FakeTracker()
+    tracker.create_issue(
+        IssueDraft(
+            title="精确指令下探索范围失控",
+            body="### 根因区域\n\nagents/main.md 未约束精确任务的探索范围",
+            labels=[sc.PROPOSAL, sc.FROM_TRIAGE],
+        )
+    )
+    rendered = Divergent._format_issues(tracker.list_open_issues())
+    assert "精确指令下探索范围失控" in rendered
+    assert "agents/main.md 未约束精确任务的探索范围" not in rendered
+
+
 def test_divergent_caps_at_three(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    many = [{"title": f"候选{i}", "fields": _rfc_fields()} for i in range(5)]
+    many = [{"title": f"候选{i}", **_pm_artifact()} for i in range(5)]
     out = _divergent(tmp_path, tracker, _submit(many)).propose_once()
     assert out.count == 3  # 每轮硬顶
 
@@ -127,7 +145,7 @@ def test_divergent_caps_at_three(tmp_path: Path) -> None:
 def test_divergent_incomplete_fields_skipped(tmp_path: Path) -> None:
     tracker = FakeTracker()
     out = _divergent(
-        tmp_path, tracker, _submit([{"title": "半成品", "fields": {"问题": "只填了这个"}}])
+        tmp_path, tracker, _submit([{"title": "半成品", "user_goal": "只填了这个"}])
     ).propose_once()
     assert out.count == 0
     assert tracker.list_open_issues() == []

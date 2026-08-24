@@ -1,19 +1,16 @@
 type: tool
 name: submit_triage
 description: >-
-  Submit your triage result and finish. This is the ONLY way to finish — call it
-  exactly once, after you have investigated every report in your batch.
+  Submit the disposition for the single isolated report and finish. Call this
+  tool exactly once after completing the evidence review.
 
-  Pass `dispositions`: one item per report. Each item needs `issue` (the number)
+  Pass `dispositions` with exactly one item. It needs `issue` (the report number)
   and `disposition` (one of accept / reject / needs_info):
   - accept: also give `kind` (bug/feature/chore/document), `priority` (P0-P3,
-    a suggestion — the admission reviewer may adjust) and `fields` (the kind's
-    normalized fields, Chinese labels). The ticket becomes a proposal — NOT
-    dev-pickable until admitted.
+    a suggestion), `proposal_title` (a task-independent harness problem title),
+    `fields` (the kind's normalized fields, Chinese labels), and the factual
+    `artifact` required by the schema.
   - reject / needs_info: also give `reason`.
-
-  Do NOT try to deduplicate across reports — judge each on its own; duplicates
-  are merged later at admission review.
 
   The parameters are schema-validated at call time; invalid values (unknown
   field, non-P0-P3 priority, self-invented keys) are rejected and you must retry.
@@ -50,6 +47,8 @@ input_schema:
               - P1
               - P2
               - P3
+          proposal_title:
+            type: string
           fields:
             type: object
             properties:
@@ -64,9 +63,23 @@ input_schema:
             additionalProperties: false
           reason:
             type: string
+          artifact:
+            type: object
+            properties:
+              reported_problem: {type: string}
+              user_impact: {type: string}
+              scope_boundary: {type: string}
+              evidence: {type: array, items: {type: string}}
+              uncertainties: {type: array, items: {type: string}}
+              implementation_target:
+                type: string
+                enum: [harness, outside_harness, uncertain]
+            required: [reported_problem, user_impact, scope_boundary, evidence, uncertainties, implementation_target]
+            additionalProperties: false
         required:
           - issue
           - disposition
+          - artifact
         additionalProperties: false
   required:
     - dispositions

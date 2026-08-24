@@ -127,6 +127,12 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0041 统一 LLM Token 用量监测与全链路归属
 为 user、triager、designer、divergent、owner、harness 与 developer/vigil 建立统一逐调用 Token 原始事件、并发上下文归属、按题与按轮聚合及看板；上游缺失时显式 unavailable，绝不伪造精确值。
 
+### 0042 需求面角色契约治理：统一术语、规范化提案投影与可靠状态迁移
+消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Owner 非原子且静默失败的状态迁移，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
+
+### 0043 需求面角色认知契约：专属产物语言与行为质量门
+在共享证据之上为 Triage、产品 PM、Synthesize 与 Owner 建立不同的认知任务、角色专属产物契约和可执行质量门，防止多角色退化为同一种技术分析 Agent。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -311,6 +317,18 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0041 | 0041/T4 | Harness 收端隔离、按题归属与落盘 | done | T1, T3 | backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/connector.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_connector.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/loop/test_parallel_sessions.py |
 | 0041 | 0041/T5 | 分层聚合 API 与看板 | pending | T1, T2, T4 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py<br>frontend/src/api.ts<br>frontend/src/types.ts<br>frontend/src/components/UsagePanel.tsx<br>frontend/src/App.tsx<br>frontend/src/styles.css |
 | 0041 | 0041/T6 | Developer/vigil 精确度审计与结构化扩展口 | done | T1 | backend/run.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>docs/usage-monitoring.md |
+| 0042 | 0042/T1 | 权威术语表、角色职责矩阵与现行流程基线 | done | — | docs/specs/0042-role-contract-governance.md<br>docs/specs/OVERVIEW.md |
+| 0042 | 0042/T2 | Canonical ProposalView 与规范化提案版本 | done | T1 | backend/auto_designer/designer/proposal_view.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/divergent.py<br>backend/tests/designer/test_proposal_view.py |
+| 0042 | 0042/T3 | Triage 可靠规范化迁移与结构化失败结果 | done | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/fake.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/designer/test_triage.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
+| 0042 | 0042/T4 | Owner 决策图验证与可靠批量落库 | done | T1, T2 | backend/auto_designer/designer/owner.py<br>backend/tests/designer/test_owner.py |
+| 0042 | 0042/T5 | 五角色专业化 Prompt 与 Tool 契约统一 | done | T1, T2, T3, T4 | backend/agent_defs/user_agent/prompt.md<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
+| 0042 | 0042/T6 | 跨角色契约测试、规格索引与历史会话回放 | done | T3, T4, T5 | backend/tests/designer/test_role_contract_flow.py<br>backend/scripts/replay_design_from_sessions.py |
+| 0043 | 0043/T1 | 角色产物模型与共享质量门契约 | done | — | backend/auto_designer/designer/role_contract.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/designer/submit_tools.py<br>backend/tests/designer/test_role_contract.py<br>backend/tests/designer/test_agent_contract.py |
+| 0043 | 0043/T2 | Triage 单报告认知隔离与事实型提案 | done | T1 | backend/auto_designer/designer/triage.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/tests/designer/test_triage.py |
+| 0043 | 0043/T3 | 产品 PM 全景洞察契约 | done | T1 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/tests/designer/test_divergent_gate.py |
+| 0043 | 0043/T4 | Synthesize 提案关系综合契约 | done | T1, T2, T3 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/tests/loop/test_designer.py |
+| 0043 | 0043/T5 | Owner 投资判断与组合质量门 | done | T1, T4 | backend/auto_designer/designer/owner.py<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/tests/designer/test_owner.py |
+| 0043 | 0043/T6 | 跨角色行为评测与真实回放验收 | done | T2, T3, T4, T5 | backend/tests/designer/test_role_contract_flow.py<br>backend/scripts/replay_design_from_sessions.py<br>backend/scripts/evaluate_role_traces.py |
 
 ## 跨 feature 关系图
 
@@ -578,6 +596,22 @@ graph LR
         n0041_T5["T5 分层聚合 API 与看板"]
         n0041_T6["T6 Developer/vigil 精确度审计与结构化扩展口"]
     end
+    subgraph G0042[0042 role-contract-governance]
+        n0042_T1["T1 权威术语表、角色职责矩阵与现行流程基线"]
+        n0042_T2["T2 Canonical ProposalView 与规范化提案版本"]
+        n0042_T3["T3 Triage 可靠规范化迁移与结构化失败结果"]
+        n0042_T4["T4 Owner 决策图验证与可靠批量落库"]
+        n0042_T5["T5 五角色专业化 Prompt 与 Tool 契约统一"]
+        n0042_T6["T6 跨角色契约测试、规格索引与历史会话回放"]
+    end
+    subgraph G0043[0043 role-cognitive-contracts]
+        n0043_T1["T1 角色产物模型与共享质量门契约"]
+        n0043_T2["T2 Triage 单报告认知隔离与事实型提案"]
+        n0043_T3["T3 产品 PM 全景洞察契约"]
+        n0043_T4["T4 Synthesize 提案关系综合契约"]
+        n0043_T5["T5 Owner 投资判断与组合质量门"]
+        n0043_T6["T6 跨角色行为评测与真实回放验收"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -746,6 +780,29 @@ graph LR
     n0041_T5 --> n0041_T2
     n0041_T5 --> n0041_T4
     n0041_T6 --> n0041_T1
+    n0042_T2 --> n0042_T1
+    n0042_T3 --> n0042_T1
+    n0042_T3 --> n0042_T2
+    n0042_T4 --> n0042_T1
+    n0042_T4 --> n0042_T2
+    n0042_T5 --> n0042_T1
+    n0042_T5 --> n0042_T2
+    n0042_T5 --> n0042_T3
+    n0042_T5 --> n0042_T4
+    n0042_T6 --> n0042_T3
+    n0042_T6 --> n0042_T4
+    n0042_T6 --> n0042_T5
+    n0043_T2 --> n0043_T1
+    n0043_T3 --> n0043_T1
+    n0043_T4 --> n0043_T1
+    n0043_T4 --> n0043_T2
+    n0043_T4 --> n0043_T3
+    n0043_T5 --> n0043_T1
+    n0043_T5 --> n0043_T4
+    n0043_T6 --> n0043_T2
+    n0043_T6 --> n0043_T3
+    n0043_T6 --> n0043_T4
+    n0043_T6 --> n0043_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -800,23 +857,28 @@ graph LR
 |----|----|
 | CLAUDE.md | 0032, 0033 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040 |
-| backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029 |
-| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029 |
-| backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029 |
+| backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043 |
+| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043 |
+| backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/agent.yaml | 0014, 0030, 0032 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014, 0030, 0032 |
-| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035 |
+| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043 |
+| backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml | 0029, 0042, 0043 |
+| backend/agent_defs/owner/systemprompt.md | 0042, 0043 |
+| backend/agent_defs/owner/tools/submit_admission.tool.yaml | 0042, 0043 |
 | backend/agent_defs/triage_agent/agent.yaml | 0027, 0029 |
-| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029 |
-| backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029 |
-| backend/auto_designer/designer/agent_contract.py | 0027, 0029 |
+| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043 |
+| backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043 |
+| backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
+| backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043 |
 | backend/auto_designer/designer/agent_runtime.py | 0029, 0041 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039 |
-| backend/auto_designer/designer/divergent.py | 0028, 0029 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043 |
+| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
-| backend/auto_designer/designer/owner.py | 0029, 0032 |
-| backend/auto_designer/designer/triage.py | 0025, 0027, 0029 |
+| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043 |
+| backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
+| backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
 | backend/auto_designer/dev/harness_boundary.py | 0015, 0030, 0040 |
@@ -832,9 +894,9 @@ graph LR
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035 |
-| backend/auto_designer/tracker/base.py | 0001, 0025 |
-| backend/auto_designer/tracker/fake.py | 0001, 0020, 0025 |
-| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039 |
+| backend/auto_designer/tracker/base.py | 0001, 0025, 0042 |
+| backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042 |
+| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035 |
@@ -865,18 +927,21 @@ graph LR
 | backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
+| backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
 | backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040 |
+| backend/tests/designer/test_agent_contract.py | 0027, 0043 |
 | backend/tests/designer/test_agent_runtime.py | 0029, 0041 |
-| backend/tests/designer/test_divergent_gate.py | 0028, 0029 |
+| backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
-| backend/tests/designer/test_owner.py | 0029, 0032 |
-| backend/tests/designer/test_triage.py | 0025, 0027, 0029 |
+| backend/tests/designer/test_owner.py | 0029, 0032, 0042, 0043 |
+| backend/tests/designer/test_role_contract_flow.py | 0042, 0043 |
+| backend/tests/designer/test_triage.py | 0025, 0027, 0029, 0042, 0043 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/dev/test_completion_gate.py | 0014, 0030 |
 | backend/tests/dev/test_harness_boundary.py | 0015, 0030, 0040 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043 |
 | backend/tests/loop/test_live.py | 0017, 0026 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041 |
@@ -887,8 +952,8 @@ graph LR
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041 |
-| backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
-| backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
+| backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042 |
+| backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035 |
 | backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
 | backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037 |
@@ -2156,5 +2221,90 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_pending;
+    class v_T6_1 st_done;
+```
+
+### 0042 需求面角色契约治理：统一术语、规范化提案投影与可靠状态迁移（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 权威术语表、角色职责矩阵与现行流程基线"]
+    nT2["T2 Canonical ProposalView 与规范化提案版本"]
+    nT3["T3 Triage 可靠规范化迁移与结构化失败结果"]
+    nT4["T4 Owner 决策图验证与可靠批量落库"]
+    nT5["T5 五角色专业化 Prompt 与 Tool 契约统一"]
+    nT6["T6 跨角色契约测试、规格索引与历史会话回放"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT1 --> nT5
+    nT2 --> nT5
+    nT3 --> nT5
+    nT4 --> nT5
+    nT3 --> nT6
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
+```
+
+### 0043 需求面角色认知契约：专属产物语言与行为质量门（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 角色产物模型与共享质量门契约"]
+    nT2["T2 Triage 单报告认知隔离与事实型提案"]
+    nT3["T3 产品 PM 全景洞察契约"]
+    nT4["T4 Synthesize 提案关系综合契约"]
+    nT5["T5 Owner 投资判断与组合质量门"]
+    nT6["T6 跨角色行为评测与真实回放验收"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+    nT1 --> nT5
+    nT4 --> nT5
+    nT2 --> nT6
+    nT3 --> nT6
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
     class v_T6_1 st_done;
 ```

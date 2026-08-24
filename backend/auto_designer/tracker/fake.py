@@ -75,6 +75,20 @@ class FakeTracker:
         self._labels.update(labels)
         issue["labels"] = list(labels)
 
+    def update_issue(
+        self, number: int, *, title: str, body: str, labels: list[str]
+    ) -> None:
+        issue = self._require(number)
+        self._labels.update(labels)
+        issue.update(title=title, body=body, labels=list(labels))
+
+    def transition_issue(self, number: int, *, state: str, labels: list[str]) -> None:
+        if state not in ISSUE_STATES:
+            raise ValueError(f"非法 state：{state!r}（须属 {ISSUE_STATES}）")
+        issue = self._require(number)
+        self._labels.update(labels)
+        issue.update(state=state, labels=list(labels))
+
     def issue(self, number: int) -> dict[str, Any]:
         """只读：返回该 issue 的快照副本，供单测断言 comment/state 生效。"""
         snapshot = self._require(number)
