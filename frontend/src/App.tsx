@@ -8,12 +8,15 @@ import {
   getIssues,
   getOverview,
   getState,
+  getUsageSummary,
+  getUsageEvents,
 } from "./api";
 import { AgentColumn } from "./components/AgentColumn";
 import { BuildingView } from "./components/BuildingView";
 import { Charts } from "./components/Charts";
 import { SidePanel } from "./components/SidePanel";
 import { TopBar } from "./components/TopBar";
+import { UsagePanel } from "./components/UsagePanel";
 import { OpenAgentsView } from "./components/openagents/OpenAgentsView";
 import { usePolling } from "./hooks/usePolling";
 import { roundOf } from "./lib/issueMeta";
@@ -87,6 +90,9 @@ export default function App() {
     const raw = new URLSearchParams(location.search).get("round");
     return raw && /^\d+$/.test(raw) ? Number(raw) : "all";
   });
+  const usageRound = round === "all" ? undefined : round;
+  const usage = usePolling(() => getUsageSummary(usageRound), POLL_MS);
+  const usageEvents = usePolling(() => getUsageEvents(usageRound), POLL_MS);
   const [selection, setSelection] = useState<Selection | null>(() =>
     parseSelection(new URLSearchParams(location.search).get("sel")),
   );
@@ -141,6 +147,7 @@ export default function App() {
         onRound={(r) => setRound(r)}
       />
       <Charts overview={overview} />
+      <UsagePanel usage={usage} events={usageEvents?.events ?? []} />
       {view === "openagents" ? (
         <div className="openagents-layout">
           <OpenAgentsView

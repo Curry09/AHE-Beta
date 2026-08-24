@@ -2899,3 +2899,17 @@ a:focus-visible,
     grid-template-columns: 1fr;
   }
 }
+.usage-panel {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border, #d8d8d8);
+  border-radius: 10px;
+}
+.usage-panel > div:not(.usage-roles) { display: grid; gap: 0.15rem; }
+.usage-panel span { color: var(--muted, #777); font-size: 0.8rem; }
+.usage-roles { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-left: auto; }
+.usage-panel details { max-width: 30rem; }
+.usage-events { display: grid; max-height: 12rem; overflow: auto; gap: 0.25rem; padding-top: 0.5rem; }

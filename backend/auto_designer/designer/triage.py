@@ -261,6 +261,7 @@ class Triager:
             msg,
             store=self._store,
             repo=self._repo,
+            role="triager",
             timeout=_TRIAGE_TIMEOUT,
             on_event=self._on_event,
         )

@@ -27,6 +27,8 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from auto_designer.usage import set_usage_context
+
 from .action_space import derive_action_space, resolve_action
 from .actions import CATALOG, Channel, Effect, Executor, Phase
 from .dimensions import Persona
@@ -931,6 +933,7 @@ def run_session(
     ledger = _UtteranceLedger()  # Spec-0024/T6：请求–回复配对
 
     while state.turn < MAX_TURNS:
+        set_usage_context(interaction_id=f"turn-{state.turn}", turn_no=state.turn)
         phase = Phase.OPENING if state.turn == 0 and not history else Phase.ACTIVE
 
         # ② 派生动作空间
@@ -1139,6 +1142,7 @@ def run_session(
     # ② 框架派生: 从 end_reason / verdict / trust 确定性聚合, 可复现, 也作兜底
     result.feeling_derived = derive_feeling(result.end_reason, result.turns)
     # ① LLM 自评: persona 在角色内给"这次体验"打 1–4 + 理由 (spec-0001/T3 产出方式)
+    set_usage_context(interaction_id=None, turn_no=None, operation="rate")
     rating = client.respond(system, build_rating_turn(task, history, state))
     result.persona_tail.extend(_take_persona_calls(client, "rate"))
     result.feeling = parse_feeling_llm(rating) or result.feeling_derived

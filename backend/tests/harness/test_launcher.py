@@ -72,6 +72,26 @@ for line in sys.stdin:
     sys.stdout.write(json.dumps({"type": "error", "message": "boom", "recoverable": False}) + "\\n")
     sys.stdout.flush()
 """
+_V1_USAGE_ENTRY = """\
+import json, sys
+for line in sys.stdin:
+    obj = json.loads(line)
+    if obj.get("type") == "message" or "message" in obj:
+        sys.stdout.write(json.dumps({"type": "usage", "provider": "nexau", "model": "m", "input_tokens": 7, "output_tokens": 3, "total_tokens": 10, "usage_source": "reported", "agent_run_id": "h1"}) + "\\n")
+        sys.stdout.write(json.dumps({"reply": "done"}) + "\\n")
+        sys.stdout.flush()
+"""
+_V1_POST_REPLY_USAGE_ENTRY = """\
+import json, sys, time
+for line in sys.stdin:
+    obj = json.loads(line)
+    if obj.get("type") == "message" or "message" in obj:
+        sys.stdout.write(json.dumps({"type": "reply", "text": "done"}) + "\\n")
+        sys.stdout.flush()
+        time.sleep(0.05)
+        sys.stdout.write(json.dumps({"type": "usage", "total_tokens": 12, "usage_source": "reported"}) + "\\n")
+        sys.stdout.flush()
+"""
 _V1_INTERRUPT_ENTRY = """\
 import json, sys, threading, time
 busy = {"on": False}
@@ -137,6 +157,33 @@ def test_multi_turn_send(tmp_path) -> None:
     try:
         assert h.send("a") == "1:a"
         assert h.send("b") == "2:b"
+    finally:
+        h.close()
+
+
+def test_usage_sideband_is_isolated_and_drained_once(tmp_path) -> None:
+    h = _launcher(tmp_path, _V1_USAGE_ENTRY).launch("main")
+    try:
+        assert h.send("a") == "done"
+        assert h.last_progress == []
+        assert h.last_visible_events[-1]["type"] == "reply"
+        assert [event["type"] for event in h.last_visible_events] == ["reply"]
+        events = h.drain_usage_events()
+        assert len(events) == 1
+        assert events[0]["total_tokens"] == 10
+        assert h.drain_usage_events() == []
+    finally:
+        h.close()
+
+
+def test_usage_arriving_shortly_after_reply_is_captured(tmp_path) -> None:
+    h = _launcher(tmp_path, _V1_POST_REPLY_USAGE_ENTRY).launch("main")
+    try:
+        assert h.send("a") == "done"
+        assert h.drain_usage_events() == [
+            {"type": "usage", "total_tokens": 12, "usage_source": "reported"}
+        ]
+        assert h.drain_usage_events() == []
     finally:
         h.close()
 

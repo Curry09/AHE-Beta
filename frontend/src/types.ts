@@ -50,6 +50,49 @@ export interface AgentsResponse {
   agents: Agent[];
 }
 
+export interface UsageTotals {
+  input_tokens: number;
+  output_tokens: number;
+  reasoning_tokens: number;
+  cached_input_tokens: number;
+  total_tokens: number;
+}
+
+export interface UsageGroup extends UsageTotals {
+  event_count: number;
+  unavailable_count: number;
+}
+
+export interface UsageSummary extends UsageTotals {
+  event_count: number;
+  unavailable_count: number;
+  by_role: Record<string, UsageGroup>;
+  by_agent: Record<string, UsageGroup>;
+  by_session: Record<string, UsageGroup>;
+  by_instance: Record<string, UsageGroup>;
+  by_interaction: Record<string, UsageGroup>;
+}
+
+export interface UsageEvent {
+  timestamp: string;
+  session_id: string | null;
+  instance_id: string | null;
+  interaction_id: string | null;
+  turn_no: number | null;
+  agent_id: string | null;
+  role: string | null;
+  model: string | null;
+  operation: string | null;
+  usage_source: "reported" | "estimated" | "unavailable";
+  input_tokens: number | null;
+  output_tokens: number | null;
+  reasoning_tokens: number | null;
+  cached_input_tokens: number | null;
+  total_tokens: number | null;
+}
+
+export interface UsageEventsResponse { events: UsageEvent[] }
+
 // 整条 run 的运行态（data/live/run.json）
 export interface RunState {
   running: boolean;

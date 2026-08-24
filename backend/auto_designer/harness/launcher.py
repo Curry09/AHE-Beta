@@ -104,6 +104,7 @@ class _HarnessHandle:
         # 不做 request/reply 配对推断，只记录 harness stdout 自身说了什么。
         self.last_visible_events: list[dict] = []
         self.visible_events: list[dict] = []
+        self._usage_events: list[dict] = []
         # 心跳/续等：进程级读线程把 stdout 行丢进队列；poll 在超时内 drain——
         # 旁路累积，reply 为软唤醒（Spec-0036；不绑写路径）。
         self._line_q: queue.Queue = queue.Queue()
@@ -134,6 +135,35 @@ class _HarnessHandle:
         """取出本轮新 stdout 可见事件；不解释、不配对，只按观察顺序返回。"""
         events = list(self.last_visible_events)
         self.last_visible_events.clear()
+        return events
+
+    def drain_usage_events(self) -> list[dict]:
+        # close/interrupt may leave a final usage line in the reader queue without
+        # another poll. Harvest only usage frames and put every other item back.
+        deferred: list[object] = []
+        while True:
+            try:
+                item = self._line_q.get_nowait()
+            except queue.Empty:
+                break
+            if item is _EOF:
+                deferred.append(item)
+                continue
+            try:
+                payload = json.loads(str(item))
+            except (json.JSONDecodeError, TypeError):
+                deferred.append(item)
+                continue
+            if isinstance(payload, dict) and (
+                payload.get("type") == "usage" or "usage" in payload
+            ):
+                self._ingest_sideband(payload)
+            else:
+                deferred.append(item)
+        for item in deferred:
+            self._line_q.put(item)
+        events = list(self._usage_events)
+        self._usage_events.clear()
         return events
 
     def _start(self) -> None:
@@ -224,6 +254,11 @@ class _HarnessHandle:
 
     def _ingest_sideband(self, payload: dict) -> None:
         """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
+        if payload.get("type") == "usage" or "usage" in payload:
+            raw = payload.get("usage") if "usage" in payload and payload.get("type") != "usage" else payload
+            if isinstance(raw, dict):
+                self._usage_events.append(dict(raw))
+            return
         self.last_sideband.append(payload)
         event_type = str(payload.get("type") or ("status" if "status" in payload else "sideband"))
         event_text = ""
@@ -259,7 +294,10 @@ class _HarnessHandle:
             try:
                 item = self._line_q.get(timeout=min(0.02, remaining))
             except queue.Empty:
-                return
+                # The stdout reader may enqueue a frame shortly after the reply.
+                # Keep the bounded grace period instead of treating the first
+                # temporarily empty queue as proof that no sideband follows.
+                continue
             if item is _EOF:
                 self._line_q.put(item)
                 return

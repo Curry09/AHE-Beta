@@ -17,6 +17,7 @@ import queue
 import sys
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,6 +80,87 @@ class HarnessSmokeTest(unittest.TestCase):
         event = entry._wire_out("status", text="[queued] waiting")
         self.assertIn("status", event)
         self.assertIn("[queued]", json.dumps(event, ensure_ascii=False))
+
+    def test_llm_span_emits_machine_usage_without_response_content(self) -> None:
+        entry = importlib.import_module("entry")
+        from nexau import Span, SpanType
+
+        collector = entry._make_step_collector()
+        collector.set_session_id("agent-1")
+        span = Span(id="", name="OpenAI chat", type=SpanType.LLM)
+        stdout = io.StringIO()
+        old_protocol = entry._OUTPUT_PROTOCOL
+        entry._OUTPUT_PROTOCOL = entry._V1
+        try:
+            with contextlib.redirect_stdout(stdout):
+                collector.end_span(span, outputs={
+                    "id": "req-1", "model": "m",
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 4,
+                              "total_tokens": 14},
+                    "choices": [{"message": {"content": "secret answer"}}],
+                })
+        finally:
+            entry._OUTPUT_PROTOCOL = old_protocol
+        event = json.loads(stdout.getvalue())
+        self.assertEqual(event["type"], "usage")
+        self.assertEqual(event["total_tokens"], 14)
+        self.assertEqual(event["agent_run_id"], "agent-1")
+        self.assertNotIn("secret answer", stdout.getvalue())
+
+    def test_each_llm_span_emits_one_usage_event_including_unavailable(self) -> None:
+        entry = importlib.import_module("entry")
+        from nexau import Span, SpanType
+
+        collector = entry._make_step_collector()
+        stdout = io.StringIO()
+        old_protocol = entry._OUTPUT_PROTOCOL
+        entry._OUTPUT_PROTOCOL = entry._V1
+        try:
+            with contextlib.redirect_stdout(stdout):
+                collector.end_span(
+                    Span(id="one", name="first call", type=SpanType.LLM),
+                    outputs={"usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 2}},
+                )
+                collector.end_span(
+                    Span(id="two", name="retry", type=SpanType.LLM),
+                    outputs={},
+                    error=RuntimeError("provider failed"),
+                )
+        finally:
+            entry._OUTPUT_PROTOCOL = old_protocol
+
+        events = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        self.assertEqual([event["type"] for event in events], ["usage", "usage"])
+        self.assertEqual(events[0]["total_tokens"], 7)
+        self.assertEqual(events[0]["usage_source"], "reported")
+        self.assertEqual(events[1]["usage_source"], "unavailable")
+        self.assertFalse(events[1]["success"])
+
+    def test_concurrent_llm_usage_frames_remain_independent_json_lines(self) -> None:
+        entry = importlib.import_module("entry")
+        from nexau import Span, SpanType
+
+        collector = entry._make_step_collector()
+        stdout = io.StringIO()
+        old_protocol = entry._OUTPUT_PROTOCOL
+        entry._OUTPUT_PROTOCOL = entry._V1
+
+        def emit(index: int) -> None:
+            collector.end_span(
+                Span(id=str(index), name=f"call-{index}", type=SpanType.LLM),
+                outputs={"usage": {"input_tokens": index, "output_tokens": 1}},
+            )
+
+        try:
+            with contextlib.redirect_stdout(stdout), ThreadPoolExecutor(max_workers=5) as pool:
+                list(pool.map(emit, range(20)))
+        finally:
+            entry._OUTPUT_PROTOCOL = old_protocol
+
+        events = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        self.assertEqual(len(events), 20)
+        self.assertTrue(all(event["type"] == "usage" for event in events))
+        self.assertEqual(sorted(event["total_tokens"] for event in events), list(range(1, 21)))
 
     def test_busy_message_emits_queued_status_and_marks_queue_item(self) -> None:
         entry = importlib.import_module("entry")

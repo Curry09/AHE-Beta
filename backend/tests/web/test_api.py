@@ -17,6 +17,7 @@ from auto_designer.models import (
     Turn,
 )
 from auto_designer.tracker.fake import FakeTracker
+from auto_designer.usage import UsageStore
 from auto_designer.user.session_store import SessionStore
 from auto_designer.web.api import create_app
 
@@ -140,6 +141,37 @@ def test_session_detail_ok(tmp_path: Path) -> None:
 def test_session_detail_404(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=FakeTracker())
     assert client.get("/api/sessions/nope").status_code == 404
+
+
+def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
+    usage = UsageStore(tmp_path / "usage.jsonl")
+    store = SessionStore(tmp_path / "sessions")
+    client = TestClient(create_app(store=store, tracker=FakeTracker(), usage_store=usage))
+    assert client.get("/api/usage/events").json() == {"events": []}
+    usage.append({"session_id": "s1", "instance_id": "i1", "interaction_id": "turn-0",
+                  "role": "user", "round_no": 1, "input_tokens": 4,
+                  "output_tokens": 2, "reasoning_tokens": None, "cached_input_tokens": None,
+                  "total_tokens": 6, "usage_source": "reported"})
+    usage.append({"session_id": "s2", "instance_id": "i2", "role": "designer",
+                  "round_no": 2, "input_tokens": 7,
+                  "output_tokens": 3, "reasoning_tokens": 1, "cached_input_tokens": 2,
+                  "total_tokens": 10, "usage_source": "reported"})
+    usage.append({"session_id": "s2", "instance_id": "i2", "role": "designer",
+                  "round_no": 2, "input_tokens": None,
+                  "output_tokens": None, "reasoning_tokens": None,
+                  "cached_input_tokens": None, "total_tokens": None,
+                  "usage_source": "unavailable"})
+    assert client.get("/api/usage/summary?role=user").json()["total_tokens"] == 6
+    summary = client.get("/api/usage/summary?instance_id=i1").json()
+    assert summary["by_instance"]["i1"]["total_tokens"] == 6
+    assert summary["by_interaction"]["turn-0"]["total_tokens"] == 6
+    events = client.get("/api/usage/events?round_no=2&session_id=s2").json()["events"]
+    assert len(events) == 2 and all(event["role"] == "designer" for event in events)
+    assert summary["by_instance"]["i1"]["unavailable_count"] == 0
+    designer = client.get("/api/usage/summary?role=designer").json()
+    assert designer["unavailable_count"] == 1
+    assert designer["by_role"]["designer"]["unavailable_count"] == 1
+    assert client.get("/api/usage/sessions/s1").json()["event_count"] == 1
 
 
 def test_issues_connected(tmp_path: Path) -> None:

@@ -6,6 +6,7 @@ import pytest
 
 from auto_designer.harness.connector import HarnessConnector
 from auto_designer.harness.interface import FakeHarness, HarnessInterface
+from auto_designer.usage import bind_usage_context, current_usage_context
 
 
 class _ShutdownHarness(FakeHarness):
@@ -54,6 +55,17 @@ class _HeartbeatHarness(FakeHarness):
         return f"[{name}]"
 
 
+class _UsageHarness(FakeHarness):
+    def __init__(self) -> None:
+        super().__init__(script=["ok"])
+        self.events = [{"provider": "nexau", "model": "m", "input_tokens": 2,
+                        "output_tokens": 1, "total_tokens": 3, "agent_run_id": "ha"}]
+
+    def drain_usage_events(self):
+        events, self.events = self.events, []
+        return events
+
+
 def test_connector_satisfies_harness_interface_and_forwards_plain_message() -> None:
     wrapped = FakeHarness(callback=lambda msg: f"echo:{msg}")
     connector = HarnessConnector(wrapped)
@@ -70,6 +82,108 @@ def test_connector_keeps_platform_metadata_out_of_harness_message() -> None:
     connector.send_user_message("human text only")
 
     assert wrapped.sent == ["human text only"]
+
+
+def test_connector_attributes_harness_usage_without_exposing_it(monkeypatch) -> None:
+    recorded = []
+    monkeypatch.setattr("auto_designer.harness.connector.record_usage",
+                        lambda **event: recorded.append(event))
+    connector = HarnessConnector(_UsageHarness())
+    with bind_usage_context(session_id="s", instance_id="i", interaction_id="turn-0"):
+        assert connector.send("hello") == "ok"
+    assert len(recorded) == 1
+    assert recorded[0]["usage"]["total_tokens"] == 3
+    assert not hasattr(connector, "last_progress")
+
+
+def test_connector_close_attributes_late_usage_to_explicit_session_context(monkeypatch) -> None:
+    class LateUsageHarness(FakeHarness):
+        def __init__(self) -> None:
+            super().__init__()
+            self.closed = False
+
+        def drain_usage_events(self):
+            if not self.closed:
+                return []
+            self.closed = False
+            return [{"total_tokens": 5, "agent_run_id": "harness-run"}]
+
+        def close(self) -> None:
+            self.closed = True
+
+    recorded = []
+
+    def capture(**event):
+        recorded.append((event, current_usage_context()))
+
+    monkeypatch.setattr("auto_designer.harness.connector.record_usage", capture)
+    connector = HarnessConnector(LateUsageHarness())
+    with bind_usage_context(
+        session_id="session-1",
+        instance_id="instance-1",
+        interaction_id="turn-2",
+        turn_no=2,
+    ):
+        connector.close()
+
+    assert len(recorded) == 1
+    event, context = recorded[0]
+    assert event["usage"]["total_tokens"] == 5
+    assert context.session_id == "session-1"
+    assert context.instance_id == "instance-1"
+    assert context.interaction_id == "turn-2"
+    assert context.turn_no == 2
+    assert context.role == "harness"
+    assert context.agent_id == "harness-run"
+
+
+def test_connector_interrupt_drains_usage_immediately(monkeypatch) -> None:
+    class InterruptUsageHarness(FakeHarness):
+        def __init__(self) -> None:
+            super().__init__()
+            self.pending = []
+
+        def control(self, name: str) -> str:
+            assert name == "interrupt"
+            self.pending.append({"total_tokens": 8})
+            return "stopped"
+
+        def drain_usage_events(self):
+            pending, self.pending = self.pending, []
+            return pending
+
+    recorded = []
+    monkeypatch.setattr(
+        "auto_designer.harness.connector.record_usage", lambda **event: recorded.append(event)
+    )
+    connector = HarnessConnector(InterruptUsageHarness())
+
+    assert connector.interrupt() == "stopped"
+    assert [event["usage"]["total_tokens"] for event in recorded] == [8]
+
+
+def test_connector_poll_wrapper_drains_usage_immediately(monkeypatch) -> None:
+    class PollUsageHarness(_HeartbeatHarness):
+        def __init__(self) -> None:
+            super().__init__()
+            self.pending = []
+
+        def poll(self, timeout: float) -> tuple[str, object]:
+            self.pending.append({"total_tokens": 13})
+            return ("pending", timeout)
+
+        def drain_usage_events(self):
+            pending, self.pending = self.pending, []
+            return pending
+
+    recorded = []
+    monkeypatch.setattr(
+        "auto_designer.harness.connector.record_usage", lambda **event: recorded.append(event)
+    )
+    connector = HarnessConnector(PollUsageHarness())
+
+    assert connector.poll(0.1) == ("pending", 0.1)
+    assert [event["usage"]["total_tokens"] for event in recorded] == [13]
 
 
 def test_connector_help_text_comes_from_wrapped_harness() -> None:

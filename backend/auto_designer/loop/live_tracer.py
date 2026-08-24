@@ -15,10 +15,13 @@ live 注册表的 log 时间线——dev/designer 的黑盒 agent.run 由此变�
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 from typing import Any
 
 from nexau import BaseTracer, Span, SpanType
+
+from auto_designer.usage import bind_usage_context, record_usage
 
 # 各类事件文本长度上限：工具入参/输出可能携带整文件内容，摘要后进时间线；
 # assistant 是过程流主体（要完整对话），给宽上限只防极端失控。
@@ -85,6 +88,12 @@ class StepTracer(BaseTracer):
 
     def __init__(self, on_event: EventFn) -> None:
         self._on_event = on_event
+        self._agent_id: str | None = None
+
+    def set_session_id(self, session_id: str) -> None:
+        # NexAU creates one canonical session per Agent instance; use it as the
+        # stable execution-level agent identifier when the orchestrator has no id.
+        self._agent_id = session_id
 
     def _emit(self, *, kind: str, text: str, cap: int) -> None:
         try:
@@ -119,6 +128,20 @@ class StepTracer(BaseTracer):
         error: Exception | None = None,
         attributes: dict[str, Any] | None = None,
     ) -> None:
+        if span.type == SpanType.LLM:
+            payload = outputs if isinstance(outputs, dict) else {}
+            usage = payload.get("usage") or payload.get("usageMetadata")
+            with bind_usage_context(agent_id=self._agent_id):
+                record_usage(
+                    usage=usage,
+                    provider="nexau",
+                    model=payload.get("model") or payload.get("modelVersion"),
+                    latency_ms=max(0.0, (time.time() - span.start_time) * 1000),
+                    success=error is None,
+                    error=error,
+                    request_id=payload.get("id") or payload.get("request_id"),
+                    operation=span.name,
+                )
         if span.type == SpanType.TOOL:
             tool = span.name.removeprefix("Tool: ")
             if error is not None:

@@ -138,6 +138,7 @@ class Divergent:
             msg,
             store=self._store,
             repo=self._repo,
+            role="divergent",
             timeout=_DIVERGENT_TIMEOUT,
             on_event=self._on_event,
         )

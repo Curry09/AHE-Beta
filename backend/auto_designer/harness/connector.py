@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from auto_designer.harness.interface import HarnessInterface
+from auto_designer.usage import bind_usage_context, record_usage
 
 # Optional streaming surface (Spec-0036): unified write + reply soft-wake poll.
 # begin/emit_message remain as deprecated aliases forwarded via __getattr__.
@@ -23,6 +24,7 @@ _HEARTBEAT_METHODS = frozenset(
         "try_reply",
         "emit_message",
         "drain_visible_events",
+        "drain_usage_events",
     }
 )
 _OBSERVATION_ATTRS = frozenset(
@@ -64,7 +66,29 @@ class HarnessConnector:
         Only the text a human could have typed crosses into the harness. Platform
         metadata remains outside this call.
         """
-        return self._harness.send(text)
+        try:
+            return self._harness.send(text)
+        finally:
+            self._drain_usage()
+
+    def _drain_usage(self) -> None:
+        drain = getattr(self._harness, "drain_usage_events", None)
+        if not callable(drain):
+            return
+        for event in drain():
+            if not isinstance(event, dict):
+                continue
+            with bind_usage_context(role="harness", agent_id=event.get("agent_run_id")):
+                record_usage(
+                    usage=event,
+                    provider=event.get("provider"),
+                    model=event.get("model"),
+                    latency_ms=event.get("latency_ms"),
+                    success=event.get("success") is not False,
+                    error=RuntimeError(event["error"]) if event.get("error") else None,
+                    request_id=event.get("request_id"),
+                    operation=event.get("operation"),
+                )
 
     def write_message(self, message: str) -> None:
         """Unified stdin write (Spec-0036): one message frame, no begin/emit split.
@@ -86,26 +110,46 @@ class HarnessConnector:
         """
         control = getattr(self._harness, "control", None)
         if callable(control):
-            return control("interrupt")
-        self._harness.close()
+            try:
+                return control("interrupt")
+            finally:
+                self._drain_usage()
+        self.close()
         return None
 
     def shutdown(self) -> None:
         """Adapter entry for ending the human-facing harness process."""
         shutdown = getattr(self._harness, "shutdown", None)
         if callable(shutdown):
-            shutdown()
+            try:
+                shutdown()
+            finally:
+                self._drain_usage()
             return
-        self._harness.close()
+        self.close()
 
     def reset(self) -> None:
         self._harness.reset()
 
     def close(self) -> None:
-        self._harness.close()
+        self._drain_usage()
+        try:
+            self._harness.close()
+        finally:
+            self._drain_usage()
 
     def __getattr__(self, name: str) -> Any:
         """Expose optional harness capabilities without lying to hasattr()."""
+        if name in {"poll", "try_reply"}:
+            fn = getattr(self._harness, name)  # raises AttributeError for non-streaming harnesses
+
+            def observed(*args: object, **kwargs: object):
+                try:
+                    return fn(*args, **kwargs)
+                finally:
+                    self._drain_usage()
+
+            return observed
         if name in _HEARTBEAT_METHODS or name in _OBSERVATION_ATTRS:
             return getattr(self._harness, name)
         raise AttributeError(name)

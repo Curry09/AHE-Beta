@@ -124,6 +124,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0040 交付面打开 RFC：drafter 落 docs/specs + 提交边界改拒绝清单
 把交付面 stages.rfc 从 skip 改为 agent，让 drafter 在 harness 仓落下施工规格；提交边界从顶层白名单改为拒绝清单（只拦密钥与 vigil 运行态），否则 RFC 写下的 docs/ 会被 smoke 打死。自定义 Anthropic 协议网关域名必须进 egress allowlist。OpenAgents 侧 implement 首轮优先跟 worktree 已有 specs（本仓只镜像描述）。
 
+### 0041 统一 LLM Token 用量监测与全链路归属
+为 user、triager、designer、divergent、owner、harness 与 developer/vigil 建立统一逐调用 Token 原始事件、并发上下文归属、按题与按轮聚合及看板；上游缺失时显式 unavailable，绝不伪造精确值。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -302,6 +305,12 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0040 | 0040/T3 | smoke 拒绝清单与种子 docs/specs 落点 | done | T2 | backend/harness_template/.gitea/workflows/smoke.yml<br>backend/harness_template/docs/specs/README.md |
 | 0040 | 0040/T4 | 自定义 Anthropic 网关域进 egress allowlist | done | — | backend/deploy/gitea/egress-proxy.conf |
 | 0040 | 0040/T5 | OpenAgents 镜像：implement 首轮优先 worktree specs | done | T1 | OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/agents/implementer.py |
+| 0041 | 0041/T1 | 统一事件模型、上下文与 user 精确采集 | done | — | backend/auto_designer/usage.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_usage.py<br>backend/tests/user/sim/test_persona_usage.py |
+| 0041 | 0041/T2 | 后端 NexAU 角色逐调用采集与轮级归属 | done | T1 | backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/designer/test_agent_runtime.py<br>backend/tests/loop/test_live_tracer.py<br>backend/tests/loop/test_orchestrator.py |
+| 0041 | 0041/T3 | Harness tracer 输出逐调用 usage 旁路 | done | T1 | backend/harness_template/entry.py<br>backend/harness_template/tests/test_smoke.py |
+| 0041 | 0041/T4 | Harness 收端隔离、按题归属与落盘 | done | T1, T3 | backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/connector.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_connector.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/loop/test_parallel_sessions.py |
+| 0041 | 0041/T5 | 分层聚合 API 与看板 | pending | T1, T2, T4 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py<br>frontend/src/api.ts<br>frontend/src/types.ts<br>frontend/src/components/UsagePanel.tsx<br>frontend/src/App.tsx<br>frontend/src/styles.css |
+| 0041 | 0041/T6 | Developer/vigil 精确度审计与结构化扩展口 | done | T1 | backend/run.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>docs/usage-monitoring.md |
 
 ## 跨 feature 关系图
 
@@ -561,6 +570,14 @@ graph LR
         n0040_T4["T4 自定义 Anthropic 网关域进 egress allowlist"]
         n0040_T5["T5 OpenAgents 镜像：implement 首轮优先 worktree specs"]
     end
+    subgraph G0041[0041 unified-llm-token-usage]
+        n0041_T1["T1 统一事件模型、上下文与 user 精确采集"]
+        n0041_T2["T2 后端 NexAU 角色逐调用采集与轮级归属"]
+        n0041_T3["T3 Harness tracer 输出逐调用 usage 旁路"]
+        n0041_T4["T4 Harness 收端隔离、按题归属与落盘"]
+        n0041_T5["T5 分层聚合 API 与看板"]
+        n0041_T6["T6 Developer/vigil 精确度审计与结构化扩展口"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -721,6 +738,14 @@ graph LR
     n0039_T6 --> n0039_T5
     n0040_T3 --> n0040_T2
     n0040_T5 --> n0040_T1
+    n0041_T2 --> n0041_T1
+    n0041_T3 --> n0041_T1
+    n0041_T4 --> n0041_T1
+    n0041_T4 --> n0041_T3
+    n0041_T5 --> n0041_T1
+    n0041_T5 --> n0041_T2
+    n0041_T5 --> n0041_T4
+    n0041_T6 --> n0041_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -786,6 +811,7 @@ graph LR
 | backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029 |
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029 |
 | backend/auto_designer/designer/agent_contract.py | 0027, 0029 |
+| backend/auto_designer/designer/agent_runtime.py | 0029, 0041 |
 | backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039 |
 | backend/auto_designer/designer/divergent.py | 0028, 0029 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
@@ -795,15 +821,16 @@ graph LR
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
 | backend/auto_designer/dev/harness_boundary.py | 0015, 0030, 0040 |
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
-| backend/auto_designer/harness/connector.py | 0030, 0035, 0036 |
+| backend/auto_designer/harness/connector.py | 0030, 0035, 0036, 0041 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028 |
+| backend/auto_designer/loop/live_tracer.py | 0032, 0041 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035 |
 | backend/auto_designer/tracker/base.py | 0001, 0025 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025 |
@@ -814,30 +841,32 @@ graph LR
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037 |
 | backend/auto_designer/user/sim/demo.py | 0005, 0037 |
 | backend/auto_designer/user/sim/dimensions.py | 0005, 0037 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012, 0037 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
-| backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032, 0039 |
+| backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
 | backend/deploy/gitea/bootstrap.sh | 0002, 0032 |
 | backend/deploy/gitea/docker-compose.yml | 0002, 0032, 0033 |
 | backend/deploy/gitea/egress-proxy.conf | 0033, 0040 |
+| backend/deploy/vigil/entrypoint.sh | 0033, 0041 |
 | backend/harness_template/.gitea/workflows/smoke.yml | 0032, 0040 |
 | backend/harness_template/HELP.md | 0030, 0035 |
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/RUNTIME.md | 0022, 0030, 0035 |
 | backend/harness_template/agents/main.md | 0003, 0030 |
-| backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035 |
+| backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041 |
 | backend/harness_template/params.yaml | 0003, 0030 |
-| backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040 |
+| backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040 |
+| backend/tests/designer/test_agent_runtime.py | 0029, 0041 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
 | backend/tests/designer/test_owner.py | 0029, 0032 |
@@ -845,19 +874,19 @@ graph LR
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/dev/test_completion_gate.py | 0014, 0030 |
 | backend/tests/dev/test_harness_boundary.py | 0015, 0030, 0040 |
-| backend/tests/harness/test_connector.py | 0030, 0035, 0036 |
-| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036 |
+| backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039 |
 | backend/tests/loop/test_live.py | 0017, 0026 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033 |
-| backend/tests/loop/test_parallel_sessions.py | 0017, 0032 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041 |
+| backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
-| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030 |
+| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
-| backend/tests/test_run_vigil.py | 0032, 0033, 0040 |
+| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035 |
@@ -872,9 +901,9 @@ graph LR
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
-| backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039 |
-| frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038 |
-| frontend/src/api.ts | 0020, 0025, 0029, 0032 |
+| backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
+| frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041 |
+| frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041 |
 | frontend/src/components/BuildingView.tsx | 0034, 0038 |
 | frontend/src/components/SidePanel.tsx | 0020, 0025, 0026, 0029, 0032 |
 | frontend/src/components/TopBar.tsx | 0026, 0034, 0038 |
@@ -884,8 +913,8 @@ graph LR
 | frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026, 0029, 0039 |
 | frontend/src/components/detail/SessionDetail.tsx | 0026, 0034 |
 | frontend/src/lib/issueMeta.ts | 0025, 0029, 0032, 0039 |
-| frontend/src/styles.css | 0026, 0034, 0038, 0039 |
-| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038, 0039 |
+| frontend/src/styles.css | 0026, 0034, 0038, 0039, 0041 |
+| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038, 0039, 0041 |
 | tools/persona-distill/card-schema.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/SKILL.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/reference.md | 0006, 0037 |
@@ -2088,4 +2117,44 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+```
+
+### 0041 统一 LLM Token 用量监测与全链路归属（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 统一事件模型、上下文与 user 精确采集"]
+    nT2["T2 后端 NexAU 角色逐调用采集与轮级归属"]
+    nT3["T3 Harness tracer 输出逐调用 usage 旁路"]
+    nT4["T4 Harness 收端隔离、按题归属与落盘"]
+    nT5["T5 分层聚合 API 与看板"]
+    nT6["T6 Developer/vigil 精确度审计与结构化扩展口"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT1 --> nT4
+    nT3 --> nT4
+    nT1 --> nT5
+    nT2 --> nT5
+    nT4 --> nT5
+    nT1 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_done;
 ```

@@ -29,6 +29,7 @@ from auto_designer.designer.divergent import Divergent
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
 from auto_designer.models import Persona, SeedScenario
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.workspace import materialize as materialize_workspace
 
@@ -197,12 +198,13 @@ class Orchestrator:
         refs: list[str] = []
         ref = self._initial_ref  # 起始游标 = main 分支名；首轮 run_round 即解析其 HEAD SHA
         for i in range(n_rounds):
-            if self._on_round_start is not None:
-                self._on_round_start(i + 1)
-            ref = self.run_round(ref)  # 返回本轮 main 最新 SHA（观测）；不参与 trunk 解析
-            refs.append(ref)
-            if self._on_round_end is not None:
-                self._on_round_end(i + 1, ref)
+            with bind_usage_context(round_no=i + 1):
+                if self._on_round_start is not None:
+                    self._on_round_start(i + 1)
+                ref = self.run_round(ref)  # 返回本轮 main 最新 SHA（观测）；不参与 trunk 解析
+                refs.append(ref)
+                if self._on_round_end is not None:
+                    self._on_round_end(i + 1, ref)
         return refs
 
     def _session_plan(self) -> Sequence[SessionPair]:

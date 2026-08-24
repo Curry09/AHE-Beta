@@ -279,6 +279,7 @@ class Owner:
             msg,
             store=self._store,
             repo=self._repo,
+            role="owner",
             timeout=_ADMIT_TIMEOUT,
             on_event=self._on_event,
         )

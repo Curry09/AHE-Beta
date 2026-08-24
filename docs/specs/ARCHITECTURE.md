@@ -13,6 +13,7 @@ _auto-designer: 自进化 harness（用户侧 a）。_
 | `__init__.py` | auto-designer: 自进化 harness（用户侧 a）。 |
 | `models.py` | 用户侧最小链路的公共数据结构（spec-0001/T1）。 |
 | `nexau_runtime.py` | 单一 nexau 适配层（spec-0003/T2）：把一份角色定义(prompt+工具)加载成可调用 Agent。 |
+| `usage.py` | Best-effort, per-call LLM usage telemetry. |
 
 ### auto_designer.designer
 
@@ -200,6 +201,7 @@ graph LR
     nauto_designer_tracker_base["tracker.base"]
     nauto_designer_tracker_fake["tracker.fake"]
     nauto_designer_tracker_gitea["tracker.gitea"]
+    nauto_designer_usage["auto_designer.usage"]
     nauto_designer_user["auto_designer.user"]
     nauto_designer_user_session_store["user.session_store"]
     nauto_designer_user_sim["user.sim"]
@@ -234,6 +236,7 @@ graph LR
     nauto_designer_designer_agent_contract --> nauto_designer_designer_issue_schema
     nauto_designer_designer_agent_runtime --> nauto_designer_designer_session_timeline
     nauto_designer_designer_agent_runtime --> nauto_designer_loop_live_tracer
+    nauto_designer_designer_agent_runtime --> nauto_designer_usage
     nauto_designer_designer_agent_runtime --> nauto_designer_user_session_store
     nauto_designer_designer_designer --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_designer --> nauto_designer_designer_issue_schema
@@ -262,7 +265,9 @@ graph LR
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
     nauto_designer_harness_connector --> nauto_designer_harness_interface
+    nauto_designer_harness_connector --> nauto_designer_usage
     nauto_designer_harness_launcher --> nauto_designer_harness_interface
+    nauto_designer_loop_live_tracer --> nauto_designer_usage
     nauto_designer_loop_metrics --> nauto_designer_designer_issue_schema
     nauto_designer_loop_metrics --> nauto_designer_tracker_base
     nauto_designer_loop_metrics --> nauto_designer_user_session_store
@@ -271,6 +276,7 @@ graph LR
     nauto_designer_loop_orchestrator --> nauto_designer_harness_interface
     nauto_designer_loop_orchestrator --> nauto_designer_harness_launcher
     nauto_designer_loop_orchestrator --> nauto_designer_models
+    nauto_designer_loop_orchestrator --> nauto_designer_usage
     nauto_designer_loop_orchestrator --> nauto_designer_user_sim_deps
     nauto_designer_loop_orchestrator --> nauto_designer_user_sim_workspace
     nauto_designer_loop_runner --> nauto_designer_loop_checkpoint
@@ -281,6 +287,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_harness_interface
     nauto_designer_loop_sim_user --> nauto_designer_models
     nauto_designer_loop_sim_user --> nauto_designer_tracker_base
+    nauto_designer_loop_sim_user --> nauto_designer_usage
     nauto_designer_loop_sim_user --> nauto_designer_user_session_store
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_deps
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_dimensions
@@ -307,6 +314,7 @@ graph LR
     nauto_designer_user_sim_demo --> nauto_designer_user_sim_persona_client
     nauto_designer_user_sim_demo --> nauto_designer_user_sim_state
     nauto_designer_user_sim_deps --> nauto_designer_models
+    nauto_designer_user_sim_loop --> nauto_designer_usage
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_action_space
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_actions
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_dimensions
@@ -314,6 +322,7 @@ graph LR
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_persona_client
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_prompt
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_state
+    nauto_designer_user_sim_persona_client --> nauto_designer_usage
     nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_actions
     nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_prompt
     nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_sandbox
@@ -362,6 +371,7 @@ graph LR
     nauto_designer_web_api --> nauto_designer_loop_roster
     nauto_designer_web_api --> nauto_designer_tracker_base
     nauto_designer_web_api --> nauto_designer_tracker_gitea
+    nauto_designer_web_api --> nauto_designer_usage
     nauto_designer_web_api --> nauto_designer_user_session_store
     nauto_designer_web_api --> nauto_designer_web_issue_timeline
     nauto_designer_web_issue_timeline --> nauto_designer_designer_issue_schema

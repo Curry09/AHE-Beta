@@ -12,6 +12,8 @@ import type {
   OverviewResponse,
   RunState,
   SessionDetail,
+  UsageSummary,
+  UsageEventsResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -31,3 +33,7 @@ export const getConfig = () => get<ConfigResponse>("/config");
 export const getSession = (id: string) => get<SessionDetail>(`/sessions/${id}`);
 export const getOverview = () => get<OverviewResponse>("/overview");
 export const getDelivery = () => get<DeliveryResponse>("/delivery"); // Spec-0032/T7：交付面观测
+export const getUsageSummary = (round?: number) =>
+  get<UsageSummary>(`/usage/summary${round ? `?round_no=${round}` : ""}`);
+export const getUsageEvents = (round?: number) =>
+  get<UsageEventsResponse>(`/usage/events${round ? `?round_no=${round}` : ""}`);

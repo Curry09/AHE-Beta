@@ -197,6 +197,7 @@ class Designer:
             msg,
             store=self._store,
             repo=self._repo,
+            role="designer",
             timeout=_DESIGN_TIMEOUT,
             on_event=self._on_event,
         )

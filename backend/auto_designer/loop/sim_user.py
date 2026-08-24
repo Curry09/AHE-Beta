@@ -8,6 +8,7 @@ Orchestrator 只认 run_session_fn(persona, scenario, harness)（返回值不管
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 
 from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
@@ -26,6 +27,7 @@ from auto_designer.models import (
     Turn,
 )
 from auto_designer.tracker.base import IssueTracker
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.dimensions import Persona as SimPersona
@@ -187,6 +189,7 @@ def make_sim_run_session_fn(
         workspace_dir: str | None = None,
     ) -> Session:
         sim_persona = sim_personas[persona.identity]
+        session_id = uuid.uuid4().hex
         client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
 
         # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
@@ -210,19 +213,29 @@ def make_sim_run_session_fn(
 
         connector = HarnessConnector(harness)
         connector.reset()  # 开局责任归编排层；connector 只做平台侧适配，不把平台元数据传入 harness
-        try:
-            res = sim_run_session(
-                sim_persona,
-                client,
-                connector,
-                scenario.description,
-                # 该版本 harness 的帮助文本：让 persona 的能力预期锚定"这工具文档说的"，
-                # 而非空泛先验；缺省空串（后端无 help_text 属性时为空）。
-                help_text=connector.help_text,
-                on_progress=progress,
-            )
-        finally:
-            connector.close()  # 无论成败都释放 harness 子进程
+        instance_id = None
+        if scenario.workspace is not None:
+            instance_id = scenario.workspace.params.get("instance_id")
+        round_no = round_provider() if round_provider is not None else None
+        with bind_usage_context(
+            session_id=session_id,
+            instance_id=instance_id,
+            role="user",
+            agent_id=f"user-{persona.identity}",
+            round_no=round_no,
+            operation="persona",
+        ):
+            try:
+                res = sim_run_session(
+                    sim_persona, client, connector, scenario.description,
+                    # 该版本 harness 的帮助文本：让 persona 的能力预期锚定"这工具文档说的"，
+                    # 而非空泛先验；缺省空串（后端无 help_text 属性时为空）。
+                    help_text=connector.help_text,
+                    on_progress=progress,
+                )
+            finally:
+                # 关闭时才到达的 usage 仍须继承本 session/instance/turn 归属。
+                connector.close()  # 无论成败都释放 harness 子进程
 
         round_no = round_provider() if round_provider is not None else None
         issue_refs = _flush_issues(tracker, res, round_no=round_no)
@@ -234,6 +247,7 @@ def make_sim_run_session_fn(
             feeling=FeelingScore(score=feel.score, reason=feel.reason),
             issue_refs=issue_refs,
             sim_trace=result_to_sim_trace(res),
+            session_id=session_id,
         )
         store.save(session)  # 体感 + session 落本地（issue 权威源在 Gitea）
         if on_turn is not None:

@@ -16,6 +16,8 @@ import time
 from pathlib import Path
 from typing import Protocol
 
+from auto_designer.usage import monotonic_ms, record_usage
+
 try:  # 对齐 NexAU: 读 repo 根 .env (USER_LLM_BASE_URL / USER_LLM_API_KEY / USER_LLM_MODEL)
     from dotenv import load_dotenv
 
@@ -93,25 +95,37 @@ class ApiPersonaClient:
         delay = 2.0
         last: Exception | None = None
         for _ in range(5):
+            started = monotonic_ms()
             try:
-                return self.client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     temperature=self.temperature,
                     max_tokens=max_tokens,
                     extra_body={"enable_thinking": False},
                 )
+                record_usage(usage=getattr(response, "usage", None), provider="openai-compatible", model=self.model,
+                             latency_ms=monotonic_ms() - started, request_id=getattr(response, "id", None))
+                return response
             except Exception as e:
                 last = e
+                record_usage(provider="openai-compatible", model=self.model,
+                             latency_ms=monotonic_ms() - started, success=False, error=e)
+                started = monotonic_ms()
                 try:  # flag 可能被网关拒 -> 裸试一次
-                    return self.client.chat.completions.create(
+                    response = self.client.chat.completions.create(
                         model=self.model,
                         messages=messages,
                         temperature=self.temperature,
                         max_tokens=max_tokens,
                     )
+                    record_usage(usage=getattr(response, "usage", None), provider="openai-compatible", model=self.model,
+                                 latency_ms=monotonic_ms() - started, request_id=getattr(response, "id", None))
+                    return response
                 except Exception as e2:
                     last = e2
+                    record_usage(provider="openai-compatible", model=self.model,
+                                 latency_ms=monotonic_ms() - started, success=False, error=e2)
             time.sleep(delay)
             delay *= 2
         raise last if last else RuntimeError("create failed")

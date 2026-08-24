@@ -15,6 +15,7 @@ import pytest
 
 from auto_designer.loop.orchestrator import Orchestrator
 from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
+from auto_designer.usage import current_usage_context
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -487,6 +488,23 @@ def test_no_owner_skips_admission(tmp_path) -> None:
     orch.run_round("c")  # owner=None 不炸、准入段跳过
     kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d")]
     assert kinds == ["session", "triage"]
+
+
+def test_run_binds_round_context_for_each_round() -> None:
+    orchestrator = object.__new__(Orchestrator)
+    orchestrator._initial_ref = "main"
+    orchestrator._on_round_start = None
+    orchestrator._on_round_end = None
+    observed: list[int | None] = []
+
+    def run_round(ref: str) -> str:
+        observed.append(current_usage_context().round_no)
+        return f"{ref}-next"
+
+    orchestrator.run_round = run_round
+
+    assert orchestrator.run(2) == ["main-next", "main-next-next"]
+    assert observed == [1, 2]
 
 
 def test_callable_session_plan_redraws_each_round(tmp_path) -> None:

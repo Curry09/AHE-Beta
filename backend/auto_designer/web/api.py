@@ -33,6 +33,7 @@ from auto_designer.loop.live import read_agents, read_history, read_live_run
 from auto_designer.loop.metrics import Metrics
 from auto_designer.loop.roster import load_roster
 from auto_designer.tracker.base import IssueTracker
+from auto_designer.usage import UsageStore, default_usage_store
 from auto_designer.user.session_store import SessionStore
 from auto_designer.web.issue_timeline import build_issue_timeline, unavailable_timeline
 
@@ -229,9 +230,11 @@ def create_app(
     tracker: IssueTracker | None,
     board_url: str | None = None,
     repo_url: str | None = None,
+    usage_store: UsageStore | None = None,
 ) -> FastAPI:
     app = FastAPI(title="auto-designer observation dashboard", version="0.1.0")
     commits_url = f"{repo_url.rstrip('/')}/commits/branch/main" if repo_url else None
+    usage_store = usage_store or default_usage_store()
 
     app.add_middleware(
         CORSMiddleware,
@@ -309,6 +312,44 @@ def create_app(
             raise HTTPException(
                 status_code=404, detail=f"session not found: {session_id}"
             ) from None
+
+    def _usage_filters(
+        run_id: str | None, round_no: int | None, session_id: str | None,
+        instance_id: str | None, interaction_id: str | None, turn_no: int | None,
+        role: str | None, agent_id: str | None, model: str | None,
+    ) -> dict[str, object]:
+        return {"run_id": run_id, "round_no": round_no, "session_id": session_id,
+                "instance_id": instance_id, "interaction_id": interaction_id,
+                "turn_no": turn_no, "role": role, "agent_id": agent_id, "model": model}
+
+    @app.get("/api/usage/events")
+    def usage_events(
+        run_id: str | None = None, round_no: int | None = None,
+        session_id: str | None = None, instance_id: str | None = None,
+        interaction_id: str | None = None, turn_no: int | None = None,
+        role: str | None = None,
+        agent_id: str | None = None, model: str | None = None,
+    ) -> dict[str, object]:
+        filters = _usage_filters(run_id, round_no, session_id, instance_id,
+                                 interaction_id, turn_no, role, agent_id, model)
+        return {"events": usage_store.events(**filters)}
+
+    @app.get("/api/usage/summary")
+    def usage_summary(
+        run_id: str | None = None, round_no: int | None = None,
+        session_id: str | None = None, instance_id: str | None = None,
+        interaction_id: str | None = None, turn_no: int | None = None,
+        role: str | None = None,
+        agent_id: str | None = None, model: str | None = None,
+    ) -> dict[str, object]:
+        return usage_store.summary(**_usage_filters(
+            run_id, round_no, session_id, instance_id, interaction_id, turn_no,
+            role, agent_id, model,
+        ))
+
+    @app.get("/api/usage/sessions/{session_id}")
+    def session_usage(session_id: str) -> dict[str, object]:
+        return usage_store.summary(session_id=session_id)
 
     # 构建过前端则由 FastAPI 直接托管 SPA（开发期 dist 不存在，跳过）。
     dist = Path(__file__).resolve().parents[3] / "frontend" / "dist"

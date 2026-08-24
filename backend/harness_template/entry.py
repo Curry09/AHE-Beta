@@ -156,6 +156,17 @@ def _emit_status(text: str) -> None:
         pass
 
 
+def _emit_usage(**payload) -> None:
+    """逐调用机器观测旁路；绝不携带 prompt/response 正文。"""
+    try:
+        line = json.dumps(_wire_out("usage", **payload), ensure_ascii=False)
+        with _stdout_lock:
+            sys.stdout.write(line + "\n")
+            sys.stdout.flush()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _run_supervised(agent, message, timeout, ctrl_q):
     """跑一次 agent.run，同时守望硬超时与用户打断（control 队列）。
 
@@ -324,6 +335,10 @@ def _make_step_collector():
     class _StepCollector(BaseTracer):
         def __init__(self):
             self.steps: list[dict] = []
+            self.agent_run_id = None
+
+        def set_session_id(self, session_id):
+            self.agent_run_id = session_id
 
         def reset(self):
             self.steps = []
@@ -349,6 +364,50 @@ def _make_step_collector():
             return span
 
         def end_span(self, span, outputs=None, error=None, attributes=None):
+            if span.type == SpanType.LLM:
+                payload = outputs if isinstance(outputs, dict) else {}
+                usage = payload.get("usage") or payload.get("usageMetadata") or {}
+                if not isinstance(usage, dict):
+                    dump = getattr(usage, "model_dump", None)
+                    usage = dump() if callable(dump) else {}
+                prompt_details = usage.get("prompt_tokens_details") or usage.get("input_tokens_details") or {}
+                completion_details = usage.get("completion_tokens_details") or usage.get("output_tokens_details") or {}
+
+                def number(*keys):
+                    for key in keys:
+                        value = usage.get(key)
+                        if isinstance(value, (int, float)) and not isinstance(value, bool):
+                            return int(value)
+                    return None
+
+                input_tokens = number("prompt_tokens", "input_tokens", "promptTokenCount")
+                output_tokens = number("completion_tokens", "output_tokens", "candidatesTokenCount")
+                total_tokens = number("total_tokens", "totalTokenCount")
+                if total_tokens is None and input_tokens is not None and output_tokens is not None:
+                    total_tokens = input_tokens + output_tokens
+                cached = number("cached_input_tokens", "cache_read_tokens", "cache_read_input_tokens")
+                if cached is None and isinstance(prompt_details, dict):
+                    cached = prompt_details.get("cached_tokens")
+                reasoning = number("reasoning_tokens", "thoughtsTokenCount")
+                if reasoning is None and isinstance(completion_details, dict):
+                    reasoning = completion_details.get("reasoning_tokens")
+                available = any(v is not None for v in (input_tokens, output_tokens, total_tokens, cached, reasoning))
+                _emit_usage(
+                    provider="nexau",
+                    model=payload.get("model") or payload.get("modelVersion"),
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    reasoning_tokens=reasoning,
+                    cached_input_tokens=cached,
+                    total_tokens=total_tokens,
+                    latency_ms=max(0.0, (time.time() - span.start_time) * 1000),
+                    success=error is None,
+                    error=type(error).__name__ if error is not None else None,
+                    request_id=payload.get("id") or payload.get("request_id"),
+                    agent_run_id=self.agent_run_id,
+                    operation=span.name,
+                    usage_source="reported" if available else "unavailable",
+                )
             if span.type == SpanType.TOOL:
                 tool = span.name.removeprefix("Tool: ")
                 if error is not None:

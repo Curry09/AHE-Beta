@@ -5,8 +5,14 @@ from __future__ import annotations
 
 import json
 
-from auto_designer.designer.agent_runtime import norm_label, read_submit, run_with_timeout
+from auto_designer.designer.agent_runtime import (
+    norm_label,
+    read_submit,
+    run_agent_def,
+    run_with_timeout,
+)
 from auto_designer.designer.session_timeline import bind_session_store, get_session_timeline
+from auto_designer.usage import current_usage_context
 from auto_designer.user.session_store import SessionStore
 
 
@@ -44,6 +50,49 @@ def test_run_with_timeout_propagates_contextvars(tmp_path) -> None:
     assert out["ok"] is False
     assert "not bound" not in out["error"]  # store 已跨线程绑定上
     assert "not found" in out["error"]  # 到了「查不到该 session」这步 = 绑定成功
+
+
+def test_run_agent_def_uses_explicit_role_instead_of_directory_name(tmp_path, monkeypatch) -> None:
+    import nexau
+
+    observed = []
+
+    class FakeConfig:
+        max_iterations = 1
+        resolved_tracer = None
+
+    class FakeAgentConfig:
+        @staticmethod
+        def from_yaml(*, config_path):
+            assert config_path.name == "agent.yaml"
+            return FakeConfig()
+
+    class FakeAgent:
+        def __init__(self, *, config):
+            self.config = config
+
+        def run(self, *, message):
+            observed.append((message, current_usage_context()))
+            return {"ok": True}
+
+    monkeypatch.setattr(nexau, "AgentConfig", FakeAgentConfig)
+    monkeypatch.setattr(nexau, "Agent", FakeAgent)
+    agent_dir = tmp_path / "misleading-directory-name"
+    agent_dir.mkdir()
+    (agent_dir / "agent.yaml").write_text("unused", encoding="utf-8")
+
+    out = run_agent_def(
+        agent_dir,
+        "review",
+        store=SessionStore(tmp_path / "sessions"),
+        repo=tmp_path,
+        role="owner",
+        timeout=5,
+    )
+
+    assert json.loads(out) == {"ok": True}
+    assert observed[0][1].role == "owner"
+    assert observed[0][1].operation == "nexau-agent"
 
 
 def test_run_with_timeout_raises_on_timeout() -> None:
