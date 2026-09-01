@@ -19,6 +19,7 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -40,6 +41,10 @@ def _args() -> argparse.Namespace:
 
 
 def _wis_env() -> dict[str, str]:
+    injected_base = os.environ.get("DESIGNER_LLM_BASE_URL", "").strip()
+    injected_key = os.environ.get("DESIGNER_LLM_API_KEY", "").strip()
+    if injected_base and injected_key:
+        return {"wis_base_url": injected_base, "wis_api_key": injected_key}
     values: dict[str, str] = {}
     for raw in (WORKSPACE / ".env").read_text(encoding="utf-8").splitlines():
         if "=" not in raw or raw.lstrip().startswith("#"):
@@ -47,6 +52,22 @@ def _wis_env() -> dict[str, str]:
         key, value = raw.split("=", 1)
         values[key.strip()] = value.strip().strip('"').strip("'")
     return values
+
+
+def _gitea_env_path() -> Path:
+    return Path(
+        os.environ.get("AUTO_DESIGNER_GITEA_ENV_FILE", "").strip()
+        or ROOT / "deploy" / "gitea" / ".env"
+    )
+
+
+def _no_proxy_value(*urls: str) -> str:
+    bypass = ["localhost", "127.0.0.1"]
+    for url in urls:
+        host = urlparse(url).hostname
+        if host and host not in bypass:
+            bypass.append(host)
+    return ",".join(bypass)
 
 
 def _ensure_fresh_repo(*, gitea: dict[str, str], repo: str) -> None:
@@ -58,7 +79,9 @@ def _ensure_fresh_repo(*, gitea: dict[str, str], repo: str) -> None:
     if check.status_code == 200:
         raise SystemExit(f"target repo already exists; refusing to overwrite: {repo}")
     if check.status_code != 404:
-        raise SystemExit(f"failed to inspect target repo: HTTP {check.status_code} {check.text[:200]}")
+        raise SystemExit(
+            f"failed to inspect target repo: HTTP {check.status_code} {check.text[:200]}"
+        )
     created = requests.post(
         f"{base}/api/v1/user/repos",
         headers=headers,
@@ -66,7 +89,9 @@ def _ensure_fresh_repo(*, gitea: dict[str, str], repo: str) -> None:
         timeout=30,
     )
     if created.status_code not in (201, 202):
-        raise SystemExit(f"failed to create target repo: HTTP {created.status_code} {created.text[:300]}")
+        raise SystemExit(
+            f"failed to create target repo: HTTP {created.status_code} {created.text[:300]}"
+        )
 
 
 def _seed_repo(*, output: Path, gitea: dict[str, str]) -> Path:
@@ -116,7 +141,10 @@ def _source_issue_numbers(*, sessions: Path) -> list[int]:
 def _validate_source_reports(*, source_tracker, sessions: Path) -> list[dict]:
     from auto_designer.designer.issue_schema import REPORT, plane
 
-    snapshots = [source_tracker.get_issue(number=number) for number in _source_issue_numbers(sessions=sessions)]
+    snapshots = [
+        source_tracker.get_issue(number=number)
+        for number in _source_issue_numbers(sessions=sessions)
+    ]
     invalid = [item["number"] for item in snapshots if plane(item["labels"]) != REPORT]
     if invalid:
         raise SystemExit(f"source issues are not raw reports: {invalid}")
@@ -151,7 +179,9 @@ def _copy_reports_and_remap(
     target_tracker.ensure_labels(["bug", "feature", "question", "document", "report", "round-1"])
     for old in old_numbers:
         item = source_tracker.get_issue(number=old)
-        kinds = [name for name in item["labels"] if name in {"bug", "feature", "question", "document"}]
+        kinds = [
+            name for name in item["labels"] if name in {"bug", "feature", "question", "document"}
+        ]
         labels = [*(kinds[:1] or ["bug"]), "report", "round-1"]
         ref = target_tracker.create_issue(
             IssueDraft(title=item["title"], body=item["body"], labels=labels)
@@ -191,14 +221,14 @@ def main() -> int:
     if not (sessions_source / "index.json").is_file():
         raise SystemExit(f"missing session index: {sessions_source}")
 
-    gitea_base = run_mod._load_env(ROOT / "deploy" / "gitea" / ".env")
+    gitea_base = run_mod._load_env(_gitea_env_path())
     source_gitea = {**gitea_base, "REPO": args.source_repo}
     target_gitea = {**gitea_base, "REPO": args.target_repo}
     wis = _wis_env()
     os.environ["DESIGNER_LLM_MODEL"] = args.model
     os.environ["DESIGNER_LLM_BASE_URL"] = wis["wis_base_url"]
     os.environ["DESIGNER_LLM_API_KEY"] = wis["wis_api_key"]
-    os.environ["NO_PROXY"] = "localhost,127.0.0.1"
+    os.environ["NO_PROXY"] = _no_proxy_value(wis["wis_base_url"], gitea_base.get("GITEA_URL", ""))
     os.environ["no_proxy"] = os.environ["NO_PROXY"]
     run_mod._isolate_git_credentials()
 
@@ -246,7 +276,11 @@ def main() -> int:
     def event(role: str):
         def write(kind: str, text: str) -> None:
             with event_lock, events.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({"role": role, "kind": kind, "text": text}, ensure_ascii=False) + "\n")
+                handle.write(
+                    json.dumps({"role": role, "kind": kind, "text": text}, ensure_ascii=False)
+                    + "\n"
+                )
+
         return write
 
     triager = Triager(
