@@ -89,3 +89,11 @@ def test_cli_requires_explicit_parquet_path(monkeypatch) -> None:
     monkeypatch.setattr(sys, "argv", ["builder"])
     with pytest.raises(SystemExit, match="2"):
         module._args()
+
+
+def test_setup_uses_the_running_python_interpreter() -> None:
+    module = _module()
+
+    commands = module._setup_commands({"repo": "owner/repo"})
+
+    assert commands[0] == f"{module.shlex.quote(sys.executable)} -m venv .venv"

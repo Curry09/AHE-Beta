@@ -23,8 +23,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import subprocess
+import sys
 import time
 from collections import Counter
 from datetime import datetime
@@ -124,7 +126,11 @@ def _tree_size(path: Path) -> int:
 
 
 def _setup_commands(row: dict[str, Any]) -> list[str]:
-    interpreter = "python3.10" if row["repo"] == "scikit-learn/scikit-learn" else "python"
+    interpreter = (
+        "python3.10"
+        if row["repo"] == "scikit-learn/scikit-learn"
+        else shlex.quote(sys.executable)
+    )
     commands = [
         f"{interpreter} -m venv .venv",
         # setuptools 81 removed pkg_resources, which several historical Verified
