@@ -43,6 +43,7 @@ DEFAULT_MANIFEST = BACKEND / "swebench_pools" / "medium_hard_16.json"
 DEFAULT_OUTPUT = BACKEND / "data" / "swebench_seed" / "medium-hard-16"
 STATE_NAME = "build-state.json"
 DEPS_MARKER = ".seed-deps-v6"
+SCIENTIFIC_DEPS_MARKER = ".seed-deps-v7"
 LEGACY_COMPAT_MARKER = ".seed-legacy-compat-v1"
 LEGACY_COMPAT_SOURCE = Path(__file__).with_name("swebench_seed_sitecustomize.py")
 LEGACY_COMPAT_REPOS = {"psf/requests", "sympy/sympy"}
@@ -158,6 +159,10 @@ def _setup_commands(row: dict[str, Any]) -> list[str]:
         commands.append(".venv/bin/python -m pip install 'numpy>=1.26,<2'")
     if repo in {"mwaskom/seaborn", "pydata/xarray", "scikit-learn/scikit-learn"}:
         commands.append(".venv/bin/python -m pip install 'pandas<3'")
+    if repo == "pvlib/pvlib-python":
+        commands.append(".venv/bin/python -m pip install 'numpy<2' 'scipy<1.12'")
+    if repo == "pyvista/pyvista" and row.get("setup_python") == "python3.10":
+        commands.append(".venv/bin/python -m pip install 'numpy<2' 'vtk<9.3'")
     if repo == "astropy/astropy":
         # These snapshots import setuptools.dep_util during their extension
         # discovery.  PEP 517 isolation would ignore our pin and install a
@@ -211,15 +216,26 @@ def _run_setup(repo_dir: Path, row: dict[str, Any], *, timeout: float) -> None:
         (repo_dir / LEGACY_COMPAT_MARKER).write_text(
             "v1: collections aliases; inspect.getargspec\n", encoding="utf-8"
         )
-    (repo_dir / DEPS_MARKER).write_text(
-        "v6: setuptools<81; scientific=numpy<2,pandas<3; astropy=setuptools<70,no-isolation; "
+    marker = _deps_marker(repo_dir, row)
+    marker.write_text(
+        "v7: setuptools<81; scientific=numpy<2,pandas<3; pvlib=scipy<1.12; "
+        "legacy-pyvista=python3.10,vtk<9.3; astropy=setuptools<70,no-isolation; "
         "scikit-learn=python3.10,pip<25,setuptools<60,no-isolation\n",
         encoding="utf-8",
     )
 
 
+def _deps_marker(repo_dir: Path, row: dict[str, Any]) -> Path:
+    name = (
+        SCIENTIFIC_DEPS_MARKER
+        if row["repo"] in {"pvlib/pvlib-python", "pyvista/pyvista"}
+        else DEPS_MARKER
+    )
+    return repo_dir / name
+
+
 def _deps_cached(repo_dir: Path, row: dict[str, Any]) -> bool:
-    if not (repo_dir / DEPS_MARKER).is_file():
+    if not _deps_marker(repo_dir, row).is_file():
         return False
     venv_python = repo_dir / ".venv" / "bin" / "python"
     if not venv_python.is_file():
@@ -314,6 +330,7 @@ def main() -> int:
                     "base_commit": row["base_commit"],
                     "difficulty": row["difficulty"],
                     "theme": row.get("theme"),
+                    "setup_python": row.get("setup_python", "current"),
                     "source_path": str(repo_dir.resolve()),
                     "source": "ok",
                     "error": None,

@@ -22,6 +22,7 @@
     {
       "instance_id": "pylint-dev__astroid-1030",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "packaging-dependency-boundary"
     },
@@ -41,18 +42,21 @@
     {
       "instance_id": "pylint-dev__astroid-1164",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "medium-hard",
       "theme": "public-api-compatibility"
     },
     {
       "instance_id": "pylint-dev__astroid-984",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "static-analysis-regression"
     },
     {
       "instance_id": "pylint-dev__astroid-1092",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "polymorphic-type-inference"
     },
@@ -66,12 +70,14 @@
     {
       "instance_id": "pylint-dev__astroid-983",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "medium-hard",
       "theme": "return-value-inference"
     },
     {
       "instance_id": "pylint-dev__astroid-941",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "metaclass-property-inference"
     },
@@ -282,54 +288,63 @@
     {
       "instance_id": "pyvista__pyvista-3675",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "frontier",
       "theme": "vtk-volume-wrapper-architecture"
     },
     {
       "instance_id": "pyvista__pyvista-3750",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "threshold-filter-semantics"
     },
     {
       "instance_id": "pyvista__pyvista-4226",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "medium-hard",
       "theme": "property-validation"
     },
     {
       "instance_id": "pyvista__pyvista-4225",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "point-cloud-filter-contracts"
     },
     {
       "instance_id": "pyvista__pyvista-4648",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "sampling-filter-api"
     },
     {
       "instance_id": "pyvista__pyvista-4329",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "numpy-vtk-memory-views"
     },
     {
       "instance_id": "pyvista__pyvista-3747",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "medium-hard",
       "theme": "mutable-return-contract"
     },
     {
       "instance_id": "pyvista__pyvista-4311",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "medium-hard",
       "theme": "cell-data-propagation"
     },
     {
       "instance_id": "pyvista__pyvista-4414",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "medium-hard",
       "theme": "geometric-composition"
     },
@@ -342,6 +357,7 @@
     {
       "instance_id": "pyvista__pyvista-4406",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "medium-hard",
       "theme": "active-scalar-propagation"
     },
