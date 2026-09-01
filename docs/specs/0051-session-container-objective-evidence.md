@@ -96,6 +96,7 @@ tasks:
       - backend/scripts/build_swebench_runtime_image.sh
       - backend/scripts/run_auditable_experiment.py
       - backend/scripts/run_swebench_closed_loop.py
+      - backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh
       - backend/scripts/e2e-spec-0051-session-container.sh
       - CLAUDE.md
     scope: 提供从现有 seed 资产构建可运行镜像的入口，并让一键实验 fail-closed 校验 image；用冒烟脚本证明无宿主工作区泄漏、结果证据可追溯。
@@ -209,7 +210,7 @@ SWE-bench 官方 harness 以 instance 为单位构建/启动 Docker image，在�
 
 无阻塞问题。操作者已确定：使用做好的 image 起 Docker；persona 保留直接查看工作区的能力；主观接受与客观执行结果都保留；审计先做最小可复核证据。
 
-正式 16×5 重跑前仍需构建新的 runnable seed image。旧的 `auto-designer-seed:swebench-medium-hard-16` 是 storage-only，按本 spec 必须被启动检查拒绝，而不是兼容运行。
+正式 16×5 重跑使用新的 `isolated-v2` experiment id 与 runnable seed digest。旧的 `auto-designer-seed:swebench-medium-hard-16` 是 storage-only，按本 spec 必须被启动检查拒绝，而不是兼容运行；旧 experiment 目录保持原样。
 
 ## Future possibilities
 
