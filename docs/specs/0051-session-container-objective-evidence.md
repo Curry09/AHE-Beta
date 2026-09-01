@@ -57,8 +57,8 @@ tasks:
       - backend/tests/harness/test_launcher.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_sim_user.py
-    scope: launcher 对容器运行时用 docker exec 启 harness；编排 finally 关闭会话容器；wire reply 带 completed/timed_out/interrupted/crashed，超时后销毁执行边界。
-    acceptance: harness 与 persona 看到同一容器 cwd；超时状态结构化可读且旧工作线程不能继续；异常路径也清理容器。
+    scope: launcher 对容器运行时用 docker exec 启 harness；编排 finally 关闭会话容器；wire reply 带 completed/timed_out/interrupted/crashed，launcher 将终态传给 sim，超时后销毁执行边界并停止 persona 续聊。
+    acceptance: harness 与 persona 看到同一容器 cwd；超时状态结构化可读且回复仅作审计证据，不触发下一次 persona 决策或 harness 写入；旧工作线程不能继续；异常路径也清理容器。
   - id: T4
     title: 双结论、客观执行与假接受
     status: done
@@ -149,7 +149,7 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 
 ### 终止语义
 
-wire v1 的 terminal reply 增加 `status`。launcher 将最近请求结果记录为 `{request_id,status,started_at,finished_at}`。`timed_out` 与 `crashed` 是 session 级污染：不允许 rebuild 后继续对话，不允许接受；orchestrator `finally` 关闭 runtime。宿主等待的绝对上限触发时同样杀容器，而非只杀 `docker exec` 客户端。
+wire v1 的 terminal reply 增加 `status`。launcher 将最近请求结果记录为 `{request_id,status,started_at,finished_at}`，并通过 `last_request_status` 将最近终态原样暴露给 sim。`timed_out` 与 `crashed` 是 session 级污染：可见回复与事件仍落为审计证据，但 sim 必须在该回复到达后直接以 `harness_timed_out` / `harness_crashed` 收场，不再调用 persona 主决策，也不再写 harness；orchestrator `finally` 关闭 runtime。宿主等待的绝对上限触发时同样杀容器，而非只杀 `docker exec` 客户端。
 
 ### 双结论
 

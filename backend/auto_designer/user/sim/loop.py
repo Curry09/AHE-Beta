@@ -165,6 +165,7 @@ _EXTREME_WAIT_SEC = 480.0
 # 用户 agent 感知。它不再触发任何框架侧动作门控——面对崩溃是否验收/开单/走人，由有判断力的模型自判
 # （prompt G6 + 终止时机条主导）；框架只负责把失败如实surfacing，不炸整局、也不替模型下结论。
 HARNESS_ERROR_PREFIX = "[harness error] "
+_HARNESS_TERMINAL_STATUSES = frozenset({"timed_out", "crashed"})
 
 # 事件等待（用户等待中的主动权）：
 #   AwaitEvent = poll 直到 harness reply（唤醒主 loop）或到心跳阈值（一次性等待决策）。
@@ -183,6 +184,12 @@ def _supports_heartbeat(harness) -> bool:
     """真实子进程句柄：统一写 + poll + 外 interrupt/shutdown；Fake/Scripted 无需心跳。"""
     has_write = hasattr(harness, "write_message") or hasattr(harness, "begin")
     return has_write and all(hasattr(harness, m) for m in ("poll", "interrupt", "shutdown"))
+
+
+def _harness_terminal_status(harness) -> str:
+    """读取 launcher 给出的机器可判终态；绝不从面向人的回复文本猜。"""
+    status = str(getattr(harness, "last_request_status", "") or "")
+    return status if status in _HARNESS_TERMINAL_STATUSES else ""
 
 
 def _write_harness_message(harness, message: str) -> None:
@@ -1248,6 +1255,13 @@ def run_session(
             result.pending_harness_events = list(harness_events or [])
             if on_progress is not None:
                 on_progress(result)
+            # timeout/crash 是 workspace 已失效的会话终态。回复文本仍作为 pending
+            # evidence 保留，但不能再进入下一轮 persona 决策，更不能再向已死容器写消息。
+            terminal_status = _harness_terminal_status(harness)
+            if terminal_status:
+                result.end_reason = f"harness_{terminal_status}"
+                result.signals.append(f"HARNESS_TERMINAL: {terminal_status}")
+                break
         # 本轮若未产生下一条 harness 输出（例如模型空转），保持上一条可见输出供下一轮继续判断。
 
     # 评估器协议失败不是用户体验分，也不是 harness 失败；保留审计哨兵但跳过正常评分。

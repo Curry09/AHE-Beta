@@ -35,6 +35,7 @@ _OBSERVATION_ATTRS = frozenset(
         "last_sideband",
         "last_visible_events",
         "visible_events",
+        "last_request_status",
         "help_text",
     }
 )

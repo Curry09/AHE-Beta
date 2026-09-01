@@ -121,6 +121,9 @@ class _HarnessHandle:
         self._request_id = ""
         self._request_started_at = ""
         self.request_outcomes: list[dict[str, Any]] = []
+        # 最近一笔已结束请求的结构化终态。调用方必须能区分正常 reply 与
+        # "带 timeout/crash 文本的终局 reply"，不能再靠解析人类可见文本猜测。
+        self.last_request_status = ""
         self._start()
 
     @property
@@ -246,6 +249,7 @@ class _HarnessHandle:
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可再 send")
         assert self._proc.stdin is not None and self._proc.stdout is not None
+        self.last_request_status = ""
         self._write(self._message_frame(message))
         self._t0 = time.monotonic()
         self._awaiting_reply = True
@@ -255,6 +259,7 @@ class _HarnessHandle:
     def _finish_request(self, status: str) -> None:
         if not self._request_id:
             return
+        self.last_request_status = status
         self.request_outcomes.append(
             {
                 "request_id": self._request_id,

@@ -197,6 +197,7 @@ def test_v1_reply_status_is_recorded_as_request_outcome(tmp_path) -> None:
         assert h.request_outcomes[-1]["status"] == "timed_out"
         assert h.request_outcomes[-1]["started_at"]
         assert h.request_outcomes[-1]["finished_at"]
+        assert h.last_request_status == "timed_out"
     finally:
         h.close()
 

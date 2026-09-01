@@ -58,6 +58,7 @@ class HeartbeatHarness:
         interrupt_reply: str = "[interrupted] stopped; session kept.",
         help_text: str = "# Help\nCtrl+C interrupts. You may send messages while waiting.",
         progress_on_poll: list[list[dict]] | None = None,
+        reply_statuses: list[str] | None = None,
     ) -> None:
         self._poll_script = list(poll_script)
         self._pi = 0
@@ -66,6 +67,8 @@ class HeartbeatHarness:
         self.last_steps: list[dict] = []
         self.last_progress: list[dict] = []
         self._progress_on_poll = progress_on_poll
+        self._reply_statuses = list(reply_statuses or [])
+        self.last_request_status = ""
         self.begun: list[str] = []
         self.emitted: list[str] = []
         self.controls: list[str] = []
@@ -83,6 +86,7 @@ class HeartbeatHarness:
             self.begun.append(message)
             self._inflight = True
             self.last_progress = []
+            self.last_request_status = ""
         else:
             self.emitted.append(message)
 
@@ -100,6 +104,9 @@ class HeartbeatHarness:
             self.last_progress = list(self._progress_on_poll[idx])
         if item[0] == "reply":
             self._inflight = False
+            reply_index = sum(1 for kind, _ in self._poll_script[: idx + 1] if kind == "reply") - 1
+            if reply_index < len(self._reply_statuses):
+                self.last_request_status = self._reply_statuses[reply_index]
         return item
 
     def try_reply(self) -> str | None:
@@ -111,6 +118,9 @@ class HeartbeatHarness:
         _kind, val = self._poll_script[self._pi]
         self._pi += 1
         self._inflight = False
+        reply_index = sum(1 for kind, _ in self._poll_script[: self._pi] if kind == "reply") - 1
+        if reply_index < len(self._reply_statuses):
+            self.last_request_status = self._reply_statuses[reply_index]
         return str(val)
 
     def interrupt(self) -> str:
@@ -288,6 +298,32 @@ def test_three_mode_keep_waiting_logs_and_calls() -> None:
         and "harness -> you:" in p
         for p in main_prompts
     )
+
+
+def test_structured_timeout_reply_ends_session_before_next_persona_turn() -> None:
+    """终局 reply 可见、可审计，但 timeout 后不能再判断一轮或写入已死 workspace。"""
+    timeout_text = (
+        "[timeout] harness request exceeded its execution limit; this session cannot continue."
+    )
+    harness = HeartbeatHarness(
+        [("reply", timeout_text)],
+        reply_statuses=["timed_out"],
+    )
+    client = WaitStubClient(
+        actions=["send_message", "send_message"],
+        acts=[{"action": "keep_waiting", "gap": False}],
+        verdict="unsure",
+    )
+
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
+
+    assert res.end_reason == "harness_timed_out"
+    assert harness.begun == ["x"]
+    assert harness.emitted == []
+    assert len([p for p in client.all_prompts if "<main_act>" in p]) == 1
+    assert len(res.turns) == 1
+    assert res.pending_harness_output == timeout_text
+    assert "HARNESS_TERMINAL: timed_out" in res.signals
 
 
 def test_open_intent_gap_comes_from_act_not_enum() -> None:
