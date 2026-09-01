@@ -107,7 +107,7 @@ def test_sandbox_does_not_auto_activate_workspace_venv(tmp_path) -> None:
     fake_python.chmod(0o755)
 
     sb = Sandbox(workspace=str(tmp_path))
-    run = run_shell(sb, "python - <<'PY'\nimport sys\nprint(sys.executable)\nPY")
+    run = run_shell(sb, "python3 - <<'PY'\nimport sys\nprint(sys.executable)\nPY")
     assert run["ok"] and run["returncode"] == 0
     assert "fake-venv-python" not in run["stdout"]
     assert str(bindir) not in (run["stdout"] + run["stderr"])

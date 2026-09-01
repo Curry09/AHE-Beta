@@ -70,12 +70,11 @@ def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
 
     turns = result_to_turns(res)
 
-    # harness 实际只回了 1 次 → 只应有 1 条 harness 轮，且严格 user/harness/user 交替
+    # accept 是 persona 本地 terminal note，不是发送给 harness 的 user turn。
     roles = [t.role for t in turns]
-    assert roles == ["user", "harness", "user"]
+    assert roles == ["user", "harness"]
     assert turns[1].content == completion
     assert turns[0].content.startswith("Please inspect")
-    assert turns[2].content == "Looks good, thanks."
 
 
 def test_result_to_sim_trace_keeps_perceive_alongside_dialogue() -> None:
@@ -404,7 +403,7 @@ def test_client_factory_gives_each_session_its_own_instance(tmp_path) -> None:
     # 每个实例恰 bind 一次、且两局的 workspace 各归各（无后 bind 覆盖先 bind）
     all_bound = [c.bound for c in made]
     assert all(len(b) == 1 for b in all_bound)
-    assert {b[0][1] for b in all_bound} == {"/ws/a", "/ws/b"}
+    assert {b[0][1].cwd for b in all_bound} == {"/ws/a", "/ws/b"}
 
 
 def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:
@@ -428,7 +427,9 @@ def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:
 
     fn(mp, scenario, ScriptedHarness())  # 不传 workspace_dir → 走回落分支
 
-    assert events == [("materialize", "funcy"), ("ensure_deps", "/ws/funcy")]
+    assert events[0] == ("materialize", "funcy")
+    assert events[1][0] == "ensure_deps"
+    assert events[1][1].cwd == "/ws/funcy"
 
 
 def test_main_path_does_not_ensure_deps_in_sim_user(tmp_path, monkeypatch) -> None:

@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -30,18 +29,14 @@ if TYPE_CHECKING:
 # --------------------------------------------------------------------------
 def read_file(sandbox: Sandbox, path: str) -> dict:
     try:
-        with open(sandbox.resolve(path), encoding="utf-8") as f:
-            return {"ok": True, "content": f.read()}
+        return {"ok": True, "content": sandbox.read_text(path)}
     except Exception as e:  # noqa: BLE001 — 工具层把任何失败转成结构化结果，绝不崩内层循环
         return {"ok": False, "error": str(e)}
 
 
 def write_file(sandbox: Sandbox, path: str, content: str) -> dict:
     try:
-        target = sandbox.resolve(path)
-        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
-        with open(target, "w", encoding="utf-8") as f:
-            f.write(content)
+        target = sandbox.write_text(path, content)
         return {"ok": True, "path": target}
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": str(e)}

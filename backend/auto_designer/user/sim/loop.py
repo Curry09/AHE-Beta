@@ -1135,7 +1135,7 @@ def run_session(
             on_progress(result)  # 逐轮观测钩子(含终止轮): 喂给看板等观测层, 不影响主循环
 
         # 记历史(只记 B 线真正发出的话；空 message 不 fabricate、不入史)；统一 [+Ns] 前缀。
-        if spec.channel is Channel.EMIT and message.strip():
+        if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE and message.strip():
             clock.stamp(history, f"you -> harness: {message}")
 
         # ⑥ 终止判定（三种终止都以本人口吻留一条自包含 issue，见 _finalize_terminal）

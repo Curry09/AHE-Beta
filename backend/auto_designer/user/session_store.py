@@ -62,6 +62,9 @@ class SessionStore:
                 "issue_numbers": [r.number for r in session.issue_refs],
                 # Spec-0048：invalid 仍落全量与索引供审计，但默认趋势读取会排除。
                 "evaluation_status": evaluation_status,
+                "user_outcome": (session.user_outcome or {}).get("end_reason"),
+                "accept_validity": session.accept_validity,
+                "objective_passed": (session.objective_evaluation or {}).get("passed"),
             }
         )
         (self._root / _INDEX_NAME).write_text(

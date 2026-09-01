@@ -60,6 +60,15 @@ _蒸馏侧（spec-0006）：persona 卡库读写 + 契约约束校验。_
 | `seed_adapter.py` | seed_adapter.py（spec-0010/T2）：把种子卡注入 0009 的 SeedSource 供给。 |
 | `seed_library.py` | SeedLibrary（spec-0010/T1）：种子卡库的最小读写 + 契约约束校验。 |
 
+### auto_designer.evaluation
+
+_Objective evaluators kept separate from simulated-user judgment._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Objective evaluators kept separate from simulated-user judgment. |
+| `swebench.py` | Official fresh-container SWE-bench objective evidence (spec-0051/T4). |
+
 ### auto_designer.experiment
 
 _Per-experiment isolation: config, manifest, compose, CLI, capacity._
@@ -145,6 +154,7 @@ _auto_designer.user.sim —— persona 驱动的 harness 用户模拟器(控制�
 | `prompt.py` | prompt.py |
 | `run_agentic.py` | run_agentic.py — 实测内层 tool-using 用户 agent 是否真去操作工作区（spec-0008）。 |
 | `run_live.py` | run_live.py |
+| `runtime.py` | Workspace execution boundaries for simulated-user sessions (spec-0051/T2). |
 | `sandbox.py` | 内层用户 agent 的最小执行 sandbox（spec-0008/T2）。 |
 | `scenarios.py` | scenarios.py |
 | `seed_source.py` | 可插拔的种子工作区供给接缝（spec-0009/T1）。 |
@@ -160,7 +170,7 @@ _SeedSource 实现子包（spec-0009/T1）。_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | SeedSource 实现子包（spec-0009/T1）。 |
-| `docker_seed.py` | Docker seed image source. |
+| `docker_seed.py` | Runnable Docker seed source (spec-0051/T2). |
 | `empty.py` | empty SeedSource（spec-0009/T2）。 |
 | `git.py` | git SeedSource（spec-0009/T4）。 |
 | `local_fixture.py` | local-fixture SeedSource（spec-0009/T1）。 |
@@ -204,6 +214,8 @@ graph LR
     nauto_designer_distill_library["distill.library"]
     nauto_designer_distill_seed_adapter["distill.seed_adapter"]
     nauto_designer_distill_seed_library["distill.seed_library"]
+    nauto_designer_evaluation["auto_designer.evaluation"]
+    nauto_designer_evaluation_swebench["evaluation.swebench"]
     nauto_designer_experiment["auto_designer.experiment"]
     nauto_designer_experiment_capacity["experiment.capacity"]
     nauto_designer_experiment_cli["experiment.cli"]
@@ -252,6 +264,7 @@ graph LR
     nauto_designer_user_sim_prompt["sim.prompt"]
     nauto_designer_user_sim_run_agentic["sim.run_agentic"]
     nauto_designer_user_sim_run_live["sim.run_live"]
+    nauto_designer_user_sim_runtime["sim.runtime"]
     nauto_designer_user_sim_sandbox["sim.sandbox"]
     nauto_designer_user_sim_scenarios["sim.scenarios"]
     nauto_designer_user_sim_seed_source["sim.seed_source"]
@@ -312,6 +325,7 @@ graph LR
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
+    nauto_designer_evaluation --> nauto_designer_evaluation_swebench
     nauto_designer_experiment_capacity --> nauto_designer_experiment_config
     nauto_designer_experiment_cli --> nauto_designer_experiment
     nauto_designer_experiment_cli --> nauto_designer_experiment_config
@@ -326,6 +340,7 @@ graph LR
     nauto_designer_harness_connector --> nauto_designer_harness_interface
     nauto_designer_harness_connector --> nauto_designer_usage
     nauto_designer_harness_launcher --> nauto_designer_harness_interface
+    nauto_designer_harness_launcher --> nauto_designer_user_sim_runtime
     nauto_designer_invocation --> nauto_designer_usage
     nauto_designer_loop_live_tracer --> nauto_designer_usage
     nauto_designer_loop_metrics --> nauto_designer_designer_issue_schema
@@ -339,11 +354,13 @@ graph LR
     nauto_designer_loop_orchestrator --> nauto_designer_models
     nauto_designer_loop_orchestrator --> nauto_designer_usage
     nauto_designer_loop_orchestrator --> nauto_designer_user_sim_deps
+    nauto_designer_loop_orchestrator --> nauto_designer_user_sim_runtime
     nauto_designer_loop_orchestrator --> nauto_designer_user_sim_workspace
     nauto_designer_loop_runner --> nauto_designer_loop_checkpoint
     nauto_designer_loop_runner --> nauto_designer_loop_orchestrator
     nauto_designer_loop_runner --> nauto_designer_loop_run_state
     nauto_designer_loop_sim_user --> nauto_designer_designer_issue_schema
+    nauto_designer_loop_sim_user --> nauto_designer_evaluation_swebench
     nauto_designer_loop_sim_user --> nauto_designer_harness_connector
     nauto_designer_loop_sim_user --> nauto_designer_harness_interface
     nauto_designer_loop_sim_user --> nauto_designer_models
@@ -354,6 +371,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_dimensions
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_loop
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_persona_client
+    nauto_designer_loop_sim_user --> nauto_designer_user_sim_runtime
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_workspace
     nauto_designer_tracker_base --> nauto_designer_models
     nauto_designer_tracker_fake --> nauto_designer_models
@@ -375,6 +393,7 @@ graph LR
     nauto_designer_user_sim_demo --> nauto_designer_user_sim_persona_client
     nauto_designer_user_sim_demo --> nauto_designer_user_sim_state
     nauto_designer_user_sim_deps --> nauto_designer_models
+    nauto_designer_user_sim_deps --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_loop --> nauto_designer_usage
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_action_space
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_actions
@@ -410,13 +429,15 @@ graph LR
     nauto_designer_user_sim_run_live --> nauto_designer_user_sim_loop
     nauto_designer_user_sim_run_live --> nauto_designer_user_sim_persona_client
     nauto_designer_user_sim_run_live --> nauto_designer_user_sim_scenarios
+    nauto_designer_user_sim_sandbox --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_seed_source --> nauto_designer_models
     nauto_designer_user_sim_seed_source --> nauto_designer_user_sim
+    nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_sources
     nauto_designer_user_sim_skills --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_models
+    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_seed_source
-    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_sources_prebuilt
     nauto_designer_user_sim_sources_empty --> nauto_designer_models
     nauto_designer_user_sim_sources_empty --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_git --> nauto_designer_models
@@ -430,6 +451,7 @@ graph LR
     nauto_designer_user_sim_tools --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_tools --> nauto_designer_user_sim_sandbox
     nauto_designer_user_sim_workspace --> nauto_designer_models
+    nauto_designer_user_sim_workspace --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_workspace --> nauto_designer_user_sim_seed_source
     nauto_designer_web_api --> nauto_designer_designer_issue_schema
     nauto_designer_web_api --> nauto_designer_loop_live

@@ -15,9 +15,7 @@ def test_docker_seed_requires_image_and_instance() -> None:
     with pytest.raises(ValueError, match="params.image"):
         seed_source.provision(WorkspaceSpec(kind="docker-seed"))
     with pytest.raises(ValueError, match="params.instance_id"):
-        seed_source.provision(
-            WorkspaceSpec(kind="docker-seed", params={"image": "seed:test"})
-        )
+        seed_source.provision(WorkspaceSpec(kind="docker-seed", params={"image": "seed:test"}))
     with pytest.raises(ValueError, match="单路径段"):
         seed_source.provision(
             WorkspaceSpec(
@@ -45,56 +43,78 @@ def test_docker_seed_reports_create_failure(monkeypatch: pytest.MonkeyPatch) -> 
         )
 
 
-def test_docker_seed_extracts_workspace_relocates_venv_and_removes_container(
+def test_docker_seed_starts_runnable_session_without_copying_repo_to_host(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from auto_designer.user.sim import seed_source
     from auto_designer.user.sim.sources import docker_seed
 
-    old_root = Path("/seed/build/workspace/instance-1/repo")
     calls: list[list[str]] = []
 
     def fake_docker(args: list[str]) -> subprocess.CompletedProcess[str]:
         calls.append(args)
-        if args[0] == "create":
-            return subprocess.CompletedProcess(args, 0, "container-1\n", "")
-        source, destination = args[1], Path(args[2])
-        if source.endswith(":/build-state.json"):
-            destination.write_text(
+        if args[:2] == ["image", "inspect"]:
+            return subprocess.CompletedProcess(
+                args,
+                0,
                 json.dumps(
-                    {"instances": {"instance-1": {"source_path": str(old_root)}}}
+                    [
+                        {
+                            "Id": "sha256:seed",
+                            "Config": {"Labels": {"org.auto-designer.seed-runtime": "1"}},
+                        }
+                    ]
                 ),
-                encoding="utf-8",
+                "",
             )
-        else:
-            destination.mkdir(parents=True)
-            metadata = destination / ".venv" / "lib" / "direct_url.json"
-            metadata.parent.mkdir(parents=True)
-            metadata.write_text(str(old_root), encoding="utf-8")
-        return subprocess.CompletedProcess(args, 0, "", "")
+        if args[0] == "run":
+            return subprocess.CompletedProcess(args, 0, "container-1\n", "")
+        if args[:2] == ["exec", "container-1"]:
+            return subprocess.CompletedProcess(
+                args, 0, json.dumps({"instances": {"instance-1": {}}}), ""
+            )
+        raise AssertionError(args)
 
     removed: list[list[str]] = []
     monkeypatch.setattr(docker_seed, "_docker", fake_docker)
     monkeypatch.setattr(
         docker_seed.subprocess,
         "run",
-        lambda args, **_kwargs: removed.append(args)
-        or subprocess.CompletedProcess(args, 0, "", ""),
+        lambda args, **_kwargs: (
+            removed.append(args) or subprocess.CompletedProcess(args, 0, "", "")
+        ),
     )
 
-    result = Path(
+    result = seed_source.provision(
+        WorkspaceSpec(
+            kind="docker-seed",
+            params={"image": "seed:test", "instance_id": "instance-1"},
+        ),
+        str(tmp_path),
+    )
+
+    assert result.container_id == "container-1"
+    assert result.cwd == "/workspace/instance-1/repo"
+    assert any(call[0] == "run" for call in calls)
+    assert not any("cp" in call for call in calls)
+    assert removed == []
+
+
+def test_docker_seed_rejects_storage_only_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    from auto_designer.user.sim import seed_source
+    from auto_designer.user.sim.sources import docker_seed
+
+    monkeypatch.setattr(
+        docker_seed,
+        "_docker",
+        lambda args: subprocess.CompletedProcess(
+            args, 0, json.dumps([{"Id": "sha256:old", "Config": {"Labels": {}}}]), ""
+        ),
+    )
+    with pytest.raises(RuntimeError, match="storage-only"):
         seed_source.provision(
             WorkspaceSpec(
                 kind="docker-seed",
-                params={"image": "seed:test", "instance_id": "instance-1"},
-            ),
-            str(tmp_path),
+                params={"image": "seed:old", "instance_id": "instance-1"},
+            )
         )
-    )
-
-    assert result == (tmp_path / "repo").resolve()
-    assert str(old_root) not in (result / ".venv/lib/direct_url.json").read_text()
-    assert str(result) in (result / ".venv/lib/direct_url.json").read_text()
-    assert calls[0] == ["create", "seed:test", "/bin/true"]
-    assert removed == [["docker", "rm", "container-1"]]
-    assert not (tmp_path / ".seed-build-state.json").exists()

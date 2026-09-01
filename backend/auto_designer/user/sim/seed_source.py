@@ -19,6 +19,7 @@ import pkgutil
 from typing import Protocol
 
 from auto_designer.models import WorkspaceSpec
+from auto_designer.user.sim.runtime import Workspace
 
 
 class SeedSource(Protocol):
@@ -30,7 +31,7 @@ class SeedSource(Protocol):
 
     kind: str
 
-    def provision(self, spec: WorkspaceSpec, dest_root: str | None = None) -> str: ...
+    def provision(self, spec: WorkspaceSpec, dest_root: str | None = None) -> Workspace: ...
 
 
 _REGISTRY: dict[str, SeedSource] = {}
@@ -59,8 +60,8 @@ def get_source(kind: str) -> SeedSource:
         raise ValueError(f"未知 seed source kind={kind!r}；已注册：{available_kinds()}") from None
 
 
-def provision(spec: WorkspaceSpec, dest_root: str | None = None) -> str:
-    """顶层分派：按 spec.kind 查表并委托其 provision，返回隔离工作区目录绝对路径。"""
+def provision(spec: WorkspaceSpec, dest_root: str | None = None) -> Workspace:
+    """顶层分派：本地源返回目录，容器源返回显式生命周期的 runtime。"""
     return get_source(spec.kind).provision(spec, dest_root)
 
 

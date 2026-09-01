@@ -1,7 +1,7 @@
-"""Docker seed image source.
+"""Runnable Docker seed source (spec-0051/T2).
 
-Extract one prepared SWE-bench repository from a storage-only image, then
-relocate its editable virtualenv for the fresh per-session path.
+Every provision call starts one disposable container.  Repository contents are
+never copied to a host workspace.
 """
 
 from __future__ import annotations
@@ -9,19 +9,35 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-import tempfile
-from pathlib import Path
+import uuid
 
 from auto_designer.models import WorkspaceSpec
+from auto_designer.user.sim.runtime import DockerWorkspaceRuntime
 from auto_designer.user.sim.seed_source import register
-from auto_designer.user.sim.sources.prebuilt import _relocate_venv
+
+RUNTIME_LABEL = "org.auto-designer.seed-runtime"
+RUNTIME_VERSION = "1"
+
+
+def _docker(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    proc = subprocess.run(["docker", *args], capture_output=True, text=True)
+    if check and proc.returncode != 0:
+        raise RuntimeError(
+            f"docker 命令失败：docker {' '.join(args)}（rc={proc.returncode}）\n"
+            f"stderr: {(proc.stderr or '').strip()[:2000]}"
+        )
+    return proc
 
 
 @register("docker-seed")
 class DockerSeedSource:
     kind = "docker-seed"
 
-    def provision(self, spec: WorkspaceSpec, dest_root: str | None = None) -> str:
+    def provision(
+        self,
+        spec: WorkspaceSpec,
+        dest_root: str | None = None,  # noqa: ARG002
+    ) -> DockerWorkspaceRuntime:
         image = str(spec.params.get("image", "")).strip()
         instance_id = str(spec.params.get("instance_id", "")).strip()
         if not image:
@@ -31,38 +47,52 @@ class DockerSeedSource:
         if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", instance_id) is None:
             raise ValueError("docker-seed params.instance_id 必须是安全的单路径段")
 
-        base = Path(dest_root) if dest_root else Path(tempfile.mkdtemp(prefix="sim_ws_docker_seed_"))
-        base.mkdir(parents=True, exist_ok=True)
-        dest = base / "repo"
-        state_path = base / ".seed-build-state.json"
-
-        created = _docker(["create", image, "/bin/true"])
-        container_id = created.stdout.strip()
-        if not container_id:
-            raise RuntimeError(f"docker create 未返回 container id：{image}")
-        try:
-            _docker(["cp", f"{container_id}:/build-state.json", str(state_path)])
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-            meta = (state.get("instances") or {}).get(instance_id)
-            if not meta:
-                raise KeyError(f"seed 镜像不含 instance：{instance_id}")
-            old_root_raw = str(meta.get("source_path", "")).strip()
-            if not old_root_raw:
-                raise KeyError(f"seed 状态缺 source_path：{instance_id}")
-            _docker(["cp", f"{container_id}:/workspace/{instance_id}/repo", str(dest)])
-        finally:
-            subprocess.run(["docker", "rm", container_id], capture_output=True, text=True)
-
-        _relocate_venv(dest=dest, old_root=Path(old_root_raw))
-        state_path.unlink(missing_ok=True)
-        return str(dest.resolve())
-
-
-def _docker(args: list[str]) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(["docker", *args], capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"docker 命令失败：docker {' '.join(args)}（rc={proc.returncode}）\n"
-            f"stderr: {(proc.stderr or '').strip()[:2000]}"
+        inspected = _docker(["image", "inspect", image])
+        image_info = json.loads(inspected.stdout)[0]
+        labels = (image_info.get("Config") or {}).get("Labels") or {}
+        if labels.get(RUNTIME_LABEL) != RUNTIME_VERSION:
+            raise RuntimeError(
+                f"seed image {image!r} 不是 runnable v{RUNTIME_VERSION}；"
+                "旧 storage-only image 禁止回退 docker cp，请先构建 runtime image"
+            )
+        image_digest = str(image_info.get("Id") or image)
+        workspace = f"/workspace/{instance_id}/repo"
+        name = f"ad-session-{uuid.uuid4().hex[:16]}"
+        network = str(spec.params.get("network") or "none")
+        started = _docker(
+            [
+                "run",
+                "-d",
+                "--name",
+                name,
+                "--label",
+                f"auto-designer.session={name}",
+                "--network",
+                network,
+                "--workdir",
+                workspace,
+                image,
+                "sh",
+                "-lc",
+                "trap 'exit 0' TERM INT; while :; do sleep 3600; done",
+            ]
         )
-    return proc
+        container_id = started.stdout.strip()
+        if not container_id:
+            raise RuntimeError(f"docker run 未返回 container id：{image}")
+        runtime = DockerWorkspaceRuntime(
+            container_id=container_id,
+            container_name=name,
+            image=image,
+            image_digest=image_digest,
+            cwd=workspace,
+        )
+        try:
+            state = _docker(["exec", container_id, "cat", "/build-state.json"]).stdout
+            parsed = json.loads(state)
+            if instance_id not in (parsed.get("instances") or {}):
+                raise KeyError(instance_id)
+        except Exception as exc:
+            runtime.close()
+            raise RuntimeError(f"seed image 不含 instance {instance_id!r}") from exc
+        return runtime

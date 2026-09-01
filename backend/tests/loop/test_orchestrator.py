@@ -300,8 +300,8 @@ def test_round_materializes_shared_workspace_before_launch(tmp_path, monkeypatch
 
     # 顺序：materialize 早于 launch；launch 与 session 收到同一个 workspace_dir。
     assert events[0] == ("materialize", "billing-split")
-    assert events[1] == ("launch", "/ws/billing-split")
-    assert events[2] == ("session", "/ws/billing-split")
+    assert events[1][0] == "launch" and events[1][1].cwd == "/ws/billing-split"
+    assert events[2][0] == "session" and events[2][1] is events[1][1]
 
 
 def test_round_ensures_deps_after_materialize_before_launch(tmp_path, monkeypatch) -> None:
@@ -331,11 +331,9 @@ def test_round_ensures_deps_after_materialize_before_launch(tmp_path, monkeypatc
     )
     orch.run_round("c")
 
-    assert events[:3] == [
-        ("materialize", "funcy"),
-        ("ensure_deps", "/ws/funcy"),
-        ("launch", "/ws/funcy"),
-    ]
+    assert events[0] == ("materialize", "funcy")
+    assert events[1][0] == "ensure_deps" and events[1][1].cwd == "/ws/funcy"
+    assert events[2][0] == "launch" and events[2][1] is events[1][1]
 
 
 def test_round_no_workspace_skips_ensure_deps(tmp_path, monkeypatch) -> None:

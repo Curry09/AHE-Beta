@@ -23,6 +23,8 @@
 
 - **a｜用户侧**：user agent 按 persona 和种子场景使用 harness，产生一段使用过程（包含追问、绕路、卡顿、放弃等情况）。输出两类信号：① 体感评分（类似 cc 的 1-4 评分，作训练信号）；② issue（bug 或需求，来自使用中的具体问题点）。
 
+  SWE-bench 场景按 spec-0051 使用**每会话一个临时容器**：从同一 runnable seed image 启动，persona 的 `read_file`/`run_shell` 与 harness 均只操作容器内 repo，不把 repo `docker cp` 到宿主。请求超时/崩溃会回收整个容器。会话仍保留主观体感与接受决定，但技术通过只认随后由官方 SWE-bench harness 在新鲜 instance 容器产生的客观结果；两者与最小审计事件分别落入 session JSON。
+
 - **b｜开发者侧（交付面，spec-0032 现行）**：由 OpenAgents vigil（独立 CLI 常驻进程）承担。需求面 Owner 准入的票带 `openagents` 交接令牌，vigil 发现后走「盖 ready → curator 排依赖 → worktree/分支 → 实现 → 评审循环 → PR → conflict/CI/review 闸 → 合并进 main」。CI/评审是**工程质量闸**（harness 仓结构冒烟，绝不跑 benchmark），与已去掉的体感门禁维度不同；体感仍纯观测、benchmark 全程 held-out。坏改动在 PR 处被打回、不落 main。
 
 - **c｜闭环（spec-0050）**：非末轮在 Owner 准入后**等待本轮准入票终态**（合进 main 或明确卡死）才开下一轮用户。末轮只跑用户交互，不再提案、不再交付。第 N+1 轮体感相对第 N 轮归因于第 N 轮已封口产物。一张票 `needs-human`/超时则实验停在该轮。同一轮内用户与多票交付仍可并行。
@@ -73,7 +75,8 @@ backend/                 # 后端（编排框架）
     models.py            # 共享数据结构（两侧共用）
     nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
     harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
-    user/                # user_agent.py + session.py(run_session) + session_store.py
+    user/                # user_agent + sim/WorkspaceRuntime（本地 fixture / 每会话 Docker）+ session_store
+    evaluation/          # 官方 SWE-bench fresh-container 客观验收与 accept validity 派生
     tracker/             # base.py(IssueTracker接口) + gitea.py(含 PR 观测读路径) + fake.py
     dev/                 # 边界/围堵原语：harness_boundary + workspace_jail + repo_guard 等（agentic_developer 已随 spec-0032 退役）
     loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
@@ -83,7 +86,7 @@ backend/                 # 后端（编排框架）
   harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml + .gitea/workflows/smoke.yml
   deploy/gitea/          # 基建：docker-compose.yml(Gitea+act_runner+egress-proxy+双网络) + bootstrap.sh
   deploy/vigil/          # 交付面围堵盒（spec-0033）：Dockerfile + entrypoint.sh(自 clone) + build.sh
-  scripts/               # bootstrap_harness.py + check-spec-number-conflicts.py
+  scripts/               # bootstrap + 实验入口 + runnable SWE-bench seed 构建/验收脚本
 frontend/                # 前端：React+Vite+TS 只读观测看板（消费 backend web API）
 docs/specs/              # 设计 specs（spec-driven-development 源，项目级）
 tools/                   # vendored spec CLI（外来工具，不纳入 lint）

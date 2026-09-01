@@ -5,7 +5,7 @@ It builds a NexAU Agent from this directory's agent.yaml and uses SANDBOX_WORK_D
 the workspace for shell commands. The internal agent topology is an implementation detail.
 
 Runtime notes: LLM_* environment variables configure the model endpoint. The process keeps
-a stable session_id; timeout or hard interrupt recovery may rebuild the internal agent_id
+with a stable session_id; a hard interrupt recovery may rebuild the internal agent_id
 and restore conversation history. See RUNTIME.md for operational boundaries.
 """
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 # ── 一级预算钮（延迟体感的总闸；改这里最省事，先质疑它再谈别的）─────────────────
-# 单轮最坏墙钟 ≈ _CALL_TIMEOUT（首次超时即回可续说明，不再闷头 × _RUN_RETRIES）。
+# 单轮最坏墙钟 ≈ _CALL_TIMEOUT（首次超时即回结构化终态，不再闷头 × _RUN_RETRIES）。
 # 空回复 / 网关毛刺仍用 _RUN_RETRIES 退避重试（同实例，不换 session）。
 _RUN_RETRIES = 4
 # 单次 agent.run 硬超时（秒）：nexau 自身的 llm_config.timeout 实测不生效，故在此层用线程兜底，
@@ -38,11 +38,10 @@ _INTERRUPT_REPLY = (
     "[interrupted] 已按你的要求停止当前处理，这一步没有完成。"
     "会话上下文已保留——你可以直接给出修改后的要求或下一条指示，我会接着当前进度继续。"
 )
-# 硬超时：不闷头重试；rebuild 接上 history 后回可续说明（与 MANUAL / RUNTIME 一致）。
+# 硬超时：不闷头重试；v1 launcher 收到 timed_out 后回收整个会话容器。
 _TIMEOUT_REPLY = (
     "[timeout] 这一步在内部时限内没有完成，当前请求已停下。"
-    "会话上下文已保留——你可以收窄要求、让我从已有进度继续，或换一条指示。"
-    "工作区里可能已有部分改动，请以磁盘实况为准并告诉我下一步怎么处理。"
+    "该工作区可能仍有未受控写入，当前会话不能继续，也不能据此宣称实现已验证。"
 )
 _HARNESS_USER_ID = "harness_user"
 _V1 = "stdio-jsonl-v1"
@@ -171,7 +170,7 @@ def _run_supervised(agent, message, timeout, ctrl_q):
     """跑一次 agent.run，同时守望硬超时与用户打断（control 队列）。
 
     - 正常完成：返回结果。
-    - 硬超时：raise TimeoutError（daemon 线程被放弃，caller 重建避自锁并回灌 history）。
+    - 硬超时：raise TimeoutError（daemon 线程被放弃，v1 caller 必须回收整个容器）。
     - 收到 interrupt：force_stop 优雅停止（保留 session）→ raise _Interrupted(rebuild=False)；
       若宽限内没停下 → _Interrupted(rebuild=True)，由 caller 重建避自锁并回灌 history。
     ctrl_q 为 None（无打断能力的调用场景）时退化为纯超时行为。"""
@@ -370,8 +369,14 @@ def _make_step_collector():
                 if not isinstance(usage, dict):
                     dump = getattr(usage, "model_dump", None)
                     usage = dump() if callable(dump) else {}
-                prompt_details = usage.get("prompt_tokens_details") or usage.get("input_tokens_details") or {}
-                completion_details = usage.get("completion_tokens_details") or usage.get("output_tokens_details") or {}
+                prompt_details = (
+                    usage.get("prompt_tokens_details") or usage.get("input_tokens_details") or {}
+                )
+                completion_details = (
+                    usage.get("completion_tokens_details")
+                    or usage.get("output_tokens_details")
+                    or {}
+                )
 
                 def number(*keys):
                     for key in keys:
@@ -385,13 +390,18 @@ def _make_step_collector():
                 total_tokens = number("total_tokens", "totalTokenCount")
                 if total_tokens is None and input_tokens is not None and output_tokens is not None:
                     total_tokens = input_tokens + output_tokens
-                cached = number("cached_input_tokens", "cache_read_tokens", "cache_read_input_tokens")
+                cached = number(
+                    "cached_input_tokens", "cache_read_tokens", "cache_read_input_tokens"
+                )
                 if cached is None and isinstance(prompt_details, dict):
                     cached = prompt_details.get("cached_tokens")
                 reasoning = number("reasoning_tokens", "thoughtsTokenCount")
                 if reasoning is None and isinstance(completion_details, dict):
                     reasoning = completion_details.get("reasoning_tokens")
-                available = any(v is not None for v in (input_tokens, output_tokens, total_tokens, cached, reasoning))
+                available = any(
+                    v is not None
+                    for v in (input_tokens, output_tokens, total_tokens, cached, reasoning)
+                )
                 _emit_usage(
                     provider="nexau",
                     model=payload.get("model") or payload.get("modelVersion"),
@@ -425,11 +435,11 @@ def _make_step_collector():
 
 
 def _reply(agent, message: str, rebuild, ctrl_q=None):
-    """返回 (live_agent, reply)。
+    """返回 (live_agent, reply, terminal_status)。
 
-    硬超时后旧实例仍持 nexau 锁 → 必须 `rebuild()` 换新 agent_id（避自锁）。
-    rebuild 由调用方闭合：固定同一 session_id，并显式回灌 history（见 RUNTIME.md）。
-    超时不闷头重试，立即回 `_TIMEOUT_REPLY` 把控制权交回用户。
+    hard interrupt 可调用 `rebuild()` 换新 agent_id 并回灌 history（见 RUNTIME.md）。
+    硬超时后旧线程是否还会写盘不可证明，因此只报告 terminal status，不再重建。
+    超时不闷头重试，立即回 `_TIMEOUT_REPLY`；v1 launcher 随后销毁会话容器。
     空回复 / 502 等同实例退避重试。优雅打断保持同实例；强打断才 rebuild。
     """
     last = None
@@ -438,20 +448,19 @@ def _reply(agent, message: str, rebuild, ctrl_q=None):
             out = _run_supervised(agent, message, _CALL_TIMEOUT, ctrl_q)  # 硬超时 + 可打断
             text = out if isinstance(out, str) else (out[0] if out else "")  # 工具型返回 result 串
             if text and text.strip():  # 非空才算成功
-                return agent, text
+                return agent, text, "completed"
             last = "empty reply"  # 空回复（网关 200+空内容不抛异常）视为失败，不得静默返回
         except _Interrupted as it:  # 用户打断：不重试，保留/重建后回定型回复
             if it.rebuild:
                 agent = rebuild(agent)
-            return agent, _INTERRUPT_REPLY
-        except TimeoutError:  # 线程被放弃仍持锁 → 重建避自锁并交回用户（可续聊）
-            agent = rebuild(agent)
-            return agent, _TIMEOUT_REPLY
+            return agent, _INTERRUPT_REPLY, "interrupted"
+        except TimeoutError:  # 线程被放弃且可能继续写盘 → launcher 回收整个容器
+            return agent, _TIMEOUT_REPLY, "timed_out"
         except Exception as exc:  # 网关 502 等 → 同 agent 退避重试（线程已结束、锁已释放）
             last = exc
         if attempt < _RUN_RETRIES - 1:  # 末次不再睡
             time.sleep(1.5 * (attempt + 1))
-    return agent, f"[harness error] {last}"
+    return agent, f"[harness error] {last}", "crashed"
 
 
 _EOF = object()  # stdin 读线程读到 EOF 时投递的哨兵
@@ -554,13 +563,13 @@ def main() -> None:
         collector.reset()  # 只收本轮内层过程
         busy.set()
         try:
-            agent, raw = _reply(agent, message, rebuild, ctrl_q)
+            agent, raw, terminal_status = _reply(agent, message, rebuild, ctrl_q)
         finally:
             busy.clear()
         history_snapshot = _snapshot_history(agent) or history_snapshot
         reply = _unwrap_reply(raw)  # 拆信封：用户只看最终答案
         steps = list(collector.steps)  # 完整内层迭代 → 诊断元数据；用户答案只看 reply
-        payload = _wire_out("reply", text=reply, steps=steps)
+        payload = _wire_out("reply", text=reply, steps=steps, status=terminal_status)
         with _stdout_lock:  # 与 progress 旁路互斥，保证终态行完整
             sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
             sys.stdout.flush()

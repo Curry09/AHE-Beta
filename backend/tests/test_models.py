@@ -124,6 +124,15 @@ def test_session_round_trip_nested() -> None:
     assert Session.from_dict(d) == s
 
 
+def test_session_round_trip_objective_audit_fields() -> None:
+    session = _session()
+    session.accept_validity = "valid_accept"
+    session.audit_events = [
+        {"seq": 1, "event": "container_started", "at": "2026-09-02T00:00:00+00:00"}
+    ]
+    assert Session.from_dict(session.to_dict()) == session
+
+
 def test_session_without_sim_trace_omits_key_and_loads_none() -> None:
     """旧 JSON 无 sim_trace → from_dict 得 None；新 Session 无 trace 时 to_dict 不落该键。"""
     s = Session(

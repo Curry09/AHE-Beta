@@ -27,8 +27,8 @@ The harness repository is not the user's project. Do not copy the user's project
 - A process keeps one conversation context while it is alive.
 - Internally, the runtime uses a stable `session_id` for the process. 换实例 ≠ 换 session: rebuilding an internal agent instance must preserve the user conversation.
 - A soft interrupt attempts to stop the current request while preserving context.
-- A hard timeout returns a clear timeout reply and keeps enough context for the user to continue or redirect.
-- Partial file changes in `SANDBOX_WORK_DIR` may remain after interruption or timeout; the final reply should say so when relevant.
+- A hard timeout returns a structured `timed_out` reply. In the auto-designer session runtime this is terminal: the launcher destroys the whole session container because an abandoned worker may still be writing.
+- Partial file changes may exist at timeout, but that workspace is contaminated and must not be accepted, resumed, or used as objective evidence.
 
 ## User-visible behavior changes
 

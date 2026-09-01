@@ -22,12 +22,15 @@ import tarfile
 import tempfile
 import threading
 import time
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from ruamel.yaml import YAML
 
 from auto_designer.harness.interface import HarnessInterface
+from auto_designer.user.sim.runtime import DockerWorkspaceRuntime, Workspace, as_runtime
 
 _PARAMS_FILE = "params.yaml"
 
@@ -82,11 +85,13 @@ class _HarnessHandle:
         env: dict[str, str],
         help_text: str,
         protocol: str = "legacy",
+        workspace_runtime=None,
     ) -> None:
         self._entry = entry
         self._cwd = cwd
         self._env = {**os.environ, **env}
         self._protocol = protocol
+        self._workspace_runtime = workspace_runtime
         self._proc: subprocess.Popen[str] | None = None
         self._closed = False
         # 该版本 harness 的帮助文本（HELP.md）：面向用户的能力契约，
@@ -113,6 +118,9 @@ class _HarnessHandle:
         # 软状态：自上次 write_message 起是否仍在等一条 reply（供 interrupt/abs-cap/try_reply）。
         # 不约束写、不约束 poll（Spec-0036）。
         self._awaiting_reply = False
+        self._request_id = ""
+        self._request_started_at = ""
+        self.request_outcomes: list[dict[str, Any]] = []
         self._start()
 
     @property
@@ -125,7 +133,7 @@ class _HarnessHandle:
             "type": event_type,
             "text": str(text or ""),
             "source": "harness_stdout",
-            "observed_at": time.monotonic(),
+            "observed_at": datetime.now(UTC).isoformat(),
             "raw": dict(raw),
         }
         self.last_visible_events.append(event)
@@ -154,9 +162,7 @@ class _HarnessHandle:
             except (json.JSONDecodeError, TypeError):
                 deferred.append(item)
                 continue
-            if isinstance(payload, dict) and (
-                payload.get("type") == "usage" or "usage" in payload
-            ):
+            if isinstance(payload, dict) and (payload.get("type") == "usage" or "usage" in payload):
                 self._ingest_sideband(payload)
             else:
                 deferred.append(item)
@@ -243,6 +249,24 @@ class _HarnessHandle:
         self._write(self._message_frame(message))
         self._t0 = time.monotonic()
         self._awaiting_reply = True
+        self._request_id = uuid.uuid4().hex
+        self._request_started_at = datetime.now(UTC).isoformat()
+
+    def _finish_request(self, status: str) -> None:
+        if not self._request_id:
+            return
+        self.request_outcomes.append(
+            {
+                "request_id": self._request_id,
+                "status": status,
+                "started_at": self._request_started_at,
+                "finished_at": datetime.now(UTC).isoformat(),
+            }
+        )
+        self._request_id = ""
+        self._request_started_at = ""
+        if status in {"timed_out", "crashed"} and self._workspace_runtime is not None:
+            self._workspace_runtime.invalidate(f"harness request {status}")
 
     def begin(self, message: str) -> None:
         """Deprecated alias of write_message（Spec-0036）。"""
@@ -255,7 +279,11 @@ class _HarnessHandle:
     def _ingest_sideband(self, payload: dict) -> None:
         """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
         if payload.get("type") == "usage" or "usage" in payload:
-            raw = payload.get("usage") if "usage" in payload and payload.get("type") != "usage" else payload
+            raw = (
+                payload.get("usage")
+                if "usage" in payload and payload.get("type") != "usage"
+                else payload
+            )
             if isinstance(raw, dict):
                 self._usage_events.append(dict(raw))
             return
@@ -332,6 +360,7 @@ class _HarnessHandle:
                 if waited_abs >= _SEND_ABS_CAP:
                     self._kill_group(signal.SIGKILL)
                     self._awaiting_reply = False
+                    self._finish_request("timed_out")
                     raise RuntimeError(
                         f"harness 单轮回复超绝对上限 >{_SEND_ABS_CAP:.0f}s（疑似活锁，已杀进程组）"
                     )
@@ -347,6 +376,7 @@ class _HarnessHandle:
                     if self._awaiting_reply:
                         self._kill_group(signal.SIGKILL)
                         self._awaiting_reply = False
+                        self._finish_request("crashed")
                         raise RuntimeError(
                             "harness 子进程已退出但未回完整行（崩溃/孤儿占管道）"
                         ) from None
@@ -354,6 +384,7 @@ class _HarnessHandle:
                 continue
             if item is _EOF:
                 self._awaiting_reply = False
+                self._finish_request("crashed")
                 raise RuntimeError("harness 子进程已退出（stdout EOF）")
             line = str(item)
             try:
@@ -366,11 +397,14 @@ class _HarnessHandle:
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
             if payload.get("type") == "error":
                 self._awaiting_reply = False
+                self._finish_request("crashed")
                 msg = payload.get("message") or payload.get("text") or payload
                 self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
             if payload.get("type") == "reply":
                 self._awaiting_reply = False
+                status = str(payload.get("status") or "completed")
+                self._finish_request(status)
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload.get("text", ""))
@@ -379,6 +413,7 @@ class _HarnessHandle:
                 return ("reply", text)
             if "reply" in payload:
                 self._awaiting_reply = False
+                self._finish_request(str(payload.get("status") or "completed"))
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload["reply"])
@@ -403,6 +438,7 @@ class _HarnessHandle:
                 return None
             if item is _EOF:
                 self._awaiting_reply = False
+                self._finish_request("crashed")
                 raise RuntimeError("harness 子进程已退出（stdout EOF）")
             line = str(item)
             try:
@@ -415,11 +451,13 @@ class _HarnessHandle:
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
             if payload.get("type") == "error":
                 self._awaiting_reply = False
+                self._finish_request("crashed")
                 msg = payload.get("message") or payload.get("text") or payload
                 self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
             if payload.get("type") == "reply":
                 self._awaiting_reply = False
+                self._finish_request(str(payload.get("status") or "completed"))
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload.get("text", ""))
@@ -428,6 +466,7 @@ class _HarnessHandle:
                 return text
             if "reply" in payload:
                 self._awaiting_reply = False
+                self._finish_request(str(payload.get("status") or "completed"))
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload["reply"])
@@ -520,15 +559,17 @@ class HarnessLauncher:
         # check-then-extract 必须进程内互斥（首线程干活，其余命中缓存）。
         self._checkout_lock = threading.Lock()
 
-    def launch(self, ref: str, workspace_dir: str | None = None) -> HarnessInterface:
+    def launch(self, ref: str, workspace_dir: Workspace | None = None) -> HarnessInterface:
         dest = self._checkout(ref=ref)
         params = self._read_params(dest)
         entry = params["entry"]
         if not isinstance(entry, list) or not entry:
             raise ValueError(f"params.yaml 的 entry 须为非空 argv 列表：{entry!r}")
         argv = [str(a) for a in entry]
+        runtime = as_runtime(workspace_dir) if workspace_dir is not None else None
+        is_docker = isinstance(runtime, DockerWorkspaceRuntime)
         if argv[0] in ("python", "python3"):
-            argv[0] = sys.executable  # 用 launcher 的解释器跑 harness（其 venv 才有 nexau 等依赖）
+            argv[0] = "python3" if is_docker else sys.executable
         cwd = dest / params["cwd"] if params.get("cwd") else dest
         env = {str(k): str(v) for k, v in (params.get("env") or {}).items()}
         protocol = str(params.get("protocol") or params.get("interface") or "legacy")
@@ -536,12 +577,35 @@ class HarnessLauncher:
             raise ValueError(f"params.yaml 的 protocol/interface 不支持：{protocol!r}")
         if protocol == "stdio-jsonl-v1":
             env.setdefault("HARNESS_STDIO_PROTOCOL", protocol)
-        if workspace_dir is not None:
+        if runtime is not None:
             # Spec-0008/T1 v2：与用户 agent 共享同一工作区——把它注入 harness 的 SANDBOX_WORK_DIR，
             # harness entry 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；覆盖 params.yaml 同名键。
-            env["SANDBOX_WORK_DIR"] = str(workspace_dir)
+            env["SANDBOX_WORK_DIR"] = runtime.cwd
+        host_cwd = cwd
+        host_env = env
+        if is_docker:
+            container_root = f"/opt/auto-designer/harness/{dest.name}"
+            runtime.stage_directory(dest, container_root)
+            relative_cwd = cwd.relative_to(dest)
+            container_cwd = str(Path(container_root) / relative_cwd)
+            inherited = {
+                key: value
+                for key, value in os.environ.items()
+                if key.startswith(("LLM_", "NEXAU_", "AUTO_DESIGNER_"))
+                or key in {"NO_PROXY", "no_proxy", "HTTP_PROXY", "HTTPS_PROXY"}
+            }
+            argv = runtime.popen_argv(argv, cwd=container_cwd, env={**inherited, **env})
+            # Environment/workdir are encoded in docker exec argv.  The docker client
+            # itself runs from the immutable host checkout and needs only host env.
+            host_cwd = dest
+            host_env = {}
         return _HarnessHandle(
-            entry=argv, cwd=cwd, env=env, help_text=self._read_help_text(dest), protocol=protocol
+            entry=argv,
+            cwd=host_cwd,
+            env=host_env,
+            help_text=self._read_help_text(dest),
+            protocol=protocol,
+            workspace_runtime=runtime if is_docker else None,
         )
 
     @staticmethod

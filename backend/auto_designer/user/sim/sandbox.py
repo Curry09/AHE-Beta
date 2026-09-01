@@ -9,10 +9,7 @@ shell 执行与路径解析。所有路径相对 cwd 解析、禁止逃逸子树
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import tempfile
-from pathlib import Path
+from auto_designer.user.sim.runtime import Workspace, as_runtime, make_empty_runtime
 
 # run_shell 输出截断上限（字符），防一次跑出超大输出灌爆 prompt。
 _MAX_OUTPUT = 20_000
@@ -21,18 +18,20 @@ _MAX_OUTPUT = 20_000
 class Sandbox:
     """一个工作目录 + 受限执行。workspace 缺省时自建空 tempdir 并在 cleanup 时删除。"""
 
-    def __init__(self, workspace: str | None = None) -> None:
+    def __init__(self, workspace: Workspace | None = None) -> None:
+        self._runtime = make_empty_runtime() if workspace is None else as_runtime(workspace)
         self._owns_tmp = workspace is None
-        base = workspace or tempfile.mkdtemp(prefix="sim_sandbox_")
-        self.cwd = str(Path(base).resolve())
+        self.cwd = self._runtime.cwd
 
     def resolve(self, path: str) -> str:
         """把相对 path 解析到 cwd 子树内的绝对路径；逃逸（.. / 绝对路径）即拒。"""
-        base = Path(self.cwd).resolve()
-        target = (base / path).resolve()
-        if target != base and base not in target.parents:
-            raise ValueError(f"path escapes sandbox: {path!r}")
-        return str(target)
+        return self._runtime.resolve(path)
+
+    def read_text(self, path: str) -> str:
+        return self._runtime.read_text(path)
+
+    def write_text(self, path: str, content: str) -> str:
+        return self._runtime.write_text(path, content)
 
     def _env(self) -> dict[str, str] | None:
         """返回私有工具执行环境。
@@ -48,32 +47,9 @@ class Sandbox:
 
         命令继承宿主环境并只切换 cwd；不隐式选择/激活 workspace `.venv`。
         """
-        try:
-            proc = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=self.cwd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                env=self._env(),
-            )
-        except subprocess.TimeoutExpired as e:
-            return {
-                "ok": False,
-                "error": "timeout",
-                "stdout": (e.stdout or "")[:_MAX_OUTPUT] if isinstance(e.stdout, str) else "",
-                "stderr": (e.stderr or "")[:_MAX_OUTPUT] if isinstance(e.stderr, str) else "",
-                "returncode": None,
-            }
-        return {
-            "ok": True,
-            "stdout": proc.stdout[:_MAX_OUTPUT],
-            "stderr": proc.stderr[:_MAX_OUTPUT],
-            "returncode": proc.returncode,
-        }
+        return self._runtime.run(cmd, timeout=timeout)
 
     def cleanup(self) -> None:
         """只清理自建的 tempdir；外部传入的 workspace 不动（归调用方/0008-T1 管理）。"""
         if self._owns_tmp:
-            shutil.rmtree(self.cwd, ignore_errors=True)
+            self._runtime.close()

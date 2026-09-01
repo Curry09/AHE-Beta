@@ -44,6 +44,20 @@ def test_save_writes_full_and_index(tmp_path) -> None:
     assert entry["created_at"] == s.created_at.isoformat()
 
 
+def test_index_keeps_subjective_and_objective_acceptance_separate(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    session = _session()
+    session.user_outcome = {"end_reason": "accepted"}
+    session.accept_validity = "false_accept"
+    session.objective_evaluation = {"status": "completed", "fresh": True, "passed": False}
+    store.save(session)
+
+    row = store.index()[0]
+    assert row["user_outcome"] == "accepted"
+    assert row["accept_validity"] == "false_accept"
+    assert row["objective_passed"] is False
+
+
 def test_save_auto_creates_root(tmp_path) -> None:
     store = SessionStore(tmp_path / "nested" / "sessions")
     s = _session()

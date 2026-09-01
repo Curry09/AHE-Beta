@@ -154,6 +154,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0050 轮次交付封口与收益归因
 非末轮：用户测完后提案、准入，并等到本轮准入票全部终态才开下一轮用户；卡死则停实验。末轮只跑用户交互，不再跑需求与交付。第 N+1 轮体感相对第 N 轮体感归因于第 N 轮已封口产物。
 
+### 0051 会话容器隔离与客观验收证据
+每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；超时回收整个容器执行边界；主观接受与新鲜 SWE-bench 客观执行结果分栏落盘，假接受不得计为通过。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -385,6 +388,11 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0050 | 0050/T3 | 编排：末轮跳过需求交付、非末轮准入后封口 | done | T2 | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py |
 | 0050 | 0050/T4 | run 接线、看板阶段、卡死保活 | done | T3 | backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/auto_designer/loop/live.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_vigil.py |
 | 0050 | 0050/T5 | 架构说明与封口 e2e 脚本 | done | T3 | CLAUDE.md<br>backend/scripts/e2e-spec-0050-round-delivery-gate.sh |
+| 0051 | 0051/T1 | 隔离与验收契约 | done | — | docs/specs/0051-session-container-objective-evidence.md |
+| 0051 | 0051/T2 | 会话运行时与容器 seed | done | T1 | backend/auto_designer/user/sim/runtime.py<br>backend/auto_designer/user/sim/workspace.py<br>backend/auto_designer/user/sim/seed_source.py<br>backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/auto_designer/user/sim/deps.py<br>backend/auto_designer/user/sim/sandbox.py<br>backend/auto_designer/user/sim/tools.py<br>backend/tests/user/sim/test_docker_seed_source.py<br>backend/tests/user/sim/test_workspace_runtime.py<br>backend/scripts/prepare_swebench_runtime_tree.py |
+| 0051 | 0051/T3 | harness 容器执行与强制终止 | done | T2 | backend/auto_designer/harness/launcher.py<br>backend/harness_template/entry.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_sim_user.py |
+| 0051 | 0051/T4 | 双结论、客观执行与假接受 | done | T3 | backend/auto_designer/evaluation/swebench.py<br>backend/auto_designer/evaluation/__init__.py<br>backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/evaluation/test_swebench.py<br>backend/tests/user/test_session_store.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/test_models.py<br>pyproject.toml<br>uv.lock |
+| 0051 | 0051/T5 | 可运行镜像、一键入口与审计冒烟 | done | T4 | backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/runtime.Dockerfile<br>backend/scripts/build_swebench_runtime_image.sh<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/e2e-spec-0051-session-container.sh<br>CLAUDE.md |
 
 ## 跨 feature 关系图
 
@@ -717,6 +725,13 @@ graph LR
         n0050_T4["T4 run 接线、看板阶段、卡死保活"]
         n0050_T5["T5 架构说明与封口 e2e 脚本"]
     end
+    subgraph G0051[0051 session-container-objective-evidence]
+        n0051_T1["T1 隔离与验收契约"]
+        n0051_T2["T2 会话运行时与容器 seed"]
+        n0051_T3["T3 harness 容器执行与强制终止"]
+        n0051_T4["T4 双结论、客观执行与假接受"]
+        n0051_T5["T5 可运行镜像、一键入口与审计冒烟"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -947,6 +962,10 @@ graph LR
     n0050_T3 --> n0050_T2
     n0050_T4 --> n0050_T3
     n0050_T5 --> n0050_T3
+    n0051_T2 --> n0051_T1
+    n0051_T3 --> n0051_T2
+    n0051_T4 --> n0051_T3
+    n0051_T5 --> n0051_T4
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -999,7 +1018,7 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
-| CLAUDE.md | 0032, 0033, 0050 |
+| CLAUDE.md | 0032, 0033, 0050, 0051 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040 |
 | backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043 |
 | backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043 |
@@ -1030,36 +1049,40 @@ graph LR
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
 | backend/auto_designer/harness/connector.py | 0030, 0035, 0036, 0041 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041, 0051 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050 |
 | backend/auto_designer/loop/live_tracer.py | 0032, 0041 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048 |
-| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051 |
+| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042 |
-| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048 |
+| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037 |
 | backend/auto_designer/user/sim/demo.py | 0005, 0037 |
+| backend/auto_designer/user/sim/deps.py | 0009, 0051 |
 | backend/auto_designer/user/sim/dimensions.py | 0005, 0037 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048, 0051 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048 |
-| backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
+| backend/auto_designer/user/sim/sandbox.py | 0008, 0009, 0051 |
+| backend/auto_designer/user/sim/seed_source.py | 0009, 0051 |
+| backend/auto_designer/user/sim/sources/docker_seed.py | 0044, 0051 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012, 0037 |
-| backend/auto_designer/user/sim/tools.py | 0008, 0022 |
-| backend/auto_designer/user/sim/workspace.py | 0008, 0009 |
+| backend/auto_designer/user/sim/tools.py | 0008, 0022, 0051 |
+| backend/auto_designer/user/sim/workspace.py | 0008, 0009, 0051 |
 | backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
 | backend/deploy/gitea/bootstrap.sh | 0002, 0032 |
 | backend/deploy/gitea/docker-compose.yml | 0002, 0032, 0033 |
 | backend/deploy/gitea/egress-proxy.conf | 0033, 0040 |
+| backend/deploy/swebench-seed/Dockerfile | 0044, 0051 |
 | backend/deploy/vigil/Dockerfile | 0033, 0045 |
 | backend/deploy/vigil/build.sh | 0033, 0045 |
 | backend/deploy/vigil/entrypoint.sh | 0033, 0041 |
@@ -1068,14 +1091,14 @@ graph LR
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/RUNTIME.md | 0022, 0030, 0035 |
 | backend/harness_template/agents/main.md | 0003, 0030 |
-| backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041 |
+| backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041, 0051 |
 | backend/harness_template/params.yaml | 0003, 0030 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041 |
 | backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050 |
+| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051 |
 | backend/tests/designer/test_agent_contract.py | 0027, 0043 |
 | backend/tests/designer/test_agent_runtime.py | 0029, 0041, 0049 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043 |
@@ -1088,33 +1111,34 @@ graph LR
 | backend/tests/dev/test_harness_boundary.py | 0015, 0030, 0040 |
 | backend/tests/dev/test_workspace_jail.py | 0015, 0049 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
-| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043 |
 | backend/tests/loop/test_live.py | 0017, 0026, 0050 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051 |
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
-| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044 |
+| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0051 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
-| backend/tests/test_models.py | 0001, 0024 |
+| backend/tests/test_models.py | 0001, 0024, 0051 |
 | backend/tests/test_run_swebench_closed_loop.py | 0044, 0047 |
 | backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048 |
 | backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
+| backend/tests/user/sim/test_docker_seed_source.py | 0044, 0051 |
 | backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037, 0048 |
 | backend/tests/user/sim/test_inner_prompt.py | 0008, 0031, 0048 |
-| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036, 0048 |
+| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036, 0048, 0051 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031, 0048 |
 | backend/tests/user/sim/test_persona_io.py | 0006, 0037 |
 | backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031, 0048 |
 | backend/tests/user/sim/test_state.py | 0005, 0012, 0037 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
-| backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048 |
+| backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
 | frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041 |
@@ -2675,6 +2699,38 @@ graph LR
     nT2 --> nT3
     nT3 --> nT4
     nT3 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+```
+
+### 0051 会话容器隔离与客观验收证据（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 隔离与验收契约"]
+    nT2["T2 会话运行时与容器 seed"]
+    nT3["T3 harness 容器执行与强制终止"]
+    nT4["T4 双结论、客观执行与假接受"]
+    nT5["T5 可运行镜像、一键入口与审计冒烟"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT3 --> nT4
+    nT4 --> nT5
 ```
 
 演化图：

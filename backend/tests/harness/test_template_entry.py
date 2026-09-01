@@ -63,37 +63,41 @@ def test_runtime_md_documents_boundary_and_session_contract() -> None:
 
 def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
     agent = _Agent(["hello"])
-    out_agent, text = entry._reply(agent, "hi", _no_rebuild)
+    out_agent, text, status = entry._reply(agent, "hi", _no_rebuild)
     assert text == "hello"
+    assert status == "completed"
     assert out_agent is agent  # 未重建，沿用同实例
     assert agent.calls == 1
 
 
 def test_reply_retries_on_blank_then_succeeds(entry: ModuleType) -> None:
     agent = _Agent(["", "   ", "real answer"])
-    out_agent, text = entry._reply(agent, "hi", _no_rebuild)
+    out_agent, text, status = entry._reply(agent, "hi", _no_rebuild)
     assert text == "real answer"
+    assert status == "completed"
     assert out_agent is agent  # 空回复同 agent 重试，不重建
     assert agent.calls == 3  # 空串/纯空白都触发重试
 
 
 def test_reply_all_blank_returns_explicit_marker(entry: ModuleType) -> None:
     agent = _Agent(["", "", "", ""])
-    _, out = entry._reply(agent, "hi", _no_rebuild)
+    _, out, status = entry._reply(agent, "hi", _no_rebuild)
     assert out != ""  # 关键：绝不静默返回空
     assert out.startswith("[harness error]")
+    assert status == "crashed"
 
 
 def test_reply_exception_then_marker(entry: ModuleType) -> None:
     agent = _Agent(
         [RuntimeError("502"), RuntimeError("502"), RuntimeError("502"), RuntimeError("502")]
     )
-    _, out = entry._reply(agent, "hi", _no_rebuild)
+    _, out, status = entry._reply(agent, "hi", _no_rebuild)
     assert out.startswith("[harness error]")
+    assert status == "crashed"
 
 
-def test_reply_timeout_rebuilds_and_returns_continuable(entry: ModuleType) -> None:
-    """超时：rebuild 换实例，立即回可续 [timeout]，不闷头对同一轮静默重试。"""
+def test_reply_timeout_is_terminal_without_rebuild(entry: ModuleType) -> None:
+    """超时：立即回结构化终态，等待 launcher 回收容器，不在污染边界中重建。"""
     stale = _Agent([TimeoutError("agent.run 超时 >240s")])
     stale.history = ["prior user turn", "prior assistant turn"]
     fresh = _Agent(["should not run"])
@@ -105,13 +109,14 @@ def test_reply_timeout_rebuilds_and_returns_continuable(entry: ModuleType) -> No
         seen.append(old)
         return fresh
 
-    out_agent, text = entry._reply(stale, "hi", rebuild)
-    assert out_agent is fresh
+    out_agent, text, status = entry._reply(stale, "hi", rebuild)
+    assert out_agent is stale
     assert text == entry._TIMEOUT_REPLY
     assert text.startswith("[timeout]")
+    assert status == "timed_out"
     assert fresh.calls == 0  # 超时后不自动再跑同一 message
-    assert fresh.history == stale.history  # 调用方回灌路径可拿到旧记忆
-    assert seen == [stale]
+    assert fresh.history == []
+    assert seen == []
 
 
 def test_snapshot_and_restore_history_roundtrip(entry: ModuleType) -> None:
@@ -153,10 +158,11 @@ def test_reply_interrupt_gracefully_stops_and_keeps_agent(entry: ModuleType) -> 
     agent = _StoppableAgent()
     ctrl_q: queue.Queue = queue.Queue()
     threading.Timer(0.2, lambda: ctrl_q.put({"control": "interrupt"})).start()
-    out_agent, text = entry._reply(agent, "hi", _no_rebuild, ctrl_q)
+    out_agent, text, status = entry._reply(agent, "hi", _no_rebuild, ctrl_q)
     assert text == entry._INTERRUPT_REPLY
     assert out_agent is agent  # 优雅停止保留 history → 沿用同实例，未重建
     assert agent.executor.stopped.is_set()  # 确实置了停止信号
+    assert status == "interrupted"
 
 
 class _UnstoppableAgent:
@@ -183,7 +189,8 @@ def test_reply_interrupt_without_stop_capability_rebuilds_with_history(entry: Mo
         fresh.history = list(getattr(old, "history", []) or [])
         return fresh
 
-    out_agent, text = entry._reply(stale, "hi", rebuild, ctrl_q)
+    out_agent, text, status = entry._reply(stale, "hi", rebuild, ctrl_q)
     assert text == entry._INTERRUPT_REPLY  # 打断仍回定型回复，不重试
     assert out_agent is fresh  # 没有优雅停止能力 → 重建避自锁
     assert fresh.history == ["from-stale"]
+    assert status == "interrupted"

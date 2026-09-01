@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Callable
 
 from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
+from auto_designer.evaluation.swebench import SWEbenchEvaluator, derive_accept_validity
 from auto_designer.harness.connector import HarnessConnector
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.models import (
@@ -34,11 +35,69 @@ from auto_designer.user.sim.dimensions import Persona as SimPersona
 from auto_designer.user.sim.loop import SessionResult
 from auto_designer.user.sim.loop import run_session as sim_run_session
 from auto_designer.user.sim.persona_client import PersonaClient
+from auto_designer.user.sim.runtime import Workspace, as_runtime, utc_now
 from auto_designer.user.sim.workspace import materialize as materialize_workspace
 
 # 观测回调：(identity, sim_persona, 进行中/最终的 SessionResult, running, *, session_id) -> None。
 # session_id 仅收尾（running=False）时携带（session 已落 store），供看板归档关联全量会话。
 SimTurnHook = Callable[..., None]
+
+
+def _audit_events(
+    *,
+    workspace_evidence: dict,
+    request_outcomes: list[dict],
+    objective_evaluation: dict | None,
+) -> list[dict]:
+    """Build the minimal ordered evidence timeline retained with a session."""
+    events: list[dict] = []
+
+    def append(event: str, at: str, data: dict) -> None:
+        events.append({"seq": len(events) + 1, "event": event, "at": at, "data": data})
+
+    if workspace_evidence.get("kind") == "docker" and workspace_evidence.get("started_at"):
+        append(
+            "container_started",
+            str(workspace_evidence["started_at"]),
+            {
+                "container_id": workspace_evidence.get("container_id"),
+                "container_name": workspace_evidence.get("container_name"),
+                "image_digest": workspace_evidence.get("image_digest"),
+            },
+        )
+    for row in request_outcomes:
+        append(
+            "harness_request_terminal",
+            str(row.get("finished_at") or row.get("started_at") or ""),
+            {key: row.get(key) for key in ("request_id", "status", "started_at")},
+        )
+    if workspace_evidence.get("diff_sha256"):
+        append(
+            "patch_exported",
+            str(workspace_evidence.get("patch_exported_at") or ""),
+            {
+                "diff_sha256": workspace_evidence.get("diff_sha256"),
+                "diff_bytes": workspace_evidence.get("diff_bytes"),
+            },
+        )
+    if workspace_evidence.get("kind") == "docker" and workspace_evidence.get("closed_at"):
+        append(
+            "container_stopped",
+            str(workspace_evidence["closed_at"]),
+            {"container_id": workspace_evidence.get("container_id")},
+        )
+    if objective_evaluation is not None:
+        append(
+            "objective_evaluation_terminal",
+            str(objective_evaluation.get("finished_at") or ""),
+            {
+                "status": objective_evaluation.get("status"),
+                "passed": objective_evaluation.get("passed"),
+                "exit_code": objective_evaluation.get("exit_code"),
+                "patch_sha256": objective_evaluation.get("patch_sha256"),
+            },
+        )
+    return events
 
 
 def result_to_turns(res: SessionResult) -> list[Turn]:
@@ -58,7 +117,12 @@ def result_to_turns(res: SessionResult) -> list[Turn]:
             turns.append(Turn(role="harness", content=ho, steps=list(t.harness_steps or [])))
         if ho:
             prev_ho = ho
-        if t.message.strip():
+        if t.message.strip() and t.action not in {
+            "accept",
+            "accept_with_reservations",
+            "file_issue",
+            "give_up",
+        }:
             turns.append(Turn(role="user", content=t.message.strip()))
     # 悬挂中的 harness 回复（已到手、尚未随下一条 TurnLog 落日志）：实时快照补上这半边
     pending = (res.pending_harness_output or "").strip()
@@ -170,6 +234,7 @@ def make_sim_run_session_fn(
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
     round_provider: Callable[[], int | None] | None = None,
+    evaluator: SWEbenchEvaluator | None = None,
 ) -> Callable[..., Session]:
     """返回 Orchestrator 用的 run_session_fn。
 
@@ -188,7 +253,7 @@ def make_sim_run_session_fn(
         scenario: SeedScenario,
         harness: HarnessInterface,
         *,
-        workspace_dir: str | None = None,
+        workspace_dir: Workspace | None = None,
     ) -> Session:
         sim_persona = sim_personas[persona.identity]
         session_id = uuid.uuid4().hex
@@ -199,9 +264,9 @@ def make_sim_run_session_fn(
         # 改、用户 agent 同目录核实。这里复用传入目录绑定内层 client，不再自行 materialize。
         # 兼容直连调用（不经 orchestrator）：未传 workspace_dir 但 scenario 带 workspace 时，回落自行
         # materialize（等价 v1）。守卫式 bind_session：仅 AgenticPersonaClient 暴露，Scripted/Api 跳过。
-        ws = workspace_dir
+        ws = as_runtime(workspace_dir) if workspace_dir is not None else None
         if ws is None and scenario.workspace is not None:
-            ws = materialize_workspace(scenario.workspace)
+            ws = as_runtime(materialize_workspace(scenario.workspace), owns_tmp=True)
             # Spec-0009/T3：回落路径 materialize 后对称调 ensure_deps（与 orchestrator 主路径同构），
             # 使这条生产接缝「建了工作区即备好依赖」，不静默缺依赖。orchestrator 已传 workspace_dir
             # 的主路径依赖由 orchestrator 就位，故仅在此回落分支 ensure，不重复调。
@@ -229,7 +294,10 @@ def make_sim_run_session_fn(
         ):
             try:
                 res = sim_run_session(
-                    sim_persona, client, connector, scenario.description,
+                    sim_persona,
+                    client,
+                    connector,
+                    scenario.description,
                     # 该版本 harness 的帮助文本：让 persona 的能力预期锚定"这工具文档说的"，
                     # 而非空泛先验；缺省空串（后端无 help_text 属性时为空）。
                     help_text=connector.help_text,
@@ -238,6 +306,57 @@ def make_sim_run_session_fn(
             finally:
                 # 关闭时才到达的 usage 仍须继承本 session/instance/turn 归属。
                 connector.close()  # 无论成败都释放 harness 子进程
+
+        request_outcomes = [dict(row) for row in (getattr(harness, "request_outcomes", None) or [])]
+        patch = ""
+        patch_sha = ""
+        workspace_evidence: dict = {}
+        if ws is not None:
+            try:
+                patch, patch_sha = ws.export_patch()
+                workspace_evidence["patch_exported_at"] = utc_now()
+            except Exception as exc:  # noqa: BLE001 - evidence must fail closed
+                workspace_evidence["patch_export_error"] = str(exc)
+            workspace_evidence.update(dict(getattr(ws, "evidence", {}) or {}))
+            if patch_sha:
+                workspace_evidence["diff_sha256"] = patch_sha
+                workspace_evidence["diff_bytes"] = len(patch.encode())
+            # The interaction boundary is no longer needed once its patch is exported.
+            # Close before the fresh official evaluation so stop evidence is durable.
+            ws.close()
+            workspace_evidence.update(dict(getattr(ws, "evidence", {}) or {}))
+
+        objective_evaluation = None
+        active_evaluator = evaluator if evaluator is not None else SWEbenchEvaluator.from_env()
+        if active_evaluator is not None and instance_id and patch_sha:
+            try:
+                objective_evaluation = active_evaluator.evaluate(
+                    instance_id=str(instance_id), patch=patch
+                )
+            except Exception as exc:  # noqa: BLE001 - persist failed verification as evidence
+                objective_evaluation = {
+                    "evaluator": "swebench.harness.run_evaluation",
+                    "instance_id": str(instance_id),
+                    "patch_sha256": patch_sha,
+                    "status": "crashed",
+                    "passed": False,
+                    "error": str(exc),
+                    "finished_at": utc_now(),
+                }
+        accept_validity = derive_accept_validity(
+            end_reason=res.end_reason,
+            request_outcomes=request_outcomes,
+            evaluation=objective_evaluation,
+        )
+        terminal_note = next(
+            (
+                t.message.strip()
+                for t in reversed(res.turns)
+                if t.action in {"accept", "accept_with_reservations", "file_issue", "give_up"}
+                and t.message.strip()
+            ),
+            "",
+        )
 
         round_no = round_provider() if round_provider is not None else None
         issue_refs = _flush_issues(tracker, res, round_no=round_no)
@@ -250,6 +369,16 @@ def make_sim_run_session_fn(
             issue_refs=issue_refs,
             sim_trace=result_to_sim_trace(res),
             session_id=session_id,
+            user_outcome={"end_reason": res.end_reason, "terminal_note": terminal_note},
+            request_outcomes=request_outcomes,
+            workspace_evidence=workspace_evidence,
+            objective_evaluation=objective_evaluation,
+            accept_validity=accept_validity,
+            audit_events=_audit_events(
+                workspace_evidence=workspace_evidence,
+                request_outcomes=request_outcomes,
+                objective_evaluation=objective_evaluation,
+            ),
         )
         store.save(session)  # 体感 + session 落本地（issue 权威源在 Gitea）
         if on_turn is not None:

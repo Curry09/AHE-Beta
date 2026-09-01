@@ -241,7 +241,14 @@ def _to_scenario(meta: dict):
             description=meta["problem_statement"],
             workspace=WorkspaceSpec(
                 kind="docker-seed",
-                params={"image": seed_image, "instance_id": meta["instance_id"]},
+                params={
+                    "image": seed_image,
+                    "instance_id": meta["instance_id"],
+                    # The harness needs the configured GLM gateway.  Isolation here is
+                    # filesystem/process isolation; deployments may replace bridge with
+                    # a dedicated egress network.
+                    "network": os.environ.get("SWEBENCH_SESSION_NETWORK", "bridge"),
+                },
             ),
         )
     return SeedScenario(

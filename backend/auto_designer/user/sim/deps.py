@@ -9,10 +9,8 @@ empty 场景零改动）。机制留在数据（命令）里：本模块只忠�
 
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path
-
 from auto_designer.models import WorkspaceSpec
+from auto_designer.user.sim.runtime import Workspace, as_runtime
 
 # 抛错时 stderr 截断上限（字符），避免超长日志灌爆异常信息。
 _STDERR_CLIP = 4_000
@@ -22,7 +20,7 @@ class SetupError(RuntimeError):
     """setup 某命令非零退出或超时——消息附命令、returncode、截断 stderr 供诊断。"""
 
 
-def ensure_deps(workspace_dir: str, spec: WorkspaceSpec, *, timeout: float = 600.0) -> None:
+def ensure_deps(workspace_dir: Workspace, spec: WorkspaceSpec, *, timeout: float = 600.0) -> None:
     """按 spec.setup 在 workspace_dir 里备好依赖；setup 空则空操作。
 
     以 workspace_dir 为 cwd 逐条 subprocess 执行 setup 命令（shell=True，捕获输出），
@@ -31,24 +29,16 @@ def ensure_deps(workspace_dir: str, spec: WorkspaceSpec, *, timeout: float = 600
     """
     if not spec.setup:
         return
-    cwd = str(Path(workspace_dir).resolve())
+    runtime = as_runtime(workspace_dir)
     for cmd in spec.setup:
-        try:
-            proc = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
+        result = runtime.run(cmd, timeout=timeout)
+        if result.get("status") == "timed_out":
+            raise SetupError(
+                f"setup 命令超时（>{timeout}s）：{cmd!r}\n"
+                f"stderr: {str(result.get('stderr') or '')[:_STDERR_CLIP]}"
             )
-        except subprocess.TimeoutExpired as e:
-            stderr = e.stderr if isinstance(e.stderr, str) else ""
+        if result.get("returncode") != 0:
             raise SetupError(
-                f"setup 命令超时（>{timeout}s）：{cmd!r}\nstderr: {stderr[:_STDERR_CLIP]}"
-            ) from e
-        if proc.returncode != 0:
-            raise SetupError(
-                f"setup 命令失败（rc={proc.returncode}）：{cmd!r}\n"
-                f"stderr: {proc.stderr[:_STDERR_CLIP]}"
+                f"setup 命令失败（rc={result.get('returncode')}）：{cmd!r}\n"
+                f"stderr: {str(result.get('stderr') or '')[:_STDERR_CLIP]}"
             )

@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from auto_designer.models import WorkspaceSpec
+from auto_designer.user.sim.runtime import Workspace
 
 
 def seed_workspaces_root() -> Path:
@@ -18,7 +19,7 @@ def seed_workspaces_root() -> Path:
     return Path(__file__).resolve().parents[3] / "seed_workspaces"
 
 
-def materialize(spec: WorkspaceSpec, dest_root: str | None = None) -> str:
+def materialize(spec: WorkspaceSpec, dest_root: str | None = None) -> Workspace:
     """兼容壳：按 spec.kind 委托可插拔 SeedSource 注册表，返回隔离工作区目录绝对路径。
 
     延迟 import 打破潜在环：seed_source 自动发现会 import local_fixture，而后者依赖本模块的

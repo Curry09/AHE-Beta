@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -63,7 +64,7 @@ def test_real_venv_python_survives_copy_when_available(tmp_path: Path) -> None:
     from auto_designer.user.sim import seed_source
 
     source = tmp_path / "source"
-    subprocess.run(["python", "-m", "venv", str(source / ".venv")], check=True)
+    subprocess.run([sys.executable, "-m", "venv", str(source / ".venv")], check=True)
     copied = Path(
         seed_source.provision(WorkspaceSpec(kind="prebuilt", params={"source": str(source)}))
     )

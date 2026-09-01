@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import subprocess
-import tempfile
 import traceback
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -23,6 +22,7 @@ from auto_designer.loop.round_gate import wait_round_delivery
 from auto_designer.models import Persona, SeedScenario
 from auto_designer.usage import bind_usage_context
 from auto_designer.user.sim.deps import ensure_deps
+from auto_designer.user.sim.runtime import WorkspaceRuntime, as_runtime, make_empty_runtime
 from auto_designer.user.sim.workspace import materialize as materialize_workspace
 
 type SessionPair = tuple[Persona, SeedScenario]
@@ -42,7 +42,7 @@ class SessionRunner(Protocol):
         scenario: SeedScenario,
         harness: HarnessInterface,
         *,
-        workspace_dir: str | None = None,
+        workspace_dir: WorkspaceRuntime | None = None,
     ) -> object: ...
 
 
@@ -107,16 +107,18 @@ class Orchestrator:
         #    Spec-0017/T3：拆两阶段——阶段一串行备工作区（materialize/ensure_deps 走 git clone 缓存
         #    等共享资源，前移规避并发竞争）；阶段二线程池并行跑会话（launch + run_session 一整包，
         #    并发单元=整局会话，信封内部时序不动）。max_parallel_users=1 时行为与旧串行等价。
-        prepared: list[tuple[Persona, SeedScenario, str]] = []
+        prepared: list[tuple[Persona, SeedScenario, WorkspaceRuntime]] = []
         for persona, scenario in self._session_plan():
             try:
                 if scenario.workspace is not None:
-                    workspace_dir = materialize_workspace(scenario.workspace)
+                    workspace_dir = as_runtime(
+                        materialize_workspace(scenario.workspace), owns_tmp=True
+                    )
                     # Spec-0009/T3：materialize 之后、launch 之前按 scenario.workspace.setup 备好依赖
                     # （约定建 per-workspace .venv）——两侧共享的这个目录开跑前就绪。
                     ensure_deps(workspace_dir, scenario.workspace)
                 else:
-                    workspace_dir = tempfile.mkdtemp(prefix="shared_ws_")
+                    workspace_dir = make_empty_runtime()
             except Exception:  # noqa: BLE001
                 # 单局 clone/setup 失败（如老仓 pip 装不上）不废整轮——记日志跳过，其余会话继续。
                 print(
@@ -127,9 +129,14 @@ class Orchestrator:
                 continue
             prepared.append((persona, scenario, workspace_dir))
 
-        def _one_session(persona: Persona, scenario: SeedScenario, workspace_dir: str) -> None:
-            harness = self._launcher.launch(sha, workspace_dir=workspace_dir)
-            self._run_session(persona, scenario, harness, workspace_dir=workspace_dir)
+        def _one_session(
+            persona: Persona, scenario: SeedScenario, workspace_dir: WorkspaceRuntime
+        ) -> None:
+            try:
+                harness = self._launcher.launch(sha, workspace_dir=workspace_dir)
+                self._run_session(persona, scenario, harness, workspace_dir=workspace_dir)
+            finally:
+                workspace_dir.close()
 
         if prepared:
             with ThreadPoolExecutor(

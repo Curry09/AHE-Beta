@@ -304,8 +304,28 @@ def _verify_git_pins(spec: FrozenExperiment) -> dict[str, str]:
 
 
 def _verify_images(spec: FrozenExperiment) -> None:
-    for _role, reference in spec.config.images.items():
-        _run(["docker", "image", "inspect", str(reference)])
+    for role, reference in spec.config.images.items():
+        inspected = _run(["docker", "image", "inspect", str(reference)])
+        if role == "seed":
+            info = json.loads(inspected.stdout)[0]
+            labels = (info.get("Config") or {}).get("Labels") or {}
+            if labels.get("org.auto-designer.seed-runtime") != "1":
+                raise AuditLaunchError(
+                    "images.seed 不是 runnable v1；禁止使用 storage-only seed 启动实验"
+                )
+
+
+def _verify_official_evaluator() -> None:
+    result = subprocess.run(
+        [sys.executable, "-c", "import swebench; print(swebench.__version__)"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise AuditLaunchError(
+            "缺官方 SWE-bench evaluator；请安装项目 evaluation extra，"
+            "客观验收不可退化为 persona 自测"
+        )
 
 
 def _probe_endpoint(*, profile: dict[str, str], model: str) -> None:
@@ -535,6 +555,7 @@ def _execution_environment(
             "PERSONA_ROSTER": str(personas["roster"]["path"]),
             "SWEBENCH_INSTANCE_FILE": str(workload["pool"]["path"]),
             "SWEBENCH_PARQUET": str(workload["dataset"]["path"]),
+            "SWEBENCH_EVAL_RESULTS_ROOT": str(spec.paths["archive"] / "objective-evaluation"),
             "SWEBENCH_INTERACTION_PLAN": str(execution["plan"]["path"]),
             "SWEBENCH_SEED_IMAGE": str(spec.config.images["seed"]),
             "TOTAL_ROUNDS": str(execution["total_rounds"]),
@@ -631,6 +652,7 @@ def _redacted_plan(spec: FrozenExperiment, *, source_pins: dict[str, str]) -> di
 def check(spec: FrozenExperiment, *, probe: bool) -> dict[str, Any]:
     source_pins = _verify_git_pins(spec)
     _verify_images(spec)
+    _verify_official_evaluator()
     profile = _load_profile(spec.model_profile_path)
     if probe:
         _probe_endpoint(profile=profile, model=str(spec.config.models["user"]))

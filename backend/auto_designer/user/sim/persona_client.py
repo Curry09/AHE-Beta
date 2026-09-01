@@ -754,11 +754,11 @@ class AgenticPersonaClient:
         self.timeout = timeout
         self._sandbox_factory = sandbox_factory or Sandbox
         self._persona = None  # 会话级，bind_session 注入
-        self._workspace_dir: str | None = None
+        self._workspace_dir = None
         self._issue_notes: list[str] = []  # 中途 report_issue tool 累积；drain 给 session
 
-    def bind_session(self, persona, workspace_dir: str | None) -> None:
-        """sim_user 每局开始调用：绑定会话级 persona 与（可选）工作区目录。"""
+    def bind_session(self, persona, workspace_dir) -> None:
+        """Bind a persona and its local-or-container workspace runtime."""
         self._persona = persona
         self._workspace_dir = workspace_dir
         self._issue_notes = []

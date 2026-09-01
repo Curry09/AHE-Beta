@@ -1,0 +1,309 @@
+"""Workspace execution boundaries for simulated-user sessions (spec-0051/T2).
+
+Callers consume this module instead of assuming that a workspace is a host
+directory.  Docker workspaces never expose their repository as a host path.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import shlex
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import uuid
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
+from typing import Any, Protocol, runtime_checkable
+
+_MAX_OUTPUT = 20_000
+
+
+def utc_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+@runtime_checkable
+class WorkspaceRuntime(Protocol):
+    """A session-scoped workspace with an explicit lifecycle."""
+
+    runtime_id: str
+    cwd: str
+    evidence: dict[str, Any]
+
+    def resolve(self, path: str) -> str: ...
+    def read_text(self, path: str) -> str: ...
+    def write_text(self, path: str, content: str) -> str: ...
+    def run(self, cmd: str, timeout: float = 10.0) -> dict[str, Any]: ...
+    def stage_directory(self, source: Path, destination: str) -> None: ...
+    def popen_argv(self, argv: list[str], *, cwd: str, env: dict[str, str]) -> list[str]: ...
+    def export_patch(self) -> tuple[str, str]: ...
+    def invalidate(self, reason: str) -> None: ...
+    def close(self) -> None: ...
+
+
+def _safe_relative(path: str) -> str:
+    candidate = PurePosixPath(path or ".")
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise ValueError(f"path escapes sandbox: {path!r}")
+    return str(candidate)
+
+
+@dataclass
+class LocalWorkspaceRuntime:
+    """Compatibility runtime for fixtures and developer-only local scenarios."""
+
+    root: str
+    owns_tmp: bool = False
+    runtime_id: str = field(default_factory=lambda: f"local-{uuid.uuid4().hex}")
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.cwd = str(Path(self.root).resolve())
+        self.evidence.update({"kind": "local", "runtime_id": self.runtime_id, "cwd": self.cwd})
+
+    def resolve(self, path: str) -> str:
+        rel = _safe_relative(path)
+        base = Path(self.cwd).resolve()
+        target = (base / rel).resolve()
+        if target != base and base not in target.parents:
+            raise ValueError(f"path escapes sandbox: {path!r}")
+        return str(target)
+
+    def read_text(self, path: str) -> str:
+        return Path(self.resolve(path)).read_text(encoding="utf-8")
+
+    def write_text(self, path: str, content: str) -> str:
+        target = Path(self.resolve(path))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        return str(target)
+
+    def run(self, cmd: str, timeout: float = 10.0) -> dict[str, Any]:
+        started = utc_now()
+        try:
+            proc = subprocess.run(
+                cmd, shell=True, cwd=self.cwd, capture_output=True, text=True, timeout=timeout
+            )
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "ok": False,
+                "status": "timed_out",
+                "error": "timeout",
+                "stdout": (exc.stdout or "")[:_MAX_OUTPUT] if isinstance(exc.stdout, str) else "",
+                "stderr": (exc.stderr or "")[:_MAX_OUTPUT] if isinstance(exc.stderr, str) else "",
+                "returncode": None,
+                "started_at": started,
+                "finished_at": utc_now(),
+            }
+        return {
+            "ok": True,
+            "status": "completed",
+            "stdout": proc.stdout[:_MAX_OUTPUT],
+            "stderr": proc.stderr[:_MAX_OUTPUT],
+            "returncode": proc.returncode,
+            "started_at": started,
+            "finished_at": utc_now(),
+        }
+
+    def stage_directory(self, source: Path, destination: str) -> None:
+        target = Path(self.resolve(destination))
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(source, target)
+
+    def popen_argv(self, argv: list[str], *, cwd: str, env: dict[str, str]) -> list[str]:
+        return list(argv)
+
+    def export_patch(self) -> tuple[str, str]:
+        proc = subprocess.run(
+            ["git", "diff", "--binary", "--no-ext-diff"],
+            cwd=self.cwd,
+            capture_output=True,
+            text=True,
+        )
+        patch = proc.stdout if proc.returncode == 0 else ""
+        return patch, hashlib.sha256(patch.encode()).hexdigest()
+
+    def invalidate(self, reason: str) -> None:
+        self.evidence.update({"invalidated_at": utc_now(), "invalid_reason": reason})
+
+    def close(self) -> None:
+        self.evidence.setdefault("closed_at", utc_now())
+        if self.owns_tmp:
+            shutil.rmtree(self.cwd, ignore_errors=True)
+
+
+@dataclass
+class DockerWorkspaceRuntime:
+    """A repository that exists only inside one disposable Docker container."""
+
+    container_id: str
+    container_name: str
+    image: str
+    image_digest: str
+    cwd: str
+    runtime_id: str = field(default_factory=lambda: f"docker-{uuid.uuid4().hex}")
+    evidence: dict[str, Any] = field(default_factory=dict)
+    _closed: bool = False
+    _invalid: bool = False
+
+    def __post_init__(self) -> None:
+        self.evidence.update(
+            {
+                "kind": "docker",
+                "runtime_id": self.runtime_id,
+                "container_id": self.container_id,
+                "container_name": self.container_name,
+                "image": self.image,
+                "image_digest": self.image_digest,
+                "cwd": self.cwd,
+                "started_at": utc_now(),
+            }
+        )
+
+    def _ensure_live(self) -> None:
+        if self._closed:
+            raise RuntimeError("workspace container is closed")
+        if self._invalid:
+            raise RuntimeError("workspace container is invalid after an uncontained timeout/crash")
+
+    def _path(self, path: str) -> str:
+        rel = _safe_relative(path)
+        return str(PurePosixPath(self.cwd) / rel)
+
+    def resolve(self, path: str) -> str:
+        """Resolve a relative path inside the container workspace."""
+        return self._path(path)
+
+    def _exec(
+        self,
+        argv: list[str],
+        *,
+        timeout: float | None = None,
+        input_text: str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        self._ensure_live()
+        command = ["docker", "exec", "-i", "-w", cwd or self.cwd]
+        for key, value in (env or {}).items():
+            command.extend(["-e", f"{key}={value}"])
+        command.extend([self.container_id, *argv])
+        return subprocess.run(
+            command, input=input_text, capture_output=True, text=True, timeout=timeout
+        )
+
+    def read_text(self, path: str) -> str:
+        proc = self._exec(["cat", self._path(path)])
+        if proc.returncode != 0:
+            raise OSError(proc.stderr.strip() or f"cannot read {path!r}")
+        return proc.stdout
+
+    def write_text(self, path: str, content: str) -> str:
+        target = self._path(path)
+        parent = str(PurePosixPath(target).parent)
+        proc = self._exec(
+            ["sh", "-lc", f"mkdir -p {shlex.quote(parent)} && cat > {shlex.quote(target)}"],
+            input_text=content,
+        )
+        if proc.returncode != 0:
+            raise OSError(proc.stderr.strip() or f"cannot write {path!r}")
+        return target
+
+    def run(self, cmd: str, timeout: float = 10.0) -> dict[str, Any]:
+        started = utc_now()
+        try:
+            proc = self._exec(["sh", "-lc", cmd], timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            # Killing docker-exec does not prove that descendants in the container stopped.
+            # Mark the whole execution boundary unusable; orchestrator finally removes it.
+            self.invalidate(f"command timeout >{timeout}s")
+            return {
+                "ok": False,
+                "status": "timed_out",
+                "error": "timeout",
+                "stdout": (exc.stdout or "")[:_MAX_OUTPUT] if isinstance(exc.stdout, str) else "",
+                "stderr": (exc.stderr or "")[:_MAX_OUTPUT] if isinstance(exc.stderr, str) else "",
+                "returncode": None,
+                "started_at": started,
+                "finished_at": utc_now(),
+            }
+        return {
+            "ok": True,
+            "status": "completed",
+            "stdout": proc.stdout[:_MAX_OUTPUT],
+            "stderr": proc.stderr[:_MAX_OUTPUT],
+            "returncode": proc.returncode,
+            "started_at": started,
+            "finished_at": utc_now(),
+        }
+
+    def stage_directory(self, source: Path, destination: str) -> None:
+        self._ensure_live()
+        destination = str(PurePosixPath(destination))
+        if not destination.startswith("/"):
+            raise ValueError("container stage destination must be absolute")
+        with tempfile.NamedTemporaryFile(suffix=".tar") as archive:
+            with tarfile.open(fileobj=archive, mode="w") as tf:
+                tf.add(source, arcname="payload")
+            archive.flush()
+            with open(archive.name, "rb") as stream:
+                command = [
+                    "docker",
+                    "exec",
+                    "-i",
+                    self.container_id,
+                    "sh",
+                    "-lc",
+                    f"rm -rf {shlex.quote(destination)} && mkdir -p {shlex.quote(destination)} "
+                    f"&& tar -xf - -C {shlex.quote(destination)} --strip-components=1",
+                ]
+                proc = subprocess.run(command, stdin=stream, capture_output=True)
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr.decode(errors="replace")[:2000])
+
+    def popen_argv(self, argv: list[str], *, cwd: str, env: dict[str, str]) -> list[str]:
+        self._ensure_live()
+        command = ["docker", "exec", "-i", "-w", cwd]
+        for key, value in env.items():
+            command.extend(["-e", f"{key}={value}"])
+        return [*command, self.container_id, *argv]
+
+    def export_patch(self) -> tuple[str, str]:
+        proc = self._exec(["git", "diff", "--binary", "--no-ext-diff"])
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr.strip() or "git diff failed")
+        patch = proc.stdout
+        digest = hashlib.sha256(patch.encode()).hexdigest()
+        self.evidence.update({"diff_sha256": digest, "diff_bytes": len(patch.encode())})
+        return patch, digest
+
+    def invalidate(self, reason: str) -> None:
+        if self._closed:
+            return
+        self._invalid = True
+        self.evidence.update({"invalidated_at": utc_now(), "invalid_reason": reason})
+        subprocess.run(["docker", "kill", self.container_id], capture_output=True, text=True)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        subprocess.run(["docker", "rm", "-f", self.container_id], capture_output=True, text=True)
+        self._closed = True
+        self.evidence["closed_at"] = utc_now()
+
+
+Workspace = str | WorkspaceRuntime
+
+
+def as_runtime(workspace: Workspace, *, owns_tmp: bool = False) -> WorkspaceRuntime:
+    if isinstance(workspace, str):
+        return LocalWorkspaceRuntime(workspace, owns_tmp=owns_tmp)
+    return workspace
+
+
+def make_empty_runtime() -> LocalWorkspaceRuntime:
+    return LocalWorkspaceRuntime(tempfile.mkdtemp(prefix="shared_ws_"), owns_tmp=True)

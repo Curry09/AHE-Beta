@@ -64,6 +64,7 @@ def test_scenario_sources_all_preserve_instance_id(tmp_path, monkeypatch) -> Non
     image = module._to_scenario(meta).workspace
     assert image is not None and image.kind == "docker-seed"
     assert image.params["instance_id"] == meta["instance_id"]
+    assert image.params["network"] == "bridge"
 
     monkeypatch.delenv("SWEBENCH_SEED_IMAGE", raising=False)
     git = module._to_scenario(meta).workspace

@@ -440,6 +440,12 @@ class Session:
     session_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     created_at: datetime = field(default_factory=datetime.now)
     sim_trace: SimTrace | None = None
+    user_outcome: dict[str, Any] = field(default_factory=dict)
+    request_outcomes: list[dict[str, Any]] = field(default_factory=list)
+    workspace_evidence: dict[str, Any] = field(default_factory=dict)
+    objective_evaluation: dict[str, Any] | None = None
+    accept_validity: str = "not_applicable"
+    audit_events: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -453,6 +459,17 @@ class Session:
         }
         if self.sim_trace is not None:
             d["sim_trace"] = self.sim_trace.to_dict()
+        if self.user_outcome:
+            d["user_outcome"] = dict(self.user_outcome)
+        if self.request_outcomes:
+            d["request_outcomes"] = [dict(row) for row in self.request_outcomes]
+        if self.workspace_evidence:
+            d["workspace_evidence"] = dict(self.workspace_evidence)
+        if self.objective_evaluation is not None:
+            d["objective_evaluation"] = dict(self.objective_evaluation)
+        d["accept_validity"] = self.accept_validity
+        if self.audit_events:
+            d["audit_events"] = [dict(row) for row in self.audit_events]
         return d
 
     @classmethod
@@ -467,4 +484,14 @@ class Session:
             session_id=data["session_id"],
             created_at=datetime.fromisoformat(data["created_at"]),
             sim_trace=SimTrace.from_dict(st) if st else None,
+            user_outcome=dict(data.get("user_outcome") or {}),
+            request_outcomes=[dict(row) for row in data.get("request_outcomes", [])],
+            workspace_evidence=dict(data.get("workspace_evidence") or {}),
+            objective_evaluation=(
+                dict(data["objective_evaluation"])
+                if isinstance(data.get("objective_evaluation"), dict)
+                else None
+            ),
+            accept_validity=str(data.get("accept_validity") or "not_applicable"),
+            audit_events=[dict(row) for row in data.get("audit_events", [])],
         )

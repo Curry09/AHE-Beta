@@ -72,6 +72,14 @@ for line in sys.stdin:
     sys.stdout.write(json.dumps({"type": "error", "message": "boom", "recoverable": False}) + "\\n")
     sys.stdout.flush()
 """
+_V1_TIMEOUT_STATUS_ENTRY = """\
+import json, sys
+for line in sys.stdin:
+    obj = json.loads(line)
+    if obj.get("type") == "message":
+        sys.stdout.write(json.dumps({"type": "reply", "text": "timed out", "status": "timed_out"}) + "\\n")
+        sys.stdout.flush()
+"""
 _V1_USAGE_ENTRY = """\
 import json, sys
 for line in sys.stdin:
@@ -172,6 +180,23 @@ def test_usage_sideband_is_isolated_and_drained_once(tmp_path) -> None:
         assert len(events) == 1
         assert events[0]["total_tokens"] == 10
         assert h.drain_usage_events() == []
+    finally:
+        h.close()
+
+
+def test_v1_reply_status_is_recorded_as_request_outcome(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _V1_TIMEOUT_STATUS_ENTRY)
+    repo = Path(launcher._harness_repo)
+    (repo / "params.yaml").write_text(
+        "entry:\n  - python\n  - fake_entry.py\nprotocol: stdio-jsonl-v1\n", encoding="utf-8"
+    )
+    _commit_all(repo, "enable v1 timeout status")
+    h = launcher.launch("main")
+    try:
+        assert h.send("a") == "timed out"
+        assert h.request_outcomes[-1]["status"] == "timed_out"
+        assert h.request_outcomes[-1]["started_at"]
+        assert h.request_outcomes[-1]["finished_at"]
     finally:
         h.close()
 

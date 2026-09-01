@@ -146,7 +146,7 @@ def test_bridge_binds_when_workspace_present(tmp_path) -> None:
     assert client.bound is not None
     persona, ws = client.bound
     assert persona is sp
-    assert ws.endswith("billing-split") and Path(ws).is_dir()
+    assert ws.cwd.endswith("billing-split")
 
 
 def test_bridge_no_bind_without_workspace(tmp_path) -> None:
@@ -200,4 +200,5 @@ def test_bridge_uses_passed_workspace_dir_and_skips_materialize(tmp_path, monkey
     scenario = SeedScenario(description="task", workspace=WorkspaceSpec(fixture="billing-split"))
     fn(mp, scenario, ScriptedHarness(), workspace_dir="/shared/ws")
 
-    assert client.bound == (sp, "/shared/ws")  # 复用传入目录，未走 materialize
+    assert client.bound[0] is sp
+    assert client.bound[1].cwd == "/shared/ws"  # 复用传入目录，未走 materialize
