@@ -19,7 +19,7 @@ tasks:
     acceptance: 九段 Spec 自包含，包含资源矩阵、状态机、Task DAG、失败语义和至少一个备选方案；spec validate/render/graph 通过。
   - id: T2
     title: 实验配置与不可变 Manifest
-    status: pending
+    status: done
     priority: P0
     tags: []
     depends-on:
@@ -36,7 +36,7 @@ tasks:
     acceptance: 实验 ID、路径和资源名非法或碰撞时 API 前 fail closed；manifest 原子创建且不可覆盖，记录全部 pin/模型/并发/端口/状态而不含密钥；序列化、漂移和并发创建测试通过。
   - id: T3
     title: 每实验独立基础设施栈
-    status: pending
+    status: done
     priority: P0
     tags: []
     depends-on:
@@ -52,7 +52,7 @@ tasks:
     acceptance: 两个实验的容器、网络、卷、端口、Gitea 数据与 token 全异；所有资源带 experiment_id label；同 ID 不误复用、错误 label 拒绝；stop 不删数据，destroy 只命中本实验且需显式确认；compose 与 mock Docker 测试通过。
   - id: T4
     title: 统一实验 CLI 与闭环接线
-    status: pending
+    status: done
     priority: P0
     tags: []
     depends-on:
@@ -74,7 +74,7 @@ tasks:
     acceptance: 操作者只需配置文件和实验 ID 即可启动；start 前输出无密钥 plan；重复命令幂等且不跨实验 attach；每阶段写 checkpoint，stop 可恢复、archive 只读冻结；既有单实验测试与新 CLI 生命周期测试通过。
   - id: T5
     title: 共享模型容量租约与故障保护
-    status: pending
+    status: done
     priority: P0
     tags: []
     depends-on:
