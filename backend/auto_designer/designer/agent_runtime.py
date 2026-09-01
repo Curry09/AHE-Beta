@@ -17,6 +17,7 @@ driver 由此瘦成「拼 prompt → run_agent_def → read_submit → 写 track
 from __future__ import annotations
 
 import contextvars
+import hashlib
 import json
 import os
 import threading
@@ -24,7 +25,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from auto_designer.designer.session_timeline import bind_session_store
-from auto_designer.usage import bind_usage_context
+from auto_designer.invocation import record_invocation
+from auto_designer.usage import bind_usage_context, current_usage_context
 from auto_designer.user.session_store import SessionStore
 
 # 拆返回值再编码的最大层数：实测 nexau 会把返回再 JSON 编码一层（故 ≥2），留余量；有界防畸形输入打转。
@@ -62,13 +64,12 @@ def run_agent_def(
     timeout: int,
     on_event: Callable[[str, str], None] | None = None,
     max_iterations: int | None = None,
+    subject: dict[str, str] | None = None,
+    replayable: bool = True,
 ) -> str:
     """加载 agent_def_dir 的 nexau agent 定义、以 message 跑一轮，返回 agent.run 的返回值（str）。
 
-    repo = 只读 grounding 的 harness 仓（设进 SANDBOX_WORK_DIR，绝对路径防 cwd 漂移）；store 经
-    bind_session_store 注入供 get_session_timeline/beat/step 工具读取；role 由调用角色显式提供，
-    不从目录名推断；on_event 给看板过程流；max_iterations 可收紧预算（如 Owner 评审段短预算），
-    None 用定义里的值。
+    Spec-0049/T3：填好的 message 与产出 fail-open 写入 ROLE_RUNS_DIR/demand。
     """
     os.environ["SANDBOX_WORK_DIR"] = str(Path(repo).resolve())
     from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
@@ -80,11 +81,63 @@ def run_agent_def(
 
     cfg.resolved_tracer = StepTracer(on_event or (lambda _kind, _text: None))
     agent = Agent(config=cfg)
+    subj = subject or {"kind": "round", "id": str(current_usage_context().round_no or "")}
+    pin = _agent_def_pin(agent_def_dir=Path(agent_def_dir))
+    model = os.environ.get("DESIGNER_LLM_MODEL")
     with bind_session_store(store), bind_usage_context(role=role, operation="nexau-agent"):
-        out = run_with_timeout(lambda: agent.run(message=message), timeout)
-    # submit 工具是 stop tool：binding 回显的 JSON 即 agent.run 的返回；非 str（nexau 有时再序列化
-    # 前就是对象）时 dumps 成 str，交由 read_submit 的有界 json.loads 处理。
-    return out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+        try:
+            out = run_with_timeout(lambda: agent.run(message=message), timeout)
+        except TimeoutError as exc:
+            record_invocation(
+                side="demand",
+                role=role,
+                subject=subj,
+                prompt=message,
+                structured=None,
+                status="timeout",
+                error=str(exc),
+                replayable=replayable,
+                model=model,
+                agent_def_pin=pin,
+            )
+            raise
+    text = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+    structured, status = _structured_status(text=text)
+    record_invocation(
+        side="demand",
+        role=role,
+        subject=subj,
+        prompt=message,
+        structured=structured,
+        status=status,
+        replayable=replayable,
+        model=model,
+        agent_def_pin=pin,
+    )
+    return text
+
+
+def _agent_def_pin(*, agent_def_dir: Path) -> str | None:
+    path = agent_def_dir / "agent.yaml"
+    try:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+    return f"sha256:{digest}"
+
+
+def _structured_status(*, text: str) -> tuple[object, str]:
+    node: object = text
+    for _ in range(_UNWRAP_MAX_DEPTH):
+        if not isinstance(node, str):
+            break
+        try:
+            node = json.loads(node)
+        except (ValueError, TypeError):
+            return {"raw": text}, "no_submit"
+    if isinstance(node, dict):
+        return node, "success"
+    return {"raw": text}, "no_submit"
 
 
 def read_submit(text: str, key: str) -> list[dict] | None:

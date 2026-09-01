@@ -171,6 +171,8 @@ class Designer:
             "expected_leverage、solution_level、abstraction_rationale + 可选 covers。"
             "字段契约由工具 input_schema 强校验，不必也不要在正文里手抄 schema。"
         )
+        from auto_designer.usage import current_usage_context  # noqa: PLC0415
+
         return run_agent_def(
             self._agent_def,
             msg,
@@ -179,6 +181,7 @@ class Designer:
             role="designer",
             timeout=_DESIGN_TIMEOUT,
             on_event=self._on_event,
+            subject={"kind": "round", "id": str(current_usage_context().round_no or "")},
         )
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:

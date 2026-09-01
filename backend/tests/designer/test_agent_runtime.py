@@ -105,6 +105,141 @@ def test_run_with_timeout_raises_on_timeout() -> None:
         pass
 
 
+def test_run_agent_def_records_demand_and_keeps_return(tmp_path, monkeypatch) -> None:
+    import nexau
+
+    monkeypatch.setenv("ROLE_RUNS_DIR", str(tmp_path))
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-x")
+
+    class FakeConfig:
+        max_iterations = 1
+        resolved_tracer = None
+
+    class FakeAgentConfig:
+        @staticmethod
+        def from_yaml(*, config_path):
+            return FakeConfig()
+
+    class FakeAgent:
+        def __init__(self, *, config):
+            self.config = config
+
+        def run(self, *, message):
+            return {"decisions": []}
+
+    monkeypatch.setattr(nexau, "AgentConfig", FakeAgentConfig)
+    monkeypatch.setattr(nexau, "Agent", FakeAgent)
+    agent_dir = tmp_path / "owner"
+    agent_dir.mkdir()
+    (agent_dir / "agent.yaml").write_text("unused", encoding="utf-8")
+
+    out = run_agent_def(
+        agent_dir,
+        "review",
+        store=SessionStore(tmp_path / "sessions"),
+        repo=tmp_path,
+        role="owner",
+        timeout=5,
+        subject={"kind": "round", "id": "3"},
+    )
+    assert json.loads(out) == {"decisions": []}
+    files = list((tmp_path / "demand").glob("*.json"))
+    assert len(files) == 1
+    data = json.loads(files[0].read_text(encoding="utf-8"))
+    assert data["side"] == "demand"
+    assert data["role"] == "owner"
+    assert data["subject"] == {"kind": "round", "id": "3"}
+    assert data["output"]["status"] == "success"
+
+
+def test_run_agent_def_timeout_still_records(tmp_path, monkeypatch) -> None:
+    import time
+
+    import nexau
+
+    monkeypatch.setenv("ROLE_RUNS_DIR", str(tmp_path))
+
+    class FakeConfig:
+        max_iterations = 1
+        resolved_tracer = None
+
+    class FakeAgentConfig:
+        @staticmethod
+        def from_yaml(*, config_path):
+            return FakeConfig()
+
+    class FakeAgent:
+        def __init__(self, *, config):
+            self.config = config
+
+        def run(self, *, message):
+            time.sleep(5)
+            return "never"
+
+    monkeypatch.setattr(nexau, "AgentConfig", FakeAgentConfig)
+    monkeypatch.setattr(nexau, "Agent", FakeAgent)
+    agent_dir = tmp_path / "owner"
+    agent_dir.mkdir()
+    (agent_dir / "agent.yaml").write_text("unused", encoding="utf-8")
+
+    try:
+        run_agent_def(
+            agent_dir,
+            "review",
+            store=SessionStore(tmp_path / "sessions"),
+            repo=tmp_path,
+            role="owner",
+            timeout=1,
+            subject={"kind": "round", "id": "1"},
+        )
+        raise AssertionError("应抛 TimeoutError")
+    except TimeoutError:
+        pass
+    data = json.loads(next((tmp_path / "demand").glob("*.json")).read_text(encoding="utf-8"))
+    assert data["output"]["status"] == "timeout"
+
+
+def test_run_agent_def_no_submit_status(tmp_path, monkeypatch) -> None:
+    import nexau
+
+    monkeypatch.setenv("ROLE_RUNS_DIR", str(tmp_path))
+
+    class FakeConfig:
+        max_iterations = 1
+        resolved_tracer = None
+
+    class FakeAgentConfig:
+        @staticmethod
+        def from_yaml(*, config_path):
+            return FakeConfig()
+
+    class FakeAgent:
+        def __init__(self, *, config):
+            self.config = config
+
+        def run(self, *, message):
+            return "我没调 submit"
+
+    monkeypatch.setattr(nexau, "AgentConfig", FakeAgentConfig)
+    monkeypatch.setattr(nexau, "Agent", FakeAgent)
+    agent_dir = tmp_path / "owner"
+    agent_dir.mkdir()
+    (agent_dir / "agent.yaml").write_text("unused", encoding="utf-8")
+
+    out = run_agent_def(
+        agent_dir,
+        "review",
+        store=SessionStore(tmp_path / "sessions"),
+        repo=tmp_path,
+        role="owner",
+        timeout=5,
+        subject={"kind": "round", "id": "1"},
+    )
+    assert out == "我没调 submit"
+    data = json.loads(next((tmp_path / "demand").glob("*.json")).read_text(encoding="utf-8"))
+    assert data["output"]["status"] == "no_submit"
+
+
 def test_norm_label_whitespace_tolerant() -> None:
     assert norm_label("涉及 issue") == norm_label("涉及issue") == "涉及issue"
     assert norm_label("  根因  区域 ") == "根因区域"

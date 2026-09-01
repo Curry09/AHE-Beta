@@ -47,7 +47,7 @@ _SHELL_TOOL = "run_shell_command"
 
 # trace 目录名兜底正则：harness_runs 唯一、绝不该出现在 harness 仓内的命令里；sessions 仅当经 `../`
 # 或绝对路径以「路径段」形式出现才算（`grep sessions foo` 这种把 sessions 当搜索词的不误伤）。
-_TRACE_REF = re.compile(r"harness_runs|(?:\.\./|/)[^\s'\"]*sessions(?:/|\b)")
+_TRACE_REF = re.compile(r"harness_runs|role_runs|(?:\.\./|/)[^\s'\"]*sessions(?:/|\b)")
 
 # heredoc 起始：`<<EOF` / `<<-EOF` / `<< 'PY'` / `<<"END"`（marker 为标识符）。用于剥掉正文行——
 # 正文是数据不是路径（扫它误伤），但含 `<<` 那一行的**重定向目标**（`cat > OUT <<EOF`）是真路径，须留。
@@ -185,7 +185,7 @@ def _shell_offender(work_dir: Path, command: str, read_roots: list[Path]) -> str
     （静态分不清读写）——靠 prompt「NexAU 只读」约束；轨迹路径仍由 _TRACE_REF 硬拒。
     """
     if _TRACE_REF.search(command):
-        return "trace 目录（sessions / harness_runs）"
+        return "trace 目录（sessions / harness_runs / role_runs）"
     scanned = _strip_heredoc_bodies(command)  # 剥正文、留重定向行——堵住 `> /仓外 <<EOF` 绕过口
     try:
         tokens = shlex.split(scanned, posix=True)
@@ -240,7 +240,7 @@ class WorkspaceJailMiddleware(Middleware):
             f"[workspace-jail] 拒绝：{what} 越界。"
             "可写范围 = harness 仓；可读范围 = harness 仓 + NexAU 源码（只读）"
             " + NexAU 运行时临时目录（bash/tool 输出，只读）。"
-            "绝不读取任务轨迹/会话录像（data/sessions、data/harness_runs）——会过拟合。"
+            "绝不读取任务轨迹/会话录像（data/sessions、data/harness_runs、data/role_runs）——会过拟合。"
             "框架细节读 NexAU；改动只落 harness 仓。"
         )
         logger.warning("workspace-jail 拦截越界访问：%s", what)

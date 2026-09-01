@@ -72,6 +72,7 @@ def test_shell_offender_flags_trace_and_escape(tmp_path: Path) -> None:
     # trace 目录名正则兜底
     assert _shell_offender(work, "cat ../../data/sessions/1.json", roots) is not None
     assert _shell_offender(work, "ls ../harness_runs", roots) is not None
+    assert _shell_offender(work, "ls ../../data/role_runs", roots) is not None
     # 逐 token 越界扫描
     assert _shell_offender(work, "head /etc/hosts", roots) is not None
     # 仓内命令放行
@@ -161,6 +162,10 @@ def test_wrap_denies_read_file_escape(tmp_path: Path) -> None:
     mw = WorkspaceJailMiddleware()
     result, ran = _run(mw, _params(work, "read_file", {"file_path": "../../data/sessions/1.json"}))
     assert _denied(result) and ran is False  # 拒绝且真工具没跑
+    result, ran = _run(
+        mw, _params(work, "read_file", {"file_path": "../../data/role_runs/x.json"})
+    )
+    assert _denied(result) and ran is False
 
 
 def test_wrap_allows_in_repo_read(tmp_path: Path) -> None:

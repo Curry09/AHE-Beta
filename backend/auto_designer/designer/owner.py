@@ -252,6 +252,8 @@ class Owner:
         self, *, proposals: list, ready: list, trend: list[tuple[str, int, str, str]]
     ) -> str:
         msg = self._review_message(proposals=proposals, ready=ready, trend=trend)
+        from auto_designer.usage import current_usage_context  # noqa: PLC0415
+
         return run_agent_def(
             self._agent_def,
             msg,
@@ -260,6 +262,7 @@ class Owner:
             role="owner",
             timeout=_ADMIT_TIMEOUT,
             on_event=self._on_event,
+            subject={"kind": "round", "id": str(current_usage_context().round_no or "")},
         )
 
     def _review_message(

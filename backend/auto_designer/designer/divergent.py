@@ -121,6 +121,8 @@ class Divergent:
             "desired_outcome、evidence_sessions、solution_level、abstraction_rationale，可选"
             " related_proposals。字段契约由工具强校验。"
         )
+        from auto_designer.usage import current_usage_context  # noqa: PLC0415
+
         return run_agent_def(
             self._agent_def,
             msg,
@@ -129,6 +131,7 @@ class Divergent:
             role="divergent",
             timeout=_DIVERGENT_TIMEOUT,
             on_event=self._on_event,
+            subject={"kind": "round", "id": str(current_usage_context().round_no or "")},
         )
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:

@@ -284,6 +284,7 @@ class Triager:
             f"## 待分诊 report（{len(pending)} 条）\n{self._format_issues(pending)}\n\n"
             "完成调查后调用 submit_triage 一次，dispositions 只能包含当前这一条 report。"
         )
+        report_id = str(pending[0].number) if pending else ""
         return run_agent_def(
             self._agent_def,
             msg,
@@ -292,6 +293,7 @@ class Triager:
             role="triager",
             timeout=_TRIAGE_TIMEOUT,
             on_event=self._on_event,
+            subject={"kind": "report", "id": report_id},
         )
 
     @staticmethod

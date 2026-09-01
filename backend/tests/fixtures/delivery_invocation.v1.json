@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "invocation_id": "fixture-delivery-1",
+  "run_id": "fixture-run",
+  "round": 1,
+  "side": "delivery",
+  "role": "drafter",
+  "subject": {"kind": "issue", "id": "12"},
+  "replayable": true,
+  "input": {
+    "prompt": "Draft a spec for issue 12.",
+    "context": "issue body",
+    "placeholders": {"issue_number": "12"}
+  },
+  "output": {
+    "structured": {"title": "x", "status": "drafted"},
+    "status": "success",
+    "error": null
+  },
+  "env": {
+    "model": "glm-test",
+    "agent_def_pin": null,
+    "captured_at": "2026-09-01T00:00:00+00:00"
+  }
+}
