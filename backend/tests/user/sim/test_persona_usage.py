@@ -83,7 +83,7 @@ def test_create_rejects_persona_context_above_256k_before_provider_call(
     monkeypatch.setattr(module, "PERSONA_MAX_CONTEXT_TOKENS", 4)
     client = _client(_response())
 
-    with pytest.raises(module.PersonaContextLimitError, match="local context limit"):
+    with pytest.raises(module.PersonaContextLimitError, match="prompt_too_large"):
         client._create([{"role": "user", "content": "prompt is too large"}], 32768)
     assert client.client.chat.completions.calls == []
 

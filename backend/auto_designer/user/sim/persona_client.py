@@ -44,14 +44,16 @@ class PersonaProtocolError(RuntimeError):
         super().__init__(f"persona protocol error at {stage}: {code} ({attempts} attempts)")
 
 
-class PersonaContextLimitError(RuntimeError):
+class PersonaContextLimitError(PersonaProtocolError):
     """Persona prompt exceeded the configured local context budget before API dispatch."""
 
     def __init__(self, estimated_tokens: int, limit: int) -> None:
         self.estimated_tokens = estimated_tokens
         self.limit = limit
         super().__init__(
-            f"persona prompt exceeds local context limit: {estimated_tokens} > {limit} tokens"
+            "llm_context",
+            f"prompt_too_large:{estimated_tokens}>{limit}",
+            attempts=0,
         )
 
 
