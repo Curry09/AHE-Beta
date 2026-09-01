@@ -128,3 +128,18 @@ def test_frozen_experiment_validates_round_roster_and_pins(tmp_path: Path) -> No
     frozen = module.FrozenExperiment.load(config_path=config, root=tmp_path / "experiments")
     assert frozen.experiment_id == "unit-audit"
     assert frozen.roster["user"] == 2
+
+    document["experiment_id"] = "unit-user-only"
+    document["mode"] = "user-only"
+    document["execution"]["total_rounds"] = 1
+    plan.write_text(json.dumps([[["correct", "one"], ["handover", "two"]]]), encoding="utf-8")
+    document["execution"]["plan"]["sha256"] = _sha(plan)
+    document["capacity"]["delivery_parallel"] = 0
+    document["roster"].update(
+        {"triager": 0, "designer": 0, "divergent": 0, "owner": 0, "developer": 0}
+    )
+    config.write_text(json.dumps(document), encoding="utf-8")
+
+    canary = module.FrozenExperiment.load(config_path=config, root=tmp_path / "experiments")
+    assert canary.config.mode == "user-only"
+    assert canary.execution["total_rounds"] == 1

@@ -97,6 +97,7 @@ tasks:
       - backend/scripts/run_auditable_experiment.py
       - backend/scripts/run_swebench_closed_loop.py
       - backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh
+      - backend/scripts/run-glm52fp8-1m-canary2-isolated.sh
       - backend/scripts/e2e-spec-0051-session-container.sh
       - CLAUDE.md
     scope: 提供从现有 seed 资产构建可运行镜像的入口，并让一键实验 fail-closed 校验 image；用冒烟脚本证明无宿主工作区泄漏、结果证据可追溯。
@@ -135,6 +136,8 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 6. session 同时展示主观与客观两栏。persona accept 但客观失败/交互超时是 `false_accept`；未执行官方 evaluator 是 `unverified_accept`；只有 fresh evaluator 明确通过才是 `valid_accept`。
 
 实验仍用一键入口，但启动前必须 fail-closed 检查 runnable image。配置了 16 并发时是最多 16 个会话容器，不是 16 份镜像；五轮按 session 生命周期累计最多 80 次创建/销毁。
+
+正式重跑前允许用独立 `user-only` canary 做小流量实测：必须恰好一轮，非 user 角色计数全为 0，使用独立 experiment id、persona roster 与 interaction plan。它复用同一隔离、客观验收和审计路径，但不启动 triage、设计、Owner 或交付面。
 
 ## Reference-level explanation
 

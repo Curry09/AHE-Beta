@@ -155,23 +155,33 @@ class FrozenExperiment:
         return path
 
     def validate_contract(self) -> None:
-        if self.config.mode != "full-evolution":
-            raise AuditLaunchError("审计闭环只接受 mode=full-evolution")
+        if self.config.mode not in {"full-evolution", "user-only"}:
+            raise AuditLaunchError("审计闭环只接受 mode=full-evolution 或 user-only")
         execution = self.raw.get("execution")
         if not isinstance(execution, dict) or execution.get("runner") != "swebench-closed-loop":
             raise AuditLaunchError("execution.runner 必须为 swebench-closed-loop")
         rounds = int(execution.get("total_rounds") or 0)
-        if rounds < 2 or not execution.get("final_round_users_only"):
-            raise AuditLaunchError("闭环要求至少两轮且末轮 users-only")
-        if not execution.get("wait_for_delivery_between_rounds"):
-            raise AuditLaunchError("闭环必须等待本轮交付封口后再切轮")
+        if self.config.mode == "full-evolution":
+            if rounds < 2 or not execution.get("final_round_users_only"):
+                raise AuditLaunchError("完整闭环要求至少两轮且末轮 users-only")
+            if not execution.get("wait_for_delivery_between_rounds"):
+                raise AuditLaunchError("闭环必须等待本轮交付封口后再切轮")
+        elif rounds != 1 or not execution.get("final_round_users_only"):
+            raise AuditLaunchError("user-only canary 必须恰好一轮且为 users-only")
 
         roster = self.raw.get("roster")
         if not isinstance(roster, dict) or set(roster) != _REQUIRED_ROSTER:
             raise AuditLaunchError(f"roster 必须且只能包含 {sorted(_REQUIRED_ROSTER)}")
         normalized = self.roster
-        if normalized["owner"] != 1 or any(value < 0 for value in normalized.values()):
-            raise AuditLaunchError("owner 必须为 1，roster 计数不得为负")
+        if any(value < 0 for value in normalized.values()):
+            raise AuditLaunchError("roster 计数不得为负")
+        if self.config.mode == "full-evolution" and normalized["owner"] != 1:
+            raise AuditLaunchError("full-evolution 的 owner 必须为 1")
+        if self.config.mode == "user-only" and any(
+            normalized[role] != 0
+            for role in ("triager", "designer", "divergent", "owner", "developer")
+        ):
+            raise AuditLaunchError("user-only canary 除 user 外的 roster 必须全为 0")
         capacity = self.config.capacity
         if int(capacity.get("user_parallel") or 0) != normalized["user"]:
             raise AuditLaunchError("capacity.user_parallel 必须等于 roster.user")
