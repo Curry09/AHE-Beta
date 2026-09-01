@@ -96,27 +96,26 @@ def test_reply_exception_then_marker(entry: ModuleType) -> None:
     assert status == "crashed"
 
 
-def test_reply_timeout_is_terminal_without_rebuild(entry: ModuleType) -> None:
-    """超时：立即回结构化终态，等待 launcher 回收容器，不在污染边界中重建。"""
-    stale = _Agent([TimeoutError("agent.run 超时 >240s")])
-    stale.history = ["prior user turn", "prior assistant turn"]
-    fresh = _Agent(["should not run"])
-    seen: list = []
+def test_run_supervised_has_no_wall_clock_timeout(entry: ModuleType) -> None:
+    """慢 agent 只能由完成或 persona interrupt 结束，不再被 harness deadline 丢弃。"""
 
-    def rebuild(old):
-        # 模拟 main()：从旧实例快照 history 种进新实例
-        fresh.history = list(getattr(old, "history", []) or [])
-        seen.append(old)
-        return fresh
+    release = threading.Event()
 
-    out_agent, text, status = entry._reply(stale, "hi", rebuild)
-    assert out_agent is stale
-    assert text == entry._TIMEOUT_REPLY
-    assert text.startswith("[timeout]")
-    assert status == "timed_out"
-    assert fresh.calls == 0  # 超时后不自动再跑同一 message
-    assert fresh.history == []
-    assert seen == []
+    class SlowAgent:
+        def run(self, *, message: str):  # noqa: ARG002
+            release.wait()
+            return "finished"
+
+    box: dict = {}
+    worker = threading.Thread(
+        target=lambda: box.setdefault("out", entry._run_supervised(SlowAgent(), "hi", None))
+    )
+    worker.start()
+    assert worker.is_alive()
+    release.set()
+    worker.join(timeout=2)
+    assert not worker.is_alive()
+    assert box["out"] == "finished"
 
 
 def test_snapshot_and_restore_history_roundtrip(entry: ModuleType) -> None:

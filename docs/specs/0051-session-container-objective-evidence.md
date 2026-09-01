@@ -3,7 +3,7 @@ number: "0051"
 title: 会话容器隔离与客观验收证据
 issue: 0
 slug: session-container-objective-evidence
-summary: 每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；超时回收整个容器执行边界；主观接受与新鲜 SWE-bench 客观执行结果分栏落盘，假接受不得计为通过。
+summary: 每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；harness 长请求由 90s persona 心跳决定续等或打断；主观接受与新鲜 SWE-bench 客观执行结果分栏落盘，假接受不得计为通过。
 tasks:
   - id: T1
     title: 隔离与验收契约
@@ -51,14 +51,17 @@ tasks:
     files:
       - backend/auto_designer/harness/launcher.py
       - backend/harness_template/entry.py
+      - backend/harness_template/RUNTIME.md
+      - backend/harness_template/tests/test_smoke.py
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/loop/sim_user.py
       - backend/auto_designer/user/sim/persona_client.py
       - backend/tests/harness/test_launcher.py
+      - backend/tests/harness/test_template_entry.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_sim_user.py
-    scope: launcher 对容器运行时用 docker exec 启 harness；编排 finally 关闭会话容器；wire reply 带 completed/timed_out/interrupted/crashed，launcher 将终态传给 sim，超时后销毁执行边界并停止 persona 续聊。
-    acceptance: harness 与 persona 看到同一容器 cwd；超时状态结构化可读且回复仅作审计证据，不触发下一次 persona 决策或 harness 写入；旧工作线程不能继续；异常路径也清理容器。
+    scope: launcher 对容器运行时用 docker exec 启 harness；编排 finally 关闭会话容器；wire reply 带 completed/interrupted/crashed，launcher 将终态传给 sim；只有基础设施绝对上限或无法收束的崩溃才作为污染边界处理。
+    acceptance: harness 与 persona 看到同一容器 cwd；正常慢请求不由 harness deadline 终止；persona 心跳可续等或 interrupt；真实崩溃/基础设施上限仍 fail-closed 并记录证据。
   - id: T4
     title: 双结论、客观执行与假接受
     status: done
@@ -120,7 +123,7 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 
 0044 把 seed image 定义成 `FROM scratch` 的存储包，并明确选择 `docker create → docker cp → docker rm`。随后 orchestrator 把得到的宿主绝对路径同时传给 harness 和 persona；harness 又是宿主 Python 子进程，persona sandbox 也是宿主 `subprocess`。所以用户能看到 `/mnt/c/Users/.../Temp/sim_ws_docker_seed_*` 不是 Docker 逃逸，而是实现从未把执行放进容器。
 
-另一条错误是把“用户愿意接受”当成“实现已经通过”。现有状态机允许 final check 失败或不可用后继续 accept；harness 的 240 秒超时只放弃 daemon thread，旧工作可能继续写盘；accept 的说明文字还会被投影成一条实际发送给 harness 的 user turn。结果是 `sr-12-steinberger` 一类会话在测试超时后仍说“verified / Done”，产生假接受和不可审计的成功率。
+另一条错误是把“用户愿意接受”当成“实现已经通过”。原实现允许 final check 失败或不可用后继续 accept，并用 240 秒 deadline 放弃 daemon worker，旧工作可能继续写盘；accept 的说明文字还会被投影成一条实际发送给 harness 的 user turn。结果是 `sr-12-steinberger` 一类会话在测试超时后仍说“verified / Done”，产生假接受和不可审计的成功率。本次 T3 修订删除这个 harness 整轮 deadline，慢请求回到 0012/0022/0023 的 persona 心跳决策。
 
 之前已跑的数据不能事后补成可信数据：其执行边界、超时后的写入和接受依据已经丢失。本组只保证新 session 的证据完整，旧 run 保留原样并标记为历史无效实验。
 
@@ -130,7 +133,7 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 
 1. `docker-seed` 校验 image 带有 runnable 协议标签，为该 session 创建唯一命名容器并启动；随后在该容器可写层移除其它 seed instance 与全池 build-state，使 `/workspace` 只剩目标 instance；工作目录是容器内 `/workspace/<instance_id>/repo`。
 2. persona 工具经 `WorkspaceRuntime` 读写/执行；harness checkout 作为只读输入复制进容器的 `/opt/auto-designer/harness/<sha>`，随后由 `docker exec -i` 启动。不得把 repo 导出成宿主工作目录。
-3. 每个 harness reply 带机器状态：`completed | timed_out | interrupted | crashed`。`timed_out`/无法确认终止时，立即停止并删除整个会话容器；该 session 不再续聊，避免旧线程继续修改可写层。
+3. harness 正常 reply 带机器状态 `completed | interrupted | crashed`。慢请求不再有 240 秒整轮 deadline；每 90 秒由 persona 选择 `keep_waiting | send_message | interrupt | give_up`。`timed_out` 仅保留给宿主绝对上限等基础设施故障，与 `crashed` 一样 fail-closed。
 4. 正常结束时从会话容器导出 `git diff --binary` 文本及 SHA-256；随后删除会话容器。
 5. evaluator 从对应的官方 SWE-bench instance image 启动**新容器**，应用 diff 并运行 canonical eval 命令。交互容器里的依赖、未跟踪进程和测试缓存不带入验收。
 6. session 同时展示主观与客观两栏。persona accept 但客观失败/交互超时是 `false_accept`；未执行官方 evaluator 是 `unverified_accept`；只有 fresh evaluator 明确通过才是 `valid_accept`。
@@ -149,7 +152,7 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 
 ### 终止语义
 
-wire v1 的 terminal reply 增加 `status`。launcher 将最近请求结果记录为 `{request_id,status,started_at,finished_at}`，并通过 `last_request_status` 将最近终态原样暴露给 sim。`timed_out` 与 `crashed` 是 session 级污染：可见回复与事件仍落为审计证据，但 sim 必须在该回复到达后直接以 `harness_timed_out` / `harness_crashed` 收场，不再调用 persona 主决策，也不再写 harness；orchestrator `finally` 关闭 runtime。宿主等待的绝对上限触发时同样杀容器，而非只杀 `docker exec` 客户端。
+wire v1 的 terminal reply 增加 `status`。launcher 将最近请求结果记录为 `{request_id,status,started_at,finished_at}`，并通过 `last_request_status` 将最近终态原样暴露给 sim。harness 自身不再产生 240 秒 `timed_out`：工作线程只用于并行收 interrupt，不设 deadline。persona 心跳是观测与决策点，不是超时。仅当宿主 1800 秒绝对上限或真实崩溃使运行时无法确认收束时，记录 `timed_out` / `crashed` 并 fail-closed，避免只杀 `docker exec` 客户端却留下执行。
 
 ### 双结论
 
@@ -189,7 +192,7 @@ flowchart TD
 
 可运行 image 比存储型 scratch image 多一套 Python、shell、git 与 NexAU runtime，镜像增大；16 个并发容器还会各自占用进程 RSS 和可写层。代价是执行边界真实存在。镜像层共享，所以不是把 2–5 GB 镜像复制 16 次。
 
-超时后整局终止会损失尚未导出的修改，也不能“再问一句”。这是刻意的 fail-closed：一旦旧线程是否仍会写盘不可证明，该工作区便不再能作为审计证据。
+去掉 harness 整轮 deadline 后，真活锁可能占用容器更久；90 秒 persona 心跳是主要收敛机制，1800 秒宿主绝对上限仅是最后基础设施保护。
 
 官方 fresh evaluation 增加一次容器启动和测试时间。它与 persona 的快速核实不能合并，因为二者回答的问题不同。
 
@@ -211,7 +214,7 @@ SWE-bench 官方 harness 以 instance 为单位构建/启动 Docker image，在�
 
 ## Unresolved questions
 
-无阻塞问题。操作者已确定：使用做好的 image 起 Docker；persona 保留直接查看工作区的能力；主观接受与客观执行结果都保留；审计先做最小可复核证据。
+无阻塞问题。操作者已确定：使用做好的 image 起 Docker；persona 保留直接查看工作区的能力；主观接受与客观执行结果都保留；审计先做最小可复核证据；移除 harness 240 秒整轮超时，长请求由 90 秒 persona 心跳决定是否继续。
 
 正式 16×5 重跑使用新的 `isolated-v2` experiment id 与 runnable seed digest。旧的 `auto-designer-seed:swebench-medium-hard-16` 是 storage-only，按本 spec 必须被启动检查拒绝，而不是兼容运行；旧 experiment 目录保持原样。
 

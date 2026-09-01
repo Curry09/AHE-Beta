@@ -63,7 +63,7 @@ harness 是黑盒对话契约：stdin 收消息、stdout 回复。需要根治�
 - **reply 给人看**；`steps` 观测旁路；`progress` 是活状态不是终答（MANUAL activity strip）。
 - **打断** → `[interrupted]`，保留会话。
 - **长任务不盲杀**：`poll` 活进程 → pending。
-- **预算钮可见**（`_CALL_TIMEOUT`/`_RUN_RETRIES`）。
+- **预算钮可见**（`_RUN_RETRIES` / `max_iterations`）；harness 不设整轮墙钟上限。
 
 ## Reference-level explanation
 

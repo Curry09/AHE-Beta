@@ -222,7 +222,7 @@ tasks:
 | stop_kind | 典型 heard | 对照源码 |
 | --- | --- | --- |
 | `max_iterations` | `Maximum iteration limit reached` | `agent.yaml` → `max_iterations` |
-| `wall_timeout` | `[timeout] …内部时限…` | `entry.py` → `_CALL_TIMEOUT` |
+| `wall_timeout` | 历史 `[timeout]` / 基础设施上限 | 旧 harness deadline / launcher 绝对上限 |
 | `interrupt` | `[interrupted]…` | 用户侧 interrupt / control |
 | `completed` | 正常交付文案 | — |
 | `empty` | 无 harness_output | 等待拍等 |
@@ -288,4 +288,3 @@ SWE-bench_Verified 真仓探针上，设计师可观测到：先读 `entry.py`/`
 - 跨局聚合：按 `stop_kind` / gap 模式聚类，生成 harness 问题假设列表。
 - 看板只读 API 复用同一 timeline / beat 格式。
 - step 支持字节偏移分页（仅当硬顶实测不够）。
-

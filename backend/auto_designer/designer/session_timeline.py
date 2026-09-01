@@ -502,8 +502,8 @@ def format_harness_beat(*, session: Session, turn: int, occurrence: int) -> dict
             "Harness inner tool trail for one user-sim beat. tool_result bodies are clipped; "
             "not a full LLM dump. If a step has truncated=true and you still need the body, "
             "call get_harness_step(turn=…, step_i=<that i>) for a larger (still capped) expand. "
-            "Map stop_kind to harness knobs (agent.yaml max_iterations / entry.py "
-            "_CALL_TIMEOUT), not to the SWE task."
+            "Map stop_kind to runtime controls (agent.yaml max_iterations / launcher "
+            "infrastructure cap), not to the SWE task."
         ),
     }
 

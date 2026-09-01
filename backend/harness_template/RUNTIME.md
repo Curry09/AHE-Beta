@@ -27,8 +27,9 @@ The harness repository is not the user's project. Do not copy the user's project
 - A process keeps one conversation context while it is alive.
 - Internally, the runtime uses a stable `session_id` for the process. 换实例 ≠ 换 session: rebuilding an internal agent instance must preserve the user conversation.
 - A soft interrupt attempts to stop the current request while preserving context.
-- A hard timeout returns a structured `timed_out` reply. In the auto-designer session runtime this is terminal: the launcher destroys the whole session container because an abandoned worker may still be writing.
-- Partial file changes may exist at timeout, but that workspace is contaminated and must not be accepted, resumed, or used as objective evidence.
+- `agent.run` has no harness-level wall-clock timeout. The worker thread exists only so the process can receive `interrupt` while a request is running; it is not abandoned after a deadline.
+- The harness does not interpret elapsed wall-clock time. An embedding client may poll progress periodically and choose to keep waiting or send `interrupt`.
+- Partial file changes may remain after an interrupt and must be checked before the user accepts the result.
 
 ## User-visible behavior changes
 

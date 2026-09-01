@@ -16,6 +16,7 @@ import json
 import queue
 import sys
 import threading
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -70,10 +71,28 @@ class HarnessSmokeTest(unittest.TestCase):
         entry = importlib.import_module("entry")
         self.assertTrue(entry._INTERRUPT_REPLY.startswith("[interrupted]"))
 
-    def test_timeout_reply_is_marked_continuable(self) -> None:
+    def test_supervisor_waits_without_a_wall_clock_deadline(self) -> None:
         entry = importlib.import_module("entry")
-        self.assertTrue(entry._TIMEOUT_REPLY.startswith("[timeout]"))
-        self.assertIn("会话上下文已保留", entry._TIMEOUT_REPLY)
+
+        release = threading.Event()
+
+        class SlowAgent:
+            def run(self, *, message):
+                self.assert_message = message
+                release.wait()
+                return "finished"
+
+        box = {}
+        worker = threading.Thread(
+            target=lambda: box.setdefault("out", entry._run_supervised(SlowAgent(), "work", None))
+        )
+        worker.start()
+        time.sleep(0.05)
+        self.assertTrue(worker.is_alive(), "slow agent must keep running until completion/interrupt")
+        release.set()
+        worker.join(timeout=2)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(box["out"], "finished")
 
     def test_status_wire_out_is_user_visible_event(self) -> None:
         entry = importlib.import_module("entry")

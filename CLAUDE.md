@@ -23,7 +23,7 @@
 
 - **a｜用户侧**：user agent 按 persona 和种子场景使用 harness，产生一段使用过程（包含追问、绕路、卡顿、放弃等情况）。输出两类信号：① 体感评分（类似 cc 的 1-4 评分，作训练信号）；② issue（bug 或需求，来自使用中的具体问题点）。
 
-  SWE-bench 场景按 spec-0051 使用**每会话一个临时容器**：从同一 runnable seed image 启动，persona 的 `read_file`/`run_shell` 与 harness 均只操作容器内 repo，不把 repo `docker cp` 到宿主。请求超时/崩溃会回收整个容器。会话仍保留主观体感与接受决定，但技术通过只认随后由官方 SWE-bench harness 在新鲜 instance 容器产生的客观结果；两者与最小审计事件分别落入 session JSON。
+  SWE-bench 场景按 spec-0051 使用**每会话一个临时容器**：从同一 runnable seed image 启动，persona 的 `read_file`/`run_shell` 与 harness 均只操作容器内 repo，不把 repo `docker cp` 到宿主。harness 不设 240 秒整轮超时，慢请求由 90 秒 persona 心跳决定续等或打断；仅真实崩溃/基础设施绝对上限 fail-closed。会话仍保留主观体感与接受决定，但技术通过只认随后由官方 SWE-bench harness 在新鲜 instance 容器产生的客观结果；两者与最小审计事件分别落入 session JSON。
 
 - **b｜开发者侧（交付面，spec-0032 现行）**：由 OpenAgents vigil（独立 CLI 常驻进程）承担。需求面 Owner 准入的票带 `openagents` 交接令牌，vigil 发现后走「盖 ready → curator 排依赖 → worktree/分支 → 实现 → 评审循环 → PR → conflict/CI/review 闸 → 合并进 main」。CI/评审是**工程质量闸**（harness 仓结构冒烟，绝不跑 benchmark），与已去掉的体感门禁维度不同；体感仍纯观测、benchmark 全程 held-out。坏改动在 PR 处被打回、不落 main。
 

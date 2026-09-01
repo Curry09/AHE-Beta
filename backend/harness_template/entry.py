@@ -22,13 +22,9 @@ import uuid
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-# ── 一级预算钮（延迟体感的总闸；改这里最省事，先质疑它再谈别的）─────────────────
-# 单轮最坏墙钟 ≈ _CALL_TIMEOUT（首次超时即回结构化终态，不再闷头 × _RUN_RETRIES）。
-# 空回复 / 网关毛刺仍用 _RUN_RETRIES 退避重试（同实例，不换 session）。
+# 空回复 / 网关毛刺用 _RUN_RETRIES 退避重试（同实例，不换 session）。
+# agent.run 没有整轮墙钟上限；慢任务由外层 90s persona 心跳观测并决定续等/打断。
 _RUN_RETRIES = 4
-# 单次 agent.run 硬超时（秒）：nexau 自身的 llm_config.timeout 实测不生效，故在此层用线程兜底，
-# 卡住即放弃该次（daemon 线程丢弃），rebuild 换锁键并回灌 history 后把控制权交回用户。
-_CALL_TIMEOUT = 240
 # 打断（control:interrupt）后等待 nexau 优雅停止（保留 session/history）的宽限秒数：
 # executor.force_stop() 只置位中断信号，run 会在下一个检查点安全退出。超过宽限仍没退，
 # 说明这次没赶上优雅停止 → 换新 agent_id 重建避自锁，并显式回灌 history。
@@ -37,11 +33,6 @@ _INTERRUPT_GRACE = 15.0
 _INTERRUPT_REPLY = (
     "[interrupted] 已按你的要求停止当前处理，这一步没有完成。"
     "会话上下文已保留——你可以直接给出修改后的要求或下一条指示，我会接着当前进度继续。"
-)
-# 硬超时：不闷头重试；v1 launcher 收到 timed_out 后回收整个会话容器。
-_TIMEOUT_REPLY = (
-    "[timeout] 这一步在内部时限内没有完成，当前请求已停下。"
-    "该工作区可能仍有未受控写入，当前会话不能继续，也不能据此宣称实现已验证。"
 )
 _HARNESS_USER_ID = "harness_user"
 _V1 = "stdio-jsonl-v1"
@@ -166,14 +157,14 @@ def _emit_usage(**payload) -> None:
         pass
 
 
-def _run_supervised(agent, message, timeout, ctrl_q):
-    """跑一次 agent.run，同时守望硬超时与用户打断（control 队列）。
+def _run_supervised(agent, message, ctrl_q):
+    """跑一次 agent.run，同时守望用户打断（control 队列）。
 
     - 正常完成：返回结果。
-    - 硬超时：raise TimeoutError（daemon 线程被放弃，v1 caller 必须回收整个容器）。
     - 收到 interrupt：force_stop 优雅停止（保留 session）→ raise _Interrupted(rebuild=False)；
       若宽限内没停下 → _Interrupted(rebuild=True)，由 caller 重建避自锁并回灌 history。
-    ctrl_q 为 None（无打断能力的调用场景）时退化为纯超时行为。"""
+    工作线程只是为了让主线程持续处理 interrupt，不再用 deadline 放弃正在运行的请求。
+    ctrl_q 为 None 时等到 agent.run 自身返回。"""
     box: dict = {}
 
     def target():
@@ -184,9 +175,8 @@ def _run_supervised(agent, message, timeout, ctrl_q):
 
     t = threading.Thread(target=target, daemon=True)
     t.start()
-    deadline = time.monotonic() + timeout
     while t.is_alive():
-        # 小步轮询：既要能及时响应打断，又要能掐硬超时。
+        # 小步轮询只为及时响应打断；长任务由 persona 心跳决定是否续等。
         t.join(0.5)
         if not t.is_alive():
             break
@@ -200,8 +190,6 @@ def _run_supervised(agent, message, timeout, ctrl_q):
                 if stopped:
                     t.join(_INTERRUPT_GRACE)  # 等它在下一个检查点优雅退出
                 raise _Interrupted(rebuild=not stopped or t.is_alive())
-        if time.monotonic() >= deadline:
-            raise TimeoutError(f"agent.run 超时 >{timeout}s")
     if "err" in box:
         raise box["err"]
     return box.get("out")
@@ -438,14 +426,12 @@ def _reply(agent, message: str, rebuild, ctrl_q=None):
     """返回 (live_agent, reply, terminal_status)。
 
     hard interrupt 可调用 `rebuild()` 换新 agent_id 并回灌 history（见 RUNTIME.md）。
-    硬超时后旧线程是否还会写盘不可证明，因此只报告 terminal status，不再重建。
-    超时不闷头重试，立即回 `_TIMEOUT_REPLY`；v1 launcher 随后销毁会话容器。
     空回复 / 502 等同实例退避重试。优雅打断保持同实例；强打断才 rebuild。
     """
     last = None
     for attempt in range(_RUN_RETRIES):
         try:
-            out = _run_supervised(agent, message, _CALL_TIMEOUT, ctrl_q)  # 硬超时 + 可打断
+            out = _run_supervised(agent, message, ctrl_q)  # 无整轮超时，但可由 persona 打断
             text = out if isinstance(out, str) else (out[0] if out else "")  # 工具型返回 result 串
             if text and text.strip():  # 非空才算成功
                 return agent, text, "completed"
@@ -454,8 +440,6 @@ def _reply(agent, message: str, rebuild, ctrl_q=None):
             if it.rebuild:
                 agent = rebuild(agent)
             return agent, _INTERRUPT_REPLY, "interrupted"
-        except TimeoutError:  # 线程被放弃且可能继续写盘 → launcher 回收整个容器
-            return agent, _TIMEOUT_REPLY, "timed_out"
         except Exception as exc:  # 网关 502 等 → 同 agent 退避重试（线程已结束、锁已释放）
             last = exc
         if attempt < _RUN_RETRIES - 1:  # 末次不再睡

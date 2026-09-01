@@ -34,13 +34,13 @@ from auto_designer.user.sim.runtime import DockerWorkspaceRuntime, Workspace, as
 
 _PARAMS_FILE = "params.yaml"
 
-# 单轮回复的兜底机制。注意：harness 自身对每轮已有上界（v0 模板 _CALL_TIMEOUT×_RUN_RETRIES ≈ 16min
-# 后必回 [harness error]），所以「慢」是合法的长任务，绝不能按墙钟盲杀（会误杀真长任务）。
+# 单轮回复的兜底机制。harness 自身不设整轮墙钟上限：「慢」是合法的长任务，
+# 由外层 90s persona 心跳决定续等/打断，不按旧 240s deadline 盲杀。
 # 真正要防的是「进程已死但孤儿子进程占着管道写端 → readline 永不 EOF」这种死锁：靠轮询 proc.poll()
 # 精确识别（进程没了却没回完整行 → 立即上抛），而非靠计时。
 _POLL_INTERVAL = 5.0
-# 绝对上限：仅作最后兜底，防「进程还活着但真活锁」（如被改坏、自身上界被移除的 harness 无限空转）。
-# 设得远高于 harness 自身 ~16min 的上界，正常长任务绝不会触达。
+# 绝对上限：仅作最后基础设施兜底，防「进程还活着但真活锁」。
+# 正常慢任务应先经多次 persona 心跳做出明确决策，不依赖此上限收敛。
 _SEND_ABS_CAP = 1800.0
 # 读线程 EOF / 进程退出时投进行队列的哨兵（与真实 stdout 行区分）。
 _EOF = object()

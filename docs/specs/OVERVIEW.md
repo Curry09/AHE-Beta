@@ -155,7 +155,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 非末轮：用户测完后提案、准入，并等到本轮准入票全部终态才开下一轮用户；卡死则停实验。末轮只跑用户交互，不再跑需求与交付。第 N+1 轮体感相对第 N 轮体感归因于第 N 轮已封口产物。
 
 ### 0051 会话容器隔离与客观验收证据
-每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；超时回收整个容器执行边界；主观接受与新鲜 SWE-bench 客观执行结果分栏落盘，假接受不得计为通过。
+每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；harness 长请求由 90s persona 心跳决定续等或打断；主观接受与新鲜 SWE-bench 客观执行结果分栏落盘，假接受不得计为通过。
 
 ## 全局看板
 
@@ -390,7 +390,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0050 | 0050/T5 | 架构说明与封口 e2e 脚本 | done | T3 | CLAUDE.md<br>backend/scripts/e2e-spec-0050-round-delivery-gate.sh |
 | 0051 | 0051/T1 | 隔离与验收契约 | done | — | docs/specs/0051-session-container-objective-evidence.md |
 | 0051 | 0051/T2 | 会话运行时与容器 seed | done | T1 | backend/auto_designer/user/sim/runtime.py<br>backend/auto_designer/user/sim/workspace.py<br>backend/auto_designer/user/sim/seed_source.py<br>backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/auto_designer/user/sim/deps.py<br>backend/auto_designer/user/sim/sandbox.py<br>backend/auto_designer/user/sim/tools.py<br>backend/tests/user/sim/test_docker_seed_source.py<br>backend/tests/user/sim/test_workspace_runtime.py<br>backend/scripts/prepare_swebench_runtime_tree.py |
-| 0051 | 0051/T3 | harness 容器执行与强制终止 | done | T2 | backend/auto_designer/harness/launcher.py<br>backend/harness_template/entry.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_sim_user.py |
+| 0051 | 0051/T3 | harness 容器执行与强制终止 | done | T2 | backend/auto_designer/harness/launcher.py<br>backend/harness_template/entry.py<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/tests/test_smoke.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_template_entry.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_sim_user.py |
 | 0051 | 0051/T4 | 双结论、客观执行与假接受 | done | T3 | backend/auto_designer/evaluation/swebench.py<br>backend/auto_designer/evaluation/__init__.py<br>backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/evaluation/test_swebench.py<br>backend/tests/user/test_session_store.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/test_models.py<br>pyproject.toml |
 | 0051 | 0051/T5 | 可运行镜像、一键入口与审计冒烟 | done | T4 | backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/runtime.Dockerfile<br>backend/scripts/build_swebench_runtime_image.sh<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh<br>backend/scripts/run-glm52fp8-1m-canary2-isolated.sh<br>backend/scripts/e2e-spec-0051-session-container.sh<br>CLAUDE.md |
 
@@ -1089,11 +1089,11 @@ graph LR
 | backend/harness_template/.gitea/workflows/smoke.yml | 0032, 0040 |
 | backend/harness_template/HELP.md | 0030, 0035 |
 | backend/harness_template/MANUAL.md | 0013, 0022 |
-| backend/harness_template/RUNTIME.md | 0022, 0030, 0035 |
+| backend/harness_template/RUNTIME.md | 0022, 0030, 0035, 0051 |
 | backend/harness_template/agents/main.md | 0003, 0030 |
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041, 0051 |
 | backend/harness_template/params.yaml | 0003, 0030 |
-| backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041 |
+| backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041, 0051 |
 | backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
@@ -1112,6 +1112,7 @@ graph LR
 | backend/tests/dev/test_workspace_jail.py | 0015, 0049 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051 |
+| backend/tests/harness/test_template_entry.py | 0013, 0051 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043 |
 | backend/tests/loop/test_live.py | 0017, 0026, 0050 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
