@@ -16,7 +16,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates coreutils git procps python3 python3-pip \
+    && apt-get install -y --no-install-recommends \
+        bash ca-certificates coreutils git procps python3 python3-pip \
+        libgl1 libx11-6 libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=py310 /usr/bin/python3.10 /usr/bin/python3.10
 COPY --from=py310 /usr/lib/python3.10/ /usr/lib/python3.10/
