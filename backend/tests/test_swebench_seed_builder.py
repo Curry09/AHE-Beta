@@ -97,3 +97,13 @@ def test_setup_uses_the_running_python_interpreter() -> None:
     commands = module._setup_commands({"repo": "owner/repo"})
 
     assert commands[0] == f"{module.shlex.quote(sys.executable)} -m venv .venv"
+
+
+def test_setup_allows_a_pinned_legacy_python() -> None:
+    module = _module()
+
+    commands = module._setup_commands(
+        {"repo": "owner/repo", "setup_python": "python3.10"}
+    )
+
+    assert commands[0] == "python3.10 -m venv .venv"

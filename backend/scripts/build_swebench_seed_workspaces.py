@@ -125,12 +125,19 @@ def _tree_size(path: Path) -> int:
     return int(proc.stdout.split()[0])
 
 
+def _setup_interpreter(row: dict[str, Any]) -> tuple[str, tuple[int, int]]:
+    requested = str(row.get("setup_python") or "").strip()
+    if not requested and row["repo"] == "scikit-learn/scikit-learn":
+        requested = "python3.10"
+    if requested == "python3.10":
+        return "python3.10", (3, 10)
+    if requested in {"", "current"}:
+        return shlex.quote(sys.executable), (sys.version_info.major, sys.version_info.minor)
+    raise ValueError(f"unsupported setup_python: {requested!r}")
+
+
 def _setup_commands(row: dict[str, Any]) -> list[str]:
-    interpreter = (
-        "python3.10"
-        if row["repo"] == "scikit-learn/scikit-learn"
-        else shlex.quote(sys.executable)
-    )
+    interpreter, _expected = _setup_interpreter(row)
     commands = [
         f"{interpreter} -m venv .venv",
         # setuptools 81 removed pkg_resources, which several historical Verified
@@ -174,7 +181,7 @@ def _setup_commands(row: dict[str, Any]) -> list[str]:
 
 def _run_setup(repo_dir: Path, row: dict[str, Any], *, timeout: float) -> None:
     venv_python = repo_dir / ".venv" / "bin" / "python"
-    expected = (3, 10) if row["repo"] == "scikit-learn/scikit-learn" else (3, 12)
+    _interpreter, expected = _setup_interpreter(row)
     if venv_python.is_file():
         proc = subprocess.run(
             [str(venv_python), "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
@@ -213,6 +220,21 @@ def _run_setup(repo_dir: Path, row: dict[str, Any], *, timeout: float) -> None:
 
 def _deps_cached(repo_dir: Path, row: dict[str, Any]) -> bool:
     if not (repo_dir / DEPS_MARKER).is_file():
+        return False
+    venv_python = repo_dir / ".venv" / "bin" / "python"
+    if not venv_python.is_file():
+        return False
+    _interpreter, expected = _setup_interpreter(row)
+    proc = subprocess.run(
+        [
+            str(venv_python),
+            "-c",
+            "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0 or proc.stdout.strip() != f"{expected[0]}.{expected[1]}":
         return False
     return row["repo"] not in LEGACY_COMPAT_REPOS or (
         repo_dir / LEGACY_COMPAT_MARKER

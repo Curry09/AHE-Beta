@@ -28,6 +28,7 @@
     {
       "instance_id": "pylint-dev__astroid-1417",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "cached-property-migration"
     },
@@ -58,6 +59,7 @@
     {
       "instance_id": "pylint-dev__astroid-1351",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "medium-hard",
       "theme": "source-location-accounting"
     },
@@ -220,18 +222,21 @@
     {
       "instance_id": "pvlib__pvlib-python-1478",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "timeseries-albedo-modelchain"
     },
     {
       "instance_id": "pvlib__pvlib-python-718",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "frontier",
       "theme": "parameter-estimation-model"
     },
     {
       "instance_id": "pvlib__pvlib-python-1176",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "frontier",
       "theme": "array-tracker-architecture"
     },
@@ -244,12 +249,14 @@
     {
       "instance_id": "pvlib__pvlib-python-1033",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "temperature-model-configuration"
     },
     {
       "instance_id": "pvlib__pvlib-python-1186",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "hard",
       "theme": "remote-api-parser"
     },
@@ -262,6 +269,7 @@
     {
       "instance_id": "pvlib__pvlib-python-823",
       "difficulty": "",
+      "setup_python": "python3.10",
       "selection_tier": "frontier",
       "theme": "solar-tracker-backtracking"
     },
