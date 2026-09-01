@@ -37,9 +37,7 @@ def test_all_once_plan_covers_each_instance_and_rotates_personas(monkeypatch) ->
     assert first == repeated
     assert sorted(instance for _persona, instance in first) == ["one", "three", "two"]
     assert len({instance for _persona, instance in first}) == 3
-    assert [persona for persona, _instance in first] != [
-        persona for persona, _instance in second
-    ]
+    assert [persona for persona, _instance in first] != [persona for persona, _instance in second]
 
 
 def test_scenario_sources_all_preserve_instance_id(tmp_path, monkeypatch) -> None:
@@ -71,3 +69,36 @@ def test_scenario_sources_all_preserve_instance_id(tmp_path, monkeypatch) -> Non
     git = module._to_scenario(meta).workspace
     assert git is not None and git.kind == "git"
     assert git.params["instance_id"] == meta["instance_id"]
+
+
+def test_frozen_plan_loads_roster_and_rejects_drift(tmp_path) -> None:
+    module = _module()
+    roster = tmp_path / "roster.json"
+    roster.write_text('{"personas":[{"id":"a"},{"id":"b"}]}', encoding="utf-8")
+    persona_ids = module._load_persona_ids(path=roster, fallback=["fallback"])
+    assert persona_ids == ["a", "b"]
+
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        '[[["a","one"],["b","two"]],[["b","one"],["a","two"]]]',
+        encoding="utf-8",
+    )
+    loaded = module._load_interaction_plan(
+        path=plan,
+        total_rounds=2,
+        persona_ids=persona_ids,
+        instance_ids=["one", "two"],
+    )
+    assert loaded == [
+        [("a", "one"), ("b", "two")],
+        [("b", "one"), ("a", "two")],
+    ]
+
+    plan.write_text('[[["a","outside"],["b","two"]]]', encoding="utf-8")
+    with pytest.raises(SystemExit, match="题池外"):
+        module._load_interaction_plan(
+            path=plan,
+            total_rounds=1,
+            persona_ids=persona_ids,
+            instance_ids=["one", "two"],
+        )

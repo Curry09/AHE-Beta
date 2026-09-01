@@ -52,6 +52,70 @@ PERSONA_IDS = [
     "sr-04-dhh",
     "sr-05-klabnik",
 ]
+
+
+def _load_persona_ids(*, path: Path | None, fallback: list[str]) -> list[str]:
+    """Load the frozen persona roster used by an auditable experiment."""
+    if path is None:
+        return list(fallback)
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        records = document["personas"]
+        persona_ids = [str(item["id"]) for item in records]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise SystemExit(f"persona roster 非法：{path}: {exc}") from exc
+    if not persona_ids or len(persona_ids) != len(set(persona_ids)):
+        raise SystemExit(f"persona roster 必须非空且 ID 唯一：{path}")
+    return persona_ids
+
+
+def _load_interaction_plan(
+    *, path: Path | None, total_rounds: int, persona_ids: list[str], instance_ids: list[str]
+) -> list[list[tuple[str, str]]] | None:
+    """Validate and freeze every round's persona/task assignment."""
+    if path is None:
+        return None
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"interaction plan 非法：{path}: {exc}") from exc
+    if not isinstance(document, list) or len(document) != total_rounds:
+        raise SystemExit(
+            f"interaction plan 轮数必须为 {total_rounds}：{path}（实际 "
+            f"{len(document) if isinstance(document, list) else '非列表'}）"
+        )
+    allowed_personas = set(persona_ids)
+    allowed_instances = set(instance_ids)
+    rounds: list[list[tuple[str, str]]] = []
+    expected_size: int | None = None
+    for round_index, raw_round in enumerate(document, start=1):
+        if not isinstance(raw_round, list) or not raw_round:
+            raise SystemExit(f"interaction plan 第 {round_index} 轮必须为非空列表")
+        pairs: list[tuple[str, str]] = []
+        for raw_pair in raw_round:
+            if not isinstance(raw_pair, list) or len(raw_pair) != 2:
+                raise SystemExit(f"interaction plan 第 {round_index} 轮含非法 pair")
+            persona_id, instance_id = map(str, raw_pair)
+            if persona_id not in allowed_personas:
+                raise SystemExit(
+                    f"interaction plan 第 {round_index} 轮引用 roster 外 persona：{persona_id}"
+                )
+            if instance_id not in allowed_instances:
+                raise SystemExit(
+                    f"interaction plan 第 {round_index} 轮引用题池外 instance：{instance_id}"
+                )
+            pairs.append((persona_id, instance_id))
+        if len({persona for persona, _instance in pairs}) != len(pairs):
+            raise SystemExit(f"interaction plan 第 {round_index} 轮 persona 必须唯一")
+        if len({instance for _persona, instance in pairs}) != len(pairs):
+            raise SystemExit(f"interaction plan 第 {round_index} 轮 instance 必须唯一")
+        expected_size = expected_size or len(pairs)
+        if len(pairs) != expected_size:
+            raise SystemExit("interaction plan 每轮 session 数必须一致")
+        rounds.append(pairs)
+    return rounds
+
+
 # 难度 4×<15min + 4×15m-1h + 2×1-4h；10 个不同仓，避开 django 过密。
 _DEFAULT_INSTANCE_IDS = [
     "pallets__flask-5014",
@@ -98,6 +162,22 @@ SESSION_SEED = int(os.environ.get("SESSION_SEED", "20260725") or "20260725")
 os.environ.setdefault("TOTAL_ROUNDS", "5")
 os.environ.setdefault("N_USERS", str(SESSIONS_PER_ROUND))
 run_mod.TOTAL_ROUNDS = int(os.environ.get("TOTAL_ROUNDS", "5") or "5")
+
+_persona_roster_raw = os.environ.get("PERSONA_ROSTER", "").strip()
+PERSONA_IDS = _load_persona_ids(
+    path=Path(_persona_roster_raw).expanduser().resolve() if _persona_roster_raw else None,
+    fallback=PERSONA_IDS,
+)
+_interaction_plan_raw = os.environ.get("SWEBENCH_INTERACTION_PLAN", "").strip()
+FROZEN_INTERACTION_PLAN = _load_interaction_plan(
+    path=(Path(_interaction_plan_raw).expanduser().resolve() if _interaction_plan_raw else None),
+    total_rounds=run_mod.TOTAL_ROUNDS,
+    persona_ids=PERSONA_IDS,
+    instance_ids=INSTANCE_IDS,
+)
+if FROZEN_INTERACTION_PLAN is not None:
+    SESSIONS_PER_ROUND = len(FROZEN_INTERACTION_PLAN[0])
+    os.environ["N_USERS"] = str(SESSIONS_PER_ROUND)
 
 
 def _setup_cmd() -> list[str]:
@@ -179,6 +259,11 @@ def _to_scenario(meta: dict):
 
 
 def _session_picks(rng: random.Random, *, round_index: int) -> list[tuple[str, str]]:
+    if FROZEN_INTERACTION_PLAN is not None:
+        try:
+            return list(FROZEN_INTERACTION_PLAN[round_index])
+        except IndexError as exc:
+            raise RuntimeError(f"interaction plan 缺第 {round_index + 1} 轮") from exc
     if ALL_ONCE:
         instance_order = list(INSTANCE_IDS)
         rng.shuffle(instance_order)
@@ -212,6 +297,12 @@ def main() -> int:
     from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
     from auto_designer.user.sim.persona_io import card_to_persona
 
+    context_path = os.environ.get("AUTO_DESIGNER_EXPERIMENT_CONTEXT", "").strip()
+    if context_path:
+        from auto_designer.experiment.runtime import ExperimentContext
+
+        context = ExperimentContext.load(path=Path(context_path))
+        run_mod.apply_experiment_context(ctx=context)
     run_mod._isolate_git_credentials()
     llm_env = run_mod._load_env(ROOT / ".env")
     # 启动命令显式注入的配置优先于仓内 .env，便于临时切换网关/模型且不把密钥写盘。
@@ -221,7 +312,11 @@ def main() -> int:
         if not val:
             raise SystemExit(f"backend/.env 缺 HARNESS_LLM_{suffix}")
         os.environ[f"LLM_{suffix}"] = val
-    gitea = run_mod._load_env(ROOT / "deploy" / "gitea" / ".env")
+    gitea_path = Path(
+        os.environ.get("AUTO_DESIGNER_GITEA_ENV_FILE", "").strip()
+        or str(ROOT / "deploy" / "gitea" / ".env")
+    )
+    gitea = run_mod._load_env(gitea_path)
 
     roster = load_roster()
     bypass = ["localhost", "127.0.0.1"]

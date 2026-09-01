@@ -52,6 +52,35 @@ class ExperimentContext:
     mode: str
     manifest_sha: str
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            key: str(value) if isinstance(value, Path) else value
+            for key, value in self.__dict__.items()
+        }
+
+    @classmethod
+    def load(cls, *, path: Path) -> ExperimentContext:
+        try:
+            values = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ConfigError(f"实验 context 不可读：{path}: {exc}") from exc
+        if not isinstance(values, dict):
+            raise ConfigError("实验 context 必须为 JSON object")
+        for key in (
+            "data_root",
+            "harness_repo",
+            "harness_runs_root",
+            "sessions_root",
+            "vigil_config_root",
+            "telemetry_root",
+        ):
+            if key in values:
+                values[key] = Path(str(values[key])).resolve()
+        try:
+            return cls(**values)
+        except TypeError as exc:
+            raise ConfigError(f"实验 context 字段非法：{exc}") from exc
+
 
 def load_config(*, path: Path) -> ExperimentConfig:
     yaml = YAML(typ="safe")
@@ -76,6 +105,7 @@ def create(*, config_path: Path, root: Path | None = None) -> dict[str, Any]:
         "workspaces",
         "source",
         "infrastructure",
+        "runtime",
         "secrets",
         "archive",
         "data",
@@ -139,9 +169,7 @@ def preflight(*, experiment_id: str, root: Path | None = None) -> dict[str, Any]
     return {"ok": True, "isolation": isolation, "compose_project": manifest["compose_project"]}
 
 
-def start(
-    *, experiment_id: str, root: Path | None = None, run=None
-) -> ExperimentContext:
+def start(*, experiment_id: str, root: Path | None = None, run=None) -> ExperimentContext:
     paths = experiment_paths(experiment_id=experiment_id, root=root or experiments_root())
     manifest = read_manifest(path=paths["manifest"])
     vigil_image = str((manifest.get("images") or {}).get("vigil") or "")
@@ -198,16 +226,6 @@ def archive(*, experiment_id: str, root: Path | None = None) -> Path:
     paths = experiment_paths(experiment_id=experiment_id, root=root or experiments_root())
     dest = paths["archive"] / "bundle"
     dest.mkdir(parents=True, exist_ok=True)
-    for name in ("manifest.json", "journal.jsonl", "config.yaml"):
-        src = paths["root"] / name
-        if src.is_file():
-            shutil.copy2(src, dest / name)
-    if paths["sessions"].is_dir():
-        shutil.copytree(paths["sessions"], dest / "sessions", dirs_exist_ok=True)
-    if paths["telemetry"].is_dir():
-        shutil.copytree(paths["telemetry"], dest / "telemetry", dirs_exist_ok=True)
-    if (dest / "secrets").exists():
-        shutil.rmtree(dest / "secrets")
     append_journal(
         path=paths["journal"],
         action="archive",
@@ -215,6 +233,18 @@ def archive(*, experiment_id: str, root: Path | None = None) -> Path:
         to_state="ARCHIVED",
         resources={"archive": str(dest)},
     )
+    for name in ("manifest.json", "journal.jsonl", "config.yaml"):
+        src = paths["root"] / name
+        if src.is_file():
+            shutil.copy2(src, dest / name)
+    for name in ("sessions", "telemetry", "logs", "checkpoints", "data", "runtime"):
+        if paths[name].is_dir():
+            shutil.copytree(paths[name], dest / name, dirs_exist_ok=True)
+    if (dest / "secrets").exists():
+        shutil.rmtree(dest / "secrets")
+    harness_bundle = paths["archive"] / "harness.bundle"
+    if harness_bundle.is_file():
+        shutil.copy2(harness_bundle, dest / harness_bundle.name)
     return dest
 
 

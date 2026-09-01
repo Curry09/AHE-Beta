@@ -90,3 +90,27 @@ def test_preflight_and_resume(tmp_path: Path, monkeypatch) -> None:
     runtime.stop(experiment_id="exp-c", root=tmp_path, run=docker)
     ctx = runtime.resume(experiment_id="exp-c", root=tmp_path, run=docker)
     assert ctx.experiment_id == "exp-c"
+
+
+def test_experiment_context_private_json_round_trip(tmp_path: Path) -> None:
+    ctx = runtime.ExperimentContext(
+        experiment_id="exp-context",
+        data_root=tmp_path / "data",
+        harness_repo=tmp_path / "data/harness",
+        harness_runs_root=tmp_path / "data/runs",
+        sessions_root=tmp_path / "sessions",
+        vigil_config_root=tmp_path / "runtime/vigil",
+        vigil_container="exp-vigil",
+        vigil_network="exp-network",
+        compose_project="exp-project",
+        gitea_host="http://127.0.0.1:3000",
+        gitea_internal="http://gitea:3000",
+        model_profile="glm-local",
+        telemetry_root=tmp_path / "telemetry",
+        mode="full-evolution",
+        manifest_sha="abc",
+    )
+    path = tmp_path / "context.json"
+    path.write_text(json.dumps(ctx.to_dict()), encoding="utf-8")
+    loaded = runtime.ExperimentContext.load(path=path)
+    assert loaded == ctx

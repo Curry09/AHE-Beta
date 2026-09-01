@@ -64,9 +64,7 @@ class ExperimentConfig:
 def validate_experiment_id(*, raw: str) -> str:
     text = raw.strip()
     if not _ID_RE.fullmatch(text) or len(text) > _ID_MAX:
-        raise ConfigError(
-            f"experiment_id 非法 {raw!r}：仅小写字母数字与单连字符，最长 {_ID_MAX}"
-        )
+        raise ConfigError(f"experiment_id 非法 {raw!r}：仅小写字母数字与单连字符，最长 {_ID_MAX}")
     return text
 
 
@@ -104,6 +102,7 @@ def experiment_paths(*, experiment_id: str, root: Path | None = None) -> dict[st
         "workspaces": base / "workspaces",
         "source": base / "source",
         "infrastructure": base / "infrastructure",
+        "runtime": base / "runtime",
         "secrets": base / "secrets",
         "archive": base / "archive",
         "data": base / "data",

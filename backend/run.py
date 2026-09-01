@@ -31,6 +31,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import uuid
 from pathlib import Path
 
@@ -49,6 +50,7 @@ DEFAULT_PERSONA_LIBRARY = (
     ROOT / "persona_library.json"
 )  # distill 合并库（sr-* + gh-*）；分库见 persona_library_{selfreport,github}.json
 DEFAULT_SEED_CARDS = ROOT / "seeds.json"  # distill 种子卡库（原始卡；经 seed_adapter 注入）
+GITEA_ENV_FILE = ROOT / "deploy" / "gitea" / ".env"
 
 # 每轮跑几个 persona（None=用满卡库全部）。默认由 roster（编制）的用户数决定，与前端房间容量一致；
 # 仍可设为具体整数手动覆盖。用户会话数≈persona 数，耗时按此线性放大，按需下调。
@@ -176,13 +178,24 @@ def _seed_harness_repo() -> Path:
     if HARNESS_REPO.exists():
         shutil.rmtree(HARNESS_REPO)
     HARNESS_REPO.mkdir(parents=True)
-    template = ROOT / "harness_template"
-    for item in template.iterdir():
-        dest = HARNESS_REPO / item.name
-        if item.is_dir():
-            shutil.copytree(item, dest)
-        else:
-            shutil.copy2(item, dest)
+    archive_raw = os.environ.get("AUTO_DESIGNER_HARNESS_ARCHIVE", "").strip()
+    if archive_raw:
+        archive = Path(archive_raw).expanduser().resolve()
+        if not archive.is_file():
+            raise SystemExit(f"冻结 Harness archive 不存在：{archive}")
+        try:
+            with tarfile.open(archive, "r:gz") as bundle:
+                bundle.extractall(HARNESS_REPO, filter="data")
+        except (tarfile.TarError, OSError) as exc:
+            raise SystemExit(f"冻结 Harness archive 解包失败：{archive}: {exc}") from exc
+    else:
+        template = ROOT / "harness_template"
+        for item in template.iterdir():
+            dest = HARNESS_REPO / item.name
+            if item.is_dir():
+                shutil.copytree(item, dest)
+            else:
+                shutil.copy2(item, dest)
     subprocess.run(
         ["git", "init", "-b", "main", str(HARNESS_REPO)], check=True, capture_output=True
     )
@@ -313,7 +326,8 @@ def apply_experiment_context(*, ctx: object) -> None:
         _SANDBOX_ROOT, \
         _VIGIL_CONTAINER, \
         _VIGIL_NETWORK, \
-        _VIGIL_CONFIG_STAGING
+        _VIGIL_CONFIG_STAGING, \
+        GITEA_ENV_FILE
     experiment_id = str(ctx.experiment_id)  # type: ignore[attr-defined]
     os.environ["AUTO_DESIGNER_EXPERIMENT_ID"] = experiment_id
     DATA = Path(ctx.data_root)  # type: ignore[attr-defined]
@@ -322,6 +336,7 @@ def apply_experiment_context(*, ctx: object) -> None:
     _VIGIL_CONTAINER = str(ctx.vigil_container)  # type: ignore[attr-defined]
     _VIGIL_NETWORK = str(ctx.vigil_network)  # type: ignore[attr-defined]
     _VIGIL_CONFIG_STAGING = Path(ctx.vigil_config_root)  # type: ignore[attr-defined]
+    GITEA_ENV_FILE = DATA.parent / "secrets" / "demand-gitea.env"
 
 
 def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
@@ -370,7 +385,9 @@ def ensure_openagents_cli() -> None:
 
 # Spec-0033/T2：交付面运行形态。container（缺省）= 围堵盒：零宿主挂载自 clone、internal 网络 +
 # egress 代理 allowlist；subprocess = 宿主直跑，无任何围堵，仅限人盯着日志的一次性联调。
-_VIGIL_IMAGE = "auto-designer-vigil:latest"
+_VIGIL_IMAGE = (
+    os.environ.get("AUTO_DESIGNER_VIGIL_IMAGE", "").strip() or "auto-designer-vigil:latest"
+)
 _VIGIL_CONTAINER = "auto-designer-vigil"
 _VIGIL_NETWORK = "auto-designer-vigil-net"  # deploy/gitea compose 里的 internal 网络（按名引用）
 _VIGIL_PROXY_URL = "http://egress-proxy:3128"  # 盒内唯一外网通道（allowlist 见 egress-proxy.conf）
@@ -687,7 +704,7 @@ def main() -> int:
                 "见 backend/.env.example"
             )
         os.environ[f"LLM_{_suffix}"] = _val
-    gitea = _load_env(ROOT / "deploy" / "gitea" / ".env")  # GITEA_URL/OWNER/REPO/TOKEN
+    gitea = _load_env(GITEA_ENV_FILE)  # GITEA_URL/OWNER/REPO/TOKEN
 
     from auto_designer.loop.roster import load_roster
 

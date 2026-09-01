@@ -16,7 +16,9 @@ LABEL_MANIFEST = "io.openagents.manifest_sha"
 COMPOSE_TEMPLATE = (
     Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "docker-compose.yml"
 )
-EGRESS_TEMPLATE = Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "egress-proxy.conf"
+EGRESS_TEMPLATE = (
+    Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "egress-proxy.conf"
+)
 
 RunFn = Callable[..., subprocess.CompletedProcess]
 
@@ -25,19 +27,32 @@ class InfrastructureError(ConfigError):
     """Compose/label mismatch or destroy without confirm."""
 
 
-def render_stack(*, dest: Path, experiment_id: str, manifest_sha: str, vigil_image: str) -> Path:
+def render_stack(
+    *,
+    dest: Path,
+    experiment_id: str,
+    manifest_sha: str,
+    vigil_image: str,
+    images: dict[str, str] | None = None,
+) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     compose_src = COMPOSE_TEMPLATE.read_text(encoding="utf-8")
     if "container_name:" in compose_src:
         raise InfrastructureError("compose 模板禁止 container_name")
     (dest / "docker-compose.yml").write_text(compose_src, encoding="utf-8")
-    (dest / "egress-proxy.conf").write_text(EGRESS_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+    (dest / "egress-proxy.conf").write_text(
+        EGRESS_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8"
+    )
     env_path = dest / "compose.env"
+    resolved_images = dict(images or {})
     env_path.write_text(
         "\n".join(
             [
                 f"EXPERIMENT_ID={experiment_id}",
                 f"MANIFEST_SHA={manifest_sha}",
+                f"GITEA_IMAGE={resolved_images.get('gitea', 'gitea/gitea:1.22')}",
+                f"RUNNER_IMAGE={resolved_images.get('runner', 'gitea/act_runner:0.2.11')}",
+                f"EGRESS_IMAGE={resolved_images.get('egress', 'ubuntu/squid:6.13')}",
                 f"VIGIL_IMAGE={vigil_image}",
                 f"COMPOSE_PROJECT_NAME={compose_project(experiment_id=experiment_id, cfg_hash=manifest_sha)}",
             ]
@@ -81,7 +96,11 @@ def provision(
     result = runner(argv, capture_output=True, text=True)
     if getattr(result, "returncode", 1) != 0:
         raise InfrastructureError(f"compose up 失败：{getattr(result, 'stderr', '')[:300]}")
-    return {"compose_project": project, "experiment_id": experiment_id, "manifest_sha": manifest_sha}
+    return {
+        "compose_project": project,
+        "experiment_id": experiment_id,
+        "manifest_sha": manifest_sha,
+    }
 
 
 def stop_stack(
