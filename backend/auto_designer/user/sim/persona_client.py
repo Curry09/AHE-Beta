@@ -19,6 +19,9 @@ from typing import Protocol
 
 from auto_designer.usage import monotonic_ms, record_usage
 
+PERSONA_MAX_CONTEXT_TOKENS = 256000
+PERSONA_MAX_OUTPUT_TOKENS = 32768
+
 try:  # 对齐 NexAU: 读 repo 根 .env (USER_LLM_BASE_URL / USER_LLM_API_KEY / USER_LLM_MODEL)
     from dotenv import load_dotenv
 
@@ -39,6 +42,29 @@ class PersonaProtocolError(RuntimeError):
         self.code = code
         self.attempts = attempts
         super().__init__(f"persona protocol error at {stage}: {code} ({attempts} attempts)")
+
+
+class PersonaContextLimitError(RuntimeError):
+    """Persona prompt exceeded the configured local context budget before API dispatch."""
+
+    def __init__(self, estimated_tokens: int, limit: int) -> None:
+        self.estimated_tokens = estimated_tokens
+        self.limit = limit
+        super().__init__(
+            f"persona prompt exceeds local context limit: {estimated_tokens} > {limit} tokens"
+        )
+
+
+def _estimate_context_tokens(messages: list[dict]) -> int:
+    """Dependency-free approximation aligned with NexAU's local fallback counter."""
+    total = 3
+    for message in messages:
+        total += 3
+        for value in message.values():
+            text = str(value)
+            ascii_chars = sum(1 for char in text if ord(char) < 128)
+            total += (ascii_chars + 3) // 4 + (len(text) - ascii_chars)
+    return total
 
 
 def _push_call_trace(
@@ -83,7 +109,7 @@ def drain_call_traces(client: object) -> list[dict]:
 class ApiPersonaClient:
     """接 NexAU 的 OpenAI 兼容网关。针对 Nex-N2-Pro 这类 reasoning 模型做了加固:
     - enable_thinking=False 抑制 CoT 泄漏 (网关拒绝则回退);
-    - content 为空时回落 reasoning_content, 再不行加大 max_tokens 重试;
+    - content 为空时用同一 32768-token 预算重试，不越过单次上限;
     - 容错 JSON 解析 (剥 code fence / 抽取首个 {...}), 解析失败也不崩 loop。"""
 
     def __init__(self, model: str | None = None, temperature: float = 0.8):
@@ -103,6 +129,9 @@ class ApiPersonaClient:
 
     def _create(self, messages: list[dict], max_tokens: int):
         """带退避重试 (429 / 瞬时网关错误)。每轮先试 enable_thinking=False, 失败再裸试。"""
+        estimated_tokens = _estimate_context_tokens(messages)
+        if estimated_tokens > PERSONA_MAX_CONTEXT_TOKENS:
+            raise PersonaContextLimitError(estimated_tokens, PERSONA_MAX_CONTEXT_TOKENS)
         delay = 2.0
         last: Exception | None = None
         for _ in range(5):
@@ -175,8 +204,8 @@ class ApiPersonaClient:
         last_code = "unparseable_json"
         steps: list[dict] = []
         for attempt in range(2):
-            # 推理模型隐藏 CoT 先吃 token; 给足头寸, 否则契约会被截断成不可解析的半截。
-            last_text = self._text(self._create(messages, 8000 if attempt == 0 else 16000))
+            # 推理模型隐藏 CoT 先吃 token；persona 与其他角色统一单次 32768。
+            last_text = self._text(self._create(messages, PERSONA_MAX_OUTPUT_TOKENS))
             last_obj = _parse_json(last_text)
             steps.append({"kind": "assistant", "text": last_text})
             code = _validate_stage_output(stage, last_obj, user)
@@ -208,11 +237,11 @@ class ApiPersonaClient:
         )
         raise PersonaProtocolError(stage, last_code, attempts=2)
 
-    def complete(self, messages: list[dict], max_tokens: int = 8000) -> str:
+    def complete(self, messages: list[dict], max_tokens: int = PERSONA_MAX_OUTPUT_TOKENS) -> str:
         """通用补全：给定 messages 直接返回文本（供 0008/T4 内层 tool-calling 循环复用网关）。"""
         text = self._text(self._create(messages, max_tokens))
         if not text:
-            text = self._text(self._create(messages, max_tokens * 2))
+            text = self._text(self._create(messages, max_tokens))
         return text
 
     def classify_action(self, system: str, ret: dict, space: list[str]) -> str:

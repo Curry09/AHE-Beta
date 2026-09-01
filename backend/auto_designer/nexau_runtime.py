@@ -64,6 +64,7 @@ def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
             (Path(tmp) / "agent.yaml").write_text(
                 "type: agent\n"
                 "name: role\n"
+                "max_context_tokens: 256000\n"
                 "system_prompt: ./prompt.md\n"
                 "system_prompt_type: string\n"
                 "llm_config:\n"

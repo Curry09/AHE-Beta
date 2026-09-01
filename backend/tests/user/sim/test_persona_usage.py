@@ -10,8 +10,10 @@ from auto_designer.user.sim import persona_client as module
 class _Completions:
     def __init__(self, outcomes: list[object]) -> None:
         self.outcomes = list(outcomes)
+        self.calls: list[dict[str, object]] = []
 
-    def create(self, **_kwargs):
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
         outcome = self.outcomes.pop(0)
         if isinstance(outcome, Exception):
             raise outcome
@@ -75,16 +77,39 @@ def test_create_records_every_failed_retry_before_raising(monkeypatch) -> None:
     assert all(event["success"] is False for event in events)
 
 
+def test_create_rejects_persona_context_above_256k_before_provider_call(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(module, "PERSONA_MAX_CONTEXT_TOKENS", 4)
+    client = _client(_response())
+
+    with pytest.raises(module.PersonaContextLimitError, match="local context limit"):
+        client._create([{"role": "user", "content": "prompt is too large"}], 32768)
+    assert client.client.chat.completions.calls == []
+
+
 def test_empty_content_retry_records_both_successful_provider_calls(monkeypatch) -> None:
     events: list[dict[str, object]] = []
     monkeypatch.setattr(module, "record_usage", lambda **event: events.append(event))
     empty = _response(usage={"prompt_tokens": 4, "completion_tokens": 0}, request_id="empty")
-    complete = _response(
-        usage={"prompt_tokens": 5, "completion_tokens": 3}, request_id="complete"
-    )
+    complete = _response(usage={"prompt_tokens": 5, "completion_tokens": 3}, request_id="complete")
     complete.choices[0].message.content = '{"verdict":"accept"}'
 
-    result = _client(empty, complete).respond("system", "user")
+    client = _client(empty, complete)
+    result = client.respond("system", "user")
 
     assert result == {"verdict": "accept"}
     assert [event["request_id"] for event in events] == ["empty", "complete"]
+    calls = client.client.chat.completions.calls
+    assert [call["max_tokens"] for call in calls] == [32768, 32768]
+
+
+def test_complete_empty_retry_never_exceeds_persona_output_budget() -> None:
+    empty = _response()
+    complete = _response()
+    complete.choices[0].message.content = "done"
+    client = _client(empty, complete)
+
+    assert client.complete([{"role": "user", "content": "hi"}]) == "done"
+    calls = client.client.chat.completions.calls
+    assert [call["max_tokens"] for call in calls] == [32768, 32768]

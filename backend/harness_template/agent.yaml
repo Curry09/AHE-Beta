@@ -2,7 +2,7 @@
 # Keep this file focused on runtime configuration; product behavior belongs in agents/main.md.
 type: agent
 name: harness
-max_context_tokens: 128000
+max_context_tokens: 256000
 system_prompt: ./agents/main.md
 system_prompt_type: string
 # structured：模型以 XML 输出工具调用、由 nexau 解析，不依赖原生 function calling（任何 chat 模型可用）。
