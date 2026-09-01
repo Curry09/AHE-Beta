@@ -75,11 +75,10 @@ if _instance_file_raw:
 else:
     _pool_instance_ids = _DEFAULT_INSTANCE_IDS
 
+
 def _select_instance_ids(pool: list[str], selected: str) -> list[str]:
     if selected and selected not in pool:
-        raise SystemExit(
-            f"SWEBENCH_INSTANCE 不在当前题池：{selected!r}；可选：{pool}"
-        )
+        raise SystemExit(f"SWEBENCH_INSTANCE 不在当前题池：{selected!r}；可选：{pool}")
     return [selected] if selected else list(pool)
 
 
@@ -92,9 +91,7 @@ ALL_ONCE = os.environ.get("SWEBENCH_ALL_ONCE", "").strip().lower() in {
     "on",
 }
 SESSIONS_PER_ROUND = (
-    len(INSTANCE_IDS)
-    if ALL_ONCE
-    else int(os.environ.get("SESSIONS_PER_ROUND", "10") or "10")
+    len(INSTANCE_IDS) if ALL_ONCE else int(os.environ.get("SESSIONS_PER_ROUND", "10") or "10")
 )
 SESSION_SEED = int(os.environ.get("SESSION_SEED", "20260725") or "20260725")
 
@@ -147,7 +144,9 @@ def _to_scenario(meta: dict):
 
     seed_root_raw = os.environ.get("SWEBENCH_SEED_ROOT", "").strip()
     if seed_root_raw:
-        prepared = Path(seed_root_raw).expanduser().resolve() / "workspace" / meta["instance_id"] / "repo"
+        prepared = (
+            Path(seed_root_raw).expanduser().resolve() / "workspace" / meta["instance_id"] / "repo"
+        )
         if prepared.is_dir() and (prepared / ".venv" / "bin" / "python").is_file():
             return SeedScenario(
                 description=meta["problem_statement"],
@@ -188,10 +187,7 @@ def _session_picks(rng: random.Random, *, round_index: int) -> list[tuple[str, s
             (PERSONA_IDS[(persona_offset + index) % len(PERSONA_IDS)], instance_id)
             for index, instance_id in enumerate(instance_order)
         ]
-    return [
-        (rng.choice(PERSONA_IDS), rng.choice(INSTANCE_IDS))
-        for _ in range(SESSIONS_PER_ROUND)
-    ]
+    return [(rng.choice(PERSONA_IDS), rng.choice(INSTANCE_IDS)) for _ in range(SESSIONS_PER_ROUND)]
 
 
 def main() -> int:
@@ -208,6 +204,7 @@ def main() -> int:
     from auto_designer.loop.metrics import Metrics
     from auto_designer.loop.orchestrator import Orchestrator
     from auto_designer.loop.roster import load_roster
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
     from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
     from auto_designer.models import Persona
     from auto_designer.tracker.gitea import GiteaTracker
@@ -288,6 +285,19 @@ def main() -> int:
         f"developer×{roster['developer']}"
     )
 
+    from auto_designer.invocation import append_round, init_manifest  # noqa: PLC0415
+
+    role_runs = run_mod.install_role_runs(data_root=run_mod.DATA)
+    init_manifest(
+        roster=roster,
+        models={
+            "user": os.environ.get("USER_LLM_MODEL", ""),
+            "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
+            "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
+            "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
+        },
+    )
+    print(f"⓪.6 实验切片 ROLE_RUNS_DIR={role_runs}")
     print("① 种 harness 本地仓 ...")
     repo = run_mod._seed_harness_repo()
     print("② 接 Gitea + 复位 ...")
@@ -297,7 +307,7 @@ def main() -> int:
     tracker.ensure_labels(["bug", "feature", "needs-triage", "RFC", "triaged"])
     run_mod._set_gitea_remote(repo, gitea)
     run_mod._reset_to_initial(repo, tracker)
-    store = SessionStore(run_mod.DATA / "sessions")
+    store = SessionStore(role_runs / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=run_mod.DATA / "harness_runs")
 
     api = ApiPersonaClient()
@@ -317,6 +327,7 @@ def main() -> int:
 
     def on_round_end(k: int, sha: str) -> None:
         round_shas[str(k)] = sha
+        append_round(round_no=k, user_sha=None, sealed_sha=sha)
         update_live_run(
             data_dir=run_mod.DATA,
             running=True,
@@ -543,28 +554,45 @@ def main() -> int:
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,
         integrity_guard=integrity_guard,
+        fetch_issue=lambda number: tracker.get_issue(number=number),
     )
 
-    # Spec-0032/T5 + 0033/T2 + 0040/T1：交付面接线与 run.py 同源——start_vigil 按 VIGIL_MODE
-    # 自带预检/配置落盘/生命周期（缺省 keep-alive，需求面收尾不拆 vigil）。
-    vigil = run_mod.start_vigil(
-        repo=repo,
-        parallel=roster["developer"],
-        gitea=gitea,
-        log_path=run_mod.DATA / "vigil.log",
-    )
+    vigil = None
+    if run_mod.TOTAL_ROUNDS > 1:
+        vigil = run_mod.start_vigil(
+            repo=repo,
+            parallel=roster["developer"],
+            gitea=gitea,
+            log_path=run_mod.DATA / "vigil.log",
+        )
 
     print(
         f"④ 跑 {run_mod.TOTAL_ROUNDS} 轮闭环（每轮 {SESSIONS_PER_ROUND} session · "
         f"{len(triagers)} triager × {len(designers)} synthesize × {len(divergents)} divergent；"
         f"owner({'评审' if roster['owner'] >= 1 else '纯机械'}) · "
-        f"交付面 vigil --parallel {roster['developer']} 常驻，"
+        f"交付面 vigil --parallel {roster['developer']}（末轮只用户），"
         f"a 段并发 {max_parallel_users}）..."
     )
+    refs: list[str] = []
     try:
         refs = orch.run(run_mod.TOTAL_ROUNDS)
+    except RoundDeliveryBlocked as exc:
+        if vigil is not None:
+            vigil.keep_alive = True
+        update_live_run(
+            data_dir=run_mod.DATA,
+            running=False,
+            round_no=current["round"],
+            total_rounds=run_mod.TOTAL_ROUNDS,
+            round_shas=round_shas,
+            phase="blocked",
+            blocked_issues=list(exc.numbers),
+        )
+        print(f"[orchestrator] 本轮交付卡死，实验停止：{exc}")
+        raise
     finally:
-        run_mod.stop_vigil(vigil)
+        if vigil is not None:
+            run_mod.stop_vigil(vigil)
         update_live_run(
             data_dir=run_mod.DATA,
             running=False,

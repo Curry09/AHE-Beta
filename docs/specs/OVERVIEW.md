@@ -148,6 +148,12 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0048 用户模拟最终查验分支与动作协议失效保护
 当模拟用户在意图阶段仍需证据时，仅允许一次有界 final check，随后强制无工具 re-judge→intent→act；阶段级语义校验阻止非法输出和 evaluator 故障再次伪装成 Accept。
 
+### 0049 角色调用输入输出持久化与跨面归因
+以 run_id 为实验切片，把用户会话与需求面/交付面每次角色调用的填好输入和结构化产出落在同一份不可复位删除的目录里，使事后能还原实验并定位出问题的环节；OpenAgents 只按同一 schema 写出。
+
+### 0050 轮次交付封口与收益归因
+非末轮：用户测完后提案、准入，并等到本轮准入票全部终态才开下一轮用户；卡死则停实验。末轮只跑用户交互，不再跑需求与交付。第 N+1 轮体感相对第 N 轮体感归因于第 N 轮已封口产物。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -358,16 +364,27 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0046 | 0046/T3 | 只读 Gitea 快照的选择性交付复制 | done | T1 | backend/scripts/prepare_openagents_validation.py<br>backend/tests/test_prepare_openagents_validation.py |
 | 0046 | 0046/T4 | 隔离 Vigil 启动与网关协议转换 | done | T1, T3 | backend/scripts/run_openagents_validation.py<br>backend/tests/test_run_openagents_validation.py |
 | 0047 | 0047/T1 | 并行实验运行时契约 | done | — | docs/specs/0047-parallel-experiment-runtime.md |
-| 0047 | 0047/T2 | 实验配置与不可变 Manifest | pending | T1 | backend/auto_designer/experiment/__init__.py<br>backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/manifest.py<br>backend/tests/experiment/test_config.py<br>backend/tests/experiment/test_manifest.py |
-| 0047 | 0047/T3 | 每实验独立基础设施栈 | pending | T2 | backend/deploy/experiment/docker-compose.yml<br>backend/deploy/experiment/egress-proxy.conf<br>backend/auto_designer/experiment/infrastructure.py<br>backend/tests/experiment/test_infrastructure.py |
-| 0047 | 0047/T4 | 统一实验 CLI 与闭环接线 | pending | T2, T3 | backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/scripts/experiment.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_run_swebench_closed_loop.py |
-| 0047 | 0047/T5 | 共享模型容量租约与故障保护 | pending | T2 | backend/auto_designer/experiment/capacity.py<br>backend/auto_designer/experiment/health.py<br>backend/tests/experiment/test_capacity.py<br>backend/tests/experiment/test_health.py |
+| 0047 | 0047/T2 | 实验配置与不可变 Manifest | done | T1 | backend/auto_designer/experiment/__init__.py<br>backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/manifest.py<br>backend/tests/experiment/test_config.py<br>backend/tests/experiment/test_manifest.py |
+| 0047 | 0047/T3 | 每实验独立基础设施栈 | done | T2 | backend/deploy/experiment/docker-compose.yml<br>backend/deploy/experiment/egress-proxy.conf<br>backend/auto_designer/experiment/infrastructure.py<br>backend/tests/experiment/test_infrastructure.py |
+| 0047 | 0047/T4 | 统一实验 CLI 与闭环接线 | done | T2, T3 | backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/scripts/experiment.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_run_swebench_closed_loop.py |
+| 0047 | 0047/T5 | 共享模型容量租约与故障保护 | done | T2 | backend/auto_designer/experiment/capacity.py<br>backend/auto_designer/experiment/health.py<br>backend/tests/experiment/test_capacity.py<br>backend/tests/experiment/test_health.py |
 | 0047 | 0047/T6 | OpenAgents 真实模型认证与双栈并行验收 | pending | T3, T4, T5 | backend/auto_designer/experiment/certification.py<br>backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh<br>backend/tests/experiment/test_certification.py<br>docs/0047-parallel-experiment-runtime.md<br>OpenAgents/scripts/live-experiment-runtime-certification.sh<br>OpenAgents/scripts/live_experiment_runtime_certification.py<br>OpenAgents/tests/test_experiment_runtime_certification.py |
 | 0048 | 0048/T1 | Spec 与实验根因证据契约 | done | — | docs/specs/0048-user-sim-final-check-convergence.md |
 | 0048 | 0048/T2 | PersonaClient 阶段语义契约与工具重分发 | done | T1 | backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_persona_client_agentic.py |
 | 0048 | 0048/T3 | 一次性 final-check 与强制重新判断状态机 | done | T2, T4 | backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/user/sim/test_prompt.py<br>backend/tests/user/sim/test_inner_prompt.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/test_session_store.py |
 | 0048 | 0048/T4 | Action 边界 fail-closed | done | T1 | backend/auto_designer/user/sim/action_space.py<br>backend/tests/user/sim/test_action_space.py |
 | 0048 | 0048/T5 | 历史 action 完整性审计与端到端认证 | done | T3 | backend/scripts/audit_sim_action_integrity.py<br>backend/scripts/canary_spec0048_final_check.py<br>backend/tests/scripts/test_audit_sim_action_integrity.py<br>backend/scripts/e2e-spec-0048-final-check-convergence.sh<br>docs/0048-user-sim-final-check-convergence.md |
+| 0049 | 0049/T1 | 调用记录契约与审计基线 | done | — | docs/specs/0049-role-invocation-io-store.md |
+| 0049 | 0049/T2 | InvocationStore、run manifest 与 v1 schema | done | T1 | backend/auto_designer/invocation.py<br>backend/tests/test_invocation.py |
+| 0049 | 0049/T3 | 需求面 run_agent_def 落盘 | done | T2 | backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/owner.py<br>backend/tests/designer/test_agent_runtime.py |
+| 0049 | 0049/T4 | run 生命周期、会话迁入、vigil 导出与 jail | done | T2 | backend/run.py<br>backend/tests/test_run_vigil.py<br>backend/auto_designer/dev/workspace_jail.py<br>backend/tests/dev/test_workspace_jail.py |
+| 0049 | 0049/T5 | 冻结调用离线重放 | done | T3 | backend/scripts/replay_role_invocations.py<br>backend/tests/scripts/test_replay_role_invocations.py<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh |
+| 0049 | 0049/T6 | 交付面 run_agent 写出同一 schema | done | T2, T4 | OpenAgents/openagents/runtime/engine.py<br>OpenAgents/tests/test_runtime_engine.py<br>backend/tests/test_delivery_invocation_contract.py<br>backend/tests/fixtures/delivery_invocation.v1.json |
+| 0050 | 0050/T1 | 轮次封口契约 | done | — | docs/specs/0050-round-delivery-gate.md |
+| 0050 | 0050/T2 | 本轮准入票终态闸 | done | T1 | backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_round_gate.py |
+| 0050 | 0050/T3 | 编排：末轮跳过需求交付、非末轮准入后封口 | done | T2 | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py |
+| 0050 | 0050/T4 | run 接线、看板阶段、卡死保活 | done | T3 | backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/auto_designer/loop/live.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_vigil.py |
+| 0050 | 0050/T5 | 架构说明与封口 e2e 脚本 | done | T3 | CLAUDE.md<br>backend/scripts/e2e-spec-0050-round-delivery-gate.sh |
 
 ## 跨 feature 关系图
 
@@ -685,6 +702,21 @@ graph LR
         n0048_T4["T4 Action 边界 fail-closed"]
         n0048_T5["T5 历史 action 完整性审计与端到端认证"]
     end
+    subgraph G0049[0049 role-invocation-io-store]
+        n0049_T1["T1 调用记录契约与审计基线"]
+        n0049_T2["T2 InvocationStore、run manifest 与 v1 schema"]
+        n0049_T3["T3 需求面 run_agent_def 落盘"]
+        n0049_T4["T4 run 生命周期、会话迁入、vigil 导出与 jail"]
+        n0049_T5["T5 冻结调用离线重放"]
+        n0049_T6["T6 交付面 run_agent 写出同一 schema"]
+    end
+    subgraph G0050[0050 round-delivery-gate]
+        n0050_T1["T1 轮次封口契约"]
+        n0050_T2["T2 本轮准入票终态闸"]
+        n0050_T3["T3 编排：末轮跳过需求交付、非末轮准入后封口"]
+        n0050_T4["T4 run 接线、看板阶段、卡死保活"]
+        n0050_T5["T5 架构说明与封口 e2e 脚本"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -905,6 +937,16 @@ graph LR
     n0048_T3 --> n0048_T4
     n0048_T4 --> n0048_T1
     n0048_T5 --> n0048_T3
+    n0049_T2 --> n0049_T1
+    n0049_T3 --> n0049_T2
+    n0049_T4 --> n0049_T2
+    n0049_T5 --> n0049_T3
+    n0049_T6 --> n0049_T2
+    n0049_T6 --> n0049_T4
+    n0050_T2 --> n0050_T1
+    n0050_T3 --> n0050_T2
+    n0050_T4 --> n0050_T3
+    n0050_T5 --> n0050_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -957,7 +999,7 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
-| CLAUDE.md | 0032, 0033 |
+| CLAUDE.md | 0032, 0033, 0050 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040 |
 | backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043 |
 | backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043 |
@@ -974,24 +1016,25 @@ graph LR
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
 | backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043 |
-| backend/auto_designer/designer/agent_runtime.py | 0029, 0041 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043 |
-| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043 |
+| backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049 |
+| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
-| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043 |
+| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049 |
 | backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
-| backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043 |
+| backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
 | backend/auto_designer/dev/harness_boundary.py | 0015, 0030, 0040 |
+| backend/auto_designer/dev/workspace_jail.py | 0015, 0049 |
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
 | backend/auto_designer/harness/connector.py | 0030, 0035, 0036, 0041 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041 |
-| backend/auto_designer/loop/live.py | 0017, 0026, 0028 |
+| backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050 |
 | backend/auto_designer/loop/live_tracer.py | 0032, 0041 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048 |
@@ -1028,13 +1071,13 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041 |
 | backend/harness_template/params.yaml | 0003, 0030 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047 |
+| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050 |
 | backend/tests/designer/test_agent_contract.py | 0027, 0043 |
-| backend/tests/designer/test_agent_runtime.py | 0029, 0041 |
+| backend/tests/designer/test_agent_runtime.py | 0029, 0041, 0049 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
 | backend/tests/designer/test_owner.py | 0029, 0032, 0042, 0043 |
@@ -1043,12 +1086,13 @@ graph LR
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/dev/test_completion_gate.py | 0014, 0030 |
 | backend/tests/dev/test_harness_boundary.py | 0015, 0030, 0040 |
+| backend/tests/dev/test_workspace_jail.py | 0015, 0049 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041 |
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043 |
-| backend/tests/loop/test_live.py | 0017, 0026 |
+| backend/tests/loop/test_live.py | 0017, 0026, 0050 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050 |
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
@@ -1056,7 +1100,7 @@ graph LR
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
 | backend/tests/test_run_swebench_closed_loop.py | 0044, 0047 |
-| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047 |
+| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048 |
@@ -2541,10 +2585,10 @@ graph LR
     classDef st_done fill:#b7e4c7;
     classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
-    class v_T2_1 st_pending;
-    class v_T3_1 st_pending;
-    class v_T4_1 st_pending;
-    class v_T5_1 st_pending;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
     class v_T6_1 st_pending;
 ```
 
@@ -2561,6 +2605,75 @@ graph LR
     nT2 --> nT3
     nT4 --> nT3
     nT1 --> nT4
+    nT3 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+```
+
+### 0049 角色调用输入输出持久化与跨面归因（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 调用记录契约与审计基线"]
+    nT2["T2 InvocationStore、run manifest 与 v1 schema"]
+    nT3["T3 需求面 run_agent_def 落盘"]
+    nT4["T4 run 生命周期、会话迁入、vigil 导出与 jail"]
+    nT5["T5 冻结调用离线重放"]
+    nT6["T6 交付面 run_agent 写出同一 schema"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT2 --> nT4
+    nT3 --> nT5
+    nT2 --> nT6
+    nT4 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
+```
+
+### 0050 轮次交付封口与收益归因（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 轮次封口契约"]
+    nT2["T2 本轮准入票终态闸"]
+    nT3["T3 编排：末轮跳过需求交付、非末轮准入后封口"]
+    nT4["T4 run 接线、看板阶段、卡死保活"]
+    nT5["T5 架构说明与封口 e2e 脚本"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT3 --> nT4
     nT3 --> nT5
 ```
 

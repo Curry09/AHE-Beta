@@ -2,11 +2,12 @@
 # 双模式预检与启停（mock docker/Popen，不触真容器）。
 """验证 run.py 的交付面接线：openagents.yml 内容与 stages 定稿一致、token 不落盘、
 VIGIL_MODE 双模式（container 缺省围堵盒 / subprocess 显式联调）各自的预检、启停与 env 注入。
-Spec-0040/T1：stages.rfc=agent；VIGIL_KEEP_ALIVE 缺省常驻。"""
+Spec-0040/T1：stages.rfc=agent。Spec-0050/T4：VIGIL_KEEP_ALIVE 缺省拆盒。"""
 
 from __future__ import annotations
 
 import importlib
+import os
 import subprocess
 from pathlib import Path
 
@@ -108,18 +109,14 @@ def test_vigil_mode_defaults_to_container(monkeypatch) -> None:
     assert run.vigil_mode() == "container"  # 围堵形态是缺省（Spec-0033）
 
 
-def test_vigil_keep_alive_defaults_on(monkeypatch) -> None:
+def test_vigil_keep_alive_defaults_off(monkeypatch) -> None:
     monkeypatch.delenv("VIGIL_KEEP_ALIVE", raising=False)
-    assert run.vigil_keep_alive() is True
+    assert run.vigil_keep_alive() is False
     monkeypatch.setenv("VIGIL_KEEP_ALIVE", "0")
     assert run.vigil_keep_alive() is False
-    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "false")
-    assert run.vigil_keep_alive() is False
-    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "no")
-    assert run.vigil_keep_alive() is False
-    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "off")
-    assert run.vigil_keep_alive() is False
     monkeypatch.setenv("VIGIL_KEEP_ALIVE", "1")
+    assert run.vigil_keep_alive() is True
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "true")
     assert run.vigil_keep_alive() is True
 
 
@@ -189,6 +186,8 @@ def _container_rig(monkeypatch, tmp_path: Path) -> dict:
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     monkeypatch.delenv("OPENAGENTS_PERMISSION_MODE", raising=False)
+    monkeypatch.delenv("AUTO_DESIGNER_RUN_ID", raising=False)
+    monkeypatch.delenv("ROLE_RUNS_DIR", raising=False)
     for key in run._CLAUDE_CONFIG_ENVS:  # 清宿主可能设的 base_url/模型，避免污染断言
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(run, "_VIGIL_CONFIG_STAGING", tmp_path / "staging")
@@ -219,7 +218,9 @@ def test_container_start_shapes_docker_run(tmp_path: Path, monkeypatch) -> None:
     joined = " ".join(docker_run)
     assert handle.mode == "container"
     assert f"--network {run._VIGIL_NETWORK}" in joined  # internal 网络（直连外网物理不通）
-    assert "/config:ro" in joined and "/entrypoint.sh:ro" in joined  # 仅两处只读挂载
+    assert "/config:ro" in joined and "/entrypoint.sh:ro" in joined  # 两处只读挂载
+    assert "/role_runs" not in joined  # 未设 ROLE_RUNS_DIR 时不挂 delivery
+    assert "sessions" not in joined and "/demand" not in joined
     assert "nexau" not in joined.lower()  # NexAU 烘入镜像，不扩大宿主挂载面
     assert "GITEA_TOKEN=secret-token" in joined  # 凭证只经容器 env
     assert "ANTHROPIC_API_KEY=sk-test" in joined
@@ -303,7 +304,7 @@ def test_container_stop_removes_container(tmp_path: Path, monkeypatch) -> None:
 
 def test_container_keep_alive_does_not_remove_container(tmp_path: Path, monkeypatch) -> None:
     calls = _container_rig(monkeypatch, tmp_path)
-    monkeypatch.delenv("VIGIL_KEEP_ALIVE", raising=False)
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "1")
     handle = run.start_vigil(
         repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
     )
@@ -329,6 +330,115 @@ def test_container_reuses_running_instance(tmp_path: Path, monkeypatch) -> None:
     assert handle.mode == "container"
     assert not any(argv[:2] == ["docker", "run"] for argv in calls["runs"])
     assert calls["popen"][:3] == ["docker", "logs", "-f"]
+
+
+def test_container_mounts_only_delivery_role_runs(tmp_path: Path, monkeypatch) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    run_root = tmp_path / "role_runs" / "run-a"
+    (run_root / "sessions").mkdir(parents=True)
+    (run_root / "demand").mkdir(parents=True)
+    monkeypatch.setenv("ROLE_RUNS_DIR", str(run_root))
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-a")
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    docker_run = next(argv for argv in calls["runs"] if argv[:2] == ["docker", "run"])
+    joined = " ".join(docker_run)
+    assert f"{(run_root / 'delivery').resolve()}:/role_runs" in joined
+    assert "ROLE_RUNS_DIR=/role_runs" in joined
+    assert "io.auto-designer.run_id=run-a" in joined
+    assert "sessions" not in joined
+    assert "/demand" not in joined
+
+
+def test_container_rebuilds_when_run_id_changes(tmp_path: Path, monkeypatch) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-b")
+
+    def _fake_run(argv, **kw):
+        calls["runs"].append(list(argv))
+        if list(argv)[:3] == ["docker", "inspect", "-f"]:
+            return subprocess.CompletedProcess(argv, 0, "true|run-a\n", "")
+        return subprocess.CompletedProcess(argv, 0, "container-id", "")
+
+    monkeypatch.setattr(run.subprocess, "run", _fake_run)
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    assert ["docker", "rm", "-f", run._VIGIL_CONTAINER] in calls["runs"]
+    assert any(argv[:2] == ["docker", "run"] for argv in calls["runs"])
+
+
+def test_container_refuses_foreign_experiment_attach(tmp_path: Path, monkeypatch) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.delenv("AUTO_DESIGNER_EXPERIMENT_ID", raising=False)
+
+    def _fake_run(argv, **kw):
+        calls["runs"].append(list(argv))
+        if list(argv)[:3] == ["docker", "inspect", "-f"]:
+            return subprocess.CompletedProcess(argv, 0, "true|run-a|exp-other\n", "")
+        return subprocess.CompletedProcess(argv, 0, "container-id", "")
+
+    monkeypatch.setattr(run.subprocess, "run", _fake_run)
+    with pytest.raises(SystemExit, match="拒绝 attach"):
+        run.start_vigil(
+            repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+        )
+
+
+def test_apply_experiment_context_overrides_singleton(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(run, "DATA", run.DATA)
+    monkeypatch.setattr(run, "HARNESS_REPO", run.HARNESS_REPO)
+    monkeypatch.setattr(run, "_SANDBOX_ROOT", run._SANDBOX_ROOT)
+    monkeypatch.setattr(run, "_VIGIL_CONTAINER", run._VIGIL_CONTAINER)
+    monkeypatch.setattr(run, "_VIGIL_NETWORK", run._VIGIL_NETWORK)
+    monkeypatch.setattr(run, "_VIGIL_CONFIG_STAGING", run._VIGIL_CONFIG_STAGING)
+
+    class _Ctx:
+        experiment_id = "exp-z"
+        data_root = tmp_path / "data"
+        harness_repo = tmp_path / "data" / "harness_sandbox" / "harness_repo"
+        vigil_container = "adx-exp-z-xxxx-vigil-1"
+        vigil_network = "adx-exp-z-xxxx_vigil_net"
+        vigil_config_root = tmp_path / "infra" / "vigil-config"
+
+    run.apply_experiment_context(ctx=_Ctx())
+    assert run.DATA == _Ctx.data_root
+    assert run._VIGIL_CONTAINER == _Ctx.vigil_container
+    assert os.environ["AUTO_DESIGNER_EXPERIMENT_ID"] == "exp-z"
+
+
+def test_install_role_runs_does_not_delete_prior_slice(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("AUTO_DESIGNER_RUN_ID", raising=False)
+    first = run.install_role_runs(data_root=tmp_path)
+    (first / "sessions" / "old.json").write_text("{}", encoding="utf-8")
+    monkeypatch.delenv("AUTO_DESIGNER_RUN_ID", raising=False)
+    second = run.install_role_runs(data_root=tmp_path)
+    assert first != second
+    assert (first / "sessions" / "old.json").is_file()
+    assert (tmp_path / "sessions").is_symlink()
+    assert (tmp_path / "sessions").resolve() == (second / "sessions").resolve()
+
+
+def test_reset_to_initial_leaves_role_runs(tmp_path: Path, monkeypatch) -> None:
+    kept = tmp_path / "role_runs" / "prior" / "sessions"
+    kept.mkdir(parents=True)
+    marker = kept / "keep.json"
+    marker.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(run, "DATA", tmp_path)
+    monkeypatch.setattr(run, "_git", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        run.subprocess,
+        "run",
+        lambda *_a, **_k: subprocess.CompletedProcess([], 0, "", ""),
+    )
+
+    class _Tracker:
+        def list_open_issues(self):
+            return []
+
+    run._reset_to_initial(tmp_path / "repo", _Tracker())
+    assert marker.is_file()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -365,7 +475,7 @@ def test_subprocess_start_spawns_with_token_env_and_cwd(tmp_path: Path, monkeypa
 def test_subprocess_keep_alive_does_not_kill_proc(tmp_path: Path, monkeypatch) -> None:
     calls: dict = {}
     monkeypatch.setenv("VIGIL_MODE", "subprocess")
-    monkeypatch.delenv("VIGIL_KEEP_ALIVE", raising=False)
+    monkeypatch.setenv("VIGIL_KEEP_ALIVE", "1")
     monkeypatch.setattr(run.shutil, "which", lambda name: "/usr/bin/openagents")
 
     def _fake_popen(argv, *, cwd, env, stdout, stderr):

@@ -31,6 +31,7 @@ import os
 import shutil
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent  # backend/
@@ -224,7 +225,8 @@ def _reset_to_initial(repo: Path, tracker) -> None:
     - Gitea: 强推本地 v0 seed 到 origin/main、删除所有远端 vK tag —— harness 回到 v0 起点
       (dev agent 在同一本地仓工作、push 同一 origin，故此处强推与其后续推进 fast-forward 兼容)。
     - issue: 关闭所有遗留 open issue (issue 编号/历史无法经 API 抹除，仅复位 open 集)。
-    - 看板: 清空 data/sessions/*.json 与 data/live/ 全部投影 (体感曲线/活动注册表/轮次归档归零)。
+    - 看板: 清空 data/live/ 投影。Spec-0049/T4：不得删除 role_runs（含其中 sessions）；
+      会话已迁入 ROLE_RUNS_DIR/sessions，也不再按共享 DATA/sessions/*.json 抹盘。
     """
     _git(repo, "push", "-f", "origin", "main")  # 远端 main 覆盖回 v0 seed
     ls = subprocess.run(
@@ -239,8 +241,6 @@ def _reset_to_initial(repo: Path, tracker) -> None:
             tracker.set_state(issue.number, "closed", "reset to initial before clean run")
         except Exception:  # noqa: BLE001  关 issue 失败不阻塞复位
             pass
-    for f in (DATA / "sessions").glob("*.json"):
-        f.unlink()
     from auto_designer.loop.live import clear_live  # noqa: PLC0415  与 main() 同风格延迟导入
 
     clear_live(data_dir=DATA)
@@ -263,6 +263,65 @@ _VIGIL_STAGES: dict[str, str] = {
 }
 # vigil 轮询间隔（秒）：比 OpenAgents 默认 60s 更紧凑——本地 Gitea 无速率压力，缩短准入→领活时延。
 _VIGIL_INTERVAL = 30
+
+
+def install_role_runs(*, data_root: Path) -> Path:
+    """Nail AUTO_DESIGNER_RUN_ID / ROLE_RUNS_DIR / usage path for this process.
+
+    Spec-0049/T4：一次闭环进程一份切片；看板 data/sessions 只是指向当前 sessions 的别名。
+    """
+    run_id = os.environ.get("AUTO_DESIGNER_RUN_ID", "").strip() or uuid.uuid4().hex
+    os.environ["AUTO_DESIGNER_RUN_ID"] = run_id
+    root = data_root / "role_runs" / run_id
+    (root / "demand").mkdir(parents=True, exist_ok=True)
+    (root / "delivery").mkdir(parents=True, exist_ok=True)
+    (root / "sessions").mkdir(parents=True, exist_ok=True)
+    os.environ["ROLE_RUNS_DIR"] = str(root)
+    os.environ["AUTO_DESIGNER_USAGE_PATH"] = str(root / "usage.jsonl")
+    _alias_current_sessions(data_root=data_root, sessions_root=root / "sessions")
+    return root
+
+
+def _alias_current_sessions(*, data_root: Path, sessions_root: Path) -> None:
+    """Point data/sessions at this run's sessions without deleting prior role_runs."""
+    alias = data_root / "sessions"
+    sessions_root.mkdir(parents=True, exist_ok=True)
+    try:
+        if alias.is_symlink() or alias.is_file():
+            alias.unlink()
+        elif alias.is_dir():
+            leftover = data_root / "sessions_pre_0049"
+            if not leftover.exists():
+                alias.rename(leftover)
+            else:
+                return
+        alias.symlink_to(sessions_root, target_is_directory=True)
+    except OSError:
+        return
+
+
+def current_role_runs_dir() -> Path | None:
+    raw = os.environ.get("ROLE_RUNS_DIR", "").strip()
+    return Path(raw) if raw else None
+
+
+def apply_experiment_context(*, ctx: object) -> None:
+    """Spec-0047/T4：用 ExperimentContext 覆盖单例 DATA/HARNESS/vigil 资源名。"""
+    global \
+        DATA, \
+        HARNESS_REPO, \
+        _SANDBOX_ROOT, \
+        _VIGIL_CONTAINER, \
+        _VIGIL_NETWORK, \
+        _VIGIL_CONFIG_STAGING
+    experiment_id = str(ctx.experiment_id)  # type: ignore[attr-defined]
+    os.environ["AUTO_DESIGNER_EXPERIMENT_ID"] = experiment_id
+    DATA = Path(ctx.data_root)  # type: ignore[attr-defined]
+    _SANDBOX_ROOT = DATA / "harness_sandbox"
+    HARNESS_REPO = Path(ctx.harness_repo)  # type: ignore[attr-defined]
+    _VIGIL_CONTAINER = str(ctx.vigil_container)  # type: ignore[attr-defined]
+    _VIGIL_NETWORK = str(ctx.vigil_network)  # type: ignore[attr-defined]
+    _VIGIL_CONFIG_STAGING = Path(ctx.vigil_config_root)  # type: ignore[attr-defined]
 
 
 def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
@@ -333,8 +392,8 @@ _CLAUDE_CONFIG_ENVS = (
 class VigilHandle:
     """交付面运行句柄：mode + 托管进程（subprocess=vigil 本体；container=docker logs 跟随器）+ 日志句柄。
 
-    keep_alive：需求面收尾是否拆掉 vigil。Spec-0040/T1：缺省常驻（交付面与 round 解耦）；
-    仅 VIGIL_KEEP_ALIVE=0/false/no/off 时 stop_vigil 才 docker rm / 杀 subprocess。
+    keep_alive：需求面收尾是否拆掉 vigil。Spec-0050/T4：缺省拆；显式 VIGIL_KEEP_ALIVE=1 或
+    卡死时 handle.keep_alive=True 才留盒。
     """
 
     def __init__(
@@ -357,10 +416,11 @@ def vigil_mode() -> str:
 def vigil_keep_alive() -> bool:
     """Return whether vigil should survive the demand-side finally.
 
-    Spec-0040/T1：缺省常驻。仅显式 0/false/no/off 时需求面收尾才拆掉 vigil。
+    Spec-0050/T4：缺省拆盒（非末轮已等交付封口）。仅显式 1/true/yes/on 才常驻调试。
+    卡死路径由调用方把 handle.keep_alive 置 True，不走本函数。
     """
     raw = os.environ.get("VIGIL_KEEP_ALIVE", "").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    return raw in ("1", "true", "yes", "on")
 
 
 def _vigil_internal_gitea_url() -> str:
@@ -447,13 +507,30 @@ def _start_vigil_subprocess(
 
 
 def _container_is_running(*, name: str) -> bool:
-    """`docker inspect` 报 Running=true 才算已在跑（不存在 / 已退出都是 false）。"""
+    running, _run_id, _experiment = _container_state(name=name)
+    return running
+
+
+def _container_state(*, name: str) -> tuple[bool, str, str]:
+    """Return (running, run_id label, experiment_id label)."""
     inspect = subprocess.run(
-        ["docker", "inspect", "-f", "{{.State.Running}}", name],
+        [
+            "docker",
+            "inspect",
+            "-f",
+            '{{.State.Running}}|{{index .Config.Labels "io.auto-designer.run_id"}}|{{index .Config.Labels "io.openagents.experiment_id"}}',
+            name,
+        ],
         capture_output=True,
         text=True,
     )
-    return inspect.returncode == 0 and inspect.stdout.strip().lower() == "true"
+    if inspect.returncode != 0:
+        return False, "", ""
+    parts = inspect.stdout.strip().split("|", 2)
+    running_s = parts[0] if parts else ""
+    run_label = parts[1] if len(parts) > 1 else ""
+    exp_label = parts[2] if len(parts) > 2 else ""
+    return running_s.lower() == "true", run_label, exp_label
 
 
 def _attach_container_logs(*, log_path: Path, keep_alive: bool) -> VigilHandle:
@@ -475,10 +552,22 @@ def _start_vigil_container(
     与代理均为盒内网络名（vigil-net internal，直连外网物理不通）。
 
     容器已在跑（需求面上一轮 keep-alive 留下的）→ 只挂日志跟随器，不 docker run（同名会撞车）。
+    Spec-0049/T4：keep-alive 且 AUTO_DESIGNER_RUN_ID 变化则拆旧盒重建，避免 delivery 挂错 run。
     """
-    if _container_is_running(name=_VIGIL_CONTAINER):
+    run_id = os.environ.get("AUTO_DESIGNER_RUN_ID", "").strip()
+    running, existing_run, experiment_id = _container_state(name=_VIGIL_CONTAINER)
+    ours = os.environ.get("AUTO_DESIGNER_EXPERIMENT_ID", "").strip()
+    if running and experiment_id and experiment_id != ours:
+        raise SystemExit(
+            f"拒绝 attach 实验 {experiment_id} 的 vigil 容器 {_VIGIL_CONTAINER}；"
+            "请用 backend/scripts/experiment.py"
+        )
+    if running and (not run_id or existing_run == run_id):
         print(f"[vigil] 容器 {_VIGIL_CONTAINER} 已在跑，复用（不 docker run）")
         return _attach_container_logs(log_path=log_path, keep_alive=keep_alive)
+    if running:
+        print(f"[vigil] 容器 {_VIGIL_CONTAINER} run_id 已变（{existing_run}→{run_id}），重建")
+        subprocess.run(["docker", "rm", "-f", _VIGIL_CONTAINER], capture_output=True, text=True)
     repo_url = _gitea_remote_url({**gitea, "GITEA_URL": _vigil_internal_gitea_url()})
     args = [
         "docker", "run", "-d", "--rm",
@@ -504,6 +593,18 @@ def _start_vigil_container(
             f"{os.environ.get('OPENAGENTS_PERMISSION_MODE', '').strip() or 'bypassPermissions'}"
         ),
     ]  # fmt: skip
+    if run_id:
+        args += [
+            "--label",
+            f"io.auto-designer.run_id={run_id}",
+            "-e",
+            f"AUTO_DESIGNER_RUN_ID={run_id}",
+        ]
+    if ours:
+        args += ["--label", f"io.openagents.experiment_id={ours}"]
+    delivery = _vigil_delivery_mount()
+    if delivery is not None:
+        args += ["-v", f"{delivery}:/role_runs", "-e", "ROLE_RUNS_DIR=/role_runs"]
     for key in (*_CLAUDE_CRED_ENVS, *_CLAUDE_CONFIG_ENVS):
         value = os.environ.get(key, "").strip()
         if value:
@@ -513,6 +614,16 @@ def _start_vigil_container(
     if started.returncode != 0:
         raise SystemExit(f"vigil 容器启动失败：{started.stderr.strip()[:300]}")
     return _attach_container_logs(log_path=log_path, keep_alive=keep_alive)
+
+
+def _vigil_delivery_mount() -> str | None:
+    """Host path of this run's delivery/ directory, or None when ROLE_RUNS_DIR is unset."""
+    root = current_role_runs_dir()
+    if root is None:
+        return None
+    delivery = root / "delivery"
+    delivery.mkdir(parents=True, exist_ok=True)
+    return str(delivery.resolve())
 
 
 def _stop_managed_proc(*, proc: subprocess.Popen) -> None:
@@ -549,6 +660,11 @@ def main() -> int:
     from urllib.parse import urlparse
 
     args = _parse_args(argv=sys.argv[1:])
+    if not os.environ.get("AUTO_DESIGNER_EXPERIMENT_ID", "").strip():
+        print(
+            "[run.py] 单例 ./run.sh 已弃用：并行隔离实验请用 backend/scripts/experiment.py",
+            file=sys.stderr,
+        )
 
     _isolate_git_credentials()  # Spec-0021/T2：进程级 git 凭证隔离（多信道封堵，见函数注释）
 
@@ -604,6 +720,7 @@ def main() -> int:
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.metrics import Metrics
     from auto_designer.loop.orchestrator import Orchestrator
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
     from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
     from auto_designer.models import Persona, SeedScenario
     from auto_designer.tracker.gitea import GiteaTracker
@@ -613,6 +730,19 @@ def main() -> int:
     from auto_designer.user.sim.persona_io import card_to_personas
 
     print(f"⓪ 输入：persona 卡库={args.persona_library} | 种子卡库={args.seed_cards}")
+    role_runs = install_role_runs(data_root=DATA)
+    from auto_designer.invocation import append_round, init_manifest  # noqa: PLC0415
+
+    init_manifest(
+        roster=roster,
+        models={
+            "user": os.environ.get("USER_LLM_MODEL", ""),
+            "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
+            "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
+            "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
+        },
+    )
+    print(f"⓪.6 实验切片 ROLE_RUNS_DIR={role_runs}")
     print("① 种 harness 本地仓 ...")
     repo = _seed_harness_repo()
 
@@ -624,7 +754,7 @@ def main() -> int:
     _set_gitea_remote(repo, gitea)  # 配 origin；推送由开发者 agent 用 git 工具自己做
     print("②.5 复位到最初状态（Gitea harness→v0 + 关闭遗留 issue + 清空看板）...")
     _reset_to_initial(repo, tracker)
-    store = SessionStore(DATA / "sessions")
+    store = SessionStore(role_runs / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 生成/准入角色 ...")
@@ -698,7 +828,13 @@ def main() -> int:
 
     def on_round_start(k):
         current["round"] = k
-        update_live_run(data_dir=DATA, running=True, round_no=k, total_rounds=TOTAL_ROUNDS)
+        update_live_run(
+            data_dir=DATA,
+            running=True,
+            round_no=k,
+            total_rounds=TOTAL_ROUNDS,
+            phase="users",
+        )
 
     # Spec-0029/T8：背压阈值（proposal/ready 队列深度）。超阈值只告警、不自动扩容——这是
     # CLAUDE.md「issue 长期不降=退化」观测指标的可执行化，处置（调轮次/加 dev/收紧准入）由人定。
@@ -731,6 +867,7 @@ def main() -> int:
 
     def on_round_end(k, sha):
         round_shas.append(sha)
+        append_round(round_no=k, user_sha=None, sealed_sha=sha)
         update_live_run(
             data_dir=DATA,
             running=True,
@@ -971,38 +1108,57 @@ def main() -> int:
         on_round_end=on_round_end,
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
         integrity_guard=integrity_guard,  # Spec-0021/T2
+        fetch_issue=lambda number: tracker.get_issue(number=number),
     )
 
-    # Spec-0032/T5 + 0033/T2：交付面接线——start_vigil 按 VIGIL_MODE 自带预检/配置落盘/生命周期
-    # （container 缺省=围堵盒零挂载自 clone；subprocess=盯屏联调）。level-triggered，与轮次解耦。
-    print(f"③.5 起交付面 vigil（OpenAgents，mode={vigil_mode()}）...")
-    vigil = start_vigil(
-        repo=repo,
-        parallel=roster["developer"],
-        gitea=gitea,
-        log_path=DATA / "vigil.log",
-    )
+    # Spec-0050/T4：TOTAL_ROUNDS=1 只测用户，不启交付面。
+    vigil = None
+    if TOTAL_ROUNDS > 1:
+        print(f"③.5 起交付面 vigil（OpenAgents，mode={vigil_mode()}）...")
+        vigil = start_vigil(
+            repo=repo,
+            parallel=roster["developer"],
+            gitea=gitea,
+            log_path=DATA / "vigil.log",
+        )
 
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
         f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {len(designers)} synthesize "
         f"→ owner({'评审' if roster['owner'] >= 1 else '禁用准入'})；交付面 vigil --parallel "
-        f"{roster['developer']} 常驻（PR 门禁：review+merge=agent，日志 data/vigil.log），"
+        f"{roster['developer']}（末轮只用户；非末轮封口后切轮），"
         f"a 段并发 {max_parallel_users}，背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，"
         "真模型）..."
     )
+    refs: list[str] = []
+    exit_code = 0
     try:
         refs = orch.run(TOTAL_ROUNDS)
-    finally:
-        # Spec-0040/T1：需求面收尾缺省 keep-alive（只拆日志跟随器，交付面继续消化 ready 票）。
-        # VIGIL_KEEP_ALIVE=0 才 docker rm / 杀 subprocess。
-        stop_vigil(vigil)
+    except RoundDeliveryBlocked as exc:
+        # Spec-0050/T4：卡死留 vigil 容器等人；进程非 0 退出。
+        exit_code = 1
+        if vigil is not None:
+            vigil.keep_alive = True
         update_live_run(
             data_dir=DATA,
             running=False,
             round_no=current["round"],
             total_rounds=TOTAL_ROUNDS,
             round_shas=round_shas,
+            phase="blocked",
+            blocked_issues=list(exc.numbers),
+        )
+        print(f"[orchestrator] 本轮交付卡死，实验停止：{exc}")
+    finally:
+        if vigil is not None:
+            stop_vigil(vigil)
+        update_live_run(
+            data_dir=DATA,
+            running=False,
+            round_no=current["round"],
+            total_rounds=TOTAL_ROUNDS,
+            round_shas=round_shas,
+            phase="blocked" if exit_code else "done",
         )
 
     print("\n=== 结果 ===")
@@ -1013,7 +1169,7 @@ def main() -> int:
     print("issue 曲线 (t, opened, net_open):", m.issue_curve())
     print("本地仓分支:", end=" ")
     subprocess.run(["git", "-C", str(repo), "branch", "--format=%(refname:short)"])
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":

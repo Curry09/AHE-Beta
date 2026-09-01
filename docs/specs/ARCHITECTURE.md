@@ -11,6 +11,7 @@ _auto-designer: 自进化 harness（用户侧 a）。_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | auto-designer: 自进化 harness（用户侧 a）。 |
+| `invocation.py` | Persist one JSON file per role invocation under ROLE_RUNS_DIR. |
 | `models.py` | 用户侧最小链路的公共数据结构（spec-0001/T1）。 |
 | `nexau_runtime.py` | 单一 nexau 适配层（spec-0003/T2）：把一份角色定义(prompt+工具)加载成可调用 Agent。 |
 | `usage.py` | Best-effort, per-call LLM usage telemetry. |
@@ -59,6 +60,21 @@ _蒸馏侧（spec-0006）：persona 卡库读写 + 契约约束校验。_
 | `seed_adapter.py` | seed_adapter.py（spec-0010/T2）：把种子卡注入 0009 的 SeedSource 供给。 |
 | `seed_library.py` | SeedLibrary（spec-0010/T1）：种子卡库的最小读写 + 契约约束校验。 |
 
+### auto_designer.experiment
+
+_Per-experiment isolation: config, manifest, compose, CLI, capacity._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Per-experiment isolation: config, manifest, compose, CLI, capacity. |
+| `capacity.py` | File-locked lease registry under EXPERIMENTS_ROOT. Expired leases reclaim only if pid is dead. |
+| `cli.py` | Operator-facing commands. Mutating commands print a secret-free plan first. |
+| `config.py` | ExperimentConfig is the operator input; secrets never belong here. |
+| `health.py` | Rolling success/error window. Trip pauses this experiment, not the shared endpoint. |
+| `infrastructure.py` | Provision, stop, and destroy experiment infrastructure via Compose project. |
+| `manifest.py` | create is exclusive; later facts go to journal.jsonl, never rewrite manifest. |
+| `runtime.py` | create/plan/preflight/start/stop/resume/archive/destroy. Manifest stays frozen. |
+
 ### auto_designer.harness
 
 _Evaluation harness integration and execution support._
@@ -81,8 +97,9 @@ _Conversation-loop coordination, tracing, and lifecycle management._
 | `live.py` | 多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/。 |
 | `live_tracer.py` | StepTracer：把 nexau agent 运行中的过程流成看板可见的结构化事件。 |
 | `metrics.py` | metrics（spec-0003/T6，曲线口径 spec-0025/T7）：统计体感与 issue backlog 随时间的曲线。 |
-| `orchestrator.py` | 闭环编排 orchestrator（需求面）：a（用户产 report+体感）→ 生成段两拍（第一拍 triage 分片∥ |
+| `orchestrator.py` | 闭环编排 orchestrator（需求面）。 |
 | `roster.py` | 角色编制（roster）：各类 agent 的数量，作为「后端编排」与「前端小镇房间」的单一真源。 |
+| `round_gate.py` | Wait until this round's admitted issues reach a delivery terminal state. |
 | `run_state.py` | run_state（spec-0004/T1）：编排游标 + 三侧中间态标记，作为「无法从产物观测」之外的兜底。 |
 | `runner.py` | 可恢复 harbor runner（spec-0004/T2）：作为一个 harbor task（方案 A，整条 run = 1 task）。 |
 | `sim_user.py` | 把 spec-0005 控制信封 sim 用户 agent 接进 spec-0003/0007 闭环。 |
@@ -187,10 +204,19 @@ graph LR
     nauto_designer_distill_library["distill.library"]
     nauto_designer_distill_seed_adapter["distill.seed_adapter"]
     nauto_designer_distill_seed_library["distill.seed_library"]
+    nauto_designer_experiment["auto_designer.experiment"]
+    nauto_designer_experiment_capacity["experiment.capacity"]
+    nauto_designer_experiment_cli["experiment.cli"]
+    nauto_designer_experiment_config["experiment.config"]
+    nauto_designer_experiment_health["experiment.health"]
+    nauto_designer_experiment_infrastructure["experiment.infrastructure"]
+    nauto_designer_experiment_manifest["experiment.manifest"]
+    nauto_designer_experiment_runtime["experiment.runtime"]
     nauto_designer_harness["auto_designer.harness"]
     nauto_designer_harness_connector["harness.connector"]
     nauto_designer_harness_interface["harness.interface"]
     nauto_designer_harness_launcher["harness.launcher"]
+    nauto_designer_invocation["auto_designer.invocation"]
     nauto_designer_loop["auto_designer.loop"]
     nauto_designer_loop_checkpoint["loop.checkpoint"]
     nauto_designer_loop_live["loop.live"]
@@ -198,6 +224,7 @@ graph LR
     nauto_designer_loop_metrics["loop.metrics"]
     nauto_designer_loop_orchestrator["loop.orchestrator"]
     nauto_designer_loop_roster["loop.roster"]
+    nauto_designer_loop_round_gate["loop.round_gate"]
     nauto_designer_loop_run_state["loop.run_state"]
     nauto_designer_loop_runner["loop.runner"]
     nauto_designer_loop_sim_user["loop.sim_user"]
@@ -243,6 +270,7 @@ graph LR
     nauto_designer_web_issue_timeline["web.issue_timeline"]
     nauto_designer_designer_agent_contract --> nauto_designer_designer_issue_schema
     nauto_designer_designer_agent_runtime --> nauto_designer_designer_session_timeline
+    nauto_designer_designer_agent_runtime --> nauto_designer_invocation
     nauto_designer_designer_agent_runtime --> nauto_designer_loop_live_tracer
     nauto_designer_designer_agent_runtime --> nauto_designer_usage
     nauto_designer_designer_agent_runtime --> nauto_designer_user_session_store
@@ -253,6 +281,7 @@ graph LR
     nauto_designer_designer_designer --> nauto_designer_designer_runtime_agg
     nauto_designer_designer_designer --> nauto_designer_models
     nauto_designer_designer_designer --> nauto_designer_tracker_base
+    nauto_designer_designer_designer --> nauto_designer_usage
     nauto_designer_designer_designer --> nauto_designer_user_session_store
     nauto_designer_designer_divergent --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_divergent --> nauto_designer_designer_issue_schema
@@ -260,12 +289,14 @@ graph LR
     nauto_designer_designer_divergent --> nauto_designer_designer_role_contract
     nauto_designer_designer_divergent --> nauto_designer_models
     nauto_designer_designer_divergent --> nauto_designer_tracker_base
+    nauto_designer_designer_divergent --> nauto_designer_usage
     nauto_designer_designer_divergent --> nauto_designer_user_session_store
     nauto_designer_designer_owner --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_owner --> nauto_designer_designer_issue_schema
     nauto_designer_designer_owner --> nauto_designer_designer_proposal_view
     nauto_designer_designer_owner --> nauto_designer_designer_role_contract
     nauto_designer_designer_owner --> nauto_designer_tracker_base
+    nauto_designer_designer_owner --> nauto_designer_usage
     nauto_designer_designer_owner --> nauto_designer_user_session_store
     nauto_designer_designer_proposal_view --> nauto_designer_designer_issue_schema
     nauto_designer_designer_runtime_agg --> nauto_designer_models
@@ -281,9 +312,21 @@ graph LR
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
+    nauto_designer_experiment_capacity --> nauto_designer_experiment_config
+    nauto_designer_experiment_cli --> nauto_designer_experiment
+    nauto_designer_experiment_cli --> nauto_designer_experiment_config
+    nauto_designer_experiment_cli --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_cli --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_health --> nauto_designer_experiment_config
+    nauto_designer_experiment_infrastructure --> nauto_designer_experiment_config
+    nauto_designer_experiment_manifest --> nauto_designer_experiment_config
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_config
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_infrastructure
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_manifest
     nauto_designer_harness_connector --> nauto_designer_harness_interface
     nauto_designer_harness_connector --> nauto_designer_usage
     nauto_designer_harness_launcher --> nauto_designer_harness_interface
+    nauto_designer_invocation --> nauto_designer_usage
     nauto_designer_loop_live_tracer --> nauto_designer_usage
     nauto_designer_loop_metrics --> nauto_designer_designer_issue_schema
     nauto_designer_loop_metrics --> nauto_designer_tracker_base
@@ -292,6 +335,7 @@ graph LR
     nauto_designer_loop_orchestrator --> nauto_designer_designer_divergent
     nauto_designer_loop_orchestrator --> nauto_designer_harness_interface
     nauto_designer_loop_orchestrator --> nauto_designer_harness_launcher
+    nauto_designer_loop_orchestrator --> nauto_designer_loop_round_gate
     nauto_designer_loop_orchestrator --> nauto_designer_models
     nauto_designer_loop_orchestrator --> nauto_designer_usage
     nauto_designer_loop_orchestrator --> nauto_designer_user_sim_deps
