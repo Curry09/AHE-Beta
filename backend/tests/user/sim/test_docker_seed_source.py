@@ -69,10 +69,12 @@ def test_docker_seed_starts_runnable_session_without_copying_repo_to_host(
             )
         if args[0] == "run":
             return subprocess.CompletedProcess(args, 0, "container-1\n", "")
-        if args[:2] == ["exec", "container-1"]:
+        if args[:3] == ["exec", "container-1", "cat"]:
             return subprocess.CompletedProcess(
                 args, 0, json.dumps({"instances": {"instance-1": {}}}), ""
             )
+        if args[:3] == ["exec", "container-1", "python3"]:
+            return subprocess.CompletedProcess(args, 0, "", "")
         raise AssertionError(args)
 
     removed: list[list[str]] = []
@@ -97,6 +99,10 @@ def test_docker_seed_starts_runnable_session_without_copying_repo_to_host(
     assert result.cwd == "/workspace/instance-1/repo"
     assert any(call[0] == "run" for call in calls)
     assert not any("cp" in call for call in calls)
+    isolate_call = next(call for call in calls if call[:3] == ["exec", "container-1", "python3"])
+    assert isolate_call[-1] == "instance-1"
+    assert "/build-state.json" in isolate_call[-2]
+    assert result.evidence["workspace_scope"] == "single_instance"
     assert removed == []
 
 

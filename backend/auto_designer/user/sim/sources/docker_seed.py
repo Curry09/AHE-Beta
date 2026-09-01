@@ -18,6 +18,32 @@ from auto_designer.user.sim.seed_source import register
 RUNTIME_LABEL = "org.auto-designer.seed-runtime"
 RUNTIME_VERSION = "1"
 
+# Runnable seed images intentionally pack a task pool into one shared image layer.  A session
+# container must not inherit that whole pool as a readable filesystem: harness shell tools are
+# allowed to use absolute paths and would otherwise cross-read another benchmark instance.
+# Deleting lower-layer siblings creates container-local whiteouts; the shared image is unchanged.
+_RETAIN_INSTANCE_SCRIPT = """\
+import shutil
+import sys
+from pathlib import Path
+
+root = Path("/workspace")
+keep = root / sys.argv[1]
+if not keep.is_dir() or not (keep / "repo").is_dir():
+    raise SystemExit(f"target workspace is missing: {keep}")
+for child in list(root.iterdir()):
+    if child == keep:
+        continue
+    if child.is_dir() and not child.is_symlink():
+        shutil.rmtree(child)
+    else:
+        child.unlink()
+Path("/build-state.json").unlink(missing_ok=True)
+remaining = [child.name for child in root.iterdir()]
+if remaining != [sys.argv[1]]:
+    raise SystemExit(f"workspace isolation failed: {remaining}")
+"""
+
 
 def _docker(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
     proc = subprocess.run(["docker", *args], capture_output=True, text=True)
@@ -95,4 +121,24 @@ class DockerSeedSource:
         except Exception as exc:
             runtime.close()
             raise RuntimeError(f"seed image 不含 instance {instance_id!r}") from exc
+        try:
+            _docker(
+                [
+                    "exec",
+                    container_id,
+                    "python3",
+                    "-c",
+                    _RETAIN_INSTANCE_SCRIPT,
+                    instance_id,
+                ]
+            )
+        except Exception as exc:
+            runtime.close()
+            raise RuntimeError(f"无法将 session 隔离到 instance {instance_id!r}") from exc
+        runtime.evidence.update(
+            {
+                "instance_id": instance_id,
+                "workspace_scope": "single_instance",
+            }
+        )
         return runtime

@@ -37,8 +37,8 @@ tasks:
       - backend/tests/user/sim/test_docker_seed_source.py
       - backend/tests/user/sim/test_workspace_runtime.py
       - backend/scripts/prepare_swebench_runtime_tree.py
-    scope: 以显式 WorkspaceRuntime 取代 docker cp 到宿主；docker-seed 每次 provision 创建独立容器，读写与命令均通过容器运行时。
-    acceptance: docker-seed 不执行 docker cp 导出 repo；两个 provision 返回不同容器；路径逃逸被拒；命令超时会使运行时进入污染态并可被回收。
+    scope: 以显式 WorkspaceRuntime 取代 docker cp 到宿主；docker-seed 每次 provision 创建独立容器，并在容器可写层只保留目标 instance，读写与命令均通过容器运行时。
+    acceptance: docker-seed 不执行 docker cp 导出 repo；两个 provision 返回不同容器；单个 session 的 `/workspace` 只含目标 instance 且不保留全池 build-state；路径逃逸被拒；命令超时会使运行时进入污染态并可被回收。
   - id: T3
     title: harness 容器执行与强制终止
     status: done
@@ -128,7 +128,7 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 
 一局的生命周期固定为：
 
-1. `docker-seed` 校验 image 带有 runnable 协议标签，为该 session 创建唯一命名容器并启动；工作目录是容器内 `/workspace/<instance_id>/repo`。
+1. `docker-seed` 校验 image 带有 runnable 协议标签，为该 session 创建唯一命名容器并启动；随后在该容器可写层移除其它 seed instance 与全池 build-state，使 `/workspace` 只剩目标 instance；工作目录是容器内 `/workspace/<instance_id>/repo`。
 2. persona 工具经 `WorkspaceRuntime` 读写/执行；harness checkout 作为只读输入复制进容器的 `/opt/auto-designer/harness/<sha>`，随后由 `docker exec -i` 启动。不得把 repo 导出成宿主工作目录。
 3. 每个 harness reply 带机器状态：`completed | timed_out | interrupted | crashed`。`timed_out`/无法确认终止时，立即停止并删除整个会话容器；该 session 不再续聊，避免旧线程继续修改可写层。
 4. 正常结束时从会话容器导出 `git diff --binary` 文本及 SHA-256；随后删除会话容器。
@@ -145,7 +145,7 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 
 `WorkspaceRuntime` 是消费侧唯一接缝：`cwd`、`read_text`、`write_text`、`run`、`export_patch`、`close`。本地 fixture 由 `LocalWorkspaceRuntime` 包装以保持开发/单测兼容；`docker-seed` 返回 `DockerWorkspaceRuntime`，不再返回 `str`。任何需要 cwd 的调用点必须消费该协议，不得用 `Path(runtime)` 或宿主 `open()` 绕过。
 
-容器创建须使用：唯一 session 名、`--label auto-designer.session=<id>`、非特权、无宿主 bind mount、工作目录为 repo。网络默认 `none`；正式 GLM 实验由 runner 显式配置 bridge 以访问 `172.22.64.1` 网关，后续可收紧为 egress allowlist。镜像标签 `org.auto-designer.seed-runtime=1` 是可运行契约；存储型旧镜像没有标签，启动即失败并提示重建，不能静默回退到 `docker cp`。
+容器创建须使用：唯一 session 名、`--label auto-designer.session=<id>`、非特权、无宿主 bind mount、工作目录为 repo。共享 runnable image 可以打包任务池以复用镜像层，但 provision 返回前必须在该容器的 overlay 可写层对白名单外的 `/workspace/*` 建立删除态，并删除含全池清单的 `/build-state.json`；不能只依赖 cwd，因为 harness shell 可使用绝对路径。网络默认 `none`；正式 GLM 实验由 runner 显式配置 bridge 以访问 `172.22.64.1` 网关，后续可收紧为 egress allowlist。镜像标签 `org.auto-designer.seed-runtime=1` 是可运行契约；存储型旧镜像没有标签，启动即失败并提示重建，不能静默回退到 `docker cp`。
 
 ### 终止语义
 
