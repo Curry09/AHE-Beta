@@ -17,8 +17,11 @@ from auto_designer.user.sim.persona_client import ScriptedPersonaClient, _parse_
 from auto_designer.user.sim.prompt import (
     build_issue_turn,
     build_main_act_turn,
+    build_main_final_check_turn,
     build_main_intent_turn,
     build_main_judge_turn,
+    build_main_reintent_turn,
+    build_main_rejudge_turn,
     build_rating_turn,
     build_system,
     build_waiting_act_turn,
@@ -142,6 +145,102 @@ def test_main_action_space_only_visible_to_act_turn() -> None:
     assert sentinel in act
 
 
+def test_main_act_actions_are_mutually_explicit_about_continuation_and_completion() -> None:
+    state = init_state(_persona())
+    act = build_main_act_turn(
+        "implement the requested fix",
+        [],
+        "I found the bug and can describe a patch.",
+        [
+            "send_message",
+            "keep_waiting",
+            "interrupt",
+            "accept",
+            "accept_with_reservations",
+            "give_up",
+            "file_issue",
+        ],
+        state,
+        verdict="satisfied",
+        perceive="the diagnosis looks right but no patch exists",
+        intent="decide whether the task is actually done",
+    )
+
+    assert "- send_message: CONTINUE the session" in act
+    assert "- keep_waiting: CONTINUE the session" in act
+    assert "- interrupt: CONTINUE the session" in act
+    assert "- accept: END the session immediately" in act
+    assert "outcome of the original <task>" in act
+    assert "not merely the latest reply, plan, diagnosis, or partial subtask" in act
+    assert "No required deliverable remains for you to supply" in act
+    assert "- accept_with_reservations: END the session immediately" in act
+    assert "Use the same completion bar as accept" in act
+    assert "if necessary work is missing, do not accept" in act
+    assert "- give_up: END the session immediately" in act
+    assert "taking over the remaining work yourself" in act
+    assert "It does not require blaming the harness" in act
+    assert "- file_issue: END the session immediately" in act
+    assert "there is no later return in this same session" in act
+
+
+def test_satisfied_judgment_is_not_a_terminal_completion_decision() -> None:
+    judge = build_main_judge_turn(
+        "implement the requested fix",
+        [],
+        "I found the bug.",
+        ["accept", "send_message"],
+        init_state(_persona()),
+    )
+
+    assert "satisfied: the current observation looks good enough to you" in judge
+    assert "does NOT mean the original task is complete" in judge
+    assert "if required work still remains" in judge
+
+
+def test_handover_persona_does_not_count_self_completion_as_assistant_delivery() -> None:
+    system = build_system(_persona(d43=D43Correct.HANDOVER))
+
+    assert "stop relying on the assistant" in system
+    assert "take over the remaining work yourself" in system
+    assert "your own takeover is not a successful assistant delivery" in system
+
+
+def test_final_check_rejudge_reintent_contracts_are_one_way() -> None:
+    state = init_state(_persona())
+    check = build_main_final_check_turn(
+        "do X",
+        [],
+        "done",
+        state,
+        verdict="unsure",
+        perceive="plausible",
+        intent="verify once",
+        check_goal="inspect the changed API",
+    )
+    rejudge = build_main_rejudge_turn(
+        "do X",
+        [],
+        "done",
+        state,
+        prior_verdict="unsure",
+        prior_perceive="plausible",
+        check_status="completed",
+        check_evidence="tests pass",
+    )
+    reintent = build_main_reintent_turn(
+        "do X", [], "done", state, verdict="satisfied", perceive="tests pass"
+    )
+
+    assert "<main_final_check>" in check and "inspect the changed API" in check
+    assert '"check_status"' in check and "Do not edit" in check
+    assert "<main_rejudge>" in rejudge and "tests pass" in rejudge
+    assert "cannot use another private tool" in rejudge
+    assert "<main_reintent>" in reintent
+    assert '"needs_final_check": false' in reintent
+    assert "already been used" in reintent
+    assert "<action_space>" not in check + rejudge + reintent
+
+
 def test_main_judge_injects_help_text() -> None:
     p = _persona()
     state = init_state(p)
@@ -216,6 +315,9 @@ def test_waiting_three_builders_tags() -> None:
     assert "report_issue" in act
     for action in ("keep_waiting", "send_message", "interrupt", "give_up"):
         assert action in act
+    assert "- interrupt: CONTINUE the session" in act
+    assert "- give_up: END the session immediately" in act
+    assert "even if you continue the real-world task yourself" in act
 
 
 def test_issue_and_rating_contracts_are_stage_local() -> None:

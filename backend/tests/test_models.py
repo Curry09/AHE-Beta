@@ -147,6 +147,20 @@ def test_session_without_sim_trace_omits_key_and_loads_none() -> None:
     assert loaded.sim_trace is None
 
 
+def test_sim_trace_evaluator_status_round_trip_and_old_default() -> None:
+    invalid = SimTrace(
+        persona_id="P",
+        end_reason="evaluator_invalid",
+        evaluation_status="invalid",
+        evaluation_error={"stage": "main_act", "code": "missing_action", "attempts": 2},
+    )
+    assert SimTrace.from_dict(invalid.to_dict()) == invalid
+
+    legacy = SimTrace.from_dict({"persona_id": "P", "end_reason": "accepted", "turns": []})
+    assert legacy.evaluation_status == "valid"
+    assert legacy.evaluation_error is None
+
+
 def test_feeling_score_out_of_range() -> None:
     """体感分越界（0/5）构造期断言失败。"""
     for bad in (0, 5):

@@ -1,7 +1,8 @@
 """本地 SessionStore（spec-0001/T6）：一局 Session 全量落盘 + 单一总索引。
 
 全量文件 root/<session_id>.json 为唯一权威；索引 root/index.json 是其派生投影（可由全量重建），
-承载体感曲线/回归基线所需最小信息 {session_id, score, reason, created_at, n_issues}。先写全量后追加索引。
+承载体感曲线/回归基线所需最小信息及 evaluation_status。invalid 条目保留供审计，但默认 index()
+过滤，避免进入正常体感/通过率。先写全量后追加索引。
 """
 
 from __future__ import annotations
@@ -44,7 +45,10 @@ class SessionStore:
             json.dumps(session.to_dict(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        entries = self.index()
+        entries = self.index(include_invalid=True)
+        evaluation_status = (
+            session.sim_trace.evaluation_status if session.sim_trace is not None else "valid"
+        )
         entries.append(
             {
                 "session_id": session.session_id,
@@ -56,6 +60,8 @@ class SessionStore:
                 "n_issues": len(session.issue_refs),
                 # 供设计师 get_session_timeline(issue_number=…) 快查；旧 index 无此键则扫盘回落。
                 "issue_numbers": [r.number for r in session.issue_refs],
+                # Spec-0048：invalid 仍落全量与索引供审计，但默认趋势读取会排除。
+                "evaluation_status": evaluation_status,
             }
         )
         (self._root / _INDEX_NAME).write_text(
@@ -68,8 +74,12 @@ class SessionStore:
         data = json.loads(full_path.read_text(encoding="utf-8"))  # 不存在则 FileNotFoundError
         return Session.from_dict(data)
 
-    def index(self) -> list[dict]:
+    def index(self, *, include_invalid: bool = False) -> list[dict]:
         index_path = self._root / _INDEX_NAME
         if not index_path.exists():
             return []  # 首次运行无索引为合法初始态
-        return json.loads(index_path.read_text(encoding="utf-8"))
+        rows = json.loads(index_path.read_text(encoding="utf-8"))
+        if include_invalid:
+            return rows
+        # 旧索引没有该字段，按 valid 兼容；正式体感/通过率消费者不接收 evaluator-invalid。
+        return [row for row in rows if row.get("evaluation_status", "valid") == "valid"]

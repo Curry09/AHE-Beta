@@ -79,7 +79,15 @@ def main() -> int:
                 print(f"[{index:02}/{len(instances)}] PASS {instance_id}: {imported}")
         except Exception as exc:  # noqa: BLE001 - validate all entries before failing
             failures.append(instance_id)
-            print(f"[{index:02}/{len(instances)}] FAIL {instance_id}: {exc}", file=sys.stderr)
+            detail = ""
+            if isinstance(exc, subprocess.CalledProcessError):
+                captured = (exc.stderr or exc.stdout or "").strip()
+                if captured:
+                    detail = f"\n{captured[-4000:]}"
+            print(
+                f"[{index:02}/{len(instances)}] FAIL {instance_id}: {exc}{detail}",
+                file=sys.stderr,
+            )
     print(f"summary: passed={len(instances) - len(failures)} failed={len(failures)}")
     return 1 if failures else 0
 

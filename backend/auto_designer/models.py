@@ -315,6 +315,9 @@ class SimTrace:
     signals: list[str] = field(default_factory=list)
     feeling_derived: FeelingScore | None = None
     persona_tail: list[PersonaCallTrace] = field(default_factory=list)
+    # valid | invalid。invalid 表示用户评估器自身协议/解析失败，不是 harness 任务失败。
+    evaluation_status: str = "valid"
+    evaluation_error: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -327,6 +330,10 @@ class SimTrace:
             d["feeling_derived"] = self.feeling_derived.to_dict()
         if self.persona_tail:
             d["persona_tail"] = [c.to_dict() for c in self.persona_tail]
+        if self.evaluation_status != "valid":
+            d["evaluation_status"] = self.evaluation_status
+        if self.evaluation_error is not None:
+            d["evaluation_error"] = dict(self.evaluation_error)
         return d
 
     @classmethod
@@ -339,6 +346,12 @@ class SimTrace:
             signals=list(data.get("signals", [])),
             feeling_derived=FeelingScore.from_dict(fd) if fd else None,
             persona_tail=[PersonaCallTrace.from_dict(c) for c in data.get("persona_tail", [])],
+            evaluation_status=str(data.get("evaluation_status") or "valid"),
+            evaluation_error=(
+                dict(data["evaluation_error"])
+                if isinstance(data.get("evaluation_error"), dict)
+                else None
+            ),
         )
 
 

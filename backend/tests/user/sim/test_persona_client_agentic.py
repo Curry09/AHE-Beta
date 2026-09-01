@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from auto_designer.models import WorkspaceSpec
 from auto_designer.user.sim.dimensions import (
     D1Eval,
@@ -24,6 +26,7 @@ from auto_designer.user.sim.harness_adapter import ScriptedHarness
 from auto_designer.user.sim.loop import run_session
 from auto_designer.user.sim.persona_client import (
     AgenticPersonaClient,
+    PersonaProtocolError,
     ScriptedPersonaClient,
 )
 from auto_designer.user.sim.workspace import materialize
@@ -44,7 +47,7 @@ def _persona(d1: D1Eval) -> Persona:
 
 
 class FakeToolLLM:
-    """按脚本逐次返回文本；特殊轮（rate/file）自动给合规 JSON；脚本耗尽给默认 accept。"""
+    """按脚本逐次返回文本；脚本耗尽时按当前阶段返回最小合法对象。"""
 
     def __init__(self, scripted: list[str] | None = None) -> None:
         self.scripted = list(scripted or [])
@@ -59,9 +62,21 @@ class FakeToolLLM:
             return json.dumps({"issue": "meh"})
         if self.scripted:
             return self.scripted.pop(0)
-        return json.dumps(
-            {"perceive": "looks fine", "verdict": "satisfied", "action": "accept", "message": "ok"}
-        )
+        if "<main_judge>" in last or "<main_rejudge>" in last:
+            return json.dumps({"perceive": "looks fine", "verdict": "satisfied"})
+        if "<main_intent>" in last or "<main_reintent>" in last:
+            return json.dumps(
+                {"intent": "accept if complete", "needs_final_check": False, "check_goal": ""}
+            )
+        if "<main_final_check>" in last:
+            return json.dumps({"perceive": "checked", "check_status": "completed"})
+        if "<main_act>" in last:
+            if "'accept'" in last:
+                return json.dumps({"action": "accept", "message": "ok", "gap": False})
+            return json.dumps(
+                {"action": "send_message", "message": "please do the task", "gap": False}
+            )
+        return json.dumps({"perceive": "looks fine", "verdict": "satisfied"})
 
 
 class FakeSandbox:
@@ -144,32 +159,46 @@ def test_blind_degrades_to_text_only() -> None:
 
 
 # --------------------------------------------------------------------------
-# (c) 超 max_inner_steps -> 兜底主观判断
+# (c) max_inner_steps 是纯工具额度；用满后另行强制主观结论
 # --------------------------------------------------------------------------
-def test_exceed_steps_falls_back() -> None:
+def test_tool_budget_exhaustion_reserves_forced_conclusion() -> None:
     sb = FakeSandbox()
     toolcall = json.dumps({"tool": "run_shell", "args": {"cmd": "echo hi"}})
-    llm = FakeToolLLM([toolcall, toolcall, toolcall])  # 恰好用满步数，之后脚本空 -> 默认 accept
+    conclusion = json.dumps({"perceive": "three checks were enough", "verdict": "satisfied"})
+    llm = FakeToolLLM([toolcall, toolcall, toolcall, conclusion])
     c = AgenticPersonaClient(llm, max_inner_steps=3, sandbox_factory=lambda workspace=None: sb)
     c.bind_session(_persona(D1Eval.EXPERT), "/ws")
 
-    out = c.respond("SYS", "<task>x</task>")
-    assert len(sb.runs) == 3  # 工具调用被步数上限封顶
-    assert out["action"] == "accept"  # 兜底返回合法输出
+    out = c.respond("SYS", "<main_judge><task>x</task></main_judge>")
+    assert out == {"perceive": "three checks were enough", "verdict": "satisfied"}
+    assert len(sb.runs) == 3
+    assert len(llm.calls) == 4
+    assert "No more tools are available" in llm.calls[-1][-1]["content"]
+
+
+def test_forced_conclusion_never_dispatches_more_tools() -> None:
+    sb = FakeSandbox()
+    toolcall = json.dumps({"tool": "run_shell", "args": {"cmd": "echo hi"}})
+    llm = FakeToolLLM([toolcall, toolcall, toolcall])
+    c = AgenticPersonaClient(llm, max_inner_steps=1, sandbox_factory=lambda workspace=None: sb)
+    c.bind_session(_persona(D1Eval.EXPERT), "/ws")
+
+    with pytest.raises(PersonaProtocolError, match="forced_conclusion_tool_not_allowed"):
+        c.respond("SYS", "<main_judge><task>x</task></main_judge>")
+    assert len(sb.runs) == 1
 
 
 # --------------------------------------------------------------------------
 # (d) 非法 JSON -> 先「只回 JSON」重试一次；两次都废才安全退化（unsure/free）
 # --------------------------------------------------------------------------
-def test_invalid_json_retry_then_degrades_safely() -> None:
-    # 两次都非法：重试仍解析不出 -> 落 _parse_failed 空壳（free/unsure），绝不伪造抱怨
+def test_invalid_json_retry_then_raises_typed_error() -> None:
+    # 两次都非法：不得把 parse-failure 空壳当成真实 action。
     llm = FakeToolLLM(["this is not json at all", "still not json"])
     c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox())
     c.bind_session(_persona(D1Eval.EXPERT), "/ws")
 
-    out = c.respond("SYS", "<task>x</task>")
-    assert out["action"] == "free" and out["verdict"] == "unsure"
-    assert out.get("_parse_failed") is True
+    with pytest.raises(PersonaProtocolError, match="unparseable_json"):
+        c.respond("SYS", "<task>x</task>")
     assert len(llm.calls) == 2  # 确有重试
 
 
@@ -185,6 +214,112 @@ def test_invalid_json_retry_recovers() -> None:
     out = c.respond("SYS", "<task>x</task>")
     assert out["action"] == "accept" and out["verdict"] == "satisfied"
     assert len(llm.calls) == 2
+
+
+def test_main_act_private_tool_object_is_retried_not_accepted() -> None:
+    llm = FakeToolLLM(
+        [
+            json.dumps({"tool": "run_shell", "args": {"cmd": "git diff"}}),
+            json.dumps({"action": "accept", "message": "checked", "gap": False}),
+        ]
+    )
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox())
+    c.bind_session(_persona(D1Eval.EXPERT), "/ws")
+
+    out = c.respond(
+        "SYS",
+        "<main_act>\n<action_space>\n['accept', 'send_message']\n</action_space>\n</main_act>",
+    )
+    assert out["action"] == "accept"
+    assert len(llm.calls) == 2
+    assert "tool_not_allowed_in_stage" in llm.calls[1][-1]["content"]
+
+
+def test_judge_tool_returned_after_contract_retry_is_dispatched() -> None:
+    sb = FakeSandbox()
+    llm = FakeToolLLM(
+        [
+            "truncated",
+            json.dumps({"tool": "run_shell", "args": {"cmd": "git diff --check"}}),
+            json.dumps({"perceive": "diff is clean", "verdict": "satisfied"}),
+        ]
+    )
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: sb)
+    c.bind_session(_persona(D1Eval.EXPERT), "/ws")
+
+    out = c.respond("SYS", "<main_judge><task>x</task></main_judge>")
+    assert out == {"perceive": "diff is clean", "verdict": "satisfied"}
+    assert sb.runs[0][0] == "git diff --check"
+
+
+def test_final_check_tool_budget_is_capped_at_four() -> None:
+    sb = FakeSandbox()
+    toolcall = json.dumps({"tool": "run_shell", "args": {"cmd": "echo check"}})
+    conclusion = json.dumps({"perceive": "four checks completed", "check_status": "completed"})
+    llm = FakeToolLLM([toolcall] * 4 + [conclusion])
+    c = AgenticPersonaClient(llm, max_inner_steps=8, sandbox_factory=lambda workspace=None: sb)
+    c.bind_session(_persona(D1Eval.EXPERT), "/ws")
+
+    out = c.respond("SYS", "<main_final_check><check_goal>x</check_goal></main_final_check>")
+    assert out == {"perceive": "four checks completed", "check_status": "completed"}
+    assert len(sb.runs) == 4
+    assert len(llm.calls) == 5
+
+
+def test_opening_judge_cannot_dispatch_private_tools() -> None:
+    created: list[int] = []
+    llm = FakeToolLLM(
+        [
+            json.dumps({"tool": "run_shell", "args": {"cmd": "git diff"}}),
+            json.dumps({"perceive": "task text only", "verdict": "unsure", "task_load": "normal"}),
+        ]
+    )
+
+    def factory(workspace=None):
+        created.append(1)
+        return FakeSandbox(workspace)
+
+    c = AgenticPersonaClient(llm, sandbox_factory=factory)
+    c.bind_session(_persona(D1Eval.EXPERT), "/ws")
+    user = (
+        "<main_judge><task>x</task>\n# SIZE UP THIS TASK (first turn only)\n"
+        'Return {"task_load":"normal"}</main_judge>'
+    )
+    out = c.respond("SYS", user)
+    assert out["task_load"] == "normal"
+    assert created == []
+    assert "tool_not_allowed_in_stage" in llm.calls[1][-1]["content"]
+
+
+def test_blind_final_check_is_explicitly_unavailable() -> None:
+    llm = FakeToolLLM()
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox())
+    c.bind_session(_persona(D1Eval.BLIND), "/ws")
+
+    out = c.respond("SYS", "<main_final_check><check_goal>x</check_goal></main_final_check>")
+    assert out["check_status"] == "unavailable"
+    assert llm.calls == []
+
+
+def test_run_session_two_illegal_act_tool_objects_yield_zero_accept() -> None:
+    llm = FakeToolLLM(
+        [
+            json.dumps(
+                {"perceive": "nothing has started", "verdict": "unsure", "task_load": "normal"}
+            ),
+            json.dumps({"intent": "start", "needs_final_check": False, "check_goal": ""}),
+            json.dumps({"tool": "run_shell", "args": {"cmd": "git diff"}}),
+            json.dumps({"tool": "run_shell", "args": {"cmd": "git status"}}),
+        ]
+    )
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox())
+    c.bind_session(_persona(D1Eval.EXPERT), "/ws")
+
+    res = run_session(_persona(D1Eval.EXPERT), c, ScriptedHarness(), "task")
+    assert res.evaluation_status == "invalid"
+    assert res.end_reason == "evaluator_invalid"
+    assert res.evaluation_error and res.evaluation_error["code"] == "tool_not_allowed_in_stage"
+    assert all(turn.action not in {"accept", "accept_with_reservations"} for turn in res.turns)
 
 
 # --------------------------------------------------------------------------
@@ -279,17 +414,16 @@ def test_run_session_collects_mid_session_issue_notes() -> None:
     persona = _persona(D1Eval.COMPETENT)
     llm = FakeToolLLM(
         [
-            # OPENING · judge：先记一笔再给现状
-            json.dumps({"tool": "report_issue", "args": {"body": "docs are wrong about /status"}}),
+            # OPENING · judge：首轮只按任务文本判断，不调用 private tool
             json.dumps(
                 {
-                    "perceive": "filed a note, still starting",
+                    "perceive": "still starting",
                     "verdict": "unsure",
                     "task_load": "normal",
                 }
             ),
             # OPENING · intent / act
-            json.dumps({"intent": "start the task"}),
+            json.dumps({"intent": "start the task", "needs_final_check": False, "check_goal": ""}),
             json.dumps(
                 {
                     "action": "send_message",
@@ -297,9 +431,12 @@ def test_run_session_collects_mid_session_issue_notes() -> None:
                     "gap": False,
                 }
             ),
-            # 下一轮 · judge / intent / act → 接受
+            # 下一轮 · judge：记录一笔真实问题后再判断；intent / act → 接受
+            json.dumps({"tool": "report_issue", "args": {"body": "docs are wrong about /status"}}),
             json.dumps({"perceive": "done", "verdict": "satisfied"}),
-            json.dumps({"intent": "accept and move on"}),
+            json.dumps(
+                {"intent": "accept and move on", "needs_final_check": False, "check_goal": ""}
+            ),
             json.dumps({"action": "accept", "message": "ok", "gap": False}),
         ]
     )

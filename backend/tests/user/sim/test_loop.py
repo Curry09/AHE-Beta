@@ -23,7 +23,7 @@ from auto_designer.user.sim.loop import (
     route,
     run_session,
 )
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
+from auto_designer.user.sim.persona_client import PersonaProtocolError, ScriptedPersonaClient
 from auto_designer.user.sim.state import State, init_state
 
 
@@ -75,7 +75,11 @@ class _StubClient:
                 out["task_load"] = "normal"
             return out
         if "<main_intent>" in user:
-            return {"intent": "do the scripted next step"}
+            return {
+                "intent": "do the scripted next step",
+                "needs_final_check": False,
+                "check_goal": "",
+            }
         if "<main_act>" in user or "<main_decide>" in user:
             a = self._actions[self._i] if self._i < len(self._actions) else self._actions[-1]
             self._i += 1
@@ -118,6 +122,37 @@ class _ClassifyingClient(_RecordingClient):
         return space[0] if space else "free"
 
 
+class _FinalCheckClient(_RecordingClient):
+    def __init__(self, outcome: dict | Exception) -> None:
+        super().__init__(["send_message", "accept"], verdict="satisfied")
+        self._intent_calls = 0
+        self._outcome = outcome
+
+    def respond(self, system: str, user: str) -> dict:
+        if "<main_intent>" in user:
+            self.seen.append(user)
+            self._intent_calls += 1
+            if self._intent_calls == 2:
+                return {
+                    "intent": "verify the changed file once before accepting",
+                    "needs_final_check": True,
+                    "check_goal": "confirm the requested implementation is present",
+                }
+            return {"intent": "start", "needs_final_check": False, "check_goal": ""}
+        if "<main_final_check>" in user:
+            self.seen.append(user)
+            if isinstance(self._outcome, Exception):
+                raise self._outcome
+            return self._outcome
+        if "<main_rejudge>" in user:
+            self.seen.append(user)
+            return {"perceive": "the available evidence is sufficient", "verdict": "satisfied"}
+        if "<main_reintent>" in user:
+            self.seen.append(user)
+            return {"intent": "accept now", "needs_final_check": False, "check_goal": ""}
+        return super().respond(system, user)
+
+
 def test_harness_text_fed_raw_without_perception_filter() -> None:
     # 低能力档(原型会用 perceive_filter 抹掉源码行)；删除过滤后, 源码应原样喂入 LLM。
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
@@ -152,6 +187,68 @@ def test_main_decide_is_judge_intent_act_isomorphic() -> None:
     assert all("<action_space>" in u for u in act_prompts)
     active = [t for t in res.turns if t.phase in ("opening", "active")]
     assert any("|" in t.perceive and "→" in t.perceive for t in active)
+
+
+def test_active_final_check_converges_through_rejudge_and_reintent() -> None:
+    """一次 final check 后只能 rejudge → reintent → act，不能再次回跳调查。"""
+    client = _FinalCheckClient(
+        {"perceive": "the implementation is present", "check_status": "completed"}
+    )
+    res = run_session(
+        _persona(D1Eval.EXPERT, D43Correct.FEEDBACK), client, ScriptedHarness(), TASK
+    )
+
+    assert res.end_reason == "accepted"
+    tags = [
+        tag
+        for user in client.seen
+        for tag in ("main_final_check", "main_rejudge", "main_reintent", "main_act")
+        if f"<{tag}>" in user
+    ]
+    assert tags[-4:] == ["main_final_check", "main_rejudge", "main_reintent", "main_act"]
+    assert tags.count("main_final_check") == 1
+
+
+def test_failed_or_exhausted_final_check_still_forces_rejudge() -> None:
+    outcomes: list[dict | Exception] = [
+        {"perceive": "the command failed", "check_status": "failed"},
+        {"perceive": "no private tools", "check_status": "unavailable"},
+        PersonaProtocolError("main_final_check", "tool_budget_exhausted", attempts=4),
+    ]
+    for outcome in outcomes:
+        client = _FinalCheckClient(outcome)
+        res = run_session(
+            _persona(D1Eval.EXPERT, D43Correct.FEEDBACK), client, ScriptedHarness(), TASK
+        )
+        assert res.end_reason == "accepted"
+        tags = "\n".join(client.seen)
+        assert tags.count("<main_final_check>") == 1
+        assert "<main_rejudge>" in tags and "<main_reintent>" in tags
+
+
+def test_protocol_failure_is_evaluator_invalid_not_accept() -> None:
+    class _BrokenActClient(_StubClient):
+        def respond(self, system: str, user: str) -> dict:
+            if "<main_act>" in user:
+                raise PersonaProtocolError("main_act", "tool_not_allowed_in_stage", attempts=2)
+            return super().respond(system, user)
+
+    res = run_session(
+        _persona(D1Eval.EXPERT, D43Correct.FEEDBACK),
+        _BrokenActClient(["accept"], verdict="satisfied"),
+        ScriptedHarness(),
+        TASK,
+    )
+    assert res.end_reason == "evaluator_invalid"
+    assert res.evaluation_status == "invalid"
+    assert res.evaluation_error == {
+        "kind": "persona_protocol",
+        "stage": "main_act",
+        "code": "tool_not_allowed_in_stage",
+        "attempts": 2,
+    }
+    assert not res.turns
+    assert res.feeling is not None and "exclude from harness metrics" in res.feeling.reason
 
 
 def test_free_action_classification_still_converges_after_open_intent() -> None:

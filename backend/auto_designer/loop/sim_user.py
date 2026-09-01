@@ -111,6 +111,8 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
             PersonaCallTrace.from_dict(c) if isinstance(c, dict) else c
             for c in (res.persona_tail or [])
         ],
+        evaluation_status=res.evaluation_status,
+        evaluation_error=(dict(res.evaluation_error) if res.evaluation_error is not None else None),
     )
 
 

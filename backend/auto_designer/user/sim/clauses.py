@@ -33,7 +33,7 @@ D1_CLAUSE = {
 D2_DEPTH = {D2Depth.NOVICE: "novice", D2Depth.PROFICIENT: "proficient", D2Depth.SENIOR: "senior"}
 
 D3_CLAUSE = {
-    D3Accept.RUNS: "if it runs without error, you accept it.",
+    D3Accept.RUNS: "your quality bar is only that the delivered result runs without error.",
     D3Accept.FUNCTIONAL: "it must work on the normal case you actually tried; you do not construct edge cases yourself.",
     D3Accept.IDIOMATIC: "it must follow idiomatic, modern practice.",
     D3Accept.RIGOROUS: "it must handle types and edge/boundary cases correctly.",
@@ -64,7 +64,10 @@ D42_CLAUSE = {
 # 质量失败策略：只描述结果不对时怎么办。
 D43_CLAUSE = {
     D43Correct.FEEDBACK: "when the result is wrong you describe the problem plainly and ask it to fix. If it keeps failing you give up — you do NOT take over the code yourself and you do NOT file a formal issue.",
-    D43Correct.HANDOVER: "when the result is wrong you take over and write the fix yourself.",
+    D43Correct.HANDOVER: (
+        "when the result is wrong you stop relying on the assistant and take over the remaining "
+        "work yourself; your own takeover is not a successful assistant delivery."
+    ),
     D43Correct.RESEND: "when the result is wrong you re-send the request, possibly rephrased.",
     D43Correct.GIVE_UP: "when the result keeps being wrong you abandon the task quickly.",
     D43Correct.FILE_ISSUE: "when the result repeatedly fails you stop and file an issue — written as YOURSELF venting to a colleague: plain first-person, a bit frustrated, concrete everyday words about what you wanted and what it kept doing wrong (e.g. 'I just wanted X in my project and it kept handing me snippets to paste instead of actually doing it'). Do NOT write it like a bug ticket / status report / spec — no detached phrasing like 'the assistant…', 'authorized', 'verification', 'remains undone'. Just talk like a person.",

@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import time
 from collections import Counter
@@ -40,6 +41,9 @@ DEFAULT_MANIFEST = BACKEND / "swebench_pools" / "medium_hard_16.json"
 DEFAULT_OUTPUT = BACKEND / "data" / "swebench_seed" / "medium-hard-16"
 STATE_NAME = "build-state.json"
 DEPS_MARKER = ".seed-deps-v6"
+LEGACY_COMPAT_MARKER = ".seed-legacy-compat-v1"
+LEGACY_COMPAT_SOURCE = Path(__file__).with_name("swebench_seed_sitecustomize.py")
+LEGACY_COMPAT_REPOS = {"psf/requests", "sympy/sympy"}
 
 
 def _args() -> argparse.Namespace:
@@ -186,11 +190,27 @@ def _run_setup(repo_dir: Path, row: dict[str, Any], *, timeout: float) -> None:
         if proc.returncode != 0:
             stderr = (proc.stderr or "")[-5000:]
             raise RuntimeError(f"setup failed rc={proc.returncode}: {cmd}\n{stderr}")
+    if row["repo"] in LEGACY_COMPAT_REPOS:
+        site_packages = list((repo_dir / ".venv" / "lib").glob("python*/site-packages"))
+        if len(site_packages) != 1:
+            raise RuntimeError(f"cannot locate unique venv site-packages: {site_packages}")
+        shutil.copyfile(LEGACY_COMPAT_SOURCE, site_packages[0] / "sitecustomize.py")
+        (repo_dir / LEGACY_COMPAT_MARKER).write_text(
+            "v1: collections aliases; inspect.getargspec\n", encoding="utf-8"
+        )
     (repo_dir / DEPS_MARKER).write_text(
         "v6: setuptools<81; scientific=numpy<2,pandas<3; astropy=setuptools<70,no-isolation; "
         "scikit-learn=python3.10,pip<25,setuptools<60,no-isolation\n",
         encoding="utf-8",
     )
+
+
+def _deps_cached(repo_dir: Path, row: dict[str, Any]) -> bool:
+    if not (repo_dir / DEPS_MARKER).is_file():
+        return False
+    return row["repo"] not in LEGACY_COMPAT_REPOS or (
+        repo_dir / LEGACY_COMPAT_MARKER
+    ).is_file()
 
 
 def _prepare_source(row: dict[str, Any], instance_root: Path) -> Path:
@@ -272,7 +292,7 @@ def main() -> int:
                 }
             )
             if want_deps:
-                if (repo_dir / DEPS_MARKER).is_file():
+                if _deps_cached(repo_dir, row):
                     print(f"[{index}/{len(rows)}] {iid}: deps cached", flush=True)
                 else:
                     print(f"[{index}/{len(rows)}] {iid}: deps", flush=True)

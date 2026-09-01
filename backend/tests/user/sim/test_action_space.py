@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
-from auto_designer.user.sim.action_space import derive_action_space, resolve_action
-from auto_designer.user.sim.actions import CATALOG, Channel, Phase
+import pytest
+
+from auto_designer.user.sim.action_space import (
+    ActionResolutionError,
+    derive_action_space,
+    resolve_action,
+)
+from auto_designer.user.sim.actions import CATALOG, Phase
 from auto_designer.user.sim.dimensions import (
     D1Eval,
     D2Depth,
@@ -84,20 +90,20 @@ def test_resolve_free_falls_back_to_safe_nonterminal() -> None:
     assert aid == "send_message" and aid != "accept" and msg.strip()
 
 
-def test_resolve_projects_legacy_external_actions_to_send_message() -> None:
+def test_resolve_rejects_legacy_external_actions() -> None:
     p = _persona(d1=D1Eval.BLIND)
     space = ["send_message", "accept"]
     for legacy in ("verify_self", "ask_harness_run", "request_evidence", "give_feedback"):
-        aid, _ = resolve_action({"action": legacy, "message": "show me evidence"}, space, p)
-        assert aid == "send_message"
+        with pytest.raises(ActionResolutionError, match="action_not_in_space"):
+            resolve_action({"action": legacy, "message": "show me evidence"}, space, p)
 
 
 def test_resolve_enforces_channel_consistency() -> None:
     p = _persona()
-    # EMIT 但 message 空 -> 框架不再 fabricate 罐头，保持空（补齐由 client 侧重问模型完成）。
+    # EMIT 但 message 空：client 契约重试仍没修好时必须失败，不能空转或 fabricate。
     space = ["send_message"]
-    aid, msg = resolve_action({"action": "send_message", "message": ""}, space, p)
-    assert aid == "send_message" and msg == "" and CATALOG[aid].channel is Channel.EMIT
+    with pytest.raises(ActionResolutionError, match="channel_mismatch"):
+        resolve_action({"action": "send_message", "message": ""}, space, p)
 
 
 def test_opening_is_the_only_structural_gate_against_accepting_nothing() -> None:
@@ -111,11 +117,29 @@ def test_opening_is_the_only_structural_gate_against_accepting_nothing() -> None
     assert "keep_waiting" in active and "interrupt" in active
 
 
-def test_negative_terminal_never_projects_to_accept() -> None:
-    # file_issue/give_up 未解锁时, 绝不投影到 accept(语义相反), 降级为继续对 harness 发消息。
+def test_negative_terminal_outside_space_is_rejected() -> None:
+    # file_issue/give_up 不在当前空间时不可猜测其替代动作，更不能投影到 accept。
     p = _persona(d43=D43Correct.FILE_ISSUE)
     space = ["accept", "send_message"]
-    aid, msg = resolve_action({"action": "file_issue", "message": "filing an issue"}, space, p)
-    assert aid == "send_message" and aid != "accept" and msg.strip()
-    aid2, _ = resolve_action({"action": "give_up", "message": "I quit"}, space, p)
-    assert aid2 == "send_message"
+    for action in ("file_issue", "give_up"):
+        with pytest.raises(ActionResolutionError, match="action_not_in_space"):
+            resolve_action({"action": action, "message": "stop"}, space, p)
+
+
+def test_missing_action_is_rejected_even_when_accept_is_first() -> None:
+    p = _persona()
+    invalid_objects = [
+        {"message": "looks fine"},
+        {"tool": "run_shell", "args": {"cmd": "git diff"}},
+        {"ok": True, "stdout": "tests pass", "returncode": 0},
+    ]
+    for space in (["accept", "send_message"], ["send_message", "accept"]):
+        for ret in invalid_objects:
+            with pytest.raises(ActionResolutionError, match="missing_action"):
+                resolve_action(ret, space, p)
+
+
+def test_silent_action_with_message_is_rejected() -> None:
+    p = _persona()
+    with pytest.raises(ActionResolutionError, match="channel_mismatch"):
+        resolve_action({"action": "keep_waiting", "message": "keep going"}, ["keep_waiting"], p)

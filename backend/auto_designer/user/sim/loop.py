@@ -29,17 +29,20 @@ from dataclasses import dataclass, field
 
 from auto_designer.usage import set_usage_context
 
-from .action_space import derive_action_space, resolve_action
+from .action_space import ActionResolutionError, derive_action_space, resolve_action
 from .actions import CATALOG, Channel, Effect, Executor, Phase
 from .dimensions import Persona
 from .feeling import FeelingScore, derive_feeling, parse_feeling_llm
-from .persona_client import PersonaClient, drain_call_traces
+from .persona_client import PersonaClient, PersonaProtocolError, drain_call_traces
 from .prompt import (
     WAITING_JUDGMENTS,
     build_issue_turn,
     build_main_act_turn,
+    build_main_final_check_turn,
     build_main_intent_turn,
     build_main_judge_turn,
+    build_main_reintent_turn,
+    build_main_rejudge_turn,
     build_rating_turn,
     build_system,
     build_waiting_act_turn,
@@ -148,6 +151,9 @@ class SessionResult:
     pending_harness_events: list | None = None  # 与 pending_harness_output 同窗口的 stdout 可见事件
     # 局末不挂某一 Turn 的用户 agent 调用（file_issue 正文 / 体感评分）。
     persona_tail: list = field(default_factory=list)
+    # Spec-0048：评估器协议异常与 harness 任务失败分轨；invalid 结果不得计入正常通过率。
+    evaluation_status: str = "valid"
+    evaluation_error: dict | None = None
 
 
 MAX_TURNS = 24
@@ -356,7 +362,7 @@ def _main_decide(
     result: SessionResult,
     phase: str,
 ) -> tuple[dict, list[dict], str, bool]:
-    """主 loop 同构决策：judge → intent → act（Spec-0023：仅 three）。
+    """主 loop 决策：judge → intent → [一次 final-check → rejudge → reintent] → act。
 
     返回 (act_ret 含 action/message, persona_calls, intent, gap)。
     judge 的 perceive/verdict/task_load 已合并进 act_ret，供后续 apply_verdict / 开局 task_load。
@@ -393,12 +399,88 @@ def _main_decide(
             harness_events=harness_events,
             verdict=verdict,
             perceive=perceive,
+            final_check_available=phase == Phase.ACTIVE.value,
         ),
     )
     new_calls = _take_persona_calls(client, "main_intent")
     calls.extend(new_calls)
     _record_private_evidence(state=state, calls=new_calls, phase=phase)
     intent = _resolve_intent(iret)
+
+    # Spec-0048：仅 ACTIVE 的本决策周期允许一次最终私有核查；无论核查成功、不可用或
+    # 协议失败，之后都必须经过无工具 rejudge/reintent，并且不能在同一周期再次回跳。
+    if phase == Phase.ACTIVE.value and iret.get("needs_final_check") is True:
+        check_goal = str(iret.get("check_goal") or "").strip()
+        check_status = "failed"
+        check_evidence = "The final check could not be completed. Judge from existing evidence."
+        try:
+            cret = client.respond(
+                system,
+                build_main_final_check_turn(
+                    task,
+                    history,
+                    harness_output,
+                    state,
+                    help_text=help_text,
+                    harness_events=harness_events,
+                    verdict=verdict,
+                    perceive=perceive,
+                    intent=intent,
+                    check_goal=check_goal,
+                ),
+            )
+            new_calls = _take_persona_calls(client, "main_final_check")
+            calls.extend(new_calls)
+            _record_private_evidence(state=state, calls=new_calls, phase=phase)
+            check_status = str(cret.get("check_status") or "failed")
+            check_evidence = str(cret.get("perceive") or "").strip() or check_evidence
+        except PersonaProtocolError as exc:
+            # final-check 本身是可选证据通道：失败时把失败作为证据交给强制复判，不把它
+            # 误作 harness 失败，也不允许重新进入工具阶段。
+            new_calls = _take_persona_calls(client, "main_final_check")
+            calls.extend(new_calls)
+            _record_private_evidence(state=state, calls=new_calls, phase=phase)
+            check_status = "failed"
+            check_evidence = f"Final check unavailable ({exc.code}); use existing evidence."
+
+        rjret = client.respond(
+            system,
+            build_main_rejudge_turn(
+                task,
+                history,
+                harness_output,
+                state,
+                help_text=help_text,
+                harness_events=harness_events,
+                prior_verdict=verdict,
+                prior_perceive=perceive,
+                check_status=check_status,
+                check_evidence=check_evidence,
+            ),
+        )
+        new_calls = _take_persona_calls(client, "main_rejudge")
+        calls.extend(new_calls)
+        _record_private_evidence(state=state, calls=new_calls, phase=phase)
+        perceive = str(rjret.get("perceive") or "")
+        verdict = str(rjret.get("verdict") or "unsure")
+
+        riret = client.respond(
+            system,
+            build_main_reintent_turn(
+                task,
+                history,
+                harness_output,
+                state,
+                help_text=help_text,
+                harness_events=harness_events,
+                verdict=verdict,
+                perceive=perceive,
+            ),
+        )
+        new_calls = _take_persona_calls(client, "main_reintent")
+        calls.extend(new_calls)
+        _record_private_evidence(state=state, calls=new_calls, phase=phase)
+        intent = _resolve_intent(riret)
 
     aret = client.respond(
         system,
@@ -940,32 +1022,65 @@ def run_session(
         space = derive_action_space(phase, persona, state)
 
         # ③ 同构主决定：judge → intent → act。
-        ret, decide_calls, intent, gap = _main_decide(
-            client=client,
-            system=system,
-            task=task,
-            history=history,
-            harness_output=harness_output,
-            harness_events=harness_events,
-            space=space,
-            state=state,
-            help_text=help_text,
-            appraise_task=phase is Phase.OPENING,
-            result=result,
-            phase=phase.value,
-        )
+        try:
+            ret, decide_calls, intent, gap = _main_decide(
+                client=client,
+                system=system,
+                task=task,
+                history=history,
+                harness_output=harness_output,
+                harness_events=harness_events,
+                space=space,
+                state=state,
+                help_text=help_text,
+                appraise_task=phase is Phase.OPENING,
+                result=result,
+                phase=phase.value,
+            )
+        except PersonaProtocolError as exc:
+            result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+            result.evaluation_status = "invalid"
+            result.evaluation_error = {
+                "kind": "persona_protocol",
+                "stage": exc.stage,
+                "code": exc.code,
+                "attempts": exc.attempts,
+            }
+            result.end_reason = "evaluator_invalid"
+            break
         # 开局：据 persona 主观任务量读数，在耐心基线上叠加一次性小浮动（同一个人接不同任务耐心不同）。
         if phase is Phase.OPENING:
             apply_task_load(state, str(ret.get("task_load", "normal")))
 
         # ③.5 方案 B：action=='free' 交给模型自评归类到合法 id（替代关键词硬猜）。
         # 仅 client 支持 classify_action 时启用；否则落 resolve 的安全兜底。
-        if ret.get("action") == "free" and hasattr(client, "classify_action"):
-            ret = {**ret, "action": client.classify_action(system, ret, space)}
-            decide_calls.extend(_take_persona_calls(client, "classify_action"))
+        try:
+            if ret.get("action") == "free" and hasattr(client, "classify_action"):
+                ret = {**ret, "action": client.classify_action(system, ret, space)}
+                decide_calls.extend(_take_persona_calls(client, "classify_action"))
 
-        # ④ resolve: 归类 + 投影 + channel 校验
-        action_id, message = resolve_action(ret, space, persona)
+            # ④ resolve: 只接收真实合法 action；缺失、越界或信道冲突一律 fail closed。
+            action_id, message = resolve_action(ret, space, persona)
+        except (PersonaProtocolError, ActionResolutionError) as exc:
+            result.persona_tail.extend(decide_calls)
+            if isinstance(exc, PersonaProtocolError):
+                result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+                detail = {
+                    "kind": "persona_protocol",
+                    "stage": exc.stage,
+                    "code": exc.code,
+                    "attempts": exc.attempts,
+                }
+            else:
+                detail = {
+                    "kind": "action_resolution",
+                    "code": exc.code,
+                    "action": exc.action_id,
+                }
+            result.evaluation_status = "invalid"
+            result.evaluation_error = detail
+            result.end_reason = "evaluator_invalid"
+            break
         spec = CATALOG[action_id]
 
         # ⑤ 状态写回 (只吃主观 verdict)
@@ -1134,6 +1249,14 @@ def run_session(
             if on_progress is not None:
                 on_progress(result)
         # 本轮若未产生下一条 harness 输出（例如模型空转），保持上一条可见输出供下一轮继续判断。
+
+    # 评估器协议失败不是用户体验分，也不是 harness 失败；保留审计哨兵但跳过正常评分。
+    if result.evaluation_status == "invalid":
+        err = result.evaluation_error or {}
+        reason = f"Evaluator invalid; exclude from harness metrics: {err.get('code', 'unknown')}"
+        result.signals.append(f"EVALUATOR_INVALID: {err}")
+        result.feeling = FeelingScore(score=2, reason=reason)
+        return result
 
     # 收尾: 汇总纯主观的行为信号
     _collect_signals(result, persona)

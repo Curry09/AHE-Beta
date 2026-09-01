@@ -10,6 +10,7 @@ from auto_designer.models import (
     Persona,
     SeedScenario,
     Session,
+    SimTrace,
     Transcript,
     Turn,
 )
@@ -59,6 +60,22 @@ def test_load_round_trip(tmp_path) -> None:
 
 def test_index_empty_when_no_file(tmp_path) -> None:
     assert SessionStore(tmp_path).index() == []
+
+
+def test_invalid_evaluator_session_is_persisted_but_excluded_from_default_index(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    session = _session()
+    session.sim_trace = SimTrace(
+        persona_id="P",
+        end_reason="evaluator_invalid",
+        evaluation_status="invalid",
+        evaluation_error={"stage": "main_act", "code": "missing_action"},
+    )
+    store.save(session)
+
+    assert store.load(session.session_id).sim_trace.evaluation_status == "invalid"
+    assert store.index() == []
+    assert store.index(include_invalid=True)[0]["evaluation_status"] == "invalid"
 
 
 def test_multiple_saves_append_index(tmp_path) -> None:

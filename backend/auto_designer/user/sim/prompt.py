@@ -215,20 +215,30 @@ def build_main_judge_turn(
             include_action_space=False,
         )
     )
+    private_check_instruction = (
+        "This is the opening appraisal. No private workspace tools are available on this "
+        "first turn; judge task size and the visible starting state from the task text only. "
+        if appraise_task
+        else "If your basis is not enough for the verdict you are about to give, and you have "
+        "private tools that can cheaply check the relevant fact in your workspace (for example "
+        "a file diff, a claimed edit, or a focused command/test), use those tools NOW before "
+        "returning this judge JSON. Private checking belongs in this judge step, not in the "
+        "later act step. These tools are for verification only: do not edit files, install "
+        "dependencies, reset/stash work, or otherwise take over implementation. "
+    )
     parts.append(
         "# JUDGE — how things stand NOW (not what you will do next)\n"
         "First write what you genuinely perceived in your own words, including the limits "
-        "of what you can tell from the visible evidence. If your basis is not enough for "
-        "the verdict you are about to give, and you have private tools that can cheaply "
-        "check the relevant fact in your workspace (for example a file diff, a claimed "
-        "edit, or a focused command/test), use those tools NOW before returning this "
-        "judge JSON. Private checking belongs in this judge step, not in the later act "
-        "step. If you choose not to check, be explicit in perceive that you are relying "
+        "of what you can tell from the visible evidence. "
+        + private_check_instruction
+        + "If you choose not to check, be explicit in perceive that you are relying "
         "only on the harness report or that the check is not worth it for this persona. "
         "Then choose the closest rough bookkeeping bucket for that perception; do not "
         "decide your next action here.\n"
         "Buckets:\n"
-        "- satisfied: you personally think this is good enough.\n"
+        "- satisfied: the current observation looks good enough to you. This is only a judgment "
+        "of what you see now; it does NOT mean the original task is complete or that the session "
+        "should end if required work still remains.\n"
         "- failed_blame_harness: you think the assistant/tool caused the failure.\n"
         "- failed_blame_self: you think your own request, limits, or choices caused the failure.\n"
         "- unsure: you are not convinced yet.\n"
@@ -254,6 +264,7 @@ def build_main_intent_turn(
     harness_events: list | None = None,
     verdict: str,
     perceive: str = "",
+    final_check_available: bool = False,
 ) -> str:
     """主 loop · Intent：开放意愿（可超菜单）。"""
     parts = ["<main_intent>"]
@@ -265,16 +276,160 @@ def build_main_intent_turn(
             action_space,
             state,
             help_text=help_text,
+            harness_events=harness_events,
             include_action_space=False,
         )
     )
     parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
     parts.append(_intent_options_block())
+    if final_check_available:
+        parts.append(
+            "# OPTIONAL FINAL CHECK\n"
+            "If you genuinely still need one last private workspace check before you can choose "
+            "an external action, set needs_final_check=true and state one focused check_goal. "
+            "This private check episode is available only once in this decision cycle. Do not "
+            "request it merely because checking is possible."
+        )
+    else:
+        parts.append(
+            "No final private check is available in this decision cycle; "
+            "needs_final_check MUST be false."
+        )
     parts.append(
         "Return EXACTLY ONE JSON object and nothing else:\n"
-        '{"intent": "<free text: what you WANT next>"}'
+        '{"intent": "<free text: what you WANT next>", '
+        '"needs_final_check": <true or false>, '
+        '"check_goal": "<one focused goal if true; else empty>"}'
     )
     parts.append("</main_intent>")
+    return "\n\n".join(parts)
+
+
+def build_main_final_check_turn(
+    task: str,
+    history_lines: list[str],
+    harness_output: str,
+    state: State,
+    *,
+    help_text: str = "",
+    harness_events: list | None = None,
+    verdict: str,
+    perceive: str,
+    intent: str,
+    check_goal: str,
+) -> str:
+    """Spec-0048/T3: ACTIVE 主决策内唯一一次有界、非 authoring 的最终私查。"""
+    parts = ["<main_final_check>"]
+    parts.extend(
+        _main_context_parts(
+            task,
+            history_lines,
+            harness_output,
+            [],
+            state,
+            help_text=help_text,
+            harness_events=harness_events,
+            include_action_space=False,
+        )
+    )
+    parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive or '(none)'}\n</judgment>")
+    parts.append(f"<intent>\n{intent or '(none)'}\n</intent>")
+    parts.append(f"<check_goal>\n{check_goal}\n</check_goal>")
+    parts.append(
+        "# FINAL CHECK — one bounded private episode\n"
+        "Use only the private read/run tools exposed to this stage, and only as needed for "
+        "<check_goal>. Do not edit files and do not file an issue. When the check is done, "
+        "report what you actually learned. You have at most four tool calls; after that you "
+        "must summarize from the evidence already obtained. You do not choose a verdict or "
+        "external action here.\n"
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"perceive": "<evidence learned, including limits/errors>", '
+        '"check_status": "completed | failed | unavailable"}'
+    )
+    parts.append("</main_final_check>")
+    return "\n\n".join(parts)
+
+
+def build_main_rejudge_turn(
+    task: str,
+    history_lines: list[str],
+    harness_output: str,
+    state: State,
+    *,
+    help_text: str = "",
+    harness_events: list | None = None,
+    prior_verdict: str,
+    prior_perceive: str,
+    check_status: str,
+    check_evidence: str,
+) -> str:
+    """final check 后强制重判；本阶段由 client 机械禁用工具。"""
+    parts = ["<main_rejudge>"]
+    parts.extend(
+        _main_context_parts(
+            task,
+            history_lines,
+            harness_output,
+            [],
+            state,
+            help_text=help_text,
+            harness_events=harness_events,
+            include_action_space=False,
+        )
+    )
+    parts.append(
+        f"<prior_judgment>\n{prior_verdict}\n{prior_perceive or '(none)'}\n</prior_judgment>"
+    )
+    parts.append(
+        f'<final_check_result status="{check_status}">\n'
+        f"{check_evidence or '(no additional evidence)'}\n</final_check_result>"
+    )
+    parts.append(
+        "# RE-JUDGE — final check is over\n"
+        "You cannot use another private tool now. Reassess the current outcome from all visible "
+        "and final-check evidence, including a failed/unavailable check. Do not choose an action.\n"
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"perceive": "<your updated understanding>", '
+        '"verdict": "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck"}'
+    )
+    parts.append("</main_rejudge>")
+    return "\n\n".join(parts)
+
+
+def build_main_reintent_turn(
+    task: str,
+    history_lines: list[str],
+    harness_output: str,
+    state: State,
+    *,
+    help_text: str = "",
+    harness_events: list | None = None,
+    verdict: str,
+    perceive: str,
+) -> str:
+    """重判后重新形成意愿；final check 已用完，不能回跳。"""
+    parts = ["<main_reintent>"]
+    parts.extend(
+        _main_context_parts(
+            task,
+            history_lines,
+            harness_output,
+            [],
+            state,
+            help_text=help_text,
+            harness_events=harness_events,
+            include_action_space=False,
+        )
+    )
+    parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive or '(none)'}\n</judgment>")
+    parts.append(_intent_options_block())
+    parts.append(
+        "The one final private check has already been used. You MUST now form an intent that "
+        "can converge to the next external act; needs_final_check MUST be false.\n"
+        "Return EXACTLY ONE JSON object and nothing else:\n"
+        '{"intent": "<what you want next>", "needs_final_check": false, "check_goal": ""}'
+    )
+    parts.append("</main_reintent>")
     return "\n\n".join(parts)
 
 
@@ -301,6 +456,7 @@ def build_main_act_turn(
             action_space,
             state,
             help_text=help_text,
+            harness_events=harness_events,
             include_action_space=True,
         )
     )
@@ -311,16 +467,32 @@ def build_main_act_turn(
         "This is the convergence step: map <intent> to an EXTERNAL move, or use "
         'action:"free" with a message if no id really fits (the framework may classify it).\n'
         "Local action semantics:\n"
-        "- send_message: send the exact line in message to the harness. Use this for any "
-        "follow-up, clarification, feedback, evidence request, or request that the harness run "
-        "something; if the harness is busy, this message may be read later.\n"
-        "- keep_waiting: send nothing and wait for the next harness output. Use it when "
-        "you want to see what the harness produces next before adding another message.\n"
-        "- interrupt: immediately stop current or ongoing harness work, without waiting for "
-        "the harness to read another message. Use it when you need the current work to stop "
-        "before you send the next correction.\n"
-        "- accept / accept_with_reservations / give_up / file_issue: terminal outcomes; keep "
-        "message short and in your voice.\n"
+        "- send_message: CONTINUE the session and send the exact line in message to the harness. "
+        "Choose this whenever you want the harness to respond or do more work: follow-up, "
+        "clarification, correction, evidence request, or another requested operation. If the "
+        "harness is busy, the message may be read later.\n"
+        "- keep_waiting: CONTINUE the session, send nothing, and wait for the next harness output. "
+        "Choose this only while the harness is already working and you want its next output. It "
+        "does not mean waiting while you do the work yourself or returning after a completed reply.\n"
+        "- interrupt: CONTINUE the session but immediately stop current harness work, like Ctrl+C. "
+        "Choose this when that work must stop before your next correction or change of direction; "
+        "it is neither acceptance nor rejection of the original task.\n"
+        "- accept: END the session immediately because the outcome of the original <task> — not "
+        "merely the latest reply, plan, diagnosis, or partial subtask — has been delivered by the "
+        "harness and meets your persona's quality bar. No required deliverable remains for you to "
+        "supply in place of the harness, and you do not intend another harness interaction.\n"
+        "- accept_with_reservations: END the session immediately. Use the same completion bar as "
+        "accept: the original <task> has been delivered by the harness and is usable. Choose this "
+        "only to record non-blocking shortcomings; if necessary work is missing, do not accept.\n"
+        "- give_up: END the session immediately because the original <task> is not adequately "
+        "completed in this harness session and you will stop relying on the harness. This includes "
+        "taking over the remaining work yourself, switching to another tool or person, or dropping "
+        "the real-world task. It does not require blaming the harness.\n"
+        "- file_issue: END the session immediately with the original <task> unresolved because a "
+        "concrete, repeatable harness or product problem is worth formally reporting to its "
+        "developers. Use give_up instead when you are leaving without that formal report.\n"
+        "Every END action is final: there is no later return in this same session. If you still "
+        "want the harness to answer, verify, implement, or revise anything, choose a CONTINUE action.\n"
         "There is NO action for private investigation here. Any private reading, diff review, "
         "or command/test run you did yourself must already have happened before this act step "
         "and should appear in your judgment evidence.\n"
@@ -515,14 +687,18 @@ def build_waiting_act_turn(
     parts.append(f"<intent>\n{intent.strip() or '(none)'}\n</intent>")
     parts.append(
         "# MENU — only these actions exist right now (this is where wishes converge)\n"
-        "- keep_waiting: leave it running.\n"
-        "- send_message: send another message while it is still running "
+        "- keep_waiting: CONTINUE the session, send nothing, and leave the current harness work "
+        "running because you want its next output.\n"
+        "- send_message: CONTINUE the session and send another message while it is still running "
         "(inside the harness — ordinary text, or a slash command listed in <harness_help>). "
         "A slash command not listed in <harness_help> is just raw text to the harness; "
         "if you wish such a slash existed, you may note that product need with report_issue "
         "if that private tool is available.\n"
-        "- interrupt: stop the current run like Ctrl+C (outside the chat).\n"
-        "- give_up: abandon and walk away.\n"
+        "- interrupt: CONTINUE the session but stop the current run like Ctrl+C (outside the chat), "
+        "so you can correct or redirect it next. This is not a terminal outcome.\n"
+        "- give_up: END the session immediately because you will stop relying on this harness. "
+        "Choose this even if you continue the real-world task yourself or with another tool; there "
+        "is no later return in this same session.\n"
         "Map <intent> to the closest menu item. If nothing really matches, "
         "pick the least-bad fallback and set gap=true — do NOT pretend a missing "
         "capability exists. If the action honestly satisfies the intent, gap=false. "

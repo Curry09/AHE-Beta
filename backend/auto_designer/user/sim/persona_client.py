@@ -10,6 +10,7 @@ persona_client.py
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import time
@@ -28,6 +29,16 @@ except Exception:
 
 class PersonaClient(Protocol):
     def respond(self, system: str, user: str) -> dict: ...
+
+
+class PersonaProtocolError(RuntimeError):
+    """Spec-0048/T2: persona 输出语法可解析、但不满足当前阶段契约。"""
+
+    def __init__(self, stage: str, code: str, *, attempts: int = 1) -> None:
+        self.stage = stage
+        self.code = code
+        self.attempts = attempts
+        super().__init__(f"persona protocol error at {stage}: {code} ({attempts} attempts)")
 
 
 def _push_call_trace(
@@ -104,13 +115,23 @@ class ApiPersonaClient:
                     max_tokens=max_tokens,
                     extra_body={"enable_thinking": False},
                 )
-                record_usage(usage=getattr(response, "usage", None), provider="openai-compatible", model=self.model,
-                             latency_ms=monotonic_ms() - started, request_id=getattr(response, "id", None))
+                record_usage(
+                    usage=getattr(response, "usage", None),
+                    provider="openai-compatible",
+                    model=self.model,
+                    latency_ms=monotonic_ms() - started,
+                    request_id=getattr(response, "id", None),
+                )
                 return response
             except Exception as e:
                 last = e
-                record_usage(provider="openai-compatible", model=self.model,
-                             latency_ms=monotonic_ms() - started, success=False, error=e)
+                record_usage(
+                    provider="openai-compatible",
+                    model=self.model,
+                    latency_ms=monotonic_ms() - started,
+                    success=False,
+                    error=e,
+                )
                 started = monotonic_ms()
                 try:  # flag 可能被网关拒 -> 裸试一次
                     response = self.client.chat.completions.create(
@@ -119,13 +140,23 @@ class ApiPersonaClient:
                         temperature=self.temperature,
                         max_tokens=max_tokens,
                     )
-                    record_usage(usage=getattr(response, "usage", None), provider="openai-compatible", model=self.model,
-                                 latency_ms=monotonic_ms() - started, request_id=getattr(response, "id", None))
+                    record_usage(
+                        usage=getattr(response, "usage", None),
+                        provider="openai-compatible",
+                        model=self.model,
+                        latency_ms=monotonic_ms() - started,
+                        request_id=getattr(response, "id", None),
+                    )
                     return response
                 except Exception as e2:
                     last = e2
-                    record_usage(provider="openai-compatible", model=self.model,
-                                 latency_ms=monotonic_ms() - started, success=False, error=e2)
+                    record_usage(
+                        provider="openai-compatible",
+                        model=self.model,
+                        latency_ms=monotonic_ms() - started,
+                        success=False,
+                        error=e2,
+                    )
             time.sleep(delay)
             delay *= 2
         raise last if last else RuntimeError("create failed")
@@ -138,13 +169,44 @@ class ApiPersonaClient:
 
     def respond(self, system: str, user: str) -> dict:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        # 推理模型隐藏 CoT 先吃 token; 给足头寸, 否则 JSON 契约会被截断成不可解析的半截。
-        text = self._text(self._create(messages, 8000))
-        if not text:
-            text = self._text(self._create(messages, 16000))
-        obj = _parse_json(text)
-        _push_call_trace(self, system=system, user=user, raw=text, parsed=obj, steps=None)
-        return obj
+        stage = _stage_from_user(user)
+        last_text = ""
+        last_obj: dict = {}
+        last_code = "unparseable_json"
+        steps: list[dict] = []
+        for attempt in range(2):
+            # 推理模型隐藏 CoT 先吃 token; 给足头寸, 否则契约会被截断成不可解析的半截。
+            last_text = self._text(self._create(messages, 8000 if attempt == 0 else 16000))
+            last_obj = _parse_json(last_text)
+            steps.append({"kind": "assistant", "text": last_text})
+            code = _validate_stage_output(stage, last_obj, user)
+            if code is None:
+                _push_call_trace(
+                    self,
+                    system=system,
+                    user=user,
+                    raw=last_text,
+                    parsed=last_obj,
+                    steps=steps,
+                )
+                return last_obj
+            last_code = code
+            if attempt == 0:
+                messages.extend(
+                    [
+                        {"role": "assistant", "content": last_text},
+                        {"role": "user", "content": _contract_reminder(stage, code)},
+                    ]
+                )
+        _push_call_trace(
+            self,
+            system=system,
+            user=user,
+            raw=last_text,
+            parsed=last_obj,
+            steps=steps,
+        )
+        raise PersonaProtocolError(stage, last_code, attempts=2)
 
     def complete(self, messages: list[dict], max_tokens: int = 8000) -> str:
         """通用补全：给定 messages 直接返回文本（供 0008/T4 内层 tool-calling 循环复用网关）。"""
@@ -214,8 +276,11 @@ class ScriptedPersonaClient:
         # 主 loop 同构分层：先算整轮决定，再按标签切片（避免三跳各算各的）。
         if (
             "<main_judge>" in user
+            or "<main_rejudge>" in user
             or "<main_intent>" in user
+            or "<main_reintent>" in user
             or "<main_act>" in user
+            or "<main_final_check>" in user
             or ("<main_judge_intent>" in user)
         ):
             full = self._decide(system, user)
@@ -228,8 +293,13 @@ class ScriptedPersonaClient:
                     "message": full.get("message", ""),
                     "gap": False,
                 }
-            if "<main_intent>" in user:
-                return {"intent": intent}
+            if "<main_final_check>" in user:
+                return {
+                    "perceive": "No additional private check was needed in the scripted path.",
+                    "check_status": "completed",
+                }
+            if "<main_intent>" in user or "<main_reintent>" in user:
+                return {"intent": intent, "needs_final_check": False, "check_goal": ""}
             if "<main_judge_intent>" in user:
                 out = {
                     "perceive": full.get("perceive", ""),
@@ -239,7 +309,7 @@ class ScriptedPersonaClient:
                 if "task_load" in full:
                     out["task_load"] = full["task_load"]
                 return out
-            # main_judge
+            # main_judge / main_rejudge
             out = {
                 "perceive": full.get("perceive", ""),
                 "verdict": full.get("verdict", "unsure"),
@@ -408,21 +478,143 @@ def _extract(user: str, tag: str) -> str:
     return seg
 
 
-# 解析失败重试：追加这句「只回合法 JSON」提醒再要一次（治标于散文/畸形/被截断的偶发输出）。
-_JSON_ONLY_REMINDER = (
-    "Your previous reply could not be parsed. Reply again with ONLY one single valid JSON "
-    "object for the OUTPUT CONTRACT — no prose, no markdown/code fence, no comments, "
-    "no trailing commas, and make sure it is complete (not truncated)."
+# Spec-0048/T2: JSON 语法解析与阶段语义校验是两层边界。任意 dict 都不能再被当作
+# 当前 OUTPUT CONTRACT 的成功结果，尤其是 main_act 中的 {tool,args}。
+_STAGE_TAGS = (
+    ("main_final_check", "<main_final_check>"),
+    ("main_rejudge", "<main_rejudge>"),
+    ("main_reintent", "<main_reintent>"),
+    ("main_judge", "<main_judge>"),
+    ("main_intent", "<main_intent>"),
+    ("main_act", "<main_act>"),
+    ("waiting_judge", "<waiting_judge>"),
+    ("waiting_intent", "<waiting_intent>"),
+    ("waiting_act", "<waiting_act>"),
+    ("file_issue", "<file_issue>"),
+    ("rate", "<rate_experience>"),
 )
+_VERDICTS = {"satisfied", "failed_blame_harness", "failed_blame_self", "unsure", "stuck"}
+_WAITING_JUDGMENTS = {"on_track", "off_track", "unclear"}
+_CHECK_STATUSES = {"completed", "failed", "unavailable"}
+_WAITING_ACTIONS = {"keep_waiting", "send_message", "interrupt", "give_up"}
+_OPENING_TASK_MARKER = "# SIZE UP THIS TASK (first turn only)"
+_FINAL_CHECK_TOOL_BUDGET = 4
+_MAIN_TOOL_CHECKPOINT = 4
+_FORCED_CONCLUSION_ATTEMPTS = 2
 
-# 空 message 重试：模型选了「要发话」的动作却没写 message 时，让它**自己**补出这句话——绝不由框架代写
-# 罐头（那会把假话灌进 transcript / 发给 harness，污染体感与 issue 信号）。
-_MESSAGE_REQUIRED_REMINDER = (
-    "Your previous reply chose an action that SENDS a line to the harness (or was 'free'), "
-    "but 'message' was empty. Reply again with the SAME OUTPUT CONTRACT JSON and put the exact "
-    "line you would actually send in 'message' — non-empty, first person, in your own voice. "
-    "If you genuinely have nothing to say, choose a different action that fits."
-)
+
+def _stage_from_user(user: str) -> str:
+    for stage, marker in _STAGE_TAGS:
+        if marker in user:
+            return stage
+    return "legacy"
+
+
+def _action_space_from_user(user: str) -> set[str]:
+    raw = _extract(user, "action_space")
+    if not raw:
+        return set()
+    try:
+        value = ast.literal_eval(raw)
+    except (SyntaxError, ValueError):
+        return set()
+    if not isinstance(value, (list, tuple, set)):
+        return set()
+    return {str(item) for item in value}
+
+
+def _stage_allows_tools(stage: str) -> bool:
+    return stage in {"main_judge", "waiting_judge", "main_final_check", "legacy"}
+
+
+def _validate_stage_output(
+    stage: str,
+    obj: dict,
+    user: str,
+    *,
+    tools_allowed: bool | None = None,
+) -> str | None:
+    """返回机器可聚合的错误码；None 表示对象满足当前阶段契约。"""
+    from .actions import CATALOG, Channel
+
+    if not isinstance(obj, dict) or obj.get("_parse_failed"):
+        return "unparseable_json"
+    if isinstance(obj.get("tool"), str):
+        allowed = _stage_allows_tools(stage) if tools_allowed is None else tools_allowed
+        return "tool_not_dispatched" if allowed else "tool_not_allowed_in_stage"
+
+    if stage in {"main_judge", "main_rejudge"}:
+        if not str(obj.get("perceive") or "").strip():
+            return "missing_perceive"
+        if str(obj.get("verdict") or "") not in _VERDICTS:
+            return "invalid_verdict"
+        return None
+    if stage == "waiting_judge":
+        if not str(obj.get("perceive") or "").strip():
+            return "missing_perceive"
+        if str(obj.get("judgment") or "") not in _WAITING_JUDGMENTS:
+            return "invalid_judgment"
+        return None
+    if stage in {"main_intent", "main_reintent"}:
+        if not str(obj.get("intent") or "").strip():
+            return "missing_intent"
+        needs = obj.get("needs_final_check")
+        if not isinstance(needs, bool):
+            return "missing_final_check_decision"
+        if stage == "main_reintent" and needs:
+            return "final_check_already_used"
+        if needs and not str(obj.get("check_goal") or "").strip():
+            return "missing_check_goal"
+        return None
+    if stage == "waiting_intent":
+        return None if str(obj.get("intent") or "").strip() else "missing_intent"
+    if stage == "main_final_check":
+        if not str(obj.get("perceive") or "").strip():
+            return "missing_perceive"
+        if str(obj.get("check_status") or "") not in _CHECK_STATUSES:
+            return "invalid_check_status"
+        return None
+    if stage in {"main_act", "waiting_act"}:
+        action = str(obj.get("action") or "").strip()
+        if not action:
+            return "missing_action"
+        allowed = _WAITING_ACTIONS if stage == "waiting_act" else _action_space_from_user(user)
+        if action != "free" and action not in allowed:
+            return "action_not_in_space"
+        if not isinstance(obj.get("gap"), bool):
+            return "invalid_gap"
+        message = obj.get("message")
+        if not isinstance(message, str):
+            return "invalid_message"
+        spec = CATALOG.get(action)
+        if action == "free" or (spec is not None and spec.channel is Channel.EMIT):
+            if not message.strip():
+                return "missing_message"
+        if spec is not None and spec.channel is Channel.SILENT and message.strip():
+            return "unexpected_message"
+        return None
+    if stage == "file_issue":
+        return None if str(obj.get("issue") or "").strip() else "missing_issue"
+    if stage == "rate":
+        score = obj.get("score")
+        if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 4:
+            return "invalid_score"
+        return None if str(obj.get("reason") or "").strip() else "missing_reason"
+
+    # 未带阶段标签的旧探针/离线调用保持兼容，但仍保留原解析/空消息检查。
+    if obj.get("_parse_failed"):
+        return "unparseable_json"
+    if _emit_action_missing_message(obj):
+        return "missing_message"
+    return None
+
+
+def _contract_reminder(stage: str, code: str) -> str:
+    return (
+        f"Your previous reply violated the {stage} OUTPUT CONTRACT ({code}). "
+        "Reply again with ONLY one complete JSON object matching the exact schema in the "
+        "current user prompt. Do not call a private tool unless this stage explicitly allows it."
+    )
 
 
 def _emit_action_missing_message(obj: dict) -> bool:
@@ -437,23 +629,10 @@ def _emit_action_missing_message(obj: dict) -> bool:
     return bool(spec and spec.channel is Channel.EMIT and msg_empty)
 
 
-def _retry_reminder(obj: dict) -> str | None:
-    """判定这次输出要不要重试并给出对应提醒；无需重试返回 None。
-
-    两类都只重试一次：①解析失败（畸形/散文/截断）→ 只回 JSON；②选了要发话的动作却空 message
-    → 让模型自己补出这句话。special 轮（file_issue/rate 无 action 字段）不会触发②。
-    """
-    if obj.get("_parse_failed"):
-        return _JSON_ONLY_REMINDER
-    if _emit_action_missing_message(obj):
-        return _MESSAGE_REQUIRED_REMINDER
-    return None
-
-
 def _dump_unparseable(*, first: str, second: str) -> None:
     """把两次都解析失败的原始输出落到 backend/data/parse_failures.jsonl，供事后判「没 JSON 还是畸形」。
 
-    纯可观测旁路：写盘失败绝不影响主流程（persona 仍走中性兜底继续跑）。
+    纯可观测旁路：写盘失败绝不影响主流程；persona 仍抛 typed protocol error。
     """
     if os.getenv("PYTEST_CURRENT_TEST"):  # 单测里别往真实 data/ 写脏数据（否则污染观测）
         return
@@ -508,7 +687,7 @@ def _iter_top_level_objects(s: str):
 
 
 def _parse_json(text: str) -> dict:
-    """容错解析 persona 的 OUTPUT CONTRACT。失败也返回安全 dict, 不崩 loop。
+    """容错抽取 persona JSON；阶段语义与失败策略由上层 validator 决定。
 
     抓所有顶层 {...} 对象、取**最后一个**能解析成 dict 的（内层 tool-loop 里最终答案总在末尾；
     前面的推理/工具示例即便带花括号也不干扰）。仍解析不出才退化空壳。
@@ -536,8 +715,8 @@ def _parse_json(text: str) -> dict:
             parsed = obj
     if parsed is not None:
         return parsed
-    # 无法解析(截断/非 JSON): 退化成安全 no-op, 绝不把原始文本灌进 message ——
-    # message 会发给 harness 且落进 transcript, 半截 JSON / 思维链不得外泄。
+    # 无法解析(截断/非 JSON)：返回仅供 validator 识别的空壳，绝不把原始文本灌进 message；
+    # 该对象不能作为真实动作，契约重试仍失败后会变成 PersonaProtocolError。
     return {
         "perceive": "(unparseable model output)",
         "verdict": "unsure",
@@ -603,42 +782,50 @@ class AgenticPersonaClient:
             "note": "issue noted; conversation continues — you are not obligated to stop",
         }
 
-    def _parse_with_retry(
-        self,
-        messages: list[dict],
-        text: str,
-        steps: list | None,
-    ) -> tuple[dict, str]:
-        """解析首次输出；失败则追加「只回 JSON」提醒重试一次。
-
-        返回 (parsed, final_raw)。steps 非空时把每次模型原文记入过程流。
-        """
-        if steps is not None:
-            steps.append({"kind": "assistant", "text": text})
-        obj = _parse_json(text)
-        reminder = _retry_reminder(obj)
-        if reminder is None:
-            return obj, text
-        retry_messages = [
-            *messages,
-            {"role": "assistant", "content": text},
-            {"role": "user", "content": reminder},
-        ]
-        text2 = self._llm(retry_messages) or ""
-        if steps is not None:
-            steps.append({"kind": "assistant", "text": text2})
-        obj2 = _parse_json(text2)
-        if obj2.get("_parse_failed"):
-            _dump_unparseable(first=text, second=text2)  # 两次都败：留证据供事后定位
-        return obj2, text2
-
-    # -- 单次主观判断（退化路径 / 特殊轮）--
-    def _final_call(self, system: str, user: str) -> dict:
+    def _call_without_tools(self, system: str, user: str, stage: str) -> dict:
+        """Spec-0048/T2: 无工具阶段严格按阶段契约重试，绝不接纳 tool JSON。"""
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        text = self._llm(messages) or ""
-        obj, raw = self._parse_with_retry(messages, text, steps=None)
-        _push_call_trace(self, system=system, user=user, raw=raw, parsed=obj, steps=None)
-        return obj
+        steps: list[dict] = []
+        first_raw = ""
+        last_raw = ""
+        last_obj: dict = {}
+        last_code = "unparseable_json"
+        for attempt in range(2):
+            last_raw = self._llm(messages) or ""
+            if attempt == 0:
+                first_raw = last_raw
+            last_obj = _parse_json(last_raw)
+            steps.append({"kind": "assistant", "text": last_raw})
+            code = _validate_stage_output(stage, last_obj, user, tools_allowed=False)
+            if code is None:
+                _push_call_trace(
+                    self,
+                    system=system,
+                    user=user,
+                    raw=last_raw,
+                    parsed=last_obj,
+                    steps=steps,
+                )
+                return last_obj
+            last_code = code
+            if attempt == 0:
+                messages.extend(
+                    [
+                        {"role": "assistant", "content": last_raw},
+                        {"role": "user", "content": _contract_reminder(stage, code)},
+                    ]
+                )
+        if last_obj.get("_parse_failed"):
+            _dump_unparseable(first=first_raw, second=last_raw)
+        _push_call_trace(
+            self,
+            system=system,
+            user=user,
+            raw=last_raw,
+            parsed=last_obj,
+            steps=steps,
+        )
+        raise PersonaProtocolError(stage, last_code, attempts=2)
 
     def _dispatch(self, obj: dict, tools_by_name: dict, sandbox) -> dict:
         name = obj.get("tool")
@@ -663,13 +850,38 @@ class AgenticPersonaClient:
         from .state import State
         from .tools import tool_stack
 
-        # 特殊轮（自评 / 写 issue）或未绑定 -> 单次主观判断
-        if self._persona is None or "<file_issue>" in user or "<rate_experience>" in user:
-            return self._final_call(system, user)
+        stage = _stage_from_user(user)
+        # intent / re-judge / re-intent / act / issue / rating 均为无工具 contract。即使 persona
+        # 本身有工具，也只用薄外层 system，避免 system 级 private-tool 协议与 act 菜单冲突。
+        opening_judge = stage == "main_judge" and _OPENING_TASK_MARKER in user
+        if self._persona is None or not _stage_allows_tools(stage) or opening_judge:
+            return self._call_without_tools(system, user, stage)
 
         tools = tool_stack(self._persona)
-        if not tools:  # blind：无工具，纯文本判断（等价旧行为）
-            return self._final_call(system, user)
+        if stage == "main_final_check":
+            # 最终核实只观察，不接管开发，也不在收口途中开单。
+            tools = [tool for tool in tools if tool.name in {"read_file", "run_shell"}]
+        elif stage in {"main_judge", "waiting_judge"}:
+            # 常规核实可顺手记录真实问题，但不能写工作区或接管实现。
+            tools = [
+                tool for tool in tools if tool.name in {"read_file", "run_shell", "report_issue"}
+            ]
+        if not tools:  # blind / final-check 无可用工具：由 loop 记录 unavailable 后强制 re-judge
+            if stage == "main_final_check":
+                obj = {
+                    "perceive": "I have no private tools available for this final check.",
+                    "check_status": "unavailable",
+                }
+                _push_call_trace(
+                    self,
+                    system=system,
+                    user=user,
+                    raw=json.dumps(obj),
+                    parsed=obj,
+                    steps=None,
+                )
+                return obj
+            return self._call_without_tools(system, user, stage)
 
         skills = select_skills(self._persona)
         inner_system = build_inner_system(
@@ -678,16 +890,28 @@ class AgenticPersonaClient:
         tools_by_name = {t.name: t for t in tools}
         sandbox = self._sandbox_factory(workspace=self._workspace_dir)
         steps: list[dict] = []
+        messages = [
+            {"role": "system", "content": inner_system},
+            {"role": "user", "content": user},
+        ]
+        last_raw = ""
+        last_obj: dict = {}
+        contract_retries = 0
+        tool_calls = 0
+        tool_budget = (
+            min(self.max_inner_steps, _FINAL_CHECK_TOOL_BUDGET)
+            if stage == "main_final_check"
+            else self.max_inner_steps
+        )
         try:
-            messages = [
-                {"role": "system", "content": inner_system},
-                {"role": "user", "content": user},
-            ]
-            for _ in range(self.max_inner_steps):
-                text = self._llm(messages) or ""
-                obj = _parse_json(text)
+            # tool_budget 只计真正执行的工具；普通契约回答和一次格式修复不再偷占查验额度。
+            while tool_calls < tool_budget:
+                last_raw = self._llm(messages) or ""
+                last_obj = _parse_json(last_raw)
+                obj = last_obj
                 if isinstance(obj.get("tool"), str):  # 工具调用 -> 执行并回灌观察
-                    steps.append({"kind": "assistant", "text": text})
+                    tool_calls += 1
+                    steps.append({"kind": "assistant", "text": last_raw})
                     name = str(obj.get("tool") or "")
                     args = obj.get("args") or {}
                     try:
@@ -704,32 +928,115 @@ class AgenticPersonaClient:
                     except (TypeError, ValueError):
                         result_s = str(result)
                     steps.append({"kind": kind, "text": result_s[:4000]})
-                    messages.append({"role": "assistant", "content": text})
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": f"<tool_result>\n{json.dumps(result)}\n</tool_result>",
-                        }
-                    )
+                    messages.append({"role": "assistant", "content": last_raw})
+                    observation = f"<tool_result>\n{json.dumps(result)}\n</tool_result>"
+                    if (
+                        stage == "main_judge"
+                        and tool_calls == _MAIN_TOOL_CHECKPOINT
+                        and tool_budget > _MAIN_TOOL_CHECKPOINT
+                    ):
+                        observation += (
+                            f"\nYou have used {tool_calls} of {tool_budget} private tool calls. "
+                            "Conclude now if the evidence is sufficient. Continue only to resolve "
+                            "one concrete fact that still changes your judgment."
+                        )
+                    messages.append({"role": "user", "content": observation})
                     continue
-                if _retry_reminder(obj) is not None:  # 解析失败 / 该发话却空 message -> 重试一次
-                    obj, raw = self._parse_with_retry(messages, text, steps)
-                else:
-                    steps.append({"kind": "assistant", "text": text})
-                    raw = text
+                steps.append({"kind": "assistant", "text": last_raw})
+                code = _validate_stage_output(stage, obj, user)
+                if code is not None:
+                    if contract_retries >= 1:
+                        _push_call_trace(
+                            self,
+                            system=inner_system,
+                            user=user,
+                            raw=last_raw,
+                            parsed=obj,
+                            steps=steps,
+                        )
+                        raise PersonaProtocolError(stage, code, attempts=contract_retries + 1)
+                    contract_retries += 1
+                    messages.append({"role": "assistant", "content": last_raw})
+                    messages.append({"role": "user", "content": _contract_reminder(stage, code)})
+                    continue
                 _push_call_trace(
                     self,
                     system=inner_system,
                     user=user,
-                    raw=raw,
+                    raw=last_raw,
                     parsed=obj,
                     steps=steps,
                 )
                 return obj  # 最终结构化输出（contract）
-            # 超步数兜底：退化为一次主观判断，保证永远返回合法输出
-            return self._final_call(system, user)
-        except Exception:  # noqa: BLE001 — 任何内层异常都不得外溢，退化兜底
-            return self._final_call(system, user)
+
+            # 查验额度与结论额度分离：工具用满不是评估失败。保留完整 tool/result 对话，
+            # 再给两次明确禁用工具的结构化收口机会。
+            forced_prompt = (
+                f"<{stage}>\n"
+                f"You have used all {tool_budget} private tool calls. No more tools are available "
+                "or will be dispatched. Using only the evidence already present above, return "
+                "ONLY one complete JSON object matching the exact OUTPUT CONTRACT in the original "
+                f"<{stage}> prompt. Report evidence limits and tool errors honestly; do not claim "
+                "anything you did not observe.\n"
+                f"</{stage}>"
+            )
+            messages.append({"role": "user", "content": forced_prompt})
+            forced_raws: list[str] = []
+            last_code = "unparseable_json"
+            for attempt in range(_FORCED_CONCLUSION_ATTEMPTS):
+                last_raw = self._llm(messages) or ""
+                forced_raws.append(last_raw)
+                last_obj = _parse_json(last_raw)
+                steps.append({"kind": "assistant", "text": last_raw})
+                last_code = _validate_stage_output(stage, last_obj, user, tools_allowed=False) or ""
+                if not last_code:
+                    _push_call_trace(
+                        self,
+                        system=inner_system,
+                        user=user,
+                        raw=last_raw,
+                        parsed=last_obj,
+                        steps=steps,
+                    )
+                    return last_obj
+                if attempt == 0:
+                    messages.extend(
+                        [
+                            {"role": "assistant", "content": last_raw},
+                            {
+                                "role": "user",
+                                "content": _contract_reminder(stage, last_code)
+                                + " Tool use is now forbidden; conclude from existing evidence.",
+                            },
+                        ]
+                    )
+            if last_obj.get("_parse_failed"):
+                _dump_unparseable(first=forced_raws[0], second=forced_raws[-1])
+            _push_call_trace(
+                self,
+                system=inner_system,
+                user=user,
+                raw=last_raw,
+                parsed=last_obj,
+                steps=steps,
+            )
+            raise PersonaProtocolError(
+                stage,
+                f"forced_conclusion_{last_code}",
+                attempts=_FORCED_CONCLUSION_ATTEMPTS,
+            )
+        except PersonaProtocolError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — 转 typed evaluator error，禁止未知异常伪造 action
+            _push_call_trace(
+                self,
+                system=inner_system,
+                user=user,
+                raw=last_raw,
+                parsed=last_obj,
+                steps=steps,
+            )
+            raise PersonaProtocolError(stage, f"internal_error:{type(exc).__name__}") from exc
         finally:
             sandbox.cleanup()  # 仅清自建 tempdir；外部工作区不动
 

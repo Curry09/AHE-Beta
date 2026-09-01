@@ -17,16 +17,16 @@ action_space.py
 
 生成纪律:
   LLM 优先从动作空间挑; 若无合适项可返回 action:"free" + message, 框架事后归类。
-  越权动作投影回合法集。channel<->message 一致性强校验。
+  缺失、越权或 channel<->message 不一致一律报 typed evaluator error，禁止猜测或投影。
 """
 
 from __future__ import annotations
 
 from .actions import (
     CATALOG,
-    Channel,
     Effect,
     Phase,
+    assert_channel,
 )
 from .dimensions import Persona
 from .state import State
@@ -38,6 +38,15 @@ LEGAL_BY_PHASE: dict[Phase, set[str]] = {
     Phase.OPENING: {"send_message"},
     Phase.ACTIVE: {"interrupt", "keep_waiting", "send_message"},
 }
+
+
+class ActionResolutionError(ValueError):
+    """Spec-0048/T4: action 缺失、越界或 channel 不一致，禁止猜测终态。"""
+
+    def __init__(self, code: str, action_id: str = "") -> None:
+        self.code = code
+        self.action_id = action_id
+        super().__init__(f"invalid action ({code}): {action_id!r}")
 
 
 # --------------------------------------------------------------------------
@@ -71,31 +80,20 @@ def classify_free_action(message: str, space: list[str], persona: Persona) -> st
     (见 loop 里 resolve 前的 classify_action 接缝); 这里只在自评缺席/失败时兜底: 一律落到安全的
     **非终止**动作(优先反馈), 绝不从 prose 推断 accept/file_issue/give_up 这类终止意图。
     """
-    if "send_message" in space:
+    if "send_message" in space and message.strip():
         return "send_message"
     non_terminal = [a for a in space if CATALOG[a].effect is not Effect.TERMINATE]
-    return sorted(non_terminal)[0] if non_terminal else space[0]
+    if message.strip() and non_terminal:
+        return sorted(non_terminal)[0]
+    raise ActionResolutionError("unclassifiable_free", "free")
 
 
 def project_to_legal(action_id: str, space: list[str]) -> str:
-    """越权动作投影回合法集。"""
+    """只确认已合法动作；排序、Effect 或历史 id 均不得承担 fallback 语义。"""
     if action_id in space:
         return action_id
-    if action_id in CATALOG:
-        want = CATALOG[action_id].effect
-        # 负向终止(file_issue/give_up)未解锁时, 绝不投影到 accept —— 语义相反, 会把
-        # "不满想升级"误记成"满意接受", 双重污染体感/issue 信号。降级为继续反馈, 把终止权
-        # 交回闸门(耐心 or 诊断): 下一轮闸门开了, persona 自然会真正落地 file_issue/give_up。
-        if want is Effect.TERMINATE and action_id != "accept":
-            if "send_message" in space:
-                return "send_message"
-            non_term = [a for a in space if CATALOG[a].effect is not Effect.TERMINATE]
-            if non_term:
-                return sorted(non_term)[0]
-        same = [a for a in space if CATALOG[a].effect is want]
-        if same:
-            return same[0]
-    return space[0]
+    code = "missing_action" if not action_id else "action_not_in_space"
+    raise ActionResolutionError(code, action_id)
 
 
 # --------------------------------------------------------------------------
@@ -106,20 +104,18 @@ def resolve_action(ret: dict, space: list[str], persona: Persona) -> tuple[str, 
     ret: LLM 返回的 dict, 含 action / message。
     返回 (action_id, message): 动作已在空间内; message 一律取模型原文, 框架绝不代写。
 
-    空 message 的补齐**只**发生在 client 侧（选了要发话的动作却空 message → 重问模型自己补，见
-    persona_client._retry_reminder）。这里不再 fabricate 任何罐头：SILENT 动作清空 message（铁律）;
-    EMIT 动作若仍为空，就保持空，由 run_session 决定「本轮不外发、不入 transcript」——宁可空转，
-    也绝不把框架编的话当成用户原话发给 harness / 落进体感信号。
+    空 message 的补齐只发生在 client 的一次契约重试。这里不 fabricate、不清空、不投影：
+    SILENT 带 message 或 EMIT 缺 message 都由 assert_channel 转成 typed evaluator error。
     """
     action_id = ret.get("action", "")
     message = ret.get("message", "") or ""
 
     if action_id == "free":
         action_id = classify_free_action(message, space, persona)
-    if action_id not in space:
-        action_id = project_to_legal(action_id, space)
+    action_id = project_to_legal(str(action_id).strip(), space)
 
-    spec = CATALOG[action_id]
-    if spec.channel is Channel.SILENT:  # SILENT 铁律：内部动作不发话
-        message = ""
+    try:
+        assert_channel(action_id, message)
+    except ValueError as exc:
+        raise ActionResolutionError("channel_mismatch", action_id) from exc
     return action_id, message.strip()

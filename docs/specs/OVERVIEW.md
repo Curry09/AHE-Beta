@@ -142,6 +142,12 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0046 冻结设计产物到 OpenAgents 的隔离验证交接
 将冻结需求面 summary 或只读 Gitea 快照复制到全新验证仓库，选择性保留交付令牌并生成不可覆盖 manifest；随后以显式 Anthropic-compatible 网关配置启动隔离 vigil，保证实验可复用且不污染来源。
 
+### 0047 并行实验运行时与真实模型认证
+以单一实验配置生成隔离的目录、Gitea、容器、网络、模型配额和可审计生命周期，并以真实模型认证门保证多条进化谱系可安全并发和便捷启停。
+
+### 0048 用户模拟最终查验分支与动作协议失效保护
+当模拟用户在意图阶段仍需证据时，仅允许一次有界 final check，随后强制无工具 re-judge→intent→act；阶段级语义校验阻止非法输出和 evaluator 故障再次伪装成 Accept。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -351,6 +357,17 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0046 | 0046/T2 | 冻结 Summary 物化为验证仓库 | done | T1 | backend/scripts/prepare_openagents_from_summary.py<br>backend/tests/test_prepare_openagents_from_summary.py |
 | 0046 | 0046/T3 | 只读 Gitea 快照的选择性交付复制 | done | T1 | backend/scripts/prepare_openagents_validation.py<br>backend/tests/test_prepare_openagents_validation.py |
 | 0046 | 0046/T4 | 隔离 Vigil 启动与网关协议转换 | done | T1, T3 | backend/scripts/run_openagents_validation.py<br>backend/tests/test_run_openagents_validation.py |
+| 0047 | 0047/T1 | 并行实验运行时契约 | done | — | docs/specs/0047-parallel-experiment-runtime.md |
+| 0047 | 0047/T2 | 实验配置与不可变 Manifest | pending | T1 | backend/auto_designer/experiment/__init__.py<br>backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/manifest.py<br>backend/tests/experiment/test_config.py<br>backend/tests/experiment/test_manifest.py |
+| 0047 | 0047/T3 | 每实验独立基础设施栈 | pending | T2 | backend/deploy/experiment/docker-compose.yml<br>backend/deploy/experiment/egress-proxy.conf<br>backend/auto_designer/experiment/infrastructure.py<br>backend/tests/experiment/test_infrastructure.py |
+| 0047 | 0047/T4 | 统一实验 CLI 与闭环接线 | pending | T2, T3 | backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/scripts/experiment.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_run_swebench_closed_loop.py |
+| 0047 | 0047/T5 | 共享模型容量租约与故障保护 | pending | T2 | backend/auto_designer/experiment/capacity.py<br>backend/auto_designer/experiment/health.py<br>backend/tests/experiment/test_capacity.py<br>backend/tests/experiment/test_health.py |
+| 0047 | 0047/T6 | OpenAgents 真实模型认证与双栈并行验收 | pending | T3, T4, T5 | backend/auto_designer/experiment/certification.py<br>backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh<br>backend/tests/experiment/test_certification.py<br>docs/0047-parallel-experiment-runtime.md<br>OpenAgents/scripts/live-experiment-runtime-certification.sh<br>OpenAgents/scripts/live_experiment_runtime_certification.py<br>OpenAgents/tests/test_experiment_runtime_certification.py |
+| 0048 | 0048/T1 | Spec 与实验根因证据契约 | done | — | docs/specs/0048-user-sim-final-check-convergence.md |
+| 0048 | 0048/T2 | PersonaClient 阶段语义契约与工具重分发 | done | T1 | backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_persona_client_agentic.py |
+| 0048 | 0048/T3 | 一次性 final-check 与强制重新判断状态机 | done | T2, T4 | backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/user/sim/test_prompt.py<br>backend/tests/user/sim/test_inner_prompt.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/test_session_store.py |
+| 0048 | 0048/T4 | Action 边界 fail-closed | done | T1 | backend/auto_designer/user/sim/action_space.py<br>backend/tests/user/sim/test_action_space.py |
+| 0048 | 0048/T5 | 历史 action 完整性审计与端到端认证 | done | T3 | backend/scripts/audit_sim_action_integrity.py<br>backend/scripts/canary_spec0048_final_check.py<br>backend/tests/scripts/test_audit_sim_action_integrity.py<br>backend/scripts/e2e-spec-0048-final-check-convergence.sh<br>docs/0048-user-sim-final-check-convergence.md |
 
 ## 跨 feature 关系图
 
@@ -653,6 +670,21 @@ graph LR
         n0046_T3["T3 只读 Gitea 快照的选择性交付复制"]
         n0046_T4["T4 隔离 Vigil 启动与网关协议转换"]
     end
+    subgraph G0047[0047 parallel-experiment-runtime]
+        n0047_T1["T1 并行实验运行时契约"]
+        n0047_T2["T2 实验配置与不可变 Manifest"]
+        n0047_T3["T3 每实验独立基础设施栈"]
+        n0047_T4["T4 统一实验 CLI 与闭环接线"]
+        n0047_T5["T5 共享模型容量租约与故障保护"]
+        n0047_T6["T6 OpenAgents 真实模型认证与双栈并行验收"]
+    end
+    subgraph G0048[0048 user-sim-final-check-convergence]
+        n0048_T1["T1 Spec 与实验根因证据契约"]
+        n0048_T2["T2 PersonaClient 阶段语义契约与工具重分发"]
+        n0048_T3["T3 一次性 final-check 与强制重新判断状态机"]
+        n0048_T4["T4 Action 边界 fail-closed"]
+        n0048_T5["T5 历史 action 完整性审计与端到端认证"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -860,6 +892,19 @@ graph LR
     n0046_T3 --> n0046_T1
     n0046_T4 --> n0046_T1
     n0046_T4 --> n0046_T3
+    n0047_T2 --> n0047_T1
+    n0047_T3 --> n0047_T2
+    n0047_T4 --> n0047_T2
+    n0047_T4 --> n0047_T3
+    n0047_T5 --> n0047_T2
+    n0047_T6 --> n0047_T3
+    n0047_T6 --> n0047_T4
+    n0047_T6 --> n0047_T5
+    n0048_T2 --> n0048_T1
+    n0048_T3 --> n0048_T2
+    n0048_T3 --> n0048_T4
+    n0048_T4 --> n0048_T1
+    n0048_T5 --> n0048_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -949,21 +994,21 @@ graph LR
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044 |
-| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048 |
+| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042 |
-| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024 |
-| backend/auto_designer/user/sim/action_space.py | 0005, 0035 |
+| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048 |
+| backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037 |
 | backend/auto_designer/user/sim/demo.py | 0005, 0037 |
 | backend/auto_designer/user/sim/dimensions.py | 0005, 0037 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
-| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012, 0037 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022 |
@@ -983,11 +1028,11 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041 |
 | backend/harness_template/params.yaml | 0003, 0030 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044 |
+| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047 |
 | backend/tests/designer/test_agent_contract.py | 0027, 0043 |
 | backend/tests/designer/test_agent_runtime.py | 0029, 0041 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043 |
@@ -1010,21 +1055,22 @@ graph LR
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024 |
-| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045 |
+| backend/tests/test_run_swebench_closed_loop.py | 0044, 0047 |
+| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042 |
-| backend/tests/user/sim/test_action_space.py | 0005, 0035 |
+| backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048 |
 | backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037 |
-| backend/tests/user/sim/test_inner_prompt.py | 0008, 0031 |
-| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036 |
-| backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037, 0048 |
+| backend/tests/user/sim/test_inner_prompt.py | 0008, 0031, 0048 |
+| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036, 0048 |
+| backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031, 0048 |
 | backend/tests/user/sim/test_persona_io.py | 0006, 0037 |
-| backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031 |
+| backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031, 0048 |
 | backend/tests/user/sim/test_state.py | 0005, 0012, 0037 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
-| backend/tests/user/test_session_store.py | 0001, 0017, 0024 |
+| backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
 | frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041 |
@@ -2460,4 +2506,77 @@ graph LR
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
+```
+
+### 0047 并行实验运行时与真实模型认证（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 并行实验运行时契约"]
+    nT2["T2 实验配置与不可变 Manifest"]
+    nT3["T3 每实验独立基础设施栈"]
+    nT4["T4 统一实验 CLI 与闭环接线"]
+    nT5["T5 共享模型容量租约与故障保护"]
+    nT6["T6 OpenAgents 真实模型认证与双栈并行验收"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT2 --> nT4
+    nT3 --> nT4
+    nT2 --> nT5
+    nT3 --> nT6
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_done;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_pending;
+```
+
+### 0048 用户模拟最终查验分支与动作协议失效保护（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 Spec 与实验根因证据契约"]
+    nT2["T2 PersonaClient 阶段语义契约与工具重分发"]
+    nT3["T3 一次性 final-check 与强制重新判断状态机"]
+    nT4["T4 Action 边界 fail-closed"]
+    nT5["T5 历史 action 完整性审计与端到端认证"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT4 --> nT3
+    nT1 --> nT4
+    nT3 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```

@@ -308,7 +308,17 @@ def test_sim_adapter_flushes_mid_session_issue_notes(tmp_path) -> None:
                     "task_load": "normal",
                 }
             if "<main_intent>" in user:
-                return {"intent": "file an issue"}
+                return {
+                    "intent": "start, then file an issue",
+                    "needs_final_check": False,
+                    "check_goal": "",
+                }
+            if "<main_act>" in user and "['send_message']" in user:
+                return {
+                    "action": "send_message",
+                    "message": "please investigate the rounding bug",
+                    "gap": False,
+                }
             return {
                 "perceive": "",
                 "verdict": "failed_blame_harness",
