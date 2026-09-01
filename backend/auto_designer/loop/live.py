@@ -167,8 +167,13 @@ def update_live_run(
     round_no: int,
     total_rounds: int,
     round_shas: list[str] | None = None,
+    phase: str | None = None,
+    blocked_issues: list[int] | None = None,
 ) -> None:
-    """更新 run 运行态。round_shas 不传则沿用已有值（各轮结束时才追加 SHA）。"""
+    """更新 run 运行态。round_shas / phase / blocked_issues 不传则沿用已有值。
+
+    Spec-0050/T4: phase ∈ users/demand/delivery_wait/blocked/done。
+    """
     with _WRITE_LOCK:  # Spec-0017/T1：prev 快照与写回之间不被其他写者插入
         path = _live_file(data_dir=data_dir, name=_RUN_NAME)
         prev = _read_json(path=path, fallback={})
@@ -180,6 +185,10 @@ def update_live_run(
                 "round": round_no,
                 "total_rounds": total_rounds,
                 "round_shas": round_shas if round_shas is not None else prev.get("round_shas", []),
+                "phase": phase if phase is not None else prev.get("phase", ""),
+                "blocked_issues": (
+                    blocked_issues if blocked_issues is not None else prev.get("blocked_issues", [])
+                ),
                 "started_at": prev.get("started_at") or now,
                 "updated_at": now,
             },
@@ -193,6 +202,8 @@ def read_live_run(*, data_dir: Path) -> dict[str, Any]:
         "round": 0,
         "total_rounds": 0,
         "round_shas": [],
+        "phase": "",
+        "blocked_issues": [],
         "started_at": None,
         "updated_at": None,
     }

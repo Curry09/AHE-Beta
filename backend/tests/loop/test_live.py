@@ -157,6 +157,17 @@ def test_live_run_roundtrip_and_defaults(tmp_path: Path) -> None:
     assert state["round_shas"] == ["abc1234"]
     assert state["started_at"] and state["updated_at"]
 
+    update_live_run(
+        data_dir=tmp_path,
+        running=False,
+        round_no=1,
+        total_rounds=5,
+        phase="blocked",
+        blocked_issues=[7],
+    )
+    blocked = read_live_run(data_dir=tmp_path)
+    assert blocked["phase"] == "blocked" and blocked["blocked_issues"] == [7]
+
     update_live_run(data_dir=tmp_path, running=False, round_no=5, total_rounds=5)
     assert read_live_run(data_dir=tmp_path)["running"] is False
 

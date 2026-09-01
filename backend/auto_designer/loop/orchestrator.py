@@ -1,18 +1,9 @@
-# Spec-0032/T4：需求面编排——生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入；dev 拍退役。
-"""闭环编排 orchestrator（需求面）：a（用户产 report+体感）→ 生成段两拍（第一拍 triage 分片∥
-divergent、第二拍 synthesize）→ Owner 唯一准入（打 openagents 交接令牌）→ c（回灌 main SHA）。
+# Spec-0032/T4：需求面编排——生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入。
+# Spec-0050/T3：非末轮准入后等本轮 admitted 票终态；末轮只跑用户，不再需求/交付。
+"""闭环编排 orchestrator（需求面）。
 
-交付面（Spec-0032）不在本进程内：Owner 准入的票由 OpenAgents vigil（常驻子进程，run.py 托管）
-level-triggered 接手——分支/PR/CI/评审/合并全在交付面完成，票何时出现何时接，两面无需同步。
-本编排因此不再有 b 段 dev 拍；c 步语义原样（spec-0007）：回灌 = harness 仓 main 当前 HEAD SHA
-纯观测游标，谁推进 main 都兼容（现在的推进者是 vigil 的 merge）。
-
-纯 trunk 语义不变：每局会话开始解析 main 当前 HEAD SHA、按该 SHA launch（会话级快照，harness 不在
-脚下变）；交付面 merge 落 main 后，下一局自然解析到前进的 HEAD（对用户永远「最新 main」）。
-
-生成段两拍（Spec-0029）：triage 分片与 divergent 都只依赖 a 段产物（report / 会话证据）→ 同拍并行；
-synthesize 要看本轮新升的 from-triage 提案 → 第二拍。生成器产出全为不可领 proposal（重复无害、
-分片自由），去重/合并/准入统一由 Owner 每轮一次批量裁决。
+非末轮：用户测当前 main → 生成两拍 → Owner 准入 → 等待本轮 admitted 票终态 → 回灌 sealed SHA。
+末轮：只跑用户，不调生成/Owner/交付闸。卡死抛 RoundDeliveryBlocked，不开下一轮用户。
 """
 
 from __future__ import annotations
@@ -20,14 +11,15 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import traceback
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Protocol
+from typing import Any, Protocol
 
 from auto_designer.designer.designer import Designer
 from auto_designer.designer.divergent import Divergent
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
+from auto_designer.loop.round_gate import wait_round_delivery
 from auto_designer.models import Persona, SeedScenario
 from auto_designer.usage import bind_usage_context
 from auto_designer.user.sim.deps import ensure_deps
@@ -72,6 +64,8 @@ class Orchestrator:
         on_round_end: Callable[[int, str], None] | None = None,
         max_parallel_users: int = 1,
         integrity_guard: Callable[[], None] | None = None,
+        fetch_issue: Callable[[int], Mapping[str, Any]] | None = None,
+        wait_delivery: Callable[..., None] | None = None,
     ) -> None:
         self._launcher = launcher
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
@@ -94,8 +88,11 @@ class Orchestrator:
         # Spec-0021/T1：编排仓完整性绊线（可选）。每轮末调用一次——本进程内 agent（生成器/Owner）
         # 或同机交付面 agent 逃逸改动编排仓即抛错中止本轮（fail-closed）。None 则跳过。
         self._integrity_guard = integrity_guard
+        # Spec-0050/T3：读单票状态供交付闸；测试可注入 wait_delivery 避免真轮询。
+        self._fetch_issue = fetch_issue
+        self._wait_delivery = wait_delivery
 
-    def run_round(self, ref: str) -> str:
+    def run_round(self, ref: str, *, deliver: bool = True) -> str:
         # Spec-0007/T2：传入的 ref 仅为「上一轮观测游标」透传（供 harbor runner 的 checkpoint 续跑链），
         # trunk 永远跟 live main、不据此 pin——本轮起始解析 main 当前 HEAD SHA 作会话级快照锚点。
         sha = self._resolve_head(ref=self._initial_ref)
@@ -151,6 +148,12 @@ class Orchestrator:
                         )
                         traceback.print_exc()
 
+        # Spec-0050/T3：末轮只测用户，跳过提案/准入/交付闸。
+        if not deliver:
+            if self._integrity_guard is not None:
+                self._integrity_guard()
+            return self._resolve_head(ref=self._initial_ref)
+
         # 生成段·第一拍（Spec-0029/T8）：triage 分片 ∥ divergent，同一线程池并行。
         # 二者都只依赖 a 段产物（triage 吃 report、divergent 吃会话证据）、互不依赖；产出全为不可领
         # proposal（重复无害，判重归 Owner）→ 分片自由（第 k 个 triager 处理 pending[k::n]）。
@@ -177,19 +180,23 @@ class Orchestrator:
 
         # Owner 唯一准入（Spec-0029/T6）：每轮一次批量裁决 proposal → ready/merged/declined/hold。
         # 崩溃记日志跳过（提案留存、下轮再审），不废整轮。
+        admitted: list[int] = []
         if self._owner is not None:
             try:
-                self._owner.admit_once()
+                outcome = self._owner.admit_once()
+                admitted = [int(n) for n in (getattr(outcome, "admitted", None) or [])]
             except Exception:  # noqa: BLE001
                 print("[orchestrator] owner 准入异常，跳过，本轮继续：")
                 traceback.print_exc()
 
-        # 交付面（Spec-0032/T4）：不在本进程——Owner 打的 openagents 交接令牌由常驻 vigil 发现并
-        # 推进到 PR/合并。这里只剩每轮一次的编排仓完整性绊线（Spec-0021，fail-closed）。
+        # Spec-0050/T3：等本轮准入票终态。空名单立即成功。卡死向上抛，不开下一轮用户。
+        self._await_round_delivery(numbers=admitted)
+
+        # 编排仓完整性绊线（Spec-0021，fail-closed）。
         if self._integrity_guard is not None:
             self._integrity_guard()
 
-        # c：回灌 = main 当前最新 HEAD SHA（纯观测游标；交付面尚未合并时与本轮起始 SHA 相同，闭环不中断）。
+        # 闸成功后的 origin/main = 本轮 sealed SHA（空等待集时可能仍是 user SHA）。
         return self._resolve_head(ref=self._initial_ref)
 
     def run(self, n_rounds: int) -> list[str]:
@@ -198,14 +205,30 @@ class Orchestrator:
         refs: list[str] = []
         ref = self._initial_ref  # 起始游标 = main 分支名；首轮 run_round 即解析其 HEAD SHA
         for i in range(n_rounds):
+            is_last = i == n_rounds - 1
             with bind_usage_context(round_no=i + 1):
                 if self._on_round_start is not None:
                     self._on_round_start(i + 1)
-                ref = self.run_round(ref)  # 返回本轮 main 最新 SHA（观测）；不参与 trunk 解析
+                # Spec-0050/T3：末轮 deliver=False。闸抛错则本循环不再进入下一轮。
+                ref = self.run_round(ref, deliver=not is_last)
                 refs.append(ref)
                 if self._on_round_end is not None:
                     self._on_round_end(i + 1, ref)
         return refs
+
+    def _await_round_delivery(self, *, numbers: list[int]) -> None:
+        """Wait for this round's admitted issues; no-op when the wait set is empty."""
+        if self._wait_delivery is not None:
+            self._wait_delivery(numbers=numbers)
+            return
+        fetch = self._fetch_issue
+        if fetch is None:
+            if numbers:
+                raise RuntimeError(
+                    "round delivery wait needs fetch_issue when Owner admitted tickets"
+                )
+            return
+        wait_round_delivery(numbers=numbers, fetch_issue=fetch)
 
     def _session_plan(self) -> Sequence[SessionPair]:
         """本轮要跑的 (persona, scenario) 列表；fixed_set 为 callable 时每轮重抽。"""

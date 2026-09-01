@@ -496,15 +496,18 @@ def test_run_binds_round_context_for_each_round() -> None:
     orchestrator._on_round_start = None
     orchestrator._on_round_end = None
     observed: list[int | None] = []
+    observed_deliver: list[bool] = []
 
-    def run_round(ref: str) -> str:
+    def run_round(ref: str, *, deliver: bool = True) -> str:
         observed.append(current_usage_context().round_no)
+        observed_deliver.append(deliver)
         return f"{ref}-next"
 
     orchestrator.run_round = run_round
 
     assert orchestrator.run(2) == ["main-next", "main-next-next"]
     assert observed == [1, 2]
+    assert observed_deliver == [True, False]
 
 
 def test_callable_session_plan_redraws_each_round(tmp_path) -> None:
@@ -530,3 +533,73 @@ def test_callable_session_plan_redraws_each_round(tmp_path) -> None:
     orch.run(2)
     assert calls["n"] == 2
     assert [e[1] for e in events if e[0] == "session"] == ["r1", "r2"]
+
+
+# Spec-0050/T3：末轮只用户；闸失败不开下一轮用户。
+
+
+class _AdmitOwner:
+    def __init__(self, events: list, numbers: list[int]) -> None:
+        self._events = events
+        self._numbers = numbers
+
+    def admit_once(self):
+        self._events.append(("admit", list(self._numbers)))
+
+        class _Out:
+            admitted = list(self._numbers)
+
+        return _Out()
+
+
+def test_run_skips_demand_on_last_round(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    events: list = []
+    waits: list[list[int]] = []
+
+    def wait_delivery(*, numbers: list[int]) -> None:
+        waits.append(list(numbers))
+
+    orch = Orchestrator(
+        launcher=_Launcher(events),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        run_session_fn=lambda persona, scenario, harness, *, workspace_dir=None: events.append(
+            ("session", None)
+        ),
+        initial_ref="main",
+        owner=_AdmitOwner(events, [11]),
+        wait_delivery=wait_delivery,
+    )
+    orch.run(2)
+    assert [e[0] for e in events if e[0] in ("session", "admit")] == [
+        "session",
+        "admit",
+        "session",
+    ]
+    assert waits == [[11]]
+
+
+def test_blocked_delivery_does_not_start_next_user_round(tmp_path) -> None:
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+    events: list = []
+
+    def wait_delivery(*, numbers: list[int]) -> None:
+        raise RoundDeliveryBlocked(numbers=numbers, reason="needs-human")
+
+    orch = Orchestrator(
+        launcher=_Launcher(events),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        run_session_fn=lambda persona, scenario, harness, *, workspace_dir=None: events.append(
+            ("session", None)
+        ),
+        initial_ref="main",
+        owner=_AdmitOwner(events, [8]),
+        wait_delivery=wait_delivery,
+    )
+    with pytest.raises(RoundDeliveryBlocked):
+        orch.run(2)
+    assert [e[0] for e in events if e[0] == "session"] == ["session"]
