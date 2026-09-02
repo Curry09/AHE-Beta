@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import run as run_mod  # noqa: E402
+
+
+def gitea_env_path() -> Path:
+    """Use the experiment-scoped Gitea credentials when one is explicitly selected."""
+    return Path(
+        os.environ.get("AUTO_DESIGNER_GITEA_ENV_FILE", "").strip()
+        or ROOT / "deploy" / "gitea" / ".env"
+    )
 
 
 def validate_summary(source: object, harness_repo: Path) -> list[dict]:
@@ -58,7 +67,7 @@ def main() -> int:
 
     source = json.loads(args.summary.read_text(encoding="utf-8"))
     issues = validate_summary(source, args.harness_repo)
-    gitea = run_mod._load_env(ROOT / "deploy" / "gitea" / ".env")
+    gitea = run_mod._load_env(gitea_env_path())
     base = gitea["GITEA_URL"].rstrip("/")
     headers = {"Authorization": f"token {gitea['TOKEN']}"}
     check = requests.get(

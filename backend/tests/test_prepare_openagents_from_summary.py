@@ -4,7 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from scripts.prepare_openagents_from_summary import validate_summary
+from scripts.prepare_openagents_from_summary import gitea_env_path, validate_summary
+
+
+def test_gitea_env_path_honors_experiment_scope(tmp_path, monkeypatch) -> None:
+    selected = tmp_path / "compose.env"
+    monkeypatch.setenv("AUTO_DESIGNER_GITEA_ENV_FILE", str(selected))
+    assert gitea_env_path() == selected
 
 
 def test_summary_preflight_requires_contiguous_typed_issues(tmp_path: Path) -> None:
