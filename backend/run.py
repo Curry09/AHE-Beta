@@ -404,6 +404,9 @@ _CLAUDE_CONFIG_ENVS = (
     "ANTHROPIC_MODEL",
     "ANTHROPIC_SMALL_FAST_MODEL",
 )
+# The product harness is a separate OpenAI-compatible client.  Pass its explicitly scoped GLM
+# configuration into the delivery container under the plain names consumed by scripts/run.sh.
+_HARNESS_LLM_SUFFIXES = ("MODEL", "BASE_URL", "API_KEY")
 
 
 class VigilHandle:
@@ -593,6 +596,7 @@ def _start_vigil_container(
         "-v", f"{(staging / '.openagents').resolve()}:/config:ro",
         "-v", f"{(ROOT / 'deploy' / 'vigil' / 'entrypoint.sh').resolve()}:/entrypoint.sh:ro",
         "-e", f"GITEA_TOKEN={gitea['TOKEN']}",
+        "-e", f"GITEA_USER={gitea['OWNER']}",
         "-e", f"VIGIL_REPO_URL={repo_url}",
         "-e", f"VIGIL_PARALLEL={max(1, parallel)}",
         "-e", f"HTTPS_PROXY={_VIGIL_PROXY_URL}",
@@ -626,6 +630,10 @@ def _start_vigil_container(
         value = os.environ.get(key, "").strip()
         if value:
             args += ["-e", f"{key}={value}"]
+    for suffix in _HARNESS_LLM_SUFFIXES:
+        value = os.environ.get(f"HARNESS_LLM_{suffix}", "").strip()
+        if value:
+            args += ["-e", f"LLM_{suffix}={value}"]
     args += [_VIGIL_IMAGE, "bash", "/entrypoint.sh"]
     started = subprocess.run(args, capture_output=True, text=True)
     if started.returncode != 0:

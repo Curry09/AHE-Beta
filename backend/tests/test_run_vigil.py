@@ -223,6 +223,7 @@ def test_container_start_shapes_docker_run(tmp_path: Path, monkeypatch) -> None:
     assert "sessions" not in joined and "/demand" not in joined
     assert "nexau" not in joined.lower()  # NexAU 烘入镜像，不扩大宿主挂载面
     assert "GITEA_TOKEN=secret-token" in joined  # 凭证只经容器 env
+    assert "GITEA_USER=harness" in joined
     assert "ANTHROPIC_API_KEY=sk-test" in joined
     assert f"HTTPS_PROXY={run._VIGIL_PROXY_URL}" in joined  # 出网只走 egress 代理
     # 盒内 claude 必须 bypass（否则 headless git 被权限门拒）；围堵由容器承担。
@@ -248,6 +249,22 @@ def test_container_passes_through_claude_config_envs(tmp_path: Path, monkeypatch
     assert "ANTHROPIC_BASE_URL=https://gw.example.top" in joined
     assert "ANTHROPIC_MODEL=vendor/Model-Pro" in joined
     assert "ANTHROPIC_SMALL_FAST_MODEL=vendor/Model-Pro" in joined
+
+
+def test_container_maps_explicit_harness_glm_envs_to_product_client_names(
+    tmp_path: Path, monkeypatch
+) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("HARNESS_LLM_MODEL", "glm-test")
+    monkeypatch.setenv("HARNESS_LLM_BASE_URL", "http://172.22.64.1:18080/v1")
+    monkeypatch.setenv("HARNESS_LLM_API_KEY", "harness-key")
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    joined = " ".join(next(a for a in calls["runs"] if a[:2] == ["docker", "run"]))
+    assert "LLM_MODEL=glm-test" in joined
+    assert "LLM_BASE_URL=http://172.22.64.1:18080/v1" in joined
+    assert "LLM_API_KEY=harness-key" in joined
 
 
 def test_container_omits_unset_claude_config_envs(tmp_path: Path, monkeypatch) -> None:

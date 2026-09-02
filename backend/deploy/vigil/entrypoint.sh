@@ -15,6 +15,12 @@ WORK=/work/harness
 
 # 容器每 run 重建 → clone 与 .openagents 运行态天然归零（原 rmtree 重置语义保留）。
 git clone "$VIGIL_REPO_URL" "$WORK"
+# The credentialed clone URL is bootstrap-only.  Keep the visible remote free of tokens and let
+# later fetch/push ask a helper that reads the already-scoped container environment at execution.
+VIGIL_GIT_SCHEME="${VIGIL_REPO_URL%%://*}"
+VIGIL_GIT_REST="${VIGIL_REPO_URL#*@}"
+git -C "$WORK" remote set-url origin "${VIGIL_GIT_SCHEME}://${VIGIL_GIT_REST}"
+unset VIGIL_REPO_URL VIGIL_GIT_SCHEME VIGIL_GIT_REST
 mkdir -p "$WORK/.openagents"
 cp /config/openagents.yml "$WORK/.openagents/openagents.yml"
 
@@ -22,6 +28,8 @@ cp /config/openagents.yml "$WORK/.openagents/openagents.yml"
 git config --global user.name "openagents"
 git config --global user.email "openagents@auto-designer.local"
 git config --global --add safe.directory "$WORK"
+git config --global credential.helper \
+  '!f() { if [ "$1" = get ]; then printf "%s\n" "username=${GITEA_USER}" "password=${GITEA_TOKEN}"; fi; }; f'
 
 cd "$WORK"
 exec openagents vigil --parallel "$VIGIL_PARALLEL"
