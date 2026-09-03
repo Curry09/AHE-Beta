@@ -24,6 +24,10 @@
 `Implementation`、`Derived View`。不要把 Meta-Spec 称为“运行时 Spec”，也不要把
 Objective Contract、Task 或实现方案混称为 SDD Spec。
 
+历史兼容说明：既有历史 Spec 或其 Derived View 中出现的 `RUNTIME.md` 是旧维护文档名，
+已由 `META_SPEC.md` 取代。历史记录保留原文以维持决策可追溯性；新增或修改制品不得继续使用
+该名称，除非是在明确的迁移说明中引用它。
+
 ### 2.2 Causal and evidence terms
 
 以下字段沿用 OpenAgents v0.2 因果 Spec 契约，使用英文 snake_case：
