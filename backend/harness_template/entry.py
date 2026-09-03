@@ -4,9 +4,9 @@ The process reads one JSON object per line from stdin and writes JSON objects to
 It builds a NexAU Agent from this directory's agent.yaml and uses SANDBOX_WORK_DIR as
 the workspace for shell commands. The internal agent topology is an implementation detail.
 
-Runtime notes: LLM_* environment variables configure the model endpoint. The process keeps
+Project guidance: LLM_* environment variables configure the model endpoint. The process keeps
 with a stable session_id; a hard interrupt recovery may rebuild the internal agent_id
-and restore conversation history. See RUNTIME.md for operational boundaries.
+and restore conversation history. See META_SPEC.md for project boundaries and development guidance.
 """
 
 from __future__ import annotations
@@ -425,7 +425,7 @@ def _make_step_collector():
 def _reply(agent, message: str, rebuild, ctrl_q=None):
     """返回 (live_agent, reply, terminal_status)。
 
-    hard interrupt 可调用 `rebuild()` 换新 agent_id 并回灌 history（见 RUNTIME.md）。
+    hard interrupt 可调用 `rebuild()` 换新 agent_id 并回灌 history（见 META_SPEC.md）。
     空回复 / 502 等同实例退避重试。优雅打断保持同实例；强打断才 rebuild。
     """
     last = None
@@ -496,7 +496,7 @@ def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue, busy: threading.Event
 def main() -> None:
     _setup_workspace()  # 先就位 SANDBOX_WORK_DIR，供 agent 的 local sandbox 读取
     collector = _make_step_collector()  # 跨轮/跨重建复用同一实例，逐轮 reset
-    # 进程级会话：session_id 固定；rebuild 只换 agent_id + 回灌 history（见 RUNTIME.md）。
+    # 进程级会话：session_id 固定；rebuild 只换 agent_id + 回灌 history（见 META_SPEC.md）。
     session_id = f"harness_{uuid.uuid4().hex}"
     history_snapshot: list = []
 

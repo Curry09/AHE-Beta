@@ -53,12 +53,12 @@ def _no_rebuild(_stale):
     raise AssertionError("rebuild 不应被调用")
 
 
-def test_runtime_md_documents_boundary_and_session_contract() -> None:
-    """RUNTIME 短宪法：工作边界 + 换实例 ≠ 换 session。"""
-    text = (_TEMPLATE / "RUNTIME.md").read_text(encoding="utf-8")
+def test_meta_spec_documents_baseline_and_changeability() -> None:
+    """Meta-Spec 提供项目基线，但不把当前实现冻结成不可修改。"""
+    text = (_TEMPLATE / "META_SPEC.md").read_text(encoding="utf-8")
     assert "session_id" in text
-    assert "只读" in text and "NexAU" in text
-    assert "换实例" in text
+    assert "NexAU" in text and "均可修改" in text
+    assert "不是实现冻结清单" in text
 
 
 def test_reply_returns_nonempty_text(entry: ModuleType) -> None:

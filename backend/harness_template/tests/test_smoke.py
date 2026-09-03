@@ -203,12 +203,12 @@ class HarnessSmokeTest(unittest.TestCase):
         self.assertIn("previous request", out)
 
     def test_product_docs_present_and_split_by_audience(self) -> None:
-        for rel in ("HELP.md", "RUNTIME.md", ".env.example", "requirements.txt"):
+        for rel in ("HELP.md", "META_SPEC.md", ".env.example", "requirements.txt"):
             self.assertTrue((ROOT / rel).is_file(), f"{rel} should exist at harness root")
         for rel in ("README.md", "USER.md", "INTERFACE.md", "MANUAL.md"):
             self.assertFalse((ROOT / rel).exists(), f"{rel} should not be shipped in harness root")
         self.assertIn("SYNOPSIS", (ROOT / "HELP.md").read_text(encoding="utf-8"))
-        self.assertIn("Runtime", (ROOT / "RUNTIME.md").read_text(encoding="utf-8"))
+        self.assertIn("Meta-Spec", (ROOT / "META_SPEC.md").read_text(encoding="utf-8"))
 
     def test_scripts_present_with_shebang(self) -> None:
         for rel in ("scripts/run.sh", "scripts/smoke.sh", "scripts/check.sh"):
@@ -227,7 +227,7 @@ class HarnessSmokeTest(unittest.TestCase):
         ]
         paths = [
             ROOT / "HELP.md",
-            ROOT / "RUNTIME.md",
+            ROOT / "META_SPEC.md",
             ROOT / "agents" / "main.md",
         ]
         for path in paths:
