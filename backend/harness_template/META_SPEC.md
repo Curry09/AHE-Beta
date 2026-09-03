@@ -5,12 +5,59 @@
 本文件是 harness 的项目级 Meta-Spec：它给后续 Spec Writer、Developer 和维护者提供
 一个共同的起点，说明当前制品的骨架、主要控制点、术语和演化原则。
 
-它不是 issue Spec，也不是实现冻结清单。Issue 的目标、取舍和验收以对应的 SDD
-Spec 为准；代码和测试是当前行为的最终事实。harness 仓库和 NexAU 依赖都属于可
+它不是 SDD Spec，也不是实现冻结清单。Issue 的目标、取舍和验收以对应的 SDD Spec
+或 Objective Contract 为准；代码和测试是当前行为的最终事实。harness 仓库和 NexAU 依赖都属于可
 修改范围；当新的 Spec 有意改变本文描述的边界时，应以新的 Spec、实现和验收结果
 为准，并在合并后修正本文受影响的章节。
 
-## 2. Current product boundary
+## 2. Terminology and naming standard
+
+### 2.1 Artifact terms
+
+- **Meta-Spec**：项目级当前基线。记录共享骨架、职责、控制点、原则和更新规则；不冻结实现。
+- **SDD Spec（Spec group）**：`docs/specs/NNNN-slug.md` 中一个 feature 的自包含设计契约，记录目标、动机、方案、取舍、任务和验收。
+- **Objective Contract**：v0.2 单 issue 的紧凑设计契约，落在 `docs/objectives/issue-*.md`；它是该 issue 的冻结实现目标，不等同于项目 Meta-Spec。代码和 prompt 中的“compact Spec”是它的兼容简称。
+- **Implementation**：代码、配置和测试的实际变更。
+- **Derived View**：由 Spec 或代码生成的视图，例如 `OVERVIEW.md`、`ARCHITECTURE.md`；不能反过来作为源数据手工维护。
+
+同一概念只使用一个正式名称：使用 `Meta-Spec`、`SDD Spec`、`Objective Contract`、
+`Implementation`、`Derived View`。不要把 Meta-Spec 称为“运行时 Spec”，也不要把
+Objective Contract、Task 或实现方案混称为 SDD Spec。
+
+### 2.2 Causal and evidence terms
+
+以下字段沿用 OpenAgents v0.2 因果 Spec 契约，使用英文 snake_case：
+
+- `ownership`：哪个组件实际拥有目标行为；
+- `delivery`：改动如何进入目标组件和执行路径；
+- `control_effect`：机制如何改变用户可观察结果，而不只是被加载或被调用；
+- `evidence`：支持判断的源码、配置、运行或测试事实；
+- `assumptions`：尚未由当前证据确认的前提；
+- `failure_modes`：机制可能失效或伪装成功的方式；
+- `scope_coverage`：原目标进入契约的范围，取 `FULL`、`PARTIAL` 或 `NONE`；
+- `evidence_level`：证据强度，取 `HYPOTHESIS`、`STRUCTURAL` 或 `BEHAVIORAL`。
+
+`scope_coverage=FULL` 不表示功能已经实现；尚未实现的效果仍可使用
+`evidence_level=HYPOTHESIS` 诚实表示。
+
+### 2.3 Topology terms
+
+- **Spec topology**：Spec 之间和 Task 之间的 `depends-on` / `relates-to` 关系；源数据在 Spec frontmatter。
+- **Code topology**：实际代码的 import 和 docstring 关系；由 `spec graph` 生成。
+- **Execution DAG**：某次 v0.2 批次运行时根据 issue 依赖和文件冲突计算出的执行图；不是永久的 Spec 关系。
+- **Dependency relation**：表示一个节点必须等待另一个节点；不要把所有关联都称为 dependency。
+
+### 2.4 Normative language
+
+- **MUST / 必须**：安全或已经承诺的外部契约；改变时必须先明确新契约并验证；
+- **SHOULD / 应**：当前推荐的默认做法，合理的 Spec 可以覆盖；
+- **MAY / 可以**：允许的实现选择；
+- **OBSERVED / 当前事实**：代码或测试观察到的行为，不自动构成设计要求。
+
+除非标注为 `MUST` 或 `SAFETY`，本文中的当前文件、符号和调用链都只是导航信息，
+不能被解释为 Developer 的固定实现清单。
+
+## 3. Current product boundary
 
 本制品是一个可启动的 terminal coding assistant。外部客户端通过进程协议发送用户
 消息并接收状态、过程和最终回复；内部使用 NexAU Agent 执行模型调用和工具操作。
@@ -29,7 +76,7 @@ params.yaml
 
 这是一份当前实现的导航，不要求未来继续保持相同的文件名或调用方式。
 
-## 3. Repository skeleton
+## 4. Repository skeleton
 
 | 路径 | 当前职责 | 变更提示 |
 |---|---|---|
@@ -43,7 +90,7 @@ params.yaml
 | `tests/` | harness 自身的行为和协议回归 | 新行为应增加可观察的回归覆盖 |
 | `docs/specs/` | SDD 设计制品（如该 harness 采用本目录） | 具体决策、历史和验收放在对应 Spec |
 
-## 4. Ownership and changeability
+## 5. Ownership and changeability
 
 下表描述当前职责归属，不是禁止修改的边界：
 
@@ -65,37 +112,37 @@ params.yaml
 不要把“当前控制点”写成“永远只能在这里修改”。真正的判断来自当前 issue
 的因果链、仓库证据和验收结果。
 
-## 5. Evolution principles
+## 6. Evolution principles
 
-### 5.1 Shared principles
+### 6.1 Shared principles
 
 1. 先建立当前系统的最小可用模型，再提出改动；Meta-Spec 用于避免从悬置状态开始。
 2. 不把历史实现、当前文件名或现有调用链自动视为永久架构。
 3. harness 和 NexAU 均可修改；跨仓库改动要明确新的 ownership、delivery 和验证面。
-4. Issue Spec 负责本次目标和设计取舍，Meta-Spec 只提供长期背景和导航。
+4. SDD Spec 或 Objective Contract 负责本次目标和设计取舍，Meta-Spec 只提供长期背景和导航。
 5. 源码、测试和实际运行结果优先于过期的 Meta-Spec；发现冲突时修正文档。
 6. 不为了文档完整而复制整个 NexAU、整个仓库或每个 issue 的局部细节。
 
-### 5.2 Spec Writer
+### 6.2 Spec Writer
 
 - 关注目标结果的因果链，不把“文件存在、prompt 被引用或配置已加载”当作效果证明。
 - 区分行为 ownership、实际 delivery 和 control effect。
 - 候选方案使用同一证据标尺，并明确假设、失败模式和独立证伪方式。
 - 可以推翻本文中的当前判断；推翻时引用新的源码、运行或测试证据。
 
-### 5.3 Developer
+### 6.3 Developer
 
-- 以冻结的 Issue Spec 为本次目标契约，以本文件为项目导航，不机械复制现有实现。
+- 以冻结的 Objective Contract（v0.2）或对应 SDD Spec 为本次目标契约，以本文件为项目导航，不机械复制现有实现。
 - 先定位实际控制点，再决定修改 harness、NexAU 或两者。
 - 不因为本文描述了某个现状就放弃更好的设计；如果改变了共享边界，要更新 Spec 和本文件。
 - 只修改完成目标所需的范围，并用相关测试或黑盒行为验证结果。
 
-### 5.4 Acceptance
+### 6.4 Acceptance
 
 - 关注用户可观察行为和真实运行结果，不只检查文件、函数或 prompt 是否存在。
 - 对协议、安全边界和 session 等兼容面，验证变更后的新契约，而不是默认旧行为永远正确。
 
-## 6. How to use and update this file
+## 7. How to use and update this file
 
 开始工作时先读本文件的骨架、ownership 和相关角色原则；随后仍需按 issue 范围
 核实源码、依赖和测试。本文不替代必要的深度调查。
@@ -117,9 +164,10 @@ params.yaml
 细节扩写成永久约束。代码与 Meta-Spec 应在同一变更中提交，验收确认文档没有
 误导后续开发。
 
-## 7. Specs and topology
+## 8. Specs and topology
 
-SDD Spec 是详细决策和历史的承载物，Meta-Spec 只保留跨 issue 的共同地图。
+SDD Spec 是 feature 级详细决策和历史的承载物；v0.2 Objective Contract 是单 issue 的冻结目标；
+Meta-Spec 只保留跨 issue 的共同地图。
 新增 Spec 不要求重写本文全文。
 
 如果项目使用 OpenAgents 的 Spec 工具：
@@ -134,7 +182,7 @@ SDD Spec 是详细决策和历史的承载物，Meta-Spec 只保留跨 issue 的
 因此，Spec 增长时应更新受影响的 Spec 关系源并重新生成对应视图；只有项目级
 骨架或共同原则变化时才更新本文件。
 
-## 8. Known gaps
+## 9. Known gaps
 
 - 本文件描述的是当前基线，可能落后于未合并分支；冲突时以当前代码、测试和最新
   已批准 Spec 为准。

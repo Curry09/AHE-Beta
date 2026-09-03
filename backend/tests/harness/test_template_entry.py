@@ -59,6 +59,10 @@ def test_meta_spec_documents_baseline_and_changeability() -> None:
     assert "session_id" in text
     assert "NexAU" in text and "均可修改" in text
     assert "不是实现冻结清单" in text
+    assert "Terminology and naming standard" in text
+    assert "Spec topology" in text and "Execution DAG" in text
+    assert "SDD Spec" in text and "Objective Contract" in text
+    assert "MUST" in text and "OBSERVED" in text
 
 
 def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
