@@ -57,6 +57,13 @@ Objective Contract、Task 或实现方案混称为 SDD Spec。
 除非标注为 `MUST` 或 `SAFETY`，本文中的当前文件、符号和调用链都只是导航信息，
 不能被解释为 Developer 的固定实现清单。
 
+### 2.5 Terminology is an evolution invariant
+
+新增或修改 Meta-Spec、SDD Spec、Objective Contract、角色 prompt、代码文档和
+Derived View 时，必须使用本节定义的正式名称、字段和关系词。若确实需要引入新术语，
+先在本节定义其含义、所属层级、与现有术语的关系以及过渡期兼容别名，再在其他制品中使用；
+不得在迭代中悄悄创造同义词或用旧词表达新的语义。
+
 ## 3. Current product boundary
 
 本制品是一个可启动的 terminal coding assistant。外部客户端通过进程协议发送用户
@@ -122,6 +129,7 @@ params.yaml
 4. SDD Spec 或 Objective Contract 负责本次目标和设计取舍，Meta-Spec 只提供长期背景和导航。
 5. 源码、测试和实际运行结果优先于过期的 Meta-Spec；发现冲突时修正文档。
 6. 不为了文档完整而复制整个 NexAU、整个仓库或每个 issue 的局部细节。
+7. 术语规范是演化不变量：所有后续制品沿用本文件的正式名称和字段；术语变化必须先更新词汇表并说明兼容关系。
 
 ### 6.2 Spec Writer
 
@@ -162,7 +170,8 @@ params.yaml
 
 更新时保持“小范围修正”：说明当前状态、控制位置和验证依据；不要把新的实现
 细节扩写成永久约束。代码与 Meta-Spec 应在同一变更中提交，验收确认文档没有
-误导后续开发。
+误导后续开发。涉及术语的变更必须同时检查受影响的 Spec、角色材料和 Derived View，
+避免同一概念在不同制品中出现未声明的异名。
 
 ## 8. Specs and topology
 

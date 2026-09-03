@@ -63,6 +63,7 @@ def test_meta_spec_documents_baseline_and_changeability() -> None:
     assert "Spec topology" in text and "Execution DAG" in text
     assert "SDD Spec" in text and "Objective Contract" in text
     assert "MUST" in text and "OBSERVED" in text
+    assert "Terminology is an evolution invariant" in text
 
 
 def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
