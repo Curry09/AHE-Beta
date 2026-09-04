@@ -1,15 +1,11 @@
 type: tool
 name: submit_admission
 description: >-
-  Submit the admission decisions for the current review batch and finish. Call
-  this tool exactly once after completing the portfolio assessment.
-
-  Pass `decisions`: zero or one item per proposal. Each item needs `issue`, one
-  decision from admit / merge / decline / hold, the required value, evidence,
-  scope, overlap, and delivery-risk assessments, plus `product_boundary` and
-  `abstraction_quality`. `admit` may provide final `priority`; `merge` requires
-  `into`; `decline` requires `reason`. Omitted proposals remain undecided and are
-  handled by the driver as hold.
+  Submit OpenAgents handoff packages for the current proposal batch and finish.
+  Each item needs a routing action plus a handoff summary, preserved capabilities,
+  and independent acceptance groups. Admit is the default. Merge is only for exact
+  duplicates; hold must name a missing handoff input. Omitted proposals are still
+  handed off by the driver.
 
   The parameters are schema-validated at call time; invalid values (unknown
   decision, self-invented keys) are rejected and you must retry.
@@ -30,7 +26,6 @@ input_schema:
             enum:
               - admit
               - merge
-              - decline
               - hold
           into:
             type: integer
@@ -43,32 +38,22 @@ input_schema:
               - P3
           reason:
             type: string
-          value_assessment:
+          handoff_summary:
             type: string
-          evidence_assessment:
-            type: string
-          scope_assessment:
-            type: string
-          overlap_assessment:
-            type: string
-          delivery_risk:
-            type: string
-          product_boundary:
-            type: string
-            enum: [in_scope, out_of_scope, uncertain]
-          abstraction_quality:
-            type: string
-            enum: [appropriate, too_implementation_specific, uncertain]
+          preserved_capabilities:
+            type: array
+            items:
+              type: string
+          acceptance_groups:
+            type: array
+            items:
+              type: string
         required:
           - issue
           - decision
-          - value_assessment
-          - evidence_assessment
-          - scope_assessment
-          - overlap_assessment
-          - delivery_risk
-          - product_boundary
-          - abstraction_quality
+          - handoff_summary
+          - preserved_capabilities
+          - acceptance_groups
         additionalProperties: false
   required:
     - decisions

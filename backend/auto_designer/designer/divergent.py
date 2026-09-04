@@ -2,7 +2,8 @@
 """Divergent（能力发现）驱动器。
 
 体验趋势提供检索索引，会话 timeline/beat/step 提供按需证据。开放 proposal 与 ready item 只作为
-重复方向参照。输出写入 proposal 平面并标记 from-divergent；Owner 负责最终准入与合并。
+重复方向参照。输出写入 proposal 平面并标记 from-divergent；Designer 负责跨提案吸收，Owner
+负责最终交接。
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
 
 _DIVERGENT_TIMEOUT = 3600
-# 单轮候选上限；跨轮去重与合并由 Owner 执行。
+# 单轮候选上限；跨提案的语义吸收由 Designer 执行。
 _MAX_CANDIDATES = 3
 
 StatusFn = Callable[..., None]
@@ -66,7 +67,7 @@ class Divergent:
         self._round_provider = round_provider
 
     def propose_once(self) -> DivergentOutcome:
-        # 全量参照用于理解产品现状；是否重叠由 Owner 裁决，不是 PM 的生成门。
+        # 全量参照用于理解产品现状；PM 不因相邻价值方向停止生成，跨提案吸收由 Designer 判断。
         backlog = self._tracker.list_open_issues()
         reference = [i for i in backlog if plane(i.labels) in (PROPOSAL, READY)]
         trend = self._feeling_trend()
@@ -110,7 +111,7 @@ class Divergent:
         msg = (
             "你是产品 PM。以下是全部可见的用户体验索引以及开放 proposal、ready item。先理解用户"
             "试图完成什么、行为反映了什么体验矛盾，再提出产品机会。已有提案是产品现状上下文，"
-            "重叠不构成生成失败，合并取舍由 Owner 负责。"
+            "重叠不构成生成失败，合并取舍由后续 Designer 负责。"
             "再以 session 标识调用 get_session_timeline 核实；仅在必要时继续调用 beat 和 step。"
             "不得直接读取 sessions 文件。\n"
             f"本轮最多提交 {_MAX_CANDIDATES} 条产品洞察。每条必须能追溯到具体会话证据。\n\n"

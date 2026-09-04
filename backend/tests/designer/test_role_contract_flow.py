@@ -91,10 +91,11 @@ def _seed_session(store: SessionStore) -> str:
 
 
 def _owner_decision(issue: int, decision: str) -> dict:
-    return {"issue": issue, "decision": decision, "value_assessment": "价值明确",
-            "evidence_assessment": "证据足够", "scope_assessment": "边界适中",
-            "overlap_assessment": "已检查组合重叠", "delivery_risk": "风险可控",
-            "product_boundary": "in_scope", "abstraction_quality": "appropriate"}
+    row = {"issue": issue, "decision": decision, "handoff_summary": "交接原始目标",
+           "preserved_capabilities": ["原始能力"], "acceptance_groups": ["独立验收"]}
+    if decision == "hold":
+        row["reason"] = "缺少可观察验收接口"
+    return row
 
 
 def test_role_contract_violations_are_structural_not_vocabulary_based() -> None:
@@ -108,8 +109,7 @@ def test_role_contract_violations_are_structural_not_vocabulary_based() -> None:
                        known_sessions={"s1"}) == []
     assert validate_triage({"issue": 1, "disposition": "accept", "artifact": {
         "implementation_target": "outside_harness"}}, report_number=1)[0].code == "out-of-product-scope"
-    assert validate_owner({"issue": 1, "decision": "admit", "product_boundary": "out_of_scope",
-                           "abstraction_quality": "appropriate"}, review_batch={1})[0].code == "out-of-product-scope"
+    assert validate_owner({"issue": 1, "decision": "hold"}, review_batch={1})[0].code == "missing-hold-gap"
 
 
 def test_report_is_normalized_once_and_raw_case_stays_out_of_downstream_context(
@@ -259,10 +259,14 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
             ensure_ascii=False,
         ),
     )
-    synthesize_number = designer.propose_once().proposal_numbers[0]
+    synthesis_outcome = designer.propose_once()
+    synthesize_number = synthesis_outcome.proposal_numbers[0]
     assert set(designer.proposal_numbers) == expected_for_synthesize
+    assert synthesis_outcome.merged_numbers == sorted(expected_for_synthesize)
+    assert all(tracker.issue(number)["state"] == "closed" for number in expected_for_synthesize)
 
-    expected_for_owner = expected_for_synthesize | {synthesize_number}
+    # Designer 已通过 covers 吸收来源，Owner 只看到仍开放的结构提案。
+    expected_for_owner = {synthesize_number}
     owner = _Owner(
         tracker,
         store,

@@ -1,6 +1,6 @@
 # Spec-0029/T4：synthesize 生成器单测（stub nexau agent + FakeTracker + 临时 SessionStore）。
-"""验证 designer 驱动器：产出落 proposal 平面 + from-synthesize（不可领、不 supersede 任何票）；
-covers 只是建议机器行（过滤到 open report/proposal）；输入 = ready + 待准入提案索引 + 体感 + runtime；
+"""验证 designer 驱动器：产出落 proposal 平面 + from-synthesize（不可领）；
+covers 是 Designer 的吸收决定（过滤到 open report/proposal）；输入 = ready + 待准入提案索引 + 体感 + runtime；
 缺字段跳过；未调 submit no-op；drift-guard（submit_rfcs yaml == rfc_input_schema）。"""
 
 from __future__ import annotations
@@ -180,8 +180,8 @@ def test_inputs_are_ready_plus_proposal_index(tmp_path) -> None:
     assert designer.seen_trend and designer.seen_runtime  # 体感+runtime 都喂（delivery 轨）
 
 
-def test_covers_line_written_but_nothing_superseded(tmp_path) -> None:
-    """covers 只是建议机器行：落在 body，**不**打 superseded、不动被覆盖票。"""
+def test_covers_line_written_and_sources_are_merged(tmp_path) -> None:
+    """covers 落在 body，并由 Designer driver 合并关闭被吸收来源。"""
     tracker = FakeTracker()
     t1 = _proposal(tracker, "症状1")
     t2 = _proposal(tracker, "症状2")
@@ -189,10 +189,41 @@ def test_covers_line_written_but_nothing_superseded(tmp_path) -> None:
 
     body = tracker.issue(outcome.proposal_numbers[0])["body"]
     assert f"covers: #{t1} #{t2}" in body  # 机器可读行
+    assert outcome.merged_numbers == [t1, t2]
+    assert outcome.failed_merges == {}
     for n in (t1, t2):
         snap = tracker.issue(n)
-        assert sc.SUPERSEDED not in snap["labels"]  # 不再单方面 supersede
-        assert snap["state"] == "open" and sc.plane(snap["labels"]) == sc.PROPOSAL  # 原样
+        assert sc.MERGED in snap["labels"]
+        assert snap["state"] == "closed" and sc.plane(snap["labels"]) is None
+        assert f"merged-into: #{outcome.proposal_numbers[0]}" in "\n".join(snap["comments"])
+
+
+def test_sources_omitted_from_covers_stay_open(tmp_path) -> None:
+    tracker = FakeTracker()
+    covered = _proposal(tracker, "被吸收")
+    independent = _proposal(tracker, "独立交付")
+    outcome = _designer(tmp_path, tracker, _rfc_canned([covered])).propose_once()
+
+    assert outcome.merged_numbers == [covered]
+    assert tracker.issue(covered)["state"] == "closed"
+    assert tracker.issue(independent)["state"] == "open"
+    assert sc.plane(tracker.issue(independent)["labels"]) == sc.PROPOSAL
+
+
+def test_cover_merge_failure_isolated_and_reported(tmp_path) -> None:
+    class BrokenTransitionTracker(FakeTracker):
+        def transition_issue(self, number: int, *, state: str, labels: list[str]) -> None:
+            raise RuntimeError(f"cannot transition #{number}")
+
+    tracker = BrokenTransitionTracker()
+    source = _proposal(tracker, "待吸收来源")
+    outcome = _designer(tmp_path, tracker, _rfc_canned([source])).propose_once()
+
+    target = outcome.proposal_numbers[0]
+    assert outcome.merged_numbers == []
+    assert source in outcome.failed_merges
+    assert tracker.issue(target)["state"] == "open"
+    assert tracker.issue(source)["state"] == "open"
 
 
 def test_covers_filtered_to_open_report_or_proposal(tmp_path) -> None:

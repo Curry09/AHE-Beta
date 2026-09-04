@@ -3,7 +3,7 @@ number: "0042"
 title: 需求面角色契约治理：统一术语、规范化提案投影与可靠状态迁移
 issue: 0
 slug: role-contract-governance
-summary: 消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Owner 非原子且静默失败的状态迁移，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
+summary: 消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Designer/Owner 状态迁移与交接边界，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
 tasks:
   - id: T1
     title: 权威术语表、角色职责矩阵与现行流程基线
@@ -16,7 +16,7 @@ tasks:
     files:
       - docs/specs/0042-role-contract-governance.md
       - docs/specs/OVERVIEW.md
-    scope: 定义 report/proposal/ready item、Triage/Divergent/Synthesize/Owner、渐进式证据检索、merge target、covers 等正式术语；明确各角色输入、输出、权限和禁止事项；本 Spec 显式取代 0029 中机械准入、旧 Triage 落库、旧 Owner 输入和 dev 阶段描述，不改写历史决策记录。
+    scope: 定义 report/proposal/ready item、Triage/Divergent/Synthesize/Owner、渐进式证据检索、merge target、covers 等正式术语；明确各角色输入、输出、权限和禁止事项；本 Spec 显式取代 0029 中机械准入、旧 Triage 落库、旧 Owner 输入和 dev 阶段描述，不改写历史决策记录。0052 进一步规定 Designer 的 covers 吸收权。
     acceptance: 每个活动概念只有一个正式名称与机器标识；角色矩阵覆盖五个需求面角色；列出被取代的 0029 条款；OVERVIEW 指向本 Spec 作为现行补充规范。
   - id: T2
     title: Canonical ProposalView 与规范化提案版本
@@ -62,8 +62,8 @@ tasks:
     files:
       - backend/auto_designer/designer/owner.py
       - backend/tests/designer/test_owner.py
-    scope: Owner 保持轻量批量准入；执行前验证决策图，merge target 只能是既有 ready item 或本批最终 admit 的 proposal，拒绝自环、链式 merge、指向 hold/decline/merge；核心落库失败进入 failed/held 并可观测，不得静默丢失裁决。
-    acceptance: 所有 proposal 仍经模型评审；owner=0 全 hold；非法 merge 图不改状态；单条失败不影响其余但明确出现在 outcome；covers 只合并未显式裁决且状态合法的对象；相关测试通过。
+    scope: Owner 保持轻量交付路由；执行既有交接状态迁移，历史 exact duplicate 兼容路径不得扩展为语义去重；核心落库失败进入 failed/held 并可观测，不得静默丢失交接。
+    acceptance: 所有开放 proposal 默认进入交接；非法/失败的交接动作可观测；Designer 已处理的 covers 来源不由 Owner 再次关闭；相关测试通过。
   - id: T5
     title: 五角色专业化 Prompt 与 Tool 契约统一
     status: done
@@ -105,8 +105,9 @@ tasks:
 
 将需求面从多个历史版本叠加的 Prompt 与状态语义，收敛为一个可测试的角色契约体系。正式流程为：
 `report（原始报告） → proposal（规范化提案） → Owner → ready item（已准入工作项）`。Triage 负责单条
-规范化，Divergent 负责基于会话行为的能力发现，Synthesize 负责跨提案结构综合，Owner 只负责批量准入、
-合并与优先级裁决。所有角色默认读取统一 ProposalView，具体案例通过渐进式证据检索获取。
+规范化，Divergent 负责基于会话行为的能力发现，Synthesize 负责跨提案结构综合及 covers 吸收决定，
+Owner 只负责批量交接与优先级整理。所有角色默认读取统一 ProposalView，具体案例通过渐进式证据检索获取；
+覆盖合并的细化语义以 Spec-0052 为准。
 
 ## Motivation
 
@@ -125,7 +126,7 @@ superseded 或开发完成后 covers 级联等语义重新进入活动 Prompt。
 | 报告规范化 | Triage | 单条 report 的分类、定位、标题与字段规范化 |
 | 能力发现 | Divergent | 从未显式形成 report 的会话行为中识别产品能力缺口 |
 | 结构综合 | Synthesize | 在规范化 backlog 上识别跨提案结构性根因 |
-| 准入评审 | Owner | 批量 admit/merge/decline/hold 与优先级裁决 |
+| 交付路由 | Owner | 批量 admit/hold 与优先级整理；保留 exact duplicate 兼容 |
 | 渐进式证据检索 | timeline→beat→step | 从摘要到执行细节的按需证据访问 |
 
 ## Role boundaries
@@ -135,14 +136,15 @@ superseded 或开发完成后 covers 级联等语义重新进入活动 Prompt。
 | User Simulator | 场景、persona、harness 响应 | 原始报告与体验评价 | 产品抽象和准入 |
 | Triage | 单条 report、对应会话证据、只读 harness | 规范化 proposal 或 reject/needs_info | 跨提案判重 |
 | Divergent | 体验索引、按需会话证据、ProposalView 参照 | 能力类 proposal | 结构性机制综合和准入 |
-| Synthesize | 全量 ProposalView、ready 参照、体验与运行聚合 | 结构类 proposal 与 covers 建议 | 准入和实现设计 |
-| Owner | ProposalView、ready queue、体验索引 | admit/merge/decline/hold | 重新诊断、架构设计和代码实现 |
+| Synthesize | 全量 ProposalView、ready 参照、体验与运行聚合 | 结构类 proposal 与 covers 吸收决定 | 实现设计和下游交接 |
+| Owner | ProposalView、ready queue、体验索引 | admit/hold 交接（及 exact duplicate 兼容） | 语义去重、重新诊断、架构设计和代码实现 |
 
 ## Superseded behavior
 
 本 Spec 取代 0029 中以下现行描述：Owner 机械准入、`owner=0` 机械降级、Triage 规范化字段只写评论、
-Owner 不读取规范化正文、Designer 使用旧 triaged/superseded 生命周期、进程内 dev 阶段。0029 保留为
-历史决策记录；活动实现与 Overview 以 0032 和本 Spec 为准。
+Owner 不读取规范化正文、Designer 使用旧 triaged/superseded 生命周期、进程内 dev 阶段。0052 进一步
+取代本 Spec 中“covers 仅为关系/Owner 负责语义合并”的旧描述。0029 保留为历史决策记录；活动实现与
+Overview 以 0032、0042 和 0052 为准。
 
 ## Reliability requirements
 
@@ -156,8 +158,9 @@ Owner 不读取规范化正文、Designer 使用旧 triaged/superseded 生命周
 Designer、Divergent 与 Owner 的共同只读数据模型，负责统一正文提取、规范化元数据和长度限制；Divergent 使用不含正文的紧凑判重投影，Synthesize 与 Owner 使用规范化正文投影。写入边界由 tracker
 提供两类语义操作：`update_issue` 迁移 title/body/labels，`transition_issue` 迁移 state/labels。Fake 后端
 可原子完成；Gitea 1.22 分别调用 EditIssue 与 labels 端点，校验最终状态，并在可观测的后续步骤失败时恢复操作前快照。Gitea 不提供覆盖两个端点的事务，故进程终止窗口由幂等重试处理。
-Owner 先验证整批 decision graph，再按 admit、merge、decline、hold 顺序执行；`covers` 仅在结构提案
-成功 admit 且覆盖项无显式 decision 时参与默认 merge。
+Designer 创建结构提案后，driver 按 `covers` 将仍开放的 report/proposal 来源合并关闭并写入
+`merged-into`。Owner 只处理合并后仍开放的 proposal；其自身的 exact duplicate 兼容操作不改变
+`covers` 已完成的状态。
 
 ## Compatibility
 

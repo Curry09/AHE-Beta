@@ -16,7 +16,7 @@ description: >-
   field, non-P0-P3 priority, self-invented keys) are rejected and you must retry.
 # Spec-0029/T3：input_schema 是 agent_contract.dispositions_input_schema() 的生成副本（受 drift-guard
 # 测试守护：test_triage.py::test_submit_triage_yaml_matches_contract 断言二者深度相等）。三值
-# disposition（duplicate 退役、判重归 Owner）。改字段改 SCHEMAS 后需重新生成此块，否则测试会红。
+# disposition（duplicate 退役、跨提案吸收归 Designer）。改字段改 SCHEMAS 后需重新生成此块，否则测试会红。
 input_schema:
   type: object
   properties:

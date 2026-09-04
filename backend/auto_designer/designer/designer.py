@@ -2,8 +2,9 @@
 """Synthesize 驱动器。
 
 该角色读取 ready queue、开放 ProposalView、体验趋势与运行时聚合，按需检索会话证据并只读检查
-harness 现状。输出写入 proposal 平面并标记 from-synthesize。`covers` 仅表达 merge 建议；Owner
-拥有准入和合并裁决权。Designer 类名及 RFC 相关机器标识保留用于兼容现有接口。
+harness 现状。输出写入 proposal 平面并标记 from-synthesize。`covers` 是 Designer 对来源提案
+的吸收决定；结构提案创建成功后，driver 直接合并关闭 covered 来源。Owner 只负责无损交接和
+历史精确重复兼容。Designer 类名及 RFC 相关机器标识保留用于兼容现有接口。
 """
 
 from __future__ import annotations
@@ -14,11 +15,16 @@ from pathlib import Path
 
 from auto_designer.designer.agent_runtime import read_submit, run_agent_def
 from auto_designer.designer.issue_schema import (
+    DIVERGENT,
     FROM_SYNTHESIZE,
+    MERGED,
+    NEEDS_TRIAGE,
+    OPENAGENTS,
     PROPOSAL,
     READY,
     REPORT,
     RFC_LABEL,
+    TRIAGED,
     format_covers_line,
     plane,
     round_label,
@@ -40,9 +46,11 @@ StatusFn = Callable[..., None]
 
 @dataclass
 class DesignOutcome:
-    """一次 propose_once 的结果：产出的提案 issue 号列表。"""
+    """一次 propose_once 的结果：产出的结构提案与被吸收来源。"""
 
     proposal_numbers: list[int] = field(default_factory=list)
+    merged_numbers: list[int] = field(default_factory=list)
+    failed_merges: dict[int, str] = field(default_factory=dict)
     artifacts: list[dict] = field(default_factory=list)
 
     @property
@@ -52,7 +60,7 @@ class DesignOutcome:
 
 @dataclass(frozen=True)
 class _Proposal:
-    """解析后的结构提案：标题、规范化字段和 merge 建议。"""
+    """解析后的结构提案：标题、规范化字段和 Designer 的吸收决定。"""
 
     title: str
     artifact: dict
@@ -74,7 +82,7 @@ def _parse_covers(raw: object) -> tuple[int, ...]:
 
 
 class Designer:
-    """synthesize nexau agent 驱动器：综合全局 → 产结构提案（proposal 平面，待 Owner 准入）。"""
+    """synthesize 驱动器：综合全局、创建结构提案并吸收其 covers 来源。"""
 
     def __init__(
         self,
@@ -115,10 +123,13 @@ class Designer:
         )
         parsed = self._proposals_from_submit(result_text)
 
-        # covers 只是建议：过滤到当前 open 的 report/proposal 票号（合并裁决在 Owner 准入时）。
-        coverable = {i.number for i in backlog if plane(i.labels) in (REPORT, PROPOSAL)}
+        # covers 是 Designer 的吸收决定：只允许当前仍开放且位于 report/proposal 平面的来源。
+        coverable = {i.number: i for i in backlog if plane(i.labels) in (REPORT, PROPOSAL)}
         visible_proposals = {i.number for i in [*ready, *proposals_open]}
         numbers: list[int] = []
+        merged_numbers: list[int] = []
+        failed_merges: dict[int, str] = {}
+        merged_sources: set[int] = set()
         round_no = self._round_provider() if self._round_provider is not None else None
         round_name = round_label(round_no) if type(round_no) is int and round_no > 0 else None
         if parsed:
@@ -128,25 +139,63 @@ class Designer:
         for prop in parsed:
             if validate_synthesis(prop.artifact, visible_proposals=visible_proposals):
                 continue
-            covers = tuple(n for n in prop.covers if n in coverable)
+            covers = tuple(n for n in prop.covers if n in coverable and n not in merged_sources)
             body = render_synthesis_artifact(prop.artifact)
             covers_line = format_covers_line(list(covers))
             if covers_line:
-                # 机器行 = 覆盖建议的单一真源（消费方：Owner 准入级联、web 徽标）。创建后不改写。
+                # 机器行 = Designer 吸收决定的单一真源（消费方：状态迁移、web 展示）。创建后不改写。
                 body = f"{body}\n\n{covers_line}"
             labels = [PROPOSAL, FROM_SYNTHESIZE] + ([round_name] if round_name else [])
             ref = self._tracker.create_issue(
                 IssueDraft(title=str(prop.title), body=body, labels=labels)
             )
             numbers.append(ref.number)
+            for source_number in covers:
+                source = coverable[source_number]
+                try:
+                    self._merge_covered(source, into=ref.number)
+                except Exception as exc:  # noqa: BLE001  单条来源失败不废目标提案
+                    failed_merges[source_number] = f"{type(exc).__name__}: {exc}"
+                else:
+                    failed_merges.pop(source_number, None)
+                    merged_sources.add(source_number)
+                    merged_numbers.append(source_number)
 
         self._emit(
             running=False,
-            status=(f"提了 {len(numbers)} 条结构提案（待准入）" if numbers else "本轮无结构提案"),
+            status=(
+                f"提了 {len(numbers)} 条结构提案，吸收 {len(merged_numbers)} 条来源（待准入）"
+                if numbers
+                else "本轮无结构提案"
+            ),
             proposals=numbers,
             detail=(result_text or None),  # 最终报告全文（详情面板展示，不截断）
         )
-        return DesignOutcome(proposal_numbers=numbers, artifacts=[dict(prop.artifact) for prop in parsed])
+        return DesignOutcome(
+            proposal_numbers=numbers,
+            merged_numbers=merged_numbers,
+            failed_merges=failed_merges,
+            artifacts=[dict(prop.artifact) for prop in parsed],
+        )
+
+    def _merge_covered(self, issue, *, into: int) -> None:
+        """按 Designer 的 covers 决定整体吸收一个仍开放的来源。"""
+        drop = {
+            PROPOSAL,
+            REPORT,
+            READY,
+            OPENAGENTS,
+            NEEDS_TRIAGE,
+            TRIAGED,
+            RFC_LABEL,
+            DIVERGENT,
+        }
+        labels = [label for label in issue.labels if label not in drop]
+        labels.append(MERGED)
+        self._tracker.transition_issue(
+            issue.number, state="closed", labels=list(dict.fromkeys(labels))
+        )
+        self._safe_comment(issue.number, f"merged-into: #{int(into)}")
 
     def _run_agent(
         self,
@@ -160,15 +209,16 @@ class Designer:
             "你是 Synthesize。以下是 ready queue 与开放 ProposalView。只分析已有提案之间的结构关系、"
             "共同张力和可复用机制；每条输出必须明确引用至少两个可见提案。体验趋势与运行时聚合仅作"
             "背景证据，不能替代跨提案关系。\n"
-            "结构提案不规定数据结构、协议或实施步骤。`covers` 仅用于"
-            "向 Owner 提供 merge 建议，不会修改任何票的状态。\n\n"
+            "结构提案不规定数据结构、协议或实施步骤。`covers` 是你对来源提案的吸收决定；"
+            "结构提案创建成功后，driver 会合并关闭其中仍开放的 report/proposal 来源。未放入"
+            "covers 的来源继续独立交付。\n\n"
             f"## ready 工作队列（{len(ready)} 条）\n{self._format_backlog(ready)}\n\n"
             f"## 开放 ProposalView（{len(proposals)} 条）\n{self._format_backlog(proposals)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
             f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
             "调查完成后调用 `submit_rfcs` 一次：`proposals` 为本轮 0..n 条结构 proposal（无则空数组）；"
             "每条含 title、source_proposals、relationship、common_tension、structural_direction、"
-            "expected_leverage、solution_level、abstraction_rationale + 可选 covers。"
+            "expected_leverage、solution_level、abstraction_rationale + 可选 covers（整体吸收来源）。"
             "字段契约由工具 input_schema 强校验，不必也不要在正文里手抄 schema。"
         )
         from auto_designer.usage import current_usage_context  # noqa: PLC0415
@@ -238,6 +288,15 @@ class Designer:
                 )
             )
         return proposals
+
+    def _safe_comment(self, number: int, body: str) -> None:
+        """合并审计评论 best effort；状态迁移已成功时评论失败不回滚。"""
+        try:
+            marker = "<!-- openagents:agent=auto-designer -->"
+            signed = body if marker in body else f"{body}\n\n{marker}"
+            self._tracker.add_comment(number, signed)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _emit(self, *, running: bool, status: str, **kw: object) -> None:
         if self._on_status is not None:

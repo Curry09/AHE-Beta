@@ -275,7 +275,7 @@ class Triager:
 
     def _run_agent(self, *, pending: list) -> str:
         # triage 只做「单条规范化」：只给它本批 report + 只读代码 + 按需拉的单局轨迹（含那局体感分，
-        # 供建议优先级）。不喂判重参照/聚合 runtime_agg/全局体感曲线——判重归 Owner、全局归 synthesize。
+        # 供建议优先级）。不喂判重参照/聚合 runtime_agg/全局体感曲线——跨提案吸收归 Designer、全局归 synthesize。
         msg = (
             "以下是本批待处理的原始报告。逐条确认 kind，按需读取 harness 源码，并以 issue 号检索"
             "对应会话证据。证据不足时依次使用 timeline、beat、step，不直接读取 sessions 文件。\n"

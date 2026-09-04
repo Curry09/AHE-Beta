@@ -48,7 +48,7 @@
 需求面角色为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」，固定角色定义置于 `agent_defs/`：
 - **用户 agent**：扮演用户，多轮使用 harness，产出体感与 issue（report 平面）。
 - **triager / synthesize / divergent**：生成器，产不可领 proposal（spec-0029 三平面）。
-- **Owner**：唯一准入——admit 打 `openagents` 交接令牌 / merge / decline / hold，covers 级联在此。
+- **Owner / Delivery Router**：需求面到 OpenAgents 的无损交接器——默认 admit 并打 `openagents` 令牌；仅保留历史精确去重兼容。Designer 通过 `covers` 决定结构提案吸收并关闭哪些开放来源；Owner 不重新做语义去重，不选择实现层、不压缩独立能力与验收目标。
 
 交付面 = OpenAgents vigil：以独立 CLI 接入（不 vendor 不 import），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。运行形态（spec-0033）：**容器围堵为缺省**——vigil 跑在专用容器（deploy/vigil 镜像，容器内自 clone harness 仓、零宿主挂载），网络只挂 internal vigil-net、外网经 egress 代理 allowlist（仅 Anthropic API），claude 凭证（ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN）与 Gitea token 只经容器 env；`VIGIL_MODE=subprocess` 为无围堵的宿主直跑，仅限盯屏联调。
 

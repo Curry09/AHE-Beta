@@ -53,16 +53,14 @@ def test_synthesis_contract_requires_two_distinct_visible_issue_numbers() -> Non
     ("change", "code"),
     [
         ({"issue": 9}, "decision-out-of-batch"),
-        ({"product_boundary": "out_of_scope"}, "out-of-product-scope"),
-        ({"abstraction_quality": "implementation"}, "wrong-abstraction"),
+        ({"decision": "merge"}, "missing-merge-target"),
+        ({"decision": "hold"}, "missing-hold-gap"),
     ],
 )
-def test_owner_contract_rejects_out_of_batch_or_unfit_admission(change, code) -> None:
+def test_owner_contract_only_guards_routing_integrity(change, code) -> None:
     valid = {
         "issue": 1,
         "decision": "admit",
-        "product_boundary": "in_scope",
-        "abstraction_quality": "appropriate",
     }
     candidate = {**valid, **change}
     assert validate_owner(candidate, review_batch={1})[0].code == code

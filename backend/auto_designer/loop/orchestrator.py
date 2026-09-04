@@ -163,7 +163,7 @@ class Orchestrator:
 
         # 生成段·第一拍（Spec-0029/T8）：triage 分片 ∥ divergent，同一线程池并行。
         # 二者都只依赖 a 段产物（triage 吃 report、divergent 吃会话证据）、互不依赖；产出全为不可领
-        # proposal（重复无害，判重归 Owner）→ 分片自由（第 k 个 triager 处理 pending[k::n]）。
+        # proposal（重复无害，跨提案吸收归 Designer）→ 分片自由（第 k 个 triager 处理 pending[k::n]）。
         # 单个生成器崩溃记日志跳过、不废整轮。
         beat1: list[tuple[str, Callable[[], object]]] = []
         n_triagers = len(self._triagers)
@@ -185,7 +185,7 @@ class Orchestrator:
         ]
         self._run_parallel(beat2)
 
-        # Owner 唯一准入（Spec-0029/T6）：每轮一次批量裁决 proposal → ready/merged/declined/hold。
+        # Delivery Router：每轮把仍开放的 proposal 无损打包交接给 OpenAgents；Designer 已处理 covers 吸收。
         # 崩溃记日志跳过（提案留存、下轮再审），不废整轮。
         admitted: list[int] = []
         if self._owner is not None:

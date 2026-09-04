@@ -7,8 +7,11 @@ description: >-
   Pass `proposals`: 0..n cross-proposal syntheses. Each item names at least two
   source proposals and explains their relationship, common tension, structural
   direction, and expected leverage. Optionally
-  provide `covers` as merge recommendations for Owner. This call does not admit,
-  merge, close, or otherwise transition existing proposals.
+  provide `covers` as the Designer's decision that the listed open sources are
+  absorbed by the new structural proposal. After the proposal is created, the
+  driver merges and closes those sources; sources omitted from `covers` remain
+  independently deliverable. This call does not admit or transition the new
+  proposal itself.
 
   The parameters are schema-validated at call time; invalid values (missing field,
   self-invented keys) are rejected and you must retry.

@@ -128,7 +128,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 为 user、triager、designer、divergent、owner、harness 与 developer/vigil 建立统一逐调用 Token 原始事件、并发上下文归属、按题与按轮聚合及看板；上游缺失时显式 unavailable，绝不伪造精确值。
 
 ### 0042 需求面角色契约治理：统一术语、规范化提案投影与可靠状态迁移
-消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Owner 非原子且静默失败的状态迁移，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
+消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Designer/Owner 状态迁移与交接边界，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
 
 ### 0043 需求面角色认知契约：专属产物语言与行为质量门
 在共享证据之上为 Triage、产品 PM、Synthesize 与 Owner 建立不同的认知任务、角色专属产物契约和可执行质量门，防止多角色退化为同一种技术分析 Agent。
@@ -156,6 +156,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 
 ### 0051 会话容器隔离与客观验收证据
 每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；harness 长请求由 90s persona 心跳决定续等或打断；主观接受与新鲜 SWE-bench 客观执行结果分栏落盘，假接受不得计为通过。
+
+### 0052 Designer 提案覆盖与重复合并权责
+由 Designer 基于全量 ProposalView 决定哪些 triage/proposal 被结构提案吸收；covers 作为唯一简化指令，目标提案创建后直接合并关闭被覆盖来源，Owner 只负责交付路由。
 
 ## 全局看板
 
@@ -380,7 +383,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0049 | 0049/T1 | 调用记录契约与审计基线 | done | — | docs/specs/0049-role-invocation-io-store.md |
 | 0049 | 0049/T2 | InvocationStore、run manifest 与 v1 schema | done | T1 | backend/auto_designer/invocation.py<br>backend/tests/test_invocation.py |
 | 0049 | 0049/T3 | 需求面 run_agent_def 落盘 | done | T2 | backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/owner.py<br>backend/tests/designer/test_agent_runtime.py |
-| 0049 | 0049/T4 | run 生命周期、会话迁入、vigil 导出与 jail | done | T2 | backend/run.py<br>backend/tests/test_run_vigil.py<br>backend/auto_designer/dev/workspace_jail.py<br>backend/tests/dev/test_workspace_jail.py |
+| 0049 | 0049/T4 | run 生命周期、会话迁入、vigil 导出与 jail | done | T2 | backend/run.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>backend/auto_designer/dev/workspace_jail.py<br>backend/tests/dev/test_workspace_jail.py |
 | 0049 | 0049/T5 | 冻结调用离线重放 | done | T3 | backend/scripts/replay_role_invocations.py<br>backend/tests/scripts/test_replay_role_invocations.py<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh |
 | 0049 | 0049/T6 | 交付面 run_agent 写出同一 schema | done | T2, T4 | OpenAgents/openagents/runtime/engine.py<br>OpenAgents/tests/test_runtime_engine.py<br>backend/tests/test_delivery_invocation_contract.py<br>backend/tests/fixtures/delivery_invocation.v1.json |
 | 0050 | 0050/T1 | 轮次封口契约 | done | — | docs/specs/0050-round-delivery-gate.md |
@@ -393,6 +396,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0051 | 0051/T3 | harness 容器执行与强制终止 | done | T2 | backend/auto_designer/harness/launcher.py<br>backend/harness_template/entry.py<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/tests/test_smoke.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_template_entry.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_sim_user.py |
 | 0051 | 0051/T4 | 双结论、客观执行与假接受 | done | T3 | backend/auto_designer/evaluation/swebench.py<br>backend/auto_designer/evaluation/__init__.py<br>backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/evaluation/test_swebench.py<br>backend/tests/user/test_session_store.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/test_models.py<br>pyproject.toml |
 | 0051 | 0051/T5 | 可运行镜像、一键入口与审计冒烟 | done | T4 | backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/runtime.Dockerfile<br>backend/scripts/build_swebench_runtime_image.sh<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh<br>backend/scripts/run-glm52fp8-1m-canary2-isolated.sh<br>backend/scripts/e2e-spec-0051-session-container.sh<br>CLAUDE.md |
+| 0052 | 0052/T1 | Designer covers 合并语义与状态迁移 | done | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/role_contract.py |
+| 0052 | 0052/T2 | Owner 退回纯交付路由 | done | T1 | backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
+| 0052 | 0052/T3 | 覆盖合并回归测试与规格验证 | done | T1, T2 | backend/tests/loop/test_designer.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_role_contract.py<br>backend/tests/designer/test_agent_contract.py<br>docs/specs/0052-designer-covers-consolidation.md |
 
 ## 跨 feature 关系图
 
@@ -732,6 +738,11 @@ graph LR
         n0051_T4["T4 双结论、客观执行与假接受"]
         n0051_T5["T5 可运行镜像、一键入口与审计冒烟"]
     end
+    subgraph G0052[0052 designer-covers-consolidation]
+        n0052_T1["T1 Designer covers 合并语义与状态迁移"]
+        n0052_T2["T2 Owner 退回纯交付路由"]
+        n0052_T3["T3 覆盖合并回归测试与规格验证"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -966,6 +977,9 @@ graph LR
     n0051_T3 --> n0051_T2
     n0051_T4 --> n0051_T3
     n0051_T5 --> n0051_T4
+    n0052_T2 --> n0052_T1
+    n0052_T3 --> n0052_T1
+    n0052_T3 --> n0052_T2
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1021,25 +1035,26 @@ graph LR
 | CLAUDE.md | 0032, 0033, 0050, 0051 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040 |
 | backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043 |
-| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043 |
+| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052 |
 | backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/agent.yaml | 0014, 0030, 0032 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014, 0030, 0032 |
 | backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043 |
 | backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml | 0029, 0042, 0043 |
-| backend/agent_defs/owner/systemprompt.md | 0042, 0043 |
-| backend/agent_defs/owner/tools/submit_admission.tool.yaml | 0042, 0043 |
+| backend/agent_defs/owner/systemprompt.md | 0042, 0043, 0052 |
+| backend/agent_defs/owner/tools/submit_admission.tool.yaml | 0042, 0043, 0052 |
 | backend/agent_defs/triage_agent/agent.yaml | 0027, 0029 |
 | backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
-| backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043 |
+| backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043, 0052 |
 | backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052 |
 | backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049 |
-| backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
-| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049 |
+| backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052 |
+| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052 |
+| backend/auto_designer/designer/role_contract.py | 0043, 0052 |
 | backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
 | backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
@@ -1085,7 +1100,7 @@ graph LR
 | backend/deploy/swebench-seed/Dockerfile | 0044, 0051 |
 | backend/deploy/vigil/Dockerfile | 0033, 0045 |
 | backend/deploy/vigil/build.sh | 0033, 0045 |
-| backend/deploy/vigil/entrypoint.sh | 0033, 0041 |
+| backend/deploy/vigil/entrypoint.sh | 0033, 0041, 0049 |
 | backend/harness_template/.gitea/workflows/smoke.yml | 0032, 0040 |
 | backend/harness_template/HELP.md | 0030, 0035 |
 | backend/harness_template/MANUAL.md | 0013, 0022 |
@@ -1099,11 +1114,12 @@ graph LR
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
 | backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051 |
-| backend/tests/designer/test_agent_contract.py | 0027, 0043 |
+| backend/tests/designer/test_agent_contract.py | 0027, 0043, 0052 |
 | backend/tests/designer/test_agent_runtime.py | 0029, 0041, 0049 |
 | backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
-| backend/tests/designer/test_owner.py | 0029, 0032, 0042, 0043 |
+| backend/tests/designer/test_owner.py | 0029, 0032, 0042, 0043, 0052 |
+| backend/tests/designer/test_role_contract.py | 0043, 0052 |
 | backend/tests/designer/test_role_contract_flow.py | 0042, 0043 |
 | backend/tests/designer/test_triage.py | 0025, 0027, 0029, 0042, 0043 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
@@ -1113,7 +1129,7 @@ graph LR
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051 |
 | backend/tests/harness/test_template_entry.py | 0013, 0051 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052 |
 | backend/tests/loop/test_live.py | 0017, 0026, 0050 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051 |
@@ -2749,4 +2765,29 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+```
+
+### 0052 Designer 提案覆盖与重复合并权责（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 Designer covers 合并语义与状态迁移"]
+    nT2["T2 Owner 退回纯交付路由"]
+    nT3["T3 覆盖合并回归测试与规格验证"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
 ```

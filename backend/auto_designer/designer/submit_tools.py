@@ -43,9 +43,8 @@ def submit_divergent(*, proposals: list | None = None, **kwargs: Any) -> str:
 
 
 def submit_admission(*, decisions: list | None = None, **kwargs: Any) -> str:
-    """Owner（准入评审）收尾工具（Spec-0029/T6）：回显已校验的 decisions（成为 agent.run 的返回值）。
+    """Delivery Router 收尾工具：回显已校验的 OpenAgents handoff 包。
 
-    每条已由 input_schema 校验（issue + decision[admit/merge/decline/hold] 必填、merge 给 into、
-    admit 可给 priority、无自创字段）。未列出的提案由 driver 默认 hold。
+    每条由 input_schema 校验；未列出的 proposal 由 driver 默认直接交接，不能通过遗漏否决。
     """
     return json.dumps({"decisions": decisions or []}, ensure_ascii=False)

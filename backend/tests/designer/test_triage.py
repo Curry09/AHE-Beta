@@ -86,7 +86,7 @@ def test_submit_triage_yaml_matches_contract() -> None:
     )
     tool_def = yaml.safe_load(p.read_text(encoding="utf-8"))
     assert tool_def["input_schema"] == dispositions_input_schema()
-    # 三值 enum：duplicate 已退役（判重归 Owner）
+    # 三值 enum：duplicate 已退役（跨提案吸收归 Designer）
     enum = tool_def["input_schema"]["properties"]["dispositions"]["items"]["properties"][
         "disposition"
     ]["enum"]
@@ -114,7 +114,7 @@ def test_accept_promotes_report_to_proposal(tmp_path) -> None:
     assert sc.REPORT not in snap["labels"]  # 离开 report 平面
     assert "round-1" in snap["labels"]  # 属性保留
     assert snap["state"] == "open"
-    # 提案不可领（进 ready 由 Owner 裁决）
+    # 提案不可领（由 Delivery Router 打 openagents 交接令牌后进入交付面）
     assert not sc.is_ready(labels=snap["labels"], state=snap["state"])
     assert sc.plane(snap["labels"]) == sc.PROPOSAL
     assert snap["body"].startswith("## Triage 规范化提案（实施对象：harness）")

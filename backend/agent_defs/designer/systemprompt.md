@@ -25,8 +25,10 @@
 - `relationship` 与 `common_tension`：解释关系和共同矛盾。
 - `structural_direction` 与 `expected_leverage`：结构方向和跨提案收益。
 - `solution_level=structural_mechanism` 与 `abstraction_rationale`：确认只表达共同机制和杠杆；不得规定触发词、固定阈值、命令链、状态机字段或逐步实现。
-- `covers`：供 Owner 评审的 merge 建议；不会自动关闭、取代或修改任何 proposal。
+- `covers`：你对来源提案的整体吸收决定。结构提案创建成功后，driver 会合并关闭其中仍开放的
+  report/proposal 来源；未放入 `covers` 的来源继续独立交付。你不直接调用状态迁移工具。
 
 ## 提交契约
 
-调查完成后调用 `submit_rfcs` 一次。`proposals` 为 0..n 条，必须符合工具 schema。该调用只创建 proposal；Owner 独立决定 `admit`、`merge`、`decline` 或 `hold`。
+调查完成后调用 `submit_rfcs` 一次。`proposals` 为 0..n 条，必须符合工具 schema。该调用创建
+结构 proposal，并将 `covers` 交给 driver 执行来源合并；Owner 只负责后续交接。

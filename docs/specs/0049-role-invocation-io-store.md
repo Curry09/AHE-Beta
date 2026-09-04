@@ -60,11 +60,12 @@ tasks:
     parallel: true
     files:
       - backend/run.py
+      - backend/deploy/vigil/entrypoint.sh
       - backend/tests/test_run_vigil.py
       - backend/auto_designer/dev/workspace_jail.py
       - backend/tests/dev/test_workspace_jail.py
-    scope: 进程启动钉死 AUTO_DESIGNER_RUN_ID 与 ROLE_RUNS_DIR；SessionStore 与用量 JSONL 写进该 run 目录；实验内 round 之间不得调用 _reset_to_initial；不得删除 role_runs（含其中 sessions）；容器只 rw 挂载本 run 的 delivery 子目录；jail 把 role_runs 列入禁读目录名。
-    acceptance: 同一进程内多 round 后 Gitea main 可前进且 role_runs 仍在；连续两次旧入口启动后上一 run_id 的 sessions/demand/delivery 仍在；看板经当前 run 的 sessions 别名可读；container 挂载不含 sessions/demand；keep-alive 且 run_id 变化时重建容器；读 role_runs 被 jail 拒绝；相关单测绿。
+    scope: 进程启动钉死 AUTO_DESIGNER_RUN_ID 与 ROLE_RUNS_DIR；SessionStore 与用量 JSONL 写进该 run 目录；实验内 round 之间不得调用 _reset_to_initial；不得删除 role_runs（含其中 sessions）；容器只 rw 挂载本 run 的 delivery 子目录，并在任何 agent/clone 前以短暂 root 入口修正跨 UID owner 后永久降权；配置了 ROLE_RUNS_DIR 却不可写时 fail-closed；jail 把 role_runs 列入禁读目录名。
+    acceptance: 同一进程内多 round 后 Gitea main 可前进且 role_runs 仍在；连续两次旧入口启动后上一 run_id 的 sessions/demand/delivery 仍在；看板经当前 run 的 sessions 别名可读；container 挂载不含 sessions/demand；入口把 delivery 交给 UID/GID 1000 后以 setpriv 降权，降权写入探针失败则非零退出；keep-alive 且 run_id 变化时重建容器；读 role_runs 被 jail 拒绝；相关单测绿。
   - id: T5
     title: 冻结调用离线重放
     status: done

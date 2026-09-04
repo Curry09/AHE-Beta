@@ -39,7 +39,7 @@ def _triage_field_labels() -> list[str]:
 def dispositions_input_schema() -> dict:
     """triage submit_triage 工具的 input_schema。
 
-    每条 disposition：`issue`(int) + `disposition`(三值枚举，Spec-0029：duplicate 退役、判重归 Owner)
+    每条 disposition：`issue`(int) + `disposition`(三值枚举，Spec-0029：duplicate 退役、跨提案吸收归 Designer)
     必填；accept 另给 `kind`(∈USER_KINDS)、`priority`(∈P0-P3 建议值)、任务无关的
     `proposal_title`、`fields`(键∈规范化字段并集)；
     reject/needs_info 给 `reason`。additionalProperties=false 杜绝 issue_number/status/平铺 root_cause
@@ -91,7 +91,8 @@ def rfc_input_schema() -> dict:
     """synthesize submit_rfcs 工具的 input_schema。
 
     每条 proposal：`title`(str) + `fields`(RFC 字段：问题/根因/涉及 issue/方向/验收) 必填，可选
-    `covers`(int 数组，声明该 RFC 综合的 triaged 票号)。fields 键取自 issue_schema 的 rfc 声明。
+    `covers`(int 数组，声明该结构提案吸收并关闭的开放来源票号)。fields 键取自 issue_schema 的
+    rfc 声明。
     """
     rfc_labels = [f.label for f in fields_of(kind="rfc")]
     item = {
@@ -164,35 +165,21 @@ def synthesis_input_schema() -> dict:
 
 
 def admission_input_schema() -> dict:
-    """Owner submit_admission 工具的 input_schema（Spec-0029/T6，取代旧 gate_input_schema）。
-
-    每条决策：`issue`(int) + `decision`(admit/merge/decline/hold 四值枚举) 必填；merge 给 `into`
-    （主票号）；admit 可给 `priority`(∈P0-P3，覆盖 triage 建议值)；decline/hold 可给 `reason`。
-    additionalProperties=false 杜绝自创字段。未出现在数组里的提案由 driver 默认 hold。
-    """
+    """Owner handoff 工具契约：只打包交接，不评审产品方案或选择实现层。"""
     item = {
         "type": "object",
         "properties": {
             "issue": {"type": "integer"},
-            "decision": {"type": "string", "enum": ["admit", "merge", "decline", "hold"]},
+            "decision": {"type": "string", "enum": ["admit", "merge", "hold"]},
             "into": {"type": "integer"},
             "priority": {"type": "string", "enum": list(PRIORITIES)},
             "reason": {"type": "string"},
-            "value_assessment": {"type": "string"},
-            "evidence_assessment": {"type": "string"},
-            "scope_assessment": {"type": "string"},
-            "overlap_assessment": {"type": "string"},
-            "delivery_risk": {"type": "string"},
-            "product_boundary": {
-                "type": "string", "enum": ["in_scope", "out_of_scope", "uncertain"]
-            },
-            "abstraction_quality": {
-                "type": "string", "enum": ["appropriate", "too_implementation_specific", "uncertain"]
-            },
+            "handoff_summary": {"type": "string"},
+            "preserved_capabilities": {"type": "array", "items": {"type": "string"}},
+            "acceptance_groups": {"type": "array", "items": {"type": "string"}},
         },
-        "required": ["issue", "decision", "value_assessment", "evidence_assessment",
-                     "scope_assessment", "overlap_assessment", "delivery_risk",
-                     "product_boundary", "abstraction_quality"],
+        "required": ["issue", "decision", "handoff_summary", "preserved_capabilities",
+                     "acceptance_groups"],
         "additionalProperties": False,
     }
     return {

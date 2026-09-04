@@ -58,10 +58,10 @@ def validate_synthesis(item: dict, *, visible_proposals: set[int]) -> list[Contr
 def validate_owner(item: dict, *, review_batch: set[int]) -> list[ContractViolation]:
     if item.get("issue") not in review_batch:
         return [ContractViolation("decision-out-of-batch", "decision is outside review batch")]
-    if item.get("decision") == "admit" and item.get("product_boundary") != "in_scope":
-        return [ContractViolation("out-of-product-scope", "admit requires in-scope harness product")]
-    if item.get("decision") == "admit" and item.get("abstraction_quality") != "appropriate":
-        return [ContractViolation("wrong-abstraction", "admit requires an appropriately abstract artifact")]
+    if item.get("decision") == "merge" and not isinstance(item.get("into"), int):
+        return [ContractViolation("missing-merge-target", "merge requires an integer target")]
+    if item.get("decision") == "hold" and not str(item.get("reason", "")).strip():
+        return [ContractViolation("missing-hold-gap", "hold must name the missing handoff input")]
     return []
 
 

@@ -14,7 +14,7 @@ def test_dispositions_schema_shape_and_enums() -> None:
     assert schema["additionalProperties"] is False
     item = schema["properties"]["dispositions"]["items"]
     props = item["properties"]
-    # disposition 三值（Spec-0029：duplicate 退役、判重归 Owner）、kind∈USER_KINDS、priority∈P0-P3
+    # disposition 三值（Spec-0029：duplicate 退役、跨提案吸收归 Designer）、kind∈USER_KINDS、priority∈P0-P3
     assert props["disposition"]["enum"] == ["accept", "reject", "needs_info"]
     assert props["kind"]["enum"] == list(sc.USER_KINDS)
     assert props["priority"]["enum"] == list(sc.PRIORITIES)

@@ -28,7 +28,7 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `designer.py` | Synthesize 驱动器。 |
 | `divergent.py` | Divergent（能力发现）驱动器。 |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
-| `owner.py` | Owner 驱动器：三平面模型的唯一准入口（backlog grooming / Definition of Ready 的执行者）。 |
+| `owner.py` | Owner 驱动器：把 proposal 无损打包并交接给 OpenAgents。 |
 | `proposal_view.py` | Canonical normalized proposal projection shared by all downstream roles. |
 | `role_contract.py` | Spec-0043: task-independent cognitive contracts for demand-side roles. |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂设计师作机制层判别证据。 |

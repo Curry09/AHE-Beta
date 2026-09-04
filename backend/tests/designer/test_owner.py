@@ -1,6 +1,4 @@
-# Spec-0029/T6：Owner 准入单测——全量模型评审、四路裁决、covers 默认级联（stub agent）。
-"""FakeTracker + 临时 SessionStore：验证唯一准入口的裁决落库——所有来源统一评审、
-admit/merge/decline/hold、显式决策 > covers 默认 merge > 默认 hold、review=False 全 hold。"""
+"""Delivery Router 单测：无损交接、精确去重、Designer covers 不由 Owner 重复处理、遗漏项 fail-open。"""
 
 from __future__ import annotations
 
@@ -73,13 +71,9 @@ def _synth_proposal(tracker: FakeTracker, title: str, covers: list[int] | None =
 
 def _submit(decisions: list) -> str:
     for decision in decisions:
-        decision.setdefault("value_assessment", "价值明确")
-        decision.setdefault("evidence_assessment", "证据充分")
-        decision.setdefault("scope_assessment", "范围内聚")
-        decision.setdefault("overlap_assessment", "已检查重叠")
-        decision.setdefault("delivery_risk", "风险可控")
-        decision.setdefault("product_boundary", "in_scope")
-        decision.setdefault("abstraction_quality", "appropriate")
+        decision.setdefault("handoff_summary", "交给 OpenAgents 规划")
+        decision.setdefault("preserved_capabilities", ["保留原始能力"])
+        decision.setdefault("acceptance_groups", ["独立验收原始目标"])
     return json.dumps({"decisions": decisions}, ensure_ascii=False)
 
 
@@ -133,8 +127,8 @@ def test_clean_triage_singleton_requires_explicit_model_admission(tmp_path: Path
     assert all("<!-- openagents:agent=auto-designer -->" in body for body in snap["comments"])
 
 
-def test_all_triage_proposals_go_to_one_batch_review(tmp_path: Path) -> None:
-    """无论标题是否近似，from-triage 都必须进入同一次全局评审。"""
+def test_similar_but_nonidentical_proposals_are_preserved(tmp_path: Path) -> None:
+    """相似标题不构成精确重复，错误 merge 会被 driver 恢复为独立 handoff。"""
     tracker = FakeTracker()
     a = _triage_proposal(tracker, "导出按钮点了没反应")
     b = _triage_proposal(tracker, "导出按钮点了没有反应")
@@ -146,10 +140,23 @@ def test_all_triage_proposals_go_to_one_batch_review(tmp_path: Path) -> None:
     out = o.admit_once()
     assert o.agent_calls == 1
     assert {i.number for i in o.seen_review} == {a, b}
+    assert out.admitted == [a, b] and out.merged == []
+    assert b in out.invalid
+    assert sc.is_ready(labels=tracker.issue(b)["labels"], state="open")
+
+
+def test_exact_duplicate_can_merge(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    a = _triage_proposal(tracker, "完全相同")
+    b = _triage_proposal(tracker, "完全相同")
+    o = _owner(
+        tmp_path,
+        tracker,
+        _submit([{"issue": a, "decision": "admit"}, {"issue": b, "decision": "merge", "into": a}]),
+    )
+    out = o.admit_once()
     assert out.admitted == [a] and out.merged == [b]
-    merged = tracker.issue(b)
-    assert sc.MERGED in merged["labels"] and merged["state"] == "closed"
-    assert any(sc.parse_merged_into(c) == a for c in merged["comments"])  # 反向边
+    assert sc.MERGED in tracker.issue(b)["labels"]
 
 
 def test_review_admit_with_priority_override(tmp_path: Path) -> None:
@@ -164,23 +171,22 @@ def test_review_admit_with_priority_override(tmp_path: Path) -> None:
     assert sc.plane(labels) == sc.READY  # 读侧仍在 READY 平面（funnel/背压/前端口径不变）
 
 
-def test_review_decline_and_unlisted_hold(tmp_path: Path) -> None:
+def test_explicit_incomplete_hold_and_unlisted_default_handoff(tmp_path: Path) -> None:
     tracker = FakeTracker()
     bad = _synth_proposal(tracker, "过拟合提案")
     quiet = _synth_proposal(tracker, "没被提到的提案")
     o = _owner(
-        tmp_path, tracker, _submit([{"issue": bad, "decision": "decline", "reason": "无证据"}])
+        tmp_path,
+        tracker,
+        _submit([{"issue": bad, "decision": "hold", "reason": "缺少可观察验收结果"}]),
     )
     out = o.admit_once()
-    assert out.declined == [bad] and quiet in out.held
-    dead = tracker.issue(bad)
-    assert sc.DECLINED in dead["labels"] and dead["state"] == "closed"
-    assert sc.PROPOSAL in tracker.issue(quiet)["labels"]  # hold 原样留下轮
+    assert out.held == [bad] and quiet in out.admitted
+    assert sc.PROPOSAL in tracker.issue(bad)["labels"]
+    assert sc.is_ready(labels=tracker.issue(quiet)["labels"], state="open")
 
 
-def test_covers_default_merge_with_explicit_keep(tmp_path: Path) -> None:
-    """裁决优先级：显式决策 > covers 默认 merge。S covers [p1,p2]；p2 显式 admit（急修保留）
-    → p1 默认并入 S、p2 独立进 ready。"""
+def test_owner_does_not_process_designer_covers(tmp_path: Path) -> None:
     tracker = FakeTracker()
     p1 = _triage_proposal(tracker, "症状甲：状态丢失")
     p2 = _triage_proposal(tracker, "急修乙：崩溃闪退", prio="P0")
@@ -191,12 +197,9 @@ def test_covers_default_merge_with_explicit_keep(tmp_path: Path) -> None:
         _submit([{"issue": s, "decision": "admit"}, {"issue": p2, "decision": "admit"}]),
     )
     out = o.admit_once()
-    assert set(out.admitted) == {s, p2}
-    assert out.merged == [p1]  # 默认级联并入 S
-    m = tracker.issue(p1)
-    assert sc.MERGED in m["labels"] and m["state"] == "closed"
-    assert any(sc.parse_merged_into(c) == s for c in m["comments"])
-    assert sc.is_ready(labels=tracker.issue(p2)["labels"], state="open")  # 显式保留
+    assert set(out.admitted) == {p1, p2, s}
+    assert out.merged == []  # Designer 已在创建阶段处理 covers；Owner 不重复处理
+    assert all(sc.is_ready(labels=tracker.issue(n)["labels"], state="open") for n in (p1, p2, s))
 
 
 def test_covers_untouched_when_structural_held(tmp_path: Path) -> None:
@@ -206,80 +209,79 @@ def test_covers_untouched_when_structural_held(tmp_path: Path) -> None:
     o = _owner(
         tmp_path,
         tracker,
-        _submit([{"issue": s, "decision": "hold"}, {"issue": p1, "decision": "hold"}]),
+        _submit([
+            {"issue": s, "decision": "hold", "reason": "缺少验收接口"},
+            {"issue": p1, "decision": "hold", "reason": "缺少复现步骤"},
+        ]),
     )
     out = o.admit_once()
     assert s in out.held and p1 in out.held and out.merged == []
-    assert sc.PROPOSAL in tracker.issue(p1)["labels"]  # covers 未触发级联
+    assert sc.PROPOSAL in tracker.issue(p1)["labels"]  # Owner 不消费 covers
 
 
-def test_invalid_merge_target_holds(tmp_path: Path) -> None:
+def test_invalid_merge_target_is_preserved_as_handoff(tmp_path: Path) -> None:
     tracker = FakeTracker()
     p = _synth_proposal(tracker, "并进不存在的票")
     o = _owner(tmp_path, tracker, _submit([{"issue": p, "decision": "merge", "into": 999}]))
     out = o.admit_once()
-    assert p in out.held and out.merged == []
+    assert p in out.admitted and p in out.invalid and out.merged == []
 
 
-def test_merge_target_cannot_be_held_or_declined_proposal(tmp_path: Path) -> None:
+def test_merge_target_cannot_be_held_proposal(tmp_path: Path) -> None:
     tracker = FakeTracker()
     source = _synth_proposal(tracker, "待合并")
     held = _synth_proposal(tracker, "暂缓目标")
-    declined = _synth_proposal(tracker, "拒绝目标")
     o = _owner(
         tmp_path,
         tracker,
         _submit(
             [
                 {"issue": source, "decision": "merge", "into": held},
-                {"issue": held, "decision": "hold"},
-                {"issue": declined, "decision": "decline", "reason": "无价值"},
+                {"issue": held, "decision": "hold", "reason": "缺少验收接口"},
             ]
         ),
     )
     out = o.admit_once()
-    assert source in out.held and source in out.invalid
-    assert sc.PROPOSAL in tracker.issue(source)["labels"]
+    assert source in out.admitted and source in out.invalid
+    assert held in out.held
+    assert sc.is_ready(labels=tracker.issue(source)["labels"], state="open")
 
 
 def test_owner_core_write_failure_is_reported(tmp_path: Path) -> None:
-    class BrokenTransitionTracker(FakeTracker):
-        def transition_issue(self, number: int, *, state: str, labels: list[str]) -> None:
-            raise RuntimeError("transition failed")
+    class BrokenSetLabelsTracker(FakeTracker):
+        def set_labels(self, number: int, labels: list[str]) -> None:
+            raise RuntimeError("set labels failed")
 
-    tracker = BrokenTransitionTracker()
-    p = _synth_proposal(tracker, "拒绝时写入失败")
-    o = _owner(
-        tmp_path,
-        tracker,
-        _submit([{"issue": p, "decision": "decline", "reason": "无价值"}]),
-    )
+    tracker = BrokenSetLabelsTracker()
+    p = _synth_proposal(tracker, "交接时写入失败")
+    o = _owner(tmp_path, tracker, _submit([]))
     out = o.admit_once()
     assert p in out.failed and p in out.held
     assert sc.PROPOSAL in tracker.issue(p)["labels"]
 
 
-def test_review_disabled_holds_every_proposal(tmp_path: Path) -> None:
-    """review=False（roster owner=0）：不存在机械旁路，全部 hold、零 LLM。"""
+def test_review_disabled_mechanically_handoffs_every_proposal(tmp_path: Path) -> None:
+    """review=False（roster owner=0）：纯机制交接，全部 admit、零 LLM。"""
     tracker = FakeTracker()
     clean = _triage_proposal(tracker, "干净单条案")
     s = _synth_proposal(tracker, "结构提案")
     o = _owner(tmp_path, tracker, _submit([{"issue": s, "decision": "admit"}]), review=False)
     out = o.admit_once()
-    assert out.admitted == [] and out.mechanical == []
-    assert set(out.held) == {clean, s}
+    assert set(out.admitted) == {clean, s} and out.mechanical == []
+    assert out.held == []
     assert o.agent_calls == 0
 
 
-def test_review_prompt_keeps_owner_lightweight(tmp_path: Path) -> None:
+def test_review_prompt_is_handoff_only(tmp_path: Path) -> None:
     tracker = FakeTracker()
     p = _triage_proposal(tracker, "某具体任务中的失败")
     o = _owner(tmp_path, tracker, _submit([]))
     issue = tracker.list_open_issues()[0]
     msg = o._review_message(proposals=[issue], ready=[], trend=[])
-    assert "投资与组合治理" in msg
-    assert "重叠" in msg
-    assert "不重新执行 Triage" in msg
+    assert "Delivery Router" in msg
+    assert "无损打包交接" in msg
+    assert "不审核上游方案" in msg
+    assert "Designer 已在结构提案创建阶段处理 `covers` 来源" in msg
     assert "必须使用仓库工具核验" not in msg
     assert f"#{p}" in msg
 
@@ -304,9 +306,9 @@ def test_owner_receives_normalized_body_for_every_proposal_source(tmp_path: Path
     assert f"#{p}" in rendered
 
 
-def test_no_submit_holds_review_set(tmp_path: Path) -> None:
+def test_no_submit_defaults_to_direct_handoff(tmp_path: Path) -> None:
     tracker = FakeTracker()
     s = _synth_proposal(tracker, "结构提案")
     o = _owner(tmp_path, tracker, "散文没调 submit")
     out = o.admit_once()
-    assert s in out.held and out.admitted == []
+    assert s in out.admitted and out.held == []

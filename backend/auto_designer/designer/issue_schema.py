@@ -38,7 +38,7 @@ OPENAGENTS = "openagents"
 DECLINED = (
     "declined"  # 被驳回关闭（triage reject/needs_info、Owner decline；原因记 comment/close reason）
 )
-MERGED = "merged"  # 被合并关闭（Owner merge；merged-into 机器行链主票）
+MERGED = "merged"  # 被 Designer 的 covers 吸收后合并关闭（merged-into 机器行链主票）
 # provenance 标签（属性，不参与资格判定）：这条提案是谁产的
 FROM_TRIAGE = "from-triage"
 FROM_SYNTHESIZE = "from-synthesize"
@@ -161,7 +161,7 @@ def provenance_of(labels: list[str]) -> str | None:
     return None
 
 
-# ---- covers / merged-into 机器行（单一真源解析；消费方：Owner 级联、web 徽标、前端链展示）----
+# ---- covers / merged-into 机器行（单一真源解析；covers 是 Designer 的吸收决定）----
 
 # covers 行（提案 body 里的覆盖声明，创建时写、之后不改写）：`covers: #5 #6`，多条取最后一条。
 _COVERS_LINE_RE = re.compile(r"^covers:((?:\s*#\d+)+)\s*$", re.MULTILINE)
