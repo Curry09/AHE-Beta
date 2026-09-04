@@ -625,7 +625,14 @@ def _start_vigil_container(
         args += ["--label", f"io.openagents.experiment_id={ours}"]
     delivery = _vigil_delivery_mount()
     if delivery is not None:
-        args += ["-v", f"{delivery}:/role_runs", "-e", "ROLE_RUNS_DIR=/role_runs"]
+        args += [
+            "--user",
+            "root",
+            "-v",
+            f"{delivery}:/role_runs",
+            "-e",
+            "ROLE_RUNS_DIR=/role_runs",
+        ]
     for key in (*_CLAUDE_CRED_ENVS, *_CLAUDE_CONFIG_ENVS):
         value = os.environ.get(key, "").strip()
         if value:

@@ -11,6 +11,28 @@ set -euo pipefail
 : "${VIGIL_PARALLEL:=1}"
 test -f /config/openagents.yml || { echo "缺 /config/openagents.yml 挂载" >&2; exit 1; }
 
+# Spec-0049/T7: the host creates the per-run delivery directory as root, while the
+# delivery process intentionally runs as the unprivileged `vigil` user.  Enter as
+# root only long enough to hand this one bind mount to vigil, then permanently drop
+# privileges before cloning or running any agent code.
+if [[ "$(id -u)" == "0" ]]; then
+  if [[ -n "${ROLE_RUNS_DIR:-}" ]]; then
+    mkdir -p "$ROLE_RUNS_DIR"
+    chown 1000:1000 "$ROLE_RUNS_DIR"
+    chmod 0700 "$ROLE_RUNS_DIR"
+  fi
+  export HOME=/home/vigil USER=vigil LOGNAME=vigil
+  exec setpriv --reuid=1000 --regid=1000 --init-groups --inh-caps=-all bash "$0" "$@"
+fi
+
+if [[ -n "${ROLE_RUNS_DIR:-}" ]]; then
+  audit_probe="$ROLE_RUNS_DIR/.openagents-write-probe-$$"
+  if ! (umask 077 && : >"$audit_probe" && rm -f "$audit_probe"); then
+    echo "ROLE_RUNS_DIR 不可写，拒绝启动无审计 vigil：$ROLE_RUNS_DIR" >&2
+    exit 1
+  fi
+fi
+
 WORK=/work/harness
 
 # 容器每 run 重建 → clone 与 .openagents 运行态天然归零（原 rmtree 重置语义保留）。

@@ -363,6 +363,7 @@ def test_container_mounts_only_delivery_role_runs(tmp_path: Path, monkeypatch) -
     joined = " ".join(docker_run)
     assert f"{(run_root / 'delivery').resolve()}:/role_runs" in joined
     assert "ROLE_RUNS_DIR=/role_runs" in joined
+    assert "--user root" in joined
     assert "io.auto-designer.run_id=run-a" in joined
     assert "sessions" not in joined
     assert "/demand" not in joined
