@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from auto_designer.designer.agent_runtime import norm_label, read_submit, run_agent_def
+from auto_designer.designer.evidence_contract import build_evidence_envelope, project_for_role
 from auto_designer.designer.issue_schema import (
     DECLINED,
     FROM_DIVERGENT,
@@ -114,9 +115,25 @@ def _fields_by_label_to_key(kind: str, fields: dict) -> dict:
     return out
 
 
-def _proposal_body(*, normalized: str) -> str:
+def _proposal_body(*, normalized: str, evidence: dict | None = None) -> str:
     """proposal 默认上下文只含规范化结论；具体案例从评论/timeline 渐进取证。"""
-    return f"## Triage 规范化提案（实施对象：harness）\n\n{normalized.strip()}"
+    body = f"## Triage 规范化提案（实施对象：harness）\n\n{normalized.strip()}"
+    # Keep only source references in the proposal.  The detailed user evidence
+    # remains in SessionStore and is retrieved through the gated timeline tools.
+    if evidence:
+        refs = evidence.get("evidence_refs") or []
+        session_id = str(evidence.get("session_id") or "")
+        if session_id or refs:
+            body += "\n\n## 证据引用（目标感知 L1）\n\n"
+            if session_id:
+                body += f"- session_id: {session_id}\n"
+            for ref in refs[:24]:
+                if isinstance(ref, dict):
+                    kind = str(ref.get("kind") or "evidence")
+                    locator = str(ref.get("locator") or "")
+                    suffix = f" ({locator})" if locator else ""
+                    body += f"- {kind}{suffix}\n"
+    return body
 
 
 class Triager:
@@ -197,7 +214,9 @@ class Triager:
         return outcome
 
     def _session_id_for_issue(self, issue_number: int) -> str | None:
-        for entry in self._store.index():
+        # User reports remain auditable even when the persona protocol was
+        # invalid; do not hide the linked session from factual triage.
+        for entry in self._store.index(include_invalid=True):
             if issue_number in [int(number) for number in entry.get("issue_numbers", [])]:
                 return str(entry.get("session_id") or "") or None
         return None
@@ -235,6 +254,7 @@ class Triager:
                 return
             priority = str(d.get("priority", "")).strip().upper()  # 建议值；Owner 准入时可改
             body = schema_render(kind=kind, fields=fields, section="triage")
+            evidence = self._evidence_for_issue(issue)
             # 原始证据先归档；核心 title/body/labels 由 tracker 单次更新，避免半迁移 proposal。
             if not self._safe_comment(
                 num,
@@ -245,7 +265,10 @@ class Triager:
             self._tracker.update_issue(
                 num,
                 title=proposal_title,
-                body=_proposal_body(normalized=body),
+                body=_proposal_body(
+                    normalized=body,
+                    evidence=evidence,
+                ),
                 labels=_proposal_labels(list(issue.labels), kind, priority),
             )
             outcome.accepted.append(num)
@@ -273,15 +296,44 @@ class Triager:
             return False
         return True
 
+    def _session_for_issue(self, issue_number: int):
+        """Load the one session linked to this report for deterministic L1 handoff."""
+        session_id = self._session_id_for_issue(issue_number)
+        if not session_id:
+            return None
+        try:
+            return self._store.load(session_id)
+        except FileNotFoundError:
+            return None
+
+    def _evidence_for_issue(self, issue) -> dict:
+        """Read the persisted handoff, with deterministic legacy reconstruction."""
+        sid = self._session_id_for_issue(int(issue.number))
+        report = {"issue_id": issue.number, "title": issue.title, "labels": list(issue.labels)}
+        if sid:
+            try:
+                envelope = self._store.load_user_feedback_envelope(sid)
+                envelope["source_report"] = report
+                return project_for_role(envelope, "triage")
+            except FileNotFoundError:
+                pass
+        return project_for_role(build_evidence_envelope(None, report=report), "triage")
+
     def _run_agent(self, *, pending: list) -> str:
         # triage 只做「单条规范化」：只给它本批 report + 只读代码 + 按需拉的单局轨迹（含那局体感分，
         # 供建议优先级）。不喂判重参照/聚合 runtime_agg/全局体感曲线——跨提案吸收归 Designer、全局归 synthesize。
+        issue = pending[0] if pending else None
+        triage_evidence = self._evidence_for_issue(issue) if issue is not None else project_for_role(
+            build_evidence_envelope(None), "triage"
+        )
         msg = (
             "以下是本批待处理的原始报告。逐条确认 kind，按需读取 harness 源码，并以 issue 号检索"
             "对应会话证据。证据不足时依次使用 timeline、beat、step，不直接读取 sessions 文件。\n"
             "accept 必须提供任务无关的 proposal_title 和完整规范化字段；reject 或 needs_info 必须说明"
             "理由。每条报告独立处理，跨提案判重由 Owner 负责。\n\n"
             f"## 待分诊 report（{len(pending)} 条）\n{self._format_issues(pending)}\n\n"
+            "## 当前 report 的目标感知用户证据（确定性 L1；缺失字段明确为 unavailable）\n"
+            f"{self._format_evidence(triage_evidence)}\n\n"
             "完成调查后调用 submit_triage 一次，dispositions 只能包含当前这一条 report。"
         )
         report_id = str(pending[0].number) if pending else ""
@@ -294,7 +346,19 @@ class Triager:
             timeout=_TRIAGE_TIMEOUT,
             on_event=self._on_event,
             subject={"kind": "report", "id": report_id},
+            evidence={
+                "default_level": "L1",
+                "session_id": triage_evidence.get("session_id", "unavailable"),
+                "allowed_levels": ["L2", "L3", "L4"],
+                "evidence_refs": list(triage_evidence.get("evidence_refs") or [])[:24],
+            },
         )
+
+    @staticmethod
+    def _format_evidence(evidence: dict) -> str:
+        import json
+
+        return json.dumps(evidence, ensure_ascii=False, indent=2)
 
     @staticmethod
     def _format_issues(issues: list) -> str:

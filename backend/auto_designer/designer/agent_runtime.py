@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -66,10 +67,12 @@ def run_agent_def(
     max_iterations: int | None = None,
     subject: dict[str, str] | None = None,
     replayable: bool = True,
+    evidence: dict[str, object] | None = None,
 ) -> str:
     """加载 agent_def_dir 的 nexau agent 定义、以 message 跑一轮，返回 agent.run 的返回值（str）。
 
-    Spec-0049/T3：填好的 message 与产出 fail-open 写入 ROLE_RUNS_DIR/demand。
+    Spec-0049/T3：填好的 message 与产出 fail-open 写入 ROLE_RUNS_DIR/demand；
+    Spec-0055：可选 evidence 元数据同步落盘，便于离线边界回放。
     """
     os.environ["SANDBOX_WORK_DIR"] = str(Path(repo).resolve())
     from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
@@ -79,15 +82,25 @@ def run_agent_def(
         cfg.max_iterations = min(int(cfg.max_iterations or max_iterations), max_iterations)
     from auto_designer.loop.live_tracer import StepTracer  # noqa: PLC0415  依赖 nexau，懒加载
 
-    cfg.resolved_tracer = StepTracer(on_event or (lambda _kind, _text: None))
+    run_metrics: dict[str, object] = {"tool_calls": 0}
+
+    def trace_event(kind: str, text: str) -> None:
+        if kind == "tool":
+            run_metrics["tool_calls"] = int(run_metrics.get("tool_calls") or 0) + 1
+        if on_event is not None:
+            on_event(kind, text)
+
+    cfg.resolved_tracer = StepTracer(trace_event)
     agent = Agent(config=cfg)
     subj = subject or {"kind": "round", "id": str(current_usage_context().round_no or "")}
     pin = _agent_def_pin(agent_def_dir=Path(agent_def_dir))
     model = os.environ.get("DESIGNER_LLM_MODEL")
     with bind_session_store(store), bind_usage_context(role=role, operation="nexau-agent"):
+        started = time.monotonic()
         try:
             out = run_with_timeout(lambda: agent.run(message=message), timeout)
         except TimeoutError as exc:
+            run_metrics["latency_ms"] = round((time.monotonic() - started) * 1000, 3)
             record_invocation(
                 side="demand",
                 role=role,
@@ -99,8 +112,11 @@ def run_agent_def(
                 replayable=replayable,
                 model=model,
                 agent_def_pin=pin,
+                evidence=evidence,
+                metrics=run_metrics,
             )
             raise
+        run_metrics["latency_ms"] = round((time.monotonic() - started) * 1000, 3)
     text = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
     structured, status = _structured_status(text=text)
     record_invocation(
@@ -113,6 +129,8 @@ def run_agent_def(
         replayable=replayable,
         model=model,
         agent_def_pin=pin,
+        evidence=evidence,
+        metrics=run_metrics,
     )
     return text
 

@@ -62,9 +62,32 @@ class SessionStore:
                 "issue_numbers": [r.number for r in session.issue_refs],
                 # Spec-0048：invalid 仍落全量与索引供审计，但默认趋势读取会排除。
                 "evaluation_status": evaluation_status,
+                # 轻量协议分轨：兼容旧 evaluation_status，同时标明是否为 persona 契约问题。
+                "interaction_status": (
+                    getattr(session.sim_trace, "interaction_status", "completed")
+                    if session.sim_trace is not None
+                    else "completed"
+                ),
                 "user_outcome": (session.user_outcome or {}).get("end_reason"),
                 "accept_validity": session.accept_validity,
                 "objective_passed": (session.objective_evaluation or {}).get("passed"),
+                # Compact goal index fields let design-side trend views discover
+                # revisions/audit warnings without loading every session JSON.
+                "goal_audit_status": (
+                    (session.sim_trace.goal_audit or {}).get("status")
+                    if session.sim_trace is not None
+                    else None
+                ),
+                "baseline_revision_count": (
+                    (session.sim_trace.goal_ledger or {}).get("baseline_revision_count", 0)
+                    if session.sim_trace is not None
+                    else 0
+                ),
+                "unresolved_goal_ids": (
+                    list((session.sim_trace.goal_ledger or {}).get("unresolved") or [])
+                    if session.sim_trace is not None
+                    else []
+                ),
             }
         )
         (self._root / _INDEX_NAME).write_text(
@@ -76,6 +99,28 @@ class SessionStore:
         full_path = self._root / f"{session_id}.json"
         data = json.loads(full_path.read_text(encoding="utf-8"))  # 不存在则 FileNotFoundError
         return Session.from_dict(data)
+
+    def load_user_feedback_envelope(self, session_id: str) -> dict:
+        """Return the persisted 0055 handoff, reconstructing legacy sessions once.
+
+        The fallback is deterministic and deliberately does not mutate the old
+        file, so replaying historical sessions remains read-only.
+        """
+        session = self.load(session_id)
+        if session.user_feedback_envelope:
+            from auto_designer.designer.evidence_contract import EvidenceEnvelope
+
+            restored = EvidenceEnvelope.from_dict(session.user_feedback_envelope)
+            if restored.evidence_categories:
+                return restored.to_dict()
+            # Early 0055 snapshots did not carry the category index; rebuild
+            # from the same persisted session rather than widening visibility.
+            from auto_designer.designer.evidence_contract import build_evidence_envelope
+
+            return build_evidence_envelope(session).to_dict()
+        from auto_designer.designer.evidence_contract import build_evidence_envelope
+
+        return build_evidence_envelope(session).to_dict()
 
     def index(self, *, include_invalid: bool = False) -> list[dict]:
         index_path = self._root / _INDEX_NAME

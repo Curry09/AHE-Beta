@@ -105,6 +105,18 @@ def drain_call_traces(client: object) -> list[dict]:
     return out
 
 
+def drain_protocol_events(client: object) -> list[dict]:
+    """Drain protocol recovery/failure evidence without affecting the state machine."""
+    fn = getattr(client, "drain_protocol_events", None)
+    if not callable(fn):
+        return []
+    try:
+        events = fn()
+    except Exception:  # pragma: no cover - audit side channel must be best effort
+        return []
+    return list(events) if isinstance(events, list) else []
+
+
 # --------------------------------------------------------------------------
 # 真实 API 后端 (NexAU 网关, OpenAI 兼容)
 # --------------------------------------------------------------------------
@@ -124,6 +136,7 @@ class ApiPersonaClient:
             raise RuntimeError("no USER_LLM_API_KEY / OPENAI_API_KEY in env")
         self.model = model or os.getenv("USER_LLM_MODEL", "nex-agi/Nex-N2-Pro")
         self.temperature = temperature
+        self._protocol_events: list[dict] = []
         kwargs: dict = {"api_key": api_key}
         if base_url:
             kwargs["base_url"] = base_url
@@ -205,7 +218,10 @@ class ApiPersonaClient:
         last_obj: dict = {}
         last_code = "unparseable_json"
         steps: list[dict] = []
-        for attempt in range(2):
+        # Explicit stages get one initial call plus two format-recovery calls. Keep
+        # legacy probes at two calls for backwards compatibility with old fixtures.
+        max_attempts = 2 if stage == "legacy" else 3
+        for attempt in range(max_attempts):
             # 推理模型隐藏 CoT 先吃 token；persona 与其他角色统一单次 32768。
             last_text = self._text(self._create(messages, PERSONA_MAX_OUTPUT_TOKENS))
             last_obj = _parse_json(last_text)
@@ -222,12 +238,17 @@ class ApiPersonaClient:
                 )
                 return last_obj
             last_code = code
-            if attempt == 0:
-                messages.extend(
-                    [
-                        {"role": "assistant", "content": last_text},
-                        {"role": "user", "content": _contract_reminder(stage, code)},
-                    ]
+            self._record_protocol_event(
+                stage=stage, code=code, attempt=attempt + 1, raw=last_text
+            )
+            if attempt < max_attempts - 1:
+                # Do not feed malformed assistant prose back to the model. Give it a
+                # compact, explicit JSON-only recovery instruction instead.
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": _contract_recovery_prompt(stage, code, attempt + 2),
+                    }
                 )
         _push_call_trace(
             self,
@@ -237,7 +258,26 @@ class ApiPersonaClient:
             parsed=last_obj,
             steps=steps,
         )
-        raise PersonaProtocolError(stage, last_code, attempts=2)
+        raise PersonaProtocolError(stage, last_code, attempts=max_attempts)
+
+    def _record_protocol_event(self, *, stage: str, code: str, attempt: int, raw: str) -> None:
+        if not hasattr(self, "_protocol_events"):
+            self._protocol_events = []
+        self._protocol_events.append(
+            {
+                "stage": stage,
+                "code": code,
+                "attempt": attempt,
+                "raw": str(raw or "")[:12000],
+                "raw_empty": not bool(str(raw or "").strip()),
+            }
+        )
+
+    def drain_protocol_events(self) -> list[dict]:
+        events = list(getattr(self, "_protocol_events", []) or [])
+        if hasattr(self, "_protocol_events"):
+            self._protocol_events.clear()
+        return events
 
     def complete(self, messages: list[dict], max_tokens: int = PERSONA_MAX_OUTPUT_TOKENS) -> str:
         """通用补全：给定 messages 直接返回文本（供 0008/T4 内层 tool-calling 循环复用网关）。"""
@@ -531,6 +571,8 @@ _WAITING_ACTIONS = {"keep_waiting", "send_message", "interrupt", "give_up"}
 _OPENING_TASK_MARKER = "# SIZE UP THIS TASK (first turn only)"
 _FINAL_CHECK_TOOL_BUDGET = 4
 _MAIN_TOOL_CHECKPOINT = 4
+# Tool budget exhaustion keeps its historical two conclusion calls.  The ordinary
+# contract path below gets the additional third attempt requested for malformed output.
 _FORCED_CONCLUSION_ATTEMPTS = 2
 
 
@@ -566,7 +608,7 @@ def _validate_stage_output(
     tools_allowed: bool | None = None,
 ) -> str | None:
     """返回机器可聚合的错误码；None 表示对象满足当前阶段契约。"""
-    from .actions import CATALOG, Channel
+    from .actions import CATALOG, MessagePolicy
 
     if not isinstance(obj, dict) or obj.get("_parse_failed"):
         return "unparseable_json"
@@ -579,12 +621,20 @@ def _validate_stage_output(
             return "missing_perceive"
         if str(obj.get("verdict") or "") not in _VERDICTS:
             return "invalid_verdict"
+        if "goal_update" in obj and not isinstance(obj.get("goal_update"), (dict, list)):
+            return "invalid_goal_update"
+        if "goal_reading" in obj and not isinstance(obj.get("goal_reading"), (dict, list)):
+            return "invalid_goal_reading"
         return None
     if stage == "waiting_judge":
         if not str(obj.get("perceive") or "").strip():
             return "missing_perceive"
         if str(obj.get("judgment") or "") not in _WAITING_JUDGMENTS:
             return "invalid_judgment"
+        if "goal_reading" in obj and not isinstance(obj.get("goal_reading"), (dict, list)):
+            return "invalid_goal_reading"
+        if "goal_update" in obj and not isinstance(obj.get("goal_update"), (dict, list)):
+            return "invalid_goal_update"
         return None
     if stage in {"main_intent", "main_reintent"}:
         if not str(obj.get("intent") or "").strip():
@@ -596,9 +646,23 @@ def _validate_stage_output(
             return "final_check_already_used"
         if needs and not str(obj.get("check_goal") or "").strip():
             return "missing_check_goal"
+        if "goal_update" in obj and not isinstance(obj.get("goal_update"), (dict, list)):
+            return "invalid_goal_update"
+        if "target_goal_ids" in obj and not isinstance(obj.get("target_goal_ids"), (list, str)):
+            return "invalid_target_goal_ids"
+        if "expected_progress" in obj and not isinstance(obj.get("expected_progress"), str):
+            return "invalid_expected_progress"
         return None
     if stage == "waiting_intent":
-        return None if str(obj.get("intent") or "").strip() else "missing_intent"
+        if not str(obj.get("intent") or "").strip():
+            return "missing_intent"
+        if "goal_update" in obj and not isinstance(obj.get("goal_update"), (dict, list)):
+            return "invalid_goal_update"
+        if "target_goal_ids" in obj and not isinstance(obj.get("target_goal_ids"), (list, str)):
+            return "invalid_target_goal_ids"
+        if "expected_progress" in obj and not isinstance(obj.get("expected_progress"), str):
+            return "invalid_expected_progress"
+        return None
     if stage == "main_final_check":
         if not str(obj.get("perceive") or "").strip():
             return "missing_perceive"
@@ -612,17 +676,29 @@ def _validate_stage_output(
         allowed = _WAITING_ACTIONS if stage == "waiting_act" else _action_space_from_user(user)
         if action != "free" and action not in allowed:
             return "action_not_in_space"
-        if not isinstance(obj.get("gap"), bool):
+        # gap 是可选的动作元数据；缺省由 loop 解释为 False。只有模型显式给出时
+        # 才校验类型，避免与动作无关的字段把合法终止变成协议失败。
+        if "gap" in obj and not isinstance(obj.get("gap"), bool):
             return "invalid_gap"
-        message = obj.get("message")
+        message = obj.get("message", "")
+        if message is None:
+            message = ""
         if not isinstance(message, str):
             return "invalid_message"
         spec = CATALOG.get(action)
-        if action == "free" or (spec is not None and spec.channel is Channel.EMIT):
-            if not message.strip():
-                return "missing_message"
-        if spec is not None and spec.channel is Channel.SILENT and message.strip():
+        policy = MessagePolicy.REQUIRED if action == "free" else (
+            spec.message_policy if spec is not None else MessagePolicy.REQUIRED
+        )
+        if policy is MessagePolicy.REQUIRED and not message.strip():
+            return "missing_message"
+        if policy is MessagePolicy.FORBIDDEN and message.strip():
             return "unexpected_message"
+        if "goal_effect" in obj and not isinstance(obj.get("goal_effect"), dict):
+            return "invalid_goal_effect"
+        if "goal_update" in obj and not isinstance(obj.get("goal_update"), (dict, list)):
+            return "invalid_goal_update"
+        if "target_goal_ids" in obj and not isinstance(obj.get("target_goal_ids"), (list, str)):
+            return "invalid_target_goal_ids"
         return None
     if stage == "file_issue":
         return None if str(obj.get("issue") or "").strip() else "missing_issue"
@@ -640,24 +716,47 @@ def _validate_stage_output(
     return None
 
 
-def _contract_reminder(stage: str, code: str) -> str:
+_CONTRACT_SCHEMAS = {
+    "main_judge": '{"perceive":"...","verdict":"satisfied|failed_blame_harness|failed_blame_self|unsure|stuck"}',
+    "main_rejudge": '{"perceive":"...","verdict":"satisfied|failed_blame_harness|failed_blame_self|unsure|stuck"}',
+    "waiting_judge": '{"perceive":"...","judgment":"on_track|off_track|unclear","goal_reading":[],"goal_update":[]}',
+    "main_intent": '{"intent":"...","needs_final_check":false,"check_goal":"","target_goal_ids":[],"expected_progress":""}',
+    "main_reintent": '{"intent":"...","needs_final_check":false,"check_goal":"","target_goal_ids":[],"expected_progress":""}',
+    "waiting_intent": '{"intent":"...","target_goal_ids":[],"expected_progress":"","goal_update":[]}',
+    "main_act": '{"action":"<one id from action_space>","message":"...","gap":false,"target_goal_ids":[],"goal_effect":{},"goal_update":[]}',
+    "waiting_act": '{"action":"keep_waiting|send_message|interrupt|give_up","message":"...","gap":false,"target_goal_ids":[],"goal_effect":{},"goal_update":[]}',
+    "main_final_check": '{"perceive":"...","check_status":"completed|failed|unavailable"}',
+    "file_issue": '{"issue":"..."}',
+    "rate": '{"score":1,"reason":"..."}',
+}
+
+
+def _contract_recovery_prompt(stage: str, code: str, attempt: int) -> str:
+    """Return a short, explicit recovery instruction for a malformed contract."""
+    schema = _CONTRACT_SCHEMAS.get(stage, '{"perceive":"...","verdict":"unsure"}')
     return (
-        f"Your previous reply violated the {stage} OUTPUT CONTRACT ({code}). "
-        "Reply again with ONLY one complete JSON object matching the exact schema in the "
-        "current user prompt. Do not call a private tool unless this stage explicitly allows it."
+        f"FORMAT RECOVERY {attempt}/3 for {stage}: previous output failed validation ({code}). "
+        "Return exactly ONE complete JSON object and nothing else. No markdown fences, no prose, "
+        "no analysis, and do not call any tool. Preserve only facts already in the prompt; do not "
+        f"invent evidence. Shape example (fill with actual values): {schema}."
     )
 
 
+def _contract_reminder(stage: str, code: str) -> str:
+    """Compatibility alias retained for callers using the previous helper name."""
+    return _contract_recovery_prompt(stage, code, 2)
+
+
 def _emit_action_missing_message(obj: dict) -> bool:
-    """正常轮里选了「要发话」的动作(EMIT 或 free)却没给 message —— 需要让模型补出这句话。"""
-    from .actions import CATALOG, Channel  # 局部导入避免任何潜在循环依赖
+    """需要正文的动作缺少 message；终止动作的 optional message 不触发重试。"""
+    from .actions import CATALOG, MessagePolicy  # 局部导入避免任何潜在循环依赖
 
     action = obj.get("action") or ""
     msg_empty = not (obj.get("message") or "").strip()
     if action == "free":  # free 也必须带 message 才能被归类
         return msg_empty
     spec = CATALOG.get(action)
-    return bool(spec and spec.channel is Channel.EMIT and msg_empty)
+    return bool(spec and spec.message_policy is MessagePolicy.REQUIRED and msg_empty)
 
 
 def _dump_unparseable(*, first: str, second: str) -> None:
@@ -787,6 +886,7 @@ class AgenticPersonaClient:
         self._persona = None  # 会话级，bind_session 注入
         self._workspace_dir = None
         self._issue_notes: list[str] = []  # 中途 report_issue tool 累积；drain 给 session
+        self._protocol_events: list[dict] = []
 
     def bind_session(self, persona, workspace_dir) -> None:
         """Bind a persona and its local-or-container workspace runtime."""
@@ -799,6 +899,25 @@ class AgenticPersonaClient:
         notes = list(self._issue_notes)
         self._issue_notes.clear()
         return notes
+
+    def _record_protocol_event(self, *, stage: str, code: str, attempt: int, raw: str) -> None:
+        if not hasattr(self, "_protocol_events"):
+            self._protocol_events = []
+        self._protocol_events.append(
+            {
+                "stage": stage,
+                "code": code,
+                "attempt": attempt,
+                "raw": str(raw or "")[:12000],
+                "raw_empty": not bool(str(raw or "").strip()),
+            }
+        )
+
+    def drain_protocol_events(self) -> list[dict]:
+        events = list(getattr(self, "_protocol_events", []) or [])
+        if hasattr(self, "_protocol_events"):
+            self._protocol_events.clear()
+        return events
 
     def _record_issue_note(self, *, body: str) -> dict:
         """中途开单：写入会话缓冲，不终止对话。"""
@@ -821,7 +940,9 @@ class AgenticPersonaClient:
         last_raw = ""
         last_obj: dict = {}
         last_code = "unparseable_json"
-        for attempt in range(2):
+        first_code = "unparseable_json"
+        max_attempts = 2 if stage == "legacy" else 3
+        for attempt in range(max_attempts):
             last_raw = self._llm(messages) or ""
             if attempt == 0:
                 first_raw = last_raw
@@ -840,14 +961,27 @@ class AgenticPersonaClient:
                 return last_obj
             last_code = code
             if attempt == 0:
-                messages.extend(
-                    [
-                        {"role": "assistant", "content": last_raw},
-                        {"role": "user", "content": _contract_reminder(stage, code)},
-                    ]
+                first_code = code
+            self._record_protocol_event(
+                stage=stage, code=code, attempt=attempt + 1, raw=last_raw
+            )
+            if attempt < max_attempts - 1:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": _contract_recovery_prompt(stage, code, attempt + 2),
+                    }
                 )
         if last_obj.get("_parse_failed"):
             _dump_unparseable(first=first_raw, second=last_raw)
+        # Keep the primary diagnosis when a recovery model emits a generic
+        # fallback object (e.g. missing_action) after an explicit tool object
+        # was rejected in a no-tool stage.
+        if first_code == "tool_not_allowed_in_stage" and last_code in {
+            "missing_action",
+            "unparseable_json",
+        }:
+            last_code = first_code
         _push_call_trace(
             self,
             system=system,
@@ -856,7 +990,102 @@ class AgenticPersonaClient:
             parsed=last_obj,
             steps=steps,
         )
-        raise PersonaProtocolError(stage, last_code, attempts=2)
+        raise PersonaProtocolError(stage, last_code, attempts=max_attempts)
+
+    def _recover_contract(
+        self,
+        *,
+        system: str,
+        user: str,
+        stage: str,
+        messages: list[dict],
+        steps: list[dict],
+        first_raw: str,
+        first_code: str,
+        tools_by_name: dict,
+        sandbox,
+        tool_budget: int,
+    ) -> dict:
+        """Perform explicit recovery calls after a tool-loop contract failure.
+
+        Recovery prompts forbid tools and malformed assistant text is not fed back. If a
+        model nevertheless emits a genuine tool object, it is dispatched only when the
+        stage permits it and the original tool budget still has room.
+        """
+        recovery_messages = list(messages)
+        last_raw = first_raw
+        last_obj = _parse_json(first_raw)
+        last_code = first_code
+        self._record_protocol_event(
+            stage=stage, code=first_code, attempt=1, raw=first_raw
+        )
+        recovery_raws = [first_raw]
+        max_recoveries = 1 if stage == "legacy" else 2
+        recovery_attempts = range(2, 2 + max_recoveries)
+        tool_calls = 0
+        for attempt in recovery_attempts:
+            recovery_messages.append(
+                {
+                    "role": "user",
+                    "content": _contract_recovery_prompt(stage, last_code, attempt),
+                }
+            )
+            last_raw = self._llm(recovery_messages) or ""
+            recovery_raws.append(last_raw)
+            last_obj = _parse_json(last_raw)
+            steps.append({"kind": "assistant", "text": last_raw})
+            # A model may still return a genuine tool call during recovery.  It is
+            # safe to execute only when the stage allows tools and budget remains;
+            # otherwise it is treated as a contract error and the final recovery is
+            # JSON-only.
+            if isinstance(last_obj.get("tool"), str) and _stage_allows_tools(stage):
+                if tool_calls < tool_budget:
+                    tool_calls += 1
+                    result = self._dispatch(last_obj, tools_by_name, sandbox)
+                    name = str(last_obj.get("tool") or "")
+                    try:
+                        args_s = json.dumps(last_obj.get("args") or {}, ensure_ascii=False)
+                    except (TypeError, ValueError):
+                        args_s = str(last_obj.get("args") or {})
+                    steps.append({"kind": "tool", "text": f"{name} {args_s}"[:2000]})
+                    kind = "tool_result" if not (isinstance(result, dict) and result.get("ok") is False) else "tool_error"
+                    steps.append({"kind": kind, "text": json.dumps(result, ensure_ascii=False, default=str)[:4000]})
+                    recovery_messages.append({"role": "assistant", "content": last_raw})
+                    recovery_messages.append(
+                        {"role": "user", "content": f"<tool_result>\n{json.dumps(result)}\n</tool_result>"}
+                    )
+                    last_code = "tool_observation_required"
+                    self._record_protocol_event(
+                        stage=stage, code=last_code, attempt=attempt, raw=last_raw
+                    )
+                    continue
+            last_code = _validate_stage_output(
+                stage, last_obj, user, tools_allowed=False
+            ) or ""
+            if not last_code:
+                _push_call_trace(
+                    self,
+                    system=system,
+                    user=user,
+                    raw=last_raw,
+                    parsed=last_obj,
+                    steps=steps,
+                )
+                return last_obj
+            self._record_protocol_event(
+                stage=stage, code=last_code, attempt=attempt, raw=last_raw
+            )
+        if last_obj.get("_parse_failed"):
+            _dump_unparseable(first=recovery_raws[0], second=recovery_raws[-1])
+        _push_call_trace(
+            self,
+            system=system,
+            user=user,
+            raw=last_raw,
+            parsed=last_obj,
+            steps=steps,
+        )
+        raise PersonaProtocolError(stage, last_code, attempts=1 + max_recoveries)
 
     def _dispatch(self, obj: dict, tools_by_name: dict, sandbox) -> dict:
         name = obj.get("tool")
@@ -927,7 +1156,6 @@ class AgenticPersonaClient:
         ]
         last_raw = ""
         last_obj: dict = {}
-        contract_retries = 0
         tool_calls = 0
         tool_budget = (
             min(self.max_inner_steps, _FINAL_CHECK_TOOL_BUDGET)
@@ -976,20 +1204,18 @@ class AgenticPersonaClient:
                 steps.append({"kind": "assistant", "text": last_raw})
                 code = _validate_stage_output(stage, obj, user)
                 if code is not None:
-                    if contract_retries >= 1:
-                        _push_call_trace(
-                            self,
-                            system=inner_system,
-                            user=user,
-                            raw=last_raw,
-                            parsed=obj,
-                            steps=steps,
-                        )
-                        raise PersonaProtocolError(stage, code, attempts=contract_retries + 1)
-                    contract_retries += 1
-                    messages.append({"role": "assistant", "content": last_raw})
-                    messages.append({"role": "user", "content": _contract_reminder(stage, code)})
-                    continue
+                    return self._recover_contract(
+                        system=inner_system,
+                        user=user,
+                        stage=stage,
+                        messages=messages,
+                        steps=steps,
+                        first_raw=last_raw,
+                        first_code=code,
+                        tools_by_name=tools_by_name,
+                        sandbox=sandbox,
+                        tool_budget=tool_budget,
+                    )
                 _push_call_trace(
                     self,
                     system=inner_system,
@@ -1030,16 +1256,21 @@ class AgenticPersonaClient:
                         steps=steps,
                     )
                     return last_obj
-                if attempt == 0:
-                    messages.extend(
-                        [
-                            {"role": "assistant", "content": last_raw},
-                            {
-                                "role": "user",
-                                "content": _contract_reminder(stage, last_code)
-                                + " Tool use is now forbidden; conclude from existing evidence.",
-                            },
-                        ]
+                self._record_protocol_event(
+                    stage=stage,
+                    code=f"forced_conclusion_{last_code}",
+                    attempt=attempt + 1,
+                    raw=last_raw,
+                )
+                if attempt < _FORCED_CONCLUSION_ATTEMPTS - 1:
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": _contract_recovery_prompt(
+                                stage, last_code, attempt + 2
+                            )
+                            + " Tool use is now forbidden; conclude from existing evidence.",
+                        }
                     )
             if last_obj.get("_parse_failed"):
                 _dump_unparseable(first=forced_raws[0], second=forced_raws[-1])

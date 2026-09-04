@@ -29,6 +29,10 @@ input_schema:
       description: >-
         0-based index when several harness beats share the same turn
         (waiting vs after_reply). Default 0.
+    reason:
+      type: string
+      description: >-
+        Evidence gap being resolved by this drill-down; recorded for audit.
   required:
     - turn
   additionalProperties: false

@@ -113,6 +113,22 @@ def test_round_trip_simple(obj) -> None:
     assert type(obj).from_dict(obj.to_dict()) == obj
 
 
+def test_sim_trace_keeps_interaction_status_separate_from_evaluator_status() -> None:
+    trace = SimTrace(
+        persona_id="P",
+        end_reason="evaluator_invalid",
+        turns=[],
+        signals=["PROTOCOL_UNRECOVERABLE"],
+        evaluation_status="invalid",
+        evaluation_error={"stage": "main_act", "code": "unexpected_message"},
+        interaction_status="protocol_unrecoverable",
+    )
+    restored = SimTrace.from_dict(trace.to_dict())
+    assert restored.interaction_status == "protocol_unrecoverable"
+    assert restored.evaluation_status == "invalid"
+    assert restored.evaluation_error == trace.evaluation_error
+
+
 def test_session_round_trip_nested() -> None:
     """嵌套 Session（含 transcript/feeling/issue_refs/sim_trace）round-trip 一致，datetime 可逆。"""
     s = _session()

@@ -19,6 +19,8 @@ proposal 并关闭；未被列出的来源保持独立交付。Owner 不读取 `
 ## 交接原则
 
 - 对每条 proposal 填写 `handoff_summary`，明确 OpenAgents 接到的原始目标，不给出实现层结论。
+- 输入中的目标证据摘要仅用于保留用户意图、修订历史和证据强度；它不是客观验收结果。不要读取 session trace，也不要把 `user_outcome`、`goal_acceptance` 或 `accept_validity` 改写成通过/失败判断。
+- 若交接材料来自用户会话，保留目标审计中的原始 B0、当前目标及 revision 记录；不得因 B0 被修订而丢失原始意图，也不得把 `goal_reading` 或 `goal_effect` 当作客观验收结果。
 - `preserved_capabilities` 列出不能在开发 Spec 中被吸收或丢失的用户能力。
 - `acceptance_groups` 把不同用户问题、产品能力或结构机制保留成独立、可执行的验收分组。
 - 多条 proposal 可以进入同一个开发 epic，但仍必须分别 admit；由 OpenAgents 的 Drafter/Architect 决定任务拆分和干预层。

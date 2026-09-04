@@ -56,6 +56,16 @@ class SWEbenchEvaluator:
 
     @classmethod
     def from_env(cls) -> SWEbenchEvaluator | None:
+        # Flow-only experiments can explicitly disable the expensive official
+        # evaluator. Normal runs keep the default enabled and fail closed.
+        if os.environ.get("AUTO_DESIGNER_OBJECTIVE_EVALUATION", "1").strip().lower() in {
+            "0",
+            "false",
+            "no",
+            "off",
+            "skip",
+        }:
+            return None
         dataset = os.environ.get("SWEBENCH_PARQUET", "").strip()
         root = os.environ.get("SWEBENCH_EVAL_RESULTS_ROOT", "").strip()
         if not dataset or not root:

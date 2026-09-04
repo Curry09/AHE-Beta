@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from auto_designer.designer.agent_runtime import read_submit, run_agent_def
+from auto_designer.designer.evidence_contract import build_evidence_envelope, project_for_role
 from auto_designer.designer.issue_schema import (
     FROM_DIVERGENT,
     PROPOSAL,
@@ -108,6 +109,9 @@ class Divergent:
         return DivergentOutcome(proposal_numbers=numbers, artifacts=[dict(item) for item in parsed])
 
     def _run_agent(self, *, trend: list[tuple[str, int, str, str]], reference: list) -> str:
+        # The global PM view is an index of compact, deterministic projections.
+        # It deliberately does not concatenate raw timeline/step output.
+        goal_index = self._goal_index(trend)
         msg = (
             "你是产品 PM。以下是全部可见的用户体验索引以及开放 proposal、ready item。先理解用户"
             "试图完成什么、行为反映了什么体验矛盾，再提出产品机会。已有提案是产品现状上下文，"
@@ -116,6 +120,8 @@ class Divergent:
             "不得直接读取 sessions 文件。\n"
             f"本轮最多提交 {_MAX_CANDIDATES} 条产品洞察。每条必须能追溯到具体会话证据。\n\n"
             f"## 体感曲线（索引：时间, 1-4 分, 理由, session 句柄）\n{self._format_trend(trend)}\n\n"
+            "## 目标感知体验摘要（确定性 L1；只保留目标、关键动作和反馈）\n"
+            f"{self._format_goal_index(goal_index)}\n\n"
             f"## 已有 proposal / ready item（{len(reference)} 条）\n{self._format_issues(reference)}\n\n"
             "调查完成后调用 `submit_divergent` 一次：`proposals` 为 0..n 条（无则空数组），"
             "每条分别说明 user_goal、observed_behaviors、experience_tension、product_opportunity、"
@@ -133,7 +139,41 @@ class Divergent:
             timeout=_DIVERGENT_TIMEOUT,
             on_event=self._on_event,
             subject={"kind": "round", "id": str(current_usage_context().round_no or "")},
+            evidence={
+                "default_level": "L1",
+                "allowed_levels": ["L2", "L3"],
+                "session_count": len(goal_index),
+                "session_ids": [str(row.get("session_id")) for row in goal_index if row.get("session_id")],
+            },
         )
+
+    def _goal_index(self, trend: list[tuple[str, int, str, str]]) -> list[dict]:
+        rows: list[dict] = []
+        seen: set[str] = set()
+        for _ts, _score, _reason, session_id in trend:
+            if not session_id:
+                continue
+            if session_id in seen:
+                continue
+            seen.add(session_id)
+            try:
+                session = self._store.load(session_id)
+            except FileNotFoundError:
+                continue
+            try:
+                envelope = self._store.load_user_feedback_envelope(session_id)
+            except FileNotFoundError:
+                envelope = build_evidence_envelope(session).to_dict()
+            rows.append(project_for_role(envelope, "pm"))
+        return rows
+
+    @staticmethod
+    def _format_goal_index(rows: list[dict]) -> str:
+        import json
+
+        if not rows:
+            return "（暂无目标证据；旧 session 或缺失 session 明确不补猜）"
+        return json.dumps(rows, ensure_ascii=False, indent=2)
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
         rows = sorted(self._store.index(), key=lambda e: e["created_at"])

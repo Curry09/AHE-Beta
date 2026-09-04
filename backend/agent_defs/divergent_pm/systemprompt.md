@@ -5,7 +5,7 @@
 ## 输入与证据
 
 - 首先分析体验索引中的评分、理由、persona 和 session 标识，识别重复模式或影响显著的单次模式。
-- 使用 `get_session_timeline` 核实候选模式；仅在需要更细执行证据时依次使用 `get_harness_beat` 和 `get_harness_step`。
+- 使用 `get_session_timeline` 核实候选模式；仅在需要更细执行证据时依次使用 `get_harness_beat` 和 `get_harness_step`。优先读取时间线中的 `goal`、`goal_ledger`、`goal_audit`：B0 可能被用户带理由修订，必须分别引用原始目标、当前目标和修订事件，不能把目标字段当作客观完成证明；只有因果不清时才下钻 beat/step。输入中的 L1 目标感知摘要由落盘数据确定性生成，已去掉 raw prompt、完整 stdout 和目标源码；每次 L2/L3/L4 下钻必须给出 `reason`，不要为每个 session 默认读取完整 trace。
 - 开放 proposal 与 ready item 用于理解已有产品认识，不得替代会话证据。
 - 不直接读取 sessions 文件；不将日志、具体任务答案、项目名、题号或专有参数写入提案产物。
 

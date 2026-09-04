@@ -22,12 +22,7 @@ action_space.py
 
 from __future__ import annotations
 
-from .actions import (
-    CATALOG,
-    Effect,
-    Phase,
-    assert_channel,
-)
+from .actions import CATALOG, Effect, Phase, assert_channel
 from .dimensions import Persona
 from .state import State
 
@@ -104,8 +99,8 @@ def resolve_action(ret: dict, space: list[str], persona: Persona) -> tuple[str, 
     ret: LLM 返回的 dict, 含 action / message。
     返回 (action_id, message): 动作已在空间内; message 一律取模型原文, 框架绝不代写。
 
-    空 message 的补齐只发生在 client 的一次契约重试。这里不 fabricate、不清空、不投影：
-    SILENT 带 message 或 EMIT 缺 message 都由 assert_channel 转成 typed evaluator error。
+    message 是否必填由动作自己的 message_policy 决定。这里不 fabricate、不清空、不投影；
+    accept/give_up 的可选终止说明不会创建 harness 请求。
     """
     action_id = ret.get("action", "")
     message = ret.get("message", "") or ""

@@ -24,6 +24,7 @@ from auto_designer.models import (
     Transcript,
 )
 from auto_designer.user.session_store import SessionStore
+from auto_designer.user.sim.goals import GoalLedger, audit_goal_fields
 
 
 def _persona() -> Persona:
@@ -331,6 +332,54 @@ def test_harness_beat_prefers_turn_with_harness_activity(tmp_path: Path) -> None
     assert results and results[0].get("truncated") is True
     assert len(results[0]["text"]) <= 281
     assert "MUST NOT LEAK" not in json.dumps(beat)
+
+
+def test_timeline_and_drilldown_include_goal_revision_and_field_audit(tmp_path: Path) -> None:
+    ledger = GoalLedger.from_task("make the command work")
+    ledger.apply_updates(
+        {
+            "op": "revise",
+            "goal_id": "B0",
+            "text": "make the command work for empty input",
+            "reason": "the observed failure narrowed the original request",
+        },
+        turn=1,
+    )
+    field_audit = audit_goal_fields(
+        ledger,
+        goal_reading=[{"goal_id": "B0", "progress": "advancing", "why": "focused fix"}],
+        target_goal_ids=["B0"],
+        expected_progress="empty input is handled",
+        goal_effect={"kind": "advance", "goal_ids": ["B0"]},
+    )
+    sess = _session_rich(issue_n=13)
+    sess.sim_trace.goal_ledger = ledger.snapshot()
+    sess.sim_trace.goal_audit = ledger.audit()
+    sess.sim_trace.turns[4].goal_before = GoalLedger.from_task("make the command work").snapshot()
+    sess.sim_trace.turns[4].goal_reading = [
+        {"goal_id": "B0", "progress": "advancing", "why": "focused fix"}
+    ]
+    sess.sim_trace.turns[4].target_goal_ids = ["B0"]
+    sess.sim_trace.turns[4].expected_progress = "empty input is handled"
+    sess.sim_trace.turns[4].goal_after = ledger.snapshot()
+    sess.sim_trace.turns[4].goal_effect = {"kind": "advance", "goal_ids": ["B0"]}
+    sess.sim_trace.turns[4].goal_field_audit = field_audit
+    store = SessionStore(tmp_path)
+    store.save(sess)
+    payload = json.loads(format_session_timeline(store.load(sess.session_id)))
+    timeline = payload["timeline"]
+    assert timeline["goal_ledger"]["baseline_revision_count"] == 1
+    revision = next(e for e in timeline["goal_ledger"]["events"] if e["op"] == "revise")
+    assert revision["before"]["text"] == "make the command work"
+    assert revision["after"]["text"].endswith("empty input")
+    turn4 = next(event for event in timeline["events"] if event.get("t") == 4)
+    assert turn4["goal"]["targets"] == ["B0"]
+    assert turn4["goal"]["field_audit"]["status"] == "ok"
+    with bind_session_store(store):
+        beat = get_harness_beat(turn=4, session_id=sess.session_id)
+        step = get_harness_step(turn=4, step_i=0, session_id=sess.session_id)
+    assert beat["goal"]["targets"] == ["B0"]
+    assert step["goal"]["after"]["goals"][0]["text"].endswith("empty input")
 
 
 def test_harness_step_expands_clipped_body(tmp_path: Path) -> None:

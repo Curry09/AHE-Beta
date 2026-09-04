@@ -235,6 +235,19 @@ def test_main_act_private_tool_object_is_retried_not_accepted() -> None:
     assert "tool_not_allowed_in_stage" in llm.calls[1][-1]["content"]
 
 
+def test_terminal_accept_contract_allows_omitted_message_and_gap() -> None:
+    llm = FakeToolLLM([json.dumps({"action": "accept"})])
+    c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox())
+    c.bind_session(_persona(D1Eval.EXPERT), "/ws")
+
+    out = c.respond(
+        "SYS",
+        "<main_act>\n<action_space>\n['accept', 'send_message']\n</action_space>\n</main_act>",
+    )
+    assert out == {"action": "accept"}
+    assert len(llm.calls) == 1
+
+
 def test_judge_tool_returned_after_contract_retry_is_dispatched() -> None:
     sb = FakeSandbox()
     llm = FakeToolLLM(

@@ -232,6 +232,11 @@ class Designer:
             timeout=_DESIGN_TIMEOUT,
             on_event=self._on_event,
             subject={"kind": "round", "id": str(current_usage_context().round_no or "")},
+            evidence={
+                "default_level": "proposal_view",
+                "allowed_levels": [],
+                "source_proposals": [int(item.number) for item in [*ready, *proposals]],
+            },
         )
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:

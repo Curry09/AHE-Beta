@@ -11,6 +11,7 @@ KV cache 友好的排序(从不变到善变):
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 from .clauses import clause_capability, clause_verification_policy, compile_block_p
@@ -147,6 +148,13 @@ def _harness_events_block(events: list | None) -> str:
     return "\n".join(lines)
 
 
+def _goal_frame_block(goal_frame: dict | None) -> str:
+    """Render the current explicit goal view without injecting the full event history."""
+    if not isinstance(goal_frame, dict):
+        return ""
+    return "<goal_frame>\n" + json.dumps(goal_frame, ensure_ascii=False, sort_keys=True) + "\n</goal_frame>"
+
+
 def _main_context_parts(
     task: str,
     history_lines: list[str],
@@ -156,6 +164,7 @@ def _main_context_parts(
     *,
     help_text: str = "",
     harness_events: list | None = None,
+    goal_frame: dict | None = None,
     include_action_space: bool,
 ) -> list[str]:
     """主 decide 共用上下文（不含分步输出契约）。
@@ -183,6 +192,9 @@ def _main_context_parts(
     private_evidence = _private_evidence_block(state)
     if private_evidence:
         parts.append(private_evidence)
+    goal_text = _goal_frame_block(goal_frame)
+    if goal_text:
+        parts.append(goal_text)
     parts.append(f"<harness_output>\n{ho}\n</harness_output>")
     if include_action_space:
         parts.append(f"<action_space>\n{action_space}\n</action_space>")
@@ -199,6 +211,7 @@ def build_main_judge_turn(
     *,
     help_text: str = "",
     harness_events: list | None = None,
+    goal_frame: dict | None = None,
     appraise_task: bool = False,
 ) -> str:
     """主 loop · Judge：只评现状（perceive + verdict）；意愿留给 intent。"""
@@ -212,6 +225,7 @@ def build_main_judge_turn(
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=goal_frame,
             include_action_space=False,
         )
     )
@@ -243,9 +257,18 @@ def build_main_judge_turn(
         "- failed_blame_self: you think your own request, limits, or choices caused the failure.\n"
         "- unsure: you are not convinced yet.\n"
         "- stuck: the tool interaction itself feels blocked or not making usable progress.\n"
+        "Before settling the verdict, explicitly read the current <goal_frame>: for each goal "
+        "that matters to this observation, describe whether it is unchanged, advancing, blocked, "
+        "unclear, or complete and why. This is a subjective progress reading, not an objective "
+        "acceptance gate. B0 is the current baseline, not an immutable anchor: if the user's "
+        "understanding or requested outcome genuinely changes, revise B0 with a reason; its "
+        "origin and revision history are retained. Do not invent a goal merely to make progress look better.\n"
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"perceive": "<what you actually understood>", '
-        '"verdict": "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck"}'
+        '"verdict": "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck", '
+        '"goal_reading": [{"goal_id": "...", "progress": "unchanged|advancing|blocked|unclear|complete", "why": "..."}], '
+        '"goal_update": [{"op": "status|focus|revise|relax|withdraw", "goal_id": "...", '
+        '"text": "<new wording for revise>", "done_if": "<new criterion>", "reason": "..."}]}'
     )
     if appraise_task:
         parts.append(_TASK_APPRAISAL)
@@ -262,8 +285,10 @@ def build_main_intent_turn(
     *,
     help_text: str = "",
     harness_events: list | None = None,
+    goal_frame: dict | None = None,
     verdict: str,
     perceive: str = "",
+    goal_reading: list[dict] | None = None,
     final_check_available: bool = False,
 ) -> str:
     """主 loop · Intent：开放意愿（可超菜单）。"""
@@ -277,11 +302,34 @@ def build_main_intent_turn(
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=goal_frame,
             include_action_space=False,
         )
     )
     parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
+    parts.append(
+        "<goal_reading>\n"
+        + json.dumps(list(goal_reading or []), ensure_ascii=False)
+        + "\n</goal_reading>"
+    )
     parts.append(_intent_options_block())
+    parts.append(
+        "# OPTIONAL GOAL UPDATE\n"
+        "If your expected outcome changed or you have a new concrete request, include a "
+        "structured goal_update. Do not silently delete or weaken a goal; relax/withdraw "
+        "requires a short reason. If the original task itself was clarified or corrected, "
+        "use op=revise on B0 with new text and/or done_if plus a reason. B0 cannot be deleted, "
+        "and its prior wording remains in the ledger history. If nothing changed, omit it.\n"
+        'Example: {"goal_update": [{"op": "add", "text": "show the changed file", '
+        '"goal_kind": "request"}]}\n'
+        'Allowed ops: add, status (open|partial|met), focus, revise, relax, withdraw.'
+    )
+    parts.append(
+        "# GOAL-DRIVEN INTENT\n"
+        "After considering <goal_frame> and the judge notes, state which goal(s) your next "
+        "intent is trying to move. This is a decision aid, not a hard rule; if the target is "
+        "unclear, say so and leave the list empty.\n"
+    )
     if final_check_available:
         parts.append(
             "# OPTIONAL FINAL CHECK\n"
@@ -299,7 +347,10 @@ def build_main_intent_turn(
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"intent": "<free text: what you WANT next>", '
         '"needs_final_check": <true or false>, '
-        '"check_goal": "<one focused goal if true; else empty>"}'
+        '"check_goal": "<one focused goal if true; else empty>", '
+        '"target_goal_ids": ["..."], "expected_progress": "<what would improve those goals>", '
+        '"goal_update": [{"op": "add|status|focus|revise|relax|withdraw", "goal_id": "...", '
+        '"text": "<new wording for revise>", "done_if": "<new criterion>", "reason": "..."}]}'
     )
     parts.append("</main_intent>")
     return "\n\n".join(parts)
@@ -313,6 +364,7 @@ def build_main_final_check_turn(
     *,
     help_text: str = "",
     harness_events: list | None = None,
+    goal_frame: dict | None = None,
     verdict: str,
     perceive: str,
     intent: str,
@@ -329,6 +381,7 @@ def build_main_final_check_turn(
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=goal_frame,
             include_action_space=False,
         )
     )
@@ -358,6 +411,7 @@ def build_main_rejudge_turn(
     *,
     help_text: str = "",
     harness_events: list | None = None,
+    goal_frame: dict | None = None,
     prior_verdict: str,
     prior_perceive: str,
     check_status: str,
@@ -374,6 +428,7 @@ def build_main_rejudge_turn(
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=goal_frame,
             include_action_space=False,
         )
     )
@@ -388,9 +443,14 @@ def build_main_rejudge_turn(
         "# RE-JUDGE — final check is over\n"
         "You cannot use another private tool now. Reassess the current outcome from all visible "
         "and final-check evidence, including a failed/unavailable check. Do not choose an action.\n"
+        "Re-read <goal_frame> and record how the latest evidence affects each relevant goal. "
+        "This is a subjective progress reading, not a hard acceptance gate.\n"
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"perceive": "<your updated understanding>", '
-        '"verdict": "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck"}'
+        '"verdict": "satisfied | failed_blame_harness | failed_blame_self | unsure | stuck", '
+        '"goal_reading": [{"goal_id": "...", "progress": "unchanged|advancing|blocked|unclear|complete", "why": "..."}], '
+        '"goal_update": [{"op": "status|focus|revise|relax|withdraw", "goal_id": "...", '
+        '"text": "<new wording for revise>", "done_if": "<new criterion>", "reason": "..."}]}'
     )
     parts.append("</main_rejudge>")
     return "\n\n".join(parts)
@@ -404,8 +464,10 @@ def build_main_reintent_turn(
     *,
     help_text: str = "",
     harness_events: list | None = None,
+    goal_frame: dict | None = None,
     verdict: str,
     perceive: str,
+    goal_reading: list[dict] | None = None,
 ) -> str:
     """重判后重新形成意愿；final check 已用完，不能回跳。"""
     parts = ["<main_reintent>"]
@@ -418,16 +480,36 @@ def build_main_reintent_turn(
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=goal_frame,
             include_action_space=False,
         )
     )
     parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive or '(none)'}\n</judgment>")
+    parts.append(
+        "<goal_reading>\n"
+        + json.dumps(list(goal_reading or []), ensure_ascii=False)
+        + "\n</goal_reading>"
+    )
     parts.append(_intent_options_block())
+    parts.append(
+        "# OPTIONAL GOAL UPDATE\n"
+        "If the latest evidence changed your expected outcome or introduced a concrete request, "
+        "include goal_update with an explicit reason for any relax/withdraw. If the original "
+        "task changed, revise B0 with a reason; B0 remains and its prior wording is auditable. "
+        "Omit it when unchanged."
+    )
+    parts.append(
+        "Re-read <goal_frame> before choosing the next intent. Name the goal(s) you want to "
+        "move and what progress you expect; this is a soft cognitive aid, not a gate.\n"
+    )
     parts.append(
         "The one final private check has already been used. You MUST now form an intent that "
         "can converge to the next external act; needs_final_check MUST be false.\n"
         "Return EXACTLY ONE JSON object and nothing else:\n"
-        '{"intent": "<what you want next>", "needs_final_check": false, "check_goal": ""}'
+        '{"intent": "<what you want next>", "needs_final_check": false, "check_goal": "", '
+        '"target_goal_ids": ["..."], "expected_progress": "<what would improve those goals>", '
+        '"goal_update": [{"op": "status|focus|revise|relax|withdraw", "goal_id": "...", '
+        '"text": "<new wording for revise>", "done_if": "<new criterion>", "reason": "..."}]}'
     )
     parts.append("</main_reintent>")
     return "\n\n".join(parts)
@@ -442,9 +524,13 @@ def build_main_act_turn(
     *,
     help_text: str = "",
     harness_events: list | None = None,
+    goal_frame: dict | None = None,
     verdict: str,
     perceive: str = "",
     intent: str,
+    goal_reading: list[dict] | None = None,
+    target_goal_ids: list[str] | None = None,
+    expected_progress: str = "",
 ) -> str:
     """主 loop · Act：把开放 intent 收敛到 action_space；兑不了就兜底并 gap=true。"""
     parts = ["<main_act>"]
@@ -457,11 +543,28 @@ def build_main_act_turn(
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=goal_frame,
             include_action_space=True,
         )
     )
     parts.append(f"<judgment>\n{verdict}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
+    parts.append(
+        "<goal_reading>\n"
+        + json.dumps(list(goal_reading or []), ensure_ascii=False)
+        + "\n</goal_reading>"
+    )
     parts.append(f"<intent>\n{intent.strip() or '(none)'}\n</intent>")
+    parts.append(
+        "<goal_intent>\n"
+        + json.dumps(
+            {
+                "target_goal_ids": list(target_goal_ids or []),
+                "expected_progress": expected_progress,
+            },
+            ensure_ascii=False,
+        )
+        + "\n</goal_intent>"
+    )
     parts.append(
         "# MENU — only ids in <action_space> exist right now\n"
         "This is the convergence step: map <intent> to an EXTERNAL move, or use "
@@ -504,7 +607,12 @@ def build_main_act_turn(
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"action": "<id from <action_space>, or free>", '
         '"message": "<exact line to the harness if action==send_message; else short/empty>", '
-        '"gap": <true if fallback; else false>}'
+        '"gap": <true if fallback; else false>, '
+        '"target_goal_ids": ["..."], '
+        '"goal_effect": {"kind": "advance|wait|close|close_with_reservations|abandon|abandon_and_report", '
+        '"goal_ids": ["..."], "evidence_refs": ["..."]}, '
+        '"goal_update": [{"op": "revise", "goal_id": "B0", "text": "<new wording>", '
+        '"done_if": "<new criterion>", "reason": "<why the task changed>"}]}'
     )
     parts.append("</main_act>")
     return "\n\n".join(parts)
@@ -536,6 +644,7 @@ def _waiting_context_parts(
     waited_sec: float,
     progress: list | None,
     prior_activity: list | None,
+    goal_frame: dict | None = None,
 ) -> list[str]:
     """等待轮共用上下文：帮助文本 / 任务 / 历史 / 活动条 / 墙钟 / mood。不含输出契约。"""
     hist = "\n".join(history_lines) if history_lines else "(empty)"
@@ -547,6 +656,9 @@ def _waiting_context_parts(
     private_evidence = _private_evidence_block(state)
     if private_evidence:
         parts.append(private_evidence)
+    goal_text = _goal_frame_block(goal_frame)
+    if goal_text:
+        parts.append(goal_text)
     prior_body = _activity_bullets(prior_activity)
     if prior_body:
         parts.append(f"<prior_activity>\n{prior_body}\n</prior_activity>")
@@ -591,6 +703,7 @@ def build_waiting_judge_turn(
     waited_sec: float = 0.0,
     progress: list | None = None,
     prior_activity: list | None = None,
+    goal_frame: dict | None = None,
 ) -> str:
     """3 跳模式·第 1 跳：只评过程内容（不对路 / 合预期 / 看不清），不选 intent/动作。"""
     parts = ["<waiting_judge>"]
@@ -603,6 +716,7 @@ def build_waiting_judge_turn(
             waited_sec=waited_sec,
             progress=progress,
             prior_activity=prior_activity,
+            goal_frame=goal_frame,
         )
     )
     parts.append(
@@ -614,9 +728,17 @@ def build_waiting_judge_turn(
         "Do NOT choose an intent or action yet. Do NOT invent a finished answer."
     )
     parts.append(
+        "Before the judgment, read <goal_frame> and note which goal(s) the visible activity "
+        "is advancing, blocking, or leaving unclear. This is a soft progress reading, not an "
+        "acceptance gate. If the original task was clarified by what you observe, you may revise "
+        "B0 with an explicit reason; the previous wording is retained.\n"
+    )
+    parts.append(
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"perceive": "<what you notice in the activity vs your task, honestly>", '
-        '"judgment": "on_track | off_track | unclear"}'
+        '"judgment": "on_track | off_track | unclear", '
+        '"goal_reading": [{"goal_id": "...", "progress": "unchanged|advancing|blocked|unclear|complete", "why": "..."}], '
+        '"goal_update": [{"op": "revise", "goal_id": "B0", "text": "<new wording>", "reason": "..."}]}'
     )
     parts.append("</waiting_judge>")
     return "\n\n".join(parts)
@@ -631,8 +753,10 @@ def build_waiting_intent_turn(
     waited_sec: float = 0.0,
     progress: list | None = None,
     prior_activity: list | None = None,
+    goal_frame: dict | None = None,
     judgment: str,
     perceive: str = "",
+    goal_reading: list[dict] | None = None,
 ) -> str:
     """3 跳模式·第 2 跳：已有 judgment，只表达真实意愿 intent（开放文本）。"""
     parts = ["<waiting_intent>"]
@@ -645,13 +769,33 @@ def build_waiting_intent_turn(
             waited_sec=waited_sec,
             progress=progress,
             prior_activity=prior_activity,
+            goal_frame=goal_frame,
         )
     )
     parts.append(f"<judgment>\n{judgment}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
+    parts.append(
+        "<goal_reading>\n"
+        + json.dumps(list(goal_reading or []), ensure_ascii=False)
+        + "\n</goal_reading>"
+    )
     parts.append(_intent_options_block())
     parts.append(
+        "# OPTIONAL GOAL UPDATE\n"
+        "If your expected outcome changed or a new concrete request appeared while waiting, "
+        "include goal_update; do not silently lower or delete a goal. To correct the original "
+        "task, revise B0 with a reason; its prior wording remains auditable. Omit it when unchanged."
+    )
+    parts.append(
+        "After considering the goal reading, state which goal(s) you want your waiting action "
+        "to move and what progress you hope to see. This is a soft cognitive aid; an empty "
+        "list is acceptable when no target is clear."
+    )
+    parts.append(
         "Return EXACTLY ONE JSON object and nothing else:\n"
-        '{"intent": "<free-text wish in your voice — what you want right now>"}'
+        '{"intent": "<free-text wish in your voice — what you want right now>", '
+        '"target_goal_ids": ["..."], "expected_progress": "<what would improve those goals>", '
+        '"goal_update": [{"op": "add|status|focus|revise|relax|withdraw", "goal_id": "...", '
+        '"text": "<new wording for revise>", "done_if": "<new criterion>", "reason": "..."}]}'
     )
     parts.append("</waiting_intent>")
     return "\n\n".join(parts)
@@ -666,9 +810,13 @@ def build_waiting_act_turn(
     waited_sec: float = 0.0,
     progress: list | None = None,
     prior_activity: list | None = None,
+    goal_frame: dict | None = None,
     judgment: str,
     perceive: str = "",
     intent: str,
+    goal_reading: list[dict] | None = None,
+    target_goal_ids: list[str] | None = None,
+    expected_progress: str = "",
 ) -> str:
     """末跳：把开放 intent 收敛到菜单；兑不了就兜底并 gap=true（框架记 WAIT_GAP）。"""
     parts = ["<waiting_act>"]
@@ -681,10 +829,27 @@ def build_waiting_act_turn(
             waited_sec=waited_sec,
             progress=progress,
             prior_activity=prior_activity,
+            goal_frame=goal_frame,
         )
     )
     parts.append(f"<judgment>\n{judgment}\nyour notes: {perceive.strip() or '(none)'}\n</judgment>")
+    parts.append(
+        "<goal_reading>\n"
+        + json.dumps(list(goal_reading or []), ensure_ascii=False)
+        + "\n</goal_reading>"
+    )
     parts.append(f"<intent>\n{intent.strip() or '(none)'}\n</intent>")
+    parts.append(
+        "<goal_intent>\n"
+        + json.dumps(
+            {
+                "target_goal_ids": list(target_goal_ids or []),
+                "expected_progress": expected_progress,
+            },
+            ensure_ascii=False,
+        )
+        + "\n</goal_intent>"
+    )
     parts.append(
         "# MENU — only these actions exist right now (this is where wishes converge)\n"
         "- keep_waiting: CONTINUE the session, send nothing, and leave the current harness work "
@@ -709,7 +874,12 @@ def build_waiting_act_turn(
         '{"action": "keep_waiting | send_message | interrupt | give_up", '
         '"message": "<text to send if action==send_message; optional short line if give_up; '
         'else empty>", '
-        '"gap": <true if this is only a fallback that does not satisfy intent; else false>}'
+        '"gap": <true if this is only a fallback that does not satisfy intent; else false>, '
+        '"target_goal_ids": ["..."], '
+        '"goal_effect": {"kind": "wait|advance|abandon", "goal_ids": ["..."], '
+        '"evidence_refs": ["..."]}, '
+        '"goal_update": [{"op": "revise", "goal_id": "B0", "text": "<new wording>", '
+        '"done_if": "<new criterion>", "reason": "<why the task changed>"}]}'
     )
     parts.append("</waiting_act>")
     return "\n\n".join(parts)

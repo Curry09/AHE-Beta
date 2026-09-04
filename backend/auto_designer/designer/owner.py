@@ -243,11 +243,18 @@ class Owner:
             timeout=_ADMIT_TIMEOUT,
             on_event=self._on_event,
             subject={"kind": "round", "id": str(current_usage_context().round_no or "")},
+            evidence={
+                "default_level": "role_artifacts",
+                "allowed_levels": [],
+                "proposal_count": len(proposals),
+                "ready_count": len(ready),
+            },
         )
 
     def _review_message(
         self, *, proposals: list, ready: list, trend: list[tuple[str, int, str, str]]
     ) -> str:
+        goal_summary = self._goal_summary_index(trend)
         return (
             "你是需求面到 OpenAgents 的 Delivery Router。以下是本批开放 ProposalView、既有 ready item"
             "和体验趋势。你的工作是逐条无损打包交接，不审核上游方案，不选择实现层，也不因低风险或易交付"
@@ -258,10 +265,37 @@ class Owner:
             f"## 待评审提案（{len(proposals)} 条）\n{self._format_index(proposals)}\n\n"
             f"## 已在 ready 的工作项（{len(ready)} 条，判重参照）\n{self._format_index(ready)}\n\n"
             f"## 体感曲线\n{self._format_trend(trend)}\n\n"
+            "## 目标证据摘要（仅审计元数据，不是客观验收）\n"
+            f"{goal_summary}\n\n"
             "只依据 ProposalView 整理交接内容，不回到原始会话重新诊断。\n\n"
             "完成后调用 `submit_admission` 一次：每条 proposal 一项，填写 handoff_summary、"
             "preserved_capabilities 与 acceptance_groups。未列出的 proposal 仍会由 driver 默认直接交接。"
         )
+
+    def _goal_summary_index(self, trend: list[tuple[str, int, str, str]]) -> str:
+        """Owner sees compact index metadata, never raw session traces."""
+        import json
+
+        wanted = {sid for _ts, _score, _reason, sid in trend if sid}
+        rows = []
+        for row in self._store.index(include_invalid=True):
+            sid = str(row.get("session_id") or "")
+            if sid not in wanted:
+                continue
+            rows.append(
+                {
+                    "session_id": sid,
+                    "goal_audit_status": row.get("goal_audit_status") or "unavailable",
+                    "baseline_revision_count": row.get("baseline_revision_count", 0),
+                    "unresolved_goal_ids": list(row.get("unresolved_goal_ids") or [])[:12],
+                    "accept_validity": row.get("accept_validity", "not_applicable"),
+                    "objective_passed": row.get("objective_passed"),
+                    "provenance": {"kind": "session_index", "session_id": sid},
+                }
+            )
+        if not rows:
+            return "（暂无可用目标元数据）"
+        return json.dumps(rows, ensure_ascii=False, indent=2)
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
         rows = sorted(self._store.index(), key=lambda e: e["created_at"])

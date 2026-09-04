@@ -342,7 +342,10 @@ def _probe_endpoint(*, profile: dict[str, str], model: str) -> None:
     openai_url = profile["USER_LLM_BASE_URL"].rstrip("/") + "/chat/completions"
     response = requests.post(
         openai_url,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {profile['USER_LLM_API_KEY']}",
+            "Content-Type": "application/json",
+        },
         json={"model": model, "max_tokens": 8, "messages": [{"role": "user", "content": "OK"}]},
         timeout=60,
         proxies={"http": None, "https": None},
@@ -352,7 +355,12 @@ def _probe_endpoint(*, profile: dict[str, str], model: str) -> None:
     anthropic_url = profile["ANTHROPIC_BASE_URL"].rstrip("/") + "/v1/messages"
     response = requests.post(
         anthropic_url,
-        headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
+        headers={
+            "Authorization": f"Bearer {profile['ANTHROPIC_AUTH_TOKEN']}",
+            "x-api-key": profile["ANTHROPIC_AUTH_TOKEN"],
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        },
         json={"model": model, "max_tokens": 8, "messages": [{"role": "user", "content": "OK"}]},
         timeout=60,
         proxies={"http": None, "https": None},
@@ -566,6 +574,9 @@ def _execution_environment(
             "SWEBENCH_INSTANCE_FILE": str(workload["pool"]["path"]),
             "SWEBENCH_PARQUET": str(workload["dataset"]["path"]),
             "SWEBENCH_EVAL_RESULTS_ROOT": str(spec.paths["archive"] / "objective-evaluation"),
+            "AUTO_DESIGNER_OBJECTIVE_EVALUATION": "1"
+            if execution.get("objective_evaluation", True)
+            else "0",
             "SWEBENCH_INTERACTION_PLAN": str(execution["plan"]["path"]),
             "SWEBENCH_SEED_IMAGE": str(spec.config.images["seed"]),
             "TOTAL_ROUNDS": str(execution["total_rounds"]),
@@ -662,7 +673,8 @@ def _redacted_plan(spec: FrozenExperiment, *, source_pins: dict[str, str]) -> di
 def check(spec: FrozenExperiment, *, probe: bool) -> dict[str, Any]:
     source_pins = _verify_git_pins(spec)
     _verify_images(spec)
-    _verify_official_evaluator()
+    if spec.execution.get("objective_evaluation", True):
+        _verify_official_evaluator()
     profile = _load_profile(spec.model_profile_path)
     if probe:
         _probe_endpoint(profile=profile, model=str(spec.config.models["user"]))

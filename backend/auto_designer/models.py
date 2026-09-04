@@ -239,6 +239,14 @@ class SimTurn:
     queued_behind: str = ""
     answers_utterance_id: str = ""
     answers_said: str = ""
+    goal_before: dict[str, Any] = field(default_factory=dict)
+    goal_reading: list[dict[str, Any]] = field(default_factory=list)
+    target_goal_ids: list[str] = field(default_factory=list)
+    expected_progress: str = ""
+    goal_updates: list[dict[str, Any]] = field(default_factory=list)
+    goal_after: dict[str, Any] = field(default_factory=dict)
+    goal_effect: dict[str, Any] = field(default_factory=dict)
+    goal_field_audit: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -272,6 +280,22 @@ class SimTurn:
             d["answers_utterance_id"] = self.answers_utterance_id
         if self.answers_said:
             d["answers_said"] = self.answers_said
+        if self.goal_before:
+            d["goal_before"] = dict(self.goal_before)
+        if self.goal_reading:
+            d["goal_reading"] = [dict(item) for item in self.goal_reading]
+        if self.target_goal_ids:
+            d["target_goal_ids"] = list(self.target_goal_ids)
+        if self.expected_progress:
+            d["expected_progress"] = self.expected_progress
+        if self.goal_updates:
+            d["goal_updates"] = [dict(item) for item in self.goal_updates]
+        if self.goal_after:
+            d["goal_after"] = dict(self.goal_after)
+        if self.goal_effect:
+            d["goal_effect"] = dict(self.goal_effect)
+        if self.goal_field_audit:
+            d["goal_field_audit"] = dict(self.goal_field_audit)
         return d
 
     @classmethod
@@ -297,6 +321,14 @@ class SimTurn:
             queued_behind=str(data.get("queued_behind") or ""),
             answers_utterance_id=str(data.get("answers_utterance_id") or ""),
             answers_said=str(data.get("answers_said") or ""),
+            goal_before=dict(data.get("goal_before") or {}),
+            goal_reading=[dict(item) for item in data.get("goal_reading", [])],
+            target_goal_ids=[str(item) for item in data.get("target_goal_ids", [])],
+            expected_progress=str(data.get("expected_progress") or ""),
+            goal_updates=[dict(item) for item in data.get("goal_updates", [])],
+            goal_after=dict(data.get("goal_after") or {}),
+            goal_effect=dict(data.get("goal_effect") or {}),
+            goal_field_audit=dict(data.get("goal_field_audit") or {}),
         )
 
 
@@ -318,6 +350,14 @@ class SimTrace:
     # valid | invalid。invalid 表示用户评估器自身协议/解析失败，不是 harness 任务失败。
     evaluation_status: str = "valid"
     evaluation_error: dict[str, Any] | None = None
+    # completed | protocol_repaired | protocol_unrecoverable；与 evaluation_status 分离，
+    # 旧 session 缺省为 completed。
+    interaction_status: str = "completed"
+    # Raw protocol recovery evidence (malformed output, parser code, attempt number).
+    protocol_events: list[dict[str, Any]] = field(default_factory=list)
+    goal_ledger: dict[str, Any] = field(default_factory=dict)
+    goal_acceptance: dict[str, Any] | None = None
+    goal_audit: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -334,6 +374,16 @@ class SimTrace:
             d["evaluation_status"] = self.evaluation_status
         if self.evaluation_error is not None:
             d["evaluation_error"] = dict(self.evaluation_error)
+        if self.interaction_status != "completed":
+            d["interaction_status"] = self.interaction_status
+        if self.protocol_events:
+            d["protocol_events"] = [dict(event) for event in self.protocol_events]
+        if self.goal_ledger:
+            d["goal_ledger"] = dict(self.goal_ledger)
+        if self.goal_acceptance is not None:
+            d["goal_acceptance"] = dict(self.goal_acceptance)
+        if self.goal_audit:
+            d["goal_audit"] = dict(self.goal_audit)
         return d
 
     @classmethod
@@ -352,6 +402,15 @@ class SimTrace:
                 if isinstance(data.get("evaluation_error"), dict)
                 else None
             ),
+            interaction_status=str(data.get("interaction_status") or "completed"),
+            protocol_events=[dict(event) for event in data.get("protocol_events", [])],
+            goal_ledger=dict(data.get("goal_ledger") or {}),
+            goal_acceptance=(
+                dict(data["goal_acceptance"])
+                if isinstance(data.get("goal_acceptance"), dict)
+                else None
+            ),
+            goal_audit=dict(data.get("goal_audit") or {}),
         )
 
 
@@ -446,6 +505,9 @@ class Session:
     objective_evaluation: dict[str, Any] | None = None
     accept_validity: str = "not_applicable"
     audit_events: list[dict[str, Any]] = field(default_factory=list)
+    # Spec-0055: deterministic user→demand handoff.  Kept optional for old
+    # sessions; SessionStore can reconstruct an unavailable/legacy envelope.
+    user_feedback_envelope: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -470,6 +532,8 @@ class Session:
         d["accept_validity"] = self.accept_validity
         if self.audit_events:
             d["audit_events"] = [dict(row) for row in self.audit_events]
+        if self.user_feedback_envelope:
+            d["user_feedback_envelope"] = dict(self.user_feedback_envelope)
         return d
 
     @classmethod
@@ -494,4 +558,5 @@ class Session:
             ),
             accept_validity=str(data.get("accept_validity") or "not_applicable"),
             audit_events=[dict(row) for row in data.get("audit_events", [])],
+            user_feedback_envelope=dict(data.get("user_feedback_envelope") or {}),
         )

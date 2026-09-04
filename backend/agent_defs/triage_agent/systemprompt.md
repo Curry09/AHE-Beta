@@ -8,7 +8,7 @@ harness 是通用编码助手。具体任务、外部项目和专有参数只能
 
 - 原始报告：提供用户视角的症状和上下文，不直接作为提案标题或正文。
 - 只读 harness 源码：使用 `search_file_content` 后按需 `read_file`，定位相关行为、编排或配置边界。
-- 会话证据：依次使用 `get_session_timeline`、`get_harness_beat`、`get_harness_step`。仅在上一层不足时下钻，不直接读取 sessions 文件，不复制大段日志。
+- 会话证据：依次使用 `get_session_timeline`、`get_harness_beat`、`get_harness_step`。仅在上一层不足时下钻，不直接读取 sessions 文件，不复制大段日志。时间线中的 `goal`、`goal_ledger` 与 `goal_audit` 是用户意图/状态的审计证据：区分原始 B0、当前 B0 和带理由的 revision，不把 goal_reading/target/effect 当作客观测试结论；若需要解释某个动作为何没有推进目标，再下钻对应 beat/step。编排器附带的 L1 目标感知摘要由落盘数据确定性生成，已去掉 raw prompt、完整 stdout 和目标源码；每次 L2/L3/L4 下钻都要在工具参数中填写简短 `reason`，只补明确证据缺口。
 - 你的视野限于当前 report；跨会话聚合、跨提案结构综合与判重分别由 Synthesize 和 Owner 负责。
 
 ## disposition

@@ -189,6 +189,148 @@ def test_main_decide_is_judge_intent_act_isomorphic() -> None:
     assert any("|" in t.perceive and "→" in t.perceive for t in active)
 
 
+def test_goal_layer_guides_same_turn_intent_without_becoming_a_gate() -> None:
+    class _GoalLayerClient(_StubClient):
+        def __init__(self) -> None:
+            super().__init__(["send_message", "accept"], verdict="unsure")
+            self.goal_added = False
+            self.seen: list[str] = []
+
+        def respond(self, system: str, user: str) -> dict:  # noqa: ARG002
+            self.seen.append(user)
+            if "<main_judge>" in user:
+                out = {"perceive": "only a diagnosis is visible", "verdict": "unsure"}
+                if not self.goal_added:
+                    self.goal_added = True
+                    out["goal_update"] = [
+                        {
+                            "op": "add",
+                            "goal_id": "G1",
+                            "text": "show the actual implementation and regression test",
+                            "goal_kind": "request",
+                        }
+                    ]
+                out["goal_reading"] = [
+                    {"goal_id": "B0", "progress": "blocked", "why": "diagnosis only"}
+                ]
+                return out
+            if "<main_intent>" in user:
+                # The judge update must already be visible in the same turn.
+                assert '"goal_id": "G1"' in user
+                return {
+                    "intent": "ask for the implementation and regression test",
+                    "needs_final_check": False,
+                    "check_goal": "",
+                    "target_goal_ids": ["G1"],
+                    "expected_progress": "receive the changed file and test result",
+                }
+            if "<main_act>" in user:
+                assert '"target_goal_ids": ["G1"]' in user
+                action = "send_message" if self._i == 0 else "accept"
+                self._i += 1
+                return {
+                    "action": action,
+                    "message": "please implement it" if action == "send_message" else "",
+                    "goal_effect": {"kind": "advance", "goal_ids": ["G1"]},
+                }
+            return super().respond(system, user)
+
+    client = _GoalLayerClient()
+    res = run_session(_persona(D1Eval.SHALLOW, D43Correct.FEEDBACK), client, ScriptedHarness(), TASK)
+
+    assert res.turns[0].goal_reading == [
+        {"goal_id": "B0", "progress": "blocked", "why": "diagnosis only"}
+    ]
+    assert res.turns[0].target_goal_ids == ["G1"]
+    assert any(goal["goal_id"] == "G1" for goal in res.turns[0].goal_after["goals"])
+    # The ledger reports the unresolved claim, but the user's accept action is not rejected.
+    assert res.end_reason == "accepted"
+    assert res.goal_acceptance["status"] == "subjective_accept_unverified"
+
+
+def test_baseline_revision_is_visible_to_same_turn_act_and_persisted() -> None:
+    class _BaselineRevisionClient(_StubClient):
+        def __init__(self) -> None:
+            super().__init__(["accept"], verdict="satisfied")
+
+        def respond(self, system: str, user: str) -> dict:  # noqa: ARG002
+            if "<main_judge>" in user:
+                return {
+                    "perceive": "the request needs a narrower, concrete scope",
+                    "verdict": "unsure",
+                    "goal_reading": [
+                        {"goal_id": "B0", "progress": "unclear", "why": "scope is too broad"}
+                    ],
+                    "goal_update": [
+                        {
+                            "op": "revise",
+                            "goal_id": "B0",
+                            "text": "implement the smallest working change and show its test",
+                            "reason": "narrowed scope after inspecting the starting request",
+                        }
+                    ],
+                }
+            if "<main_intent>" in user:
+                assert "implement the smallest working change" in user
+                return {
+                    "intent": "accept the narrowed outcome",
+                    "needs_final_check": False,
+                    "check_goal": "",
+                    "target_goal_ids": ["B0"],
+                    "expected_progress": "the narrowed change and its test are shown",
+                }
+            if "<main_act>" in user:
+                action = "send_message" if self._i == 0 else "accept"
+                self._i += 1
+                return {
+                    "action": action,
+                    "message": "narrow the request" if action == "send_message" else "",
+                    "target_goal_ids": ["B0"],
+                    "goal_effect": {
+                        "kind": "advance" if action == "send_message" else "close",
+                        "goal_ids": ["B0"],
+                    },
+                }
+            return super().respond(system, user)
+
+    res = run_session(
+        _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK),
+        _BaselineRevisionClient(),
+        ScriptedHarness(),
+        TASK,
+    )
+    baseline = next(goal for goal in res.goal_ledger["goals"] if goal["goal_id"] == "B0")
+    assert baseline["text"].startswith("implement the smallest working change")
+    assert baseline["initial_text"] == TASK
+    revision = next(event for event in res.goal_ledger["events"] if event["op"] == "revise")
+    assert revision["before"]["version"] == 1
+    assert revision["after"]["version"] == 2
+    assert res.turns[0].goal_field_audit["status"] == "ok"
+
+
+def test_accept_without_message_finishes_without_fake_harness_utterance() -> None:
+    class _NoTerminalMessageClient(_StubClient):
+        def respond(self, system: str, user: str) -> dict:
+            out = super().respond(system, user)
+            if "<main_act>" in user and out.get("action") == "accept":
+                out.pop("message", None)
+                out.pop("gap", None)
+            return out
+
+    res = run_session(
+        _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK),
+        _NoTerminalMessageClient(["send_message", "accept"], verdict="satisfied"),
+        ScriptedHarness(),
+        TASK,
+    )
+    assert res.end_reason == "accepted"
+    assert res.interaction_status == "completed"
+    terminal = res.turns[-1]
+    assert terminal.action == "accept"
+    assert terminal.message == ""
+    assert terminal.utterance_id == ""
+
+
 def test_active_final_check_converges_through_rejudge_and_reintent() -> None:
     """一次 final check 后只能 rejudge → reintent → act，不能再次回跳调查。"""
     client = _FinalCheckClient(

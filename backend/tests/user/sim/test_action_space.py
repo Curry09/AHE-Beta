@@ -9,7 +9,7 @@ from auto_designer.user.sim.action_space import (
     derive_action_space,
     resolve_action,
 )
-from auto_designer.user.sim.actions import CATALOG, Phase
+from auto_designer.user.sim.actions import CATALOG, MessagePolicy, Phase
 from auto_designer.user.sim.dimensions import (
     D1Eval,
     D2Depth,
@@ -104,6 +104,20 @@ def test_resolve_enforces_channel_consistency() -> None:
     space = ["send_message"]
     with pytest.raises(ActionResolutionError, match="channel_mismatch"):
         resolve_action({"action": "send_message", "message": ""}, space, p)
+
+
+def test_accept_without_terminal_message_is_valid_and_not_emitted() -> None:
+    p = _persona()
+    aid, msg = resolve_action({"action": "accept"}, ["accept", "send_message"], p)
+    assert aid == "accept" and msg == ""
+    assert CATALOG["accept"].message_policy is MessagePolicy.OPTIONAL
+    assert CATALOG["send_message"].message_policy is MessagePolicy.REQUIRED
+
+
+def test_terminal_message_policy_is_action_specific() -> None:
+    assert CATALOG["give_up"].message_policy is MessagePolicy.OPTIONAL
+    assert CATALOG["accept_with_reservations"].message_policy is MessagePolicy.REQUIRED
+    assert CATALOG["file_issue"].message_policy is MessagePolicy.REQUIRED
 
 
 def test_opening_is_the_only_structural_gate_against_accepting_nothing() -> None:

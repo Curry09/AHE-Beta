@@ -160,6 +160,15 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0052 Designer 提案覆盖与重复合并权责
 由 Designer 基于全量 ProposalView 决定哪些 triage/proposal 被结构提案吸收；covers 作为唯一简化指令，目标提案创建后直接合并关闭被覆盖来源，Owner 只负责交付路由。
 
+### 0053 Persona 语义动作契约与可审计终止状态机
+将用户模拟从统一脆弱 JSON 校验改为按动作语义定义契约：消息 required/optional/forbidden、阶段局部字段、可恢复协议修复与不可恢复错误分级；把用户 verdict、交互协议状态、客观 evaluator 结果和容器收尾拆成独立且可审计的状态，并以现有八个交互建立回归门禁。
+
+### 0054 用户模拟目标驱动与可修订目标账本
+为用户模拟增加显式、可修订且可审计的目标账本：以不可删除的 B0 保留原始任务身份，允许用户根据交互重新表述目标并记录理由；每轮通过目标感知、目标指向、预期进展和目标效果影响动作决策，但不把目标状态或主观 accept 冒充客观验收。
+
+### 0055 目标感知的需求面证据分层与角色可见性
+在不把完整用户 trace 灌入需求面角色的前提下，将用户目标演化、关键交互行为和客观执行结果编成有来源的分层证据；Triage 默认获得当前 report 的有界目标感知证据，产品 PM 保持全局体验视野，Synthesize 只沿 proposal 关系下钻，避免额外延迟、跨题过拟合和主观 accept 冒充客观通过。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -399,6 +408,20 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0052 | 0052/T1 | Designer covers 合并语义与状态迁移 | done | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/role_contract.py |
 | 0052 | 0052/T2 | Owner 退回纯交付路由 | done | T1 | backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
 | 0052 | 0052/T3 | 覆盖合并回归测试与规格验证 | done | T1, T2 | backend/tests/loop/test_designer.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_role_contract.py<br>backend/tests/designer/test_agent_contract.py<br>docs/specs/0052-designer-covers-consolidation.md |
+| 0053 | 0053/T1 | 定义语义动作契约与分层结果模型 | done | — | docs/specs/0053-persona-semantic-action-lifecycle.md |
+| 0053 | 0053/T2 | 实现动作语义契约与阶段局部 schema | done | — | backend/auto_designer/user/sim/actions.py<br>backend/auto_designer/user/sim/action_space.py<br>backend/tests/user/sim/test_action_space.py |
+| 0053 | 0053/T3 | 实现协议解析修复与错误分级 | in-progress | T2 | backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_persona_client_agentic.py<br>backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/test_models.py |
+| 0053 | 0053/T4 | 接入独立结果状态与优雅终止状态机 | pending | T2, T3 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/state.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py |
+| 0053 | 0053/T5 | 补齐事件溯源审计与八会话回归门禁 | pending | T3, T4 | backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/loop/live.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py |
+| 0054 | 0054/T1 | 目标账本与修订事件模型 | done | — | backend/auto_designer/user/sim/goals.py<br>backend/tests/user/sim/test_goals.py |
+| 0054 | 0054/T2 | 目标进入用户感知与动作决策 | done | T1 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_persona_client_agentic.py |
+| 0054 | 0054/T3 | 目标结果与主客观结论分离 | done | T1, T2 | backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/test_models.py<br>backend/tests/user/test_session_store.py |
+| 0054 | 0054/T4 | 时间线投影与目标账本完整审计 | done | T2, T3 | backend/auto_designer/designer/session_timeline.py<br>backend/tests/designer/test_session_timeline.py |
+| 0055 | 0055/T1 | 定义目标感知证据包与分层读取契约 | done | 0054/T4 | backend/auto_designer/designer/evidence_contract.py<br>backend/tests/designer/test_evidence_contract.py |
+| 0055 | 0055/T2 | 用户反馈 handoff 与 Triage 单报告输入 | done | T1, 0054/T4 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/role_contract.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_triage.py |
+| 0055 | 0055/T3 | 产品 PM 全局体验输入与产品视角边界 | done | T1, 0054/T4 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_divergent_gate.py |
+| 0055 | 0055/T4 | Synthesize 提案关系输入与证据下钻约束 | done | T1, T2, T3, 0054/T4 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/systemprompt.md<br>backend/auto_designer/designer/session_timeline.py<br>backend/tests/loop/test_designer.py |
+| 0055 | 0055/T5 | 角色可见性、过拟合和延迟回归评测 | done | T2, T3, T4 | backend/scripts/evaluate_role_traces.py<br>backend/tests/designer/test_role_contract_flow.py |
 
 ## 跨 feature 关系图
 
@@ -743,6 +766,26 @@ graph LR
         n0052_T2["T2 Owner 退回纯交付路由"]
         n0052_T3["T3 覆盖合并回归测试与规格验证"]
     end
+    subgraph G0053[0053 persona-semantic-action-lifecycle]
+        n0053_T1["T1 定义语义动作契约与分层结果模型"]
+        n0053_T2["T2 实现动作语义契约与阶段局部 schema"]
+        n0053_T3["T3 实现协议解析修复与错误分级"]
+        n0053_T4["T4 接入独立结果状态与优雅终止状态机"]
+        n0053_T5["T5 补齐事件溯源审计与八会话回归门禁"]
+    end
+    subgraph G0054[0054 user-goal-driven-simulation]
+        n0054_T1["T1 目标账本与修订事件模型"]
+        n0054_T2["T2 目标进入用户感知与动作决策"]
+        n0054_T3["T3 目标结果与主客观结论分离"]
+        n0054_T4["T4 时间线投影与目标账本完整审计"]
+    end
+    subgraph G0055[0055 goal-aware-demand-evidence-boundaries]
+        n0055_T1["T1 定义目标感知证据包与分层读取契约"]
+        n0055_T2["T2 用户反馈 handoff 与 Triage 单报告输入"]
+        n0055_T3["T3 产品 PM 全局体验输入与产品视角边界"]
+        n0055_T4["T4 Synthesize 提案关系输入与证据下钻约束"]
+        n0055_T5["T5 角色可见性、过拟合和延迟回归评测"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -980,6 +1023,28 @@ graph LR
     n0052_T2 --> n0052_T1
     n0052_T3 --> n0052_T1
     n0052_T3 --> n0052_T2
+    n0053_T3 --> n0053_T2
+    n0053_T4 --> n0053_T2
+    n0053_T4 --> n0053_T3
+    n0053_T5 --> n0053_T3
+    n0053_T5 --> n0053_T4
+    n0054_T2 --> n0054_T1
+    n0054_T3 --> n0054_T1
+    n0054_T3 --> n0054_T2
+    n0054_T4 --> n0054_T2
+    n0054_T4 --> n0054_T3
+    n0055_T1 --> n0054_T4
+    n0055_T2 --> n0055_T1
+    n0055_T2 --> n0054_T4
+    n0055_T3 --> n0055_T1
+    n0055_T3 --> n0054_T4
+    n0055_T4 --> n0055_T1
+    n0055_T4 --> n0055_T2
+    n0055_T4 --> n0055_T3
+    n0055_T4 --> n0054_T4
+    n0055_T5 --> n0055_T2
+    n0055_T5 --> n0055_T3
+    n0055_T5 --> n0055_T4
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1035,62 +1100,65 @@ graph LR
 | CLAUDE.md | 0032, 0033, 0050, 0051 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040 |
 | backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043 |
-| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052 |
+| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052, 0055 |
 | backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/agent.yaml | 0014, 0030, 0032 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014, 0030, 0032 |
-| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043 |
+| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055 |
 | backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml | 0029, 0042, 0043 |
 | backend/agent_defs/owner/systemprompt.md | 0042, 0043, 0052 |
 | backend/agent_defs/owner/tools/submit_admission.tool.yaml | 0042, 0043, 0052 |
 | backend/agent_defs/triage_agent/agent.yaml | 0027, 0029 |
-| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043 |
+| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043, 0055 |
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
 | backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043, 0052 |
 | backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052 |
-| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055 |
+| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052 |
 | backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052 |
-| backend/auto_designer/designer/role_contract.py | 0043, 0052 |
+| backend/auto_designer/designer/role_contract.py | 0043, 0052, 0055 |
+| backend/auto_designer/designer/session_timeline.py | 0024, 0054, 0055 |
 | backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
-| backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049 |
+| backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
 | backend/auto_designer/dev/harness_boundary.py | 0015, 0030, 0040 |
 | backend/auto_designer/dev/workspace_jail.py | 0015, 0049 |
+| backend/auto_designer/experiment/cli.py | 0047, 0053 |
+| backend/auto_designer/experiment/runtime.py | 0047, 0053 |
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
 | backend/auto_designer/harness/connector.py | 0030, 0035, 0036, 0041 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041, 0051 |
-| backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050 |
+| backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053 |
 | backend/auto_designer/loop/live_tracer.py | 0032, 0041 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051 |
-| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053 |
+| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042 |
-| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051 |
-| backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048 |
-| backend/auto_designer/user/sim/actions.py | 0005, 0035 |
+| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051, 0053, 0054 |
+| backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048, 0053 |
+| backend/auto_designer/user/sim/actions.py | 0005, 0035, 0053 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037 |
 | backend/auto_designer/user/sim/demo.py | 0005, 0037 |
 | backend/auto_designer/user/sim/deps.py | 0009, 0051 |
 | backend/auto_designer/user/sim/dimensions.py | 0005, 0037 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048, 0051 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048, 0051, 0053, 0054 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
-| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048, 0054 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009, 0051 |
 | backend/auto_designer/user/sim/seed_source.py | 0009, 0051 |
 | backend/auto_designer/user/sim/sources/docker_seed.py | 0044, 0051 |
-| backend/auto_designer/user/sim/state.py | 0005, 0012, 0037 |
+| backend/auto_designer/user/sim/state.py | 0005, 0012, 0037, 0053 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022, 0051 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009, 0051 |
 | backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
@@ -1111,25 +1179,29 @@ graph LR
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041, 0051 |
 | backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
+| backend/scripts/evaluate_role_traces.py | 0043, 0055 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
 | backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051 |
 | backend/tests/designer/test_agent_contract.py | 0027, 0043, 0052 |
 | backend/tests/designer/test_agent_runtime.py | 0029, 0041, 0049 |
-| backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043 |
+| backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043, 0055 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
 | backend/tests/designer/test_owner.py | 0029, 0032, 0042, 0043, 0052 |
 | backend/tests/designer/test_role_contract.py | 0043, 0052 |
-| backend/tests/designer/test_role_contract_flow.py | 0042, 0043 |
-| backend/tests/designer/test_triage.py | 0025, 0027, 0029, 0042, 0043 |
+| backend/tests/designer/test_role_contract_flow.py | 0042, 0043, 0055 |
+| backend/tests/designer/test_session_timeline.py | 0024, 0054 |
+| backend/tests/designer/test_triage.py | 0025, 0027, 0029, 0042, 0043, 0055 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/dev/test_completion_gate.py | 0014, 0030 |
 | backend/tests/dev/test_harness_boundary.py | 0015, 0030, 0040 |
 | backend/tests/dev/test_workspace_jail.py | 0015, 0049 |
+| backend/tests/experiment/test_cli.py | 0047, 0053 |
+| backend/tests/experiment/test_runtime.py | 0047, 0053 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051 |
 | backend/tests/harness/test_template_entry.py | 0013, 0051 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055 |
 | backend/tests/loop/test_live.py | 0017, 0026, 0050 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051 |
@@ -1138,24 +1210,24 @@ graph LR
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0051 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
-| backend/tests/test_models.py | 0001, 0024, 0051 |
+| backend/tests/test_models.py | 0001, 0024, 0051, 0053, 0054 |
 | backend/tests/test_run_swebench_closed_loop.py | 0044, 0047 |
 | backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042 |
-| backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048 |
+| backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048, 0053 |
 | backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
 | backend/tests/user/sim/test_docker_seed_source.py | 0044, 0051 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037, 0048 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037, 0048, 0053 |
 | backend/tests/user/sim/test_inner_prompt.py | 0008, 0031, 0048 |
-| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036, 0048, 0051 |
-| backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031, 0048 |
+| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036, 0048, 0051, 0053, 0054 |
+| backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031, 0048, 0053, 0054 |
 | backend/tests/user/sim/test_persona_io.py | 0006, 0037 |
 | backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031, 0048 |
 | backend/tests/user/sim/test_state.py | 0005, 0012, 0037 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
-| backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051 |
+| backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051, 0054 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
 | frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041 |
@@ -2790,4 +2862,105 @@ graph LR
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
+```
+
+### 0053 Persona 语义动作契约与可审计终止状态机（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 定义语义动作契约与分层结果模型"]
+    nT2["T2 实现动作语义契约与阶段局部 schema"]
+    nT3["T3 实现协议解析修复与错误分级"]
+    nT4["T4 接入独立结果状态与优雅终止状态机"]
+    nT5["T5 补齐事件溯源审计与八会话回归门禁"]
+    nT2 --> nT3
+    nT2 --> nT4
+    nT3 --> nT4
+    nT3 --> nT5
+    nT4 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    classDef st_in_progress fill:#fff3b0;
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_in_progress;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+```
+
+### 0054 用户模拟目标驱动与可修订目标账本（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 目标账本与修订事件模型"]
+    nT2["T2 目标进入用户感知与动作决策"]
+    nT3["T3 目标结果与主客观结论分离"]
+    nT4["T4 时间线投影与目标账本完整审计"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT2 --> nT4
+    nT3 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+```
+
+### 0055 目标感知的需求面证据分层与角色可见性（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 定义目标感知证据包与分层读取契约"]
+    nT2["T2 用户反馈 handoff 与 Triage 单报告输入"]
+    nT3["T3 产品 PM 全局体验输入与产品视角边界"]
+    nT4["T4 Synthesize 提案关系输入与证据下钻约束"]
+    nT5["T5 角色可见性、过拟合和延迟回归评测"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+    nT2 --> nT5
+    nT3 --> nT5
+    nT4 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```

@@ -8,6 +8,7 @@ Orchestrator 只认 run_session_fn(persona, scenario, harness)（返回值不管
 
 from __future__ import annotations
 
+import os
 import uuid
 from collections.abc import Callable
 
@@ -166,6 +167,14 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
                 queued_behind=getattr(t, "queued_behind", "") or "",
                 answers_utterance_id=getattr(t, "answers_utterance_id", "") or "",
                 answers_said=getattr(t, "answers_said", "") or "",
+                goal_before=dict(getattr(t, "goal_before", {}) or {}),
+                goal_reading=[dict(item) for item in (getattr(t, "goal_reading", []) or [])],
+                target_goal_ids=[str(item) for item in (getattr(t, "target_goal_ids", []) or [])],
+                expected_progress=str(getattr(t, "expected_progress", "") or ""),
+                goal_updates=[dict(item) for item in (getattr(t, "goal_updates", []) or [])],
+                goal_after=dict(getattr(t, "goal_after", {}) or {}),
+                goal_effect=dict(getattr(t, "goal_effect", {}) or {}),
+                goal_field_audit=dict(getattr(t, "goal_field_audit", {}) or {}),
             )
             for t in res.turns
         ],
@@ -177,6 +186,13 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
         ],
         evaluation_status=res.evaluation_status,
         evaluation_error=(dict(res.evaluation_error) if res.evaluation_error is not None else None),
+        interaction_status=getattr(res, "interaction_status", "completed"),
+        protocol_events=[dict(event) for event in (getattr(res, "protocol_events", []) or [])],
+        goal_ledger=dict(getattr(res, "goal_ledger", {}) or {}),
+        goal_acceptance=(
+            dict(res.goal_acceptance) if getattr(res, "goal_acceptance", None) is not None else None
+        ),
+        goal_audit=dict(getattr(res, "goal_audit", {}) or {}),
     )
 
 
@@ -343,6 +359,21 @@ def make_sim_run_session_fn(
                     "error": str(exc),
                     "finished_at": utc_now(),
                 }
+        elif (
+            evaluator is None
+            and os.environ.get("AUTO_DESIGNER_OBJECTIVE_EVALUATION", "1").strip().lower()
+            in {"0", "false", "no", "off", "skip"}
+        ):
+            # Preserve an explicit audit marker; skipped is not a pass.
+            objective_evaluation = {
+                "evaluator": "swebench.harness.run_evaluation",
+                "instance_id": str(instance_id) if instance_id else None,
+                "patch_sha256": patch_sha or None,
+                "status": "skipped",
+                "passed": None,
+                "reason": "disabled_by_experiment_config",
+                "finished_at": utc_now(),
+            }
         accept_validity = derive_accept_validity(
             end_reason=res.end_reason,
             request_outcomes=request_outcomes,
@@ -380,6 +411,12 @@ def make_sim_run_session_fn(
                 objective_evaluation=objective_evaluation,
             ),
         )
+        # Spec-0055/T2: materialize the bounded, deterministic user feedback
+        # handoff at session close.  Demand roles consume this projection rather
+        # than reparsing the complete persona trace.
+        from auto_designer.designer.evidence_contract import build_evidence_envelope
+
+        session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
         store.save(session)  # 体感 + session 落本地（issue 权威源在 Gitea）
         if on_turn is not None:
             # 收尾：标 running=False，带 session_id 供看板归档关联全量会话。

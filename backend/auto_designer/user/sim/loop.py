@@ -33,7 +33,13 @@ from .action_space import ActionResolutionError, derive_action_space, resolve_ac
 from .actions import CATALOG, Channel, Effect, Executor, Phase
 from .dimensions import Persona
 from .feeling import FeelingScore, derive_feeling, parse_feeling_llm
-from .persona_client import PersonaClient, PersonaProtocolError, drain_call_traces
+from .goals import GoalLedger, audit_goal_fields
+from .persona_client import (
+    PersonaClient,
+    PersonaProtocolError,
+    drain_call_traces,
+    drain_protocol_events,
+)
 from .prompt import (
     WAITING_JUDGMENTS,
     build_issue_turn,
@@ -90,6 +96,22 @@ class TurnLog:
     queued_behind: str = ""
     answers_utterance_id: str = ""
     answers_said: str = ""
+    # Explicit user-goal control: compact before/after snapshots plus the model's
+    # declared change/effect.  The complete append-only event history lives on
+    # SessionResult.goal_ledger.
+    goal_before: dict = field(default_factory=dict)
+    # Perception-level goal appraisal.  This is deliberately separate from goal_updates:
+    # reading a goal's progress guides the next decision but does not mutate the ledger.
+    goal_reading: list[dict] = field(default_factory=list)
+    # Intent-level binding: which goals this decision is trying to move, and how.
+    target_goal_ids: list[str] = field(default_factory=list)
+    expected_progress: str = ""
+    goal_updates: list[dict] = field(default_factory=list)
+    goal_after: dict = field(default_factory=dict)
+    goal_effect: dict = field(default_factory=dict)
+    # Soft content/integrity audit for goal_reading, targets, expected progress and effect.
+    # Warnings are observational and never turn a valid user decision into a protocol error.
+    goal_field_audit: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -154,6 +176,17 @@ class SessionResult:
     # Spec-0048：评估器协议异常与 harness 任务失败分轨；invalid 结果不得计入正常通过率。
     evaluation_status: str = "valid"
     evaluation_error: dict | None = None
+    # 轻量协议分轨：保留 evaluation_status 的旧兼容语义，同时让消费者知道是否只是
+    # persona 输出契约失败，而不是把它误读成用户 give_up 或客观代码失败。
+    interaction_status: str = "completed"
+    # Every failed contract attempt is retained separately from persona_tail so an
+    # auditor can distinguish malformed output, recovery, and the eventual outcome.
+    protocol_events: list[dict] = field(default_factory=list)
+    # Explicit goal ledger snapshot and terminal claim.  Objective evaluation remains separate.
+    goal_ledger: dict = field(default_factory=dict)
+    goal_acceptance: dict | None = None
+    # Final non-gating integrity audit; per-turn audits live on TurnLog.
+    goal_audit: dict = field(default_factory=dict)
 
 
 MAX_TURNS = 24
@@ -176,6 +209,9 @@ _HARNESS_TERMINAL_STATUSES = frozenset({"timed_out", "crashed"})
 _HEARTBEAT_SEC = 90.0
 # 心跳唤醒次数硬上限（兜底防病态：模型一直 keep_waiting 而 harness 永不回）。到顶即强制放弃。
 _MAX_HEARTBEATS = 8
+# A malformed persona reply is not a user give-up. Allow one warning heartbeat
+# to keep listening; repeated failures then stop safely with an auditable status.
+_MAX_PROTOCOL_STALL_HEARTBEATS = 2
 # 等待菜单：内 = send_message；外 = interrupt（Ctrl+C）+ give_up；keep_waiting = 决定继续等。
 WAITING_ACTIONS = ["keep_waiting", "send_message", "interrupt", "give_up"]
 
@@ -210,6 +246,13 @@ def _take_persona_calls(client: PersonaClient, role: str) -> list[dict]:
         tagged["role"] = role
         out.append(tagged)
     return out
+
+
+def _take_protocol_events(client: PersonaClient, result: SessionResult) -> None:
+    """Drain protocol evidence into the session; never raise on an audit side channel."""
+    for event in drain_protocol_events(client):
+        if isinstance(event, dict):
+            result.protocol_events.append(dict(event))
 
 
 _PRIVATE_EVIDENCE_MAX_ITEMS = 8
@@ -354,6 +397,36 @@ def _resolve_intent(ret: dict) -> str:
     return raw
 
 
+def _goal_reading(raw: object) -> list[dict]:
+    """Keep the model's per-turn goal appraisal as an auditable soft signal.
+
+    Missing or malformed readings are intentionally tolerated.  The goal layer guides
+    cognition; it is not a protocol gate that can invalidate a session.
+    """
+    values = raw if isinstance(raw, list) else ([raw] if isinstance(raw, dict) else [])
+    return [dict(item) for item in values if isinstance(item, dict)]
+
+
+def _goal_ids(raw: object) -> list[str]:
+    """Normalize soft intent target ids without rejecting unknown future goal ids."""
+    values = raw if isinstance(raw, list) else ([raw] if isinstance(raw, str) else [])
+    out: list[str] = []
+    for item in values:
+        value = str(item).strip()
+        if value and value not in out:
+            out.append(value)
+    return out
+
+
+def _current_goal_text(task: str, goal_ledger: GoalLedger | None) -> str:
+    """Use the current B0 wording for cognition; keep the seed task in the ledger audit."""
+    if goal_ledger is not None:
+        baseline = goal_ledger.goals.get(goal_ledger.baseline_id)
+        if baseline is not None and baseline.text.strip():
+            return baseline.text.strip()
+    return task
+
+
 def _main_decide(
     *,
     client: PersonaClient,
@@ -368,6 +441,8 @@ def _main_decide(
     appraise_task: bool,
     result: SessionResult,
     phase: str,
+    goal_frame: dict | None = None,
+    goal_ledger: GoalLedger | None = None,
 ) -> tuple[dict, list[dict], str, bool]:
     """主 loop 决策：judge → intent → [一次 final-check → rejudge → reintent] → act。
 
@@ -375,16 +450,31 @@ def _main_decide(
     judge 的 perceive/verdict/task_load 已合并进 act_ret，供后续 apply_verdict / 开局 task_load。
     """
     calls: list[dict] = []
+    goal_updates: list = []
+    current_goal_frame = goal_frame
+    decision_task = _current_goal_text(task, goal_ledger)
+
+    def apply_goal_updates(raw: object) -> None:
+        """Apply updates between cognitive stages so this turn sees its own changes."""
+        nonlocal current_goal_frame, decision_task
+        if goal_ledger is None or raw is None:
+            return
+        values = goal_ledger.apply_updates(raw, turn=state.turn + 1)
+        goal_updates.extend(values)
+        current_goal_frame = goal_ledger.prompt_snapshot()
+        decision_task = _current_goal_text(task, goal_ledger)
+
     jret = client.respond(
         system,
         build_main_judge_turn(
-            task,
+            decision_task,
             history,
             harness_output,
             [],  # judge 不看当前动作菜单；只在 act 收敛阶段暴露真实 action_space
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=current_goal_frame,
             appraise_task=appraise_task,
         ),
     )
@@ -394,18 +484,24 @@ def _main_decide(
     perceive = str(jret.get("perceive", ""))
     verdict = str(jret.get("verdict", "unsure"))
     task_load = jret.get("task_load")
+    goal_reading = _goal_reading(jret.get("goal_reading"))
+    apply_goal_updates(jret.get("goal_update"))
+    target_goal_ids: list[str] = []
+    expected_progress = ""
     iret = client.respond(
         system,
         build_main_intent_turn(
-            task,
+            decision_task,
             history,
             harness_output,
             [],  # intent 仍是开放意愿，不看当前动作菜单
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=current_goal_frame,
             verdict=verdict,
             perceive=perceive,
+            goal_reading=goal_reading,
             final_check_available=phase == Phase.ACTIVE.value,
         ),
     )
@@ -413,6 +509,9 @@ def _main_decide(
     calls.extend(new_calls)
     _record_private_evidence(state=state, calls=new_calls, phase=phase)
     intent = _resolve_intent(iret)
+    target_goal_ids = _goal_ids(iret.get("target_goal_ids"))
+    expected_progress = str(iret.get("expected_progress") or "").strip()
+    apply_goal_updates(iret.get("goal_update"))
 
     # Spec-0048：仅 ACTIVE 的本决策周期允许一次最终私有核查；无论核查成功、不可用或
     # 协议失败，之后都必须经过无工具 rejudge/reintent，并且不能在同一周期再次回跳。
@@ -424,12 +523,13 @@ def _main_decide(
             cret = client.respond(
                 system,
                 build_main_final_check_turn(
-                    task,
+                    decision_task,
                     history,
                     harness_output,
                     state,
                     help_text=help_text,
                     harness_events=harness_events,
+                    goal_frame=current_goal_frame,
                     verdict=verdict,
                     perceive=perceive,
                     intent=intent,
@@ -453,12 +553,13 @@ def _main_decide(
         rjret = client.respond(
             system,
             build_main_rejudge_turn(
-                task,
+                decision_task,
                 history,
                 harness_output,
                 state,
                 help_text=help_text,
                 harness_events=harness_events,
+                goal_frame=current_goal_frame,
                 prior_verdict=verdict,
                 prior_perceive=perceive,
                 check_status=check_status,
@@ -470,38 +571,49 @@ def _main_decide(
         _record_private_evidence(state=state, calls=new_calls, phase=phase)
         perceive = str(rjret.get("perceive") or "")
         verdict = str(rjret.get("verdict") or "unsure")
+        goal_reading = _goal_reading(rjret.get("goal_reading"))
+        apply_goal_updates(rjret.get("goal_update"))
 
         riret = client.respond(
             system,
             build_main_reintent_turn(
-                task,
+                decision_task,
                 history,
                 harness_output,
                 state,
                 help_text=help_text,
                 harness_events=harness_events,
+                goal_frame=current_goal_frame,
                 verdict=verdict,
                 perceive=perceive,
+                goal_reading=goal_reading,
             ),
         )
         new_calls = _take_persona_calls(client, "main_reintent")
         calls.extend(new_calls)
         _record_private_evidence(state=state, calls=new_calls, phase=phase)
         intent = _resolve_intent(riret)
+        target_goal_ids = _goal_ids(riret.get("target_goal_ids"))
+        expected_progress = str(riret.get("expected_progress") or "").strip()
+        apply_goal_updates(riret.get("goal_update"))
 
     aret = client.respond(
         system,
         build_main_act_turn(
-            task,
+            decision_task,
             history,
             harness_output,
             space,
             state,
             help_text=help_text,
             harness_events=harness_events,
+            goal_frame=current_goal_frame,
             verdict=verdict,
             perceive=perceive,
             intent=intent,
+            goal_reading=goal_reading,
+            target_goal_ids=target_goal_ids,
+            expected_progress=expected_progress,
         ),
     )
     new_calls = _take_persona_calls(client, "main_act")
@@ -509,6 +621,26 @@ def _main_decide(
     _record_private_evidence(state=state, calls=new_calls, phase=phase)
     _drain_issue_notes(client, result)
     gap = _resolve_gap(aret)
+    act_target_ids = _goal_ids(aret.get("target_goal_ids"))
+    if act_target_ids:
+        target_goal_ids = act_target_ids
+    act_expected_progress = str(aret.get("expected_progress") or "").strip()
+    if act_expected_progress:
+        expected_progress = act_expected_progress
+    apply_goal_updates(aret.get("goal_update"))
+    goal_effect = aret.get("goal_effect") if isinstance(aret.get("goal_effect"), dict) else {}
+    goal_field_audit = (
+        audit_goal_fields(
+            goal_ledger,
+            goal_reading=goal_reading,
+            target_goal_ids=target_goal_ids,
+            expected_progress=expected_progress,
+            goal_effect=goal_effect,
+            goal_updates=goal_updates,
+        )
+        if goal_ledger is not None
+        else {}
+    )
     merged = {
         "perceive": perceive,
         "verdict": verdict,
@@ -516,7 +648,17 @@ def _main_decide(
         "action": aret.get("action"),
         "message": aret.get("message", ""),
         "gap": gap,
+        "goal_reading": goal_reading,
+        "target_goal_ids": target_goal_ids,
+        "expected_progress": expected_progress,
+        "goal_field_audit": goal_field_audit,
     }
+    if goal_updates:
+        # These are already applied summaries, not raw updates.  Keeping them under a
+        # separate key prevents run_session from applying them a second time.
+        merged["goal_updates_applied"] = goal_updates
+    if "goal_effect" in aret:
+        merged["goal_effect"] = aret.get("goal_effect")
     if task_load is not None:
         merged["task_load"] = task_load
     return merged, calls, intent, gap
@@ -606,6 +748,14 @@ def _log_waiting(
     on_progress: Callable[[SessionResult], None] | None,
     persona_trace: list,
     ledger: _UtteranceLedger,
+    goal_before: dict | None = None,
+    goal_reading: list[dict] | None = None,
+    target_goal_ids: list[str] | None = None,
+    expected_progress: str = "",
+    goal_updates: list[dict] | None = None,
+    goal_after: dict | None = None,
+    goal_effect: dict | None = None,
+    goal_field_audit: dict | None = None,
 ) -> None:
     """把一次心跳唤醒的等待决策记为 phase='waiting' 的 TurnLog（观测用，不占 harness_output）。
 
@@ -647,6 +797,14 @@ def _log_waiting(
             utterance_id=utterance_id,
             delivery=delivery,
             queued_behind=queued_behind,
+            goal_before=dict(goal_before or {}),
+            goal_reading=[dict(item) for item in (goal_reading or [])],
+            target_goal_ids=list(target_goal_ids or []),
+            expected_progress=expected_progress,
+            goal_updates=[dict(item) for item in (goal_updates or [])],
+            goal_after=dict(goal_after or {}),
+            goal_effect=dict(goal_effect or {}),
+            goal_field_audit=dict(goal_field_audit or {}),
         )
     )
     if gap:
@@ -726,8 +884,30 @@ def _finalize_terminal(
         "accept_with_reservations": "accepted",
     }.get(action_id)
     if issue_mode is not None:
-        issue_resp = client.respond(system, build_issue_turn(task, history, state, mode=issue_mode))
+        try:
+            issue_resp = client.respond(
+                system, build_issue_turn(task, history, state, mode=issue_mode)
+            )
+        except PersonaProtocolError as exc:
+            # Terminal issue narration is non-gating. Preserve the chosen terminal
+            # action, but retain a typed warning instead of losing the whole session.
+            result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+            _take_protocol_events(client, result)
+            result.protocol_events.append(
+                {
+                    "stage": exc.stage,
+                    "code": exc.code,
+                    "attempts": exc.attempts,
+                    "status": "warning",
+                    "terminal_narration": True,
+                }
+            )
+            result.signals.append(
+                f"PERSONA_PROTOCOL_WARNING: stage={exc.stage} code={exc.code} terminal_narration"
+            )
+            return
         result.persona_tail.extend(_take_persona_calls(client, "file_issue"))
+        _take_protocol_events(client, result)
         issue_text = str(issue_resp.get("issue") or "")
         result.issue_artifact = emit_issue_artifact(persona, result.turns, issue_text)
 
@@ -765,6 +945,8 @@ def _heartbeat_once(
     progress_seen: int,
     heartbeats: int,
     ledger: _UtteranceLedger,
+    goal_frame: dict | None = None,
+    goal_ledger: GoalLedger | None = None,
 ) -> tuple[str, str, bool, int]:
     """一次性等待决策（timer 触发）。任意动作（含 keep_waiting）做完即结束本次心跳。
 
@@ -773,21 +955,32 @@ def _heartbeat_once(
     强制 give_up：心跳次数触顶，或 keep_waiting 且无新进度把耐心耗尽。
     """
     new_progress = len(progress) > progress_seen
+    goal_before = goal_ledger.snapshot() if goal_ledger is not None else {}
+    decision_task = _current_goal_text(task, goal_ledger)
     seen = len(progress)
     ctx = dict(
-        task=task,
+        task=decision_task,
         history_lines=history,
         state=state,
         help_text=help_text,
         waited_sec=waited_sec,
         progress=progress,
         prior_activity=prior_activity,
+        goal_frame=goal_frame,
     )
     jret = client.respond(system, build_waiting_judge_turn(**ctx))
     wait_calls = _take_persona_calls(client, "waiting_judge")
     _record_private_evidence(state=state, calls=wait_calls, phase="waiting")
     judgment = _resolve_judgment(jret)
     perceive = str(jret.get("perceive", ""))
+    goal_reading = _goal_reading(jret.get("goal_reading"))
+    goal_updates: list[dict] = []
+    if goal_ledger is not None and jret.get("goal_update") is not None:
+        raw_updates = jret["goal_update"]
+        raw_updates = raw_updates if isinstance(raw_updates, list) else [raw_updates]
+        goal_updates.extend(goal_ledger.apply_updates(raw_updates, turn=state.turn))
+        ctx["goal_frame"] = goal_ledger.prompt_snapshot()
+        ctx["task"] = _current_goal_text(task, goal_ledger)
     iret = client.respond(
         system,
         build_waiting_intent_turn(
@@ -800,6 +993,14 @@ def _heartbeat_once(
     wait_calls.extend(new_calls)
     _record_private_evidence(state=state, calls=new_calls, phase="waiting")
     intent = _resolve_intent(iret)
+    target_goal_ids = _goal_ids(iret.get("target_goal_ids"))
+    expected_progress = str(iret.get("expected_progress") or "").strip()
+    if goal_ledger is not None and iret.get("goal_update") is not None:
+        raw_updates = iret["goal_update"]
+        raw_updates = raw_updates if isinstance(raw_updates, list) else [raw_updates]
+        goal_updates.extend(goal_ledger.apply_updates(raw_updates, turn=state.turn))
+        ctx["goal_frame"] = goal_ledger.prompt_snapshot()
+        ctx["task"] = _current_goal_text(task, goal_ledger)
     aret = client.respond(
         system,
         build_waiting_act_turn(
@@ -807,13 +1008,32 @@ def _heartbeat_once(
             judgment=judgment,
             perceive=perceive,
             intent=intent,
+            target_goal_ids=target_goal_ids,
+            expected_progress=expected_progress,
         ),
     )
     new_calls = _take_persona_calls(client, "waiting_act")
     wait_calls.extend(new_calls)
     _record_private_evidence(state=state, calls=new_calls, phase="waiting")
     _drain_issue_notes(client, result)
+    if goal_ledger is not None and aret.get("goal_update") is not None:
+        raw_updates = aret["goal_update"]
+        raw_updates = raw_updates if isinstance(raw_updates, list) else [raw_updates]
+        goal_updates.extend(goal_ledger.apply_updates(raw_updates, turn=state.turn))
     action, wait_message, gap = _resolve_waiting(aret)
+    goal_effect = aret.get("goal_effect") if isinstance(aret.get("goal_effect"), dict) else {}
+    goal_field_audit = (
+        audit_goal_fields(
+            goal_ledger,
+            goal_reading=goal_reading,
+            target_goal_ids=target_goal_ids,
+            expected_progress=expected_progress,
+            goal_effect=goal_effect,
+            goal_updates=goal_updates,
+        )
+        if goal_ledger is not None
+        else {}
+    )
     if heartbeats >= _MAX_HEARTBEATS:
         action = "give_up"
         wait_message = ""
@@ -837,6 +1057,14 @@ def _heartbeat_once(
         on_progress=on_progress,
         persona_trace=wait_calls,
         ledger=ledger,
+        goal_before=goal_before,
+        goal_reading=goal_reading,
+        target_goal_ids=target_goal_ids,
+        expected_progress=expected_progress,
+        goal_updates=goal_updates,
+        goal_after=goal_ledger.snapshot() if goal_ledger is not None else {},
+        goal_effect=goal_effect,
+        goal_field_audit=goal_field_audit,
     )
     _note_waiting_memory(
         history,
@@ -876,6 +1104,8 @@ def _await_harness(
     prior_activity: list[dict],
     ledger: _UtteranceLedger,
     open_utterance_id: str,
+    goal_frame: dict | None = None,
+    goal_ledger: GoalLedger | None = None,
 ) -> tuple[str, float, str | None, str | None]:
     """写消息后进入 AwaitEvent：reply → 交主 loop；timer → 一次性心跳后回到 AwaitEvent。
 
@@ -904,6 +1134,7 @@ def _await_harness(
     ledger.mark_open(open_utterance_id)
     heartbeats = 0
     progress_seen = 0
+    protocol_failures = 0
     while True:
         # —— AwaitEvent ——
         try:
@@ -926,24 +1157,72 @@ def _await_harness(
         clock.observe(begin_at + waited)
         heartbeats += 1
         progress = list(getattr(harness, "last_progress", None) or [])
-        action, wait_message, _gap, progress_seen = _heartbeat_once(
-            client=client,
-            system=system,
-            task=task,
-            history=history,
-            clock=clock,
-            state=state,
-            coef=coef,
-            help_text=help_text,
-            result=result,
-            on_progress=on_progress,
-            prior_activity=prior_activity,
-            waited_sec=waited,
-            progress=progress,
-            progress_seen=progress_seen,
-            heartbeats=heartbeats,
-            ledger=ledger,
+        current_goal_frame = (
+            goal_ledger.prompt_snapshot() if goal_ledger is not None else goal_frame
         )
+        try:
+            action, wait_message, _gap, progress_seen = _heartbeat_once(
+                client=client,
+                system=system,
+                task=task,
+                history=history,
+                clock=clock,
+                state=state,
+                coef=coef,
+                help_text=help_text,
+                result=result,
+                on_progress=on_progress,
+                prior_activity=prior_activity,
+                waited_sec=waited,
+                progress=progress,
+                progress_seen=progress_seen,
+                heartbeats=heartbeats,
+                ledger=ledger,
+                goal_frame=current_goal_frame,
+                goal_ledger=goal_ledger,
+            )
+            # A successful complete heartbeat clears only the transient warning;
+            # protocol evidence remains in result.protocol_events.
+            protocol_failures = 0
+        except PersonaProtocolError as exc:
+            protocol_failures += 1
+            result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+            _take_protocol_events(client, result)
+            result.protocol_events.append(
+                {
+                    "stage": exc.stage,
+                    "code": exc.code,
+                    "attempts": exc.attempts,
+                    "heartbeat": heartbeats,
+                    "status": "warning" if protocol_failures < _MAX_PROTOCOL_STALL_HEARTBEATS else "stalled",
+                }
+            )
+            result.signals.append(
+                f"PERSONA_PROTOCOL_WARNING: stage={exc.stage} code={exc.code} "
+                f"attempts={exc.attempts} heartbeat={heartbeats}"
+            )
+            # No fake intent/action, no patience mutation, and no harness write on
+            # a malformed decision. Keep polling once so a later harness reply can
+            # still be judged. Repeated failure becomes a distinct safe terminal.
+            if protocol_failures >= _MAX_PROTOCOL_STALL_HEARTBEATS:
+                result.interaction_status = "protocol_stalled"
+                result.evaluation_status = "invalid"
+                result.evaluation_error = {
+                    "kind": "persona_protocol",
+                    "stage": exc.stage,
+                    "code": exc.code,
+                    "attempts": exc.attempts,
+                    "heartbeat_failures": protocol_failures,
+                }
+                # All protocol evidence has already been copied to result. Close
+                # the harness only at this terminal boundary; the outer connector
+                # also closes idempotently for production sessions.
+                try:
+                    harness.shutdown()
+                except Exception:  # pragma: no cover - cleanup is best effort
+                    pass
+                return "", time.monotonic() - t0, "protocol_stalled", None
+            continue
         # 决策期间 reply 可能已进缓冲：动作执行前先确认；有则作废等待动作，交回主 loop。
         ready = _try_ready_reply(harness)
         if ready is not None:
@@ -1013,6 +1292,8 @@ def run_session(
     system = build_system(persona)
 
     result = SessionResult(persona_id=persona.persona_id, end_reason="max_turns")
+    goal_ledger = GoalLedger.from_task(task)
+    result.goal_ledger = goal_ledger.snapshot()
     history: list[str] = []
     clock = _SessionClock()
     harness_output = ""
@@ -1024,6 +1305,7 @@ def run_session(
     while state.turn < MAX_TURNS:
         set_usage_context(interaction_id=f"turn-{state.turn}", turn_no=state.turn)
         phase = Phase.OPENING if state.turn == 0 and not history else Phase.ACTIVE
+        goal_before = goal_ledger.snapshot()
 
         # ② 派生动作空间
         space = derive_action_space(phase, persona, state)
@@ -1043,9 +1325,13 @@ def run_session(
                 appraise_task=phase is Phase.OPENING,
                 result=result,
                 phase=phase.value,
+                goal_frame=goal_ledger.prompt_snapshot(),
+                goal_ledger=goal_ledger,
             )
         except PersonaProtocolError as exc:
             result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+            _take_protocol_events(client, result)
+            result.interaction_status = "protocol_unrecoverable"
             result.evaluation_status = "invalid"
             result.evaluation_error = {
                 "kind": "persona_protocol",
@@ -1054,7 +1340,24 @@ def run_session(
                 "attempts": exc.attempts,
             }
             result.end_reason = "evaluator_invalid"
+            result.goal_ledger = goal_ledger.snapshot()
+            result.goal_audit = goal_ledger.audit()
             break
+        # _main_decide applies updates between judge/intent/rejudge stages so the current
+        # decision sees them.  Do not apply them again here; this is only the turn-log view.
+        goal_updates = [dict(item) for item in (ret.get("goal_updates_applied") or [])]
+        goal_reading = _goal_reading(ret.get("goal_reading"))
+        target_goal_ids = _goal_ids(ret.get("target_goal_ids"))
+        expected_progress = str(ret.get("expected_progress") or "").strip()
+        goal_effect = ret.get("goal_effect") if isinstance(ret.get("goal_effect"), dict) else {}
+        goal_field_audit = (
+            dict(ret.get("goal_field_audit") or {})
+            if isinstance(ret.get("goal_field_audit"), dict)
+            else {}
+        )
+        goal_after = goal_ledger.snapshot()
+        result.goal_ledger = goal_after
+        result.goal_audit = goal_ledger.audit()
         # 开局：据 persona 主观任务量读数，在耐心基线上叠加一次性小浮动（同一个人接不同任务耐心不同）。
         if phase is Phase.OPENING:
             apply_task_load(state, str(ret.get("task_load", "normal")))
@@ -1070,8 +1373,10 @@ def run_session(
             action_id, message = resolve_action(ret, space, persona)
         except (PersonaProtocolError, ActionResolutionError) as exc:
             result.persona_tail.extend(decide_calls)
+            result.interaction_status = "protocol_unrecoverable"
             if isinstance(exc, PersonaProtocolError):
                 result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+                _take_protocol_events(client, result)
                 detail = {
                     "kind": "persona_protocol",
                     "stage": exc.stage,
@@ -1087,6 +1392,8 @@ def run_session(
             result.evaluation_status = "invalid"
             result.evaluation_error = detail
             result.end_reason = "evaluator_invalid"
+            result.goal_ledger = goal_ledger.snapshot()
+            result.goal_audit = goal_ledger.audit()
             break
         spec = CATALOG[action_id]
 
@@ -1106,7 +1413,11 @@ def run_session(
             answers_id, answers_said = ledger.consume_pending_answers()
         utterance_id = ""
         delivery = ""
-        if spec.channel is Channel.EMIT and message.strip():
+        if (
+            spec.channel is Channel.EMIT
+            and spec.effect is not Effect.TERMINATE
+            and message.strip()
+        ):
             utterance_id = ledger.alloc(message)
             delivery = "open"
 
@@ -1134,6 +1445,14 @@ def run_session(
                 delivery=delivery,
                 answers_utterance_id=answers_id,
                 answers_said=answers_said,
+                goal_before=goal_before,
+                goal_reading=goal_reading,
+                target_goal_ids=target_goal_ids,
+                expected_progress=expected_progress,
+                goal_updates=goal_updates,
+                goal_after=goal_after,
+                goal_effect=goal_effect,
+                goal_field_audit=goal_field_audit,
             )
         )
         if gap:
@@ -1147,13 +1466,22 @@ def run_session(
 
         # ⑥ 终止判定（三种终止都以本人口吻留一条自包含 issue，见 _finalize_terminal）
         if spec.effect is Effect.TERMINATE:
+            result.goal_acceptance = goal_ledger.terminal_check(action_id, goal_effect)
+            if result.goal_acceptance["status"] in {
+                "subjective_accept_unverified",
+                "reservations_with_unmet_goals",
+            }:
+                result.signals.append(
+                    "GOAL_ACCEPT_UNVERIFIED: "
+                    + ",".join(result.goal_acceptance["unresolved_goals"])
+                )
             _finalize_terminal(
                 action_id,
                 result=result,
                 persona=persona,
                 client=client,
                 system=system,
-                task=task,
+                task=_current_goal_text(task, goal_ledger),
                 history=history,
                 state=state,
             )
@@ -1183,6 +1511,8 @@ def run_session(
                 prior_activity=prior_activity,
                 ledger=ledger,
                 open_utterance_id=utterance_id,
+                goal_frame=goal_ledger.prompt_snapshot(),
+                goal_ledger=goal_ledger,
             )
             if terminal_from_wait == "give_up":  # 等待决策放弃：走终止路径并结束
                 _finalize_terminal(
@@ -1191,10 +1521,18 @@ def run_session(
                     persona=persona,
                     client=client,
                     system=system,
-                    task=task,
+                    task=_current_goal_text(task, goal_ledger),
                     history=history,
                     state=state,
                 )
+                break
+            if terminal_from_wait == "protocol_stalled":
+                # Protocol degradation is not user give-up and must not fabricate a
+                # terminal message or issue. Keep the container/log evidence for the
+                # outer session store, then leave the normal metrics as invalid.
+                result.end_reason = "protocol_stalled"
+                result.interaction_status = "protocol_stalled"
+                result.evaluation_status = "invalid"
                 break
         else:
             nxt = route(action_id, message, state, harness, harness_output)
@@ -1264,10 +1602,16 @@ def run_session(
                 break
         # 本轮若未产生下一条 harness 输出（例如模型空转），保持上一条可见输出供下一轮继续判断。
 
+    # Flush any recovery events from a successful or normally terminated session.
+    _take_protocol_events(client, result)
     # 评估器协议失败不是用户体验分，也不是 harness 失败；保留审计哨兵但跳过正常评分。
+    result.goal_ledger = goal_ledger.snapshot()
+    result.goal_audit = goal_ledger.audit()
     if result.evaluation_status == "invalid":
         err = result.evaluation_error or {}
         reason = f"Evaluator invalid; exclude from harness metrics: {err.get('code', 'unknown')}"
+        if result.interaction_status in {"protocol_unrecoverable", "protocol_stalled"}:
+            result.signals.append(f"PROTOCOL_UNRECOVERABLE: {err}")
         result.signals.append(f"EVALUATOR_INVALID: {err}")
         result.feeling = FeelingScore(score=2, reason=reason)
         return result
@@ -1280,9 +1624,31 @@ def run_session(
     result.feeling_derived = derive_feeling(result.end_reason, result.turns)
     # ① LLM 自评: persona 在角色内给"这次体验"打 1–4 + 理由 (spec-0001/T3 产出方式)
     set_usage_context(interaction_id=None, turn_no=None, operation="rate")
-    rating = client.respond(system, build_rating_turn(task, history, state))
-    result.persona_tail.extend(_take_persona_calls(client, "rate"))
-    result.feeling = parse_feeling_llm(rating) or result.feeling_derived
+    try:
+        rating = client.respond(
+            system, build_rating_turn(_current_goal_text(task, goal_ledger), history, state)
+        )
+        result.persona_tail.extend(_take_persona_calls(client, "rate"))
+        _take_protocol_events(client, result)
+        result.feeling = parse_feeling_llm(rating) or result.feeling_derived
+    except PersonaProtocolError as exc:
+        # Rating is a non-gating training signal. A malformed rating must not erase
+        # an otherwise complete interaction; use the deterministic derived score.
+        result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+        _take_protocol_events(client, result)
+        result.protocol_events.append(
+            {
+                "stage": exc.stage,
+                "code": exc.code,
+                "attempts": exc.attempts,
+                "status": "warning",
+                "non_gating": True,
+            }
+        )
+        result.signals.append(
+            f"PERSONA_PROTOCOL_WARNING: stage={exc.stage} code={exc.code} rating"
+        )
+        result.feeling = result.feeling_derived
     return result
 
 

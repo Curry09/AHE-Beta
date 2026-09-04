@@ -10,6 +10,7 @@
 - 运行时聚合：用于区分表现相似但机制不同的问题；统计值是证据，不是自动归因。
 - 只读 harness 与 NexAU：先搜索后按需读取，用于验证结构判断。
 - 不提供 session timeline/beat/step 工具。关系判断只依据 ProposalView 已携带的规范化证据，避免脱离 proposal 重新发现需求。
+- ProposalView 中的目标感知内容只作为带 `evidence_ref` 的用户意图证据；B0、当前目标、revision 和用户 accept 都不能被改写成客观验收或实现规格。若来源没有证据引用，就不能自行回到 session 发现单票需求。
 
 ## 结构综合原则
 

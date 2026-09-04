@@ -48,6 +48,7 @@ _ACTIVITY_MAX = 8
 _ACTIVITY_TEXT = 160
 _HEARD_MAX = 1200
 _PRIVATE_STEP_MAX = 6
+_GOAL_TEXT_MAX = 500
 
 # perceive 被 loop 打上的机器头：[judgment|intent→action] …
 _PERCEIVE_HEAD = re.compile(r"^\[.*?\]\s*")
@@ -173,6 +174,86 @@ def _capability_gap(
     }
 
 
+def _compact_goal_snapshot(snapshot: Any) -> dict[str, Any]:
+    """Keep goal context useful for design while excluding the full event log."""
+    if not isinstance(snapshot, dict):
+        return {}
+    goals: list[dict[str, Any]] = []
+    for raw in snapshot.get("goals", []):
+        if not isinstance(raw, dict):
+            continue
+        item: dict[str, Any] = {
+            "goal_id": str(raw.get("goal_id") or ""),
+            "text": str(raw.get("text") or "")[:_GOAL_TEXT_MAX],
+            "kind": str(raw.get("kind") or ""),
+            "status": str(raw.get("status") or ""),
+            "version": raw.get("version"),
+        }
+        if raw.get("initial_text") and raw.get("initial_text") != raw.get("text"):
+            item["initial_text"] = str(raw.get("initial_text") or "")[:_GOAL_TEXT_MAX]
+        if raw.get("done_if"):
+            item["done_if"] = str(raw.get("done_if") or "")[:_GOAL_TEXT_MAX]
+        goals.append(item)
+    return {
+        "baseline_id": snapshot.get("baseline_id"),
+        "focus_goal_id": snapshot.get("focus_goal_id"),
+        "unresolved": list(snapshot.get("unresolved") or []),
+        "baseline_revision_count": snapshot.get("baseline_revision_count", 0),
+        "goals": goals,
+    }
+
+
+def _goal_event_view(event: Any) -> dict[str, Any]:
+    """Clip goal transition text but retain before/after versions for audit."""
+    if not isinstance(event, dict):
+        return {}
+    out: dict[str, Any] = {
+        key: event.get(key)
+        for key in ("seq", "turn", "op", "goal_id", "actor", "reason", "evidence_refs")
+        if event.get(key) not in (None, "", [])
+    }
+    for key in ("before", "after"):
+        value = event.get(key)
+        if isinstance(value, dict):
+            compact = _compact_goal_snapshot({"goals": [value]})
+            if compact.get("goals"):
+                out[key] = compact["goals"][0]
+    for key in ("text", "status", "kind"):
+        if event.get(key) not in (None, ""):
+            value = event[key]
+            out[key] = str(value)[:_GOAL_TEXT_MAX] if key == "text" else value
+    return out
+
+
+def _goal_turn_view(turn: SimTurn) -> dict[str, Any] | None:
+    """Expose goal semantics beside each decision for downstream design audit."""
+    if not any(
+        (
+            turn.goal_before,
+            turn.goal_reading,
+            turn.target_goal_ids,
+            turn.expected_progress,
+            turn.goal_updates,
+            turn.goal_after,
+            turn.goal_effect,
+            turn.goal_field_audit,
+        )
+    ):
+        return None
+    return {
+        "before": _compact_goal_snapshot(turn.goal_before),
+        "reading": [dict(item) for item in (turn.goal_reading or []) if isinstance(item, dict)],
+        "targets": list(turn.target_goal_ids or []),
+        "expected_progress": (turn.expected_progress or "").strip(),
+        "updates": [dict(item) for item in (turn.goal_updates or []) if isinstance(item, dict)],
+        "after": _compact_goal_snapshot(turn.goal_after),
+        "effect": dict(turn.goal_effect or {}) if isinstance(turn.goal_effect, dict) else {},
+        "field_audit": dict(turn.goal_field_audit or {})
+        if isinstance(turn.goal_field_audit, dict)
+        else {},
+    }
+
+
 def _project_turn(turn: SimTurn) -> dict[str, Any]:
     """一轮 → 一条使用事件（去仿真外壳，留珍贵上帝视角标注）。"""
     parsed_list = _parsed_from(turn)
@@ -240,6 +321,10 @@ def _project_turn(turn: SimTurn) -> dict[str, Any]:
     if gap is not None:
         event["capability_gap"] = gap
 
+    goal = _goal_turn_view(turn)
+    if goal is not None:
+        event["goal"] = goal
+
     return event
 
 
@@ -278,6 +363,24 @@ def _project_sim_trace(trace: SimTrace) -> dict[str, Any]:
         "end_reason": trace.end_reason,
         "events": events,
     }
+    if trace.goal_ledger:
+        ledger = dict(trace.goal_ledger)
+        out["goal_ledger"] = {
+            "baseline_id": ledger.get("baseline_id"),
+            "focus_goal_id": ledger.get("focus_goal_id"),
+            "goals": _compact_goal_snapshot(ledger).get("goals", []),
+            "unresolved": list(ledger.get("unresolved") or []),
+            "baseline_revision_count": ledger.get("baseline_revision_count", 0),
+            "events": [
+                _goal_event_view(event)
+                for event in (ledger.get("events") or [])
+                if isinstance(event, dict)
+            ],
+        }
+    if trace.goal_audit:
+        out["goal_audit"] = dict(trace.goal_audit)
+    if trace.goal_acceptance is not None:
+        out["goal_acceptance"] = dict(trace.goal_acceptance)
     # WAIT_GAP 等信号若已落在 turns 的 capability_gap，这里不再原样甩机器信号串
     return out
 
@@ -362,9 +465,58 @@ def _resolve_session(
     return {"ok": False, "error": "provide issue_number or session_id"}
 
 
+def _check_role_access(*, level: str, session_id: str, reason: str = "") -> dict[str, Any] | None:
+    """Enforce the role matrix at the tool boundary (prompts are not a permission system)."""
+    from auto_designer.usage import current_usage_context
+
+    ctx = current_usage_context()
+    role = str(ctx.role or "").strip().lower()
+    known_roles = {
+        "triager", "triage", "triage_agent", "divergent", "pm", "divergent_pm",
+        "designer", "synthesize", "owner",
+    }
+    if role and role not in known_roles:
+        from auto_designer.designer.evidence_contract import record_evidence_access
+
+        record_evidence_access(
+            level=level,
+            session_id=session_id,
+            reason="unknown role",
+            allowed=False,
+        )
+        return {"ok": False, "error": f"role {role} cannot read evidence"}
+    if role in {"owner", "designer", "synthesize"} and level in {"L2", "L3", "L4"}:
+        from auto_designer.designer.evidence_contract import record_evidence_access
+
+        record_evidence_access(
+            level=level,
+            session_id=session_id,
+            reason=reason or "role visibility denial",
+            allowed=False,
+        )
+        return {"ok": False, "error": f"role {role} cannot directly read {level} evidence"}
+    if role in {"triager", "triage", "triage_agent"}:
+        bound = str(ctx.session_id or "").strip()
+        if bound and bound != session_id:
+            from auto_designer.designer.evidence_contract import record_evidence_access
+
+            record_evidence_access(
+                level=level,
+                session_id=session_id,
+                reason=reason or "triage session mismatch",
+                allowed=False,
+            )
+            return {
+                "ok": False,
+                "error": "triage evidence is limited to the session linked to the current report",
+            }
+    return None
+
+
 def get_session_timeline(
     issue_number: int | None = None,
     session_id: str | None = None,
+    reason: str = "",
     agent_state: Any = None,  # noqa: ARG001 — nexau 注入，未用
 ) -> dict[str, Any]:
     """设计师 tool：按 issue 或 session_id 取一局使用事件时间线（投影，非 raw dump）。"""
@@ -372,12 +524,29 @@ def get_session_timeline(
     resolved = _resolve_session(issue_number=issue_number, session_id=session_id)
     if isinstance(resolved, dict):
         return resolved
+    denied = _check_role_access(level="L2", session_id=resolved.session_id, reason=reason)
+    if denied is not None:
+        return denied
+    from auto_designer.designer.evidence_contract import record_evidence_access
+
+    record_evidence_access(
+        level="L2",
+        session_id=resolved.session_id,
+        reason=reason,
+        allowed=True,
+    )
     text = format_session_timeline(resolved)
-    return {
+    result: dict[str, Any] = {
         "ok": True,
         "session_id": resolved.session_id,
         "timeline": text,
+        "evidence_access": {
+            "level": "L2",
+            "reason": str(reason or "unspecified"),
+            "session_id": resolved.session_id,
+        },
     }
+    return result
 
 
 # ── get_harness_beat：按需下钻某一拍 harness 内层做了什么 ─────────────────────
@@ -456,10 +625,15 @@ def _candidate_beats(*, trace: SimTrace, turn: int) -> list[SimTurn]:
     return with_harness or matches
 
 
-def format_harness_beat(*, session: Session, turn: int, occurrence: int) -> dict[str, Any]:
+def format_harness_beat(
+    *, session: Session, turn: int, occurrence: int, reason: str = ""
+) -> dict[str, Any]:
     """Session × turn → 某一拍 harness 活动细节（供 tool 返回）。"""
     if session.sim_trace is None:
         return {"ok": False, "error": "session has no sim_trace"}
+    denied = _check_role_access(level="L3", session_id=session.session_id, reason=reason)
+    if denied is not None:
+        return denied
     candidates = _candidate_beats(trace=session.sim_trace, turn=turn)
     if not candidates:
         return {
@@ -482,7 +656,7 @@ def format_harness_beat(*, session: Session, turn: int, occurrence: int) -> dict
     if len(heard) > _BEAT_HEARD_MAX:
         heard = heard[:_BEAT_HEARD_MAX] + "…"
     steps = _format_beat_steps(steps=list(beat.harness_steps or []))
-    return {
+    result: dict[str, Any] = {
         "ok": True,
         "session_id": session.session_id,
         "turn": beat.turn,
@@ -506,6 +680,12 @@ def format_harness_beat(*, session: Session, turn: int, occurrence: int) -> dict
             "infrastructure cap), not to the SWE task."
         ),
     }
+    goal = _goal_turn_view(beat)
+    if goal is not None:
+        # Keep the same goal context at the second level so designers do not have
+        # to join a beat back to its parent timeline to understand its purpose.
+        result["goal"] = goal
+    return result
 
 
 def get_harness_beat(
@@ -513,6 +693,7 @@ def get_harness_beat(
     issue_number: int | None = None,
     session_id: str | None = None,
     occurrence: int = 0,
+    reason: str = "",
     agent_state: Any = None,  # noqa: ARG001 — nexau 注入，未用
 ) -> dict[str, Any]:
     """设计师 tool：下钻某一拍（timeline 的 t）看 harness 内层做了哪些 tool。
@@ -528,7 +709,24 @@ def get_harness_beat(
         occ = int(occurrence)
     except (TypeError, ValueError):
         return {"ok": False, "error": "turn and occurrence must be integers"}
-    return format_harness_beat(session=resolved, turn=turn_n, occurrence=occ)
+    result = format_harness_beat(session=resolved, turn=turn_n, occurrence=occ, reason=reason)
+    if result.get("ok"):
+        from auto_designer.designer.evidence_contract import record_evidence_access
+
+        record_evidence_access(
+            level="L3",
+            session_id=resolved.session_id,
+            reason=reason,
+            allowed=True,
+            locator=f"turn:{turn_n}",
+        )
+        result["evidence_access"] = {
+            "level": "L3",
+            "reason": str(reason or "unspecified"),
+            "session_id": resolved.session_id,
+            "turn": turn_n,
+        }
+    return result
 
 
 # ── get_harness_step：某一步正文按需展开（仍有硬顶，永不无限）────────────────
@@ -589,7 +787,7 @@ def format_harness_step(
     n_chars = len(raw)
     truncated = n_chars > _STEP_EXPAND_MAX
     text = raw if not truncated else raw[:_STEP_EXPAND_MAX] + "\n…[truncated]"
-    return {
+    result: dict[str, Any] = {
         "ok": True,
         "session_id": session.session_id,
         "turn": picked.turn,
@@ -608,6 +806,12 @@ def format_harness_step(
             "artifact is too large to paste into a design proposal; cite kind/path only."
         ),
     }
+    goal = _goal_turn_view(picked)
+    if goal is not None:
+        # A single harness step is still interpreted in the user's current goal
+        # context; retain only the compact projection, not another raw trace dump.
+        result["goal"] = goal
+    return result
 
 
 def get_harness_step(
@@ -616,6 +820,7 @@ def get_harness_step(
     issue_number: int | None = None,
     session_id: str | None = None,
     occurrence: int = 0,
+    reason: str = "",
     agent_state: Any = None,  # noqa: ARG001 — nexau 注入，未用
 ) -> dict[str, Any]:
     """设计师 tool：展开 get_harness_beat 里某一步的较长正文（仍有硬顶）。
@@ -626,10 +831,31 @@ def get_harness_step(
     resolved = _resolve_session(issue_number=issue_number, session_id=session_id)
     if isinstance(resolved, dict):
         return resolved
+    denied = _check_role_access(level="L4", session_id=resolved.session_id, reason=reason)
+    if denied is not None:
+        return denied
     try:
         turn_n = int(turn)
         occ = int(occurrence)
         idx = int(step_i)
     except (TypeError, ValueError):
         return {"ok": False, "error": "turn, step_i, and occurrence must be integers"}
-    return format_harness_step(session=resolved, turn=turn_n, occurrence=occ, step_i=idx)
+    result = format_harness_step(session=resolved, turn=turn_n, occurrence=occ, step_i=idx)
+    if result.get("ok"):
+        from auto_designer.designer.evidence_contract import record_evidence_access
+
+        record_evidence_access(
+            level="L4",
+            session_id=resolved.session_id,
+            reason=reason,
+            allowed=True,
+            locator=f"turn:{turn_n}:step:{idx}",
+        )
+        result["evidence_access"] = {
+            "level": "L4",
+            "reason": str(reason or "unspecified"),
+            "session_id": resolved.session_id,
+            "turn": turn_n,
+            "step_i": idx,
+        }
+    return result

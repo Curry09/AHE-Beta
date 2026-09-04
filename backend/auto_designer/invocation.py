@@ -124,8 +124,14 @@ def record_invocation(
     replayable: bool = True,
     model: str | None = None,
     agent_def_pin: str | None = None,
+    evidence: dict[str, Any] | None = None,
+    metrics: dict[str, Any] | None = None,
 ) -> None:
-    """Fail-open write of one role invocation. No-op when ROLE_RUNS_DIR is unset."""
+    """Fail-open write of one role invocation. No-op when ROLE_RUNS_DIR is unset.
+
+    ``evidence`` is compact access metadata (level/source ids), never the raw
+    session payload.
+    """
     try:
         root = role_runs_dir()
         if root is None:
@@ -156,6 +162,10 @@ def record_invocation(
                 "captured_at": datetime.now(UTC).isoformat(),
             },
         }
+        if evidence is not None:
+            payload["input"]["evidence"] = dict(evidence)
+        if metrics is not None:
+            payload["metrics"] = dict(metrics)
         InvocationStore(root=root).record(payload=payload)
     except Exception:
         return
