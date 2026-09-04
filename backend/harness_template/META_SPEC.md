@@ -202,3 +202,6 @@ Meta-Spec 只保留跨 issue 的共同地图。
 - NexAU 的实际版本、公开接口和内部实现可能变化；涉及依赖控制点时仍需检查当前
   解释器加载的版本和源码。
 - 现有文件布局是导航线索，不是 Developer 必须遵循的实现清单。
+- Meta-Spec 的渐进式升级（按多轮实验自动扩展或细化共享地图）暂缓。未形成独立
+  SDD Spec、明确的 ownership/delivery/control_effect 和对照实验前，不把一次性实验
+  观察或单个 issue 的局部细节继续写入本文件。
