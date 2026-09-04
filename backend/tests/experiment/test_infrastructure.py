@@ -25,6 +25,13 @@ def test_compose_template_has_no_global_names() -> None:
     assert "io.openagents.experiment_id" in text
 
 
+def test_experiment_egress_allows_configured_wis_gateway() -> None:
+    # Delivery runs inside the isolated vigil network; the host-side API probe
+    # is not sufficient to prove that the configured WIS gateway is reachable.
+    egress = Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "egress-proxy.conf"
+    assert "acl allowed_egress dstdomain .paperbypass.com" in egress.read_text(encoding="utf-8")
+
+
 def test_two_experiments_get_distinct_projects(tmp_path: Path) -> None:
     a = {"experiment_id": "exp-a", "n": 1}
     b = {"experiment_id": "exp-b", "n": 1}
