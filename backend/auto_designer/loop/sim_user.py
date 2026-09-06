@@ -175,6 +175,7 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
                 goal_after=dict(getattr(t, "goal_after", {}) or {}),
                 goal_effect=dict(getattr(t, "goal_effect", {}) or {}),
                 goal_field_audit=dict(getattr(t, "goal_field_audit", {}) or {}),
+                acceptance_basis=dict(getattr(t, "acceptance_basis", {}) or {}),
             )
             for t in res.turns
         ],
@@ -193,6 +194,7 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
             dict(res.goal_acceptance) if getattr(res, "goal_acceptance", None) is not None else None
         ),
         goal_audit=dict(getattr(res, "goal_audit", {}) or {}),
+        terminal_audit=dict(getattr(res, "terminal_audit", {}) or {}),
     )
 
 
@@ -359,11 +361,9 @@ def make_sim_run_session_fn(
                     "error": str(exc),
                     "finished_at": utc_now(),
                 }
-        elif (
-            evaluator is None
-            and os.environ.get("AUTO_DESIGNER_OBJECTIVE_EVALUATION", "1").strip().lower()
-            in {"0", "false", "no", "off", "skip"}
-        ):
+        elif evaluator is None and os.environ.get(
+            "AUTO_DESIGNER_OBJECTIVE_EVALUATION", "1"
+        ).strip().lower() in {"0", "false", "no", "off", "skip"}:
             # Preserve an explicit audit marker; skipped is not a pass.
             objective_evaluation = {
                 "evaluator": "swebench.harness.run_evaluation",

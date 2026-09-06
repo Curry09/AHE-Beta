@@ -251,6 +251,22 @@ def test_resolve_intent_is_open_text() -> None:
     assert _resolve_judgment({"judgment": "on_track"}) == "on_track"
 
 
+def test_waiting_can_report_without_interrupting_or_ending() -> None:
+    note = "Progress updates did not tell me whether my requested check had started."
+    harness = HeartbeatHarness([("pending", 90.0), ("reply", "done at last!")])
+    client = WaitStubClient(
+        actions=["send_message", "accept"],
+        acts=[{"action": "keep_waiting", "report_issue": {"body": note}}],
+        verdict="satisfied",
+    )
+    result = run_session(_persona(), client, harness, TASK)
+    assert result.issue_notes == [note]
+    assert result.end_reason == "accepted"
+    assert harness.interrupts == 0
+    assert harness.emitted == []
+    assert any("feedback recorded for tool developers" in p for p in client.all_prompts)
+
+
 def test_three_mode_keep_waiting_logs_and_calls() -> None:
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done at last!")])
     client = WaitStubClient(

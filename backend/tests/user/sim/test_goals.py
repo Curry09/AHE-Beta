@@ -1,4 +1,9 @@
-from auto_designer.user.sim.goals import GoalLedger, GoalStatus, audit_goal_fields
+from auto_designer.user.sim.goals import (
+    GoalLedger,
+    GoalStatus,
+    audit_acceptance_basis,
+    audit_goal_fields,
+)
 
 
 def test_goal_updates_are_append_only_and_relax_requires_reason() -> None:
@@ -14,9 +19,12 @@ def test_goal_updates_are_append_only_and_relax_requires_reason() -> None:
     )
     assert added == [{"op": "add", "goal_id": "G1"}]
     assert ledger.goals["G1"].status == GoalStatus.OPEN.value
-    assert ledger.apply_updates(
-        {"op": "relax", "goal_id": "G1", "done_if": "a summary is enough"}, turn=2
-    ) == []
+    assert (
+        ledger.apply_updates(
+            {"op": "relax", "goal_id": "G1", "done_if": "a summary is enough"}, turn=2
+        )
+        == []
+    )
     assert ledger.goals["G1"].status == GoalStatus.OPEN.value
     assert ledger.apply_updates(
         {
@@ -90,3 +98,31 @@ def test_terminal_accept_is_normal_after_explicit_goal_completion() -> None:
     )
     result = ledger.terminal_check("accept")
     assert result == {"status": "accepted", "unresolved_goals": []}
+
+
+def test_terminal_close_commits_subjective_goal_atomically() -> None:
+    ledger = GoalLedger.from_task("fix the reproduction example")
+    audit = ledger.commit_terminal_effect(
+        "accept",
+        {"kind": "close", "goal_ids": ["B0"], "evidence_refs": ["harness_request:r1"]},
+        turn=1,
+    )
+    assert audit["status"] == "ok"
+    assert audit["committed_goal_ids"] == ["B0"]
+    assert ledger.goals["B0"].status == GoalStatus.MET.value
+    result = ledger.terminal_check("accept", audit.get("effect"), terminal_audit=audit)
+    assert result["status"] == "accepted"
+    assert result["unresolved_goals"] == []
+    assert ledger.goals["B0"].done_if
+
+
+def test_acceptance_basis_flags_strict_persona_without_making_action_invalid() -> None:
+    audit = audit_acceptance_basis(
+        "accept",
+        {"mode": "subjective", "reason": "the report looked convincing"},
+        persona_d1="expert",
+        persona_d3="idiomatic",
+    )
+    assert audit["alignment"] == "weak"
+    assert audit["status"] == "warning"
+    assert "strict_persona_without_independent_or_delegated_basis" in audit["warnings"]

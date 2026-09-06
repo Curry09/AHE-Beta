@@ -63,7 +63,13 @@ D42_CLAUSE = {
 
 # 质量失败策略：只描述结果不对时怎么办。
 D43_CLAUSE = {
-    D43Correct.FEEDBACK: "when the result is wrong you describe the problem plainly and ask it to fix. If it keeps failing you give up — you do NOT take over the code yourself and you do NOT file a formal issue.",
+    D43Correct.FEEDBACK: (
+        "when the result is wrong you describe the problem plainly and ask it to fix. "
+        "If it keeps failing you give up — you do NOT take over the code yourself. "
+        "Separately, you may report a concrete product or harness problem to its developers "
+        "if doing so is worth the effort; ordinary corrections and frustration do not require "
+        "a report. Reporting is optional and does not change your main task action."
+    ),
     D43Correct.HANDOVER: (
         "when the result is wrong you stop relying on the assistant and take over the remaining "
         "work yourself; your own takeover is not a successful assistant delivery."

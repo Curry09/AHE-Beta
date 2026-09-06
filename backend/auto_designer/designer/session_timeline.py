@@ -237,6 +237,7 @@ def _goal_turn_view(turn: SimTurn) -> dict[str, Any] | None:
             turn.goal_after,
             turn.goal_effect,
             turn.goal_field_audit,
+            turn.acceptance_basis,
         )
     ):
         return None
@@ -250,6 +251,9 @@ def _goal_turn_view(turn: SimTurn) -> dict[str, Any] | None:
         "effect": dict(turn.goal_effect or {}) if isinstance(turn.goal_effect, dict) else {},
         "field_audit": dict(turn.goal_field_audit or {})
         if isinstance(turn.goal_field_audit, dict)
+        else {},
+        "acceptance_basis": dict(turn.acceptance_basis or {})
+        if isinstance(turn.acceptance_basis, dict)
         else {},
     }
 
@@ -381,6 +385,8 @@ def _project_sim_trace(trace: SimTrace) -> dict[str, Any]:
         out["goal_audit"] = dict(trace.goal_audit)
     if trace.goal_acceptance is not None:
         out["goal_acceptance"] = dict(trace.goal_acceptance)
+    if trace.terminal_audit:
+        out["terminal_audit"] = dict(trace.terminal_audit)
     # WAIT_GAP 等信号若已落在 turns 的 capability_gap，这里不再原样甩机器信号串
     return out
 
@@ -472,8 +478,15 @@ def _check_role_access(*, level: str, session_id: str, reason: str = "") -> dict
     ctx = current_usage_context()
     role = str(ctx.role or "").strip().lower()
     known_roles = {
-        "triager", "triage", "triage_agent", "divergent", "pm", "divergent_pm",
-        "designer", "synthesize", "owner",
+        "triager",
+        "triage",
+        "triage_agent",
+        "divergent",
+        "pm",
+        "divergent_pm",
+        "designer",
+        "synthesize",
+        "owner",
     }
     if role and role not in known_roles:
         from auto_designer.designer.evidence_contract import record_evidence_access

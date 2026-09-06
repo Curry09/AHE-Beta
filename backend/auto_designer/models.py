@@ -247,6 +247,7 @@ class SimTurn:
     goal_after: dict[str, Any] = field(default_factory=dict)
     goal_effect: dict[str, Any] = field(default_factory=dict)
     goal_field_audit: dict[str, Any] = field(default_factory=dict)
+    acceptance_basis: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -296,6 +297,8 @@ class SimTurn:
             d["goal_effect"] = dict(self.goal_effect)
         if self.goal_field_audit:
             d["goal_field_audit"] = dict(self.goal_field_audit)
+        if self.acceptance_basis:
+            d["acceptance_basis"] = dict(self.acceptance_basis)
         return d
 
     @classmethod
@@ -329,6 +332,7 @@ class SimTurn:
             goal_after=dict(data.get("goal_after") or {}),
             goal_effect=dict(data.get("goal_effect") or {}),
             goal_field_audit=dict(data.get("goal_field_audit") or {}),
+            acceptance_basis=dict(data.get("acceptance_basis") or {}),
         )
 
 
@@ -358,6 +362,7 @@ class SimTrace:
     goal_ledger: dict[str, Any] = field(default_factory=dict)
     goal_acceptance: dict[str, Any] | None = None
     goal_audit: dict[str, Any] = field(default_factory=dict)
+    terminal_audit: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -384,6 +389,8 @@ class SimTrace:
             d["goal_acceptance"] = dict(self.goal_acceptance)
         if self.goal_audit:
             d["goal_audit"] = dict(self.goal_audit)
+        if self.terminal_audit:
+            d["terminal_audit"] = dict(self.terminal_audit)
         return d
 
     @classmethod
@@ -411,6 +418,7 @@ class SimTrace:
                 else None
             ),
             goal_audit=dict(data.get("goal_audit") or {}),
+            terminal_audit=dict(data.get("terminal_audit") or {}),
         )
 
 

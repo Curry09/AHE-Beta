@@ -152,7 +152,11 @@ def _goal_frame_block(goal_frame: dict | None) -> str:
     """Render the current explicit goal view without injecting the full event history."""
     if not isinstance(goal_frame, dict):
         return ""
-    return "<goal_frame>\n" + json.dumps(goal_frame, ensure_ascii=False, sort_keys=True) + "\n</goal_frame>"
+    return (
+        "<goal_frame>\n"
+        + json.dumps(goal_frame, ensure_ascii=False, sort_keys=True)
+        + "\n</goal_frame>"
+    )
 
 
 def _main_context_parts(
@@ -322,7 +326,7 @@ def build_main_intent_turn(
         "and its prior wording remains in the ledger history. If nothing changed, omit it.\n"
         'Example: {"goal_update": [{"op": "add", "text": "show the changed file", '
         '"goal_kind": "request"}]}\n'
-        'Allowed ops: add, status (open|partial|met), focus, revise, relax, withdraw.'
+        "Allowed ops: add, status (open|partial|met), focus, revise, relax, withdraw."
     )
     parts.append(
         "# GOAL-DRIVEN INTENT\n"
@@ -604,6 +608,12 @@ def build_main_act_turn(
         "empty output, or unverified claim as if it worked.\n"
         "If the chosen id is only a fallback that does NOT really satisfy intent, set gap=true; "
         "otherwise gap=false. Honor <mood>.\n"
+        "For accept or accept_with_reservations, also report why this persona can accept: "
+        "mode=subjective (personal judgment), independent (your own private check), "
+        "delegated (a concrete harness command/result is enough for you), or waived (you "
+        "consciously waive a check). Do not invent evidence references; use only visible "
+        "harness/private evidence and explain a waiver. This records alignment and does not "
+        "prevent a persona from choosing its own action.\n"
         "Return EXACTLY ONE JSON object and nothing else:\n"
         '{"action": "<id from <action_space>, or free>", '
         '"message": "<exact line to the harness if action==send_message; else short/empty>", '
@@ -611,9 +621,13 @@ def build_main_act_turn(
         '"target_goal_ids": ["..."], '
         '"goal_effect": {"kind": "advance|wait|close|close_with_reservations|abandon|abandon_and_report", '
         '"goal_ids": ["..."], "evidence_refs": ["..."]}, '
-        '"goal_update": [{"op": "revise", "goal_id": "B0", "text": "<new wording>", '
-        '"done_if": "<new criterion>", "reason": "<why the task changed>"}]}'
+        '"acceptance_basis": {"mode": "subjective|independent|delegated|waived", '
+        '"evidence_refs": ["..."], "reason": "..."}, '
+        '"goal_update": [{"op": "add|status|focus|revise|relax|withdraw", '
+        '"goal_id": "B0", "text": "<new wording>", "done_if": "<new criterion>", '
+        '"reason": "<why the task changed>"}]}'
     )
+    parts.append(_optional_report_block())
     parts.append("</main_act>")
     return "\n\n".join(parts)
 
@@ -690,7 +704,32 @@ def _intent_options_block() -> str:
         "as a real person would.\n"
         "State the raw wish that would feel most natural to you right now. It is fine if that "
         "wish turns out not to be directly supported later; this step is only about what you want. "
-        "The next act step will handle any mapping or gap."
+        "The next act step will handle any mapping or gap.\n"
+        "You can also want to tell the coding tool's developers about an experience or "
+        "unmet need you encountered, while continuing the task or accepting its result. "
+        "Sending a correction to the harness advances this task; reporting feedback records "
+        "something for future product improvement and does not fix this task immediately. "
+        "Decide in your own voice whether reporting is worth your effort as this persona. "
+        "Ordinary corrections, frustration, or a low rating do not require a report."
+    )
+
+
+def _optional_report_block() -> str:
+    return (
+        "# OPTIONAL PRODUCT FEEDBACK\n"
+        "Alongside your main action, you may use report_issue by adding "
+        '`"report_issue": {"body": "<your report>"}` to the SAME JSON object. '
+        "This is available to every persona without workspace tools. It records a note "
+        "for the coding tool's developers; it does not send a correction to the harness, "
+        "interrupt work, change goals, or change your main action. You may report and "
+        "continue, wait, or accept. Notes are submitted at session close.\n"
+        "Use this only if you choose to report something worth improving from your actual "
+        "experience. In your own words, describe what you wanted, what happened, and why "
+        "it mattered; mention if it was later resolved. You need not diagnose the cause, "
+        "prove repeatability, or propose an implementation. Express detail according to "
+        "your persona. An ordinary correction need not become a report. Do not repeat a "
+        "note already recorded in history unless you have materially new information. "
+        "Omit report_issue (or use null) when you do not want to report."
     )
 
 
@@ -857,8 +896,8 @@ def build_waiting_act_turn(
         "- send_message: CONTINUE the session and send another message while it is still running "
         "(inside the harness — ordinary text, or a slash command listed in <harness_help>). "
         "A slash command not listed in <harness_help> is just raw text to the harness; "
-        "if you wish such a slash existed, you may note that product need with report_issue "
-        "if that private tool is available.\n"
+        "if you wish such a slash existed, you may record that need using the optional "
+        "report_issue field alongside your main action.\n"
         "- interrupt: CONTINUE the session but stop the current run like Ctrl+C (outside the chat), "
         "so you can correct or redirect it next. This is not a terminal outcome.\n"
         "- give_up: END the session immediately because you will stop relying on this harness. "
@@ -881,6 +920,7 @@ def build_waiting_act_turn(
         '"goal_update": [{"op": "revise", "goal_id": "B0", "text": "<new wording>", '
         '"done_if": "<new criterion>", "reason": "<why the task changed>"}]}'
     )
+    parts.append(_optional_report_block())
     parts.append("</waiting_act>")
     return "\n\n".join(parts)
 

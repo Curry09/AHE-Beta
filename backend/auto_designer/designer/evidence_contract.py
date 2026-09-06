@@ -13,10 +13,11 @@ import json
 import os
 import re
 import threading
-from datetime import UTC, datetime
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Mapping
+from typing import Any
 
 from auto_designer.models import Session, SimTrace, SimTurn
 
@@ -136,7 +137,7 @@ def _goal_summary(trace: SimTrace | None, *, session_id: str) -> dict[str, Any]:
         "version": (current or {}).get("version"),
     }
     revisions: list[dict[str, Any]] = []
-    for event in (ledger.get("events") or []):
+    for event in ledger.get("events") or []:
         if not isinstance(event, Mapping) or event.get("op") != "revise":
             continue
         row: dict[str, Any] = {
@@ -198,16 +199,16 @@ def _goal_events(trace: SimTrace | None, *, session_id: str) -> list[dict[str, A
             "target_goal_ids": [str(x) for x in (turn.target_goal_ids or [])[:8]],
             "expected_progress": _safe_text(turn.expected_progress, 300),
             "goal_effect": {},
-            "provenance": _source("interaction", session_id=session_id, locator=f"turn:{turn.turn}"),
+            "provenance": _source(
+                "interaction", session_id=session_id, locator=f"turn:{turn.turn}"
+            ),
         }
         if isinstance(turn.goal_effect, Mapping):
             if turn.goal_effect.get("kind") not in (None, ""):
                 event["goal_effect"]["kind"] = _safe_text(turn.goal_effect.get("kind"), 80)
             goal_ids = turn.goal_effect.get("goal_ids")
             if isinstance(goal_ids, list):
-                event["goal_effect"]["goal_ids"] = [
-                    _safe_text(item, 80) for item in goal_ids[:8]
-                ]
+                event["goal_effect"]["goal_ids"] = [_safe_text(item, 80) for item in goal_ids[:8]]
         # Free intent is useful but must remain bounded and path-safe.
         parsed = [c.parsed for c in (turn.persona_trace or []) if isinstance(c.parsed, Mapping)]
         intents = [p.get("intent") for p in parsed if p.get("intent")]
@@ -233,25 +234,37 @@ def _feedback_events(session: Session, *, session_id: str) -> list[dict[str, Any
             if role == "file_issue" or parsed.get("issue"):
                 text = _safe_text(parsed.get("issue"), L1_MAX_FEEDBACK)
                 if text:
-                    out.append({
-                        "kind": "issue_report",
-                        "text": text,
-                        "provenance": _source("report", session_id=session_id, locator="persona_tail:file_issue"),
-                    })
+                    out.append(
+                        {
+                            "kind": "issue_report",
+                            "text": text,
+                            "provenance": _source(
+                                "report", session_id=session_id, locator="persona_tail:file_issue"
+                            ),
+                        }
+                    )
             if role == "rate" or ("score" in parsed and "reason" in parsed):
-                out.append({
-                    "kind": "experience_rating",
-                    "score": parsed.get("score", session.feeling.score),
-                    "reason": _safe_text(parsed.get("reason") or session.feeling.reason, L1_MAX_FEEDBACK),
-                    "provenance": _source("feeling", session_id=session_id, locator="persona_tail:rate"),
-                })
+                out.append(
+                    {
+                        "kind": "experience_rating",
+                        "score": parsed.get("score", session.feeling.score),
+                        "reason": _safe_text(
+                            parsed.get("reason") or session.feeling.reason, L1_MAX_FEEDBACK
+                        ),
+                        "provenance": _source(
+                            "feeling", session_id=session_id, locator="persona_tail:rate"
+                        ),
+                    }
+                )
     if not out and session.feeling.reason:
-        out.append({
-            "kind": "experience_rating",
-            "score": session.feeling.score,
-            "reason": _safe_text(session.feeling.reason, L1_MAX_FEEDBACK),
-            "provenance": _source("feeling", session_id=session_id, locator="session:feeling"),
-        })
+        out.append(
+            {
+                "kind": "experience_rating",
+                "score": session.feeling.score,
+                "reason": _safe_text(session.feeling.reason, L1_MAX_FEEDBACK),
+                "provenance": _source("feeling", session_id=session_id, locator="session:feeling"),
+            }
+        )
     return out[:4]
 
 
@@ -287,6 +300,33 @@ def _goal_acceptance(trace: SimTrace | None, *, session_id: str) -> dict[str, An
             out[key] = [str(x)[:100] for x in item[:24]]
         else:
             out[key] = _safe_text(item, 300)
+    terminal = value.get("terminal_audit")
+    if isinstance(terminal, Mapping):
+        # Spec-0056/T3: preserve declared basis without widening the L1 evidence lane.
+        basis = terminal.get("acceptance_basis")
+        compact_basis = _unavailable("acceptance basis missing")
+        if isinstance(basis, Mapping):
+            compact_basis = {
+                key: _safe_text(basis[key], 300 if key == "reason" else 80)
+                for key in ("status", "mode", "reason", "expected", "alignment")
+                if key in basis
+            }
+            for key in ("evidence_refs", "warnings"):
+                items = basis.get(key)
+                if isinstance(items, list):
+                    compact_basis[key] = [_safe_text(item, 100) for item in items[:24]]
+        out["terminal_audit"] = {
+            "status": _safe_text(terminal.get("status") or "unavailable", 40),
+            "action": _safe_text(terminal.get("action"), 80),
+            "effect_kind": _safe_text(terminal.get("effect_kind"), 80),
+            "committed_goal_ids": [
+                _safe_text(item, 100) for item in (terminal.get("committed_goal_ids") or [])[:24]
+            ],
+            "unresolved_after": [
+                _safe_text(item, 100) for item in (terminal.get("unresolved_after") or [])[:24]
+            ],
+            "acceptance_basis": compact_basis,
+        }
     out["provenance"] = {
         "kind": "goal_acceptance",
         "session_id": session_id,
@@ -297,6 +337,7 @@ def _goal_acceptance(trace: SimTrace | None, *, session_id: str) -> dict[str, An
 
 def _enforce_l1_budget(result: dict[str, Any]) -> dict[str, Any]:
     """Trim optional event detail until the serialized projection fits its cap."""
+
     def size() -> int:
         return len(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
 
@@ -325,7 +366,11 @@ def build_l1_summary(session: Session) -> dict[str, Any]:
     goal = _goal_summary(trace, session_id=sid)
     events = _goal_events(trace, session_id=sid)
     feedback = _feedback_events(session, session_id=sid)
-    refs = [item["provenance"] for item in [*events, *feedback] if isinstance(item, Mapping) and item.get("provenance")]
+    refs = [
+        item["provenance"]
+        for item in [*events, *feedback]
+        if isinstance(item, Mapping) and item.get("provenance")
+    ]
     result: dict[str, Any] = {
         "level": EvidenceLevel.COMPACT.value,
         "session_id": sid,
@@ -333,11 +378,11 @@ def build_l1_summary(session: Session) -> dict[str, Any]:
         "key_events": events,
         "feedback_events": feedback,
         "user_outcome": {
-        "end_reason": _safe_text(
-            (session.user_outcome or {}).get("end_reason")
-            or (trace.end_reason if trace else "unavailable"),
-            120,
-        ),
+            "end_reason": _safe_text(
+                (session.user_outcome or {}).get("end_reason")
+                or (trace.end_reason if trace else "unavailable"),
+                120,
+            ),
             "terminal_note": _safe_text((session.user_outcome or {}).get("terminal_note"), 500),
         },
         "goal_acceptance": _goal_acceptance(trace, session_id=sid),
@@ -388,7 +433,7 @@ class EvidenceEnvelope:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "EvidenceEnvelope":
+    def from_dict(cls, data: Mapping[str, Any]) -> EvidenceEnvelope:
         """Restore a persisted handoff without widening any evidence lane."""
         return cls(
             source_report=dict(data.get("source_report") or {}),
@@ -396,7 +441,11 @@ class EvidenceEnvelope:
             user_evidence=dict(data.get("user_evidence") or {}),
             objective_evidence=dict(data.get("objective_evidence") or _unavailable()),
             harness_source=dict(data.get("harness_source") or {"status": "read_only"}),
-            evidence_refs=[dict(item) for item in (data.get("evidence_refs") or []) if isinstance(item, Mapping)],
+            evidence_refs=[
+                dict(item)
+                for item in (data.get("evidence_refs") or [])
+                if isinstance(item, Mapping)
+            ],
             accept_validity=str(data.get("accept_validity") or "not_applicable"),
             evidence_categories={
                 str(key): dict(value)
@@ -433,11 +482,31 @@ def build_evidence_envelope(
         l1 = build_l1_summary(session)
     source = {"status": "read_only", "repo": "harness", "ref": harness_ref or "unavailable"}
     categories = {
-        "report": {"level": "L0", "status": "provided" if report else "unavailable", "provenance": {"kind": "report", "session_id": sid}},
-        "user_goal": {"level": "L1", "status": (l1.get("goal_summary") or {}).get("status", "unavailable"), "provenance": {"kind": "goal_ledger", "session_id": sid}},
-        "interaction": {"level": "L1", "status": "provided" if l1.get("key_events") else "unavailable", "provenance": {"kind": "interaction", "session_id": sid}},
-        "objective": {"level": "L1", "status": (l1.get("objective_evidence") or {}).get("status", "unavailable"), "provenance": {"kind": "objective_evaluator", "session_id": sid}},
-        "harness_source": {"level": "L4", "status": "read_only", "provenance": {"kind": "harness_source", "session_id": sid}},
+        "report": {
+            "level": "L0",
+            "status": "provided" if report else "unavailable",
+            "provenance": {"kind": "report", "session_id": sid},
+        },
+        "user_goal": {
+            "level": "L1",
+            "status": (l1.get("goal_summary") or {}).get("status", "unavailable"),
+            "provenance": {"kind": "goal_ledger", "session_id": sid},
+        },
+        "interaction": {
+            "level": "L1",
+            "status": "provided" if l1.get("key_events") else "unavailable",
+            "provenance": {"kind": "interaction", "session_id": sid},
+        },
+        "objective": {
+            "level": "L1",
+            "status": (l1.get("objective_evidence") or {}).get("status", "unavailable"),
+            "provenance": {"kind": "objective_evaluator", "session_id": sid},
+        },
+        "harness_source": {
+            "level": "L4",
+            "status": "read_only",
+            "provenance": {"kind": "harness_source", "session_id": sid},
+        },
     }
     return EvidenceEnvelope(
         source_report=dict(report or {}),
@@ -448,7 +517,11 @@ def build_evidence_envelope(
             "feedback_events": list(l1.get("feedback_events") or []),
             "user_outcome": dict(l1.get("user_outcome") or {}),
             "goal_acceptance": dict(l1.get("goal_acceptance") or _unavailable()),
-            "provenance": {"kind": "user_evidence", "session_id": sid, "level": EvidenceLevel.COMPACT.value},
+            "provenance": {
+                "kind": "user_evidence",
+                "session_id": sid,
+                "level": EvidenceLevel.COMPACT.value,
+            },
         },
         objective_evidence=dict(l1.get("objective_evidence") or _unavailable()),
         harness_source=source,
@@ -492,10 +565,16 @@ def project_for_role(envelope: EvidenceEnvelope | Mapping[str, Any], role: str) 
             "session_id": raw.get("session_id", "unavailable"),
             "evidence_refs": list(raw.get("evidence_refs") or []),
         }
-    return {"level": raw.get("level", EvidenceLevel.COMPACT.value), "session_id": raw.get("session_id", "unavailable"), "evidence_refs": []}
+    return {
+        "level": raw.get("level", EvidenceLevel.COMPACT.value),
+        "session_id": raw.get("session_id", "unavailable"),
+        "evidence_refs": [],
+    }
 
 
-def validate_role_access(*, role: str, level: str, session_id: str | None = None, source_session_id: str | None = None) -> tuple[bool, str]:
+def validate_role_access(
+    *, role: str, level: str, session_id: str | None = None, source_session_id: str | None = None
+) -> tuple[bool, str]:
     """Small fail-closed gate used by future evidence tools and replay tests."""
 
     allowed = {item.value for item in EvidenceLevel}
@@ -503,14 +582,30 @@ def validate_role_access(*, role: str, level: str, session_id: str | None = None
         return False, f"unknown evidence level: {level}"
     normalized = str(role or "").strip().lower()
     known_roles = {
-        "triage", "triager", "triage_agent", "pm", "divergent", "divergent_pm",
-        "synthesize", "designer", "owner",
+        "triage",
+        "triager",
+        "triage_agent",
+        "pm",
+        "divergent",
+        "divergent_pm",
+        "synthesize",
+        "designer",
+        "owner",
     }
     if normalized not in known_roles:
         return False, f"unknown role: {normalized or 'unavailable'}"
-    if normalized in {"synthesize", "designer", "owner"} and level in {EvidenceLevel.TIMELINE.value, EvidenceLevel.BEAT.value, EvidenceLevel.DETAIL.value}:
+    if normalized in {"synthesize", "designer", "owner"} and level in {
+        EvidenceLevel.TIMELINE.value,
+        EvidenceLevel.BEAT.value,
+        EvidenceLevel.DETAIL.value,
+    }:
         return False, f"{normalized} cannot directly read {level}"
-    if normalized in {"triage", "triager", "triage_agent"} and session_id and source_session_id and session_id != source_session_id:
+    if (
+        normalized in {"triage", "triager", "triage_agent"}
+        and session_id
+        and source_session_id
+        and session_id != source_session_id
+    ):
         return False, "triage session does not match current report"
     return True, "ok"
 
@@ -588,7 +683,16 @@ def validate_envelope(envelope: EvidenceEnvelope | Mapping[str, Any]) -> list[st
                 errors.append(f"missing-provenance:{category}")
     # Reject only actual raw-prompt/large-output field names, not ordinary user
     # vocabulary.  The projection is allowed to carry user text in bounded form.
-    forbidden = {"system_prompt", "persona_prompt", "raw_prompt", "stdout", "patch", "source_code", "oracle"}
+    forbidden = {
+        "system_prompt",
+        "persona_prompt",
+        "raw_prompt",
+        "stdout",
+        "patch",
+        "source_code",
+        "oracle",
+    }
+
     def walk(value: object, path: str = "") -> None:
         if isinstance(value, Mapping):
             for key, child in value.items():
@@ -598,6 +702,7 @@ def validate_envelope(envelope: EvidenceEnvelope | Mapping[str, Any]) -> list[st
         elif isinstance(value, list):
             for i, child in enumerate(value):
                 walk(child, f"{path}{i}.")
+
     walk(raw)
     return list(dict.fromkeys(errors))
 

@@ -238,9 +238,7 @@ class ApiPersonaClient:
                 )
                 return last_obj
             last_code = code
-            self._record_protocol_event(
-                stage=stage, code=code, attempt=attempt + 1, raw=last_text
-            )
+            self._record_protocol_event(stage=stage, code=code, attempt=attempt + 1, raw=last_text)
             if attempt < max_attempts - 1:
                 # Do not feed malformed assistant prose back to the model. Give it a
                 # compact, explicit JSON-only recovery instruction instead.
@@ -686,8 +684,10 @@ def _validate_stage_output(
         if not isinstance(message, str):
             return "invalid_message"
         spec = CATALOG.get(action)
-        policy = MessagePolicy.REQUIRED if action == "free" else (
-            spec.message_policy if spec is not None else MessagePolicy.REQUIRED
+        policy = (
+            MessagePolicy.REQUIRED
+            if action == "free"
+            else (spec.message_policy if spec is not None else MessagePolicy.REQUIRED)
         )
         if policy is MessagePolicy.REQUIRED and not message.strip():
             return "missing_message"
@@ -695,6 +695,8 @@ def _validate_stage_output(
             return "unexpected_message"
         if "goal_effect" in obj and not isinstance(obj.get("goal_effect"), dict):
             return "invalid_goal_effect"
+        if "acceptance_basis" in obj and not isinstance(obj.get("acceptance_basis"), dict):
+            return "invalid_acceptance_basis"
         if "goal_update" in obj and not isinstance(obj.get("goal_update"), (dict, list)):
             return "invalid_goal_update"
         if "target_goal_ids" in obj and not isinstance(obj.get("target_goal_ids"), (list, str)):
@@ -962,9 +964,7 @@ class AgenticPersonaClient:
             last_code = code
             if attempt == 0:
                 first_code = code
-            self._record_protocol_event(
-                stage=stage, code=code, attempt=attempt + 1, raw=last_raw
-            )
+            self._record_protocol_event(stage=stage, code=code, attempt=attempt + 1, raw=last_raw)
             if attempt < max_attempts - 1:
                 messages.append(
                     {
@@ -1016,9 +1016,7 @@ class AgenticPersonaClient:
         last_raw = first_raw
         last_obj = _parse_json(first_raw)
         last_code = first_code
-        self._record_protocol_event(
-            stage=stage, code=first_code, attempt=1, raw=first_raw
-        )
+        self._record_protocol_event(stage=stage, code=first_code, attempt=1, raw=first_raw)
         recovery_raws = [first_raw]
         max_recoveries = 1 if stage == "legacy" else 2
         recovery_attempts = range(2, 2 + max_recoveries)
@@ -1048,20 +1046,30 @@ class AgenticPersonaClient:
                     except (TypeError, ValueError):
                         args_s = str(last_obj.get("args") or {})
                     steps.append({"kind": "tool", "text": f"{name} {args_s}"[:2000]})
-                    kind = "tool_result" if not (isinstance(result, dict) and result.get("ok") is False) else "tool_error"
-                    steps.append({"kind": kind, "text": json.dumps(result, ensure_ascii=False, default=str)[:4000]})
+                    kind = (
+                        "tool_result"
+                        if not (isinstance(result, dict) and result.get("ok") is False)
+                        else "tool_error"
+                    )
+                    steps.append(
+                        {
+                            "kind": kind,
+                            "text": json.dumps(result, ensure_ascii=False, default=str)[:4000],
+                        }
+                    )
                     recovery_messages.append({"role": "assistant", "content": last_raw})
                     recovery_messages.append(
-                        {"role": "user", "content": f"<tool_result>\n{json.dumps(result)}\n</tool_result>"}
+                        {
+                            "role": "user",
+                            "content": f"<tool_result>\n{json.dumps(result)}\n</tool_result>",
+                        }
                     )
                     last_code = "tool_observation_required"
                     self._record_protocol_event(
                         stage=stage, code=last_code, attempt=attempt, raw=last_raw
                     )
                     continue
-            last_code = _validate_stage_output(
-                stage, last_obj, user, tools_allowed=False
-            ) or ""
+            last_code = _validate_stage_output(stage, last_obj, user, tools_allowed=False) or ""
             if not last_code:
                 _push_call_trace(
                     self,
@@ -1072,9 +1080,7 @@ class AgenticPersonaClient:
                     steps=steps,
                 )
                 return last_obj
-            self._record_protocol_event(
-                stage=stage, code=last_code, attempt=attempt, raw=last_raw
-            )
+            self._record_protocol_event(stage=stage, code=last_code, attempt=attempt, raw=last_raw)
         if last_obj.get("_parse_failed"):
             _dump_unparseable(first=recovery_raws[0], second=recovery_raws[-1])
         _push_call_trace(
@@ -1266,9 +1272,7 @@ class AgenticPersonaClient:
                     messages.append(
                         {
                             "role": "user",
-                            "content": _contract_recovery_prompt(
-                                stage, last_code, attempt + 2
-                            )
+                            "content": _contract_recovery_prompt(stage, last_code, attempt + 2)
                             + " Tool use is now forbidden; conclude from existing evidence.",
                         }
                     )

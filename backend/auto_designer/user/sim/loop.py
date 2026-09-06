@@ -33,7 +33,7 @@ from .action_space import ActionResolutionError, derive_action_space, resolve_ac
 from .actions import CATALOG, Channel, Effect, Executor, Phase
 from .dimensions import Persona
 from .feeling import FeelingScore, derive_feeling, parse_feeling_llm
-from .goals import GoalLedger, audit_goal_fields
+from .goals import GoalLedger, audit_acceptance_basis, audit_goal_fields
 from .persona_client import (
     PersonaClient,
     PersonaProtocolError,
@@ -112,6 +112,8 @@ class TurnLog:
     # Soft content/integrity audit for goal_reading, targets, expected progress and effect.
     # Warnings are observational and never turn a valid user decision into a protocol error.
     goal_field_audit: dict = field(default_factory=dict)
+    # Terminal-only explanation of the persona's acceptance basis.
+    acceptance_basis: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -187,6 +189,7 @@ class SessionResult:
     goal_acceptance: dict | None = None
     # Final non-gating integrity audit; per-turn audits live on TurnLog.
     goal_audit: dict = field(default_factory=dict)
+    terminal_audit: dict = field(default_factory=dict)
 
 
 MAX_TURNS = 24
@@ -620,6 +623,7 @@ def _main_decide(
     calls.extend(new_calls)
     _record_private_evidence(state=state, calls=new_calls, phase=phase)
     _drain_issue_notes(client, result)
+    _record_act_report(aret, result, history, stage="main_act", turn=state.turn)
     gap = _resolve_gap(aret)
     act_target_ids = _goal_ids(aret.get("target_goal_ids"))
     if act_target_ids:
@@ -659,6 +663,8 @@ def _main_decide(
         merged["goal_updates_applied"] = goal_updates
     if "goal_effect" in aret:
         merged["goal_effect"] = aret.get("goal_effect")
+    if isinstance(aret.get("acceptance_basis"), dict):
+        merged["acceptance_basis"] = dict(aret["acceptance_basis"])
     if task_load is not None:
         merged["task_load"] = task_load
     return merged, calls, intent, gap
@@ -702,6 +708,40 @@ def route(action_id: str, message: str, state: State, harness, observable: str) 
     return None  # 终止动作: 不再驱动 harness
 
 
+def _append_issue_note(result: SessionResult, body: str) -> bool:
+    text = body.strip()
+    if not text or text in result.issue_notes:
+        return False
+    result.issue_notes.append(text)
+    result.signals.append(f"ISSUE_TOOL: report_issue ({len(result.issue_notes)})")
+    return True
+
+
+def _record_act_report(
+    ret: dict, result: SessionResult, history: list[str], *, stage: str, turn: int
+) -> None:
+    """Spec-0057/T1: reporting is independent of action and persona tool ability.
+
+    The act's raw/parsed trace retains the choice. Malformed optional feedback must
+    never retry or replace an otherwise valid main action (including acceptance).
+    """
+    report = ret.get("report_issue")
+    if report is None:
+        return
+    body = report.get("body") if isinstance(report, dict) else None
+    if not isinstance(body, str) or not body.strip():
+        result.protocol_events.append(
+            {"stage": stage, "turn": turn, "code": "invalid_report_issue", "status": "warning"}
+        )
+        result.signals.append(f"PERSONA_PROTOCOL_WARNING: stage={stage} code=invalid_report_issue")
+        return
+    if _append_issue_note(result, body):
+        history.append(
+            f"[turn {turn}] feedback recorded for tool developers (queued for session close): "
+            f"{body.strip()}"
+        )
+
+
 def _drain_issue_notes(client: PersonaClient, result: SessionResult) -> None:
     """把 agentic 中途 report_issue 笔记并入 SessionResult（允许闲置；无则空操作）。"""
     drain = getattr(client, "drain_issue_notes", None)
@@ -711,8 +751,7 @@ def _drain_issue_notes(client: PersonaClient, result: SessionResult) -> None:
         text = str(note).strip()
         if not text:
             continue
-        result.issue_notes.append(text)
-        result.signals.append(f"ISSUE_TOOL: report_issue ({len(result.issue_notes)})")
+        _append_issue_note(result, text)
 
 
 def emit_issue_artifact(persona: Persona, log: list[TurnLog], issue_text: str) -> str:
@@ -1016,6 +1055,7 @@ def _heartbeat_once(
     wait_calls.extend(new_calls)
     _record_private_evidence(state=state, calls=new_calls, phase="waiting")
     _drain_issue_notes(client, result)
+    _record_act_report(aret, result, history, stage="waiting_act", turn=state.turn)
     if goal_ledger is not None and aret.get("goal_update") is not None:
         raw_updates = aret["goal_update"]
         raw_updates = raw_updates if isinstance(raw_updates, list) else [raw_updates]
@@ -1194,7 +1234,9 @@ def _await_harness(
                     "code": exc.code,
                     "attempts": exc.attempts,
                     "heartbeat": heartbeats,
-                    "status": "warning" if protocol_failures < _MAX_PROTOCOL_STALL_HEARTBEATS else "stalled",
+                    "status": "warning"
+                    if protocol_failures < _MAX_PROTOCOL_STALL_HEARTBEATS
+                    else "stalled",
                 }
             )
             result.signals.append(
@@ -1350,6 +1392,11 @@ def run_session(
         target_goal_ids = _goal_ids(ret.get("target_goal_ids"))
         expected_progress = str(ret.get("expected_progress") or "").strip()
         goal_effect = ret.get("goal_effect") if isinstance(ret.get("goal_effect"), dict) else {}
+        acceptance_basis = (
+            dict(ret.get("acceptance_basis") or {})
+            if isinstance(ret.get("acceptance_basis"), dict)
+            else {}
+        )
         goal_field_audit = (
             dict(ret.get("goal_field_audit") or {})
             if isinstance(ret.get("goal_field_audit"), dict)
@@ -1413,11 +1460,7 @@ def run_session(
             answers_id, answers_said = ledger.consume_pending_answers()
         utterance_id = ""
         delivery = ""
-        if (
-            spec.channel is Channel.EMIT
-            and spec.effect is not Effect.TERMINATE
-            and message.strip()
-        ):
+        if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE and message.strip():
             utterance_id = ledger.alloc(message)
             delivery = "open"
 
@@ -1453,6 +1496,7 @@ def run_session(
                 goal_after=goal_after,
                 goal_effect=goal_effect,
                 goal_field_audit=goal_field_audit,
+                acceptance_basis=acceptance_basis,
             )
         )
         if gap:
@@ -1466,7 +1510,47 @@ def run_session(
 
         # ⑥ 终止判定（三种终止都以本人口吻留一条自包含 issue，见 _finalize_terminal）
         if spec.effect is Effect.TERMINATE:
-            result.goal_acceptance = goal_ledger.terminal_check(action_id, goal_effect)
+            # Spec-0056/T4: persist the user's terminal claim without overriding it.
+            terminal_audit = goal_ledger.commit_terminal_effect(
+                action_id, goal_effect, turn=state.turn
+            )
+            basis_audit = audit_acceptance_basis(
+                action_id,
+                acceptance_basis,
+                persona_d1=persona.d1.value,
+                persona_d3=persona.d3.value if persona.d3 is not None else "",
+            )
+            terminal_audit["acceptance_basis"] = basis_audit
+            if basis_audit.get("status") == "warning":
+                terminal_audit["status"] = "warning"
+                terminal_audit.setdefault("warnings", []).extend(
+                    f"acceptance_basis:{warning}" for warning in basis_audit.get("warnings", [])
+                )
+            result.terminal_audit = terminal_audit
+            result.goal_acceptance = goal_ledger.terminal_check(
+                action_id, goal_effect, terminal_audit=terminal_audit
+            )
+            result.goal_ledger = goal_ledger.snapshot()
+            result.goal_audit = goal_ledger.audit()
+            result.goal_audit["terminal"] = terminal_audit
+            if terminal_audit.get("status") == "warning":
+                result.goal_audit["status"] = "warning"
+                result.goal_audit.setdefault("warnings", []).extend(
+                    terminal_audit.get("warnings", [])
+                )
+                result.signals.append(
+                    "GOAL_TERMINAL_AUDIT_WARNING: " + ",".join(terminal_audit.get("warnings", []))
+                )
+            if basis_audit.get("alignment") == "weak":
+                result.signals.append("PERSONA_ACCEPTANCE_ALIGNMENT: weak")
+            # The terminal action is a subjective ledger transaction.  Update the
+            # already-persisted terminal turn with the post-commit snapshot so the
+            # trace cannot show close while the final goal remains open.
+            result.turns[-1].goal_after = goal_ledger.snapshot()
+            result.turns[-1].goal_field_audit = {
+                **result.turns[-1].goal_field_audit,
+                "terminal": terminal_audit,
+            }
             if result.goal_acceptance["status"] in {
                 "subjective_accept_unverified",
                 "reservations_with_unmet_goals",
@@ -1606,7 +1690,15 @@ def run_session(
     _take_protocol_events(client, result)
     # 评估器协议失败不是用户体验分，也不是 harness 失败；保留审计哨兵但跳过正常评分。
     result.goal_ledger = goal_ledger.snapshot()
-    result.goal_audit = goal_ledger.audit()
+    final_goal_audit = goal_ledger.audit()
+    if result.terminal_audit:
+        final_goal_audit["terminal"] = result.terminal_audit
+        if result.terminal_audit.get("status") == "warning":
+            final_goal_audit["status"] = "warning"
+            final_goal_audit.setdefault("warnings", []).extend(
+                result.terminal_audit.get("warnings", [])
+            )
+    result.goal_audit = final_goal_audit
     if result.evaluation_status == "invalid":
         err = result.evaluation_error or {}
         reason = f"Evaluator invalid; exclude from harness metrics: {err.get('code', 'unknown')}"
@@ -1645,9 +1737,7 @@ def run_session(
                 "non_gating": True,
             }
         )
-        result.signals.append(
-            f"PERSONA_PROTOCOL_WARNING: stage={exc.stage} code={exc.code} rating"
-        )
+        result.signals.append(f"PERSONA_PROTOCOL_WARNING: stage={exc.stage} code={exc.code} rating")
         result.feeling = result.feeling_derived
     return result
 

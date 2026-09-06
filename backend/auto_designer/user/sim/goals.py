@@ -32,6 +32,9 @@ GOAL_EFFECT_KINDS = frozenset(
     {"advance", "wait", "close", "close_with_reservations", "abandon", "abandon_and_report"}
 )
 GOAL_UPDATE_OPS = frozenset({"add", "status", "focus", "revise", "relax", "withdraw"})
+ACCEPTANCE_BASIS_MODES = frozenset(
+    {"subjective", "independent", "delegated", "waived", "unreported"}
+)
 
 
 @dataclass
@@ -94,6 +97,16 @@ class GoalEvent:
         return asdict(self)
 
 
+def default_done_if(task: str) -> str:
+    """Spec-0056/T1: derive a visible criterion without using benchmark gold."""
+    text = str(task or "").strip().lower()
+    if any(token in text for token in ("repro", "reproduction", "example", "expected")):
+        return "The reported reproduction or expected behavior works after the requested change."
+    if any(token in text for token in ("test", "pytest", "regression")):
+        return "The requested change is delivered and a relevant test or check reports success."
+    return "The requested behavior is delivered and a relevant check reports success."
+
+
 @dataclass
 class GoalLedger:
     """Current goals plus an append-only history of goal changes."""
@@ -107,6 +120,8 @@ class GoalLedger:
     @classmethod
     def from_task(cls, task: str, *, done_if: str = "") -> GoalLedger:
         ledger = cls()
+        if not done_if.strip():
+            done_if = default_done_if(task)
         ledger.goals[ledger.baseline_id] = Goal(
             goal_id=ledger.baseline_id,
             text=task.strip(),
@@ -169,7 +184,8 @@ class GoalLedger:
         return [
             goal
             for goal in self.goals.values()
-            if goal.kind in {
+            if goal.kind
+            in {
                 GoalKind.BASELINE.value,
                 GoalKind.CORE.value,
                 GoalKind.REQUEST.value,
@@ -405,13 +421,85 @@ class GoalLedger:
             "focus_goal_id": self.focus_goal_id,
         }
 
-    def terminal_check(self, action: str, effect: Any = None) -> dict[str, Any]:
+    def commit_terminal_effect(
+        self, action: str, effect: Any = None, *, turn: int
+    ) -> dict[str, Any]:
+        """Spec-0056/T1: commit an explicit close to the subjective goal ledger.
+
+        This is intentionally a subjective transaction: it records what the persona
+        claimed at termination, not whether the code is objectively correct.  The
+        independent evaluator remains the only source of technical truth.
+        """
+        raw = effect if isinstance(effect, dict) else {}
+        kind = str(raw.get("kind") or "").strip()
+        raw_ids = raw.get("goal_ids")
+        goal_ids = (
+            [str(item).strip() for item in raw_ids if str(item).strip()]
+            if isinstance(raw_ids, list)
+            else []
+        )
+        refs = self._refs(raw.get("evidence_refs"))
+        warnings: list[str] = []
+        expected_kind = {
+            "accept": "close",
+            "accept_with_reservations": "close_with_reservations",
+        }.get(action)
+        if expected_kind and kind != expected_kind:
+            warnings.append(f"terminal_effect_mismatch:{action}:{kind or 'missing'}")
+        if expected_kind and not goal_ids:
+            warnings.append("terminal_close_missing_goal_ids")
+
+        committed: list[str] = []
+        if kind in {"close", "close_with_reservations"}:
+            for goal_id in goal_ids:
+                goal = self.goals.get(goal_id)
+                if goal is None:
+                    warnings.append(f"terminal_unknown_goal:{goal_id}")
+                    continue
+                before = self._state_view(goal)
+                if refs:
+                    for ref in refs:
+                        if ref not in goal.evidence_refs:
+                            goal.evidence_refs.append(ref)
+                if goal.status != GoalStatus.MET.value:
+                    goal.status = GoalStatus.MET.value
+                    goal.version += 1
+                after = self._state_view(goal)
+                self._record(
+                    turn=turn,
+                    op="status",
+                    goal_id=goal_id,
+                    actor="terminal",
+                    status=GoalStatus.MET.value,
+                    reason=f"{action} declared {kind}",
+                    evidence_refs=refs,
+                    before=before,
+                    after=after,
+                )
+                committed.append(goal_id)
+
+        return {
+            "status": "warning" if warnings else "ok",
+            "warnings": warnings,
+            "action": action,
+            "effect_kind": kind,
+            "effect_goal_ids": list(dict.fromkeys(goal_ids)),
+            "committed_goal_ids": committed,
+            "evidence_refs": refs,
+            "unresolved_after": [goal.goal_id for goal in self.unresolved()],
+        }
+
+    def terminal_check(
+        self, action: str, effect: Any = None, *, terminal_audit: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Check a terminal claim without overriding the user's chosen action."""
         unresolved = [goal.goal_id for goal in self.unresolved()]
         if action == "accept":
             status = "accepted" if not unresolved else "subjective_accept_unverified"
         elif action == "accept_with_reservations":
-            status = "accepted_with_reservations" if not unresolved else "reservations_with_unmet_goals"
+            status = (
+                "accepted_with_reservations" if not unresolved else "reservations_with_unmet_goals"
+            )
         else:
             status = "not_applicable"
         result: dict[str, Any] = {
@@ -420,6 +508,8 @@ class GoalLedger:
         }
         if isinstance(effect, dict):
             result["effect"] = dict(effect)
+        if isinstance(terminal_audit, dict):
+            result["terminal_audit"] = dict(terminal_audit)
         return result
 
 
@@ -503,9 +593,7 @@ def audit_goal_fields(
             warnings.append("goal_update_add_missing_text")
         if op in {"revise", "relax", "withdraw"} and not str(update.get("reason") or "").strip():
             warnings.append(f"goal_update_missing_reason:{op}")
-        if op == "revise" and not (
-            "changed" in update or "text" in update or "done_if" in update
-        ):
+        if op == "revise" and not ("changed" in update or "text" in update or "done_if" in update):
             warnings.append("goal_update_revise_missing_change")
     return {
         "status": "warning" if warnings else "ok",
@@ -518,4 +606,59 @@ def audit_goal_fields(
         "update_ops": update_ops,
         "update_goal_ids": list(dict.fromkeys(update_goal_ids)),
         "ledger": ledger.audit(),
+    }
+
+
+def audit_acceptance_basis(
+    action: str,
+    basis: Any,
+    *,
+    persona_d1: str = "",
+    persona_d3: str = "",
+) -> dict[str, Any]:
+    """Spec-0056/T1: audit the acceptance basis without turning it into a gate.
+
+    ``subjective`` is valid for a trusting/low-bar persona.  A capable or strict
+    persona should normally point to either its own check or a concrete harness
+    result, but may still waive it with an explicit reason.  This records alignment;
+    it never changes the chosen user action.
+    """
+    if action not in {"accept", "accept_with_reservations"}:
+        return {"status": "not_applicable", "mode": "not_applicable", "warnings": []}
+    value = basis if isinstance(basis, dict) else {}
+    mode = str(value.get("mode") or "unreported").strip().lower()
+    refs_raw = value.get("evidence_refs")
+    refs = (
+        [str(item).strip() for item in refs_raw if str(item).strip()]
+        if isinstance(refs_raw, list)
+        else []
+    )
+    reason = str(value.get("reason") or "").strip()
+    warnings: list[str] = []
+    if mode not in ACCEPTANCE_BASIS_MODES:
+        warnings.append(f"acceptance_basis_invalid_mode:{mode or '?'}")
+        mode = "unreported"
+    if mode == "unreported":
+        warnings.append("acceptance_basis_missing")
+    if mode in {"independent", "delegated"} and not refs:
+        warnings.append("acceptance_basis_missing_evidence_refs")
+    if mode == "waived" and not reason:
+        warnings.append("acceptance_basis_waiver_missing_reason")
+
+    strict = persona_d1 in {"competent", "expert"} or persona_d3 in {"idiomatic", "rigorous"}
+    if strict and mode in {"subjective", "waived", "unreported"}:
+        alignment = "weak"
+        warnings.append("strict_persona_without_independent_or_delegated_basis")
+    elif mode == "unreported":
+        alignment = "unreported"
+    else:
+        alignment = "aligned"
+    return {
+        "status": "warning" if warnings else "ok",
+        "mode": mode,
+        "evidence_refs": refs,
+        "reason": reason,
+        "expected": "independent_or_delegated" if strict else "subjective_or_delegated",
+        "alignment": alignment,
+        "warnings": warnings,
     }

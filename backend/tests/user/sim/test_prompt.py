@@ -78,6 +78,15 @@ def test_build_system_excludes_global_platform_contract() -> None:
     assert "# PERCEPTION BOUNDARY" in sys
 
 
+def test_feedback_persona_can_report_without_takeover_or_forced_reporting() -> None:
+    system = build_system(_persona(d43=D43Correct.FEEDBACK))
+
+    assert "do NOT take over the code yourself" in system
+    assert "do NOT file a formal issue" not in system
+    assert "report a concrete product or harness problem" in system
+    assert "Reporting is optional" in system
+
+
 def test_main_three_builders_have_sections() -> None:
     p = _persona()
     state = init_state(p)

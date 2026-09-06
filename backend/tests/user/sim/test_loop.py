@@ -231,12 +231,17 @@ def test_goal_layer_guides_same_turn_intent_without_becoming_a_gate() -> None:
                 return {
                     "action": action,
                     "message": "please implement it" if action == "send_message" else "",
-                    "goal_effect": {"kind": "advance", "goal_ids": ["G1"]},
+                    "goal_effect": {
+                        "kind": "advance" if action == "send_message" else "close",
+                        "goal_ids": ["G1"],
+                    },
                 }
             return super().respond(system, user)
 
     client = _GoalLayerClient()
-    res = run_session(_persona(D1Eval.SHALLOW, D43Correct.FEEDBACK), client, ScriptedHarness(), TASK)
+    res = run_session(
+        _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK), client, ScriptedHarness(), TASK
+    )
 
     assert res.turns[0].goal_reading == [
         {"goal_id": "B0", "progress": "blocked", "why": "diagnosis only"}
@@ -246,6 +251,9 @@ def test_goal_layer_guides_same_turn_intent_without_becoming_a_gate() -> None:
     # The ledger reports the unresolved claim, but the user's accept action is not rejected.
     assert res.end_reason == "accepted"
     assert res.goal_acceptance["status"] == "subjective_accept_unverified"
+    g1 = next(goal for goal in res.goal_ledger["goals"] if goal["goal_id"] == "G1")
+    assert g1["status"] == "met"
+    assert res.terminal_audit["committed_goal_ids"] == ["G1"]
 
 
 def test_baseline_revision_is_visible_to_same_turn_act_and_persisted() -> None:
@@ -336,9 +344,7 @@ def test_active_final_check_converges_through_rejudge_and_reintent() -> None:
     client = _FinalCheckClient(
         {"perceive": "the implementation is present", "check_status": "completed"}
     )
-    res = run_session(
-        _persona(D1Eval.EXPERT, D43Correct.FEEDBACK), client, ScriptedHarness(), TASK
-    )
+    res = run_session(_persona(D1Eval.EXPERT, D43Correct.FEEDBACK), client, ScriptedHarness(), TASK)
 
     assert res.end_reason == "accepted"
     tags = [
