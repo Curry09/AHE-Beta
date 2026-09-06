@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from auto_designer.designer import issue_schema as sc
 from auto_designer.designer.designer import (
     Designer,
@@ -49,6 +51,53 @@ def _persona() -> Persona:
     return Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s")
 
 
+@pytest.mark.parametrize("payload", [json.dumps({"proposals": []}), None])
+def test_valid_submit_does_not_trigger_recovery(tmp_path, monkeypatch, payload) -> None:
+    designer = _designer(tmp_path, FakeTracker(), payload or _rfc_canned())
+    calls = []
+    original = designer._run_agent
+
+    def invoke(**kwargs):
+        calls.append(designer._force_submit_prompt)
+        return original(**kwargs)
+
+    monkeypatch.setattr(designer, "_run_agent", invoke)
+    designer.propose_once()
+    assert calls == [False]
+
+
+@pytest.mark.parametrize("recovered", [True, False])
+def test_missing_submit_has_one_recovery_with_same_inputs(tmp_path, monkeypatch, recovered) -> None:
+    designer = _designer(tmp_path, FakeTracker(), _rfc_canned())
+    replies = iter(["分析尚未提交", _rfc_canned() if recovered else "仍未提交"])
+    calls = []
+
+    def invoke(**kwargs):
+        calls.append((designer._force_submit_prompt, kwargs))
+        return next(replies)
+
+    monkeypatch.setattr(designer, "_run_agent", invoke)
+    outcome = designer.propose_once()
+    assert outcome.count == int(recovered)
+    assert [flag for flag, _ in calls] == [False, True]
+    assert calls[0][1] == calls[1][1]
+    assert designer._force_submit_prompt is False
+
+
+def test_recovery_error_restores_normal_prompt(tmp_path, monkeypatch) -> None:
+    designer = _designer(tmp_path, FakeTracker(), _rfc_canned())
+
+    def invoke(**kwargs):
+        if designer._force_submit_prompt:
+            raise RuntimeError("backend unavailable")
+        return "未调用提交工具"
+
+    monkeypatch.setattr(designer, "_run_agent", invoke)
+    with pytest.raises(RuntimeError, match="backend unavailable"):
+        designer.propose_once()
+    assert designer._force_submit_prompt is False
+
+
 def _seed_session(store: SessionStore, *, score: int, reason: str = "r") -> None:
     store.save(
         Session(
@@ -69,7 +118,16 @@ def _designer(
 ) -> _StubDesigner:
     # A synthesis fixture needs an actual cross-proposal set.
     if '"proposals": []' not in canned and "散文" not in canned and canned:
-        while len([i for i in tracker.list_open_issues() if sc.plane(i.labels) in (sc.PROPOSAL, sc.READY)]) < 2:
+        while (
+            len(
+                [
+                    i
+                    for i in tracker.list_open_issues()
+                    if sc.plane(i.labels) in (sc.PROPOSAL, sc.READY)
+                ]
+            )
+            < 2
+        ):
             _proposal(tracker, "辅助来源")
     store = SessionStore(tmp_path / "sessions")
     _seed_session(store, score=2, reason="等太久")
@@ -268,7 +326,11 @@ def test_empty_or_no_submit_yields_no_proposal(tmp_path) -> None:
 
 def test_synthesis_requires_cross_proposal_sources(tmp_path) -> None:
     tracker = FakeTracker()
-    outcome = _designer(tmp_path, tracker, _submit([{"title": "单源", **{**_synthesis_artifact(), "source_proposals": [1]}}])).propose_once()
+    outcome = _designer(
+        tmp_path,
+        tracker,
+        _submit([{"title": "单源", **{**_synthesis_artifact(), "source_proposals": [1]}}]),
+    ).propose_once()
     assert outcome.count == 0
 
 

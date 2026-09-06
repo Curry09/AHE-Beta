@@ -259,6 +259,15 @@ PM 用于解释跨 session 体验；Synthesize 仅沿已引用 proposal 下钻�
 
 ## Reference-level explanation
 
+### Synthesize 的单次协议收尾
+
+若模型返回文本但没有结构化提交 proposals，驱动器最多再次调用一次相同角色，复用本轮的
+ready、proposal、trend 和 runtime 输入，并追加只调用 `submit_rfcs` 提交 0..n 条结果的收尾提示。
+合法空数组也是成功收尾，不再重试；再次缺少提交则保持空结果，不从散文推断产物。
+这是一次新的角色调用，并不恢复模型上一调用的内部推理；“只提交”是指令约束，不是工具权限硬限制。
+重试异常仍向上暴露，临时提示状态在 finally 中复位。该行为归属 T4，测试覆盖正常不重试、
+成功恢复、最多两次调用及异常后复位；不改变证据访问范围或提案准入标准。
+
 ### 输入构造与权限执行
 
 SessionStore 是用户证据的权威来源。会话收尾时，确定性投影器先生成 L1，并把目标 ledger 的 revision、关键

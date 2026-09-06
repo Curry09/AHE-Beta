@@ -103,6 +103,9 @@ class Designer:
             on_event  # 过程流回调 (kind, text)：assistant 发言/工具调用/结果，看板时间线用
         )
         self._round_provider = round_provider
+        # Spec-0055/T4: set only for a single protocol-recovery call when the model
+        # returns without invoking submit_rfcs; keep the normal prompt stable.
+        self._force_submit_prompt = False
 
     def propose_once(self) -> DesignOutcome:
         backlog = self._tracker.list_open_issues()
@@ -122,6 +125,18 @@ class Designer:
             ready=ready, proposals=proposals_open, trend=trend, runtime=runtime
         )
         parsed = self._proposals_from_submit(result_text)
+        if read_submit(result_text, "proposals") is None:
+            # A prose answer is not a design result.  Give the model exactly one
+            # constrained recovery turn; the driver remains the authority and
+            # will persist an empty result if this also fails.
+            self._force_submit_prompt = True
+            try:
+                retry_text = self._run_agent(
+                    ready=ready, proposals=proposals_open, trend=trend, runtime=runtime
+                )
+            finally:
+                self._force_submit_prompt = False
+            parsed = self._proposals_from_submit(retry_text)
 
         # covers 是 Designer 的吸收决定：只允许当前仍开放且位于 report/proposal 平面的来源。
         coverable = {i.number: i for i in backlog if plane(i.labels) in (REPORT, PROPOSAL)}
@@ -221,6 +236,12 @@ class Designer:
             "expected_leverage、solution_level、abstraction_rationale + 可选 covers（整体吸收来源）。"
             "字段契约由工具 input_schema 强校验，不必也不要在正文里手抄 schema。"
         )
+        if self._force_submit_prompt:
+            msg += (
+                "\n\n【协议收尾】你刚才没有调用 submit_rfcs。现在停止读取文件和继续调查，"
+                "只调用一次 submit_rfcs 提交 0..n 条结果；没有可提交内容就提交空数组，"
+                "不要用解释文字代替工具调用。"
+            )
         from auto_designer.usage import current_usage_context  # noqa: PLC0415
 
         return run_agent_def(
