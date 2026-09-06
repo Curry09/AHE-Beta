@@ -32,6 +32,17 @@ def test_experiment_egress_allows_configured_wis_gateway() -> None:
     assert "acl allowed_egress dstdomain .paperbypass.com" in egress.read_text(encoding="utf-8")
 
 
+def test_experiment_egress_scopes_boyue_gateway_to_exact_host_and_port() -> None:
+    egress = Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "egress-proxy.conf"
+    rules = egress.read_text(encoding="utf-8")
+    assert "acl boyue_glm dst 35.220.164.252/32" in rules
+    assert "acl boyue_glm_port port 3888" in rules
+    rule = "http_access allow boyue_glm boyue_glm_port"
+    assert rule in rules
+    assert rules.index(rule) < rules.index("http_access deny all")
+    assert "http_access allow all" not in rules.splitlines()
+
+
 def test_two_experiments_get_distinct_projects(tmp_path: Path) -> None:
     a = {"experiment_id": "exp-a", "n": 1}
     b = {"experiment_id": "exp-b", "n": 1}
