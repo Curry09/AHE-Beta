@@ -169,6 +169,12 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0055 目标感知的需求面证据分层与角色可见性
 在不把完整用户 trace 灌入需求面角色的前提下，将用户目标演化、关键交互行为和客观执行结果编成有来源的分层证据；Triage 默认获得当前 report 的有界目标感知证据，产品 PM 保持全局体验视野，Synthesize 只沿 proposal 关系下钻，避免额外延迟、跨题过拟合和主观 accept 冒充客观通过。
 
+### 0056 终止接受的目标原子提交与 Persona 证据对齐
+保留用户主观接受的自由，同时让目标账本、Persona 验收依据和客观评估成为三个互不覆盖、可审计的结果面；终止动作的 close 必须原子提交到目标账本，但不替代客观 evaluator。
+
+### 0057 自主产品反馈与交互主动作并行
+在原有用户动作中附带自主产品反馈，保留继续、等待、接受或放弃的语义；反馈可达性不依赖工具能力或纠偏策略，格式异常仅警告，不按低分自动提单。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -422,6 +428,12 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0055 | 0055/T3 | 产品 PM 全局体验输入与产品视角边界 | done | T1, 0054/T4 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_divergent_gate.py |
 | 0055 | 0055/T4 | Synthesize 提案关系输入与证据下钻约束 | done | T1, T2, T3, 0054/T4 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/systemprompt.md<br>backend/auto_designer/designer/session_timeline.py<br>backend/tests/loop/test_designer.py |
 | 0055 | 0055/T5 | 角色可见性、过拟合和延迟回归评测 | done | T2, T3, T4 | backend/scripts/evaluate_role_traces.py<br>backend/tests/designer/test_role_contract_flow.py |
+| 0056 | 0056/T1 | 终止动作与目标账本原子提交 | done | 0054/T4 | backend/auto_designer/user/sim/goals.py<br>backend/tests/user/sim/test_goals.py |
+| 0056 | 0056/T2 | Persona 验收依据与能力对齐 | done | 0053/T4 | backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/persona_client.py |
+| 0056 | 0056/T3 | 可见初始完成条件与客观结果分轨 | done | 0051/T4, 0054/T2 | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/designer/evidence_contract.py<br>backend/auto_designer/designer/session_timeline.py<br>backend/tests/designer/test_terminal_evidence.py |
+| 0056 | 0056/T4 | 终止一致性回归 | done | T1, T2, T3 | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/scripts/e2e-spec-0056-0057-user-semantics.sh |
+| 0057 | 0057/T1 | 主动作伴随反馈与既有提单兼容 | done | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/clauses.py |
+| 0057 | 0057/T2 | 动作兼容与持久化回归 | done | T1 | backend/tests/user/sim/test_feedback.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/sim/test_prompt.py |
 
 ## 跨 feature 关系图
 
@@ -786,6 +798,16 @@ graph LR
         n0055_T4["T4 Synthesize 提案关系输入与证据下钻约束"]
         n0055_T5["T5 角色可见性、过拟合和延迟回归评测"]
     end
+    subgraph G0056[0056 terminal-acceptance-alignment]
+        n0056_T1["T1 终止动作与目标账本原子提交"]
+        n0056_T2["T2 Persona 验收依据与能力对齐"]
+        n0056_T3["T3 可见初始完成条件与客观结果分轨"]
+        n0056_T4["T4 终止一致性回归"]
+    end
+    subgraph G0057[0057 voluntary-product-feedback]
+        n0057_T1["T1 主动作伴随反馈与既有提单兼容"]
+        n0057_T2["T2 动作兼容与持久化回归"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1045,6 +1067,14 @@ graph LR
     n0055_T5 --> n0055_T2
     n0055_T5 --> n0055_T3
     n0055_T5 --> n0055_T4
+    n0056_T1 --> n0054_T4
+    n0056_T2 --> n0053_T4
+    n0056_T3 --> n0051_T4
+    n0056_T3 --> n0054_T2
+    n0056_T4 --> n0056_T1
+    n0056_T4 --> n0056_T2
+    n0056_T4 --> n0056_T3
+    n0057_T2 --> n0057_T1
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1117,10 +1147,11 @@ graph LR
 | backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049 |
 | backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055 |
 | backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055 |
+| backend/auto_designer/designer/evidence_contract.py | 0055, 0056 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052 |
 | backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052 |
 | backend/auto_designer/designer/role_contract.py | 0043, 0052, 0055 |
-| backend/auto_designer/designer/session_timeline.py | 0024, 0054, 0055 |
+| backend/auto_designer/designer/session_timeline.py | 0024, 0054, 0055, 0056 |
 | backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
 | backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
@@ -1139,22 +1170,23 @@ graph LR
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053 |
-| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056 |
+| backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054, 0056 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051, 0053, 0054 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048, 0053 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035, 0053 |
-| backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037 |
+| backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037, 0057 |
 | backend/auto_designer/user/sim/demo.py | 0005, 0037 |
 | backend/auto_designer/user/sim/deps.py | 0009, 0051 |
 | backend/auto_designer/user/sim/dimensions.py | 0005, 0037 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048, 0051, 0053, 0054 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054 |
+| backend/auto_designer/user/sim/goals.py | 0054, 0056 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048, 0051, 0053, 0054, 0056, 0057 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054, 0056 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
-| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048, 0054 |
+| backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048, 0054, 0056, 0057 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009, 0051 |
 | backend/auto_designer/user/sim/seed_source.py | 0009, 0051 |
 | backend/auto_designer/user/sim/sources/docker_seed.py | 0044, 0051 |
@@ -1218,12 +1250,13 @@ graph LR
 | backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048, 0053 |
 | backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
 | backend/tests/user/sim/test_docker_seed_source.py | 0044, 0051 |
-| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037, 0048, 0053 |
+| backend/tests/user/sim/test_goals.py | 0054, 0056 |
+| backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037, 0048, 0053, 0057 |
 | backend/tests/user/sim/test_inner_prompt.py | 0008, 0031, 0048 |
-| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036, 0048, 0051, 0053, 0054 |
+| backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036, 0048, 0051, 0053, 0054, 0056 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031, 0048, 0053, 0054 |
 | backend/tests/user/sim/test_persona_io.py | 0006, 0037 |
-| backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031, 0048 |
+| backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031, 0048, 0057 |
 | backend/tests/user/sim/test_state.py | 0005, 0012, 0037 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
@@ -2963,4 +2996,52 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+```
+
+### 0056 终止接受的目标原子提交与 Persona 证据对齐（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 终止动作与目标账本原子提交"]
+    nT2["T2 Persona 验收依据与能力对齐"]
+    nT3["T3 可见初始完成条件与客观结果分轨"]
+    nT4["T4 终止一致性回归"]
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+```
+
+### 0057 自主产品反馈与交互主动作并行（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 主动作伴随反馈与既有提单兼容"]
+    nT2["T2 动作兼容与持久化回归"]
+    nT1 --> nT2
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
 ```

@@ -27,6 +27,7 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `agent_runtime.py` | 四个 driver（triage / synthesize / divergent / owner）此前各抄一份的公共逻辑收拢于此： |
 | `designer.py` | Synthesize 驱动器。 |
 | `divergent.py` | Divergent（能力发现）驱动器。 |
+| `evidence_contract.py` | Goal-aware evidence contracts for demand-side roles. |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
 | `owner.py` | Owner 驱动器：把 proposal 无损打包并交接给 OpenAgents。 |
 | `proposal_view.py` | Canonical normalized proposal projection shared by all downstream roles. |
@@ -147,6 +148,7 @@ _auto_designer.user.sim —— persona 驱动的 harness 用户模拟器(控制�
 | `deps.py` | 依赖供给：执行 WorkspaceSpec.setup 在工作区里备好依赖环境（spec-0009/T3）。 |
 | `dimensions.py` | dimensions.py |
 | `feeling.py` | feeling.py |
+| `goals.py` | Explicit, append-only user goals for the persona control loop. |
 | `harness_adapter.py` | harness_adapter.py |
 | `loop.py` | loop.py |
 | `persona_client.py` | persona_client.py |
@@ -196,6 +198,7 @@ graph LR
     nauto_designer_designer_agent_runtime["designer.agent_runtime"]
     nauto_designer_designer_designer["designer.designer"]
     nauto_designer_designer_divergent["designer.divergent"]
+    nauto_designer_designer_evidence_contract["designer.evidence_contract"]
     nauto_designer_designer_issue_schema["designer.issue_schema"]
     nauto_designer_designer_owner["designer.owner"]
     nauto_designer_designer_proposal_view["designer.proposal_view"]
@@ -257,6 +260,7 @@ graph LR
     nauto_designer_user_sim_deps["sim.deps"]
     nauto_designer_user_sim_dimensions["sim.dimensions"]
     nauto_designer_user_sim_feeling["sim.feeling"]
+    nauto_designer_user_sim_goals["sim.goals"]
     nauto_designer_user_sim_harness_adapter["sim.harness_adapter"]
     nauto_designer_user_sim_loop["sim.loop"]
     nauto_designer_user_sim_persona_client["sim.persona_client"]
@@ -297,6 +301,7 @@ graph LR
     nauto_designer_designer_designer --> nauto_designer_usage
     nauto_designer_designer_designer --> nauto_designer_user_session_store
     nauto_designer_designer_divergent --> nauto_designer_designer_agent_runtime
+    nauto_designer_designer_divergent --> nauto_designer_designer_evidence_contract
     nauto_designer_designer_divergent --> nauto_designer_designer_issue_schema
     nauto_designer_designer_divergent --> nauto_designer_designer_proposal_view
     nauto_designer_designer_divergent --> nauto_designer_designer_role_contract
@@ -304,6 +309,8 @@ graph LR
     nauto_designer_designer_divergent --> nauto_designer_tracker_base
     nauto_designer_designer_divergent --> nauto_designer_usage
     nauto_designer_designer_divergent --> nauto_designer_user_session_store
+    nauto_designer_designer_evidence_contract --> nauto_designer_models
+    nauto_designer_designer_evidence_contract --> nauto_designer_usage
     nauto_designer_designer_owner --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_owner --> nauto_designer_designer_issue_schema
     nauto_designer_designer_owner --> nauto_designer_designer_proposal_view
@@ -314,9 +321,12 @@ graph LR
     nauto_designer_designer_proposal_view --> nauto_designer_designer_issue_schema
     nauto_designer_designer_runtime_agg --> nauto_designer_models
     nauto_designer_designer_runtime_agg --> nauto_designer_user_session_store
+    nauto_designer_designer_session_timeline --> nauto_designer_designer_evidence_contract
     nauto_designer_designer_session_timeline --> nauto_designer_models
+    nauto_designer_designer_session_timeline --> nauto_designer_usage
     nauto_designer_designer_session_timeline --> nauto_designer_user_session_store
     nauto_designer_designer_triage --> nauto_designer_designer_agent_runtime
+    nauto_designer_designer_triage --> nauto_designer_designer_evidence_contract
     nauto_designer_designer_triage --> nauto_designer_designer_issue_schema
     nauto_designer_designer_triage --> nauto_designer_designer_role_contract
     nauto_designer_designer_triage --> nauto_designer_tracker_base
@@ -359,6 +369,7 @@ graph LR
     nauto_designer_loop_runner --> nauto_designer_loop_checkpoint
     nauto_designer_loop_runner --> nauto_designer_loop_orchestrator
     nauto_designer_loop_runner --> nauto_designer_loop_run_state
+    nauto_designer_loop_sim_user --> nauto_designer_designer_evidence_contract
     nauto_designer_loop_sim_user --> nauto_designer_designer_issue_schema
     nauto_designer_loop_sim_user --> nauto_designer_evaluation_swebench
     nauto_designer_loop_sim_user --> nauto_designer_harness_connector
@@ -376,6 +387,7 @@ graph LR
     nauto_designer_tracker_base --> nauto_designer_models
     nauto_designer_tracker_fake --> nauto_designer_models
     nauto_designer_tracker_gitea --> nauto_designer_models
+    nauto_designer_user_session_store --> nauto_designer_designer_evidence_contract
     nauto_designer_user_session_store --> nauto_designer_models
     nauto_designer_user_sim --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim --> nauto_designer_user_sim_feeling
@@ -399,6 +411,7 @@ graph LR
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_actions
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_feeling
+    nauto_designer_user_sim_loop --> nauto_designer_user_sim_goals
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_persona_client
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_prompt
     nauto_designer_user_sim_loop --> nauto_designer_user_sim_state
