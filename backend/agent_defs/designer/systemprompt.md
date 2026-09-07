@@ -7,9 +7,12 @@
 - ProposalView：全量开放 proposal 的任务无关标题、规范化字段、标签、优先级、来源和 `covers`。
 - ready item 摘要：用于判断当前能力和已有工作方向。
 - 体验趋势：评分定位影响范围，理由解释用户体验；不得仅凭分数推断根因。
-- 运行时聚合：用于区分表现相似但机制不同的问题；统计值是证据，不是自动归因。
 - 只读 harness 与 NexAU：先搜索后按需读取，用于验证结构判断。
-- 不提供 session timeline/beat/step 工具。关系判断只依据 ProposalView 已携带的规范化证据，避免脱离 proposal 重新发现需求。
+- 可以使用 session timeline、beat、step，或通过 read_file、list_directory、search_file_content
+  查阅制品观测文件；范围限于可见提案已引用的 session。先提出需要核实的关系，再按需读取对应证据。
+  manifest 和阅读说明由制品提供，日志格式和事件名可以随版本变化；没有记录时保留不确定性。
+  内部重试与用户可见等待可以相互解释，但不能自动推出用户需要看见内部日志。
+  不通过下钻重新发现单票需求；不以每条关系都完成日志调查作为提交的硬性条件。
 - ProposalView 中的目标感知内容只作为带 `evidence_ref` 的用户意图证据；B0、当前目标、revision 和用户 accept 都不能被改写成客观验收或实现规格。若来源没有证据引用，就不能自行回到 session 发现单票需求。
 
 ## 结构综合原则

@@ -175,6 +175,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0057 自主产品反馈与交互主动作并行
 在原有用户动作中附带自主产品反馈，保留继续、等待、接受或放弃的语义；反馈可达性不依赖工具能力或纠偏策略，格式异常仅警告，不按低分自动提单。
 
+### 0059 观测文件入口与设计角色按需取证
+让 Triage、独立 PM 与 Designer 通过普通文件工具按职责查阅制品自己的观测文件，保留原有需求产物与角色分工。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -434,6 +437,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 | 0056 | 0056/T4 | 终止一致性回归 | done | T1, T2, T3 | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/scripts/e2e-spec-0056-0057-user-semantics.sh |
 | 0057 | 0057/T1 | 主动作伴随反馈与既有提单兼容 | done | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/clauses.py |
 | 0057 | 0057/T2 | 动作兼容与持久化回归 | done | T1 | backend/tests/user/sim/test_feedback.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/sim/test_prompt.py |
+| 0059 | 0059/T1 | 制品观测文件的只读入口和访问审计 | done | — | backend/auto_designer/designer/observation_provider.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/dev/workspace_jail.py |
+| 0059 | 0059/T2 | 独立 PM 和结构综合按需取证与证据引用延续 | done | T1 | backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/proposal_view.py<br>backend/auto_designer/designer/evidence_contract.py<br>backend/auto_designer/designer/session_timeline.py<br>backend/tests/loop/test_designer.py<br>backend/agent_defs/designer<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/triage_agent/systemprompt.md |
+| 0059 | 0059/T3 | 边界回归与真实模型单链路回放 | done | T1, T2 | backend/tests/designer/test_observation_provider.py<br>backend/scripts/replay_observation_design.py |
 
 ## 跨 feature 关系图
 
@@ -808,6 +814,11 @@ graph LR
         n0057_T1["T1 主动作伴随反馈与既有提单兼容"]
         n0057_T2["T2 动作兼容与持久化回归"]
     end
+    subgraph G0059[0059 observation-evolution-contract]
+        n0059_T1["T1 制品观测文件的只读入口和访问审计"]
+        n0059_T2["T2 独立 PM 和结构综合按需取证与证据引用延续"]
+        n0059_T3["T3 边界回归与真实模型单链路回放"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1075,6 +1086,9 @@ graph LR
     n0056_T4 --> n0056_T2
     n0056_T4 --> n0056_T3
     n0057_T2 --> n0057_T1
+    n0059_T2 --> n0059_T1
+    n0059_T3 --> n0059_T1
+    n0059_T3 --> n0059_T2
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1135,29 +1149,30 @@ graph LR
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/agent.yaml | 0014, 0030, 0032 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014, 0030, 0032 |
-| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055 |
+| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059 |
 | backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml | 0029, 0042, 0043 |
 | backend/agent_defs/owner/systemprompt.md | 0042, 0043, 0052 |
 | backend/agent_defs/owner/tools/submit_admission.tool.yaml | 0042, 0043, 0052 |
 | backend/agent_defs/triage_agent/agent.yaml | 0027, 0029 |
-| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043, 0055 |
+| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043, 0055, 0059 |
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
 | backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043, 0052 |
-| backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055 |
-| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055 |
-| backend/auto_designer/designer/evidence_contract.py | 0055, 0056 |
+| backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049, 0059 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059 |
+| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059 |
+| backend/auto_designer/designer/evidence_contract.py | 0055, 0056, 0059 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052 |
 | backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052 |
+| backend/auto_designer/designer/proposal_view.py | 0042, 0059 |
 | backend/auto_designer/designer/role_contract.py | 0043, 0052, 0055 |
-| backend/auto_designer/designer/session_timeline.py | 0024, 0054, 0055, 0056 |
+| backend/auto_designer/designer/session_timeline.py | 0024, 0054, 0055, 0056, 0059 |
 | backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
 | backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
 | backend/auto_designer/dev/harness_boundary.py | 0015, 0030, 0040 |
-| backend/auto_designer/dev/workspace_jail.py | 0015, 0049 |
+| backend/auto_designer/dev/workspace_jail.py | 0015, 0049, 0059 |
 | backend/auto_designer/experiment/cli.py | 0047, 0053 |
 | backend/auto_designer/experiment/runtime.py | 0047, 0053 |
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
@@ -1233,7 +1248,7 @@ graph LR
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051 |
 | backend/tests/harness/test_template_entry.py | 0013, 0051 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055, 0059 |
 | backend/tests/loop/test_live.py | 0017, 0026, 0050 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
 | backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051 |
@@ -3044,4 +3059,29 @@ graph LR
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
+```
+
+### 0059 观测文件入口与设计角色按需取证（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 制品观测文件的只读入口和访问审计"]
+    nT2["T2 独立 PM 和结构综合按需取证与证据引用延续"]
+    nT3["T3 边界回归与真实模型单链路回放"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
 ```

@@ -25,6 +25,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from auto_designer.designer.observation_provider import (
+    bind_observation_provider,
+    bind_observation_scope,
+)
 from auto_designer.designer.session_timeline import bind_session_store
 from auto_designer.invocation import record_invocation
 from auto_designer.usage import bind_usage_context, current_usage_context
@@ -68,6 +72,8 @@ def run_agent_def(
     subject: dict[str, str] | None = None,
     replayable: bool = True,
     evidence: dict[str, object] | None = None,
+    allowed_session_ids: set[str] | frozenset[str] | None = None,
+    observation_root: str | Path | None = None,
 ) -> str:
     """加载 agent_def_dir 的 nexau agent 定义、以 message 跑一轮，返回 agent.run 的返回值（str）。
 
@@ -91,11 +97,39 @@ def run_agent_def(
             on_event(kind, text)
 
     cfg.resolved_tracer = StepTracer(trace_event)
-    agent = Agent(config=cfg)
     subj = subject or {"kind": "round", "id": str(current_usage_context().round_no or "")}
     pin = _agent_def_pin(agent_def_dir=Path(agent_def_dir))
     model = os.environ.get("DESIGNER_LLM_MODEL")
-    with bind_session_store(store), bind_usage_context(role=role, operation="nexau-agent"):
+    scoped_sessions = set(allowed_session_ids or ())
+    if role in {"triager", "triage", "triage_agent"}:
+        scoped_sessions = {str(current_usage_context().session_id or "unavailable")}
+    if role not in {
+        "triager",
+        "triage",
+        "triage_agent",
+        "divergent",
+        "pm",
+        "divergent_pm",
+        "designer",
+        "synthesize",
+    }:
+        scoped_sessions = set()
+    with (
+        bind_session_store(store),
+        bind_observation_provider(
+            store, allowed_session_ids=scoped_sessions, observation_root=observation_root
+        ) as observations,
+        bind_observation_scope(allowed_session_ids=scoped_sessions),
+        bind_usage_context(role=role, operation="nexau-agent"),
+    ):
+        if role != "owner":
+            message += "\n\n" + observations.prompt_index()
+            evidence = {
+                **(evidence or {}),
+                "observation_sessions": sorted(scoped_sessions),
+                "observation_manifests": [str(paths[0]) for paths in observations.files.values()],
+            }
+        agent = Agent(config=cfg)
         started = time.monotonic()
         try:
             out = run_with_timeout(lambda: agent.run(message=message), timeout)

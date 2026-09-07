@@ -471,59 +471,32 @@ def _resolve_session(
     return {"ok": False, "error": "provide issue_number or session_id"}
 
 
-def _check_role_access(*, level: str, session_id: str, reason: str = "") -> dict[str, Any] | None:
+def _check_role_access(*, level: str, session_id: str, reason: str) -> dict[str, Any] | None:
     """Enforce the role matrix at the tool boundary (prompts are not a permission system)."""
+    from auto_designer.designer.evidence_contract import (
+        record_evidence_access,
+        validate_role_access,
+    )
+    from auto_designer.designer.observation_provider import current_observation_scope
     from auto_designer.usage import current_usage_context
 
     ctx = current_usage_context()
     role = str(ctx.role or "").strip().lower()
-    known_roles = {
-        "triager",
-        "triage",
-        "triage_agent",
-        "divergent",
-        "pm",
-        "divergent_pm",
-        "designer",
-        "synthesize",
-        "owner",
-    }
-    if role and role not in known_roles:
-        from auto_designer.designer.evidence_contract import record_evidence_access
-
-        record_evidence_access(
-            level=level,
-            session_id=session_id,
-            reason="unknown role",
-            allowed=False,
-        )
-        return {"ok": False, "error": f"role {role} cannot read evidence"}
-    if role in {"owner", "designer", "synthesize"} and level in {"L2", "L3", "L4"}:
-        from auto_designer.designer.evidence_contract import record_evidence_access
-
-        record_evidence_access(
-            level=level,
-            session_id=session_id,
-            reason=reason or "role visibility denial",
-            allowed=False,
-        )
-        return {"ok": False, "error": f"role {role} cannot directly read {level} evidence"}
-    if role in {"triager", "triage", "triage_agent"}:
-        bound = str(ctx.session_id or "").strip()
-        if bound and bound != session_id:
-            from auto_designer.designer.evidence_contract import record_evidence_access
-
-            record_evidence_access(
-                level=level,
-                session_id=session_id,
-                reason=reason or "triage session mismatch",
-                allowed=False,
-            )
-            return {
-                "ok": False,
-                "error": "triage evidence is limited to the session linked to the current report",
-            }
-    return None
+    if not role:  # Compatibility for local projection helpers outside role execution.
+        return None
+    allowed, error = validate_role_access(
+        role=role,
+        level=level,
+        session_id=session_id,
+        source_session_id=ctx.session_id,
+        allowed_session_ids=current_observation_scope(),
+    )
+    if allowed:
+        return None
+    record_evidence_access(
+        level=level, session_id=session_id, reason=reason or error, allowed=False
+    )
+    return {"ok": False, "error": error}
 
 
 def get_session_timeline(

@@ -573,7 +573,12 @@ def project_for_role(envelope: EvidenceEnvelope | Mapping[str, Any], role: str) 
 
 
 def validate_role_access(
-    *, role: str, level: str, session_id: str | None = None, source_session_id: str | None = None
+    *,
+    role: str,
+    level: str,
+    session_id: str | None = None,
+    source_session_id: str | None = None,
+    allowed_session_ids: set[str] | frozenset[str] | None = None,
 ) -> tuple[bool, str]:
     """Small fail-closed gate used by future evidence tools and replay tests."""
 
@@ -594,17 +599,25 @@ def validate_role_access(
     }
     if normalized not in known_roles:
         return False, f"unknown role: {normalized or 'unavailable'}"
-    if normalized in {"synthesize", "designer", "owner"} and level in {
+    if normalized == "owner" and level in {
         EvidenceLevel.TIMELINE.value,
         EvidenceLevel.BEAT.value,
         EvidenceLevel.DETAIL.value,
     }:
         return False, f"{normalized} cannot directly read {level}"
-    if (
-        normalized in {"triage", "triager", "triage_agent"}
-        and session_id
-        and source_session_id
-        and session_id != source_session_id
+    if normalized in {"synthesize", "designer"} and level in {
+        EvidenceLevel.TIMELINE.value,
+        EvidenceLevel.BEAT.value,
+        EvidenceLevel.DETAIL.value,
+    }:
+        allowed = set(allowed_session_ids or ())
+        if not session_id or session_id not in allowed:
+            return False, f"{normalized} may read {level} only for cited sessions"
+    if normalized in {"pm", "divergent", "divergent_pm"} and allowed_session_ids is not None:
+        if not session_id or session_id not in allowed_session_ids:
+            return False, "session is outside the PM experience index"
+    if normalized in {"triage", "triager", "triage_agent"} and (
+        not source_session_id or session_id != source_session_id
     ):
         return False, "triage session does not match current report"
     return True, "ok"

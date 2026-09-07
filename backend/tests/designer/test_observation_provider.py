@@ -1,0 +1,237 @@
+"""Observation access through ordinary tools and the real role handoff boundaries."""
+
+from __future__ import annotations
+
+import json
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from nexau.archs.main_sub.execution.hooks import ToolCallParams
+
+from auto_designer.designer.designer import Designer
+from auto_designer.designer.divergent import Divergent
+from auto_designer.designer.observation_provider import (
+    ObservationProvider,
+    bind_observation_provider,
+    bind_observation_scope,
+    current_observation_provider,
+)
+from auto_designer.designer.proposal_view import evidence_session_ids, format_proposal_view
+from auto_designer.designer.session_timeline import bind_session_store, get_session_timeline
+from auto_designer.dev.workspace_jail import WorkspaceJailMiddleware
+from auto_designer.models import (
+    FeelingScore,
+    IssueDraft,
+    OpenIssue,
+    Persona,
+    SeedScenario,
+    Session,
+    Transcript,
+)
+from auto_designer.tracker.fake import FakeTracker
+from auto_designer.usage import bind_usage_context
+from auto_designer.user.session_store import SessionStore
+
+
+def bundle(root: Path, sid: str, filename: str = "engine.log") -> Path:
+    path = root / sid
+    path.mkdir(parents=True)
+    (path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "session_id": sid,
+                "artifact": {"commit": "fixture-v2"},
+                "files": [{"path": filename}, {"path": "READING.md"}],
+            }
+        )
+    )
+    (path / filename).write_text(
+        f"request={sid} attempt=1 parser failed\nretry retained context\nreply completed\n"
+    )
+    (path / "READING.md").write_text("Internal engine diagnostics; not displayed to the user.")
+    (path / "unexported.env").write_text("private data")
+    return path
+
+
+def session(sid: str) -> Session:
+    return Session(
+        session_id=sid,
+        persona=Persona("tester", "experienced", "coding", "complete work", "direct"),
+        scenario=SeedScenario("fix the problem"),
+        transcript=Transcript(),
+        feeling=FeelingScore(2, "I had to wait without understanding progress"),
+    )
+
+
+def call_file(workdir: Path, tool: str, **parameters):
+    args = ToolCallParams(
+        agent_state=None,
+        sandbox=SimpleNamespace(work_dir=str(workdir)),
+        tool_name=tool,
+        parameters=parameters,
+        tool_call_id="fixture",
+        execution_params={},
+    )
+    return WorkspaceJailMiddleware().wrap_tool_call(args, lambda _: {"ordinary_source_tool": True})
+
+
+def test_read_search_list_use_manifest_without_fixed_log_schema(tmp_path, monkeypatch):
+    store = SessionStore(tmp_path / "sessions")
+    path = bundle(tmp_path / "observations", "s1", "renamed-v9.txt")
+    monkeypatch.setenv("ROLE_RUNS_DIR", str(tmp_path / "role-runs"))
+    monkeypatch.setenv("DESIGNER_LLM_API_KEY", "secret-value")
+    (path / "renamed-v9.txt").write_text(
+        "new-engine-key=secret-value\nretry now uses a different format\nfinished\n"
+    )
+    with (
+        bind_usage_context(role="divergent"),
+        bind_observation_provider(store, allowed_session_ids={"s1"}) as provider,
+    ):
+        assert str(path / "manifest.json") in provider.prompt_index()
+        assert "retry now" not in provider.prompt_index()
+        listing = call_file(tmp_path, "list_directory", dir_path=str(path))
+        read = call_file(
+            tmp_path, "read_file", file_path=str(path / "renamed-v9.txt"), offset=0, limit=2
+        )
+        search = call_file(tmp_path, "search_file_content", dir_path=str(path), pattern="retry")
+    assert "renamed-v9.txt" in listing["content"]
+    assert "unexported.env" not in listing["content"]
+    assert "secret-value" not in read["content"]
+    assert "2| retry now uses a different format" in read["content"]
+    assert "renamed-v9.txt:2:" in search["content"]
+    events = [
+        json.loads(line)
+        for line in (tmp_path / "role-runs/evidence_access.jsonl").read_text().splitlines()
+    ]
+    assert len(events) == 3 and all(row["allowed"] for row in events)
+    assert {row["role"] for row in events} == {"divergent"}
+    assert "pattern=retry" in events[-1]["reason"]
+
+
+def test_undeclared_cross_session_and_write_access_are_denied(tmp_path):
+    store = SessionStore(tmp_path / "sessions")
+    first = bundle(tmp_path / "observations", "s1")
+    second = bundle(tmp_path / "observations", "s2")
+    workdir = tmp_path / "harness"
+    workdir.mkdir()
+    with bind_observation_provider(store, allowed_session_ids={"s1"}):
+        for target in [first / "unexported.env", second / "engine.log"]:
+            result = call_file(workdir, "read_file", file_path=str(target))
+            assert "error" in result
+        assert "error" in call_file(workdir, "list_directory", dir_path=str(first.parent))
+        assert "error" in call_file(
+            workdir, "write_file", file_path=str(first / "engine.log"), content="overwrite"
+        )
+        assert call_file(workdir, "read_file", file_path="entry.py")["ordinary_source_tool"]
+
+
+@pytest.mark.parametrize("bad_path", ["../s2/engine.log", "/etc/passwd", "linked.log"])
+def test_bad_manifest_or_symlink_is_unavailable(tmp_path, bad_path):
+    root = tmp_path / "observations"
+    path = bundle(root, "s1")
+    other = bundle(root, "s2")
+    (path / "linked.log").symlink_to(other / "engine.log")
+    (path / "manifest.json").write_text(
+        json.dumps({"session_id": "s1", "files": [{"path": bad_path}]})
+    )
+    provider = ObservationProvider(
+        SessionStore(tmp_path / "sessions"), allowed_session_ids=frozenset({"s1"})
+    )
+    assert not provider.files and "s1" in provider.unavailable
+
+
+def test_missing_logs_do_not_invent_success_and_session_schema_is_not_required(tmp_path):
+    store = SessionStore(tmp_path / "sessions")  # No Session JSON is necessary for a native bundle.
+    bundle(tmp_path / "observations", "s1")
+    provider = ObservationProvider(store, allowed_session_ids=frozenset({"s1", "old-session"}))
+    assert "s1" in provider.files and "old-session" in provider.unavailable
+    assert "原生日志不可用" in provider.prompt_index()
+
+
+def test_broad_source_search_and_alias_cannot_bypass_file_scope(tmp_path):
+    store = SessionStore(tmp_path / "sessions")
+    path = bundle(tmp_path / "observations", "s1")
+    alias = tmp_path / "alias.log"
+    alias.symlink_to(path / "unexported.env")
+    with bind_observation_provider(store, allowed_session_ids={"s1"}):
+        assert "error" in call_file(tmp_path, "search_file_content", pattern="private")
+        assert "error" in call_file(tmp_path, "read_file", file_path=str(alias))
+
+
+def test_parallel_invocations_keep_independent_scopes(tmp_path):
+    store = SessionStore(tmp_path / "sessions")
+    for sid in ("s1", "s2"):
+        bundle(tmp_path / "observations", sid)
+
+    def read_own(sid):
+        with bind_observation_provider(store, allowed_session_ids={sid}):
+            provider = current_observation_provider()
+            return sorted(provider.files)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        assert list(executor.map(read_own, ["s1", "s2"])) == [["s1"], ["s2"]]
+    assert current_observation_provider() is None
+
+
+def test_reference_chain_survives_body_clipping_and_legacy_raw_is_excluded():
+    issue = OpenIssue(
+        1,
+        "normalized problem",
+        "x" * 4000 + "\n会话：s1, s2\n## 原始用户报告（案例证据，非实现对象）\nsession_id: private",
+    )
+    assert evidence_session_ids([issue]) == {"s1", "s2"}
+    assert "evidence_sessions=s1,s2" in format_proposal_view(issue)
+    assert "private" not in format_proposal_view(issue)
+
+
+def test_designer_tools_are_available_only_for_cited_sessions(tmp_path):
+    store = SessionStore(tmp_path / "sessions")
+    store.save(session("s1"))
+    store.save(session("s2"))
+    with bind_session_store(store), bind_usage_context(role="designer"):
+        assert not get_session_timeline(session_id="s1")["ok"]
+        with bind_observation_scope(allowed_session_ids={"s1"}):
+            assert get_session_timeline(session_id="s1", reason="compare two reports")["ok"]
+            assert not get_session_timeline(session_id="s2")["ok"]
+
+
+def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_path, monkeypatch):
+    store = SessionStore(tmp_path / "sessions")
+    store.save(session("s1"))
+    store.save(session("s2"))
+    tracker = FakeTracker()
+    a = tracker.create_issue(IssueDraft("one", "session_id: s1", ["proposal"]))
+    b = tracker.create_issue(IssueDraft("two", "会话：s2", ["proposal"]))
+    seen = []
+
+    def pm_run(*args, **kwargs):
+        seen.append(kwargs["allowed_session_ids"])
+        return '{"proposals": []}'
+
+    monkeypatch.setattr("auto_designer.designer.divergent.run_agent_def", pm_run)
+    Divergent(tracker, store, str(tmp_path), str(tmp_path)).propose_once()
+    assert seen == [{"s1", "s2"}]
+    product = {
+        "title": "shared direction",
+        "source_proposals": [a.number, b.number],
+        "relationship": "shared",
+        "common_tension": "uncertain state",
+        "structural_direction": "coherent execution",
+        "expected_leverage": "preserved user control",
+        "solution_level": "structural_mechanism",
+        "abstraction_rationale": "shared behavior",
+        "covers": [a.number, b.number],
+    }
+
+    def designer_run(*args, **kwargs):
+        assert kwargs["allowed_session_ids"] == {"s1", "s2"}
+        assert "运行时行为聚合" not in args[1]
+        return json.dumps({"proposals": [product]})
+
+    monkeypatch.setattr("auto_designer.designer.designer.run_agent_def", designer_run)
+    outcome = Designer(tracker, store, str(tmp_path), str(tmp_path)).propose_once()
+    assert len(outcome.proposal_numbers) == 1
+    assert sorted(outcome.merged_numbers) == [a.number, b.number]
+    assert evidence_session_ids(tracker.list_open_issues()) == {"s1", "s2"}

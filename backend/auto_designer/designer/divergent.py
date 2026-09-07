@@ -111,6 +111,7 @@ class Divergent:
     def _run_agent(self, *, trend: list[tuple[str, int, str, str]], reference: list) -> str:
         # The global PM view is an index of compact, deterministic projections.
         # It deliberately does not concatenate raw timeline/step output.
+        known_sessions = {sid for _, _, _, sid in trend if sid}
         goal_index = self._goal_index(trend)
         msg = (
             "你是产品 PM。以下是全部可见的用户体验索引以及开放 proposal、ready item。先理解用户"
@@ -143,8 +144,11 @@ class Divergent:
                 "default_level": "L1",
                 "allowed_levels": ["L2", "L3"],
                 "session_count": len(goal_index),
-                "session_ids": [str(row.get("session_id")) for row in goal_index if row.get("session_id")],
+                "session_ids": [
+                    str(row.get("session_id")) for row in goal_index if row.get("session_id")
+                ],
             },
+            allowed_session_ids=known_sessions,
         )
 
     def _goal_index(self, trend: list[tuple[str, int, str, str]]) -> list[dict]:

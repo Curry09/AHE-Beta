@@ -7,6 +7,7 @@ session timeline tools and tracker comments.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from auto_designer.designer.issue_schema import (
@@ -29,6 +30,14 @@ _BODY_LIMIT = 3000
 _CANONICAL_LABELS = frozenset(
     {REPORT, PROPOSAL, READY, OPENAGENTS, FROM_TRIAGE, FROM_SYNTHESIZE, FROM_DIVERGENT}
     | set(PRIORITIES)
+)
+_SESSION_REF = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:session_id|会话)\s*[:：]\s*([^\n]+)",
+    re.MULTILINE | re.IGNORECASE,
+)
+_SESSION_TAG = re.compile(
+    r"\[session=([A-Za-z0-9][A-Za-z0-9_.-]{0,127})\]",
+    re.IGNORECASE,
 )
 
 
@@ -75,6 +84,9 @@ def format_proposal_view(issue) -> str:
     if view.covers:
         metadata.append(f"covers={','.join(f'#{number}' for number in view.covers)}")
     body = view.body or "（无规范化正文）"
+    sessions = evidence_session_ids([issue])
+    if sessions:
+        metadata.append(f"evidence_sessions={','.join(sorted(sessions))}")
     return f"- #{view.number} [{'; '.join(metadata)}] {view.title}\n  {body}"
 
 
@@ -99,3 +111,29 @@ def format_proposal_reference_list(issues: list) -> str:
     if not issues:
         return "（空）"
     return "\n".join(format_proposal_reference(issue) for issue in issues)
+
+
+def evidence_session_ids(issues: list) -> set[str]:
+    """Extract bounded session handles from normalized proposal evidence.
+
+    This is intentionally lexical rather than semantic: a Designer may inspect
+    only evidence a preceding role actually cited.  It never scans the session
+    store to discover additional tickets, and malformed/host-path-like values
+    are ignored by the conservative token pattern.
+    """
+
+    found: set[str] = set()
+    for issue in issues:
+        # References may follow a long normalized body; never lose the authority
+        # chain to the display text budget. Raw legacy reports remain excluded.
+        body = str(getattr(issue, "body", "") or "").split(_LEGACY_EVIDENCE_HEADING, 1)[0]
+        for match in _SESSION_REF.finditer(body):
+            for value in re.split(r"[,，、\s]+", match.group(1)):
+                value = value.strip("`\"'[]")
+                if (
+                    re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value)
+                    and value != "unavailable"
+                ):
+                    found.add(value)
+        found.update(_SESSION_TAG.findall(body))
+    return found

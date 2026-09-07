@@ -29,6 +29,7 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `divergent.py` | Divergent（能力发现）驱动器。 |
 | `evidence_contract.py` | Goal-aware evidence contracts for demand-side roles. |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
+| `observation_provider.py` | Spec-0059: discover and read artifact-owned diagnostic files with ordinary tools. |
 | `owner.py` | Owner 驱动器：把 proposal 无损打包并交接给 OpenAgents。 |
 | `proposal_view.py` | Canonical normalized proposal projection shared by all downstream roles. |
 | `role_contract.py` | Spec-0043: task-independent cognitive contracts for demand-side roles. |
@@ -200,6 +201,7 @@ graph LR
     nauto_designer_designer_divergent["designer.divergent"]
     nauto_designer_designer_evidence_contract["designer.evidence_contract"]
     nauto_designer_designer_issue_schema["designer.issue_schema"]
+    nauto_designer_designer_observation_provider["designer.observation_provider"]
     nauto_designer_designer_owner["designer.owner"]
     nauto_designer_designer_proposal_view["designer.proposal_view"]
     nauto_designer_designer_role_contract["designer.role_contract"]
@@ -286,6 +288,7 @@ graph LR
     nauto_designer_web_api["web.api"]
     nauto_designer_web_issue_timeline["web.issue_timeline"]
     nauto_designer_designer_agent_contract --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_agent_runtime --> nauto_designer_designer_observation_provider
     nauto_designer_designer_agent_runtime --> nauto_designer_designer_session_timeline
     nauto_designer_designer_agent_runtime --> nauto_designer_invocation
     nauto_designer_designer_agent_runtime --> nauto_designer_loop_live_tracer
@@ -295,7 +298,6 @@ graph LR
     nauto_designer_designer_designer --> nauto_designer_designer_issue_schema
     nauto_designer_designer_designer --> nauto_designer_designer_proposal_view
     nauto_designer_designer_designer --> nauto_designer_designer_role_contract
-    nauto_designer_designer_designer --> nauto_designer_designer_runtime_agg
     nauto_designer_designer_designer --> nauto_designer_models
     nauto_designer_designer_designer --> nauto_designer_tracker_base
     nauto_designer_designer_designer --> nauto_designer_usage
@@ -311,6 +313,9 @@ graph LR
     nauto_designer_designer_divergent --> nauto_designer_user_session_store
     nauto_designer_designer_evidence_contract --> nauto_designer_models
     nauto_designer_designer_evidence_contract --> nauto_designer_usage
+    nauto_designer_designer_observation_provider --> nauto_designer_designer_evidence_contract
+    nauto_designer_designer_observation_provider --> nauto_designer_invocation
+    nauto_designer_designer_observation_provider --> nauto_designer_user_session_store
     nauto_designer_designer_owner --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_owner --> nauto_designer_designer_issue_schema
     nauto_designer_designer_owner --> nauto_designer_designer_proposal_view
@@ -322,6 +327,7 @@ graph LR
     nauto_designer_designer_runtime_agg --> nauto_designer_models
     nauto_designer_designer_runtime_agg --> nauto_designer_user_session_store
     nauto_designer_designer_session_timeline --> nauto_designer_designer_evidence_contract
+    nauto_designer_designer_session_timeline --> nauto_designer_designer_observation_provider
     nauto_designer_designer_session_timeline --> nauto_designer_models
     nauto_designer_designer_session_timeline --> nauto_designer_usage
     nauto_designer_designer_session_timeline --> nauto_designer_user_session_store
@@ -332,6 +338,7 @@ graph LR
     nauto_designer_designer_triage --> nauto_designer_tracker_base
     nauto_designer_designer_triage --> nauto_designer_usage
     nauto_designer_designer_triage --> nauto_designer_user_session_store
+    nauto_designer_dev_workspace_jail --> nauto_designer_designer_observation_provider
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models

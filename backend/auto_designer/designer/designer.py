@@ -1,7 +1,7 @@
 # Spec-0042/T5：Synthesize 在规范化 ProposalView 上形成结构提案。
 """Synthesize 驱动器。
 
-该角色读取 ready queue、开放 ProposalView、体验趋势与运行时聚合，按需检索会话证据并只读检查
+该角色读取 ready queue、开放 ProposalView、体验趋势，按需检索会话/制品观测证据并只读检查
 harness 现状。输出写入 proposal 平面并标记 from-synthesize。`covers` 是 Designer 对来源提案
 的吸收决定；结构提案创建成功后，driver 直接合并关闭 covered 来源。Owner 只负责无损交接和
 历史精确重复兼容。Designer 类名及 RFC 相关机器标识保留用于兼容现有接口。
@@ -29,9 +29,8 @@ from auto_designer.designer.issue_schema import (
     plane,
     round_label,
 )
-from auto_designer.designer.proposal_view import format_proposal_list
+from auto_designer.designer.proposal_view import evidence_session_ids, format_proposal_list
 from auto_designer.designer.role_contract import render_synthesis_artifact, validate_synthesis
-from auto_designer.designer.runtime_agg import aggregate_runtime, format_runtime_agg
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.user.session_store import SessionStore
@@ -114,15 +113,13 @@ class Designer:
         ready = [i for i in backlog if plane(i.labels) == READY]
         proposals_open = [i for i in backlog if plane(i.labels) == PROPOSAL]
         trend = self._feeling_trend()
-        # 任务无关机制层数字：扫已落盘 steps/reply + 仓内预算钮（delivery 轨信号，divergent 不吃）。
-        runtime = format_runtime_agg(aggregate_runtime(store=self._store, harness_repo=self._repo))
         self._emit(
             running=True,
             status=f"综合中…（ready={len(ready)} · 待准入提案={len(proposals_open)}）",
         )
 
         result_text = self._run_agent(
-            ready=ready, proposals=proposals_open, trend=trend, runtime=runtime
+            ready=ready, proposals=proposals_open, trend=trend, runtime=""
         )
         parsed = self._proposals_from_submit(result_text)
         if read_submit(result_text, "proposals") is None:
@@ -132,7 +129,7 @@ class Designer:
             self._force_submit_prompt = True
             try:
                 retry_text = self._run_agent(
-                    ready=ready, proposals=proposals_open, trend=trend, runtime=runtime
+                    ready=ready, proposals=proposals_open, trend=trend, runtime=""
                 )
             finally:
                 self._force_submit_prompt = False
@@ -156,6 +153,14 @@ class Designer:
                 continue
             covers = tuple(n for n in prop.covers if n in coverable and n not in merged_sources)
             body = render_synthesis_artifact(prop.artifact)
+            source_ids = set(prop.artifact.get("source_proposals") or [])
+            source_sessions = evidence_session_ids(
+                [item for item in [*ready, *proposals_open] if item.number in source_ids]
+            )
+            if source_sessions:
+                body += "\n\n## 证据引用\n\n" + "\n".join(
+                    f"- session_id: {sid}" for sid in sorted(source_sessions)
+                )
             covers_line = format_covers_line(list(covers))
             if covers_line:
                 # 机器行 = Designer 吸收决定的单一真源（消费方：状态迁移、web 展示）。创建后不改写。
@@ -220,17 +225,21 @@ class Designer:
         trend: list[tuple[str, int, str, str]],
         runtime: str,
     ) -> str:
+        # Keep the legacy driver/replay signature, but don't inject aggregates
+        # inferred from an earlier artifact's fields or source constants.
+        del runtime
         msg = (
             "你是 Synthesize。以下是 ready queue 与开放 ProposalView。只分析已有提案之间的结构关系、"
-            "共同张力和可复用机制；每条输出必须明确引用至少两个可见提案。体验趋势与运行时聚合仅作"
+            "共同张力和可复用机制；每条输出必须明确引用至少两个可见提案。体验趋势仅作"
             "背景证据，不能替代跨提案关系。\n"
+            "若可见 ProposalView 已携带会话证据引用，可按需查阅观测文件、时间线、beat、step "
+            "验证关系；不得用这些工具脱离 proposal 重新发现单票需求。\n"
             "结构提案不规定数据结构、协议或实施步骤。`covers` 是你对来源提案的吸收决定；"
             "结构提案创建成功后，driver 会合并关闭其中仍开放的 report/proposal 来源。未放入"
             "covers 的来源继续独立交付。\n\n"
             f"## ready 工作队列（{len(ready)} 条）\n{self._format_backlog(ready)}\n\n"
             f"## 开放 ProposalView（{len(proposals)} 条）\n{self._format_backlog(proposals)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
-            f"## 运行时行为聚合（任务无关，只给数字）\n{runtime}\n\n"
             "调查完成后调用 `submit_rfcs` 一次：`proposals` 为本轮 0..n 条结构 proposal（无则空数组）；"
             "每条含 title、source_proposals、relationship、common_tension、structural_direction、"
             "expected_leverage、solution_level、abstraction_rationale + 可选 covers（整体吸收来源）。"
@@ -255,9 +264,11 @@ class Designer:
             subject={"kind": "round", "id": str(current_usage_context().round_no or "")},
             evidence={
                 "default_level": "proposal_view",
-                "allowed_levels": [],
+                "allowed_levels": ["L2", "L3", "L4"],
                 "source_proposals": [int(item.number) for item in [*ready, *proposals]],
+                "session_ids": sorted(evidence_session_ids([*ready, *proposals])),
             },
+            allowed_session_ids=evidence_session_ids([*ready, *proposals]),
         )
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:

@@ -23,5 +23,8 @@ input_schema:
       description: >-
         Session id from the feeling curve line ([session=...]). If both are set,
         session_id wins.
+    reason:
+      type: string
+      description: Short evidence gap this lookup is intended to resolve; recorded for audit.
   additionalProperties: false
   $schema: http://json-schema.org/draft-07/schema#

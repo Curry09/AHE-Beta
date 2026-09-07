@@ -26,6 +26,9 @@ input_schema:
     occurrence:
       type: integer
       description: Same occurrence as get_harness_beat (default 0).
+    reason:
+      type: string
+      description: Evidence gap being resolved by this drill-down; recorded for audit.
   required:
     - turn
     - step_i

@@ -235,7 +235,8 @@ def test_inputs_are_ready_plus_proposal_index(tmp_path) -> None:
     designer.propose_once()
     assert [i.number for i in designer.seen_ready] == [r]
     assert [i.number for i in designer.seen_proposals] == [p]
-    assert designer.seen_trend and designer.seen_runtime  # 体感+runtime 都喂（delivery 轨）
+    assert designer.seen_trend
+    assert designer.seen_runtime == ""  # 0059: 不再默认注入耦合旧制品字段的运行时聚合。
 
 
 def test_covers_line_written_and_sources_are_merged(tmp_path) -> None:

@@ -9,6 +9,7 @@
 覆盖：
 - 写类工具（write_file/replace/…）：目标必须在 harness work_dir 内。
 - 读类工具：work_dir **或** NexAU 仓根 **或** NexAU 运行时临时目录内放行。
+- 设计角色绑定的制品观测包：普通文件工具只读其声明文件，访问单独记录；不开放原始 sessions 库。
 - run_shell_command：path-like token 同读规则；trace 目录名仍一律拒。
 
 caveat：bash `python -c` 动态拼路径静态扫不出——要 100% airtight 需 OS 级沙箱。
@@ -216,6 +217,19 @@ class WorkspaceJailMiddleware(Middleware):
             work_dir = Path(str(work_dir_raw)).resolve()
         except (OSError, RuntimeError, ValueError):
             return call_next(params)
+
+        # Artifact-owned exports use the same file tools. The provider restricts
+        # reads/searches to the invocation's declared files and audits accesses;
+        # source/workspace access continues through the existing jail below.
+        from auto_designer.designer.observation_provider import current_observation_provider
+
+        observations = current_observation_provider()
+        if observations is not None:
+            result = observations.handle_file_tool(
+                tool=params.tool_name, parameters=params.parameters, work_dir=work_dir
+            )
+            if result is not None:
+                return result
 
         read_roots = _read_roots_for(work_dir)
 
