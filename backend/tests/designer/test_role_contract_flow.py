@@ -241,7 +241,7 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
         title="验证阶段再次丢失约束", body="session_id: " + session_id,
         labels=[sc.PROPOSAL, sc.FROM_TRIAGE],
     )).number
-    expected_for_synthesize = {report, second_report, divergent_number}
+    expected_for_synthesize = {report, second_report}
     designer = _Designer(
         tracker,
         store,
@@ -258,7 +258,7 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
                         "expected_leverage": "覆盖多个体验问题",
                         "solution_level": "structural_mechanism",
                         "abstraction_rationale": "跨提案机制层",
-                        "covers": sorted(expected_for_synthesize),
+                        "covers": sorted({*expected_for_synthesize, divergent_number}),
                     }
                 ]
             },
@@ -298,7 +298,7 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
 
 
 @pytest.mark.parametrize("labels", [[sc.FROM_DIVERGENT], [sc.DIVERGENT], [sc.FROM_DIVERGENT, sc.FROM_TRIAGE]])
-def test_pm_context_cannot_replace_two_delivery_sources(tmp_path, labels):
+def test_pm_is_not_visible_and_cannot_be_cited(tmp_path, labels):
     tracker = FakeTracker()
     a = tracker.create_issue(IssueDraft("delivery", "fact", [sc.PROPOSAL, sc.FROM_TRIAGE])).number
     b = tracker.create_issue(IssueDraft("product", "user outcome", [sc.PROPOSAL, *labels])).number
@@ -313,7 +313,8 @@ def test_pm_context_cannot_replace_two_delivery_sources(tmp_path, labels):
                          result=json.dumps({"proposals": [artifact]}))
     outcome = designer.propose_once()
     assert outcome.proposal_numbers == outcome.merged_numbers == []
-    assert outcome.rejected_proposals[0]["reasons"] == ["not-cross-delivery-proposal"]
+    assert designer.proposal_numbers == [a]
+    assert outcome.rejected_proposals[0]["reasons"] == ["foreign-source"]
     assert {i.number for i in tracker.list_open_issues()} == {a, b}
 
 

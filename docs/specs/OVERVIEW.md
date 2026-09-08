@@ -179,7 +179,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 让 Triage、独立 PM 与 Designer 通过普通文件工具按职责查阅制品自己的观测文件，保留原有需求产物与角色分工。
 
 ### 0060 独立 PM 路线与双轨交付协调
-PM 独立交给 Owner；Designer 仅吸收非 PM 来源并保持两条交付来源下限；Owner 显式关联共享交付工作，保留独立验收。
+PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer 综合交付路线提案；Owner 显式关联共享工作并保留独立验收。
 
 ## 全局看板
 

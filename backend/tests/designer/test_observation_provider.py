@@ -234,7 +234,8 @@ def test_designer_tools_are_available_only_for_cited_sessions(tmp_path):
             assert not get_session_timeline(session_id="s2")["ok"]
 
 
-def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_path, monkeypatch):
+@pytest.mark.parametrize("needs_recovery", [False, True])
+def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_path, monkeypatch, needs_recovery):
     store = SessionStore(tmp_path / "sessions")
     store.save(session("s1"))
     store.save(session("s2"))
@@ -242,7 +243,8 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
     tracker = FakeTracker()
     a = tracker.create_issue(IssueDraft("one", "session_id: s1", ["proposal"]))
     b = tracker.create_issue(IssueDraft("two", "会话：s2", ["proposal"]))
-    pm = tracker.create_issue(IssueDraft("product", "会话：s3", ["proposal", "from-divergent"]))
+    pm = tracker.create_issue(IssueDraft("PM_TITLE_SENTINEL", "PM_BODY_SENTINEL\n会话：s3", ["proposal", "from-divergent"]))
+    tracker.create_issue(IssueDraft("PM_READY_SENTINEL", "会话：s3", ["ready", "from-divergent"]))
     seen = []
 
     def pm_run(*args, **kwargs):
@@ -254,7 +256,7 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
     assert seen == [{"s1", "s2", "s3"}]
     product = {
         "title": "shared direction",
-        "source_proposals": [a.number, b.number, pm.number],
+        "source_proposals": [a.number, b.number],
         "relationship": "shared",
         "common_tension": "uncertain state",
         "structural_direction": "coherent execution",
@@ -264,9 +266,16 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
         "covers": [a.number, b.number, pm.number],
     }
 
+    designer_calls = []
+
     def designer_run(*args, **kwargs):
-        assert kwargs["allowed_session_ids"] == {"s1", "s2", "s3"}
+        designer_calls.append(args[1])
+        assert kwargs["allowed_session_ids"] == {"s1", "s2"}
+        assert kwargs["evidence"]["source_proposals"] == [a.number, b.number]
+        assert all(marker not in args[1] for marker in ("PM_TITLE_SENTINEL", "PM_BODY_SENTINEL", "PM_READY_SENTINEL"))
         assert "运行时行为聚合" not in args[1]
+        if needs_recovery and len(designer_calls) == 1:
+            return "unfinished investigation without submit"
         return json.dumps({"proposals": [product]})
 
     monkeypatch.setattr("auto_designer.designer.designer.run_agent_def", designer_run)
@@ -275,4 +284,5 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
     assert sorted(outcome.merged_numbers) == [a.number, b.number]
     assert tracker.issue(pm.number)["state"] == "open"
     structures = [i for i in tracker.list_open_issues() if i.number in outcome.proposal_numbers]
-    assert evidence_session_ids(structures) == {"s1", "s2", "s3"}
+    assert evidence_session_ids(structures) == {"s1", "s2"}
+    assert len(designer_calls) == (2 if needs_recovery else 1)
