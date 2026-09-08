@@ -181,6 +181,9 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0060 独立 PM 路线与双轨交付协调
 PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer 综合交付路线提案；Owner 显式关联共享工作并保留独立验收。
 
+### 0061 开发侧观测使用与制品日志演进闭环
+制品维护日志起点和版本说明，平台收集并向交付侧提供受限证据包；功能设计与验收覆盖观测影响，已确认观测缺口形成普通补强提案。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -445,6 +448,12 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0059 | 0059/T3 | 边界回归与真实模型单链路回放 | done | T1, T2 | backend/tests/designer/test_observation_provider.py<br>backend/scripts/replay_observation_design.py |
 | 0060 | 0060/T1 | 双轨角色边界与协调契约 | done | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>CLAUDE.md |
 | 0060 | 0060/T2 | 角色与跨轮观测回归和实验审计 | done | T1 | backend/tests/designer/test_role_contract_flow.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_observation_provider.py<br>docs/audits/0060-spec0059-observation-audit.md |
+| 0061 | 0061/T1 | NexAU 起点的制品自有观测包 | pending | — | backend/harness_template/entry.py<br>backend/harness_template/observability.py<br>backend/harness_template/OBSERVABILITY.md<br>backend/harness_template/tests/test_observability.py |
+| 0061 | 0061/T2 | 会话收集、版本绑定与历史留存 | pending | T1 | backend/auto_designer/user/sim/runtime.py<br>backend/auto_designer/user/sim/runner.py<br>backend/auto_designer/observations/publication.py<br>backend/auto_designer/designer/observation_provider.py<br>backend/tests/observations/test_publication.py |
+| 0061 | 0061/T3 | 跨容器开发证据交接 | pending | T2 | backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/designer/test_delivery_evidence.py |
+| 0061 | 0061/T4 | 开发设计、实现、评审的观测职责 | pending | T3 | backend/harness_template/META_SPEC.md<br>OpenAgents/openagents/agents/drafter.py<br>OpenAgents/openagents/agents/architect.py<br>OpenAgents/openagents/agents/reviewer.py<br>OpenAgents/openagents/observations/evidence.py<br>OpenAgents/tests/test_observation_evidence.py |
+| 0061 | 0061/T5 | 观测缺口提案与可恢复提交 | pending | T3 | backend/auto_designer/observations/gaps.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/designer/submit_tools.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml<br>backend/tests/observations/test_gaps.py<br>OpenAgents/openagents/observations/gaps.py |
+| 0061 | 0061/T6 | 跨轮与替代 harness 验证 | pending | T1, T2, T3, T4, T5 | backend/tests/observations/test_delivery_lifecycle.py<br>backend/scripts/replay_observation_lifecycle.py<br>docs/audits/0061-observation-lifecycle-validation.md |
 
 ## 跨 feature 关系图
 
@@ -828,6 +837,14 @@ graph LR
         n0060_T1["T1 双轨角色边界与协调契约"]
         n0060_T2["T2 角色与跨轮观测回归和实验审计"]
     end
+    subgraph G0061[0061 delivery-observability-lifecycle]
+        n0061_T1["T1 NexAU 起点的制品自有观测包"]
+        n0061_T2["T2 会话收集、版本绑定与历史留存"]
+        n0061_T3["T3 跨容器开发证据交接"]
+        n0061_T4["T4 开发设计、实现、评审的观测职责"]
+        n0061_T5["T5 观测缺口提案与可恢复提交"]
+        n0061_T6["T6 跨轮与替代 harness 验证"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1099,6 +1116,15 @@ graph LR
     n0059_T3 --> n0059_T1
     n0059_T3 --> n0059_T2
     n0060_T2 --> n0060_T1
+    n0061_T2 --> n0061_T1
+    n0061_T3 --> n0061_T2
+    n0061_T4 --> n0061_T3
+    n0061_T5 --> n0061_T3
+    n0061_T6 --> n0061_T1
+    n0061_T6 --> n0061_T2
+    n0061_T6 --> n0061_T3
+    n0061_T6 --> n0061_T4
+    n0061_T6 --> n0061_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1153,31 +1179,34 @@ graph LR
 |----|----|
 | CLAUDE.md | 0032, 0033, 0050, 0051, 0060 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040 |
-| backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043 |
-| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052, 0055, 0060 |
+| backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043, 0061 |
+| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052, 0055, 0060, 0061 |
 | backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029, 0042, 0043, 0060 |
 | backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
 | backend/agent_defs/developer_agent/agent.yaml | 0014, 0030, 0032 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014, 0030, 0032 |
-| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059, 0060 |
+| backend/agent_defs/divergent_pm/agent.yaml | 0029, 0061 |
+| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059, 0060, 0061 |
 | backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml | 0029, 0042, 0043 |
-| backend/agent_defs/owner/systemprompt.md | 0042, 0043, 0052, 0060 |
+| backend/agent_defs/owner/agent.yaml | 0043, 0061 |
+| backend/agent_defs/owner/systemprompt.md | 0042, 0043, 0052, 0060, 0061 |
 | backend/agent_defs/owner/tools/submit_admission.tool.yaml | 0042, 0043, 0052, 0060 |
-| backend/agent_defs/triage_agent/agent.yaml | 0027, 0029 |
-| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043, 0055, 0059 |
+| backend/agent_defs/triage_agent/agent.yaml | 0027, 0029, 0061 |
+| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043, 0055, 0059, 0061 |
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
-| backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043, 0052, 0060 |
+| backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043, 0052, 0060, 0061 |
 | backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049, 0059 |
 | backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059, 0060 |
 | backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059 |
 | backend/auto_designer/designer/evidence_contract.py | 0055, 0056, 0059 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052 |
-| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052, 0060 |
+| backend/auto_designer/designer/observation_provider.py | 0059, 0061 |
+| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052, 0060, 0061 |
 | backend/auto_designer/designer/proposal_view.py | 0042, 0059 |
 | backend/auto_designer/designer/role_contract.py | 0043, 0052, 0055 |
 | backend/auto_designer/designer/session_timeline.py | 0024, 0054, 0055, 0056, 0059 |
-| backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
+| backend/auto_designer/designer/submit_tools.py | 0029, 0043, 0061 |
 | backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
@@ -1192,14 +1221,14 @@ graph LR
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053 |
 | backend/auto_designer/loop/live_tracer.py | 0032, 0041 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0061 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054, 0056 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042 |
-| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042 |
+| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042, 0061 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051, 0053, 0054 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048, 0053 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035, 0053 |
@@ -1212,6 +1241,7 @@ graph LR
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054, 0056 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048, 0054, 0056, 0057 |
+| backend/auto_designer/user/sim/runtime.py | 0051, 0061 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009, 0051 |
 | backend/auto_designer/user/sim/seed_source.py | 0009, 0051 |
 | backend/auto_designer/user/sim/sources/docker_seed.py | 0044, 0051 |
@@ -1231,7 +1261,7 @@ graph LR
 | backend/harness_template/MANUAL.md | 0013, 0022 |
 | backend/harness_template/RUNTIME.md | 0022, 0030, 0035, 0051 |
 | backend/harness_template/agents/main.md | 0003, 0030 |
-| backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041, 0051 |
+| backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041, 0051, 0061 |
 | backend/harness_template/params.yaml | 0003, 0030 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041, 0051 |
 | backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050 |
@@ -3115,4 +3145,44 @@ graph LR
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
+```
+
+### 0061 开发侧观测使用与制品日志演进闭环（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 NexAU 起点的制品自有观测包"]
+    nT2["T2 会话收集、版本绑定与历史留存"]
+    nT3["T3 跨容器开发证据交接"]
+    nT4["T4 开发设计、实现、评审的观测职责"]
+    nT5["T5 观测缺口提案与可恢复提交"]
+    nT6["T6 跨轮与替代 harness 验证"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT3 --> nT4
+    nT3 --> nT5
+    nT1 --> nT6
+    nT2 --> nT6
+    nT3 --> nT6
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_pending;
 ```
