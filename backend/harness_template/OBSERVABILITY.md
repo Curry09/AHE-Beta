@@ -4,6 +4,12 @@ This directory belongs to the running harness version. The platform supplies
 HARNESS_OBSERVATION_DIR and collects declared files; it does not interpret events.
 Other harnesses may use different files, event names and recording mechanisms.
 
+These files serve maintainer diagnosis: reconstructing execution, distinguishing
+causes, and verifying changes. User-facing state feedback separately helps the user
+understand the current situation and decide what to do next. Shared events can serve
+both, but each goal needs its own acceptance: saved logs do not prove timely user
+feedback, and visible progress does not prove adequate diagnostic evidence.
+
 runtime-<process>.jsonl contains wall-clock `at`, a process identifier, and metadata:
 
 - process_started/stopped identify a process, not a user's logical session.

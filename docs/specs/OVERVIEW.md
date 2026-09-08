@@ -107,7 +107,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 在现有列式观测看板之外补回 Agent Company 大楼视图：按用户/分诊/发散/设计/准入/交付面楼层展示 live/归档 agent，保留 SidePanel 详情与交付面 PR 面板；用户会话详情新增可折叠的 Judge/Intent/Act 心智轨迹，展示 sim_trace 而不改后端 API。
 
 ### 0035 stdout 可见 harness 状态与主 loop 等待/打断动作
-用 stdout 可见事件修复用户对回复轮次滞后的弱感知：接缝层不做 request/reply 配对，只按 harness 输出顺序展示 reply/progress/status；主 loop 常驻 keep_waiting/interrupt；v0 harness busy 输入需如实输出 queued/status，帮助用户与设计师感知当前正在处理什么。
+用户侧状态反馈帮助用户理解当前状况并决定下一步；接缝层按顺序展示真实 stdout，主 loop 支持等待与打断，v0 harness 显示排队状态；与 0061 维护者诊断观测分别定义目标和验收。
 
 ### 0036 接缝层统一 stdin 写入口：去 begin/emit 二分，reply 软唤醒
 接缝层 begin/emit_message 二分泄漏「正式轮次 vs 加塞」语义，并把读 stdout 绑在 in_flight 上，导致 reply 后 keep_waiting 空转。本组改为：用户消息统一一个写入口（始终写 stdin，类 CC 输入框）；堵/排队由 harness 决定；平台以 type=reply 为软唤醒（等下一条 reply 或超时），poll 不依赖写路径旗标；interrupt 仍为外通道。改动面集中在 launcher/loop/connector 与测试，不改 harness 线协议形状。
@@ -182,7 +182,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer 综合交付路线提案；Owner 显式关联共享工作并保留独立验收。
 
 ### 0061 开发侧观测使用与制品日志演进闭环
-制品维护日志起点和版本说明，平台收集并向交付侧提供受限证据包；功能设计与验收覆盖观测影响，已确认观测缺口形成普通补强提案。
+制品维护诊断日志和版本说明，平台提供受限证据包；维护者取证缺口形成诊断补强，用户状态反馈走普通产品提案；功能设计分别说明两类影响并独立验收。
 
 ## 全局看板
 
@@ -451,8 +451,8 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0061 | 0061/T1 | NexAU 起点的制品自有观测包 | done | — | backend/harness_template/entry.py<br>backend/harness_template/observability.py<br>backend/harness_template/OBSERVABILITY.md<br>backend/harness_template/tests/test_observability.py<br>backend/tests/harness/test_template_entry.py<br>backend/harness_template/params.yaml |
 | 0061 | 0061/T2 | 会话收集、版本绑定与历史留存 | done | T1 | backend/auto_designer/user/sim/runtime.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/observations/publication.py<br>backend/auto_designer/observations/__main__.py<br>backend/auto_designer/designer/observation_provider.py<br>backend/tests/observations/test_publication.py |
 | 0061 | 0061/T3 | 跨容器开发证据交接 | done | T2 | backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/auto_designer/observations/grants.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/designer/test_delivery_evidence.py |
-| 0061 | 0061/T4 | 开发设计、实现、评审的观测职责 | done | T3 | backend/harness_template/META_SPEC.md<br>backend/deploy/vigil/observability-overlay.Dockerfile<br>backend/deploy/vigil/observation-runtime.json<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/utils/gitea.py<br>OpenAgents/openagents/observations/evidence.py<br>OpenAgents/tests/test_observation_evidence.py |
-| 0061 | 0061/T5 | 观测缺口提案与可恢复提交 | done | T3 | backend/auto_designer/observations/gaps.py<br>backend/auto_designer/observations/delivery_gaps.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/designer.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml<br>backend/tests/observations/test_gaps.py<br>OpenAgents/openagents/observations/gaps.py<br>OpenAgents/openagents/v02/openagents_adapter.py |
+| 0061 | 0061/T4 | 开发设计、实现、评审的观测职责 | done | T3 | backend/harness_template/META_SPEC.md<br>backend/deploy/vigil/observability-overlay.Dockerfile<br>backend/deploy/vigil/observation-runtime.json<br>docs/audits/0061-observation-goal-boundaries.json<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/utils/gitea.py<br>OpenAgents/openagents/observations/evidence.py<br>OpenAgents/tests/test_observation_evidence.py |
+| 0061 | 0061/T5 | 诊断观测缺口提案与可恢复提交 | done | T3 | backend/auto_designer/observations/gaps.py<br>backend/auto_designer/observations/delivery_gaps.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/designer.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml<br>backend/tests/observations/test_gaps.py<br>OpenAgents/openagents/observations/gaps.py<br>OpenAgents/openagents/v02/openagents_adapter.py |
 | 0061 | 0061/T6 | 跨轮与替代 harness 验证 | done | T1, T2, T3, T4, T5 | backend/tests/observations/fixtures/alternate_v1.py<br>backend/tests/observations/fixtures/alternate_v2.py<br>backend/scripts/replay_observation_lifecycle.py<br>docs/audits/0061-observation-lifecycle-validation.md |
 
 ## 跨 feature 关系图
@@ -842,7 +842,7 @@ graph LR
         n0061_T2["T2 会话收集、版本绑定与历史留存"]
         n0061_T3["T3 跨容器开发证据交接"]
         n0061_T4["T4 开发设计、实现、评审的观测职责"]
-        n0061_T5["T5 观测缺口提案与可恢复提交"]
+        n0061_T5["T5 诊断观测缺口提案与可恢复提交"]
         n0061_T6["T6 跨轮与替代 harness 验证"]
     end
     n0001_T2 --> n0001_T1
@@ -3159,7 +3159,7 @@ graph LR
     nT2["T2 会话收集、版本绑定与历史留存"]
     nT3["T3 跨容器开发证据交接"]
     nT4["T4 开发设计、实现、评审的观测职责"]
-    nT5["T5 观测缺口提案与可恢复提交"]
+    nT5["T5 诊断观测缺口提案与可恢复提交"]
     nT6["T6 跨轮与替代 harness 验证"]
     nT1 --> nT2
     nT2 --> nT3

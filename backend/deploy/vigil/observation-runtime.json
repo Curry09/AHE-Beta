@@ -1,15 +1,15 @@
 {
   "schema": "observation-runtime-pin-v1",
-  "openagents_source_commit": "1dda04ab2de550685b7bc181f6b61b26f8972b51",
-  "image_tag": "auto-designer-vigil:observability-spec61-1dda04a",
+  "openagents_source_commit": "e89a41591211743f2eb13d25a0522912668ca0c4",
+  "image_tag": "auto-designer-vigil:observation-goals-e89a415",
   "runtime_environment": {
-    "AUTO_DESIGNER_VIGIL_IMAGE": "auto-designer-vigil:observability-spec61-1dda04a"
+    "AUTO_DESIGNER_VIGIL_IMAGE": "auto-designer-vigil:observation-goals-e89a415"
   },
-  "image_id": "sha256:efdce28072a5640d6e30ecfa7622f809ae83f0f5ad4d21785e5881c12426ad1c",
+  "image_id": "sha256:28db0b5a6be0808cb41131a26e3953fae97a532953d069f0aced9a3981321a3f",
   "base_image_id": "sha256:e092fd2ba48a9698ff7a5809c1b78bc4a2ef878fe618b6fdce336b7d59449be9",
   "base_local_tag": "auto-designer-vigil:spec61-base-e092fd2ba48a",
   "validation_date": "2026-09-08",
-  "validation": "private Gitea attachment read inside installed delivery container, no host bind mounts",
-  "result_file": "/root/src/auto-designer-experiments/spec0061-observation-validation/spec0061-lifecycle-0rsw87jo/result.json",
+  "validation": "installed module digest matches committed source; all eight delivery roles receive the revised contract in a network-disabled container without host bind mounts; controlled forge, not a new lifecycle integration run",
+  "result_file": "docs/audits/0061-observation-goal-boundaries.json",
   "deployment": "Prepared for new experiments. Existing running experiments and the latest tag were not replaced."
 }

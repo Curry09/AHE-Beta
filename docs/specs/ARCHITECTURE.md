@@ -125,7 +125,7 @@ _Artifact-owned observations with platform-owned collection and authorization._
 | `__init__.py` | Artifact-owned observations with platform-owned collection and authorization. |
 | `__main__.py` | Explicit recovery: python -m auto_designer.observations --root ROOT --receipt FILE. |
 | `delivery_gaps.py` | Ingest only authenticated delivery requests, never arbitrary comments or logs. |
-| `gaps.py` | Non-terminal, scoped observation gap requests with a durable outbox. |
+| `gaps.py` | Spec-0061: scoped maintainer diagnostic gaps with a durable outbox. |
 | `grants.py` | Persist evidence authority separately from model-authored issue text. |
 | `publication.py` | Collect bounded opaque artifact files and publish immutable session evidence. |
 

@@ -3,7 +3,7 @@ number: "0035"
 title: stdout 可见 harness 状态与主 loop 等待/打断动作
 issue: 0
 slug: stdout-visible-harness-state
-summary: 用 stdout 可见事件修复用户对回复轮次滞后的弱感知：接缝层不做 request/reply 配对，只按 harness 输出顺序展示 reply/progress/status；主 loop 常驻 keep_waiting/interrupt；v0 harness busy 输入需如实输出 queued/status，帮助用户与设计师感知当前正在处理什么。
+summary: 用户侧状态反馈帮助用户理解当前状况并决定下一步；接缝层按顺序展示真实 stdout，主 loop 支持等待与打断，v0 harness 显示排队状态；与 0061 维护者诊断观测分别定义目标和验收。
 tasks:
   - id: T1
     title: 写 0035 活快照
@@ -94,6 +94,21 @@ tasks:
 本组不让接缝层做 request/reply 配对，也不固化当前 v0 harness 的 FIFO 队列模型。原则是：stdout 是 harness 的用户可见界面；接缝层只按观察顺序收集并展示 harness stdout 上真实出现的 reply/progress/status/ack/error 等可见事件；用户 agent 根据这些事件自行判断是继续等待、打断、追问还是验收。为使用户在主 loop 中也能表达真实 CLI 行为，ACTIVE 动作空间常驻 `keep_waiting` 与 `interrupt`。v0 harness 则补最小 busy 输入可见性：busy 时收到新 message 不再静默排队，而是输出 queued/status 事件，如实说明收到、排队、正在处理或正在运行什么。
 
 ## Motivation
+
+### 与诊断观测的目标边界
+
+本组的用户侧状态反馈服务于使用当下的判断：用户在何时需要知道什么，才能决定继续等待、
+补充要求、打断或接受结果。0061 的设计开发侧诊断观测服务于维护者还原经过、区分原因和
+验证改动。分类依据是信息服务谁、支持什么判断；发现者的角色和底层事件来源不决定类别。
+
+用户反馈不足沿用普通 report → Triage proposal 或独立 PM proposal 路线，可以凭用户实际
+收到的内容和时序成立，不以先查清内部根因为前置条件。维护者缺少证据则按 0061 提交诊断
+观测补强；用户体验正常时也可以独立成立。同一问题同时涉及两者时，可以关联提案或共享
+一次实现，但交接和验收分别保留目标，不自动建立依赖或要求拆票。
+
+用户反馈验收检查真实界面在决策时刻是否给出准确、及时、足以支持所需判断的信息；后台
+存在日志、维护者事后能够解释经过，不能代替此项验收。反过来，进度提示也不能证明诊断
+记录足够。沿用工程行为验证，用户体感继续作为观测，不恢复体感发版门禁。
 
 ### 回复轮次滞后的机制问题
 
@@ -332,4 +347,3 @@ stdout 是 harness 对用户的真实界面。真实 CLI 用户不是只看到 f
 - 设计师 timeline 可聚合「用户因 stdout 跑偏而 interrupt」「用户因 stdout 正在验证而 keep_waiting」等体验信号。
 - 前端会话详情以事件流方式展示 harness stdout，帮助人类观察用户为什么等待、打断或追问。
 - 接缝层统一写入口（去 begin/emit 二分）、以 `type=reply` 为软唤醒：见后续 spec「unify-harness-stdin-write」。
-

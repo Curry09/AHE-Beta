@@ -1,39 +1,45 @@
 {
   "type": "tool",
   "name": "submit_observation_gap",
-  "description": "Submit a concrete observation capability gap without ending this role. Use only authorized evidence references. Framework export/storage/permission failures become infrastructure diagnostics, never harness proposals. A pending receipt is not a created issue.",
+  "description": "Submit a maintainer diagnostic evidence gap without ending this role: reconstruct execution, distinguish causes, or verify a change. User-facing state feedback requirements use ordinary product proposals, not this tool, even when discovered by PM. Shared implementation must preserve separate user-feedback and diagnostic acceptance. Use only authorized evidence references. Framework export/storage/permission failures become infrastructure diagnostics, never harness proposals. A pending receipt is not a created issue.",
   "input_schema": {
     "type": "object",
     "properties": {
       "question": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 2000
+        "maxLength": 2000,
+        "description": "The concrete diagnostic question a maintainer needs to answer about execution or a change."
       },
       "checked": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 2000
+        "maxLength": 2000,
+        "description": "Authorized versioned records and reading guidance already checked, with their limits."
       },
       "unknowns": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 2000
+        "maxLength": 2000,
+        "description": "Facts or causes the maintainer still cannot distinguish; do not invent a root cause."
       },
       "impact": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 2000
+        "maxLength": 2000,
+        "description": "Which maintenance, design, or verification decision is blocked or weakened by missing evidence."
       },
       "desired_capability": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 2000
+        "maxLength": 2000,
+        "description": "The ability to reconstruct or distinguish execution from evidence, not a user-facing status feature."
       },
       "verification": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 2000
+        "maxLength": 2000,
+        "description": "A scenario proving the diagnostic question is answerable; user-visible progress alone is insufficient."
       },
       "request_id": {
         "type": "string",
