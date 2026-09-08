@@ -6,6 +6,7 @@ entry:
 # Preferred process protocol is stdio JSONL v1. The entry process also accepts
 # legacy {"message"}/{"control"} input for local compatibility.
 protocol: stdio-jsonl-v1
+observations: artifact-observations-v1
 # cwd: .
 # env:
 #   NEXAU_MODEL: claude-opus-4-8

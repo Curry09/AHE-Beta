@@ -1,0 +1,79 @@
+{
+  "type": "tool",
+  "name": "submit_observation_gap",
+  "description": "Submit a concrete observation capability gap without ending this role. Use only authorized evidence references. Framework export/storage/permission failures become infrastructure diagnostics, never harness proposals. A pending receipt is not a created issue.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "question": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "checked": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "unknowns": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "impact": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "desired_capability": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "verification": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "request_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "scope": {
+        "type": "string",
+        "enum": [
+          "harness",
+          "framework"
+        ]
+      },
+      "session_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 16
+      },
+      "related_issues": {
+        "type": "array",
+        "items": {
+          "type": "integer"
+        },
+        "maxItems": 16
+      }
+    },
+    "required": [
+      "question",
+      "checked",
+      "unknowns",
+      "impact",
+      "desired_capability",
+      "verification",
+      "request_id",
+      "scope",
+      "session_ids",
+      "related_issues"
+    ],
+    "additionalProperties": false
+  }
+}

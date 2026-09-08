@@ -243,6 +243,10 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
     tracker = FakeTracker()
     a = tracker.create_issue(IssueDraft("one", "session_id: s1", ["proposal"]))
     b = tracker.create_issue(IssueDraft("two", "会话：s2", ["proposal"]))
+    from auto_designer.observations.grants import grant
+
+    grant(store=store, issue=a.number, sessions={"s1"})
+    grant(store=store, issue=b.number, sessions={"s2"})
     pm = tracker.create_issue(IssueDraft("PM_TITLE_SENTINEL", "PM_BODY_SENTINEL\n会话：s3", ["proposal", "from-divergent"]))
     tracker.create_issue(IssueDraft("PM_READY_SENTINEL", "会话：s3", ["ready", "from-divergent"]))
     seen = []

@@ -43,6 +43,8 @@ class _Agent:
 
 @pytest.fixture()
 def entry(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    # Match `python entry.py`: sibling seed modules are on the entrypoint import path.
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "harness_template"))
     module = _load_entry()
     monkeypatch.setattr(module.time, "sleep", lambda _s: None)  # 退避不真睡
     return module

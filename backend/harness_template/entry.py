@@ -21,6 +21,8 @@ import time
 import uuid
 from pathlib import Path
 
+from observability import observer
+
 _HERE = Path(__file__).resolve().parent
 # 空回复 / 网关毛刺用 _RUN_RETRIES 退避重试（同实例，不换 session）。
 # agent.run 没有整轮墙钟上限；慢任务由外层 90s persona 心跳观测并决定续等/打断。
@@ -166,6 +168,9 @@ def _run_supervised(agent, message, ctrl_q):
     工作线程只是为了让主线程持续处理 interrupt，不再用 deadline 放弃正在运行的请求。
     ctrl_q 为 None 时等到 agent.run 自身返回。"""
     box: dict = {}
+    attempt_id = uuid.uuid4().hex
+    began = time.monotonic()
+    observer.event("attempt_started", attempt_id=attempt_id)
 
     def target():
         try:
@@ -186,12 +191,18 @@ def _run_supervised(agent, message, ctrl_q):
             except queue.Empty:
                 ctrl = None
             if isinstance(ctrl, dict) and ctrl.get("control") == "interrupt":
+                observer.event("interrupt_requested", attempt_id=attempt_id)
                 stopped = _force_stop(agent)
                 if stopped:
                     t.join(_INTERRUPT_GRACE)  # 等它在下一个检查点优雅退出
+                observer.event("attempt_failed", attempt_id=attempt_id, error_type="_Interrupted",
+                               elapsed_seconds=time.monotonic() - began)
                 raise _Interrupted(rebuild=not stopped or t.is_alive())
     if "err" in box:
+        observer.event("attempt_failed", attempt_id=attempt_id, error_type=type(box["err"]).__name__,
+                       elapsed_seconds=time.monotonic() - began)
         raise box["err"]
+    observer.event("attempt_returned", attempt_id=attempt_id, elapsed_seconds=time.monotonic() - began)
     return box.get("out")
 
 
@@ -340,7 +351,8 @@ def _make_step_collector():
                 pass
 
         def start_span(self, name, span_type, inputs=None, parent_span=None, attributes=None):
-            span = Span(id="", name=name, type=span_type)
+            span = Span(id=uuid.uuid4().hex, name=name, type=span_type)
+            observer.event("span_started", span_id=span.id, kind=str(span_type))
             if span_type == SpanType.TOOL:
                 tool = name.removeprefix("Tool: ")
                 params = (inputs or {}).get("parameters") or {}
@@ -351,6 +363,9 @@ def _make_step_collector():
             return span
 
         def end_span(self, span, outputs=None, error=None, attributes=None):
+            observer.event("span_finished", span_id=span.id, kind=str(span.type),
+                           elapsed_seconds=max(0.0, time.time() - span.start_time),
+                           has_error=error is not None)
             if span.type == SpanType.LLM:
                 payload = outputs if isinstance(outputs, dict) else {}
                 usage = payload.get("usage") or payload.get("usageMetadata") or {}
@@ -510,6 +525,7 @@ def main() -> None:
             f"harness_{uuid.uuid4().hex[:8]}",
         )
         _restore_history(fresh, snap)
+        observer.event("agent_rebuilt", restored_history_items=len(snap))
         return fresh
 
     agent = _build_agent(collector, session_id, "harness")

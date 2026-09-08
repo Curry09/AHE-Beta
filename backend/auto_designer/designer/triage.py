@@ -179,6 +179,9 @@ class Triager:
         # 每个 report 拥有独立模型上下文；相邻报告不能污染问题定义或证据判断。
         for issue in pending:
             session_id = self._session_id_for_issue(issue.number)
+            from auto_designer.observations.grants import grant
+
+            grant(store=self._store, issue=issue.number, sessions={session_id} if session_id else set())
             with bind_usage_context(
                 session_id=session_id or "unavailable",
                 interaction_id=session_id or f"report-{issue.number}",
@@ -343,6 +346,8 @@ class Triager:
             store=self._store,
             repo=self._repo,
             role="triager",
+            tracker=self._tracker,
+            source_issue_ids={i.number for i in pending},
             timeout=_TRIAGE_TIMEOUT,
             on_event=self._on_event,
             subject={"kind": "report", "id": report_id},

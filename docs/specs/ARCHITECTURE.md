@@ -25,6 +25,7 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `__init__.py` | Product discovery, proposal synthesis, and admission decision roles. |
 | `agent_contract.py` | 由 issue_schema.SCHEMAS 生成各 producer 的 submit 工具 input_schema——契约与 schema 同源， |
 | `agent_runtime.py` | 四个 driver（triage / synthesize / divergent / owner）此前各抄一份的公共逻辑收拢于此： |
+| `delivery_evidence.py` | Publish issue-scoped opaque evidence through the existing forge boundary. |
 | `designer.py` | Synthesize 驱动器。 |
 | `divergent.py` | Divergent（能力发现）驱动器。 |
 | `evidence_contract.py` | Goal-aware evidence contracts for demand-side roles. |
@@ -115,6 +116,19 @@ _Conversation-loop coordination, tracing, and lifecycle management._
 | `runner.py` | 可恢复 harbor runner（spec-0004/T2）：作为一个 harbor task（方案 A，整条 run = 1 task）。 |
 | `sim_user.py` | 把 spec-0005 控制信封 sim 用户 agent 接进 spec-0003/0007 闭环。 |
 
+### auto_designer.observations
+
+_Artifact-owned observations with platform-owned collection and authorization._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Artifact-owned observations with platform-owned collection and authorization. |
+| `__main__.py` | Explicit recovery: python -m auto_designer.observations --root ROOT --receipt FILE. |
+| `delivery_gaps.py` | Ingest only authenticated delivery requests, never arbitrary comments or logs. |
+| `gaps.py` | Non-terminal, scoped observation gap requests with a durable outbox. |
+| `grants.py` | Persist evidence authority separately from model-authored issue text. |
+| `publication.py` | Collect bounded opaque artifact files and publish immutable session evidence. |
+
 ### auto_designer.tracker
 
 _Issue-tracker integration and proposal state management._
@@ -197,6 +211,7 @@ graph LR
     nauto_designer_designer["auto_designer.designer"]
     nauto_designer_designer_agent_contract["designer.agent_contract"]
     nauto_designer_designer_agent_runtime["designer.agent_runtime"]
+    nauto_designer_designer_delivery_evidence["designer.delivery_evidence"]
     nauto_designer_designer_designer["designer.designer"]
     nauto_designer_designer_divergent["designer.divergent"]
     nauto_designer_designer_evidence_contract["designer.evidence_contract"]
@@ -247,6 +262,12 @@ graph LR
     nauto_designer_loop_sim_user["loop.sim_user"]
     nauto_designer_models["auto_designer.models"]
     nauto_designer_nexau_runtime["auto_designer.nexau_runtime"]
+    nauto_designer_observations["auto_designer.observations"]
+    nauto_designer_observations___main__["observations.__main__"]
+    nauto_designer_observations_delivery_gaps["observations.delivery_gaps"]
+    nauto_designer_observations_gaps["observations.gaps"]
+    nauto_designer_observations_grants["observations.grants"]
+    nauto_designer_observations_publication["observations.publication"]
     nauto_designer_tracker["auto_designer.tracker"]
     nauto_designer_tracker_base["tracker.base"]
     nauto_designer_tracker_fake["tracker.fake"]
@@ -292,13 +313,17 @@ graph LR
     nauto_designer_designer_agent_runtime --> nauto_designer_designer_session_timeline
     nauto_designer_designer_agent_runtime --> nauto_designer_invocation
     nauto_designer_designer_agent_runtime --> nauto_designer_loop_live_tracer
+    nauto_designer_designer_agent_runtime --> nauto_designer_observations_gaps
     nauto_designer_designer_agent_runtime --> nauto_designer_usage
     nauto_designer_designer_agent_runtime --> nauto_designer_user_session_store
+    nauto_designer_designer_delivery_evidence --> nauto_designer_observations_grants
+    nauto_designer_designer_delivery_evidence --> nauto_designer_observations_publication
     nauto_designer_designer_designer --> nauto_designer_designer_agent_runtime
     nauto_designer_designer_designer --> nauto_designer_designer_issue_schema
     nauto_designer_designer_designer --> nauto_designer_designer_proposal_view
     nauto_designer_designer_designer --> nauto_designer_designer_role_contract
     nauto_designer_designer_designer --> nauto_designer_models
+    nauto_designer_designer_designer --> nauto_designer_observations_grants
     nauto_designer_designer_designer --> nauto_designer_tracker_base
     nauto_designer_designer_designer --> nauto_designer_usage
     nauto_designer_designer_designer --> nauto_designer_user_session_store
@@ -308,6 +333,7 @@ graph LR
     nauto_designer_designer_divergent --> nauto_designer_designer_proposal_view
     nauto_designer_designer_divergent --> nauto_designer_designer_role_contract
     nauto_designer_designer_divergent --> nauto_designer_models
+    nauto_designer_designer_divergent --> nauto_designer_observations_grants
     nauto_designer_designer_divergent --> nauto_designer_tracker_base
     nauto_designer_designer_divergent --> nauto_designer_usage
     nauto_designer_designer_divergent --> nauto_designer_user_session_store
@@ -317,9 +343,12 @@ graph LR
     nauto_designer_designer_observation_provider --> nauto_designer_invocation
     nauto_designer_designer_observation_provider --> nauto_designer_user_session_store
     nauto_designer_designer_owner --> nauto_designer_designer_agent_runtime
+    nauto_designer_designer_owner --> nauto_designer_designer_delivery_evidence
     nauto_designer_designer_owner --> nauto_designer_designer_issue_schema
     nauto_designer_designer_owner --> nauto_designer_designer_proposal_view
     nauto_designer_designer_owner --> nauto_designer_designer_role_contract
+    nauto_designer_designer_owner --> nauto_designer_observations_delivery_gaps
+    nauto_designer_designer_owner --> nauto_designer_observations_grants
     nauto_designer_designer_owner --> nauto_designer_tracker_base
     nauto_designer_designer_owner --> nauto_designer_usage
     nauto_designer_designer_owner --> nauto_designer_user_session_store
@@ -335,6 +364,7 @@ graph LR
     nauto_designer_designer_triage --> nauto_designer_designer_evidence_contract
     nauto_designer_designer_triage --> nauto_designer_designer_issue_schema
     nauto_designer_designer_triage --> nauto_designer_designer_role_contract
+    nauto_designer_designer_triage --> nauto_designer_observations_grants
     nauto_designer_designer_triage --> nauto_designer_tracker_base
     nauto_designer_designer_triage --> nauto_designer_usage
     nauto_designer_designer_triage --> nauto_designer_user_session_store
@@ -357,6 +387,7 @@ graph LR
     nauto_designer_harness_connector --> nauto_designer_harness_interface
     nauto_designer_harness_connector --> nauto_designer_usage
     nauto_designer_harness_launcher --> nauto_designer_harness_interface
+    nauto_designer_harness_launcher --> nauto_designer_observations_publication
     nauto_designer_harness_launcher --> nauto_designer_user_sim_runtime
     nauto_designer_invocation --> nauto_designer_usage
     nauto_designer_loop_live_tracer --> nauto_designer_usage
@@ -382,6 +413,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_harness_connector
     nauto_designer_loop_sim_user --> nauto_designer_harness_interface
     nauto_designer_loop_sim_user --> nauto_designer_models
+    nauto_designer_loop_sim_user --> nauto_designer_observations_publication
     nauto_designer_loop_sim_user --> nauto_designer_tracker_base
     nauto_designer_loop_sim_user --> nauto_designer_usage
     nauto_designer_loop_sim_user --> nauto_designer_user_session_store
@@ -391,6 +423,14 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_persona_client
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_runtime
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_workspace
+    nauto_designer_observations___main__ --> nauto_designer_observations_publication
+    nauto_designer_observations_delivery_gaps --> nauto_designer_observations_gaps
+    nauto_designer_observations_delivery_gaps --> nauto_designer_observations_grants
+    nauto_designer_observations_gaps --> nauto_designer_invocation
+    nauto_designer_observations_gaps --> nauto_designer_models
+    nauto_designer_observations_gaps --> nauto_designer_observations_grants
+    nauto_designer_observations_grants --> nauto_designer_observations_publication
+    nauto_designer_observations_publication --> nauto_designer_invocation
     nauto_designer_tracker_base --> nauto_designer_models
     nauto_designer_tracker_fake --> nauto_designer_models
     nauto_designer_tracker_gitea --> nauto_designer_models

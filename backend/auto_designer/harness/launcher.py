@@ -532,6 +532,13 @@ class _HarnessHandle:
         self._awaiting_reply = False
         if self._proc is None:
             return
+        if (getattr(getattr(self, "observation_source", None), "expected", False)
+                and self._protocol == "stdio-jsonl-v1" and self._proc.poll() is None):
+            try:
+                self._write(self._shutdown_frame())
+                self._proc.wait(timeout=1)
+            except (BrokenPipeError, OSError, AssertionError, subprocess.TimeoutExpired):
+                pass  # Busy/crashed processes still follow the existing bounded kill path.
         # 顺序：先杀整组 → wait/兜底 SIGKILL → join 读线程 → 再关流、置空 _proc。
         # readline 得 EOF 的前提是管道写端都关闭，故 join 放在 SIGKILL 兜底之后；
         # _read_loop 已兜 (ValueError, OSError)。反序关流会与在途读线程抢 stdout。
@@ -563,9 +570,13 @@ class HarnessLauncher:
         # Spec-0017/T5：a 段并行后同轮所有会话同 SHA → 同一 checkout dest，_checkout 的
         # check-then-extract 必须进程内互斥（首线程干活，其余命中缓存）。
         self._checkout_lock = threading.Lock()
+        from auto_designer.observations.publication import framework_version
+
+        self._observation_framework_pin = framework_version()
 
     def launch(self, ref: str, workspace_dir: Workspace | None = None) -> HarnessInterface:
-        dest = self._checkout(ref=ref)
+        sha = self._resolve_sha(ref=ref)
+        dest = self._checkout(ref=sha)
         params = self._read_params(dest)
         entry = params["entry"]
         if not isinstance(entry, list) or not entry:
@@ -588,6 +599,29 @@ class HarnessLauncher:
             env["SANDBOX_WORK_DIR"] = runtime.cwd
         host_cwd = cwd
         host_env = env
+        from auto_designer.observations.publication import ObservationSource
+
+        observation_id = uuid.uuid4().hex
+        if is_docker:
+            observation_dir = f"/tmp/auto-designer-observations/{observation_id}"
+        else:
+            observation_parent = self._runs_root.parent / "observation-staging"
+            observation_parent.mkdir(parents=True, exist_ok=True)
+            observation_dir = tempfile.mkdtemp(prefix="run-", dir=observation_parent.resolve())
+        env["HARNESS_OBSERVATION_DIR"] = observation_dir
+        source = ObservationSource(
+            directory=observation_dir,
+            container_id=runtime.container_id if is_docker else None,
+            version={"harness_sha": sha, "image_digest": runtime.image_digest if is_docker else None,
+                     "observation_framework_sha256": self._observation_framework_pin},
+            expected=params.get("observations") == "artifact-observations-v1",
+        )
+        if is_docker and source.expected:
+            # Validate the actual producer user's destination before any interaction.
+            check = runtime._exec(["mkdir", "-p", observation_dir], timeout=10)
+            if check.returncode != 0:
+                raise OSError("harness observation directory preflight failed")
+            runtime.evidence["observation"] = {"status": "collecting", "retain_source": True}
         if is_docker:
             container_root = f"/opt/auto-designer/harness/{dest.name}"
             runtime.stage_directory(dest, container_root)
@@ -604,7 +638,7 @@ class HarnessLauncher:
             # itself runs from the immutable host checkout and needs only host env.
             host_cwd = dest
             host_env = {}
-        return _HarnessHandle(
+        handle = _HarnessHandle(
             entry=argv,
             cwd=host_cwd,
             env=host_env,
@@ -612,6 +646,8 @@ class HarnessLauncher:
             protocol=protocol,
             workspace_runtime=runtime if is_docker else None,
         )
+        handle.observation_source = source
+        return handle
 
     @staticmethod
     def _read_help_text(dest: Path) -> str:

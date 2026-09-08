@@ -8,9 +8,11 @@ Orchestrator 只认 run_session_fn(persona, scenario, harness)（返回值不管
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 
 from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
 from auto_designer.evaluation.swebench import SWEbenchEvaluator, derive_accept_validity
@@ -266,6 +268,20 @@ def make_sim_run_session_fn(
     标签（供增量 triage 与观测曲线）。None（或返回 None）则不盖轮号，兼容旧调用。
     """
 
+    observation_root = Path(os.environ.get(
+        "AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations")
+    ))
+    from auto_designer.observations.publication import preflight_root
+
+    preflight_root(observation_root)
+    preflight = getattr(tracker, "preflight_observations", None)
+    if preflight is not None:
+        contract = preflight()
+        binding = observation_root / ".framework-contract.json"
+        if binding.exists() and json.loads(binding.read_text()) != contract:
+            raise ValueError("observation root already belongs to a different repository/contract")
+        binding.write_text(json.dumps(contract))
+
     def run(
         persona: Persona,
         scenario: SeedScenario,
@@ -297,7 +313,6 @@ def make_sim_run_session_fn(
                 on_turn(persona.identity, sim_persona, partial, True, session_id=None)
 
         connector = HarnessConnector(harness)
-        connector.reset()  # 开局责任归编排层；connector 只做平台侧适配，不把平台元数据传入 harness
         instance_id = None
         if scenario.workspace is not None:
             instance_id = scenario.workspace.params.get("instance_id")
@@ -311,6 +326,7 @@ def make_sim_run_session_fn(
             operation="persona",
         ):
             try:
+                connector.reset()  # Include startup failure in the evidence cleanup boundary.
                 res = sim_run_session(
                     sim_persona,
                     client,
@@ -323,7 +339,14 @@ def make_sim_run_session_fn(
                 )
             finally:
                 # 关闭时才到达的 usage 仍须继承本 session/instance/turn 归属。
-                connector.close()  # 无论成败都释放 harness 子进程
+                try:
+                    connector.close()  # 无论成败都释放 harness 子进程
+                finally:
+                    source = getattr(harness, "observation_source", None)
+                    if source is not None:
+                        receipt = source.collect(root=observation_root, session_id=session_id)
+                        if ws is not None:
+                            ws.evidence["observation"] = receipt
 
         request_outcomes = [dict(row) for row in (getattr(harness, "request_outcomes", None) or [])]
         patch = ""

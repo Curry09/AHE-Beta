@@ -102,6 +102,9 @@ class Owner:
         self._review = review
 
     def admit_once(self) -> AdmitOutcome:
+        from auto_designer.observations.delivery_gaps import ingest_delivery_gaps
+
+        ingest_delivery_gaps(store=self._store, tracker=self._tracker)
         backlog = self._tracker.list_open_issues()
         proposals = [i for i in backlog if plane(i.labels) == PROPOSAL]
         if not proposals:
@@ -230,10 +233,23 @@ class Owner:
         return outcome
 
     def _admit(self, issue, *, priority: str | None, note: str) -> None:
+        from auto_designer.designer.delivery_evidence import publish_delivery_evidence
+
+        publish_delivery_evidence(tracker=self._tracker, store=self._store, issue=issue)
         self._tracker.set_labels(issue.number, _ready_labels(list(issue.labels), priority))
         self._safe_comment(issue.number, note)
 
     def _merge(self, issue, *, into: int) -> None:
+        from auto_designer.designer.delivery_evidence import publish_delivery_evidence
+        from auto_designer.observations.grants import authorized_sessions, grant, is_pm_source
+
+        sessions = authorized_sessions(store=self._store, issue=into)
+        sessions |= authorized_sessions(store=self._store, issue=issue.number)
+        grant(store=self._store, issue=into, sessions=sessions,
+              pm_origin=is_pm_source(store=self._store, issue=into) or
+              is_pm_source(store=self._store, issue=issue.number))
+        target = next(i for i in self._tracker.list_open_issues() if i.number == into)
+        publish_delivery_evidence(tracker=self._tracker, store=self._store, issue=target)
         self._tracker.transition_issue(
             issue.number, state="closed", labels=_terminal_labels(list(issue.labels), MERGED)
         )
@@ -251,6 +267,8 @@ class Owner:
             store=self._store,
             repo=self._repo,
             role="owner",
+            tracker=self._tracker,
+            source_issue_ids={i.number for i in [*ready, *proposals]},
             timeout=_ADMIT_TIMEOUT,
             on_event=self._on_event,
             subject={"kind": "round", "id": str(current_usage_context().round_no or "")},

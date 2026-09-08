@@ -1,5 +1,27 @@
 # Harness Meta-Spec
 
+## Observability lifecycle
+
+观测记录、关联方式与阅读说明属于本 harness，随功能一起演进。当前 NexAU 起点由
+`observability.py` 和 `OBSERVABILITY.md` 维护；换运行时可替换它们，不要求维持内部事件字段。
+`params.yaml` 声明 `observations: artifact-observations-v1`，运行器提供
+`HARNESS_OBSERVATION_DIR`；制品发布相对文件清单 `manifest.json` 与其 `reading` 入口。
+清单标注 complete/partial。框架只处理传输、版本、完整性与授权，不包装制品私有函数。
+
+功能的 SDD Spec / Objective Contract 在既有章节内说明观测影响：什么现象必须可辨别、
+现有信息是否足够、需改变什么和如何验证；无影响可说明理由，不强制增加事件或章节格式。
+Developer 同步维护受影响的记录、说明和测试；评审分别核实功能行为与诊断能力，不能用
+“输出了一条成功日志”代替行为通过。历史日志按历史版本解读，测试新日志绑定实际 HEAD。
+
+具体必要问题因覆盖不足无法查明时，设计和开发角色都提出普通观测补强提案，保留已查范围、
+未知事实、影响、期望辨别能力及验证场景；不要求先证明尚不可见的根因，也不能臆造它。
+原功能与补强独立验收，不擅改冻结目标。宿主的导出、权限或留存故障属于基础设施诊断，
+由环境维护者处理，不要求本 harness 修改宿主。
+
+记录必须有界、默认最小化，不保存提示全文、工具参数/返回全文、凭证、隐藏提示或受保护的
+评测参考数据；写入失败不能改变任务结果或无限阻塞。退出/崩溃未完成记录应明确标为 partial，
+而不是装作完整。
+
 ## 1. Purpose and authority
 
 本文件是 harness 的项目级 Meta-Spec：它给后续 Spec Writer、Developer 和维护者提供

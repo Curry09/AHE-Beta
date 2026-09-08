@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import threading
+import time
 from typing import Any
 
 import requests
@@ -473,6 +474,72 @@ class GiteaTracker:
         return mapping
 
     # ---- 内部 ----
+
+    def find_observation_gap(self, *, marker: str) -> int | None:
+        # Paginate including closed issues: closing a ticket must not break retry identity.
+        for page in range(1, 101):
+            rows = self._request("GET", f"/repos/{self._owner}/{self._repo}/issues"
+                                 f"?state=all&type=issues&limit=50&page={page}", None)
+            for item in rows:
+                if marker in (item.get("body") or ""):
+                    return int(item["number"])
+            if len(rows) < 50:
+                return None
+        raise ValueError("gap identity scan exhausted; refusing ambiguous duplicate creation")
+
+    def authenticated_login(self) -> str:
+        return str(self._request("GET", "/user", None)["login"])
+
+    def preflight_observations(self) -> dict:
+        settings = self._request("GET", "/settings/attachment", None)
+        repo = self._request("GET", f"/repos/{self._owner}/{self._repo}", None)
+        if (not settings.get("enabled") or int(settings.get("max_size", 0)) < 4
+                or ".gz" not in settings.get("allowed_types", "")
+                or not (repo.get("permissions", {}).get("push") or repo.get("permissions", {}).get("admin"))):
+            raise ValueError("observation attachment transport preflight failed")
+        return {"repository": f"{self._api}/repos/{self._owner}/{self._repo}",
+                "format": "artifact-observations-v1", "max_transfer_bytes": 4_000_000}
+
+    def list_issue_assets(self, *, number: int) -> list[dict]:
+        import json
+
+        data = self._observation_bytes(
+            url=f"{self._api}/repos/{self._owner}/{self._repo}/issues/{number}/assets", limit=1_000_000)
+        return json.loads(data)
+
+    def upload_issue_asset(self, *, number: int, name: str, data: bytes) -> dict:
+        endpoint = f"/repos/{self._owner}/{self._repo}/issues/{number}/assets"
+        response = self._session.post(self._api + endpoint,
+            files={"attachment": (name, data, "application/gzip")},
+            headers={"Content-Type": None}, timeout=_REQUEST_TIMEOUT, allow_redirects=False)
+        return self._ok(response, endpoint)
+
+    def download_issue_asset(self, *, number: int, asset_id: int, limit: int) -> bytes:
+        assets = self.list_issue_assets(number=number)
+        asset = next((a for a in assets if a["id"] == asset_id), None)
+        if asset is None or not re.fullmatch(r"[a-fA-F0-9-]{36}", str(asset.get("uuid", ""))):
+            raise ValueError("attachment is not a member of this issue")
+        # Never follow browser_download_url supplied by the server or model across origins.
+        url = self._api.removesuffix("/api/v1") + "/attachments/" + asset["uuid"]
+        return self._observation_bytes(url=url, limit=limit)
+
+    def _observation_bytes(self, *, url: str, limit: int) -> bytes:
+        deadline = time.monotonic() + 15
+        with self._session.get(url, stream=True, timeout=(5, 5), allow_redirects=False,
+                               headers={"Accept-Encoding": "identity"}) as response:
+            if response.status_code != 200:
+                raise GiteaError(response.status_code, "attachment download")
+            chunks, size = [], 0
+            while True:
+                # read1 returns available data; read(n) can wait forever on a drip-fed body.
+                chunk = response.raw.read1(min(65536, limit + 1 - size), decode_content=False)
+                size += len(chunk)
+                if size > limit or time.monotonic() > deadline:
+                    raise ValueError("attachment download exceeds budget")
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            return b"".join(chunks)
 
     def _refresh_label_cache(self) -> None:
         data = self._request("GET", f"/repos/{self._owner}/{self._repo}/labels", None)

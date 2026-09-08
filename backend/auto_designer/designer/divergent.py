@@ -98,6 +98,9 @@ class Divergent:
             ref = self._tracker.create_issue(
                 IssueDraft(title=str(item["title"]), body=body, labels=labels)
             )
+            from auto_designer.observations.grants import grant
+
+            grant(store=self._store, issue=ref.number, sessions=set(item["evidence_sessions"]), pm_origin=True)
             numbers.append(ref.number)
 
         self._emit(
@@ -116,7 +119,7 @@ class Divergent:
         msg = (
             "你是产品 PM。以下是全部可见的用户体验索引以及开放 proposal、ready item。先理解用户"
             "试图完成什么、行为反映了什么体验矛盾，再提出产品机会。已有提案是产品现状上下文，"
-            "重叠不构成生成失败，合并取舍由后续 Designer 负责。"
+            "重叠不构成生成失败；PM 独立到 Owner，Designer 不读取或吸收 PM 提案。"
             "再以 session 标识调用 get_session_timeline 核实；仅在必要时继续调用 beat 和 step。"
             "不得直接读取 sessions 文件。\n"
             f"本轮最多提交 {_MAX_CANDIDATES} 条产品洞察。每条必须能追溯到具体会话证据。\n\n"
@@ -137,6 +140,8 @@ class Divergent:
             store=self._store,
             repo=self._repo,
             role="divergent",
+            tracker=self._tracker,
+            source_issue_ids={i.number for i in reference},
             timeout=_DIVERGENT_TIMEOUT,
             on_event=self._on_event,
             subject={"kind": "round", "id": str(current_usage_context().round_no or "")},

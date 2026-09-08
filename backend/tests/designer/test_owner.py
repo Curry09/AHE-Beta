@@ -101,7 +101,8 @@ def test_owner_agent_exposes_only_admission_tool() -> None:
 
     path = Path(__file__).resolve().parents[2] / "agent_defs" / "owner" / "agent.yaml"
     config = yaml.safe_load(path.read_text(encoding="utf-8"))
-    assert [tool["name"] for tool in config["tools"]] == ["submit_admission"]
+    assert [tool["name"] for tool in config["tools"]] == ["submit_observation_gap", "submit_admission"]
+    assert config["stop_tools"] == ["submit_admission"]
 
 
 def test_no_proposals_is_noop(tmp_path: Path) -> None:

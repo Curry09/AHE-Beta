@@ -185,6 +185,11 @@ class Designer:
             ref = self._tracker.create_issue(
                 IssueDraft(title=str(prop.title), body=body, labels=labels)
             )
+            from auto_designer.observations.grants import authorized_sessions, grant
+
+            trusted_sessions = set().union(*(authorized_sessions(store=self._store, issue=n)
+                                             for n in source_ids))
+            grant(store=self._store, issue=ref.number, sessions=trusted_sessions)
             numbers.append(ref.number)
             for source_number in covers:
                 source = coverable[source_number]
@@ -268,7 +273,10 @@ class Designer:
                 "只调用一次 submit_rfcs 提交 0..n 条结果；没有可提交内容就提交空数组，"
                 "不要用解释文字代替工具调用。"
             )
+        from auto_designer.observations.grants import sessions_for_issues
         from auto_designer.usage import current_usage_context  # noqa: PLC0415
+
+        authorized = sessions_for_issues(store=self._store, issues=[*ready, *proposals])
 
         return run_agent_def(
             self._agent_def,
@@ -276,6 +284,8 @@ class Designer:
             store=self._store,
             repo=self._repo,
             role="designer",
+            tracker=self._tracker,
+            source_issue_ids={i.number for i in [*ready, *proposals]},
             timeout=_DESIGN_TIMEOUT,
             on_event=self._on_event,
             subject={"kind": "round", "id": str(current_usage_context().round_no or "")},
@@ -283,9 +293,9 @@ class Designer:
                 "default_level": "proposal_view",
                 "allowed_levels": ["L2", "L3", "L4"],
                 "source_proposals": [int(item.number) for item in [*ready, *proposals]],
-                "session_ids": sorted(evidence_session_ids([*ready, *proposals])),
+                "session_ids": sorted(authorized),
             },
-            allowed_session_ids=evidence_session_ids([*ready, *proposals]),
+            allowed_session_ids=authorized,
         )
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:

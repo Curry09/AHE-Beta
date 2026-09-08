@@ -7,7 +7,7 @@ summary: 制品维护日志起点和版本说明，平台收集并向交付侧�
 tasks:
   - id: T1
     title: NexAU 起点的制品自有观测包
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -18,11 +18,13 @@ tasks:
       - backend/harness_template/observability.py
       - backend/harness_template/OBSERVABILITY.md
       - backend/harness_template/tests/test_observability.py
+      - backend/tests/harness/test_template_entry.py
+      - backend/harness_template/params.yaml
     scope: 将种子已有 tracer 接成制品自有文件输出与说明，不依赖外部脚本包装私有函数；内部事件格式可演进。
     acceptance: 正常、错误、中断、重试和退出可按说明定位；记录失败不改变任务结果，资源有界，敏感数据不导出。
   - id: T2
     title: 会话收集、版本绑定与历史留存
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -31,15 +33,17 @@ tasks:
     parallel: false
     files:
       - backend/auto_designer/user/sim/runtime.py
-      - backend/auto_designer/user/sim/runner.py
+      - backend/auto_designer/loop/sim_user.py
+      - backend/auto_designer/harness/launcher.py
       - backend/auto_designer/observations/publication.py
+      - backend/auto_designer/observations/__main__.py
       - backend/auto_designer/designer/observation_provider.py
       - backend/tests/observations/test_publication.py
     scope: 启动时约定观测输出目录，清理容器前按受限清单收集，平台绑定真实 session 和制品版本，校验发布完整性并保留旧包。
     acceptance: 正常或放弃会话均尝试收集；崩溃留下明确缺失状态；路径、大小、版本摘要校验，旧轮不被覆盖。
   - id: T3
     title: 跨容器开发证据交接
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -49,14 +53,14 @@ tasks:
     files:
       - backend/auto_designer/designer/owner.py
       - backend/auto_designer/designer/delivery_evidence.py
+      - backend/auto_designer/observations/grants.py
       - backend/auto_designer/tracker/gitea.py
-      - backend/auto_designer/loop/orchestrator.py
       - backend/tests/designer/test_delivery_evidence.py
     scope: 从准入票的授权引用发布审计过的交付证据包；通过现有 Gitea 边界提供可解析句柄，避免宿主路径和全量 session 挂载。平台范围的缺口不得误投 harness 队列。
     acceptance: 开发容器能定位对应版本包；引用在合并和截断后保留；权限失败明确降级，禁止外链下载与扩权。
   - id: T4
     title: 开发设计、实现、评审的观测职责
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -65,16 +69,20 @@ tasks:
     parallel: false
     files:
       - backend/harness_template/META_SPEC.md
-      - OpenAgents/openagents/agents/drafter.py
-      - OpenAgents/openagents/agents/architect.py
-      - OpenAgents/openagents/agents/reviewer.py
+      - backend/deploy/vigil/observability-overlay.Dockerfile
+      - backend/deploy/vigil/observation-runtime.json
+      - OpenAgents/openagents/runtime/engine.py
+      - OpenAgents/openagents/runtime/context.py
+      - OpenAgents/openagents/recipes/stages.py
+      - OpenAgents/openagents/recipes/vigil.py
+      - OpenAgents/openagents/utils/gitea.py
       - OpenAgents/openagents/observations/evidence.py
       - OpenAgents/tests/test_observation_evidence.py
     scope: 交付角色按任务读取版本匹配证据；功能契约说明观测影响，实现同步更新事件说明与测试，评审验证行为及诊断可区分性。跨仓变更须单独交付并更新 pin。
     acceptance: 新旧版本证据不混用；新增功能不以日志存在替代行为验收；无观测影响可说明理由；无新常驻评审角色。
   - id: T5
     title: 观测缺口提案与可恢复提交
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -83,8 +91,11 @@ tasks:
     parallel: false
     files:
       - backend/auto_designer/observations/gaps.py
-      - backend/auto_designer/designer/agent_contract.py
-      - backend/auto_designer/designer/submit_tools.py
+      - backend/auto_designer/observations/delivery_gaps.py
+      - backend/auto_designer/designer/agent_runtime.py
+      - backend/auto_designer/designer/triage.py
+      - backend/auto_designer/designer/divergent.py
+      - backend/auto_designer/designer/designer.py
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/triage_agent/agent.yaml
       - backend/agent_defs/divergent_pm/systemprompt.md
@@ -99,11 +110,12 @@ tasks:
       - backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml
       - backend/tests/observations/test_gaps.py
       - OpenAgents/openagents/observations/gaps.py
+      - OpenAgents/openagents/v02/openagents_adapter.py
     scope: 需求与开发角色均可提交缺口；平台确定性落普通 proposal，保留来源身份、目标组件、证据不足原因和独立验收，重试幂等，不自动 ready 或回写冻结目标。
     acceptance: 缺日志本身不阻止提案；不让 PM 缺口泄漏到 Designer 输入；同一提交重试不重复建票；离线请求在重启后补交；原问题与观测补强分别记录状态。
   - id: T6
     title: 跨轮与替代 harness 验证
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -115,7 +127,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/tests/observations/test_delivery_lifecycle.py
+      - backend/tests/observations/fixtures/alternate_v1.py
+      - backend/tests/observations/fixtures/alternate_v2.py
       - backend/scripts/replay_observation_lifecycle.py
       - docs/audits/0061-observation-lifecycle-validation.md
     scope: 先合成双轮测试，再真实交付一项观测补强并在新版本会话复查；用非 NexAU 起点验证平台不解析内部事件。
@@ -136,7 +149,8 @@ tracer 生成观测文件与说明，换其他 harness 起点时替换制品侧�
 功能建设同时考虑“用户获得什么行为”和“维护者如何辨别该行为实际发生了什么”。
 不要求每个改动新增日志，不规定统一内部事件字典，不新增常驻日志评审角色。
 
-本文件为设计方案，T1–T6 均 pending；创建 spec 不代表生产收集和开发读取已实现。
+实施和验证状态见任务表及 `docs/audits/0061-observation-lifecycle-validation.md`。
+工程闭环验证与真实模型是否主动、有效使用观测是两种证据，不能相互冒充。
 
 ## Motivation
 
@@ -159,7 +173,7 @@ tracer 生成观测文件与说明，换其他 harness 起点时替换制品侧�
 | 所属方 | 负责内容 | 不负责内容 |
 |---|---|---|
 | harness 制品 | 记录什么、何时记录、关联语义、文件格式、说明、开销与脱敏；随实现共同演进 | 将当前事件名变成平台永久字段 |
-| 平台 | 提供输出位置，收集声明文件，绑定可信版本/session，安全留存并按任务授权交接 | 通过固定私有函数包装猜测内部过程，统一解释所有日志 |
+| 迭代框架（实验开始前固定） | 提供输出位置，预检存储和附件能力，收集声明文件，绑定可信版本/session，安全留存并按任务授权交接 | 通过固定私有函数包装猜测内部过程，统一解释所有日志，混入 harness 自我演进 |
 | 设计与开发角色 | 带问题取证、区分事实与解释、指出缺口、实现和验证补强 | 把日志条数当质量分、把记录缺失当行为没发生 |
 
 ### 2. 开发侧如何使用
@@ -223,7 +237,8 @@ tracer 生成观测文件与说明，换其他 harness 起点时替换制品侧�
 本组只为 NexAU seed 给出默认记录范围：模型/工具活动、请求执行、错误恢复、中断与
 退出，配套解释其能证明和不能证明的内容；不是所有未来 harness 必须共享的事件 schema。
 
-启动器提供专用输出目录（建议配置名 HARNESS_OBSERVATION_DIR，T1/T2 统一落地），
+启动器提供专用输出目录 HARNESS_OBSERVATION_DIR，制品在 params.yaml 声明
+`observations: artifact-observations-v1`；未声明的旧制品返回 not_supported，不假装有日志。
 制品在其中写文件清单与阅读说明。输出目录是收集契约，不是一个可由日志内容发起执行
 或读宿主文件的接口。制品清单只声明相对文件，平台最终封装 0059 可读的 manifest。
 
@@ -236,6 +251,12 @@ tracer 生成观测文件与说明，换其他 harness 起点时替换制品侧�
 不得把缺包伪装成空日志。崩溃、截断或尚未写完的内容标为 partial/unavailable，只有
 完成校验的包成为完整可用入口。日志异常不能把产品行为改成成功，也不能因持续写日志
 耗尽磁盘或无限阻塞退出。必要时优先保留有界元数据并明确丢弃/采样范围。
+
+框架在用户交互开始前检查存储读写、剩余空间、待恢复积压、Gitea 附件能力及仓库写权限，
+把观测根目录绑定到当前仓库，拒绝复用其它仓库的授权数据。发布使用临时目录与原子切换、
+摘要及幂等运行 ID；中途失败不破坏旧版本。收集重试有界，失败时停止并保留原容器/本地源，
+落恢复回执，不先删唯一现场；显式恢复命令复用原身份。积压过多在下次启动前要求维护，
+不在用户交互中无限重试。不能承诺磁盘/守护进程永久无故障，但不能以隐藏故障伪装闭环。
 
 平台检查相对路径、符号链接/硬链接、文件数量与大小、归档解包安全和摘要；导出不包含
 原始凭证、persona 隐藏提示、benchmark gold/oracle 或任务答案。仅靠显示时脱敏不够，
@@ -251,11 +272,15 @@ Owner 仍只看到引用，不负责下载日志。平台为准入票解析其�
 首选在现有 Gitea 内发布筛选后的证据附件及索引，交付运行器按 issue 清单取回到独立
 证据目录，再为 agent 提供普通文件读取与搜索入口。不得把宿主 observations 或 sessions
 根目录整体挂给开发 agent，也不得将大包/raw trace 放进 harness main。附件接口、大小
-限制与部署 pin 由 T3 集成验证；当前 gitea tracker 尚无该能力，不声称已可直接调用。
+限制与部署 pin 由真实集成验证。当前实现使用 issue assets API 与有界 gzip JSON 文本包；
+压缩包及解压都有字节预算，附件以内容摘要命名。发布及回读校验成功后才打交付令牌；失败保留
+proposal 和归档，下一次普通准入重试同一附件，不自动绕过交付。超过传输预算的条目明确 unavailable，
+原始有界包仍在平台归档，不静默截断文本。
 
 取回只允许配置中的 Gitea origin 与该 issue 获准对象，校验摘要、安全解包，不跟随
 任意外链，不执行包内脚本。凭证由运行器掌管，不写进 issue、文件或模型输入。访问有
-角色/issue/包/文件级审计。平台保存的包是不可变证据，开发侧在隔离目录读其副本；
+角色/issue/包的取回记录与获准文件摘要。普通文件工具的实际阅读与下载/授予不是一回事，
+不把下载回执冒充角色已经理解证据。平台保存的包是不可变证据，开发侧在隔离目录读其副本；
 若副本发生改动，摘要校验使它不能充当原始证据。
 
 历史证据与当前工作树同时标注版本。开发者在自己的测试中生成的新日志绑定当前 head，
@@ -279,12 +304,17 @@ Owner 仍只看到引用，不负责下载日志。平台为准入票解析其�
 缺口需区分三个归属：
 
 - harness 没有记录/关联/说明所需事实：制品观测能力提案，正常 Owner→OpenAgents；
-- 平台没有导出、权限映射错误或历史文件丢失：平台范围提案，进入平台维护队列，
-  不打 harness 仓的 openagents 令牌，不要求 harness 开发者越权修平台；
+- 迭代框架没有导出、权限映射错误或历史文件丢失：基础设施诊断与维护回执，实验中框架固定，
+  不创建 harness proposal，不打 openagents，不要求 harness 开发者越权修框架；
 - 原日志已可回答而只缺检索或版本定位：先完成定位；确有说明/发现性缺陷时提出对应补强。
 
 不把所有观测提案自动提升为 P0，也不因提案很多而扩张记录范围。期望诊断结果、真实
 影响与验证必要性决定优先级。提案进入工作队列后仍经过正常工程质量与范围约束。
+
+设计侧 schema 位于 observations.gaps，四角色 YAML 有 drift guard。PM 来源及其后续
+Owner/开发补强按可信来源保留 from-divergent，不能借补强绕回 Designer。Designer 的原始
+证据权限来自框架保存的来源授权，而非模型正文里新增的 session_id。没有可信授权的历史
+票不从文字补权限；这类迁移必须从可信会话/调用来源重建授权。
 
 如果原功能能凭其他证据独立实现和验证，观测补强可并行，二者保持独立验收；如果缺口
 阻止安全选方案或证明目标，明确原任务的阻塞原因，并让补强作为先行交付。不得偷偷
@@ -309,8 +339,10 @@ OpenAgents/ 前缀表示独立仓交付范围，不应在 auto-designer 中创�
    中的成功字样不能掩盖产品失败。缺失或采样记录必须保留不确定性。
 3. 合成跨轮：v1 记录不足→两侧分别提出缺口→Owner/交付→v2 新格式和说明→开发与设计
    读同一获准包；旧版本仍可查。非 NexAU fixture 改字段/文件但不修改平台解析代码。
-4. 真实闭环：至少一项补强真正合并，再以 sealed SHA 跑新版本用户/受控复現；记录
+4. 真实基础设施闭环：至少一项补强真正合并，再以 sealed SHA 跑新版本用户/受控复现；记录
    原诊断问题是否变得可回答，以及功能效果。不能用两局同版本实验代替这一层。
+   本次受控验证使用脚本化角色决策、真实 Docker/Gitea/PR 合并和已安装开发镜像；不是
+   长时模型自主进化，也不是 vigil 工程质量闸的全链路验收，报告必须明确区分。
 
 CI 只验证工程行为与安全契约；benchmark 全程 held-out，不作为日志选择、提案、实现
 或发版门禁的训练信号。用户体感用于观测，不恢复体感 gate。
@@ -348,12 +380,13 @@ CI 只验证工程行为与安全契约；benchmark 全程 held-out，不作为�
 
 ## Unresolved questions
 
-T3 必须验证部署中 Gitea 的附件接口、权限与限额；不能预先假设 API 已被 tracker 支持。
+Gitea 的实际附件接口和私有仓跨容器访问已由受控验证确认，部署更新仍须使用记录的镜像 pin。
 字节预算、留存期限与历史版本保留成本需结合真实包规模确定，并以配置表达，不写死在
 角色 prompt。输出不依赖具体事件 schema，但发布外壳升级仍需兼容性验证。
 
-OpenAgents 当前部署 pin 可能与本地源码不同；T4 开始前必须核对实际启用的 Objective
-Contract/SDD 流程及角色，不能只改未被执行的 prompt。暂不引入运行中动态 DAG 插入；
+运行中的旧实验不被替换。新代码接在公共 engine，并覆盖独立 v0.2 Developer、Spec Writer、
+Acceptance 及传统 Drafter/Architect/Implementer/Reviewer；生产新实验须选择对应镜像与新版种子。
+暂不引入运行中动态 DAG 插入；
 关键补强如何拆为独立先行交付，使用现有阻塞/修订路径并由受控验证确认。
 
 ## Future possibilities

@@ -27,6 +27,9 @@ sandbox_config:
   type: local
 
 tools:
+  - name: submit_observation_gap
+    yaml_path: ./tools/submit_observation_gap.tool.yaml
+    binding: auto_designer.observations.gaps:submit_observation_gap
   # 收尾工具：input_schema = agent_contract.admission_input_schema() 的生成副本（drift-guard 守护）；
   # nexau 在调用层强校验，stop tool 的返回值（decisions JSON）成为 agent.run 的返回。
   - name: submit_admission

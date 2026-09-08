@@ -31,6 +31,7 @@ from auto_designer.designer.observation_provider import (
 )
 from auto_designer.designer.session_timeline import bind_session_store
 from auto_designer.invocation import record_invocation
+from auto_designer.observations.gaps import GapService, bind_gaps
 from auto_designer.usage import bind_usage_context, current_usage_context
 from auto_designer.user.session_store import SessionStore
 
@@ -74,6 +75,8 @@ def run_agent_def(
     evidence: dict[str, object] | None = None,
     allowed_session_ids: set[str] | frozenset[str] | None = None,
     observation_root: str | Path | None = None,
+    tracker=None,
+    source_issue_ids: set[int] | None = None,
 ) -> str:
     """加载 agent_def_dir 的 nexau agent 定义、以 message 跑一轮，返回 agent.run 的返回值（str）。
 
@@ -115,6 +118,10 @@ def run_agent_def(
     }:
         scoped_sessions = set()
     with (
+        bind_gaps(GapService(store=store, tracker=tracker, role=role,
+                            subject=json.dumps(subj, sort_keys=True),
+                            sessions=scoped_sessions, issues=set(source_issue_ids or ()))
+                  if tracker is not None else None),
         bind_session_store(store),
         bind_observation_provider(
             store, allowed_session_ids=scoped_sessions, observation_root=observation_root

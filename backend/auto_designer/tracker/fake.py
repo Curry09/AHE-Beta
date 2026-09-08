@@ -102,6 +102,9 @@ class FakeTracker:
         """只读：当前标签集副本。"""
         return set(self._labels)
 
+    def find_observation_gap(self, *, marker: str) -> int | None:
+        return next((n for n, issue in self._issues.items() if marker in issue["body"]), None)
+
     def _require(self, number: int) -> dict[str, Any]:
         if number not in self._issues:
             raise KeyError(f"issue 不存在：#{number}")

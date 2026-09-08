@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextvars
 import fnmatch
+import hashlib
 import json
 import os
 import subprocess
@@ -73,6 +74,7 @@ class ObservationProvider:
         configured = observation_root or os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT")
         self.root = Path(configured or (store.root.parent / "observations")).absolute()
         self.allowed_session_ids = allowed_session_ids
+        self.digests: dict[Path, str] = {}
         self.files: dict[str, tuple[Path, ...]] = {}
         self.unavailable: list[str] = []
         for sid in sorted(allowed_session_ids):
@@ -108,6 +110,8 @@ class ObservationProvider:
                     return ()
                 if path.is_file():
                     paths.append(path)
+                    if isinstance(entry.get("sha256"), str):
+                        self.digests[path] = entry["sha256"]
             return tuple(dict.fromkeys(paths))
         except (OSError, UnicodeError, ValueError, RecursionError):
             return ()
@@ -196,6 +200,11 @@ class ObservationProvider:
         try:
             if any(not _safe_path(p, self.root) for p in selected):
                 raise ValueError("observation file changed to a symlink")
+            for selected_path in selected:
+                expected = self.digests.get(selected_path)
+                if expected and (selected_path.stat().st_size > 4_500_000 or
+                        hashlib.sha256(selected_path.read_bytes()).hexdigest() != expected):
+                    raise ValueError("observation integrity mismatch")
             if tool == "read_file":
                 content = self._read(path, parameters=parameters)
             elif tool == "list_directory":
