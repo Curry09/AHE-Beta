@@ -3,8 +3,8 @@
 
 该角色读取 ready queue、开放 ProposalView、体验趋势，按需检索会话/制品观测证据并只读检查
 harness 现状。输出写入 proposal 平面并标记 from-synthesize。`covers` 是 Designer 对来源提案
-的吸收决定；结构提案创建成功后，driver 直接合并关闭 covered 来源。Owner 只负责无损交接和
-历史精确重复兼容。Designer 类名及 RFC 相关机器标识保留用于兼容现有接口。
+的吸收决定，但 PM 路线只可参考、不可吸收，也不能替代交付路线的两条来源。
+Owner 协调双轨交接并保留独立验收。Designer 类名及 RFC 标识保留用于兼容现有接口。
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from pathlib import Path
 from auto_designer.designer.agent_runtime import read_submit, run_agent_def
 from auto_designer.designer.issue_schema import (
     DIVERGENT,
+    FROM_DIVERGENT,
     FROM_SYNTHESIZE,
     MERGED,
     NEEDS_TRIAGE,
@@ -51,6 +52,7 @@ class DesignOutcome:
     merged_numbers: list[int] = field(default_factory=list)
     failed_merges: dict[int, str] = field(default_factory=dict)
     artifacts: list[dict] = field(default_factory=list)
+    rejected_proposals: list[dict] = field(default_factory=list)
 
     @property
     def count(self) -> int:
@@ -135,13 +137,22 @@ class Designer:
                 self._force_submit_prompt = False
             parsed = self._proposals_from_submit(retry_text)
 
-        # covers 是 Designer 的吸收决定：只允许当前仍开放且位于 report/proposal 平面的来源。
-        coverable = {i.number: i for i in backlog if plane(i.labels) in (REPORT, PROPOSAL)}
+        # PM is an independent discovery route, including legacy provenance. Its
+        # proposals may inform a relationship but never become closure targets.
+        product_numbers = {
+            i.number for i in backlog if {FROM_DIVERGENT, DIVERGENT}.intersection(i.labels)
+        }
+        coverable = {
+            i.number: i
+            for i in backlog
+            if plane(i.labels) in (REPORT, PROPOSAL) and i.number not in product_numbers
+        }
         visible_proposals = {i.number for i in [*ready, *proposals_open]}
         numbers: list[int] = []
         merged_numbers: list[int] = []
         failed_merges: dict[int, str] = {}
         merged_sources: set[int] = set()
+        rejected_proposals: list[dict] = []
         round_no = self._round_provider() if self._round_provider is not None else None
         round_name = round_label(round_no) if type(round_no) is int and round_no > 0 else None
         if parsed:
@@ -149,11 +160,20 @@ class Designer:
                 [PROPOSAL, FROM_SYNTHESIZE] + ([round_name] if round_name else [])
             )
         for prop in parsed:
-            if validate_synthesis(prop.artifact, visible_proposals=visible_proposals):
+            violations = validate_synthesis(prop.artifact, visible_proposals=visible_proposals)
+            if violations:
+                rejected_proposals.append(
+                    {"title": prop.title, "reasons": [v.code for v in violations]}
+                )
+                continue
+            source_ids = set(prop.artifact["source_proposals"])
+            if len(source_ids - product_numbers) < 2:
+                rejected_proposals.append(
+                    {"title": prop.title, "reasons": ["not-cross-delivery-proposal"]}
+                )
                 continue
             covers = tuple(n for n in prop.covers if n in coverable and n not in merged_sources)
             body = render_synthesis_artifact(prop.artifact)
-            source_ids = set(prop.artifact.get("source_proposals") or [])
             source_sessions = evidence_session_ids(
                 [item for item in [*ready, *proposals_open] if item.number in source_ids]
             )
@@ -196,6 +216,7 @@ class Designer:
             merged_numbers=merged_numbers,
             failed_merges=failed_merges,
             artifacts=[dict(prop.artifact) for prop in parsed],
+            rejected_proposals=rejected_proposals,
         )
 
     def _merge_covered(self, issue, *, into: int) -> None:
@@ -230,12 +251,14 @@ class Designer:
         del runtime
         msg = (
             "你是 Synthesize。以下是 ready queue 与开放 ProposalView。只分析已有提案之间的结构关系、"
-            "共同张力和可复用机制；每条输出必须明确引用至少两个可见提案。体验趋势仅作"
+            "共同张力和可复用机制；每条输出必须引用至少两个非 PM 的可见交付路线提案。体验趋势仅作"
             "背景证据，不能替代跨提案关系。\n"
             "若可见 ProposalView 已携带会话证据引用，可按需查阅观测文件、时间线、beat、step "
             "验证关系；不得用这些工具脱离 proposal 重新发现单票需求。\n"
             "结构提案不规定数据结构、协议或实施步骤。`covers` 是你对来源提案的吸收决定；"
-            "结构提案创建成功后，driver 会合并关闭其中仍开放的 report/proposal 来源。未放入"
+            "PM（from-divergent 或旧 divergent 标签）提案只作上下文，可引用但不能计入两条交付来源，"
+            "也不能放入 covers；它们独立交给 Owner，不能仅将 PM 洞察改写为结构方案。"
+            "结构提案创建成功后，driver 会合并关闭其中仍开放的非 PM report/proposal 来源。未放入"
             "covers 的来源继续独立交付。\n\n"
             f"## ready 工作队列（{len(ready)} 条）\n{self._format_backlog(ready)}\n\n"
             f"## 开放 ProposalView（{len(proposals)} 条）\n{self._format_backlog(proposals)}\n\n"

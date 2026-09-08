@@ -177,6 +177,7 @@ def admission_input_schema() -> dict:
             "handoff_summary": {"type": "string"},
             "preserved_capabilities": {"type": "array", "items": {"type": "string"}},
             "acceptance_groups": {"type": "array", "items": {"type": "string"}},
+            "delivery_overlaps": {"type": "array", "items": {"type": "integer"}, "uniqueItems": True},
         },
         "required": ["issue", "decision", "handoff_summary", "preserved_capabilities",
                      "acceptance_groups"],

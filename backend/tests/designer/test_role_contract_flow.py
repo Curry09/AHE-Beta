@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from auto_designer.designer import issue_schema as sc
 from auto_designer.designer.designer import Designer
 from auto_designer.designer.divergent import Divergent
@@ -235,7 +237,11 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
     divergent_number = divergent.propose_once().proposal_numbers[0]
     assert divergent.reference_numbers == [report]
 
-    expected_for_synthesize = {report, divergent_number}
+    second_report = tracker.create_issue(IssueDraft(
+        title="验证阶段再次丢失约束", body="session_id: " + session_id,
+        labels=[sc.PROPOSAL, sc.FROM_TRIAGE],
+    )).number
+    expected_for_synthesize = {report, second_report, divergent_number}
     designer = _Designer(
         tracker,
         store,
@@ -262,11 +268,14 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
     synthesis_outcome = designer.propose_once()
     synthesize_number = synthesis_outcome.proposal_numbers[0]
     assert set(designer.proposal_numbers) == expected_for_synthesize
-    assert synthesis_outcome.merged_numbers == sorted(expected_for_synthesize)
-    assert all(tracker.issue(number)["state"] == "closed" for number in expected_for_synthesize)
+    assert synthesis_outcome.merged_numbers == sorted({report, second_report})
+    assert all(tracker.issue(number)["state"] == "closed" for number in (report, second_report))
+    assert tracker.issue(divergent_number)["state"] == "open"
+    assert sc.PROPOSAL in tracker.issue(divergent_number)["labels"]
+    assert sc.parse_covers_line(tracker.issue(synthesize_number)["body"]) == [report, second_report]
 
-    # Designer 已通过 covers 吸收来源，Owner 只看到仍开放的结构提案。
-    expected_for_owner = {synthesize_number}
+    # PM independent route survives even an explicit Designer attempt to cover it.
+    expected_for_owner = {synthesize_number, divergent_number}
     owner = _Owner(
         tracker,
         store,
@@ -286,3 +295,42 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
     assert set(owner.review_context.split())  # context was actually assembled
     assert "RAW_TITLE_SENTINEL" not in owner.review_context
     assert "RAW_BODY_SENTINEL" not in owner.review_context
+
+
+@pytest.mark.parametrize("labels", [[sc.FROM_DIVERGENT], [sc.DIVERGENT], [sc.FROM_DIVERGENT, sc.FROM_TRIAGE]])
+def test_pm_context_cannot_replace_two_delivery_sources(tmp_path, labels):
+    tracker = FakeTracker()
+    a = tracker.create_issue(IssueDraft("delivery", "fact", [sc.PROPOSAL, sc.FROM_TRIAGE])).number
+    b = tracker.create_issue(IssueDraft("product", "user outcome", [sc.PROPOSAL, *labels])).number
+    artifact = {
+        "title": "should not rewrite PM", "source_proposals": [a, b],
+        "relationship": "related", "common_tension": "waiting",
+        "structural_direction": "shared mechanism", "expected_leverage": "control",
+        "solution_level": "structural_mechanism", "abstraction_rationale": "shared",
+        "covers": [a, b],
+    }
+    designer = _Designer(tracker, SessionStore(tmp_path / "sessions"), str(tmp_path), str(tmp_path),
+                         result=json.dumps({"proposals": [artifact]}))
+    outcome = designer.propose_once()
+    assert outcome.proposal_numbers == outcome.merged_numbers == []
+    assert outcome.rejected_proposals[0]["reasons"] == ["not-cross-delivery-proposal"]
+    assert {i.number for i in tracker.list_open_issues()} == {a, b}
+
+
+@pytest.mark.parametrize("labels", [[sc.FROM_DIVERGENT], [sc.DIVERGENT]])
+def test_pm_only_synthesis_is_rejected_but_owner_receives_products(tmp_path, labels):
+    tracker = FakeTracker()
+    nums = [tracker.create_issue(IssueDraft(title, "outcome", [sc.PROPOSAL, *labels])).number
+            for title in ("control", "visibility")]
+    artifact = {
+        "title": "unnecessary architecture", "source_proposals": nums,
+        "relationship": "related", "common_tension": "waiting",
+        "structural_direction": "stages", "expected_leverage": "control",
+        "solution_level": "structural_mechanism", "abstraction_rationale": "shared", "covers": nums,
+    }
+    store = SessionStore(tmp_path / "sessions")
+    out = _Designer(tracker, store, str(tmp_path), str(tmp_path),
+                    result=json.dumps({"proposals": [artifact]})).propose_once()
+    assert not out.proposal_numbers and out.rejected_proposals
+    admitted = Owner(tracker, store, str(tmp_path), str(tmp_path), review=False).admit_once()
+    assert set(admitted.admitted) == set(nums)

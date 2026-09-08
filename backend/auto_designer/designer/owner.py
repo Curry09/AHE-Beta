@@ -2,8 +2,8 @@
 """Owner 驱动器：把 proposal 无损打包并交接给 OpenAgents。
 
 生成器（triage/synthesize/divergent）负责问题诊断、产品发现和结构设计；Owner 不重新判断根因、
-不选择 prompt/runtime 等实现层，也不以交付风险为由压缩目标。模型只补充 handoff 摘要、需保留
-的能力和独立验收分组。未被模型列出的提案默认直接交接，避免遗漏成为隐性否决。
+不选择 prompt/runtime 等实现层，也不以交付风险为由压缩目标。模型协调 PM/结构路线的交付重叠，
+补充 handoff 摘要、需保留的能力和独立验收分组。未被模型列出的提案默认直接交接，避免遗漏成为隐性否决。
 
 路由动作：
 - admit → 加 `openagents` 交付面交接令牌；
@@ -113,7 +113,7 @@ class Owner:
         outcome = AdmitOutcome()
         by_number = {i.number: i for i in backlog}
 
-        # 模型只整理交接元数据，不拥有 Designer 已完成的来源合并权限。
+        # Cross-route overlap is a coordination relation, never an absorption instruction.
         review_needed = proposals
         decisions: list[dict] = []
         if review_needed and self._review:
@@ -124,6 +124,7 @@ class Owner:
         # review=False 或 agent 未列出某项：该项在 pass 2 默认直接交接。
 
         reviewable = {i.number for i in review_needed}
+        visible_routing = reviewable | {i.number for i in ready}
         explicit: dict[int, dict] = {}
         for d in decisions:
             try:
@@ -137,7 +138,17 @@ class Owner:
                     outcome.invalid[num] = ",".join(v.code for v in violations)
                 continue
             if num not in explicit:  # 只裁本批评审集合；重复决策先者得
-                explicit[num] = d
+                routing = dict(d)
+                overlaps = d.get("delivery_overlaps", [])
+                visible = visible_routing - {num}
+                if not isinstance(overlaps, list):
+                    overlaps = []
+                    outcome.invalid[num] = "delivery_overlaps 必须为可见票号数组；已保留交接"
+                valid = [n for n in overlaps if type(n) is int and n in visible]
+                if len(valid) != len(overlaps):
+                    outcome.invalid[num] = "delivery_overlaps 含不可见或自身票号；已过滤并保留交接"
+                routing["delivery_overlaps"] = list(dict.fromkeys(valid))
+                explicit[num] = routing
 
         # merge target 必须是既有 ready item，或本批显式 admit 的 proposal；driver 还会验证
         # 两者是精确重复，不能以“相同价值方向”为由吞掉独立能力。
@@ -262,6 +273,9 @@ class Owner:
             "任务所必需的信息。Designer 已在结构提案创建阶段处理 `covers` 来源；你不要据此再次"
             "关闭或合并来源。\n"
             "每个不同的用户问题、产品能力或结构机制都必须保留为独立 handoff 或独立 acceptance group。\n\n"
+            "PM 独立到 Owner；Designer 只吸收非 PM 来源。你负责识别双轨交付重叠：用可选 "
+            "delivery_overlaps 列出本批或 ready 中关联票号，并在 handoff_summary 解释共享工作与独立验收边界。"
+            "重叠不代表重复，双方仍分别 admit；此字段不是 merge、依赖或自动合并实现的指令。\n\n"
             f"## 待评审提案（{len(proposals)} 条）\n{self._format_index(proposals)}\n\n"
             f"## 已在 ready 的工作项（{len(ready)} 条，判重参照）\n{self._format_index(ready)}\n\n"
             f"## 体感曲线\n{self._format_trend(trend)}\n\n"
@@ -345,6 +359,9 @@ class Owner:
                 f"- 摘要：{decision.get('handoff_summary', '')}",
                 "- 保留能力：" + "；".join(decision.get("preserved_capabilities", [])),
                 "- 验收分组：" + "；".join(decision.get("acceptance_groups", [])),
+                "- 交付重叠（关联，不合并）：" + (
+                    ", ".join(f"#{n}" for n in decision.get("delivery_overlaps", [])) or "无"
+                ),
             ]
         )
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from auto_designer.designer import issue_schema as sc
 from auto_designer.designer.owner import AdmitOutcome, Owner
 from auto_designer.models import (
@@ -157,6 +159,40 @@ def test_exact_duplicate_can_merge(tmp_path: Path) -> None:
     out = o.admit_once()
     assert out.admitted == [a] and out.merged == [b]
     assert sc.MERGED in tracker.issue(b)["labels"]
+
+
+@pytest.mark.parametrize("bad_overlap", [None, "invalid", [999], [True]])
+def test_cross_route_overlap_preserves_independent_handoffs(tmp_path, bad_overlap):
+    tracker = FakeTracker()
+    pm = tracker.create_issue(IssueDraft("用户能随时纠偏", "product outcome", [sc.PROPOSAL, sc.FROM_DIVERGENT])).number
+    synth = _synth_proposal(tracker, "控制生命周期")
+    rows = [
+        {"issue": pm, "decision": "admit", "delivery_overlaps": [synth],
+         "handoff_summary": "共享控制实现，但 PM 独立验收用户可及时纠偏"},
+        {"issue": synth, "decision": "admit", "delivery_overlaps": bad_overlap},
+    ]
+    owner = _owner(tmp_path, tracker, _submit(rows))
+    out = owner.admit_once()
+    assert set(out.admitted) == {pm, synth}
+    assert not out.merged and not out.failed
+    assert synth in out.invalid
+    assert any(f"交付重叠（关联，不合并）：#{synth}" in c for c in tracker.issue(pm)["comments"])
+    assert "product outcome" == tracker.issue(pm)["body"]
+
+
+def test_overlap_can_reference_ready_but_not_self_or_report(tmp_path):
+    tracker = FakeTracker()
+    pm = _triage_proposal(tracker, "new")
+    ready = tracker.create_issue(IssueDraft("existing", "x", [sc.READY])).number
+    report = tracker.create_issue(IssueDraft("raw", "x", [sc.REPORT])).number
+    owner = _owner(tmp_path, tracker, _submit([
+        {"issue": pm, "decision": "admit", "delivery_overlaps": [pm, ready, report]},
+    ]))
+    out = owner.admit_once()
+    assert out.admitted == [pm] and pm in out.invalid
+    comments = tracker.issue(pm)["comments"]
+    assert any(f"交付重叠（关联，不合并）：#{ready}" in c for c in comments)
+    assert all(f"#{report}" not in c for c in comments)
 
 
 def test_review_admit_with_priority_override(tmp_path: Path) -> None:

@@ -5,7 +5,8 @@ description: >-
   Each item needs a routing action plus a handoff summary, preserved capabilities,
   and independent acceptance groups. Admit is the default. Merge is only for exact
   duplicates; hold must name a missing handoff input. Omitted proposals are still
-  handed off by the driver.
+  handed off by the driver. Optional delivery_overlaps references visible proposal
+  or ready issue numbers to coordinate shared work without merging independent goals.
 
   The parameters are schema-validated at call time; invalid values (unknown
   decision, self-invented keys) are rejected and you must retry.
@@ -48,6 +49,11 @@ input_schema:
             type: array
             items:
               type: string
+          delivery_overlaps:
+            type: array
+            items:
+              type: integer
+            uniqueItems: true
         required:
           - issue
           - decision

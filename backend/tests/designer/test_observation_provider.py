@@ -175,6 +175,43 @@ def test_parallel_invocations_keep_independent_scopes(tmp_path):
     assert current_observation_provider() is None
 
 
+def test_successive_round_formats_and_historical_evidence_coexist(tmp_path):
+    """Reader compatibility, not a claim that the production exporter exists."""
+    store = SessionStore(tmp_path / "sessions")
+    first = bundle(tmp_path / "observations", "round1-session", "runtime.jsonl")
+    second = bundle(tmp_path / "observations", "round2-session", "scheduler-v2.txt")
+    (first / "runtime.jsonl").write_text('{"event":"span_finished","has_error":true}\n')
+    (second / "scheduler-v2.txt").write_text("job abc entered WAITING_FOR_REMOTE\n")
+    (second / "READING.md").write_text("v2 has no spans; WAITING_FOR_REMOTE means blocked on provider.")
+    manifest = json.loads((second / "manifest.json").read_text())
+    manifest["artifact"]["commit"] = "fixture-v3"
+    (second / "manifest.json").write_text(json.dumps(manifest))
+    for sid, filename, expected in (
+        ("round1-session", "runtime.jsonl", "span_finished"),
+        ("round2-session", "scheduler-v2.txt", "WAITING_FOR_REMOTE"),
+    ):
+        with bind_observation_provider(store, allowed_session_ids={sid}) as provider:
+            assert set(provider.files) == {sid}
+            result = call_file(tmp_path, "read_file", file_path=str(provider.root / sid / filename))
+            assert expected in result["content"]
+    # A later synthesis can still cite both versions; neither is interpreted using
+    # the other's format. Reading instructions remain bundle-local.
+    with bind_observation_provider(store, allowed_session_ids={"round1-session", "round2-session"}):
+        for path in (first, second):
+            assert "error" not in call_file(tmp_path, "read_file", file_path=str(path / "manifest.json"))
+        assert "v2 has no spans" in call_file(tmp_path, "read_file", file_path=str(second / "READING.md"))["content"]
+
+
+def test_new_round_missing_bundle_does_not_reuse_previous_round(tmp_path):
+    store = SessionStore(tmp_path / "sessions")
+    bundle(tmp_path / "observations", "previous-session")
+    with bind_observation_provider(store, allowed_session_ids={"new-session"}) as provider:
+        assert not provider.files
+        assert provider.unavailable == ["new-session"]
+        result = call_file(tmp_path, "read_file", file_path=str(provider.root / "previous-session" / "engine.log"))
+        assert "error" in result
+
+
 def test_reference_chain_survives_body_clipping_and_legacy_raw_is_excluded():
     issue = OpenIssue(
         1,
@@ -201,9 +238,11 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
     store = SessionStore(tmp_path / "sessions")
     store.save(session("s1"))
     store.save(session("s2"))
+    store.save(session("s3"))
     tracker = FakeTracker()
     a = tracker.create_issue(IssueDraft("one", "session_id: s1", ["proposal"]))
     b = tracker.create_issue(IssueDraft("two", "会话：s2", ["proposal"]))
+    pm = tracker.create_issue(IssueDraft("product", "会话：s3", ["proposal", "from-divergent"]))
     seen = []
 
     def pm_run(*args, **kwargs):
@@ -212,21 +251,21 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
 
     monkeypatch.setattr("auto_designer.designer.divergent.run_agent_def", pm_run)
     Divergent(tracker, store, str(tmp_path), str(tmp_path)).propose_once()
-    assert seen == [{"s1", "s2"}]
+    assert seen == [{"s1", "s2", "s3"}]
     product = {
         "title": "shared direction",
-        "source_proposals": [a.number, b.number],
+        "source_proposals": [a.number, b.number, pm.number],
         "relationship": "shared",
         "common_tension": "uncertain state",
         "structural_direction": "coherent execution",
         "expected_leverage": "preserved user control",
         "solution_level": "structural_mechanism",
         "abstraction_rationale": "shared behavior",
-        "covers": [a.number, b.number],
+        "covers": [a.number, b.number, pm.number],
     }
 
     def designer_run(*args, **kwargs):
-        assert kwargs["allowed_session_ids"] == {"s1", "s2"}
+        assert kwargs["allowed_session_ids"] == {"s1", "s2", "s3"}
         assert "运行时行为聚合" not in args[1]
         return json.dumps({"proposals": [product]})
 
@@ -234,4 +273,6 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
     outcome = Designer(tracker, store, str(tmp_path), str(tmp_path)).propose_once()
     assert len(outcome.proposal_numbers) == 1
     assert sorted(outcome.merged_numbers) == [a.number, b.number]
-    assert evidence_session_ids(tracker.list_open_issues()) == {"s1", "s2"}
+    assert tracker.issue(pm.number)["state"] == "open"
+    structures = [i for i in tracker.list_open_issues() if i.number in outcome.proposal_numbers]
+    assert evidence_session_ids(structures) == {"s1", "s2", "s3"}

@@ -5,11 +5,13 @@ description: >-
   exactly once after reviewing ProposalView, experience trends, and runtime data.
 
   Pass `proposals`: 0..n cross-proposal syntheses. Each item names at least two
-  source proposals and explains their relationship, common tension, structural
+  non-PM delivery source proposals and explains their relationship, common tension, structural
   direction, and expected leverage. Optionally
   provide `covers` as the Designer's decision that the listed open sources are
   absorbed by the new structural proposal. After the proposal is created, the
-  driver merges and closes those sources; sources omitted from `covers` remain
+  driver merges and closes those non-PM sources. PM proposals can be cited as
+  context but never count toward the two delivery sources or enter covers;
+  they go independently to Owner. Sources omitted from `covers` remain
   independently deliverable. This call does not admit or transition the new
   proposal itself.
 
