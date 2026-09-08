@@ -71,3 +71,33 @@ def test_classify_closed_with_needs_human_is_blocked() -> None:
     assert classify_issue(state="closed", labels=["needs-human"]) == "blocked"
     assert classify_issue(state="closed", labels=["ready"]) == "done"
     assert classify_issue(state="open", labels=["ready"]) == "inflight"
+
+
+@pytest.mark.parametrize("state", ["open", "closed"])
+@pytest.mark.parametrize("label", ["automation-failed", "needs-human"])
+@pytest.mark.parametrize("mapping", [True, False])
+def test_failure_labels_stop_immediately(state: str, label: str, mapping: bool) -> None:
+    """Spec-0062/T1: failure must not wait for timeout, even after issue closure."""
+    assert classify_issue(state=state, labels=[label]) == "blocked"
+    sleeps: list[float] = []
+
+    def fetch_issue(number: int) -> dict:
+        return {"state": state, "labels": [{"name": label}] if mapping else [label]}
+
+    with pytest.raises(RoundDeliveryBlocked) as caught:
+        wait_round_delivery(numbers=[8, 8], fetch_issue=fetch_issue, sleep=sleeps.append)
+    assert caught.value.numbers == [8]
+    assert caught.value.reason == label
+    assert sleeps == []
+
+
+def test_mixed_failure_reasons_are_explicit() -> None:
+    """Spec-0062/T1: report all blocked subjects and the labels actually observed."""
+    def fetch_issue(number: int) -> dict:
+        labels = {1: [], 2: ["needs-human"], 3: ["automation-failed"]}
+        return {"state": "closed", "labels": labels[number]}
+
+    with pytest.raises(RoundDeliveryBlocked) as caught:
+        wait_round_delivery(numbers=[1, 2, 3], fetch_issue=fetch_issue)
+    assert caught.value.numbers == [2, 3]
+    assert caught.value.reason == "automation-failed,needs-human"

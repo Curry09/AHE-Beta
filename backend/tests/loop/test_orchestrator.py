@@ -578,14 +578,19 @@ def test_run_skips_demand_on_last_round(tmp_path) -> None:
     assert waits == [[11]]
 
 
-def test_blocked_delivery_does_not_start_next_user_round(tmp_path) -> None:
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+@pytest.mark.parametrize("failure_label", ["needs-human", "automation-failed"])
+def test_blocked_delivery_does_not_start_next_user_round(tmp_path, failure_label) -> None:
+    # Spec-0062/T1: exercise the real gate, not a preconstructed exception.
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked, wait_round_delivery
 
     repo = _seed_repo(tmp_path)
     events: list = []
 
     def wait_delivery(*, numbers: list[int]) -> None:
-        raise RoundDeliveryBlocked(numbers=numbers, reason="needs-human")
+        wait_round_delivery(
+            numbers=numbers,
+            fetch_issue=lambda number: {"state": "closed", "labels": [failure_label]},
+        )
 
     orch = Orchestrator(
         launcher=_Launcher(events),
@@ -598,6 +603,6 @@ def test_blocked_delivery_does_not_start_next_user_round(tmp_path) -> None:
         owner=_AdmitOwner(events, [8]),
         wait_delivery=wait_delivery,
     )
-    with pytest.raises(RoundDeliveryBlocked):
+    with pytest.raises(RoundDeliveryBlocked, match=failure_label):
         orch.run(2)
     assert [e[0] for e in events if e[0] == "session"] == ["session"]

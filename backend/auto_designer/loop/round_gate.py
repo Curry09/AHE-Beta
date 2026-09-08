@@ -1,7 +1,7 @@
 # Spec-0050/T2：本轮准入票终态闸——下一轮用户不得与本轮交付重叠。
 """Wait until this round's admitted issues reach a delivery terminal state.
 
-Empty wait sets succeed immediately. `needs-human`, watchdog-equivalent hangs, or wall-clock
+Empty wait sets succeed immediately. `automation-failed`, `needs-human`, or wall-clock
 timeout raise RoundDeliveryBlocked so the experiment does not start the next user round.
 """
 
@@ -13,6 +13,9 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 NEEDS_HUMAN = "needs-human"
+AUTOMATION_FAILED = "automation-failed"
+# Spec-0062/T1: current and legacy terminal failures outrank even a closed issue.
+_FAILURE_LABELS = frozenset({AUTOMATION_FAILED, NEEDS_HUMAN})
 _DEFAULT_TIMEOUT_SEC = 14400.0
 _DEFAULT_POLL_SEC = 15.0
 
@@ -56,11 +59,11 @@ def _label_names(*, labels: object) -> list[str]:
 def classify_issue(*, state: str, labels: list[str]) -> str:
     """Classify one issue: done, blocked, or inflight.
 
-    Spec-0050/T2: closed without needs-human is success; needs-human is stuck regardless of
-    state; still-open without that label is in flight.
+    Spec-0062/T1: current/legacy failure labels block regardless of issue state.
+    Otherwise closed succeeds and open remains in flight (Spec-0050/T2).
     """
     names = {item.strip() for item in labels if item and item.strip()}
-    if NEEDS_HUMAN in names:
+    if _FAILURE_LABELS & names:
         return _STATUS_BLOCKED
     if str(state).strip().lower() == "closed":
         return _STATUS_DONE
@@ -76,7 +79,7 @@ def wait_round_delivery(
     sleep: Callable[[float], None] | None = None,
     monotonic: Callable[[], float] | None = None,
 ) -> None:
-    """Block until every admitted issue is closed without needs-human.
+    """Block until every admitted issue is closed without a terminal failure label.
 
     Spec-0050/T2: empty `numbers` is immediate success and must not call `fetch_issue`.
     """
@@ -98,19 +101,22 @@ def wait_round_delivery(
     deadline = clock() + limit
     while True:
         blocked: list[int] = []
+        failure_reasons: set[str] = set()
         inflight: list[int] = []
         for number in unique:
             snapshot = fetch_issue(number)
+            labels = _label_names(labels=snapshot.get("labels"))
             status = classify_issue(
                 state=str(snapshot.get("state") or ""),
-                labels=_label_names(labels=snapshot.get("labels")),
+                labels=labels,
             )
             if status == _STATUS_BLOCKED:
                 blocked.append(number)
+                failure_reasons.update(_FAILURE_LABELS & {label.strip() for label in labels})
             elif status == _STATUS_INFLIGHT:
                 inflight.append(number)
         if blocked:
-            raise RoundDeliveryBlocked(numbers=blocked, reason="needs-human")
+            raise RoundDeliveryBlocked(numbers=blocked, reason=",".join(sorted(failure_reasons)))
         if not inflight:
             return
         if clock() >= deadline:

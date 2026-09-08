@@ -184,6 +184,9 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 ### 0061 开发侧观测使用与制品日志演进闭环
 制品维护诊断日志和版本说明，平台提供受限证据包；维护者取证缺口形成诊断补强，用户状态反馈走普通产品提案；功能设计分别说明两类影响并独立验收。
 
+### 0062 交付失败终态协议兼容
+本轮交付闸识别 automation-failed，保留 needs-human 兼容并禁止失败轮推进。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -454,6 +457,7 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0061 | 0061/T4 | 开发设计、实现、评审的观测职责 | done | T3 | backend/harness_template/META_SPEC.md<br>backend/deploy/vigil/observability-overlay.Dockerfile<br>backend/deploy/vigil/observation-runtime.json<br>docs/audits/0061-observation-goal-boundaries.json<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/utils/gitea.py<br>OpenAgents/openagents/observations/evidence.py<br>OpenAgents/tests/test_observation_evidence.py |
 | 0061 | 0061/T5 | 诊断观测缺口提案与可恢复提交 | done | T3 | backend/auto_designer/observations/gaps.py<br>backend/auto_designer/observations/delivery_gaps.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/designer.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml<br>backend/tests/observations/test_gaps.py<br>OpenAgents/openagents/observations/gaps.py<br>OpenAgents/openagents/v02/openagents_adapter.py |
 | 0061 | 0061/T6 | 跨轮与替代 harness 验证 | done | T1, T2, T3, T4, T5 | backend/tests/observations/fixtures/alternate_v1.py<br>backend/tests/observations/fixtures/alternate_v2.py<br>backend/scripts/replay_observation_lifecycle.py<br>docs/audits/0061-observation-lifecycle-validation.md |
+| 0062 | 0062/T1 | 当前与历史失败终态及闭环回归 | done | — | CLAUDE.md<br>backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_round_gate.py<br>backend/tests/loop/test_orchestrator.py<br>docs/audits/0062-two-user-closure-and-framework-fixes.md |
 
 ## 跨 feature 关系图
 
@@ -845,6 +849,9 @@ graph LR
         n0061_T5["T5 诊断观测缺口提案与可恢复提交"]
         n0061_T6["T6 跨轮与替代 harness 验证"]
     end
+    subgraph G0062[0062 delivery-failure-terminal]
+        n0062_T1["T1 当前与历史失败终态及闭环回归"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1177,7 +1184,7 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
-| CLAUDE.md | 0032, 0033, 0050, 0051, 0060 |
+| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062 |
 | OpenAgents/openagents/recipes/stages.py | 0032, 0061 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061 |
 | OpenAgents/openagents/runtime/context.py | 0032, 0061 |
@@ -1227,6 +1234,7 @@ graph LR
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
+| backend/auto_designer/loop/round_gate.py | 0050, 0062 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007 |
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056, 0061 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054, 0056 |
@@ -1296,9 +1304,10 @@ graph LR
 | backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055, 0059 |
 | backend/tests/loop/test_live.py | 0017, 0026, 0050 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062 |
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032 |
+| backend/tests/loop/test_round_gate.py | 0050, 0062 |
 | backend/tests/loop/test_run_state.py | 0004, 0007 |
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0051 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
@@ -3189,4 +3198,20 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0062 交付失败终态协议兼容（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 当前与历史失败终态及闭环回归"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
 ```

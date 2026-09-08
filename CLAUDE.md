@@ -27,7 +27,7 @@
 
 - **b｜开发者侧（交付面，spec-0032 现行）**：由 OpenAgents vigil（独立 CLI 常驻进程）承担。需求面 Owner 准入的票带 `openagents` 交接令牌，vigil 发现后走「盖 ready → curator 排依赖 → worktree/分支 → 实现 → 评审循环 → PR → conflict/CI/review 闸 → 合并进 main」。CI/评审是**工程质量闸**（harness 仓结构冒烟，绝不跑 benchmark），与已去掉的体感门禁维度不同；体感仍纯观测、benchmark 全程 held-out。坏改动在 PR 处被打回、不落 main。
 
-- **c｜闭环（spec-0050）**：非末轮在 Owner 准入后**等待本轮准入票终态**（合进 main 或明确卡死）才开下一轮用户。末轮只跑用户交互，不再提案、不再交付。第 N+1 轮体感相对第 N 轮归因于第 N 轮已封口产物。一张票 `needs-human`/超时则实验停在该轮。同一轮内用户与多票交付仍可并行。
+- **c｜闭环（spec-0050/0062）**：非末轮在 Owner 准入后**等待本轮准入票终态**（合进 main 或明确卡死）才开下一轮用户。末轮只跑用户交互，不再提案、不再交付。第 N+1 轮体感相对第 N 轮归因于第 N 轮已封口产物。一张票 `automation-failed`、历史 `needs-human` 或超时则实验停在该轮，闭票不覆盖失败。同一轮内用户与多票交付仍可并行。
 
 ### 约束
 1. benchmark 全程 held-out：不参与训练，不参与发版门禁。
@@ -66,7 +66,7 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 - **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
 
 ### 闭环
-`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；`TOTAL_ROUNDS=1` 不启 vigil。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。并行隔离实验用 `backend/scripts/experiment.py`（spec-0047）；`./run.sh` 单例入口已弃用，并拒绝 attach 实验托管的 vigil。
+`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；`TOTAL_ROUNDS=1` 不启 vigil。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。并行隔离实验用 `backend/scripts/experiment.py`（spec-0047）；`./run.sh` 单例入口已弃用，并拒绝 attach 实验托管的 vigil。
 
 ### 目录结构
 前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 占位待建，项目级文档/工具与配置留根。
