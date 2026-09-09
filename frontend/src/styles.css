@@ -195,6 +195,32 @@ a:focus-visible,
   flex-direction: column;
 }
 
+.experiment-picker {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.experiment-picker-label {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.experiment-picker select {
+  max-width: min(560px, 80vw);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 3px 8px;
+  font: inherit;
+}
+
 .board {
   flex: 1;
   min-height: 0;

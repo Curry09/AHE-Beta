@@ -1,4 +1,4 @@
-// 薄 fetch 客户端：/api 相对路径——dev 由 vite 代理到 :8000，生产同源（FastAPI 托管 dist）。
+// fetch 客户端：本地/后端托管模式走 /api；GitHub Pages 模式走当前实验的静态 API 快照。
 
 import type {
   AgentsResponse,
@@ -16,10 +16,44 @@ import type {
   UsageEventsResponse,
 } from "./types";
 
+export interface ExperimentSummary {
+  id: string;
+  title: string;
+  status: string;
+  updated_at: string;
+  source: "static" | "api";
+  description?: string;
+}
+
+const staticSite = import.meta.env.VITE_STATIC_SITE === "1";
+const baseUrl = import.meta.env.BASE_URL;
+
+function selectedExperiment(): string | null {
+  const query = new URLSearchParams(window.location.search).get("experiment");
+  if (query) return query;
+  const match = window.location.pathname.match(/\/experiments\/([^/]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function apiRoot(): string {
+  if (!staticSite) return "/api";
+  const id = selectedExperiment() || "_default";
+  return `${baseUrl}experiments/${encodeURIComponent(id)}/api`;
+}
+
 async function get<T>(path: string): Promise<T> {
-  const resp = await fetch(`/api${path}`);
-  if (!resp.ok) throw new Error(`GET /api${path} -> ${resp.status}`);
+  const root = apiRoot();
+  const resp = await fetch(`${root}${path}`);
+  if (!resp.ok) throw new Error(`GET ${root}${path} -> ${resp.status}`);
   return (await resp.json()) as T;
+}
+
+export async function getExperiments(): Promise<ExperimentSummary[]> {
+  if (!staticSite) return [];
+  const resp = await fetch(`${baseUrl}experiments/index.json`);
+  if (!resp.ok) throw new Error(`GET experiments/index.json -> ${resp.status}`);
+  const data = (await resp.json()) as { experiments: ExperimentSummary[] };
+  return data.experiments;
 }
 
 export const getAgents = () => get<AgentsResponse>("/agents");

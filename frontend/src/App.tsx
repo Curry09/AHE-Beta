@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  getExperiments,
   getAgents,
   getCommits,
   getConfig,
@@ -11,6 +12,7 @@ import {
   getUsageSummary,
   getUsageEvents,
 } from "./api";
+import { ExperimentPicker } from "./components/ExperimentPicker";
 import { AgentColumn } from "./components/AgentColumn";
 import { BuildingView } from "./components/BuildingView";
 import { Charts } from "./components/Charts";
@@ -68,6 +70,22 @@ function parseFloor(raw: string | null): AgentRole {
 }
 
 export default function App() {
+  const [experiments, setExperiments] = useState<Awaited<ReturnType<typeof getExperiments>>>([]);
+  const staticSite = import.meta.env.VITE_STATIC_SITE === "1";
+  const selectedExperiment = new URLSearchParams(location.search).get("experiment");
+
+  useEffect(() => {
+    if (!staticSite) return;
+    getExperiments().then((items) => {
+      setExperiments(items);
+      if (!selectedExperiment && items[0]) {
+        const url = new URL(location.href);
+        url.searchParams.set("experiment", items[0].id);
+        window.history.replaceState(null, "", url.pathname + url.search);
+      }
+    }).catch(() => setExperiments([]));
+  }, [staticSite, selectedExperiment]);
+
   const agents = usePolling(getAgents, POLL_MS);
   const state = usePolling(getState, POLL_MS);
   const history = usePolling(getHistory, POLL_MS);
@@ -135,6 +153,15 @@ export default function App() {
 
   return (
     <div className="app">
+      <ExperimentPicker
+        experiments={experiments}
+        selected={selectedExperiment}
+        onSelect={(id) => {
+          const url = new URL(location.href);
+          url.searchParams.set("experiment", id);
+          window.location.assign(url.pathname + url.search);
+        }}
+      />
       <TopBar
         state={state}
         openCount={openCount}
