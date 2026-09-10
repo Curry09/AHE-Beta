@@ -114,6 +114,37 @@ def test_satisfies_protocol() -> None:
     assert isinstance(_tracker(FakeGitea()), IssueTracker)
 
 
+@pytest.mark.parametrize("count", [0, 50, 117])
+def test_open_issue_queue_reads_every_page(count) -> None:
+    from urllib.parse import parse_qs, urlparse
+
+    issues = [{"number": number, "title": str(number), "labels": [{"name": "proposal"}]}
+              for number in range(1, count + 1)]
+    pages = []
+
+    def handler(method, url, body):
+        query = parse_qs(urlparse(url).query)
+        assert method == "GET" and body is None
+        assert query["state"] == ["open"] and query["type"] == ["issues"]
+        page = int(query["page"][0])
+        pages.append(page)
+        return _Resp(200, issues[(page - 1) * 50:page * 50])
+
+    observed = _tracker(handler).list_open_issues()
+    assert [issue.number for issue in observed] == list(range(1, count + 1))
+    assert pages == list(range(1, count // 50 + 2))
+
+
+def test_open_issue_queue_does_not_return_partial_data_on_later_page_error() -> None:
+    def handler(method, url, body):
+        if "page=1" in url:
+            return _Resp(200, [{"number": number} for number in range(1, 51)])
+        return _Resp(503, text="temporarily unavailable")
+
+    with pytest.raises(GiteaError):
+        _tracker(handler).list_open_issues()
+
+
 def test_authorization_header_set() -> None:
     t = GiteaTracker(base_url="http://gitea", owner="o", repo="r", token="SECRET")
     assert t._session.headers["Authorization"] == "token SECRET"

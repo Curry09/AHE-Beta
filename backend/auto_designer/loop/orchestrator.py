@@ -179,7 +179,8 @@ class Orchestrator:
         self._run_parallel(beat1)
 
         # 生成段·第二拍：synthesize（跑在 triage 全部收尾之后——要看本轮新升的 from-triage 提案，
-        # 结构综合不滞后一轮）。通常 0..1 个；多个也并行无妨（产出仍是提案）。
+        # 结构综合不滞后一轮）。启用分组时，入口提供一个协调器：全池只分类一次，
+        # 再由已有 Designer workers 领取互斥组，避免多个 worker 各自处理整池。
         beat2: list[tuple[str, Callable[[], object]]] = [
             ("synthesize", designer.propose_once) for designer in self._designers
         ]

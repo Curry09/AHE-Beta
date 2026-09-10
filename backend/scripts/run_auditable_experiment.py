@@ -160,6 +160,8 @@ class FrozenExperiment:
         execution = self.raw.get("execution")
         if not isinstance(execution, dict) or execution.get("runner") != "swebench-closed-loop":
             raise AuditLaunchError("execution.runner 必须为 swebench-closed-loop")
+        if type(execution.get("designer_grouping", False)) is not bool:
+            raise AuditLaunchError("execution.designer_grouping 必须为 boolean")
         rounds = int(execution.get("total_rounds") or 0)
         if self.config.mode == "full-evolution":
             if rounds < 2 or not execution.get("final_round_users_only"):
@@ -583,6 +585,7 @@ def _execution_environment(
             "N_USERS": str(roster["user"]),
             "N_TRIAGERS": str(roster["triager"]),
             "N_DESIGNERS": str(roster["designer"]),
+            "DESIGNER_GROUPING": "1" if execution.get("designer_grouping", False) else "0",
             "N_DIVERGENTS": str(roster["divergent"]),
             "N_OWNERS": str(roster["owner"]),
             "N_DEVELOPERS": str(roster["developer"]),

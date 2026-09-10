@@ -1019,7 +1019,7 @@ def main() -> int:
 
         return cb
 
-    designers = [  # roster 个创新者 agent：a 之后综合全局 backlog+体感产结构性提案（design 标签），供 dev 领取
+    designers = [
         Designer(
             tracker,
             store,
@@ -1033,6 +1033,9 @@ def main() -> int:
         )
         for i in range(roster["designer"])
     ]
+    from auto_designer.designer.grouped_designer import group_designer_stage
+
+    designers = group_designer_stage(designers, artifact_root=role_runs / "designer_grouping")
 
     def make_divergent_status(agent_id, label):
         def cb(*, running, status, detail=None, proposals=None):
@@ -1156,7 +1159,7 @@ def main() -> int:
 
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
-        f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {len(designers)} synthesize "
+        f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {roster['designer']} synthesize "
         f"→ owner({'评审' if roster['owner'] >= 1 else '禁用准入'})；交付面 vigil --parallel "
         f"{roster['developer']}（末轮只用户；非末轮封口后切轮），"
         f"a 段并发 {max_parallel_users}，背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，"

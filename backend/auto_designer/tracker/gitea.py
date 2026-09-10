@@ -126,9 +126,18 @@ class GiteaTracker:
         return self._parse_issue_ref(data)
 
     def list_open_issues(self) -> list[OpenIssue]:
-        data = self._request(
-            "GET", f"/repos/{self._owner}/{self._repo}/issues?state=open&type=issues", None
-        )
+        data = []
+        page = 1
+        while True:
+            items = self._request(
+                "GET",
+                f"/repos/{self._owner}/{self._repo}/issues?state=open&type=issues&limit=50&page={page}",
+                None,
+            ) or []
+            data.extend(items)
+            if len(items) < 50:
+                break
+            page += 1
         return [
             OpenIssue(
                 number=item["number"],

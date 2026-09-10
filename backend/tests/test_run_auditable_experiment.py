@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 import run_auditable_experiment
 
 
@@ -128,6 +130,17 @@ def test_frozen_experiment_validates_round_roster_and_pins(tmp_path: Path) -> No
     frozen = module.FrozenExperiment.load(config_path=config, root=tmp_path / "experiments")
     assert frozen.experiment_id == "unit-audit"
     assert frozen.roster["user"] == 2
+
+    for enabled in (False, True):
+        frozen.raw["execution"]["designer_grouping"] = enabled
+        environment = module._execution_environment(frozen, profile={}, context_path=tmp_path / "context.json")
+        assert environment["DESIGNER_GROUPING"] == ("1" if enabled else "0")
+        assert environment["NO_PROXY"] == environment["no_proxy"] == "*"
+        frozen.validate_contract()
+    frozen.raw["execution"]["designer_grouping"] = "false"
+    with pytest.raises(module.AuditLaunchError, match="designer_grouping"):
+        frozen.validate_contract()
+    frozen.raw["execution"]["designer_grouping"] = True
 
     document["experiment_id"] = "unit-user-only"
     document["mode"] = "user-only"

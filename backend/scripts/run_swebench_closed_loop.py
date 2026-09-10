@@ -558,6 +558,9 @@ def main() -> int:
         )
         for i in range(roster["designer"])
     ]
+    from auto_designer.designer.grouped_designer import group_designer_stage
+
+    designers = group_designer_stage(designers, artifact_root=role_runs / "designer_grouping")
 
     def make_divergent_status(agent_id: str, label: str):
         def cb(*, running, status, detail=None, proposals=None):
@@ -670,7 +673,7 @@ def main() -> int:
 
     print(
         f"④ 跑 {run_mod.TOTAL_ROUNDS} 轮闭环（每轮 {SESSIONS_PER_ROUND} session · "
-        f"{len(triagers)} triager × {len(designers)} synthesize × {len(divergents)} divergent；"
+        f"{len(triagers)} triager × {roster['designer']} synthesize × {len(divergents)} divergent；"
         f"owner({'评审' if roster['owner'] >= 1 else '纯机械'}) · "
         f"交付面 vigil --parallel {roster['developer']}（末轮只用户），"
         f"a 段并发 {max_parallel_users}）..."
