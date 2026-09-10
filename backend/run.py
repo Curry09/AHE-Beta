@@ -352,11 +352,15 @@ def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
     ci_stage = os.environ.get("VIGIL_CI_STAGE", "").strip().lower()
     if ci_stage in ("agent", "human", "skip"):
         effective["ci"] = ci_stage
+    coordination = os.environ.get("VIGIL_COORDINATION", "soft").strip().lower()
+    if coordination not in {"soft", "off", "dependencies"}:
+        raise ValueError("VIGIL_COORDINATION must be soft, off, or dependencies")
     stages = "\n".join(f"  {stage}: {owner}" for stage, owner in effective.items())
     text = (
         "# 由 backend/run.py 每次 run 生成（Spec-0032/T5），勿手工编辑——改 run.py 的定稿常量。\n"
         "version: 1\n"
         "forge: gitea\n"
+        f"coordination: {coordination}\n"
         "gitea:\n"
         f"  base_url: {gitea['GITEA_URL']}\n"
         f"  owner: {gitea['OWNER']}\n"

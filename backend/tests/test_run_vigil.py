@@ -53,6 +53,7 @@ def test_write_openagents_config_matches_stage_finalization(tmp_path: Path) -> N
     assert path == tmp_path / ".openagents" / "openagents.yml"
     data = _load_yaml(path)
     assert data["forge"] == "gitea"
+    assert data["coordination"] == "soft"
     assert data["gitea"] == {
         "base_url": "http://localhost:3000",
         "owner": "harness",
@@ -84,6 +85,15 @@ def test_ci_stage_env_override(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("VIGIL_CI_STAGE", "banana")
     data = _load_yaml(run.write_openagents_config(repo=tmp_path, gitea=_GITEA))
     assert data["stages"]["ci"] == "skip"
+
+
+def test_coordination_can_be_disabled_without_restoring_hard_curator(tmp_path, monkeypatch):
+    monkeypatch.setenv("VIGIL_COORDINATION", "off")
+    data = _load_yaml(run.write_openagents_config(repo=tmp_path, gitea=_GITEA))
+    assert data["coordination"] == "off"
+    monkeypatch.setenv("VIGIL_COORDINATION", "typo")
+    with pytest.raises(ValueError, match="VIGIL_COORDINATION"):
+        run.write_openagents_config(repo=tmp_path, gitea=_GITEA)
 
 
 def test_write_openagents_config_is_idempotent(tmp_path: Path) -> None:
