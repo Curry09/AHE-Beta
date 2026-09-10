@@ -18,7 +18,9 @@ OpenAgents 需使用包含 spec-0091 的版本；容器部署需用该 checkout 
 ## 30 张 issue 进入后的实际流程
 
 1. 用户在本轮冻结 main SHA 上交互。非末轮产生 proposal：PM 独立到 Owner，Triage 经
-   Designer 到 Owner。Owner 分别保留每张票的交付目标和验收，准入后打 openagents。
+   Designer 到 Owner。启用 DESIGNER_GROUPING 时，Triage 之后先做一次分组，再由已有
+   Designer 按互斥组并行设计（组内顺序）；这一步处理 proposal，和 Owner 之后处理交付
+   issue 的轻前置职责不同。Owner 分别保留每张票的交付目标和验收，准入后打 openagents。
 2. Vigil 发现并打 ready。soft 模式收集最多 64 张 ready open issue，排除 automation-failed。
    这只是限长规划视图；完整原始 issue 留在 forge，开发时照常读取。没有合票、删票或改验收。
 3. 一次前置生成至多 8 个共享机制候选、8 条建议先后、8 条复用提示。Claude/NexAU 前置
@@ -52,3 +54,15 @@ token 用量进入现有 token-usage.jsonl。前置失败不设置 automation-fa
 本次验证只跑前置模型、历史规划输出回放与本地并发队列压测，没有启动真实 developer A/B。
 队列正确性与调度耗时可由压测检验；真实返工率、合并冲突率、端到端节省时间仍需后续
 正常开发数据判断。启用不会自动提高 worker 数；先保留当前并发，观察后再调。
+
+已准备本地兼容镜像 `auto-designer-vigil:preflight-26cbe45`，镜像 ID：
+`sha256:f3ecbc8b1e9d387483e0a9060c658e695534f1f0e4a10bdbb434bec04948cac1`。
+无网络容器中的 soft 配置加载冒烟已通过。普通入口可设置：
+
+```sh
+export AUTO_DESIGNER_VIGIL_IMAGE=auto-designer-vigil:preflight-26cbe45
+```
+
+审计实验则在新实验配置的 `images.vigil` 选择该镜像/固定 ID；不改历史实验 pack。
+与最新 Designer 分组提交 `72afc00` 集成后，分组、Owner、Vigil 配置、审计入口与
+Gitea 相关测试共 99 项通过。
