@@ -239,6 +239,22 @@ def test_inputs_are_ready_plus_proposal_index(tmp_path) -> None:
     assert designer.seen_runtime == ""  # 0059: 不再默认注入耦合旧制品字段的运行时聚合。
 
 
+def test_inputs_are_limited_to_the_active_round(tmp_path) -> None:
+    tracker = FakeTracker()
+    current = tracker.create_issue(
+        IssueDraft(title="current", body="x", labels=[sc.PROPOSAL, sc.FROM_TRIAGE, "round-4"])
+    ).number
+    tracker.create_issue(
+        IssueDraft(title="old", body="x", labels=[sc.READY, "round-3"])
+    )
+    designer = _designer(tmp_path, tracker, _submit([]), round_provider=lambda: 4)
+
+    designer.propose_once()
+
+    assert [item.number for item in designer.seen_ready] == []
+    assert [item.number for item in designer.seen_proposals] == [current]
+
+
 def test_covers_line_written_and_sources_are_merged(tmp_path) -> None:
     """covers 落在 body，并由 Designer driver 合并关闭被吸收来源。"""
     tracker = FakeTracker()

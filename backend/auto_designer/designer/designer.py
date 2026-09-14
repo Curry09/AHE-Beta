@@ -26,6 +26,7 @@ from auto_designer.designer.issue_schema import (
     REPORT,
     RFC_LABEL,
     TRIAGED,
+    filter_current_round,
     format_covers_line,
     plane,
     round_label,
@@ -109,12 +110,16 @@ class Designer:
         self._force_submit_prompt = False
 
     def propose_once(self) -> DesignOutcome:
+        round_no = self._round_provider() if self._round_provider is not None else None
         # Input isolation, not a prompt exception: PM products (including legacy
         # and already-ready ones) never enter synthesis or its evidence scope.
-        backlog = [
-            i for i in self._tracker.list_open_issues()
-            if not {FROM_DIVERGENT, DIVERGENT}.intersection(i.labels)
-        ]
+        backlog = filter_current_round(
+            (
+                i for i in self._tracker.list_open_issues()
+                if not {FROM_DIVERGENT, DIVERGENT}.intersection(i.labels)
+            ),
+            round_no=round_no,
+        )
         # Spec-0029/T4：输入 = ready 工作队列 + 待准入提案索引（编排保证跑在本轮 triage 之后，
         # 索引因此含本轮新升的 from-triage 提案）。提案索引兼作「勿重复提」参照。
         ready = [i for i in backlog if plane(i.labels) == READY]
@@ -154,7 +159,6 @@ class Designer:
         failed_merges: dict[int, str] = {}
         merged_sources: set[int] = set()
         rejected_proposals: list[dict] = []
-        round_no = self._round_provider() if self._round_provider is not None else None
         round_name = round_label(round_no) if type(round_no) is int and round_no > 0 else None
         if parsed:
             self._tracker.ensure_labels(

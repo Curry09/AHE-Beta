@@ -164,6 +164,26 @@ def test_no_classification_call_when_synthesis_is_impossible(tmp_path, count):
     assert stage.propose_once().count == 0 and receipt(tmp_path)["status"] == "skipped"
 
 
+def test_grouping_only_reads_the_active_round(tmp_path):
+    tracker = FakeTracker()
+    for number, round_name in (("current-a", "round-4"), ("old", "round-3"), ("current-b", "round-4")):
+        tracker.create_issue(IssueDraft(title=number, body="summary", labels=[PROPOSAL, round_name]))
+    calls = []
+
+    class Worker(Designer):
+        def propose_once(self):
+            ids = [item.number for item in self._tracker.list_open_issues()]
+            calls.append(ids)
+            return DesignOutcome()
+
+    def classify(cards):
+        assert [card["id"] for card in cards] == [1, 3]
+        return response([[1, 3]])
+
+    grouped(tmp_path, tracker, classify, Worker).propose_once()
+    assert calls == [[1, 3]]
+
+
 def test_actual_designer_rejects_cross_group_sources(tmp_path, monkeypatch):
     tracker = tracker_with(4)
     barrier = threading.Barrier(2)

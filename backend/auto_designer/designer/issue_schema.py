@@ -86,6 +86,23 @@ def round_of(labels: list[str]) -> int | None:
     return None
 
 
+def filter_current_round(items, *, round_no: int | None):
+    """Keep only issues belonging to the active round.
+
+    New issues are stamped with a ``round-N`` label.  If a collection contains
+    any such labels, unlabelled issues are excluded as well: their round cannot
+    be inferred safely and allowing them would reintroduce cross-round input
+    leakage.  Collections made entirely of legacy, unlabelled issues are kept
+    unchanged for backwards compatibility with old repositories and fixtures.
+    """
+    if type(round_no) is not int or round_no <= 0:
+        return list(items)
+    values = list(items)
+    if not any(round_of(item.labels) is not None for item in values):
+        return values
+    return [item for item in values if round_of(item.labels) == round_no]
+
+
 def priority_of(labels: list[str]) -> str | None:
     """标签 → 优先级（P0-P3）；无则 None。多个并存取最高（PRIORITIES 已按高→低）。"""
     present = [p for p in PRIORITIES if p in (labels or [])]

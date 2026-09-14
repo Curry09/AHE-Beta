@@ -13,7 +13,14 @@ from queue import Empty, Queue
 from uuid import uuid4
 
 from auto_designer.designer.designer import Designer, DesignOutcome
-from auto_designer.designer.issue_schema import DIVERGENT, FROM_DIVERGENT, PROPOSAL, READY, plane
+from auto_designer.designer.issue_schema import (
+    DIVERGENT,
+    FROM_DIVERGENT,
+    PROPOSAL,
+    READY,
+    filter_current_round,
+    plane,
+)
 from auto_designer.designer.proposal_view import normalized_proposal_body
 from auto_designer.usage import bind_usage_context, monotonic_ms, record_usage
 
@@ -163,13 +170,18 @@ class GroupedDesigner:
         self.classify = classify
 
     def propose_once(self) -> DesignOutcome:
-        issues = sorted(
+        round_no = self.round_provider() if self.round_provider else None
+        issues = filter_current_round(
             (
                 item
                 for item in self.tracker.list_open_issues()
                 if plane(item.labels) in (PROPOSAL, READY)
                 and not {DIVERGENT, FROM_DIVERGENT}.intersection(item.labels)
             ),
+            round_no=round_no,
+        )
+        issues = sorted(
+            issues,
             key=lambda item: item.number,
         )
         cards = [
@@ -183,7 +195,6 @@ class GroupedDesigner:
             for item in issues
         ]
         numbers = [item.number for item in issues]
-        round_no = self.round_provider() if self.round_provider else None
         directory = self.artifact_root / f"round-{round_no or 0}-{uuid4().hex}"
         receipt = {
             "round": round_no,
@@ -250,12 +261,17 @@ class GroupedDesigner:
         def work(worker_id, designer):
             scope = _BatchTracker(self.tracker, set())
             original_tracker = designer._tracker
+            original_round_provider = designer._round_provider
             results = []
             designer._tracker = scope
+            # Keep every worker on the same round snapshot as the grouping input,
+            # even if the external round provider advances while batches run.
+            designer._round_provider = lambda: round_no
             try:
                 return run_batches(worker_id, designer, scope, results)
             finally:
                 designer._tracker = original_tracker
+                designer._round_provider = original_round_provider
 
         def run_batches(worker_id, designer, scope, results):
             with bind_usage_context(
