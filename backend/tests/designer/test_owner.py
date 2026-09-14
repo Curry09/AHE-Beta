@@ -223,6 +223,18 @@ def test_explicit_incomplete_hold_and_unlisted_default_handoff(tmp_path: Path) -
     assert sc.is_ready(labels=tracker.issue(quiet)["labels"], state="open")
 
 
+def test_invalid_explicit_decision_is_held_not_default_admitted(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+    proposal = _synth_proposal(tracker, "缺少 hold 理由")
+    o = _owner(tmp_path, tracker, _submit([{"issue": proposal, "decision": "hold"}]))
+
+    out = o.admit_once()
+
+    assert out.held == [proposal]
+    assert proposal in out.invalid
+    assert sc.PROPOSAL in tracker.issue(proposal)["labels"]
+
+
 def test_owner_does_not_process_designer_covers(tmp_path: Path) -> None:
     tracker = FakeTracker()
     p1 = _triage_proposal(tracker, "症状甲：状态丢失")

@@ -139,6 +139,11 @@ class Owner:
             if violations:
                 if num in reviewable:
                     outcome.invalid[num] = ",".join(v.code for v in violations)
+                    # An explicitly malformed decision is not the same as an
+                    # omitted decision.  Preserve the proposal as hold so the
+                    # default-handoff pass cannot accidentally admit it.
+                    if num not in outcome.held:
+                        outcome.held.append(num)
                 continue
             if num not in explicit:  # 只裁本批评审集合；重复决策先者得
                 routing = dict(d)
