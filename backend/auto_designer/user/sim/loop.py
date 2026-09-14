@@ -211,7 +211,7 @@ _HARNESS_TERMINAL_STATUSES = frozenset({"timed_out", "crashed"})
 #   （Spec-0024/T6：heard.answers → utterance）。
 _HEARTBEAT_SEC = 90.0
 # 心跳唤醒次数硬上限（兜底防病态：模型一直 keep_waiting 而 harness 永不回）。到顶即强制放弃。
-_MAX_HEARTBEATS = 8
+_MAX_HEARTBEATS = 12
 # A malformed persona reply is not a user give-up. Allow one warning heartbeat
 # to keep listening; repeated failures then stop safely with an auditable status.
 _MAX_PROTOCOL_STALL_HEARTBEATS = 2

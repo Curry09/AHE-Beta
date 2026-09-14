@@ -606,6 +606,24 @@ def test_pathological_keep_waiting_is_bounded() -> None:
     assert 0 < len(waiting) <= _MAX_HEARTBEATS
 
 
+def test_heartbeat_cap_allows_corrections_until_twelfth_check() -> None:
+    """等待兜底从 8 次放宽到 12 次；仅第 12 次覆盖动作，其余终止规则不变。"""
+    harness = HeartbeatHarness([("pending", 90.0)])
+    client = WaitStubClient(
+        actions=["send_message"],
+        acts=[{"action": "send_message", "message": "Please continue", "gap": False}],
+        intents=[{"intent": "Send a correction without interrupting"}],
+    )
+    res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
+    waiting = [t for t in res.turns if t.phase == "waiting"]
+    assert len(waiting) == 12
+    assert [t.action for t in waiting] == ["send_message"] * 11 + ["give_up"]
+    assert harness.emitted == ["Please continue"] * 11
+    assert waiting[-1].message == ""
+    assert res.end_reason == "abandoned"
+    assert harness.shutdowns == 1
+
+
 def test_on_track_progress_skips_patience_tax() -> None:
     progress_on_poll = [
         [{"kind": "tool", "text": "🔧 read_file: billing/core.py"}],
