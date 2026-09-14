@@ -187,6 +187,12 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 ### 0062 交付失败终态协议兼容
 本轮交付闸识别 automation-failed，保留 needs-human 兼容并禁止失败轮推进。
 
+### 0063 轻量交付前置与软调度
+对需求侧 proposal 先做一次分组并把交付侧共享机制、建议顺序与复用提示作为有界软信号，在不合票、不阻塞 worker 的前提下降低并行返工。
+
+### 0064 阶段级可恢复实验运行
+把真实闭环改造成带持久化阶段游标、工作项幂等键和外部状态对账的可重入状态机，使实验失败后从最近完成的用户、Triage、Designer、Owner 或交付节点继续。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -458,6 +464,14 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0061 | 0061/T5 | 诊断观测缺口提案与可恢复提交 | done | T3 | backend/auto_designer/observations/gaps.py<br>backend/auto_designer/observations/delivery_gaps.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/designer.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml<br>backend/tests/observations/test_gaps.py<br>OpenAgents/openagents/observations/gaps.py<br>OpenAgents/openagents/v02/openagents_adapter.py |
 | 0061 | 0061/T6 | 跨轮与替代 harness 验证 | done | T1, T2, T3, T4, T5 | backend/tests/observations/fixtures/alternate_v1.py<br>backend/tests/observations/fixtures/alternate_v2.py<br>backend/scripts/replay_observation_lifecycle.py<br>docs/audits/0061-observation-lifecycle-validation.md |
 | 0062 | 0062/T1 | 当前与历史失败终态及闭环回归 | done | — | CLAUDE.md<br>backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_round_gate.py<br>backend/tests/loop/test_orchestrator.py<br>docs/audits/0062-two-user-closure-and-framework-fixes.md |
+| 0063 | 0063/T1 | 需求侧提案分组与并行 Designer | done | — | backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/tracker/gitea.py<br>backend/run.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/tracker/test_gitea.py<br>docs/designer-grouping.md |
+| 0063 | 0063/T2 | 交付侧有界前置与软调度 | done | — | CLAUDE.md<br>backend/tests/test_run_vigil.py<br>OpenAgents/openagents/runtime/preflight.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/tests/test_preflight.py<br>OpenAgents/tools/preflight_stress.py |
+| 0064 | 0064/T1 | 持久化恢复状态与对账原语 | pending | — | backend/auto_designer/loop/recovery.py<br>backend/auto_designer/loop/run_state.py<br>backend/auto_designer/loop/checkpoint.py<br>backend/auto_designer/invocation.py<br>backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/fake.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_run_state.py<br>backend/tests/loop/test_checkpoint.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
+| 0064 | 0064/T2 | 阶段化 Orchestrator 与交付恢复 | pending | T1 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/runner.py<br>backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_runner.py<br>backend/tests/loop/test_round_gate.py |
+| 0064 | 0064/T3 | 用户会话工作项级恢复 | pending | T1, T2 | backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/test_session_store.py |
+| 0064 | 0064/T4 | Triage 与 Divergent 第一拍恢复 | pending | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/tests/designer/test_triage.py<br>backend/tests/designer/test_divergent_gate.py |
+| 0064 | 0064/T5 | Designer 与 Owner 输出先存后应用 | pending | T1, T2, T4 | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/tests/loop/test_designer.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_delivery_evidence.py |
+| 0064 | 0064/T6 | Fresh/resume 入口与故障矩阵验收 | pending | T1, T2, T3, T4, T5 | backend/run.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/manifest.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/e2e-stage-resume.sh<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_stage_resume_e2e.py<br>docs/audits/0064-stage-resume-validation.md |
 
 ## 跨 feature 关系图
 
@@ -852,6 +866,18 @@ graph LR
     subgraph G0062[0062 delivery-failure-terminal]
         n0062_T1["T1 当前与历史失败终态及闭环回归"]
     end
+    subgraph G0063[0063 lightweight-delivery-preflight]
+        n0063_T1["T1 需求侧提案分组与并行 Designer"]
+        n0063_T2["T2 交付侧有界前置与软调度"]
+    end
+    subgraph G0064[0064 stage-resumable-experiment-runtime]
+        n0064_T1["T1 持久化恢复状态与对账原语"]
+        n0064_T2["T2 阶段化 Orchestrator 与交付恢复"]
+        n0064_T3["T3 用户会话工作项级恢复"]
+        n0064_T4["T4 Triage 与 Divergent 第一拍恢复"]
+        n0064_T5["T5 Designer 与 Owner 输出先存后应用"]
+        n0064_T6["T6 Fresh/resume 入口与故障矩阵验收"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1132,6 +1158,19 @@ graph LR
     n0061_T6 --> n0061_T3
     n0061_T6 --> n0061_T4
     n0061_T6 --> n0061_T5
+    n0064_T2 --> n0064_T1
+    n0064_T3 --> n0064_T1
+    n0064_T3 --> n0064_T2
+    n0064_T4 --> n0064_T1
+    n0064_T4 --> n0064_T2
+    n0064_T5 --> n0064_T1
+    n0064_T5 --> n0064_T2
+    n0064_T5 --> n0064_T4
+    n0064_T6 --> n0064_T1
+    n0064_T6 --> n0064_T2
+    n0064_T6 --> n0064_T3
+    n0064_T6 --> n0064_T4
+    n0064_T6 --> n0064_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1184,11 +1223,11 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
-| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062 |
-| OpenAgents/openagents/recipes/stages.py | 0032, 0061 |
-| OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061 |
-| OpenAgents/openagents/runtime/context.py | 0032, 0061 |
-| OpenAgents/openagents/runtime/engine.py | 0049, 0061 |
+| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063 |
+| OpenAgents/openagents/recipes/stages.py | 0032, 0061, 0063 |
+| OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061, 0063 |
+| OpenAgents/openagents/runtime/context.py | 0032, 0061, 0063 |
+| OpenAgents/openagents/runtime/engine.py | 0049, 0061, 0063 |
 | OpenAgents/openagents/utils/gitea.py | 0032, 0061 |
 | backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043, 0061 |
 | backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052, 0055, 0060, 0061 |
@@ -1208,40 +1247,46 @@ graph LR
 | backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
 | backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043, 0052, 0060 |
 | backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049, 0059, 0061 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059, 0060, 0061 |
-| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059, 0061 |
+| backend/auto_designer/designer/delivery_evidence.py | 0061, 0064 |
+| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059, 0060, 0061, 0064 |
+| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059, 0061, 0064 |
 | backend/auto_designer/designer/evidence_contract.py | 0055, 0056, 0059 |
+| backend/auto_designer/designer/grouped_designer.py | 0063, 0064 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052 |
 | backend/auto_designer/designer/observation_provider.py | 0059, 0061 |
-| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052, 0060, 0061 |
+| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052, 0060, 0061, 0064 |
 | backend/auto_designer/designer/proposal_view.py | 0042, 0059 |
 | backend/auto_designer/designer/role_contract.py | 0043, 0052, 0055 |
 | backend/auto_designer/designer/session_timeline.py | 0024, 0054, 0055, 0056, 0059 |
 | backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
-| backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055, 0061 |
+| backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055, 0061, 0064 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
 | backend/auto_designer/dev/harness_boundary.py | 0015, 0030, 0040 |
 | backend/auto_designer/dev/workspace_jail.py | 0015, 0049, 0059 |
-| backend/auto_designer/experiment/cli.py | 0047, 0053 |
-| backend/auto_designer/experiment/runtime.py | 0047, 0053 |
+| backend/auto_designer/experiment/cli.py | 0047, 0053, 0064 |
+| backend/auto_designer/experiment/manifest.py | 0047, 0064 |
+| backend/auto_designer/experiment/runtime.py | 0047, 0053, 0064 |
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
 | backend/auto_designer/harness/connector.py | 0030, 0035, 0036, 0041 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041, 0051, 0061 |
-| backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053 |
+| backend/auto_designer/invocation.py | 0049, 0064 |
+| backend/auto_designer/loop/checkpoint.py | 0004, 0064 |
+| backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053, 0064 |
 | backend/auto_designer/loop/live_tracer.py | 0032, 0041 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0063, 0064 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
-| backend/auto_designer/loop/round_gate.py | 0050, 0062 |
-| backend/auto_designer/loop/run_state.py | 0004, 0007 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056, 0061 |
+| backend/auto_designer/loop/round_gate.py | 0050, 0062, 0064 |
+| backend/auto_designer/loop/run_state.py | 0004, 0007, 0064 |
+| backend/auto_designer/loop/runner.py | 0004, 0064 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056, 0061, 0064 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054, 0056 |
-| backend/auto_designer/tracker/base.py | 0001, 0025, 0042 |
-| backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042 |
-| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042, 0061 |
-| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051, 0053, 0054 |
+| backend/auto_designer/tracker/base.py | 0001, 0025, 0042, 0064 |
+| backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042, 0064 |
+| backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042, 0061, 0063, 0064 |
+| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051, 0053, 0054, 0064 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048, 0053 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035, 0053 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037, 0057 |
@@ -1276,46 +1321,52 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041, 0051, 0061 |
 | backend/harness_template/params.yaml | 0003, 0030, 0061 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041, 0051 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0064 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/evaluate_role_traces.py | 0043, 0055 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
 | backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051 |
+| backend/scripts/run_auditable_experiment.py | 0051, 0063, 0064 |
+| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051, 0063, 0064 |
 | backend/tests/designer/test_agent_contract.py | 0027, 0043, 0052 |
 | backend/tests/designer/test_agent_runtime.py | 0029, 0041, 0049 |
-| backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043, 0055 |
+| backend/tests/designer/test_delivery_evidence.py | 0061, 0064 |
+| backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043, 0055, 0064 |
+| backend/tests/designer/test_grouped_designer.py | 0063, 0064 |
 | backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
 | backend/tests/designer/test_observation_provider.py | 0059, 0060 |
-| backend/tests/designer/test_owner.py | 0029, 0032, 0042, 0043, 0052, 0060 |
+| backend/tests/designer/test_owner.py | 0029, 0032, 0042, 0043, 0052, 0060, 0064 |
 | backend/tests/designer/test_role_contract.py | 0043, 0052 |
 | backend/tests/designer/test_role_contract_flow.py | 0042, 0043, 0055, 0060 |
 | backend/tests/designer/test_session_timeline.py | 0024, 0054 |
-| backend/tests/designer/test_triage.py | 0025, 0027, 0029, 0042, 0043, 0055 |
+| backend/tests/designer/test_triage.py | 0025, 0027, 0029, 0042, 0043, 0055, 0064 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/dev/test_completion_gate.py | 0014, 0030 |
 | backend/tests/dev/test_harness_boundary.py | 0015, 0030, 0040 |
 | backend/tests/dev/test_workspace_jail.py | 0015, 0049 |
-| backend/tests/experiment/test_cli.py | 0047, 0053 |
-| backend/tests/experiment/test_runtime.py | 0047, 0053 |
+| backend/tests/experiment/test_cli.py | 0047, 0053, 0064 |
+| backend/tests/experiment/test_runtime.py | 0047, 0053, 0064 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051 |
 | backend/tests/harness/test_template_entry.py | 0013, 0051, 0061 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055, 0059 |
-| backend/tests/loop/test_live.py | 0017, 0026, 0050 |
+| backend/tests/loop/test_checkpoint.py | 0004, 0064 |
+| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055, 0059, 0064 |
+| backend/tests/loop/test_live.py | 0017, 0026, 0050, 0064 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062, 0064 |
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032 |
-| backend/tests/loop/test_round_gate.py | 0050, 0062 |
-| backend/tests/loop/test_run_state.py | 0004, 0007 |
-| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0051 |
+| backend/tests/loop/test_round_gate.py | 0050, 0062, 0064 |
+| backend/tests/loop/test_run_state.py | 0004, 0007, 0064 |
+| backend/tests/loop/test_runner.py | 0004, 0064 |
+| backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0051, 0064 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_models.py | 0001, 0024, 0051, 0053, 0054 |
-| backend/tests/test_run_swebench_closed_loop.py | 0044, 0047 |
-| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050 |
-| backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042 |
-| backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042 |
+| backend/tests/test_run_auditable_experiment.py | 0063, 0064 |
+| backend/tests/test_run_swebench_closed_loop.py | 0044, 0047, 0064 |
+| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050, 0063 |
+| backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042, 0064 |
+| backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042, 0063, 0064 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048, 0053 |
 | backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
 | backend/tests/user/sim/test_docker_seed_source.py | 0044, 0051 |
@@ -1329,7 +1380,7 @@ graph LR
 | backend/tests/user/sim/test_state.py | 0005, 0012, 0037 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
-| backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051, 0054 |
+| backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051, 0054, 0064 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
 | frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041 |
@@ -3214,4 +3265,67 @@ graph LR
     v_T1_1["T1 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
+```
+
+### 0063 轻量交付前置与软调度（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 需求侧提案分组与并行 Designer"]
+    nT2["T2 交付侧有界前置与软调度"]
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+```
+
+### 0064 阶段级可恢复实验运行（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 持久化恢复状态与对账原语"]
+    nT2["T2 阶段化 Orchestrator 与交付恢复"]
+    nT3["T3 用户会话工作项级恢复"]
+    nT4["T4 Triage 与 Divergent 第一拍恢复"]
+    nT5["T5 Designer 与 Owner 输出先存后应用"]
+    nT6["T6 Fresh/resume 入口与故障矩阵验收"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT1 --> nT5
+    nT2 --> nT5
+    nT4 --> nT5
+    nT1 --> nT6
+    nT2 --> nT6
+    nT3 --> nT6
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_pending;
 ```

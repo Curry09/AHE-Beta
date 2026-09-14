@@ -29,6 +29,7 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `designer.py` | Synthesize 驱动器。 |
 | `divergent.py` | Divergent（能力发现）驱动器。 |
 | `evidence_contract.py` | Goal-aware evidence contracts for demand-side roles. |
+| `grouped_designer.py` | Group a proposal snapshot once, then give each group to one existing Designer. |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
 | `observation_provider.py` | Spec-0059: discover and read artifact-owned diagnostic files with ordinary tools. |
 | `owner.py` | Owner 驱动器：把 proposal 无损打包并交接给 OpenAgents。 |
@@ -215,6 +216,7 @@ graph LR
     nauto_designer_designer_designer["designer.designer"]
     nauto_designer_designer_divergent["designer.divergent"]
     nauto_designer_designer_evidence_contract["designer.evidence_contract"]
+    nauto_designer_designer_grouped_designer["designer.grouped_designer"]
     nauto_designer_designer_issue_schema["designer.issue_schema"]
     nauto_designer_designer_observation_provider["designer.observation_provider"]
     nauto_designer_designer_owner["designer.owner"]
@@ -339,6 +341,10 @@ graph LR
     nauto_designer_designer_divergent --> nauto_designer_user_session_store
     nauto_designer_designer_evidence_contract --> nauto_designer_models
     nauto_designer_designer_evidence_contract --> nauto_designer_usage
+    nauto_designer_designer_grouped_designer --> nauto_designer_designer_designer
+    nauto_designer_designer_grouped_designer --> nauto_designer_designer_issue_schema
+    nauto_designer_designer_grouped_designer --> nauto_designer_designer_proposal_view
+    nauto_designer_designer_grouped_designer --> nauto_designer_usage
     nauto_designer_designer_observation_provider --> nauto_designer_designer_evidence_contract
     nauto_designer_designer_observation_provider --> nauto_designer_invocation
     nauto_designer_designer_observation_provider --> nauto_designer_user_session_store
