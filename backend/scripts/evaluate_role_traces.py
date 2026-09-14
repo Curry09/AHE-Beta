@@ -14,15 +14,15 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from auto_designer.designer.evidence_contract import (
+    project_for_role,
+    validate_envelope,
+)
 from auto_designer.designer.role_contract import (
     validate_owner,
     validate_pm,
     validate_synthesis,
     validate_triage,
-)
-from auto_designer.designer.evidence_contract import (
-    project_for_role,
-    validate_envelope,
 )
 
 

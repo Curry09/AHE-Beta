@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -107,7 +107,7 @@ def main() -> None:
     parser.add_argument("--title")
     args = parser.parse_args()
     export(args.source, args.output, args.title)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     index_path = args.output / "index.json"
     existing = read_json(index_path) if index_path.exists() else {"experiments": []}
     entry = {
