@@ -8,8 +8,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from auto_designer.designer import issue_schema as sc
 from auto_designer.designer.divergent import Divergent, DivergentOutcome
+from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
 from auto_designer.models import (
     FeelingScore,
     IssueDraft,
@@ -19,6 +22,7 @@ from auto_designer.models import (
     Transcript,
 )
 from auto_designer.tracker.fake import FakeTracker
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
 
 
@@ -60,8 +64,10 @@ class _StubDivergent(Divergent):
         self._canned = canned
         self.seen_trend: list = []
         self.seen_reference: list = []
+        self.agent_calls = 0
 
     def _run_agent(self, *, trend: list, reference: list) -> str:
+        self.agent_calls += 1
         self.seen_trend = trend
         self.seen_reference = reference
         return self._canned
@@ -74,6 +80,36 @@ def _divergent(tmp_path: Path, tracker: FakeTracker, canned: str, **kw) -> _Stub
     return _StubDivergent(
         tracker, store, str(tmp_path / "harness"), str(tmp_path / "agent"), canned=canned, **kw
     )
+
+
+def _recovery(tmp_path: Path) -> RecoveryStore:
+    store = RecoveryStore.initialize(
+        root=tmp_path / "recovery",
+        identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
+    )
+    store.freeze_round(round_no=1, user_sha="user", plan=[])
+    started = operation_key("round-started")
+    store.begin_unit(
+        round_no=1,
+        stage="round_started",
+        key=started,
+        input_value={},
+        expected_postconditions={"completed": True},
+    )
+    store.complete_unit(round_no=1, stage="round_started", key=started)
+    store.complete_stage(round_no=1, stage="round_started")
+    users = operation_key("users")
+    store.begin_unit(
+        round_no=1,
+        stage="users",
+        key=users,
+        input_value={},
+        expected_postconditions={"completed": True},
+        dependencies=("round_started",),
+    )
+    store.complete_unit(round_no=1, stage="users", key=users)
+    store.complete_stage(round_no=1, stage="users")
+    return store
 
 
 def test_submit_divergent_yaml_matches_contract() -> None:
@@ -155,3 +191,32 @@ def test_divergent_no_submit_is_noop(tmp_path: Path) -> None:
     tracker = FakeTracker()
     out = _divergent(tmp_path, tracker, "散文，没调 submit").propose_once()
     assert out.count == 0
+
+
+def test_recovery_reuses_output_and_reconciles_created_proposal(tmp_path: Path) -> None:
+    class CrashAfterCreateTracker(FakeTracker):
+        crashed = False
+
+        def create_issue_once(self, draft, *, operation_key):
+            ref = super().create_issue_once(draft, operation_key=operation_key)
+            if not self.crashed:
+                self.crashed = True
+                raise RuntimeError("injected after issue create")
+            return ref
+
+    tracker = CrashAfterCreateTracker()
+    recovery = _recovery(tmp_path)
+    divergent = _divergent(
+        tmp_path,
+        tracker,
+        _submit([{"title": "状态交接产品化", **_pm_artifact()}]),
+        recovery=recovery,
+    )
+    with bind_usage_context(round_no=1, operation="divergent-worker-0"):
+        with pytest.raises(RuntimeError, match="injected"):
+            divergent.propose_once()
+    with bind_usage_context(round_no=1, operation="divergent-worker-0"):
+        outcome = divergent.propose_once()
+    assert divergent.agent_calls == 1
+    assert outcome.count == 1
+    assert len(tracker.list_open_issues()) == 1

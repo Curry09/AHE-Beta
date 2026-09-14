@@ -128,6 +128,11 @@ class Orchestrator:
         # Spec-0064/T2: when present, run_round delegates to the durable stage
         # machine.  None preserves the established in-process behavior.
         self._recovery = recovery
+        if recovery is not None:
+            for role in [*self._triagers, *self._divergents, *self._designers, self._owner]:
+                bind_recovery = getattr(role, "bind_recovery", None)
+                if callable(bind_recovery):
+                    bind_recovery(recovery)
 
     @property
     def recovery_enabled(self) -> bool:
@@ -754,7 +759,8 @@ class Orchestrator:
             if unit.get("status") == "completed":
                 continue
             try:
-                result = call()
+                with bind_usage_context(operation=key, role=stage, round_no=round_no):
+                    result = call()
                 recovery.save_output(
                     round_no=round_no,
                     stage=stage,

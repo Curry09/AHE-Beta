@@ -7,10 +7,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from auto_designer.designer import issue_schema as sc
 from auto_designer.designer.triage import TriageOutcome, Triager, _proposal_labels
+from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.fake import FakeTracker
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
 
 
@@ -45,6 +49,36 @@ def _report(tracker: FakeTracker, title: str, kind: str = "bug") -> int:
 def _submit(dispositions: list) -> str:
     """打成 submit_triage 的返回形状（stop tool binding 的输出）。"""
     return json.dumps({"dispositions": dispositions}, ensure_ascii=False)
+
+
+def _recovery(tmp_path: Path) -> RecoveryStore:
+    store = RecoveryStore.initialize(
+        root=tmp_path / "recovery",
+        identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
+    )
+    store.freeze_round(round_no=1, user_sha="user", plan=[])
+    started = operation_key("round-started")
+    store.begin_unit(
+        round_no=1,
+        stage="round_started",
+        key=started,
+        input_value={},
+        expected_postconditions={"completed": True},
+    )
+    store.complete_unit(round_no=1, stage="round_started", key=started)
+    store.complete_stage(round_no=1, stage="round_started")
+    key = operation_key("users", "empty")
+    store.begin_unit(
+        round_no=1,
+        stage="users",
+        key=key,
+        input_value={},
+        expected_postconditions={"completed": True},
+        dependencies=("round_started",),
+    )
+    store.complete_unit(round_no=1, stage="users", key=key)
+    store.complete_stage(round_no=1, stage="users")
+    return store
 
 
 def _accept(n: int, *, kind: str = "bug", priority: str = "P1", fields: dict | None = None) -> dict:
@@ -265,3 +299,46 @@ def test_proposal_labels_keep_attributes_only() -> None:
     cur = ["bug", sc.REPORT, "round-3", "misc"]
     out = _proposal_labels(cur, "feature", "P0")
     assert set(out) == {"misc", "round-3", "feature", sc.PROPOSAL, sc.FROM_TRIAGE, "P0"}
+
+
+def test_recovery_replays_saved_triage_output_without_model_or_duplicate_comment(tmp_path) -> None:
+    tracker = FakeTracker()
+    number = _report(tracker, "recover me")
+    frozen_issue = tracker.list_open_issues()[0]
+    recovery = _recovery(tmp_path)
+
+    class CrashBeforeCompletion(_StubTriager):
+        crashed = False
+
+        def _complete_recovery_item(self, **kwargs) -> None:
+            if not self.crashed:
+                self.crashed = True
+                raise RuntimeError("injected after tracker apply")
+            return super()._complete_recovery_item(**kwargs)
+
+    first = CrashBeforeCompletion(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([_accept(number)]),
+        recovery=recovery,
+    )
+    with bind_usage_context(round_no=1, operation="triage-worker-0"):
+        with pytest.raises(RuntimeError, match="injected"):
+            first.triage_once(pending=[frozen_issue])
+    assert sc.PROPOSAL in tracker.issue(number)["labels"]
+
+    resumed = _StubTriager(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned="must not be used",
+        recovery=recovery,
+    )
+    with bind_usage_context(round_no=1, operation="triage-worker-0"):
+        outcome = resumed.triage_once(pending=[frozen_issue])
+    assert outcome.accepted == [number]
+    assert resumed.agent_calls == 0
+    assert len(tracker.issue(number)["comments"]) == 1

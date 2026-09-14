@@ -43,8 +43,9 @@ from auto_designer.designer.issue_schema import (
     validate as schema_validate,
 )
 from auto_designer.designer.role_contract import validate_triage
+from auto_designer.loop.recovery import RecoveryConflictError, RecoveryStore, operation_key
 from auto_designer.tracker.base import IssueTracker
-from auto_designer.usage import bind_usage_context
+from auto_designer.usage import bind_usage_context, current_usage_context
 from auto_designer.user.session_store import SessionStore
 
 _TRIAGE_TIMEOUT = 900
@@ -147,6 +148,7 @@ class Triager:
         agent_def_dir: str,
         on_status: StatusFn | None = None,
         on_event: Callable[[str, str], None] | None = None,
+        recovery: RecoveryStore | None = None,
     ) -> None:
         self._tracker = tracker
         self._store = store
@@ -154,6 +156,11 @@ class Triager:
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
         self._on_event = on_event
+        self._recovery = recovery
+
+    def bind_recovery(self, recovery: RecoveryStore) -> None:
+        """Attach the experiment ledger after role construction."""
+        self._recovery = recovery
 
     def triage_once(
         self, pending: list | None = None, shard: tuple[int, int] | None = None
@@ -178,32 +185,97 @@ class Triager:
         details: list[str] = []
         # 每个 report 拥有独立模型上下文；相邻报告不能污染问题定义或证据判断。
         for issue in pending:
+            recovery_key = self._recovery_key(issue.number)
+            recovery_unit = self._begin_recovery_item(issue=issue, key=recovery_key)
+            if recovery_unit is not None and recovery_unit.get("status") == "completed":
+                self._restore_completed_item(
+                    unit=recovery_unit, issue_number=issue.number, outcome=outcome
+                )
+                continue
             session_id = self._session_id_for_issue(issue.number)
             from auto_designer.observations.grants import grant
 
-            grant(store=self._store, issue=issue.number, sessions={session_id} if session_id else set())
-            with bind_usage_context(
-                session_id=session_id or "unavailable",
-                interaction_id=session_id or f"report-{issue.number}",
-                agent_id=f"triage-report-{issue.number}",
-            ):
-                result_text = self._run_agent(pending=[issue])
-            details.append(result_text or "")
-            dispositions = read_submit(result_text, "dispositions")
+            grant(
+                store=self._store,
+                issue=issue.number,
+                sessions={session_id} if session_id else set(),
+            )
+            if recovery_unit is not None and recovery_unit.get("output_digest"):
+                saved = self._recovery.read_output(
+                    round_no=self._round_no(),
+                    stage="triage",
+                    key=recovery_key,
+                )
+                dispositions = list(saved.get("dispositions") or [])
+                details.append("[replayed saved triage output]")
+            else:
+                with bind_usage_context(
+                    session_id=session_id or "unavailable",
+                    interaction_id=session_id or f"report-{issue.number}",
+                    agent_id=f"triage-report-{issue.number}",
+                ):
+                    result_text = self._run_agent(pending=[issue])
+                details.append(result_text or "")
+                dispositions = read_submit(result_text, "dispositions")
             if dispositions is None:
                 outcome.failed[issue.number] = "missing-submit"
+                self._fail_recovery_item(
+                    key=recovery_key,
+                    error="triage model output did not contain dispositions",
+                )
                 continue
+            valid_dispositions: list[dict] = []
             for d in dispositions:
+                try:
+                    target_number = int(d.get("issue"))
+                except (TypeError, ValueError):
+                    target_number = -1
+                if target_number != issue.number:
+                    continue
                 violations = validate_triage(d, report_number=issue.number)
                 if violations:
                     outcome.warnings.setdefault(issue.number, []).extend(v.code for v in violations)
                     outcome.failed[issue.number] = ",".join(v.code for v in violations)
                     continue
+                valid_dispositions.append(dict(d))
+            if not valid_dispositions and issue.number not in outcome.failed:
+                outcome.failed[issue.number] = "missing-report-disposition"
+            if outcome.failed.get(issue.number):
+                self._fail_recovery_item(
+                    key=recovery_key,
+                    error=outcome.failed[issue.number],
+                )
+                continue
+            if (
+                self._recovery is not None
+                and recovery_unit is not None
+                and not recovery_unit.get("output_digest")
+            ):
+                self._recovery.save_output(
+                    round_no=self._round_no(),
+                    stage="triage",
+                    key=recovery_key,
+                    output={"dispositions": valid_dispositions},
+                )
+            for d in valid_dispositions:
                 try:
                     outcome.artifacts[issue.number] = dict(d)
-                    self._apply(d, by_number={issue.number: issue}, outcome=outcome)
+                    self._apply(
+                        d,
+                        by_number={issue.number: issue},
+                        outcome=outcome,
+                        operation_prefix=recovery_key if self._recovery is not None else None,
+                    )
                 except Exception as exc:  # noqa: BLE001
                     outcome.failed[issue.number] = f"{type(exc).__name__}: {exc}"
+            if issue.number in outcome.failed:
+                self._fail_recovery_item(key=recovery_key, error=outcome.failed[issue.number])
+                continue
+            self._complete_recovery_item(
+                key=recovery_key,
+                issue_number=issue.number,
+                outcome=outcome,
+            )
 
         self._emit(
             running=False,
@@ -214,7 +286,90 @@ class Triager:
             ),
             detail="\n".join(details) or None,
         )
+        if self._recovery is not None and outcome.failed:
+            raise RecoveryConflictError(f"triage items remain incomplete: {sorted(outcome.failed)}")
         return outcome
+
+    def _round_no(self) -> int:
+        round_no = current_usage_context().round_no
+        if round_no is None:
+            raise RecoveryConflictError("triage recovery requires a bound round number")
+        return round_no
+
+    def _recovery_key(self, issue_number: int) -> str:
+        scope = current_usage_context().operation or "triage"
+        return operation_key(scope, "report", issue_number)
+
+    def _begin_recovery_item(self, *, issue, key: str) -> dict | None:
+        if self._recovery is None:
+            return None
+        return self._recovery.begin_unit(
+            round_no=self._round_no(),
+            stage="triage",
+            key=key,
+            input_value={"report": issue.to_dict()},
+            expected_postconditions={"completed": True},
+            dependencies=("users",),
+        )
+
+    def _fail_recovery_item(self, *, key: str, error: str) -> None:
+        if self._recovery is not None:
+            self._recovery.fail_unit(
+                round_no=self._round_no(),
+                stage="triage",
+                key=key,
+                error=error,
+            )
+
+    def _complete_recovery_item(
+        self, *, key: str, issue_number: int, outcome: TriageOutcome
+    ) -> None:
+        if self._recovery is None:
+            return
+        bucket = next(
+            (
+                name
+                for name, values in (
+                    ("accepted", outcome.accepted),
+                    ("rejected", outcome.rejected),
+                    ("needs_info", outcome.needs_info),
+                )
+                if issue_number in values
+            ),
+            "handled",
+        )
+        self._recovery.complete_unit(
+            round_no=self._round_no(),
+            stage="triage",
+            key=key,
+            observed_postconditions={
+                "completed": True,
+                "issue": issue_number,
+                "bucket": bucket,
+                "warnings": list(outcome.warnings.get(issue_number) or []),
+            },
+        )
+
+    def _restore_completed_item(
+        self, *, unit: dict, issue_number: int, outcome: TriageOutcome
+    ) -> None:
+        observed = unit.get("observed_postconditions") or {}
+        bucket = str(observed.get("bucket") or "")
+        values = getattr(outcome, bucket, None)
+        if isinstance(values, list):
+            values.append(issue_number)
+        warnings = list(observed.get("warnings") or [])
+        if warnings:
+            outcome.warnings[issue_number] = warnings
+        if unit.get("output_digest") and self._recovery is not None:
+            saved = self._recovery.read_output(
+                round_no=self._round_no(),
+                stage="triage",
+                key=self._recovery_key(issue_number),
+            )
+            dispositions = list(saved.get("dispositions") or [])
+            if dispositions:
+                outcome.artifacts[issue_number] = dict(dispositions[0])
 
     def snapshot_pending(self) -> list:
         """Return one stable, sorted report snapshot for orchestrator sharding.
@@ -234,7 +389,14 @@ class Triager:
                 return str(entry.get("session_id") or "") or None
         return None
 
-    def _apply(self, d: dict, *, by_number: dict, outcome: TriageOutcome) -> None:
+    def _apply(
+        self,
+        d: dict,
+        *,
+        by_number: dict,
+        outcome: TriageOutcome,
+        operation_prefix: str | None = None,
+    ) -> None:
         # d 已由 nexau input_schema 校验（issue/disposition 必填、三值 enum、fields 键锁定）。
         try:
             num = int(d.get("issue"))
@@ -249,20 +411,32 @@ class Triager:
             kind = str(d.get("kind", "")).strip().lower()
             if kind not in USER_KINDS:  # 非法 kind → 当信息不足处理（下一轮重来）
                 self._decline(
-                    issue, "信息不足", f"triage 给了非法 kind {kind!r}", outcome.needs_info
+                    issue,
+                    "信息不足",
+                    f"triage 给了非法 kind {kind!r}",
+                    outcome.needs_info,
+                    operation_prefix=operation_prefix,
                 )
                 return
             fields = _fields_by_label_to_key(kind, d.get("fields") or {})
             proposal_title = str(d.get("proposal_title", "")).strip()
             if not proposal_title:
                 self._decline(
-                    issue, "信息不足", "triage 未给任务无关 proposal_title", outcome.needs_info
+                    issue,
+                    "信息不足",
+                    "triage 未给任务无关 proposal_title",
+                    outcome.needs_info,
+                    operation_prefix=operation_prefix,
                 )
                 return
             errs = schema_validate(kind=kind, fields=fields, section="triage")
             if errs:  # 规范化字段没填全 → 降级 needs_info（保证升上去的提案定位完整）
                 self._decline(
-                    issue, "信息不足", f"triage 定位不全：{'；'.join(errs)}", outcome.needs_info
+                    issue,
+                    "信息不足",
+                    f"triage 定位不全：{'；'.join(errs)}",
+                    outcome.needs_info,
+                    operation_prefix=operation_prefix,
                 )
                 return
             priority = str(d.get("priority", "")).strip().upper()  # 建议值；Owner 准入时可改
@@ -273,6 +447,9 @@ class Triager:
                 num,
                 f"## 原始用户报告（案例证据，非实现对象）\n\n"
                 f"**原始标题：** {issue.title}\n\n{issue.body or '（空）'}",
+                operation_key=(
+                    operation_key(operation_prefix, "original-report") if operation_prefix else None
+                ),
             ):
                 outcome.warnings.setdefault(num, []).append("原始报告审计评论写入失败")
             self._tracker.update_issue(
@@ -287,24 +464,53 @@ class Triager:
             outcome.accepted.append(num)
 
         elif disp == "reject":
-            self._decline(issue, "驳回", str(d.get("reason", "")).strip(), outcome.rejected)
+            self._decline(
+                issue,
+                "驳回",
+                str(d.get("reason", "")).strip(),
+                outcome.rejected,
+                operation_prefix=operation_prefix,
+            )
         elif disp == "needs_info":
-            self._decline(issue, "信息不足", str(d.get("reason", "")).strip(), outcome.needs_info)
+            self._decline(
+                issue,
+                "信息不足",
+                str(d.get("reason", "")).strip(),
+                outcome.needs_info,
+                operation_prefix=operation_prefix,
+            )
         # 未知 disposition：忽略（票仍在 report 平面，下轮再分诊）
 
-    def _decline(self, issue, head: str, reason: str, bucket: list[int]) -> None:
+    def _decline(
+        self,
+        issue,
+        head: str,
+        reason: str,
+        bucket: list[int],
+        *,
+        operation_prefix: str | None = None,
+    ) -> None:
         """declined 终态 + 写原因 + 关闭。"""
         self._tracker.transition_issue(
             issue.number,
             state="closed",
             labels=_declined_labels(list(issue.labels)),
         )
-        self._safe_comment(issue.number, f"{head}：{reason or '（未给原因）'}")
+        self._safe_comment(
+            issue.number,
+            f"{head}：{reason or '（未给原因）'}",
+            operation_key=(
+                operation_key(operation_prefix, "decision-comment") if operation_prefix else None
+            ),
+        )
         bucket.append(issue.number)
 
-    def _safe_comment(self, number: int, body: str) -> bool:
+    def _safe_comment(self, number: int, body: str, *, operation_key: str | None = None) -> bool:
         try:
-            self._tracker.add_comment(number, body)
+            if operation_key is not None:
+                self._tracker.add_comment_once(number, body, operation_key=operation_key)
+            else:
+                self._tracker.add_comment(number, body)
         except Exception:  # noqa: BLE001  单条挂链失败不拖垮其余
             return False
         return True
@@ -336,8 +542,10 @@ class Triager:
         # triage 只做「单条规范化」：只给它本批 report + 只读代码 + 按需拉的单局轨迹（含那局体感分，
         # 供建议优先级）。不喂判重参照/聚合 runtime_agg/全局体感曲线——跨提案吸收归 Designer、全局归 synthesize。
         issue = pending[0] if pending else None
-        triage_evidence = self._evidence_for_issue(issue) if issue is not None else project_for_role(
-            build_evidence_envelope(None), "triage"
+        triage_evidence = (
+            self._evidence_for_issue(issue)
+            if issue is not None
+            else project_for_role(build_evidence_envelope(None), "triage")
         )
         msg = (
             "以下是本批待处理的原始报告。逐条确认 kind，按需读取 harness 源码，并以 issue 号检索"

@@ -65,7 +65,7 @@ tasks:
     acceptance: 并行用户任意部分完成后恢复只补跑缺失 session；同一 session/index/issue 不重复；进行中 workspace 可重建，已完成会话的体感、issue 引用与审计内容保持字节级稳定。
   - id: T4
     title: Triage 与 Divergent 第一拍恢复
-    status: in-progress
+    status: done
     priority: P0
     tags: []
     depends-on:
@@ -82,7 +82,7 @@ tasks:
     acceptance: 恢复不重新切片、不吸收快照后新增 report；已处理票和已创建 PM proposal 不重复；部分应用可补齐，输入漂移或矛盾远端状态明确 blocked。
   - id: T5
     title: Designer 与 Owner 输出先存后应用
-    status: pending
+    status: in-progress
     priority: P0
     tags: []
     depends-on:
