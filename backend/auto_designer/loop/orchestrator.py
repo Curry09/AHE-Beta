@@ -440,6 +440,22 @@ class Orchestrator:
                 continue
             workspace_dir: WorkspaceRuntime | None = None
             try:
+                load_completed = getattr(self._run_session, "load_completed_session", None)
+                existing = load_completed(key) if callable(load_completed) else None
+                if existing is not None:
+                    recovery.save_output(
+                        round_no=round_no,
+                        stage="users",
+                        key=key,
+                        output=_result_payload(existing),
+                    )
+                    recovery.complete_unit(
+                        round_no=round_no,
+                        stage="users",
+                        key=key,
+                        observed_postconditions={"completed": True, "session_id": key},
+                    )
+                    continue
                 if scenario.workspace is not None:
                     workspace_dir = as_runtime(
                         materialize_workspace(scenario.workspace), owns_tmp=True
@@ -448,12 +464,13 @@ class Orchestrator:
                 else:
                     workspace_dir = make_empty_runtime()
                 harness = self._launcher.launch(user_sha, workspace_dir=workspace_dir)
-                result = self._run_session(
-                    persona,
-                    scenario,
-                    harness,
-                    workspace_dir=workspace_dir,
-                )
+                with bind_usage_context(session_id=key, round_no=round_no):
+                    result = self._run_session(
+                        persona,
+                        scenario,
+                        harness,
+                        workspace_dir=workspace_dir,
+                    )
                 recovery.save_output(
                     round_no=round_no,
                     stage="users",

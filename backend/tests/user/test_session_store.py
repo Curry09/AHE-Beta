@@ -14,7 +14,7 @@ from auto_designer.models import (
     Transcript,
     Turn,
 )
-from auto_designer.user.session_store import SessionStore
+from auto_designer.user.session_store import SessionConflictError, SessionStore
 
 
 def _session(n_issues: int = 1) -> Session:
@@ -111,13 +111,45 @@ def test_load_missing_raises(tmp_path) -> None:
         SessionStore(tmp_path).load("nope")
 
 
-def test_resave_overwrites_full_index_duplicates(tmp_path) -> None:
+def test_resave_same_content_is_idempotent_index_upsert(tmp_path) -> None:
     store = SessionStore(tmp_path)
     s = _session()
     store.save(s)
     store.save(s)
-    # 全量被覆盖（仍单文件），索引不去重 → 两条
-    assert len(store.index()) == 2
+    assert len(store.index()) == 1
+
+
+def test_stable_session_id_rejects_different_content(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    first = _session()
+    store.save(first)
+    changed = _session(n_issues=0)
+    changed.session_id = first.session_id
+    with pytest.raises(SessionConflictError, match="different content"):
+        store.save(changed)
+    assert store.load(first.session_id) == first
+
+
+def test_reconcile_repairs_missing_or_duplicate_index_without_rewriting_session(tmp_path) -> None:
+    import json
+
+    store = SessionStore(tmp_path)
+    session = _session()
+    store.save(session)
+    full = tmp_path / f"{session.session_id}.json"
+    original = full.read_bytes()
+    row = store.index()[0]
+    (tmp_path / "index.json").write_text(json.dumps([row, row]), encoding="utf-8")
+    assert store.reconcile(session.session_id) == session
+    assert store.index() == [row]
+    assert full.read_bytes() == original
+
+
+def test_reconcile_missing_session_returns_none_and_ids_are_path_safe(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    assert store.reconcile("missing") is None
+    with pytest.raises(ValueError, match="invalid session id"):
+        store.load("../escape")
 
 
 def test_concurrent_saves_lose_no_index_entries(tmp_path) -> None:

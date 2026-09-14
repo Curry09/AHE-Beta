@@ -18,6 +18,7 @@ from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
 from auto_designer.evaluation.swebench import SWEbenchEvaluator, derive_accept_validity
 from auto_designer.harness.connector import HarnessConnector
 from auto_designer.harness.interface import HarnessInterface
+from auto_designer.loop.recovery import operation_key
 from auto_designer.models import (
     FeelingScore,
     IssueDraft,
@@ -31,7 +32,7 @@ from auto_designer.models import (
     Turn,
 )
 from auto_designer.tracker.base import IssueTracker
-from auto_designer.usage import bind_usage_context
+from auto_designer.usage import bind_usage_context, current_usage_context
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.dimensions import Persona as SimPersona
@@ -230,19 +231,32 @@ def _issue_draft(res: SessionResult) -> IssueDraft:
 
 
 def _flush_issues(
-    tracker: IssueTracker, res: SessionResult, *, round_no: int | None = None
+    tracker: IssueTracker,
+    res: SessionResult,
+    *,
+    round_no: int | None = None,
+    session_id: str | None = None,
 ) -> list:
     """中途 report_issue notes + 终结 issue_artifact 一并建单（顺序：先中途、后收场）。
 
     round_no 由编排层透传（Spec-0025/T6）：给每条 raw issue 盖 `round-N`，供增量 triage 与观测曲线。
     """
     refs = []
-    for body in res.issue_notes:
-        refs.append(tracker.create_issue(_issue_draft_from_body(body, round_no=round_no)))
+    bodies = list(res.issue_notes)
     if res.issue_artifact:
-        refs.append(
-            tracker.create_issue(_issue_draft_from_body(res.issue_artifact, round_no=round_no))
-        )
+        bodies.append(res.issue_artifact)
+    create_once = getattr(tracker, "create_issue_once", None)
+    for index, body in enumerate(bodies):
+        draft = _issue_draft_from_body(body, round_no=round_no)
+        if session_id and callable(create_once):
+            refs.append(
+                create_once(
+                    draft,
+                    operation_key=operation_key("session-issue", session_id, index),
+                )
+            )
+        else:
+            refs.append(tracker.create_issue(draft))
     return refs
 
 
@@ -268,9 +282,9 @@ def make_sim_run_session_fn(
     标签（供增量 triage 与观测曲线）。None（或返回 None）则不盖轮号，兼容旧调用。
     """
 
-    observation_root = Path(os.environ.get(
-        "AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations")
-    ))
+    observation_root = Path(
+        os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations"))
+    )
     from auto_designer.observations.publication import preflight_root
 
     preflight_root(observation_root)
@@ -290,7 +304,9 @@ def make_sim_run_session_fn(
         workspace_dir: Workspace | None = None,
     ) -> Session:
         sim_persona = sim_personas[persona.identity]
-        session_id = uuid.uuid4().hex
+        # Spec-0064/T3: the staged orchestrator binds a stable operation id.
+        # Direct/legacy callers retain a random per-session identity.
+        session_id = current_usage_context().session_id or uuid.uuid4().hex
         client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
 
         # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
@@ -413,7 +429,12 @@ def make_sim_run_session_fn(
         )
 
         round_no = round_provider() if round_provider is not None else None
-        issue_refs = _flush_issues(tracker, res, round_no=round_no)
+        issue_refs = _flush_issues(
+            tracker,
+            res,
+            round_no=round_no,
+            session_id=session_id,
+        )
         feel = res.feeling or res.feeling_derived
         session = Session(
             persona=persona,
@@ -446,4 +467,7 @@ def make_sim_run_session_fn(
             on_turn(persona.identity, sim_persona, res, False, session_id=session.session_id)
         return session
 
+    # The orchestrator uses this read path to reconcile a crash after SessionStore
+    # committed but before the recovery completion marker was published.
+    run.load_completed_session = store.reconcile
     return run

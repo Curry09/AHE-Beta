@@ -795,3 +795,34 @@ def test_completed_recovery_round_is_an_idempotent_skip(tmp_path) -> None:
     assert calls == ["user"]
     round_state = orch._recovery.round_state(round_no=1)
     assert set(round_state["stages"]) == {"round_started", "users", "round_sealed"}
+
+
+def test_recovery_users_reconcile_session_store_and_run_only_missing_items(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    calls: list[str] = []
+    reconciled = 0
+
+    def run_user(persona, scenario, harness, *, workspace_dir=None):
+        calls.append(scenario.description)
+        return {"session_id": current_usage_context().session_id}
+
+    def load_completed(session_id):
+        nonlocal reconciled
+        reconciled += 1
+        return {"session_id": session_id} if reconciled == 1 else None
+
+    run_user.load_completed_session = load_completed
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[
+            (_persona(), SeedScenario(description="already-saved")),
+            (_persona(), SeedScenario(description="missing")),
+        ],
+        run_session_fn=run_user,
+        initial_ref="main",
+        recovery=_recovery(tmp_path),
+    )
+    orch.run_round("main", round_no=1, deliver=False)
+    assert reconciled == 2
+    assert calls == ["missing"]

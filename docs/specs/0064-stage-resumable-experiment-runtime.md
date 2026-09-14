@@ -48,7 +48,7 @@ tasks:
     acceptance: 从每个阶段边界及 delivery inflight/blocked 恢复只执行合法后继；末轮跳过需求交付；完成轮幂等跳过；阶段依赖、远端 main 冲突和失败终态 fail-closed。
   - id: T3
     title: 用户会话工作项级恢复
-    status: in-progress
+    status: done
     priority: P0
     tags: []
     depends-on:
@@ -65,7 +65,7 @@ tasks:
     acceptance: 并行用户任意部分完成后恢复只补跑缺失 session；同一 session/index/issue 不重复；进行中 workspace 可重建，已完成会话的体感、issue 引用与审计内容保持字节级稳定。
   - id: T4
     title: Triage 与 Divergent 第一拍恢复
-    status: pending
+    status: in-progress
     priority: P0
     tags: []
     depends-on:

@@ -468,8 +468,8 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0063 | 0063/T2 | 交付侧有界前置与软调度 | done | — | CLAUDE.md<br>backend/tests/test_run_vigil.py<br>OpenAgents/openagents/runtime/preflight.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/tests/test_preflight.py<br>OpenAgents/tools/preflight_stress.py |
 | 0064 | 0064/T1 | 持久化恢复状态与对账原语 | done | — | backend/auto_designer/loop/recovery.py<br>backend/auto_designer/loop/run_state.py<br>backend/auto_designer/loop/checkpoint.py<br>backend/auto_designer/invocation.py<br>backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/fake.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_run_state.py<br>backend/tests/loop/test_checkpoint.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
 | 0064 | 0064/T2 | 阶段化 Orchestrator 与交付恢复 | done | T1 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/runner.py<br>backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_runner.py<br>backend/tests/loop/test_round_gate.py |
-| 0064 | 0064/T3 | 用户会话工作项级恢复 | in-progress | T1, T2 | backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/test_session_store.py |
-| 0064 | 0064/T4 | Triage 与 Divergent 第一拍恢复 | pending | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/tests/designer/test_triage.py<br>backend/tests/designer/test_divergent_gate.py |
+| 0064 | 0064/T3 | 用户会话工作项级恢复 | done | T1, T2 | backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/test_session_store.py |
+| 0064 | 0064/T4 | Triage 与 Divergent 第一拍恢复 | in-progress | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/tests/designer/test_triage.py<br>backend/tests/designer/test_divergent_gate.py |
 | 0064 | 0064/T5 | Designer 与 Owner 输出先存后应用 | pending | T1, T2, T4 | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/tests/loop/test_designer.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_delivery_evidence.py |
 | 0064 | 0064/T6 | Fresh/resume 入口与故障矩阵验收 | pending | T1, T2, T3, T4, T5 | backend/run.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/manifest.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/e2e-stage-resume.sh<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_stage_resume_e2e.py<br>docs/audits/0064-stage-resume-validation.md |
 
@@ -3326,8 +3326,8 @@ graph LR
     classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
-    class v_T3_1 st_in_progress;
-    class v_T4_1 st_pending;
+    class v_T3_1 st_done;
+    class v_T4_1 st_in_progress;
     class v_T5_1 st_pending;
     class v_T6_1 st_pending;
 ```
