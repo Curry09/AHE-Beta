@@ -33,8 +33,10 @@ from auto_designer.designer.issue_schema import (
 )
 from auto_designer.designer.proposal_view import evidence_session_ids, format_proposal_list
 from auto_designer.designer.role_contract import render_synthesis_artifact, validate_synthesis
-from auto_designer.models import IssueDraft
+from auto_designer.loop.recovery import RecoveryConflictError, RecoveryStore, operation_key
+from auto_designer.models import IssueDraft, OpenIssue
 from auto_designer.tracker.base import IssueTracker
+from auto_designer.usage import current_usage_context
 from auto_designer.user.session_store import SessionStore
 
 # 向后兼容别名；现行业务术语为“结构提案”。
@@ -95,6 +97,7 @@ class Designer:
         on_status: StatusFn | None = None,
         on_event: Callable[[str, str], None] | None = None,
         round_provider: Callable[[], int | None] | None = None,
+        recovery: RecoveryStore | None = None,
     ) -> None:
         self._tracker = tracker
         self._store = store  # 体感曲线数据源（本地 SessionStore 索引）
@@ -108,51 +111,121 @@ class Designer:
         # Spec-0055/T4: set only for a single protocol-recovery call when the model
         # returns without invoking submit_rfcs; keep the normal prompt stable.
         self._force_submit_prompt = False
+        self._recovery = recovery
+
+    def bind_recovery(self, recovery: RecoveryStore) -> None:
+        """Attach the experiment ledger after role construction."""
+        self._recovery = recovery
 
     def propose_once(self) -> DesignOutcome:
         round_no = self._round_provider() if self._round_provider is not None else None
-        # Input isolation, not a prompt exception: PM products (including legacy
-        # and already-ready ones) never enter synthesis or its evidence scope.
-        backlog = filter_current_round(
-            (
-                i for i in self._tracker.list_open_issues()
-                if not {FROM_DIVERGENT, DIVERGENT}.intersection(i.labels)
-            ),
-            round_no=round_no,
+        recovery_key = self._recovery_key()
+        recovery_unit = (
+            self._recovery.unit(
+                round_no=self._recovery_round_no(), stage="designer", key=recovery_key
+            )
+            if self._recovery is not None
+            else None
         )
+        if recovery_unit is not None:
+            frozen = recovery_unit["input"]
+            backlog = [OpenIssue.from_dict(item) for item in frozen["backlog"]]
+            trend = [tuple(item) for item in frozen["trend"]]
+        else:
+            # Input isolation, not a prompt exception: PM products (including legacy
+            # and already-ready ones) never enter synthesis or its evidence scope.
+            backlog = filter_current_round(
+                (
+                    i
+                    for i in self._tracker.list_open_issues()
+                    if not {FROM_DIVERGENT, DIVERGENT}.intersection(i.labels)
+                ),
+                round_no=round_no,
+            )
+            trend = self._feeling_trend()
+        if self._recovery is not None:
+            recovery_unit = self._recovery.begin_unit(
+                round_no=self._recovery_round_no(),
+                stage="designer",
+                key=recovery_key,
+                input_value={
+                    "backlog": [item.to_dict() for item in backlog],
+                    "trend": [list(item) for item in trend],
+                },
+                expected_postconditions={"completed": True},
+                dependencies=("triage",),
+            )
+            if recovery_unit.get("status") == "completed":
+                observed = recovery_unit.get("observed_postconditions") or {}
+                return DesignOutcome(
+                    proposal_numbers=[int(n) for n in observed.get("proposal_numbers") or []],
+                    merged_numbers=[int(n) for n in observed.get("merged_numbers") or []],
+                    failed_merges={
+                        int(k): str(v) for k, v in (observed.get("failed_merges") or {}).items()
+                    },
+                    artifacts=[dict(item) for item in observed.get("artifacts") or []],
+                    rejected_proposals=[
+                        dict(item) for item in observed.get("rejected_proposals") or []
+                    ],
+                )
         # Spec-0029/T4：输入 = ready 工作队列 + 待准入提案索引（编排保证跑在本轮 triage 之后，
         # 索引因此含本轮新升的 from-triage 提案）。提案索引兼作「勿重复提」参照。
         ready = [i for i in backlog if plane(i.labels) == READY]
         proposals_open = [i for i in backlog if plane(i.labels) == PROPOSAL]
-        trend = self._feeling_trend()
         self._emit(
             running=True,
             status=f"综合中…（ready={len(ready)} · 待准入提案={len(proposals_open)}）",
         )
 
-        result_text = self._run_agent(
-            ready=ready, proposals=proposals_open, trend=trend, runtime=""
-        )
-        parsed = self._proposals_from_submit(result_text)
-        if read_submit(result_text, "proposals") is None:
-            # A prose answer is not a design result.  Give the model exactly one
-            # constrained recovery turn; the driver remains the authority and
-            # will persist an empty result if this also fails.
-            self._force_submit_prompt = True
-            try:
-                retry_text = self._run_agent(
-                    ready=ready, proposals=proposals_open, trend=trend, runtime=""
+        if recovery_unit is not None and recovery_unit.get("output_digest"):
+            saved = self._recovery.read_output(
+                round_no=self._recovery_round_no(), stage="designer", key=recovery_key
+            )
+            parsed = [
+                _Proposal(
+                    title=str(item["title"]),
+                    artifact=dict(item["artifact"]),
+                    covers=tuple(int(n) for n in item.get("covers") or []),
                 )
-            finally:
-                self._force_submit_prompt = False
-            parsed = self._proposals_from_submit(retry_text)
+                for item in saved.get("parsed") or []
+            ]
+            result_text = "[replayed saved designer output]"
+        else:
+            result_text = self._run_agent(
+                ready=ready, proposals=proposals_open, trend=trend, runtime=""
+            )
+            parsed = self._proposals_from_submit(result_text)
+            if read_submit(result_text, "proposals") is None:
+                # A prose answer is not a design result.  Give the model exactly one
+                # constrained recovery turn; the driver remains the authority and
+                # will persist an empty result if this also fails.
+                self._force_submit_prompt = True
+                try:
+                    retry_text = self._run_agent(
+                        ready=ready, proposals=proposals_open, trend=trend, runtime=""
+                    )
+                finally:
+                    self._force_submit_prompt = False
+                parsed = self._proposals_from_submit(retry_text)
+            if self._recovery is not None:
+                self._recovery.save_output(
+                    round_no=self._recovery_round_no(),
+                    stage="designer",
+                    key=recovery_key,
+                    output={
+                        "parsed": [
+                            {
+                                "title": proposal.title,
+                                "artifact": proposal.artifact,
+                                "covers": list(proposal.covers),
+                            }
+                            for proposal in parsed
+                        ]
+                    },
+                )
 
         # The same filtered backlog also bounds state transitions.
-        coverable = {
-            i.number: i
-            for i in backlog
-            if plane(i.labels) in (REPORT, PROPOSAL)
-        }
+        coverable = {i.number: i for i in backlog if plane(i.labels) in (REPORT, PROPOSAL)}
         visible_proposals = {i.number for i in [*ready, *proposals_open]}
         numbers: list[int] = []
         merged_numbers: list[int] = []
@@ -164,7 +237,7 @@ class Designer:
             self._tracker.ensure_labels(
                 [PROPOSAL, FROM_SYNTHESIZE] + ([round_name] if round_name else [])
             )
-        for prop in parsed:
+        for proposal_index, prop in enumerate(parsed):
             violations = validate_synthesis(prop.artifact, visible_proposals=visible_proposals)
             if violations:
                 rejected_proposals.append(
@@ -186,19 +259,31 @@ class Designer:
                 # 机器行 = Designer 吸收决定的单一真源（消费方：状态迁移、web 展示）。创建后不改写。
                 body = f"{body}\n\n{covers_line}"
             labels = [PROPOSAL, FROM_SYNTHESIZE] + ([round_name] if round_name else [])
-            ref = self._tracker.create_issue(
-                IssueDraft(title=str(prop.title), body=body, labels=labels)
-            )
+            draft = IssueDraft(title=str(prop.title), body=body, labels=labels)
+            proposal_key = operation_key(recovery_key, "proposal", proposal_index)
+            if self._recovery is not None:
+                ref = self._tracker.create_issue_once(draft, operation_key=proposal_key)
+            else:
+                ref = self._tracker.create_issue(draft)
             from auto_designer.observations.grants import authorized_sessions, grant
 
-            trusted_sessions = set().union(*(authorized_sessions(store=self._store, issue=n)
-                                             for n in source_ids))
+            trusted_sessions = set().union(
+                *(authorized_sessions(store=self._store, issue=n) for n in source_ids)
+            )
             grant(store=self._store, issue=ref.number, sessions=trusted_sessions)
             numbers.append(ref.number)
             for source_number in covers:
                 source = coverable[source_number]
                 try:
-                    self._merge_covered(source, into=ref.number)
+                    self._merge_covered(
+                        source,
+                        into=ref.number,
+                        operation_prefix=(
+                            operation_key(proposal_key, "source", source_number)
+                            if self._recovery is not None
+                            else None
+                        ),
+                    )
                 except Exception as exc:  # noqa: BLE001  单条来源失败不废目标提案
                     failed_merges[source_number] = f"{type(exc).__name__}: {exc}"
                 else:
@@ -216,15 +301,40 @@ class Designer:
             proposals=numbers,
             detail=(result_text or None),  # 最终报告全文（详情面板展示，不截断）
         )
-        return DesignOutcome(
+        result = DesignOutcome(
             proposal_numbers=numbers,
             merged_numbers=merged_numbers,
             failed_merges=failed_merges,
             artifacts=[dict(prop.artifact) for prop in parsed],
             rejected_proposals=rejected_proposals,
         )
+        if self._recovery is not None:
+            if failed_merges:
+                self._recovery.fail_unit(
+                    round_no=self._recovery_round_no(),
+                    stage="designer",
+                    key=recovery_key,
+                    error=f"source merges incomplete: {sorted(failed_merges)}",
+                )
+                raise RecoveryConflictError(
+                    f"designer source merges remain incomplete: {sorted(failed_merges)}"
+                )
+            self._recovery.complete_unit(
+                round_no=self._recovery_round_no(),
+                stage="designer",
+                key=recovery_key,
+                observed_postconditions={
+                    "completed": True,
+                    "proposal_numbers": numbers,
+                    "merged_numbers": merged_numbers,
+                    "failed_merges": {},
+                    "artifacts": [dict(prop.artifact) for prop in parsed],
+                    "rejected_proposals": rejected_proposals,
+                },
+            )
+        return result
 
-    def _merge_covered(self, issue, *, into: int) -> None:
+    def _merge_covered(self, issue, *, into: int, operation_prefix: str | None = None) -> None:
         """按 Designer 的 covers 决定整体吸收一个仍开放的来源。"""
         drop = {
             PROPOSAL,
@@ -241,7 +351,25 @@ class Designer:
         self._tracker.transition_issue(
             issue.number, state="closed", labels=list(dict.fromkeys(labels))
         )
-        self._safe_comment(issue.number, f"merged-into: #{int(into)}")
+        self._safe_comment(
+            issue.number,
+            f"merged-into: #{int(into)}",
+            operation_key=(
+                operation_key(operation_prefix, "merge-comment") if operation_prefix else None
+            ),
+        )
+
+    def _recovery_round_no(self) -> int:
+        value = current_usage_context().round_no
+        if value is None and self._round_provider is not None:
+            value = self._round_provider()
+        if type(value) is not int or value <= 0:
+            raise RecoveryConflictError("designer recovery requires a bound round number")
+        return value
+
+    def _recovery_key(self) -> str:
+        context = current_usage_context()
+        return operation_key(context.operation or "designer", "model-output")
 
     def _run_agent(
         self,
@@ -357,12 +485,15 @@ class Designer:
             )
         return proposals
 
-    def _safe_comment(self, number: int, body: str) -> None:
+    def _safe_comment(self, number: int, body: str, *, operation_key: str | None = None) -> None:
         """合并审计评论 best effort；状态迁移已成功时评论失败不回滚。"""
         try:
             marker = "<!-- openagents:agent=auto-designer -->"
             signed = body if marker in body else f"{body}\n\n{marker}"
-            self._tracker.add_comment(number, signed)
+            if operation_key is not None:
+                self._tracker.add_comment_once(number, signed, operation_key=operation_key)
+            else:
+                self._tracker.add_comment(number, signed)
         except Exception:  # noqa: BLE001
             pass
 

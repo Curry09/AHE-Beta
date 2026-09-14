@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from pathlib import Path
 from queue import Empty, Queue
-from uuid import uuid4
 
 from auto_designer.designer.designer import Designer, DesignOutcome
 from auto_designer.designer.issue_schema import (
@@ -22,7 +21,19 @@ from auto_designer.designer.issue_schema import (
     plane,
 )
 from auto_designer.designer.proposal_view import normalized_proposal_body
-from auto_designer.usage import bind_usage_context, monotonic_ms, record_usage
+from auto_designer.loop.recovery import (
+    RecoveryConflictError,
+    RecoveryStore,
+    digest_value,
+    operation_key,
+)
+from auto_designer.models import OpenIssue
+from auto_designer.usage import (
+    bind_usage_context,
+    current_usage_context,
+    monotonic_ms,
+    record_usage,
+)
 
 GROUPING_MAX_TOKENS = 16384
 GROUPING_TIMEOUT_SECONDS = 300
@@ -168,34 +179,61 @@ class GroupedDesigner:
         self.round_provider = designers[0]._round_provider
         self.on_event = designers[0]._on_event
         self.classify = classify
+        self.recovery: RecoveryStore | None = None
+
+    def bind_recovery(self, recovery: RecoveryStore) -> None:
+        self.recovery = recovery
+        for designer in self.designers:
+            designer.bind_recovery(recovery)
 
     def propose_once(self) -> DesignOutcome:
         round_no = self.round_provider() if self.round_provider else None
-        issues = filter_current_round(
-            (
-                item
-                for item in self.tracker.list_open_issues()
-                if plane(item.labels) in (PROPOSAL, READY)
-                and not {DIVERGENT, FROM_DIVERGENT}.intersection(item.labels)
-            ),
-            round_no=round_no,
+        grouping_key = self._recovery_key()
+        recovery_unit = (
+            self.recovery.unit(
+                round_no=self._recovery_round_no(), stage="designer", key=grouping_key
+            )
+            if self.recovery is not None
+            else None
         )
-        issues = sorted(
-            issues,
-            key=lambda item: item.number,
-        )
-        cards = [
-            {
-                "id": item.number,
-                "title": item.title,
-                "summary": normalized_proposal_body(item.body)
-                .split("## 证据引用", 1)[0]
-                .strip()[:1200],
-            }
-            for item in issues
-        ]
+        if recovery_unit is not None:
+            frozen = recovery_unit["input"]
+            issues = [OpenIssue.from_dict(item) for item in frozen["issues"]]
+            cards = [dict(item) for item in frozen["cards"]]
+        else:
+            issues = filter_current_round(
+                (
+                    item
+                    for item in self.tracker.list_open_issues()
+                    if plane(item.labels) in (PROPOSAL, READY)
+                    and not {DIVERGENT, FROM_DIVERGENT}.intersection(item.labels)
+                ),
+                round_no=round_no,
+            )
+            issues = sorted(issues, key=lambda item: item.number)
+            cards = [
+                {
+                    "id": item.number,
+                    "title": item.title,
+                    "summary": normalized_proposal_body(item.body)
+                    .split("## 证据引用", 1)[0]
+                    .strip()[:1200],
+                }
+                for item in issues
+            ]
+        if self.recovery is not None:
+            recovery_unit = self.recovery.begin_unit(
+                round_no=self._recovery_round_no(),
+                stage="designer",
+                key=grouping_key,
+                input_value={"issues": [item.to_dict() for item in issues], "cards": cards},
+                expected_postconditions={"completed": True},
+                dependencies=("triage",),
+            )
         numbers = [item.number for item in issues]
-        directory = self.artifact_root / f"round-{round_no or 0}-{uuid4().hex}"
+        directory = self.artifact_root / (
+            f"round-{round_no or 0}-{digest_value({'cards': cards})[:16]}"
+        )
         receipt = {
             "round": round_no,
             "input": cards,
@@ -205,7 +243,19 @@ class GroupedDesigner:
         }
         parallel = len(self.designers)
         started = time.monotonic()
-        if len(numbers) < 2:
+        if recovery_unit is not None and recovery_unit.get("output_digest"):
+            saved_grouping = self.recovery.read_output(
+                round_no=self._recovery_round_no(), stage="designer", key=grouping_key
+            )
+            groups = [list(group) for group in saved_grouping["groups"]]
+            batches = [
+                [list(batch) for batch in group_batches]
+                for group_batches in saved_grouping["batches"]
+            ]
+            parallel = int(saved_grouping["parallel"])
+            receipt.update(saved_grouping)
+            receipt["replayed"] = True
+        elif len(numbers) < 2:
             groups = [numbers] if numbers else []
             receipt["status"] = "skipped"
         else:
@@ -236,10 +286,30 @@ class GroupedDesigner:
                     error_type=type(error).__name__,
                     status_code=getattr(error, "status_code", None),
                 )
-        batches = [
-            [group[i : i + self.batch_size] for i in range(0, len(group), self.batch_size)]
-            for group in groups
-        ]
+        if not (recovery_unit is not None and recovery_unit.get("output_digest")):
+            batches = [
+                [group[i : i + self.batch_size] for i in range(0, len(group), self.batch_size)]
+                for group in groups
+            ]
+            if self.recovery is not None:
+                grouping_output = {
+                    key: value
+                    for key, value in receipt.items()
+                    if key not in {"input", "prompt", "seconds"}
+                }
+                grouping_output.update(groups=groups, batches=batches, parallel=parallel)
+                self.recovery.save_output(
+                    round_no=self._recovery_round_no(),
+                    stage="designer",
+                    key=grouping_key,
+                    output=grouping_output,
+                )
+                self.recovery.complete_unit(
+                    round_no=self._recovery_round_no(),
+                    stage="designer",
+                    key=grouping_key,
+                    observed_postconditions={"completed": True},
+                )
         receipt.update(
             groups=groups,
             batches=batches,
@@ -255,6 +325,7 @@ class GroupedDesigner:
             )
 
         jobs = Queue()
+        failed_batches: list[tuple[int, int]] = []
         for index, group_batches in enumerate(batches):
             jobs.put((index, group_batches))
 
@@ -291,12 +362,25 @@ class GroupedDesigner:
                             "ids": ids,
                         }
                         try:
-                            if len(scope.list_open_issues()) < 2:
+                            batch_operation = operation_key(
+                                grouping_key, "batch", group_index, batch_index
+                            )
+                            saved_batch = (
+                                self.recovery.unit(
+                                    round_no=self._recovery_round_no(),
+                                    stage="designer",
+                                    key=operation_key(batch_operation, "model-output"),
+                                )
+                                if self.recovery is not None
+                                else None
+                            )
+                            if len(scope.list_open_issues()) < 2 and saved_batch is None:
                                 # Synthesis needs two sources; leave singletons for Owner.
                                 record["status"] = "retained_without_synthesis"
                                 outcome = DesignOutcome()
                             else:
-                                outcome = designer.propose_once()
+                                with bind_usage_context(operation=batch_operation):
+                                    outcome = designer.propose_once()
                                 record.update(
                                     status="completed",
                                     proposals=outcome.proposal_numbers,
@@ -305,6 +389,7 @@ class GroupedDesigner:
                                 )
                             results.append((group_index, batch_index, outcome))
                         except Exception as error:
+                            failed_batches.append((group_index, batch_index))
                             record.update(status="failed", error_type=type(error).__name__)
                             designer._emit(
                                 running=False, status=f"分组设计失败：{type(error).__name__}"
@@ -326,4 +411,20 @@ class GroupedDesigner:
         outcome = DesignOutcome()
         for _, _, batch in sorted(results, key=lambda item: item[:2]):
             _extend_outcome(outcome, batch)
+        if self.recovery is not None and failed_batches:
+            raise RecoveryConflictError(
+                f"designer batches remain incomplete: {sorted(failed_batches)}"
+            )
         return outcome
+
+    def _recovery_round_no(self) -> int:
+        value = current_usage_context().round_no
+        if value is None and self.round_provider is not None:
+            value = self.round_provider()
+        if type(value) is not int or value <= 0:
+            raise RecoveryConflictError("grouping recovery requires a bound round number")
+        return value
+
+    def _recovery_key(self) -> str:
+        context = current_usage_context()
+        return operation_key(context.operation or "grouped-designer", "grouping")

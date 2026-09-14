@@ -9,6 +9,12 @@ import pytest
 
 from auto_designer.designer import issue_schema as sc
 from auto_designer.designer.owner import AdmitOutcome, Owner
+from auto_designer.loop.recovery import (
+    RecoveryConflictError,
+    RecoveryIdentity,
+    RecoveryStore,
+    operation_key,
+)
 from auto_designer.models import (
     FeelingScore,
     IssueDraft,
@@ -18,6 +24,7 @@ from auto_designer.models import (
     Transcript,
 )
 from auto_designer.tracker.fake import FakeTracker
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
 
 
@@ -79,6 +86,26 @@ def _submit(decisions: list) -> str:
     return json.dumps({"decisions": decisions}, ensure_ascii=False)
 
 
+def _owner_recovery(tmp_path: Path) -> RecoveryStore:
+    store = RecoveryStore.initialize(
+        root=tmp_path / "recovery",
+        identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
+    )
+    store.freeze_round(round_no=1, user_sha="user", plan=[])
+    for stage in ("divergent", "designer"):
+        key = operation_key(stage, "complete")
+        store.begin_unit(
+            round_no=1,
+            stage=stage,
+            key=key,
+            input_value={},
+            expected_postconditions={"completed": True},
+        )
+        store.complete_unit(round_no=1, stage=stage, key=key)
+        store.complete_stage(round_no=1, stage=stage)
+    return store
+
+
 def test_submit_admission_yaml_matches_contract() -> None:
     """drift-guard：submit_admission.tool.yaml 的 input_schema 与 admission_input_schema() 深度相等。"""
     import yaml
@@ -101,7 +128,10 @@ def test_owner_agent_exposes_only_admission_tool() -> None:
 
     path = Path(__file__).resolve().parents[2] / "agent_defs" / "owner" / "agent.yaml"
     config = yaml.safe_load(path.read_text(encoding="utf-8"))
-    assert [tool["name"] for tool in config["tools"]] == ["submit_observation_gap", "submit_admission"]
+    assert [tool["name"] for tool in config["tools"]] == [
+        "submit_observation_gap",
+        "submit_admission",
+    ]
     assert config["stop_tools"] == ["submit_admission"]
 
 
@@ -165,11 +195,17 @@ def test_exact_duplicate_can_merge(tmp_path: Path) -> None:
 @pytest.mark.parametrize("bad_overlap", [None, "invalid", [999], [True]])
 def test_cross_route_overlap_preserves_independent_handoffs(tmp_path, bad_overlap):
     tracker = FakeTracker()
-    pm = tracker.create_issue(IssueDraft("用户能随时纠偏", "product outcome", [sc.PROPOSAL, sc.FROM_DIVERGENT])).number
+    pm = tracker.create_issue(
+        IssueDraft("用户能随时纠偏", "product outcome", [sc.PROPOSAL, sc.FROM_DIVERGENT])
+    ).number
     synth = _synth_proposal(tracker, "控制生命周期")
     rows = [
-        {"issue": pm, "decision": "admit", "delivery_overlaps": [synth],
-         "handoff_summary": "共享控制实现，但 PM 独立验收用户可及时纠偏"},
+        {
+            "issue": pm,
+            "decision": "admit",
+            "delivery_overlaps": [synth],
+            "handoff_summary": "共享控制实现，但 PM 独立验收用户可及时纠偏",
+        },
         {"issue": synth, "decision": "admit", "delivery_overlaps": bad_overlap},
     ]
     owner = _owner(tmp_path, tracker, _submit(rows))
@@ -186,9 +222,15 @@ def test_overlap_can_reference_ready_but_not_self_or_report(tmp_path):
     pm = _triage_proposal(tracker, "new")
     ready = tracker.create_issue(IssueDraft("existing", "x", [sc.READY])).number
     report = tracker.create_issue(IssueDraft("raw", "x", [sc.REPORT])).number
-    owner = _owner(tmp_path, tracker, _submit([
-        {"issue": pm, "decision": "admit", "delivery_overlaps": [pm, ready, report]},
-    ]))
+    owner = _owner(
+        tmp_path,
+        tracker,
+        _submit(
+            [
+                {"issue": pm, "decision": "admit", "delivery_overlaps": [pm, ready, report]},
+            ]
+        ),
+    )
     out = owner.admit_once()
     assert out.admitted == [pm] and pm in out.invalid
     comments = tracker.issue(pm)["comments"]
@@ -258,10 +300,12 @@ def test_covers_untouched_when_structural_held(tmp_path: Path) -> None:
     o = _owner(
         tmp_path,
         tracker,
-        _submit([
-            {"issue": s, "decision": "hold", "reason": "缺少验收接口"},
-            {"issue": p1, "decision": "hold", "reason": "缺少复现步骤"},
-        ]),
+        _submit(
+            [
+                {"issue": s, "decision": "hold", "reason": "缺少验收接口"},
+                {"issue": p1, "decision": "hold", "reason": "缺少复现步骤"},
+            ]
+        ),
     )
     out = o.admit_once()
     assert s in out.held and p1 in out.held and out.merged == []
@@ -361,3 +405,31 @@ def test_no_submit_defaults_to_direct_handoff(tmp_path: Path) -> None:
     o = _owner(tmp_path, tracker, "散文没调 submit")
     out = o.admit_once()
     assert s in out.admitted and out.held == []
+
+
+def test_recovery_replays_owner_decisions_after_partial_admission(tmp_path: Path) -> None:
+    class CrashAfterLabelsTracker(FakeTracker):
+        crashed = False
+
+        def set_labels(self, number: int, labels: list[str]) -> None:
+            super().set_labels(number, labels)
+            if not self.crashed:
+                self.crashed = True
+                raise RuntimeError("injected after admission labels")
+
+    tracker = CrashAfterLabelsTracker()
+    proposal = _synth_proposal(tracker, "resume owner")
+    owner = _owner(
+        tmp_path,
+        tracker,
+        _submit([{"issue": proposal, "decision": "admit"}]),
+        recovery=_owner_recovery(tmp_path),
+    )
+    with bind_usage_context(round_no=1, operation="owner-stage"):
+        with pytest.raises(RecoveryConflictError, match="remain incomplete"):
+            owner.admit_once()
+    with bind_usage_context(round_no=1, operation="owner-stage"):
+        outcome = owner.admit_once()
+    assert outcome.admitted == [proposal]
+    assert owner.agent_calls == 1
+    assert len(tracker.issue(proposal)["comments"]) == 2

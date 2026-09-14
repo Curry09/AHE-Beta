@@ -82,7 +82,7 @@ tasks:
     acceptance: 恢复不重新切片、不吸收快照后新增 report；已处理票和已创建 PM proposal 不重复；部分应用可补齐，输入漂移或矛盾远端状态明确 blocked。
   - id: T5
     title: Designer 与 Owner 输出先存后应用
-    status: in-progress
+    status: done
     priority: P0
     tags: []
     depends-on:
@@ -104,7 +104,7 @@ tasks:
     acceptance: 分类和角色输出完整落盘后不再调用模型；崩溃恢复不重复建票、合并来源、评论或准入；Owner 完成后 admitted 集固定，后续开放队列变化不扩大本轮交付。
   - id: T6
     title: Fresh/resume 入口与故障矩阵验收
-    status: pending
+    status: in-progress
     priority: P0
     tags: []
     depends-on:

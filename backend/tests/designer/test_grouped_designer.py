@@ -15,9 +15,15 @@ from auto_designer.designer.grouped_designer import (
 )
 from auto_designer.designer.issue_schema import FROM_DIVERGENT, PROPOSAL, REPORT
 from auto_designer.loop.orchestrator import Orchestrator
+from auto_designer.loop.recovery import (
+    RecoveryConflictError,
+    RecoveryIdentity,
+    RecoveryStore,
+    operation_key,
+)
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import current_usage_context
+from auto_designer.usage import bind_usage_context, current_usage_context
 from auto_designer.user.session_store import SessionStore
 
 
@@ -55,6 +61,25 @@ def grouped(tmp_path, tracker, classify, cls=Designer):
 
 def receipt(tmp_path):
     return json.loads(next((tmp_path / "grouping").glob("*/grouping.json")).read_text())
+
+
+def recovery_for_designer(tmp_path):
+    store = RecoveryStore.initialize(
+        root=tmp_path / "recovery",
+        identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
+    )
+    store.freeze_round(round_no=1, user_sha="user", plan=[])
+    triage = operation_key("triage", "complete")
+    store.begin_unit(
+        round_no=1,
+        stage="triage",
+        key=triage,
+        input_value={},
+        expected_postconditions={"completed": True},
+    )
+    store.complete_unit(round_no=1, stage="triage", key=triage)
+    store.complete_stage(round_no=1, stage="triage")
+    return store
 
 
 @pytest.mark.parametrize(
@@ -166,8 +191,14 @@ def test_no_classification_call_when_synthesis_is_impossible(tmp_path, count):
 
 def test_grouping_only_reads_the_active_round(tmp_path):
     tracker = FakeTracker()
-    for number, round_name in (("current-a", "round-4"), ("old", "round-3"), ("current-b", "round-4")):
-        tracker.create_issue(IssueDraft(title=number, body="summary", labels=[PROPOSAL, round_name]))
+    for number, round_name in (
+        ("current-a", "round-4"),
+        ("old", "round-3"),
+        ("current-b", "round-4"),
+    ):
+        tracker.create_issue(
+            IssueDraft(title=number, body="summary", labels=[PROPOSAL, round_name])
+        )
     calls = []
 
     class Worker(Designer):
@@ -268,6 +299,43 @@ def test_unwritable_telemetry_does_not_discard_work(tmp_path):
         tmp_path, tracker_with(2), lambda cards: response([[1, 2]]), Worker
     ).propose_once()
     assert calls == [True] and result.proposal_numbers == [10]
+
+
+def test_recovery_reuses_grouping_receipt_after_batch_failure(tmp_path):
+    tracker = tracker_with(2)
+    classify_calls: list[list[dict]] = []
+    worker_calls = 0
+
+    class Worker(Designer):
+        def propose_once(self):
+            nonlocal worker_calls
+            worker_calls += 1
+            if worker_calls == 1:
+                raise RuntimeError("injected batch failure")
+            return DesignOutcome()
+
+    worker = Worker(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path),
+        str(tmp_path),
+        round_provider=lambda: 1,
+    )
+
+    def classify(cards):
+        classify_calls.append(cards)
+        return response([[1, 2]])
+
+    stage = GroupedDesigner([worker], artifact_root=tmp_path / "grouping", classify=classify)
+    stage.bind_recovery(recovery_for_designer(tmp_path))
+    with bind_usage_context(round_no=1, operation="designer-stage"):
+        with pytest.raises(RecoveryConflictError, match="batches remain incomplete"):
+            stage.propose_once()
+    with bind_usage_context(round_no=1, operation="designer-stage"):
+        stage.propose_once()
+    assert len(classify_calls) == 1
+    assert worker_calls == 2
+    assert len(list((tmp_path / "grouping").glob("*/grouping.json"))) == 1
 
 
 def test_entry_point_switch_preserves_workers_and_disabled_roster(tmp_path, monkeypatch):
