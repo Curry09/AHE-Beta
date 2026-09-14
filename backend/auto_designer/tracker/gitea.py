@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import threading
 import time
@@ -16,6 +17,12 @@ from typing import Any
 import requests
 
 from auto_designer.models import ISSUE_STATES, IssueDraft, IssueRef, OpenIssue
+from auto_designer.tracker.base import (
+    IdempotencyConflictError,
+    issue_payload_digest,
+    operation_marker,
+    operation_marker_digest,
+)
 
 # 新建 label 的默认颜色（标签语义集 {bug,feature} 由 T1 预置；此处仅兜底建缺失项）。
 _DEFAULT_LABEL_COLOR = "#ededed"
@@ -125,15 +132,35 @@ class GiteaTracker:
         )
         return self._parse_issue_ref(data)
 
+    def create_issue_once(self, draft: IssueDraft, *, operation_key: str) -> IssueRef:
+        """Spec-0064/T1: reconcile a marked issue before retrying its creation."""
+        payload_digest = issue_payload_digest(draft)
+        existing = self._find_issue_operation(operation_key=operation_key)
+        if existing is not None:
+            number, observed_digest, url, state = existing
+            if observed_digest != payload_digest:
+                raise IdempotencyConflictError(
+                    f"operation key already created issue #{number} with another payload"
+                )
+            return IssueRef(number=number, url=url, state=state)
+        marker = operation_marker(operation_key=operation_key, payload_digest=payload_digest)
+        body = f"{draft.body.rstrip()}\n\n{marker}" if draft.body else marker
+        return self.create_issue(
+            IssueDraft(title=draft.title, body=body, labels=list(draft.labels))
+        )
+
     def list_open_issues(self) -> list[OpenIssue]:
         data = []
         page = 1
         while True:
-            items = self._request(
-                "GET",
-                f"/repos/{self._owner}/{self._repo}/issues?state=open&type=issues&limit=50&page={page}",
-                None,
-            ) or []
+            items = (
+                self._request(
+                    "GET",
+                    f"/repos/{self._owner}/{self._repo}/issues?state=open&type=issues&limit=50&page={page}",
+                    None,
+                )
+                or []
+            )
             data.extend(items)
             if len(items) < 50:
                 break
@@ -155,6 +182,23 @@ class GiteaTracker:
             f"/repos/{self._owner}/{self._repo}/issues/{number}/comments",
             {"body": body},
         )
+
+    def add_comment_once(self, number: int, body: str, *, operation_key: str) -> None:
+        """Spec-0064/T1: reconcile a marked comment before retrying its creation."""
+        payload_digest = hashlib.sha256(body.encode()).hexdigest()
+        for comment in self.list_comments(number=number):
+            existing = operation_marker_digest(
+                text=str(comment.get("body") or ""), operation_key=operation_key
+            )
+            if existing is None:
+                continue
+            if existing != payload_digest:
+                raise IdempotencyConflictError(
+                    f"operation key already added another comment to issue #{number}"
+                )
+            return
+        marker = operation_marker(operation_key=operation_key, payload_digest=payload_digest)
+        self.add_comment(number, f"{body.rstrip()}\n\n{marker}" if body else marker)
 
     def set_state(self, number: int, state: str, reason: str) -> None:
         if state not in ISSUE_STATES:
@@ -179,9 +223,7 @@ class GiteaTracker:
             {"labels": label_ids},
         )
 
-    def update_issue(
-        self, number: int, *, title: str, body: str, labels: list[str]
-    ) -> None:
+    def update_issue(self, number: int, *, title: str, body: str, labels: list[str]) -> None:
         """安全迁移提案主体；Gitea 1.22 不支持在 EditIssue 中更新 labels。"""
         before = self.get_issue(number=number)
         self._request(
@@ -192,16 +234,16 @@ class GiteaTracker:
         try:
             self.set_labels(number, labels)
             observed = self.get_issue(number=number)
-            if not self._matches(
-                observed, title=title, body=body, labels=labels, state=None
-            ):
+            if not self._matches(observed, title=title, body=body, labels=labels, state=None):
                 raise ValueError("postcondition mismatch")
         except Exception as exc:
             rollback_error: BaseException | None = None
             try:
                 current = self.get_issue(number=number)
                 if current.get("title") != title or current.get("body") != body:
-                    raise RuntimeError("rollback skipped because issue content changed concurrently")
+                    raise RuntimeError(
+                        "rollback skipped because issue content changed concurrently"
+                    )
                 self._request(
                     "PATCH",
                     f"/repos/{self._owner}/{self._repo}/issues/{number}",
@@ -229,9 +271,7 @@ class GiteaTracker:
                 {"state": state},
             )
             observed = self.get_issue(number=number)
-            if not self._matches(
-                observed, title=None, body=None, labels=labels, state=state
-            ):
+            if not self._matches(observed, title=None, body=None, labels=labels, state=state):
                 raise ValueError("postcondition mismatch")
         except Exception as exc:
             rollback_error: BaseException | None = None
@@ -301,6 +341,33 @@ class GiteaTracker:
             }
             for item in (data or [])
         ]
+
+    def _find_issue_operation(self, *, operation_key: str) -> tuple[int, str, str, str] | None:
+        page = 1
+        while True:
+            rows = (
+                self._request(
+                    "GET",
+                    f"/repos/{self._owner}/{self._repo}/issues"
+                    f"?state=all&type=issues&limit=50&page={page}",
+                    None,
+                )
+                or []
+            )
+            for item in rows:
+                observed = operation_marker_digest(
+                    text=str(item.get("body") or ""), operation_key=operation_key
+                )
+                if observed is not None:
+                    return (
+                        int(item["number"]),
+                        observed,
+                        str(item.get("html_url") or ""),
+                        str(item.get("state") or "open"),
+                    )
+            if len(rows) < 50:
+                return None
+            page += 1
 
     def list_timeline(self, *, number: int) -> list[dict[str, Any]]:
         """分页读取 issue timeline，并归一 label add/remove 方向及调试所需原始字段。
@@ -487,8 +554,12 @@ class GiteaTracker:
     def find_observation_gap(self, *, marker: str) -> int | None:
         # Paginate including closed issues: closing a ticket must not break retry identity.
         for page in range(1, 101):
-            rows = self._request("GET", f"/repos/{self._owner}/{self._repo}/issues"
-                                 f"?state=all&type=issues&limit=50&page={page}", None)
+            rows = self._request(
+                "GET",
+                f"/repos/{self._owner}/{self._repo}/issues"
+                f"?state=all&type=issues&limit=50&page={page}",
+                None,
+            )
             for item in rows:
                 if marker in (item.get("body") or ""):
                     return int(item["number"])
@@ -502,25 +573,39 @@ class GiteaTracker:
     def preflight_observations(self) -> dict:
         settings = self._request("GET", "/settings/attachment", None)
         repo = self._request("GET", f"/repos/{self._owner}/{self._repo}", None)
-        if (not settings.get("enabled") or int(settings.get("max_size", 0)) < 4
-                or ".gz" not in settings.get("allowed_types", "")
-                or not (repo.get("permissions", {}).get("push") or repo.get("permissions", {}).get("admin"))):
+        if (
+            not settings.get("enabled")
+            or int(settings.get("max_size", 0)) < 4
+            or ".gz" not in settings.get("allowed_types", "")
+            or not (
+                repo.get("permissions", {}).get("push") or repo.get("permissions", {}).get("admin")
+            )
+        ):
             raise ValueError("observation attachment transport preflight failed")
-        return {"repository": f"{self._api}/repos/{self._owner}/{self._repo}",
-                "format": "artifact-observations-v1", "max_transfer_bytes": 4_000_000}
+        return {
+            "repository": f"{self._api}/repos/{self._owner}/{self._repo}",
+            "format": "artifact-observations-v1",
+            "max_transfer_bytes": 4_000_000,
+        }
 
     def list_issue_assets(self, *, number: int) -> list[dict]:
         import json
 
         data = self._observation_bytes(
-            url=f"{self._api}/repos/{self._owner}/{self._repo}/issues/{number}/assets", limit=1_000_000)
+            url=f"{self._api}/repos/{self._owner}/{self._repo}/issues/{number}/assets",
+            limit=1_000_000,
+        )
         return json.loads(data)
 
     def upload_issue_asset(self, *, number: int, name: str, data: bytes) -> dict:
         endpoint = f"/repos/{self._owner}/{self._repo}/issues/{number}/assets"
-        response = self._session.post(self._api + endpoint,
+        response = self._session.post(
+            self._api + endpoint,
             files={"attachment": (name, data, "application/gzip")},
-            headers={"Content-Type": None}, timeout=_REQUEST_TIMEOUT, allow_redirects=False)
+            headers={"Content-Type": None},
+            timeout=_REQUEST_TIMEOUT,
+            allow_redirects=False,
+        )
         return self._ok(response, endpoint)
 
     def download_issue_asset(self, *, number: int, asset_id: int, limit: int) -> bytes:
@@ -534,8 +619,13 @@ class GiteaTracker:
 
     def _observation_bytes(self, *, url: str, limit: int) -> bytes:
         deadline = time.monotonic() + 15
-        with self._session.get(url, stream=True, timeout=(5, 5), allow_redirects=False,
-                               headers={"Accept-Encoding": "identity"}) as response:
+        with self._session.get(
+            url,
+            stream=True,
+            timeout=(5, 5),
+            allow_redirects=False,
+            headers={"Accept-Encoding": "identity"},
+        ) as response:
             if response.status_code != 200:
                 raise GiteaError(response.status_code, "attachment download")
             chunks, size = [], 0

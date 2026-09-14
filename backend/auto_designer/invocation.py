@@ -17,7 +17,7 @@ from typing import Any
 
 from auto_designer.usage import current_usage_context
 
-_LOCK = threading.Lock()
+_LOCK = threading.RLock()
 _SECRET_ENV_NAMES = (
     "GITEA_TOKEN",
     "ANTHROPIC_API_KEY",
@@ -42,7 +42,7 @@ class InvocationStore:
         return self._root
 
     def record(self, *, payload: dict[str, Any]) -> Path | None:
-        """Write one invocation JSON and append index.jsonl. Fail-open."""
+        """Write one invocation JSON and append its index entry once. Fail-open."""
         try:
             side = str(payload.get("side") or "demand")
             role = str(payload.get("role") or "unknown")
@@ -51,23 +51,27 @@ class InvocationStore:
             stamp = captured.replace(":", "").replace("-", "")[:15] or "unknown"
             rel = Path(side) / f"{stamp}_{role}_{invocation_id[:8]}.json"
             path = self._root / rel
-            path.parent.mkdir(parents=True, exist_ok=True)
             body = json.dumps(payload, ensure_ascii=False, indent=2)
-            tmp = path.with_suffix(path.suffix + ".tmp")
-            tmp.write_text(body, encoding="utf-8")
-            tmp.replace(path)
-            index = self._root / "index.jsonl"
-            line = json.dumps(
-                {
-                    "invocation_id": invocation_id,
-                    "side": side,
-                    "role": role,
-                    "status": (payload.get("output") or {}).get("status"),
-                    "path": str(rel).replace("\\", "/"),
-                },
-                ensure_ascii=False,
-            )
             with _LOCK:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if path.exists():
+                    # Spec-0064/T1: a replayed saved model output must not create a
+                    # second audit index entry or overwrite different content.
+                    return path if path.read_text(encoding="utf-8") == body else None
+                tmp = path.with_suffix(path.suffix + ".tmp")
+                tmp.write_text(body, encoding="utf-8")
+                tmp.replace(path)
+                index = self._root / "index.jsonl"
+                line = json.dumps(
+                    {
+                        "invocation_id": invocation_id,
+                        "side": side,
+                        "role": role,
+                        "status": (payload.get("output") or {}).get("status"),
+                        "path": str(rel).replace("\\", "/"),
+                    },
+                    ensure_ascii=False,
+                )
                 with index.open("a", encoding="utf-8") as handle:
                     handle.write(line + "\n")
             return path
@@ -83,14 +87,21 @@ class InvocationStore:
 
     def append_round(self, *, round_no: int, user_sha: str | None, sealed_sha: str | None) -> None:
         path = self._root / "manifest.json"
-        try:
-            current = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-        except Exception:
-            current = {}
-        rounds = list(current.get("rounds") or [])
-        rounds.append({"round": round_no, "user_sha": user_sha, "sealed_sha": sealed_sha})
-        current["rounds"] = rounds
-        self.write_manifest(data=current)
+        row = {"round": round_no, "user_sha": user_sha, "sealed_sha": sealed_sha}
+        with _LOCK:
+            try:
+                current = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            except Exception:
+                current = {}
+            rounds = list(current.get("rounds") or [])
+            existing = next((item for item in rounds if item.get("round") == round_no), None)
+            if existing is not None:
+                if existing != row:
+                    raise ValueError(f"round {round_no} invocation manifest conflicts")
+                return
+            rounds.append(row)
+            current["rounds"] = sorted(rounds, key=lambda item: int(item["round"]))
+            self.write_manifest(data=current)
 
 
 def role_runs_dir() -> Path | None:

@@ -7,7 +7,7 @@ summary: 把真实闭环改造成带持久化阶段游标、工作项幂等键�
 tasks:
   - id: T1
     title: 持久化恢复状态与对账原语
-    status: pending
+    status: done
     priority: P0
     tags: []
     depends-on: []
@@ -30,7 +30,7 @@ tasks:
     acceptance: 崩溃发生在输出保存和副作用提交前后时均能判定重放或补记完成；状态撕裂、身份漂移、摘要冲突和旧 revision 写入被拒绝，快照不含密钥。
   - id: T2
     title: 阶段化 Orchestrator 与交付恢复
-    status: pending
+    status: in-progress
     priority: P0
     tags: []
     depends-on:

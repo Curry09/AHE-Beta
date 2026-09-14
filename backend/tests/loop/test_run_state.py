@@ -22,7 +22,12 @@ def test_round_trip_in_memory() -> None:
 
 
 def test_write_then_read(tmp_path) -> None:
-    rs = RunState(round=2, current_release_ref="deadbeef1234", done_session_keys=["a"])
+    rs = RunState(
+        recovery_revision=7,
+        round=2,
+        current_release_ref="deadbeef1234",
+        done_session_keys=["a"],
+    )
     write_run_state(tmp_path, rs)
     assert read_run_state(tmp_path) == rs
 
