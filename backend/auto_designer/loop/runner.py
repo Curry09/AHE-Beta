@@ -1,8 +1,7 @@
-"""可恢复 harbor runner（spec-0004/T2）：作为一个 harbor task（方案 A，整条 run = 1 task）。
+"""可恢复 Harbor runner（Spec-0004/T2, Spec-0064/T2）。
 
 在 orchestrator 外层驱动逐轮跑；每轮边界 write_run_state + save_checkpoint，经 harbor artifact 通道吐出沙盒；
-新 task 喂最新 checkpoint 即从断点续跑（轮次粒度幂等：已完成的轮跳过，最坏丢当前轮在途）。
-orchestrator.run_round 保持纯编排，恢复逻辑收在此外层；逐轮真人对话仍走 spec-0001 自立协议（非 harbor 批接口）。
+新运行可由 Orchestrator 的 recovery ledger 续到阶段/工作项；旧运行仍按完整轮次游标恢复。
 """
 
 from __future__ import annotations
@@ -45,6 +44,8 @@ class HarborRunner:
 
         if checkpoint_artifact is not None:
             self._load(Path(checkpoint_artifact), self._state_dir)  # 还原 STATE_DIR
+            if getattr(self._orch, "recovery_enabled", False):
+                self._orch.refresh_recovery()
             rs = read_run_state(self._state_dir)
             start_round = rs.round
             ref = rs.current_release_ref or initial_release_ref
@@ -55,9 +56,44 @@ class HarborRunner:
 
         latest: Path | None = Path(checkpoint_artifact) if checkpoint_artifact is not None else None
         for r in range(start_round, n_rounds):
-            ref = self._orch.run_round(ref)  # 纯编排一轮 a→b→c
+            try:
+                if getattr(self._orch, "recovery_enabled", False):
+                    ref = self._orch.run_round(
+                        ref,
+                        deliver=r + 1 < n_rounds,
+                        round_no=r + 1,
+                    )
+                else:
+                    ref = self._orch.run_round(ref)
+            except Exception:
+                # Spec-0064/T2: preserve the latest stage cursor in the
+                # portable archive in addition to the already durable ledger.
+                write_run_state(
+                    self._state_dir,
+                    RunState(
+                        recovery_revision=getattr(self._orch, "recovery_revision", 0),
+                        round=r,
+                        phase=(
+                            self._orch.recovery_phase(round_no=r + 1)
+                            if getattr(self._orch, "recovery_enabled", False)
+                            else "a"
+                        ),
+                        current_release_ref=ref,
+                    ),
+                )
+                self._save(
+                    self._state_dir,
+                    self._artifact_dir / f"checkpoint-round-{r + 1}-incomplete.tar.gz",
+                )
+                raise
             write_run_state(
-                self._state_dir, RunState(round=r + 1, phase="c", current_release_ref=ref)
+                self._state_dir,
+                RunState(
+                    recovery_revision=getattr(self._orch, "recovery_revision", 0),
+                    round=r + 1,
+                    phase=("completed" if getattr(self._orch, "recovery_enabled", False) else "c"),
+                    current_release_ref=ref,
+                ),
             )
             latest = self._save(
                 self._state_dir, self._artifact_dir / f"checkpoint-round-{r + 1}.tar.gz"

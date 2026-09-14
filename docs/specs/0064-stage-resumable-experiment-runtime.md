@@ -30,7 +30,7 @@ tasks:
     acceptance: 崩溃发生在输出保存和副作用提交前后时均能判定重放或补记完成；状态撕裂、身份漂移、摘要冲突和旧 revision 写入被拒绝，快照不含密钥。
   - id: T2
     title: 阶段化 Orchestrator 与交付恢复
-    status: in-progress
+    status: done
     priority: P0
     tags: []
     depends-on:
@@ -48,7 +48,7 @@ tasks:
     acceptance: 从每个阶段边界及 delivery inflight/blocked 恢复只执行合法后继；末轮跳过需求交付；完成轮幂等跳过；阶段依赖、远端 main 冲突和失败终态 fail-closed。
   - id: T3
     title: 用户会话工作项级恢复
-    status: pending
+    status: in-progress
     priority: P0
     tags: []
     depends-on:

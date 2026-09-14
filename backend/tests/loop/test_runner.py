@@ -104,3 +104,49 @@ def test_nonpositive_rounds_raises(tmp_path) -> None:
     runner = _runner(tmp_path, _FakeOrch([]))
     with pytest.raises(ValueError):
         runner.run(initial_release_ref="v1", n_rounds=0)
+
+
+def test_recoverable_runner_passes_round_and_last_round_semantics(tmp_path) -> None:
+    class RecoverableOrch:
+        recovery_enabled = True
+        recovery_revision = 9
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, bool, int]] = []
+
+        def run_round(self, ref, *, deliver, round_no):
+            self.calls.append((ref, deliver, round_no))
+            return f"v{round_no + 1}"
+
+    orch = RecoverableOrch()
+    runner = _runner(tmp_path, orch)
+    runner.run(initial_release_ref="v1", n_rounds=2)
+    assert orch.calls == [("v1", True, 1), ("v2", False, 2)]
+    state = read_run_state(tmp_path / "state")
+    assert state.phase == "completed" and state.recovery_revision == 9
+
+
+def test_recoverable_runner_archives_incomplete_stage_before_raising(tmp_path) -> None:
+    class BrokenRecoverableOrch:
+        recovery_enabled = True
+        recovery_revision = 4
+
+        def run_round(self, ref, *, deliver, round_no):
+            raise RuntimeError("injected")
+
+        def recovery_phase(self, *, round_no):
+            return "designer"
+
+    save = _SaveSpy()
+    runner = HarborRunner(
+        orchestrator=BrokenRecoverableOrch(),
+        state_dir=tmp_path / "state",
+        artifact_dir=tmp_path / "artifacts",
+        save_fn=save,
+        load_fn=lambda a, s: None,
+    )
+    with pytest.raises(RuntimeError, match="injected"):
+        runner.run(initial_release_ref="v1", n_rounds=2)
+    state = read_run_state(tmp_path / "state")
+    assert (state.round, state.phase, state.recovery_revision) == (0, "designer", 4)
+    assert save.calls[-1].name == "checkpoint-round-1-incomplete.tar.gz"

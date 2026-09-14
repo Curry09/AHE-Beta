@@ -313,6 +313,7 @@ class RecoveryStore:
             unit = {
                 "status": "running",
                 "attempt": 1,
+                "input": safe_input,
                 "input_digest": input_digest,
                 "output_artifact": None,
                 "output_digest": None,
@@ -450,6 +451,8 @@ class RecoveryStore:
         stage_state = round_state["stages"].get(stage)
         if not stage_state:
             raise RecoveryConflictError(f"stage has not started: {stage}")
+        if stage_state.get("status") == _STAGE_COMPLETE:
+            return
         missing_dependencies = [
             name
             for name in stage_state.get("dependencies") or []
@@ -503,6 +506,11 @@ class RecoveryStore:
         round_state = self._state["rounds"].get(str(round_no)) or {}
         stage_state = (round_state.get("stages") or {}).get(stage) or {}
         value = (stage_state.get("units") or {}).get(key)
+        return copy.deepcopy(value) if value is not None else None
+
+    def round_state(self, *, round_no: int) -> dict[str, Any] | None:
+        """Return a defensive copy of one frozen round."""
+        value = self._state["rounds"].get(str(round_no))
         return copy.deepcopy(value) if value is not None else None
 
     def stage_status(self, *, round_no: int, stage: str) -> str:

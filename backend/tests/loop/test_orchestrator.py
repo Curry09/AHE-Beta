@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from auto_designer.loop.orchestrator import Orchestrator
+from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
 from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
 from auto_designer.usage import current_usage_context
 
@@ -69,6 +70,19 @@ def _orch(repo, events, fixed_k=1, **kw):
         run_session_fn=run_session_fn,
         initial_ref="main",
         **kw,
+    )
+
+
+def _recovery(tmp_path) -> RecoveryStore:
+    return RecoveryStore.initialize(
+        root=tmp_path / "checkpoints",
+        identity=RecoveryIdentity(
+            experiment_id="exp-1",
+            run_id="run-1",
+            config_hash="config-1",
+            controller_sha="controller-1",
+            plan_hash="plan-1",
+        ),
     )
 
 
@@ -511,8 +525,13 @@ def test_triage_workers_receive_fixed_disjoint_snapshots(tmp_path) -> None:
     orch = _orch(repo, events, triagers=[SnapshotTriager(), SnapshotTriager()])
     orch.run_round("c")
 
-    triage_events = [event for event in events if isinstance(event, tuple) and isinstance(event[0], list)]
-    assert [sorted(issue.number for issue in pending) for pending, shard in triage_events] == [[1, 3], [2, 4]]
+    triage_events = [
+        event for event in events if isinstance(event, tuple) and isinstance(event[0], list)
+    ]
+    assert [sorted(issue.number for issue in pending) for pending, shard in triage_events] == [
+        [1, 3],
+        [2, 4],
+    ]
     assert all(shard is None for pending, shard in triage_events)
 
 
@@ -668,3 +687,111 @@ def test_blocked_delivery_does_not_start_next_user_round(tmp_path, failure_label
     with pytest.raises(RoundDeliveryBlocked, match=failure_label):
         orch.run(2)
     assert [e[0] for e in events if e[0] == "session"] == ["session"]
+
+
+# Spec-0064/T2: durable stages skip completed work and reattach delivery.
+
+
+def test_recovery_resumes_only_failed_stage_unit_and_keeps_frozen_plan(tmp_path) -> None:
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+    events: list[str] = []
+    plan_calls = 0
+
+    def plan():
+        nonlocal plan_calls
+        plan_calls += 1
+        return [(_persona(), SeedScenario(description=f"draw-{plan_calls}"))]
+
+    class Triager:
+        def __init__(self, name: str, *, fail_once: bool = False) -> None:
+            self.name = name
+            self.fail_once = fail_once
+
+        def snapshot_pending(self):
+            return []
+
+        def triage_once(self, *, pending=None, shard=None):
+            events.append(self.name)
+            if self.fail_once:
+                self.fail_once = False
+                raise RuntimeError("injected triage failure")
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=plan,
+        run_session_fn=lambda *args, **kwargs: events.append("user"),
+        initial_ref="main",
+        triagers=[Triager("triage-0"), Triager("triage-1", fail_once=True)],
+        recovery=_recovery(tmp_path),
+    )
+    with pytest.raises(RoundDeliveryBlocked, match="triage-incomplete"):
+        orch.run_round("main", round_no=1)
+    assert events == ["user", "triage-0", "triage-1"]
+
+    orch.run_round("main", round_no=1)
+    assert events == ["user", "triage-0", "triage-1", "triage-1"]
+    assert plan_calls == 1
+    assert orch._recovery.stage_status(round_no=1, stage="round_sealed") == "completed"
+
+
+def test_recovery_reattaches_delivery_without_rerunning_owner_or_users(tmp_path) -> None:
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+    calls = {"user": 0, "owner": 0, "wait": 0}
+    closed = False
+
+    class Owner:
+        def admit_once(self):
+            calls["owner"] += 1
+            return type("Outcome", (), {"admitted": [11]})()
+
+    def wait_delivery(*, numbers):
+        calls["wait"] += 1
+        raise RoundDeliveryBlocked(numbers=list(numbers), reason="timeout")
+
+    def fetch_issue(number):
+        assert number == 11
+        return {"state": "closed" if closed else "open", "labels": ["ready"]}
+
+    def run_user(*args, **kwargs):
+        calls["user"] += 1
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="one"))],
+        run_session_fn=run_user,
+        initial_ref="main",
+        owner=Owner(),
+        fetch_issue=fetch_issue,
+        wait_delivery=wait_delivery,
+        recovery=_recovery(tmp_path),
+    )
+    with pytest.raises(RoundDeliveryBlocked, match="timeout"):
+        orch.run_round("main", round_no=1)
+    closed = True
+    orch.run_round("main", round_no=1)
+    assert calls == {"user": 1, "owner": 1, "wait": 1}
+
+
+def test_completed_recovery_round_is_an_idempotent_skip(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    calls: list[str] = []
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="one"))],
+        run_session_fn=lambda *args, **kwargs: calls.append("user"),
+        initial_ref="main",
+        recovery=_recovery(tmp_path),
+    )
+    first = orch.run_round("main", round_no=1, deliver=False)
+    second = orch.run_round("ignored", round_no=1, deliver=False)
+    assert first == second
+    assert calls == ["user"]
+    round_state = orch._recovery.round_state(round_no=1)
+    assert set(round_state["stages"]) == {"round_started", "users", "round_sealed"}

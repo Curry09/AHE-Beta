@@ -8,6 +8,7 @@ import pytest
 from auto_designer.loop.round_gate import (
     RoundDeliveryBlocked,
     classify_issue,
+    inspect_round_delivery,
     wait_round_delivery,
 )
 
@@ -28,6 +29,24 @@ def test_all_closed_succeeds() -> None:
         return {"state": "closed", "labels": ["openagents"]}
 
     wait_round_delivery(numbers=[3, 3, 4], fetch_issue=fetch_issue)
+
+
+def test_inspect_round_delivery_deduplicates_and_classifies_for_resume() -> None:
+    calls: list[int] = []
+
+    def fetch_issue(number: int) -> dict:
+        calls.append(number)
+        return {
+            "state": "closed" if number == 1 else "open",
+            "labels": ["ready"] if number != 3 else ["automation-failed"],
+        }
+
+    assert inspect_round_delivery(numbers=[1, 1, 2, 3], fetch_issue=fetch_issue) == {
+        1: "done",
+        2: "inflight",
+        3: "blocked",
+    }
+    assert calls == [1, 2, 3]
 
 
 def test_needs_human_raises() -> None:
@@ -93,6 +112,7 @@ def test_failure_labels_stop_immediately(state: str, label: str, mapping: bool) 
 
 def test_mixed_failure_reasons_are_explicit() -> None:
     """Spec-0062/T1: report all blocked subjects and the labels actually observed."""
+
     def fetch_issue(number: int) -> dict:
         labels = {1: [], 2: ["needs-human"], 3: ["automation-failed"]}
         return {"state": "closed", "labels": labels[number]}
