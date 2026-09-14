@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 import traceback
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -108,7 +109,8 @@ class Orchestrator:
         #    等共享资源，前移规避并发竞争）；阶段二线程池并行跑会话（launch + run_session 一整包，
         #    并发单元=整局会话，信封内部时序不动）。max_parallel_users=1 时行为与旧串行等价。
         prepared: list[tuple[Persona, SeedScenario, WorkspaceRuntime]] = []
-        for persona, scenario in self._session_plan():
+        planned = list(self._session_plan())
+        for persona, scenario in planned:
             try:
                 if scenario.workspace is not None:
                     workspace_dir = as_runtime(
@@ -120,7 +122,8 @@ class Orchestrator:
                 else:
                     workspace_dir = make_empty_runtime()
             except Exception:  # noqa: BLE001
-                # 单局 clone/setup 失败（如老仓 pip 装不上）不废整轮——记日志跳过，其余会话继续。
+                # 单局 clone/setup 失败（如老仓 pip 装不上）先记日志跳过；若整轮都失败，
+                # 下面的 all-user-sessions-failed 闸会阻止本轮继续。
                 print(
                     f"[orchestrator] 备工作区失败（persona={persona.identity}），"
                     "跳过该局，同轮其余会话继续："
@@ -129,12 +132,18 @@ class Orchestrator:
                 continue
             prepared.append((persona, scenario, workspace_dir))
 
+        successful_sessions = 0
+        session_lock = threading.Lock()
+
         def _one_session(
             persona: Persona, scenario: SeedScenario, workspace_dir: WorkspaceRuntime
         ) -> None:
+            nonlocal successful_sessions
             try:
                 harness = self._launcher.launch(sha, workspace_dir=workspace_dir)
                 self._run_session(persona, scenario, harness, workspace_dir=workspace_dir)
+                with session_lock:
+                    successful_sessions += 1
             finally:
                 workspace_dir.close()
 
@@ -155,6 +164,11 @@ class Orchestrator:
                         )
                         traceback.print_exc()
 
+        if planned and successful_sessions == 0:
+            from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+            raise RoundDeliveryBlocked(numbers=[], reason="all-user-sessions-failed")
+
         # Spec-0050/T3：末轮只测用户，跳过提案/准入/交付闸。
         if not deliver:
             if self._integrity_guard is not None:
@@ -167,13 +181,27 @@ class Orchestrator:
         # 单个生成器崩溃记日志跳过、不废整轮。
         beat1: list[tuple[str, Callable[[], object]]] = []
         n_triagers = len(self._triagers)
+        triage_shards: list[list] | None = None
+        if n_triagers and hasattr(self._triagers[0], "snapshot_pending"):
+            # Snapshot once before any triager can mutate report labels.  Passing
+            # explicit subsets makes ownership stable for the whole parallel beat.
+            pending = self._triagers[0].snapshot_pending()
+            triage_shards = [pending[idx::n_triagers] for idx in range(n_triagers)]
         for idx, triager in enumerate(self._triagers):
-            beat1.append(
-                (
-                    f"triage[{idx}]",
-                    (lambda t=triager, k=idx: t.triage_once(shard=(k, n_triagers))),
+            if triage_shards is None:
+                beat1.append(
+                    (
+                        f"triage[{idx}]",
+                        (lambda t=triager, k=idx: t.triage_once(shard=(k, n_triagers))),
+                    )
                 )
-            )
+            else:
+                beat1.append(
+                    (
+                        f"triage[{idx}]",
+                        (lambda t=triager, p=triage_shards[idx]: t.triage_once(pending=p)),
+                    )
+                )
         for divergent in self._divergents:
             beat1.append(("divergent", divergent.propose_once))
         self._run_parallel(beat1)
@@ -187,15 +215,23 @@ class Orchestrator:
         self._run_parallel(beat2)
 
         # Owner 汇合独立 PM 与交付路线，标注交付重叠但保留独立验收；Designer 仅处理非 PM covers。
-        # 崩溃记日志跳过（提案留存、下轮再审），不废整轮。
+        # Owner 是唯一准入权威；其失败必须阻断本轮，不能以空等待集伪装成功。
         admitted: list[int] = []
         if self._owner is not None:
             try:
                 outcome = self._owner.admit_once()
                 admitted = [int(n) for n in (getattr(outcome, "admitted", None) or [])]
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 print("[orchestrator] owner 准入异常，跳过，本轮继续：")
                 traceback.print_exc()
+                # Owner is the sole admission authority.  Continuing with an
+                # empty wait set would incorrectly mark the round successful
+                # and start the next user round with proposals still blocked.
+                from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+                raise RoundDeliveryBlocked(
+                    numbers=[], reason="owner-failed:admission did not complete"
+                ) from exc
 
         # Spec-0050/T3：等本轮准入票终态。空名单立即成功。卡死向上抛，不开下一轮用户。
         self._await_round_delivery(numbers=admitted)
@@ -263,12 +299,13 @@ class Orchestrator:
 
         Spec-0033/T3：先 fetch origin 再**优先解析 origin/<ref>**——spec-0032 后推进 main 的是 Gitea
         上的 server-side merge，本地 main 停在 seed 不再是真身；fetch 同时把远端对象取回本地，launcher
-        按该 SHA checkout 才解析得到。无 origin（Fake/单仓测试）或 fetch 失败（离线）→ 退化本地 <ref>，
-        行为与旧实现等价；fetch 失败只告警不抛——观测游标宁可停滞也不废轮。
+        按该 SHA checkout 才解析得到。无 origin 或无可用远端跟踪 ref 时退化本地 <ref>；但若已有
+        origin/<ref> 且本次 fetch 失败，拒绝使用可能过期的远端游标，避免静默重复旧轮次。
         """
         remotes = subprocess.run(
             ["git", "-C", self._harness_repo, "remote"], capture_output=True, text=True
         ).stdout.split()
+        fetch_failed = False
         if "origin" in remotes:
             fetched = subprocess.run(
                 ["git", "-C", self._harness_repo, "fetch", "origin", ref],
@@ -276,6 +313,7 @@ class Orchestrator:
                 text=True,
             )
             if fetched.returncode != 0:
+                fetch_failed = True
                 print(
                     f"[orchestrator] fetch origin {ref} 失败（游标可能停滞）："
                     f"{fetched.stderr.strip()[:200]}"
@@ -294,5 +332,9 @@ class Orchestrator:
                 text=True,
             )
             if result.returncode == 0:
+                if fetch_failed and candidate.startswith("refs/remotes/origin/"):
+                    raise RuntimeError(
+                        f"origin/{ref} fetch 失败，拒绝使用可能过期的远端游标"
+                    )
                 return result.stdout.strip()
         raise RuntimeError(f"解析 main ref {ref!r} 失败：{result.stderr[:200]}")

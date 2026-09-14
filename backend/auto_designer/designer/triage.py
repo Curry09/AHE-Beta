@@ -216,6 +216,16 @@ class Triager:
         )
         return outcome
 
+    def snapshot_pending(self) -> list:
+        """Return one stable, sorted report snapshot for orchestrator sharding.
+
+        The orchestrator takes this snapshot once before starting parallel
+        triagers.  Each worker then receives an explicit issue subset instead
+        of re-reading and re-slicing a tracker that other workers are mutating.
+        """
+        backlog = self._tracker.list_open_issues()
+        return sorted((i for i in backlog if plane(i.labels) == REPORT), key=lambda i: i.number)
+
     def _session_id_for_issue(self, issue_number: int) -> str | None:
         # User reports remain auditable even when the persona protocol was
         # invalid; do not hide the linked session from factual triage.

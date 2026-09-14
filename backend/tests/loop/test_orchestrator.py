@@ -184,6 +184,15 @@ def test_cursor_falls_back_to_local_when_origin_unreachable(tmp_path) -> None:
     assert _orch(repo, []).run_round("c") == head
 
 
+def test_cursor_refuses_stale_remote_tracking_head_after_fetch_failure(tmp_path) -> None:
+    """已有 origin/main 但 fetch 失败时，不能静默使用可能过期的远端跟踪游标。"""
+    repo, _writer = _seed_with_origin(tmp_path)
+    _git(repo, "remote", "set-url", "origin", str(tmp_path / "missing-origin.git"))
+
+    with pytest.raises(RuntimeError, match="拒绝使用可能过期"):
+        _orch(repo, []).run_round("c")
+
+
 def test_run_nonpositive_raises(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     with pytest.raises(ValueError):
@@ -245,6 +254,26 @@ def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
 
     assert out == head
     assert {d for k, d in events if k == "session"} == {"s0", "s2"}  # 其余会话都完成
+
+
+def test_all_user_sessions_failed_blocks_round(tmp_path) -> None:
+    """所有会话都失败时，不能继续进入生成/准入并推进下一轮。"""
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+
+    def fail_session(persona, scenario, harness, *, workspace_dir=None):
+        raise RuntimeError("session unavailable")
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        run_session_fn=fail_session,
+        initial_ref="main",
+    )
+    with pytest.raises(RoundDeliveryBlocked, match="all-user-sessions-failed"):
+        orch.run_round("c")
 
 
 def test_parallel_default_is_serial_equivalent(tmp_path) -> None:
@@ -468,6 +497,25 @@ def test_beats_order_triage_divergent_then_synth_then_owner(tmp_path) -> None:
     assert shards == {"triage0": (0, 2), "triage1": (1, 2)}
 
 
+def test_triage_workers_receive_fixed_disjoint_snapshots(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    events: list = []
+
+    class SnapshotTriager:
+        def snapshot_pending(self):
+            return [type("Issue", (), {"number": number})() for number in (1, 2, 3, 4)]
+
+        def triage_once(self, *, pending=None, shard=None):
+            events.append((pending, shard))
+
+    orch = _orch(repo, events, triagers=[SnapshotTriager(), SnapshotTriager()])
+    orch.run_round("c")
+
+    triage_events = [event for event in events if isinstance(event, tuple) and isinstance(event[0], list)]
+    assert [sorted(issue.number for issue in pending) for pending, shard in triage_events] == [[1, 3], [2, 4]]
+    assert all(shard is None for pending, shard in triage_events)
+
+
 def test_no_owner_skips_admission(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []
@@ -486,6 +534,20 @@ def test_no_owner_skips_admission(tmp_path) -> None:
     orch.run_round("c")  # owner=None 不炸、准入段跳过
     kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d")]
     assert kinds == ["session", "triage"]
+
+
+def test_owner_failure_blocks_round_instead_of_advancing(tmp_path) -> None:
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+
+    class BrokenOwner:
+        def admit_once(self):
+            raise RuntimeError("owner unavailable")
+
+    orch = _orch(repo, [], owner=BrokenOwner())
+    with pytest.raises(RoundDeliveryBlocked, match="owner-failed"):
+        orch.run_round("c")
 
 
 def test_run_binds_round_context_for_each_round() -> None:
