@@ -366,11 +366,12 @@ def main() -> int:
         }
 
     rng = random.Random(SESSION_SEED)
-    pair_log: list[list[tuple[str, str]]] = []
+    pair_log: dict[int, list[tuple[str, str]]] = {}
 
     def session_plan():
-        picks = _session_picks(rng, round_index=len(pair_log))
-        pair_log.append(list(picks))
+        round_no = current["round"]
+        picks = _session_picks(rng, round_index=round_no - 1)
+        pair_log[round_no] = list(picks)
         print(f"  session plan ({len(picks)}): {picks}")
         return [(display[pid], scenarios[iid]) for pid, iid in picks]
 
@@ -389,26 +390,38 @@ def main() -> int:
 
     from auto_designer.invocation import append_round, init_manifest  # noqa: PLC0415
 
+    run_mode = run_mod.experiment_run_mode()
     role_runs = run_mod.install_role_runs(data_root=run_mod.DATA)
-    init_manifest(
-        roster=roster,
-        models={
-            "user": os.environ.get("USER_LLM_MODEL", ""),
-            "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
-            "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
-            "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
-        },
-    )
+    recovery = run_mod.load_recovery_store(mode=run_mode)
+    if run_mode == "fresh":
+        init_manifest(
+            roster=roster,
+            models={
+                "user": os.environ.get("USER_LLM_MODEL", ""),
+                "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
+                "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
+                "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
+            },
+        )
     print(f"⓪.6 实验切片 ROLE_RUNS_DIR={role_runs}")
-    print("① 种 harness 本地仓 ...")
-    repo = run_mod._seed_harness_repo()
-    print("② 接 Gitea + 复位 ...")
+    if run_mode == "fresh":
+        print("① fresh：种 harness 本地仓 ...")
+        repo = run_mod._seed_harness_repo()
+    else:
+        print("① resume：复用现有 harness 本地仓 ...")
+        repo = run_mod.existing_harness_repo()
+    print("② 接 Gitea ...")
     tracker = GiteaTracker(
         base_url=gitea["GITEA_URL"], owner=gitea["OWNER"], repo=gitea["REPO"], token=gitea["TOKEN"]
     )
     tracker.ensure_labels(["bug", "feature", "needs-triage", "RFC", "triaged"])
     run_mod._set_gitea_remote(repo, gitea)
-    run_mod._reset_to_initial(repo, tracker)
+    if run_mode == "fresh":
+        run_mod._reset_to_initial(repo, tracker)
+    if run_mode == "resume" and recovery is not None:
+        from auto_designer.loop.live import prepare_live_resume
+
+        prepare_live_resume(data_dir=run_mod.DATA, phase="reconcile")
     store = SessionStore(role_runs / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=run_mod.DATA / "harness_runs")
 
@@ -423,7 +436,11 @@ def main() -> int:
     def on_round_start(k: int) -> None:
         current["round"] = k
         update_live_run(
-            data_dir=run_mod.DATA, running=True, round_no=k, total_rounds=run_mod.TOTAL_ROUNDS
+            data_dir=run_mod.DATA,
+            running=True,
+            round_no=k,
+            total_rounds=run_mod.TOTAL_ROUNDS,
+            phase=orch.recovery_phase(round_no=k) if recovery is not None else "users",
         )
         print(f"\n==== round {k}/{run_mod.TOTAL_ROUNDS} ====")
 
@@ -660,6 +677,7 @@ def main() -> int:
         max_parallel_users=max_parallel_users,
         integrity_guard=integrity_guard,
         fetch_issue=lambda number: tracker.get_issue(number=number),
+        recovery=recovery,
     )
 
     vigil = None
@@ -707,8 +725,27 @@ def main() -> int:
         )
 
     plan_path = run_mod.DATA / "swebench_session_plans.json"
+    if recovery is not None:
+        saved_rounds = recovery.snapshot().get("rounds") or {}
+        recovered_log = []
+        for round_no in range(1, run_mod.TOTAL_ROUNDS + 1):
+            saved = saved_rounds.get(str(round_no), {}).get("plan") or []
+            recovered_log.append(
+                [
+                    [
+                        item["persona"]["identity"],
+                        ((item["scenario"].get("workspace") or {}).get("params") or {}).get(
+                            "instance_id", ""
+                        ),
+                    ]
+                    for item in saved
+                ]
+            )
+        plan_payload = recovered_log
+    else:
+        plan_payload = [pair_log[key] for key in sorted(pair_log)]
     plan_path.write_text(
-        json.dumps(pair_log, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(plan_payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     print("\n=== 结果 ===")
     print("各轮 main HEAD SHA:", refs)

@@ -104,7 +104,7 @@ tasks:
     acceptance: 分类和角色输出完整落盘后不再调用模型；崩溃恢复不重复建票、合并来源、评论或准入；Owner 完成后 admitted 集固定，后续开放队列变化不扩大本轮交付。
   - id: T6
     title: Fresh/resume 入口与故障矩阵验收
-    status: in-progress
+    status: done
     priority: P0
     tags: []
     depends-on:

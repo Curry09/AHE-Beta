@@ -130,6 +130,19 @@ def test_stable_session_id_rejects_different_content(tmp_path) -> None:
     assert store.load(first.session_id) == first
 
 
+def test_legacy_second_save_may_only_attach_issue_handoff(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    session = _session(n_issues=0)
+    store.save(session)
+    session.issue_refs = [IssueRef(number=7, url="fake://issues/7", state="open")]
+    session.user_feedback_envelope = {"level": "L1", "source_issue_ids": [7]}
+
+    store.save(session)
+
+    assert store.load(session.session_id).issue_refs[0].number == 7
+    assert store.index()[0]["issue_numbers"] == [7]
+
+
 def test_reconcile_repairs_missing_or_duplicate_index_without_rewriting_session(tmp_path) -> None:
     import json
 

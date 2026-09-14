@@ -61,9 +61,12 @@ class SessionStore:
                     f"session file is invalid: {session.session_id}"
                 ) from exc
             if existing != body:
-                raise SessionConflictError(
-                    f"stable session id has different content: {session.session_id}"
-                )
+                if _is_issue_handoff_enrichment(existing=existing, current=body):
+                    _atomic_json(full_path, body)
+                else:
+                    raise SessionConflictError(
+                        f"stable session id has different content: {session.session_id}"
+                    )
         else:
             _atomic_json(full_path, body)
         entries = self.index(include_invalid=True)
@@ -137,6 +140,20 @@ class SessionStore:
 def _validate_session_id(session_id: str) -> None:
     if not session_id or not _SESSION_ID_RE.fullmatch(session_id):
         raise ValueError(f"invalid session id: {session_id!r}")
+
+
+def _is_issue_handoff_enrichment(*, existing: dict, current: dict) -> bool:
+    """Allow the legacy two-step save that only attaches the final issue handoff."""
+    old_refs = existing.get("issue_refs") or []
+    new_refs = current.get("issue_refs") or []
+    if old_refs or not new_refs:
+        return False
+    old_base = dict(existing)
+    new_base = dict(current)
+    for key in ("issue_refs", "user_feedback_envelope"):
+        old_base.pop(key, None)
+        new_base.pop(key, None)
+    return old_base == new_base
 
 
 def _atomic_json(path: Path, value: object) -> None:

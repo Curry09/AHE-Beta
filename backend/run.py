@@ -295,6 +295,49 @@ def install_role_runs(*, data_root: Path) -> Path:
     return root
 
 
+def experiment_run_mode() -> str:
+    """Return the explicit lifecycle mode used by recoverable experiment runs."""
+    mode = os.environ.get("AUTO_DESIGNER_RUN_MODE", "fresh").strip().lower() or "fresh"
+    if mode not in {"fresh", "resume"}:
+        raise SystemExit(f"AUTO_DESIGNER_RUN_MODE 必须为 fresh 或 resume：{mode!r}")
+    return mode
+
+
+def load_recovery_store(*, mode: str):
+    """Create/open the shared recovery ledger when an experiment identity is present."""
+    root_raw = os.environ.get("AUTO_DESIGNER_RECOVERY_ROOT", "").strip()
+    identity_names = {
+        "experiment_id": "AUTO_DESIGNER_EXPERIMENT_ID",
+        "run_id": "AUTO_DESIGNER_RUN_ID",
+        "config_hash": "AUTO_DESIGNER_CONFIG_HASH",
+        "controller_sha": "AUTO_DESIGNER_CONTROLLER_SHA",
+        "plan_hash": "AUTO_DESIGNER_PLAN_HASH",
+    }
+    values = {field: os.environ.get(name, "").strip() for field, name in identity_names.items()}
+    configured = bool(root_raw or any(values.values()))
+    if not configured:
+        return None
+    missing = [name for field, name in identity_names.items() if not values[field]]
+    if not root_raw:
+        missing.append("AUTO_DESIGNER_RECOVERY_ROOT")
+    if missing:
+        raise SystemExit("恢复身份环境变量不完整：" + ", ".join(missing))
+    from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore  # noqa: PLC0415
+
+    identity = RecoveryIdentity(**values)
+    root = Path(root_raw).expanduser().resolve()
+    if mode == "fresh":
+        return RecoveryStore.initialize(root=root, identity=identity)
+    return RecoveryStore.open(root=root, identity=identity)
+
+
+def existing_harness_repo() -> Path:
+    """Return the preserved harness repo required by resume without mutating it."""
+    if not (HARNESS_REPO / ".git").is_dir():
+        raise SystemExit(f"resume 缺少已初始化 harness 仓：{HARNESS_REPO}")
+    return HARNESS_REPO
+
+
 def _alias_current_sessions(*, data_root: Path, sessions_root: Path) -> None:
     """Point data/sessions at this run's sessions without deleting prior role_runs."""
     alias = data_root / "sessions"
@@ -766,21 +809,28 @@ def main() -> int:
     from auto_designer.user.sim.persona_io import card_to_personas
 
     print(f"⓪ 输入：persona 卡库={args.persona_library} | 种子卡库={args.seed_cards}")
+    run_mode = experiment_run_mode()
     role_runs = install_role_runs(data_root=DATA)
+    recovery = load_recovery_store(mode=run_mode)
     from auto_designer.invocation import append_round, init_manifest  # noqa: PLC0415
 
-    init_manifest(
-        roster=roster,
-        models={
-            "user": os.environ.get("USER_LLM_MODEL", ""),
-            "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
-            "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
-            "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
-        },
-    )
+    if run_mode == "fresh":
+        init_manifest(
+            roster=roster,
+            models={
+                "user": os.environ.get("USER_LLM_MODEL", ""),
+                "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
+                "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
+                "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
+            },
+        )
     print(f"⓪.6 实验切片 ROLE_RUNS_DIR={role_runs}")
-    print("① 种 harness 本地仓 ...")
-    repo = _seed_harness_repo()
+    if run_mode == "fresh":
+        print("① fresh：种 harness 本地仓 ...")
+        repo = _seed_harness_repo()
+    else:
+        print("① resume：复用现有 harness 本地仓 ...")
+        repo = existing_harness_repo()
 
     print("② 接 Gitea + 本地存储 + launcher ...")
     tracker = GiteaTracker(
@@ -788,8 +838,11 @@ def main() -> int:
     )
     tracker.ensure_labels(["bug", "feature"])
     _set_gitea_remote(repo, gitea)  # 配 origin；推送由开发者 agent 用 git 工具自己做
-    print("②.5 复位到最初状态（Gitea harness→v0 + 关闭遗留 issue + 清空看板）...")
-    _reset_to_initial(repo, tracker)
+    if run_mode == "fresh":
+        print("②.5 fresh：复位 Gitea harness、issue 与 live 投影 ...")
+        _reset_to_initial(repo, tracker)
+    else:
+        print("②.5 resume：保留 Gitea、session、harness 与 live 历史 ...")
     store = SessionStore(role_runs / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
@@ -852,11 +905,15 @@ def main() -> int:
         append_agent_log,
         archive_agent,
         clear_live,
+        prepare_live_resume,
         update_agent,
         update_live_run,
     )
 
-    clear_live(data_dir=DATA)  # 一轮 run 开始清空 live 观测投影（agents/run/history）
+    if run_mode == "fresh":
+        clear_live(data_dir=DATA)
+    elif recovery is not None:
+        prepare_live_resume(data_dir=DATA, phase="reconcile")
 
     # 当前轮游标：orchestrator 轮次回调写入，各 agent 活动/归档据此标轮。round_shas 逐轮累计。
     current = {"round": 0}
@@ -869,7 +926,7 @@ def main() -> int:
             running=True,
             round_no=k,
             total_rounds=TOTAL_ROUNDS,
-            phase="users",
+            phase=orch.recovery_phase(round_no=k) if recovery is not None else "users",
         )
 
     # Spec-0029/T8：背压阈值（proposal/ready 队列深度）。超阈值只告警、不自动扩容——这是
@@ -1148,6 +1205,7 @@ def main() -> int:
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
         integrity_guard=integrity_guard,  # Spec-0021/T2
         fetch_issue=lambda number: tracker.get_issue(number=number),
+        recovery=recovery,
     )
 
     # Spec-0050/T4：TOTAL_ROUNDS=1 只测用户，不启交付面。

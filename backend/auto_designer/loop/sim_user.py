@@ -306,7 +306,8 @@ def make_sim_run_session_fn(
         sim_persona = sim_personas[persona.identity]
         # Spec-0064/T3: the staged orchestrator binds a stable operation id.
         # Direct/legacy callers retain a random per-session identity.
-        session_id = current_usage_context().session_id or uuid.uuid4().hex
+        bound_session_id = current_usage_context().session_id
+        session_id = bound_session_id or uuid.uuid4().hex
         client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
 
         # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
@@ -433,7 +434,7 @@ def make_sim_run_session_fn(
             tracker,
             res,
             round_no=round_no,
-            session_id=session_id,
+            session_id=session_id if bound_session_id else None,
         )
         feel = res.feeling or res.feeling_derived
         session = Session(

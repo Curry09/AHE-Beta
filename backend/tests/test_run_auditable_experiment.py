@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 
 import run_auditable_experiment
+from auto_designer.experiment import runtime
+from auto_designer.experiment.manifest import read_manifest, recovery_identity
+from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
 
 
 def _module():
@@ -131,9 +134,38 @@ def test_frozen_experiment_validates_round_roster_and_pins(tmp_path: Path) -> No
     assert frozen.experiment_id == "unit-audit"
     assert frozen.roster["user"] == 2
 
+    runtime.create(config_path=config, root=frozen.root.parent)
+    identity = recovery_identity(read_manifest(path=frozen.paths["manifest"]))
+    fresh_env = module._execution_environment(
+        frozen,
+        profile={},
+        context_path=tmp_path / "context.json",
+        run_mode="fresh",
+        identity=identity,
+    )
+    resumed_env = module._execution_environment(
+        frozen,
+        profile={},
+        context_path=tmp_path / "context.json",
+        run_mode="resume",
+        identity=identity,
+    )
+    assert fresh_env["AUTO_DESIGNER_RUN_ID"] == resumed_env["AUTO_DESIGNER_RUN_ID"]
+    assert resumed_env["AUTO_DESIGNER_RUN_MODE"] == "resume"
+    assert resumed_env["AUTO_DESIGNER_PLAN_HASH"] == _sha(plan)
+    RecoveryStore.initialize(
+        root=frozen.paths["checkpoints"], identity=RecoveryIdentity(**identity)
+    )
+    assert module._validate_recovery_identity(frozen, resume=True) == identity
+
     for enabled in (False, True):
         frozen.raw["execution"]["designer_grouping"] = enabled
-        environment = module._execution_environment(frozen, profile={}, context_path=tmp_path / "context.json")
+        environment = module._execution_environment(
+            frozen,
+            profile={},
+            context_path=tmp_path / "context.json",
+            identity=identity,
+        )
         assert environment["DESIGNER_GROUPING"] == ("1" if enabled else "0")
         assert environment["NO_PROXY"] == environment["no_proxy"] == "*"
         frozen.validate_contract()

@@ -7,7 +7,7 @@
 - history.json：按轮归档的已完成工作项（append-only）——agent 槽位每轮被覆盖，归档让
   「已完成状态按轮回看」成为可能。
 
-原子写（temp+replace）避免读进程读到半成品。一轮 run 开始时 clear_live 全部清空。
+原子写（temp+replace）避免读进程读到半成品。fresh run 清空；resume 保留历史并修正中断槽位。
 """
 
 from __future__ import annotations
@@ -267,3 +267,36 @@ def clear_live(*, data_dir: Path) -> None:
     with _WRITE_LOCK:  # Spec-0017/T1：与在途写者互斥，清空不与 upsert 交错出半新半旧
         for name in (_AGENTS_NAME, _RUN_NAME, _HISTORY_NAME):
             _live_file(data_dir=data_dir, name=name).unlink(missing_ok=True)
+
+
+def prepare_live_resume(*, data_dir: Path, phase: str) -> None:
+    """Preserve live/history while making stale in-process activity explicit."""
+    with _WRITE_LOCK:
+        now = datetime.now().isoformat()
+        agents_path = _live_file(data_dir=data_dir, name=_AGENTS_NAME)
+        registry = _read_json(path=agents_path, fallback={})
+        if not isinstance(registry, dict):
+            registry = {}
+        for slot in registry.values():
+            if not isinstance(slot, dict) or not slot.get("running"):
+                continue
+            slot["running"] = False
+            slot["status"] = "上次进程已中断，等待恢复对账"
+            slot["updated_at"] = now
+            log = list(slot.get("log") or [])
+            if not log or log[-1].get("text") != slot["status"]:
+                log.append({"t": now, "kind": "status", "text": slot["status"]})
+            slot["log"] = log[-_LOG_CAP:]
+        _write_atomic(path=agents_path, data=registry)
+
+        run_path = _live_file(data_dir=data_dir, name=_RUN_NAME)
+        run = _read_json(path=run_path, fallback={})
+        if not isinstance(run, dict):
+            run = {}
+        run.setdefault("round", 0)
+        run.setdefault("total_rounds", 0)
+        run.setdefault("round_shas", [])
+        run.setdefault("blocked_issues", [])
+        run.update(running=True, phase=f"recovering:{phase}", updated_at=now)
+        run.setdefault("started_at", now)
+        _write_atomic(path=run_path, data=run)

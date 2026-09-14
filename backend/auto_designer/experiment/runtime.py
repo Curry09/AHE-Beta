@@ -4,7 +4,11 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import subprocess
+import sys
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -31,7 +35,9 @@ from auto_designer.experiment.manifest import (
     create_manifest,
     last_state,
     read_manifest,
+    recovery_identity,
 )
+from auto_designer.loop.recovery import RecoveryError, RecoveryIdentity, RecoveryStore
 
 
 @dataclass(frozen=True)
@@ -120,9 +126,15 @@ def create(*, config_path: Path, root: Path | None = None) -> dict[str, Any]:
         yaml.dump(snapshot, handle)
     digest = config_hash(data=cfg.raw)
     project = compose_project(experiment_id=cfg.experiment_id, cfg_hash=digest)
+    execution = cfg.raw.get("execution") if isinstance(cfg.raw.get("execution"), dict) else {}
+    plan_node = execution.get("plan") if isinstance(execution.get("plan"), dict) else {}
     manifest = {
         "experiment_id": cfg.experiment_id,
+        "run_id": uuid.uuid4().hex,
         "config_hash": digest,
+        "controller_sha": str(cfg.source.get("auto_designer_sha") or digest),
+        "plan_hash": str(plan_node.get("sha256") or digest),
+        "runner": str(execution.get("runner") or ""),
         "compose_project": project,
         "mode": cfg.mode,
         "isolation": cfg.infrastructure.get("isolation", "dedicated"),
@@ -214,11 +226,42 @@ def stop(*, experiment_id: str, root: Path | None = None, run=None) -> None:
     )
 
 
-def resume(*, experiment_id: str, root: Path | None = None, run=None) -> ExperimentContext:
+def resume(
+    *, experiment_id: str, root: Path | None = None, run=None, demand_run=None
+) -> ExperimentContext:
+    """Resume infrastructure and, for auditable runs, the demand controller."""
     paths = experiment_paths(experiment_id=experiment_id, root=root or experiments_root())
     state = last_state(path=paths["journal"])
     if state not in ("STOPPED", "FAILED", "CREATED", "PROVISIONED", "READY"):
         raise ConfigError(f"不可从 {state} resume")
+    manifest = read_manifest(path=paths["manifest"])
+    if manifest.get("runner") == "swebench-closed-loop":
+        identity = recovery_identity(manifest)
+        try:
+            RecoveryStore.open(root=paths["checkpoints"], identity=RecoveryIdentity(**identity))
+        except RecoveryError as exc:
+            raise ConfigError(f"recovery state 不可续跑：{exc}") from exc
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve().parents[2] / "scripts" / "run_auditable_experiment.py"),
+            "--config",
+            str(paths["config"]),
+            "--resume",
+        ]
+        runner = demand_run or subprocess.run
+        environment = os.environ.copy()
+        environment["EXPERIMENTS_ROOT"] = str(paths["root"].parent)
+        result = runner(
+            command,
+            cwd=Path(__file__).resolve().parents[3],
+            env=environment,
+            check=False,
+        )
+        if getattr(result, "returncode", 1) != 0:
+            raise ConfigError(
+                f"需求进程 resume 失败：returncode={getattr(result, 'returncode', '?')}"
+            )
+        return context_from_manifest(experiment_id=experiment_id, paths=paths, manifest=manifest)
     return start(experiment_id=experiment_id, root=root, run=run)
 
 
