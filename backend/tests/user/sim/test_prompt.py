@@ -75,6 +75,7 @@ def test_build_system_excludes_global_platform_contract() -> None:
     for marker in GLOBAL_FORBIDDEN_MARKERS:
         assert marker not in sys
     assert "# PERSONA" in sys
+    assert "# GOAL OWNERSHIP" in sys
     assert "# PERCEPTION BOUNDARY" in sys
 
 
