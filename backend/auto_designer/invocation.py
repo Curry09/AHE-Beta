@@ -96,8 +96,23 @@ class InvocationStore:
             rounds = list(current.get("rounds") or [])
             existing = next((item for item in rounds if item.get("round") == round_no), None)
             if existing is not None:
-                if existing != row:
+                if existing.get("user_sha") != user_sha:
                     raise ValueError(f"round {round_no} invocation manifest conflicts")
+                existing_sealed = existing.get("sealed_sha")
+                # Round start records the observation SHA before delivery has a
+                # sealed result.  Filling that result is the only permitted
+                # mutation.  A resume may replay the start assertion (None)
+                # after the row is already sealed; that must be idempotent and
+                # must never clear or replace the recorded SHA.
+                if sealed_sha is None or existing_sealed == sealed_sha:
+                    return
+                if existing_sealed is not None:
+                    raise ValueError(f"round {round_no} invocation manifest conflicts")
+                existing["sealed_sha"] = sealed_sha
+                current["rounds"] = sorted(
+                    rounds, key=lambda item: int(item["round"])
+                )
+                self.write_manifest(data=current)
                 return
             rounds.append(row)
             current["rounds"] = sorted(rounds, key=lambda item: int(item["round"]))
