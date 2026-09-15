@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 from pathlib import Path
 
 import pytest
@@ -826,3 +827,38 @@ def test_recovery_users_reconcile_session_store_and_run_only_missing_items(tmp_p
     orch.run_round("main", round_no=1, deliver=False)
     assert reconciled == 2
     assert calls == ["missing"]
+
+
+def test_recovery_users_preserve_configured_parallelism(tmp_path) -> None:
+    """A resumable round runs independent user envelopes concurrently."""
+    import time
+
+    repo = _seed_repo(tmp_path)
+    lock = threading.Lock()
+    active = 0
+    max_active = 0
+
+    def run_user(*args, **kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.05)
+        with lock:
+            active -= 1
+        return {"session_id": current_usage_context().session_id}
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[
+            (_persona(), SeedScenario(description="one")),
+            (_persona(), SeedScenario(description="two")),
+        ],
+        run_session_fn=run_user,
+        initial_ref="main",
+        max_parallel_users=2,
+        recovery=_recovery(tmp_path),
+    )
+    orch.run_round("main", round_no=1, deliver=False)
+    assert max_active == 2

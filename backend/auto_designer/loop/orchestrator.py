@@ -424,7 +424,17 @@ class Orchestrator:
             )
             return
 
+        # Recoverable runs must retain the configured session fan-out.  The
+        # original implementation executed this loop inline, so a resumed
+        # round silently degraded to one user at a time even when
+        # ``max_parallel_users`` was set to 16.  We freeze every unit intent
+        # first, then execute the independent session envelopes concurrently.
+        # Recovery mutations are kept behind one lock because RecoveryStore's
+        # revisioned snapshot is intentionally single-writer; model/tool work
+        # remains outside that lock.
         failures: list[str] = []
+        recovery_lock = threading.RLock()
+        pending: list[tuple[str, Persona, SeedScenario]] = []
         for index, (persona, scenario) in enumerate(planned):
             key = operation_key(round_no, "users", index, persona.to_dict(), scenario.to_dict())
             input_value = {
@@ -433,34 +443,40 @@ class Orchestrator:
                 "scenario": scenario.to_dict(),
                 "user_sha": user_sha,
             }
-            unit = recovery.begin_unit(
-                round_no=round_no,
-                stage="users",
-                key=key,
-                input_value=input_value,
-                expected_postconditions={"completed": True},
-                dependencies=("round_started",),
-            )
+            with recovery_lock:
+                unit = recovery.begin_unit(
+                    round_no=round_no,
+                    stage="users",
+                    key=key,
+                    input_value=input_value,
+                    expected_postconditions={"completed": True},
+                    dependencies=("round_started",),
+                )
             if unit.get("status") == "completed":
                 continue
+            pending.append((key, persona, scenario))
+
+        def run_one(item: tuple[str, Persona, SeedScenario]) -> None:
+            key, persona, scenario = item
             workspace_dir: WorkspaceRuntime | None = None
             try:
                 load_completed = getattr(self._run_session, "load_completed_session", None)
                 existing = load_completed(key) if callable(load_completed) else None
                 if existing is not None:
-                    recovery.save_output(
-                        round_no=round_no,
-                        stage="users",
-                        key=key,
-                        output=_result_payload(existing),
-                    )
-                    recovery.complete_unit(
-                        round_no=round_no,
-                        stage="users",
-                        key=key,
-                        observed_postconditions={"completed": True, "session_id": key},
-                    )
-                    continue
+                    with recovery_lock:
+                        recovery.save_output(
+                            round_no=round_no,
+                            stage="users",
+                            key=key,
+                            output=_result_payload(existing),
+                        )
+                        recovery.complete_unit(
+                            round_no=round_no,
+                            stage="users",
+                            key=key,
+                            observed_postconditions={"completed": True, "session_id": key},
+                        )
+                    return
                 if scenario.workspace is not None:
                     workspace_dir = as_runtime(
                         materialize_workspace(scenario.workspace), owns_tmp=True
@@ -476,30 +492,42 @@ class Orchestrator:
                         harness,
                         workspace_dir=workspace_dir,
                     )
-                recovery.save_output(
-                    round_no=round_no,
-                    stage="users",
-                    key=key,
-                    output=_result_payload(result),
-                )
-                recovery.complete_unit(
-                    round_no=round_no,
-                    stage="users",
-                    key=key,
-                    observed_postconditions={"completed": True},
-                )
+                with recovery_lock:
+                    recovery.save_output(
+                        round_no=round_no,
+                        stage="users",
+                        key=key,
+                        output=_result_payload(result),
+                    )
+                    recovery.complete_unit(
+                        round_no=round_no,
+                        stage="users",
+                        key=key,
+                        observed_postconditions={"completed": True},
+                    )
             except Exception as exc:  # noqa: BLE001
-                recovery.fail_unit(
-                    round_no=round_no,
-                    stage="users",
-                    key=key,
-                    error=f"{type(exc).__name__}: {exc}",
-                )
-                failures.append(key)
+                with recovery_lock:
+                    recovery.fail_unit(
+                        round_no=round_no,
+                        stage="users",
+                        key=key,
+                        error=f"{type(exc).__name__}: {exc}",
+                    )
+                    failures.append(key)
                 traceback.print_exc()
             finally:
                 if workspace_dir is not None:
                     workspace_dir.close()
+
+        if pending:
+            with ThreadPoolExecutor(
+                max_workers=min(len(pending), self._max_parallel_users)
+            ) as pool:
+                futures = [pool.submit(run_one, item) for item in pending]
+                for future in futures:
+                    # Exceptions are recorded by run_one; this retrieval also
+                    # prevents an unexpected worker error from being hidden.
+                    future.result()
         if failures:
             raise RoundDeliveryBlocked(numbers=[], reason="user-sessions-incomplete")
         recovery.complete_stage(round_no=round_no, stage="users")
