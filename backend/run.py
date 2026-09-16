@@ -844,6 +844,10 @@ def main() -> int:
     else:
         print("②.5 resume：保留 Gitea、session、harness 与 live 历史 ...")
     store = SessionStore(role_runs / "sessions")
+    # A resume may contain authoritative session files whose derived index was
+    # not published before an interruption.  Rebuild it before any role can
+    # resolve issue -> session evidence.
+    store.rebuild_index()
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 生成/准入角色 ...")

@@ -423,6 +423,10 @@ def main() -> int:
 
         prepare_live_resume(data_dir=run_mod.DATA, phase="reconcile")
     store = SessionStore(role_runs / "sessions")
+    # Rehydrate the derived issue/session index before triage on resume.  The
+    # full session JSON is authoritative and can survive an interrupted index
+    # write, so this must happen before any evidence lookup.
+    store.rebuild_index()
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=run_mod.DATA / "harness_runs")
 
     api = ApiPersonaClient()
