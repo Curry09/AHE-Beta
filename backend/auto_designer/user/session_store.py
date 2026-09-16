@@ -104,6 +104,63 @@ class SessionStore:
                     _atomic_json(self._root / _INDEX_NAME, entries)
                 return session
 
+    def find_session_id_by_issue(self, issue_number: int) -> str | None:
+        """Resolve an issue to its session, repairing a stale/missing index.
+
+        The full session file is the authoritative record.  A crash or a
+        resume restore can leave that file present while the derived
+        ``index.json`` is empty or stale; callers must not turn that recoverable
+        state into an evidence gap.
+        """
+        number = int(issue_number)
+        for entry in reversed(self.index(include_invalid=True)):
+            if number in [int(value) for value in entry.get("issue_numbers", [])]:
+                sid = str(entry.get("session_id") or "")
+                if sid:
+                    try:
+                        self.load(sid)
+                    except (FileNotFoundError, ValueError, json.JSONDecodeError):
+                        continue
+                    return sid
+
+        # Index miss: scan authoritative session files and repair the derived
+        # projection before returning the match.  This is intentionally a
+        # bounded local read with no model/tool activity.
+        for path in sorted(self._root.glob("*.json")):
+            if path.name == _INDEX_NAME:
+                continue
+            try:
+                session = self.load(path.stem)
+            except (FileNotFoundError, ValueError, json.JSONDecodeError):
+                continue
+            if any(ref.number == number for ref in session.issue_refs):
+                self.reconcile(session.session_id)
+                return session.session_id
+        return None
+
+    def rebuild_index(self) -> list[dict]:
+        """Rebuild ``index.json`` from authoritative session files.
+
+        Resume and replay entry points call this before role stages.  Invalid
+        or partial files are skipped and remain available for separate audit;
+        they must not prevent valid sessions from becoming trace-addressable.
+        """
+        with self._lock:
+            self._root.mkdir(parents=True, exist_ok=True)
+            with (self._root / ".sessions.lock").open("a+b") as lock_handle:
+                fcntl.flock(lock_handle, fcntl.LOCK_EX)
+                entries: list[dict] = []
+                for path in sorted(self._root.glob("*.json")):
+                    if path.name == _INDEX_NAME:
+                        continue
+                    try:
+                        session = self.load(path.stem)
+                    except (FileNotFoundError, ValueError, json.JSONDecodeError):
+                        continue
+                    entries.append(_index_entry(session))
+                _atomic_json(self._root / _INDEX_NAME, entries)
+                return entries
+
     def load_user_feedback_envelope(self, session_id: str) -> dict:
         """Return the persisted 0055 handoff, reconstructing legacy sessions once.
 

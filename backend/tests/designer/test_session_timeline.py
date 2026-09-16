@@ -297,6 +297,20 @@ def test_tool_by_issue_and_session(tmp_path: Path) -> None:
         assert get_session_timeline(issue_number=999)["ok"] is False
 
 
+def test_tool_by_issue_repairs_empty_session_index(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    sess = _session_rich(issue_n=42)
+    store.save(sess)
+    (tmp_path / "index.json").write_text("[]\n", encoding="utf-8")
+
+    with bind_session_store(store):
+        result = get_session_timeline(issue_number=42)
+
+    assert result["ok"] is True
+    assert json.loads(result["timeline"])["session_id"] == sess.session_id
+    assert store.index(include_invalid=True)[0]["issue_numbers"] == [42]
+
+
 def test_harness_beat_drilldown_clips_and_classifies(tmp_path: Path) -> None:
     store = SessionStore(tmp_path)
     sess = _session_rich(issue_n=9)

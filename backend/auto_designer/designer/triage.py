@@ -384,10 +384,7 @@ class Triager:
     def _session_id_for_issue(self, issue_number: int) -> str | None:
         # User reports remain auditable even when the persona protocol was
         # invalid; do not hide the linked session from factual triage.
-        for entry in self._store.index(include_invalid=True):
-            if issue_number in [int(number) for number in entry.get("issue_numbers", [])]:
-                return str(entry.get("session_id") or "") or None
-        return None
+        return self._store.find_session_id_by_issue(issue_number)
 
     def _apply(
         self,

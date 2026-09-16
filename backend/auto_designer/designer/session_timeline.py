@@ -427,22 +427,9 @@ def find_session_by_id(store: SessionStore, session_id: str) -> Session | None:
 
 
 def find_session_by_issue(store: SessionStore, issue_number: int) -> Session | None:
-    """按 issue 号反查：先看 index.issue_numbers，再扫全量（兼容旧 index）。"""
-    n = int(issue_number)
-    for entry in reversed(store.index()):
-        nums = entry.get("issue_numbers") or []
-        if n in nums:
-            found = find_session_by_id(store, str(entry.get("session_id", "")))
-            if found is not None:
-                return found
-    for entry in reversed(store.index()):
-        sid = str(entry.get("session_id", ""))
-        sess = find_session_by_id(store, sid)
-        if sess is None:
-            continue
-        if any(r.number == n for r in sess.issue_refs):
-            return sess
-    return None
+    """按 issue 号反查，并在索引缺失时从权威会话文件恢复索引。"""
+    sid = store.find_session_id_by_issue(int(issue_number))
+    return find_session_by_id(store, sid) if sid else None
 
 
 def _resolve_session(

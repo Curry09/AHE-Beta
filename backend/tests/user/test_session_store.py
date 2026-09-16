@@ -165,6 +165,30 @@ def test_reconcile_missing_session_returns_none_and_ids_are_path_safe(tmp_path) 
         store.load("../escape")
 
 
+def test_find_session_by_issue_recovers_from_empty_index(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    session = _session()
+    store.save(session)
+    (tmp_path / "index.json").write_text("[]\n", encoding="utf-8")
+
+    assert store.find_session_id_by_issue(1) == session.session_id
+    assert store.index(include_invalid=True)[0]["issue_numbers"] == [1]
+
+
+def test_rebuild_index_recovers_all_authoritative_session_files(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    first = _session()
+    second = _session()
+    second.session_id = "second-session"
+    store.save(first)
+    store.save(second)
+    (tmp_path / "index.json").write_text("[]\n", encoding="utf-8")
+
+    rows = store.rebuild_index()
+    assert {row["session_id"] for row in rows} == {first.session_id, second.session_id}
+    assert len(store.index(include_invalid=True)) == 2
+
+
 def test_concurrent_saves_lose_no_index_entries(tmp_path) -> None:
     """Spec-0017/T1 竞态回归：并发 save N 局后 index 恰好 N 条、全量文件 N 个。
 
