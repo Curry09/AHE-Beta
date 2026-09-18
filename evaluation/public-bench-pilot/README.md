@@ -46,19 +46,23 @@ and grading execute inside ephemeral Daytona sandboxes.
 
 Host requirements are therefore only Python 3.12, `uv`, the Daytona SDK, the
 prepared thin task package, the frozen harness archive, and runtime credentials.
-A Docker daemon is not required. Keep concurrency at 1 for this pilot and inject
-secrets only at runtime. Never write credentials into a manifest or committed
-configuration.
+A Docker daemon is not required. The tested Daytona tier has a 10 GiB aggregate
+memory limit, so schedule at most one 6 GiB plus one 4 GiB sandbox concurrently.
+Inject secrets only at runtime. Never write credentials into a manifest or
+committed configuration.
 
 Before running a preflight:
 
 ```bash
 export DAYTONA_API_KEY='...'
 export OPENROUTER_API_KEY='...'
-export HARNESS_V0_ARCHIVE=/absolute/path/to/harness-v0-cade14d.tar.gz
+export HARNESS_ARCHIVE=/absolute/path/to/harness-under-test.tar.gz
+export HARNESS_EVAL_LABEL=baseline-v0-cade14d
 ```
 
-`HARNESS_V0_ARCHIVE` must have the SHA-256 recorded in `protocol.json`. The
+For the baseline-v0 run, `HARNESS_ARCHIVE` must have the SHA-256 recorded in
+`protocol.json`. `HARNESS_V0_ARCHIVE` remains a deprecated compatibility alias;
+it does not identify the actual version. The
 runners create ignored `runs/` directories locally for downloaded logs and
 manifests, and delete their remote sandboxes in a `finally` block.
 
@@ -74,6 +78,30 @@ UV_CACHE_DIR=/tmp/daytona-uv-cache uv run --with daytona \
 UV_CACHE_DIR=/tmp/daytona-uv-cache uv run --with daytona \
   python run_daytona_tau3_preflight.py
 ```
+
+The parameterized expansion runners are `run_daytona_swe_case.py`,
+`run_daytona_terminal_case.py`, and `run_daytona_tua_case.py`; the tau3 runner
+accepts `--domain` and `--task-id`.
+
+### Time-budget policy
+
+Active runners no longer use the pilot's former hard-coded 360-second wait.
+They resolve the whole-trial agent budget as follows:
+
+- use pinned `[agent].timeout_sec` from the task's official `task.toml` when it
+  exists;
+- otherwise use 1800 seconds and record
+  `agent_timeout_source=fallback_no_official_timeout`;
+- share that one deadline across all conversation turns rather than granting a
+  fresh budget to each follow-up;
+- size the remote-command wait and Daytona TTL above the task, build, and
+  verifier budgets so an outer controller cannot undercut the selected task
+  limit.
+
+Harness-owned early termination remains part of the artifact under test. A
+Harness `[timeout]` reply is recorded as a self-timeout, not a normal completion.
+The JSON results below that explicitly record `360` are historical pilot runs
+and must not be reported as official-budget benchmark scores.
 
 `run_daytona_tau3_preflight.py` fetches the locked tau3 source commit inside
 the sandbox and sets `TAU2_DATA_DIR` to that retained source tree because the
@@ -129,6 +157,60 @@ action checks but missed the required user communication. Thus the diagnostic
 preflight task success rate is 2/4, harness completion is 4/4, and the observed
 infrastructure failure rate is 0/4. These validation runs are explicitly not a
 reported benchmark score.
+
+The later rerun in `preflight-results-strict-goal-r3.json` uses the exact
+harness archive loaded by `harness-mixed16-20260916-strict-goal-r3` (SHA-256
+`686b5eda...9cd4`). It again passes SWE-bench and TUA, again receives reward 0
+on tau3 after completing all actions but omitting the required communication,
+and fails to return the first Terminal-Bench reply within 360 seconds. Its
+end-to-end pass rate remains 2/4 while harness completion drops from 4/4 to
+3/4. Controller-only failed attempts are listed separately and excluded.
+
+The eight-task expansion is recorded in
+`expanded8-results-strict-goal-r3.json`. It uses two tasks per benchmark. Four
+of eight tasks pass end to end, five of eight reach an official grader, one of
+those five receives reward 0, and three time out before the first harness reply.
+Thus end-to-end pass rate is 4/8, graded-task success is 4/5, and harness
+completion is 5/8. Invalid setup/grader attempts fixed during bring-up are
+listed separately and excluded from these rates.
+
+The matched baseline-v0 rerun and the direct paired comparison are recorded in
+`expanded8-comparison-v0-vs-strict-goal-r3.json`. Across the same eight tasks,
+baseline v0 passes 2/8 and completes the harness interaction on 8/8, while
+strict-goal-r3 passes 4/8 and completes 5/8. The latest harness wins two paired
+tasks (Django and tau3 telecom), loses none on end-to-end pass/fail, and ties six;
+however, it regresses completion on three tied-failure tasks by timing out before
+its first reply where v0 returned a result. These are one-trial environment-
+validation observations, not a statistically stable benchmark score.
+
+The same eight-task paired run with both the harness model and tau3 user
+simulator changed to the historical `deepseek/deepseek-v4-flash` model is in
+`expanded8-comparison-ds4-flash.json`. The NL judge remains fixed at GPT-4.1.
+Both harnesses pass 1/8 (astropy only). Baseline v0 completes 8/8, while
+strict-goal-r3 completes 3/8: four first-reply timeouts plus one tau3 protocol
+failure where it emits three tool requests in one turn. Both DS4 tau3 retail
+runs and the v0 telecom run reach the 40-step maximum with reward 0. Compared
+with the GLM-5.2 paired run, DS4 reduces baseline v0 from 2/8 to 1/8 and the
+latest harness from 4/8 to 1/8 on this sample.
+
+A separate no-user-interaction check is recorded in
+`standard6-results-strict-goal-r3-glm52.json`. It excludes tau3, sends exactly
+one official benchmark instruction to each of the six SWE/Terminal/TUA tasks,
+and uses `z-ai/glm-5.2`. The latest harness passes 2/6 and completes 3/6. These
+aggregate rates match its strict-follow-up run over the same six tasks, though
+Django changes from pass to timeout and the TUA pivot task changes from timeout
+to pass, showing material run-to-run variance.
+
+The corrected GLM-5.2 LLM-user rerun is recorded in
+`llm-user-comparison-glm52.json`. For each non-tau task, the official
+instruction is followed by the first harness reply, one GLM-5.2-generated user
+follow-up, and a second harness reply. The user model sees no grader or hidden
+tests; its prompt, output, and usage are preserved per run. Existing tau3
+official-user-simulator trials are reused rather than rerun. On the expanded
+eight-task set, baseline v0 passes 4/8 and completes 8/8 interactions, while
+strict-goal-r3 passes 3/8 and completes 4/8. These remain one-trial environment
+validation observations rather than a stable causal estimate of user-simulator
+impact.
 
 ## Pilot protocol
 

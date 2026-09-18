@@ -193,6 +193,9 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 ### 0064 阶段级可恢复实验运行
 把真实闭环改造成带持久化阶段游标、工作项幂等键和外部状态对账的可重入状态机，使实验失败后从最近完成的用户、Triage、Designer、Owner 或交付节点继续。
 
+### 0065 标准化 Harness 评测框架
+以不可变计划驱动隔离沙盒中的 Harness 评测，统一官方时间预算、直出与带心跳 LLM 用户模拟、官方 grader、失败分类、恢复和可复现实验报告。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -472,6 +475,12 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0064 | 0064/T4 | Triage 与 Divergent 第一拍恢复 | done | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/tests/designer/test_triage.py<br>backend/tests/designer/test_divergent_gate.py |
 | 0064 | 0064/T5 | Designer 与 Owner 输出先存后应用 | done | T1, T2, T4 | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/tests/loop/test_designer.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_delivery_evidence.py |
 | 0064 | 0064/T6 | Fresh/resume 入口与故障矩阵验收 | done | T1, T2, T3, T4, T5 | backend/run.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/manifest.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/e2e-stage-resume.sh<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_stage_resume_e2e.py<br>docs/audits/0064-stage-resume-validation.md |
+| 0065 | 0065/T1 | 版本化评测计划与不可变清单 | done | — | evaluation/harness_bench/schema.py<br>evaluation/harness_bench/config.py<br>evaluation/harness_bench/manifest.py<br>evaluation/harness_bench/cli.py<br>evaluation/tests/harness_bench/test_config.py<br>evaluation/tests/harness_bench/test_manifest.py |
+| 0065 | 0065/T2 | 可插拔沙盒提供方与隔离生命周期 | done | — | evaluation/harness_bench/providers/base.py<br>evaluation/harness_bench/providers/daytona.py<br>evaluation/harness_bench/providers/local.py<br>evaluation/harness_bench/sandbox.py<br>evaluation/tests/harness_bench/test_sandbox.py |
+| 0065 | 0065/T3 | Harness 持久会话与流式控制协议 | done | — | evaluation/harness_bench/harness/protocol.py<br>evaluation/harness_bench/harness/session.py<br>evaluation/harness_bench/harness/adapters.py<br>evaluation/tests/harness_bench/test_harness_session.py |
+| 0065 | 0065/T4 | 直出与带心跳 LLM 用户模拟策略 | done | T1, T3 | evaluation/harness_bench/interactions/base.py<br>evaluation/harness_bench/interactions/direct.py<br>evaluation/harness_bench/interactions/simulated_user.py<br>evaluation/harness_bench/interactions/native_user.py<br>evaluation/tests/harness_bench/test_interactions.py |
+| 0065 | 0065/T5 | Benchmark 插件、官方预算与隐藏 grader | done | T1, T2, T3 | evaluation/harness_bench/benchmarks/base.py<br>evaluation/harness_bench/benchmarks/swebench.py<br>evaluation/harness_bench/benchmarks/terminal_bench.py<br>evaluation/harness_bench/benchmarks/tua_bench.py<br>evaluation/harness_bench/benchmarks/tau3.py<br>evaluation/tests/harness_bench/test_benchmarks.py |
+| 0065 | 0065/T6 | 可恢复编排、统一结果与配对报告 | done | T1, T2, T3, T4, T5 | evaluation/harness_bench/orchestrator.py<br>evaluation/harness_bench/state.py<br>evaluation/harness_bench/outcomes.py<br>evaluation/harness_bench/report.py<br>evaluation/tests/harness_bench/test_orchestrator.py<br>evaluation/tests/harness_bench/test_reporting.py |
 
 ## 跨 feature 关系图
 
@@ -878,6 +887,14 @@ graph LR
         n0064_T5["T5 Designer 与 Owner 输出先存后应用"]
         n0064_T6["T6 Fresh/resume 入口与故障矩阵验收"]
     end
+    subgraph G0065[0065 standardized-harness-evaluation]
+        n0065_T1["T1 版本化评测计划与不可变清单"]
+        n0065_T2["T2 可插拔沙盒提供方与隔离生命周期"]
+        n0065_T3["T3 Harness 持久会话与流式控制协议"]
+        n0065_T4["T4 直出与带心跳 LLM 用户模拟策略"]
+        n0065_T5["T5 Benchmark 插件、官方预算与隐藏 grader"]
+        n0065_T6["T6 可恢复编排、统一结果与配对报告"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1171,6 +1188,16 @@ graph LR
     n0064_T6 --> n0064_T3
     n0064_T6 --> n0064_T4
     n0064_T6 --> n0064_T5
+    n0065_T4 --> n0065_T1
+    n0065_T4 --> n0065_T3
+    n0065_T5 --> n0065_T1
+    n0065_T5 --> n0065_T2
+    n0065_T5 --> n0065_T3
+    n0065_T6 --> n0065_T1
+    n0065_T6 --> n0065_T2
+    n0065_T6 --> n0065_T3
+    n0065_T6 --> n0065_T4
+    n0065_T6 --> n0065_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -3304,6 +3331,47 @@ graph LR
     nT1 --> nT5
     nT2 --> nT5
     nT4 --> nT5
+    nT1 --> nT6
+    nT2 --> nT6
+    nT3 --> nT6
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
+```
+
+### 0065 标准化 Harness 评测框架（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 版本化评测计划与不可变清单"]
+    nT2["T2 可插拔沙盒提供方与隔离生命周期"]
+    nT3["T3 Harness 持久会话与流式控制协议"]
+    nT4["T4 直出与带心跳 LLM 用户模拟策略"]
+    nT5["T5 Benchmark 插件、官方预算与隐藏 grader"]
+    nT6["T6 可恢复编排、统一结果与配对报告"]
+    nT1 --> nT4
+    nT3 --> nT4
+    nT1 --> nT5
+    nT2 --> nT5
+    nT3 --> nT5
     nT1 --> nT6
     nT2 --> nT6
     nT3 --> nT6

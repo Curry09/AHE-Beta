@@ -7,7 +7,6 @@ import hashlib
 import json
 from pathlib import Path
 
-
 HERE = Path(__file__).resolve().parent
 PREPARED = HERE / "prepared"
 

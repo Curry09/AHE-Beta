@@ -8,16 +8,18 @@ tool and returns the resulting ``ToolMessage`` on the next turn.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import os
-from pathlib import Path
 import re
 import shlex
+import shutil
 import tarfile
 import tempfile
-from typing import Any, Optional
+import time
 import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 from tau2.agent.base_agent import HalfDuplexAgent
 from tau2.data_model.message import (
@@ -31,7 +33,6 @@ from tau2.data_model.message import (
 from tau2.environment.tool import Tool
 
 from .stdio import HarnessStdioSession, harness_environment
-
 
 _CALL_PATTERN = re.compile(
     r"<TAU3_TOOL_CALL>\s*(\{.*?\})\s*</TAU3_TOOL_CALL>", re.DOTALL
@@ -67,6 +68,7 @@ class HarnessV0TauState:
     initialized: bool = False
     turns: int = 0
     transcript: list[dict[str, Any]] = field(default_factory=list)
+    deadline: float | None = None
 
 
 class HarnessV0TauAgent(HalfDuplexAgent[HarnessV0TauState]):
@@ -77,7 +79,7 @@ class HarnessV0TauAgent(HalfDuplexAgent[HarnessV0TauState]):
         tools: list[Tool],
         domain_policy: str,
         llm: str | None = None,
-        llm_args: Optional[dict[str, Any]] = None,
+        llm_args: dict[str, Any] | None = None,
         *,
         harness_archive: str | Path | None = None,
         harness_dir: str | Path | None = None,
@@ -85,7 +87,7 @@ class HarnessV0TauAgent(HalfDuplexAgent[HarnessV0TauState]):
         model: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
-        turn_timeout_sec: float = 360.0,
+        trial_timeout_sec: float = 1800.0,
     ) -> None:
         super().__init__(tools=tools, domain_policy=domain_policy)
         self.llm = llm
@@ -116,7 +118,11 @@ class HarnessV0TauAgent(HalfDuplexAgent[HarnessV0TauState]):
             or os.environ.get("LLM_API_KEY")
             or self._provider_key(llm)
         )
-        self._turn_timeout_sec = float(turn_timeout_sec)
+        self._trial_timeout_sec = float(trial_timeout_sec)
+        if self._trial_timeout_sec <= 0:
+            raise ValueError("trial_timeout_sec must be positive")
+        artifact_dir = os.environ.get("HARNESS_V0_ARTIFACT_DIR")
+        self._artifact_dir = Path(artifact_dir) if artifact_dir else None
         self._active_state: HarnessV0TauState | None = None
         self._tools_by_name = {tool.name: tool for tool in tools}
         if len(self._tools_by_name) != len(tools):
@@ -216,7 +222,7 @@ not use shell commands for anything except this helper during this benchmark.
 {history_text}"""
 
     def get_init_state(
-        self, message_history: Optional[list[Message]] = None
+        self, message_history: list[Message] | None = None
     ) -> HarnessV0TauState:
         if self._active_state is not None:
             self.stop(state=self._active_state)
@@ -309,13 +315,20 @@ not use shell commands for anything except this helper during this benchmark.
         state: HarnessV0TauState,
     ) -> tuple[AssistantMessage, HarnessV0TauState]:
         incoming = self._format_input(message)
+        if state.deadline is None:
+            state.deadline = time.monotonic() + self._trial_timeout_sec
+        remaining = state.deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                f"tau3 trial exhausted its total {self._trial_timeout_sec:.1f}s agent budget"
+            )
         if not state.initialized:
             bootstrap = Path(state.workspace_temp.name, "bootstrap.txt").read_text(
                 encoding="utf-8"
             )
             incoming = bootstrap + "\n\nCurrent user message:\n" + incoming
             state.initialized = True
-        reply = state.session.request(incoming, timeout=self._turn_timeout_sec)
+        reply = state.session.request(incoming, timeout=remaining)
         state.turns += 1
         state.transcript.append(
             {
@@ -344,13 +357,24 @@ not use shell commands for anything except this helper during this benchmark.
 
     def stop(
         self,
-        message: Optional[UserMessage | ToolMessage | MultiToolMessage] = None,
-        state: Optional[HarnessV0TauState] = None,
+        message: UserMessage | ToolMessage | MultiToolMessage | None = None,
+        state: HarnessV0TauState | None = None,
     ) -> None:
         target = state or self._active_state
         if target is None:
             return
         target.session.close()
+        if self._artifact_dir is not None:
+            self._artifact_dir.mkdir(parents=True, exist_ok=True)
+            workspace = Path(target.workspace_temp.name)
+            for name in ("harness-transcript.jsonl", "harness-stderr.log"):
+                source = workspace / name
+                if source.is_file():
+                    shutil.copy2(source, self._artifact_dir / name)
+            (self._artifact_dir / "adapter-turns.json").write_text(
+                json.dumps(target.transcript, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
         if target.harness_temp is not None:
             target.harness_temp.cleanup()
         target.workspace_temp.cleanup()
@@ -372,7 +396,7 @@ def create_harness_v0_agent(
         "model",
         "base_url",
         "api_key",
-        "turn_timeout_sec",
+        "trial_timeout_sec",
     }
     return HarnessV0TauAgent(
         tools=tools,

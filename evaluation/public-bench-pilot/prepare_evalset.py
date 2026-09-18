@@ -4,18 +4,17 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
 import shutil
 import tarfile
 import tempfile
 import tomllib
+from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
 
 import pyarrow.parquet as pq
-
 
 HERE = Path(__file__).resolve().parent
 SELECTION = HERE / "selection.json"
@@ -336,7 +335,7 @@ def build(args: argparse.Namespace) -> Path:
             staging / "prepared-manifest.json",
             {
                 "schema_version": 1,
-                "prepared_at": datetime.now(timezone.utc).isoformat(),
+                "prepared_at": datetime.now(UTC).isoformat(),
                 "total_tasks": 19,
                 "counts": counts,
                 "source_archive_roots": {

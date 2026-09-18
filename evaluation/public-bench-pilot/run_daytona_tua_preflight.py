@@ -3,33 +3,42 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import argparse
 import json
-import os
-from pathlib import Path
 import traceback
+from datetime import UTC, datetime
+from pathlib import Path
 
 from daytona import CreateSandboxFromImageParams, Daytona, DaytonaConfig, Resources
-
 from daytona_common import (
     credentials,
     download_artifacts,
+    evaluation_model,
+    exec_async_logged,
     exec_logged,
+    harness_archive_path,
+    harness_eval_label,
     new_run_dir,
+    prepared_root,
+    safe_run_label,
+    sha256_file,
+    user_simulator_model,
     write_controller_manifest,
 )
-
+from timeout_policy import (
+    remote_command_timeout,
+    resolve_task_timeouts,
+    sandbox_ttl_minutes,
+)
 
 HERE = Path(__file__).resolve().parent
 TASK_NAME = "106-create-charles-ssh-user"
 TASK = (
-    HERE
-    / "prepared/controller-private/task-sources/tua-bench/tasks"
+    prepared_root(HERE)
+    / "controller-private/task-sources/tua-bench/tasks"
     / TASK_NAME
 )
-HARNESS = Path(
-    os.environ.get("HARNESS_V0_ARCHIVE", HERE / "artifacts/harness-v0-cade14d.tar.gz")
-)
+HARNESS = harness_archive_path(HERE)
 NEXAU_COMMIT = "09e747b59e3684d5541d557087d6d93790c5a43f"
 STRICT_FOLLOWUP = (
     "Before I accept this, verify every requested account property yourself: the "
@@ -39,18 +48,41 @@ STRICT_FOLLOWUP = (
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--llm-user-simulator", action="store_true")
+    args = parser.parse_args()
+    timeouts = resolve_task_timeouts(TASK / "task.toml")
     daytona_key, model_key = credentials()
-    run_dir = new_run_dir(HERE, f"tua-{TASK_NAME}-harnessv0-daytona")
+    model = evaluation_model()
+    simulator_model = user_simulator_model()
+    harness_label = harness_eval_label(HARNESS)
+    run_dir = new_run_dir(
+        HERE,
+        f"tua-{TASK_NAME}-{safe_run_label(harness_label)}-{safe_run_label(model)}-daytona",
+    )
     client = Daytona(DaytonaConfig(api_key=daytona_key))
     sandbox = None
     manifest = {
         "benchmark": "TUA-Bench",
         "task": TASK_NAME,
+        "harness_archive_sha256": sha256_file(HARNESS),
+        "harness_label": harness_label,
+        "agent_model": model,
         "nexau_commit": NEXAU_COMMIT,
         "execution_location": "daytona",
         "grader_visibility": "uploaded only after agent exit",
+        "input_mode": (
+            "official-plus-llm-user-followup"
+            if args.llm_user_simulator
+            else "official-plus-strict-followup"
+        ),
+        "user_simulator_model": simulator_model if args.llm_user_simulator else None,
         "local_benchmark_dependencies": False,
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "agent_timeout_seconds": timeouts.agent_seconds,
+        "agent_timeout_source": timeouts.agent_source,
+        "verifier_timeout_seconds": timeouts.verifier_seconds,
+        "environment_build_timeout_seconds": timeouts.environment_build_seconds,
+        "started_at": datetime.now(UTC).isoformat(),
     }
     try:
         print(f"RUN_DIR {run_dir}", flush=True)
@@ -59,12 +91,18 @@ def main() -> int:
                 image="ubuntu:24.04",
                 resources=Resources(cpu=2, memory=4, disk=10),
                 ephemeral=True,
-                ttl_minutes=90,
+                ttl_minutes=sandbox_ttl_minutes(
+                    timeouts.environment_build_seconds,
+                    timeouts.agent_seconds,
+                    timeouts.verifier_seconds,
+                    minimum_minutes=90,
+                ),
                 labels={"purpose": "tua-harness-v0-preflight", "task": TASK_NAME},
                 env_vars={
                     "LLM_API_KEY": model_key,
                     "LLM_BASE_URL": "https://openrouter.ai/api/v1",
-                    "LLM_MODEL": "z-ai/glm-5.2",
+                    "LLM_MODEL": model,
+                    "USER_SIMULATOR_MODEL": simulator_model,
                     "HARNESS_STDIO_PROTOCOL": "stdio-jsonl-v1",
                     "PYTHONUNBUFFERED": "1",
                 },
@@ -102,6 +140,7 @@ def main() -> int:
             "harness-install",
             "sudo -u agent python3 -m venv /app/.harness-venv "
             "&& sudo -u agent /app/.harness-venv/bin/pip install --no-cache-dir "
+            "'ag-ui-protocol==0.1.22' "
             f"'git+https://github.com/nex-agi/NexAU.git@{NEXAU_COMMIT}' "
             "&& sudo -u agent mkdir -p /app/harness-v0",
             1800,
@@ -115,32 +154,49 @@ def main() -> int:
             str(HERE / "adapters/harness_v0/harbor_driver.py"),
             "/app/harness_driver.py",
         )
+        sandbox.fs.upload_file(
+            str(HERE / "adapters/harness_v0/llm_user_simulator.py"),
+            "/app/llm_user_simulator.py",
+        )
         sandbox.fs.upload_file(str(TASK / "instruction.md"), "/app/instruction.md")
-        sandbox.fs.upload_file(STRICT_FOLLOWUP.encode(), "/app/followup.md")
+        if not args.llm_user_simulator:
+            sandbox.fs.upload_file(STRICT_FOLLOWUP.encode(), "/app/followup.md")
         exec_logged(
             sandbox,
             run_dir,
             "harness-unpack",
             "tar -xzf /tmp/harness-v0.tar.gz -C /app/harness-v0 "
             "&& chown -R agent:agent /app/harness-v0 /app/stdio.py "
-            "/app/harness_driver.py /app/instruction.md /app/followup.md",
+            "/app/harness_driver.py /app/llm_user_simulator.py /app/instruction.md "
+            + ("" if args.llm_user_simulator else "/app/followup.md"),
             120,
         )
-        response = sandbox.process.exec(
+        followup_arg = (
+            "--llm-user-simulator --user-simulator-output /tmp/eval-output/user-simulator.json "
+            if args.llm_user_simulator
+            else "--followup-file /app/followup.md "
+        )
+        agent_exit_code, agent_stdout, agent_stderr = exec_async_logged(
+            sandbox,
+            run_dir,
+            "agent",
             "sudo -u agent -E /app/.harness-venv/bin/python -u /app/harness_driver.py "
             "--python /app/.harness-venv/bin/python --harness-dir /app/harness-v0 "
-            "--work-dir /app --instruction-file /app/instruction.md "
-            "--followup-file /app/followup.md "
+            f"--work-dir /app --instruction-file /app/instruction.md {followup_arg}"
             "--transcript /tmp/eval-output/harness-transcript.jsonl "
-            "--stderr /tmp/eval-output/harness-stderr.log --timeout 360",
-            timeout=900,
+            "--stderr /tmp/eval-output/harness-stderr.log "
+            f"--timeout {timeouts.agent_seconds}",
+            remote_command_timeout(timeouts.agent_seconds),
         )
-        (run_dir / "remote-agent.log").write_text(
-            response.result or "", encoding="utf-8"
+        manifest["agent_exit_code"] = agent_exit_code
+        download_artifacts(
+            sandbox, run_dir, ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json")
         )
-        manifest["agent_exit_code"] = response.exit_code
-        if response.exit_code != 0:
-            raise RuntimeError(f"remote harness failed: {response.exit_code}")
+        if agent_exit_code != 0:
+            raise RuntimeError(
+                f"remote harness failed: {agent_exit_code}: "
+                f"{(agent_stdout + agent_stderr)[-2000:]}"
+            )
 
         # The verifier stays outside the agent-visible filesystem until now.
         sandbox.process.exec("mkdir -p /tests /logs/verifier /logs/artifacts", timeout=30)
@@ -154,7 +210,7 @@ def main() -> int:
             "&& cd /tmp "
             "&& sudo -u agent -E env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin "
             "bash /tests/test.sh",
-            timeout=600,
+            timeout=timeouts.verifier_seconds or 1800,
         )
         (run_dir / "grader.log").write_text(grader.result or "", encoding="utf-8")
         reward_raw = sandbox.fs.download_file("/logs/verifier/reward.txt")
@@ -191,7 +247,7 @@ def main() -> int:
         print(f"RUN_ERROR {type(exc).__name__}: {exc}", flush=True)
         return 1
     finally:
-        manifest["finished_at"] = datetime.now(timezone.utc).isoformat()
+        manifest["finished_at"] = datetime.now(UTC).isoformat()
         write_controller_manifest(run_dir, manifest)
         if sandbox is not None:
             try:

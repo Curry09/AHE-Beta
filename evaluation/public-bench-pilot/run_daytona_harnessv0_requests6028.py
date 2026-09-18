@@ -8,16 +8,18 @@ after the model patch has been captured.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from getpass import getpass
+import argparse
 import json
 import os
-from pathlib import Path
 import re
 import time
 import traceback
+from datetime import UTC, datetime
+from getpass import getpass
+from pathlib import Path
 from urllib.parse import urlsplit
 
+from adapters.harness_v0.llm_user_simulator import generate_followup
 from daytona import (
     CreateSandboxFromImageParams,
     Daytona,
@@ -26,18 +28,24 @@ from daytona import (
     Resources,
     SessionExecuteRequest,
 )
-
+from daytona_common import (
+    evaluation_model,
+    harness_archive_path,
+    harness_eval_label,
+    prepared_root,
+    safe_run_label,
+    sha256_file,
+    user_simulator_model,
+)
+from timeout_policy import resolve_task_timeouts, sandbox_ttl_minutes
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-HARNESS_ARCHIVE = Path(
-    os.environ.get("HARNESS_V0_ARCHIVE", HERE / "artifacts/harness-v0-cade14d.tar.gz")
-)
+HARNESS_ARCHIVE = harness_archive_path(HERE)
 IMAGE = "swebench/sweb.eval.x86_64.psf_1776_requests-6028:latest"
-MODEL = "z-ai/glm-5.2"
 INSTANCE_ID = "psf__requests-6028"
 BASE_COMMIT = "0192aac24123735b3eaf9b08df46429bb770c283"
-DATASET = HERE / "prepared/controller-private/swe-bench-verified-full.jsonl"
+DATASET = prepared_root(HERE) / "controller-private/swe-bench-verified-full.jsonl"
 
 PROBLEM_STATEMENT = r"""Proxy authentication bug
 <!-- Summary. -->
@@ -186,9 +194,18 @@ def score_targets(log: str, fail_to_pass: list[str], pass_to_pass: list[str]) ->
 
 
 def main() -> int:
-    root_env = load_env(ROOT / ".env")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--llm-user-simulator", action="store_true")
+    args = parser.parse_args()
+    timeouts = resolve_task_timeouts()
+    model = evaluation_model()
+    simulator_model = user_simulator_model()
+    env_file = Path(os.environ.get("PUBLIC_BENCH_ENV_FILE", ROOT / ".env"))
+    root_env = load_env(env_file)
     model_base = "https://openrouter.ai/api/v1"
-    model_key = root_env.get("openrouter_api_key", "")
+    model_key = os.environ.get("OPENROUTER_API_KEY") or root_env.get(
+        "openrouter_api_key", ""
+    )
     if not model_base or not model_key:
         raise SystemExit("OPENROUTER_API_KEY is unavailable")
     model_host = urlsplit(model_base).hostname
@@ -200,8 +217,13 @@ def main() -> int:
 
     daytona_key = os.environ.get("DAYTONA_API_KEY") or getpass("Daytona API key: ")
     client = Daytona(DaytonaConfig(api_key=daytona_key))
-    run_stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = HERE / "runs" / f"{run_stamp}-{INSTANCE_ID}-harnessv0"
+    harness_label = harness_eval_label(HARNESS_ARCHIVE)
+    run_stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    run_dir = (
+        HERE
+        / "runs"
+        / f"{run_stamp}-{INSTANCE_ID}-{safe_run_label(harness_label)}-{safe_run_label(model)}-daytona"
+    )
     run_dir.mkdir(parents=True, exist_ok=False)
 
     sandbox = None
@@ -213,14 +235,28 @@ def main() -> int:
         "instance_id": INSTANCE_ID,
         "benchmark": "SWE-bench Verified",
         "image": IMAGE,
-        "harness_archive_sha256": "dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011",
+        "harness_archive_sha256": sha256_file(HARNESS_ARCHIVE),
+        "harness_label": harness_label,
+        "agent_model": model,
         "nexau_commit": "09e747b59e3684d5541d557087d6d93790c5a43f",
         "runtime_install_location": "daytona",
-        "model": MODEL,
+        "model": model,
         "model_base_host": model_host,
         "model_route_note": "OpenRouter is used because Daytona Tier 1/2 blocks the original custom gateway domain.",
-        "user_simulator": "deterministic-strict-followup-v1",
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "input_mode": (
+            "official-plus-llm-user-followup"
+            if args.llm_user_simulator
+            else "official-plus-strict-followup"
+        ),
+        "user_simulator": (
+            "llm-generated-followup-v1"
+            if args.llm_user_simulator
+            else "deterministic-strict-followup-v1"
+        ),
+        "user_simulator_model": simulator_model if args.llm_user_simulator else None,
+        "agent_timeout_seconds": timeouts.agent_seconds,
+        "agent_timeout_source": timeouts.agent_source,
+        "started_at": datetime.now(UTC).isoformat(),
         "run_dir": str(run_dir),
     }
 
@@ -237,6 +273,7 @@ def main() -> int:
             "tar -xzf /tmp/python312.tar.gz -C /opt && "
             "/opt/python/bin/python3 -m venv /opt/harness-venv && "
             "/opt/harness-venv/bin/pip install --no-cache-dir "
+            "'ag-ui-protocol==0.1.22' "
             "'git+https://github.com/nex-agi/NexAU.git@09e747b59e3684d5541d557087d6d93790c5a43f' && "
             "rm -f /tmp/python312.tar.gz"
         )
@@ -245,10 +282,12 @@ def main() -> int:
                 image=runtime_image,
                 resources=Resources(cpu=2, memory=8, disk=10),
                 ephemeral=True,
-                ttl_minutes=45,
+                ttl_minutes=sandbox_ttl_minutes(
+                    timeouts.agent_seconds, minimum_minutes=60
+                ),
                 labels={"purpose": "harness-v0-smoke", "instance": INSTANCE_ID},
                 env_vars={
-                    "LLM_MODEL": MODEL,
+                    "LLM_MODEL": model,
                     "LLM_BASE_URL": model_base,
                     "LLM_API_KEY": model_key,
                     "SANDBOX_WORK_DIR": "/testbed",
@@ -315,21 +354,57 @@ def main() -> int:
         command_id = command.cmd_id
         print(f"HARNESS_STARTED {session_id} {command_id}", flush=True)
 
+        trial_deadline = time.monotonic() + timeouts.agent_seconds
+
+        def remaining_trial_seconds() -> float:
+            remaining = trial_deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"trial exhausted its total {timeouts.agent_seconds}s agent budget"
+                )
+            return remaining
+
         turn0 = {"type": "message", "text": PROBLEM_STATEMENT}
         trace.append({"role": "user", "turn": 0, "content": PROBLEM_STATEMENT})
         sandbox.process.send_session_command_input(
             session_id, command_id, json.dumps(turn0, ensure_ascii=False) + "\n"
         )
-        events, replies = wait_for_replies(sandbox, session_id, command_id, 1, 360)
+        events, replies = wait_for_replies(
+            sandbox,
+            session_id,
+            command_id,
+            1,
+            remaining_trial_seconds(),
+        )
         trace.append({"role": "harness", "turn": 0, "event": replies[0]})
         print("TURN0_REPLY " + str(replies[0].get("text", ""))[:500].replace("\n", " "), flush=True)
 
-        turn1 = {"type": "message", "text": STRICT_USER_FOLLOWUP}
-        trace.append({"role": "user", "turn": 1, "content": STRICT_USER_FOLLOWUP})
+        followup = STRICT_USER_FOLLOWUP
+        if args.llm_user_simulator:
+            audit = generate_followup(
+                instruction=PROBLEM_STATEMENT,
+                agent_reply=str(replies[0].get("text", "")),
+                model=simulator_model,
+                api_key=model_key,
+                base_url=model_base,
+            )
+            (run_dir / "user-simulator.json").write_text(
+                json.dumps(audit, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            followup = audit["followup"]
+        turn1 = {"type": "message", "text": followup}
+        trace.append({"role": "user", "turn": 1, "content": followup})
         sandbox.process.send_session_command_input(
             session_id, command_id, json.dumps(turn1, ensure_ascii=False) + "\n"
         )
-        events, replies = wait_for_replies(sandbox, session_id, command_id, 2, 360)
+        events, replies = wait_for_replies(
+            sandbox,
+            session_id,
+            command_id,
+            2,
+            remaining_trial_seconds(),
+        )
         trace.append({"role": "harness", "turn": 1, "event": replies[1]})
         print("TURN1_REPLY " + str(replies[1].get("text", ""))[:500].replace("\n", " "), flush=True)
 
@@ -399,7 +474,7 @@ def main() -> int:
         )
         print("GRADER_TAIL " + grader_output[-1000:].replace("\n", " "), flush=True)
 
-        manifest["finished_at"] = datetime.now(timezone.utc).isoformat()
+        manifest["finished_at"] = datetime.now(UTC).isoformat()
         (run_dir / "manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
@@ -408,7 +483,7 @@ def main() -> int:
         manifest["passed"] = False
         manifest["error"] = f"{type(exc).__name__}: {exc}"
         manifest["traceback"] = traceback.format_exc()
-        manifest["finished_at"] = datetime.now(timezone.utc).isoformat()
+        manifest["finished_at"] = datetime.now(UTC).isoformat()
         (run_dir / "manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )

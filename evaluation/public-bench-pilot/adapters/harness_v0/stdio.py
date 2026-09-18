@@ -6,15 +6,16 @@ stacks and unit-tested without installing either framework.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import os
-from pathlib import Path
 import queue
 import subprocess
 import threading
 import time
-from typing import Any, Mapping, Sequence, TextIO
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, TextIO
 
 
 class HarnessProtocolError(RuntimeError):
@@ -58,7 +59,7 @@ class HarnessStdioSession:
     def pid(self) -> int | None:
         return self._process.pid if self._process is not None else None
 
-    def start(self) -> "HarnessStdioSession":
+    def start(self) -> HarnessStdioSession:
         if self._process is not None:
             return self
         self._cwd.mkdir(parents=True, exist_ok=True)
@@ -119,7 +120,7 @@ class HarnessStdioSession:
         finally:
             self._events.put(None)
 
-    def request(self, text: str, *, timeout: float = 360.0) -> HarnessReply:
+    def request(self, text: str, *, timeout: float = 1800.0) -> HarnessReply:
         if not isinstance(text, str) or not text.strip():
             raise ValueError("message text must be a non-empty string")
         with self._request_lock:
@@ -205,7 +206,7 @@ class HarnessStdioSession:
             self._transcript_handle.close()
         self._process = None
 
-    def __enter__(self) -> "HarnessStdioSession":
+    def __enter__(self) -> HarnessStdioSession:
         return self.start()
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:

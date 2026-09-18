@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-from getpass import getpass
 import json
 import os
+from datetime import UTC, datetime
+from getpass import getpass
 from pathlib import Path
 
 from daytona import CreateSandboxFromImageParams, Daytona, DaytonaConfig, Resources
-
 from run_daytona_harnessv0_requests6028 import (
     BASE_COMMIT,
     DATASET,
@@ -118,7 +117,7 @@ def main() -> int:
                 "sandbox_deleted": cleanup_error is None,
                 "cleanup_error": cleanup_error,
                 "image": IMAGE,
-                "graded_at": datetime.now(timezone.utc).isoformat(),
+                "graded_at": datetime.now(UTC).isoformat(),
                 "log": str(run_dir / "grader-fresh-daytona.log"),
             },
         }

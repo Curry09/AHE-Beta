@@ -2,22 +2,85 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from getpass import getpass
+import hashlib
 import json
 import os
-from pathlib import Path
+import shlex
 import time
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from getpass import getpass
+from pathlib import Path
 
 from daytona import SessionExecuteRequest
-
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def harness_archive_path(here: Path) -> Path:
+    """Resolve the harness under test without implying a specific version."""
+    configured = os.environ.get("HARNESS_ARCHIVE") or os.environ.get(
+        "HARNESS_V0_ARCHIVE"
+    )
+    return Path(configured) if configured else here / "artifacts/harness-v0-cade14d.tar.gz"
+
+
+def harness_eval_label(archive: Path) -> str:
+    return os.environ.get("HARNESS_EVAL_LABEL", archive.name.removesuffix(".tar.gz"))
+
+
+def safe_run_label(label: str) -> str:
+    cleaned = "".join(c if c.isalnum() or c in "-_" else "-" for c in label)
+    return cleaned.strip("-")[:80] or "unlabeled-harness"
+
+
+def evaluation_model() -> str:
+    return os.environ.get("HARNESS_MODEL", "z-ai/glm-5.2")
+
+
+def user_simulator_model() -> str:
+    return os.environ.get("USER_SIMULATOR_MODEL", evaluation_model())
+
+
+def openrouter_litellm_model(model: str) -> str:
+    return model if model.startswith("openrouter/") else f"openrouter/{model}"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def prepared_root(here: Path) -> Path:
+    """Resolve the intentionally external, controller-private prepared data."""
+    configured = os.environ.get("PUBLIC_BENCH_PREPARED_DIR")
+    candidates = [
+        Path(configured).expanduser() if configured else None,
+        here / "prepared",
+        here.parents[2]
+        / "auto-designer-experiment-configs/public-bench-pilot-20260917/prepared",
+    ]
+    for candidate in candidates:
+        if candidate is not None and candidate.is_dir():
+            return candidate.resolve()
+    raise FileNotFoundError(
+        "prepared benchmark data not found; set PUBLIC_BENCH_PREPARED_DIR"
+    )
+
+
 def load_env(path: Path | None = None) -> dict[str, str]:
-    path = path or Path(os.environ.get("PUBLIC_BENCH_ENV_FILE", ROOT / ".env"))
+    configured = os.environ.get("PUBLIC_BENCH_ENV_FILE")
+    candidates = (
+        [path]
+        if path is not None
+        else [Path(configured)]
+        if configured
+        else [ROOT / ".env", ROOT.parent / ".env"]
+    )
+    path = next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
     values: dict[str, str] = {}
     if not path.is_file():
         return values
@@ -42,7 +105,7 @@ def credentials() -> tuple[str, str]:
 
 
 def new_run_dir(base: Path, suffix: str) -> Path:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     target = base / "runs" / f"{stamp}-{suffix}"
     target.mkdir(parents=True, exist_ok=False)
     return target
@@ -116,6 +179,22 @@ def download_artifacts(
 ) -> None:
     for name in names:
         download_if_present(sandbox, f"{remote_dir}/{name}", run_dir / name)
+
+
+def upload_tree(sandbox, local_root: Path, remote_root: str) -> None:
+    """Upload a small benchmark fixture tree without local archive tooling."""
+    for path in sorted(local_root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(local_root).as_posix()
+        remote = f"{remote_root.rstrip('/')}/{relative}"
+        parent = remote.rsplit("/", 1)[0]
+        response = sandbox.process.exec(
+            f"mkdir -p {shlex.quote(parent)}", timeout=30
+        )
+        if response.exit_code != 0:
+            raise RuntimeError(f"could not create remote directory {parent}")
+        sandbox.fs.upload_file(str(path), remote)
 
 
 def write_controller_manifest(run_dir: Path, payload: dict) -> None:

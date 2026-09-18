@@ -9,12 +9,12 @@ the sandbox, while only the resulting artifacts are downloaded by the controller
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 import shutil
 import traceback
+from datetime import UTC, datetime
+from pathlib import Path
 
 
 def main() -> int:
@@ -23,18 +23,26 @@ def main() -> int:
     parser.add_argument("--task-id", default="7")
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--max-steps", type=int, default=40)
+    parser.add_argument("--timeout", type=float, default=1800.0)
     parser.add_argument("--output-dir", default="/tmp/eval-output")
     args = parser.parse_args()
 
+    from adapters.harness_v0.tau3 import HarnessV0TauAgent
+    from tau2.evaluator import evaluator_nl_assertions
     from tau2.evaluator.evaluator import EvaluationType
     from tau2.orchestrator.orchestrator import Orchestrator
     from tau2.runner import build_environment, build_user, get_tasks, run_simulation
 
-    from adapters.harness_v0.tau3 import HarnessV0TauAgent
-
     output = Path(args.output_dir)
     output.mkdir(parents=True, exist_ok=True)
     model = os.environ["AGENT_LLM"]
+    user_model = os.environ.get("USER_SIMULATOR_LLM", model)
+    nl_judge_model = os.environ.get(
+        "NL_JUDGE_LLM", "openrouter/openai/gpt-4.1"
+    )
+    # The pinned benchmark hard-codes an OpenAI model. Route the same judge
+    # family through the configured OpenRouter credential in sandbox runs.
+    evaluator_nl_assertions.DEFAULT_LLM_NL_ASSERTIONS = nl_judge_model
     tasks = get_tasks(args.domain, task_ids=[args.task_id])
     if len(tasks) != 1:
         raise RuntimeError(
@@ -48,8 +56,9 @@ def main() -> int:
         llm=model,
         harness_archive="/opt/pilot/harness-v0.tar.gz",
         harness_python="/opt/harness-venv/bin/python",
+        trial_timeout_sec=args.timeout,
     )
-    user = build_user("user_simulator", environment, task, llm=model)
+    user = build_user("user_simulator", environment, task, llm=user_model)
     orchestrator = Orchestrator(
         domain=args.domain,
         agent=agent,
@@ -67,11 +76,15 @@ def main() -> int:
         "task_id": args.task_id,
         "seed": args.seed,
         "max_steps": args.max_steps,
-        "agent": "harness-v0-cade14d",
+        "agent_timeout_seconds": args.timeout,
+        "agent_timeout_source": "fallback_no_official_timeout",
+        "agent": os.environ.get("HARNESS_AGENT_LABEL", "harness-v0-cade14d"),
         "model": model,
+        "user_simulator_model": user_model,
+        "nl_judge_model": nl_judge_model,
         "execution_location": "daytona",
         "user_simulator_location": "daytona",
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": datetime.now(UTC).isoformat(),
     }
 
     def preserve_adapter_artifacts() -> None:
@@ -120,7 +133,7 @@ def main() -> int:
         return 1
     finally:
         agent.stop()
-        manifest["finished_at"] = datetime.now(timezone.utc).isoformat()
+        manifest["finished_at"] = datetime.now(UTC).isoformat()
         (output / "manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",

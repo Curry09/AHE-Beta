@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
-
+from adapters.harness_v0.llm_user_simulator import _content_text
 from adapters.harness_v0.stdio import HarnessProtocolError, HarnessStdioSession
-
 
 FAKE_HARNESS = r'''
 import json
@@ -56,11 +55,16 @@ def test_stdio_session_reports_early_exit(tmp_path: Path) -> None:
     session.close()
 
 
+def test_user_simulator_content_normalization() -> None:
+    assert _content_text(" verify this ") == "verify this"
+    assert _content_text([{"type": "text", "text": "one"}, {"text": "two"}]) == "one\ntwo"
+    assert _content_text(None) == ""
+
+
 def test_tau_marker_regex_accepts_one_json_object() -> None:
     pytest.importorskip("tau2")
+    from adapters.harness_v0.tau3 import _CALL_PATTERN, HarnessV0TauAgent
     from tau2.environment.tool import as_tool
-
-    from adapters.harness_v0.tau3 import HarnessV0TauAgent, _CALL_PATTERN
 
     match = _CALL_PATTERN.search(
         '<TAU3_TOOL_CALL>{"name":"lookup","arguments":{"id":7}}</TAU3_TOOL_CALL>'
