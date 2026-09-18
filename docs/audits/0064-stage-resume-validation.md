@@ -31,8 +31,8 @@
 | Divergent proposal 创建后 | 按 operation key 找回原票；不重复建票 | `test_stage_resume_e2e.py`、`test_divergent_gate.py` |
 | Designer grouping/batch/proposal 后 | 复用冻结分组及 batch 输出；补齐未完成来源迁移 | `test_stage_resume_e2e.py`、`test_designer.py`、`test_grouped_designer.py` |
 | Owner 标签或评论后 | 重放冻结决策；admitted 集合保持不变 | `test_stage_resume_e2e.py`、`test_owner.py` |
-| Delivery inflight/timeout | 不重跑上游；重新读取固定 admitted 集并对账终态 | `test_stage_resume_e2e.py`、`test_orchestrator.py`、`test_round_gate.py` |
-| Delivery 业务失败 | `automation-failed`/`needs-human` 继续 blocked | `test_stage_resume_e2e.py`、`test_orchestrator.py` |
+| Delivery inflight/timeout | 不重跑上游；重新读取完整固定 admitted 集并逐票对账终态；已完成票不能被同批其他超时票误标失败 | `test_stage_resume_e2e.py`、`test_orchestrator.py`、`test_round_gate.py` |
+| Delivery 业务失败 | 先完成全 admitted 集合对账，再只报告 `automation-failed`/`needs-human` 的真实 blocker；不得让列表中较早的失败票阻止后续票补记完成 | `test_stage_resume_e2e.py`、`test_orchestrator.py` |
 | 身份、输入、输出或 revision 漂移 | fail-closed，不覆盖旧状态 | `test_recovery.py`、`test_run_auditable_experiment.py` |
 
 `backend/scripts/e2e-stage-resume.sh` 汇总运行上述阶段、角色和副作用测试。故障用例在副作用写入后抛出
@@ -52,6 +52,16 @@ pytest（实验 runtime/CLI、live、审计 controller、SWE-bench 入口及 E2E
 backend 全量 pytest
 940 passed
 ```
+
+## 2026-09-18 Delivery 对账回归
+
+修复恢复流程在遇到首个 delivery 失败票时立即抛错的问题。恢复器现在会先遍历完整的冻结 admitted
+集合，把 forge 中已经完成的票补记为 `completed`，收集全部真实 blocker 后再 fail-closed。等待过程
+返回 timeout/blocked 时也会重新读取每张 inflight 票的 forge 终态，只给实际受影响的票写入失败，
+避免已合并票或无关在途票被批量误标，从而使后续 resume 反复卡在同一张旧票。
+
+新增 `test_delivery_reconciles_every_ticket_before_reporting_blockers` 和
+`test_delivery_timeout_rechecks_forge_before_marking_units_failed` 两项端到端回归测试。
 
 阶段恢复不尝试续接进行中的 token stream 或容器内线程。未完整保存输出的最小工作项会重新调用模型；
 已经完整保存的角色输出与已经满足的外部后置条件不会重复执行。

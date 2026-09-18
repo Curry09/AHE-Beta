@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from auto_designer.loop.orchestrator import Orchestrator
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
+from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
 from auto_designer.loop.round_gate import RoundDeliveryBlocked
 from auto_designer.models import Persona, SeedScenario
 from auto_designer.usage import current_usage_context
@@ -203,3 +203,88 @@ def test_business_delivery_failure_remains_blocked(tmp_path: Path) -> None:
     with pytest.raises(RoundDeliveryBlocked, match="delivery-failed"):
         orchestrator.run_round("main", round_no=1)
     assert recovery.stage_status(round_no=1, stage="delivery_wait") == "blocked"
+
+
+def test_delivery_reconciles_every_ticket_before_reporting_blockers(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    recovery = RecoveryStore.initialize(
+        root=tmp_path / "checkpoints",
+        identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
+    )
+    snapshots = {
+        41: {"state": "closed", "labels": []},
+        42: {"state": "open", "labels": ["automation-failed"]},
+        43: {"state": "closed", "labels": []},
+    }
+
+    class Owner:
+        def admit_once(self):
+            return _Outcome([41, 42, 43])
+
+    orchestrator = Orchestrator(
+        launcher=_Launcher(),
+        harness_repo=str(repo),
+        fixed_set=[],
+        run_session_fn=lambda *args, **kwargs: None,
+        initial_ref="main",
+        owner=Owner(),
+        fetch_issue=lambda number: snapshots[number],
+        recovery=recovery,
+    )
+
+    with pytest.raises(RoundDeliveryBlocked) as raised:
+        orchestrator.run_round("main", round_no=1)
+    assert raised.value.numbers == [42]
+    assert {
+        number: recovery.unit(
+            round_no=1,
+            stage="delivery_wait",
+            key=operation_key(1, "delivery", number),
+        )["status"]
+        for number in snapshots
+    } == {41: "completed", 42: "blocked", 43: "completed"}
+
+
+def test_delivery_timeout_rechecks_forge_before_marking_units_failed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    recovery = RecoveryStore.initialize(
+        root=tmp_path / "checkpoints",
+        identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
+    )
+    snapshots = {
+        41: {"state": "open", "labels": []},
+        42: {"state": "open", "labels": []},
+    }
+
+    class Owner:
+        def admit_once(self):
+            return _Outcome([41, 42])
+
+    def wait_delivery(*, numbers: list[int]) -> None:
+        assert numbers == [41, 42]
+        snapshots[41] = {"state": "closed", "labels": []}
+        raise RoundDeliveryBlocked(numbers=[42], reason="timeout")
+
+    orchestrator = Orchestrator(
+        launcher=_Launcher(),
+        harness_repo=str(repo),
+        fixed_set=[],
+        run_session_fn=lambda *args, **kwargs: None,
+        initial_ref="main",
+        owner=Owner(),
+        fetch_issue=lambda number: snapshots[number],
+        wait_delivery=wait_delivery,
+        recovery=recovery,
+    )
+
+    with pytest.raises(RoundDeliveryBlocked, match="timeout"):
+        orchestrator.run_round("main", round_no=1)
+    statuses = {
+        number: recovery.unit(
+            round_no=1,
+            stage="delivery_wait",
+            key=operation_key(1, "delivery", number),
+        )["status"]
+        for number in snapshots
+    }
+    assert statuses == {41: "completed", 42: "failed"}

@@ -677,6 +677,7 @@ class Orchestrator:
             )
             return
         inflight: list[tuple[int, str]] = []
+        blocked_numbers: list[int] = []
         for number in admitted:
             key = operation_key(round_no, "delivery", int(number))
             unit = recovery.begin_unit(
@@ -711,21 +712,59 @@ class Orchestrator:
                         error="delivery terminal failure",
                         blocked=True,
                     )
-                    raise RoundDeliveryBlocked(numbers=[int(number)], reason="delivery-failed")
+                    blocked_numbers.append(int(number))
+                    continue
             inflight.append((int(number), key))
+        # Reconcile the complete admitted set before failing closed.  Raising
+        # on the first terminal failure left later merged issues stale in the
+        # durable ledger and made every subsequent resume stop at the same
+        # ticket without projecting forge truth for the rest of the round.
+        if blocked_numbers:
+            raise RoundDeliveryBlocked(numbers=blocked_numbers, reason="delivery-failed")
         if inflight:
             try:
                 self._await_round_delivery(numbers=[number for number, _ in inflight])
             except RoundDeliveryBlocked as exc:
-                blocked = exc.reason != "timeout"
+                affected = set(int(number) for number in exc.numbers)
                 for number, key in inflight:
-                    recovery.fail_unit(
-                        round_no=round_no,
-                        stage="delivery_wait",
-                        key=key,
-                        error=f"delivery {exc.reason} for issue #{number}",
-                        blocked=blocked,
-                    )
+                    if self._fetch_issue is not None:
+                        snapshot = self._fetch_issue(number)
+                        classification = classify_issue(
+                            state=str(snapshot.get("state") or ""),
+                            labels=_issue_labels(snapshot.get("labels")),
+                        )
+                        if classification == "done":
+                            recovery.complete_unit(
+                                round_no=round_no,
+                                stage="delivery_wait",
+                                key=key,
+                                observed_postconditions={
+                                    "classification": "done",
+                                    "issue": snapshot,
+                                },
+                            )
+                            continue
+                        if classification == "blocked":
+                            recovery.fail_unit(
+                                round_no=round_no,
+                                stage="delivery_wait",
+                                key=key,
+                                error=f"delivery terminal failure for issue #{number}",
+                                blocked=True,
+                            )
+                            affected.add(number)
+                            continue
+                    # The gate reports only the tickets responsible for the
+                    # stop.  Leave unrelated in-flight units retryable instead
+                    # of falsely stamping the whole original wait set failed.
+                    if number in affected:
+                        recovery.fail_unit(
+                            round_no=round_no,
+                            stage="delivery_wait",
+                            key=key,
+                            error=f"delivery {exc.reason} for issue #{number}",
+                            blocked=exc.reason != "timeout",
+                        )
                 raise
             for number, key in inflight:
                 observed: dict[str, Any] = {"classification": "done"}
