@@ -97,13 +97,13 @@ The 2026-09-20 Boyue/Harbor canary verified both gateway protocols and Harbor
 0.23.0's local Docker lifecycle. The frozen `harness-v0` adapter then passed a
 one-trial local end-to-end run with verifier reward `1.0`. Credentialed Daytona
 runs created the sandbox, but the current account tier blocked outbound model
-traffic; a user-space relay was independently healthy but Daytona blocked its
-high port and rejected sandbox-level allowlist overrides. Those reward-zero
-runs are diagnostic only. The generic Harbor Claude Code canary stalled while
-installing runtime packages into a minimal image; the formal runner must
-preinstall those dependencies in its pinned image or use the existing
-`harness-v0` adapter. These are integration preparation findings, not
-benchmark scores.
+traffic. A user-space relay and a Cloudflare Quick Tunnel were independently
+healthy, but Daytona never delivered chat traffic to either and rejected
+sandbox-level allowlist overrides. Those reward-zero runs are diagnostic only.
+The generic Harbor Claude Code canary stalled while installing runtime packages
+into a minimal image; the formal runner must preinstall those dependencies in
+its pinned image or use the existing `harness-v0` adapter. These are integration
+preparation findings, not benchmark scores.
 
 ### A control plane is still required
 

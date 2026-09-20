@@ -14,9 +14,9 @@ boundary. The Daytona real-developer smoke has reached model execution, PR,
 review, merge, and issue closure. The Harbor batch adapter has passed a local
 Docker checkpoint/artifact canary; credentialed Daytona trials created the
 sandbox but the current account tier blocks model egress. A relay on the
-provided server was independently verified and then tested through Daytona;
-the provider blocked both the high port and sandbox-level allowlist override,
-so those reward-zero runs are diagnostic only.
+provided server and a Cloudflare Quick Tunnel were independently verified and
+then tested through Daytona; neither received Daytona chat traffic, so those
+reward-zero runs are diagnostic only.
 
 The pilot configuration is [configs/ordinary-pilot.json](configs/ordinary-pilot.json).
 Trial and batch output are schema-defined under [schemas](schemas), and the

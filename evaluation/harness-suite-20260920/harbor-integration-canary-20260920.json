@@ -69,5 +69,13 @@
     "status": "not_a_workaround_for_current_daytona_tier",
     "secrets_recorded": false
   },
-  "conclusion": "Boyue model API, Harbor local lifecycle, and the frozen harness-v0 adapter are reachable end to end in local Docker; the one-trial verifier passed. A credentialed Daytona sandbox can be created, but the current Daytona tier blocks outbound model traffic and rejects sandbox-level allowlist overrides. A relay on 38.47.121.235 was verified independently but cannot bypass that provider policy. Do not count the Daytona reward-zero trials as benchmark results; formal execution requires a Daytona plan with provider-supported public egress or a different execution tier."
+  "cloudflared_canary": {
+    "quick_tunnel": "https://essentially-pasta-lawn-proven.trycloudflare.com",
+    "server_side_models_http": 200,
+    "daytona_request": "ConnectError before reaching the relay",
+    "relay_received_daytona_chat": false,
+    "status": "not_a_workaround_for_current_daytona_tier",
+    "secrets_recorded": false
+  },
+  "conclusion": "Boyue model API, Harbor local lifecycle, and the frozen harness-v0 adapter are reachable end to end in local Docker; the one-trial verifier passed. A credentialed Daytona sandbox can be created, but the current Daytona tier blocks outbound model traffic and rejects sandbox-level allowlist overrides. A relay on 38.47.121.235 and a Cloudflare Quick Tunnel were both verified independently, but neither received Daytona chat traffic. Do not count the Daytona reward-zero trials as benchmark results; formal execution requires a Daytona plan with provider-supported public egress or a different execution tier."
 }
