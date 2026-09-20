@@ -1166,7 +1166,7 @@ def main() -> int:
 
     from auto_designer.designer.owner import Owner  # noqa: PLC0415
 
-    # Owner 恒 1 实例（唯一准入）；roster owner=0 → review=False，全部提案 hold（无机械旁路）。
+    # Owner 恒 1 个路由实例；默认 roster owner=0 使用零 LLM 机械交接，N_OWNERS=1 才启用模型评审。
     owner = Owner(
         tracker,
         store,
@@ -1226,7 +1226,7 @@ def main() -> int:
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
         f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {roster['designer']} synthesize "
-        f"→ owner({'评审' if roster['owner'] >= 1 else '禁用准入'})；交付面 vigil --parallel "
+        f"→ owner({'评审' if roster['owner'] >= 1 else '零 LLM 机械交接'})；交付面 vigil --parallel "
         f"{roster['developer']}（末轮只用户；非末轮封口后切轮），"
         f"a 段并发 {max_parallel_users}，背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，"
         "真模型）..."
