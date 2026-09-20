@@ -1,0 +1,98 @@
+{
+  "schema_version": "hse-config-v1",
+  "suite_id": "harness-suite-20260920",
+  "experiment_id": "ordinary-pilot-scaling-20260920",
+  "status": "pilot-freeze-ordinary-1-4",
+  "purpose": "Task-only pilot at N=1 and N=4; no mechanism seeds.",
+  "freeze_record": {
+    "path": "freeze-record.json",
+    "freeze_id": "ordinary-pilot-1-4-20260920"
+  },
+  "orchestrator": {
+    "name": "harbor",
+    "task_granularity": "one_batch_task",
+    "checkpoint_interval": "after_each_terminal_trial"
+  },
+  "provider": {
+    "name": "daytona",
+    "sandbox_per_trial": true,
+    "ephemeral": true,
+    "ttl_minutes": 60,
+    "resource_class": "per_task_manifest",
+    "image_digest": "per_task_pinned_image",
+    "model_gateway": {
+      "provider": "boyue",
+      "openai_base_url": "https://api.boyuerichdata.opensphereai.com/v1",
+      "anthropic_base_url": "https://api.boyuerichdata.opensphereai.com",
+      "credentials_source": "/root/src/.boyue",
+      "required_protocols": ["openai-compatible", "anthropic-compatible"]
+    }
+  },
+  "harness": {
+    "id": "baseline-v0-cade14d",
+    "revision": "sha256:dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011",
+    "archive": "auto-designer-experiment-artifacts/harness-v0-cade14d.tar.gz",
+    "owner_mode": "mechanical_review_false",
+    "developer_backend": "openagents-vigil-claude-code"
+  },
+  "models": {
+    "harness": "glm-5.3-flash",
+    "user_simulator": "glm-5.3-flash",
+    "design": "glm-5.3",
+    "developer": "glm-5.3",
+    "owner": "mechanical_review_false"
+  },
+  "interaction": {
+    "conditions": ["direct", "simulated_user"],
+    "direct": {
+      "initial_messages": 1,
+      "fixed_followups": false
+    },
+    "simulated_user": {
+      "heartbeat_seconds": 90,
+      "max_wait_seconds": 180,
+      "fixed_followups": false,
+      "historical_persona_loop": true
+    }
+  },
+  "timeouts": {
+    "official_timeout_source": "task_metadata_or_benchmark_protocol",
+    "fallback_trial_seconds": 1800,
+    "sandbox_create_seconds": 1200,
+    "infrastructure_retry_limit": 2
+  },
+  "profiles": {
+    "ordinary_1": {
+      "task_ids": ["O03"],
+      "role": "canary_not_population_estimate"
+    },
+    "ordinary_4": {
+      "task_ids": ["O03", "O09", "O14", "O18"],
+      "role": "first_interpretable_task_only_point"
+    }
+  },
+  "execution_rules": {
+    "nested_sets": true,
+    "same_tasks_across_conditions": true,
+    "retry_only_infrastructure_invalid": true,
+    "completed_trials_are_immutable": true,
+    "grader_runs_inside_sandbox": true,
+    "delete_sandbox_after_artifact_download": true
+  },
+  "output": {
+    "root": "runs/{experiment_id}/{batch_id}",
+    "trial_result": "trials/{trial_id}/result.json",
+    "batch_result": "batch-result.json",
+    "event_ledger": "events.jsonl",
+    "checkpoint": "checkpoints/ckpt-{sequence:06d}.json",
+    "checkpoint_artifact": "checkpoints/ckpt-{sequence:06d}.tar.gz"
+  },
+  "freeze_requirements": [
+    "Use the frozen ordinary task records O03, O09, O14, and O18 in task-manifest.json.",
+    "Resolve per-task image digest/materialization and verify the Boyue model gateway before launch.",
+    "Use baseline-v0-cade14d for every harness trial.",
+    "Use glm-5.3-flash for user and harness, and glm-5.3 for design/developer.",
+    "Run direct and simulated_user with the same task membership.",
+    "Do not mix OpenRouter fallback smoke results with Boyue/GLM score tables."
+  ]
+}

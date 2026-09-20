@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hse-batch-result-v1",
+  "type": "object",
+  "required": ["schema_version", "experiment_id", "batch_id", "config_sha256", "manifest_sha256", "profile", "conditions", "trials", "metrics"],
+  "properties": {
+    "schema_version": {"const": "hse-batch-result-v1"},
+    "experiment_id": {"type": "string"},
+    "batch_id": {"type": "string"},
+    "config_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "profile": {"enum": ["ordinary_1", "ordinary_4", "ordinary_12", "ordinary_20", "mixed_16", "mixed_24", "mixed_32"]},
+    "conditions": {"type": "array", "items": {"enum": ["direct", "simulated_user"]}},
+    "trials": {"type": "array", "items": {"type": "string"}},
+    "metrics": {
+      "type": "object",
+      "required": ["total_trials", "terminal_trials", "valid_trials", "task_pass_rate", "harness_completion_rate"],
+      "properties": {
+        "total_trials": {"type": "integer", "minimum": 0},
+        "terminal_trials": {"type": "integer", "minimum": 0},
+        "valid_trials": {"type": "integer", "minimum": 0},
+        "task_pass_rate": {"type": ["number", "null"]},
+        "harness_completion_rate": {"type": ["number", "null"]},
+        "user_acceptance_rate": {"type": ["number", "null"]},
+        "mean_score": {"type": ["number", "null"]},
+        "by_benchmark": {"type": "object"},
+        "by_condition": {"type": "object"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
