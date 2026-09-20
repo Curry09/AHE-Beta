@@ -95,13 +95,14 @@ user-simulation semantics.
 
 The 2026-09-20 Boyue/Harbor canary verified both gateway protocols and Harbor
 0.23.0's local Docker lifecycle. The frozen `harness-v0` adapter then passed a
-one-trial local end-to-end run with verifier reward `1.0`. A credentialed
-Daytona run created the sandbox and executed the adapter, but repeated TLS
-connection errors from Daytona to the Boyue endpoint prevented a model reply;
-that reward-zero run is diagnostic only. The generic Harbor Claude Code canary
-stalled while installing runtime packages into a minimal image; the formal
-runner must preinstall those dependencies in its pinned image or use the
-existing `harness-v0` adapter. These are integration preparation findings, not
+one-trial local end-to-end run with verifier reward `1.0`. Credentialed Daytona
+runs created the sandbox, but the current account tier blocked outbound model
+traffic; a user-space relay was independently healthy but Daytona blocked its
+high port and rejected sandbox-level allowlist overrides. Those reward-zero
+runs are diagnostic only. The generic Harbor Claude Code canary stalled while
+installing runtime packages into a minimal image; the formal runner must
+preinstall those dependencies in its pinned image or use the existing
+`harness-v0` adapter. These are integration preparation findings, not
 benchmark scores.
 
 ### A control plane is still required
@@ -279,9 +280,10 @@ Only infrastructure-invalid attempts may be retried automatically. Task, harness
 - [ ] Pin source revision/digest, task package, grader, timeout, and resource limits for every ordinary task beyond the pilot.
 - [ ] Materialize the 8 newly authored mechanism seed packages (`M05`–`M12`) with task materials and evaluators.
 - [ ] Build one Daytona image per required resource class, each pinned by digest.
-- [ ] Obtain a Daytona-to-Boyue egress allowlist or proxy path, then rerun the
-      Harbor adapter canary remotely (the credentialed sandbox-only canary is
-      already recorded, but is not valid until the model call succeeds).
+- [ ] Obtain a Daytona plan with provider-supported public egress (a
+      user-space relay is insufficient for the current tier), then rerun the
+      Harbor adapter canary remotely (the credentialed sandbox-only canaries
+      are already recorded, but are not valid until the model call succeeds).
 - [ ] Run one direct and one simulated-user smoke trial through Daytona.
 - [x] Run one Harbor-wrapped adapter smoke in local Docker (1 trial, verifier
       reward `1.0`); the remote Daytona version remains gated by model egress.

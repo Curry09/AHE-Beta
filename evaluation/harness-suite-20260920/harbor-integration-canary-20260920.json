@@ -57,5 +57,17 @@
     },
     "blocker": "The Daytona sandbox can be created and the adapter runs, but its egress cannot establish a TLS connection to api.boyuerichdata.opensphereai.com. This is a network allowlist/egress issue, not a harness or credential issue."
   },
-  "conclusion": "Boyue model API, Harbor local lifecycle, and the frozen harness-v0 adapter are reachable end to end in local Docker; the one-trial verifier passed. Daytona credentialing and sandbox creation also work, but formal Boyue execution is currently blocked by Daytona-to-Boyue TLS egress. Do not count the Daytona reward-zero trial as a benchmark result."
+  "relay_canary": {
+    "server": "38.47.121.235",
+    "upstream": "api.boyuerichdata.opensphereai.com",
+    "server_to_boyue_authenticated_http": 200,
+    "relay_local_models_http": 200,
+    "relay_local_chat_http": 200,
+    "daytona_high_port": "timed_out_before_reaching_relay",
+    "daytona_http_80": "blocked_by_tier_network_policy_before_reaching_relay",
+    "daytona_allowlist_override": "rejected_by_provider_account_policy",
+    "status": "not_a_workaround_for_current_daytona_tier",
+    "secrets_recorded": false
+  },
+  "conclusion": "Boyue model API, Harbor local lifecycle, and the frozen harness-v0 adapter are reachable end to end in local Docker; the one-trial verifier passed. A credentialed Daytona sandbox can be created, but the current Daytona tier blocks outbound model traffic and rejects sandbox-level allowlist overrides. A relay on 38.47.121.235 was verified independently but cannot bypass that provider policy. Do not count the Daytona reward-zero trials as benchmark results; formal execution requires a Daytona plan with provider-supported public egress or a different execution tier."
 }

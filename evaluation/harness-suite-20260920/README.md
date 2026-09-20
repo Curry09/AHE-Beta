@@ -12,9 +12,11 @@ checkpoint/artifact lifecycle, while Daytona provides one fresh sandbox per
 trial. Both direct and historical simulated-user trials use the same provider
 boundary. The Daytona real-developer smoke has reached model execution, PR,
 review, merge, and issue closure. The Harbor batch adapter has passed a local
-Docker checkpoint/artifact canary; a credentialed Daytona trial created the
-sandbox and ran the adapter, but its egress could not establish TLS to Boyue,
-so that reward-zero run is diagnostic only.
+Docker checkpoint/artifact canary; credentialed Daytona trials created the
+sandbox but the current account tier blocks model egress. A relay on the
+provided server was independently verified and then tested through Daytona;
+the provider blocked both the high port and sandbox-level allowlist override,
+so those reward-zero runs are diagnostic only.
 
 The pilot configuration is [configs/ordinary-pilot.json](configs/ordinary-pilot.json).
 Trial and batch output are schema-defined under [schemas](schemas), and the
@@ -67,6 +69,7 @@ The ordinary-only pilot curve is 1/4/12/20. The mixed curve is 16/24/32:
 The four tasks used by the current pilot are frozen. The freeze receipt is
 deliberately separate from a run result: it does not claim that a formal score
 has been produced. Before launch, the runner still has to resolve immutable
-Daytona image digests, obtain a Daytona-to-Boyue egress allowlist/proxy path,
-and pass the same adapter canary in Daytona. `O01`–`O02`, `O04`–`O08`, `O10`–`O13`, and
+Daytona image digests, obtain a Daytona plan with provider-supported public
+egress (a user-space relay is insufficient for the current tier), and pass the
+same adapter canary in Daytona. `O01`–`O02`, `O04`–`O08`, `O10`–`O13`, and
 `O15`–`O20` remain `needs-dev-freeze` and must not silently enter this pilot.
