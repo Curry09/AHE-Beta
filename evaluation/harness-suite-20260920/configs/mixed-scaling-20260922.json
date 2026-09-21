@@ -20,10 +20,10 @@
     "launch_gate": "validator_passes_and_all_task_records_are_frozen"
   },
   "reconciliation": {
-    "status": "requires_explicit_freeze_decision",
+    "status": "latest_plan_authoritative",
     "current_plan_interpretation": "N is the cumulative mixed-task size; therefore N4 contains O03, O09, O14 and M03.",
     "previous_ordinary_control": ["O03", "O09", "O14", "O18"],
-    "warning": "The current plan's mixed N4/N8 membership is not the earlier ordinary-only O03/O09/O14/O18 control. Do not compare them as the same curve until this is explicitly frozen."
+    "warning": "The previous ordinary-only O03/O09/O14/O18 control is retained for historical comparison only; the current plan's mixed N4/N8 membership is authoritative for this run."
   },
   "roles": {
     "harness": {"provider":"boyue","model":"glm-5.3-flash","execution":"harbor_task"},
