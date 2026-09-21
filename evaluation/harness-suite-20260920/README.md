@@ -98,6 +98,22 @@ The ordinary-only pilot curve is 1/4/8/12/20. The mixed curve is 16/24/32:
 mechanism package manifest is authoritative for this current construction;
 the 24-task point is optional and the 32-task point is the main experiment.
 
+The persona-assigned mixed preparation is captured in
+[`configs/mixed-scaling-20260922.json`](configs/mixed-scaling-20260922.json),
+with task/persona/mode rows in
+[`configs/mixed-scaling-20260922.tasks.json`](configs/mixed-scaling-20260922.tasks.json).
+Run the read-only preparation audit with:
+
+```bash
+python evaluation/harness-suite-20260920/tools/validate_mixed_config.py
+```
+
+The audit does not start Harbor or call a model. `--check-launch` is an
+intentional gate and fails while task, grader, and image freeze receipts are
+pending. It also reports the current-plan versus historical mechanism-manifest
+membership difference and the earlier ordinary-only N=4 control, so those
+cannot be conflated at launch.
+
 ## Freeze status
 
 The four tasks used by the current pilot are frozen. The freeze receipt is

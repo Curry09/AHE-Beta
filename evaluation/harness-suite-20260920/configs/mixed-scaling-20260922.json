@@ -1,0 +1,86 @@
+{
+  "schema_version": "hse-mixed-scaling-v1",
+  "plan_id": "mixed-scaling-20260922",
+  "status": "prepared-not-launchable",
+  "purpose": "Prepare the 1/4/8/16/32 mixed scaling curve: 24 ordinary tasks plus 8 mechanism seeds at N=32.",
+  "source": {
+    "design": "/mnt/d/workspace/plan.md",
+    "assignments": "mixed-scaling-20260922.tasks.json",
+    "ordinary_manifest": "../task-manifest.json",
+    "mechanism_manifest": "../mechanism-seeds/manifest.json",
+    "persona_library": "../../../backend/persona_library.json",
+    "persona_library_sha256": "0ad1c21b171eafbfcd40ab7d55246b8b4d8db423e322bb91626c1c44c2c1ab6c"
+  },
+  "freeze": {
+    "harness_id": "baseline-v0-cade14d",
+    "harness_sha256": "dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011",
+    "task_revision": "pending-task-record-freeze",
+    "grader_revision": "pending-grader-freeze",
+    "image_digest": "pending-harbor-image-freeze",
+    "launch_gate": "validator_passes_and_all_task_records_are_frozen"
+  },
+  "reconciliation": {
+    "status": "requires_explicit_freeze_decision",
+    "current_plan_interpretation": "N is the cumulative mixed-task size; therefore N4 contains O03, O09, O14 and M03.",
+    "previous_ordinary_control": ["O03", "O09", "O14", "O18"],
+    "warning": "The current plan's mixed N4/N8 membership is not the earlier ordinary-only O03/O09/O14/O18 control. Do not compare them as the same curve until this is explicitly frozen."
+  },
+  "roles": {
+    "harness": {"provider":"boyue","model":"glm-5.3-flash","execution":"harbor_task"},
+    "user_simulator": {"provider":"boyue","model":"glm-5.3-flash","execution":"same_harbor_task","implementation":"historical_agentic_persona_loop"},
+    "designer": {"provider":"boyue","model":"glm-5.3","execution":"same_harbor_task_after_user_phase"},
+    "developer": {"provider":"boyue","model":"glm-5.3","execution":"same_harbor_task_after_design_phase"},
+    "owner": {"mode":"mechanical","review":false,"n_owners":0},
+    "pm": {"enabled":false,"n_divergents":0}
+  },
+  "interaction": {
+    "simulated_user": {"heartbeat_seconds":90,"fixed_followups":false,"can_read_workspace":true,"can_run_checks":true,"can_modify_harness":false},
+    "direct": {"initial_message_only":true,"user_model":false,"heartbeat":false,"followups":false}
+  },
+  "timeouts": {
+    "official_agent_timeout_source":"task_metadata_or_1800_fallback",
+    "fallback_agent_seconds":1800,
+    "outer_rule":"official_agent_timeout_seconds + 600",
+    "outer_grace_seconds":600,
+    "grace_purpose":"artifact_and_checkpoint_persistence_only"
+  },
+  "execution": {
+    "sandbox_provider":"harbor",
+    "sandbox_per_trial":true,
+    "model_gateway":"boyue",
+    "credentials_source":".boyue_or_injected_BOYUE_API_KEY",
+    "formal_openrouter_fallback":false,
+    "rounds":5,
+    "checkpoint":"after_each_round_and_after_release",
+    "artifact_root":"runs/mixed-scaling-20260922/{experiment_id}",
+    "parallel_isolation":["process","compose_project","gitea_instance","gitea_volume","runner","vigil","artifact_root"]
+  },
+  "scaling_sets": {
+    "N1":["O03"],
+    "N4":["O03","O09","O14","M03"],
+    "N8":["O03","O09","O14","M03","O01","kv-live-surgery","tinydb","M01"],
+    "N16":["O03","O09","O14","M03","O01","kv-live-surgery","tinydb","M01","O05","O06","vf2-speedup-networkx","pretrain-shard-corruption","091-add-receipts-bookkeeping","flask-restful","M05","M09"],
+    "N32":["O03","O09","O14","M03","O01","kv-live-surgery","tinydb","M01","O05","O06","vf2-speedup-networkx","pretrain-shard-corruption","091-add-receipts-bookkeeping","flask-restful","M05","M09","O02","O04","astroid-1030","sqlfluff-3608","marshmallow-2123","payments-pipeline-fix","wal-recovery-ordering","vba-userform-port","react-lead-form","080-convert-novel-epub","cookiecutter","tqdm","M02","M04","M07","M10"]
+  },
+  "tasks_file":"mixed-scaling-20260922.tasks.json",
+  "result_contract": {
+    "trial_result":"{artifact_root}/round-{round}/trials/{task_key}/result.json",
+    "session":"{artifact_root}/round-{round}/trials/{task_key}/session.json",
+    "trace":"{artifact_root}/round-{round}/trials/{task_key}/trace.jsonl",
+    "grader":"{artifact_root}/round-{round}/trials/{task_key}/grader.json",
+    "round_checkpoint":"{artifact_root}/checkpoints/round-{round}.json",
+    "summary":"{artifact_root}/summary.json"
+  },
+  "scoring": {
+    "official_grader_only":true,
+    "infrastructure_failures_excluded":true,
+    "report_mixed_headline_and_strata":true,
+    "mechanism_results_keep_mechanism_metadata":true
+  },
+  "freeze_requirements":[
+    "Resolve every task_key to an immutable task record, revision, prompt, environment, grader, and timeout.",
+    "Pin the persona library hash and keep task-persona-mode assignment fixed across harness/model comparisons.",
+    "Materialize Harbor image digest and pass the Boyue full-loop canary before launch.",
+    "Do not interpret this preparation file as a score or launch authorization."
+  ]
+}
