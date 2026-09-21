@@ -1,6 +1,8 @@
 import csv
 import io
+import json
 import unittest
+from pathlib import Path
 
 from clients import billing, dashboard
 from exporter import export_rows
@@ -42,3 +44,11 @@ class ExportContract(unittest.TestCase):
     def test_blank_salt(self):
         with self.assertRaises(ValueError):
             export_rows(self.rows, anonymize=True, salt="")
+
+    def test_fixture_covers_old_new_clients_and_tenants(self):
+        rows = json.loads(Path("fixtures.json").read_text())
+        output = parse(dashboard.render(rows, "one"))
+        self.assertEqual(output[0]["customer_id"], output[1]["customer_id"])
+        self.assertNotEqual(output[0]["customer_id"], output[2]["customer_id"])
+        for row in output:
+            self.assertNotIn("@", row["email"])

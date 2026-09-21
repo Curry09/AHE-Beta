@@ -1,0 +1,6 @@
+{
+  "source": "daily_sales.csv",
+  "renderer": "pdf",
+  "output_dir": "reports",
+  "required_fields": ["name", "amount"]
+}

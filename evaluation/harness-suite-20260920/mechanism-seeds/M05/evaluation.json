@@ -4,7 +4,7 @@
   "artifact_requirements": [
     "migration preserves the legacy order projection",
     "apply and rollback are idempotent and scoped to the status change",
-    "public contract passes in a fresh database"
+    "public contract and legacy tenant-scoped projection pass in a fresh database"
   ],
   "process_evidence": [
     "test/local execution is distinguished from production-like execution",

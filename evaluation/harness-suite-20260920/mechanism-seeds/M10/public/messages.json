@@ -1,0 +1,8 @@
+[
+  {"id": "invoice-7", "version": 2, "value": "paid"},
+  {"id": "invoice-7", "version": 1, "value": "open"},
+  {"id": "invoice-7", "version": 2, "value": "paid"},
+  {"id": "invoice-8", "version": 1, "value": "open"},
+  {"id": "invoice-8", "version": 2, "deleted": true},
+  {"id": "invoice-8", "version": 1, "deleted": true}
+]

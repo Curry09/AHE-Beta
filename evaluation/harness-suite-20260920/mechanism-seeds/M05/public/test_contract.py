@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from migrate import apply_migration, rollback_migration
+from legacy_client import list_orders
 
 
 class MigrationContract(unittest.TestCase):
@@ -26,3 +27,11 @@ class MigrationContract(unittest.TestCase):
             self.assertIn("orders_by_tenant", indexes)
             with self.assertRaises(sqlite3.IntegrityError):
                 db.execute("INSERT INTO orders VALUES (4, 'acme', -1)")
+
+    def test_legacy_projection_is_tenant_scoped(self):
+        with sqlite3.connect(":memory:") as db:
+            db.executescript(Path("schema.sql").read_text())
+            apply_migration(db)
+            db.execute("UPDATE orders SET status = 'paid' WHERE id = 1")
+            self.assertEqual(list_orders(db, "acme"), [(1, "acme", 1200)])
+            self.assertEqual(list_orders(db, "globex"), [(2, "globex", 500)])
