@@ -23,7 +23,7 @@ explicitly different per N and is passed as `N_USERS`, `N_TRIAGERS`,
 | N | user | triage | designer | PM/divergent | developer | owner |
 |---:|---:|---:|---:|---:|---:|---:|
 | 1 | 1 | 1 | 1 | 0 | 1 | 0 |
-| 4 | 4 | 2 | 1 | 0 | 2 | 0 |
+| 4 | 4 | 2 | 1 | 1 | 2 | 0 |
 | 8 | 8 | 4 | 1 | 1 | 4 | 0 |
 | 16 | 16 | 8 | 1 | 1 | 4 | 0 |
 | 32 | 32 | 16 | 2 | 2 | 8 | 0 |

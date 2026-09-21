@@ -156,6 +156,7 @@ def run_one(row: dict, command: list[str], resume: bool) -> dict:
             "N_DIVERGENTS": str(profile["pm"]),
             "N_OWNERS": str(profile["owner"]),
             "N_DEVELOPERS": str(profile["developer"]),
+            "DESIGNER_GROUPING": "1",
         },
     )
     stdout, _ = process.communicate()
