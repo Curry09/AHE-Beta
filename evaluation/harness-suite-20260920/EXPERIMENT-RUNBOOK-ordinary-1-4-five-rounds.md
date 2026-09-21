@@ -2,6 +2,9 @@
 
 本文是把实验迁移到另一台机器或交给另一位执行者时的操作契约。正式配置见
 [`configs/ordinary-1-4-five-rounds.json`](configs/ordinary-1-4-five-rounds.json)。
+论文主实验、数量 scaling 和其他消融组见
+[`EXPERIMENT-MATRIX.md`](EXPERIMENT-MATRIX.md)。N=1/N=4 是工程 pilot，不自动等同于
+论文矩阵中的分层 S4。
 
 ## 1. 实验问题与固定变量
 
