@@ -49,8 +49,8 @@ class HarborHistoricalUserAgent(BaseAgent):
         # Harbor serializes some ``--agent-env`` values as references such as
         # ``${HARNESS_LLM_API_KEY}``. Resolve those references on the
         # controller before injecting the environment into the sandbox; the
-        # literal placeholder would make OpenRouter reject the request with a
-        # missing-authentication-header 401.
+        # literal placeholder would make the configured gateway reject the
+        # request with a missing-authentication-header 401.
         value = str(self.extra_env.get(name) or "")
         if value.startswith("${") and value.endswith("}"):
             value = os.environ.get(value[2:-1], "")
@@ -127,6 +127,21 @@ class HarborHistoricalUserAgent(BaseAgent):
             "HARNESS_LLM_MODEL": self._value("HARNESS_LLM_MODEL", "glm-5.3-flash"),
             "HARNESS_LLM_BASE_URL": self._value("HARNESS_LLM_BASE_URL"),
             "HARNESS_LLM_API_KEY": self._value("HARNESS_LLM_API_KEY"),
+            "DESIGNER_LLM_MODEL": self._value("DESIGNER_LLM_MODEL", "glm-5.3"),
+            "DESIGNER_LLM_BASE_URL": self._value("DESIGNER_LLM_BASE_URL"),
+            "DESIGNER_LLM_API_KEY": self._value("DESIGNER_LLM_API_KEY"),
+            "DEVELOPER_LLM_MODEL": self._value("DEVELOPER_LLM_MODEL", "glm-5.3"),
+            "DEVELOPER_LLM_BASE_URL": self._value("DEVELOPER_LLM_BASE_URL"),
+            "DEVELOPER_LLM_API_KEY": self._value("DEVELOPER_LLM_API_KEY"),
+            # The delivery worker uses an Anthropic-compatible client. Boyue
+            # exposes that protocol at the gateway root, while the other roles
+            # use its OpenAI-compatible /v1 endpoint.
+            "ANTHROPIC_MODEL": self._value("ANTHROPIC_MODEL", "glm-5.3"),
+            "ANTHROPIC_SMALL_FAST_MODEL": self._value(
+                "ANTHROPIC_SMALL_FAST_MODEL", "glm-5.3"
+            ),
+            "ANTHROPIC_BASE_URL": self._value("ANTHROPIC_BASE_URL"),
+            "ANTHROPIC_AUTH_TOKEN": self._value("ANTHROPIC_AUTH_TOKEN"),
             "HSE_PERSONA_ID": self._value("HSE_PERSONA_ID", "sr-01-willison"),
             "HSE_TASK_INSTANCE": self._value(
                 "HSE_TASK_INSTANCE", "pvlib__pvlib-python-1478"
@@ -147,6 +162,9 @@ class HarborHistoricalUserAgent(BaseAgent):
             "harness_revision": "baseline-v0-cade14d",
             "model": env["HARNESS_LLM_MODEL"],
             "user_model": env["USER_LLM_MODEL"],
+            "designer_model": env["DESIGNER_LLM_MODEL"],
+            "developer_model": env["DEVELOPER_LLM_MODEL"],
+            "model_gateway": "boyue",
             "return_code": result.return_code,
         }
         if result.return_code != 0:

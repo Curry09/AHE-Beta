@@ -21,9 +21,9 @@ session、checkpoint 或 artifact。这样比较的是任务规模对闭环演�
 
 固定角色和模型：
 
-- Harbor/Daytona 内的 harness：OpenRouter `z-ai/glm-5.3-flash`。
-- Harbor/Daytona 内的历史用户模拟：OpenRouter `z-ai/glm-5.3-flash`。
-- 本地 designer/developer：Boyue `glm-5.3`。
+- Harbor 任务内的 harness：Boyue `glm-5.3-flash`。
+- Harbor 任务内的历史用户模拟：Boyue `glm-5.3-flash`。
+- Harbor 任务内的 designer/developer：Boyue `glm-5.3`。
 - PM/divergent：关闭，`N_DIVERGENTS=0`。
 - Owner：机械验收，`review=false`，不调用 LLM。
 
@@ -42,7 +42,7 @@ harness revision。若某轮未发布，则沿用上一轮 revision。
 
 每轮的边界是：
 
-1. Harbor/Daytona 执行该轮全部 task，收集 harness transcript、用户 trace、patch 和 grader 输出。
+1. Harbor Docker task 执行该轮全部 task，收集 harness transcript、用户 trace、patch 和 grader 输出。
 2. 将 session、用户反馈、objective grader 结果写入本轮 checkpoint。
 3. 本地 designer 只读取本轮冻结输入，生成设计交付物。
 4. 本地 developer 根据设计和 trace 修改当前 harness revision。
@@ -54,26 +54,34 @@ harness revision。若某轮未发布，则沿用上一轮 revision。
 
 ## 3. 机器和凭证准备
 
-在仓库根目录准备 Python 3.12、Harbor 0.23.0、Daytona SDK 0.214.x，以及本仓库
-的依赖。凭证只放在执行机环境或本地 ignored 文件中，绝不写进 JSON、日志或 git：
+在仓库根目录准备 Python 3.12、Harbor 0.23.0、Docker，以及本仓库的依赖。凭证只放在
+执行机环境或本地 ignored 文件中，绝不写进 JSON、日志或 git：
 
 ```bash
-export DAYTONA_API_KEY='...'
-export OPENROUTER_API_KEY='...'
-export HARNESS_LLM_API_KEY="$OPENROUTER_API_KEY"
-export USER_LLM_API_KEY="$OPENROUTER_API_KEY"
-export HARNESS_LLM_BASE_URL='https://openrouter.ai/api/v1'
-export USER_LLM_BASE_URL='https://openrouter.ai/api/v1'
-export HARNESS_LLM_MODEL='z-ai/glm-5.3-flash'
-export USER_LLM_MODEL='z-ai/glm-5.3-flash'
+export BOYUE_API_KEY='...'
+export HARNESS_LLM_API_KEY="$BOYUE_API_KEY"
+export USER_LLM_API_KEY="$BOYUE_API_KEY"
+export DESIGNER_LLM_API_KEY="$BOYUE_API_KEY"
+export DEVELOPER_LLM_API_KEY="$BOYUE_API_KEY"
+export HARNESS_LLM_BASE_URL='https://api.boyuerichdata.opensphereai.com/v1'
+export USER_LLM_BASE_URL='https://api.boyuerichdata.opensphereai.com/v1'
+export DESIGNER_LLM_BASE_URL='https://api.boyuerichdata.opensphereai.com/v1'
+export DEVELOPER_LLM_BASE_URL='https://api.boyuerichdata.opensphereai.com/v1'
+export HARNESS_LLM_MODEL='glm-5.3-flash'
+export USER_LLM_MODEL='glm-5.3-flash'
+export DESIGNER_LLM_MODEL='glm-5.3'
+export DEVELOPER_LLM_MODEL='glm-5.3'
+export ANTHROPIC_BASE_URL='https://api.boyuerichdata.opensphereai.com'
+export ANTHROPIC_AUTH_TOKEN="$BOYUE_API_KEY"
+export ANTHROPIC_MODEL='glm-5.3'
+export ANTHROPIC_SMALL_FAST_MODEL='glm-5.3'
 export PYTHONPATH="$PWD"
 ```
 
-本地 design/development 使用项目既有的 Boyue credential loader；迁移时只需提供
-与 `.boyue` 等价的本地凭证，不要把 Boyue key 注入 Daytona。当前 Daytona tier 已
-验证的约束是：每 sandbox 最多 10 GiB 存储、聚合内存约 10 GiB。正式运行前先做
-provider preflight；若仍是该 tier，默认并发设为 1，不能盲目同时创建四个 6 GiB
-sandbox。
+Harbor 任务内的四个角色共用 Boyue 网关，但每个角色仍使用独立的模型变量，便于
+审计和恢复。凭证只从 Harbor secret/env 注入，不写入 task artifact。正式路径使用
+Harbor Docker；当前 Harbor 0.23.0 没有 E2B environment adapter，E2B 不能写成已接通
+的正式 backend。
 
 历史 v0 harness archive 需要由执行者从受控 artifact store 取回，并核对：
 
@@ -101,15 +109,26 @@ uvx --from harbor==0.23.0 harbor run \
   --config evaluation/harness-suite-20260920/harbor-ordinary-o03/config.json \
   --jobs-dir evaluation/harness-suite-20260920/harbor-canary-jobs \
   --job-name ordinary-1-o03-historical-user-canary \
-  --env daytona --n-concurrent 1 --yes \
+  --env docker --n-concurrent 1 --yes \
   --override-cpus 2 --override-memory-mb 6144 --override-storage-mb 10240 \
   --agent-env 'HSE_HARNESS_ARCHIVE=${HSE_HARNESS_ARCHIVE}' \
+  --agent-env 'BOYUE_API_KEY=${BOYUE_API_KEY}' \
   --agent-env 'HARNESS_LLM_API_KEY=${HARNESS_LLM_API_KEY}' \
   --agent-env 'USER_LLM_API_KEY=${USER_LLM_API_KEY}' \
+  --agent-env 'DESIGNER_LLM_API_KEY=${DESIGNER_LLM_API_KEY}' \
+  --agent-env 'DEVELOPER_LLM_API_KEY=${DEVELOPER_LLM_API_KEY}' \
   --agent-env 'HARNESS_LLM_BASE_URL=${HARNESS_LLM_BASE_URL}' \
   --agent-env 'USER_LLM_BASE_URL=${USER_LLM_BASE_URL}' \
+  --agent-env 'DESIGNER_LLM_BASE_URL=${DESIGNER_LLM_BASE_URL}' \
+  --agent-env 'DEVELOPER_LLM_BASE_URL=${DEVELOPER_LLM_BASE_URL}' \
   --agent-env 'HARNESS_LLM_MODEL=${HARNESS_LLM_MODEL}' \
   --agent-env 'USER_LLM_MODEL=${USER_LLM_MODEL}' \
+  --agent-env 'DESIGNER_LLM_MODEL=${DESIGNER_LLM_MODEL}' \
+  --agent-env 'DEVELOPER_LLM_MODEL=${DEVELOPER_LLM_MODEL}' \
+  --agent-env 'ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL}' \
+  --agent-env 'ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}' \
+  --agent-env 'ANTHROPIC_MODEL=${ANTHROPIC_MODEL}' \
+  --agent-env 'ANTHROPIC_SMALL_FAST_MODEL=${ANTHROPIC_SMALL_FAST_MODEL}' \
   --agent-env HSE_OFFICIAL_AGENT_TIMEOUT_SECONDS=1800 \
   --agent-env HSE_OUTER_AGENT_TIMEOUT_SECONDS=2400 \
   --agent-env HSE_PERSONA_ID=sr-01-willison \
@@ -145,11 +164,11 @@ for experiment in [ordinary-1-glm53-v0-r5, ordinary-4-glm53-v0-r5]:
     revision = baseline-v0-cade14d
     for round in 1..5:
         freeze(round, experiment, revision, task_ids, interaction_assignment)
-        run every task in fresh Daytona sandbox
+        run every task in a fresh Harbor task environment
         download transcript/user_trace/patch/official_grader
         checkpoint(round, inputs, outputs, revision)
-        design locally with Boyue glm-5.3
-        develop locally with Boyue glm-5.3
+        design in the Harbor task with Boyue glm-5.3
+        develop in the Harbor task with Boyue glm-5.3
         mechanical owner gate (review=false)
         revision = released_revision or revision
         checkpoint(round, revision)
@@ -187,10 +206,11 @@ reward，也不能把 canary reward 当 benchmark accuracy。
 - [ ] `configs/ordinary-1-4-five-rounds.json` hash 已记录。
 - [ ] O03/O09/O14/O18 的 task revision、grader 和 image digest 与 freeze record 一致。
 - [ ] `baseline-v0-cade14d` archive hash 正确。
-- [ ] OpenRouter `z-ai/glm-5.3-flash` chat probe 成功。
-- [ ] Boyue `glm-5.3` probe 成功。
-- [ ] Daytona 创建、公开镜像启动、文件上传/下载和 sandbox 删除均成功。
+- [ ] Boyue `glm-5.3-flash` and `glm-5.3` probes succeed from the Harbor task environment。
+- [ ] Harbor full-loop canary executes user, harness, designer, developer, and owner phases in one task。
+- [ ] Selected Harbor environment creates, starts, uploads/downloads artifacts, and deletes cleanly。
 - [ ] PM 为关闭，Owner 为 mechanical `review=false`。
 - [ ] N=1、N=4 使用不同 artifact/Gitea/revision lineage。
 - [ ] official timeout 与 outer timeout 分开记录。
 - [ ] canary 与正式 grader 结果分开存放、分开报告。
+- [ ] 全局配置检查确认没有 OpenRouter endpoint、key 或 model。

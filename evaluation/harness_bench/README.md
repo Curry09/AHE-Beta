@@ -16,7 +16,9 @@ Supported interaction policies:
 Budget policy is fixed: use pinned official `[agent].timeout_sec` when present;
 otherwise use 1800 seconds and record `fallback_no_official_timeout`. The budget
 belongs to the whole trial, not each turn. Harness self-timeouts remain visible
-product behavior.
+product behavior. Harbor's outer agent watchdog is always the official budget
+plus a fixed 600-second persistence grace; the grace is for checkpoint/artifact
+flush and must not be used for additional model work.
 
 Validate and freeze a plan:
 

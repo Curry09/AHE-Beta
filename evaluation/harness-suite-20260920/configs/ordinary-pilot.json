@@ -14,7 +14,8 @@
     "checkpoint_interval": "after_each_terminal_trial"
   },
   "provider": {
-    "name": "daytona",
+    "name": "harbor",
+    "environment_backend": "docker",
     "sandbox_per_trial": true,
     "ephemeral": true,
     "ttl_minutes": 60,
@@ -77,7 +78,9 @@
     "retry_only_infrastructure_invalid": true,
     "completed_trials_are_immutable": true,
     "grader_runs_inside_sandbox": true,
-    "delete_sandbox_after_artifact_download": true
+    "delete_sandbox_after_artifact_download": true,
+    "all_roles_inside_harbor_task": true,
+    "forbid_openrouter_fallback": true
   },
   "output": {
     "root": "runs/{experiment_id}/{batch_id}",
@@ -93,6 +96,6 @@
     "Use baseline-v0-cade14d for every harness trial.",
     "Use glm-5.3-flash for user and harness, and glm-5.3 for design/developer.",
     "Run direct and simulated_user with the same task membership.",
-    "Do not mix OpenRouter fallback smoke results with Boyue/GLM score tables."
+    "Run harness, user simulator, designer, and developer inside Harbor with Boyue; do not use OpenRouter fallback."
   ]
 }

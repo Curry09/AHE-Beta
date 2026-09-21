@@ -4,8 +4,9 @@
 - **Status:** ordinary pilot task/model/grader freeze complete; Harbor batch integration specified
 - **Scope:** the 20 ordinary tasks, 12 mechanism seeds, ordinary 1/4/12/20 pilots, and nested 16/24/32 mixed runs in `task-manifest.json`
 - **Outer run orchestrator:** Harbor
-- **Primary trial execution provider:** Daytona
-- **Fallback provider:** local provider for protocol/adapter smoke tests only
+- **Primary orchestrator:** Harbor
+- **Trial environment backend:** Harbor Docker
+- **Model gateway for every role:** Boyue
 
 ## 1. Objective
 
@@ -39,7 +40,21 @@ The ordinary pilot sets are deliberately task-only (no mechanism seeds):
 ```text
 ordinary_1 = [O03]                         # SWE-bench dev anchor
 ordinary_4 = [O03, O09, O14, O18]           # SWE + Terminal + TUA + τ³
+ordinary_8 = [O03, O09, O14, O18, O06, O12, O15, NL2Repo-01]
+                                             # 5 simulated-user + 3 direct
 ```
+
+`ordinary_8` is currently a preparation profile, not a formal freeze:
+`NL2Repo-01` still needs a public non-test task record; O12 and O15 have been
+replaced with resource-compatible frozen preparation records.
+
+The N=1, N=4, and N=8 batches may run concurrently. Each batch must be a
+separate experiment process with its own Compose project, Gitea instance,
+Gitea volume, act-runner, vigil container, credentials, sessions, checkpoints,
+and artifact root. The legacy singleton stack under
+`backend/deploy/gitea/docker-compose.yml` is not a valid concurrent-run path.
+The per-experiment stack under `backend/deploy/experiment/docker-compose.yml`
+is the only supported path.
 
 The exact pilot freeze is recorded in `freeze-record.json`. That receipt is
 the authoritative source for task IDs, source revisions/material hashes,
@@ -54,7 +69,7 @@ by selecting different tasks or injecting a prewritten follow-up.
 
 ### Local execution is not required for task execution
 
-With Daytona, the following do not need to run on the local machine:
+With the Harbor task environment, the following do not need to run on the local machine:
 
 - benchmark repository and task workspace;
 - harness process and its terminal/file tools;
@@ -73,7 +88,7 @@ protocol or become a second user simulator. The supported shape is:
 ```text
 one Harbor task = one complete experiment batch (4/8/12/16/20/24/32)
   └── coordinator/scheduler
-        └── one fresh Daytona sandbox per trial
+        └── one fresh Harbor task environment per trial
               ├── harness + task workspace
               ├── direct or simulated-user loop
               └── official grader/verifier
@@ -83,7 +98,7 @@ The Harbor task receives the frozen manifest, harness/model configuration, and
 an optional previous checkpoint artifact. At trial and batch boundaries it
 emits the run ledger, transcripts, grader results, and checkpoint artifacts.
 Restarting a Harbor task from the latest checkpoint must skip terminal trials,
-recreate only missing/invalid Daytona trials, and preserve the original
+recreate only missing/invalid Harbor trials, and preserve the original
 manifest hash and seeds. A Harbor retry is therefore an infrastructure retry,
 not a second measurement of a completed trial.
 
@@ -112,7 +127,7 @@ Something must run the coordinator. It can be the local machine, CI, or a small 
 The control plane owns:
 
 - loading and validating the frozen manifest;
-- creating/deleting Daytona sandboxes;
+- creating/deleting Harbor task environments;
 - uploading the task package, harness archive, and driver;
 - starting/monitoring the in-sandbox interaction driver;
 - collecting artifacts and writing the run ledger;
@@ -131,7 +146,7 @@ valid measurement.
                          control plane
                  manifest / scheduler / ledger
                               |
-                         Daytona API
+                    Harbor environment API
                               |
                  one ephemeral sandbox per trial
                               |
@@ -141,28 +156,29 @@ valid measurement.
           └── grader/verifier
 ```
 
-The user simulator must run in the same per-trial sandbox/workspace as in the prior local experiments. Its private `read_file`, `run_shell`, optional `write_file`, and `report_issue` tools remain subject to the existing persona capability gate and workspace path jail. Daytona changes the runtime location only; it does not change what the simulated user can observe, inspect, or do.
+The user simulator must run in the same per-trial sandbox/workspace as in the prior local experiments. Its private `read_file`, `run_shell`, optional `write_file`, and `report_issue` tools remain subject to the existing persona capability gate and workspace path jail. Harbor changes the runtime location only; it does not change what the simulated user can observe, inspect, or do.
 
 ## 4. Per-trial lifecycle
 
 1. Validate the task manifest and resolve every task to a pinned revision/digest.
 2. Freeze the trial row: task ID, harness ID/hash, model, interaction mode, seed, timeout, provider, and resource class.
-3. Create one ephemeral Daytona sandbox with a digest-pinned image.
+3. Create one ephemeral Harbor task environment with a digest-pinned image.
 4. Upload or materialize the task package, harness, historical user-simulator runtime, user instruction, and grader.
-5. Start the in-sandbox interaction loop with the official task timeout. The harness and user simulator share the trial workspace exactly as before. If no official timeout exists, use **1800 seconds for the whole trial**, not per turn.
+5. Start the in-sandbox interaction loop with the official task timeout. The harness and user simulator share the trial workspace exactly as before. If no official timeout exists, use **1800 seconds for the whole trial**, not per turn. Harbor's outer agent watchdog is `official_agent_timeout + 600 seconds`; the additional 600 seconds is persistence grace for checkpoint/artifact flushing only and cannot extend model execution.
 6. Run either the direct interaction or the heartbeat-supervised simulated-user interaction.
 7. Run the objective grader inside the sandbox after the agent session ends, unless the benchmark's official protocol defines another order.
 8. Download transcript, stderr, user trace, grader result, and declared artifacts.
 9. Write a terminal outcome to the run ledger.
 10. Delete the ephemeral sandbox, including on exceptions.
 
-The existing `harness_bench` Daytona provider implements the provider boundary needed for this topology. Its generic `remote_driver`/`simulated_user` path is useful for direct/public-observation smoke tests, but it must not replace the historical persona loop for the paper's mechanism comparison. The paper runner must package the existing `AgenticPersonaClient`/persona loop and its workspace runtime into the Daytona trial. The local provider remains useful for protocol and adapter smoke tests, not for the paper run.
+The existing `harness_bench` provider boundary remains the execution seam. Its generic `remote_driver`/`simulated_user` path is useful for direct/public-observation smoke tests, but it must not replace the historical persona loop for the paper's mechanism comparison. The paper runner must package the existing `AgenticPersonaClient`/persona loop and its workspace runtime into the Harbor trial. The local provider remains useful for protocol and adapter smoke tests, not for the paper run.
 
 The Harbor integration consumes this provider boundary rather than calling
-Daytona primitives from benchmark/task code. In particular, the Harbor layer
-owns batch lifecycle and checkpoint artifacts; the Daytona provider owns
-sandbox lifecycle; the trial driver owns direct/simulated-user interaction;
-and the grader owns objective scoring.
+environment primitives from benchmark/task code. In particular, Harbor owns
+batch lifecycle, task lifecycle, role execution, and checkpoint artifacts; the
+trial driver owns direct/simulated-user interaction; and the grader owns
+objective scoring. Designer and developer execute after the user phase inside
+the same Harbor task and consume only persisted session/trace artifacts.
 
 ## 5. Interaction contract
 
@@ -279,14 +295,12 @@ Only infrastructure-invalid attempts may be retried automatically. Task, harness
 - [ ] Replace the remaining `needs-dev-freeze` ordinary slots before expanding beyond `ordinary_4`.
 - [ ] Pin source revision/digest, task package, grader, timeout, and resource limits for every ordinary task beyond the pilot.
 - [ ] Materialize the 8 newly authored mechanism seed packages (`M05`–`M12`) with task materials and evaluators.
-- [ ] Build one Daytona image per required resource class, each pinned by digest.
-- [ ] Obtain a Daytona plan with provider-supported public egress (a
-      user-space relay is insufficient for the current tier), then rerun the
-      Harbor adapter canary remotely (the credentialed sandbox-only canaries
-      are already recorded, but are not valid until the model call succeeds).
-- [ ] Run one direct and one simulated-user smoke trial through Daytona.
-- [x] Run one Harbor-wrapped adapter smoke in local Docker (1 trial, verifier
-      reward `1.0`); the remote Daytona version remains gated by model egress.
+- [ ] Build one Harbor Docker image per required resource class, each pinned by digest.
+- [ ] Run one direct and one simulated-user smoke trial through Harbor Docker with Boyue.
+- [x] Run one Harbor-wrapped adapter smoke in local Docker (1 trial, verifier reward `1.0`).
+- [ ] Run a full-loop Harbor canary that reaches user, harness, designer,
+      developer, mechanical owner, and checkpoint persistence without using
+      OpenRouter or a local role process.
 - [ ] Run one Harbor-wrapped batch smoke (at least 1 direct + 1 simulated-user trial),
       verify checkpoint emission, restart-from-checkpoint, and no duplicate
       accounting for the completed trial.
@@ -309,13 +323,18 @@ are intentionally not considered frozen by this pilot configuration.
 
 ## 10. Decision summary
 
-For the planned evaluation, use **Harbor as the outer batch runner and remote Daytona sandboxes for all task/harness/user-simulator/grader execution**. Keep only the Harbor control plane and artifact ledger outside the trial sandboxes; it may run locally at first, but the same task should also run from CI or a small remote worker. Do not download or execute the full benchmark environments on the local machine merely because Harbor or the coordinator is local. The only intentional change from the historical local experiment is the execution provider; the user-simulation mechanism and its private workspace checks stay unchanged.
+For the planned evaluation, use **Harbor Docker for user, harness, designer,
+developer, mechanical owner, and grader execution**. Keep only Harbor launch
+and artifact collection outside the task environment. Do not run designer or
+developer as local post-processing. The historical user-simulation mechanism
+and its private workspace checks stay unchanged.
 
 ### Model gateway constraint observed in validation
 
 The formal pilot gateway is Boyue, with both its OpenAI-compatible `/v1` base
 URL and Anthropic-compatible base URL recorded in the freeze receipt. The
 validated 2026-09-20 canary returned both requested GLM5.3 model IDs. Any old
-OpenRouter fallback smoke remains infrastructure-only and must not be mixed
-with Boyue/GLM benchmark scores. The runner must record the actual gateway and
-model in every `trial.json`.
+Historical OpenRouter fallback smokes remain infrastructure-only and must not
+be mixed with Boyue/GLM benchmark scores. Formal configs reject OpenRouter.
+The runner must record the actual gateway and model for all four roles in every
+`trial.json`.

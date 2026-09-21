@@ -37,11 +37,12 @@
       "type": "object",
       "required": ["name", "sandbox_id", "image_digest", "model_gateway"],
       "properties": {
-        "name": {"const": "daytona"},
+        "name": {"enum": ["harbor", "docker", "e2b", "daytona"]},
         "sandbox_id": {"type": "string"},
         "image_digest": {"type": "string"},
         "model_gateway": {"type": "string"},
-        "resource_class": {"type": "string"}
+        "resource_class": {"type": "string"},
+        "environment_backend": {"enum": ["docker", "e2b", "daytona"]}
       },
       "additionalProperties": true
     },

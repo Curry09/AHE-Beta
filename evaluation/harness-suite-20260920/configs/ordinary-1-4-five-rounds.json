@@ -18,35 +18,35 @@
     "checkpoint": "after_user_evaluation_and_after_release"
   },
   "pipeline": [
-    "harbor_daytona_user_evaluation",
+    "harbor_full_loop_user_evaluation",
     "persist_sessions_traces_grader_outputs",
-    "local_boyue_design",
-    "local_boyue_development",
+    "harbor_boyue_design",
+    "harbor_boyue_development",
     "mechanical_owner_gate",
     "release_or_keep_previous_revision",
     "round_checkpoint"
   ],
   "roles": {
     "harness": {
-      "provider": "openrouter",
-      "model": "z-ai/glm-5.3-flash",
-      "execution": "harbor_on_daytona"
+      "provider": "boyue",
+      "model": "glm-5.3-flash",
+      "execution": "harbor_task"
     },
     "user_simulator": {
-      "provider": "openrouter",
-      "model": "z-ai/glm-5.3-flash",
-      "execution": "same_daytona_trial_as_harness",
+      "provider": "boyue",
+      "model": "glm-5.3-flash",
+      "execution": "same_harbor_task_as_harness",
       "implementation": "historical_agentic_persona_loop"
     },
     "designer": {
       "provider": "boyue",
       "model": "glm-5.3",
-      "execution": "local"
+      "execution": "same_harbor_task_after_user_phase"
     },
     "developer": {
       "provider": "boyue",
       "model": "glm-5.3",
-      "execution": "local"
+      "execution": "same_harbor_task_after_design_phase"
     },
     "pm": {
       "enabled": false,
@@ -70,12 +70,17 @@
     "reason": "isolate harness revision changes from user-simulator sampling noise"
   },
   "execution": {
-    "sandbox_provider": "daytona",
+    "sandbox_provider": "harbor",
+    "environment_backend": "docker",
+    "model_gateway": {
+      "provider": "boyue",
+      "credentials_source": ".boyue or injected BOYUE_API_KEY",
+      "openai_base_url": "https://api.boyuerichdata.opensphereai.com/v1",
+      "anthropic_base_url": "https://api.boyuerichdata.opensphereai.com"
+    },
     "sandbox_per_trial": true,
     "delete_after_artifact_download": true,
-    "current_safe_daytona_concurrency": 1,
-    "current_verified_aggregate_memory_gib": 10,
-    "current_verified_per_sandbox_storage_gib": 10,
+    "concurrency_source": "per_experiment_host_preflight",
     "experiment_isolation": [
       "process",
       "compose_project",
