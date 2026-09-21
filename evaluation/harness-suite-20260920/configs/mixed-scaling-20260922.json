@@ -56,9 +56,15 @@
       "base_url_env":"BOYUE_ANTHROPIC_BASE_URL", "api_key_env":"BOYUE_API_KEY",
       "execution":"same_trial_sandbox_after_design", "permission_mode":"bypassPermissions"
     },
-    "owner": {"mode":"mechanical","review":false,"n_owners":0},
-    "pm": {"enabled":false,"n_divergents":0}
+    "pm": {
+      "provider":"boyue", "model":"glm-5.3", "protocol":"openai-compatible",
+      "base_url_env":"BOYUE_OPENAI_BASE_URL", "api_key_env":"BOYUE_API_KEY",
+      "execution":"same_trial_sandbox_after_design", "max_context_tokens":256000,
+      "max_output_tokens":32768, "request_timeout_seconds":300, "max_iterations":30
+    },
+    "owner": {"mode":"mechanical","llm":false,"review":false,"n_owners":0}
   },
+  "pm": {"enabled":"per_profile","count_source":"scaling-e2b-20260922.profiles[*].pm"},
   "interaction": {
     "simulated_user": {"heartbeat_seconds":90,"fixed_followups":false,"can_read_workspace":true,"can_run_checks":true,"can_modify_harness":false},
     "direct": {"initial_message_only":true,"user_model":false,"heartbeat":false,"followups":false}

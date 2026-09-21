@@ -6,18 +6,47 @@ replace the historical persona loop, Owner, or developer delivery protocol.
 
 ## Roles and capacity
 
-Model/API budgets come from the N1 role configuration; effective values, hashes,
+Model/API budgets come from the mixed-scaling role configuration; effective values, hashes,
 task assignments and role counts are resolved into each run's config snapshot.
 Triage uses the current shared DESIGNER model configuration; inconsistent values
 must fail validation. Owner is mechanical and PM is off. Designer grouping is
 enabled, at most six proposals per batch, one Designer worker.
 
-All groups start independently from the frozen v0 archive. Each has its own
+Each N is an independent terminal process; there is deliberately no
+all-N supervisor. The five terminals are started with the five `start_scaling_n*.sh`
+wrappers (and resumed with the matching `resume_scaling_n*.sh` wrapper). Each has its own
 Gitea repository, E2B runtime, run ID, artifact directory and recovery identity.
-N counts tasks per round, not worker processes. Task/triage/developer concurrency
-is capped at four; N1 uses one. Five rounds means four design/delivery transitions
-and a final user-only round. These concurrency choices are explicit operator
-defaults, not claimed historical settings or a pure compute-controlled ablation.
+N counts user sessions per round, not worker processes. The role roster is
+explicitly different per N and is passed as `N_USERS`, `N_TRIAGERS`,
+`N_DESIGNERS`, `N_DIVERGENTS` (PM), `N_OWNERS`, and `N_DEVELOPERS`.
+
+| N | user | triage | designer | PM/divergent | developer | owner |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 1 | 1 | 1 | 0 | 1 | 0 |
+| 4 | 4 | 2 | 1 | 0 | 2 | 0 |
+| 8 | 8 | 4 | 1 | 1 | 4 | 0 |
+| 16 | 16 | 8 | 1 | 1 | 4 | 0 |
+| 32 | 32 | 16 | 2 | 2 | 8 | 0 |
+
+The N=16 triage/developer anchor follows the historical mixed16 roster
+(triage=8, developer=4); the remaining profiles are explicit scaling policy,
+not an accidental global cap. Five rounds means four design/delivery transitions
+and a final user-only round.
+
+Use one terminal per N, for example:
+
+```bash
+bash evaluation/harness-suite-20260920/start_scaling_n1_e2b.sh --executor '...'
+bash evaluation/harness-suite-20260920/start_scaling_n4_e2b.sh --executor '...'
+bash evaluation/harness-suite-20260920/start_scaling_n8_e2b.sh --executor '...'
+bash evaluation/harness-suite-20260920/start_scaling_n16_e2b.sh --executor '...'
+bash evaluation/harness-suite-20260920/start_scaling_n32_e2b.sh --executor '...'
+```
+
+Each command validates and starts only its own N. A failed terminal cannot
+terminate sibling terminals. `--executor` is the prepared per-N runtime entry
+point; it is intentionally required until the corresponding bundle receipt is
+materialized.
 
 ## Lifecycle
 

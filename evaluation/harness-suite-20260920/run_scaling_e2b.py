@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Fail-closed parallel controller for the frozen mixed scaling matrix.
+"""Fail-closed single-N launcher for the frozen mixed scaling matrix.
 
 Dry-run and preflight are useful today. A real start additionally requires a
 trusted per-N runtime receipt and an executor command supplied by that bundle.
-The controller never silently substitutes the N=1 SWE-only runner for N>1.
+The launcher never silently substitutes the N=1 SWE-only runner for N>1 and
+refuses multi-N starts; operators run one wrapper per terminal.
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ SUITE = ROOT / "evaluation" / "harness-suite-20260920"
 CONFIG = SUITE / "configs" / "scaling-e2b-20260922.json"
 MIXED = SUITE / "configs" / "mixed-scaling-20260922.json"
 ASSIGNMENTS = SUITE / "configs" / "mixed-scaling-20260922.tasks.json"
-ROLES = SUITE / "configs" / "n1-e2b-20260922.json"
+ROLES = MIXED
 NS = (1, 4, 8, 16, 32)
 
 
@@ -73,7 +74,7 @@ def validate_roles() -> list[str]:
     for name in ("harness", "user_simulator", "triager", "designer", "developer", "owner"):
         if name not in roles:
             errors.append(f"角色配置缺失：{name}")
-    for name in ("harness", "user_simulator", "triager", "designer", "developer"):
+    for name in ("harness", "user_simulator", "triager", "designer", "developer", "pm"):
         role = roles.get(name) or {}
         for field in ("provider", "model", "protocol"):
             if not role.get(field):
@@ -88,11 +89,21 @@ def gate(rows: list[dict]) -> list[str]:
     mixed = load(MIXED)
     assignment = load(ASSIGNMENTS)
     launch = load(CONFIG)["launch_gate"]
+    profiles = load(CONFIG).get("profiles") or {}
     if mixed.get("status") != "launchable":
         errors.append(f"mixed config status={mixed.get('status')!r}，不是 launchable")
     if assignment.get("status") != "frozen":
         errors.append(f"task assignment status={assignment.get('status')!r}，不是 frozen")
     for row in rows:
+        profile = profiles.get(str(row["n"]))
+        if not isinstance(profile, dict):
+            errors.append(f"N{row['n']} 缺 roster profile")
+        else:
+            for field in ("user", "task_parallel", "triager", "designer", "developer", "owner", "pm"):
+                if not isinstance(profile.get(field), int) or profile[field] < 0:
+                    errors.append(f"N{row['n']}.{field} 必须是非负整数")
+            if profile.get("user") != row["task_count"]:
+                errors.append(f"N{row['n']} user roster={profile.get('user')} != task_count={row['task_count']}")
         receipt = Path(row["runtime_receipt"])
         if not receipt.is_file():
             errors.append(f"N{row['n']} 缺 runtime receipt：{receipt}")
@@ -112,6 +123,7 @@ def redacted(rows: list[dict]) -> dict:
         "assignments": str(ASSIGNMENTS),
         "provider": load(CONFIG)["provider"],
         "rounds": load(CONFIG)["rounds"],
+        "profiles": load(CONFIG)["profiles"],
         "roles": role_config,
         "experiments": rows,
         "credentials": "not loaded by dry-run/preflight",
@@ -120,15 +132,31 @@ def redacted(rows: list[dict]) -> dict:
 
 def run_one(row: dict, command: list[str], resume: bool) -> dict:
     n = row["n"]
-    formatted = [item.replace("{n}", str(n)).replace("{experiment_id}", row["experiment_id"]) for item in command]
+    profile = load(CONFIG)["profiles"][str(n)]
+    replacements = {
+        "{n}": str(n),
+        "{experiment_id}": row["experiment_id"],
+        **{f"{{{key}}}": str(value) for key, value in profile.items()},
+    }
+    formatted = [item.format_map(replacements) for item in command]
     process = subprocess.Popen(
         formatted,
         cwd=ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        env={**os.environ, "HSE_SCALING_N": str(n), "HSE_SCALING_EXPERIMENT_ID": row["experiment_id"],
-             "HSE_SCALING_ACTION": "resume" if resume else "fresh"},
+        env={
+            **os.environ,
+            "HSE_SCALING_N": str(n),
+            "HSE_SCALING_EXPERIMENT_ID": row["experiment_id"],
+            "HSE_SCALING_ACTION": "resume" if resume else "fresh",
+            "N_USERS": str(profile["user"]),
+            "N_TRIAGERS": str(profile["triager"]),
+            "N_DESIGNERS": str(profile["designer"]),
+            "N_DIVERGENTS": str(profile["pm"]),
+            "N_OWNERS": str(profile["owner"]),
+            "N_DEVELOPERS": str(profile["developer"]),
+        },
     )
     stdout, _ = process.communicate()
     path = SUITE / "runs" / "scaling-e2b-20260922" / f"n{n}" / "controller.log"
@@ -150,6 +178,8 @@ def main() -> int:
         parser.error("--start 与 --resume 不能同时使用")
     try:
         ns = selected(args.n)
+        if (args.start or args.resume) and len(ns) != 1:
+            raise LaunchGateError("正式启动/恢复必须只选择一个 N；请在五个终端分别运行对应脚本")
         rows = plan(ns)
         if args.dry_run or not (args.check_launch or args.start or args.resume):
             print(json.dumps(redacted(rows), ensure_ascii=False, indent=2))
