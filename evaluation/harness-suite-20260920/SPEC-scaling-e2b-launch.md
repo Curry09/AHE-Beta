@@ -98,3 +98,20 @@ the prepared runtime must demonstrate actual deadline enforcement in its canary.
 
 Missing receipt/task material/template/canary causes a nonzero preflight result
 before credentials, network access or cost. No flag skips this gate.
+
+## Materializing the bundle inventory
+
+The preparation helper resolves task sources from the pinned local archives and
+separates agent-visible payloads from grader payloads:
+
+```bash
+python evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py \
+  --n all --materialize
+```
+
+It writes `prepared/scaling-e2b-20260922/nN/bundle-inventory.json` and keeps
+large SWE repositories as pinned source references instead of copying them into
+the controller repository. A row is `missing-source` when its task has not yet
+been materialized; the helper never creates an empty fallback. This inventory
+is preparation evidence only and does not replace the required `receipt.json`
+or full-loop canary.
