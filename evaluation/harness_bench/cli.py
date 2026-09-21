@@ -38,6 +38,7 @@ def _resolve(plan) -> dict[str, dict[str, Any]]:
                 )
         resolved[f"{case.benchmark}/{case.task_id}"] = {
             "agent_timeout_seconds": spec.budget.agent_timeout_seconds,
+            "outer_agent_timeout_seconds": spec.budget.outer_agent_timeout_seconds,
             "agent_timeout_source": spec.budget.agent_source,
             "verifier_timeout_seconds": spec.budget.verifier_timeout_seconds,
             "environment_build_timeout_seconds": spec.budget.environment_build_timeout_seconds,

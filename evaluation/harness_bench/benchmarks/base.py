@@ -10,6 +10,16 @@ from typing import Protocol
 from ..schema import CaseRef, InteractionMode
 
 
+OUTER_AGENT_GRACE_SECONDS = 600
+
+
+def outer_agent_timeout_seconds(official_agent_timeout_seconds: int) -> int:
+    """Return the Harbor watchdog deadline including persistence grace."""
+    if official_agent_timeout_seconds <= 0:
+        raise ValueError("official agent timeout must be positive")
+    return official_agent_timeout_seconds + OUTER_AGENT_GRACE_SECONDS
+
+
 @dataclass(frozen=True)
 class BudgetResolution:
     agent_timeout_seconds: int
@@ -17,6 +27,11 @@ class BudgetResolution:
     verifier_timeout_seconds: int | None = None
     environment_build_timeout_seconds: int | None = None
     clock: str = "trial_wall"
+
+    @property
+    def outer_agent_timeout_seconds(self) -> int:
+        """Watchdog deadline; grace is for persistence, not model work."""
+        return outer_agent_timeout_seconds(self.agent_timeout_seconds)
 
 
 @dataclass(frozen=True)

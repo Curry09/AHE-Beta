@@ -1,0 +1,26 @@
+schema_version = "1"
+
+artifacts = [
+  "/eval-out/session.json",
+  "/eval-out/model.patch",
+  "/eval-out/patch.sha256",
+  "/logs/agent/harness-transcript.jsonl",
+  "/logs/agent/harness-stderr.log",
+]
+
+[task]
+name = "hse/ordinary-o03-historical-user"
+description = "Run the frozen O03 task with the historical simulated-user protocol."
+
+[verifier]
+timeout_sec = 30.0
+
+[agent]
+# Official O03 budget (1800s) plus 600s persistence grace.
+timeout_sec = 2400.0
+
+[environment]
+build_timeout_sec = 300.0
+cpus = 4
+memory_mb = 8192
+storage_mb = 10240

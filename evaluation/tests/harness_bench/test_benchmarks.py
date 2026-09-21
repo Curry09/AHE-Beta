@@ -29,6 +29,7 @@ storage_mb = 10240
     resolved = TerminalBenchPlugin().resolve_case(case, 1800)
 
     assert resolved.budget.agent_timeout_seconds == 7200
+    assert resolved.budget.outer_agent_timeout_seconds == 7800
     assert resolved.budget.agent_source == "official_task_metadata"
     assert resolved.grader.timeout_seconds == 60
     assert resolved.grader.submission_paths == ("/app/output.txt",)
@@ -39,5 +40,6 @@ def test_tau3_uses_1800_fallback_and_native_user_only() -> None:
     resolved = Tau3Plugin().resolve_case(case, 1800)
 
     assert resolved.budget.agent_timeout_seconds == 1800
+    assert resolved.budget.outer_agent_timeout_seconds == 2400
     assert resolved.budget.agent_source == "fallback_no_official_timeout"
     assert resolved.supported_interactions == frozenset({InteractionMode.BENCHMARK_NATIVE})
