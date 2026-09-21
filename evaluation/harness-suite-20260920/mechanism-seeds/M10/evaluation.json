@@ -1,0 +1,8 @@
+{
+  "task_id": "review-verifier-catches-regression",
+  "mechanism": "review/revision",
+  "artifact_requirements": ["out-of-order records do not rewind state", "duplicates are idempotent", "deletes obey version ordering", "smoke and regression checks pass after repair"],
+  "process_evidence": ["agent runs the public regression check", "failure evidence leads to an implementation revision", "agent reruns checks and reports the actual result"],
+  "unknown_rule": "Passing a final check without trace evidence of using feedback does not prove the revision mechanism",
+  "not_scored_as": ["a hidden grader message", "changing assertions to pass", "number of review roles"]
+}

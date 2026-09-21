@@ -58,11 +58,23 @@ into the Harbor task from the ignored `.boyue` file or equivalent secret store.
 OpenRouter is not a formal fallback. Historical OpenRouter/Daytona canaries are
 diagnostic artifacts only and must not enter score aggregation.
 
+## Mechanism seed construction
+
+The current mechanism freeze is the dedicated
+[`mechanism-seeds/manifest.json`](mechanism-seeds/manifest.json), which keeps
+historical M01--M04 and adds the constructed M05, M07, M09 and M10. The old
+M06/M08/M11/M12 rows in the working manifest are draft candidates and are not
+part of the current eight-task mechanism set. Construction details and the
+non-scripted interaction contract are in
+[`mechanism-seeds/SPEC.md`](mechanism-seeds/SPEC.md).
+
 ## Composition
 
-- Ordinary pool: 20 tasks (`O01`–`O20`), balanced across SWE, Terminal, TUA, and tau3.
-- Mechanism pool: 12 interactive seeds (`M01`–`M12`).
-- Full mixed set: `O01`–`O20` + `M01`–`M12` (32 tasks).
+- Ordinary pool: 24 tasks for the main experiment; this working manifest currently
+  materializes `O01`–`O20`, while the remaining four ordinary records are frozen
+  separately from this mechanism package.
+- Mechanism pool: 8 interactive seeds (`M01`–`M05`, `M07`, `M09`, `M10`).
+- Full mixed set: 24 ordinary tasks + these 8 mechanism tasks (32 tasks).
 
 The mechanism pool is not folded into the ordinary benchmark score. It is included in the mixed headline run, but every result retains `stratum=ordinary|mechanism` and `mechanism` metadata.
 
@@ -79,10 +91,12 @@ The ordinary-only pilot curve is 1/4/8/12/20. The mixed curve is 16/24/32:
 ```text
 16 = ordinary_12 + mechanism_4
 24 = ordinary_16 + mechanism_8
-32 = ordinary_20 + mechanism_12
+32 = ordinary_24 + mechanism_8
 ```
 
-`mechanism_4 ⊂ mechanism_8 ⊂ mechanism_12`, and the ordinary subsets are also nested. The 24-task point is optional; the 32-task point is the main experiment.
+`mechanism_4 ⊂ mechanism_8`; the ordinary subsets are also nested. The
+mechanism package manifest is authoritative for this current construction;
+the 24-task point is optional and the 32-task point is the main experiment.
 
 ## Freeze status
 
