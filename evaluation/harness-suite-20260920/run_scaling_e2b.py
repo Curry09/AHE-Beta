@@ -105,6 +105,20 @@ def gate(rows: list[dict]) -> list[str]:
             if profile.get("user") != row["task_count"]:
                 errors.append(f"N{row['n']} user roster={profile.get('user')} != task_count={row['task_count']}")
         receipt = Path(row["runtime_receipt"])
+        inventory = receipt.parent / "bundle-inventory.json"
+        if inventory.is_file():
+            document = load(inventory)
+            if document.get("status") != "ready":
+                missing = [
+                    str(item.get("task_key"))
+                    for item in document.get("tasks", [])
+                    if item.get("status") != "ready"
+                ]
+                errors.append(
+                    f"N{row['n']} runtime bundle incomplete：{', '.join(missing) or 'unknown'}"
+                )
+        else:
+            errors.append(f"N{row['n']} 缺 bundle inventory：{inventory}")
         if not receipt.is_file():
             errors.append(f"N{row['n']} 缺 runtime receipt：{receipt}")
         else:
