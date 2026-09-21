@@ -26,10 +26,36 @@
     "warning": "The previous ordinary-only O03/O09/O14/O18 control is retained for historical comparison only; the current plan's mixed N4/N8 membership is authoritative for this run."
   },
   "roles": {
-    "harness": {"provider":"boyue","model":"glm-5.3-flash","execution":"harbor_task"},
-    "user_simulator": {"provider":"boyue","model":"glm-5.3-flash","execution":"same_harbor_task","implementation":"historical_agentic_persona_loop"},
-    "designer": {"provider":"boyue","model":"glm-5.3","execution":"same_harbor_task_after_user_phase"},
-    "developer": {"provider":"boyue","model":"glm-5.3","execution":"same_harbor_task_after_design_phase"},
+    "harness": {
+      "provider":"boyue", "model":"glm-5.3-flash", "protocol":"openai-compatible",
+      "base_url_env":"BOYUE_OPENAI_BASE_URL", "api_key_env":"BOYUE_API_KEY",
+      "execution":"same_trial_sandbox", "max_context_tokens":128000,
+      "max_output_tokens":32768, "request_timeout_seconds":300, "max_iterations":100
+    },
+    "user_simulator": {
+      "provider":"boyue", "model":"glm-5.3-flash", "protocol":"openai-compatible",
+      "base_url_env":"BOYUE_OPENAI_BASE_URL", "api_key_env":"BOYUE_API_KEY",
+      "execution":"same_trial_sandbox", "implementation":"historical_agentic_persona_loop",
+      "max_context_tokens":256000, "max_output_tokens":32768, "temperature":0.8,
+      "heartbeat_seconds":90, "api_retry_attempts":5
+    },
+    "triager": {
+      "provider":"boyue", "model":"glm-5.3", "protocol":"openai-compatible",
+      "base_url_env":"BOYUE_OPENAI_BASE_URL", "api_key_env":"BOYUE_API_KEY",
+      "execution":"same_trial_sandbox_after_user_phase", "max_context_tokens":256000,
+      "max_output_tokens":32768, "request_timeout_seconds":300, "max_iterations":30
+    },
+    "designer": {
+      "provider":"boyue", "model":"glm-5.3", "protocol":"openai-compatible",
+      "base_url_env":"BOYUE_OPENAI_BASE_URL", "api_key_env":"BOYUE_API_KEY",
+      "execution":"same_trial_sandbox_after_triage", "max_context_tokens":256000,
+      "max_output_tokens":32768, "request_timeout_seconds":300, "max_iterations":300
+    },
+    "developer": {
+      "provider":"boyue", "model":"glm-5.3", "protocol":"anthropic-compatible",
+      "base_url_env":"BOYUE_ANTHROPIC_BASE_URL", "api_key_env":"BOYUE_API_KEY",
+      "execution":"same_trial_sandbox_after_design", "permission_mode":"bypassPermissions"
+    },
     "owner": {"mode":"mechanical","review":false,"n_owners":0},
     "pm": {"enabled":false,"n_divergents":0}
   },
@@ -44,6 +70,12 @@
     "outer_grace_seconds":600,
     "grace_purpose":"artifact_and_checkpoint_persistence_only"
   },
+  "role_timeout_contract": {
+    "task_inner":"official_agent_timeout_seconds",
+    "task_outer":"official_agent_timeout_seconds + 600",
+    "direct_uses_same_rule":true,
+    "role_api_timeout_is_not_task_timeout":true
+  },
   "execution": {
     "sandbox_provider":"harbor",
     "sandbox_per_trial":true,
@@ -53,6 +85,11 @@
     "rounds":5,
     "checkpoint":"after_each_round_and_after_release",
     "artifact_root":"runs/mixed-scaling-20260922/{experiment_id}",
+    "parallel": {
+      "independent_experiments":true,
+      "max_concurrent_experiments":5,
+      "isolation_key":"experiment_id"
+    },
     "parallel_isolation":["process","compose_project","gitea_instance","gitea_volume","runner","vigil","artifact_root"]
   },
   "scaling_sets": {
