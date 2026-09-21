@@ -47,3 +47,11 @@ hash, five rounds, `official_agent_timeout=1800`, and `outer_timeout=2400`.
 Official SWE-bench grading is a separate fresh-container step after the
 evolution run; this E2B launcher sets objective evaluation to `0` so a nested
 Docker grader cannot be mistaken for a valid score.
+
+The role block in the JSON is part of the frozen core configuration: provider,
+model, protocol, endpoint-variable mapping, context/output budgets, iteration
+limits, heartbeat, and permission mode are recorded there. Secret values remain
+outside the config. For a direct (one-shot) task, the same timeout rule applies
+per task: `inner = official_agent_timeout_seconds`, `outer = inner + 600`; the
+outer grace covers setup, checkpoint, artifact persistence, and teardown, not a
+second model budget.

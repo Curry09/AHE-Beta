@@ -33,12 +33,36 @@
     "sha256": "dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011"
   },
   "roles": {
-    "harness": {"provider": "boyue", "model": "glm-5.3-flash", "protocol": "openai-compatible"},
-    "user_simulator": {"provider": "boyue", "model": "glm-5.3-flash", "protocol": "openai-compatible", "heartbeat_seconds": 90},
-    "designer": {"provider": "boyue", "model": "glm-5.3", "protocol": "openai-compatible"},
-    "developer": {"provider": "boyue", "model": "glm-5.3", "protocol": "anthropic-compatible"},
+    "harness": {
+      "provider": "boyue", "model": "glm-5.3-flash", "protocol": "openai-compatible",
+      "base_url_env": "BOYUE_OPENAI_BASE_URL", "api_key_env": "BOYUE_API_KEY",
+      "max_context_tokens": 128000, "max_output_tokens": 32768,
+      "request_timeout_seconds": 300, "max_iterations": 100
+    },
+    "user_simulator": {
+      "provider": "boyue", "model": "glm-5.3-flash", "protocol": "openai-compatible",
+      "base_url_env": "BOYUE_OPENAI_BASE_URL", "api_key_env": "BOYUE_API_KEY",
+      "max_context_tokens": 256000, "max_output_tokens": 32768, "temperature": 0.8,
+      "heartbeat_seconds": 90, "api_retry_attempts": 5
+    },
+    "designer": {
+      "provider": "boyue", "model": "glm-5.3", "protocol": "openai-compatible",
+      "base_url_env": "BOYUE_OPENAI_BASE_URL", "api_key_env": "BOYUE_API_KEY",
+      "max_context_tokens": 256000, "max_output_tokens": 32768,
+      "request_timeout_seconds": 300, "max_iterations": 300
+    },
+    "developer": {
+      "provider": "boyue", "model": "glm-5.3", "protocol": "anthropic-compatible",
+      "base_url_env": "BOYUE_ANTHROPIC_BASE_URL", "api_key_env": "BOYUE_API_KEY",
+      "permission_mode": "bypassPermissions"
+    },
     "owner": {"mode": "mechanical", "llm": false},
-    "triager": {"model": "glm-5.3", "protocol": "openai-compatible"}
+    "triager": {
+      "provider": "boyue", "model": "glm-5.3", "protocol": "openai-compatible",
+      "base_url_env": "BOYUE_OPENAI_BASE_URL", "api_key_env": "BOYUE_API_KEY",
+      "max_context_tokens": 256000, "max_output_tokens": 32768,
+      "request_timeout_seconds": 300, "max_iterations": 30
+    }
   },
   "roster": {
     "user": 1,
@@ -85,6 +109,12 @@
     "user_can_wait_interrupt_continue_accept": true,
     "user_cannot_modify_harness": true,
     "direct": false
+  },
+  "timeout_contract": {
+    "task_inner_seconds": "official_agent_timeout_seconds",
+    "task_outer_seconds": "official_agent_timeout_seconds + 600",
+    "direct_tasks_same_rule": true,
+    "outer_scope": "setup_artifact_checkpoint_teardown_grace_only"
   },
   "resume_contract": {
     "identity_fields": ["experiment_id", "run_id", "config_hash", "controller_sha", "plan_hash"],

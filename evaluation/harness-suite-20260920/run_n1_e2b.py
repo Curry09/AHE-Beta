@@ -98,6 +98,11 @@ def load_plan(path: Path) -> dict:
         raise LaunchError("N=1 config drift: expected frozen O03 task/revision/persona")
     if plan.get("rounds", {}).get("count") != 5:
         raise LaunchError("N=1 config must contain exactly five rounds")
+    if task.get("outer_timeout_seconds") != task.get("official_agent_timeout_seconds", 1800) + 600:
+        raise LaunchError("outer timeout must equal official task timeout + 600 seconds")
+    for role in ("harness", "user_simulator", "designer", "developer", "triager"):
+        if not plan.get("roles", {}).get(role, {}).get("model"):
+            raise LaunchError(f"missing frozen model configuration for role: {role}")
     archive = Path(plan["harness"]["archive"]).expanduser()
     if not archive.is_file() or sha256(archive) != plan["harness"]["sha256"]:
         raise LaunchError(f"frozen harness archive missing or hash mismatch: {archive}")
@@ -217,22 +222,27 @@ def remote_files(
     plan: dict, creds: dict[str, str], run_id: str, repo_name: str, metadata: dict
 ) -> dict[str, str]:
     task_file = (SUITE / "harbor-ordinary-o03" / "instruction.md").read_text(encoding="utf-8")
+    roles = plan["roles"]
+    harness_model = roles["harness"]["model"]
+    user_model = roles["user_simulator"]["model"]
+    designer_model = roles["designer"]["model"]
+    developer_model = roles["developer"]["model"]
     backend_env = "\n".join(
         [
-            "USER_LLM_MODEL=glm-5.3-flash",
+            f"USER_LLM_MODEL={user_model}",
             f"USER_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
             f"USER_LLM_API_KEY={creds['BOYUE_API_KEY']}",
-            "HARNESS_LLM_MODEL=glm-5.3-flash",
+            f"HARNESS_LLM_MODEL={harness_model}",
             f"HARNESS_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
             f"HARNESS_LLM_API_KEY={creds['BOYUE_API_KEY']}",
-            "DESIGNER_LLM_MODEL=glm-5.3",
+            f"DESIGNER_LLM_MODEL={designer_model}",
             f"DESIGNER_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
             f"DESIGNER_LLM_API_KEY={creds['BOYUE_API_KEY']}",
-            "DEVELOPER_LLM_MODEL=glm-5.3",
+            f"DEVELOPER_LLM_MODEL={developer_model}",
             f"DEVELOPER_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
             f"DEVELOPER_LLM_API_KEY={creds['BOYUE_API_KEY']}",
-            "ANTHROPIC_MODEL=glm-5.3",
-            "ANTHROPIC_SMALL_FAST_MODEL=glm-5.3",
+            f"ANTHROPIC_MODEL={developer_model}",
+            f"ANTHROPIC_SMALL_FAST_MODEL={developer_model}",
             f"ANTHROPIC_BASE_URL={creds['BOYUE_ANTHROPIC']}",
             f"ANTHROPIC_AUTH_TOKEN={creds['BOYUE_API_KEY']}",
             "PYTHONUNBUFFERED=1",
@@ -334,6 +344,7 @@ def redacted(plan: dict, state: dict | None = None) -> dict:
         "roster": plan["roster"],
         "execution": plan["execution"],
         "interaction_contract": plan["interaction_contract"],
+        "timeout_contract": plan["timeout_contract"],
         "resume_contract": plan["resume_contract"],
         "secrets": "loaded at runtime; never printed",
     }
@@ -343,6 +354,8 @@ def redacted(plan: dict, state: dict | None = None) -> dict:
 
 
 def start_remote(sandbox, plan: dict, identity_data: dict[str, str], resume: bool) -> object:
+    roster = plan["roster"]
+    rounds = int(plan["rounds"]["count"])
     envs = {
         **identity_data,
         "AUTO_DESIGNER_RUN_MODE": "resume" if resume else "fresh",
@@ -354,20 +367,20 @@ def start_remote(sandbox, plan: dict, identity_data: dict[str, str], resume: boo
         "SWEBENCH_INSTANCE": TASK_ID,
         "PERSONA_ROSTER": "/opt/hse-round/persona-roster.json",
         "SWEBENCH_INTERACTION_PLAN": "/opt/hse-round/interaction-plan.json",
-        "TOTAL_ROUNDS": "5",
+        "TOTAL_ROUNDS": str(rounds),
         "SESSIONS_PER_ROUND": "1",
         "MAX_PARALLEL_USERS": "1",
-        "N_USERS": "1",
-        "N_TRIAGERS": "1",
-        "N_DESIGNERS": "1",
-        "N_DIVERGENTS": "0",
-        "N_OWNERS": "0",
-        "N_DEVELOPERS": "1",
-        "HSE_OFFICIAL_AGENT_TIMEOUT_SECONDS": "1800",
-        "HSE_OUTER_AGENT_TIMEOUT_SECONDS": "2400",
+        "N_USERS": str(roster["user"]),
+        "N_TRIAGERS": str(roster["triager"]),
+        "N_DESIGNERS": str(roster["designer"]),
+        "N_DIVERGENTS": str(roster["divergent"]),
+        "N_OWNERS": str(roster["owner"]),
+        "N_DEVELOPERS": str(roster["developer"]),
+        "HSE_OFFICIAL_AGENT_TIMEOUT_SECONDS": str(plan["task"]["official_agent_timeout_seconds"]),
+        "HSE_OUTER_AGENT_TIMEOUT_SECONDS": str(plan["task"]["outer_timeout_seconds"]),
         "VIGIL_MODE": "subprocess",
         "AUTO_DESIGNER_OBJECTIVE_EVALUATION": "0",
-        "OPENAGENTS_PERMISSION_MODE": "bypassPermissions",
+        "OPENAGENTS_PERMISSION_MODE": plan["roles"]["developer"]["permission_mode"],
         "PYTHONUNBUFFERED": "1",
     }
     # The closed-loop script accepts the same command for fresh and resume;
