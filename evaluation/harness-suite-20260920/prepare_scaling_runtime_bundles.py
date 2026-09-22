@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import tarfile
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -36,6 +37,13 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+BENCHMARK_REVISIONS = {
+    "Terminal-Bench": "452bf305c6daa62fc59061d22133a7cbc7c1572e",
+    "TUA-Bench": "3497fd320abcafaf4797424192c891a593fd7964",
+    "NL2Repo": "781a1da1ee41fb8edb0bed22f586d69111610edf",
+}
+
+
 def tree_digest(root: Path) -> str:
     """Hash relative names and bytes, excluding local caches and gold outputs."""
     digest = hashlib.sha256()
@@ -48,6 +56,21 @@ def tree_digest(root: Path) -> str:
         digest.update(rel)
         digest.update(sha256_file(path).encode())
     return digest.hexdigest()
+
+
+def source_revision(source: Path | None, benchmark: str) -> str | None:
+    if source is None:
+        return None
+    if benchmark == "SWE-bench" and (source / "repo" / ".git").exists():
+        result = subprocess.run(
+            ["git", "-C", str(source / "repo"), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    return BENCHMARK_REVISIONS.get(benchmark)
 
 
 def source_for(row: dict) -> tuple[Path | None, str]:
@@ -106,6 +129,8 @@ def rows_for(n: int) -> list[dict]:
                 "source_kind": kind,
                 "source": str(source) if source else None,
                 "source_tree_sha256": tree_digest(source) if source else None,
+                "benchmark_revision": BENCHMARK_REVISIONS.get(item["benchmark"]),
+                "source_revision": source_revision(source, item["benchmark"]),
                 "status": "ready" if source else "missing-source",
             }
         )

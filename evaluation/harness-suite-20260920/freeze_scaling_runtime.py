@@ -60,10 +60,14 @@ def freeze(n: int, canary: dict | None) -> Path:
         payloads.append({
             "task_key": item.get("task_key"),
             "benchmark": item.get("benchmark"),
+            "task_id": item.get("task_id"),
+            "source_revision": item.get("source_revision") or item.get("benchmark_revision"),
+            "source_content_sha256": item.get("source_tree_sha256"),
             "agent_payload": item.get("agent_payload"),
             "agent_payload_sha256": item.get("agent_payload_sha256"),
             "grader_payload": item.get("grader_payload"),
             "grader_payload_sha256": item.get("grader_payload_sha256"),
+            "grader_sha256": item.get("grader_payload_sha256"),
         })
     canary_ok = bool(canary and canary.get("status") == "passed" and canary.get("full_loop") is True)
     if not canary_ok:
