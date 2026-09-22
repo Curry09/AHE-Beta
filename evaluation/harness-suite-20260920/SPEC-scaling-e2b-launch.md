@@ -111,7 +111,23 @@ python evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py \
 
 It writes `prepared/scaling-e2b-20260922/nN/bundle-inventory.json` and keeps
 large SWE repositories as pinned source references instead of copying them into
-the controller repository. A row is `missing-source` when its task has not yet
-been materialized; the helper never creates an empty fallback. This inventory
-is preparation evidence only and does not replace the required `receipt.json`
-or full-loop canary.
+the controller repository. The current registry covers all 32 assigned tasks
+(SWE aliases resolve to canonical repository IDs; Terminal-Bench 4.0, TUA-091
+and the four NL2Repo tasks are pinned local archives). Agent and grader archives
+are separate; `user_context.md`, tests and solutions never cross that boundary.
+A row is `missing-source` when its task has not yet been materialized; the
+helper never creates an empty fallback. This inventory is preparation evidence
+only and does not replace the required `receipt.json` or full-loop canary.
+
+After materialization, freeze the content-addressed receipts with:
+
+```bash
+python evaluation/harness-suite-20260920/freeze_scaling_runtime.py --n all
+```
+
+Without an explicit `--canary-receipt` whose `status` is `passed` and
+`full_loop` is true, receipts intentionally remain `prepared` and the launch
+gate rejects them. A complete payload inventory is not evidence that the E2B
+controller can execute the user → triage → designer → developer loop; the
+freeze command records that reason instead of silently producing a launchable
+placeholder.

@@ -22,6 +22,7 @@ ASSIGNMENTS = SUITE / "configs" / "mixed-scaling-20260922.tasks.json"
 MEMBERSHIP = SUITE / "configs" / "mixed-scaling-20260922.json"
 EXPERIMENT_CONFIGS = ROOT.parent / "auto-designer-experiment-configs"
 PUBLIC_SOURCES = EXPERIMENT_CONFIGS / "public-bench-pilot-20260917" / "prepared" / "controller-private" / "task-sources"
+NL2REPO_SOURCES = PUBLIC_SOURCES / "nl2repo-bench" / "tasks"
 HISTORICAL_TASKS = EXPERIMENT_CONFIGS / "harness-mixed16-20260916-strict-goal-r3" / "tasks"
 SWE_WORKSPACES = ROOT / "backend" / "data" / "swebench_seed" / "dev-balanced-64" / "workspace"
 OUT_ROOT = SUITE / "prepared" / "scaling-e2b-20260922"
@@ -53,7 +54,16 @@ def source_for(row: dict) -> tuple[Path | None, str]:
     benchmark = row["benchmark"]
     task_id = row["task_id"]
     if benchmark == "SWE-bench":
-        path = SWE_WORKSPACES / task_id
+        # The assignment file intentionally uses short display ids for the
+        # last three SWE tasks.  The workspace cache uses the canonical
+        # owner/repository prefix; resolving this here prevents a false
+        # missing-source status and is recorded in the inventory.
+        aliases = {
+            "astroid-1030": "pylint-dev__astroid-1030",
+            "sqlfluff-3608": "sqlfluff__sqlfluff-3608",
+            "marshmallow-2123": "marshmallow-code__marshmallow-2123",
+        }
+        path = SWE_WORKSPACES / aliases.get(task_id, task_id)
         return (path if path.is_dir() else None), "swe-prebuilt-workspace"
     if benchmark == "Terminal-Bench":
         path = PUBLIC_SOURCES / "terminal-bench-4.0" / "tasks" / task_id
@@ -61,6 +71,9 @@ def source_for(row: dict) -> tuple[Path | None, str]:
     if benchmark == "TUA-Bench":
         path = PUBLIC_SOURCES / "tua-bench" / "tasks" / task_id
         return (path if path.is_dir() else None), "tua-task-source"
+    if benchmark == "NL2Repo":
+        path = NL2REPO_SOURCES / task_id
+        return (path if path.is_dir() else None), "nl2repo-task-source"
     if benchmark == "mechanism":
         path = HISTORICAL_TASKS / task_id
         if path.is_dir():
@@ -114,18 +127,28 @@ def write_inventory(n: int) -> Path:
     return destination
 
 
-def _add_tree(archive: tarfile.TarFile, root: Path, arcroot: str, *, grader: bool) -> None:
+def _add_tree(archive: tarfile.TarFile, root: Path, arcroot: str, *, grader: bool, benchmark: str) -> None:
     """Add only the side of a task visible to that process."""
-    hidden = {".git", ".venv", "__pycache__", ".pytest_cache", "solution", "reference"}
+    hidden = {".git", ".venv", "__pycache__", ".pytest_cache", "solution", "reference", "cheat"}
     for path in sorted(root.rglob("*")):
         if any(part in hidden for part in path.parts):
             continue
         rel = path.relative_to(root)
-        # Agent must not see benchmark tests; grader must not receive solution
-        # material (already excluded above).
-        if grader and not (str(rel).startswith("tests/") or rel.name in {"task.toml", "evaluation.json"}):
+        # Agent receives only the public instruction/environment.  Grader gets
+        # the official tests and task metadata, never the reference solution.
+        if benchmark == "NL2Repo":
+            if grader and rel.name not in {"test_files.json", "test_case_count.txt", "test_commands.json"}:
+                continue
+            if not grader and rel.name != "start.md":
+                continue
+        else:
+            if grader and not (str(rel).startswith("tests/") or rel.name in {"task.toml", "evaluation.json"}):
+                continue
+            if not grader and (str(rel).startswith("tests/") or rel.name in {"task.toml", "evaluation.json"}):
+                continue
+        if not grader and rel.name == "user_context.md":
             continue
-        if not grader and (str(rel).startswith("tests/") or rel.name in {"task.toml", "evaluation.json"}):
+        if path.is_symlink() or not path.is_file():
             continue
         archive.add(path, arcname=f"{arcroot}/{rel.as_posix()}", recursive=False)
 
@@ -138,18 +161,40 @@ def materialize(n: int) -> Path:
     payload_root.mkdir(parents=True, exist_ok=True)
     for row in inventory["tasks"]:
         source = Path(row["source"]) if row["source"] else None
-        if source is None or row["benchmark"] == "SWE-bench":
+        if source is None:
             continue
         agent_path = payload_root / f"{row['task_key']}.agent.tar.gz"
         grader_path = payload_root / f"{row['task_key']}.grader.tar.gz"
         with tarfile.open(agent_path, "w:gz") as archive:
-            _add_tree(archive, source, row["task_key"], grader=False)
+            if row["benchmark"] == "SWE-bench":
+                _add_tree(archive, source / "repo", row["task_key"] + "/repo", grader=False, benchmark="SWE-bench")
+            else:
+                _add_tree(archive, source, row["task_key"], grader=False, benchmark=row["benchmark"])
         with tarfile.open(grader_path, "w:gz") as archive:
-            _add_tree(archive, source, row["task_key"], grader=True)
+            _add_tree(archive, source, row["task_key"], grader=True, benchmark=row["benchmark"])
+            # Every grader receives a small immutable identity record, even
+            # when a benchmark's verifier lives outside the task directory
+            # (SWE and the historical mechanism seeds).
+            metadata = {
+                "task_key": row["task_key"],
+                "task_id": row["task_id"],
+                "benchmark": row["benchmark"],
+                "source_tree_sha256": row["source_tree_sha256"],
+            }
+            info = tarfile.TarInfo(f"{row['task_key']}/grader-manifest.json")
+            encoded = (json.dumps(metadata, ensure_ascii=False, sort_keys=True) + "\n").encode()
+            info.size = len(encoded)
+            info.mode = 0o644
+            import io
+            archive.addfile(info, io.BytesIO(encoded))
         row["agent_payload"] = str(agent_path)
         row["agent_payload_sha256"] = sha256_file(agent_path)
         row["grader_payload"] = str(grader_path)
         row["grader_payload_sha256"] = sha256_file(grader_path)
+        row["payload_status"] = "ready"
+    for row in inventory["tasks"]:
+        if row.get("status") == "ready" and row.get("payload_status") != "ready":
+            row["status"] = "missing-agent-repo" if row["benchmark"] == "SWE-bench" else "not-materialized"
     inventory["status"] = "ready" if all(item["status"] == "ready" for item in inventory["tasks"]) else "incomplete"
     inventory["materialization"] = {
         "payload_root": str(payload_root),
