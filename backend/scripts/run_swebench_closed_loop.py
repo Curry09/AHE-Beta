@@ -297,7 +297,11 @@ def main() -> int:
     from auto_designer.loop.orchestrator import Orchestrator
     from auto_designer.loop.roster import load_roster
     from auto_designer.loop.round_gate import RoundDeliveryBlocked
-    from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
+    from auto_designer.loop.sim_user import (
+        make_mixed_run_session_fn,
+        make_sim_run_session_fn,
+        result_to_turns,
+    )
     from auto_designer.models import Persona
     from auto_designer.tracker.gitea import GiteaTracker
     from auto_designer.user.session_store import SessionStore
@@ -498,7 +502,12 @@ def main() -> int:
                 },
             )
 
-    user_run_session_fn = make_sim_run_session_fn(
+    session_factory = (
+        make_mixed_run_session_fn
+        if os.environ.get("MIXED_TASK_MANIFEST", "").strip()
+        else make_sim_run_session_fn
+    )
+    user_run_session_fn = session_factory(
         client_factory=client_factory,
         tracker=tracker,
         store=store,

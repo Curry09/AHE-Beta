@@ -20,6 +20,7 @@ import contextvars
 import hashlib
 import json
 import os
+import asyncio
 import threading
 import time
 from collections.abc import Callable
@@ -32,15 +33,43 @@ from auto_designer.designer.observation_provider import (
 from auto_designer.designer.session_timeline import bind_session_store
 from auto_designer.invocation import record_invocation
 from auto_designer.observations.gaps import GapService, bind_gaps
-from auto_designer.usage import bind_usage_context, current_usage_context
+from auto_designer.usage import (
+    bind_time_accounting,
+    bind_usage_context,
+    current_time_accounting,
+    current_usage_context,
+)
 from auto_designer.user.session_store import SessionStore
 
 # 拆返回值再编码的最大层数：实测 nexau 会把返回再 JSON 编码一层（故 ≥2），留余量；有界防畸形输入打转。
 _UNWRAP_MAX_DEPTH = 4
 
 
-def run_with_timeout(call: Callable[[], object], timeout: int) -> object:
-    """daemon 线程跑 call，超时抛 TimeoutError（丢弃线程，不阻塞进程）；contextvars 跨线程传递。"""
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+class AgentTimeout(TimeoutError):
+    """Timeout with a stable classification for scoring and recovery."""
+
+    def __init__(self, message: str, *, timeout_class: str, timing: dict[str, object]):
+        super().__init__(message)
+        self.timeout_class = timeout_class
+        self.timing = timing
+
+
+def run_with_timeout(
+    call: Callable[[], object],
+    timeout: int,
+    *,
+    wall_guard: float | None = None,
+    latency_isolated: bool = False,
+    cancel: Callable[[], None] | None = None,
+) -> object:
+    """Run an agent with optional provider-wait-isolated accounting."""
     ctx = contextvars.copy_context()
     box: dict = {}
 
@@ -52,9 +81,71 @@ def run_with_timeout(call: Callable[[], object], timeout: int) -> object:
 
     t = threading.Thread(target=target, daemon=True)
     t.start()
-    t.join(timeout)
-    if t.is_alive():
-        raise TimeoutError(f"agent 超时 >{timeout}s")
+    if not latency_isolated:
+        t.join(timeout)
+        if t.is_alive():
+            if cancel is not None:
+                cancel()
+            raise AgentTimeout(
+                f"agent 超时 >{timeout}s", timeout_class="legacy_wall_timeout", timing={}
+            )
+    else:
+        accounting = current_time_accounting()
+        if accounting is None:
+            raise RuntimeError("latency_isolated_timeout requires time accounting state")
+        guard = timeout + (float(wall_guard) if wall_guard is not None else 600)
+        while t.is_alive():
+            timing = accounting.snapshot()
+            active = float(timing["active_elapsed_ms"] or 0) / 1000
+            wall = float(timing["wall_elapsed_ms"] or 0) / 1000
+            if active >= timeout:
+                if cancel is not None:
+                    cancel()
+                raise AgentTimeout(
+                    f"agent active timeout >{timeout}s",
+                    timeout_class="mechanism_timeout",
+                    timing=timing,
+                )
+            if wall >= guard:
+                timeout_class = (
+                    "infrastructure_timeout"
+                    if timing.get("provider_active")
+                    else "controller_timeout"
+                )
+                if cancel is not None:
+                    cancel()
+                raise AgentTimeout(
+                    f"agent wall guard >{guard}s",
+                    timeout_class=timeout_class,
+                    timing=timing,
+                )
+            t.join(0.25)
+        # The polling interval may observe the worker only after it has
+        # finished.  Enforce the active deadline at that boundary as well;
+        # provider-wait time remains excluded from this check.
+        timing = accounting.snapshot()
+        wall = float(timing["wall_elapsed_ms"] or 0) / 1000
+        if wall >= guard:
+            timeout_class = (
+                "infrastructure_timeout"
+                if timing.get("provider_active")
+                else "controller_timeout"
+            )
+            if cancel is not None:
+                cancel()
+            raise AgentTimeout(
+                f"agent wall guard >{guard}s",
+                timeout_class=timeout_class,
+                timing=timing,
+            )
+        if float(timing["active_elapsed_ms"] or 0) / 1000 >= timeout:
+            if cancel is not None:
+                cancel()
+            raise AgentTimeout(
+                f"agent active timeout >{timeout}s",
+                timeout_class="mechanism_timeout",
+                timing=timing,
+            )
     if "err" in box:
         raise box["err"]
     return box.get("out")
@@ -77,6 +168,7 @@ def run_agent_def(
     observation_root: str | Path | None = None,
     tracker=None,
     source_issue_ids: set[int] | None = None,
+    restored_timing: dict[str, object] | None = None,
 ) -> str:
     """加载 agent_def_dir 的 nexau agent 定义、以 message 跑一轮，返回 agent.run 的返回值（str）。
 
@@ -138,26 +230,51 @@ def run_agent_def(
             }
         agent = Agent(config=cfg)
         started = time.monotonic()
-        try:
-            out = run_with_timeout(lambda: agent.run(message=message), timeout)
-        except TimeoutError as exc:
+        latency_isolated = _env_bool("AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT")
+        wall_guard = int(os.environ.get("AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS", "0") or 0)
+        with bind_time_accounting(
+            enabled=latency_isolated,
+            restored=restored_timing,
+        ) as accounting:
+            try:
+                def cancel_agent() -> None:
+                    try:
+                        asyncio.run(agent.stop(force=True, timeout=5))
+                    except Exception:
+                        pass
+
+                out = run_with_timeout(
+                    lambda: agent.run(message=message),
+                    timeout,
+                    wall_guard=wall_guard or None,
+                    latency_isolated=latency_isolated,
+                    cancel=cancel_agent,
+                )
+            except TimeoutError as exc:
+                accounting.finish()
+                run_metrics["timeout_class"] = getattr(exc, "timeout_class", "legacy_wall_timeout")
+                run_metrics["time_accounting"] = (
+                    getattr(exc, "timing", None) or accounting.snapshot()
+                )
+                run_metrics["latency_ms"] = round((time.monotonic() - started) * 1000, 3)
+                record_invocation(
+                    side="demand",
+                    role=role,
+                    subject=subj,
+                    prompt=message,
+                    structured=None,
+                    status="timeout",
+                    error=str(exc),
+                    replayable=replayable,
+                    model=model,
+                    agent_def_pin=pin,
+                    evidence=evidence,
+                    metrics=run_metrics,
+                )
+                raise
+            accounting.finish()
+            run_metrics["time_accounting"] = accounting.snapshot()
             run_metrics["latency_ms"] = round((time.monotonic() - started) * 1000, 3)
-            record_invocation(
-                side="demand",
-                role=role,
-                subject=subj,
-                prompt=message,
-                structured=None,
-                status="timeout",
-                error=str(exc),
-                replayable=replayable,
-                model=model,
-                agent_def_pin=pin,
-                evidence=evidence,
-                metrics=run_metrics,
-            )
-            raise
-        run_metrics["latency_ms"] = round((time.monotonic() - started) * 1000, 3)
     text = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
     structured, status = _structured_status(text=text)
     record_invocation(

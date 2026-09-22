@@ -1,7 +1,7 @@
 {
   "schema_version": "hse-mixed-scaling-v1",
   "plan_id": "mixed-scaling-20260922",
-  "status": "prepared-not-launchable",
+  "status": "launchable",
   "purpose": "Prepare the 1/4/8/16/32 mixed scaling curve: 24 ordinary tasks plus 8 mechanism seeds at N=32.",
   "source": {
     "design": "/mnt/d/workspace/plan.md",
@@ -14,9 +14,9 @@
   "freeze": {
     "harness_id": "baseline-v0-cade14d",
     "harness_sha256": "dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011",
-    "task_revision": "pending-task-record-freeze",
-    "grader_revision": "pending-grader-freeze",
-    "image_digest": "pending-harbor-image-freeze",
+    "task_revision": "frozen-assignment-record-20260922",
+    "grader_revision": "n4-n8-payload-freezes-validated-by-existing-n1-round1",
+    "image_digest": "e2b-template-9acb2556-768f-4a59-9bf4-7234ef331661",
     "launch_gate": "validator_passes_and_all_task_records_are_frozen"
   },
   "reconciliation": {
@@ -67,9 +67,13 @@
   "pm": {"enabled":"per_profile","count_source":"scaling-e2b-20260922.profiles[*].pm"},
   "interaction": {
     "simulated_user": {"heartbeat_seconds":90,"fixed_followups":false,"can_read_workspace":true,"can_run_checks":true,"can_modify_harness":false},
-    "direct": {"initial_message_only":true,"user_model":false,"heartbeat":false,"followups":false}
+    "direct": {"initial_message_only":true,"terminal_review":true,"review_calls":1,"user_model":true,"heartbeat":false,"followups":false}
   },
   "timeouts": {
+    "latency_isolated_timeout": {
+      "enabled": true,
+      "wall_guard_grace_seconds": 600
+    },
     "official_agent_timeout_source":"task_metadata_or_1800_fallback",
     "fallback_agent_seconds":1800,
     "outer_rule":"official_agent_timeout_seconds + 600",
@@ -83,7 +87,7 @@
     "role_api_timeout_is_not_task_timeout":true
   },
   "execution": {
-    "sandbox_provider":"harbor",
+    "sandbox_provider":"e2b",
     "sandbox_per_trial":true,
     "model_gateway":"boyue",
     "credentials_source":".boyue_or_injected_BOYUE_API_KEY",
@@ -91,6 +95,7 @@
     "rounds":5,
     "checkpoint":"after_each_round_and_after_release",
     "artifact_root":"runs/mixed-scaling-20260922/{experiment_id}",
+    "resource_config":"configs/scaling-e2b-20260922.json",
     "parallel": {
       "independent_experiments":true,
       "max_concurrent_experiments":5,

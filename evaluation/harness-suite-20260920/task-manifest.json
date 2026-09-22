@@ -130,10 +130,19 @@
     {
       "id": "O12",
       "benchmark": "Terminal-Bench 4.0",
-      "status": "needs-dev-freeze",
-      "task_id": null,
-      "capability": "long-horizon state and checkpoint artifact",
-      "backup_task_id": "lake-temp-glm"
+      "status": "frozen-n8-prep",
+      "task_id": "music-harmony",
+      "capability": "multimedia artifact transformation and validation",
+      "source": {
+        "dataset": "terminal-bench/terminal-bench@4.0.0",
+        "revision": "hub-revision-4",
+        "hub_revision": 4,
+        "task_digest": "sha256:f5ba5ef9140c164e1c3654425caea7dc0f74423c9632f5e0c9a6dc9001d38f00",
+        "materialized_tree_sha256": "49330d8d73d607a0226a9e92c79785c9380923d0899d7d8212e3d5101e265f5c"
+      },
+      "grader": {"type": "terminal-bench-official", "command": "bash tests/test.sh", "isolation": "fresh-separate-grader", "timeout_seconds": 60},
+      "resources": {"cpu": 2, "memory_mb": 4096, "storage_mb": 10240},
+      "timeouts": {"agent_seconds": 7200, "environment_build_seconds": 600, "verifier_seconds": 60}
     },
     {
       "id": "O13",
@@ -163,10 +172,19 @@
     {
       "id": "O15",
       "benchmark": "TUA-Bench",
-      "status": "needs-dev-freeze",
-      "task_id": null,
-      "capability": "document/PDF/format conversion",
-      "backup_task_id": "080-convert-novel-epub"
+      "status": "frozen-n8-prep",
+      "task_id": "106-create-charles-ssh-user",
+      "capability": "Linux administration, permissions, and account lifecycle",
+      "source": {
+        "repository": "facebookresearch/TUA-Bench",
+        "revision": "3497fd320abcafaf4797424192c891a593fd7964",
+        "source_archive_sha256": "6ffa44b490de0a3bab3f36458e5fb6d61a17471d9f5fa094ec4591ef72348cbd",
+        "task_material_sha256": "85e1afd03ca41299b77562a0a5fc04bfe155a654e0784c15339e3a6149b57b6b",
+        "task_material_hash_scope": "prepared task directory; deterministic relative-path and content hash (including task.toml, instruction.md, environment, tests, solution metadata)"
+      },
+      "grader": {"type": "tua-bench-official", "command": "bash tests/test.sh", "isolation": "same-task-fresh-grader", "timeout_seconds": 2400},
+      "resources": {"cpu": 1, "memory_mb": 2048, "storage_mb": 10240},
+      "timeouts": {"agent_seconds": 2400, "environment_build_seconds": 2400, "verifier_seconds": 2400}
     },
     {
       "id": "O16",

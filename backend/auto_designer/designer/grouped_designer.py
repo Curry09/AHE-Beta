@@ -32,6 +32,7 @@ from auto_designer.usage import (
     bind_usage_context,
     current_usage_context,
     monotonic_ms,
+    provider_wait_scope,
     record_usage,
 )
 
@@ -78,15 +79,16 @@ def classify_once(cards: list[dict]) -> dict:
             timeout=GROUPING_TIMEOUT_SECONDS,
             max_retries=0,
         ) as client:
-            response = client.chat.completions.create(
-                model=model,
-                temperature=0,
-                max_tokens=GROUPING_MAX_TOKENS,
-                messages=[
-                    {"role": "system", "content": GROUPING_PROMPT},
-                    {"role": "user", "content": json.dumps(cards, ensure_ascii=False)},
-                ],
-            )
+            with provider_wait_scope():
+                response = client.chat.completions.create(
+                    model=model,
+                    temperature=0,
+                    max_tokens=GROUPING_MAX_TOKENS,
+                    messages=[
+                        {"role": "system", "content": GROUPING_PROMPT},
+                        {"role": "user", "content": json.dumps(cards, ensure_ascii=False)},
+                    ],
+                )
     except Exception as error:
         record_usage(
             provider="openai",

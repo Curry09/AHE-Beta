@@ -15,6 +15,49 @@
   "designer": {"grouping": true, "batch_size": 6},
   "delivery": {"invocation_wall_seconds": 3600, "idle_seconds": 300, "round_wait_seconds": 14400},
   "task_timeout": {"fallback_seconds": 1800, "outer_grace_seconds": 600, "scope": "per_trial_not_whole_evolution"},
+  "timeouts": {
+    "latency_isolated_timeout": {
+      "enabled": true,
+      "wall_guard_grace_seconds": 600
+    }
+  },
+  "interaction_contract": {
+    "simulated_user": {
+      "initial_message": true,
+      "heartbeat_seconds": 90,
+      "fixed_followups": false,
+      "can_read_workspace": true,
+      "can_run_checks": true,
+      "can_modify_harness": false
+    },
+    "direct": {
+      "initial_message": true,
+      "heartbeat": false,
+      "followups": false,
+      "terminal_review": true,
+      "review_calls": 1,
+      "user_model": true
+    }
+  },
+  "checkpoint_contract": {
+    "after_each_round": true,
+    "after_release": true,
+    "checkpoint_root": "/opt/hse-run/recovery",
+    "artifacts_root": "/opt/hse-run/artifacts",
+    "resume_requires_same_sandbox": true,
+    "resume_requires_same_gitea_repository": true,
+    "duplicate_run_prohibited": true
+  },
+  "resume_contract": {
+    "identity_fields": ["experiment_id", "run_id", "config_sha256", "controller_sha", "plan_hash"],
+    "fresh_start_on_missing_sandbox": false,
+    "recovery_mode": "reuse_recovery_identity_and_existing_gitea_repo"
+  },
+  "secrets": {
+    "source": ".e2b/.boyue or injected environment",
+    "required": ["E2B_API_KEY", "BOYUE_API_KEY", "GITEA_TOKEN"],
+    "never_in_config": true
+  },
   "capacity": {"max_concurrent_experiments_per_controller": 1, "task_parallel_cap": "per_profile"},
   "roster_policy": {
     "pm_env": "N_DIVERGENTS",
@@ -29,7 +72,27 @@
     "16": {"user": 16, "task_parallel": 16, "triager": 8, "designer": 1, "developer": 4, "owner": 0, "pm": 1},
     "32": {"user": 32, "task_parallel": 32, "triager": 16, "designer": 2, "developer": 8, "owner": 0, "pm": 2}
   },
-  "e2b": {"lifetime_seconds": 86400, "one_runtime_per_experiment": true, "renewal_automatic": false},
+  "e2b": {
+    "lifetime_seconds": 86400,
+    "one_runtime_per_experiment": true,
+    "renewal_automatic": false,
+    "template_alias": "hse-runtime-8g-v1",
+    "template_id": "9aaeq3ys1frj3uvgx9sz",
+    "template_build_id": "9acb2556-768f-4a59-9bf4-7234ef331661",
+    "resource_profiles": {
+      "interaction": {"cpu_count": 2, "memory_mb": 4096, "storage_mb": 10240},
+      "analysis": {"cpu_count": 2, "memory_mb": 4096, "storage_mb": 10240},
+      "developer": {"cpu_count": 4, "memory_mb": 8192, "storage_mb": 10240}
+    },
+    "effective_profile_by_n": {
+      "1": "developer",
+      "4": "developer",
+      "8": "developer",
+      "16": "developer",
+      "32": "developer"
+    },
+    "resource_policy": "the physical trial sandbox uses the peak developer profile; phases are logical, not resizable"
+  },
   "gitea": {"location": "vps", "one_repository_per_experiment": true, "https_required_unless_explicit_opt_in": true},
   "paths": {"runs": "runs/scaling-e2b-20260922", "bundles": "prepared/scaling-e2b-20260922"},
   "launch_gate": {
@@ -37,6 +100,7 @@
     "requires": ["config_sha256", "bundle_sha256", "template_id", "template_build_id", "task_freezes", "canary_passed"],
     "no_models_or_resources_during_dry_run": true,
     "preflight_all_selected_before_any_start": true,
-    "status": "runtime-bundles-not-materialized"
+    "status": "canary-pending",
+    "scope": "single-N launch only; all selected tasks are preflighted before start"
   }
 }

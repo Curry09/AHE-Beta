@@ -1,0 +1,79 @@
+{
+  "schema_version": "hse-n8-preflight-v1",
+  "checked_at": "2026-09-21",
+  "formal_launch_ready": false,
+  "parallel_infrastructure_ready": true,
+  "data_boundary": {
+    "policy": "public dev/dev-like only; no hidden/test task used for preparation",
+    "O06": {
+      "status": "confirmed",
+      "source": "SWE-bench dev",
+      "task_id": "sqlfluff__sqlfluff-2336",
+      "revision": "37a993f7ad841ab3035d1db5ce6525f2e5584fd5",
+      "image": "sha256:c17b409507343c82938160bb70af6ca6731683c5429a9ad655da7652c0617d9b"
+    },
+    "O12": {
+      "status": "confirmed-resource-compatible",
+      "source": "Terminal-Bench 4.0 public task package",
+      "task_id": "music-harmony",
+      "task_digest": "sha256:f5ba5ef9140c164e1c3654425caea7dc0f74423c9632f5e0c9a6dc9001d38f00",
+      "materialized_tree_sha256": "49330d8d73d607a0226a9e92c79785c9380923d0899d7d8212e3d5101e265f5c",
+      "agent_timeout_seconds": 7200,
+      "environment": {"memory_mb": 4096, "storage_mb": 10240}
+    },
+    "O15": {
+      "status": "confirmed-resource-compatible",
+      "source": "TUA-Bench public pinned task package",
+      "task_id": "106-create-charles-ssh-user",
+      "source_revision": "3497fd320abcafaf4797424192c891a593fd7964",
+      "source_archive_sha256": "6ffa44b490de0a3bab3f36458e5fb6d61a17471d9f5fa094ec4591ef72348cbd",
+      "task_material_sha256": "85e1afd03ca41299b77562a0a5fc04bfe155a654e0784c15339e3a6149b57b6b",
+      "agent_timeout_seconds": 2400,
+      "environment": {"memory_mb": 2048, "storage_mb": 10240}
+    },
+    "NL2Repo-01": {
+      "status": "not-frozen",
+      "blocker": "exact public non-test task ID, source material, image, and grader are not selected"
+    }
+  },
+  "model_gateway": {
+    "harbor_trial_provider": "OpenRouter",
+    "harbor_trial_credentials_source": "/root/src/.env:openrouter_api_key",
+    "openrouter_key_present": true,
+    "openrouter_models_endpoint": 200,
+    "openrouter_chat_probe": {"status": 200, "model": "z-ai/glm-5.3-flash"},
+    "openrouter_available_models": ["z-ai/glm-5.3-flash", "z-ai/glm-5.3"],
+    "local_design_development_provider": "Boyue",
+    "boyue_credentials_source": "/root/src/.boyue",
+    "boyue_models_endpoint": 200,
+    "secret_values_recorded": false
+  },
+  "model_routing": {
+    "harness_in_harbor_trial": "OpenRouter / z-ai/glm-5.3-flash",
+    "user_simulator_in_harbor_trial": "OpenRouter / z-ai/glm-5.3-flash",
+    "design_local": "Boyue / glm-5.3",
+    "developer_local": "Boyue / glm-5.3"
+  },
+  "daytona": {
+    "sdk_importable": true,
+    "api_key_available_to_current_process": false,
+    "last_credentialed_canary": "sandbox creation passed; sandbox-to-Boyue TLS egress failed (not the Harbor trial gateway after routing to OpenRouter)",
+    "verified_aggregate_memory_gib": 10,
+    "verified_per_sandbox_storage_gib": 10,
+    "required_peak_sandboxes_for_1_4_8": 13,
+    "status": "resource-and-egress-capability-must-be-rechecked-from-the-actual-Harbor-trial-network"
+  },
+  "isolation": {
+    "compose_template": "backend/deploy/experiment/docker-compose.yml",
+    "legacy_singleton_stack_allowed": false,
+    "three_project_generation_test": "passed",
+    "experiment_processes_required": 3,
+    "gitea_instances_required": 3,
+    "artifact_roots_required": 3
+  },
+  "next_valid_options": [
+    "Keep the Harbor trial harness and user simulator on OpenRouter; keep local design/development on Boyue.",
+    "The selected O12/O15 replacements fit the current 10 GiB per-sandbox storage limit; aggregate concurrency is still limited to the verified 10 GiB memory tier.",
+    "NL2Repo still needs a public non-test task freeze before N=8 is formal."
+  ]
+}

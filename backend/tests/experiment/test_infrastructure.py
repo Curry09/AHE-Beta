@@ -62,6 +62,29 @@ def test_two_experiments_get_distinct_projects(tmp_path: Path) -> None:
     assert env_a != env_b
 
 
+def test_three_scaling_batches_get_distinct_compose_projects_and_stacks(tmp_path: Path) -> None:
+    batches = ("ordinary-1-glm53-v0", "ordinary-4-glm53-v0", "ordinary-8-glm53-v0")
+    projects = set()
+    envs = []
+    for batch in batches:
+        digest = config_hash(data={"experiment_id": batch, "batch_size": batch.split("-")[1]})
+        project = compose_project(experiment_id=batch, cfg_hash=digest)
+        projects.add(project)
+        destination = tmp_path / batch / "infrastructure"
+        render_stack(
+            dest=destination,
+            experiment_id=batch,
+            manifest_sha=digest,
+            vigil_image="sha256:vigil",
+        )
+        envs.append((destination / "compose.env").read_text(encoding="utf-8"))
+
+    assert len(projects) == 3
+    assert len(set(envs)) == 3
+    assert all("COMPOSE_PROJECT_NAME=" in env for env in envs)
+    assert all("TOKEN=" not in env for env in envs)
+
+
 class _Docker:
     def __init__(self) -> None:
         self.calls: list[list[str]] = []

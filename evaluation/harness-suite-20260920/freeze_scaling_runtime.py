@@ -32,6 +32,32 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def prompt_metadata(item: dict, assignment: dict) -> tuple[str | None, str | None]:
+    explicit_source = assignment.get("prompt_source")
+    explicit_hash = assignment.get("prompt_sha256")
+    if explicit_source:
+        path = Path(str(explicit_source))
+        if path.is_file():
+            return str(path), str(explicit_hash or sha256(path))
+        return str(explicit_source), str(explicit_hash or "") or None
+    if item.get("benchmark") == "mechanism":
+        manifest = load(SUITE / "task-manifest.json")
+        for task in manifest.get("mechanism_tasks", []):
+            if task.get("task_id") == item.get("task_id"):
+                opening = str(task.get("opening_message") or "")
+                return f"task-manifest.json#{task.get('id')}", sha256_text(opening) if opening else None
+    source = Path(str(item.get("source") or ""))
+    for candidate in ("instruction.md", "TASK.md", "start.md"):
+        path = source / candidate
+        if path.is_file():
+            return str(path), sha256(path)
+    return None, None
+
+
 def git_sha() -> str:
     result = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True)
     return result.stdout.strip() if result.returncode == 0 else "unknown"
@@ -45,9 +71,27 @@ def freeze(n: int, canary: dict | None) -> Path:
     folder = PREPARED / f"n{n}"
     inventory_path = folder / "bundle-inventory.json"
     inventory = load(inventory_path)
+    scaling_config = load(CONFIG)
+    assignment_rows = {
+        str(item["task_key"]): item
+        for item in load(ASSIGNMENTS).get("tasks", [])
+    }
+    e2b = scaling_config.get("e2b") or {}
+    profile_name = (e2b.get("effective_profile_by_n") or {}).get(str(n))
+    resource_profile = (e2b.get("resource_profiles") or {}).get(profile_name)
+    failures = []
+    if not profile_name or not isinstance(resource_profile, dict):
+        failures.append(f"N{n}: missing effective E2B resource profile")
+    resource_plan_path = folder / "resource-plan.json"
+    if not resource_plan_path.is_file():
+        failures.append(f"N{n}: missing resource plan {resource_plan_path}")
+    elif load(resource_plan_path).get("config_sha256") != sha256(CONFIG):
+        failures.append(f"N{n}: resource plan config hash mismatch")
     failures = []
     payloads = []
     for item in inventory.get("tasks", []):
+        assignment = assignment_rows.get(str(item.get("task_key")), {})
+        prompt_source, prompt_sha = prompt_metadata(item, assignment)
         for field in ("agent_payload", "grader_payload", "agent_payload_sha256", "grader_payload_sha256"):
             if not item.get(field):
                 failures.append(f"{item.get('task_key')}: missing {field}")
@@ -57,10 +101,18 @@ def freeze(n: int, canary: dict | None) -> Path:
                 failures.append(f"{item.get('task_key')}: missing file {path}")
             elif item.get(field + "_sha256") != sha256(path):
                 failures.append(f"{item.get('task_key')}: {field} hash mismatch")
+        official_timeout = int(assignment.get("official_agent_timeout_seconds", 1800))
         payloads.append({
             "task_key": item.get("task_key"),
             "benchmark": item.get("benchmark"),
             "task_id": item.get("task_id"),
+            "stratum": assignment.get("stratum"),
+            "interaction": assignment.get("interaction"),
+            "persona_id": assignment.get("persona_id"),
+            "prompt_source": prompt_source,
+            "prompt_sha256": prompt_sha,
+            "official_agent_timeout_seconds": official_timeout,
+            "outer_timeout_seconds": official_timeout + 600,
             "source_revision": item.get("source_revision") or item.get("benchmark_revision"),
             "source_content_sha256": item.get("source_tree_sha256"),
             "agent_payload": item.get("agent_payload"),
@@ -83,6 +135,13 @@ def freeze(n: int, canary: dict | None) -> Path:
         "assignment_sha256": sha256(ASSIGNMENTS),
         "mixed_config_sha256": sha256(MIXED),
         "bundle_inventory_sha256": sha256(inventory_path),
+        "e2b": {
+            "template_alias": e2b.get("template_alias"),
+            "template_build_id": e2b.get("template_build_id"),
+            "profile": profile_name,
+            "resources": resource_profile,
+        },
+        "timeouts": scaling_config.get("timeouts") or {},
         "task_count": len(payloads),
         "payloads": payloads,
         "canary": canary,

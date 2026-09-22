@@ -70,10 +70,26 @@ must cover the experiment, or an operator must pause/renew before expiry.
 
 ## Task runtime readiness
 
-There is no validated general mixed-task E2B bundle in the repository yet. The
-old N1 launcher also has unvalidated runtime/resume seams. Neither a wrapper nor
-a JSON field is evidence that the full loop runs. The new launcher therefore
-requires a trusted preparation receipt under prepared/scaling-e2b-20260922/nN/:
+### Resource contract
+
+The E2B sandbox is not resized between phases. User simulation, triage, and
+design are logical phases inside the same trial sandbox; the physical sandbox
+must therefore be provisioned for the peak developer phase. The formal scaling
+profile is 4 vCPU, 8192 MiB RAM, and 10240 MiB storage. The 2 GiB N=1 recovery
+is retained as a historical diagnostic and is not directly comparable to the
+formal N=4/N=8/N=16/N=32 resource-controlled runs.
+
+The selected template alias and immutable build ID must be recorded in every
+N receipt. A pending alias/build ID is a preparation state and cannot pass the
+launch gate. The template is built with E2B's template resource settings; a
+JSON memory field alone does not change an already-created sandbox.
+
+The mixed-task E2B bundle and runtime/resume path are now implemented. N16 and
+N32 have materialized, frozen receipts with `launchable=true`; N1's existing
+full-loop round-1 evidence is the shared canary for the scaling receipts, and N4/N8
+use the same receipt contract. A wrapper or JSON field alone is still not evidence
+that a new bundle runs, so every N continues to require a trusted preparation
+receipt under prepared/scaling-e2b-20260922/nN/:
 
 - immutable E2B template ID and build ID;
 - bundle.tar.gz with bin/run (the real closed-loop runtime, not a placeholder);

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import hashlib
 import json
 import os
 import shlex
@@ -32,6 +33,14 @@ class LaunchGateError(RuntimeError):
 
 def load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def selected(raw: str) -> list[int]:
@@ -90,8 +99,21 @@ def gate(rows: list[dict]) -> list[str]:
     assignment = load(ASSIGNMENTS)
     launch = load(CONFIG)["launch_gate"]
     profiles = load(CONFIG).get("profiles") or {}
+    scaling_config = load(CONFIG)
+    e2b = scaling_config.get("e2b") or {}
+    executor_path = SUITE / "run_scaling_bundle_e2b.py"
+    if not executor_path.is_file():
+        errors.append(f"missing mixed-task E2B executor: {executor_path}")
+    resource_profiles = e2b.get("resource_profiles") or {}
+    effective_profiles = e2b.get("effective_profile_by_n") or {}
+    if not e2b.get("template_alias") or not e2b.get("template_build_id"):
+        errors.append("E2B template alias/build id missing")
+    if str(e2b.get("template_build_id", "")).startswith("pending-"):
+        errors.append("E2B template build is still pending")
     if mixed.get("status") != "launchable":
         errors.append(f"mixed config status={mixed.get('status')!r}，不是 launchable")
+    if (mixed.get("execution") or {}).get("sandbox_provider") != "e2b":
+        errors.append("mixed config sandbox_provider must be e2b for scaling-e2b")
     if assignment.get("status") != "frozen":
         errors.append(f"task assignment status={assignment.get('status')!r}，不是 frozen")
     for row in rows:
@@ -125,6 +147,22 @@ def gate(rows: list[dict]) -> list[str]:
             document = load(receipt)
             if document.get("status") != "ready":
                 errors.append(f"N{row['n']} runtime receipt status={document.get('status')!r}")
+            if document.get("launchable") is not True:
+                errors.append(f"N{row['n']} runtime receipt is not launchable")
+            if document.get("mixed_config_sha256") != sha256(MIXED):
+                errors.append(f"N{row['n']} runtime receipt mixed-config hash is stale")
+            canary = document.get("canary") or {}
+            if canary.get("status") != "passed" or canary.get("full_loop") is not True:
+                errors.append(f"N{row['n']} missing passed full-loop canary")
+            expected_profile = effective_profiles.get(str(row["n"]))
+            expected_resources = resource_profiles.get(expected_profile)
+            actual = document.get("e2b") or {}
+            if actual.get("template_alias") != e2b.get("template_alias"):
+                errors.append(f"N{row['n']} receipt E2B template alias mismatch")
+            if actual.get("template_build_id") != e2b.get("template_build_id"):
+                errors.append(f"N{row['n']} receipt E2B template build mismatch")
+            if actual.get("profile") != expected_profile or actual.get("resources") != expected_resources:
+                errors.append(f"N{row['n']} receipt E2B resource profile mismatch")
     if not launch.get("preflight_all_selected_before_any_start"):
         errors.append("配置未开启 all-selected preflight gate")
     return errors
@@ -148,9 +186,9 @@ def run_one(row: dict, command: list[str], resume: bool) -> dict:
     n = row["n"]
     profile = load(CONFIG)["profiles"][str(n)]
     replacements = {
-        "{n}": str(n),
-        "{experiment_id}": row["experiment_id"],
-        **{f"{{{key}}}": str(value) for key, value in profile.items()},
+        "n": str(n),
+        "experiment_id": row["experiment_id"],
+        **{key: str(value) for key, value in profile.items()},
     }
     formatted = [item.format_map(replacements) for item in command]
     process = subprocess.Popen(
@@ -204,6 +242,9 @@ def main() -> int:
             for error in errors:
                 print("LAUNCH_GATE_ERROR:", error, file=os.sys.stderr)
             return 2
+        if args.check_launch and not (args.start or args.resume):
+            print(json.dumps({"launchable": True, "experiments": rows}, ensure_ascii=False, indent=2))
+            return 0
         if not args.executor:
             raise LaunchGateError("--start/--resume 需要 --executor，不能默认替换成 N=1 runner")
         command = shlex.split(args.executor)

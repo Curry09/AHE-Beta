@@ -472,3 +472,254 @@ def make_sim_run_session_fn(
     # committed but before the recovery completion marker was published.
     run.load_completed_session = store.reconcile
     return run
+
+
+def make_direct_run_session_fn(
+    *,
+    client_factory: Callable[[], PersonaClient],
+    tracker: IssueTracker,
+    store: SessionStore,
+    sim_personas: dict[str, SimPersona],
+    round_provider: Callable[[], int | None] | None = None,
+) -> Callable[..., Session]:
+    """Build the no-intermediate-control runner used by mixed benchmark tasks.
+
+    Direct mode sends the frozen task description exactly once and never sends
+    a heartbeat, follow-up, interrupt, or acceptance message to the harness.
+    After the harness reaches its terminal reply, the assigned user persona
+    gets one bounded review call to inspect the reply/artifact and produce the
+    same feedback/issue handoff consumed by triage. Thus direct removes the
+    intermediate control loop, not the user feedback signal.
+    """
+
+    observation_root = Path(
+        os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations"))
+    )
+    from auto_designer.observations.publication import preflight_root
+
+    preflight_root(observation_root)
+    preflight = getattr(tracker, "preflight_observations", None)
+    if preflight is not None:
+        contract = preflight()
+        binding = observation_root / ".framework-contract.json"
+        if binding.exists() and json.loads(binding.read_text()) != contract:
+            raise ValueError("observation root already belongs to a different repository/contract")
+        binding.write_text(json.dumps(contract))
+
+    def run(
+        persona: Persona,
+        scenario: SeedScenario,
+        harness: HarnessInterface,
+        *,
+        workspace_dir: Workspace | None = None,
+    ) -> Session:
+        params = dict((scenario.workspace.params if scenario.workspace else {}) or {})
+        task_key = str(params.get("task_key") or persona.identity or "direct-task")
+        benchmark = str(params.get("benchmark") or "unknown")
+        session_id = current_usage_context().session_id or uuid.uuid4().hex
+        connector = HarnessConnector(harness)
+        reply = ""
+        harness_error: str | None = None
+        workspace_evidence: dict = {}
+        patch_text = ""
+        try:
+            connector.reset()
+            with bind_usage_context(
+                session_id=session_id,
+                instance_id=params.get("task_id") or task_key,
+                role="direct",
+                agent_id=f"direct-{task_key}",
+                round_no=round_provider() if round_provider else None,
+            ):
+                reply = connector.send(scenario.description)
+        except Exception as exc:  # noqa: BLE001 - preserve an auditable infrastructure failure
+            harness_error = str(exc)
+            reply = f"[harness error] {harness_error}"
+        finally:
+            try:
+                connector.close()
+            finally:
+                source = getattr(harness, "observation_source", None)
+                if source is not None:
+                    workspace_evidence["observation"] = source.collect(
+                        root=observation_root, session_id=session_id
+                    )
+
+        if workspace_dir is not None:
+            try:
+                patch, patch_sha = workspace_dir.export_patch()
+                patch_text = patch[:12_000]
+                workspace_evidence.update(
+                    {
+                        "patch_sha256": patch_sha,
+                        "patch_bytes": len(patch.encode()),
+                        "patch_exported_at": utc_now(),
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001 - evidence is still retained
+                workspace_evidence["patch_export_error"] = str(exc)
+            workspace_evidence.update(dict(getattr(workspace_dir, "evidence", {}) or {}))
+
+        # Direct mode still has a user-side terminal review. It is deliberately
+        # one bounded persona call after the harness reply: no tool/heartbeat/
+        # follow-up is sent back to the harness.
+        review_client = client_factory()
+        sim_persona = sim_personas.get(persona.identity)
+        review_error: str | None = None
+        review: dict = {}
+        review_system = "You are a strict software user reviewing a completed harness run. Return JSON only."
+        if sim_persona is not None:
+            from auto_designer.user.sim.prompt import build_system
+
+            review_system = build_system(sim_persona)
+            if workspace_dir is not None and hasattr(review_client, "bind_session"):
+                review_client.bind_session(
+                    persona=sim_persona,
+                    workspace_dir=as_runtime(workspace_dir),
+                )
+        review_prompt = (
+            "<direct_review>\n"
+            "The harness has finished. Review its final reply and the bounded patch excerpt below. "
+            "Do not send anything to the harness and do not invent tests or evidence. Return exactly "
+            '{"verdict":"accept|file_issue","feedback":"user-facing concise findings",'
+            '"issue":"self-contained issue text if needed","score":1,"reason":"..."}.\n'
+            f"<task>\n{scenario.description}\n</task>\n"
+            f"<harness_reply>\n{reply}\n</harness_reply>\n"
+            f"<patch_excerpt>\n{patch_text or '(no patch exported)'}\n</patch_excerpt>\n"
+            "</direct_review>"
+        )
+        try:
+            with bind_usage_context(
+                session_id=session_id,
+                instance_id=params.get("task_id") or task_key,
+                role="user",
+                agent_id=f"user-{persona.identity}",
+                round_no=round_provider() if round_provider else None,
+                operation="direct_review",
+            ):
+                review = dict(review_client.respond(review_system, review_prompt) or {})
+        except Exception as exc:  # noqa: BLE001 - preserve feedback even if review is unavailable
+            review_error = str(exc)
+        feedback = str(review.get("feedback") or review.get("message") or review.get("issue") or "").strip()
+        if not feedback:
+            feedback = "Harness final reply recorded without additional user findings."
+        review_issue = str(review.get("issue") or feedback).strip()
+        verdict = str(review.get("verdict") or "file_issue").strip()
+        score = review.get("score")
+        if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 4:
+            score = 3
+        review_status = "infrastructure_failure" if review_error else "completed"
+
+        body = (
+            f"[direct task {task_key} / {benchmark}]\n"
+            f"Task instruction:\n{scenario.description}\n\n"
+            f"Harness final reply:\n{reply}\n"
+            f"\nUser terminal review ({verdict}):\n{review_issue}\n"
+        )
+        round_no = round_provider() if round_provider is not None else None
+        labels = ["bug", NEEDS_TRIAGE, "direct"]
+        if round_no is not None:
+            labels.append(round_label(round_no))
+        draft = IssueDraft(
+            title=f"direct task {task_key}"[:80],
+            body=body,
+            labels=labels,
+        )
+        create_once = getattr(tracker, "create_issue_once", None)
+        if callable(create_once):
+            issue_refs = [
+                create_once(
+                    draft,
+                    operation_key=operation_key("direct-session-issue", session_id),
+                )
+            ]
+        else:
+            issue_refs = [tracker.create_issue(draft)]
+
+        session = Session(
+            persona=persona,
+            scenario=scenario,
+            transcript=Transcript(
+                turns=[
+                    Turn(role="user", content=scenario.description),
+                    Turn(role="harness", content=reply),
+                    Turn(role="user", content=feedback),
+                ]
+            ),
+            feeling=FeelingScore(score=score, reason=str(review.get("reason") or "terminal user review")),
+            issue_refs=issue_refs,
+            session_id=session_id,
+            user_outcome={
+                "interaction_mode": "direct",
+                "user_model": getattr(review_client, "model", None),
+                "user_turns": 1,
+                "harness_messages": 1,
+                "review_calls": 1,
+                "followups": 0,
+                "heartbeat": False,
+                "status": "infrastructure_failure" if harness_error else "completed",
+                "review_status": review_status,
+                "review_verdict": verdict,
+                "review_feedback": feedback,
+                "harness_reply": reply,
+                **({"error": harness_error} if harness_error else {}),
+                **({"review_error": review_error} if review_error else {}),
+            },
+            request_outcomes=list(getattr(harness, "request_outcomes", []) or []),
+            workspace_evidence=workspace_evidence,
+            accept_validity="not_applicable",
+            audit_events=_audit_events(
+                workspace_evidence=workspace_evidence,
+                request_outcomes=list(getattr(harness, "request_outcomes", []) or []),
+                objective_evaluation=None,
+            ),
+        )
+        from auto_designer.designer.evidence_contract import build_evidence_envelope
+
+        session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
+        store.save(session)
+        return session
+
+    run.load_completed_session = store.reconcile
+    return run
+
+
+def make_mixed_run_session_fn(
+    *,
+    client_factory: Callable[[], PersonaClient],
+    tracker: IssueTracker,
+    store: SessionStore,
+    sim_personas: dict[str, SimPersona],
+    on_turn: SimTurnHook | None = None,
+    round_provider: Callable[[], int | None] | None = None,
+    evaluator: SWEbenchEvaluator | None = None,
+) -> Callable[..., Session]:
+    """Dispatch a frozen task to simulated-user or direct interaction mode."""
+
+    simulated = make_sim_run_session_fn(
+        client_factory=client_factory,
+        tracker=tracker,
+        store=store,
+        sim_personas=sim_personas,
+        on_turn=on_turn,
+        round_provider=round_provider,
+        evaluator=evaluator,
+    )
+    direct = make_direct_run_session_fn(
+        client_factory=client_factory,
+        tracker=tracker,
+        store=store,
+        sim_personas=sim_personas,
+        round_provider=round_provider,
+    )
+
+    def run(persona: Persona, scenario: SeedScenario, harness: HarnessInterface, *, workspace_dir=None):
+        mode = str((scenario.workspace.params if scenario.workspace else {}).get("interaction", "simulated_user"))
+        if mode == "direct":
+            return direct(persona, scenario, harness, workspace_dir=workspace_dir)
+        if mode != "simulated_user":
+            raise ValueError(f"unsupported interaction mode: {mode}")
+        return simulated(persona, scenario, harness, workspace_dir=workspace_dir)
+
+    run.load_completed_session = simulated.load_completed_session
+    return run

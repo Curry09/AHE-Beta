@@ -90,7 +90,8 @@ HSE_HARNESS_ARCHIVE=.artifacts/harness-v0-cade14d.tar.gz
 sha256 = dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011
 ```
 
-`nexau==0.4.1` 和 `ag-ui-protocol==0.1.22` 会在 sandbox setup 阶段按固定版本安装。
+NexAU 使用冻结的官方源码快照随启动包上传到 sandbox，并在 `/opt/hse-venv` 中以本地
+editable 方式安装；不依赖 PyPI 上的 `nexau==0.4.1`（该包未发布到当前 PyPI）。
 
 ## 4. 先做 canary，再做正式 trial
 

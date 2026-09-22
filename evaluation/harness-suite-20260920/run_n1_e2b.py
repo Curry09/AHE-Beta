@@ -15,6 +15,7 @@ import json
 import os
 import secrets
 import subprocess
+import sys
 import tarfile
 import tempfile
 from datetime import UTC, datetime
@@ -30,6 +31,7 @@ ARTIFACTS = ROOT.parent / "auto-designer-experiment-artifacts"
 HARNESS_ARCHIVE = ARTIFACTS / "harness-v0-cade14d.tar.gz"
 CLAUDE = Path("/root/.local/share/claude/versions/2.1.261")
 OPENAGENTS = ROOT.parent / "OpenAgents"
+NEXAU = ROOT.parent / "NexAU"
 TASK_ID = "pvlib__pvlib-python-1478"
 TASK_COMMIT = "3f397ed44075b01f4ba535750356859195a51b2d"
 TASK_REPO = "pvlib/pvlib-python"
@@ -186,6 +188,7 @@ def archive_sources(destination: Path) -> None:
         ROOT / "backend" / "harness_template",
         ROOT / "backend" / "run.py",
         ROOT / "backend" / "scripts" / "run_swebench_closed_loop.py",
+        ROOT / "backend" / "scripts" / "run_mixed_closed_loop.py",
         ROOT / "backend" / "persona_library.json",
         ROOT / "pyproject.toml",
     ]
@@ -227,6 +230,7 @@ def remote_files(
     user_model = roles["user_simulator"]["model"]
     designer_model = roles["designer"]["model"]
     developer_model = roles["developer"]["model"]
+    timing_policy = (plan.get("timeouts") or {}).get("latency_isolated_timeout") or {}
     backend_env = "\n".join(
         [
             f"USER_LLM_MODEL={user_model}",
@@ -241,6 +245,8 @@ def remote_files(
             f"DEVELOPER_LLM_MODEL={developer_model}",
             f"DEVELOPER_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
             f"DEVELOPER_LLM_API_KEY={creds['BOYUE_API_KEY']}",
+            f"AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT={'1' if timing_policy.get('enabled', False) else '0'}",
+            f"AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS={int(timing_policy.get('wall_guard_grace_seconds', 600))}",
             f"ANTHROPIC_MODEL={developer_model}",
             f"ANTHROPIC_SMALL_FAST_MODEL={developer_model}",
             f"ANTHROPIC_BASE_URL={creds['BOYUE_ANTHROPIC']}",
@@ -259,7 +265,7 @@ def remote_files(
         ]
     )
     plan_json = json.dumps(
-        [[PERSONA, TASK_ID] for _ in range(int(plan["rounds"]["count"]))],
+        [[[PERSONA, TASK_ID]] for _ in range(int(plan["rounds"]["count"]))],
         ensure_ascii=False,
     )
     return {
@@ -275,6 +281,8 @@ def remote_files(
         "/opt/hse-round/run.sh": """#!/usr/bin/env bash
 set -u
 mkdir -p /opt/hse-run
+exec >> /opt/hse-run/controller.log 2>&1
+export PATH=/opt/hse-venv/bin:/usr/local/bin:/usr/bin:/bin
 set +e
 PYTHONPATH=/opt/hse-round/backend /opt/hse-venv/bin/python -u /opt/hse-round/backend/scripts/run_swebench_closed_loop.py
 code=$?
@@ -288,19 +296,35 @@ def shell_setup() -> str:
     return r"""set -eux
 mkdir -p /opt/hse-round/backend/deploy/gitea /opt/hse-run /opt/hse-run/recovery /opt/claude-bin
 tar -xzf /tmp/hse-code.tar.gz -C /opt/hse-round
+mkdir -p /opt/hse-round/harness
 install -m 0644 /tmp/hse-harness.tar.gz /opt/hse-round/harness-v0-cade14d.tar.gz
+tar -xzf /tmp/hse-harness.tar.gz -C /opt/hse-round/harness
 tar -xzf /tmp/hse-openagents.tar.gz -C /opt/hse-round
+tar -xzf /tmp/hse-nexau.tar.gz -C /opt/hse-round
 install -m 0755 /tmp/claude-bin /usr/local/bin/claude
-python3 -m venv /opt/hse-venv
+curl -fL --retry 3 \
+  'https://github.com/astral-sh/python-build-standalone/releases/download/20260814/cpython-3.12.14%2B20260814-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz' \
+  -o /tmp/python312.tar.gz
+echo '5acfa3e9ba26b51ae161c83aff278da915b590d22373a424b2ba55b8afe91fcc  /tmp/python312.tar.gz' \
+  | sha256sum -c -
+tar -xzf /tmp/python312.tar.gz -C /opt
+/opt/python/bin/python3 -m venv /opt/hse-venv
 /opt/hse-venv/bin/pip install --no-cache-dir requests ruamel.yaml jsonschema fastapi uvicorn pyarrow
-/opt/hse-venv/bin/pip install --no-cache-dir ag-ui-protocol==0.1.22 nexau==0.4.1
+/opt/hse-venv/bin/pip install --no-cache-dir -e /opt/hse-round/NexAU
+/opt/hse-venv/bin/pip install --no-cache-dir 'ag-ui-protocol==0.1.22'
+/opt/hse-venv/bin/pip install --no-cache-dir 'e2b==2.51.0'
 /opt/hse-venv/bin/pip install --no-cache-dir -e /opt/hse-round/OpenAgents
 mkdir -p /opt/hse-run/workspace/pvlib__pvlib-python-1478
 git clone --quiet https://github.com/pvlib/pvlib-python.git /opt/hse-run/workspace/pvlib__pvlib-python-1478/repo
 git -C /opt/hse-run/workspace/pvlib__pvlib-python-1478/repo checkout --quiet 3f397ed44075b01f4ba535750356859195a51b2d
-ln -s /opt/hse-venv /opt/hse-run/workspace/pvlib__pvlib-python-1478/repo/.venv
-/opt/hse-venv/bin/pip install --no-cache-dir -e /opt/hse-run/workspace/pvlib__pvlib-python-1478/repo
-python3 - <<'PY'
+git config --global --add safe.directory /opt/hse-run/workspace/pvlib__pvlib-python-1478/repo
+python3 -m venv /opt/task-venv
+/opt/task-venv/bin/python -m pip install --no-cache-dir -U pip 'setuptools<81' wheel
+ln -s /opt/task-venv /opt/hse-run/workspace/pvlib__pvlib-python-1478/repo/.venv
+/opt/task-venv/bin/pip install --no-cache-dir -e /opt/hse-run/workspace/pvlib__pvlib-python-1478/repo
+/opt/task-venv/bin/pip install --no-cache-dir 'numpy==1.26.4' 'scipy==1.13.1'
+rm -f /tmp/python312.tar.gz
+/opt/hse-venv/bin/python - <<'PY'
 import json, pyarrow as pa, pyarrow.parquet as pq
 from pathlib import Path
 item=json.loads(Path('/opt/hse-round/instance.json').read_text())
@@ -310,6 +334,17 @@ chmod +x /opt/hse-round/run.sh
 test -f /opt/hse-round/harness/entry.py
 test -f /opt/hse-round/backend/scripts/run_swebench_closed_loop.py
 test -x /usr/local/bin/claude
+git -C /opt/hse-round init -b main
+/opt/hse-venv/bin/python - <<'PY'
+from pathlib import Path
+Path('/opt/hse-round/.gitignore').write_text(
+    '*.env\n.env*\n__pycache__/\n*.pyc\nbackend/data/\n'
+    'OpenAgents/\nNexAU/\nharness/\n*.tar.gz\n'
+)
+PY
+git -C /opt/hse-round add .gitignore backend/auto_designer backend/agent_defs backend/harness_template backend/run.py backend/scripts/run_swebench_closed_loop.py backend/persona_library.json pyproject.toml
+git -C /opt/hse-round -c user.name=hse-runtime -c user.email=hse-runtime@localhost commit -m 'Snapshot uploaded controller sources'
+chown -R user:user /opt/hse-round /opt/hse-run /opt/task-venv
 """
 
 
@@ -331,6 +366,32 @@ def write_state(run_dir: Path, state: dict) -> None:
     (run_dir / "state.json").write_text(
         json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+
+
+def start_status_relay(*, run_id: str, sandbox_id: str) -> int | None:
+    """Start the best-effort local E2B→VPS status relay for this run."""
+    relay = SUITE / "sync_status_vps.py"
+    vps_file = ROOT.parent / ".vps"
+    if not relay.is_file() or not vps_file.is_file():
+        return None
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            str(relay),
+            "--run-id",
+            run_id,
+            "--sandbox-id",
+            sandbox_id,
+            "--vps-file",
+            str(vps_file),
+        ],
+        cwd=str(ROOT),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return proc.pid
 
 
 def redacted(plan: dict, state: dict | None = None) -> dict:
@@ -357,7 +418,8 @@ def start_remote(sandbox, plan: dict, identity_data: dict[str, str], resume: boo
     roster = plan["roster"]
     rounds = int(plan["rounds"]["count"])
     envs = {
-        **identity_data,
+        **{f"AUTO_DESIGNER_{key.upper()}": value for key, value in identity_data.items()},
+        "PATH": "/opt/hse-venv/bin:/usr/local/bin:/usr/bin:/bin",
         "AUTO_DESIGNER_RUN_MODE": "resume" if resume else "fresh",
         "AUTO_DESIGNER_GITEA_ENV_FILE": "/opt/hse-round/backend/deploy/gitea/.env",
         "AUTO_DESIGNER_HARNESS_ARCHIVE": "/opt/hse-round/harness-v0-cade14d.tar.gz",
@@ -383,13 +445,14 @@ def start_remote(sandbox, plan: dict, identity_data: dict[str, str], resume: boo
         "OPENAGENTS_PERMISSION_MODE": plan["roles"]["developer"]["permission_mode"],
         "PYTHONUNBUFFERED": "1",
     }
-    # The closed-loop script accepts the same command for fresh and resume;
-    # AUTO_DESIGNER_RUN_MODE is the only lifecycle switch.
+    # Keep the E2B background command alive for the whole sandbox lifetime.
+    # A short command timeout would kill the remote process during a trial.
     return sandbox.commands.run(
         "bash /opt/hse-round/run.sh",
         envs=envs,
+        user="user",
         background=True,
-        timeout=120,
+        timeout=int(plan["execution"]["sandbox_timeout_seconds"]),
     )
 
 
@@ -404,6 +467,9 @@ def create_sandbox(
     temp = Path(tempfile.mkdtemp(prefix="hse-n1-"))
     code_tar = temp / "hse-code.tar.gz"
     oa_tar = temp / "hse-openagents.tar.gz"
+    nexau_tar = temp / "hse-nexau.tar.gz"
+    if not NEXAU.is_dir():
+        raise LaunchError(f"NexAU source tree missing: {NEXAU}")
     archive_sources(code_tar)
     with tarfile.open(oa_tar, "w:gz") as archive:
         archive.add(
@@ -411,14 +477,49 @@ def create_sandbox(
             arcname="OpenAgents",
             filter=lambda info: (
                 None
-                if any(part in {".git", "__pycache__"} for part in Path(info.name).parts)
+                if any(
+                    part in {
+                        ".git",
+                        "__pycache__",
+                        ".pytest_cache",
+                        ".openagents",
+                        ".venv",
+                        "build",
+                        "dist",
+                    }
+                    for part in Path(info.name).parts
+                )
+                else info
+            ),
+        )
+    with tarfile.open(nexau_tar, "w:gz") as archive:
+        archive.add(
+            NEXAU,
+            arcname="NexAU",
+            filter=lambda info: (
+                None
+                if any(
+                    part in {
+                        ".git",
+                        "__pycache__",
+                        ".pytest_cache",
+                        ".venv",
+                        "build",
+                        "dist",
+                        ".mypy_cache",
+                        ".ruff_cache",
+                    }
+                    for part in Path(info.name).parts
+                )
                 else info
             ),
         )
     sandbox = None
     try:
+        resource_profile = plan.get("execution", {}).get("resource_profile") or {}
+        template_alias = resource_profile.get("template_alias") or "base"
         sandbox = Sandbox.create(
-            template="base",
+            template=template_alias,
             timeout=int(plan["execution"]["sandbox_timeout_seconds"]),
             allow_internet_access=True,
             metadata={"experiment_id": plan["experiment_id"], "run_id": run_id, "task": TASK_ID},
@@ -436,6 +537,7 @@ def create_sandbox(
 
         upload(code_tar, "/tmp/hse-code.tar.gz")
         upload(oa_tar, "/tmp/hse-openagents.tar.gz")
+        upload(nexau_tar, "/tmp/hse-nexau.tar.gz")
         upload(HARNESS_ARCHIVE, "/tmp/hse-harness.tar.gz")
         upload(CLAUDE, "/tmp/claude-bin")
         for path, text in remote_files(plan, creds, run_id, repo_name, metadata).items():
@@ -477,8 +579,12 @@ def fresh(args, plan: dict, creds: dict[str, str]) -> int:
         "harness_id": plan["harness"]["id"],
         "identity": ident,
         "command_id": getattr(command, "cmd_id", None),
+        "command_pid": getattr(command, "pid", None),
         "started_at": now(),
     }
+    relay_pid = start_status_relay(run_id=run_id, sandbox_id=sandbox.sandbox_id)
+    if relay_pid is not None:
+        state["status_relay_pid"] = relay_pid
     write_state(run_dir, state)
     print(f"STARTED run_id={run_id}")
     print(f"E2B_SANDBOX_ID={sandbox.sandbox_id}")
@@ -518,6 +624,9 @@ def resume(args, plan: dict, creds: dict[str, str]) -> int:
         return int(exit_probe.stdout.strip())
     command = start_remote(sandbox, plan, ident, True)
     state["resume_command_id"] = getattr(command, "cmd_id", None)
+    relay_pid = start_status_relay(run_id=args.run_id, sandbox_id=state["sandbox_id"])
+    if relay_pid is not None:
+        state["status_relay_pid"] = relay_pid
     state["resumed_at"] = now()
     write_state(run_dir, state)
     print(f"RESUMED run_id={args.run_id} sandbox={state['sandbox_id']}")

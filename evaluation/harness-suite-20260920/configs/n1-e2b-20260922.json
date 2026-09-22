@@ -77,6 +77,16 @@
     "sandbox_per_experiment": true,
     "allow_internet_access": true,
     "sandbox_timeout_seconds": 86400,
+    "resource_profile": {
+      "template_alias": "base",
+      "template_build_id": "historical-base-2g-diagnostic",
+      "cpu_count": 2,
+      "memory_mb": 2048,
+      "storage_mb": 10240,
+      "profile": "historical-diagnostic",
+      "formal_comparison_eligible": false,
+      "note": "This already-started N=1 recovery keeps its frozen identity; future formal runs use the scaling developer profile."
+    },
     "gitea": {
       "location": "vps",
       "url_env": "GITEA_URL",
@@ -115,6 +125,12 @@
     "task_outer_seconds": "official_agent_timeout_seconds + 600",
     "direct_tasks_same_rule": true,
     "outer_scope": "setup_artifact_checkpoint_teardown_grace_only"
+  },
+  "timeouts": {
+    "latency_isolated_timeout": {
+      "enabled": true,
+      "wall_guard_grace_seconds": 600
+    }
   },
   "resume_contract": {
     "identity_fields": ["experiment_id", "run_id", "config_hash", "controller_sha", "plan_hash"],
