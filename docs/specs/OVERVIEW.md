@@ -196,6 +196,12 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 ### 0065 标准化 Harness 评测框架
 以不可变计划驱动隔离沙盒中的 Harness 评测，统一官方时间预算、直出与带心跳 LLM 用户模拟、官方 grader、失败分类、恢复和可复现实验报告。
 
+### 0066 Provider latency 隔离与官方预算超时
+保留完整 wall time，同时把模型提供方等待从机制 active-time 预算中隔离，并统一官方任务内层预算与外层加 600 秒规则。
+
+### 0067 混合 Harness E2B Scaling 运行时
+为 N=1/4/8/16/32 建立按 receipt 冻结、可恢复、可并行启动的 E2B 混合任务运行时，并统一 direct 与 simulated-user 结果产物。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -481,6 +487,14 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0065 | 0065/T4 | 直出与带心跳 LLM 用户模拟策略 | done | T1, T3 | evaluation/harness_bench/interactions/base.py<br>evaluation/harness_bench/interactions/direct.py<br>evaluation/harness_bench/interactions/simulated_user.py<br>evaluation/harness_bench/interactions/native_user.py<br>evaluation/tests/harness_bench/test_interactions.py |
 | 0065 | 0065/T5 | Benchmark 插件、官方预算与隐藏 grader | done | T1, T2, T3 | evaluation/harness_bench/benchmarks/base.py<br>evaluation/harness_bench/benchmarks/swebench.py<br>evaluation/harness_bench/benchmarks/terminal_bench.py<br>evaluation/harness_bench/benchmarks/tua_bench.py<br>evaluation/harness_bench/benchmarks/tau3.py<br>evaluation/tests/harness_bench/test_benchmarks.py |
 | 0065 | 0065/T6 | 可恢复编排、统一结果与配对报告 | done | T1, T2, T3, T4, T5 | evaluation/harness_bench/orchestrator.py<br>evaluation/harness_bench/state.py<br>evaluation/harness_bench/outcomes.py<br>evaluation/harness_bench/report.py<br>evaluation/tests/harness_bench/test_orchestrator.py<br>evaluation/tests/harness_bench/test_reporting.py |
+| 0066 | 0066/T1 | 统一时间账本与 provider scope | done | — | backend/auto_designer/usage.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/user/sim/persona_client.py |
+| 0066 | 0066/T2 | 角色超时分类与可恢复取消 | done | T1 | backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/loop/sim_user.py |
+| 0066 | 0066/T3 | 官方内层预算与 E2B 配置传播 | done | T1, T2 | evaluation/harness-suite-20260920/configs/scaling-e2b-20260922.json<br>evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.json<br>evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py |
+| 0066 | 0066/T4 | 回归验收与操作文档 | done | T1, T2, T3 | backend/tests/test_time_accounting.py<br>evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md |
+| 0067 | 0067/T1 | 冻结任务、资源和运行身份 | done | — | evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py<br>evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.tasks.json |
+| 0067 | 0067/T2 | E2B mixed executor 与交互边界 | done | T1 | evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>backend/scripts/run_mixed_closed_loop.py<br>backend/auto_designer/loop/sim_user.py |
+| 0067 | 0067/T3 | 单 N 启动、五轮检查点与恢复 | done | T1, T2 | evaluation/harness-suite-20260920/run_scaling_e2b.py<br>evaluation/harness-suite-20260920/start_scaling_n1_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n4_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n8_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n16_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n32_e2b.sh |
+| 0067 | 0067/T4 | 结果规范和迁移手册 | done | T1, T2, T3 | evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md<br>evaluation/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md<br>evaluation/harness-suite-20260920/SPEC-scaling-e2b-launch.md |
 
 ## 跨 feature 关系图
 
@@ -895,6 +909,18 @@ graph LR
         n0065_T5["T5 Benchmark 插件、官方预算与隐藏 grader"]
         n0065_T6["T6 可恢复编排、统一结果与配对报告"]
     end
+    subgraph G0066[0066 provider-latency-isolated-timeout]
+        n0066_T1["T1 统一时间账本与 provider scope"]
+        n0066_T2["T2 角色超时分类与可恢复取消"]
+        n0066_T3["T3 官方内层预算与 E2B 配置传播"]
+        n0066_T4["T4 回归验收与操作文档"]
+    end
+    subgraph G0067[0067 mixed-e2b-scaling-runtime]
+        n0067_T1["T1 冻结任务、资源和运行身份"]
+        n0067_T2["T2 E2B mixed executor 与交互边界"]
+        n0067_T3["T3 单 N 启动、五轮检查点与恢复"]
+        n0067_T4["T4 结果规范和迁移手册"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1198,6 +1224,18 @@ graph LR
     n0065_T6 --> n0065_T3
     n0065_T6 --> n0065_T4
     n0065_T6 --> n0065_T5
+    n0066_T2 --> n0066_T1
+    n0066_T3 --> n0066_T1
+    n0066_T3 --> n0066_T2
+    n0066_T4 --> n0066_T1
+    n0066_T4 --> n0066_T2
+    n0066_T4 --> n0066_T3
+    n0067_T2 --> n0067_T1
+    n0067_T3 --> n0067_T1
+    n0067_T3 --> n0067_T2
+    n0067_T4 --> n0067_T1
+    n0067_T4 --> n0067_T2
+    n0067_T4 --> n0067_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1244,6 +1282,13 @@ graph LR
     n0023_T4 -.note.-> n0019_T1
     n0037_T5 -.extends.-> n0006_T1
     n0037_T5 -.extends.-> n0006_T3
+    n0066_T2 -.extends.-> n0064_T2
+    n0066_T3 -.extends.-> n0065_T5
+    n0066_T4 -.note.-> n0067_T4
+    n0067_T1 -.extends.-> n0065_T1
+    n0067_T2 -.extends.-> n0065_T4
+    n0067_T3 -.extends.-> n0064_T2
+    n0067_T4 -.extends.-> n0065_T6
 ```
 
 ## 文件冲突报告
@@ -1273,12 +1318,12 @@ graph LR
 | backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043 |
 | backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
 | backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043, 0052, 0060 |
-| backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049, 0059, 0061 |
+| backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049, 0059, 0061, 0066 |
 | backend/auto_designer/designer/delivery_evidence.py | 0061, 0064 |
 | backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059, 0060, 0061, 0064 |
 | backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059, 0061, 0064 |
 | backend/auto_designer/designer/evidence_contract.py | 0055, 0056, 0059 |
-| backend/auto_designer/designer/grouped_designer.py | 0063, 0064 |
+| backend/auto_designer/designer/grouped_designer.py | 0063, 0064, 0066 |
 | backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052 |
 | backend/auto_designer/designer/observation_provider.py | 0059, 0061 |
 | backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052, 0060, 0061, 0064 |
@@ -1301,18 +1346,19 @@ graph LR
 | backend/auto_designer/invocation.py | 0049, 0064 |
 | backend/auto_designer/loop/checkpoint.py | 0004, 0064 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053, 0064 |
-| backend/auto_designer/loop/live_tracer.py | 0032, 0041 |
+| backend/auto_designer/loop/live_tracer.py | 0032, 0041, 0066 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
 | backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0063, 0064 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/loop/round_gate.py | 0050, 0062, 0064 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007, 0064 |
 | backend/auto_designer/loop/runner.py | 0004, 0064 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056, 0061, 0064 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056, 0061, 0064, 0066, 0067 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054, 0056 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042, 0064 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042, 0064 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042, 0061, 0063, 0064 |
+| backend/auto_designer/usage.py | 0041, 0066 |
 | backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051, 0053, 0054, 0064 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048, 0053 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035, 0053 |
@@ -1322,7 +1368,7 @@ graph LR
 | backend/auto_designer/user/sim/dimensions.py | 0005, 0037 |
 | backend/auto_designer/user/sim/goals.py | 0054, 0056 |
 | backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048, 0051, 0053, 0054, 0056, 0057 |
-| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054, 0056 |
+| backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054, 0056, 0066 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048, 0054, 0056, 0057 |
 | backend/auto_designer/user/sim/runtime.py | 0051, 0061 |
@@ -1409,6 +1455,9 @@ graph LR
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051, 0054, 0064 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
+| evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md | 0066, 0067 |
+| evaluation/harness-suite-20260920/freeze_scaling_runtime.py | 0066, 0067 |
+| evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py | 0066, 0067 |
 | frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041 |
 | frontend/src/components/BuildingView.tsx | 0034, 0038 |
@@ -3396,4 +3445,66 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0066 Provider latency 隔离与官方预算超时（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 统一时间账本与 provider scope"]
+    nT2["T2 角色超时分类与可恢复取消"]
+    nT3["T3 官方内层预算与 E2B 配置传播"]
+    nT4["T4 回归验收与操作文档"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+```
+
+### 0067 混合 Harness E2B Scaling 运行时（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 冻结任务、资源和运行身份"]
+    nT2["T2 E2B mixed executor 与交互边界"]
+    nT3["T3 单 N 启动、五轮检查点与恢复"]
+    nT4["T4 结果规范和迁移手册"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
 ```

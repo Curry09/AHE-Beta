@@ -25,7 +25,9 @@ tasks:
     priority: P0
     tags: [timeout, recovery]
     depends-on: [T1]
-    relates-to: [0064]
+    relates-to:
+      - ref: 0064/T2
+        type: extends
     parallel: false
     files:
       - backend/auto_designer/designer/agent_runtime.py
@@ -39,7 +41,9 @@ tasks:
     priority: P0
     tags: [evaluation, e2b]
     depends-on: [T1, T2]
-    relates-to: [0065]
+    relates-to:
+      - ref: 0065/T5
+        type: extends
     parallel: false
     files:
       - evaluation/harness-suite-20260920/configs/scaling-e2b-20260922.json
@@ -54,7 +58,9 @@ tasks:
     priority: P1
     tags: [tests, docs]
     depends-on: [T1, T2, T3]
-    relates-to: [0067]
+    relates-to:
+      - ref: 0067/T4
+        type: note
     parallel: false
     files:
       - backend/tests/test_time_accounting.py
@@ -93,3 +99,47 @@ manifest/receipt 中标记来源。该规则适用于 direct 和 simulated-user 
 closed-loop 回归测试；启动前 receipt 还必须绑定 config/task/template/payload SHA、
 canary evidence 和 timeout policy。详细实现约束见
 `evaluation/harness-suite-20260920/SPEC-time-accounting-provider-latency.md`。
+
+## Motivation
+
+现有运行时把模型服务排队、流式首 token 延迟和本地机制工作混进同一个截止时间，导致
+provider 慢被误报为 agent 失败，也让恢复时无法判断是否需要重放。0066 将时间账本和
+超时分类固定下来，供 direct、simulated-user 以及 E2B 控制面共同使用。
+
+## Guide-level explanation
+
+每个 role operation 同时记录 wall、active、provider wait 和 unknown 时间。provider
+请求有自己的 deadline；机制预算只消耗 active work，外层 wall guard 负责兜底。恢复时
+根据 operation key 和已保存的截止证据继续未完成步骤，不重放已经提交的副作用。
+
+## Reference-level explanation
+
+时间区间按调用事件关联到稳定 call_id；重叠 provider 区间按 union 计数。manifest、receipt、
+远端 run.sh 和 controller 都携带同一 timeout policy，且由 launch gate 检查 policy 摘要
+一致。没有官方预算时才使用带来源标记的 1800 秒 fallback，外层截止固定为内层加 600 秒。
+
+## Drawbacks
+
+账本字段和 receipt 更复杂，旧消费者需要兼容读取；provider 事件缺失时仍可能留下 unknown
+时间，需要在报告中单独展示而不能静默归入 active。
+
+## Rationale and alternatives
+
+选择显式拆分时间而不是简单延长总超时，是为了保留真实 wall time 同时避免服务端排队污染
+机制指标。备选方案是继续使用单一 wall budget，但它无法区分模型提供方故障、基础设施故障
+和 agent 本身超时，恢复也无法安全判定。
+
+## Prior art
+
+0064 提供阶段游标、operation key 和 delivery 恢复边界；0065 提供官方预算、direct/模拟
+用户模式及统一 outcome。本 spec 把这些约束落实到 provider latency 和外层 wall guard。
+
+## Unresolved questions
+
+不同 provider 的重试等待是否应在报告中进一步拆成排队、首 token 和流式读取三个子类，待
+真实运行样本足够后再决定是否升级 schema。
+
+## Future possibilities
+
+可基于 call_id 生成跨角色 latency 分位数和预算预测，并在 launch 前用历史 provider wait
+估计是否需要调整并发或资源，而不改变官方 agent timeout。
