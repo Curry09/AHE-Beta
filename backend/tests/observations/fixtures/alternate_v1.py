@@ -1,4 +1,5 @@
 """A non-NexAU fixture whose behavior is observable but request ownership is not logged."""
+
 import json
 import os
 import sys
@@ -6,9 +7,14 @@ from pathlib import Path
 
 root = Path(os.environ["HARNESS_OBSERVATION_DIR"])
 root.mkdir(parents=True, exist_ok=True)
-(root / "READING.md").write_text("v1: transitions.log records transitions, but cannot distinguish request ownership.")
-manifest = {"reading": "READING.md", "status": "partial",
-            "files": [{"path": "READING.md"}, {"path": "transitions.log"}]}
+(root / "READING.md").write_text(
+    "v1: transitions.log records transitions, but cannot distinguish request ownership."
+)
+manifest = {
+    "reading": "READING.md",
+    "status": "partial",
+    "files": [{"path": "READING.md"}, {"path": "transitions.log"}],
+}
 (root / "manifest.json").write_text(json.dumps(manifest))
 owner = "none"
 with (root / "transitions.log").open("w") as log:

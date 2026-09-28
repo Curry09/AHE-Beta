@@ -676,13 +676,13 @@ class GiteaTracker:
                     and resp.status_code in {408, 429, 500, 502, 503, 504}
                     and attempt + 1 < attempts
                 ):
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
                 return self._ok(resp, endpoint)
             except requests.RequestException:
                 if attempt + 1 >= attempts:
                     raise
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
 
     def _ok(self, resp: requests.Response, endpoint: str) -> Any:
         if not 200 <= resp.status_code < 300:

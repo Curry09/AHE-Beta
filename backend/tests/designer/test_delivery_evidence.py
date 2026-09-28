@@ -36,13 +36,21 @@ class AssetTracker(FakeTracker):
 def setup(tmp_path):
     store = SessionStore(tmp_path / "sessions")
     tracker = AssetTracker()
-    issue = tracker.create_issue(IssueDraft(title="A", body="session_id: other", labels=["proposal"]))
+    issue = tracker.create_issue(
+        IssueDraft(title="A", body="session_id: other", labels=["proposal"])
+    )
     grant(store=store, issue=issue.number, sessions={"s1"})
     files = {"READING.md": b"current meaning", "events.log": b"old or new?"}
-    files["manifest.json"] = json.dumps({"reading": "READING.md", "status": "complete",
-                                        "files": [{"path": n} for n in files]}).encode()
-    publish(root=tmp_path / "observations", session_id="s1", run_id="r1",
-            version={"harness_sha": "actual-v1"}, files=files)
+    files["manifest.json"] = json.dumps(
+        {"reading": "READING.md", "status": "complete", "files": [{"path": n} for n in files]}
+    ).encode()
+    publish(
+        root=tmp_path / "observations",
+        session_id="s1",
+        run_id="r1",
+        version={"harness_sha": "actual-v1"},
+        files=files,
+    )
     return store, tracker, tracker.list_open_issues()[0]
 
 
@@ -75,7 +83,9 @@ def test_owner_publishes_before_admission_without_gaining_raw_tools(tmp_path):
 def test_failed_upload_preserves_proposal_and_retry(tmp_path, monkeypatch):
     store, tracker, issue = setup(tmp_path)
     original = tracker.upload_issue_asset
-    monkeypatch.setattr(tracker, "upload_issue_asset", lambda **kw: (_ for _ in ()).throw(OSError("offline")))
+    monkeypatch.setattr(
+        tracker, "upload_issue_asset", lambda **kw: (_ for _ in ()).throw(OSError("offline"))
+    )
     owner = Owner(tracker, store, str(tmp_path), "unused", review=False)
     assert owner.admit_once().failed
     assert tracker.issue(issue.number)["labels"] == ["proposal"]

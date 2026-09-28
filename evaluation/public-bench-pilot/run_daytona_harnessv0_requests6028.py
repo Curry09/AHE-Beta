@@ -177,7 +177,8 @@ def score_targets(log: str, fail_to_pass: list[str], pass_to_pass: list[str]) ->
     failed_p2p = [name for name in pass_to_pass if status_map.get(name) not in maintained]
     scored_names = set(fail_to_pass) | set(pass_to_pass)
     unrelated_errors = sorted(
-        name for name, status in status_map.items()
+        name
+        for name, status in status_map.items()
         if status == "ERROR" and name not in scored_names
     )
     return {
@@ -203,9 +204,7 @@ def main() -> int:
     env_file = Path(os.environ.get("PUBLIC_BENCH_ENV_FILE", ROOT / ".env"))
     root_env = load_env(env_file)
     model_base = "https://openrouter.ai/api/v1"
-    model_key = os.environ.get("OPENROUTER_API_KEY") or root_env.get(
-        "openrouter_api_key", ""
-    )
+    model_key = os.environ.get("OPENROUTER_API_KEY") or root_env.get("openrouter_api_key", "")
     if not model_base or not model_key:
         raise SystemExit("OPENROUTER_API_KEY is unavailable")
     model_host = urlsplit(model_base).hostname
@@ -282,9 +281,7 @@ def main() -> int:
                 image=runtime_image,
                 resources=Resources(cpu=2, memory=8, disk=10),
                 ephemeral=True,
-                ttl_minutes=sandbox_ttl_minutes(
-                    timeouts.agent_seconds, minimum_minutes=60
-                ),
+                ttl_minutes=sandbox_ttl_minutes(timeouts.agent_seconds, minimum_minutes=60),
                 labels={"purpose": "harness-v0-smoke", "instance": INSTANCE_ID},
                 env_vars={
                     "LLM_MODEL": model,
@@ -297,9 +294,7 @@ def main() -> int:
                 },
             ),
             timeout=900,
-            on_snapshot_create_logs=lambda chunk: print(
-                f"IMAGE_BUILD {chunk}", flush=True
-            ),
+            on_snapshot_create_logs=lambda chunk: print(f"IMAGE_BUILD {chunk}", flush=True),
         )
         manifest["sandbox_id"] = sandbox.id
         print(f"CREATED {sandbox.id}", flush=True)
@@ -318,21 +313,21 @@ def main() -> int:
             ),
             (
                 "gateway_preflight",
-                "/opt/harness-venv/bin/python -c \""
+                '/opt/harness-venv/bin/python -c "'
                 "import os,requests; "
                 "r=requests.get(os.environ['LLM_BASE_URL'], timeout=30); "
-                "print(r.status_code)\"",
+                'print(r.status_code)"',
                 60,
             ),
         ]
         for name, command, timeout in setup_commands:
             print(f"SETUP_START {name}", flush=True)
             response = sandbox.process.exec(command, timeout=timeout)
-            (run_dir / f"setup-{name}.log").write_text(
-                (response.result or ""), encoding="utf-8"
-            )
+            (run_dir / f"setup-{name}.log").write_text((response.result or ""), encoding="utf-8")
             if response.exit_code != 0:
-                raise RuntimeError(f"setup {name} failed: {response.exit_code}: {response.result[-3000:]}")
+                raise RuntimeError(
+                    f"setup {name} failed: {response.exit_code}: {response.result[-3000:]}"
+                )
             print(f"SETUP_OK {name}", flush=True)
 
         baseline = sandbox.process.exec(
@@ -419,9 +414,7 @@ def main() -> int:
             json.dumps(trace, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
 
-        patch_response = sandbox.process.exec(
-            "git -C /testbed diff --binary", timeout=60
-        )
+        patch_response = sandbox.process.exec("git -C /testbed diff --binary", timeout=60)
         model_patch = patch_response.result or ""
         (run_dir / "model.patch").write_text(model_patch, encoding="utf-8")
         manifest["model_patch_bytes"] = len(model_patch.encode())

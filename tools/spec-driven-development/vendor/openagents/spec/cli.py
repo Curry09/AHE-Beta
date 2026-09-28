@@ -53,9 +53,14 @@ def main(*, argv: list[str] | None = None) -> int:
             number=args.number,
         )
     if args.command == "reserve-number":
-        print(reserve_number(
-            specs_root=specs_root, issue=args.issue, slug=args.slug, number=args.number,
-        ))
+        print(
+            reserve_number(
+                specs_root=specs_root,
+                issue=args.issue,
+                slug=args.slug,
+                number=args.number,
+            )
+        )
         return 0
     if args.command == "add-task":
         return _cmd_add_task(specs_root=specs_root, args=args)

@@ -20,7 +20,6 @@ sys.path.insert(0, str(ROOT))
 
 import run_swebench_closed_loop as base  # noqa: E402
 
-
 MANIFEST = Path(os.environ.get("MIXED_TASK_MANIFEST", "")).expanduser().resolve()
 if not MANIFEST.is_file():
     raise SystemExit(f"MIXED_TASK_MANIFEST missing: {MANIFEST}")
@@ -76,8 +75,7 @@ def _session_picks(rng: random.Random, *, round_index: int) -> list[tuple[str, s
     offset = round_index % len(TASK_IDS)
     ordered = TASK_IDS[offset:] + TASK_IDS[:offset]
     return [
-        (str(BY_ID[task_id].get("persona_id") or DIRECT_PERSONA), task_id)
-        for task_id in ordered
+        (str(BY_ID[task_id].get("persona_id") or DIRECT_PERSONA), task_id) for task_id in ordered
     ]
 
 

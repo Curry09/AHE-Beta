@@ -314,38 +314,78 @@ def create_app(
             ) from None
 
     def _usage_filters(
-        run_id: str | None, round_no: int | None, session_id: str | None,
-        instance_id: str | None, interaction_id: str | None, turn_no: int | None,
-        role: str | None, agent_id: str | None, model: str | None,
+        run_id: str | None,
+        round_no: int | None,
+        session_id: str | None,
+        instance_id: str | None,
+        interaction_id: str | None,
+        turn_no: int | None,
+        role: str | None,
+        agent_id: str | None,
+        model: str | None,
     ) -> dict[str, object]:
-        return {"run_id": run_id, "round_no": round_no, "session_id": session_id,
-                "instance_id": instance_id, "interaction_id": interaction_id,
-                "turn_no": turn_no, "role": role, "agent_id": agent_id, "model": model}
+        return {
+            "run_id": run_id,
+            "round_no": round_no,
+            "session_id": session_id,
+            "instance_id": instance_id,
+            "interaction_id": interaction_id,
+            "turn_no": turn_no,
+            "role": role,
+            "agent_id": agent_id,
+            "model": model,
+        }
 
     @app.get("/api/usage/events")
     def usage_events(
-        run_id: str | None = None, round_no: int | None = None,
-        session_id: str | None = None, instance_id: str | None = None,
-        interaction_id: str | None = None, turn_no: int | None = None,
+        run_id: str | None = None,
+        round_no: int | None = None,
+        session_id: str | None = None,
+        instance_id: str | None = None,
+        interaction_id: str | None = None,
+        turn_no: int | None = None,
         role: str | None = None,
-        agent_id: str | None = None, model: str | None = None,
+        agent_id: str | None = None,
+        model: str | None = None,
     ) -> dict[str, object]:
-        filters = _usage_filters(run_id, round_no, session_id, instance_id,
-                                 interaction_id, turn_no, role, agent_id, model)
+        filters = _usage_filters(
+            run_id,
+            round_no,
+            session_id,
+            instance_id,
+            interaction_id,
+            turn_no,
+            role,
+            agent_id,
+            model,
+        )
         return {"events": usage_store.events(**filters)}
 
     @app.get("/api/usage/summary")
     def usage_summary(
-        run_id: str | None = None, round_no: int | None = None,
-        session_id: str | None = None, instance_id: str | None = None,
-        interaction_id: str | None = None, turn_no: int | None = None,
+        run_id: str | None = None,
+        round_no: int | None = None,
+        session_id: str | None = None,
+        instance_id: str | None = None,
+        interaction_id: str | None = None,
+        turn_no: int | None = None,
         role: str | None = None,
-        agent_id: str | None = None, model: str | None = None,
+        agent_id: str | None = None,
+        model: str | None = None,
     ) -> dict[str, object]:
-        return usage_store.summary(**_usage_filters(
-            run_id, round_no, session_id, instance_id, interaction_id, turn_no,
-            role, agent_id, model,
-        ))
+        return usage_store.summary(
+            **_usage_filters(
+                run_id,
+                round_no,
+                session_id,
+                instance_id,
+                interaction_id,
+                turn_no,
+                role,
+                agent_id,
+                model,
+            )
+        )
 
     @app.get("/api/usage/sessions/{session_id}")
     def session_usage(session_id: str) -> dict[str, object]:

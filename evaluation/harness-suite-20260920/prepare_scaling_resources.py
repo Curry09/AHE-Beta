@@ -51,9 +51,17 @@ def main() -> int:
         }
         destination = OUT / f"n{n}" / "resource-plan.json"
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        destination.write_text(
+            json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         outputs.append(str(destination))
-    print(json.dumps({"plans": outputs, "template_build_id": e2b["template_build_id"]}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {"plans": outputs, "template_build_id": e2b["template_build_id"]},
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 

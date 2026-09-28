@@ -15,13 +15,10 @@ from pathlib import Path
 from harbor.agents.base import AgentContext, BaseAgent
 from harbor.environments.base import BaseEnvironment
 
-
 ROOT = Path(__file__).resolve().parents[2]
 ADAPTER_ROOT = ROOT / "evaluation/public-bench-pilot/adapters/harness_v0"
 DRIVER = Path(__file__).with_name("harbor_v0_driver.py")
-HARNESS_ARCHIVE = Path(
-    "/root/src/auto-designer-experiment-artifacts/harness-v0-cade14d.tar.gz"
-)
+HARNESS_ARCHIVE = Path("/root/src/auto-designer-experiment-artifacts/harness-v0-cade14d.tar.gz")
 NEXAU_WHEEL = Path("/tmp/nexau-wheel/nexau-0.4.1-py3-none-any.whl")
 
 
@@ -50,12 +47,8 @@ class HarnessV0Agent(BaseAgent):
         )
         await environment.upload_file(HARNESS_ARCHIVE, "/tmp/harness-v0.tar.gz")
         await environment.upload_file(NEXAU_WHEEL, "/tmp/nexau-0.4.1-py3-none-any.whl")
-        await environment.upload_file(
-            ADAPTER_ROOT / "stdio.py", "/opt/hse-v0/stdio.py"
-        )
-        await environment.upload_file(
-            DRIVER, "/opt/hse-v0/driver.py"
-        )
+        await environment.upload_file(ADAPTER_ROOT / "stdio.py", "/opt/hse-v0/stdio.py")
+        await environment.upload_file(DRIVER, "/opt/hse-v0/driver.py")
         result = await environment.exec(
             "chmod 0644 /tmp/harness-v0.tar.gz "
             "/tmp/nexau-0.4.1-py3-none-any.whl "
@@ -92,13 +85,10 @@ class HarnessV0Agent(BaseAgent):
         api_key = self._env_value("HARNESS_LLM_API_KEY", "LLM_API_KEY")
         if not model or not base_url or not api_key:
             raise RuntimeError(
-                "harness-v0 requires model, HARNESS_LLM_BASE_URL, and "
-                "HARNESS_LLM_API_KEY"
+                "harness-v0 requires model, HARNESS_LLM_BASE_URL, and HARNESS_LLM_API_KEY"
             )
         encoded = base64.b64encode(instruction.encode("utf-8")).decode("ascii")
-        write_instruction = (
-            f"printf '%s' '{encoded}' | base64 -d > /tmp/hse-v0-instruction.md"
-        )
+        write_instruction = f"printf '%s' '{encoded}' | base64 -d > /tmp/hse-v0-instruction.md"
         result = await environment.exec(write_instruction, timeout_sec=30)
         if result.return_code != 0:
             raise RuntimeError(result.stderr or result.stdout or "instruction upload failed")
@@ -131,8 +121,5 @@ class HarnessV0Agent(BaseAgent):
                 timeout_sec=30,
             )
             raise RuntimeError(
-                result.stderr
-                or result.stdout
-                or diagnostics.stdout
-                or "harness-v0 failed"
+                result.stderr or result.stdout or diagnostics.stdout or "harness-v0 failed"
             )

@@ -45,9 +45,7 @@ def sha256_tree(path: Path) -> str:
 
 def write_json(path: Path, value) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -207,9 +205,10 @@ def build(args: argparse.Namespace) -> Path:
             )
         archive_info[name] = {"sha256": actual, "bytes": path.stat().st_size}
 
-    if sha256_file(args.swe_parquet) != benchmark(selection, "SWE-bench Verified")["version"][
-        "local_parquet_sha256"
-    ]:
+    if (
+        sha256_file(args.swe_parquet)
+        != benchmark(selection, "SWE-bench Verified")["version"]["local_parquet_sha256"]
+    ):
         raise RuntimeError("local SWE-bench Verified parquet checksum mismatch")
 
     output = args.output
@@ -257,8 +256,7 @@ def build(args: argparse.Namespace) -> Path:
                     "benchmark": "Terminal-Bench 4.0",
                     "task_id": task_id,
                     "hub_digest": next(
-                        task["hub_digest"] for task in terminal["tasks"]
-                        if task["id"] == task_id
+                        task["hub_digest"] for task in terminal["tasks"] if task["id"] == task_id
                     ),
                     "instruction": terminal_meta[task_id]["instruction"],
                 }
@@ -295,10 +293,7 @@ def build(args: argparse.Namespace) -> Path:
                     "domain": item["domain"],
                     "task_id": str(item["task"]["id"]),
                     "delivery": "user-simulator",
-                    **(
-                        {"retrieval": "bm25"}
-                        if item["domain"] == "banking_knowledge" else {}
-                    ),
+                    **({"retrieval": "bm25"} if item["domain"] == "banking_knowledge" else {}),
                 }
                 for item in selected_tau
             ],

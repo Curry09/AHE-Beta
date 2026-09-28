@@ -81,9 +81,14 @@ def test_triager_cannot_read_generated_runtime_files(tmp_path: Path) -> None:
             result, called = _run(middleware, _params(work, tool, arguments))
             assert _denied(result)
             assert not called
-        result, called = _run(middleware, _params(work, "read_file", {"file_path": str(work / "src" / "main.py")}))
+        result, called = _run(
+            middleware, _params(work, "read_file", {"file_path": str(work / "src" / "main.py")})
+        )
         assert result == "REAL_TOOL_RAN" and called
-    result, called = _run(middleware, _params(work, "read_file", {"file_path": str(work / ".openagents" / "vigil-queue.db")}))
+    result, called = _run(
+        middleware,
+        _params(work, "read_file", {"file_path": str(work / ".openagents" / "vigil-queue.db")}),
+    )
     assert result == "REAL_TOOL_RAN" and called
 
 
@@ -184,9 +189,7 @@ def test_wrap_denies_read_file_escape(tmp_path: Path) -> None:
     mw = WorkspaceJailMiddleware()
     result, ran = _run(mw, _params(work, "read_file", {"file_path": "../../data/sessions/1.json"}))
     assert _denied(result) and ran is False  # 拒绝且真工具没跑
-    result, ran = _run(
-        mw, _params(work, "read_file", {"file_path": "../../data/role_runs/x.json"})
-    )
+    result, ran = _run(mw, _params(work, "read_file", {"file_path": "../../data/role_runs/x.json"}))
     assert _denied(result) and ran is False
 
 

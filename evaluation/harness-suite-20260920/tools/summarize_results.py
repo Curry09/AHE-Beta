@@ -12,7 +12,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = ROOT / "schemas"
 
@@ -39,7 +38,9 @@ def validate(value: dict[str, Any], schema_path: Path, source: Path) -> None:
     except ImportError as exc:  # pragma: no cover - environment preflight
         raise SystemExit("jsonschema is required to validate evaluation artifacts") from exc
     schema = read_json(schema_path)
-    errors = sorted(Draft202012Validator(schema).iter_errors(value), key=lambda error: list(error.path))
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(value), key=lambda error: list(error.path)
+    )
     if errors:
         details = "; ".join(f"{list(error.path)}: {error.message}" for error in errors[:8])
         raise ValueError(f"invalid {source}: {details}")
@@ -52,15 +53,21 @@ def rate(numerator: int, denominator: int) -> float | None:
 def aggregate(trials: list[dict[str, Any]]) -> dict[str, Any]:
     terminal = [trial for trial in trials if trial.get("outcome", {}).get("terminal_status")]
     valid = [
-        trial for trial in terminal
+        trial
+        for trial in terminal
         if trial["outcome"].get("category") not in {"infrastructure", "protocol"}
     ]
     passed = [trial for trial in valid if trial["outcome"].get("passed") is True]
     completed = [
-        trial for trial in valid
+        trial
+        for trial in valid
         if trial["outcome"].get("category") not in {"harness", "user_simulator", "deadline"}
     ]
-    scores = [trial["outcome"]["score"] for trial in valid if isinstance(trial["outcome"].get("score"), (int, float))]
+    scores = [
+        trial["outcome"]["score"]
+        for trial in valid
+        if isinstance(trial["outcome"].get("score"), (int, float))
+    ]
 
     def group(key: str) -> dict[str, Any]:
         groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -72,8 +79,13 @@ def aggregate(trials: list[dict[str, Any]]) -> dict[str, Any]:
             result[name] = {
                 "total_trials": len(items),
                 "valid_trials": len(valid_items),
-                "task_pass_rate": rate(sum(item["outcome"].get("passed") is True for item in valid_items), len(valid_items)),
-                "harness_completion_rate": rate(sum(item in completed for item in valid_items), len(valid_items)),
+                "task_pass_rate": rate(
+                    sum(item["outcome"].get("passed") is True for item in valid_items),
+                    len(valid_items),
+                ),
+                "harness_completion_rate": rate(
+                    sum(item in completed for item in valid_items), len(valid_items)
+                ),
             }
         return result
 

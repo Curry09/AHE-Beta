@@ -32,9 +32,9 @@ CASE_BATCHES = (
         ("run_daytona_tua_case.py", "080-convert-novel-epub", "--llm-user-simulator"),
     ),
 )
-async def run_case(
-    index: int, total: int, argv: tuple[str, ...], env: dict[str, str]
-) -> int:
+
+
+async def run_case(index: int, total: int, argv: tuple[str, ...], env: dict[str, str]) -> int:
     name = f"{index + 1:02d}-{'-'.join(argv[1:])}"
     log_path = (
         HERE

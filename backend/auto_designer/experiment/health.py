@@ -27,7 +27,11 @@ def record(
     root: Path | None = None,
 ) -> dict[str, Any]:
     path = _path(experiment_id=experiment_id, root=root)
-    data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"events": [], "paused": False}
+    data = (
+        json.loads(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else {"events": [], "paused": False}
+    )
     events = list(data.get("events") or [])
     events.append({"success": success, "kind": kind})
     events = events[-WINDOW:]

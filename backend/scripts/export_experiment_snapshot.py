@@ -58,7 +58,9 @@ def export(source: Path, output: Path, title: str | None) -> None:
         "history.json": {"items": []},
         "issues.json": {"connected": False, "board_url": None, "issues": []},
         "commits.json": {"connected": False, "commits_url": None, "commits": []},
-        "config.json": {"roster": {"user": len(agents), "triager": 0, "designer": 0, "developer": 0}},
+        "config.json": {
+            "roster": {"user": len(agents), "triager": 0, "designer": 0, "developer": 0}
+        },
         "overview.json": {
             "open_issue_count": issue_counts.get("open", 0),
             "session_count": latest.get("sessions_saved", 0),
@@ -93,10 +95,21 @@ def export(source: Path, output: Path, title: str | None) -> None:
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            timeline.append({
-                key: row.get(key)
-                for key in ("time", "state", "round", "total_rounds", "worker_alive", "sessions_saved", "active_roles", "alerts")
-            })
+            timeline.append(
+                {
+                    key: row.get(key)
+                    for key in (
+                        "time",
+                        "state",
+                        "round",
+                        "total_rounds",
+                        "worker_alive",
+                        "sessions_saved",
+                        "active_roles",
+                        "alerts",
+                    )
+                }
+            )
     (out / "timeline.json").write_text(json.dumps(timeline, ensure_ascii=False, indent=2) + "\n")
 
 

@@ -35,7 +35,9 @@ class Observer:
             self.root.mkdir(parents=True, exist_ok=True)
             existing = list(self.root.glob("runtime-*.jsonl"))
             # A restarted process shares the same session budget, not a fresh allowance.
-            self.limit = min(self.limit, max(0, 12_000_000 - sum(p.stat().st_size for p in existing)))
+            self.limit = min(
+                self.limit, max(0, 12_000_000 - sum(p.stat().st_size for p in existing))
+            )
             if len(existing) >= 120:
                 raise ValueError("observation process budget exhausted")
             self.path = self.root / f"runtime-{self.process_id}.jsonl"
@@ -100,7 +102,9 @@ class Observer:
         value = {
             "format": "artifact-observations-v1",
             "reading": "READING.md",
-            "status": "partial" if list(self.root.glob(".active-*")) or self.error or self.dropped else "complete",
+            "status": "partial"
+            if list(self.root.glob(".active-*")) or self.error or self.dropped
+            else "complete",
             "files": [{"path": path} for path in files],
             "dropped_events": self.dropped,
         }

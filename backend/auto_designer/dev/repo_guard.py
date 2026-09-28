@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import subprocess
 
-
 # Python imports in the frozen harness checkout may create bytecode caches while a
 # role is running.  They are runtime by-products, not edits to the orchestration
 # source.  Keep the guard fail-closed for every other untracked path.

@@ -28,12 +28,12 @@ from __future__ import annotations
 
 import argparse
 import os
-import signal
 import shutil
+import signal
 import subprocess
-import time
 import sys
 import tarfile
+import time
 import uuid
 from pathlib import Path
 
@@ -122,7 +122,7 @@ def _git(repo: Path, *args: str) -> None:
         except subprocess.CalledProcessError:
             if attempt + 1 >= attempts:
                 raise
-            time.sleep(2 ** attempt)
+            time.sleep(2**attempt)
 
 
 def _gitea_remote_url(gitea: dict[str, str]) -> str:
@@ -475,6 +475,8 @@ def _subagent_model_lock_env() -> dict[str, str]:
     if model:
         lock["CLAUDE_CODE_SUBAGENT_MODEL"] = model
     return lock
+
+
 # The product harness is a separate OpenAI-compatible client.  Pass its explicitly scoped GLM
 # configuration into the delivery container under the plain names consumed by scripts/run.sh.
 _HARNESS_LLM_SUFFIXES = ("MODEL", "BASE_URL", "API_KEY")
@@ -757,21 +759,26 @@ def _stop_vigil_model_processes(*, vigil_pid: int, proc_root: Path = Path("/proc
             continue
         try:
             stat = (entry / "stat").read_text().split()
-            command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+            command = (
+                (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+            )
             same_run = bool(run_id) and (
-                f"AUTO_DESIGNER_RUN_ID={run_id}".encode() in (entry / "environ").read_bytes().split(b"\0")
+                f"AUTO_DESIGNER_RUN_ID={run_id}".encode()
+                in (entry / "environ").read_bytes().split(b"\0")
             )
             processes[int(entry.name)] = (int(stat[3]), int(stat[4]), command, same_run)
         except (OSError, ValueError):
             continue
     roots = {
-        pid for pid, (parent, _group, command, same_run) in processes.items()
+        pid
+        for pid, (parent, _group, command, same_run) in processes.items()
         if command.startswith("claude -p ") and (parent == vigil_pid or same_run)
     }
     descendants = set(roots)
     while True:
         expanded = descendants | {
-            pid for pid, (parent, _group, _command, _same_run) in processes.items()
+            pid
+            for pid, (parent, _group, _command, _same_run) in processes.items()
             if parent in descendants
         }
         if expanded == descendants:

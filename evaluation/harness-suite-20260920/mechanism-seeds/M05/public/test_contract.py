@@ -2,8 +2,8 @@ import sqlite3
 import unittest
 from pathlib import Path
 
-from migrate import apply_migration, rollback_migration
 from legacy_client import list_orders
+from migrate import apply_migration, rollback_migration
 
 
 class MigrationContract(unittest.TestCase):

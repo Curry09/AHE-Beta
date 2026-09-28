@@ -9,14 +9,12 @@ repository or to the canary receipt.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 from e2b import Sandbox
-
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "evaluation" / "harness-suite-20260920"

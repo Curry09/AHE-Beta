@@ -13,8 +13,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import tarfile
 import subprocess
+import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +22,13 @@ SUITE = ROOT / "evaluation" / "harness-suite-20260920"
 ASSIGNMENTS = SUITE / "configs" / "mixed-scaling-20260922.tasks.json"
 MEMBERSHIP = SUITE / "configs" / "mixed-scaling-20260922.json"
 EXPERIMENT_CONFIGS = ROOT.parent / "auto-designer-experiment-configs"
-PUBLIC_SOURCES = EXPERIMENT_CONFIGS / "public-bench-pilot-20260917" / "prepared" / "controller-private" / "task-sources"
+PUBLIC_SOURCES = (
+    EXPERIMENT_CONFIGS
+    / "public-bench-pilot-20260917"
+    / "prepared"
+    / "controller-private"
+    / "task-sources"
+)
 NL2REPO_SOURCES = PUBLIC_SOURCES / "nl2repo-bench" / "tasks"
 HISTORICAL_TASKS = EXPERIMENT_CONFIGS / "harness-mixed16-20260916-strict-goal-r3" / "tasks"
 SWE_WORKSPACES = ROOT / "backend" / "data" / "swebench_seed" / "dev-balanced-64" / "workspace"
@@ -148,11 +154,15 @@ def write_inventory(n: int) -> Path:
         "source_policy": "pinned local material only; no empty or synthetic fallback",
         "tasks": rows,
     }
-    destination.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    destination.write_text(
+        json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     return destination
 
 
-def _add_tree(archive: tarfile.TarFile, root: Path, arcroot: str, *, grader: bool, benchmark: str) -> None:
+def _add_tree(
+    archive: tarfile.TarFile, root: Path, arcroot: str, *, grader: bool, benchmark: str
+) -> None:
     """Add only the side of a task visible to that process."""
     hidden = {".git", ".venv", "__pycache__", ".pytest_cache", "solution", "reference", "cheat"}
     for path in sorted(root.rglob("*")):
@@ -162,14 +172,22 @@ def _add_tree(archive: tarfile.TarFile, root: Path, arcroot: str, *, grader: boo
         # Agent receives only the public instruction/environment.  Grader gets
         # the official tests and task metadata, never the reference solution.
         if benchmark == "NL2Repo":
-            if grader and rel.name not in {"test_files.json", "test_case_count.txt", "test_commands.json"}:
+            if grader and rel.name not in {
+                "test_files.json",
+                "test_case_count.txt",
+                "test_commands.json",
+            }:
                 continue
             if not grader and rel.name != "start.md":
                 continue
         else:
-            if grader and not (str(rel).startswith("tests/") or rel.name in {"task.toml", "evaluation.json"}):
+            if grader and not (
+                str(rel).startswith("tests/") or rel.name in {"task.toml", "evaluation.json"}
+            ):
                 continue
-            if not grader and (str(rel).startswith("tests/") or rel.name in {"task.toml", "evaluation.json"}):
+            if not grader and (
+                str(rel).startswith("tests/") or rel.name in {"task.toml", "evaluation.json"}
+            ):
                 continue
         if not grader and rel.name == "user_context.md":
             continue
@@ -192,9 +210,17 @@ def materialize(n: int) -> Path:
         grader_path = payload_root / f"{row['task_key']}.grader.tar.gz"
         with tarfile.open(agent_path, "w:gz") as archive:
             if row["benchmark"] == "SWE-bench":
-                _add_tree(archive, source / "repo", row["task_key"] + "/repo", grader=False, benchmark="SWE-bench")
+                _add_tree(
+                    archive,
+                    source / "repo",
+                    row["task_key"] + "/repo",
+                    grader=False,
+                    benchmark="SWE-bench",
+                )
             else:
-                _add_tree(archive, source, row["task_key"], grader=False, benchmark=row["benchmark"])
+                _add_tree(
+                    archive, source, row["task_key"], grader=False, benchmark=row["benchmark"]
+                )
         with tarfile.open(grader_path, "w:gz") as archive:
             _add_tree(archive, source, row["task_key"], grader=True, benchmark=row["benchmark"])
             # Every grader receives a small immutable identity record, even
@@ -211,6 +237,7 @@ def materialize(n: int) -> Path:
             info.size = len(encoded)
             info.mode = 0o644
             import io
+
             archive.addfile(info, io.BytesIO(encoded))
         row["agent_payload"] = str(agent_path)
         row["agent_payload_sha256"] = sha256_file(agent_path)
@@ -219,20 +246,28 @@ def materialize(n: int) -> Path:
         row["payload_status"] = "ready"
     for row in inventory["tasks"]:
         if row.get("status") == "ready" and row.get("payload_status") != "ready":
-            row["status"] = "missing-agent-repo" if row["benchmark"] == "SWE-bench" else "not-materialized"
-    inventory["status"] = "ready" if all(item["status"] == "ready" for item in inventory["tasks"]) else "incomplete"
+            row["status"] = (
+                "missing-agent-repo" if row["benchmark"] == "SWE-bench" else "not-materialized"
+            )
+    inventory["status"] = (
+        "ready" if all(item["status"] == "ready" for item in inventory["tasks"]) else "incomplete"
+    )
     inventory["materialization"] = {
         "payload_root": str(payload_root),
         "policy": "agent and grader payloads are separate; solutions/references are excluded",
     }
-    inventory_path.write_text(json.dumps(inventory, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    inventory_path.write_text(
+        json.dumps(inventory, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     return inventory_path
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", default="all", choices=["all", "4", "8", "16", "32"])
-    parser.add_argument("--materialize", action="store_true", help="also create agent/grader payload archives")
+    parser.add_argument(
+        "--materialize", action="store_true", help="also create agent/grader payload archives"
+    )
     args = parser.parse_args()
     values = (4, 8, 16, 32) if args.n == "all" else (int(args.n),)
     result = []
@@ -240,7 +275,9 @@ def main() -> int:
         path = materialize(n) if args.materialize else write_inventory(n)
         document = json.loads(path.read_text(encoding="utf-8"))
         missing = [item["task_key"] for item in document["tasks"] if item["status"] != "ready"]
-        result.append({"n": n, "inventory": str(path), "status": document["status"], "missing": missing})
+        result.append(
+            {"n": n, "inventory": str(path), "status": document["status"], "missing": missing}
+        )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if all(item["status"] == "ready" for item in result) else 2
 

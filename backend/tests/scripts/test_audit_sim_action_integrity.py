@@ -56,7 +56,9 @@ def test_golden_historical_counts_are_reproduced(tmp_path: Path) -> None:
         "explicit_broad_accept": 53,
         "invalid_accept_fallback": 41,
     }
-    assert [old_report["by_round"][f"v{i}"]["invalid_accept_fallback"] for i in range(7)] == fake_by_round
+    assert [
+        old_report["by_round"][f"v{i}"]["invalid_accept_fallback"] for i in range(7)
+    ] == fake_by_round
 
     hard_report = audit.audit_paths([tmp_path / "hard64.json"])
     assert hard_report["totals"] == {

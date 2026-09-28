@@ -71,7 +71,11 @@ def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
                 f"  model: {model}\n"
                 f"  base_url: {base_url}\n"
                 f"  api_key: {api_key}\n"
-                + (f"  reasoning_effort: {os.environ['LLM_REASONING_EFFORT']}\n" if os.environ.get("LLM_REASONING_EFFORT") else "")
+                + (
+                    f"  reasoning_effort: {os.environ['LLM_REASONING_EFFORT']}\n"
+                    if os.environ.get("LLM_REASONING_EFFORT")
+                    else ""
+                )
                 + "  max_tokens: 32768\n"
                 # per-call 超时：不设则 openai 客户端无限挂起；超时即触发本模块重试。
                 "  timeout: 300\n"

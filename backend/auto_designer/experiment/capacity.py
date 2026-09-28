@@ -94,7 +94,14 @@ def acquire(
         return lease
 
 
-def heartbeat(*, experiment_id: str, endpoint: str, ttl_sec: int, root: Path | None = None, now: float | None = None) -> None:
+def heartbeat(
+    *,
+    experiment_id: str,
+    endpoint: str,
+    ttl_sec: int,
+    root: Path | None = None,
+    now: float | None = None,
+) -> None:
     path = _registry_path(root=root)
     clock = time.time() if now is None else now
     data = _load(path=path)

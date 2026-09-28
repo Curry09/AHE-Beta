@@ -54,10 +54,12 @@ def evaluate(record: dict) -> list[dict[str, str]]:
         if role.lower() in {"owner", "designer", "synthesize"}:
             for key in ("source_report", "user_evidence", "objective_evidence", "harness_source"):
                 if key in projected:
-                    result.append({
-                        "code": f"evidence:visibility:{role}:{key}",
-                        "detail": "role projection exposes a forbidden lane",
-                    })
+                    result.append(
+                        {
+                            "code": f"evidence:visibility:{role}:{key}",
+                            "detail": "role projection exposes a forbidden lane",
+                        }
+                    )
     return result
 
 
@@ -126,7 +128,12 @@ def compare_inputs(baseline: list[dict], layered: list[dict]) -> dict[str, objec
                 else int(a.get(key, 0)) - int(b.get(key, 0))
             )
             for key in (
-                "records", "chars", "token_estimate", "tool_calls", "evidence_refs", "latency_ms"
+                "records",
+                "chars",
+                "token_estimate",
+                "tool_calls",
+                "evidence_refs",
+                "latency_ms",
             )
         }
     return {"baseline": before, "layered": after, "delta": delta}

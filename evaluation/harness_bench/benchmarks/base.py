@@ -9,7 +9,6 @@ from typing import Protocol
 
 from ..schema import CaseRef, InteractionMode
 
-
 OUTER_AGENT_GRACE_SECONDS = 600
 
 

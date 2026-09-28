@@ -16,11 +16,11 @@ driver 由此瘦成「拼 prompt → run_agent_def → read_submit → 写 track
 
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import hashlib
 import json
 import os
-import asyncio
 import threading
 import time
 from collections.abc import Callable
@@ -127,9 +127,7 @@ def run_with_timeout(
         wall = float(timing["wall_elapsed_ms"] or 0) / 1000
         if wall >= guard:
             timeout_class = (
-                "infrastructure_timeout"
-                if timing.get("provider_active")
-                else "controller_timeout"
+                "infrastructure_timeout" if timing.get("provider_active") else "controller_timeout"
             )
             if cancel is not None:
                 cancel()
@@ -213,10 +211,18 @@ def run_agent_def(
     }:
         scoped_sessions = set()
     with (
-        bind_gaps(GapService(store=store, tracker=tracker, role=role,
-                            subject=json.dumps(subj, sort_keys=True),
-                            sessions=scoped_sessions, issues=set(source_issue_ids or ()))
-                  if tracker is not None else None),
+        bind_gaps(
+            GapService(
+                store=store,
+                tracker=tracker,
+                role=role,
+                subject=json.dumps(subj, sort_keys=True),
+                sessions=scoped_sessions,
+                issues=set(source_issue_ids or ()),
+            )
+            if tracker is not None
+            else None
+        ),
         bind_session_store(store),
         bind_observation_provider(
             store, allowed_session_ids=scoped_sessions, observation_root=observation_root
@@ -240,6 +246,7 @@ def run_agent_def(
             restored=restored_timing,
         ) as accounting:
             try:
+
                 def cancel_agent() -> None:
                     try:
                         asyncio.run(agent.stop(force=True, timeout=5))

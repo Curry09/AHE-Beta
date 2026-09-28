@@ -12,7 +12,12 @@ import requests
 
 from auto_designer.designer import issue_schema as sc
 from auto_designer.designer.triage import TriageOutcome, Triager, _proposal_labels, _proposal_title
-from auto_designer.loop.recovery import RecoveryConflictError, RecoveryIdentity, RecoveryStore, operation_key
+from auto_designer.loop.recovery import (
+    RecoveryConflictError,
+    RecoveryIdentity,
+    RecoveryStore,
+    operation_key,
+)
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.fake import FakeTracker
 from auto_designer.tracker.gitea import GiteaError, IssueMigrationError
@@ -403,7 +408,9 @@ def test_recovery_replays_saved_triage_output_without_model_or_duplicate_comment
 
 
 @pytest.mark.parametrize("external_edit", [False, True])
-def test_recovery_reconciles_partial_proposal_only_if_content_is_ours(tmp_path, external_edit) -> None:
+def test_recovery_reconciles_partial_proposal_only_if_content_is_ours(
+    tmp_path, external_edit
+) -> None:
     model_title = "中文提案" * 35
 
     class PartialWriteTracker(FakeTracker):
@@ -423,8 +430,10 @@ def test_recovery_reconciles_partial_proposal_only_if_content_is_ours(tmp_path, 
     disposition["proposal_title"] = model_title
     recovery = _recovery(tmp_path)
     args = (
-        tracker, SessionStore(tmp_path / "sessions"),
-        str(tmp_path / "harness"), str(tmp_path / "agent"),
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
     )
     first = _StubTriager(*args, canned=_submit([disposition]), recovery=recovery)
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
@@ -472,8 +481,12 @@ def test_recovery_retries_transient_read_without_rerunning_model(tmp_path, monke
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
     triager = _StubTriager(
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path / "harness"),
-        str(tmp_path / "agent"), canned=_submit([_accept(number)]), recovery=recovery,
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([_accept(number)]),
+        recovery=recovery,
     )
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
         result = triager.triage_once(pending=[frozen])
@@ -481,12 +494,17 @@ def test_recovery_retries_transient_read_without_rerunning_model(tmp_path, monke
     assert triager.agent_calls == 1 and tracker.reads == 2
     assert result.warnings[number] == ["tracker-write-retried"]
     assert len(tracker.issue(number)["comments"]) == 1
-    assert recovery.unit(
-        round_no=1, stage="triage", key=operation_key("triage-worker-0", "report", number)
-    )["status"] == "completed"
+    assert (
+        recovery.unit(
+            round_no=1, stage="triage", key=operation_key("triage-worker-0", "report", number)
+        )["status"]
+        == "completed"
+    )
 
 
-def test_recovery_reconciles_lost_update_response_without_second_write(tmp_path, monkeypatch) -> None:
+def test_recovery_reconciles_lost_update_response_without_second_write(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr("auto_designer.designer.triage.time.sleep", lambda _: None)
 
     class LostResponseTracker(FakeTracker):
@@ -503,8 +521,12 @@ def test_recovery_reconciles_lost_update_response_without_second_write(tmp_path,
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
     triager = _StubTriager(
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path / "harness"),
-        str(tmp_path / "agent"), canned=_submit([_accept(number)]), recovery=recovery,
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([_accept(number)]),
+        recovery=recovery,
     )
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
         result = triager.triage_once(pending=[frozen])
@@ -513,7 +535,9 @@ def test_recovery_reconciles_lost_update_response_without_second_write(tmp_path,
     assert len(tracker.issue(number)["comments"]) == 1
 
 
-def test_recovery_reconciles_lost_decline_response_without_second_write(tmp_path, monkeypatch) -> None:
+def test_recovery_reconciles_lost_decline_response_without_second_write(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr("auto_designer.designer.triage.time.sleep", lambda _: None)
 
     class LostResponseTracker(FakeTracker):
@@ -531,8 +555,12 @@ def test_recovery_reconciles_lost_decline_response_without_second_write(tmp_path
     recovery = _recovery(tmp_path)
     disposition = {"issue": number, "disposition": "reject", "reason": "范围外"}
     triager = _StubTriager(
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path / "harness"),
-        str(tmp_path / "agent"), canned=_submit([disposition]), recovery=recovery,
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([disposition]),
+        recovery=recovery,
     )
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
         result = triager.triage_once(pending=[frozen])
@@ -557,17 +585,24 @@ def test_recovery_stops_after_bounded_transient_retries(tmp_path, monkeypatch) -
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
     triager = _StubTriager(
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path / "harness"),
-        str(tmp_path / "agent"), canned=_submit([_accept(number)]), recovery=recovery,
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([_accept(number)]),
+        recovery=recovery,
     )
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
         with pytest.raises(RecoveryConflictError, match="remain incomplete"):
             triager.triage_once(pending=[frozen])
     assert tracker.reads == 3 and triager.agent_calls == 1
     assert tracker.issue(number)["title"] == "原报告"
-    assert recovery.unit(
-        round_no=1, stage="triage", key=operation_key("triage-worker-0", "report", number)
-    )["status"] == "failed"
+    assert (
+        recovery.unit(
+            round_no=1, stage="triage", key=operation_key("triage-worker-0", "report", number)
+        )["status"]
+        == "failed"
+    )
 
 
 def test_recovery_replays_only_our_partial_migration(tmp_path, monkeypatch) -> None:
@@ -582,9 +617,11 @@ def test_recovery_replays_only_our_partial_migration(tmp_path, monkeypatch) -> N
                 original_labels = self.issue(number)["labels"]
                 super().update_issue(number, title=title, body=body, labels=original_labels)
                 raise IssueMigrationError(
-                    number=number, operation="update_issue",
+                    number=number,
+                    operation="update_issue",
                     primary=requests.ConnectionError("labels response lost"),
-                    rollback=None, observed=self.issue(number),
+                    rollback=None,
+                    observed=self.issue(number),
                 )
             return super().update_issue(number, title=title, body=body, labels=labels)
 
@@ -592,8 +629,12 @@ def test_recovery_replays_only_our_partial_migration(tmp_path, monkeypatch) -> N
     number = _report(tracker, "原报告")
     frozen = tracker.list_open_issues()[0]
     triager = _StubTriager(
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path / "harness"),
-        str(tmp_path / "agent"), canned=_submit([_accept(number)]), recovery=_recovery(tmp_path),
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([_accept(number)]),
+        recovery=_recovery(tmp_path),
     )
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
         result = triager.triage_once(pending=[frozen])
@@ -603,7 +644,9 @@ def test_recovery_replays_only_our_partial_migration(tmp_path, monkeypatch) -> N
     assert len(tracker.issue(number)["comments"]) == 1
 
 
-def test_recovery_does_not_overwrite_external_edit_after_lost_response(tmp_path, monkeypatch) -> None:
+def test_recovery_does_not_overwrite_external_edit_after_lost_response(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr("auto_designer.designer.triage.time.sleep", lambda _: None)
 
     class ConcurrentEditTracker(FakeTracker):
@@ -618,8 +661,12 @@ def test_recovery_does_not_overwrite_external_edit_after_lost_response(tmp_path,
     number = _report(tracker, "原报告")
     frozen = tracker.list_open_issues()[0]
     triager = _StubTriager(
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path / "harness"),
-        str(tmp_path / "agent"), canned=_submit([_accept(number)]), recovery=_recovery(tmp_path),
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([_accept(number)]),
+        recovery=_recovery(tmp_path),
     )
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
         with pytest.raises(RecoveryConflictError, match="remain incomplete"):
@@ -644,8 +691,12 @@ def test_recovery_retries_temporary_server_error(tmp_path, monkeypatch) -> None:
     number = _report(tracker, "原报告")
     frozen = tracker.list_open_issues()[0]
     triager = _StubTriager(
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path / "harness"),
-        str(tmp_path / "agent"), canned=_submit([_accept(number)]), recovery=_recovery(tmp_path),
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([_accept(number)]),
+        recovery=_recovery(tmp_path),
     )
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
         result = triager.triage_once(pending=[frozen])
@@ -668,7 +719,9 @@ def test_recovery_reuses_saved_output_after_previous_tracker_outage(tmp_path, mo
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
     args = (
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path / "harness"),
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
         str(tmp_path / "agent"),
     )
     first = _StubTriager(*args, canned=_submit([_accept(number)]), recovery=recovery)

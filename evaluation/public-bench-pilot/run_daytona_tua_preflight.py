@@ -33,11 +33,7 @@ from timeout_policy import (
 
 HERE = Path(__file__).resolve().parent
 TASK_NAME = "106-create-charles-ssh-user"
-TASK = (
-    prepared_root(HERE)
-    / "controller-private/task-sources/tua-bench/tasks"
-    / TASK_NAME
-)
+TASK = prepared_root(HERE) / "controller-private/task-sources/tua-bench/tasks" / TASK_NAME
 HARNESS = harness_archive_path(HERE)
 NEXAU_COMMIT = "09e747b59e3684d5541d557087d6d93790c5a43f"
 STRICT_FOLLOWUP = (
@@ -147,9 +143,7 @@ def main() -> int:
         )
 
         sandbox.fs.upload_file(str(HARNESS), "/tmp/harness-v0.tar.gz")
-        sandbox.fs.upload_file(
-            str(HERE / "adapters/harness_v0/stdio.py"), "/app/stdio.py"
-        )
+        sandbox.fs.upload_file(str(HERE / "adapters/harness_v0/stdio.py"), "/app/stdio.py")
         sandbox.fs.upload_file(
             str(HERE / "adapters/harness_v0/harbor_driver.py"),
             "/app/harness_driver.py",
@@ -190,19 +184,18 @@ def main() -> int:
         )
         manifest["agent_exit_code"] = agent_exit_code
         download_artifacts(
-            sandbox, run_dir, ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json")
+            sandbox,
+            run_dir,
+            ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json"),
         )
         if agent_exit_code != 0:
             raise RuntimeError(
-                f"remote harness failed: {agent_exit_code}: "
-                f"{(agent_stdout + agent_stderr)[-2000:]}"
+                f"remote harness failed: {agent_exit_code}: {(agent_stdout + agent_stderr)[-2000:]}"
             )
 
         # The verifier stays outside the agent-visible filesystem until now.
         sandbox.process.exec("mkdir -p /tests /logs/verifier /logs/artifacts", timeout=30)
-        sandbox.fs.upload_file(
-            str(TASK / "tests/test_outputs.py"), "/tests/test_outputs.py"
-        )
+        sandbox.fs.upload_file(str(TASK / "tests/test_outputs.py"), "/tests/test_outputs.py")
         sandbox.fs.upload_file(str(TASK / "tests/test.sh"), "/tests/test.sh")
         grader = sandbox.process.exec(
             "chmod +x /tests/test.sh "
@@ -231,10 +224,7 @@ def main() -> int:
         account_state = sandbox.fs.download_file("/logs/artifacts/account_state.txt")
         (run_dir / "account_state.txt").write_bytes(account_state)
         (run_dir / "result.json").write_text(
-            json.dumps(
-                {"reward": reward, "passed": manifest["passed"]}, indent=2
-            )
-            + "\n",
+            json.dumps({"reward": reward, "passed": manifest["passed"]}, indent=2) + "\n",
             encoding="utf-8",
         )
         print(f"RESULT reward={reward} passed={manifest['passed']}", flush=True)

@@ -53,9 +53,7 @@ def test_expired_dead_pid_is_reclaimed(tmp_path: Path, monkeypatch) -> None:
         pid=999999,
         now=10.0,
     )
-    monkeypatch.setattr(
-        "auto_designer.experiment.capacity._pid_alive", lambda *, pid: False
-    )
+    monkeypatch.setattr("auto_designer.experiment.capacity._pid_alive", lambda *, pid: False)
     acquire(
         experiment_id="e2",
         endpoint="glm",

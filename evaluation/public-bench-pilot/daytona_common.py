@@ -19,9 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def harness_archive_path(here: Path) -> Path:
     """Resolve the harness under test without implying a specific version."""
-    configured = os.environ.get("HARNESS_ARCHIVE") or os.environ.get(
-        "HARNESS_V0_ARCHIVE"
-    )
+    configured = os.environ.get("HARNESS_ARCHIVE") or os.environ.get("HARNESS_V0_ARCHIVE")
     return Path(configured) if configured else here / "artifacts/harness-v0-cade14d.tar.gz"
 
 
@@ -60,15 +58,12 @@ def prepared_root(here: Path) -> Path:
     candidates = [
         Path(configured).expanduser() if configured else None,
         here / "prepared",
-        here.parents[2]
-        / "auto-designer-experiment-configs/public-bench-pilot-20260917/prepared",
+        here.parents[2] / "auto-designer-experiment-configs/public-bench-pilot-20260917/prepared",
     ]
     for candidate in candidates:
         if candidate is not None and candidate.is_dir():
             return candidate.resolve()
-    raise FileNotFoundError(
-        "prepared benchmark data not found; set PUBLIC_BENCH_PREPARED_DIR"
-    )
+    raise FileNotFoundError("prepared benchmark data not found; set PUBLIC_BENCH_PREPARED_DIR")
 
 
 def load_env(path: Path | None = None) -> dict[str, str]:
@@ -96,9 +91,7 @@ def load_env(path: Path | None = None) -> dict[str, str]:
 def credentials() -> tuple[str, str]:
     values = load_env()
     daytona_key = os.environ.get("DAYTONA_API_KEY") or getpass("Daytona API key: ")
-    model_key = os.environ.get("OPENROUTER_API_KEY") or values.get(
-        "openrouter_api_key", ""
-    )
+    model_key = os.environ.get("OPENROUTER_API_KEY") or values.get("openrouter_api_key", "")
     if not model_key:
         raise SystemExit("OPENROUTER_API_KEY is unavailable")
     return daytona_key, model_key
@@ -114,9 +107,7 @@ def new_run_dir(base: Path, suffix: str) -> Path:
 def exec_logged(sandbox, run_dir: Path, name: str, command: str, timeout: int):
     print(f"REMOTE_START {name}", flush=True)
     response = sandbox.process.exec(command, timeout=timeout)
-    (run_dir / f"remote-{name}.log").write_text(
-        response.result or "", encoding="utf-8"
-    )
+    (run_dir / f"remote-{name}.log").write_text(response.result or "", encoding="utf-8")
     print(f"REMOTE_END {name} exit={response.exit_code}", flush=True)
     if response.exit_code != 0:
         tail = (response.result or "")[-3000:]
@@ -143,21 +134,15 @@ def exec_async_logged(
                 logs = sandbox.process.get_session_command_logs(session_id, started.cmd_id)
                 stdout = logs.stdout or ""
                 stderr = logs.stderr or ""
-                (run_dir / f"remote-{name}.log").write_text(
-                    stdout, encoding="utf-8"
-                )
-                (run_dir / f"remote-{name}-stderr.log").write_text(
-                    stderr, encoding="utf-8"
-                )
+                (run_dir / f"remote-{name}.log").write_text(stdout, encoding="utf-8")
+                (run_dir / f"remote-{name}-stderr.log").write_text(stderr, encoding="utf-8")
                 return int(current.exit_code), stdout, stderr
             time.sleep(5)
         logs = sandbox.process.get_session_command_logs(session_id, started.cmd_id)
         stdout = logs.stdout or ""
         stderr = logs.stderr or ""
         (run_dir / f"remote-{name}.log").write_text(stdout, encoding="utf-8")
-        (run_dir / f"remote-{name}-stderr.log").write_text(
-            stderr, encoding="utf-8"
-        )
+        (run_dir / f"remote-{name}-stderr.log").write_text(stderr, encoding="utf-8")
         raise TimeoutError(f"remote async step {name} exceeded {timeout}s")
     finally:
         try:
@@ -189,9 +174,7 @@ def upload_tree(sandbox, local_root: Path, remote_root: str) -> None:
         relative = path.relative_to(local_root).as_posix()
         remote = f"{remote_root.rstrip('/')}/{relative}"
         parent = remote.rsplit("/", 1)[0]
-        response = sandbox.process.exec(
-            f"mkdir -p {shlex.quote(parent)}", timeout=30
-        )
+        response = sandbox.process.exec(f"mkdir -p {shlex.quote(parent)}", timeout=30)
         if response.exit_code != 0:
             raise RuntimeError(f"could not create remote directory {parent}")
         sandbox.fs.upload_file(str(path), remote)

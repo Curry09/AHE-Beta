@@ -5,22 +5,23 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
-import shutil
 import sys
-import tarfile
 from pathlib import Path
-
 
 ROOT = Path("/opt/hse-round")
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "eval"))
 
-from auto_designer.user.sim.loop import run_session  # noqa: E402
-from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient  # noqa: E402
-from auto_designer.user.sim.persona_io import card_to_persona  # noqa: E402
-from auto_designer.user.sim.runtime import LocalWorkspaceRuntime  # noqa: E402
 from harness.adapters import FROZEN_V0  # noqa: E402
 from harness.session import HarnessSession  # noqa: E402
+
+from auto_designer.user.sim.loop import run_session  # noqa: E402
+from auto_designer.user.sim.persona_client import (  # noqa: E402
+    AgenticPersonaClient,
+    ApiPersonaClient,
+)
+from auto_designer.user.sim.persona_io import card_to_persona  # noqa: E402
+from auto_designer.user.sim.runtime import LocalWorkspaceRuntime  # noqa: E402
 
 
 class SessionBridge:
@@ -28,7 +29,11 @@ class SessionBridge:
 
     def __init__(self, session: HarnessSession) -> None:
         self._session = session
-        self.help_text = (ROOT / "harness" / "HELP.md").read_text(encoding="utf-8") if (ROOT / "harness" / "HELP.md").is_file() else ""
+        self.help_text = (
+            (ROOT / "harness" / "HELP.md").read_text(encoding="utf-8")
+            if (ROOT / "harness" / "HELP.md").is_file()
+            else ""
+        )
 
     @property
     def last_progress(self):

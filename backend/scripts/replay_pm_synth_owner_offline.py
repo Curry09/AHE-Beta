@@ -37,12 +37,17 @@ def main() -> int:
     sessions = args.output / "sessions"
     shutil.copytree(args.sessions, sessions)
     harness = args.output / "harness_repo"
-    shutil.copytree(ROOT / "harness_template", harness, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+    shutil.copytree(
+        ROOT / "harness_template", harness, ignore=shutil.ignore_patterns(".git", "__pycache__")
+    )
     source = json.loads(args.source_summary.read_text(encoding="utf-8"))
     wis = _env(WORKSPACE / ".env")
-    os.environ.update(DESIGNER_LLM_MODEL=args.model, DESIGNER_LLM_BASE_URL=wis["wis_base_url"],
-                      DESIGNER_LLM_API_KEY=wis["wis_api_key"],
-                      AUTO_DESIGNER_USAGE_PATH=str(args.output / "usage.jsonl"))
+    os.environ.update(
+        DESIGNER_LLM_MODEL=args.model,
+        DESIGNER_LLM_BASE_URL=wis["wis_base_url"],
+        DESIGNER_LLM_API_KEY=wis["wis_api_key"],
+        AUTO_DESIGNER_USAGE_PATH=str(args.output / "usage.jsonl"),
+    )
 
     from auto_designer.designer.designer import Designer
     from auto_designer.designer.divergent import Divergent
@@ -57,24 +62,47 @@ def main() -> int:
     triage_numbers = set(int(n) for n in source["triage"]["accepted"])
     for item in source["issues"]:
         if int(item["number"]) in triage_numbers:
-            tracker.create_issue(IssueDraft(title=item["title"], body=item["body"],
-                                            labels=[PROPOSAL, FROM_TRIAGE, "round-1"]))
+            tracker.create_issue(
+                IssueDraft(
+                    title=item["title"],
+                    body=item["body"],
+                    labels=[PROPOSAL, FROM_TRIAGE, "round-1"],
+                )
+            )
     store = SessionStore(sessions)
     event_path = args.output / "agent-events.jsonl"
     lock = threading.Lock()
+
     def event(role: str):
         def write(kind: str, text: str) -> None:
             with lock, event_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({"role": role, "kind": kind, "text": text}, ensure_ascii=False) + "\n")
+                handle.write(
+                    json.dumps({"role": role, "kind": kind, "text": text}, ensure_ascii=False)
+                    + "\n"
+                )
+
         return write
+
     common = (tracker, store, str(harness))
-    pm = Divergent(*common, str(ROOT / "agent_defs/divergent_pm"), on_event=event("pm"), round_provider=lambda: 1)
-    synth = Designer(*common, str(ROOT / "agent_defs/designer"), on_event=event("synthesize"), round_provider=lambda: 1)
+    pm = Divergent(
+        *common,
+        str(ROOT / "agent_defs/divergent_pm"),
+        on_event=event("pm"),
+        round_provider=lambda: 1,
+    )
+    synth = Designer(
+        *common,
+        str(ROOT / "agent_defs/designer"),
+        on_event=event("synthesize"),
+        round_provider=lambda: 1,
+    )
     owner = Owner(*common, str(ROOT / "agent_defs/owner"), on_event=event("owner"))
     run_id = f"spec-0043-resume-{uuid.uuid4().hex}"
+
     def invoke(role: str, operation):
         with bind_usage_context(run_id=run_id, role=role, round_no=1):
             return operation()
+
     pm_out = invoke("pm", pm.propose_once)
     synth_out = invoke("synthesize", synth.propose_once)
     owner_out = invoke("owner", owner.admit_once)
@@ -82,15 +110,34 @@ def main() -> int:
     for number in range(1, tracker._counter + 1):
         item = tracker.issue(number)
         issues.append({"number": number, **item, "plane": plane(item["labels"])})
-    summary = {"model": args.model, "source_summary": str(args.source_summary),
-               "triage_artifacts": source["triage"]["artifacts"], "pm": pm_out.__dict__,
-               "synthesize": synth_out.__dict__, "owner": owner_out.__dict__, "issues": issues,
-               "usage": default_usage_store().summary(run_id=run_id),
-               "openagents_started": False, "tracker": "offline-fake"}
-    (args.output / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"pm": summary["pm"], "synthesize": summary["synthesize"],
-                      "owner": summary["owner"], "usage": summary["usage"],
-                      "openagents_started": False}, ensure_ascii=False, indent=2))
+    summary = {
+        "model": args.model,
+        "source_summary": str(args.source_summary),
+        "triage_artifacts": source["triage"]["artifacts"],
+        "pm": pm_out.__dict__,
+        "synthesize": synth_out.__dict__,
+        "owner": owner_out.__dict__,
+        "issues": issues,
+        "usage": default_usage_store().summary(run_id=run_id),
+        "openagents_started": False,
+        "tracker": "offline-fake",
+    }
+    (args.output / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(
+        json.dumps(
+            {
+                "pm": summary["pm"],
+                "synthesize": summary["synthesize"],
+                "owner": summary["owner"],
+                "usage": summary["usage"],
+                "openagents_started": False,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 

@@ -33,11 +33,7 @@ from timeout_policy import (
 
 HERE = Path(__file__).resolve().parent
 TASK_NAME = "html-js-filter"
-TASK = (
-    prepared_root(HERE)
-    / "controller-private/task-sources/terminal-bench-4.0/tasks"
-    / TASK_NAME
-)
+TASK = prepared_root(HERE) / "controller-private/task-sources/terminal-bench-4.0/tasks" / TASK_NAME
 HARNESS = harness_archive_path(HERE)
 NEXAU_COMMIT = "09e747b59e3684d5541d557087d6d93790c5a43f"
 FOLLOWUP = (
@@ -124,8 +120,12 @@ def main() -> int:
         )
         agent_box.fs.upload_file(str(HARNESS), "/tmp/harness-v0.tar.gz")
         agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/stdio.py"), "/app/stdio.py")
-        agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/harbor_driver.py"), "/app/harness_driver.py")
-        agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/llm_user_simulator.py"), "/app/llm_user_simulator.py")
+        agent_box.fs.upload_file(
+            str(HERE / "adapters/harness_v0/harbor_driver.py"), "/app/harness_driver.py"
+        )
+        agent_box.fs.upload_file(
+            str(HERE / "adapters/harness_v0/llm_user_simulator.py"), "/app/llm_user_simulator.py"
+        )
         agent_box.fs.upload_file(str(TASK / "instruction.md"), "/app/instruction.md")
         if not args.llm_user_simulator:
             agent_box.fs.upload_file(FOLLOWUP.encode(), "/app/followup.md")
@@ -154,11 +154,13 @@ def main() -> int:
             remote_command_timeout(timeouts.agent_seconds),
         )
         manifest["agent_exit_code"] = agent_exit_code
-        download_artifacts(agent_box, run_dir, ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json"))
+        download_artifacts(
+            agent_box,
+            run_dir,
+            ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json"),
+        )
         if agent_exit_code != 0:
-            raise RuntimeError(
-                f"remote harness failed: {agent_exit_code}: {agent_stdout[-2000:]}"
-            )
+            raise RuntimeError(f"remote harness failed: {agent_exit_code}: {agent_stdout[-2000:]}")
         if agent_box.process.exec("test -f /app/filter.py", timeout=30).exit_code != 0:
             raise RuntimeError("agent produced no /app/filter.py")
         artifact = run_dir / "filter.py"

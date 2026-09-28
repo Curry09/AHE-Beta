@@ -32,10 +32,7 @@ def test_projection_contains_canonical_metadata_and_normalized_body() -> None:
 
 
 def test_legacy_raw_report_section_is_excluded() -> None:
-    body = (
-        "### 根因区域\n\n通用机制缺陷\n\n"
-        "## 原始用户报告（案例证据，非实现对象）\n\n具体任务正文"
-    )
+    body = "### 根因区域\n\n通用机制缺陷\n\n## 原始用户报告（案例证据，非实现对象）\n\n具体任务正文"
     assert normalized_proposal_body(body) == "### 根因区域\n\n通用机制缺陷"
     assert "具体任务正文" not in normalized_proposal_body(body)
 

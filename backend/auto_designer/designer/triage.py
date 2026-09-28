@@ -112,7 +112,7 @@ def _proposal_title(value: str) -> str:
     title = value.strip()
     if len(title.encode("utf-8")) <= _PROPOSAL_TITLE_MAX_BYTES:
         return title
-    limit = _PROPOSAL_TITLE_MAX_BYTES - len("…".encode("utf-8"))
+    limit = _PROPOSAL_TITLE_MAX_BYTES - len("…".encode())
     chars: list[str] = []
     size = 0
     for char in title:
@@ -284,7 +284,9 @@ class Triager:
                         f"{boundary}（原分诊为 accept，implementation_target={target!r}）。"
                         f"{str(d.get('reason') or '').strip()}"
                     )
-                    outcome.warnings.setdefault(issue.number, []).append("out-of-product-scope-normalized")
+                    outcome.warnings.setdefault(issue.number, []).append(
+                        "out-of-product-scope-normalized"
+                    )
                     violations = validate_triage(d, report_number=issue.number)
                 if violations:
                     outcome.warnings.setdefault(issue.number, []).extend(v.code for v in violations)
@@ -344,7 +346,11 @@ class Triager:
         return outcome
 
     def _apply_with_retry(
-        self, d: dict, *, by_number: dict, outcome: TriageOutcome,
+        self,
+        d: dict,
+        *,
+        by_number: dict,
+        outcome: TriageOutcome,
         operation_prefix: str | None,
     ) -> None:
         # The output receipt is durable before this point.  Do not retry a
@@ -354,7 +360,9 @@ class Triager:
         for attempt in range(attempts):
             try:
                 self._apply(
-                    d, by_number=by_number, outcome=outcome,
+                    d,
+                    by_number=by_number,
+                    outcome=outcome,
                     operation_prefix=operation_prefix,
                 )
                 if attempt:
@@ -366,7 +374,7 @@ class Triager:
                 # _apply checks live state before its next mutation.  A lost
                 # response can mean the write succeeded; the next attempt must
                 # reconcile rather than blindly repeat it.
-                time.sleep(0.5 * (2 ** attempt))
+                time.sleep(0.5 * (2**attempt))
 
     def _round_no(self) -> int:
         round_no = current_usage_context().round_no
@@ -523,8 +531,11 @@ class Triager:
             already_applied = False
             if operation_prefix is not None:
                 already_applied = self._check_recovery_issue(
-                    issue=issue, model_title=model_title, proposal_title=proposal_title,
-                    proposal_body=proposal_body, proposal_labels=proposal_labels,
+                    issue=issue,
+                    model_title=model_title,
+                    proposal_title=proposal_title,
+                    proposal_body=proposal_body,
+                    proposal_labels=proposal_labels,
                 )
             if proposal_title != model_title:
                 outcome.warnings.setdefault(num, []).append("proposal-title-shortened")
@@ -566,8 +577,13 @@ class Triager:
         # 未知 disposition：忽略（票仍在 report 平面，下轮再分诊）
 
     def _check_recovery_issue(
-        self, *, issue, model_title: str, proposal_title: str,
-        proposal_body: str, proposal_labels: list[str],
+        self,
+        *,
+        issue,
+        model_title: str,
+        proposal_title: str,
+        proposal_body: str,
+        proposal_labels: list[str],
     ) -> bool:
         """Return whether this output is already applied; reject unrelated edits."""
         read = getattr(self._tracker, "get_issue", None)
@@ -583,9 +599,8 @@ class Triager:
             and labels == set(issue.labels)
         )
         partial_title = str(live.get("title") or "")
-        title_from_this_output = (
-            partial_title in {model_title, proposal_title}
-            or (partial_title.endswith("…") and model_title.startswith(partial_title[:-1]))
+        title_from_this_output = partial_title in {model_title, proposal_title} or (
+            partial_title.endswith("…") and model_title.startswith(partial_title[:-1])
         )
         partial = (
             live.get("body") == proposal_body
@@ -598,7 +613,9 @@ class Triager:
             and labels == set(proposal_labels)
         )
         if not (original or partial):
-            raise RecoveryConflictError(f"triage issue #{issue.number} changed outside this migration")
+            raise RecoveryConflictError(
+                f"triage issue #{issue.number} changed outside this migration"
+            )
         return applied
 
     def _decline(
@@ -633,7 +650,9 @@ class Triager:
             return False
         live = read(number=issue.number)
         if live.get("title") != issue.title or live.get("body") != issue.body:
-            raise RecoveryConflictError(f"triage issue #{issue.number} changed outside this migration")
+            raise RecoveryConflictError(
+                f"triage issue #{issue.number} changed outside this migration"
+            )
         live_labels = set(live.get("labels") or [])
         desired = set(labels)
         if live.get("state") == "closed" and live_labels == desired:

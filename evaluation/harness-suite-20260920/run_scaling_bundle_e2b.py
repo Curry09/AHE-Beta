@@ -5,6 +5,7 @@ The outer launcher owns policy and gates. This module owns the E2B upload,
 Gitea repository, remote run and resume lifecycle. Missing prompts/payloads
 fail closed; no synthetic task text is allowed.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -96,22 +97,32 @@ def credentials(gitea_env: Path | None, source_sandbox_id: str | None = None) ->
                 values["GITEA_TOKEN"] = value
     result = {
         "E2B_API_KEY": values.get("E2B_API_KEY") or values.get("API_KEY") or values.get("API_KET"),
-        "BOYUE_API_KEY": values.get("BOYUE_API_KEY") or values.get("BOYUE_KEY") or values.get("api-key"),
+        "BOYUE_API_KEY": values.get("BOYUE_API_KEY")
+        or values.get("BOYUE_KEY")
+        or values.get("api-key"),
         "GITEA_URL": (values.get("GITEA_URL") or "http://38.47.121.235:3000").rstrip("/"),
         "GITEA_USER": values.get("GITEA_USER") or values.get("OWNER") or "hseadmin",
-        "GITEA_TOKEN": values.get("GITEA_TOKEN") or values.get("TOKEN") or values.get("GITEA_PASSWORD"),
+        "GITEA_TOKEN": values.get("GITEA_TOKEN")
+        or values.get("TOKEN")
+        or values.get("GITEA_PASSWORD"),
     }
     missing = [key for key in ("E2B_API_KEY", "BOYUE_API_KEY", "GITEA_TOKEN") if not result[key]]
     if missing:
         raise LaunchError("missing secret(s): " + ", ".join(missing))
     if result["GITEA_URL"].startswith("http://") and os.environ.get("ALLOW_INSECURE_GITEA") != "1":
-        raise LaunchError("Gitea is HTTP; set ALLOW_INSECURE_GITEA=1 explicitly for the VPS smoke run")
-    result.update(BOYUE_OPENAI="https://api.boyuerichdata.opensphereai.com/v1", BOYUE_ANTHROPIC="https://api.boyuerichdata.opensphereai.com")
+        raise LaunchError(
+            "Gitea is HTTP; set ALLOW_INSECURE_GITEA=1 explicitly for the VPS smoke run"
+        )
+    result.update(
+        BOYUE_OPENAI="https://api.boyuerichdata.opensphereai.com/v1",
+        BOYUE_ANTHROPIC="https://api.boyuerichdata.opensphereai.com",
+    )
     return {key: str(value) for key, value in result.items()}
 
 
 def gitea(method: str, url: str, token: str, **kwargs):
     import requests
+
     headers = dict(kwargs.pop("headers", {}))
     headers["Authorization"] = f"token {token}"
     headers.setdefault("Accept", "application/json")
@@ -125,9 +136,16 @@ def ensure_repo(creds: dict[str, str], name: str, resume: bool) -> None:
         if response.status_code != 200:
             raise LaunchError(f"resume repository unavailable: HTTP {response.status_code}")
         return
-    response = gitea("POST", f"{api}/user/repos", creds["GITEA_TOKEN"], json={"name": name, "private": True, "auto_init": False})
+    response = gitea(
+        "POST",
+        f"{api}/user/repos",
+        creds["GITEA_TOKEN"],
+        json={"name": name, "private": True, "auto_init": False},
+    )
     if response.status_code != 201:
-        raise LaunchError(f"cannot create Gitea repository: HTTP {response.status_code} {response.text[:300]}")
+        raise LaunchError(
+            f"cannot create Gitea repository: HTTP {response.status_code} {response.text[:300]}"
+        )
 
 
 def task_rows(n: int) -> list[dict]:
@@ -152,7 +170,12 @@ def task_rows(n: int) -> list[dict]:
         if receipt_row is None:
             raise LaunchError(f"N{n}/{key} missing from runtime receipt payload list")
         row = {**assignments[key], **found.get(key, {}), **receipt_row}
-        for field in ("agent_payload", "grader_payload", "agent_payload_sha256", "grader_payload_sha256"):
+        for field in (
+            "agent_payload",
+            "grader_payload",
+            "agent_payload_sha256",
+            "grader_payload_sha256",
+        ):
             if not row.get(field):
                 raise LaunchError(f"N{n}/{key} missing frozen {field}")
         for kind in ("agent", "grader"):
@@ -175,7 +198,9 @@ def prompt_for(row: dict) -> str:
                 if opening:
                     expected = str(row.get("prompt_sha256") or "").strip()
                     if expected and hashlib.sha256(opening.encode("utf-8")).hexdigest() != expected:
-                        raise LaunchError(f"{row['task_key']}/{row['task_id']} mechanism prompt hash mismatch")
+                        raise LaunchError(
+                            f"{row['task_key']}/{row['task_id']} mechanism prompt hash mismatch"
+                        )
                     return opening
         raise LaunchError(f"{row['task_key']}/{row['task_id']} has no frozen mechanism prompt")
     # SWE task prompts are frozen outside the agent-visible payload.  Resolve
@@ -185,7 +210,9 @@ def prompt_for(row: dict) -> str:
     if prompt_source:
         path = Path(prompt_source)
         if not path.is_file():
-            raise LaunchError(f"{row['task_key']}/{row['task_id']} frozen prompt is missing: {path}")
+            raise LaunchError(
+                f"{row['task_key']}/{row['task_id']} frozen prompt is missing: {path}"
+            )
         expected = str(row.get("prompt_sha256") or "").strip()
         if expected and sha256(path) != expected:
             raise LaunchError(f"{row['task_key']}/{row['task_id']} frozen prompt hash mismatch")
@@ -207,7 +234,9 @@ def prompt_for(row: dict) -> str:
             text = path.read_text(encoding="utf-8").strip()
             if text:
                 return text
-    raise LaunchError(f"{row['task_key']}/{row['task_id']} has no frozen prompt; refusing synthetic task text")
+    raise LaunchError(
+        f"{row['task_key']}/{row['task_id']} has no frozen prompt; refusing synthetic task text"
+    )
 
 
 def build_manifest(n: int, rows: list[dict], profile: dict, rounds: int) -> dict:
@@ -215,15 +244,28 @@ def build_manifest(n: int, rows: list[dict], profile: dict, rounds: int) -> dict
     for row in rows:
         key = str(row["task_key"])
         timeout = int(row.get("official_agent_timeout_seconds") or 1800)
-        tasks.append({
-            "task_key": key, "task_id": row["task_id"], "benchmark": row["benchmark"], "stratum": row["stratum"],
-            "interaction": row["interaction"], "persona_id": row.get("persona_id"), "description": prompt_for(row),
-            "workspace": f"/opt/hse-run/workspaces/{key}/repo" if row["benchmark"] == "SWE-bench" else f"/opt/hse-run/workspaces/{key}",
-            "workspace_setup": [], "official_agent_timeout_seconds": timeout, "outer_timeout_seconds": timeout + 600,
-            "agent_payload": row["agent_payload"], "agent_payload_sha256": row["agent_payload_sha256"],
-            "grader_payload": row["grader_payload"], "grader_payload_sha256": row["grader_payload_sha256"],
-            "grader": {"payload": f"/opt/hse-run/payloads/grader/{key}.tar.gz"},
-        })
+        tasks.append(
+            {
+                "task_key": key,
+                "task_id": row["task_id"],
+                "benchmark": row["benchmark"],
+                "stratum": row["stratum"],
+                "interaction": row["interaction"],
+                "persona_id": row.get("persona_id"),
+                "description": prompt_for(row),
+                "workspace": f"/opt/hse-run/workspaces/{key}/repo"
+                if row["benchmark"] == "SWE-bench"
+                else f"/opt/hse-run/workspaces/{key}",
+                "workspace_setup": [],
+                "official_agent_timeout_seconds": timeout,
+                "outer_timeout_seconds": timeout + 600,
+                "agent_payload": row["agent_payload"],
+                "agent_payload_sha256": row["agent_payload_sha256"],
+                "grader_payload": row["grader_payload"],
+                "grader_payload_sha256": row["grader_payload_sha256"],
+                "grader": {"payload": f"/opt/hse-run/payloads/grader/{key}.tar.gz"},
+            }
+        )
     config = read_json(CONFIG)
     return {
         "schema_version": "hse-mixed-task-runtime-v1",
@@ -240,19 +282,33 @@ def build_manifest(n: int, rows: list[dict], profile: dict, rounds: int) -> dict
 
 def archive_tree(source: Path, destination: Path, arcname: str) -> None:
     with tarfile.open(destination, "w:gz") as archive:
-        archive.add(source, arcname=arcname, filter=lambda info: None if any(part in {".git", "__pycache__", ".pytest_cache", ".venv", "build", "dist"} for part in Path(info.name).parts) else info)
+        archive.add(
+            source,
+            arcname=arcname,
+            filter=lambda info: (
+                None
+                if any(
+                    part in {".git", "__pycache__", ".pytest_cache", ".venv", "build", "dist"}
+                    for part in Path(info.name).parts
+                )
+                else info
+            ),
+        )
 
 
 def payload_bundle(rows: list[dict], destination: Path) -> None:
     with tarfile.open(destination, "w:gz") as bundle:
         for row in rows:
             for kind in ("agent", "grader"):
-                bundle.add(row[f"{kind}_payload"], arcname=f"payloads/{kind}/{row['task_key']}.tar.gz")
+                bundle.add(
+                    row[f"{kind}_payload"], arcname=f"payloads/{kind}/{row['task_key']}.tar.gz"
+                )
 
 
 def source_archive(destination: Path) -> None:
     sys.path.insert(0, str(SUITE))
     from run_n1_e2b import archive_sources
+
     archive_sources(destination)
 
 
@@ -275,17 +331,42 @@ def remote_files(
         receipt_root = SUITE / "prepared" / "scaling-e2b-20260922" / "n4"
     receipt = read_json(receipt_root / "receipt.json")
     values = {
-        "USER_LLM_MODEL": roles["user_simulator"]["model"], "USER_LLM_BASE_URL": creds["BOYUE_OPENAI"], "USER_LLM_API_KEY": creds["BOYUE_API_KEY"],
-        "HARNESS_LLM_MODEL": roles["harness"]["model"], "HARNESS_LLM_BASE_URL": creds["BOYUE_OPENAI"], "HARNESS_LLM_API_KEY": creds["BOYUE_API_KEY"],
-        "DESIGNER_LLM_MODEL": roles["designer"]["model"], "DESIGNER_LLM_BASE_URL": creds["BOYUE_OPENAI"], "DESIGNER_LLM_API_KEY": creds["BOYUE_API_KEY"],
-        "DEVELOPER_LLM_MODEL": roles["developer"]["model"], "DEVELOPER_LLM_BASE_URL": creds["BOYUE_ANTHROPIC"], "DEVELOPER_LLM_API_KEY": creds["BOYUE_API_KEY"],
-        "AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT": "1" if timing_policy.get("enabled", False) else "0",
-        "AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS": str(int(timing_policy.get("wall_guard_grace_seconds", 600))),
-        "ANTHROPIC_MODEL": roles["developer"]["model"], "ANTHROPIC_SMALL_FAST_MODEL": roles["developer"]["model"], "ANTHROPIC_BASE_URL": creds["BOYUE_ANTHROPIC"], "ANTHROPIC_AUTH_TOKEN": creds["BOYUE_API_KEY"], "PYTHONUNBUFFERED": "1",
-        "CLAUDE_CODE_SUBAGENT_MODEL": roles["developer"]["model"], "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1",
+        "USER_LLM_MODEL": roles["user_simulator"]["model"],
+        "USER_LLM_BASE_URL": creds["BOYUE_OPENAI"],
+        "USER_LLM_API_KEY": creds["BOYUE_API_KEY"],
+        "HARNESS_LLM_MODEL": roles["harness"]["model"],
+        "HARNESS_LLM_BASE_URL": creds["BOYUE_OPENAI"],
+        "HARNESS_LLM_API_KEY": creds["BOYUE_API_KEY"],
+        "DESIGNER_LLM_MODEL": roles["designer"]["model"],
+        "DESIGNER_LLM_BASE_URL": creds["BOYUE_OPENAI"],
+        "DESIGNER_LLM_API_KEY": creds["BOYUE_API_KEY"],
+        "DEVELOPER_LLM_MODEL": roles["developer"]["model"],
+        "DEVELOPER_LLM_BASE_URL": creds["BOYUE_ANTHROPIC"],
+        "DEVELOPER_LLM_API_KEY": creds["BOYUE_API_KEY"],
+        "AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT": "1"
+        if timing_policy.get("enabled", False)
+        else "0",
+        "AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS": str(
+            int(timing_policy.get("wall_guard_grace_seconds", 600))
+        ),
+        "ANTHROPIC_MODEL": roles["developer"]["model"],
+        "ANTHROPIC_SMALL_FAST_MODEL": roles["developer"]["model"],
+        "ANTHROPIC_BASE_URL": creds["BOYUE_ANTHROPIC"],
+        "ANTHROPIC_AUTH_TOKEN": creds["BOYUE_API_KEY"],
+        "PYTHONUNBUFFERED": "1",
+        "CLAUDE_CODE_SUBAGENT_MODEL": roles["developer"]["model"],
+        "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1",
     }
     backend_env = "\n".join(f"{key}={value}" for key, value in values.items()) + "\n"
-    gitea_env = "\n".join((f"GITEA_URL={creds['GITEA_URL']}", f"OWNER={creds['GITEA_USER']}", f"REPO={repo}", f"TOKEN={creds['GITEA_TOKEN']}", ""))
+    gitea_env = "\n".join(
+        (
+            f"GITEA_URL={creds['GITEA_URL']}",
+            f"OWNER={creds['GITEA_USER']}",
+            f"REPO={repo}",
+            f"TOKEN={creds['GITEA_TOKEN']}",
+            "",
+        )
+    )
     persona_ids: list[str] = []
     for row in manifest["tasks"]:
         persona_id = str(row.get("persona_id") or "")
@@ -299,28 +380,36 @@ def remote_files(
     latency_enabled = "1" if timing_policy.get("enabled", False) else "0"
     latency_guard = int(timing_policy.get("wall_guard_grace_seconds", 600))
     round_wait = int((config.get("delivery") or {}).get("round_wait_seconds", 86400))
-    run = f'''#!/usr/bin/env bash
+    run = f"""#!/usr/bin/env bash
 set -u
 mkdir -p /opt/hse-run
 exec >> /opt/hse-run/controller.log 2>&1
 export PATH=/opt/hse-venv/bin:/usr/local/bin:/usr/bin:/bin PYTHONPATH=/opt/hse-round/backend PYTHONDONTWRITEBYTECODE=1
 export MIXED_TASK_MANIFEST=/opt/hse-round/mixed-task-manifest.json PERSONA_ROSTER=/opt/hse-round/persona-roster.json AUTO_DESIGNER_GITEA_ENV_FILE=/opt/hse-round/backend/deploy/gitea/.env
 export AUTO_DESIGNER_EXPERIMENT_ID={experiment_id} AUTO_DESIGNER_RUN_ID={run_id} AUTO_DESIGNER_CONFIG_HASH={config_hash} AUTO_DESIGNER_CONTROLLER_SHA={controller_sha} AUTO_DESIGNER_PLAN_HASH={plan_hash} AUTO_DESIGNER_RECOVERY_ROOT=/opt/hse-run/recovery
-export AUTO_DESIGNER_HARNESS_ARCHIVE=/opt/hse-round/harness-v0-cade14d.tar.gz AUTO_DESIGNER_OBJECTIVE_EVALUATION=0 TOTAL_ROUNDS={int(config['rounds'])} SESSIONS_PER_ROUND={int(profile['user'])} N_USERS={int(profile['user'])}
+export AUTO_DESIGNER_HARNESS_ARCHIVE=/opt/hse-round/harness-v0-cade14d.tar.gz AUTO_DESIGNER_OBJECTIVE_EVALUATION=0 TOTAL_ROUNDS={int(config["rounds"])} SESSIONS_PER_ROUND={int(profile["user"])} N_USERS={int(profile["user"])}
 export AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT={latency_enabled} AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS={latency_guard}
 export ROUND_DELIVERY_TIMEOUT_SEC={round_wait}
-export N_TRIAGERS={int(profile['triager'])} N_DESIGNERS={int(profile['designer'])} N_DEVELOPERS={int(profile['developer'])} N_DIVERGENTS={int(profile['pm'])} N_OWNERS={int(profile['owner'])} MAX_PARALLEL_USERS={int(profile['task_parallel'])} OPENAGENTS_PERMISSION_MODE=bypassPermissions VIGIL_MODE=subprocess
+export N_TRIAGERS={int(profile["triager"])} N_DESIGNERS={int(profile["designer"])} N_DEVELOPERS={int(profile["developer"])} N_DIVERGENTS={int(profile["pm"])} N_OWNERS={int(profile["owner"])} MAX_PARALLEL_USERS={int(profile["task_parallel"])} OPENAGENTS_PERMISSION_MODE=bypassPermissions VIGIL_MODE=subprocess
 set +e
 /opt/hse-venv/bin/python -u /opt/hse-round/backend/scripts/run_mixed_closed_loop.py
 code=$?
 echo "$code" > /opt/hse-run/exit_code
 exit "$code"
-'''
-    return {"/opt/hse-round/backend/.env": backend_env, "/opt/hse-round/backend/deploy/gitea/.env": gitea_env, "/opt/hse-round/mixed-task-manifest.json": json.dumps(manifest, ensure_ascii=False) + "\n", "/opt/hse-round/persona-roster.json": json.dumps(roster, ensure_ascii=False) + "\n", "/opt/hse-round/run.sh": run, "/opt/hse-round/.runtime-identity.json": json.dumps({"run_id": run_id, "n": manifest["n"]}) + "\n"}
+"""
+    return {
+        "/opt/hse-round/backend/.env": backend_env,
+        "/opt/hse-round/backend/deploy/gitea/.env": gitea_env,
+        "/opt/hse-round/mixed-task-manifest.json": json.dumps(manifest, ensure_ascii=False) + "\n",
+        "/opt/hse-round/persona-roster.json": json.dumps(roster, ensure_ascii=False) + "\n",
+        "/opt/hse-round/run.sh": run,
+        "/opt/hse-round/.runtime-identity.json": json.dumps({"run_id": run_id, "n": manifest["n"]})
+        + "\n",
+    }
 
 
 def setup_script() -> str:
-    return r'''set -eux
+    return r"""set -eux
 mkdir -p /opt/hse-round/backend/deploy/gitea /opt/hse-run/payloads-incoming /opt/hse-run/workspaces
 tar -xzf /tmp/hse-code.tar.gz -C /opt/hse-round
 tar -xzf /tmp/hse-openagents.tar.gz -C /opt/hse-round
@@ -348,7 +437,7 @@ git -C /opt/hse-round config user.email hse-runtime@localhost
 git -C /opt/hse-round add .gitignore backend/auto_designer backend/agent_defs backend/harness_template backend/run.py backend/scripts backend/persona_library.json pyproject.toml
 git -C /opt/hse-round commit -m 'Snapshot uploaded controller sources'
 chown -R user:user /opt/hse-round /opt/hse-run
-'''
+"""
 
 
 def create_sandbox(
@@ -364,24 +453,55 @@ def create_sandbox(
     plan_hash_override: str | None = None,
 ):
     from e2b import Sandbox
+
     temp = Path(tempfile.mkdtemp(prefix=f"hse-n{manifest['n']}-"))
-    code, oa, nexau, payloads = (temp / name for name in ("code.tar.gz", "openagents.tar.gz", "nexau.tar.gz", "payloads.tar.gz"))
+    code, oa, nexau, payloads = (
+        temp / name
+        for name in ("code.tar.gz", "openagents.tar.gz", "nexau.tar.gz", "payloads.tar.gz")
+    )
     source_archive(code)
     archive_tree(OPENAGENTS, oa, "OpenAgents")
     archive_tree(NEXAU, nexau, "NexAU")
     payload_bundle(manifest["tasks"], payloads)
-    sandbox = Sandbox.create(template=(config.get("e2b") or {}).get("template_alias") or "base", timeout=int((config.get("e2b") or {}).get("lifetime_seconds", 86400)), allow_internet_access=True, metadata={"experiment_id": experiment_id or f"hse-n{manifest['n']}-e2b-20260922", "run_id": run_id}, api_key=creds["E2B_API_KEY"])
+    sandbox = Sandbox.create(
+        template=(config.get("e2b") or {}).get("template_alias") or "base",
+        timeout=int((config.get("e2b") or {}).get("lifetime_seconds", 86400)),
+        allow_internet_access=True,
+        metadata={
+            "experiment_id": experiment_id or f"hse-n{manifest['n']}-e2b-20260922",
+            "run_id": run_id,
+        },
+        api_key=creds["E2B_API_KEY"],
+    )
     try:
-        sandbox.commands.run("mkdir -p /opt/hse-round/backend/deploy/gitea /opt/hse-run/payloads-incoming", user="root", timeout=30)
+        sandbox.commands.run(
+            "mkdir -p /opt/hse-round/backend/deploy/gitea /opt/hse-run/payloads-incoming",
+            user="root",
+            timeout=30,
+        )
+
         def upload(local: Path, remote: str) -> None:
             with local.open("rb") as stream:
                 sandbox.files.write(remote, stream, request_timeout=1800, use_octet_stream=True)
-        for local, remote in ((code, "/tmp/hse-code.tar.gz"), (oa, "/tmp/hse-openagents.tar.gz"), (nexau, "/tmp/hse-nexau.tar.gz"), (payloads, "/opt/hse-run/payloads-incoming/task-payloads.tar.gz"), (HARNESS_ARCHIVE, "/tmp/hse-harness.tar.gz"), (CLAUDE, "/tmp/claude-bin")):
+
+        for local, remote in (
+            (code, "/tmp/hse-code.tar.gz"),
+            (oa, "/tmp/hse-openagents.tar.gz"),
+            (nexau, "/tmp/hse-nexau.tar.gz"),
+            (payloads, "/opt/hse-run/payloads-incoming/task-payloads.tar.gz"),
+            (HARNESS_ARCHIVE, "/tmp/hse-harness.tar.gz"),
+            (CLAUDE, "/tmp/claude-bin"),
+        ):
             if not local.is_file():
                 raise LaunchError(f"upload source missing: {local}")
             upload(local, remote)
         for path, text in remote_files(
-            manifest, creds, repo, config, profile, run_id,
+            manifest,
+            creds,
+            repo,
+            config,
+            profile,
+            run_id,
             experiment_id=experiment_id,
             config_hash_override=config_hash_override,
             plan_hash_override=plan_hash_override,
@@ -402,7 +522,9 @@ def create_sandbox(
 def start_remote(sandbox, resume: bool, extra_env: dict[str, str] | None = None):
     envs = {"AUTO_DESIGNER_RUN_MODE": "resume" if resume else "fresh"}
     envs.update(extra_env or {})
-    return sandbox.commands.run("bash /opt/hse-round/run.sh", envs=envs, user="user", background=True, timeout=86400)
+    return sandbox.commands.run(
+        "bash /opt/hse-round/run.sh", envs=envs, user="user", background=True, timeout=86400
+    )
 
 
 def write_state(path: Path, state: dict) -> None:
@@ -421,17 +543,30 @@ def start_status_relay(*, run_id: str, sandbox_id: str) -> int | None:
     try:
         existing = subprocess.run(
             ["pgrep", "-f", f"sync_status_vps.py --run-id {run_id} "],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if existing.stdout.strip():
             return int(existing.stdout.splitlines()[0])
     except (OSError, ValueError):
         pass
     proc = subprocess.Popen(
-        [sys.executable, str(relay), "--run-id", run_id, "--sandbox-id", sandbox_id,
-         "--vps-file", str(vps_file)],
-        cwd=str(ROOT), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, start_new_session=True,
+        [
+            sys.executable,
+            str(relay),
+            "--run-id",
+            run_id,
+            "--sandbox-id",
+            sandbox_id,
+            "--vps-file",
+            str(vps_file),
+        ],
+        cwd=str(ROOT),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
     return proc.pid
 
@@ -448,12 +583,27 @@ def start_lifecycle_guardian(*, run_id: str, sandbox_id: str, receipt: Path) -> 
     if not guardian.is_file() or not e2b_file.is_file():
         return None
     proc = subprocess.Popen(
-        [sys.executable, str(guardian), "--run-id", run_id,
-         "--sandbox-id", sandbox_id, "--receipt", str(receipt),
-         "--e2b-env", str(e2b_file), "--interval", "600",
-         "--snapshot-interval", "1800"],
-        cwd=str(ROOT), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, start_new_session=True,
+        [
+            sys.executable,
+            str(guardian),
+            "--run-id",
+            run_id,
+            "--sandbox-id",
+            sandbox_id,
+            "--receipt",
+            str(receipt),
+            "--e2b-env",
+            str(e2b_file),
+            "--interval",
+            "600",
+            "--snapshot-interval",
+            "1800",
+        ],
+        cwd=str(ROOT),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
     return proc.pid
 
@@ -467,7 +617,18 @@ def fresh(n: int, config: dict, creds: dict[str, str]) -> int:
     sandbox = create_sandbox(manifest, creds, repo, config, profile, run_id)
     command = start_remote(sandbox, False)
     path = SUITE / "runs" / "scaling-e2b-20260922" / f"n{n}" / run_id / "state.json"
-    write_state(path, {"n": n, "run_id": run_id, "sandbox_id": sandbox.sandbox_id, "gitea_repo_name": repo, "manifest": manifest, "command_id": getattr(command, "cmd_id", None), "started_at": datetime.now(UTC).isoformat()})
+    write_state(
+        path,
+        {
+            "n": n,
+            "run_id": run_id,
+            "sandbox_id": sandbox.sandbox_id,
+            "gitea_repo_name": repo,
+            "manifest": manifest,
+            "command_id": getattr(command, "cmd_id", None),
+            "started_at": datetime.now(UTC).isoformat(),
+        },
+    )
     guardian_receipt = path.parent / "guardian.jsonl"
     guardian_pid = start_lifecycle_guardian(
         run_id=run_id, sandbox_id=sandbox.sandbox_id, receipt=guardian_receipt
@@ -489,12 +650,19 @@ def resume(n: int, run_id: str, creds: dict[str, str], *, allow_failed: bool = F
         raise LaunchError("state N mismatch")
     ensure_repo(creds, state["gitea_repo_name"], resume=True)
     from e2b import Sandbox
-    sandbox = Sandbox.connect(state["sandbox_id"], api_key=creds["E2B_API_KEY"], timeout=86400, on_resume="restore")
-    controller = sandbox.commands.run("pgrep -af '[p]ython.*scripts/run_mixed_closed_loop.py' || true", timeout=30)
+
+    sandbox = Sandbox.connect(
+        state["sandbox_id"], api_key=creds["E2B_API_KEY"], timeout=86400, on_resume="restore"
+    )
+    controller = sandbox.commands.run(
+        "pgrep -af '[p]ython.*scripts/run_mixed_closed_loop.py' || true", timeout=30
+    )
     if controller.stdout.strip():
         print("ALREADY_RUNNING")
         return 0
-    probe = sandbox.commands.run("test -f /opt/hse-run/exit_code && cat /opt/hse-run/exit_code || true", timeout=30)
+    probe = sandbox.commands.run(
+        "test -f /opt/hse-run/exit_code && cat /opt/hse-run/exit_code || true", timeout=30
+    )
     exit_text = probe.stdout.strip()
     if exit_text and (not allow_failed or exit_text == "0"):
         print(f"ALREADY_FINISHED exit_code={exit_text}")
@@ -504,7 +672,9 @@ def resume(n: int, run_id: str, creds: dict[str, str], *, allow_failed: bool = F
     if policy.get("enabled"):
         extra_env = {
             "AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT": "1",
-            "AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS": str(int(policy.get("wall_guard_grace_seconds", 600))),
+            "AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS": str(
+                int(policy.get("wall_guard_grace_seconds", 600))
+            ),
         }
     extra_env["ROUND_DELIVERY_TIMEOUT_SEC"] = str(
         int((read_json(CONFIG).get("delivery") or {}).get("round_wait_seconds", 86400))
@@ -514,7 +684,8 @@ def resume(n: int, run_id: str, creds: dict[str, str], *, allow_failed: bool = F
         backup = "/opt/hse-run/recovery-overrides/auto-resume-" + stamp
         sandbox.commands.run(
             f"mkdir -p {backup} && mv /opt/hse-run/exit_code {backup}/exit_code.previous",
-            user="root", timeout=20,
+            user="root",
+            timeout=20,
         )
     command = start_remote(sandbox, True, extra_env=extra_env)
     state["resume_command_id"] = getattr(command, "cmd_id", None)
@@ -528,7 +699,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, choices=(1, 4, 8, 16, 32), required=True)
     parser.add_argument("--gitea-env", type=Path)
-    parser.add_argument("--gitea-source-sandbox-id", help="relay the validated Gitea credentials from an existing N=1 E2B sandbox")
+    parser.add_argument(
+        "--gitea-source-sandbox-id",
+        help="relay the validated Gitea credentials from an existing N=1 E2B sandbox",
+    )
     parser.add_argument("--run-id")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--allow-failed-resume", action="store_true")
@@ -537,7 +711,17 @@ def main() -> int:
     try:
         config = read_json(CONFIG)
         if args.dry_run:
-            print(json.dumps({"n": args.n, "rounds": config["rounds"], "profile": config["profiles"][str(args.n)]}, ensure_ascii=False, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "n": args.n,
+                        "rounds": config["rounds"],
+                        "profile": config["profiles"][str(args.n)],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
             return 0
         creds = credentials(
             args.gitea_env.expanduser().resolve() if args.gitea_env else None,

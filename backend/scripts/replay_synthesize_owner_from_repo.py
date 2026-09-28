@@ -103,7 +103,9 @@ def main() -> int:
         tracker.transition_issue(
             number, state="closed", labels=list(dict.fromkeys([*labels, DECLINED]))
         )
-        tracker.add_comment(number, "Replay artifact isolated before rerunning Synthesize and Owner.")
+        tracker.add_comment(
+            number, "Replay artifact isolated before rerunning Synthesize and Owner."
+        )
 
     before = tracker.list_open_issues()
     if sum(plane(issue.labels) == PROPOSAL for issue in before) != len(
@@ -117,16 +119,28 @@ def main() -> int:
     def event(role: str):
         def write(kind: str, text: str) -> None:
             with events.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({"role": role, "kind": kind, "text": text}, ensure_ascii=False) + "\n")
+                handle.write(
+                    json.dumps({"role": role, "kind": kind, "text": text}, ensure_ascii=False)
+                    + "\n"
+                )
+
         return write
 
     designer = Designer(
-        tracker, store, str(args.harness_repo), str(ROOT / "agent_defs" / "designer"),
-        on_event=event("designer"), round_provider=lambda: 1,
+        tracker,
+        store,
+        str(args.harness_repo),
+        str(ROOT / "agent_defs" / "designer"),
+        on_event=event("designer"),
+        round_provider=lambda: 1,
     )
     owner = Owner(
-        tracker, store, str(args.harness_repo), str(ROOT / "agent_defs" / "owner"),
-        on_event=event("owner"), review=True,
+        tracker,
+        store,
+        str(args.harness_repo),
+        str(ROOT / "agent_defs" / "owner"),
+        on_event=event("owner"),
+        review=True,
     )
     design = designer.propose_once()
     admission = owner.admit_once()

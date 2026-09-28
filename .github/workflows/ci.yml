@@ -41,6 +41,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
+      # The backend's tracer/workspace tests import the pinned NexAU runtime. Keep the
+      # dependency hermetic in CI instead of relying on a developer's sibling checkout.
+      - uses: actions/checkout@v4
+        with:
+          repository: nex-agi/NexAU
+          ref: 5cd791b1382f1163621c9ff0b50c2cf01c4ba923
+          path: .ci/nexau
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -49,7 +57,8 @@ jobs:
           uv venv
           uv pip install pytest requests ruamel.yaml jsonschema fastapi httpx pyyaml
           if [ -d backend/tests ] && [ -n "$(find backend/tests -name 'test_*.py' -print -quit)" ]; then
-            .venv/bin/pytest backend/tests/ -v
+            PYTHONPATH="$GITHUB_WORKSPACE/.ci/nexau:$GITHUB_WORKSPACE/backend" \
+              .venv/bin/pytest backend/tests/ -v
           else
             echo "尚无测试，跳过"
           fi

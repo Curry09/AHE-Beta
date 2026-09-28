@@ -76,20 +76,32 @@ def main() -> int:
         *gateway,
     ]
     command = [
-        "docker", "run", "-d", "--name", args.container,
-        "--network", "auto-designer-vigil-net",
-        "-v", f"{config}:/config:ro",
-        "-v", f"{entrypoint}:/entrypoint.sh:ro",
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        args.container,
+        "--network",
+        "auto-designer-vigil-net",
+        "-v",
+        f"{config}:/config:ro",
+        "-v",
+        f"{entrypoint}:/entrypoint.sh:ro",
     ]
     for key in passthrough:
         command += ["-e", key]
     for key in ("HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"):
         command += ["-e", f"{key}={proxy}"]
     command += [
-        "-e", "NO_PROXY=gitea,localhost,127.0.0.1",
-        "-e", "no_proxy=gitea,localhost,127.0.0.1",
-        "-e", "OPENAGENTS_PERMISSION_MODE=bypassPermissions",
-        "auto-designer-vigil:latest", "bash", "/entrypoint.sh",
+        "-e",
+        "NO_PROXY=gitea,localhost,127.0.0.1",
+        "-e",
+        "no_proxy=gitea,localhost,127.0.0.1",
+        "-e",
+        "OPENAGENTS_PERMISSION_MODE=bypassPermissions",
+        "auto-designer-vigil:latest",
+        "bash",
+        "/entrypoint.sh",
     ]
     subprocess.run(command, env=runtime_env, check=True)
     return 0

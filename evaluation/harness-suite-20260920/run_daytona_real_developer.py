@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import tarfile
@@ -12,8 +11,14 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from daytona import CreateSandboxFromImageParams, Daytona, DaytonaConfig, Image, Resources
-from daytona import SessionExecuteRequest
+from daytona import (
+    CreateSandboxFromImageParams,
+    Daytona,
+    DaytonaConfig,
+    Image,
+    Resources,
+    SessionExecuteRequest,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 OPENAGENTS = ROOT / "OpenAgents"
@@ -146,7 +151,13 @@ def main() -> int:
         code, stdout, stderr = wait_command(box, sid, started.cmd_id, 1800)
         (run_dir / "remote-stdout.log").write_text(stdout, encoding="utf-8")
         (run_dir / "remote-stderr.log").write_text(stderr, encoding="utf-8")
-        for name in ("real-developer.json", "developer-stdout.log", "developer-stderr.log", "gitea.log", "model-probe.log"):
+        for name in (
+            "real-developer.json",
+            "developer-stdout.log",
+            "developer-stderr.log",
+            "gitea.log",
+            "model-probe.log",
+        ):
             probe = box.process.exec(f"test -f /tmp/eval-output/{name}", timeout=30)
             if probe.exit_code == 0:
                 box.fs.download_file(f"/tmp/eval-output/{name}", str(run_dir / name))

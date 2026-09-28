@@ -56,10 +56,12 @@ class TimeAccounting:
     _finished: float | None = None
 
     @classmethod
-    def create(cls, enabled: bool, restored: dict | None = None) -> "TimeAccounting":
+    def create(cls, enabled: bool, restored: dict | None = None) -> TimeAccounting:
         saved = restored or {}
         return cls(
-            enabled=enabled, started=time.monotonic(), _lock=threading.Lock(),
+            enabled=enabled,
+            started=time.monotonic(),
+            _lock=threading.Lock(),
             _provider_wait_seconds=float(saved.get("provider_wait_ms", 0)) / 1000,
             _carried_wall_seconds=float(saved.get("wall_elapsed_ms", 0)) / 1000,
             _carried_active_seconds=float(saved.get("active_elapsed_ms", 0)) / 1000,
@@ -68,9 +70,7 @@ class TimeAccounting:
     def _settle(self, now: float) -> None:
         if self._provider_started is not None:
             self._provider_wait_seconds += max(0.0, now - self._provider_started)
-        self._provider_started = (
-            now if self._provider_depth and not self._tool_depth else None
-        )
+        self._provider_started = now if self._provider_depth and not self._tool_depth else None
 
     def tool_started(self) -> None:
         with self._lock:
@@ -128,9 +128,10 @@ class TimeAccounting:
                 "provider_wait_ms": round(provider * 1000, 3),
                 "provider_active": self._provider_depth > 0,
                 "provider_only_wait": self._provider_depth > 0 and not self._tool_depth,
-                "oldest_request_ms": round(max(
-                    (now - start for start in self._request_starts.values()), default=0
-                ) * 1000, 3),
+                "oldest_request_ms": round(
+                    max((now - start for start in self._request_starts.values()), default=0) * 1000,
+                    3,
+                ),
             }
 
     def active_seconds(self) -> float:
@@ -146,7 +147,9 @@ _time_accounting: contextvars.ContextVar[TimeAccounting | None] = contextvars.Co
 
 
 @contextlib.contextmanager
-def bind_time_accounting(*, enabled: bool, restored: dict | None = None) -> Iterator[TimeAccounting]:
+def bind_time_accounting(
+    *, enabled: bool, restored: dict | None = None
+) -> Iterator[TimeAccounting]:
     state = TimeAccounting.create(enabled=enabled, restored=restored)
     token = _time_accounting.set(state)
     try:
@@ -288,24 +291,35 @@ class UsageStore:
 
     def summary(self, **filters: object) -> dict[str, object]:
         events = self.events(**filters)
-        fields = ("input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "total_tokens")
-        totals = {field: sum(e.get(field) or 0 for e in events) for field in fields}
+        fields = (
+            "input_tokens",
+            "output_tokens",
+            "reasoning_tokens",
+            "cached_input_tokens",
+            "total_tokens",
+        )
+        totals = {metric: sum(e.get(metric) or 0 for e in events) for metric in fields}
         unavailable = sum(1 for e in events if e.get("usage_source") == "unavailable")
         groups: dict[str, dict[str, dict[str, int]]] = {
-            "by_role": {}, "by_agent": {}, "by_session": {}, "by_instance": {},
+            "by_role": {},
+            "by_agent": {},
+            "by_session": {},
+            "by_instance": {},
             "by_interaction": {},
         }
         for event in events:
             for group, key in (
-                ("by_role", "role"), ("by_agent", "agent_id"),
-                ("by_session", "session_id"), ("by_instance", "instance_id"),
+                ("by_role", "role"),
+                ("by_agent", "agent_id"),
+                ("by_session", "session_id"),
+                ("by_instance", "instance_id"),
                 ("by_interaction", "interaction_id"),
             ):
                 name = str(event.get(key) or "unknown")
                 bucket = groups[group].setdefault(
                     name,
                     {
-                        **{field: 0 for field in fields},
+                        **{metric: 0 for metric in fields},
                         "event_count": 0,
                         "unavailable_count": 0,
                     },
@@ -313,21 +327,31 @@ class UsageStore:
                 bucket["event_count"] += 1
                 if event.get("usage_source") == "unavailable":
                     bucket["unavailable_count"] += 1
-                for field in fields:
-                    bucket[field] += event.get(field) or 0
+                for metric in fields:
+                    bucket[metric] += event.get(metric) or 0
         return {"event_count": len(events), "unavailable_count": unavailable, **totals, **groups}
 
 
 def default_usage_store() -> UsageStore:
     configured = os.environ.get("AUTO_DESIGNER_USAGE_PATH", "").strip()
-    path = Path(configured) if configured else Path(__file__).resolve().parents[1] / "data" / "usage.jsonl"
+    path = (
+        Path(configured)
+        if configured
+        else Path(__file__).resolve().parents[1] / "data" / "usage.jsonl"
+    )
     return UsageStore(path)
 
 
 def record_usage(
-    *, usage: object = None, provider: str | None = None, model: str | None = None,
-    latency_ms: float | None = None, success: bool = True, error: object = None,
-    request_id: str | None = None, operation: str | None = None,
+    *,
+    usage: object = None,
+    provider: str | None = None,
+    model: str | None = None,
+    latency_ms: float | None = None,
+    success: bool = True,
+    error: object = None,
+    request_id: str | None = None,
+    operation: str | None = None,
 ) -> None:
     try:
         ctx = current_usage_context()

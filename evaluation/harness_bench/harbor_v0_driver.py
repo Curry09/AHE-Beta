@@ -30,9 +30,7 @@ def main() -> int:
             Path("/tmp/hse-v0-instruction.md").read_text(encoding="utf-8"),
             timeout=1800,
         )
-        Path("/logs/agent/harness-v0-reply.txt").write_text(
-            reply.text, encoding="utf-8"
-        )
+        Path("/logs/agent/harness-v0-reply.txt").write_text(reply.text, encoding="utf-8")
     finally:
         session.close()
     return 0

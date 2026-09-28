@@ -146,9 +146,7 @@ def main() -> int:
                 image=runtime_image,
                 resources=Resources(cpu=2, memory=6, disk=10),
                 ephemeral=True,
-                ttl_minutes=sandbox_ttl_minutes(
-                    timeouts.agent_seconds, minimum_minutes=60
-                ),
+                ttl_minutes=sandbox_ttl_minutes(timeouts.agent_seconds, minimum_minutes=60),
                 labels={"purpose": "swe-agent", "instance": instance_id},
                 env_vars={
                     "LLM_API_KEY": model_key,
@@ -166,12 +164,22 @@ def main() -> int:
         exec_logged(agent_box, run_dir, "agent-init", "mkdir -p /opt/harness /tmp/eval-output", 60)
         agent_box.fs.upload_file(str(HARNESS), "/tmp/harness.tar.gz")
         agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/stdio.py"), "/tmp/stdio.py")
-        agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/harbor_driver.py"), "/tmp/harness_driver.py")
-        agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/llm_user_simulator.py"), "/tmp/llm_user_simulator.py")
+        agent_box.fs.upload_file(
+            str(HERE / "adapters/harness_v0/harbor_driver.py"), "/tmp/harness_driver.py"
+        )
+        agent_box.fs.upload_file(
+            str(HERE / "adapters/harness_v0/llm_user_simulator.py"), "/tmp/llm_user_simulator.py"
+        )
         agent_box.fs.upload_file(row["problem_statement"].encode(), "/tmp/instruction.md")
         if not args.standard_input_only and not args.llm_user_simulator:
             agent_box.fs.upload_file(case["followup"].encode(), "/tmp/followup.md")
-        exec_logged(agent_box, run_dir, "harness-unpack", "tar -xzf /tmp/harness.tar.gz -C /opt/harness", 120)
+        exec_logged(
+            agent_box,
+            run_dir,
+            "harness-unpack",
+            "tar -xzf /tmp/harness.tar.gz -C /opt/harness",
+            120,
+        )
         followup_arg = (
             "--llm-user-simulator --user-simulator-output /tmp/eval-output/user-simulator.json "
             if args.llm_user_simulator
@@ -192,7 +200,11 @@ def main() -> int:
             remote_command_timeout(timeouts.agent_seconds),
         )
         manifest["agent_exit_code"] = code
-        download_artifacts(agent_box, run_dir, ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json"))
+        download_artifacts(
+            agent_box,
+            run_dir,
+            ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json"),
+        )
         if code != 0:
             raise RuntimeError(f"remote harness failed: {code}: {(stdout + stderr)[-3000:]}")
         patch = agent_box.process.exec("git -C /testbed diff --binary", timeout=120).result or ""
@@ -217,7 +229,9 @@ def main() -> int:
         manifest["grader_sandbox_id"] = grader_box.id
         grader_box.fs.upload_file(str(run_dir / "model.patch"), "/tmp/model.patch")
         grader_box.fs.upload_file(str(eval_script), "/tmp/eval.sh")
-        apply_result = grader_box.process.exec("cd /testbed && git apply /tmp/model.patch", timeout=120)
+        apply_result = grader_box.process.exec(
+            "cd /testbed && git apply /tmp/model.patch", timeout=120
+        )
         (run_dir / "grader-apply.log").write_text(apply_result.result or "", encoding="utf-8")
         if apply_result.exit_code != 0:
             raise RuntimeError(f"model patch did not apply in fresh grader: {apply_result.result}")
@@ -226,14 +240,16 @@ def main() -> int:
         (run_dir / "grader.log").write_text(grader_output, encoding="utf-8")
         marker = ">>>>> Test Exit Code: 0"
         resolved = marker in grader_output
-        manifest.update({
-            "grader_process_exit_code": grader.exit_code,
-            "official_test_exit_code": 0 if resolved else None,
-            "passed": resolved,
-            "controller_completed": True,
-            "fail_to_pass_total": len(json.loads(row["FAIL_TO_PASS"])),
-            "pass_to_pass_total": len(json.loads(row["PASS_TO_PASS"])),
-        })
+        manifest.update(
+            {
+                "grader_process_exit_code": grader.exit_code,
+                "official_test_exit_code": 0 if resolved else None,
+                "passed": resolved,
+                "controller_completed": True,
+                "fail_to_pass_total": len(json.loads(row["FAIL_TO_PASS"])),
+                "pass_to_pass_total": len(json.loads(row["PASS_TO_PASS"])),
+            }
+        )
         (run_dir / "result.json").write_text(
             json.dumps({"reward": int(resolved), "passed": resolved}, indent=2) + "\n",
             encoding="utf-8",
@@ -241,7 +257,14 @@ def main() -> int:
         print(f"RESULT reward={int(resolved)} passed={resolved}", flush=True)
         return 0 if resolved else 2
     except Exception as exc:
-        manifest.update({"controller_completed": False, "passed": False, "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()})
+        manifest.update(
+            {
+                "controller_completed": False,
+                "passed": False,
+                "error": f"{type(exc).__name__}: {exc}",
+                "traceback": traceback.format_exc(),
+            }
+        )
         print(f"RUN_ERROR {type(exc).__name__}: {exc}", flush=True)
         return 1
     finally:
@@ -253,7 +276,9 @@ def main() -> int:
                     client.delete(box, timeout=180, wait=True)
                     print(f"DELETED_{label.upper()} {box.id}", flush=True)
                 except Exception as exc:
-                    print(f"{label.upper()}_CLEANUP_WARNING {type(exc).__name__}: {exc}", flush=True)
+                    print(
+                        f"{label.upper()}_CLEANUP_WARNING {type(exc).__name__}: {exc}", flush=True
+                    )
 
 
 if __name__ == "__main__":

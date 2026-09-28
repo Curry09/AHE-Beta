@@ -22,7 +22,9 @@ def test_prebuilt_copies_and_relocates_text_metadata(tmp_path: Path) -> None:
         f"#!{source}/.venv/bin/python\n", encoding="utf-8"
     )
 
-    copied = Path(seed_source.provision(WorkspaceSpec(kind="prebuilt", params={"source": str(source)})))
+    copied = Path(
+        seed_source.provision(WorkspaceSpec(kind="prebuilt", params={"source": str(source)}))
+    )
 
     assert copied != source
     assert (copied / "payload.txt").read_text(encoding="utf-8") == "source\n"

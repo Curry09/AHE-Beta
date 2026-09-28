@@ -1,4 +1,5 @@
 """Create disposable databases; never overwrites an existing database."""
+
 import sqlite3
 from pathlib import Path
 

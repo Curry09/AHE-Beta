@@ -42,8 +42,14 @@ def preflight_root(root: Path) -> None:
 
 def safe_relative(value: str) -> str:
     path = PurePosixPath(value)
-    if (not value or path.is_absolute() or ".." in path.parts or "\\" in value
-            or any(ord(c) < 32 for c in value) or str(path) == "."):
+    if (
+        not value
+        or path.is_absolute()
+        or ".." in path.parts
+        or "\\" in value
+        or any(ord(c) < 32 for c in value)
+        or str(path) == "."
+    ):
         raise ValueError("invalid observation path")
     return str(path)
 
@@ -110,8 +116,10 @@ def archive_files(raw: bytes) -> dict[str, bytes]:
     if "manifest.json" not in files and files:
         roots = {PurePosixPath(name).parts[0] for name in files}
         if len(roots) == 1 and all(len(PurePosixPath(name).parts) > 1 for name in files):
-            files = {str(PurePosixPath(*PurePosixPath(name).parts[1:])): data
-                     for name, data in files.items()}
+            files = {
+                str(PurePosixPath(*PurePosixPath(name).parts[1:])): data
+                for name, data in files.items()
+            }
     return files
 
 
@@ -125,10 +133,14 @@ def local_files(root: Path) -> dict[str, bytes]:
         directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
             for part in parts[:-1]:
-                child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+                child = os.open(
+                    part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory
+                )
                 os.close(directory)
                 directory = child
-            descriptor = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+            descriptor = os.open(
+                parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory
+            )
         except OSError as exc:
             raise ValueError("unsafe or unavailable observation file") from exc
         finally:
@@ -153,8 +165,9 @@ def local_files(root: Path) -> dict[str, bytes]:
     return out
 
 
-def publish(*, root: Path, session_id: str, run_id: str, version: dict,
-            files: dict[str, bytes]) -> dict:
+def publish(
+    *, root: Path, session_id: str, run_id: str, version: dict, files: dict[str, bytes]
+) -> dict:
     """Atomically publish a validated run; never overwrite historical evidence."""
     for identifier in (session_id, run_id):
         if safe_relative(identifier) != identifier or "/" in identifier:
@@ -180,19 +193,28 @@ def publish(*, root: Path, session_id: str, run_id: str, version: dict,
         exported[name] = text.encode()
     if reading not in exported or sum(map(len, exported.values())) > MAX_BUNDLE:
         raise ValueError("missing reading guide or oversized bundle")
-    declared = [{"path": name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
-                for name, data in sorted(exported.items())]
-    manifest = {"session_id": session_id, "run_id": run_id, "artifact": version,
-                "reading": reading, "status": "complete" if artifact.get("status") == "complete" else "partial",
-                "files": declared, "redaction": "platform-filtered"}
+    declared = [
+        {"path": name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+        for name, data in sorted(exported.items())
+    ]
+    manifest = {
+        "session_id": session_id,
+        "run_id": run_id,
+        "artifact": version,
+        "reading": reading,
+        "status": "complete" if artifact.get("status") == "complete" else "partial",
+        "files": declared,
+        "redaction": "platform-filtered",
+    }
     session = root / session_id
     session.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (session / ".publish.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         dest = session / "runs" / run_id
         previous = list((session / "runs").glob("*/manifest.json"))
-        previous_count = sum(1 + len(json.loads(p.read_text())["files"])
-                             for p in previous if p.parent != dest)
+        previous_count = sum(
+            1 + len(json.loads(p.read_text())["files"]) for p in previous if p.parent != dest
+        )
         if previous_count + 1 + len(declared) > 256:
             raise ValueError("session observation index exceeds budget")
         if dest.exists():
@@ -220,25 +242,44 @@ def publish(*, root: Path, session_id: str, run_id: str, version: dict,
         for path in sorted((session / "runs").glob("*/manifest.json")):
             value = json.loads(path.read_text())
             prefix = path.parent.relative_to(session).as_posix()
-            index_files.append({"path": f"{prefix}/manifest.json",
-                                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-                                "bytes": path.stat().st_size})
+            index_files.append(
+                {
+                    "path": f"{prefix}/manifest.json",
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    "bytes": path.stat().st_size,
+                }
+            )
             index_files.extend({**e, "path": f"{prefix}/{e['path']}"} for e in value["files"])
-            runs.append({"run_id": value["run_id"], "artifact": value["artifact"],
-                         "manifest": f"{prefix}/manifest.json", "status": value["status"]})
+            runs.append(
+                {
+                    "run_id": value["run_id"],
+                    "artifact": value["artifact"],
+                    "manifest": f"{prefix}/manifest.json",
+                    "status": value["status"],
+                }
+            )
         if len(index_files) > 256:
             raise ValueError("session observation index exceeds budget")
         temp = session / ".index.tmp"
-        temp.write_text(json.dumps({"session_id": session_id, "runs": runs, "files": index_files}, ensure_ascii=False))
+        temp.write_text(
+            json.dumps(
+                {"session_id": session_id, "runs": runs, "files": index_files}, ensure_ascii=False
+            )
+        )
         temp.replace(session / "manifest.json")
-    return {"status": manifest["status"], "manifest": str(session / "manifest.json"), "run_id": run_id}
+    return {
+        "status": manifest["status"],
+        "manifest": str(session / "manifest.json"),
+        "run_id": run_id,
+    }
 
 
 class ObservationSource:
     """Bind trusted launch provenance and collect without knowing the runtime schema."""
 
-    def __init__(self, *, directory: str, container_id: str | None, version: dict,
-                 expected: bool = True) -> None:
+    def __init__(
+        self, *, directory: str, container_id: str | None, version: dict, expected: bool = True
+    ) -> None:
         self.directory = directory
         self.container_id = container_id
         self.version = dict(version)
@@ -251,19 +292,45 @@ class ObservationSource:
         error = None
         for _ in range(2):
             try:
-                files = (archive_files(bounded_command(
-                    ["docker", "cp", f"{self.container_id}:{self.directory}/.", "-"],
-                    timeout=10, limit=MAX_BUNDLE,
-                )) if self.container_id else local_files(Path(self.directory)))
-                return publish(root=root, session_id=session_id, run_id=self.run_id,
-                               version=self.version, files=files)
-            except (OSError, ValueError, KeyError, TypeError, RecursionError, TimeoutError, tarfile.TarError) as exc:
+                files = (
+                    archive_files(
+                        bounded_command(
+                            ["docker", "cp", f"{self.container_id}:{self.directory}/.", "-"],
+                            timeout=10,
+                            limit=MAX_BUNDLE,
+                        )
+                    )
+                    if self.container_id
+                    else local_files(Path(self.directory))
+                )
+                return publish(
+                    root=root,
+                    session_id=session_id,
+                    run_id=self.run_id,
+                    version=self.version,
+                    files=files,
+                )
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                TypeError,
+                RecursionError,
+                TimeoutError,
+                tarfile.TarError,
+            ) as exc:
                 error = type(exc).__name__
         # Infrastructure failures do not become harness evolution proposals.
-        receipt = {"status": "unavailable", "reason": error, "run_id": self.run_id,
-                   "session_id": session_id, "artifact": self.version,
-                   "source_directory": self.directory, "container_id": self.container_id,
-                   "retain_source": True}
+        receipt = {
+            "status": "unavailable",
+            "reason": error,
+            "run_id": self.run_id,
+            "session_id": session_id,
+            "artifact": self.version,
+            "source_directory": self.directory,
+            "container_id": self.container_id,
+            "retain_source": True,
+        }
         root.mkdir(parents=True, exist_ok=True)
         receipts = root / "collection-failures"
         receipts.mkdir(exist_ok=True, mode=0o700)
@@ -279,8 +346,11 @@ def recover(*, receipt_path: Path, root: Path) -> dict:
     receipt = json.loads(receipt_path.read_text())
     if receipt.get("status") != "unavailable" or not receipt.get("retain_source"):
         raise ValueError("not an observation recovery receipt")
-    source = ObservationSource(directory=receipt["source_directory"], container_id=receipt["container_id"],
-                               version=receipt["artifact"])
+    source = ObservationSource(
+        directory=receipt["source_directory"],
+        container_id=receipt["container_id"],
+        version=receipt["artifact"],
+    )
     source.run_id = receipt["run_id"]
     result = source.collect(root=root, session_id=receipt["session_id"])
     if result["status"] != "unavailable":

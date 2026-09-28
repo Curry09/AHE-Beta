@@ -202,8 +202,10 @@ class ObservationProvider:
                 raise ValueError("observation file changed to a symlink")
             for selected_path in selected:
                 expected = self.digests.get(selected_path)
-                if expected and (selected_path.stat().st_size > 4_500_000 or
-                        hashlib.sha256(selected_path.read_bytes()).hexdigest() != expected):
+                if expected and (
+                    selected_path.stat().st_size > 4_500_000
+                    or hashlib.sha256(selected_path.read_bytes()).hexdigest() != expected
+                ):
                     raise ValueError("observation integrity mismatch")
             if tool == "read_file":
                 content = self._read(path, parameters=parameters)

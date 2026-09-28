@@ -8,7 +8,7 @@ import pytest
 from adapters.harness_v0.llm_user_simulator import _content_text
 from adapters.harness_v0.stdio import HarnessProtocolError, HarnessStdioSession
 
-FAKE_HARNESS = r'''
+FAKE_HARNESS = r"""
 import json
 import sys
 
@@ -19,7 +19,7 @@ for raw in sys.stdin:
     print(json.dumps({"type": "usage", "success": True, "error": None}), flush=True)
     print(json.dumps({"type": "progress", "kind": "tool", "text": f"turn-{turn}"}), flush=True)
     print(json.dumps({"type": "reply", "text": f"reply:{obj['text']}:{turn}"}), flush=True)
-'''
+"""
 
 
 def test_stdio_session_keeps_one_process_across_turns(tmp_path: Path) -> None:
@@ -103,6 +103,4 @@ def test_tau_marker_rejects_unknown_tool() -> None:
         api_key="not-used-by-this-unit-test",
     )
     with pytest.raises(ValueError, match="unknown"):
-        agent._parse_tool_call(
-            '<TAU3_TOOL_CALL>{"name":"missing","arguments":{}}</TAU3_TOOL_CALL>'
-        )
+        agent._parse_tool_call('<TAU3_TOOL_CALL>{"name":"missing","arguments":{}}</TAU3_TOOL_CALL>')

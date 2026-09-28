@@ -51,14 +51,15 @@ def _relocate_venv(*, dest: Path, old_root: Path) -> None:
     candidates: list[Path] = [venv / "pyvenv.cfg"]
     bin_dir = venv / "bin"
     if bin_dir.is_dir():
-        candidates.extend(path for path in bin_dir.iterdir() if path.is_file() and not path.is_symlink())
+        candidates.extend(
+            path for path in bin_dir.iterdir() if path.is_file() and not path.is_symlink()
+        )
     lib_dir = venv / "lib"
     if lib_dir.is_dir():
         candidates.extend(
             path
             for path in lib_dir.rglob("*")
-            if path.is_file()
-            and (path.suffix in _TEXT_SUFFIXES or path.name == "direct_url.json")
+            if path.is_file() and (path.suffix in _TEXT_SUFFIXES or path.name == "direct_url.json")
         )
 
     for path in candidates:

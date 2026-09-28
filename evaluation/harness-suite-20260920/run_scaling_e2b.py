@@ -6,6 +6,7 @@ trusted per-N runtime receipt and an executor command supplied by that bundle.
 The launcher never silently substitutes the N=1 SWE-only runner for N>1 and
 refuses multi-N starts; operators run one wrapper per terminal.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -121,11 +122,21 @@ def gate(rows: list[dict]) -> list[str]:
         if not isinstance(profile, dict):
             errors.append(f"N{row['n']} 缺 roster profile")
         else:
-            for field in ("user", "task_parallel", "triager", "designer", "developer", "owner", "pm"):
+            for field in (
+                "user",
+                "task_parallel",
+                "triager",
+                "designer",
+                "developer",
+                "owner",
+                "pm",
+            ):
                 if not isinstance(profile.get(field), int) or profile[field] < 0:
                     errors.append(f"N{row['n']}.{field} 必须是非负整数")
             if profile.get("user") != row["task_count"]:
-                errors.append(f"N{row['n']} user roster={profile.get('user')} != task_count={row['task_count']}")
+                errors.append(
+                    f"N{row['n']} user roster={profile.get('user')} != task_count={row['task_count']}"
+                )
         receipt = Path(row["runtime_receipt"])
         inventory = receipt.parent / "bundle-inventory.json"
         if inventory.is_file():
@@ -161,7 +172,10 @@ def gate(rows: list[dict]) -> list[str]:
                 errors.append(f"N{row['n']} receipt E2B template alias mismatch")
             if actual.get("template_build_id") != e2b.get("template_build_id"):
                 errors.append(f"N{row['n']} receipt E2B template build mismatch")
-            if actual.get("profile") != expected_profile or actual.get("resources") != expected_resources:
+            if (
+                actual.get("profile") != expected_profile
+                or actual.get("resources") != expected_resources
+            ):
                 errors.append(f"N{row['n']} receipt E2B resource profile mismatch")
     if not launch.get("preflight_all_selected_before_any_start"):
         errors.append("配置未开启 all-selected preflight gate")
@@ -215,7 +229,12 @@ def run_one(row: dict, command: list[str], resume: bool) -> dict:
     path = SUITE / "runs" / "scaling-e2b-20260922" / f"n{n}" / "controller.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(stdout, encoding="utf-8")
-    return {"n": n, "experiment_id": row["experiment_id"], "returncode": process.returncode, "log": str(path)}
+    return {
+        "n": n,
+        "experiment_id": row["experiment_id"],
+        "returncode": process.returncode,
+        "log": str(path),
+    }
 
 
 def main() -> int:
@@ -225,7 +244,9 @@ def main() -> int:
     parser.add_argument("--check-launch", action="store_true")
     parser.add_argument("--start", action="store_true")
     parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--executor", help="trusted bundle command, supports {n} and {experiment_id}")
+    parser.add_argument(
+        "--executor", help="trusted bundle command, supports {n} and {experiment_id}"
+    )
     args = parser.parse_args()
     if args.start and args.resume:
         parser.error("--start 与 --resume 不能同时使用")
@@ -243,7 +264,9 @@ def main() -> int:
                 print("LAUNCH_GATE_ERROR:", error, file=os.sys.stderr)
             return 2
         if args.check_launch and not (args.start or args.resume):
-            print(json.dumps({"launchable": True, "experiments": rows}, ensure_ascii=False, indent=2))
+            print(
+                json.dumps({"launchable": True, "experiments": rows}, ensure_ascii=False, indent=2)
+            )
             return 0
         if not args.executor:
             raise LaunchGateError("--start/--resume 需要 --executor，不能默认替换成 N=1 runner")
@@ -254,7 +277,13 @@ def main() -> int:
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(rows)) as pool:
             futures = [pool.submit(run_one, row, command, action_resume) for row in rows]
             results = [future.result() for future in futures]
-        print(json.dumps({"started_at": datetime.now(UTC).isoformat(), "results": results}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {"started_at": datetime.now(UTC).isoformat(), "results": results},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0 if all(item["returncode"] == 0 for item in results) else 1
     except (OSError, KeyError, ValueError, json.JSONDecodeError, LaunchGateError) as exc:
         print(f"LAUNCH_ERROR: {exc}", file=os.sys.stderr)

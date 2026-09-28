@@ -55,7 +55,11 @@ CASES = {
         "agent_image": "python:3.13-slim-bookworm",
         "agent_bootstrap": "apt-get update && apt-get install -y --no-install-recommends bash git ca-certificates && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir pyyaml==6.0.2",
         "agent_fixture": ("environment/data", "/app/data"),
-        "artifacts": ["output/erp_writeback.sql", "output/mes_writeback.sql", "output/wms_writeback.sql"],
+        "artifacts": [
+            "output/erp_writeback.sql",
+            "output/mes_writeback.sql",
+            "output/wms_writeback.sql",
+        ],
         "followup": (
             "Before I accept this, replay-check all three writeback files against the "
             "ERP, MES, and WMS constraints, including capacities, inventory, dates, "
@@ -155,15 +159,31 @@ def main() -> int:
         fixture_from, fixture_to = case["agent_fixture"]
         upload_tree(agent_box, task / fixture_from, fixture_to)
         if task_name == "production-planning":
-            exec_logged(agent_box, run_dir, "fixture-permissions", "chmod +x /app/data/dbgw.py && mkdir -p /app/output", 60)
+            exec_logged(
+                agent_box,
+                run_dir,
+                "fixture-permissions",
+                "chmod +x /app/data/dbgw.py && mkdir -p /app/output",
+                60,
+            )
         agent_box.fs.upload_file(str(HARNESS), "/tmp/harness.tar.gz")
         agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/stdio.py"), "/app/stdio.py")
-        agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/harbor_driver.py"), "/app/harness_driver.py")
-        agent_box.fs.upload_file(str(HERE / "adapters/harness_v0/llm_user_simulator.py"), "/app/llm_user_simulator.py")
+        agent_box.fs.upload_file(
+            str(HERE / "adapters/harness_v0/harbor_driver.py"), "/app/harness_driver.py"
+        )
+        agent_box.fs.upload_file(
+            str(HERE / "adapters/harness_v0/llm_user_simulator.py"), "/app/llm_user_simulator.py"
+        )
         agent_box.fs.upload_file(str(task / "instruction.md"), "/app/instruction.md")
         if not args.standard_input_only and not args.llm_user_simulator:
             agent_box.fs.upload_file(case["followup"].encode(), "/app/followup.md")
-        exec_logged(agent_box, run_dir, "harness-unpack", "tar -xzf /tmp/harness.tar.gz -C /app/harness-v0", 120)
+        exec_logged(
+            agent_box,
+            run_dir,
+            "harness-unpack",
+            "tar -xzf /tmp/harness.tar.gz -C /app/harness-v0",
+            120,
+        )
         followup_arg = (
             "--llm-user-simulator --user-simulator-output /tmp/eval-output/user-simulator.json "
             if args.llm_user_simulator
@@ -183,7 +203,11 @@ def main() -> int:
             remote_command_timeout(timeouts.agent_seconds),
         )
         manifest["agent_exit_code"] = code
-        download_artifacts(agent_box, run_dir, ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json"))
+        download_artifacts(
+            agent_box,
+            run_dir,
+            ("harness-transcript.jsonl", "harness-stderr.log", "user-simulator.json"),
+        )
         if code != 0:
             raise RuntimeError(f"remote harness failed: {code}: {(stdout + stderr)[-3000:]}")
         missing = []
@@ -202,7 +226,11 @@ def main() -> int:
 
         if missing:
             manifest.update({"controller_completed": True, "reward": 0, "passed": False})
-            (run_dir / "result.json").write_text(json.dumps({"reward": 0, "passed": False, "missing_artifacts": missing}, indent=2) + "\n", encoding="utf-8")
+            (run_dir / "result.json").write_text(
+                json.dumps({"reward": 0, "passed": False, "missing_artifacts": missing}, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
             print(f"RESULT reward=0 passed=False missing={missing}", flush=True)
             return 2
 
@@ -231,12 +259,28 @@ def main() -> int:
         )
         (run_dir / "grader.log").write_text(grader.result or "", encoding="utf-8")
         reward = int(grader_box.fs.download_file("/logs/verifier/reward.txt").decode().strip())
-        manifest.update({"grader_exit_code": grader.exit_code, "reward": reward, "passed": reward == 1, "controller_completed": True})
-        (run_dir / "result.json").write_text(json.dumps({"reward": reward, "passed": reward == 1}, indent=2) + "\n", encoding="utf-8")
+        manifest.update(
+            {
+                "grader_exit_code": grader.exit_code,
+                "reward": reward,
+                "passed": reward == 1,
+                "controller_completed": True,
+            }
+        )
+        (run_dir / "result.json").write_text(
+            json.dumps({"reward": reward, "passed": reward == 1}, indent=2) + "\n", encoding="utf-8"
+        )
         print(f"RESULT reward={reward} passed={reward == 1}", flush=True)
         return 0 if reward == 1 else 2
     except Exception as exc:
-        manifest.update({"controller_completed": False, "passed": False, "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()})
+        manifest.update(
+            {
+                "controller_completed": False,
+                "passed": False,
+                "error": f"{type(exc).__name__}: {exc}",
+                "traceback": traceback.format_exc(),
+            }
+        )
         print(f"RUN_ERROR {type(exc).__name__}: {exc}", flush=True)
         return 1
     finally:
@@ -248,7 +292,9 @@ def main() -> int:
                     client.delete(box, timeout=180, wait=True)
                     print(f"DELETED_{label.upper()} {box.id}", flush=True)
                 except Exception as exc:
-                    print(f"{label.upper()}_CLEANUP_WARNING {type(exc).__name__}: {exc}", flush=True)
+                    print(
+                        f"{label.upper()}_CLEANUP_WARNING {type(exc).__name__}: {exc}", flush=True
+                    )
 
 
 if __name__ == "__main__":

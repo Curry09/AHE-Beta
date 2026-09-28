@@ -532,8 +532,11 @@ class _HarnessHandle:
         self._awaiting_reply = False
         if self._proc is None:
             return
-        if (getattr(getattr(self, "observation_source", None), "expected", False)
-                and self._protocol == "stdio-jsonl-v1" and self._proc.poll() is None):
+        if (
+            getattr(getattr(self, "observation_source", None), "expected", False)
+            and self._protocol == "stdio-jsonl-v1"
+            and self._proc.poll() is None
+        ):
             try:
                 self._write(self._shutdown_frame())
                 self._proc.wait(timeout=1)
@@ -612,8 +615,11 @@ class HarnessLauncher:
         source = ObservationSource(
             directory=observation_dir,
             container_id=runtime.container_id if is_docker else None,
-            version={"harness_sha": sha, "image_digest": runtime.image_digest if is_docker else None,
-                     "observation_framework_sha256": self._observation_framework_pin},
+            version={
+                "harness_sha": sha,
+                "image_digest": runtime.image_digest if is_docker else None,
+                "observation_framework_sha256": self._observation_framework_pin,
+            },
             expected=params.get("observations") == "artifact-observations-v1",
         )
         if is_docker and source.expected:

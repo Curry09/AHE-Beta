@@ -14,7 +14,6 @@ from pathlib import Path
 from harbor.agents.base import AgentContext, BaseAgent
 from harbor.environments.base import BaseEnvironment
 
-
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ARCHIVE = ROOT / ".artifacts" / "harness-v0-cade14d.tar.gz"
 BACKEND_ROOT = ROOT / "backend" / "auto_designer"
@@ -60,9 +59,7 @@ class HarborHistoricalUserAgent(BaseAgent):
 
     def _outer_timeout(self) -> tuple[int, int]:
         official = int(self._value("HSE_OFFICIAL_AGENT_TIMEOUT_SECONDS", "1800"))
-        configured = int(
-            self._value("HSE_OUTER_AGENT_TIMEOUT_SECONDS", str(official + 600))
-        )
+        configured = int(self._value("HSE_OUTER_AGENT_TIMEOUT_SECONDS", str(official + 600)))
         expected = official + 600
         if configured != expected:
             raise ValueError(
@@ -137,15 +134,11 @@ class HarborHistoricalUserAgent(BaseAgent):
             # exposes that protocol at the gateway root, while the other roles
             # use its OpenAI-compatible /v1 endpoint.
             "ANTHROPIC_MODEL": self._value("ANTHROPIC_MODEL", "glm-5.3"),
-            "ANTHROPIC_SMALL_FAST_MODEL": self._value(
-                "ANTHROPIC_SMALL_FAST_MODEL", "glm-5.3"
-            ),
+            "ANTHROPIC_SMALL_FAST_MODEL": self._value("ANTHROPIC_SMALL_FAST_MODEL", "glm-5.3"),
             "ANTHROPIC_BASE_URL": self._value("ANTHROPIC_BASE_URL"),
             "ANTHROPIC_AUTH_TOKEN": self._value("ANTHROPIC_AUTH_TOKEN"),
             "HSE_PERSONA_ID": self._value("HSE_PERSONA_ID", "sr-01-willison"),
-            "HSE_TASK_INSTANCE": self._value(
-                "HSE_TASK_INSTANCE", "pvlib__pvlib-python-1478"
-            ),
+            "HSE_TASK_INSTANCE": self._value("HSE_TASK_INSTANCE", "pvlib__pvlib-python-1478"),
             "HSE_OFFICIAL_AGENT_TIMEOUT_SECONDS": str(official_timeout),
             "HSE_OUTER_AGENT_TIMEOUT_SECONDS": str(outer_timeout),
             "PYTHONUNBUFFERED": "1",
@@ -174,4 +167,6 @@ class HarborHistoricalUserAgent(BaseAgent):
                 timeout_sec=30,
                 user="root",
             )
-            raise RuntimeError(result.stderr or result.stdout or diagnostics.stdout or "historical-user failed")
+            raise RuntimeError(
+                result.stderr or result.stdout or diagnostics.stdout or "historical-user failed"
+            )

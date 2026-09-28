@@ -85,9 +85,7 @@ def main() -> int:
                 image="python:3.12-slim-bookworm",
                 resources=Resources(cpu=2, memory=6, disk=10),
                 ephemeral=True,
-                ttl_minutes=sandbox_ttl_minutes(
-                    1800, timeouts.agent_seconds, minimum_minutes=90
-                ),
+                ttl_minutes=sandbox_ttl_minutes(1800, timeouts.agent_seconds, minimum_minutes=90),
                 labels={"purpose": "tau3-harness-v0-preflight", "domain": args.domain},
                 env_vars={
                     "OPENROUTER_API_KEY": model_key,
@@ -110,7 +108,9 @@ def main() -> int:
         print(f"CREATED {sandbox.id}", flush=True)
         sandbox.process.exec("mkdir -p /opt/pilot", timeout=30)
         sandbox.fs.upload_file(str(HARNESS), "/opt/pilot/harness-v0.tar.gz")
-        sandbox.fs.upload_file(str(HERE / "remote_tau3_runner.py"), "/opt/pilot/remote_tau3_runner.py")
+        sandbox.fs.upload_file(
+            str(HERE / "remote_tau3_runner.py"), "/opt/pilot/remote_tau3_runner.py"
+        )
         for path in sorted((HERE / "adapters").rglob("*.py")):
             remote = "/opt/pilot/" + str(path.relative_to(HERE))
             parent = os.path.dirname(remote)
@@ -144,8 +144,8 @@ def main() -> int:
             sandbox,
             run_dir,
             "version-check",
-            "/opt/tau-venv/bin/python -c \"import tau2; print(tau2.__file__)\" "
-            "&& /opt/harness-venv/bin/python -c \"import nexau; print(nexau.__file__)\"",
+            '/opt/tau-venv/bin/python -c "import tau2; print(tau2.__file__)" '
+            '&& /opt/harness-venv/bin/python -c "import nexau; print(nexau.__file__)"',
             120,
         )
         agent_exit, agent_stdout, agent_stderr = exec_async_logged(
@@ -172,8 +172,7 @@ def main() -> int:
         manifest["agent_exit_code"] = agent_exit
         if agent_exit != 0:
             raise RuntimeError(
-                f"remote tau3 runner failed: {agent_exit}: "
-                f"{(agent_stdout + agent_stderr)[-3000:]}"
+                f"remote tau3 runner failed: {agent_exit}: {(agent_stdout + agent_stderr)[-3000:]}"
             )
         manifest["controller_completed"] = True
         return 0

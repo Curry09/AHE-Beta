@@ -86,7 +86,9 @@ def _submit(decisions: list) -> str:
     return json.dumps({"decisions": decisions}, ensure_ascii=False)
 
 
-def _owner_recovery(tmp_path: Path, *, designer_proposals: list[int] | None = None) -> RecoveryStore:
+def _owner_recovery(
+    tmp_path: Path, *, designer_proposals: list[int] | None = None
+) -> RecoveryStore:
     store = RecoveryStore.initialize(
         root=tmp_path / "recovery",
         identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),

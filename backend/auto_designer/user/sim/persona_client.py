@@ -165,7 +165,9 @@ class ApiPersonaClient:
                 # rejects ``enable_thinking=false`` with HTTP 400.  Do not
                 # spend a retry on a parameter that is known to be invalid;
                 # other OpenAI-compatible gateways keep the historical flag.
-                if not reasoning_effort and not self.model.lower().startswith(("glm-5.2", "glm-5.3")):
+                if not reasoning_effort and not self.model.lower().startswith(
+                    ("glm-5.2", "glm-5.3")
+                ):
                     request["extra_body"] = {"enable_thinking": False}
                 with provider_wait_scope():
                     response = self.client.chat.completions.create(**request)

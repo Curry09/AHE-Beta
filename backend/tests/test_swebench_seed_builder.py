@@ -58,13 +58,7 @@ def test_load_pool_requires_unique_instances_and_matching_difficulty(tmp_path, m
     assert enriched[0]["base_commit"] == "abc"
 
     manifest.write_text(
-        json.dumps(
-            {
-                "instances": [
-                    {"instance_id": "repo__issue-1", "difficulty": "medium"}
-                ]
-            }
-        ),
+        json.dumps({"instances": [{"instance_id": "repo__issue-1", "difficulty": "medium"}]}),
         encoding="utf-8",
     )
     with pytest.raises(SystemExit, match="difficulty mismatch"):
@@ -77,9 +71,7 @@ def test_state_write_replaces_document_without_leaving_temporary_file(tmp_path) 
     module._write_state(path, {"instances": {"one": {"stage": "source"}}})
     module._write_state(path, {"instances": {"two": {"stage": "dependencies"}}})
 
-    assert module._read_state(path) == {
-        "instances": {"two": {"stage": "dependencies"}}
-    }
+    assert module._read_state(path) == {"instances": {"two": {"stage": "dependencies"}}}
     assert not path.with_suffix(".tmp").exists()
 
 
@@ -102,8 +94,6 @@ def test_setup_uses_the_running_python_interpreter() -> None:
 def test_setup_allows_a_pinned_legacy_python() -> None:
     module = _module()
 
-    commands = module._setup_commands(
-        {"repo": "owner/repo", "setup_python": "python3.10"}
-    )
+    commands = module._setup_commands({"repo": "owner/repo", "setup_python": "python3.10"})
 
     assert commands[0] == "python3.10 -m venv .venv"

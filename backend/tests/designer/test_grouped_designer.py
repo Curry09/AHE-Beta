@@ -267,8 +267,12 @@ def test_delivery_gap_ingestion_precedes_designer_snapshot(tmp_path, monkeypatch
 def test_single_designer_includes_triage_and_delivery_gaps(tmp_path, monkeypatch):
     tracker = FakeTracker()
     tracker.create_issue(IssueDraft(title="current", body="summary", labels=[PROPOSAL, "round-4"]))
-    tracker.create_issue(IssueDraft(title="triage gap", body="summary", labels=[PROPOSAL, "observation-gap"]))
-    tracker.create_issue(IssueDraft(title="old ordinary", body="summary", labels=[PROPOSAL, "round-3"]))
+    tracker.create_issue(
+        IssueDraft(title="triage gap", body="summary", labels=[PROPOSAL, "observation-gap"])
+    )
+    tracker.create_issue(
+        IssueDraft(title="old ordinary", body="summary", labels=[PROPOSAL, "round-3"])
+    )
     seen = []
 
     def ingest(*, store, tracker):
@@ -284,7 +288,10 @@ def test_single_designer_includes_triage_and_delivery_gaps(tmp_path, monkeypatch
     monkeypatch.setattr("auto_designer.observations.delivery_gaps.ingest_delivery_gaps", ingest)
     monkeypatch.setattr(Designer, "_run_agent", run_agent)
     designer = Designer(
-        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path), str(tmp_path),
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path),
+        str(tmp_path),
         round_provider=lambda: 4,
     )
     designer.propose_once()

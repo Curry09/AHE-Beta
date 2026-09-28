@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
-import shlex
 import subprocess
 import sys
 from dataclasses import asdict
@@ -15,10 +13,10 @@ from auto_designer.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D2Domain,
+    D5Autonomy,
     D41Grain,
     D42Supervise,
     D43Correct,
-    D5Autonomy,
     Persona,
     TimeTemperament,
     finalize_persona,
@@ -26,7 +24,6 @@ from auto_designer.user.sim.dimensions import (
 from auto_designer.user.sim.loop import run_session
 from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
 from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
-
 
 TASK = (
     "I've got a small Python billing module (billing/core.py) in my project. Add a "
@@ -42,7 +39,9 @@ def persona() -> Persona:
             d1=D1Eval.EXPERT,
             d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR),
             d41=D41Grain.SPEC_LEVEL,
-            d42=D42Supervise.DURING if hasattr(D42Supervise, "DURING") else D42Supervise.PHASE_CHECK,
+            d42=D42Supervise.DURING
+            if hasattr(D42Supervise, "DURING")
+            else D42Supervise.PHASE_CHECK,
             d43=D43Correct.FILE_ISSUE,
             d5=D5Autonomy.COLLABORATIVE,
             tempo=TimeTemperament.STEADY,
@@ -52,7 +51,6 @@ def persona() -> Persona:
 
 def main() -> int:
     harness_dir = Path("/opt/harness")
-    params = harness_dir / "params.yaml"
     # The pinned archive's entry is fixed to python3 entry.py and stdio-jsonl-v1.
     handle = _HarnessHandle(
         entry=["/opt/harness-venv/bin/python", "entry.py"],
@@ -87,7 +85,11 @@ def main() -> int:
             "interaction_status": result.interaction_status,
             "goal_ledger": result.goal_ledger,
             "persona_tail": result.persona_tail,
-            "workspace": {"cwd": ws.cwd, "patch_sha256": patch_sha, "patch_bytes": len(patch.encode())},
+            "workspace": {
+                "cwd": ws.cwd,
+                "patch_sha256": patch_sha,
+                "patch_bytes": len(patch.encode()),
+            },
         }
         Path("/tmp/eval-output/result.json").write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, default=str) + "\n",
@@ -96,7 +98,11 @@ def main() -> int:
         # Smoke objective: the user mechanism is the primary assertion; this check only
         # confirms that the produced workspace can execute the requested function.
         check = subprocess.run(
-            [sys.executable, "-c", "from billing.core import split_bill; x=split_bill(100,3); assert sum(x)==100; print(x)"],
+            [
+                sys.executable,
+                "-c",
+                "from billing.core import split_bill; x=split_bill(100,3); assert sum(x)==100; print(x)",
+            ],
             cwd="/testbed",
             capture_output=True,
             text=True,

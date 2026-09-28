@@ -20,7 +20,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -51,7 +50,7 @@ def experiment_name(run_id: str) -> str:
             return f"Scaling N={n}（补跑设计开发＋第6轮）"
         if n:
             return f"Scaling N={n}（5轮混合实验）"
-        identity = (value.get("identity") or {})
+        identity = value.get("identity") or {}
         experiment_id = str(identity.get("experiment_id") or "")
         if experiment_id:
             return experiment_id
@@ -188,7 +187,16 @@ def _normalized_state(value: dict | None, *, default: str = "pending") -> str:
         return "running"
     if raw in {"failed", "error", "timeout", "timed_out", "失败", "超时"}:
         return "failed"
-    if raw in {"completed", "complete", "done", "finished", "success", "succeeded", "已完成", "完成"}:
+    if raw in {
+        "completed",
+        "complete",
+        "done",
+        "finished",
+        "success",
+        "succeeded",
+        "已完成",
+        "完成",
+    }:
         return "finished"
     return default
 
@@ -199,53 +207,80 @@ def proposal_progress(current_round: dict, runtime: dict, timing_text: str) -> d
     A producer's repeated `in-flight` is only liveness, never a completion
     signal. Do not count every delivery_wait/running unit as an active worker.
     """
-    units = _unit_rows(((current_round.get('stages') or {}).get('delivery_wait') or {}).get('units'))
-    by_issue = {u.get('input', {}).get('issue'): u for u in units}
-    admitted = current_round.get('admitted_issue_ids')
+    units = _unit_rows(
+        ((current_round.get("stages") or {}).get("delivery_wait") or {}).get("units")
+    )
+    by_issue = {u.get("input", {}).get("issue"): u for u in units}
+    admitted = current_round.get("admitted_issue_ids")
     if admitted is None:
         admitted = list(by_issue)
     numbers = sorted({n for n in admitted if isinstance(n, int) and not isinstance(n, bool)})
     latest, actions = {}, {}
     for line in timing_text.splitlines():
         row = _json(line)
-        if not isinstance(row, dict) or row.get('issue') not in numbers:
+        if not isinstance(row, dict) or row.get("issue") not in numbers:
             continue
-        number = row['issue']
-        if str(row.get('at', '')) >= str(latest.get(number, {}).get('at', '')):
+        number = row["issue"]
+        if str(row.get("at", "")) >= str(latest.get(number, {}).get("at", "")):
             latest[number] = row
-        if row.get('phase') not in {'in-flight', 'ready'}:
+        if row.get("phase") not in {"in-flight", "ready"}:
             actions[number] = row
-    runs = runtime.get('runs') or {}
+    runs = runtime.get("runs") or {}
     rows = []
     for number in numbers:
         unit = by_issue.get(number) or {}
         event = latest.get(number) or {}
         run = runs.get(str(number)) or {}
-        phase = event.get('phase')
-        ledger_status = unit.get('status', 'pending')
-        if ledger_status == 'completed':
-            state = 'completed'
-        elif ledger_status in {'failed', 'blocked'}:
+        phase = event.get("phase")
+        ledger_status = unit.get("status", "pending")
+        if ledger_status == "completed":
+            state = "completed"
+        elif ledger_status in {"failed", "blocked"}:
             state = ledger_status
-        elif run.get('status') == 'done':
-            state = 'awaiting_confirmation'
-        elif phase == 'ready':
-            state = 'ready'
-        elif phase in {'in-flight', 'solve', 'rebase', 'fix-ci', 'e2e', 'review-or-fix', 'merge', 'reply'}:
-            state = 'processing'
+        elif run.get("status") == "done":
+            state = "awaiting_confirmation"
+        elif phase == "ready":
+            state = "ready"
+        elif phase in {
+            "in-flight",
+            "solve",
+            "rebase",
+            "fix-ci",
+            "e2e",
+            "review-or-fix",
+            "merge",
+            "reply",
+        }:
+            state = "processing"
         else:
-            state = 'unknown'
+            state = "unknown"
         action = actions.get(number) or {}
-        rows.append({
-            'issue': number, 'pr': event.get('pr') or run.get('pr_number'),
-            'state': state, 'ledger_status': ledger_status,
-            'runtime_status': run.get('status'), 'observed_phase': phase,
-            'last_action': action.get('phase'), 'last_action_at': action.get('at'),
-            'last_observed_at': event.get('at'),
-        })
-    summary = {name: sum(r['state'] == name for r in rows) for name in (
-        'completed', 'processing', 'ready', 'awaiting_confirmation', 'failed', 'blocked', 'unknown')}
-    return {'admitted': len(rows), **summary, 'items': rows}
+        rows.append(
+            {
+                "issue": number,
+                "pr": event.get("pr") or run.get("pr_number"),
+                "state": state,
+                "ledger_status": ledger_status,
+                "runtime_status": run.get("status"),
+                "observed_phase": phase,
+                "last_action": action.get("phase"),
+                "last_action_at": action.get("at"),
+                "last_observed_at": event.get("at"),
+            }
+        )
+    summary = {
+        name: sum(r["state"] == name for r in rows)
+        for name in (
+            "completed",
+            "processing",
+            "ready",
+            "awaiting_confirmation",
+            "failed",
+            "blocked",
+            "unknown",
+        )
+    }
+    return {"admitted": len(rows), **summary, "items": rows}
 
 
 _REMOTE_COLLECT = """\
@@ -359,13 +394,15 @@ def _collect_bundle(sandbox) -> dict | None:
     # A transport timeout means the sandbox connection needs to be reopened.
     # Falling back to many file downloads on that same connection can stall a
     # relay for minutes and suppress every subsequent refresh.
-    result = sandbox.commands.run(
-        "python3 -c " + shlex.quote(_REMOTE_COLLECT), timeout=30
-    )
+    result = sandbox.commands.run("python3 -c " + shlex.quote(_REMOTE_COLLECT), timeout=30)
     value = _json(getattr(result, "stdout", ""))
-    if (isinstance(value, dict) and isinstance(value.get("run"), dict)
-            and value["run"] and isinstance(value.get("recovery"), dict)
-            and value["recovery"].get("round") is not None):
+    if (
+        isinstance(value, dict)
+        and isinstance(value.get("run"), dict)
+        and value["run"]
+        and isinstance(value.get("recovery"), dict)
+        and value["recovery"].get("round") is not None
+    ):
         return value
     return None
 
@@ -385,16 +422,18 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
         openagents_running = bool(bundle.get("openagents_running"))
     else:
         run = _json(_read_remote(sandbox, "/opt/hse-round/backend/data/live/run.json", limit=None))
-        agents = _json(_read_remote(sandbox, "/opt/hse-round/backend/data/live/agents.json", limit=None))
+        agents = _json(
+            _read_remote(sandbox, "/opt/hse-round/backend/data/live/agents.json", limit=None)
+        )
         sources = api_sources(_read_remote(sandbox, "/opt/hse-round/backend/.env", limit=None))
         # Never parse a tail-truncated recovery JSON document.
         recovery = _json(_read_remote(sandbox, "/opt/hse-run/recovery/recovery.json", limit=None))
         exit_code = _read_remote(sandbox, "/opt/hse-run/exit_code", 100).strip()
         log_tail = _read_remote(sandbox, "/opt/hse-run/controller.log", 16_000)
         events = _read_remote(sandbox, "/opt/hse-run/recovery/recovery.jsonl", 16_000)
-        oa_root = '/opt/hse-round/backend/data/harness_sandbox/harness_repo/.openagents/'
-        oa_runtime = _json(_read_remote(sandbox, oa_root + 'runtime-state.json', limit=None))
-        oa_timing = _run_remote(sandbox, 'tail -c 131072 ' + oa_root + 'timing.jsonl', 131072)
+        oa_root = "/opt/hse-round/backend/data/harness_sandbox/harness_repo/.openagents/"
+        oa_runtime = _json(_read_remote(sandbox, oa_root + "runtime-state.json", limit=None))
+        oa_timing = _run_remote(sandbox, "tail -c 131072 " + oa_root + "timing.jsonl", 131072)
         process_list = _run_remote(sandbox, "ps -eo args", 12_000)
         openagents_running = any(
             token in line.lower() and "grep" not in line.lower()
@@ -402,7 +441,7 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
             for token in ("openagents", "vigil")
         )
     if not isinstance(run, dict) or not isinstance(recovery, dict):
-        raise ValueError('Incomplete status read; retaining last valid VPS snapshot')
+        raise ValueError("Incomplete status read; retaining last valid VPS snapshot")
     run = run if isinstance(run, dict) else {}
     agents = agents if isinstance(agents, dict) else {}
     recovery = recovery if isinstance(recovery, dict) else {}
@@ -410,9 +449,25 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
     round_states = recovery.get("rounds") or {}
     current_round = round_states.get(str(recovery.get("round"))) or {}
     stages = current_round.get("stages") or {}
-    proposals = proposal_progress(current_round, oa_runtime if isinstance(oa_runtime, dict) else {}, oa_timing)
-    phase = next((name for name in ("users", "triage", "divergent", "designer", "owner", "delivery_wait", "round_sealed")
-                  if (stages.get(name) or {}).get("status") != "completed"), "completed")
+    proposals = proposal_progress(
+        current_round, oa_runtime if isinstance(oa_runtime, dict) else {}, oa_timing
+    )
+    phase = next(
+        (
+            name
+            for name in (
+                "users",
+                "triage",
+                "divergent",
+                "designer",
+                "owner",
+                "delivery_wait",
+                "round_sealed",
+            )
+            if (stages.get(name) or {}).get("status") != "completed"
+        ),
+        "completed",
+    )
     agent_rows = list(agents.values())
     timestamps = [str(run.get("updated_at") or "")]
     timestamps += [str(row.get("updated_at") or "") for row in agent_rows if isinstance(row, dict)]
@@ -423,8 +478,13 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
     # old implementation treated the role rows as task units (e.g. 1/4), which
     # made a healthy delivery wait look like a failed task.
     by_role = {str(row.get("role")): row for row in agent_rows if isinstance(row, dict)}
-    stage_for_role = {"user": "users", "triager": "triage", "pm": "divergent",
-                      "designer": "designer", "owner": "owner"}
+    stage_for_role = {
+        "user": "users",
+        "triager": "triage",
+        "pm": "divergent",
+        "designer": "designer",
+        "owner": "owner",
+    }
     components: list[dict] = []
     for role in ("user", "triager", "pm", "designer", "owner"):
         row = by_role.get(role)
@@ -434,27 +494,35 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
             state = _normalized_state(row, default="pending")
         if exit_code and state == "running":
             state = "interrupted"
-        units = _unit_rows(stage.get('units'))
-        components.append({
-            "name": role,
-            "state": state or "pending",
-            "running": state == "running",
-            "updated_at": (row or {}).get("updated_at") or stage.get("updated_at"),
-            "completed": sum(_normalized_state(unit) == 'finished' for unit in units),
-            "failed": sum(_normalized_state(unit) == 'failed' for unit in units),
-            "total": len(units),
-        })
-    oa_state = "running" if openagents_running else ("finished" if phase == "completed" or exit_code else "pending")
+        units = _unit_rows(stage.get("units"))
+        components.append(
+            {
+                "name": role,
+                "state": state or "pending",
+                "running": state == "running",
+                "updated_at": (row or {}).get("updated_at") or stage.get("updated_at"),
+                "completed": sum(_normalized_state(unit) == "finished" for unit in units),
+                "failed": sum(_normalized_state(unit) == "failed" for unit in units),
+                "total": len(units),
+            }
+        )
+    oa_state = (
+        "running"
+        if openagents_running
+        else ("finished" if phase == "completed" or exit_code else "pending")
+    )
     terminal = bool(exit_code)
     if terminal and openagents_running:
         oa_state = "retained"
-    components.append({
-        "name": "openagents",
-        "state": oa_state,
-        "running": oa_state == "running",
-        "post_exit": terminal and openagents_running,
-        "process_running": openagents_running,
-    })
+    components.append(
+        {
+            "name": "openagents",
+            "state": oa_state,
+            "running": oa_state == "running",
+            "post_exit": terminal and openagents_running,
+            "process_running": openagents_running,
+        }
+    )
 
     delivery_stage = stages.get("delivery_wait") or {}
     delivery_rows = _unit_rows(delivery_stage.get("units"))
@@ -472,12 +540,9 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
         # is not a successful outcome: a controller can exit on a blocked
         # round before its exit_code file is visible to the relay.  Keep the
         # terminal states explicit and reserve ``finished`` for exit 0.
-        "state": (
-            "finished" if exit_code == "0" else "controller_exited"
-        ) if exit_code else (
-            "running" if run.get("running", True) else
-            "controller_exited"
-        ),
+        "state": ("finished" if exit_code == "0" else "controller_exited")
+        if exit_code
+        else ("running" if run.get("running", True) else "controller_exited"),
         "round": run.get("round", 0),
         "total_rounds": run.get("total_rounds", 0),
         "phase": phase if recovery else run.get("phase", ""),
@@ -488,7 +553,9 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
             "completed": delivery_completed,
             "failed": delivery_failed,
             "running": delivery_running,
-            "pending": max(0, delivery_total - delivery_completed - delivery_failed - delivery_running),
+            "pending": max(
+                0, delivery_total - delivery_completed - delivery_failed - delivery_running
+            ),
             "total": delivery_total,
         },
         "components": components,
@@ -505,7 +572,9 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
             heartbeat = datetime.fromisoformat(last_heartbeat.replace("Z", "+00:00"))
             if heartbeat.tzinfo is None:
                 heartbeat = heartbeat.replace(tzinfo=UTC)
-            status["stalled_for_seconds"] = max(0, int((datetime.now(UTC) - heartbeat).total_seconds()))
+            status["stalled_for_seconds"] = max(
+                0, int((datetime.now(UTC) - heartbeat).total_seconds())
+            )
         except ValueError:
             status["stalled_for_seconds"] = None
     else:
@@ -520,7 +589,14 @@ def _ssh_env(password: str) -> tuple[dict[str, str], Path]:
     path.write_text("#!/bin/sh\nprintf '%s\\n' \"$HSE_VPS_PASSWORD\"\n", encoding="utf-8")
     path.chmod(0o700)
     env = dict(os.environ)
-    env.update({"DISPLAY": ":0", "SSH_ASKPASS": str(path), "SSH_ASKPASS_REQUIRE": "force", "HSE_VPS_PASSWORD": password})
+    env.update(
+        {
+            "DISPLAY": ":0",
+            "SSH_ASKPASS": str(path),
+            "SSH_ASKPASS_REQUIRE": "force",
+            "HSE_VPS_PASSWORD": password,
+        }
+    )
     return env, path
 
 
@@ -573,7 +649,9 @@ def _ssh_proxy_options() -> list[str]:
     return ["-o", f"ProxyCommand=nc -X {mode} -x {address} %h %p"]
 
 
-def push(directory: Path, host: str, password: str, remote_root: str, run_id: str, port: str) -> bool:
+def push(
+    directory: Path, host: str, password: str, remote_root: str, run_id: str, port: str
+) -> bool:
     env, askpass = _ssh_env(password)
     try:
         payload = {
@@ -586,11 +664,24 @@ def push(directory: Path, host: str, password: str, remote_root: str, run_id: st
         # One SSH connection publishes all three files. The status rename is
         # last, so readers never see a partial JSON document.
         result = subprocess.run(
-            ["ssh", "-p", str(port), "-o", "StrictHostKeyChecking=no",
-             "-o", "UserKnownHostsFile=/dev/null", "-o", "ConnectTimeout=5",
-             "-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=2",
-             *_ssh_proxy_options(),
-             f"root@{host}", "python3 -c " + shlex.quote(_REMOTE_PUBLISH)],
+            [
+                "ssh",
+                "-p",
+                str(port),
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+                "-o",
+                "ConnectTimeout=5",
+                "-o",
+                "ServerAliveInterval=5",
+                "-o",
+                "ServerAliveCountMax=2",
+                *_ssh_proxy_options(),
+                f"root@{host}",
+                "python3 -c " + shlex.quote(_REMOTE_PUBLISH),
+            ],
             env=env,
             input=json.dumps(payload, ensure_ascii=False),
             text=True,
@@ -614,7 +705,9 @@ def main() -> int:
     parser.add_argument("--remote-root", default="/srv/hse-status")
     args = parser.parse_args()
     vps = _kv(args.vps_file)
-    lines = args.vps_file.read_text(encoding="utf-8").splitlines() if args.vps_file.is_file() else []
+    lines = (
+        args.vps_file.read_text(encoding="utf-8").splitlines() if args.vps_file.is_file() else []
+    )
     host = vps.get("VPS_HOST") or (lines[0].strip() if lines else "")
     password = vps.get("VPS_PASSWORD") or (lines[1].strip() if len(lines) > 1 else "")
     port = vps.get("VPS_PORT") or (lines[2].strip() if len(lines) > 2 else "22")
@@ -624,7 +717,9 @@ def main() -> int:
 
     e2b_values = _kv(ROOT.parent / ".e2b")
     e2b_values.update(_kv(ROOT / ".e2b"))
-    e2b_key = e2b_values.get("API_KEY") or e2b_values.get("E2B_API_KEY") or e2b_values.get("API_KET")
+    e2b_key = (
+        e2b_values.get("API_KEY") or e2b_values.get("E2B_API_KEY") or e2b_values.get("API_KET")
+    )
     if not e2b_key:
         return 2
     sandbox = None
@@ -637,20 +732,29 @@ def main() -> int:
                 if sandbox is None:
                     sandbox = Sandbox.connect(args.sandbox_id, api_key=e2b_key, timeout=30)
                 status, events, log_tail = snapshot(sandbox, args.run_id, args.sandbox_id)
-                (directory / "status.json").write_text(json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                (directory / "status.json").write_text(
+                    json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+                )
                 (directory / "events.jsonl").write_text(events, encoding="utf-8")
                 (directory / "log.tail").write_text(log_tail, encoding="utf-8")
                 ok = push(directory, host, password, args.remote_root, args.run_id, port)
                 failures = 0 if ok else failures + 1
-                if ok and status.get("exit_code") is not None and not any(
-                    c.get('process_running', c.get('running')) for c in status.get('components', [])
+                if (
+                    ok
+                    and status.get("exit_code") is not None
+                    and not any(
+                        c.get("process_running", c.get("running"))
+                        for c in status.get("components", [])
+                    )
                 ):
                     return int(status["exit_code"])
             except Exception:
                 failures += 1
                 # A paused/resumed sandbox can invalidate the old envd connection.
                 sandbox = None
-                Path(str(directory) + ".relay-error.log").write_text(traceback.format_exc(), encoding="utf-8")
+                Path(str(directory) + ".relay-error.log").write_text(
+                    traceback.format_exc(), encoding="utf-8"
+                )
             time.sleep(args.interval if not failures else min(30.0, 10.0 * failures))
 
 

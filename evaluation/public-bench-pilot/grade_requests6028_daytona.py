@@ -70,14 +70,11 @@ def main() -> int:
         )
         grader_exit_code = grader.exit_code
         grader_output = grader.result or ""
-        (run_dir / "grader-fresh-daytona.log").write_text(
-            grader_output, encoding="utf-8"
-        )
+        (run_dir / "grader-fresh-daytona.log").write_text(grader_output, encoding="utf-8")
         score = score_targets(grader_output, fail_to_pass, pass_to_pass)
         if "test session starts" not in grader_output:
             raise RuntimeError(
-                f"grader did not start pytest (exit {grader_exit_code}): "
-                f"{grader_output[-1000:]}"
+                f"grader did not start pytest (exit {grader_exit_code}): {grader_output[-1000:]}"
             )
         print(
             f"GRADER_SCORE f2p={score['fail_to_pass_success']}/"

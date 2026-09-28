@@ -13,17 +13,29 @@ _RESERVATION_REF = "refs/heads/spec-reservations/{number}"
 _TIMEOUT_SECONDS = 45
 
 
-def _git(repo: Path, *args: str, input_text: str | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _git(
+    repo: Path, *args: str, input_text: str | None = None, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["git", *args], cwd=repo, input=input_text, text=True,
-        capture_output=True, timeout=_TIMEOUT_SECONDS, check=False, env=env,
+        ["git", *args],
+        cwd=repo,
+        input=input_text,
+        text=True,
+        capture_output=True,
+        timeout=_TIMEOUT_SECONDS,
+        check=False,
+        env=env,
     )
 
 
-def _checked(repo: Path, *args: str, input_text: str | None = None, env: dict[str, str] | None = None) -> str:
+def _checked(
+    repo: Path, *args: str, input_text: str | None = None, env: dict[str, str] | None = None
+) -> str:
     result = _git(repo, *args, input_text=input_text, env=env)
     if result.returncode:
-        raise RuntimeError(f"spec 编号预留失败：git {' '.join(args)}：{result.stderr.strip() or result.stdout.strip()}")
+        raise RuntimeError(
+            f"spec 编号预留失败：git {' '.join(args)}：{result.stderr.strip() or result.stdout.strip()}"
+        )
     return result.stdout.strip()
 
 
@@ -32,7 +44,9 @@ def _numbers_from_paths(paths: list[str]) -> set[int]:
 
 
 def _local_numbers(specs_root: Path) -> set[int]:
-    return _numbers_from_paths([f"docs/specs/{p.name}" for p in specs_root.glob("[0-9][0-9][0-9][0-9]-*.md")])
+    return _numbers_from_paths(
+        [f"docs/specs/{p.name}" for p in specs_root.glob("[0-9][0-9][0-9][0-9]-*.md")]
+    )
 
 
 def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | None) -> str:
@@ -65,9 +79,13 @@ def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | Non
     # Include the authoritative base branch. A stale worktree must not reuse a
     # number already merged since its checkout was created.
     _checked(repo, "fetch", "--no-tags", remote, "HEAD")
-    base_paths = _checked(repo, "ls-tree", "-r", "--name-only", "FETCH_HEAD", "--", "docs/specs").splitlines()
+    base_paths = _checked(
+        repo, "ls-tree", "-r", "--name-only", "FETCH_HEAD", "--", "docs/specs"
+    ).splitlines()
     occupied = local | _numbers_from_paths(base_paths)
-    refs = _checked(repo, "ls-remote", "--heads", remote, "refs/heads/spec-reservations/*").splitlines()
+    refs = _checked(
+        repo, "ls-remote", "--heads", remote, "refs/heads/spec-reservations/*"
+    ).splitlines()
     for row in refs:
         ref = row.split()[-1]
         match = re.fullmatch(r"refs/heads/spec-reservations/(\d{4})", ref)
@@ -84,10 +102,14 @@ def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | Non
     tree = _checked(repo, "rev-parse", "FETCH_HEAD^{tree}")
     parent = _checked(repo, "rev-parse", "FETCH_HEAD")
     identity = os.environ.copy()
-    identity.update({
-        "GIT_AUTHOR_NAME": "Spec Allocator", "GIT_AUTHOR_EMAIL": "spec-allocator@local.invalid",
-        "GIT_COMMITTER_NAME": "Spec Allocator", "GIT_COMMITTER_EMAIL": "spec-allocator@local.invalid",
-    })
+    identity.update(
+        {
+            "GIT_AUTHOR_NAME": "Spec Allocator",
+            "GIT_AUTHOR_EMAIL": "spec-allocator@local.invalid",
+            "GIT_COMMITTER_NAME": "Spec Allocator",
+            "GIT_COMMITTER_EMAIL": "spec-allocator@local.invalid",
+        }
+    )
     for candidate in candidates:
         if candidate in occupied:
             if number is not None:
@@ -95,7 +117,11 @@ def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | Non
             continue
         formatted = f"{candidate:04d}"
         marker = _checked(
-            repo, "commit-tree", tree, "-p", parent,
+            repo,
+            "commit-tree",
+            tree,
+            "-p",
+            parent,
             input_text=f"Reserve spec {formatted} for issue {issue} ({slug}); nonce={uuid.uuid4()}\n",
             env=identity,
         )
@@ -111,7 +137,9 @@ def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | Non
                 raise FileExistsError(f"spec 编号 {formatted} 已被并发工作区预留")
             occupied.add(candidate)
             continue
-        raise RuntimeError(f"spec 编号预留失败：git push {ref}：{pushed.stderr.strip() or pushed.stdout.strip()}")
+        raise RuntimeError(
+            f"spec 编号预留失败：git push {ref}：{pushed.stderr.strip() or pushed.stdout.strip()}"
+        )
     raise RuntimeError("spec 编号已超出四位范围")
 
 

@@ -16,7 +16,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 EXPECTED_SIZES = {"N1": 1, "N4": 4, "N8": 8, "N16": 16, "N32": 32}
 
 
@@ -95,7 +94,7 @@ def _check(config_path: Path, check_launch: bool) -> int:
         if set(values) != expected_from_first_n:
             errors.append(f"{name}: membership does not match first_n assignments")
 
-    for left, right in zip(("N1", "N4", "N8", "N16"), ("N4", "N8", "N16", "N32")):
+    for left, right in zip(("N1", "N4", "N8", "N16"), ("N4", "N8", "N16", "N32"), strict=True):
         if not set(scaling.get(left, [])).issubset(set(scaling.get(right, []))):
             errors.append(f"scaling sets are not nested: {left} is not a subset of {right}")
 
@@ -104,8 +103,13 @@ def _check(config_path: Path, check_launch: bool) -> int:
     manifest_ids = {entry["id"] for section in ("historical", "new") for entry in manifest[section]}
     assigned_mechanisms = {task["task_key"] for task in mechanism}
     if not assigned_mechanisms.issubset(manifest_ids):
-        errors.append("one or more mechanism assignments are absent from mechanism-seeds/manifest.json")
-    for manifest_set, expected_set in (("mechanism_4", {"M03", "M01"}), ("mechanism_8", assigned_mechanisms)):
+        errors.append(
+            "one or more mechanism assignments are absent from mechanism-seeds/manifest.json"
+        )
+    for manifest_set, expected_set in (
+        ("mechanism_4", {"M03", "M01"}),
+        ("mechanism_8", assigned_mechanisms),
+    ):
         observed = set(manifest["scaling_sets"].get(manifest_set, []))
         if manifest_set == "mechanism_4":
             # The plan has only M03 at N=4; M01 is added at N=8.  This is a

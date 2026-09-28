@@ -15,12 +15,17 @@ import shlex
 import tarfile
 import tempfile
 import time
-from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from daytona import CreateSandboxFromImageParams, Daytona, DaytonaConfig, Image, Resources
-from daytona import SessionExecuteRequest
+from daytona import (
+    CreateSandboxFromImageParams,
+    Daytona,
+    DaytonaConfig,
+    Image,
+    Resources,
+    SessionExecuteRequest,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 AUTO = ROOT / "auto-designer"

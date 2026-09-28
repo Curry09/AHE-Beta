@@ -8,7 +8,6 @@ model prompts, source trees, or credentials.
 
 from __future__ import annotations
 
-import html
 import gzip
 import json
 import os
@@ -17,25 +16,44 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-
 ROOT = Path(os.environ.get("HSE_STATUS_ROOT", "/srv/hse-status"))
 HOST = os.environ.get("HSE_STATUS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("HSE_STATUS_PORT", "18080"))
 PUBLIC = os.environ.get("HSE_STATUS_PUBLIC") == "1"
-HIDDEN_RUNS = {item.strip() for item in os.environ.get(
-    "HSE_STATUS_HIDDEN_RUNS",
-    "probe-20260922,20260921T220110Z-33a8ee",
-).split(",") if item.strip()}
+HIDDEN_RUNS = {
+    item.strip()
+    for item in os.environ.get(
+        "HSE_STATUS_HIDDEN_RUNS",
+        "probe-20260922,20260921T220110Z-33a8ee",
+    ).split(",")
+    if item.strip()
+}
 _CACHE: dict[str, dict] = {}
 _CACHE_LOCK = threading.Lock()
 
 
 def public_status(value: dict) -> dict:
     """Allowlist only progress metadata; never publish raw conversation/log fields."""
-    fields = ("schema", "run_id", "experiment_name", "state", "round", "total_rounds", "phase",
-              "completed", "failed", "total_units", "delivery", "components",
-              "last_heartbeat", "updated_at", "exit_code", "recovery_revision",
-              "stalled_for_seconds", "started_at")
+    fields = (
+        "schema",
+        "run_id",
+        "experiment_name",
+        "state",
+        "round",
+        "total_rounds",
+        "phase",
+        "completed",
+        "failed",
+        "total_units",
+        "delivery",
+        "components",
+        "last_heartbeat",
+        "updated_at",
+        "exit_code",
+        "recovery_revision",
+        "stalled_for_seconds",
+        "started_at",
+    )
     result = {key: value.get(key) for key in fields}
     sources = value.get("api_sources")
     result["api_sources"] = {
@@ -44,22 +62,45 @@ def public_status(value: dict) -> dict:
         if isinstance(sources, dict) and sources.get(role) in ("Boyue", "WIS", "OpenRouter", "未知")
     }
     # Historical snapshots may have labelled a failed process as finished.
-    if result.get('exit_code') not in (None, 0, '0'):
-        result['state'] = 'controller_exited'
+    if result.get("exit_code") not in (None, 0, "0"):
+        result["state"] = "controller_exited"
     result["agents"] = [
         {key: row.get(key) for key in ("role", "running", "round", "started_at", "updated_at")}
-        for row in value.get("agents", []) if isinstance(row, dict)
+        for row in value.get("agents", [])
+        if isinstance(row, dict)
     ]
-    proposals = value.get('proposals')
+    proposals = value.get("proposals")
     if isinstance(proposals, dict):
-        result['proposals'] = {key: proposals.get(key) for key in (
-            'admitted', 'completed', 'processing', 'ready', 'awaiting_confirmation',
-            'failed', 'blocked', 'unknown')}
-        result['proposals']['items'] = [
-            {key: row.get(key) for key in (
-                'issue', 'pr', 'state', 'ledger_status', 'runtime_status',
-                'observed_phase', 'last_action', 'last_action_at', 'last_observed_at')}
-            for row in proposals.get('items', []) if isinstance(row, dict)
+        result["proposals"] = {
+            key: proposals.get(key)
+            for key in (
+                "admitted",
+                "completed",
+                "processing",
+                "ready",
+                "awaiting_confirmation",
+                "failed",
+                "blocked",
+                "unknown",
+            )
+        }
+        result["proposals"]["items"] = [
+            {
+                key: row.get(key)
+                for key in (
+                    "issue",
+                    "pr",
+                    "state",
+                    "ledger_status",
+                    "runtime_status",
+                    "observed_phase",
+                    "last_action",
+                    "last_action_at",
+                    "last_observed_at",
+                )
+            }
+            for row in proposals.get("items", [])
+            if isinstance(row, dict)
         ]
     return result
 
@@ -77,21 +118,26 @@ def _runs() -> list[dict]:
             value = _read_json(path, {})
             if isinstance(value, dict) and value.get("run_id") == path.parent.name:
                 _CACHE[path.parent.name] = value
-        rows = [public_status(row) if PUBLIC else dict(row) for run_id, row in _CACHE.items()
-                if run_id not in HIDDEN_RUNS]
+        rows = [
+            public_status(row) if PUBLIC else dict(row)
+            for run_id, row in _CACHE.items()
+            if run_id not in HIDDEN_RUNS
+        ]
     # IDs contain immutable launch timestamps. Never sort by relay freshness.
     return sorted(rows, key=lambda row: str(row.get("run_id") or ""), reverse=True)
 
 
 def _run_payload(run_id: str) -> dict:
-    if not run_id or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in run_id):
+    if not run_id or any(
+        c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in run_id
+    ):
         return {}
     safe = Path(run_id).name
     directory = ROOT / safe
     value = _read_json(directory / "status.json", {})
     if safe in HIDDEN_RUNS:
         return {}
-    if not isinstance(value, dict) or value.get('run_id') != safe:
+    if not isinstance(value, dict) or value.get("run_id") != safe:
         with _CACHE_LOCK:
             value = dict(_CACHE.get(safe, {}))
     if PUBLIC:
@@ -194,9 +240,11 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, value: object) -> None:
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
         encoding = self.headers.get("Accept-Encoding", "")
-        use_gzip = any(part.strip().split(";", 1)[0].lower() == "gzip" and
-                       not any(option.strip().lower() == "q=0" for option in part.split(";")[1:])
-                       for part in encoding.split(","))
+        use_gzip = any(
+            part.strip().split(";", 1)[0].lower() == "gzip"
+            and not any(option.strip().lower() == "q=0" for option in part.split(";")[1:])
+            for part in encoding.split(",")
+        )
         if use_gzip:
             body = gzip.compress(body, compresslevel=5, mtime=0)
         self.send_response(200)

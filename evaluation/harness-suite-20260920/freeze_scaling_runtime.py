@@ -49,7 +49,9 @@ def prompt_metadata(item: dict, assignment: dict) -> tuple[str | None, str | Non
         for task in manifest.get("mechanism_tasks", []):
             if task.get("task_id") == item.get("task_id"):
                 opening = str(task.get("opening_message") or "")
-                return f"task-manifest.json#{task.get('id')}", sha256_text(opening) if opening else None
+                return f"task-manifest.json#{task.get('id')}", sha256_text(
+                    opening
+                ) if opening else None
     source = Path(str(item.get("source") or ""))
     for candidate in ("instruction.md", "TASK.md", "start.md"):
         path = source / candidate
@@ -59,7 +61,9 @@ def prompt_metadata(item: dict, assignment: dict) -> tuple[str | None, str | Non
 
 
 def git_sha() -> str:
-    result = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True
+    )
     return result.stdout.strip() if result.returncode == 0 else "unknown"
 
 
@@ -72,10 +76,7 @@ def freeze(n: int, canary: dict | None) -> Path:
     inventory_path = folder / "bundle-inventory.json"
     inventory = load(inventory_path)
     scaling_config = load(CONFIG)
-    assignment_rows = {
-        str(item["task_key"]): item
-        for item in load(ASSIGNMENTS).get("tasks", [])
-    }
+    assignment_rows = {str(item["task_key"]): item for item in load(ASSIGNMENTS).get("tasks", [])}
     e2b = scaling_config.get("e2b") or {}
     profile_name = (e2b.get("effective_profile_by_n") or {}).get(str(n))
     resource_profile = (e2b.get("resource_profiles") or {}).get(profile_name)
@@ -92,7 +93,12 @@ def freeze(n: int, canary: dict | None) -> Path:
     for item in inventory.get("tasks", []):
         assignment = assignment_rows.get(str(item.get("task_key")), {})
         prompt_source, prompt_sha = prompt_metadata(item, assignment)
-        for field in ("agent_payload", "grader_payload", "agent_payload_sha256", "grader_payload_sha256"):
+        for field in (
+            "agent_payload",
+            "grader_payload",
+            "agent_payload_sha256",
+            "grader_payload_sha256",
+        ):
             if not item.get(field):
                 failures.append(f"{item.get('task_key')}: missing {field}")
         for field in ("agent_payload", "grader_payload"):
@@ -102,26 +108,30 @@ def freeze(n: int, canary: dict | None) -> Path:
             elif item.get(field + "_sha256") != sha256(path):
                 failures.append(f"{item.get('task_key')}: {field} hash mismatch")
         official_timeout = int(assignment.get("official_agent_timeout_seconds", 1800))
-        payloads.append({
-            "task_key": item.get("task_key"),
-            "benchmark": item.get("benchmark"),
-            "task_id": item.get("task_id"),
-            "stratum": assignment.get("stratum"),
-            "interaction": assignment.get("interaction"),
-            "persona_id": assignment.get("persona_id"),
-            "prompt_source": prompt_source,
-            "prompt_sha256": prompt_sha,
-            "official_agent_timeout_seconds": official_timeout,
-            "outer_timeout_seconds": official_timeout + 600,
-            "source_revision": item.get("source_revision") or item.get("benchmark_revision"),
-            "source_content_sha256": item.get("source_tree_sha256"),
-            "agent_payload": item.get("agent_payload"),
-            "agent_payload_sha256": item.get("agent_payload_sha256"),
-            "grader_payload": item.get("grader_payload"),
-            "grader_payload_sha256": item.get("grader_payload_sha256"),
-            "grader_sha256": item.get("grader_payload_sha256"),
-        })
-    canary_ok = bool(canary and canary.get("status") == "passed" and canary.get("full_loop") is True)
+        payloads.append(
+            {
+                "task_key": item.get("task_key"),
+                "benchmark": item.get("benchmark"),
+                "task_id": item.get("task_id"),
+                "stratum": assignment.get("stratum"),
+                "interaction": assignment.get("interaction"),
+                "persona_id": assignment.get("persona_id"),
+                "prompt_source": prompt_source,
+                "prompt_sha256": prompt_sha,
+                "official_agent_timeout_seconds": official_timeout,
+                "outer_timeout_seconds": official_timeout + 600,
+                "source_revision": item.get("source_revision") or item.get("benchmark_revision"),
+                "source_content_sha256": item.get("source_tree_sha256"),
+                "agent_payload": item.get("agent_payload"),
+                "agent_payload_sha256": item.get("agent_payload_sha256"),
+                "grader_payload": item.get("grader_payload"),
+                "grader_payload_sha256": item.get("grader_payload_sha256"),
+                "grader_sha256": item.get("grader_payload_sha256"),
+            }
+        )
+    canary_ok = bool(
+        canary and canary.get("status") == "passed" and canary.get("full_loop") is True
+    )
     if not canary_ok:
         failures.append("missing full-loop E2B/Boyue canary receipt")
     receipt = {

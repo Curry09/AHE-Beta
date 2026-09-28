@@ -37,17 +37,13 @@ def main() -> int:
     output.mkdir(parents=True, exist_ok=True)
     model = os.environ["AGENT_LLM"]
     user_model = os.environ.get("USER_SIMULATOR_LLM", model)
-    nl_judge_model = os.environ.get(
-        "NL_JUDGE_LLM", "openrouter/openai/gpt-4.1"
-    )
+    nl_judge_model = os.environ.get("NL_JUDGE_LLM", "openrouter/openai/gpt-4.1")
     # The pinned benchmark hard-codes an OpenAI model. Route the same judge
     # family through the configured OpenRouter credential in sandbox runs.
     evaluator_nl_assertions.DEFAULT_LLM_NL_ASSERTIONS = nl_judge_model
     tasks = get_tasks(args.domain, task_ids=[args.task_id])
     if len(tasks) != 1:
-        raise RuntimeError(
-            f"expected one {args.domain}/{args.task_id} task, got {len(tasks)}"
-        )
+        raise RuntimeError(f"expected one {args.domain}/{args.task_id} task, got {len(tasks)}")
     task = tasks[0]
     environment = build_environment(args.domain)
     agent = HarnessV0TauAgent(
@@ -105,8 +101,7 @@ def main() -> int:
         result = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
         preserve_adapter_artifacts()
         (output / "simulation.json").write_text(
-            json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2)
-            + "\n",
+            json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
         manifest.update(

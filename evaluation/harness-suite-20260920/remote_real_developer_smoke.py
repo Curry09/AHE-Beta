@@ -34,16 +34,25 @@ def model_probe(out: Path) -> None:
         "proxy=" + json.dumps({k: bool(v) for k, v in os.environ.items() if "proxy" in k.lower()}),
         "base=" + base,
     ]
-    body = {"model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
-            "max_tokens": 64, "stream": True,
-            "messages": [{"role": "user", "content": "Reply with exactly OK."}]}
-    headers = {"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+    body = {
+        "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
+        "max_tokens": 64,
+        "stream": True,
+        "messages": [{"role": "user", "content": "Reply with exactly OK."}],
+    }
+    headers = {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
     messages_url = base + ("/messages" if base.endswith("/v1") else "/v1/messages")
     for label, trust_env in (("proxy", True), ("direct", False)):
         session = requests.Session()
         session.trust_env = trust_env
         try:
-            with session.post(messages_url, headers=headers, json=body, stream=True, timeout=(15, 90)) as response:
+            with session.post(
+                messages_url, headers=headers, json=body, stream=True, timeout=(15, 90)
+            ) as response:
                 lines.append(f"{label}_status={response.status_code}")
                 lines.append(f"{label}_headers={dict(response.headers)}")
                 chunks = []
@@ -76,7 +85,10 @@ def main() -> int:
     if not Path(gitea_bin).is_file():
         raise RuntimeError("Gitea binary was not installed")
     user_create = run(["useradd", "--system", "--create-home", "--shell", "/bin/sh", "gitea"])
-    if user_create.returncode != 0 and "already exists" not in (user_create.stderr + user_create.stdout).lower():
+    if (
+        user_create.returncode != 0
+        and "already exists" not in (user_create.stderr + user_create.stdout).lower()
+    ):
         raise RuntimeError(f"cannot create gitea user: {user_create.stderr[-500:]}")
     run(["chown", "-R", "gitea:gitea", str(gitea)])
     gitea_env = {
@@ -117,7 +129,13 @@ def main() -> int:
     )
     run(["chown", "-R", "gitea:gitea", str(gitea)])
     gitea_log = (out / "gitea.log").open("w", encoding="utf-8")
-    proc = subprocess.Popen(["runuser", "-u", "gitea", "--", gitea_bin, "web"], env=gitea_env, stdout=gitea_log, stderr=subprocess.STDOUT, text=True)
+    proc = subprocess.Popen(
+        ["runuser", "-u", "gitea", "--", gitea_bin, "web"],
+        env=gitea_env,
+        stdout=gitea_log,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
     try:
         for _ in range(90):
             try:
@@ -127,20 +145,56 @@ def main() -> int:
                 time.sleep(1)
         else:
             gitea_log.flush()
-            tail = Path("/tmp/eval-output/gitea.log").read_text(encoding="utf-8", errors="replace")[-2000:]
+            tail = Path("/tmp/eval-output/gitea.log").read_text(encoding="utf-8", errors="replace")[
+                -2000:
+            ]
             raise RuntimeError(f"Gitea did not become ready; log={tail}")
 
         create_user = run(
-            ["runuser", "-u", "gitea", "--", gitea_bin, "admin", "user", "create", "--username", USER, "--password", PASSWORD,
-             "--email", "designer@example.invalid", "--admin", "--must-change-password=false"],
+            [
+                "runuser",
+                "-u",
+                "gitea",
+                "--",
+                gitea_bin,
+                "admin",
+                "user",
+                "create",
+                "--username",
+                USER,
+                "--password",
+                PASSWORD,
+                "--email",
+                "designer@example.invalid",
+                "--admin",
+                "--must-change-password=false",
+            ],
             env=gitea_env,
         )
-        if create_user.returncode != 0 and "already exists" not in (create_user.stderr + create_user.stdout).lower():
+        if (
+            create_user.returncode != 0
+            and "already exists" not in (create_user.stderr + create_user.stdout).lower()
+        ):
             raise RuntimeError(f"Gitea user create failed: {create_user.stderr[-500:]}")
 
         token_result = run(
-            ["runuser", "-u", "gitea", "--", gitea_bin, "admin", "user", "generate-access-token", "--username", USER,
-             "--token-name", "daytona-real-developer", "--scopes", "all", "--raw"],
+            [
+                "runuser",
+                "-u",
+                "gitea",
+                "--",
+                gitea_bin,
+                "admin",
+                "user",
+                "generate-access-token",
+                "--username",
+                USER,
+                "--token-name",
+                "daytona-real-developer",
+                "--scopes",
+                "all",
+                "--raw",
+            ],
             env=gitea_env,
         )
         if token_result.returncode != 0:
@@ -170,7 +224,12 @@ def main() -> int:
         repo_state = api(
             "PATCH",
             f"/repos/{USER}/{REPO}",
-            json={"has_issues": True, "has_projects": True, "has_wiki": False, "has_pull_requests": True},
+            json={
+                "has_issues": True,
+                "has_projects": True,
+                "has_wiki": False,
+                "has_pull_requests": True,
+            },
         )
         if repo_state.get("has_pull_requests") is not True:
             raise RuntimeError(f"Gitea did not enable pull requests: {repo_state}")
@@ -191,7 +250,12 @@ def main() -> int:
             if not existing_unit:
                 db.execute(
                     "INSERT INTO repo_unit (repo_id, type, config) VALUES (?, 3, ?)",
-                    (repo_id[0], json.dumps({"allow_merge": True, "allow_rebase": True, "allow_squash": True})),
+                    (
+                        repo_id[0],
+                        json.dumps(
+                            {"allow_merge": True, "allow_rebase": True, "allow_squash": True}
+                        ),
+                    ),
                 )
                 db.commit()
         finally:
@@ -223,7 +287,9 @@ def main() -> int:
         clone = run(["git", "clone", remote, str(work)])
         if clone.returncode != 0:
             raise RuntimeError(f"initial clone failed: {clone.stderr[-500:]}")
-        (work / "billing.py").write_text("def total(items):\n    return sum(items)\n", encoding="utf-8")
+        (work / "billing.py").write_text(
+            "def total(items):\n    return sum(items)\n", encoding="utf-8"
+        )
         (work / "README.md").write_text("# real developer smoke\n", encoding="utf-8")
         (work / ".gitignore").write_text("__pycache__/\n*.py[cod]\n", encoding="utf-8")
         for command in (
@@ -244,14 +310,25 @@ def main() -> int:
         repo_after_push = api("GET", f"/repos/{USER}/{REPO}")
         if repo_after_push.get("empty") is True:
             raise RuntimeError(f"Gitea repository stayed empty after push: {repo_after_push}")
-        pulls_probe = requests.get(API_BASE + f"/repos/{USER}/{REPO}/pulls", auth=(USER, PASSWORD), timeout=30)
+        pulls_probe = requests.get(
+            API_BASE + f"/repos/{USER}/{REPO}/pulls", auth=(USER, PASSWORD), timeout=30
+        )
         if pulls_probe.status_code != 200:
-            raise RuntimeError(f"Gitea PR unit probe failed: {pulls_probe.status_code} {pulls_probe.text[:500]}")
+            raise RuntimeError(
+                f"Gitea PR unit probe failed: {pulls_probe.status_code} {pulls_probe.text[:500]}"
+            )
 
-        label = api("POST", f"/repos/{USER}/{REPO}/labels", json={"name": "openagents", "color": "1d76db"})
+        label = api(
+            "POST", f"/repos/{USER}/{REPO}/labels", json={"name": "openagents", "color": "1d76db"}
+        )
         issue = api(
-            "POST", f"/repos/{USER}/{REPO}/issues",
-            json={"title": "Add a safe average helper", "body": "Add average(items) to billing.py, handle an empty list explicitly, and add a small test or executable check.", "labels": [label["id"]]},
+            "POST",
+            f"/repos/{USER}/{REPO}/issues",
+            json={
+                "title": "Add a safe average helper",
+                "body": "Add average(items) to billing.py, handle an empty list explicitly, and add a small test or executable check.",
+                "labels": [label["id"]],
+            },
         )
         config = work / ".openagents" / "openagents.yml"
         config.parent.mkdir()
@@ -323,7 +400,10 @@ def main() -> int:
             "PYTHONDONTWRITEBYTECODE": "1",
         }
         worker_user = run(["useradd", "--create-home", "--shell", "/bin/bash", "worker"])
-        if worker_user.returncode != 0 and "already exists" not in (worker_user.stderr + worker_user.stdout).lower():
+        if (
+            worker_user.returncode != 0
+            and "already exists" not in (worker_user.stderr + worker_user.stdout).lower()
+        ):
             raise RuntimeError(f"cannot create worker user: {worker_user.stderr[-500:]}")
         ownership = run(["chown", "-R", "worker:worker", str(work)])
         if ownership.returncode != 0:
@@ -341,7 +421,11 @@ def main() -> int:
                 "--parallel",
                 "1",
             ],
-            cwd=str(work), env=claude_env, text=True, capture_output=True, timeout=1200,
+            cwd=str(work),
+            env=claude_env,
+            text=True,
+            capture_output=True,
+            timeout=1200,
         )
         (out / "developer-stdout.log").write_text(worker.stdout, encoding="utf-8")
         (out / "developer-stderr.log").write_text(worker.stderr, encoding="utf-8")
@@ -359,7 +443,9 @@ def main() -> int:
             "gitea": "local-daytona",
             "owner_mode": "mechanical_review_false_before_worker",
         }
-        (out / "real-developer.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (out / "real-developer.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         return 0 if workflow_ok else (worker.returncode or 1)
     finally:
         proc.terminate()

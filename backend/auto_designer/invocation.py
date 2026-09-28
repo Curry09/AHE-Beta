@@ -109,9 +109,7 @@ class InvocationStore:
                 if existing_sealed is not None:
                     raise ValueError(f"round {round_no} invocation manifest conflicts")
                 existing["sealed_sha"] = sealed_sha
-                current["rounds"] = sorted(
-                    rounds, key=lambda item: int(item["round"])
-                )
+                current["rounds"] = sorted(rounds, key=lambda item: int(item["round"]))
                 self.write_manifest(data=current)
                 return
             rounds.append(row)

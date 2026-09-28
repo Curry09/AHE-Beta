@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import json
 import secrets
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,7 +25,10 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--gitea-env", type=Path)
     parser.add_argument("--gitea-url", help="publicly reachable Gitea URL for the sandbox")
-    parser.add_argument("--source-sandbox-id", help="reuse the frozen Gitea credentials from an existing E2B sandbox")
+    parser.add_argument(
+        "--source-sandbox-id",
+        help="reuse the frozen Gitea credentials from an existing E2B sandbox",
+    )
     args = parser.parse_args()
 
     creds = n1.credentials(args.gitea_env)
@@ -81,7 +83,9 @@ def main() -> int:
     try:
         sandbox = n1.create_sandbox(plan, creds, run_id, repo_name, identity)
         command = n1.start_remote(sandbox, plan, identity, False)
-        output.update({"sandbox_id": sandbox.sandbox_id, "command_pid": getattr(command, "pid", None)})
+        output.update(
+            {"sandbox_id": sandbox.sandbox_id, "command_pid": getattr(command, "pid", None)}
+        )
         # Keep the SDK connection alive while the background command runs.  E2B
         # tears down a background command when the client process disappears;
         # a canary must observe the actual one-round result, not just enqueue it.
@@ -103,15 +107,25 @@ def main() -> int:
             time.sleep(10)
         if exit_code is None:
             raise n1.LaunchError("full-loop canary exceeded 3600 seconds")
-        output.update({"exit_code": exit_code, "status": "passed" if exit_code == 0 else "failed", "full_loop": exit_code == 0})
+        output.update(
+            {
+                "exit_code": exit_code,
+                "status": "passed" if exit_code == 0 else "failed",
+                "full_loop": exit_code == 0,
+            }
+        )
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        args.output.write_text(
+            json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         print(json.dumps(output, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:
         output["error"] = f"{type(exc).__name__}: {exc}"
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        args.output.write_text(
+            json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         raise
 
 

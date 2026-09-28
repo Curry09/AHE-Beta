@@ -10,7 +10,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-
 SCHEMA_VERSION = "hse-checkpoint-v1"
 
 
@@ -30,7 +29,14 @@ def write_checkpoint(path: Path, payload: dict[str, Any]) -> str:
     """
     if payload.get("schema_version") != SCHEMA_VERSION:
         raise ValueError(f"checkpoint schema must be {SCHEMA_VERSION}")
-    for key in ("experiment_id", "batch_id", "config_sha256", "manifest_sha256", "completed_trials", "pending_trials"):
+    for key in (
+        "experiment_id",
+        "batch_id",
+        "config_sha256",
+        "manifest_sha256",
+        "completed_trials",
+        "pending_trials",
+    ):
         if key not in payload:
             raise ValueError(f"checkpoint missing {key}")
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -34,10 +34,8 @@ from tau2.environment.tool import Tool
 
 from .stdio import HarnessStdioSession, harness_environment
 
-_CALL_PATTERN = re.compile(
-    r"<TAU3_TOOL_CALL>\s*(\{.*?\})\s*</TAU3_TOOL_CALL>", re.DOTALL
-)
-_REQUEST_HELPER = r'''#!/usr/bin/env python3
+_CALL_PATTERN = re.compile(r"<TAU3_TOOL_CALL>\s*(\{.*?\})\s*</TAU3_TOOL_CALL>", re.DOTALL)
+_REQUEST_HELPER = r"""#!/usr/bin/env python3
 import json
 from pathlib import Path
 import sys
@@ -57,7 +55,7 @@ if not isinstance(arguments, dict):
 payload = json.dumps({"name": name, "arguments": arguments}, ensure_ascii=False)
 print(f"<TAU3_TOOL_CALL>{payload}</TAU3_TOOL_CALL>")
 print("Return the marker above exactly via complete_task; do not call another tool yet.")
-'''
+"""
 
 
 @dataclass
@@ -101,10 +99,7 @@ class HarnessV0TauAgent(HalfDuplexAgent[HarnessV0TauState]):
         )
         self._harness_dir = Path(harness_dir) if harness_dir else None
         self._harness_python = str(
-            harness_python
-            or os.environ.get(
-                "HARNESS_V0_PYTHON", "/opt/harness-venv/bin/python"
-            )
+            harness_python or os.environ.get("HARNESS_V0_PYTHON", "/opt/harness-venv/bin/python")
         )
         self._model = model or os.environ.get("LLM_MODEL") or self._model_from_llm(llm)
         self._base_url = (
@@ -113,11 +108,7 @@ class HarnessV0TauAgent(HalfDuplexAgent[HarnessV0TauState]):
             or os.environ.get("OPENAI_BASE_URL")
             or self._default_base_url(llm)
         )
-        self._api_key = (
-            api_key
-            or os.environ.get("LLM_API_KEY")
-            or self._provider_key(llm)
-        )
+        self._api_key = api_key or os.environ.get("LLM_API_KEY") or self._provider_key(llm)
         self._trial_timeout_sec = float(trial_timeout_sec)
         if self._trial_timeout_sec <= 0:
             raise ValueError("trial_timeout_sec must be positive")
@@ -172,8 +163,7 @@ class HarnessV0TauAgent(HalfDuplexAgent[HarnessV0TauState]):
 
     def _write_tool_bridge(self, workspace: Path) -> Path:
         schemas = {
-            name: tool.openai_schema["function"]
-            for name, tool in self._tools_by_name.items()
+            name: tool.openai_schema["function"] for name, tool in self._tools_by_name.items()
         }
         manifest = workspace / "tau3_tools.json"
         manifest.write_text(
@@ -186,10 +176,7 @@ class HarnessV0TauAgent(HalfDuplexAgent[HarnessV0TauState]):
 
     def _bootstrap_prompt(self, helper: Path, history: list[Message] | None) -> str:
         tool_docs = json.dumps(
-            {
-                name: tool.openai_schema["function"]
-                for name, tool in self._tools_by_name.items()
-            },
+            {name: tool.openai_schema["function"] for name, tool in self._tools_by_name.items()},
             ensure_ascii=False,
             indent=2,
         )
@@ -221,9 +208,7 @@ a tool result, never place both user-facing prose and a tool call in one turn, a
 not use shell commands for anything except this helper during this benchmark.
 {history_text}"""
 
-    def get_init_state(
-        self, message_history: list[Message] | None = None
-    ) -> HarnessV0TauState:
+    def get_init_state(self, message_history: list[Message] | None = None) -> HarnessV0TauState:
         if self._active_state is not None:
             self.stop(state=self._active_state)
         missing = [
@@ -323,9 +308,7 @@ not use shell commands for anything except this helper during this benchmark.
                 f"tau3 trial exhausted its total {self._trial_timeout_sec:.1f}s agent budget"
             )
         if not state.initialized:
-            bootstrap = Path(state.workspace_temp.name, "bootstrap.txt").read_text(
-                encoding="utf-8"
-            )
+            bootstrap = Path(state.workspace_temp.name, "bootstrap.txt").read_text(encoding="utf-8")
             incoming = bootstrap + "\n\nCurrent user message:\n" + incoming
             state.initialized = True
         reply = state.session.request(incoming, timeout=remaining)

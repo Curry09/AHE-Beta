@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Hourly dashboard monitor with conservative same-sandbox resume."""
+
 from __future__ import annotations
 
 import argparse
@@ -18,9 +19,11 @@ DEFAULT_URL = "http://38.47.121.235:18080/api/runs"
 GITEA_ENV = Path("/tmp/hse-gitea.env")
 ALLOWED_N = {1, 4, 8, 16, 32}
 ACTIVE_RUN_IDS = (
-    '20260922T045045Z-5bb0a2', '20260922T133329Z-e04374',
-    '20260922T133332Z-0e6120', '20260922T184216Z-124e65',
-    '20260922T184219Z-bae826',
+    "20260922T045045Z-5bb0a2",
+    "20260922T133329Z-e04374",
+    "20260922T133332Z-0e6120",
+    "20260922T184216Z-124e65",
+    "20260922T184219Z-bae826",
 )
 
 
@@ -62,8 +65,14 @@ def resume_one(row: dict, log_path: Path) -> None:
     if not run_id or n not in ALLOWED_N or state_path is None:
         log(f"SKIP resume: no frozen local state for {run_id!r}", log_path)
         return
-    command = [sys.executable, str(SUITE / 'resume_checkpoint_e2b.py'),
-               '--n', str(n), '--run-id', run_id]
+    command = [
+        sys.executable,
+        str(SUITE / "resume_checkpoint_e2b.py"),
+        "--n",
+        str(n),
+        "--run-id",
+        run_id,
+    ]
     log(f"RECOVERY inspect run={run_id} n={n}", log_path)
     result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=180)
     output = (result.stdout + "\n" + result.stderr).strip().replace("\x00", "")
@@ -78,9 +87,11 @@ def check_once(url: str, log_path: Path) -> None:
         rows = []
     # Dashboard age/running flags are not liveness evidence. Probe only the five
     # explicitly monitored experiments, even when the dashboard is unreachable.
-    visible = {str(row.get('run_id')): row for row in rows}
-    rows = [visible.get(run_id, {'run_id': run_id, 'state': 'dashboard_unavailable'})
-            for run_id in ACTIVE_RUN_IDS]
+    visible = {str(row.get("run_id")): row for row in rows}
+    rows = [
+        visible.get(run_id, {"run_id": run_id, "state": "dashboard_unavailable"})
+        for run_id in ACTIVE_RUN_IDS
+    ]
     for row in rows:
         run_id = str(row.get("run_id") or "")
         state = str(row.get("state") or "")
@@ -89,7 +100,7 @@ def check_once(url: str, log_path: Path) -> None:
         try:
             resume_one(row, log_path)
         except Exception as exc:
-            log(f'RECOVERY error run={run_id} {type(exc).__name__}: {exc}', log_path)
+            log(f"RECOVERY error run={run_id} {type(exc).__name__}: {exc}", log_path)
 
 
 def main() -> int:
@@ -100,7 +111,7 @@ def main() -> int:
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
     args.log.parent.mkdir(parents=True, exist_ok=True)
-    lock = args.log.with_suffix('.lock').open('a')
+    lock = args.log.with_suffix(".lock").open("a")
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     while True:
         check_once(args.dashboard_url, args.log)

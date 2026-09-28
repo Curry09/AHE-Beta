@@ -20,7 +20,10 @@ def test_triage_contract_isolated_report_and_product_boundary() -> None:
     }
     assert validate_triage(valid, report_number=7) == []
     assert validate_triage({**valid, "issue": 8}, report_number=7)[0].code == "foreign-source"
-    assert validate_triage({"issue": 7, "disposition": "accept"}, report_number=7)[0].code == "missing-artifact"
+    assert (
+        validate_triage({"issue": 7, "disposition": "accept"}, report_number=7)[0].code
+        == "missing-artifact"
+    )
     outside = {**valid, "artifact": {"implementation_target": "external-project"}}
     assert validate_triage(outside, report_number=7)[0].code == "out-of-product-scope"
 
@@ -31,9 +34,20 @@ def test_pm_contract_requires_product_level_known_session_evidence() -> None:
         "evidence_sessions": ["session-1"],
     }
     assert validate_pm(valid, known_sessions={"session-1"}) == []
-    assert validate_pm({**valid, "solution_level": "implementation"}, known_sessions={"session-1"})[0].code == "wrong-abstraction"
-    assert validate_pm({**valid, "evidence_sessions": []}, known_sessions={"session-1"})[0].code == "missing-evidence"
-    assert validate_pm({**valid, "evidence_sessions": [{}]}, known_sessions={"session-1"})[0].code == "invalid-evidence"
+    assert (
+        validate_pm({**valid, "solution_level": "implementation"}, known_sessions={"session-1"})[
+            0
+        ].code
+        == "wrong-abstraction"
+    )
+    assert (
+        validate_pm({**valid, "evidence_sessions": []}, known_sessions={"session-1"})[0].code
+        == "missing-evidence"
+    )
+    assert (
+        validate_pm({**valid, "evidence_sessions": [{}]}, known_sessions={"session-1"})[0].code
+        == "invalid-evidence"
+    )
     assert validate_pm(valid, known_sessions={"session-2"})[0].code == "foreign-source"
 
 
@@ -43,9 +57,20 @@ def test_synthesis_contract_requires_two_distinct_visible_issue_numbers() -> Non
         "source_proposals": [1, 2],
     }
     assert validate_synthesis(valid, visible_proposals={1, 2}) == []
-    assert validate_synthesis({**valid, "solution_level": "implementation"}, visible_proposals={1, 2})[0].code == "wrong-abstraction"
-    assert validate_synthesis({**valid, "source_proposals": [1, 1]}, visible_proposals={1, 2})[0].code == "not-cross-proposal"
-    assert validate_synthesis({**valid, "source_proposals": [1, {}]}, visible_proposals={1, 2})[0].code == "invalid-source"
+    assert (
+        validate_synthesis({**valid, "solution_level": "implementation"}, visible_proposals={1, 2})[
+            0
+        ].code
+        == "wrong-abstraction"
+    )
+    assert (
+        validate_synthesis({**valid, "source_proposals": [1, 1]}, visible_proposals={1, 2})[0].code
+        == "not-cross-proposal"
+    )
+    assert (
+        validate_synthesis({**valid, "source_proposals": [1, {}]}, visible_proposals={1, 2})[0].code
+        == "invalid-source"
+    )
     assert validate_synthesis(valid, visible_proposals={1, 3})[0].code == "foreign-source"
 
 

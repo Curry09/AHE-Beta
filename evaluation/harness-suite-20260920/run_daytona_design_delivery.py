@@ -6,15 +6,20 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shlex
 import tarfile
 import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from daytona import CreateSandboxFromImageParams, Daytona, DaytonaConfig, Image, Resources
-from daytona import SessionExecuteRequest
+from daytona import (
+    CreateSandboxFromImageParams,
+    Daytona,
+    DaytonaConfig,
+    Image,
+    Resources,
+    SessionExecuteRequest,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 AUTO = ROOT / "auto-designer"
@@ -74,7 +79,9 @@ def main() -> int:
         "designer_model": "z-ai/glm-5.2",
         "owner_mode": "review_false_mechanical",
         "developer_stage": "handoff_preflight_only",
-        "backend_sha256": hashlib.sha256((BACKEND / "auto_designer/__init__.py").read_bytes()).hexdigest(),
+        "backend_sha256": hashlib.sha256(
+            (BACKEND / "auto_designer/__init__.py").read_bytes()
+        ).hexdigest(),
         "started_at": datetime.now(UTC).isoformat(),
     }
     box = None
@@ -144,7 +151,9 @@ def main() -> int:
         (run_dir / "remote-stderr.log").write_text(stderr, encoding="utf-8")
         probe = box.process.exec("test -f /tmp/eval-output/design-delivery.json", timeout=30)
         if probe.exit_code == 0:
-            box.fs.download_file("/tmp/eval-output/design-delivery.json", str(run_dir / "design-delivery.json"))
+            box.fs.download_file(
+                "/tmp/eval-output/design-delivery.json", str(run_dir / "design-delivery.json")
+            )
         manifest["remote_exit_code"] = code
         manifest["passed"] = code == 0
         if code != 0:

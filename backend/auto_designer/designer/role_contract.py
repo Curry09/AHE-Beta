@@ -19,15 +19,28 @@ def validate_triage(item: dict, *, report_number: int) -> list[ContractViolation
     if item.get("issue") != report_number:
         return [ContractViolation("foreign-source", "disposition is not for the isolated report")]
     if item.get("disposition") == "accept" and not isinstance(item.get("artifact"), dict):
-        return [ContractViolation("missing-artifact", "accepted report needs factual triage artifact")]
-    if item.get("disposition") == "accept" and item.get("artifact", {}).get("implementation_target") != "harness":
-        return [ContractViolation("out-of-product-scope", "accepted proposal must target harness behaviour")]
+        return [
+            ContractViolation("missing-artifact", "accepted report needs factual triage artifact")
+        ]
+    if (
+        item.get("disposition") == "accept"
+        and item.get("artifact", {}).get("implementation_target") != "harness"
+    ):
+        return [
+            ContractViolation(
+                "out-of-product-scope", "accepted proposal must target harness behaviour"
+            )
+        ]
     return []
 
 
 def validate_pm(item: dict, *, known_sessions: set[str]) -> list[ContractViolation]:
     if item.get("solution_level") != "product_capability":
-        return [ContractViolation("wrong-abstraction", "PM output must stay at product capability level")]
+        return [
+            ContractViolation(
+                "wrong-abstraction", "PM output must stay at product capability level"
+            )
+        ]
     evidence = item.get("evidence_sessions")
     if not isinstance(evidence, list) or not evidence:
         return [ContractViolation("missing-evidence", "product insight needs session evidence")]
@@ -41,12 +54,18 @@ def validate_pm(item: dict, *, known_sessions: set[str]) -> list[ContractViolati
 
 def validate_synthesis(item: dict, *, visible_proposals: set[int]) -> list[ContractViolation]:
     if item.get("solution_level") != "structural_mechanism":
-        return [ContractViolation("wrong-abstraction", "synthesis must stay at structural mechanism level")]
+        return [
+            ContractViolation(
+                "wrong-abstraction", "synthesis must stay at structural mechanism level"
+            )
+        ]
     sources = item.get("source_proposals")
     if not isinstance(sources, list) or len(sources) < 2:
         return [ContractViolation("not-cross-proposal", "synthesis needs at least two proposals")]
     if any(not isinstance(number, int) or isinstance(number, bool) for number in sources):
-        return [ContractViolation("invalid-source", "proposal sources must use integer issue numbers")]
+        return [
+            ContractViolation("invalid-source", "proposal sources must use integer issue numbers")
+        ]
     if len(set(sources)) < 2:
         return [ContractViolation("not-cross-proposal", "synthesis needs at least two proposals")]
     foreign = [number for number in sources if number not in visible_proposals]

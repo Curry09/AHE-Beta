@@ -9,7 +9,9 @@ from auto_designer.observations.publication import safe_relative
 
 
 def observation_root(store) -> Path:
-    return Path(os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations")))
+    return Path(
+        os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations"))
+    )
 
 
 def grant(*, store, issue: int, sessions: set[str], pm_origin: bool = False) -> None:
@@ -19,7 +21,9 @@ def grant(*, store, issue: int, sessions: set[str], pm_origin: bool = False) -> 
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = root / f"{int(issue)}.json"
     temp = root / f".{uuid.uuid4().hex}.tmp"
-    temp.write_text(json.dumps({"issue": issue, "sessions": sorted(sessions), "pm_origin": pm_origin}))
+    temp.write_text(
+        json.dumps({"issue": issue, "sessions": sorted(sessions), "pm_origin": pm_origin})
+    )
     temp.replace(path)
 
 

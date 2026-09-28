@@ -480,7 +480,8 @@ def create_sandbox(
             filter=lambda info: (
                 None
                 if any(
-                    part in {
+                    part
+                    in {
                         ".git",
                         "__pycache__",
                         ".pytest_cache",
@@ -501,7 +502,8 @@ def create_sandbox(
             filter=lambda info: (
                 None
                 if any(
-                    part in {
+                    part
+                    in {
                         ".git",
                         "__pycache__",
                         ".pytest_cache",

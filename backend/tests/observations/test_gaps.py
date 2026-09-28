@@ -18,16 +18,30 @@ from auto_designer.user.session_store import SessionStore
 
 
 def request(**changes):
-    return {"request_id": "cancel-ownership", "scope": "harness", "session_ids": ["s1"],
-            "related_issues": [], "question": "Which request resumed after cancel?",
-            "checked": "v1 READING and activity window", "unknowns": "old or new request",
-            "impact": "Cannot verify cancellation ownership", "desired_capability": "Distinguish ownership",
-            "verification": "Controlled overlapping old/new requests", **changes}
+    return {
+        "request_id": "cancel-ownership",
+        "scope": "harness",
+        "session_ids": ["s1"],
+        "related_issues": [],
+        "question": "Which request resumed after cancel?",
+        "checked": "v1 READING and activity window",
+        "unknowns": "old or new request",
+        "impact": "Cannot verify cancellation ownership",
+        "desired_capability": "Distinguish ownership",
+        "verification": "Controlled overlapping old/new requests",
+        **changes,
+    }
 
 
 def service(tmp_path, tracker=None, role="triager"):
-    return GapService(store=SessionStore(tmp_path / "sessions"), tracker=tracker or FakeTracker(),
-                      role=role, subject="round1", sessions={"s1"}, issues={1})
+    return GapService(
+        store=SessionStore(tmp_path / "sessions"),
+        tracker=tracker or FakeTracker(),
+        role=role,
+        subject="round1",
+        sessions={"s1"},
+        issues={1},
+    )
 
 
 def test_submission_does_not_stop_role_and_is_scoped(tmp_path):
@@ -35,7 +49,10 @@ def test_submission_does_not_stop_role_and_is_scoped(tmp_path):
     with bind_gaps(svc):
         result = submit_observation_gap(**request())
         assert result["status"] == "submitted"
-        assert submit_observation_gap(**request(session_ids=["other"]))["error"] == "outside_evidence_scope"
+        assert (
+            submit_observation_gap(**request(session_ids=["other"]))["error"]
+            == "outside_evidence_scope"
+        )
         assert submit_observation_gap(**request())["issue"] == result["issue"]
         assert authorized_sessions(store=svc.store, issue=result["issue"]) == {"s1"}
     assert svc.submit(request())["error"] == "invocation_closed"
@@ -47,8 +64,10 @@ def test_gap_created_in_round_has_round_label(tmp_path):
     svc = service(tmp_path)
     with bind_usage_context(round_no=2):
         result = svc.submit(request())
-    assert svc.tracker.issue(result['issue'])['labels'] == [
-        'proposal', 'observation-gap', 'round-2',
+    assert svc.tracker.issue(result["issue"])["labels"] == [
+        "proposal",
+        "observation-gap",
+        "round-2",
     ]
 
 
@@ -72,7 +91,9 @@ def test_pm_lineage_cannot_leak_back_through_followup_gaps(tmp_path, role):
     svc = service(tmp_path, role=role)
     from auto_designer.models import IssueDraft
 
-    source = svc.tracker.create_issue(IssueDraft(title="PM", body="opportunity", labels=["from-divergent"]))
+    source = svc.tracker.create_issue(
+        IssueDraft(title="PM", body="opportunity", labels=["from-divergent"])
+    )
     grant(store=svc.store, issue=source.number, sessions={"s1"}, pm_origin=True)
     result = svc.submit(request(related_issues=[source.number], session_ids=[]))
     assert "from-divergent" in svc.tracker.issue(result["issue"])["labels"]
@@ -113,12 +134,18 @@ def test_delivery_ingestion_requires_authenticated_author_and_issue_scope(tmp_pa
 
     ref = tracker.create_issue(IssueDraft(title="original", body="context", labels=["openagents"]))
     grant(store=svc.store, issue=ref.number, sessions={"s1"})
-    payload = {"issue": ref.number, "role": "reviewer", "request": request(related_issues=[ref.number])}
+    payload = {
+        "issue": ref.number,
+        "role": "reviewer",
+        "request": request(related_issues=[ref.number]),
+    }
     body = f"<!-- openagents:agent=observation-runner -->\n<!-- {MARKER} {json.dumps(payload)} -->"
     tracker.authenticated_login = lambda: "automation"
     tracker.list_comments = lambda **kw: [{"author": "human", "body": body}]
     assert ingest_delivery_gaps(store=svc.store, tracker=tracker) == []
-    tracker.list_comments = lambda **kw: [{"author": "automation", "body": body}] if kw["number"] == ref.number else []
+    tracker.list_comments = lambda **kw: (
+        [{"author": "automation", "body": body}] if kw["number"] == ref.number else []
+    )
     result = ingest_delivery_gaps(store=svc.store, tracker=tracker)
     assert result[0]["status"] == "submitted"
     assert tracker.issue(result[0]["issue"])["labels"] == ["proposal", "observation-gap"]

@@ -89,22 +89,24 @@ def test_timeout_raises(*, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_default_wait_survives_four_hours_and_expires_after_one_day(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv('ROUND_DELIVERY_TIMEOUT_SEC', raising=False)
-    ticks = {'now': 0.0, 'reads': 0}
+    monkeypatch.delenv("ROUND_DELIVERY_TIMEOUT_SEC", raising=False)
+    ticks = {"now": 0.0, "reads": 0}
     jumps = iter((14_401.0, 86_399.0, 86_401.0))
 
     def fetch_issue(number: int) -> dict:
-        ticks['reads'] += 1
-        return {'state': 'open', 'labels': ['ready']}
+        ticks["reads"] += 1
+        return {"state": "open", "labels": ["ready"]}
 
     with pytest.raises(RoundDeliveryBlocked) as caught:
         wait_round_delivery(
-            numbers=[9], fetch_issue=fetch_issue,
-            poll_sec=1, monotonic=lambda: ticks['now'],
-            sleep=lambda _seconds: ticks.__setitem__('now', next(jumps)),
+            numbers=[9],
+            fetch_issue=fetch_issue,
+            poll_sec=1,
+            monotonic=lambda: ticks["now"],
+            sleep=lambda _seconds: ticks.__setitem__("now", next(jumps)),
         )
-    assert caught.value.reason == 'timeout'
-    assert ticks['reads'] == 4
+    assert caught.value.reason == "timeout"
+    assert ticks["reads"] == 4
 
 
 def test_classify_closed_with_needs_human_is_blocked() -> None:

@@ -65,14 +65,10 @@ class HarnessStdioSession:
         self._cwd.mkdir(parents=True, exist_ok=True)
         if self._transcript_path:
             self._transcript_path.parent.mkdir(parents=True, exist_ok=True)
-            self._transcript_handle = self._transcript_path.open(
-                "a", encoding="utf-8", buffering=1
-            )
+            self._transcript_handle = self._transcript_path.open("a", encoding="utf-8", buffering=1)
         if self._stderr_path:
             self._stderr_path.parent.mkdir(parents=True, exist_ok=True)
-            self._stderr_handle = self._stderr_path.open(
-                "a", encoding="utf-8", buffering=1
-            )
+            self._stderr_handle = self._stderr_path.open("a", encoding="utf-8", buffering=1)
         stderr: int | TextIO = self._stderr_handle or subprocess.DEVNULL
         self._process = subprocess.Popen(
             self._command,
@@ -148,23 +144,17 @@ class HarnessStdioSession:
                 try:
                     item = self._events.get(timeout=remaining)
                 except queue.Empty as exc:
-                    raise TimeoutError(
-                        f"harness did not reply within {timeout:.1f}s"
-                    ) from exc
+                    raise TimeoutError(f"harness did not reply within {timeout:.1f}s") from exc
                 if item is None:
                     code = self._process.poll()
-                    raise HarnessProtocolError(
-                        f"harness stdout closed before reply (exit={code})"
-                    )
+                    raise HarnessProtocolError(f"harness stdout closed before reply (exit={code})")
                 if isinstance(item, BaseException):
                     raise HarnessProtocolError("harness stdout reader failed") from item
                 seen.append(item)
                 event_type = item.get("type")
                 # Usage frames legitimately carry ``"error": null``. Only a
                 # v1 error frame or a non-empty legacy error payload is fatal.
-                if event_type == "error" or (
-                    event_type is None and item.get("error") is not None
-                ):
+                if event_type == "error" or (event_type is None and item.get("error") is not None):
                     raise HarnessProtocolError(f"harness error event: {item}")
                 if event_type == "reply":
                     reply_text = item.get("text", "")

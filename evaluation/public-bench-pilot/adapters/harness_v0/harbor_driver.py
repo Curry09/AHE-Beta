@@ -54,9 +54,7 @@ def main() -> int:
     def remaining() -> float:
         seconds = deadline - time.monotonic()
         if seconds <= 0:
-            raise TimeoutError(
-                f"trial exhausted its total {args.timeout:.1f}s agent budget"
-            )
+            raise TimeoutError(f"trial exhausted its total {args.timeout:.1f}s agent budget")
         return seconds
 
     try:

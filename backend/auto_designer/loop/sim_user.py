@@ -567,7 +567,9 @@ def make_direct_run_session_fn(
         sim_persona = sim_personas.get(persona.identity)
         review_error: str | None = None
         review: dict = {}
-        review_system = "You are a strict software user reviewing a completed harness run. Return JSON only."
+        review_system = (
+            "You are a strict software user reviewing a completed harness run. Return JSON only."
+        )
         if sim_persona is not None:
             from auto_designer.user.sim.prompt import build_system
 
@@ -600,7 +602,9 @@ def make_direct_run_session_fn(
                 review = dict(review_client.respond(review_system, review_prompt) or {})
         except Exception as exc:  # noqa: BLE001 - preserve feedback even if review is unavailable
             review_error = str(exc)
-        feedback = str(review.get("feedback") or review.get("message") or review.get("issue") or "").strip()
+        feedback = str(
+            review.get("feedback") or review.get("message") or review.get("issue") or ""
+        ).strip()
         if not feedback:
             feedback = "Harness final reply recorded without additional user findings."
         review_issue = str(review.get("issue") or feedback).strip()
@@ -646,7 +650,9 @@ def make_direct_run_session_fn(
                     Turn(role="user", content=feedback),
                 ]
             ),
-            feeling=FeelingScore(score=score, reason=str(review.get("reason") or "terminal user review")),
+            feeling=FeelingScore(
+                score=score, reason=str(review.get("reason") or "terminal user review")
+            ),
             issue_refs=issue_refs,
             session_id=session_id,
             user_outcome={
@@ -713,8 +719,14 @@ def make_mixed_run_session_fn(
         round_provider=round_provider,
     )
 
-    def run(persona: Persona, scenario: SeedScenario, harness: HarnessInterface, *, workspace_dir=None):
-        mode = str((scenario.workspace.params if scenario.workspace else {}).get("interaction", "simulated_user"))
+    def run(
+        persona: Persona, scenario: SeedScenario, harness: HarnessInterface, *, workspace_dir=None
+    ):
+        mode = str(
+            (scenario.workspace.params if scenario.workspace else {}).get(
+                "interaction", "simulated_user"
+            )
+        )
         if mode == "direct":
             return direct(persona, scenario, harness, workspace_dir=workspace_dir)
         if mode != "simulated_user":

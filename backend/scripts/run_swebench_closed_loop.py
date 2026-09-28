@@ -455,12 +455,16 @@ def main() -> int:
         source_url = os.environ.get("AUTO_DESIGNER_REPLAY_SOURCE_URL", "").strip()
         base_ref = os.environ.get("AUTO_DESIGNER_REPLAY_BASE_REF", "").strip()
         if not source_url or not base_ref:
-            raise SystemExit("replay requires AUTO_DESIGNER_REPLAY_SOURCE_URL and AUTO_DESIGNER_REPLAY_BASE_REF")
+            raise SystemExit(
+                "replay requires AUTO_DESIGNER_REPLAY_SOURCE_URL and AUTO_DESIGNER_REPLAY_BASE_REF"
+            )
         subprocess.run(["git", "remote", "remove", "replay-source"], cwd=repo, check=False)
         subprocess.run(["git", "remote", "add", "replay-source", source_url], cwd=repo, check=True)
         fetch = subprocess.run(
             ["git", "fetch", "--no-tags", "replay-source", base_ref],
-            cwd=repo, text=True, capture_output=True,
+            cwd=repo,
+            text=True,
+            capture_output=True,
         )
         if fetch.returncode != 0:
             raise SystemExit(f"replay source fetch failed: {fetch.stderr[-1000:]}")

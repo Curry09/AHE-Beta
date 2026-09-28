@@ -1,4 +1,5 @@
 """The same non-NexAU behavior with ownership diagnostics and version-specific documentation."""
+
 import json
 import os
 import sys
@@ -6,9 +7,14 @@ from pathlib import Path
 
 root = Path(os.environ["HARNESS_OBSERVATION_DIR"])
 root.mkdir(parents=True, exist_ok=True)
-(root / "READING.md").write_text("v2: ownership.tsv columns are action and affected owner. Cancel records the OLD owner; inspect records the CURRENT owner. Compare with actual replies; logs alone do not prove behavior.")
-manifest = {"reading": "READING.md", "status": "partial",
-            "files": [{"path": "READING.md"}, {"path": "ownership.tsv"}]}
+(root / "READING.md").write_text(
+    "v2: ownership.tsv columns are action and affected owner. Cancel records the OLD owner; inspect records the CURRENT owner. Compare with actual replies; logs alone do not prove behavior."
+)
+manifest = {
+    "reading": "READING.md",
+    "status": "partial",
+    "files": [{"path": "READING.md"}, {"path": "ownership.tsv"}],
+}
 (root / "manifest.json").write_text(json.dumps(manifest))
 owner = "none"
 with (root / "ownership.tsv").open("w") as log:
