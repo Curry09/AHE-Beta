@@ -2,14 +2,16 @@
 # Gitea 一键初始化（spec-0002/T1）：等待就绪 → 建 admin → 生成 token → 建工作仓 → ensure 标签。
 # 每步幂等，可重跑。产出 deploy/gitea/.env（GITEA_URL/OWNER/REPO/TOKEN），作为 T2/T3 唯一配置入口。
 set -euo pipefail
+umask 077
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$HERE/.env"
+if [[ -f "$ENV_FILE" ]]; then chmod 600 "$ENV_FILE"; fi
 COMPOSE="docker compose -f $HERE/docker-compose.yml"
 
 GITEA_URL="${GITEA_URL:-http://localhost:3000}"
 OWNER="${GITEA_ADMIN_USER:-designer}"
-ADMIN_PASS="${GITEA_ADMIN_PASS:-designer-pass-123}"
+ADMIN_PASS="${GITEA_ADMIN_PASS:?Set GITEA_ADMIN_PASS before bootstrapping Gitea}"
 ADMIN_EMAIL="${GITEA_ADMIN_EMAIL:-designer@example.com}"
 REPO="${GITEA_WORK_REPO:-auto-designer-work}"
 TOKEN_NAME="${GITEA_TOKEN_NAME:-auto-designer}"

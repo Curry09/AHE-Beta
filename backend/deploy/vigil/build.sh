@@ -7,7 +7,8 @@ set -euo pipefail
 OPENAGENTS_PATH="${1:?用法: build.sh <OpenAgents 仓路径> <NexAU 仓路径>}"
 NEXAU_PATH="${2:?用法: build.sh <OpenAgents 仓路径> <NexAU 仓路径>}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PIP_INDEX_URL="${VIGIL_PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+PIP_INDEX_URL="${VIGIL_PIP_INDEX_URL:-https://pypi.org/simple}"
+IMAGE_TAG="${VIGIL_IMAGE_TAG:-auto-designer-vigil:latest}"
 CLAUDE_CODE_VERSION="${VIGIL_CLAUDE_CODE_VERSION:-2.1.261}"
 
 test -f "$OPENAGENTS_PATH/pyproject.toml" || {
@@ -36,6 +37,6 @@ docker build \
   --build-arg "HTTPS_PROXY=${https_proxy:-${HTTPS_PROXY:-}}" \
   --build-arg "NO_PROXY=${no_proxy:-${NO_PROXY:-}}" \
   -f "$HERE/Dockerfile" \
-  -t auto-designer-vigil:latest \
+  -t "$IMAGE_TAG" \
   "$OPENAGENTS_PATH"
-echo "✓ 镜像 auto-designer-vigil:latest 构建完成（OpenAgents pin = $(git -C "$OPENAGENTS_PATH" rev-parse --short HEAD 2>/dev/null || echo '非 git checkout')，NexAU pin = $(git -C "$NEXAU_PATH" rev-parse --short HEAD 2>/dev/null || echo '非 git checkout')）"
+echo "✓ 镜像 $IMAGE_TAG 构建完成（OpenAgents pin = $(git -C "$OPENAGENTS_PATH" rev-parse --short HEAD 2>/dev/null || echo '非 git checkout')，NexAU pin = $(git -C "$NEXAU_PATH" rev-parse --short HEAD 2>/dev/null || echo '非 git checkout')）"

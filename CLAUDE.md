@@ -7,7 +7,7 @@
 2. `nexau` 作为 agent 实现，同时兼容 claude code / codex 接入。
 
 ### 项目文档
-飞书文档：https://sxddhcrtbqu.feishu.cn/wiki/P3dEw0vmhix6IXk7KpJc4O85nfc?from=from_copylink
+用户入口见 README.md；当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
@@ -32,7 +32,7 @@
 ### 约束
 1. benchmark 全程 held-out：不参与训练，不参与发版门禁。
 2. persona 来自真实数据，不依据 benchmark 或轨迹构造。
-3. 发版门禁只用体感；benchmark 只用于观测。
+3. 体感与 benchmark 只作观测；交付按配置启用工程质量闸，不以体感分数决定合并。
 
 ### 观测指标
 记录 issue 数量随时间的曲线，用于判断新 issue 的产生和已有 issue 的解决是否平衡：issue 长期不下降说明 harness 在退化；issue 过早归零说明 persona 多样性不足、探索停止。
@@ -40,7 +40,7 @@
 ### 待定项
 1. 体感 1-4 的评分细则（评分维度与归一）。
 2. 真实数据盘点（确认蒸馏模块的输入）。
-3. 体感门禁的最小样本量 N 与回归判定方式（单点比较 vs 分布比较）。
+3. 体感观测的样本量与回归分析口径（单点比较 vs 分布比较）。
 
 ## 架构（MVP）
 
@@ -69,7 +69,7 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 `loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；`TOTAL_ROUNDS=1` 不启 vigil。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。并行隔离实验用 `backend/scripts/experiment.py`（spec-0047）；`./run.sh` 单例入口已弃用，并拒绝 attach 实验托管的 vigil。
 
 ### 目录结构
-前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 占位待建，项目级文档/工具与配置留根。
+前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 提供只读观测看板，项目级文档/工具与配置留根。
 ```
 backend/                 # 后端（编排框架）
   auto_designer/         # 包（编排框架本体）

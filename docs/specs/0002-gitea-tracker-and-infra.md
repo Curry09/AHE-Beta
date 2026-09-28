@@ -136,7 +136,7 @@ T3：Gitea 不可达/token 失效时建仓 API 抛 4xx/连接异常，脚本非�
 
 ### 接口
 
-T1：产出文件契约 `backend/deploy/gitea/.env`（四键见上）；脚本入口 `bash backend/deploy/gitea/bootstrap.sh`（幂等），服务入口 `docker compose -f backend/deploy/gitea/docker-compose.yml up -d`；消费方为 GiteaTracker(T2) 与 bootstrap_harness(T3)。
+T1：产出文件契约 `backend/deploy/gitea/.env`（四键见上）；脚本入口 `bash backend/deploy/gitea/bootstrap.sh`（幂等），服务入口 `docker compose -f backend/deploy/gitea/docker-compose.yml up -d`（宿主 HTTP/SSH 仅绑定 loopback；bootstrap 必须显式传入 `GITEA_ADMIN_PASS`，以 umask 077 写凭证）；消费方为 GiteaTracker(T2) 与 bootstrap_harness(T3)。
 
 T2：类 `GiteaTracker(base_url: str, owner: str, repo: str, token: str)`，实现 spec-0001/T5 `IssueTracker` 协议：
 - `ensure_labels(names: list[str]) -> None`

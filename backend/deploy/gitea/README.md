@@ -1,5 +1,7 @@
 # 本地 Gitea（spec-0002/T1）
 
+旧单实例联调入口；并行实验优先用 `backend/deploy/experiment/`。端口仅绑定 loopback，bootstrap 要求显式管理员密码，凭证文件使用私有权限。
+
 issue 与 harness 仓的家。单服务 + sqlite，最小运维面；非生产化（无 TLS/外部 DB/HA）。
 
 ## 启动
@@ -13,6 +15,8 @@ Gitea 在固定端口 `http://localhost:3000`（`GET /api/v1/version` 返回 200
 ## 一键初始化 / 拿 token
 
 ```bash
+read -rs -p "Gitea admin password: " GITEA_ADMIN_PASS
+export GITEA_ADMIN_PASS
 bash backend/deploy/gitea/bootstrap.sh
 ```
 

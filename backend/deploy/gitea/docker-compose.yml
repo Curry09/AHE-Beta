@@ -26,8 +26,8 @@ services:
       # （issue/push/merge），host 端口映射照旧走 ci 网络，不受 internal 影响。
       - vigil_net
     ports:
-      - "3000:3000"   # HTTP（固定）
-      - "2222:22"     # SSH（可选）
+      - "127.0.0.1:3000:3000"   # HTTP（固定）
+      - "127.0.0.1:2222:22"     # SSH（可选）
 
   # Spec-0032/T6：Actions runner。注册 token 由 bootstrap.sh 生成并写进本目录 .env 的 RUNNER_TOKEN
   # （compose 自动读同目录 .env 做插值），首次注册后凭据落 runner_data 卷、重启免重注册。
