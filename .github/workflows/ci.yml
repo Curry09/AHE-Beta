@@ -55,7 +55,7 @@ jobs:
       - name: Pytest
         run: |
           uv venv
-          uv pip install pytest requests ruamel.yaml jsonschema fastapi httpx pyyaml json-repair python-dotenv
+          uv pip install pytest requests ruamel.yaml jsonschema fastapi httpx pyyaml json-repair python-dotenv pathspec
           if [ -d backend/tests ] && [ -n "$(find backend/tests -name 'test_*.py' -print -quit)" ]; then
             PYTHONPATH="$GITHUB_WORKSPACE/.ci/nexau:$GITHUB_WORKSPACE/backend" \
               .venv/bin/pytest backend/tests/ -v
