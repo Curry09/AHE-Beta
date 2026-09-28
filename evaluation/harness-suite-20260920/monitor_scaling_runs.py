@@ -15,7 +15,6 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "evaluation" / "harness-suite-20260920"
-DEFAULT_URL = "http://38.47.121.235:18080/api/runs"
 GITEA_ENV = Path("/tmp/hse-gitea.env")
 ALLOWED_N = {1, 4, 8, 16, 32}
 ACTIVE_RUN_IDS = (
@@ -106,7 +105,7 @@ def check_once(url: str, log_path: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--interval", type=int, default=3600)
-    parser.add_argument("--dashboard-url", default=DEFAULT_URL)
+    parser.add_argument("--dashboard-url", required=True)
     parser.add_argument("--log", type=Path, default=SUITE / "runs" / "monitor.log")
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()

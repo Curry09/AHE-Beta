@@ -122,7 +122,7 @@ def credentials(gitea_file: Path | None) -> dict[str, str]:
     env.update({key: value for key, value in os.environ.items() if value})
     e2b_key = env.get("E2B_API_KEY") or env.get("API_KEY") or env.get("API_KET")
     boyue_key = env.get("BOYUE_API_KEY") or env.get("api-key") or env.get("BOYUE_KEY")
-    gitea_url = env.get("GITEA_URL", "http://38.47.121.235:3000").rstrip("/")
+    gitea_url = env.get("GITEA_URL", "").rstrip("/")
     gitea_user = env.get("GITEA_USER") or env.get("OWNER") or "hseadmin"
     gitea_token = env.get("GITEA_TOKEN") or env.get("TOKEN") or env.get("GITEA_PASSWORD")
     missing = [
@@ -130,6 +130,7 @@ def credentials(gitea_file: Path | None) -> dict[str, str]:
         for name, value in (
             ("E2B_API_KEY", e2b_key),
             ("BOYUE_API_KEY", boyue_key),
+            ("GITEA_URL", gitea_url),
             ("GITEA_USER", gitea_user),
             ("GITEA_TOKEN", gitea_token),
         )

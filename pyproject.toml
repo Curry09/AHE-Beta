@@ -3,7 +3,13 @@ name = "auto-designer"
 version = "0.0.0"
 description = "自进化 harness：模拟用户→开发者闭环，体感驱动、benchmark held-out"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+readme = "README.md"
 dependencies = [
+    "nexau @ git+https://github.com/nex-agi/NexAU.git@5cd791b1382f1163621c9ff0b50c2cf01c4ba923",
+    # NexAU at this commit still imports pre-1.0 AG-UI thinking events.
+    "ag-ui-protocol==0.1.22",
     # spec CLI（vendored 在 tools/spec-driven-development/vendor）所需
     "ruamel.yaml>=0.18",
     "jsonschema>=4",
@@ -21,6 +27,8 @@ evaluation = [
     "swebench==4.1.0",
 ]
 dev = [
+    "httpx>=0.28",
+    "httpx2>=1.0",
     "ruff>=0.9.0",
     "pytest>=8.0.0",
     # drift-guard 测试解析 agent_defs 的 *.tool.yaml（对照 agent_contract 生成的 input_schema）

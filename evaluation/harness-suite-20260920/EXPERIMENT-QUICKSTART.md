@@ -1,3 +1,5 @@
+> 历史研究工作流：依赖该日期套件、外部 sandbox 与对应配置。通用安装从根 README / docs/QUICKSTART.md 开始。运行前显式配置自己的 Gitea/dashboard 地址；不要复用原实验服务。
+
 # Scaling 实验快速启动手册
 
 本文面向第一次接手仓库的执行者。正式 scaling 使用 E2B + Boyue；每个 N 是一个

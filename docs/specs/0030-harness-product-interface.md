@@ -26,6 +26,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
+      - backend/harness_template/LICENSE
       - backend/harness_template/HELP.md
       - backend/harness_template/RUNTIME.md
       - backend/harness_template/.env.example
@@ -144,6 +145,8 @@ harness repo 内只有两类文字说明：
 ## Reference-level explanation
 
 ### Harness template 文件职责
+
+`LICENSE` 随独立 seed Harness 分发，保留项目 MIT 许可；它不作为 `/help` 内容。
 
 | 文件 | 职责 |
 |------|------|

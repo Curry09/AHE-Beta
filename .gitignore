@@ -22,9 +22,6 @@ evaluation/harness-suite-20260920/harbor-canary-jobs/
 # openagents 本地运行态（worktrees + state.json，本机专属）
 .openagents/
 
-# 依赖锁文件：本地各自生成，不入库
-uv.lock
-
 # 前端构建产物与依赖
 frontend/node_modules/
 frontend/dist/
@@ -42,3 +39,13 @@ backend/.env
 
 # dev agent 逃逸产物：编排仓下伪 origin bare 仓（见 spec-0021）
 **/.canonical_origin.git/
+
+# Local credentials and experiment output (examples remain tracked)
+.env
+.env.*
+!.env.example
+!*.env.example
+.e2b
+.boyue
+.profiles/
+auto-designer-experiments/
