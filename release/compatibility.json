@@ -12,9 +12,9 @@
     "branch": "main",
     "baseline_commit": "122155377ed38f441501012adea0e633d23473b5",
     "release_branch": "main",
-    "main_integration": "functional branch merged via PR #185; open-source preparation still pending",
+    "main_integration": "functional branch and open-source preparation merged via PR #185 and PR #186",
     "baseline_branch": "auto-designer/v0.2",
-    "integration_commit": "1d4976c9a9e844037ddcadef8649aacb33edd950"
+    "integration_commit": "ee87df3acab036213cecbc35cdea01339a5dd988"
   },
   "nexau": {
     "repository": "https://github.com/nex-agi/NexAU",

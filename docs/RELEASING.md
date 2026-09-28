@@ -6,7 +6,7 @@
 
 `release/compatibility.json` 的 `baseline_commit` 保留整理前的审计来源，`openagents.integration_commit` 则记录当前跨仓 CI 使用的完整 SHA，**两者都不是整理完成后的正式发行版本**。整理 PR 合并并通过检查后，从双方目标分支取最终提交，生成发布资产中的完整 manifest，填写两仓 SHA/tag、NexAU、seed Harness tree、容器 digest、配置 profile、平台及验证结果。避免在提交内部记录自身 commit hash。
 
-两仓最终均从 main 发布。OpenAgents 功能分支已通过 [PR #185](https://github.com/Curry09/OpenAgents/pull/185) 合入 main，合并提交为 `1d4976c9a9e844037ddcadef8649aacb33edd950`。`chore/opensource-prep` 尚待评审合并；正式 tag 应包含这批许可、安装和 CI 整理改动。项目/前端/桌面组件版本可以不同，Release notes 解释各自范围。NexAU 的 extra 含固定 Git 来源，当前优先源码/GitHub wheel 发布；PyPI 发行前需另行验证 direct-reference 依赖政策与分发方案。
+两仓最终均从 main 发布。OpenAgents 的功能和开源整理已分别通过 [PR #185](https://github.com/Curry09/OpenAgents/pull/185) 与 [PR #186](https://github.com/Curry09/OpenAgents/pull/186) 合入 main；当前跨仓受测提交为 `ee87df3acab036213cecbc35cdea01339a5dd988`。这仍是提交 pin，尚未发布正式 tag。项目/前端/桌面组件版本可以不同，Release notes 解释各自范围。NexAU 的 extra 含固定 Git 来源，当前优先源码/GitHub wheel 发布；PyPI 发行前需另行验证 direct-reference 依赖政策与分发方案。
 
 ## 已纳入本轮代码的检查
 
@@ -30,7 +30,7 @@ GitHub CI 的跨仓 checkout 要求对方仓库可读；首次公开前若仍是
 
 ## 发布顺序
 
-1. OpenAgents 的功能合并已完成；继续将 `chore/opensource-prep` 评审合入 main。随后更新 auto-designer 的 OpenAgents pin、复测契约并将其整理 PR 合入 main，跑离线与真实验收。
+1. OpenAgents 功能与整理已合入 main；auto-designer 已更新 pin 并复测契约，继续将本整理 PR 合入 main，完成离线与真实验收。
 2. 构建 OpenAgents wheel、源码包，以及约定的镜像；auto-designer 保持源码发行。使用不可变版本名，生成校验和、manifest、Release notes 和已知限制。
 3. 先准备依赖方可引用的 OpenAgents 版本，再冻结 auto-designer 指向该版本；先以 draft/prerelease 验证安装与下载。
 4. 维护者确认上述待办与资产后，执行正式 tag、Release 和可见性变更；双方 Release 互相链接。
