@@ -55,7 +55,7 @@ jobs:
       - name: Pytest
         run: |
           uv venv
-          uv pip install pytest requests ruamel.yaml jsonschema fastapi httpx httpx2 pyyaml json-repair python-dotenv pathspec pillow anthropic openai ag-ui-protocol mcp sqlmodel tiktoken asyncer python-ulid nest_asyncio
+          uv pip install pytest requests ruamel.yaml jsonschema fastapi httpx httpx2 pyyaml json-repair python-dotenv pathspec pillow anthropic openai 'ag-ui-protocol==0.1.22' mcp sqlmodel tiktoken asyncer python-ulid nest_asyncio
           uv pip install -e .ci/nexau
           if [ -d backend/tests ] && [ -n "$(find backend/tests -name 'test_*.py' -print -quit)" ]; then
             PYTHONPATH="$GITHUB_WORKSPACE/.ci/nexau:$GITHUB_WORKSPACE/backend" \
