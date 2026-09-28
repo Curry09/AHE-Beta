@@ -1,12 +1,13 @@
 # 两仓联合 Quickstart
 
-以下命令从两个 sibling checkout 开始。OpenAgents 当前先从功能分支取新版；功能和整理改动合入 main 后，两仓统一从 main 的发行 tag/SHA 获取。发布前使用维护者给出的候选分支；正式发布后应按 `release/compatibility.json` 中已验证的不可变提交或 tag 组合安装。单独追踪两个分支的最新 HEAD 不保证兼容。
+以下命令从两个 sibling checkout 开始。OpenAgents 功能已合入 main；下面固定到 PR #185 的合并提交。开源整理仍在候选分支，正式发布时再固定到包含整理改动的发行 tag/SHA。发布前使用维护者给出的候选分支；正式发布后应按 `release/compatibility.json` 中已验证的不可变提交或 tag 组合安装。单独追踪两个分支的最新 HEAD 不保证兼容。
 
 ## 1. 安装与无模型自检
 
 ```bash
 git clone https://github.com/Curry09/auto-designer.git
-git clone --branch auto-designer/v0.2 https://github.com/Curry09/OpenAgents.git
+git clone https://github.com/Curry09/OpenAgents.git
+git -C OpenAgents checkout --detach 1d4976c9a9e844037ddcadef8649aacb33edd950
 cd auto-designer
 uv sync --locked --extra dev
 uv run --locked python backend/scripts/offline_demo.py
