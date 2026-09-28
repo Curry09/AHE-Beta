@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -44,8 +45,17 @@ def test_setup_idempotent_reentry(tmp_path: Path) -> None:
     assert (tmp_path / ".venv" / "bin").is_dir()
 
 
-def test_sandbox_does_not_inject_venv_when_present(tmp_path: Path) -> None:
+@pytest.mark.parametrize("ambient_venv", [None, "/test-parent-venv"])
+def test_sandbox_does_not_inject_venv_when_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ambient_venv: str | None
+) -> None:
     """工作区含 .venv/bin 也不自动改 VIRTUAL_ENV/PATH；环境选择需显式命令。"""
+    # uv run / activated shells supply VIRTUAL_ENV; inheritance is part of the contract.
+    if ambient_venv is None:
+        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+    else:
+        monkeypatch.setenv("VIRTUAL_ENV", ambient_venv)
+    ambient_path = os.environ["PATH"]
     bindir = tmp_path / ".venv" / "bin"
     bindir.mkdir(parents=True)
     fake_python = bindir / "python"
@@ -53,8 +63,9 @@ def test_sandbox_does_not_inject_venv_when_present(tmp_path: Path) -> None:
     fake_python.chmod(0o755)
 
     sb = Sandbox(workspace=str(tmp_path))
-    assert sb.run("echo $VIRTUAL_ENV")["stdout"].strip() == ""
-    assert str(bindir.resolve()) not in sb.run("echo $PATH")["stdout"]
+    assert sb.run('printf "%s" "$VIRTUAL_ENV"')["stdout"] == (ambient_venv or "")
+    assert sb.run('printf "%s" "$PATH"')["stdout"] == ambient_path
+    assert str(bindir.resolve()) not in ambient_path.split(os.pathsep)
 
     explicit = sb.run(".venv/bin/python")
     assert explicit["stdout"].strip() == "fake-venv-python"
