@@ -33,7 +33,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import pyarrow.parquet as pq
+try:
+    import pyarrow.parquet as pq
+except ModuleNotFoundError:  # pragma: no cover - exercised by dependency-free unit tests
+    class _MissingPyarrow:
+        @staticmethod
+        def read_table(*_args: Any, **_kwargs: Any) -> Any:
+            raise ModuleNotFoundError("pyarrow is required to read the SWE-bench parquet input")
+
+    pq = _MissingPyarrow()
 
 from auto_designer.models import WorkspaceSpec
 from auto_designer.user.sim.seed_source import provision

@@ -13,12 +13,12 @@
   "owner": {"mode": "mechanical", "review": false},
   "pm": {"enabled": true, "count_source": "profiles[N].pm"},
   "designer": {"grouping": true, "batch_size": 6},
-  "delivery": {"invocation_wall_seconds": 3600, "idle_seconds": 300, "round_wait_seconds": 14400},
+  "delivery": {"invocation_wall_seconds": 3600, "idle_seconds": 300, "round_wait_seconds": 86400},
   "task_timeout": {"fallback_seconds": 1800, "outer_grace_seconds": 600, "scope": "per_trial_not_whole_evolution"},
   "timeouts": {
     "latency_isolated_timeout": {
       "enabled": true,
-      "wall_guard_grace_seconds": 600
+      "wall_guard_grace_seconds": 1800
     }
   },
   "interaction_contract": {

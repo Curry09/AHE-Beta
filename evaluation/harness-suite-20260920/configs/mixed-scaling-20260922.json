@@ -72,7 +72,7 @@
   "timeouts": {
     "latency_isolated_timeout": {
       "enabled": true,
-      "wall_guard_grace_seconds": 600
+      "wall_guard_grace_seconds": 1800
     },
     "official_agent_timeout_source":"task_metadata_or_1800_fallback",
     "fallback_agent_seconds":1800,

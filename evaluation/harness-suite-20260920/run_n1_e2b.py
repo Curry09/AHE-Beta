@@ -249,6 +249,8 @@ def remote_files(
             f"AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS={int(timing_policy.get('wall_guard_grace_seconds', 600))}",
             f"ANTHROPIC_MODEL={developer_model}",
             f"ANTHROPIC_SMALL_FAST_MODEL={developer_model}",
+            f"CLAUDE_CODE_SUBAGENT_MODEL={developer_model}",
+            "CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1",
             f"ANTHROPIC_BASE_URL={creds['BOYUE_ANTHROPIC']}",
             f"ANTHROPIC_AUTH_TOKEN={creds['BOYUE_API_KEY']}",
             "PYTHONUNBUFFERED=1",

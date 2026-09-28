@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import subprocess
 import sys
@@ -16,6 +17,11 @@ SUITE = ROOT / "evaluation" / "harness-suite-20260920"
 DEFAULT_URL = "http://38.47.121.235:18080/api/runs"
 GITEA_ENV = Path("/tmp/hse-gitea.env")
 ALLOWED_N = {1, 4, 8, 16, 32}
+ACTIVE_RUN_IDS = (
+    '20260922T045045Z-5bb0a2', '20260922T133329Z-e04374',
+    '20260922T133332Z-0e6120', '20260922T184216Z-124e65',
+    '20260922T184219Z-bae826',
+)
 
 
 def log(message: str, path: Path) -> None:
@@ -56,36 +62,34 @@ def resume_one(row: dict, log_path: Path) -> None:
     if not run_id or n not in ALLOWED_N or state_path is None:
         log(f"SKIP resume: no frozen local state for {run_id!r}", log_path)
         return
-    if n == 1 and run_id == "20260922T045045Z-5bb0a2":
-        command = [sys.executable, str(SUITE / "resume_n1_latency_recovery.py")]
-    elif n == 1:
-        log(f"SKIP resume: N1 run {run_id} has no generic recovery adapter", log_path)
-        return
-    else:
-        command = [sys.executable, str(SUITE / "run_scaling_bundle_e2b.py"),
-                   "--n", str(n), "--run-id", run_id, "--resume", "--allow-failed-resume"]
-        if GITEA_ENV.is_file():
-            command += ["--gitea-env", str(GITEA_ENV)]
-    log(f"RESUME start run={run_id} n={n}", log_path)
-    result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=1800)
+    command = [sys.executable, str(SUITE / 'resume_checkpoint_e2b.py'),
+               '--n', str(n), '--run-id', run_id]
+    log(f"RECOVERY inspect run={run_id} n={n}", log_path)
+    result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=180)
     output = (result.stdout + "\n" + result.stderr).strip().replace("\x00", "")
     log(f"RESUME result run={run_id} rc={result.returncode} output={output[-1200:]}", log_path)
 
 
-def check_once(url: str, log_path: Path, attempted: set[str]) -> None:
+def check_once(url: str, log_path: Path) -> None:
     try:
         rows = fetch(url)
     except Exception as exc:  # noqa: BLE001 - monitor survives dashboard blips
         log(f"CHECK dashboard_error={type(exc).__name__}: {exc}", log_path)
-        return
+        rows = []
+    # Dashboard age/running flags are not liveness evidence. Probe only the five
+    # explicitly monitored experiments, even when the dashboard is unreachable.
+    visible = {str(row.get('run_id')): row for row in rows}
+    rows = [visible.get(run_id, {'run_id': run_id, 'state': 'dashboard_unavailable'})
+            for run_id in ACTIVE_RUN_IDS]
     for row in rows:
         run_id = str(row.get("run_id") or "")
         state = str(row.get("state") or "")
         exit_code = row.get("exit_code")
         log(f"CHECK run={run_id} state={state} phase={row.get('phase')} exit={exit_code}", log_path)
-        if state == "controller_exited" and exit_code not in (None, 0, "0") and run_id not in attempted:
-            attempted.add(run_id)
+        try:
             resume_one(row, log_path)
+        except Exception as exc:
+            log(f'RECOVERY error run={run_id} {type(exc).__name__}: {exc}', log_path)
 
 
 def main() -> int:
@@ -95,9 +99,11 @@ def main() -> int:
     parser.add_argument("--log", type=Path, default=SUITE / "runs" / "monitor.log")
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
-    attempted: set[str] = set()
+    args.log.parent.mkdir(parents=True, exist_ok=True)
+    lock = args.log.with_suffix('.lock').open('a')
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     while True:
-        check_once(args.dashboard_url, args.log, attempted)
+        check_once(args.dashboard_url, args.log)
         if args.once:
             return 0
         time.sleep(max(60, args.interval))

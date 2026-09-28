@@ -9,6 +9,7 @@ model prompts, source trees, or credentials.
 from __future__ import annotations
 
 import html
+import gzip
 import json
 import os
 import threading
@@ -36,6 +37,12 @@ def public_status(value: dict) -> dict:
               "last_heartbeat", "updated_at", "exit_code", "recovery_revision",
               "stalled_for_seconds", "started_at")
     result = {key: value.get(key) for key in fields}
+    sources = value.get("api_sources")
+    result["api_sources"] = {
+        role: sources[role]
+        for role in ("harness", "user", "designer", "developer")
+        if isinstance(sources, dict) and sources.get(role) in ("Boyue", "WIS", "OpenRouter", "未知")
+    }
     # Historical snapshots may have labelled a failed process as finished.
     if result.get('exit_code') not in (None, 0, '0'):
         result['state'] = 'controller_exited'
@@ -106,7 +113,7 @@ table{border-collapse:collapse;width:100%;background:white}th,td{padding:9px;bor
 section{background:#fff;padding:16px;margin:14px 0;border:1px solid #e1e4e8;border-radius:8px}
 button{padding:5px 10px;cursor:pointer}small{color:#667085}
 </style><body><h1>Harness Evaluation Status</h1><small id="updated">loading…</small>
-<section><table><thead><tr><th>实验</th><th>run</th><th>round</th><th>phase</th><th>OpenAgents 提案</th><th>components</th><th>账本更新时间</th><th>state</th></tr></thead><tbody id="runs"></tbody></table></section>
+<section><table><thead><tr><th>实验</th><th>run</th><th>API 使用源</th><th>round</th><th>phase</th><th>OpenAgents 提案</th><th>components</th><th>账本更新时间</th><th>state</th></tr></thead><tbody id="runs"></tbody></table></section>
 <section id="detail"><h2>选择一个 run</h2></section>
 <script>
 let selected=null, refreshInFlight=false;
@@ -114,34 +121,37 @@ const snapshots=new Map(), rowNodes=new Map();
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function componentSummary(x){return (x.components||[]).map(c=>esc(c.name)+': '+esc(c.state)+(c.total?' · '+esc(c.completed)+'/'+esc(c.total)+' 完成':'')+(c.failed?' · '+esc(c.failed)+' 失败':'')+(c.name==='openagents'?'（进程状态，不代表正在交付）':'')).join('<br>')||'—';}
 function proposalSummary(x){let p=x.proposals;if(!p)return '尚无提案监控数据';return `进入 ${esc(p.admitted)} 条 · 完成 ${esc(p.completed)}<br>处理中 ${esc(p.processing)} · 就绪 ${esc(p.ready)} · 待确认 ${esc(p.awaiting_confirmation)}<br>失败 ${esc(p.failed)} · 阻塞 ${esc(p.blocked)} · 未知 ${esc(p.unknown)}`;}
+function sourceSummary(x){let s=x.api_sources||{};let names=[...new Set(['harness','user','designer','developer'].map(k=>s[k]).filter(Boolean))];return names.length?names.map(esc).join(' / '):'未记录';}
 function proposalTable(x){let p=x.proposals;if(!p)return '<p>尚无提案监控数据</p>';let labels={completed:'已完成（账本确认）',processing:'处理中',ready:'就绪待处理',awaiting_confirmation:'开发完成，待总控确认',failed:'失败',blocked:'阻塞',unknown:'待核实'};return '<h3>本轮进入 OpenAgents 的提案</h3><p>'+proposalSummary(x)+'</p><small>处理中来自最近观测，不保证持续推进；心跳更新不等于完成。账本长期不变也不直接代表卡死。</small><table><thead><tr><th>提案</th><th>PR</th><th>状态</th><th>开发记录</th><th>最近具体动作 / 时间</th><th>最近观测</th></tr></thead><tbody>'+p.items.map(r=>`<tr><td>#${esc(r.issue)}</td><td>${r.pr?'#'+esc(r.pr):'—'}</td><td>${esc(labels[r.state]||r.state)}</td><td>${esc(r.runtime_status||'—')} / ${esc(r.observed_phase||'—')}</td><td>${esc(r.last_action||'—')}<br>${esc(r.last_action_at||'—')}</td><td>${esc(r.last_observed_at||'—')}</td></tr>`).join('')+'</tbody></table>';}
 function renderRows(rows){
 const tbody=document.getElementById('runs');
 for(const x of rows){
 let tr=rowNodes.get(x.run_id);
-if(!tr){tr=document.createElement('tr');for(let i=0;i<8;i++)tr.appendChild(document.createElement('td'));rowNodes.set(x.run_id,tr);}
+if(!tr){tr=document.createElement('tr');for(let i=0;i<9;i++)tr.appendChild(document.createElement('td'));rowNodes.set(x.run_id,tr);}
 const bad=x.state==='controller_exited'||(x.exit_code!=null&&x.exit_code!==0);
 const age=x.updated_at?Math.max(0,Math.floor((Date.now()-Date.parse(x.updated_at))/1000)):null;
-const stale=age==null||age>90;
-const cells=[esc(x.experiment_name||'未标注实验'),`<button onclick="selectRun('${esc(x.run_id)}')">${esc(x.run_id)}</button>`,`${esc(x.round)}/${esc(x.total_rounds)}`,esc(x.phase),proposalSummary(x),componentSummary(x),`${esc(x.last_heartbeat||'—')}<br><small>同步 ${esc(x.updated_at||'—')}</small><br><span class="${stale?'stale':'ok'}">${stale?'同步陈旧':'同步正常'} · ${esc(age??'—')}s 前</span>`,`<span class="${bad?'bad':'ok'}">${esc(x.state||'unknown')}</span>`];
+const openagents=(x.components||[]).find(c=>c.name==='openagents');
+const final=x.state==='finished'||(x.exit_code!=null&&!openagents?.process_running);
+const stale=!final&&(age==null||age>180);
+const syncLabel=final?'最终快照':stale?'同步陈旧':'同步正常';
+const cells=[esc(x.experiment_name||'未标注实验'),`<button onclick="selectRun('${esc(x.run_id)}')">${esc(x.run_id)}</button>`,sourceSummary(x),`${esc(x.round)}/${esc(x.total_rounds)}`,esc(x.phase),proposalSummary(x),componentSummary(x),`${esc(x.last_heartbeat||'—')}<br><small>同步 ${esc(x.updated_at||'—')}</small><br><span class="${stale?'stale':'ok'}">${syncLabel} · ${esc(age??'—')}s 前</span>`,`<span class="${bad?'bad':'ok'}">${esc(x.state||'unknown')}</span>`];
 cells.forEach((body,i)=>{if(tr.children[i].innerHTML!==body)tr.children[i].innerHTML=body;});
 }
 rows.forEach((x,i)=>{const tr=rowNodes.get(x.run_id);if(tbody.children[i]!==tr)tbody.insertBefore(tr,tbody.children[i]||null);});
-if(!rows.length)tbody.innerHTML='<tr><td colspan="8">暂无同步数据</td></tr>';
+if(!rows.length)tbody.innerHTML='<tr><td colspan="9">暂无同步数据</td></tr>';
 }
 async function refresh(){
 if(refreshInFlight)return;
 refreshInFlight=true;
+let timeout;
+const controller=typeof AbortController==='function'?new AbortController():null;
 try{
 // Avoid AbortSignal.timeout(): older browsers and embedded webviews do not
 // implement it, which previously made every refresh fail before fetch ran.
-let timeout;
-let r=await Promise.race([
- fetch('/api/runs',{cache:'no-store'}),
- new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('request timeout')),10000)})
+let fresh=await Promise.race([
+ (async()=>{let r=await fetch('/api/runs',{cache:'no-store',...(controller?{signal:controller.signal}:{})});if(!r.ok)throw new Error(r.status);return r.json();})(),
+ new Promise((_,reject)=>{timeout=setTimeout(()=>{if(controller)controller.abort();reject(new Error('request timeout'));},20000)})
 ]);
-clearTimeout(timeout);
-if(!r.ok)throw new Error(r.status);let fresh=await r.json();
 if(!Array.isArray(fresh))throw new Error('invalid runs payload');
 for(const row of fresh){const prev=snapshots.get(row.run_id);if(row.run_id&&(!prev||String(row.updated_at||'')>=String(prev.updated_at||'')))snapshots.set(row.run_id,row);}
 let rows=Array.from(snapshots.values()).sort((a,b)=>b.run_id.localeCompare(a.run_id));
@@ -150,7 +160,7 @@ renderRows(rows);
 if(!selected&&rows.length)selected=rows[0].run_id;
 if(selected)selectRun(selected);
 }catch(e){document.getElementById('updated').textContent='refresh failed; retaining last snapshot';}
-finally{refreshInFlight=false;}
+finally{clearTimeout(timeout);refreshInFlight=false;}
 }
 function selectRun(id){selected=id;let x=snapshots.get(id);if(!x)return;
 const detail=document.getElementById('detail');const opened=detail.querySelector('details')?.open;
@@ -183,9 +193,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _json(self, value: object) -> None:
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
+        encoding = self.headers.get("Accept-Encoding", "")
+        use_gzip = any(part.strip().split(";", 1)[0].lower() == "gzip" and
+                       not any(option.strip().lower() == "q=0" for option in part.split(";")[1:])
+                       for part in encoding.split(","))
+        if use_gzip:
+            body = gzip.compress(body, compresslevel=5, mtime=0)
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Vary", "Accept-Encoding")
+        if use_gzip:
+            self.send_header("Content-Encoding", "gzip")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
