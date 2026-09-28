@@ -8,7 +8,9 @@ from auto_designer.observations.publication import recover
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Recover one retained observation source without deleting it")
+    parser = argparse.ArgumentParser(
+        description="Recover one retained observation source without deleting it"
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
     args = parser.parse_args()

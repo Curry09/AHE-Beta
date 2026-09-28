@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "pilot_name": "public-harness-19-v1",
+  "harness": {
+    "name": "harness-v0",
+    "archive_env": "HARNESS_V0_ARCHIVE",
+    "archive_sha256": "dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011",
+    "nexau_commit": "09e747b59e3684d5541d557087d6d93790c5a43f"
+  },
+  "execution": {
+    "provider": "daytona",
+    "concurrency": 1,
+    "ephemeral": true,
+    "agent_network": "benchmark-specific-minimum",
+    "secrets": "runtime injection only",
+    "model": "set in immutable run manifest before launch",
+    "whole_task_retries": 0,
+    "api_retry_policy": "bounded and logged"
+  },
+  "stages": [
+    {
+      "name": "environment_validation",
+      "runs_per_case": 1,
+      "included_in_score": false,
+      "requirements": [
+        "task resolves",
+        "oracle/reference succeeds where available",
+        "raw interaction and grader artifacts are retained"
+      ]
+    },
+    {
+      "name": "measurement",
+      "runs_per_case": 3,
+      "tau3_runs_per_case": 4,
+      "included_in_score": true,
+      "enabled_after": "all environment-validation cases pass"
+    }
+  ],
+  "user_interaction": {
+    "code_terminal_tua": {
+      "policy": "external-strict-followup-v1",
+      "placement": "outside agent sandbox",
+      "rules": [
+        "send the public benchmark instruction as turn 0",
+        "answer genuine clarification requests using only public task information",
+        "after the first completion claim, demand concrete verification and preservation of ordinary cases",
+        "never reveal tests, gold patches, solutions, evaluation criteria, or grader output"
+      ]
+    },
+    "tau3": {
+      "policy": "native benchmark user simulator",
+      "seeds": [17, 29, 43, 71],
+      "max_turns": 40,
+      "rules": [
+        "one persistent harness session per trial",
+        "preserve tool names, arguments, results, and errors",
+        "reset task state between trials"
+      ]
+    }
+  },
+  "grading": {
+    "agent_environment_separate_from_grader": true,
+    "swe_bench": "fresh Daytona sandbox using official image and declared F2P/P2P parser",
+    "terminal_bench": "fresh separate Daytona grader sandbox receiving only declared artifacts",
+    "tua_bench": "Daytona task sandbox with controller-private tests uploaded only after agent exit",
+    "tau3": "official task reward/evaluation criteria with fresh task state"
+  },
+  "outcome_classes": [
+    "task_success",
+    "task_failure",
+    "harness_failure",
+    "grader_failure",
+    "infrastructure_failure"
+  ],
+  "required_artifacts": [
+    "immutable run manifest",
+    "full redacted user/assistant/tool trajectory",
+    "harness stdout and stderr",
+    "model usage and cost",
+    "grader log and per-criterion result",
+    "container image digest",
+    "cleanup status"
+  ]
+}

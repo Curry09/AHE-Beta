@@ -8,7 +8,7 @@ import pytest
 import requests
 
 from auto_designer.models import IssueDraft
-from auto_designer.tracker.base import IssueTracker
+from auto_designer.tracker.base import IdempotencyConflictError, IssueTracker
 from auto_designer.tracker.gitea import GiteaError, GiteaTracker, IssueMigrationError
 
 
@@ -50,6 +50,7 @@ class FakeGitea:
         self._next_label = 1
         self._next_issue = 1
         self.issues: dict[int, dict] = {}
+        self.comments: dict[int, list[dict[str, Any]]] = {}
         self._race = race_on_label
 
     def __call__(self, method: str, url: str, json: Any) -> _Resp:
@@ -76,25 +77,50 @@ class FakeGitea:
                 "state": "open",
                 "labels": json["labels"],
             }
+            self.comments[n] = []
             return _Resp(
                 201,
                 {"number": n, "html_url": f"http://gitea/issues/{n}", "state": "open"},
             )
         if method == "POST" and path.endswith("/comments"):
-            return _Resp(201, {"id": 1})
+            n = int(path.rsplit("/", 2)[1])
+            comment = {"id": len(self.comments[n]) + 1, "body": json["body"], "user": {}}
+            self.comments[n].append(comment)
+            return _Resp(201, comment)
+        if method == "GET" and path.endswith("/comments"):
+            n = int(path.rsplit("/", 2)[1])
+            return _Resp(200, list(self.comments[n]))
+        if method == "GET" and "/issues?" in path:
+            from urllib.parse import parse_qs, urlparse
+
+            query = parse_qs(urlparse(url).query)
+            page = int(query.get("page", ["1"])[0])
+            limit = int(query.get("limit", ["50"])[0])
+            values = []
+            by_id = {label_id: name for name, label_id in self.labels.items()}
+            for issue in self.issues.values():
+                item = dict(issue)
+                item["html_url"] = f"http://gitea/issues/{item['number']}"
+                item["labels"] = [
+                    {"id": label_id, "name": by_id[label_id]} for label_id in item["labels"]
+                ]
+                values.append(item)
+            start = (page - 1) * limit
+            return _Resp(200, values[start : start + limit])
         if method == "GET" and "/issues/" in path:
             n = int(path.rsplit("/", 1)[1])
             issue = dict(self.issues[n])
             by_id = {label_id: name for name, label_id in self.labels.items()}
             issue["labels"] = [
-                {"id": label_id, "name": by_id[label_id]}
-                for label_id in issue["labels"]
+                {"id": label_id, "name": by_id[label_id]} for label_id in issue["labels"]
             ]
             return _Resp(200, issue)
         if method == "PATCH" and "/issues/" in path:
             n = int(path.rsplit("/", 1)[1])
             # Gitea 1.22 EditIssueOption 不含 labels；未知字段被忽略。
-            accepted = {key: value for key, value in json.items() if key in {"title", "body", "state"}}
+            accepted = {
+                key: value for key, value in json.items() if key in {"title", "body", "state"}
+            }
             self.issues[n].update(accepted)
             return _Resp(200, {"number": n, **accepted})
         if method == "PUT" and path.endswith("/labels"):  # Spec-0025/T3a：整组替换
@@ -112,6 +138,39 @@ def _tracker(handler) -> GiteaTracker:
 
 def test_satisfies_protocol() -> None:
     assert isinstance(_tracker(FakeGitea()), IssueTracker)
+
+
+@pytest.mark.parametrize("count", [0, 50, 117])
+def test_open_issue_queue_reads_every_page(count) -> None:
+    from urllib.parse import parse_qs, urlparse
+
+    issues = [
+        {"number": number, "title": str(number), "labels": [{"name": "proposal"}]}
+        for number in range(1, count + 1)
+    ]
+    pages = []
+
+    def handler(method, url, body):
+        query = parse_qs(urlparse(url).query)
+        assert method == "GET" and body is None
+        assert query["state"] == ["open"] and query["type"] == ["issues"]
+        page = int(query["page"][0])
+        pages.append(page)
+        return _Resp(200, issues[(page - 1) * 50 : page * 50])
+
+    observed = _tracker(handler).list_open_issues()
+    assert [issue.number for issue in observed] == list(range(1, count + 1))
+    assert pages == list(range(1, count // 50 + 2))
+
+
+def test_open_issue_queue_does_not_return_partial_data_on_later_page_error() -> None:
+    def handler(method, url, body):
+        if "page=1" in url:
+            return _Resp(200, [{"number": number} for number in range(1, 51)])
+        return _Resp(503, text="temporarily unavailable")
+
+    with pytest.raises(GiteaError):
+        _tracker(handler).list_open_issues()
 
 
 def test_authorization_header_set() -> None:
@@ -174,6 +233,33 @@ def test_create_issue_auto_ensures_missing_label() -> None:
     issue_post = [c for c in t._session.calls if c[0] == "POST" and c[1].endswith("/issues")][0]
     assert issue_post[2]["labels"] == [backend.labels["bug"]]
     assert ref.number == 1
+
+
+def test_create_issue_once_reconciles_remote_marker() -> None:
+    backend = FakeGitea()
+    backend.labels = {"bug": 5}
+    tracker = _tracker(backend)
+    draft = IssueDraft(title="t", body="b", labels=["bug"])
+    first = tracker.create_issue_once(draft, operation_key="round-1/user-1/report-1")
+    second = tracker.create_issue_once(draft, operation_key="round-1/user-1/report-1")
+    assert first == second
+    assert len(backend.issues) == 1
+    with pytest.raises(IdempotencyConflictError):
+        tracker.create_issue_once(
+            IssueDraft(title="changed", body="b", labels=["bug"]),
+            operation_key="round-1/user-1/report-1",
+        )
+
+
+def test_add_comment_once_reconciles_remote_marker() -> None:
+    backend = FakeGitea()
+    tracker = _tracker(backend)
+    issue = tracker.create_issue(IssueDraft(title="t", body="b"))
+    tracker.add_comment_once(issue.number, "decision", operation_key="owner/1")
+    tracker.add_comment_once(issue.number, "decision", operation_key="owner/1")
+    assert len(backend.comments[issue.number]) == 1
+    with pytest.raises(IdempotencyConflictError):
+        tracker.add_comment_once(issue.number, "changed", operation_key="owner/1")
 
 
 def test_ensure_labels_idempotent() -> None:
@@ -356,6 +442,27 @@ def test_non_2xx_raises_with_status() -> None:
     with pytest.raises(GiteaError) as ei:
         t.create_issue(IssueDraft(title="t", body="b"))
     assert ei.value.status == 401
+
+
+def test_transient_get_server_error_retries_without_replaying_writes(monkeypatch) -> None:
+    monkeypatch.setattr("auto_designer.tracker.gitea.time.sleep", lambda _seconds: None)
+    calls: list[str] = []
+
+    def handler(method: str, url: str, json: Any) -> _Resp:
+        calls.append(method)
+        if method == "GET" and calls.count("GET") < 3:
+            return _Resp(502, text="temporary gateway failure")
+        if method == "POST":
+            return _Resp(502, text="write result unknown")
+        return _Resp(200, [])
+
+    tracker = _tracker(handler)
+    assert tracker._request("GET", "/repos/o/r/labels", None) == []
+    assert calls == ["GET", "GET", "GET"]
+    with pytest.raises(GiteaError) as exc:
+        tracker._request("POST", "/repos/o/r/issues", {})
+    assert exc.value.status == 502
+    assert calls == ["GET", "GET", "GET", "POST"]
 
 
 def test_connection_error_propagates() -> None:

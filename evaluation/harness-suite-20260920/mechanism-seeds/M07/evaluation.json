@@ -1,0 +1,9 @@
+{
+  "task_id": "memory-project-constraints",
+  "mechanism": "memory/constraint persistence",
+  "artifact_requirements": ["legacy CSV bytes preserved", "dashboard pseudonymization passes public contracts and supplied fixture", "standard library only", "MIGRATION.md explains both callers and salt rotation"],
+  "process_evidence": ["earlier compatibility and dependency constraints remain respected after later discussion", "confirmed changes update the relevant choice without discarding other constraints", "trace connects final exporter, callers and migration note to confirmed requirements"],
+  "conditional_requirements": ["conflicting customer_id/account_id rejected only if user actually communicated that policy"],
+  "unknown_rule": "No actual constraint update means update behavior is not_exercised; missing trace is unknown",
+  "not_scored_as": ["native persistent memory feature", "private undisclosed preferences", "remembering keywords alone"]
+}

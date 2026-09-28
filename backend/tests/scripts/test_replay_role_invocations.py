@@ -61,9 +61,7 @@ def test_replay_diffs_structured_and_skips_implementer(tmp_path: Path) -> None:
         assert role == "owner"
         return json.dumps({"decisions": [{"issue": 1}]})
 
-    out = mod.replay_records(
-        records=records, agent_def=tmp_path, repo=tmp_path, runner=runner
-    )
+    out = mod.replay_records(records=records, agent_def=tmp_path, repo=tmp_path, runner=runner)
     assert out["skipped"] == 1
     assert out["replayed"] == 1
     assert out["diffs"][0]["changed"] is True

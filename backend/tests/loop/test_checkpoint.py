@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.loop.checkpoint import REQUIRED_MEMBERS, load_checkpoint, save_checkpoint
+from auto_designer.loop.checkpoint import (
+    RECOVERY_MEMBERS,
+    REQUIRED_MEMBERS,
+    load_checkpoint,
+    save_checkpoint,
+)
 
 
 def _make_state_dir(root, *, complete: bool = True):
@@ -53,3 +58,25 @@ def test_save_atomic_no_tmp_left(tmp_path) -> None:
 
 def test_required_members_constant() -> None:
     assert set(REQUIRED_MEMBERS) == {"gitea", "sessions", "metrics.jsonl", "run_state.json"}
+    assert set(RECOVERY_MEMBERS) == {"recovery.json", "recovery.jsonl"}
+
+
+def test_new_checkpoint_requires_complete_recovery_ledger(tmp_path) -> None:
+    state = _make_state_dir(tmp_path)
+    (state / "recovery.json").write_text('{"rounds": {}}', encoding="utf-8")
+    artifact = save_checkpoint(state, tmp_path / "ckpt.tar.gz")
+    with pytest.raises(ValueError, match="recovery.jsonl"):
+        load_checkpoint(artifact, tmp_path / "restored")
+
+
+def test_recovery_receipts_are_validated(tmp_path) -> None:
+    state = _make_state_dir(tmp_path)
+    (state / "recovery.jsonl").write_text("{}\n", encoding="utf-8")
+    (state / "recovery.json").write_text(
+        '{"rounds":{"1":{"stages":{"users":{"units":{"op":{"output_artifact":'
+        '"recovery-receipts/1/users/op.json"}}}}}}}',
+        encoding="utf-8",
+    )
+    artifact = save_checkpoint(state, tmp_path / "ckpt.tar.gz")
+    with pytest.raises(ValueError, match="receipt"):
+        load_checkpoint(artifact, tmp_path / "restored")

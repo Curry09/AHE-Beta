@@ -8,7 +8,7 @@ OPENAGENTS_PATH="${1:?用法: build.sh <OpenAgents 仓路径> <NexAU 仓路径>}
 NEXAU_PATH="${2:?用法: build.sh <OpenAgents 仓路径> <NexAU 仓路径>}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIP_INDEX_URL="${VIGIL_PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
-CLAUDE_CODE_VERSION="${VIGIL_CLAUDE_CODE_VERSION:-2.1.235}"
+CLAUDE_CODE_VERSION="${VIGIL_CLAUDE_CODE_VERSION:-2.1.261}"
 
 test -f "$OPENAGENTS_PATH/pyproject.toml" || {
   echo "不是 OpenAgents 仓（缺 pyproject.toml）：$OPENAGENTS_PATH" >&2

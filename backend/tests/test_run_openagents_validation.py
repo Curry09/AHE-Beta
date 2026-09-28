@@ -16,6 +16,8 @@ def test_gateway_environment_accepts_spaced_assignments(tmp_path: Path) -> None:
         "ANTHROPIC_AUTH_TOKEN": "secret",
         "ANTHROPIC_MODEL": "z-ai/glm-5.2",
         "ANTHROPIC_SMALL_FAST_MODEL": "z-ai/glm-5.2",
+        "CLAUDE_CODE_SUBAGENT_MODEL": "z-ai/glm-5.2",
+        "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1",
     }
 
 

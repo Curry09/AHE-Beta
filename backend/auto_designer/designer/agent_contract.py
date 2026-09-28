@@ -68,11 +68,18 @@ def dispositions_input_schema() -> dict:
                     "evidence": {"type": "array", "items": {"type": "string"}},
                     "uncertainties": {"type": "array", "items": {"type": "string"}},
                     "implementation_target": {
-                        "type": "string", "enum": ["harness", "outside_harness", "uncertain"]
+                        "type": "string",
+                        "enum": ["harness", "outside_harness", "uncertain"],
                     },
                 },
-                "required": ["reported_problem", "user_impact", "scope_boundary", "evidence",
-                             "uncertainties", "implementation_target"],
+                "required": [
+                    "reported_problem",
+                    "user_impact",
+                    "scope_boundary",
+                    "evidence",
+                    "uncertainties",
+                    "implementation_target",
+                ],
                 "additionalProperties": False,
             },
         },
@@ -126,18 +133,31 @@ def pm_input_schema() -> dict:
             "desired_outcome": {"type": "string"},
             "evidence_sessions": {"type": "array", "items": {"type": "string"}},
             "related_proposals": {"type": "array", "items": {"type": "integer"}},
-            "solution_level": {"type": "string", "enum": ["product_capability", "implementation_design"]},
+            "solution_level": {
+                "type": "string",
+                "enum": ["product_capability", "implementation_design"],
+            },
             "abstraction_rationale": {"type": "string"},
         },
         "required": [
-            "title", "user_goal", "observed_behaviors", "experience_tension",
-            "product_opportunity", "desired_outcome", "evidence_sessions", "solution_level",
+            "title",
+            "user_goal",
+            "observed_behaviors",
+            "experience_tension",
+            "product_opportunity",
+            "desired_outcome",
+            "evidence_sessions",
+            "solution_level",
             "abstraction_rationale",
         ],
         "additionalProperties": False,
     }
-    return {"type": "object", "properties": {"proposals": {"type": "array", "items": item}},
-            "required": ["proposals"], "additionalProperties": False}
+    return {
+        "type": "object",
+        "properties": {"proposals": {"type": "array", "items": item}},
+        "required": ["proposals"],
+        "additionalProperties": False,
+    }
 
 
 def synthesis_input_schema() -> dict:
@@ -152,16 +172,30 @@ def synthesis_input_schema() -> dict:
             "structural_direction": {"type": "string"},
             "expected_leverage": {"type": "string"},
             "covers": {"type": "array", "items": {"type": "integer"}},
-            "solution_level": {"type": "string", "enum": ["structural_mechanism", "implementation_design"]},
+            "solution_level": {
+                "type": "string",
+                "enum": ["structural_mechanism", "implementation_design"],
+            },
             "abstraction_rationale": {"type": "string"},
         },
-        "required": ["title", "source_proposals", "relationship", "common_tension",
-                     "structural_direction", "expected_leverage", "solution_level",
-                     "abstraction_rationale"],
+        "required": [
+            "title",
+            "source_proposals",
+            "relationship",
+            "common_tension",
+            "structural_direction",
+            "expected_leverage",
+            "solution_level",
+            "abstraction_rationale",
+        ],
         "additionalProperties": False,
     }
-    return {"type": "object", "properties": {"proposals": {"type": "array", "items": item}},
-            "required": ["proposals"], "additionalProperties": False}
+    return {
+        "type": "object",
+        "properties": {"proposals": {"type": "array", "items": item}},
+        "required": ["proposals"],
+        "additionalProperties": False,
+    }
 
 
 def admission_input_schema() -> dict:
@@ -177,10 +211,19 @@ def admission_input_schema() -> dict:
             "handoff_summary": {"type": "string"},
             "preserved_capabilities": {"type": "array", "items": {"type": "string"}},
             "acceptance_groups": {"type": "array", "items": {"type": "string"}},
-            "delivery_overlaps": {"type": "array", "items": {"type": "integer"}, "uniqueItems": True},
+            "delivery_overlaps": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "uniqueItems": True,
+            },
         },
-        "required": ["issue", "decision", "handoff_summary", "preserved_capabilities",
-                     "acceptance_groups"],
+        "required": [
+            "issue",
+            "decision",
+            "handoff_summary",
+            "preserved_capabilities",
+            "acceptance_groups",
+        ],
         "additionalProperties": False,
     }
     return {

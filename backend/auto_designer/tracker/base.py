@@ -5,9 +5,43 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from typing import Protocol, runtime_checkable
 
 from auto_designer.models import IssueDraft, IssueRef, OpenIssue
+
+_OPERATION_MARKER_RE = re.compile(r"<!-- auto-designer-operation:([0-9a-f]{32}):([0-9a-f]{64}) -->")
+
+
+class IdempotencyConflictError(RuntimeError):
+    """A stable operation key already exists with a different payload."""
+
+
+def operation_marker(*, operation_key: str, payload_digest: str) -> str:
+    """Return a hidden marker without exposing the original operation key."""
+    key_digest = hashlib.sha256(operation_key.encode()).hexdigest()[:32]
+    return f"<!-- auto-designer-operation:{key_digest}:{payload_digest} -->"
+
+
+def operation_marker_digest(*, text: str, operation_key: str) -> str | None:
+    """Return the payload digest recorded for an operation, when present."""
+    key_digest = hashlib.sha256(operation_key.encode()).hexdigest()[:32]
+    return next(
+        (
+            payload_digest
+            for marker_key, payload_digest in _OPERATION_MARKER_RE.findall(text)
+            if marker_key == key_digest
+        ),
+        None,
+    )
+
+
+def issue_payload_digest(draft: IssueDraft) -> str:
+    """Return the digest used to detect operation-key payload conflicts."""
+    body = json.dumps(draft.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(body.encode()).hexdigest()
 
 
 @runtime_checkable
@@ -22,12 +56,20 @@ class IssueTracker(Protocol):
         """按 draft 建 issue，返回带号回执 IssueRef（初始 state="open"）。不去重。"""
         ...
 
+    def create_issue_once(self, draft: IssueDraft, *, operation_key: str) -> IssueRef:
+        """Create once by stable operation key; reconcile an existing matching issue."""
+        ...
+
     def list_open_issues(self) -> list[OpenIssue]:
         """读路径：列出当前 open 的 issue（供开发者侧 spec-0003/T3 领取）。无则空列表。"""
         ...
 
     def add_comment(self, number: int, body: str) -> None:
         """向指定 issue 追加评论。number 不存在抛 KeyError。"""
+        ...
+
+    def add_comment_once(self, number: int, body: str, *, operation_key: str) -> None:
+        """Append a comment once by stable operation key."""
         ...
 
     def set_state(self, number: int, state: str, reason: str) -> None:
@@ -41,9 +83,7 @@ class IssueTracker(Protocol):
         """
         ...
 
-    def update_issue(
-        self, number: int, *, title: str, body: str, labels: list[str]
-    ) -> None:
+    def update_issue(self, number: int, *, title: str, body: str, labels: list[str]) -> None:
         """以一个可重试语义操作替换标题、正文和标签；后端分步实现必须失败回滚。"""
         ...
 

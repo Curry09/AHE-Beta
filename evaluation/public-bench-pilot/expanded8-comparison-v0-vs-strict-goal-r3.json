@@ -1,0 +1,308 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-18T05:22:13Z",
+  "stage": "paired_expanded_environment_validation",
+  "included_in_final_score": false,
+  "comparison_design": "same 8 tasks, model, follow-ups, timeout, graders, tau3 seed, and Daytona resource ceilings",
+  "harnesses": {
+    "baseline_v0": {
+      "label": "baseline-v0-cade14d",
+      "archive_sha256": "dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011"
+    },
+    "latest": {
+      "label": "strict-goal-r3-686b5e",
+      "source_experiment": "harness-mixed16-20260916-strict-goal-r3",
+      "archive_sha256": "686b5eda80176a7f938abc6e51da8fa2c04353478045868b2434ff0046449cd4"
+    }
+  },
+  "agent_model": "z-ai/glm-5.2",
+  "summary": {
+    "paired_tasks": 8,
+    "baseline_v0": {
+      "passed": 2,
+      "end_to_end_pass_rate": 0.25,
+      "harness_completed": 8,
+      "harness_completion_rate": 1.0,
+      "official_grader_reached": 6,
+      "task_failures": 6,
+      "harness_failures": 0
+    },
+    "latest": {
+      "passed": 4,
+      "end_to_end_pass_rate": 0.5,
+      "harness_completed": 5,
+      "harness_completion_rate": 0.625,
+      "official_grader_reached": 5,
+      "task_failures": 1,
+      "harness_failures": 3
+    },
+    "latest_minus_baseline": {
+      "passed_tasks": 2,
+      "pass_rate_points": 0.25,
+      "harness_completed_tasks": -3,
+      "harness_completion_rate_points": -0.375
+    },
+    "paired_outcomes": {
+      "latest_wins": 2,
+      "baseline_v0_wins": 0,
+      "both_pass": 2,
+      "both_fail": 4
+    },
+    "excluded_invalid_baseline_attempts": 3
+  },
+  "by_benchmark": {
+    "SWE-bench Verified": {
+      "baseline_v0": "1/2",
+      "latest": "2/2"
+    },
+    "Terminal-Bench 4.0": {
+      "baseline_v0": "0/2",
+      "latest": "0/2"
+    },
+    "TUA-Bench": {
+      "baseline_v0": "0/2",
+      "latest": "0/2"
+    },
+    "tau3-bench Core/Text": {
+      "baseline_v0": "1/2",
+      "latest": "2/2"
+    }
+  },
+  "results": [
+    {
+      "benchmark": "SWE-bench Verified",
+      "task": "astropy__astropy-12907",
+      "baseline_v0": {
+        "outcome": "task_success",
+        "passed": true,
+        "official_grader_reached": true,
+        "harness_replies": 2,
+        "harness_llm_calls": 31,
+        "harness_total_tokens": 523072,
+        "wall_seconds": 389.61,
+        "run": "runs/20260918T041351Z-swe-astropy__astropy-12907-baseline-v0-cade14d-daytona"
+      },
+      "latest": {
+        "outcome": "task_success",
+        "passed": true,
+        "official_grader_reached": true,
+        "harness_replies": 2,
+        "harness_llm_calls": 38,
+        "harness_total_tokens": 488255,
+        "wall_seconds": 299.733,
+        "run": "runs/20260917T124508Z-swe-astropy__astropy-12907-strict-goal-r3-daytona"
+      },
+      "paired_result": "both_pass"
+    },
+    {
+      "benchmark": "SWE-bench Verified",
+      "task": "django__django-15957",
+      "baseline_v0": {
+        "outcome": "task_failure",
+        "passed": false,
+        "official_grader_reached": true,
+        "grader_detail": "93 tests run; 8 failures in sliced prefetch behavior",
+        "harness_replies": 2,
+        "harness_llm_calls": 116,
+        "harness_total_tokens": 4102453,
+        "wall_seconds": 545.894,
+        "run": "runs/20260918T042244Z-swe-django__django-15957-baseline-v0-cade14d-daytona"
+      },
+      "latest": {
+        "outcome": "task_success",
+        "passed": true,
+        "official_grader_reached": true,
+        "grader_detail": "F2P 4/4; P2P 89/89",
+        "harness_replies": 2,
+        "harness_llm_calls": 84,
+        "harness_total_tokens": 3471970,
+        "wall_seconds": 551.178,
+        "run": "runs/20260918T031450Z-swe-django__django-15957-strict-goal-r3-daytona"
+      },
+      "paired_result": "latest_win"
+    },
+    {
+      "benchmark": "Terminal-Bench 4.0",
+      "task": "music-harmony",
+      "baseline_v0": {
+        "outcome": "task_failure",
+        "passed": false,
+        "official_grader_reached": false,
+        "failure": "harness returned two replies but did not create harmony.mxl",
+        "harness_replies": 2,
+        "harness_llm_calls": 41,
+        "harness_total_tokens": 1212115,
+        "wall_seconds": 531.135,
+        "run": "runs/20260918T041351Z-terminal-music-harmony-baseline-v0-cade14d-daytona"
+      },
+      "latest": {
+        "outcome": "harness_failure",
+        "passed": false,
+        "official_grader_reached": false,
+        "failure": "no first harness reply within 360 seconds",
+        "harness_replies": 0,
+        "harness_llm_calls": 17,
+        "harness_total_tokens": 346369,
+        "wall_seconds": 413.32,
+        "run": "runs/20260918T031512Z-terminal-music-harmony-strict-goal-r3-daytona"
+      },
+      "paired_result": "both_fail_latest_regresses_completion"
+    },
+    {
+      "benchmark": "Terminal-Bench 4.0",
+      "task": "production-planning",
+      "baseline_v0": {
+        "outcome": "task_failure",
+        "passed": false,
+        "official_grader_reached": false,
+        "failure": "harness returned two replies but created none of the three required SQL artifacts",
+        "harness_replies": 2,
+        "harness_llm_calls": 10,
+        "harness_total_tokens": 301215,
+        "wall_seconds": 538.687,
+        "run": "runs/20260918T042244Z-terminal-production-planning-baseline-v0-cade14d-daytona"
+      },
+      "latest": {
+        "outcome": "harness_failure",
+        "passed": false,
+        "official_grader_reached": false,
+        "failure": "no first harness reply within 360 seconds",
+        "harness_replies": 0,
+        "harness_llm_calls": 10,
+        "harness_total_tokens": 384658,
+        "wall_seconds": 436.117,
+        "run": "runs/20260918T032340Z-terminal-production-planning-strict-goal-r3-daytona"
+      },
+      "paired_result": "both_fail_latest_regresses_completion"
+    },
+    {
+      "benchmark": "TUA-Bench",
+      "task": "010-pivot-product-revenue",
+      "baseline_v0": {
+        "outcome": "task_failure",
+        "passed": false,
+        "reward": 0.0,
+        "official_grader_reached": true,
+        "harness_replies": 2,
+        "harness_llm_calls": 19,
+        "harness_total_tokens": 201158,
+        "wall_seconds": 642.781,
+        "run": "runs/20260918T043152Z-tua-010-pivot-product-revenue-baseline-v0-cade14d-daytona"
+      },
+      "latest": {
+        "outcome": "harness_failure",
+        "passed": false,
+        "official_grader_reached": false,
+        "failure": "no first harness reply within 360 seconds",
+        "harness_replies": 0,
+        "harness_llm_calls": 13,
+        "harness_total_tokens": 47868,
+        "wall_seconds": 521.982,
+        "run": "runs/20260917T124824Z-tua-010-pivot-product-revenue-strict-goal-r3-daytona"
+      },
+      "paired_result": "both_fail_latest_regresses_completion"
+    },
+    {
+      "benchmark": "TUA-Bench",
+      "task": "080-convert-novel-epub",
+      "baseline_v0": {
+        "outcome": "task_failure",
+        "passed": false,
+        "reward": 0.0,
+        "official_grader_reached": true,
+        "harness_replies": 2,
+        "harness_llm_calls": 16,
+        "harness_total_tokens": 155902,
+        "wall_seconds": 228.885,
+        "run": "runs/20260918T044242Z-tua-080-convert-novel-epub-baseline-v0-cade14d-daytona"
+      },
+      "latest": {
+        "outcome": "task_failure",
+        "passed": false,
+        "reward": 0.0,
+        "official_grader_reached": true,
+        "harness_replies": 2,
+        "harness_llm_calls": 23,
+        "harness_total_tokens": 265164,
+        "wall_seconds": 360.128,
+        "run": "runs/20260918T035243Z-tua-080-convert-novel-epub-strict-goal-r3-daytona"
+      },
+      "paired_result": "both_fail"
+    },
+    {
+      "benchmark": "tau3-bench Core/Text",
+      "task": "retail/76",
+      "baseline_v0": {
+        "outcome": "task_success",
+        "passed": true,
+        "reward": 1.0,
+        "official_grader_reached": true,
+        "details": "DB 1; action checks 2/2; NL assertion 1; communicate 1",
+        "message_count": 34,
+        "harness_replies": 16,
+        "harness_llm_calls": 27,
+        "harness_total_tokens": 300990,
+        "wall_seconds": 272.227,
+        "run": "runs/20260918T051217Z-tau3-retail-76-baseline-v0-cade14d-daytona"
+      },
+      "latest": {
+        "outcome": "task_success",
+        "passed": true,
+        "reward": 1.0,
+        "official_grader_reached": true,
+        "details": "DB 1; action checks 2/2; NL assertion 1; communicate 1",
+        "message_count": 36,
+        "harness_replies": 17,
+        "harness_llm_calls": 28,
+        "harness_total_tokens": 314041,
+        "wall_seconds": 198.103,
+        "run": "runs/20260918T033708Z-tau3-retail-76-strict-goal-r3-daytona"
+      },
+      "paired_result": "both_pass"
+    },
+    {
+      "benchmark": "tau3-bench Core/Text",
+      "task": "telecom/[service_issue]overdue_bill_suspension[PERSONA:Easy]",
+      "baseline_v0": {
+        "outcome": "task_failure",
+        "passed": false,
+        "reward": 0.0,
+        "official_grader_reached": true,
+        "details": "environment assertions 0/2; action checks 1/4",
+        "message_count": 24,
+        "harness_replies": 10,
+        "harness_llm_calls": 18,
+        "harness_total_tokens": 204518,
+        "wall_seconds": 229.948,
+        "run": "runs/20260918T051655Z-tau3-telecom-_service_issue_overdue_bill_suspension_PERSONA_Easy_-baseline-v0-cade14d-daytona"
+      },
+      "latest": {
+        "outcome": "task_success",
+        "passed": true,
+        "reward": 1.0,
+        "official_grader_reached": true,
+        "details": "environment assertions 2/2; action checks 4/4",
+        "message_count": 30,
+        "harness_replies": 11,
+        "harness_llm_calls": 18,
+        "harness_total_tokens": 204423,
+        "wall_seconds": 190.301,
+        "run": "runs/20260918T034742Z-tau3-telecom-_service_issue_overdue_bill_suspension_PERSONA_Easy_-strict-goal-r3-daytona"
+      },
+      "paired_result": "latest_win"
+    }
+  ],
+  "excluded_baseline_attempts": [
+    {
+      "count": 2,
+      "classification": "controller_invalid",
+      "reason": "outer shell exported the quoted .env value verbatim; tau3 user simulator received OpenRouter 401 before the harness conversation"
+    },
+    {
+      "count": 1,
+      "classification": "controller_invalid",
+      "reason": "correctly unset key exposed an incorrect default env-file path and exited locally before sandbox creation"
+    }
+  ],
+  "token_accounting_note": "Harness transcript usage only; excludes tau3 user-simulator and judge calls. Totals sum provider-reported per-request total_tokens and include cached inputs."
+}

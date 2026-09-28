@@ -12,7 +12,16 @@ from auto_designer.observations.gaps import GapService
 from auto_designer.observations.grants import authorized_sessions, observation_root
 
 MARKER = "auto-designer:observation-gap-v1"
-ROLES = {"drafter", "spec_writer", "architect", "developer", "implementer", "executor", "reviewer", "acceptance"}
+ROLES = {
+    "drafter",
+    "spec_writer",
+    "architect",
+    "developer",
+    "implementer",
+    "executor",
+    "reviewer",
+    "acceptance",
+}
 
 
 def ingest_delivery_gaps(*, store, tracker) -> list[dict]:
@@ -42,8 +51,14 @@ def ingest_delivery_gaps(*, store, tracker) -> list[dict]:
                 role = payload["role"]
                 if payload["issue"] != issue or role not in ROLES:
                     continue
-                service = GapService(store=store, tracker=tracker, role=f"delivery-{role}",
-                                     subject=f"issue-{issue}", sessions=sessions, issues={issue})
+                service = GapService(
+                    store=store,
+                    tracker=tracker,
+                    role=f"delivery-{role}",
+                    subject=f"issue-{issue}",
+                    sessions=sessions,
+                    issues={issue},
+                )
                 outcomes.append(service.submit(payload["request"]))
             except (ValueError, TypeError, KeyError, ValidationError):
                 outcomes.append({"ok": False, "error": "invalid_delivery_gap"})

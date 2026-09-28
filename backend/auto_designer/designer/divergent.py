@@ -23,8 +23,10 @@ from auto_designer.designer.issue_schema import (
 )
 from auto_designer.designer.proposal_view import format_proposal_reference_list
 from auto_designer.designer.role_contract import render_pm_artifact, validate_pm
-from auto_designer.models import IssueDraft
+from auto_designer.loop.recovery import RecoveryConflictError, RecoveryStore, operation_key
+from auto_designer.models import IssueDraft, OpenIssue
 from auto_designer.tracker.base import IssueTracker
+from auto_designer.usage import current_usage_context
 from auto_designer.user.session_store import SessionStore
 
 _DIVERGENT_TIMEOUT = 3600
@@ -58,6 +60,7 @@ class Divergent:
         on_status: StatusFn | None = None,
         on_event: Callable[[str, str], None] | None = None,
         round_provider: Callable[[], int | None] | None = None,
+        recovery: RecoveryStore | None = None,
     ) -> None:
         self._tracker = tracker
         self._store = store
@@ -66,27 +69,78 @@ class Divergent:
         self._on_status = on_status
         self._on_event = on_event
         self._round_provider = round_provider
+        self._recovery = recovery
+
+    def bind_recovery(self, recovery: RecoveryStore) -> None:
+        """Attach the experiment ledger after role construction."""
+        self._recovery = recovery
 
     def propose_once(self) -> DivergentOutcome:
-        # 全量参照用于理解产品现状；PM 不因相邻价值方向停止生成，跨提案吸收由 Designer 判断。
-        backlog = self._tracker.list_open_issues()
-        reference = [i for i in backlog if plane(i.labels) in (PROPOSAL, READY)]
-        trend = self._feeling_trend()
+        recovery_key = self._recovery_key()
+        recovery_unit = (
+            self._recovery.unit(round_no=self._round_no(), stage="divergent", key=recovery_key)
+            if self._recovery is not None
+            else None
+        )
+        if recovery_unit is not None:
+            frozen = recovery_unit["input"]
+            trend = [tuple(item) for item in frozen["trend"]]
+            reference = [OpenIssue.from_dict(item) for item in frozen["reference"]]
+        else:
+            # 全量参照用于理解产品现状；PM 不因相邻价值方向停止生成，跨提案吸收由 Designer 判断。
+            backlog = self._tracker.list_open_issues()
+            reference = [i for i in backlog if plane(i.labels) in (PROPOSAL, READY)]
+            trend = self._feeling_trend()
+        if self._recovery is not None:
+            recovery_unit = self._recovery.begin_unit(
+                round_no=self._round_no(),
+                stage="divergent",
+                key=recovery_key,
+                input_value={
+                    "trend": [list(item) for item in trend],
+                    "reference": [item.to_dict() for item in reference],
+                },
+                expected_postconditions={"completed": True},
+                dependencies=("users",),
+            )
+            if recovery_unit.get("status") == "completed":
+                saved = self._recovery.read_output(
+                    round_no=self._round_no(), stage="divergent", key=recovery_key
+                )
+                observed = recovery_unit.get("observed_postconditions") or {}
+                return DivergentOutcome(
+                    proposal_numbers=[int(n) for n in observed.get("proposal_numbers") or []],
+                    artifacts=[dict(item) for item in saved.get("parsed") or []],
+                )
         self._emit(
             running=True,
             status=f"发散中…（会话={len(trend)} 局 · 参照={len(reference)} 条）",
         )
 
-        result_text = self._run_agent(trend=trend, reference=reference)
-        raw = read_submit(result_text, "proposals") or []
-        parsed = raw[:_MAX_CANDIDATES]
+        if recovery_unit is not None and recovery_unit.get("output_digest"):
+            saved = self._recovery.read_output(
+                round_no=self._round_no(), stage="divergent", key=recovery_key
+            )
+            parsed = list(saved.get("parsed") or [])
+            result_text = "[replayed saved divergent output]"
+        else:
+            result_text = self._run_agent(trend=trend, reference=reference)
+            raw = read_submit(result_text, "proposals") or []
+            parsed = raw[:_MAX_CANDIDATES]
+            if self._recovery is not None:
+                self._recovery.save_output(
+                    round_no=self._round_no(),
+                    stage="divergent",
+                    key=recovery_key,
+                    output={"parsed": parsed},
+                )
 
         numbers: list[int] = []
         if parsed:
             self._tracker.ensure_labels([PROPOSAL, FROM_DIVERGENT])
         round_no = self._round_provider() if self._round_provider is not None else None
         known_sessions = {sid for _, _, _, sid in trend if sid}
-        for item in parsed:
+        for index, item in enumerate(parsed):
             if not item.get("title"):
                 continue
             if validate_pm(item, known_sessions=known_sessions):
@@ -95,12 +149,22 @@ class Divergent:
             labels = [PROPOSAL, FROM_DIVERGENT]
             if isinstance(round_no, int) and round_no > 0:
                 labels.append(round_label(round_no))
-            ref = self._tracker.create_issue(
-                IssueDraft(title=str(item["title"]), body=body, labels=labels)
-            )
+            draft = IssueDraft(title=str(item["title"]), body=body, labels=labels)
+            if self._recovery is not None:
+                ref = self._tracker.create_issue_once(
+                    draft,
+                    operation_key=operation_key(recovery_key, "proposal", index),
+                )
+            else:
+                ref = self._tracker.create_issue(draft)
             from auto_designer.observations.grants import grant
 
-            grant(store=self._store, issue=ref.number, sessions=set(item["evidence_sessions"]), pm_origin=True)
+            grant(
+                store=self._store,
+                issue=ref.number,
+                sessions=set(item["evidence_sessions"]),
+                pm_origin=True,
+            )
             numbers.append(ref.number)
 
         self._emit(
@@ -109,7 +173,27 @@ class Divergent:
             proposals=numbers,
             detail=(result_text or None),
         )
+        if self._recovery is not None:
+            self._recovery.complete_unit(
+                round_no=self._round_no(),
+                stage="divergent",
+                key=recovery_key,
+                observed_postconditions={
+                    "completed": True,
+                    "proposal_numbers": numbers,
+                },
+            )
         return DivergentOutcome(proposal_numbers=numbers, artifacts=[dict(item) for item in parsed])
+
+    def _round_no(self) -> int:
+        round_no = current_usage_context().round_no
+        if round_no is None:
+            raise RecoveryConflictError("divergent recovery requires a bound round number")
+        return round_no
+
+    def _recovery_key(self) -> str:
+        context = current_usage_context()
+        return operation_key(context.operation or "divergent", "model-output")
 
     def _run_agent(self, *, trend: list[tuple[str, int, str, str]], reference: list) -> str:
         # The global PM view is an index of compact, deterministic projections.

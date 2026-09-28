@@ -1,0 +1,16 @@
+{
+  "job_name": "ordinary-1-o03-historical-user-canary",
+  "jobs_dir": "evaluation/harness-suite-20260920/harbor-canary-jobs",
+  "n_concurrent_trials": 1,
+  "agents": [
+    {
+      "name": "evaluation.harness_bench.harbor_historical_user_agent:HarborHistoricalUserAgent",
+      "model_name": "glm-5.3-flash"
+    }
+  ],
+  "tasks": [
+    {
+      "path": "evaluation/harness-suite-20260920/harbor-ordinary-o03"
+    }
+  ]
+}

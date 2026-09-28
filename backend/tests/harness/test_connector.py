@@ -58,8 +58,16 @@ class _HeartbeatHarness(FakeHarness):
 class _UsageHarness(FakeHarness):
     def __init__(self) -> None:
         super().__init__(script=["ok"])
-        self.events = [{"provider": "nexau", "model": "m", "input_tokens": 2,
-                        "output_tokens": 1, "total_tokens": 3, "agent_run_id": "ha"}]
+        self.events = [
+            {
+                "provider": "nexau",
+                "model": "m",
+                "input_tokens": 2,
+                "output_tokens": 1,
+                "total_tokens": 3,
+                "agent_run_id": "ha",
+            }
+        ]
 
     def drain_usage_events(self):
         events, self.events = self.events, []
@@ -86,8 +94,9 @@ def test_connector_keeps_platform_metadata_out_of_harness_message() -> None:
 
 def test_connector_attributes_harness_usage_without_exposing_it(monkeypatch) -> None:
     recorded = []
-    monkeypatch.setattr("auto_designer.harness.connector.record_usage",
-                        lambda **event: recorded.append(event))
+    monkeypatch.setattr(
+        "auto_designer.harness.connector.record_usage", lambda **event: recorded.append(event)
+    )
     connector = HarnessConnector(_UsageHarness())
     with bind_usage_context(session_id="s", instance_id="i", interaction_id="turn-0"):
         assert connector.send("hello") == "ok"

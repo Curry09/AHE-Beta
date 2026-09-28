@@ -7,6 +7,8 @@ import json
 import threading
 from pathlib import Path
 
+import pytest
+
 from auto_designer.invocation import InvocationStore, record_invocation
 from auto_designer.usage import bind_usage_context
 
@@ -76,6 +78,44 @@ def test_append_round_keeps_user_and_sealed_sha(tmp_path: Path) -> None:
     store.append_round(round_no=1, user_sha="aaa", sealed_sha="bbb")
     data = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
     assert data["rounds"] == [{"round": 1, "user_sha": "aaa", "sealed_sha": "bbb"}]
+
+
+def test_append_round_is_idempotent_and_conflict_visible(tmp_path: Path) -> None:
+    store = InvocationStore(root=tmp_path)
+    store.write_manifest(data={"rounds": []})
+    store.append_round(round_no=1, user_sha="aaa", sealed_sha="bbb")
+    store.append_round(round_no=1, user_sha="aaa", sealed_sha="bbb")
+    data = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert len(data["rounds"]) == 1
+    with pytest.raises(ValueError, match="conflicts"):
+        store.append_round(round_no=1, user_sha="aaa", sealed_sha="changed")
+
+
+def test_append_round_fills_sealed_sha_once_and_resume_start_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    store = InvocationStore(root=tmp_path)
+    store.write_manifest(data={"rounds": []})
+    store.append_round(round_no=1, user_sha="aaa", sealed_sha=None)
+    store.append_round(round_no=1, user_sha="aaa", sealed_sha="bbb")
+    # A resumed controller reasserts the round start and must not clear the seal.
+    store.append_round(round_no=1, user_sha="aaa", sealed_sha=None)
+    data = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert data["rounds"] == [{"round": 1, "user_sha": "aaa", "sealed_sha": "bbb"}]
+    with pytest.raises(ValueError, match="conflicts"):
+        store.append_round(round_no=1, user_sha="different", sealed_sha=None)
+
+
+def test_record_same_invocation_id_does_not_duplicate_index(tmp_path: Path) -> None:
+    store = InvocationStore(root=tmp_path)
+    payload = {
+        "invocation_id": "fixed-id",
+        "side": "demand",
+        "role": "owner",
+        "output": {"status": "success"},
+    }
+    assert store.record(payload=payload) == store.record(payload=payload)
+    assert len((tmp_path / "index.jsonl").read_text().splitlines()) == 1
 
 
 def test_concurrent_records_do_not_tear_index(tmp_path: Path, monkeypatch) -> None:

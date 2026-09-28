@@ -27,9 +27,9 @@ def test_dispositions_schema_shape_and_enums() -> None:
         "priority",
         "proposal_title",
         "fields",
-            "reason",
-            "artifact",
-        }
+        "reason",
+        "artifact",
+    }
     assert item["required"] == ["issue", "disposition", "artifact"]
 
 

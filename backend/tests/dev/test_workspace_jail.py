@@ -18,6 +18,7 @@ from auto_designer.dev.workspace_jail import (  # noqa: E402
     _nexau_runtime_read_roots,
     _shell_offender,
 )
+from auto_designer.usage import bind_usage_context  # noqa: E402
 
 
 class _FakeSandbox:
@@ -63,6 +64,32 @@ def test_escapes_detects_out_of_workdir(tmp_path: Path) -> None:
     assert _escapes(work, "../sessions/x.json") is True
     assert _escapes(work, "../../data/sessions/x.json") is True
     assert _escapes(work, "/etc/passwd") is True
+
+
+def test_triager_cannot_read_generated_runtime_files(tmp_path: Path) -> None:
+    work = (tmp_path / "harness_repo").resolve()
+    (work / ".openagents" / "worktrees").mkdir(parents=True)
+    (work / "src").mkdir()
+    middleware = WorkspaceJailMiddleware()
+    with bind_usage_context(role="triager"):
+        for tool, arguments in (
+            ("read_file", {"file_path": str(work / ".openagents" / "vigil-queue.db")}),
+            ("list_directory", {"dir_path": str(work / ".openagents" / "worktrees")}),
+            ("search_file_content", {"pattern": "error", "dir_path": str(work / ".openagents")}),
+            ("read_file", {"file_path": str(work / "src" / ".ruff_cache" / "entry")}),
+        ):
+            result, called = _run(middleware, _params(work, tool, arguments))
+            assert _denied(result)
+            assert not called
+        result, called = _run(
+            middleware, _params(work, "read_file", {"file_path": str(work / "src" / "main.py")})
+        )
+        assert result == "REAL_TOOL_RAN" and called
+    result, called = _run(
+        middleware,
+        _params(work, "read_file", {"file_path": str(work / ".openagents" / "vigil-queue.db")}),
+    )
+    assert result == "REAL_TOOL_RAN" and called
 
 
 def test_shell_offender_flags_trace_and_escape(tmp_path: Path) -> None:
@@ -162,9 +189,7 @@ def test_wrap_denies_read_file_escape(tmp_path: Path) -> None:
     mw = WorkspaceJailMiddleware()
     result, ran = _run(mw, _params(work, "read_file", {"file_path": "../../data/sessions/1.json"}))
     assert _denied(result) and ran is False  # 拒绝且真工具没跑
-    result, ran = _run(
-        mw, _params(work, "read_file", {"file_path": "../../data/role_runs/x.json"})
-    )
+    result, ran = _run(mw, _params(work, "read_file", {"file_path": "../../data/role_runs/x.json"}))
     assert _denied(result) and ran is False
 
 

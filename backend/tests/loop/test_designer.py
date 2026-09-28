@@ -16,6 +16,7 @@ from auto_designer.designer.designer import (
     DesignOutcome,
     _parse_covers,
 )
+from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
 from auto_designer.models import (
     FeelingScore,
     IssueDraft,
@@ -25,6 +26,7 @@ from auto_designer.models import (
     Transcript,
 )
 from auto_designer.tracker.fake import FakeTracker
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
 
 
@@ -38,8 +40,10 @@ class _StubDesigner(Designer):
         self.seen_proposals: list = []
         self.seen_trend: list = []
         self.seen_runtime: str = ""
+        self.agent_calls = 0
 
     def _run_agent(self, *, ready: list, proposals: list, trend: list, runtime: str) -> str:
+        self.agent_calls += 1
         self.seen_ready = ready
         self.seen_proposals = proposals
         self.seen_trend = trend
@@ -115,6 +119,7 @@ def _designer(
     canned: str,
     *,
     round_provider=None,
+    recovery=None,
 ) -> _StubDesigner:
     # A synthesis fixture needs an actual cross-proposal set.
     if '"proposals": []' not in canned and "散文" not in canned and canned:
@@ -139,7 +144,27 @@ def _designer(
         str(tmp_path / "agent_def"),
         canned=canned,
         round_provider=round_provider,
+        recovery=recovery,
     )
+
+
+def _designer_recovery(tmp_path: Path) -> RecoveryStore:
+    store = RecoveryStore.initialize(
+        root=tmp_path / "recovery",
+        identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
+    )
+    store.freeze_round(round_no=1, user_sha="user", plan=[])
+    triage = operation_key("triage-complete")
+    store.begin_unit(
+        round_no=1,
+        stage="triage",
+        key=triage,
+        input_value={},
+        expected_postconditions={"completed": True},
+    )
+    store.complete_unit(round_no=1, stage="triage", key=triage)
+    store.complete_stage(round_no=1, stage="triage")
+    return store
 
 
 def _synthesis_artifact() -> dict:
@@ -237,6 +262,20 @@ def test_inputs_are_ready_plus_proposal_index(tmp_path) -> None:
     assert [i.number for i in designer.seen_proposals] == [p]
     assert designer.seen_trend
     assert designer.seen_runtime == ""  # 0059: 不再默认注入耦合旧制品字段的运行时聚合。
+
+
+def test_inputs_are_limited_to_the_active_round(tmp_path) -> None:
+    tracker = FakeTracker()
+    current = tracker.create_issue(
+        IssueDraft(title="current", body="x", labels=[sc.PROPOSAL, sc.FROM_TRIAGE, "round-4"])
+    ).number
+    tracker.create_issue(IssueDraft(title="old", body="x", labels=[sc.READY, "round-3"]))
+    designer = _designer(tmp_path, tracker, _submit([]), round_provider=lambda: 4)
+
+    designer.propose_once()
+
+    assert [item.number for item in designer.seen_ready] == []
+    assert [item.number for item in designer.seen_proposals] == [current]
 
 
 def test_covers_line_written_and_sources_are_merged(tmp_path) -> None:
@@ -339,3 +378,36 @@ def test_parse_covers_field_shapes() -> None:
     """covers 宽进严出：去重、剔 bool/负数/字符串。"""
     assert _parse_covers([5, 5, 6, True, -1, 0, "8"]) == (5, 6)
     assert _parse_covers("nope") == ()
+
+
+def test_recovery_replays_designer_output_and_reconciles_proposal_create(tmp_path) -> None:
+    class CrashAfterCreateTracker(FakeTracker):
+        crashed = False
+
+        def create_issue_once(self, draft, *, operation_key):
+            ref = super().create_issue_once(draft, operation_key=operation_key)
+            if not self.crashed:
+                self.crashed = True
+                raise RuntimeError("injected after proposal create")
+            return ref
+
+    tracker = CrashAfterCreateTracker()
+    recovery = _designer_recovery(tmp_path)
+    designer = _designer(
+        tmp_path,
+        tracker,
+        _rfc_canned(),
+        round_provider=lambda: 1,
+        recovery=recovery,
+    )
+    with bind_usage_context(round_no=1, operation="designer-worker-0"):
+        with pytest.raises(RuntimeError, match="injected"):
+            designer.propose_once()
+    with bind_usage_context(round_no=1, operation="designer-worker-0"):
+        outcome = designer.propose_once()
+    assert designer.agent_calls == 1
+    assert outcome.count == 1
+    assert (
+        len([issue for issue in tracker.list_open_issues() if sc.FROM_SYNTHESIZE in issue.labels])
+        == 1
+    )

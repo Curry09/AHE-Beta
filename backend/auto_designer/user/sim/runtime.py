@@ -293,10 +293,15 @@ class DockerWorkspaceRuntime:
             return
         if self.evidence.get("observation", {}).get("retain_source"):
             # Keep the only copy after a failed export, but never keep the task running.
-            stopped = subprocess.run(["docker", "stop", "--time", "2", self.container_id],
-                                     capture_output=True, text=True, timeout=15)
-            self.evidence.update({"retained_for_observations": True,
-                                  "stop_confirmed": stopped.returncode == 0})
+            stopped = subprocess.run(
+                ["docker", "stop", "--time", "2", self.container_id],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            self.evidence.update(
+                {"retained_for_observations": True, "stop_confirmed": stopped.returncode == 0}
+            )
             self._closed = True
             self.evidence["closed_at"] = utc_now()
             return

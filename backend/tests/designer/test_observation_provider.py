@@ -182,7 +182,9 @@ def test_successive_round_formats_and_historical_evidence_coexist(tmp_path):
     second = bundle(tmp_path / "observations", "round2-session", "scheduler-v2.txt")
     (first / "runtime.jsonl").write_text('{"event":"span_finished","has_error":true}\n')
     (second / "scheduler-v2.txt").write_text("job abc entered WAITING_FOR_REMOTE\n")
-    (second / "READING.md").write_text("v2 has no spans; WAITING_FOR_REMOTE means blocked on provider.")
+    (second / "READING.md").write_text(
+        "v2 has no spans; WAITING_FOR_REMOTE means blocked on provider."
+    )
     manifest = json.loads((second / "manifest.json").read_text())
     manifest["artifact"]["commit"] = "fixture-v3"
     (second / "manifest.json").write_text(json.dumps(manifest))
@@ -198,8 +200,13 @@ def test_successive_round_formats_and_historical_evidence_coexist(tmp_path):
     # the other's format. Reading instructions remain bundle-local.
     with bind_observation_provider(store, allowed_session_ids={"round1-session", "round2-session"}):
         for path in (first, second):
-            assert "error" not in call_file(tmp_path, "read_file", file_path=str(path / "manifest.json"))
-        assert "v2 has no spans" in call_file(tmp_path, "read_file", file_path=str(second / "READING.md"))["content"]
+            assert "error" not in call_file(
+                tmp_path, "read_file", file_path=str(path / "manifest.json")
+            )
+        assert (
+            "v2 has no spans"
+            in call_file(tmp_path, "read_file", file_path=str(second / "READING.md"))["content"]
+        )
 
 
 def test_new_round_missing_bundle_does_not_reuse_previous_round(tmp_path):
@@ -208,7 +215,9 @@ def test_new_round_missing_bundle_does_not_reuse_previous_round(tmp_path):
     with bind_observation_provider(store, allowed_session_ids={"new-session"}) as provider:
         assert not provider.files
         assert provider.unavailable == ["new-session"]
-        result = call_file(tmp_path, "read_file", file_path=str(provider.root / "previous-session" / "engine.log"))
+        result = call_file(
+            tmp_path, "read_file", file_path=str(provider.root / "previous-session" / "engine.log")
+        )
         assert "error" in result
 
 
@@ -235,7 +244,9 @@ def test_designer_tools_are_available_only_for_cited_sessions(tmp_path):
 
 
 @pytest.mark.parametrize("needs_recovery", [False, True])
-def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_path, monkeypatch, needs_recovery):
+def test_drivers_scope_pm_independently_and_inherit_synthesis_references(
+    tmp_path, monkeypatch, needs_recovery
+):
     store = SessionStore(tmp_path / "sessions")
     store.save(session("s1"))
     store.save(session("s2"))
@@ -247,7 +258,11 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
 
     grant(store=store, issue=a.number, sessions={"s1"})
     grant(store=store, issue=b.number, sessions={"s2"})
-    pm = tracker.create_issue(IssueDraft("PM_TITLE_SENTINEL", "PM_BODY_SENTINEL\n会话：s3", ["proposal", "from-divergent"]))
+    pm = tracker.create_issue(
+        IssueDraft(
+            "PM_TITLE_SENTINEL", "PM_BODY_SENTINEL\n会话：s3", ["proposal", "from-divergent"]
+        )
+    )
     tracker.create_issue(IssueDraft("PM_READY_SENTINEL", "会话：s3", ["ready", "from-divergent"]))
     seen = []
 
@@ -276,7 +291,10 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(tmp_pat
         designer_calls.append(args[1])
         assert kwargs["allowed_session_ids"] == {"s1", "s2"}
         assert kwargs["evidence"]["source_proposals"] == [a.number, b.number]
-        assert all(marker not in args[1] for marker in ("PM_TITLE_SENTINEL", "PM_BODY_SENTINEL", "PM_READY_SENTINEL"))
+        assert all(
+            marker not in args[1]
+            for marker in ("PM_TITLE_SENTINEL", "PM_BODY_SENTINEL", "PM_READY_SENTINEL")
+        )
         assert "运行时行为聚合" not in args[1]
         if needs_recovery and len(designer_calls) == 1:
             return "unfinished investigation without submit"

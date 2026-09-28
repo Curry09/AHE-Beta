@@ -14,7 +14,7 @@ from auto_designer.models import (
     Transcript,
     Turn,
 )
-from auto_designer.user.session_store import SessionStore
+from auto_designer.user.session_store import SessionConflictError, SessionStore
 
 
 def _session(n_issues: int = 1) -> Session:
@@ -111,13 +111,82 @@ def test_load_missing_raises(tmp_path) -> None:
         SessionStore(tmp_path).load("nope")
 
 
-def test_resave_overwrites_full_index_duplicates(tmp_path) -> None:
+def test_resave_same_content_is_idempotent_index_upsert(tmp_path) -> None:
     store = SessionStore(tmp_path)
     s = _session()
     store.save(s)
     store.save(s)
-    # 全量被覆盖（仍单文件），索引不去重 → 两条
-    assert len(store.index()) == 2
+    assert len(store.index()) == 1
+
+
+def test_stable_session_id_rejects_different_content(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    first = _session()
+    store.save(first)
+    changed = _session(n_issues=0)
+    changed.session_id = first.session_id
+    with pytest.raises(SessionConflictError, match="different content"):
+        store.save(changed)
+    assert store.load(first.session_id) == first
+
+
+def test_legacy_second_save_may_only_attach_issue_handoff(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    session = _session(n_issues=0)
+    store.save(session)
+    session.issue_refs = [IssueRef(number=7, url="fake://issues/7", state="open")]
+    session.user_feedback_envelope = {"level": "L1", "source_issue_ids": [7]}
+
+    store.save(session)
+
+    assert store.load(session.session_id).issue_refs[0].number == 7
+    assert store.index()[0]["issue_numbers"] == [7]
+
+
+def test_reconcile_repairs_missing_or_duplicate_index_without_rewriting_session(tmp_path) -> None:
+    import json
+
+    store = SessionStore(tmp_path)
+    session = _session()
+    store.save(session)
+    full = tmp_path / f"{session.session_id}.json"
+    original = full.read_bytes()
+    row = store.index()[0]
+    (tmp_path / "index.json").write_text(json.dumps([row, row]), encoding="utf-8")
+    assert store.reconcile(session.session_id) == session
+    assert store.index() == [row]
+    assert full.read_bytes() == original
+
+
+def test_reconcile_missing_session_returns_none_and_ids_are_path_safe(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    assert store.reconcile("missing") is None
+    with pytest.raises(ValueError, match="invalid session id"):
+        store.load("../escape")
+
+
+def test_find_session_by_issue_recovers_from_empty_index(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    session = _session()
+    store.save(session)
+    (tmp_path / "index.json").write_text("[]\n", encoding="utf-8")
+
+    assert store.find_session_id_by_issue(1) == session.session_id
+    assert store.index(include_invalid=True)[0]["issue_numbers"] == [1]
+
+
+def test_rebuild_index_recovers_all_authoritative_session_files(tmp_path) -> None:
+    store = SessionStore(tmp_path)
+    first = _session()
+    second = _session()
+    second.session_id = "second-session"
+    store.save(first)
+    store.save(second)
+    (tmp_path / "index.json").write_text("[]\n", encoding="utf-8")
+
+    rows = store.rebuild_index()
+    assert {row["session_id"] for row in rows} == {first.session_id, second.session_id}
+    assert len(store.index(include_invalid=True)) == 2
 
 
 def test_concurrent_saves_lose_no_index_entries(tmp_path) -> None:

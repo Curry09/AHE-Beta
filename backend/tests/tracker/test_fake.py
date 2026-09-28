@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from auto_designer.models import IssueDraft
-from auto_designer.tracker.base import IssueTracker
+from auto_designer.tracker.base import IdempotencyConflictError, IssueTracker
 from auto_designer.tracker.fake import FakeTracker
 
 
@@ -115,3 +115,27 @@ def test_create_issue_does_not_dedupe() -> None:
     t = FakeTracker()
     d = _draft()
     assert t.create_issue(d).number != t.create_issue(d).number
+
+
+def test_create_issue_once_reconciles_marker_and_rejects_payload_drift() -> None:
+    t = FakeTracker()
+    first = t.create_issue_once(_draft(), operation_key="round-1/user-1/report-1")
+    second = t.create_issue_once(_draft(), operation_key="round-1/user-1/report-1")
+    assert first == second
+    assert len(t.list_open_issues()) == 1
+    assert "auto-designer-operation" in t.issue(first.number)["body"]
+    with pytest.raises(IdempotencyConflictError):
+        t.create_issue_once(
+            IssueDraft(title="changed", body="b", labels=["bug"]),
+            operation_key="round-1/user-1/report-1",
+        )
+
+
+def test_add_comment_once_reconciles_marker_and_rejects_payload_drift() -> None:
+    t = FakeTracker()
+    issue = t.create_issue(_draft())
+    t.add_comment_once(issue.number, "decision", operation_key="owner/1")
+    t.add_comment_once(issue.number, "decision", operation_key="owner/1")
+    assert len(t.issue(issue.number)["comments"]) == 1
+    with pytest.raises(IdempotencyConflictError):
+        t.add_comment_once(issue.number, "changed", operation_key="owner/1")

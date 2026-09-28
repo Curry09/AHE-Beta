@@ -54,4 +54,13 @@ git config --global credential.helper \
   '!f() { if [ "$1" = get ]; then printf "%s\n" "username=${GITEA_USER}" "password=${GITEA_TOKEN}"; fi; }; f'
 
 cd "$WORK"
+# Final OpenAgents boundary: a model requested by Agent(model=sonnet/haiku) must
+# not escape the delivery session's model. FORCE alone inherits the parent on
+# Claude Code >= 2.1.257; the explicit pin also covers older installed CLIs.
+export CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1
+if [[ -n "${ANTHROPIC_MODEL:-}" ]]; then
+  export CLAUDE_CODE_SUBAGENT_MODEL="$ANTHROPIC_MODEL"
+else
+  unset CLAUDE_CODE_SUBAGENT_MODEL
+fi
 exec openagents vigil --parallel "$VIGIL_PARALLEL"

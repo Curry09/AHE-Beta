@@ -33,7 +33,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import pyarrow.parquet as pq
+try:
+    import pyarrow.parquet as pq
+except ModuleNotFoundError:  # pragma: no cover - exercised by dependency-free unit tests
+
+    class _MissingPyarrow:
+        @staticmethod
+        def read_table(*_args: Any, **_kwargs: Any) -> Any:
+            raise ModuleNotFoundError("pyarrow is required to read the SWE-bench parquet input")
+
+    pq = _MissingPyarrow()
 
 from auto_designer.models import WorkspaceSpec
 from auto_designer.user.sim.seed_source import provision
@@ -77,7 +86,9 @@ def _args() -> argparse.Namespace:
     return args
 
 
-def _load_pool(manifest_path: Path, parquet_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _load_pool(
+    manifest_path: Path, parquet_path: Path
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     requested = list(manifest.get("instances") or [])
     if not requested:
@@ -120,9 +131,7 @@ def _write_state(path: Path, state: dict[str, Any]) -> None:
 
 
 def _tree_size(path: Path) -> int:
-    proc = subprocess.run(
-        ["du", "-sb", str(path)], capture_output=True, text=True, check=True
-    )
+    proc = subprocess.run(["du", "-sb", str(path)], capture_output=True, text=True, check=True)
     return int(proc.stdout.split()[0])
 
 
@@ -175,9 +184,7 @@ def _setup_commands(row: dict[str, Any]) -> list[str]:
     elif repo == "scikit-learn/scikit-learn":
         # This pre-PEP-660 backend cannot do editable installs with modern pip.
         # Python 3.10 + the period build toolchain preserves setup.py develop.
-        commands.append(
-            ".venv/bin/python -m pip install 'pip<25' 'setuptools<60' 'cython<3' scipy"
-        )
+        commands.append(".venv/bin/python -m pip install 'pip<25' 'setuptools<60' 'cython<3' scipy")
         commands.append(".venv/bin/python -m pip install --no-build-isolation -e .")
     else:
         commands.append(".venv/bin/python -m pip install -e .")
@@ -189,7 +196,11 @@ def _run_setup(repo_dir: Path, row: dict[str, Any], *, timeout: float) -> None:
     _interpreter, expected = _setup_interpreter(row)
     if venv_python.is_file():
         proc = subprocess.run(
-            [str(venv_python), "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
+            [
+                str(venv_python),
+                "-c",
+                "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+            ],
             capture_output=True,
             text=True,
         )
@@ -252,9 +263,7 @@ def _deps_cached(repo_dir: Path, row: dict[str, Any]) -> bool:
     )
     if proc.returncode != 0 or proc.stdout.strip() != f"{expected[0]}.{expected[1]}":
         return False
-    return row["repo"] not in LEGACY_COMPAT_REPOS or (
-        repo_dir / LEGACY_COMPAT_MARKER
-    ).is_file()
+    return row["repo"] not in LEGACY_COMPAT_REPOS or (repo_dir / LEGACY_COMPAT_MARKER).is_file()
 
 
 def _prepare_source(row: dict[str, Any], instance_root: Path) -> Path:

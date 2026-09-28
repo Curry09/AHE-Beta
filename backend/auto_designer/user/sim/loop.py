@@ -211,7 +211,7 @@ _HARNESS_TERMINAL_STATUSES = frozenset({"timed_out", "crashed"})
 #   （Spec-0024/T6：heard.answers → utterance）。
 _HEARTBEAT_SEC = 90.0
 # 心跳唤醒次数硬上限（兜底防病态：模型一直 keep_waiting 而 harness 永不回）。到顶即强制放弃。
-_MAX_HEARTBEATS = 8
+_MAX_HEARTBEATS = 12
 # A malformed persona reply is not a user give-up. Allow one warning heartbeat
 # to keep listening; repeated failures then stop safely with an auditable status.
 _MAX_PROTOCOL_STALL_HEARTBEATS = 2
@@ -1326,6 +1326,7 @@ def run_session(
     *,
     help_text: str = "",
     on_progress: Callable[[SessionResult], None] | None = None,
+    deadline_seconds: float | None = None,
 ) -> SessionResult:
     # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
     # Spec-0023：主决定与心跳均为 judge → intent → act（three），无 mode 旋钮。
@@ -1343,8 +1344,12 @@ def run_session(
     harness_events: list = []  # 上一轮 stdout 可见事件流，供下一次主决策感知
     prior_activity: list[dict] = []  # 上一轮已完成请求的活动条（过程记忆，供对照）
     ledger = _UtteranceLedger()  # Spec-0024/T6：请求–回复配对
+    started_at = time.monotonic()
 
     while state.turn < MAX_TURNS:
+        if deadline_seconds is not None and time.monotonic() - started_at >= deadline_seconds:
+            result.end_reason = "official_deadline"
+            break
         set_usage_context(interaction_id=f"turn-{state.turn}", turn_no=state.turn)
         phase = Phase.OPENING if state.turn == 0 and not history else Phase.ACTIVE
         goal_before = goal_ledger.snapshot()

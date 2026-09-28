@@ -53,6 +53,7 @@ def test_write_openagents_config_matches_stage_finalization(tmp_path: Path) -> N
     assert path == tmp_path / ".openagents" / "openagents.yml"
     data = _load_yaml(path)
     assert data["forge"] == "gitea"
+    assert data["coordination"] == "soft"
     assert data["gitea"] == {
         "base_url": "http://localhost:3000",
         "owner": "harness",
@@ -84,6 +85,15 @@ def test_ci_stage_env_override(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("VIGIL_CI_STAGE", "banana")
     data = _load_yaml(run.write_openagents_config(repo=tmp_path, gitea=_GITEA))
     assert data["stages"]["ci"] == "skip"
+
+
+def test_coordination_can_be_disabled_without_restoring_hard_curator(tmp_path, monkeypatch):
+    monkeypatch.setenv("VIGIL_COORDINATION", "off")
+    data = _load_yaml(run.write_openagents_config(repo=tmp_path, gitea=_GITEA))
+    assert data["coordination"] == "off"
+    monkeypatch.setenv("VIGIL_COORDINATION", "typo")
+    with pytest.raises(ValueError, match="VIGIL_COORDINATION"):
+        run.write_openagents_config(repo=tmp_path, gitea=_GITEA)
 
 
 def test_write_openagents_config_is_idempotent(tmp_path: Path) -> None:
@@ -118,6 +128,33 @@ def test_vigil_keep_alive_defaults_off(monkeypatch) -> None:
     assert run.vigil_keep_alive() is True
     monkeypatch.setenv("VIGIL_KEEP_ALIVE", "true")
     assert run.vigil_keep_alive() is True
+
+
+def test_stop_vigil_model_processes_is_scoped_to_run(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "target-run")
+    monkeypatch.setattr(run.os, "getpgrp", lambda: 900)
+    killed_groups: list[int] = []
+    killed_pids: list[int] = []
+    monkeypatch.setattr(run.os, "killpg", lambda pgid, _sig: killed_groups.append(pgid))
+    monkeypatch.setattr(run.os, "kill", lambda pid, _sig: killed_pids.append(pid))
+
+    def process(pid: int, parent: int, group: int, cmd: str, run_id: str) -> None:
+        directory = tmp_path / str(pid)
+        directory.mkdir()
+        (directory / "stat").write_text(f"{pid} (process) S {parent} {group} 0\n")
+        (directory / "cmdline").write_bytes(cmd.encode() + b"\0")
+        (directory / "environ").write_bytes(f"AUTO_DESIGNER_RUN_ID={run_id}".encode() + b"\0")
+
+    process(101, 77, 101, "claude -p --verbose", "target-run")
+    process(102, 101, 102, "python -m unittest", "target-run")
+    process(103, 1, 103, "claude -p --verbose", "target-run")  # old orphan
+    process(104, 1, 104, "claude -p --verbose", "another-run")
+    process(105, 77, 900, "sleep 300", "target-run")  # task service, not a model call
+
+    run._stop_vigil_model_processes(vigil_pid=77, proc_root=tmp_path)
+
+    assert set(killed_groups) == {101, 102, 103}
+    assert set(killed_pids) == {101, 102, 103}
 
 
 def test_vigil_mode_invalid_fails_loud(monkeypatch) -> None:
@@ -190,6 +227,8 @@ def _container_rig(monkeypatch, tmp_path: Path) -> dict:
     monkeypatch.delenv("ROLE_RUNS_DIR", raising=False)
     for key in run._CLAUDE_CONFIG_ENVS:  # 清宿主可能设的 base_url/模型，避免污染断言
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_SUBAGENT_MODEL", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_SUBAGENT_MODEL_FORCE", raising=False)
     monkeypatch.setattr(run, "_VIGIL_CONFIG_STAGING", tmp_path / "staging")
     monkeypatch.setattr(run.shutil, "which", lambda name: f"/usr/bin/{name}")
 
@@ -249,6 +288,8 @@ def test_container_passes_through_claude_config_envs(tmp_path: Path, monkeypatch
     assert "ANTHROPIC_BASE_URL=https://gw.example.top" in joined
     assert "ANTHROPIC_MODEL=vendor/Model-Pro" in joined
     assert "ANTHROPIC_SMALL_FAST_MODEL=vendor/Model-Pro" in joined
+    assert "CLAUDE_CODE_SUBAGENT_MODEL=vendor/Model-Pro" in joined
+    assert "CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1" in joined
 
 
 def test_container_maps_explicit_harness_glm_envs_to_product_client_names(
@@ -277,6 +318,8 @@ def test_container_omits_unset_claude_config_envs(tmp_path: Path, monkeypatch) -
     )
     joined = " ".join(next(a for a in calls["runs"] if a[:2] == ["docker", "run"]))
     assert "ANTHROPIC_MODEL" not in joined and "ANTHROPIC_BASE_URL" not in joined
+    assert "CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1" in joined
+    assert "CLAUDE_CODE_SUBAGENT_MODEL=" not in joined
 
 
 def test_container_permission_mode_host_overridable(tmp_path: Path, monkeypatch) -> None:
@@ -468,6 +511,9 @@ def test_subprocess_start_spawns_with_token_env_and_cwd(tmp_path: Path, monkeypa
     calls: dict = {}
     monkeypatch.setenv("VIGIL_MODE", "subprocess")
     monkeypatch.setenv("VIGIL_KEEP_ALIVE", "0")
+    monkeypatch.setenv("ANTHROPIC_MODEL", "vendor/Model-Pro")
+    monkeypatch.setenv("CLAUDE_CODE_SUBAGENT_MODEL", "anthropic/claude-sonnet-5")
+    monkeypatch.setenv("CLAUDE_CODE_SUBAGENT_MODEL_FORCE", "0")
     monkeypatch.setattr(run.shutil, "which", lambda name: "/usr/bin/openagents")
 
     def _fake_popen(argv, *, cwd, env, stdout, stderr):
@@ -484,6 +530,8 @@ def test_subprocess_start_spawns_with_token_env_and_cwd(tmp_path: Path, monkeypa
     assert calls["argv"] == ["openagents", "vigil", "--parallel", "3"]
     assert calls["cwd"] == str(repo)
     assert calls["env"]["GITEA_TOKEN"] == "secret-token"  # token 只经子进程 env，不落配置
+    assert calls["env"]["CLAUDE_CODE_SUBAGENT_MODEL"] == "vendor/Model-Pro"
+    assert calls["env"]["CLAUDE_CODE_SUBAGENT_MODEL_FORCE"] == "1"
     assert (repo / ".openagents" / "openagents.yml").is_file()  # 联调模式配置写进宿主仓（既有行为）
 
     run.stop_vigil(handle)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import random
 from pathlib import Path
 
@@ -103,3 +104,57 @@ def test_frozen_plan_loads_roster_and_rejects_drift(tmp_path) -> None:
             persona_ids=persona_ids,
             instance_ids=["one", "two"],
         )
+
+
+def test_shared_recovery_loader_reuses_identity_and_rejects_missing_state(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = _module()
+    values = {
+        "AUTO_DESIGNER_EXPERIMENT_ID": "exp",
+        "AUTO_DESIGNER_RUN_ID": "run",
+        "AUTO_DESIGNER_CONFIG_HASH": "config",
+        "AUTO_DESIGNER_CONTROLLER_SHA": "controller",
+        "AUTO_DESIGNER_PLAN_HASH": "plan",
+        "AUTO_DESIGNER_RECOVERY_ROOT": str(tmp_path / "checkpoints"),
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+
+    fresh = module.run_mod.load_recovery_store(mode="fresh")
+    assert fresh is not None
+    resumed = module.run_mod.load_recovery_store(mode="resume")
+    assert resumed is not None and resumed.snapshot()["identity"]["run_id"] == "run"
+
+    snapshot = tmp_path / "checkpoints" / "recovery.json"
+    document = json.loads(snapshot.read_text(encoding="utf-8"))
+    document["identity"]["plan_hash"] = "drift"
+    snapshot.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(Exception, match="identity changed"):
+        module.run_mod.load_recovery_store(mode="resume")
+
+
+def test_replay_resume_starts_from_frozen_or_current_round() -> None:
+    module = _module()
+
+    class Recovery:
+        def __init__(self, round_no):
+            self.round_no = round_no
+
+        def snapshot(self):
+            return {"round": self.round_no}
+
+    assert module._start_round(run_mode="replay", replay_start=3, recovery=None) == 3
+    assert module._start_round(run_mode="resume", replay_start=3, recovery=Recovery(3)) == 3
+    assert module._start_round(run_mode="resume", replay_start=3, recovery=Recovery(4)) == 4
+    assert module._start_round(run_mode="resume", replay_start=None, recovery=Recovery(3)) == 1
+
+
+def test_replay_resume_reads_frozen_start_when_launcher_omits_it(tmp_path) -> None:
+    module = _module()
+    manifest = tmp_path / "mixed.json"
+    manifest.write_text('{"replay":{"start_round":3}}', encoding="utf-8")
+    assert module._replay_start(run_mode="resume", explicit="", manifest_path=str(manifest)) == 3
+    assert module._replay_start(run_mode="resume", explicit="3", manifest_path=str(manifest)) == 3
+    with pytest.raises(RuntimeError, match="conflicts"):
+        module._replay_start(run_mode="resume", explicit="1", manifest_path=str(manifest))

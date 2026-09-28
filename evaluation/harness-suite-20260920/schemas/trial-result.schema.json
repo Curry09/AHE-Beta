@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hse-trial-result-v1",
+  "type": "object",
+  "required": ["schema_version", "experiment_id", "batch_id", "trial_id", "task", "condition", "harness", "provider", "timing", "outcome", "artifacts"],
+  "properties": {
+    "schema_version": {"const": "hse-trial-result-v1"},
+    "experiment_id": {"type": "string", "minLength": 1},
+    "batch_id": {"type": "string", "minLength": 1},
+    "trial_id": {"type": "string", "minLength": 1},
+    "attempt": {"type": "integer", "minimum": 1},
+    "task": {
+      "type": "object",
+      "required": ["task_id", "benchmark", "stratum"],
+      "properties": {
+        "task_id": {"type": "string"},
+        "benchmark": {"type": "string"},
+        "stratum": {"enum": ["ordinary", "mechanism"]},
+        "source_revision": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "condition": {"enum": ["direct", "simulated_user"]},
+    "harness": {
+      "type": "object",
+      "required": ["id", "revision", "model", "owner_mode"],
+      "properties": {
+        "id": {"type": "string"},
+        "revision": {"type": "string"},
+        "model": {"type": "string"},
+        "owner_mode": {"const": "mechanical_review_false"},
+        "developer_backend": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "provider": {
+      "type": "object",
+      "required": ["name", "sandbox_id", "image_digest", "model_gateway"],
+      "properties": {
+        "name": {"enum": ["harbor", "docker", "e2b", "daytona"]},
+        "sandbox_id": {"type": "string"},
+        "image_digest": {"type": "string"},
+        "model_gateway": {"type": "string"},
+        "resource_class": {"type": "string"},
+        "environment_backend": {"enum": ["docker", "e2b", "daytona"]}
+      },
+      "additionalProperties": true
+    },
+    "timing": {
+      "type": "object",
+      "required": ["started_at", "ended_at", "timeout_seconds"],
+      "properties": {
+        "started_at": {"type": "string"},
+        "ended_at": {"type": "string"},
+        "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "heartbeat_seconds": {"type": ["number", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "interaction": {"type": "object", "additionalProperties": true},
+    "grader": {"type": "object", "additionalProperties": true},
+    "outcome": {
+      "type": "object",
+      "required": ["terminal_status", "category", "passed"],
+      "properties": {
+        "terminal_status": {"enum": ["completed", "failed", "timeout", "invalid", "infrastructure_failed"]},
+        "category": {"enum": ["task", "harness", "user_simulator", "protocol", "grader", "infrastructure", "deadline"]},
+        "passed": {"type": "boolean"},
+        "score": {"type": ["number", "null"]},
+        "reason": {"type": ["string", "null"]},
+        "retryable": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["trial_manifest", "transcript", "grader_result"],
+      "properties": {
+        "trial_manifest": {"type": "string"},
+        "transcript": {"type": "string"},
+        "grader_result": {"type": "string"},
+        "user_trace": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -3,7 +3,8 @@
 
 生成器（triage/synthesize/divergent）负责问题诊断、产品发现和结构设计；Owner 不重新判断根因、
 不选择 prompt/runtime 等实现层，也不以交付风险为由压缩目标。模型协调 PM/结构路线的交付重叠，
-补充 handoff 摘要、需保留的能力和独立验收分组。未被模型列出的提案默认直接交接，避免遗漏成为隐性否决。
+补充 handoff 摘要、需保留的能力和独立验收分组。恢复日志先限定机械准入集合；
+集合内未被模型列出的提案默认直接交接，避免遗漏成为隐性否决。
 
 路由动作：
 - admit → 加 `openagents` 交付面交接令牌；
@@ -35,7 +36,10 @@ from auto_designer.designer.issue_schema import (
 )
 from auto_designer.designer.proposal_view import format_proposal_list, normalized_proposal_body
 from auto_designer.designer.role_contract import validate_owner
+from auto_designer.loop.recovery import RecoveryConflictError, RecoveryStore, operation_key
+from auto_designer.models import OpenIssue
 from auto_designer.tracker.base import IssueTracker
+from auto_designer.usage import current_usage_context
 from auto_designer.user.session_store import SessionStore
 
 _ADMIT_TIMEOUT = 1800
@@ -91,6 +95,7 @@ class Owner:
         on_status: StatusFn | None = None,
         on_event: Callable[[str, str], None] | None = None,
         review: bool = True,
+        recovery: RecoveryStore | None = None,
     ) -> None:
         self._tracker = tracker
         self._store = store
@@ -98,19 +103,66 @@ class Owner:
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
         self._on_event = on_event
-        # review=False = 纯机械交接：不调用模型，全部 proposal 直接交给 OpenAgents。
+        # review=False = 纯机械交接：不调用模型，交接恢复日志确认已设计的 proposal。
         self._review = review
+        self._recovery = recovery
+
+    def bind_recovery(self, recovery: RecoveryStore) -> None:
+        """Attach the experiment ledger after role construction."""
+        self._recovery = recovery
 
     def admit_once(self) -> AdmitOutcome:
-        from auto_designer.observations.delivery_gaps import ingest_delivery_gaps
-
-        ingest_delivery_gaps(store=self._store, tracker=self._tracker)
-        backlog = self._tracker.list_open_issues()
+        recovery_key = self._recovery_key()
+        recovery_unit = (
+            self._recovery.unit(round_no=self._round_no(), stage="owner", key=recovery_key)
+            if self._recovery is not None
+            else None
+        )
+        if recovery_unit is not None:
+            frozen = recovery_unit["input"]
+            backlog = [OpenIssue.from_dict(item) for item in frozen["backlog"]]
+            trend = [tuple(item) for item in frozen["trend"]]
+        else:
+            backlog = self._tracker.list_open_issues()
+            trend = self._feeling_trend()
         proposals = [i for i in backlog if plane(i.labels) == PROPOSAL]
+        if self._recovery is not None:
+            eligible = self._designed_proposal_ids()
+            proposals = [i for i in proposals if i.number in eligible]
+        ready = [i for i in backlog if plane(i.labels) == READY]
+        if self._recovery is not None:
+            recovery_unit = self._recovery.begin_unit(
+                round_no=self._round_no(),
+                stage="owner",
+                key=recovery_key,
+                input_value={
+                    "backlog": [item.to_dict() for item in backlog],
+                    "trend": [list(item) for item in trend],
+                },
+                expected_postconditions={"completed": True},
+                dependencies=("divergent", "designer"),
+            )
+            if recovery_unit.get("status") == "completed":
+                return self._outcome_from_observed(
+                    recovery_unit.get("observed_postconditions") or {}
+                )
         if not proposals:
+            if self._recovery is not None:
+                if not recovery_unit.get("output_digest"):
+                    self._recovery.save_output(
+                        round_no=self._round_no(),
+                        stage="owner",
+                        key=recovery_key,
+                        output={"decisions": []},
+                    )
+                self._recovery.complete_unit(
+                    round_no=self._round_no(),
+                    stage="owner",
+                    key=recovery_key,
+                    observed_postconditions={"completed": True},
+                )
             self._emit(running=False, status="无待准入提案")
             return AdmitOutcome()
-        ready = [i for i in backlog if plane(i.labels) == READY]
         self._emit(running=True, status=f"交接打包中…（{len(proposals)} 条提案）")
 
         outcome = AdmitOutcome()
@@ -119,12 +171,23 @@ class Owner:
         # Cross-route overlap is a coordination relation, never an absorption instruction.
         review_needed = proposals
         decisions: list[dict] = []
-        if review_needed and self._review:
-            result_text = self._run_agent(
-                proposals=review_needed, ready=ready, trend=self._feeling_trend()
+        if recovery_unit is not None and recovery_unit.get("output_digest"):
+            saved = self._recovery.read_output(
+                round_no=self._round_no(), stage="owner", key=recovery_key
             )
-            decisions = read_submit(result_text, "decisions") or []
-        # review=False 或 agent 未列出某项：该项在 pass 2 默认直接交接。
+            decisions = [dict(item) for item in saved.get("decisions") or []]
+        else:
+            if review_needed and self._review:
+                result_text = self._run_agent(proposals=review_needed, ready=ready, trend=trend)
+                decisions = read_submit(result_text, "decisions") or []
+            if self._recovery is not None:
+                self._recovery.save_output(
+                    round_no=self._round_no(),
+                    stage="owner",
+                    key=recovery_key,
+                    output={"decisions": decisions},
+                )
+        # review=False 或 agent 未列出某项：准入集合内的该项在 pass 2 默认直接交接。
 
         reviewable = {i.number for i in review_needed}
         visible_routing = reviewable | {i.number for i in ready}
@@ -139,6 +202,11 @@ class Owner:
             if violations:
                 if num in reviewable:
                     outcome.invalid[num] = ",".join(v.code for v in violations)
+                    # An explicitly malformed decision is not the same as an
+                    # omitted decision.  Preserve the proposal as hold so the
+                    # default-handoff pass cannot accidentally admit it.
+                    if num not in outcome.held:
+                        outcome.held.append(num)
                 continue
             if num not in explicit:  # 只裁本批评审集合；重复决策先者得
                 routing = dict(d)
@@ -186,13 +254,19 @@ class Owner:
                         or target.number not in existing_ready | set(outcome.admitted)
                     ):
                         self._admit(issue, priority=None, note="handoff: invalid merge preserved")
-                        outcome.invalid[num] = "merge target 必须是既有 ready item 或本批 admit 提案"
+                        outcome.invalid[num] = (
+                            "merge target 必须是既有 ready item 或本批 admit 提案"
+                        )
                         outcome.admitted.append(num)
                         continue
                     if self._dedupe_signature(issue) != self._dedupe_signature(target):
-                        self._admit(issue, priority=None, note="handoff: non-duplicate merge preserved")
+                        self._admit(
+                            issue, priority=None, note="handoff: non-duplicate merge preserved"
+                        )
                         self._safe_comment(num, self._decision_note(d))
-                        outcome.invalid[num] = "仅标题与规范化正文完全相同的提案可 merge；已独立交接"
+                        outcome.invalid[num] = (
+                            "仅标题与规范化正文完全相同的提案可 merge；已独立交接"
+                        )
                         outcome.admitted.append(num)
                         continue
                     self._merge(issue, into=target.number)
@@ -230,7 +304,89 @@ class Owner:
             ),
             proposals=outcome.admitted,
         )
+        if self._recovery is not None:
+            observed = {
+                "completed": True,
+                "admitted": outcome.admitted,
+                "merged": outcome.merged,
+                "declined": outcome.declined,
+                "held": outcome.held,
+                "mechanical": outcome.mechanical,
+                "invalid": outcome.invalid,
+                "failed": outcome.failed,
+                "artifacts": outcome.artifacts,
+            }
+            if outcome.failed:
+                self._recovery.fail_unit(
+                    round_no=self._round_no(),
+                    stage="owner",
+                    key=recovery_key,
+                    error=f"owner decisions incomplete: {sorted(outcome.failed)}",
+                )
+                raise RecoveryConflictError(
+                    f"owner decisions remain incomplete: {sorted(outcome.failed)}"
+                )
+            self._recovery.complete_unit(
+                round_no=self._round_no(),
+                stage="owner",
+                key=recovery_key,
+                observed_postconditions=observed,
+            )
         return outcome
+
+    def _designed_proposal_ids(self) -> set[int]:
+        """Admit PM output, Designer output, and sources Designer saw but retained.
+
+        The recovery ledger is the authority for what Designer actually saw.  A
+        diagnostic request arriving after its snapshot remains pending for the
+        next design stage, regardless of its labels.
+        """
+        round_state = self._recovery.round_state(round_no=self._round_no()) or {}
+        stages = round_state.get("stages") or {}
+        if (stages.get("designer") or {}).get("status") != "completed":
+            raise RecoveryConflictError("owner requires a completed designer stage")
+
+        pm: set[int] = set()
+        for unit in ((stages.get("divergent") or {}).get("units") or {}).values():
+            if unit.get("status") == "completed":
+                pm.update((unit.get("observed_postconditions") or {}).get("proposal_numbers") or [])
+
+        seen: set[int] = set()
+        merged: set[int] = set()
+        synthesized: set[int] = set()
+        for unit in (stages["designer"].get("units") or {}).values():
+            if unit.get("status") != "completed":
+                continue
+            frozen = unit.get("input") or {}
+            issues = frozen.get("issues") or frozen.get("backlog") or []
+            seen.update(int(item["number"]) for item in issues)
+            observed = unit.get("observed_postconditions") or {}
+            merged.update(observed.get("merged_numbers") or [])
+            synthesized.update(observed.get("proposal_numbers") or [])
+        return pm | synthesized | (seen - merged)
+
+    def _round_no(self) -> int:
+        value = current_usage_context().round_no
+        if type(value) is not int or value <= 0:
+            raise RecoveryConflictError("owner recovery requires a bound round number")
+        return value
+
+    def _recovery_key(self) -> str:
+        context = current_usage_context()
+        return operation_key(context.operation or "owner", "decisions")
+
+    @staticmethod
+    def _outcome_from_observed(observed: dict) -> AdmitOutcome:
+        return AdmitOutcome(
+            admitted=[int(n) for n in observed.get("admitted") or []],
+            merged=[int(n) for n in observed.get("merged") or []],
+            declined=[int(n) for n in observed.get("declined") or []],
+            held=[int(n) for n in observed.get("held") or []],
+            mechanical=[int(n) for n in observed.get("mechanical") or []],
+            invalid={int(k): str(v) for k, v in (observed.get("invalid") or {}).items()},
+            failed={int(k): str(v) for k, v in (observed.get("failed") or {}).items()},
+            artifacts=[dict(item) for item in observed.get("artifacts") or []],
+        )
 
     def _admit(self, issue, *, priority: str | None, note: str) -> None:
         from auto_designer.designer.delivery_evidence import publish_delivery_evidence
@@ -245,9 +401,13 @@ class Owner:
 
         sessions = authorized_sessions(store=self._store, issue=into)
         sessions |= authorized_sessions(store=self._store, issue=issue.number)
-        grant(store=self._store, issue=into, sessions=sessions,
-              pm_origin=is_pm_source(store=self._store, issue=into) or
-              is_pm_source(store=self._store, issue=issue.number))
+        grant(
+            store=self._store,
+            issue=into,
+            sessions=sessions,
+            pm_origin=is_pm_source(store=self._store, issue=into)
+            or is_pm_source(store=self._store, issue=issue.number),
+        )
         target = next(i for i in self._tracker.list_open_issues() if i.number == into)
         publish_delivery_evidence(tracker=self._tracker, store=self._store, issue=target)
         self._tracker.transition_issue(
@@ -365,7 +525,14 @@ class Owner:
             # rather than matching individual decision text downstream.
             marker = "<!-- openagents:agent=auto-designer -->"
             signed = body if marker in body else f"{body}\n\n{marker}"
-            self._tracker.add_comment(number, signed)
+            if self._recovery is not None:
+                self._tracker.add_comment_once(
+                    number,
+                    signed,
+                    operation_key=operation_key(self._recovery_key(), "comment", number, signed),
+                )
+            else:
+                self._tracker.add_comment(number, signed)
         except Exception:  # noqa: BLE001
             pass
 
@@ -377,9 +544,8 @@ class Owner:
                 f"- 摘要：{decision.get('handoff_summary', '')}",
                 "- 保留能力：" + "；".join(decision.get("preserved_capabilities", [])),
                 "- 验收分组：" + "；".join(decision.get("acceptance_groups", [])),
-                "- 交付重叠（关联，不合并）：" + (
-                    ", ".join(f"#{n}" for n in decision.get("delivery_overlaps", [])) or "无"
-                ),
+                "- 交付重叠（关联，不合并）："
+                + (", ".join(f"#{n}" for n in decision.get("delivery_overlaps", [])) or "无"),
             ]
         )
 

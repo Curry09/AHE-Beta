@@ -10,6 +10,7 @@ from auto_designer.loop.live import (
     append_agent_log,
     archive_agent,
     clear_live,
+    prepare_live_resume,
     read_agents,
     read_history,
     read_live_run,
@@ -344,6 +345,32 @@ def test_clear_removes_all(tmp_path: Path) -> None:
     assert read_agents(data_dir=tmp_path) == []
     assert read_history(data_dir=tmp_path) == []
     assert read_live_run(data_dir=tmp_path)["running"] is False
+
+
+def test_prepare_resume_preserves_history_and_marks_stale_slots(tmp_path: Path) -> None:
+    update_agent(
+        data_dir=tmp_path,
+        agent_id="u",
+        role="user",
+        label="U",
+        running=True,
+        status="模型调用中",
+        round_no=2,
+    )
+    archive_agent(
+        data_dir=tmp_path,
+        agent_id="u",
+        round_no=1,
+        extra={"kind": "user_session", "session_id": "done"},
+    )
+    update_live_run(data_dir=tmp_path, running=True, round_no=2, total_rounds=3)
+
+    prepare_live_resume(data_dir=tmp_path, phase="designer")
+
+    assert read_history(data_dir=tmp_path)[0]["session_id"] == "done"
+    assert read_agents(data_dir=tmp_path)[0]["running"] is False
+    assert "等待恢复" in read_agents(data_dir=tmp_path)[0]["status"]
+    assert read_live_run(data_dir=tmp_path)["phase"] == "recovering:designer"
 
 
 def test_triager_sorts_between_user_and_designer(tmp_path: Path) -> None:

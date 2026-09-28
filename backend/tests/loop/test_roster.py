@@ -1,5 +1,5 @@
 # Spec-0029/T8（Spec-0032/T4 调整）：roster 编制解析——developer 语义改为交付面并发 K。
-"""验证 load_roster：默认 user3/triager1/designer1/divergent0/owner1/developer1；各 N_* 覆盖。"""
+"""验证 load_roster：默认 user3/triager1/designer1/divergent0/owner0/developer1；各 N_* 覆盖。"""
 
 from __future__ import annotations
 
@@ -23,10 +23,10 @@ def test_defaults(monkeypatch) -> None:
         "triager": 1,
         "designer": 1,
         "divergent": 0,
-        "owner": 1,
+        "owner": 0,
         "developer": 1,  # Spec-0032：交付面并发 K（vigil --parallel），保守默认串行
     }
-    assert DEFAULT_ROSTER["owner"] == 1
+    assert DEFAULT_ROSTER["owner"] == 0
 
 
 def test_triager_override(monkeypatch) -> None:
@@ -47,7 +47,7 @@ def test_zero_triagers_allowed(monkeypatch) -> None:
 def test_invalid_falls_back(monkeypatch) -> None:
     for raw in ("abc", "-1", "1.5"):
         monkeypatch.setenv("N_OWNERS", raw)
-        assert load_roster()["owner"] == 1  # 非法/负值回落默认
+        assert load_roster()["owner"] == 0  # 非法/负值回落默认
 
 
 def test_all_roles_overridable(monkeypatch) -> None:

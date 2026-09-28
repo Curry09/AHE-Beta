@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Protocol
 
-from auto_designer.usage import monotonic_ms, record_usage
+from auto_designer.usage import monotonic_ms, provider_wait_scope, record_usage
 
 PERSONA_MAX_CONTEXT_TOKENS = 256000
 PERSONA_MAX_OUTPUT_TOKENS = 32768
@@ -152,13 +152,25 @@ class ApiPersonaClient:
         for _ in range(5):
             started = monotonic_ms()
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=self.temperature,
-                    max_tokens=max_tokens,
-                    extra_body={"enable_thinking": False},
-                )
+                request = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": self.temperature,
+                    "max_tokens": max_tokens,
+                }
+                reasoning_effort = os.getenv("USER_LLM_REASONING_EFFORT", "").strip()
+                if reasoning_effort:
+                    request["reasoning_effort"] = reasoning_effort
+                # Boyue's GLM-5.x endpoint is an always-thinking model and
+                # rejects ``enable_thinking=false`` with HTTP 400.  Do not
+                # spend a retry on a parameter that is known to be invalid;
+                # other OpenAI-compatible gateways keep the historical flag.
+                if not reasoning_effort and not self.model.lower().startswith(
+                    ("glm-5.2", "glm-5.3")
+                ):
+                    request["extra_body"] = {"enable_thinking": False}
+                with provider_wait_scope():
+                    response = self.client.chat.completions.create(**request)
                 record_usage(
                     usage=getattr(response, "usage", None),
                     provider="openai-compatible",
@@ -178,12 +190,16 @@ class ApiPersonaClient:
                 )
                 started = monotonic_ms()
                 try:  # flag 可能被网关拒 -> 裸试一次
-                    response = self.client.chat.completions.create(
-                        model=self.model,
-                        messages=messages,
-                        temperature=self.temperature,
-                        max_tokens=max_tokens,
-                    )
+                    with provider_wait_scope():
+                        retry_request = {
+                            "model": self.model,
+                            "messages": messages,
+                            "temperature": self.temperature,
+                            "max_tokens": max_tokens,
+                        }
+                        if reasoning_effort:
+                            retry_request["reasoning_effort"] = reasoning_effort
+                        response = self.client.chat.completions.create(**retry_request)
                     record_usage(
                         usage=getattr(response, "usage", None),
                         provider="openai-compatible",

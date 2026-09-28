@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from auto_designer.designer import issue_schema as sc
+from auto_designer.designer.divergent import Divergent
 from auto_designer.designer.evidence_contract import (
     EvidenceLevel,
     build_evidence_envelope,
@@ -12,8 +14,17 @@ from auto_designer.designer.evidence_contract import (
     validate_envelope,
     validate_role_access,
 )
+from auto_designer.designer.owner import Owner
+from auto_designer.designer.session_timeline import (
+    bind_session_store,
+    get_harness_beat,
+    get_session_timeline,
+)
+from auto_designer.designer.triage import Triager
 from auto_designer.models import (
     FeelingScore,
+    IssueDraft,
+    IssueRef,
     Persona,
     PersonaCallTrace,
     SeedScenario,
@@ -23,18 +34,8 @@ from auto_designer.models import (
     Transcript,
 )
 from auto_designer.tracker.fake import FakeTracker
-from auto_designer.designer import issue_schema as sc
-from auto_designer.designer.triage import Triager
-from auto_designer.designer.divergent import Divergent
-from auto_designer.designer.owner import Owner
-from auto_designer.models import IssueDraft, IssueRef
-from auto_designer.user.session_store import SessionStore
-from auto_designer.designer.session_timeline import (
-    bind_session_store,
-    get_harness_beat,
-    get_session_timeline,
-)
 from auto_designer.usage import bind_usage_context
+from auto_designer.user.session_store import SessionStore
 
 
 def _session(tmp_path: Path | None = None) -> Session:
@@ -148,9 +149,10 @@ def test_role_access_fails_closed_for_forbidden_levels() -> None:
     assert validate_role_access(role="owner", level="L3")[0] is False
     assert validate_role_access(role="designer", level="L4")[0] is False
     assert validate_role_access(role="pm", level="L3")[0] is True
-    assert validate_role_access(
-        role="triager", level="L2", session_id="s2", source_session_id="s1"
-    )[0] is False
+    assert (
+        validate_role_access(role="triager", level="L2", session_id="s2", source_session_id="s1")[0]
+        is False
+    )
     assert validate_role_access(role="random", level="L1")[0] is False
 
 
@@ -164,9 +166,9 @@ def test_session_store_persists_and_triage_consumes_handoff(tmp_path, monkeypatc
     assert store.load_user_feedback_envelope(session.session_id)["level"] == "L1"
 
     tracker = FakeTracker()
-    issue = tracker.create_issue(IssueDraft(
-        title="raw user report", body="raw report body", labels=[sc.REPORT]
-    ))
+    issue = tracker.create_issue(
+        IssueDraft(title="raw user report", body="raw report body", labels=[sc.REPORT])
+    )
     session.issue_refs = [IssueRef(number=issue.number, url="", state="open")]
     # Re-save now that the issue↔session link is present.
     session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
@@ -209,7 +211,9 @@ def test_timeline_tools_enforce_role_visibility_and_audit_reason(tmp_path, monke
         denied = get_session_timeline(session_id=session.session_id, reason="should not be visible")
     assert denied["ok"] is False
     with bind_session_store(store), bind_usage_context(role="divergent"):
-        allowed = get_session_timeline(session_id=session.session_id, reason="explain the user wait")
+        allowed = get_session_timeline(
+            session_id=session.session_id, reason="explain the user wait"
+        )
         beat = get_harness_beat(
             turn=1, session_id=session.session_id, reason="attribute the harness reply"
         )

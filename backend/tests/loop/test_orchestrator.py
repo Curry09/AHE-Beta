@@ -9,11 +9,13 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 from pathlib import Path
 
 import pytest
 
 from auto_designer.loop.orchestrator import Orchestrator
+from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
 from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
 from auto_designer.usage import current_usage_context
 
@@ -69,6 +71,19 @@ def _orch(repo, events, fixed_k=1, **kw):
         run_session_fn=run_session_fn,
         initial_ref="main",
         **kw,
+    )
+
+
+def _recovery(tmp_path) -> RecoveryStore:
+    return RecoveryStore.initialize(
+        root=tmp_path / "checkpoints",
+        identity=RecoveryIdentity(
+            experiment_id="exp-1",
+            run_id="run-1",
+            config_hash="config-1",
+            controller_sha="controller-1",
+            plan_hash="plan-1",
+        ),
     )
 
 
@@ -184,6 +199,15 @@ def test_cursor_falls_back_to_local_when_origin_unreachable(tmp_path) -> None:
     assert _orch(repo, []).run_round("c") == head
 
 
+def test_cursor_refuses_stale_remote_tracking_head_after_fetch_failure(tmp_path) -> None:
+    """已有 origin/main 但 fetch 失败时，不能静默使用可能过期的远端跟踪游标。"""
+    repo, _writer = _seed_with_origin(tmp_path)
+    _git(repo, "remote", "set-url", "origin", str(tmp_path / "missing-origin.git"))
+
+    with pytest.raises(RuntimeError, match="拒绝使用可能过期"):
+        _orch(repo, []).run_round("c")
+
+
 def test_run_nonpositive_raises(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     with pytest.raises(ValueError):
@@ -245,6 +269,26 @@ def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
 
     assert out == head
     assert {d for k, d in events if k == "session"} == {"s0", "s2"}  # 其余会话都完成
+
+
+def test_all_user_sessions_failed_blocks_round(tmp_path) -> None:
+    """所有会话都失败时，不能继续进入生成/准入并推进下一轮。"""
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+
+    def fail_session(persona, scenario, harness, *, workspace_dir=None):
+        raise RuntimeError("session unavailable")
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="s"))],
+        run_session_fn=fail_session,
+        initial_ref="main",
+    )
+    with pytest.raises(RoundDeliveryBlocked, match="all-user-sessions-failed"):
+        orch.run_round("c")
 
 
 def test_parallel_default_is_serial_equivalent(tmp_path) -> None:
@@ -468,6 +512,30 @@ def test_beats_order_triage_divergent_then_synth_then_owner(tmp_path) -> None:
     assert shards == {"triage0": (0, 2), "triage1": (1, 2)}
 
 
+def test_triage_workers_receive_fixed_disjoint_snapshots(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    events: list = []
+
+    class SnapshotTriager:
+        def snapshot_pending(self):
+            return [type("Issue", (), {"number": number})() for number in (1, 2, 3, 4)]
+
+        def triage_once(self, *, pending=None, shard=None):
+            events.append((pending, shard))
+
+    orch = _orch(repo, events, triagers=[SnapshotTriager(), SnapshotTriager()])
+    orch.run_round("c")
+
+    triage_events = [
+        event for event in events if isinstance(event, tuple) and isinstance(event[0], list)
+    ]
+    assert [sorted(issue.number for issue in pending) for pending, shard in triage_events] == [
+        [1, 3],
+        [2, 4],
+    ]
+    assert all(shard is None for pending, shard in triage_events)
+
+
 def test_no_owner_skips_admission(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []
@@ -486,6 +554,20 @@ def test_no_owner_skips_admission(tmp_path) -> None:
     orch.run_round("c")  # owner=None 不炸、准入段跳过
     kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d")]
     assert kinds == ["session", "triage"]
+
+
+def test_owner_failure_blocks_round_instead_of_advancing(tmp_path) -> None:
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+
+    class BrokenOwner:
+        def admit_once(self):
+            raise RuntimeError("owner unavailable")
+
+    orch = _orch(repo, [], owner=BrokenOwner())
+    with pytest.raises(RoundDeliveryBlocked, match="owner-failed"):
+        orch.run_round("c")
 
 
 def test_run_binds_round_context_for_each_round() -> None:
@@ -606,3 +688,177 @@ def test_blocked_delivery_does_not_start_next_user_round(tmp_path, failure_label
     with pytest.raises(RoundDeliveryBlocked, match=failure_label):
         orch.run(2)
     assert [e[0] for e in events if e[0] == "session"] == ["session"]
+
+
+# Spec-0064/T2: durable stages skip completed work and reattach delivery.
+
+
+def test_recovery_resumes_only_failed_stage_unit_and_keeps_frozen_plan(tmp_path) -> None:
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+    events: list[str] = []
+    plan_calls = 0
+
+    def plan():
+        nonlocal plan_calls
+        plan_calls += 1
+        return [(_persona(), SeedScenario(description=f"draw-{plan_calls}"))]
+
+    class Triager:
+        def __init__(self, name: str, *, fail_once: bool = False) -> None:
+            self.name = name
+            self.fail_once = fail_once
+
+        def snapshot_pending(self):
+            return []
+
+        def triage_once(self, *, pending=None, shard=None):
+            events.append(self.name)
+            if self.fail_once:
+                self.fail_once = False
+                raise RuntimeError("injected triage failure")
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=plan,
+        run_session_fn=lambda *args, **kwargs: events.append("user"),
+        initial_ref="main",
+        triagers=[Triager("triage-0"), Triager("triage-1", fail_once=True)],
+        recovery=_recovery(tmp_path),
+    )
+    with pytest.raises(RoundDeliveryBlocked, match="triage-incomplete"):
+        orch.run_round("main", round_no=1)
+    assert events == ["user", "triage-0", "triage-1"]
+
+    orch.run_round("main", round_no=1)
+    assert events == ["user", "triage-0", "triage-1", "triage-1"]
+    assert plan_calls == 1
+    assert orch._recovery.stage_status(round_no=1, stage="round_sealed") == "completed"
+
+
+def test_recovery_reattaches_delivery_without_rerunning_owner_or_users(tmp_path) -> None:
+    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+
+    repo = _seed_repo(tmp_path)
+    calls = {"user": 0, "owner": 0, "wait": 0}
+    closed = False
+
+    class Owner:
+        def admit_once(self):
+            calls["owner"] += 1
+            return type("Outcome", (), {"admitted": [11]})()
+
+    def wait_delivery(*, numbers):
+        calls["wait"] += 1
+        raise RoundDeliveryBlocked(numbers=list(numbers), reason="timeout")
+
+    def fetch_issue(number):
+        assert number == 11
+        return {"state": "closed" if closed else "open", "labels": ["ready"]}
+
+    def run_user(*args, **kwargs):
+        calls["user"] += 1
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="one"))],
+        run_session_fn=run_user,
+        initial_ref="main",
+        owner=Owner(),
+        fetch_issue=fetch_issue,
+        wait_delivery=wait_delivery,
+        recovery=_recovery(tmp_path),
+    )
+    with pytest.raises(RoundDeliveryBlocked, match="timeout"):
+        orch.run_round("main", round_no=1)
+    closed = True
+    orch.run_round("main", round_no=1)
+    assert calls == {"user": 1, "owner": 1, "wait": 1}
+
+
+def test_completed_recovery_round_is_an_idempotent_skip(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    calls: list[str] = []
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[(_persona(), SeedScenario(description="one"))],
+        run_session_fn=lambda *args, **kwargs: calls.append("user"),
+        initial_ref="main",
+        recovery=_recovery(tmp_path),
+    )
+    first = orch.run_round("main", round_no=1, deliver=False)
+    second = orch.run_round("ignored", round_no=1, deliver=False)
+    assert first == second
+    assert calls == ["user"]
+    round_state = orch._recovery.round_state(round_no=1)
+    assert set(round_state["stages"]) == {"round_started", "users", "round_sealed"}
+
+
+def test_recovery_users_reconcile_session_store_and_run_only_missing_items(tmp_path) -> None:
+    repo = _seed_repo(tmp_path)
+    calls: list[str] = []
+    reconciled = 0
+
+    def run_user(persona, scenario, harness, *, workspace_dir=None):
+        calls.append(scenario.description)
+        return {"session_id": current_usage_context().session_id}
+
+    def load_completed(session_id):
+        nonlocal reconciled
+        reconciled += 1
+        return {"session_id": session_id} if reconciled == 1 else None
+
+    run_user.load_completed_session = load_completed
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[
+            (_persona(), SeedScenario(description="already-saved")),
+            (_persona(), SeedScenario(description="missing")),
+        ],
+        run_session_fn=run_user,
+        initial_ref="main",
+        recovery=_recovery(tmp_path),
+    )
+    orch.run_round("main", round_no=1, deliver=False)
+    assert reconciled == 2
+    assert calls == ["missing"]
+
+
+def test_recovery_users_preserve_configured_parallelism(tmp_path) -> None:
+    """A resumable round runs independent user envelopes concurrently."""
+    import time
+
+    repo = _seed_repo(tmp_path)
+    lock = threading.Lock()
+    active = 0
+    max_active = 0
+
+    def run_user(*args, **kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.05)
+        with lock:
+            active -= 1
+        return {"session_id": current_usage_context().session_id}
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[
+            (_persona(), SeedScenario(description="one")),
+            (_persona(), SeedScenario(description="two")),
+        ],
+        run_session_fn=run_user,
+        initial_ref="main",
+        max_parallel_users=2,
+        recovery=_recovery(tmp_path),
+    )
+    orch.run_round("main", round_no=1, deliver=False)
+    assert max_active == 2

@@ -29,7 +29,7 @@ def test_build_validates_checkouts_and_shapes_named_context(tmp_path: Path) -> N
     log = tmp_path / "docker.args"
     docker = fake_bin / "docker"
     docker.write_text(
-        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$VIGIL_BUILD_TEST_LOG\"\n",
+        '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$VIGIL_BUILD_TEST_LOG"\n',
         encoding="utf-8",
     )
     docker.chmod(0o755)

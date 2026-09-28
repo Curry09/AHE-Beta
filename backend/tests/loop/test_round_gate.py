@@ -8,6 +8,7 @@ import pytest
 from auto_designer.loop.round_gate import (
     RoundDeliveryBlocked,
     classify_issue,
+    inspect_round_delivery,
     wait_round_delivery,
 )
 
@@ -28,6 +29,24 @@ def test_all_closed_succeeds() -> None:
         return {"state": "closed", "labels": ["openagents"]}
 
     wait_round_delivery(numbers=[3, 3, 4], fetch_issue=fetch_issue)
+
+
+def test_inspect_round_delivery_deduplicates_and_classifies_for_resume() -> None:
+    calls: list[int] = []
+
+    def fetch_issue(number: int) -> dict:
+        calls.append(number)
+        return {
+            "state": "closed" if number == 1 else "open",
+            "labels": ["ready"] if number != 3 else ["automation-failed"],
+        }
+
+    assert inspect_round_delivery(numbers=[1, 1, 2, 3], fetch_issue=fetch_issue) == {
+        1: "done",
+        2: "inflight",
+        3: "blocked",
+    }
+    assert calls == [1, 2, 3]
 
 
 def test_needs_human_raises() -> None:
@@ -67,6 +86,29 @@ def test_timeout_raises(*, monkeypatch: pytest.MonkeyPatch) -> None:
     assert caught.value.numbers == [9]
 
 
+def test_default_wait_survives_four_hours_and_expires_after_one_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ROUND_DELIVERY_TIMEOUT_SEC", raising=False)
+    ticks = {"now": 0.0, "reads": 0}
+    jumps = iter((14_401.0, 86_399.0, 86_401.0))
+
+    def fetch_issue(number: int) -> dict:
+        ticks["reads"] += 1
+        return {"state": "open", "labels": ["ready"]}
+
+    with pytest.raises(RoundDeliveryBlocked) as caught:
+        wait_round_delivery(
+            numbers=[9],
+            fetch_issue=fetch_issue,
+            poll_sec=1,
+            monotonic=lambda: ticks["now"],
+            sleep=lambda _seconds: ticks.__setitem__("now", next(jumps)),
+        )
+    assert caught.value.reason == "timeout"
+    assert ticks["reads"] == 4
+
+
 def test_classify_closed_with_needs_human_is_blocked() -> None:
     assert classify_issue(state="closed", labels=["needs-human"]) == "blocked"
     assert classify_issue(state="closed", labels=["ready"]) == "done"
@@ -93,6 +135,7 @@ def test_failure_labels_stop_immediately(state: str, label: str, mapping: bool) 
 
 def test_mixed_failure_reasons_are_explicit() -> None:
     """Spec-0062/T1: report all blocked subjects and the labels actually observed."""
+
     def fetch_issue(number: int) -> dict:
         labels = {1: [], 2: ["needs-human"], 3: ["automation-failed"]}
         return {"state": "closed", "labels": labels[number]}

@@ -16,7 +16,7 @@ NEEDS_HUMAN = "needs-human"
 AUTOMATION_FAILED = "automation-failed"
 # Spec-0062/T1: current and legacy terminal failures outrank even a closed issue.
 _FAILURE_LABELS = frozenset({AUTOMATION_FAILED, NEEDS_HUMAN})
-_DEFAULT_TIMEOUT_SEC = 14400.0
+_DEFAULT_TIMEOUT_SEC = 86400.0
 _DEFAULT_POLL_SEC = 15.0
 
 _STATUS_DONE = "done"
@@ -70,6 +70,20 @@ def classify_issue(*, state: str, labels: list[str]) -> str:
     return _STATUS_INFLIGHT
 
 
+def inspect_round_delivery(
+    *, numbers: list[int], fetch_issue: Callable[[int], Mapping[str, Any]]
+) -> dict[int, str]:
+    """Read each unique admitted issue once for restart reconciliation."""
+    result: dict[int, str] = {}
+    for number in dict.fromkeys(int(item) for item in numbers):
+        snapshot = fetch_issue(number)
+        result[number] = classify_issue(
+            state=str(snapshot.get("state") or ""),
+            labels=_label_names(labels=snapshot.get("labels")),
+        )
+    return result
+
+
 def wait_round_delivery(
     *,
     numbers: list[int],
@@ -100,21 +114,22 @@ def wait_round_delivery(
     clock = monotonic if monotonic is not None else time.monotonic
     deadline = clock() + limit
     while True:
-        blocked: list[int] = []
-        failure_reasons: set[str] = set()
-        inflight: list[int] = []
-        for number in unique:
-            snapshot = fetch_issue(number)
-            labels = _label_names(labels=snapshot.get("labels"))
-            status = classify_issue(
+        snapshots = {number: fetch_issue(number) for number in unique}
+        statuses = {
+            number: classify_issue(
                 state=str(snapshot.get("state") or ""),
-                labels=labels,
+                labels=_label_names(labels=snapshot.get("labels")),
             )
-            if status == _STATUS_BLOCKED:
-                blocked.append(number)
-                failure_reasons.update(_FAILURE_LABELS & {label.strip() for label in labels})
-            elif status == _STATUS_INFLIGHT:
-                inflight.append(number)
+            for number, snapshot in snapshots.items()
+        }
+        blocked = [number for number, status in statuses.items() if status == _STATUS_BLOCKED]
+        failure_reasons = {
+            label.strip()
+            for number in blocked
+            for label in _label_names(labels=snapshots[number].get("labels"))
+            if label.strip() in _FAILURE_LABELS
+        }
+        inflight = [number for number, status in statuses.items() if status == _STATUS_INFLIGHT]
         if blocked:
             raise RoundDeliveryBlocked(numbers=blocked, reason=",".join(sorted(failure_reasons)))
         if not inflight:

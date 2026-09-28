@@ -195,14 +195,24 @@ def _run_supervised(agent, message, ctrl_q):
                 stopped = _force_stop(agent)
                 if stopped:
                     t.join(_INTERRUPT_GRACE)  # 等它在下一个检查点优雅退出
-                observer.event("attempt_failed", attempt_id=attempt_id, error_type="_Interrupted",
-                               elapsed_seconds=time.monotonic() - began)
+                observer.event(
+                    "attempt_failed",
+                    attempt_id=attempt_id,
+                    error_type="_Interrupted",
+                    elapsed_seconds=time.monotonic() - began,
+                )
                 raise _Interrupted(rebuild=not stopped or t.is_alive())
     if "err" in box:
-        observer.event("attempt_failed", attempt_id=attempt_id, error_type=type(box["err"]).__name__,
-                       elapsed_seconds=time.monotonic() - began)
+        observer.event(
+            "attempt_failed",
+            attempt_id=attempt_id,
+            error_type=type(box["err"]).__name__,
+            elapsed_seconds=time.monotonic() - began,
+        )
         raise box["err"]
-    observer.event("attempt_returned", attempt_id=attempt_id, elapsed_seconds=time.monotonic() - began)
+    observer.event(
+        "attempt_returned", attempt_id=attempt_id, elapsed_seconds=time.monotonic() - began
+    )
     return box.get("out")
 
 
@@ -363,9 +373,13 @@ def _make_step_collector():
             return span
 
         def end_span(self, span, outputs=None, error=None, attributes=None):
-            observer.event("span_finished", span_id=span.id, kind=str(span.type),
-                           elapsed_seconds=max(0.0, time.time() - span.start_time),
-                           has_error=error is not None)
+            observer.event(
+                "span_finished",
+                span_id=span.id,
+                kind=str(span.type),
+                elapsed_seconds=max(0.0, time.time() - span.start_time),
+                has_error=error is not None,
+            )
             if span.type == SpanType.LLM:
                 payload = outputs if isinstance(outputs, dict) else {}
                 usage = payload.get("usage") or payload.get("usageMetadata") or {}

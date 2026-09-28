@@ -47,9 +47,7 @@ class _Owner(Owner):
         self.review_context = ""
 
     def _run_agent(self, *, proposals: list, ready: list, trend: list) -> str:
-        self.review_context = self._review_message(
-            proposals=proposals, ready=ready, trend=trend
-        )
+        self.review_context = self._review_message(proposals=proposals, ready=ready, trend=trend)
         return self._result
 
 
@@ -86,15 +84,25 @@ def _rfc_fields(*, direction: str) -> dict[str, str]:
 
 
 def _seed_session(store: SessionStore) -> str:
-    store.save(Session(persona=Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s"),
-                       scenario=SeedScenario(description="s"), transcript=Transcript(turns=[]),
-                       feeling=FeelingScore(score=2, reason="等待中缺少确定感")))
+    store.save(
+        Session(
+            persona=Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s"),
+            scenario=SeedScenario(description="s"),
+            transcript=Transcript(turns=[]),
+            feeling=FeelingScore(score=2, reason="等待中缺少确定感"),
+        )
+    )
     return str(store.index()[0]["session_id"])
 
 
 def _owner_decision(issue: int, decision: str) -> dict:
-    row = {"issue": issue, "decision": decision, "handoff_summary": "交接原始目标",
-           "preserved_capabilities": ["原始能力"], "acceptance_groups": ["独立验收"]}
+    row = {
+        "issue": issue,
+        "decision": decision,
+        "handoff_summary": "交接原始目标",
+        "preserved_capabilities": ["原始能力"],
+        "acceptance_groups": ["独立验收"],
+    }
     if decision == "hold":
         row["reason"] = "缺少可观察验收接口"
     return row
@@ -102,16 +110,47 @@ def _owner_decision(issue: int, decision: str) -> dict:
 
 def test_role_contract_violations_are_structural_not_vocabulary_based() -> None:
     assert validate_triage({"issue": 8}, report_number=7)[0].code == "foreign-source"
-    assert validate_pm({"evidence_sessions": [], "solution_level": "product_capability"}, known_sessions={"s1"})[0].code == "missing-evidence"
-    assert validate_synthesis({"source_proposals": [1], "solution_level": "structural_mechanism"}, visible_proposals={1, 2})[0].code == "not-cross-proposal"
+    assert (
+        validate_pm(
+            {"evidence_sessions": [], "solution_level": "product_capability"}, known_sessions={"s1"}
+        )[0].code
+        == "missing-evidence"
+    )
+    assert (
+        validate_synthesis(
+            {"source_proposals": [1], "solution_level": "structural_mechanism"},
+            visible_proposals={1, 2},
+        )[0].code
+        == "not-cross-proposal"
+    )
     assert validate_owner({"issue": 9}, review_batch={1, 2})[0].code == "decision-out-of-batch"
     # No prose keyword or workflow-term blacklist: valid source binding is sufficient here.
-    assert validate_pm({"evidence_sessions": ["s1"], "product_opportunity": "任意措辞",
-                        "solution_level": "product_capability"},
-                       known_sessions={"s1"}) == []
-    assert validate_triage({"issue": 1, "disposition": "accept", "artifact": {
-        "implementation_target": "outside_harness"}}, report_number=1)[0].code == "out-of-product-scope"
-    assert validate_owner({"issue": 1, "decision": "hold"}, review_batch={1})[0].code == "missing-hold-gap"
+    assert (
+        validate_pm(
+            {
+                "evidence_sessions": ["s1"],
+                "product_opportunity": "任意措辞",
+                "solution_level": "product_capability",
+            },
+            known_sessions={"s1"},
+        )
+        == []
+    )
+    assert (
+        validate_triage(
+            {
+                "issue": 1,
+                "disposition": "accept",
+                "artifact": {"implementation_target": "outside_harness"},
+            },
+            report_number=1,
+        )[0].code
+        == "out-of-product-scope"
+    )
+    assert (
+        validate_owner({"issue": 1, "decision": "hold"}, review_batch={1})[0].code
+        == "missing-hold-gap"
+    )
 
 
 def test_report_is_normalized_once_and_raw_case_stays_out_of_downstream_context(
@@ -138,9 +177,14 @@ def test_report_is_normalized_once_and_raw_case_stays_out_of_downstream_context(
                         "边界": "仅调整跨任务成立的 harness 行为",
                         "验收": "约束在执行和验证输出中保持一致",
                     },
-                    "artifact": {"reported_problem": "执行约束丢失", "user_impact": "结果不稳定",
-                                 "scope_boundary": "harness 跨阶段行为", "evidence": ["report"],
-                                 "uncertainties": [], "implementation_target": "harness"},
+                    "artifact": {
+                        "reported_problem": "执行约束丢失",
+                        "user_impact": "结果不稳定",
+                        "scope_boundary": "harness 跨阶段行为",
+                        "evidence": ["report"],
+                        "uncertainties": [],
+                        "implementation_target": "harness",
+                    },
                 }
             ]
         },
@@ -168,9 +212,7 @@ def test_report_is_normalized_once_and_raw_case_stays_out_of_downstream_context(
         store,
         str(tmp_path / "harness"),
         str(tmp_path / "owner-agent"),
-        result=json.dumps(
-            {"decisions": [{**_owner_decision(number, "admit"), "priority": "P1"}]}
-        ),
+        result=json.dumps({"decisions": [{**_owner_decision(number, "admit"), "priority": "P1"}]}),
     )
     admitted = owner.admit_once()
     assert admitted.admitted == [number]
@@ -208,9 +250,14 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
                             "边界": "跨任务运行时行为",
                             "验收": "约束在阶段之间保持一致",
                         },
-                        "artifact": {"reported_problem": "约束传递失败", "user_impact": "交付不稳定",
-                                     "scope_boundary": "harness 行为", "evidence": ["report"],
-                                     "uncertainties": [], "implementation_target": "harness"},
+                        "artifact": {
+                            "reported_problem": "约束传递失败",
+                            "user_impact": "交付不稳定",
+                            "scope_boundary": "harness 行为",
+                            "evidence": ["report"],
+                            "uncertainties": [],
+                            "implementation_target": "harness",
+                        },
                     }
                 ]
             },
@@ -225,22 +272,35 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
         str(tmp_path / "harness"),
         str(tmp_path / "divergent"),
         result=json.dumps(
-            {"proposals": [{"title": "约束反馈能力", "user_goal": "掌握任务进展",
-                             "observed_behaviors": ["等待后追问"], "experience_tension": "进展不可见",
-                             "product_opportunity": "连续反馈", "desired_outcome": "无需追问",
-                             "evidence_sessions": [session_id], "related_proposals": [report],
-                             "solution_level": "product_capability",
-                             "abstraction_rationale": "用户能力层"}]},
+            {
+                "proposals": [
+                    {
+                        "title": "约束反馈能力",
+                        "user_goal": "掌握任务进展",
+                        "observed_behaviors": ["等待后追问"],
+                        "experience_tension": "进展不可见",
+                        "product_opportunity": "连续反馈",
+                        "desired_outcome": "无需追问",
+                        "evidence_sessions": [session_id],
+                        "related_proposals": [report],
+                        "solution_level": "product_capability",
+                        "abstraction_rationale": "用户能力层",
+                    }
+                ]
+            },
             ensure_ascii=False,
         ),
     )
     divergent_number = divergent.propose_once().proposal_numbers[0]
     assert divergent.reference_numbers == [report]
 
-    second_report = tracker.create_issue(IssueDraft(
-        title="验证阶段再次丢失约束", body="session_id: " + session_id,
-        labels=[sc.PROPOSAL, sc.FROM_TRIAGE],
-    )).number
+    second_report = tracker.create_issue(
+        IssueDraft(
+            title="验证阶段再次丢失约束",
+            body="session_id: " + session_id,
+            labels=[sc.PROPOSAL, sc.FROM_TRIAGE],
+        )
+    ).number
     expected_for_synthesize = {report, second_report}
     designer = _Designer(
         tracker,
@@ -253,7 +313,8 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
                     {
                         "title": "统一约束生命周期",
                         "source_proposals": sorted(expected_for_synthesize),
-                        "relationship": "互补", "common_tension": "反馈边界不一致",
+                        "relationship": "互补",
+                        "common_tension": "反馈边界不一致",
                         "structural_direction": "统一约束表达与反馈边界",
                         "expected_leverage": "覆盖多个体验问题",
                         "solution_level": "structural_mechanism",
@@ -284,8 +345,7 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
         result=json.dumps(
             {
                 "decisions": [
-                    _owner_decision(number, "hold")
-                    for number in sorted(expected_for_owner)
+                    _owner_decision(number, "hold") for number in sorted(expected_for_owner)
                 ]
             }
         ),
@@ -297,20 +357,31 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
     assert "RAW_BODY_SENTINEL" not in owner.review_context
 
 
-@pytest.mark.parametrize("labels", [[sc.FROM_DIVERGENT], [sc.DIVERGENT], [sc.FROM_DIVERGENT, sc.FROM_TRIAGE]])
+@pytest.mark.parametrize(
+    "labels", [[sc.FROM_DIVERGENT], [sc.DIVERGENT], [sc.FROM_DIVERGENT, sc.FROM_TRIAGE]]
+)
 def test_pm_is_not_visible_and_cannot_be_cited(tmp_path, labels):
     tracker = FakeTracker()
     a = tracker.create_issue(IssueDraft("delivery", "fact", [sc.PROPOSAL, sc.FROM_TRIAGE])).number
     b = tracker.create_issue(IssueDraft("product", "user outcome", [sc.PROPOSAL, *labels])).number
     artifact = {
-        "title": "should not rewrite PM", "source_proposals": [a, b],
-        "relationship": "related", "common_tension": "waiting",
-        "structural_direction": "shared mechanism", "expected_leverage": "control",
-        "solution_level": "structural_mechanism", "abstraction_rationale": "shared",
+        "title": "should not rewrite PM",
+        "source_proposals": [a, b],
+        "relationship": "related",
+        "common_tension": "waiting",
+        "structural_direction": "shared mechanism",
+        "expected_leverage": "control",
+        "solution_level": "structural_mechanism",
+        "abstraction_rationale": "shared",
         "covers": [a, b],
     }
-    designer = _Designer(tracker, SessionStore(tmp_path / "sessions"), str(tmp_path), str(tmp_path),
-                         result=json.dumps({"proposals": [artifact]}))
+    designer = _Designer(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path),
+        str(tmp_path),
+        result=json.dumps({"proposals": [artifact]}),
+    )
     outcome = designer.propose_once()
     assert outcome.proposal_numbers == outcome.merged_numbers == []
     assert designer.proposal_numbers == [a]
@@ -321,17 +392,25 @@ def test_pm_is_not_visible_and_cannot_be_cited(tmp_path, labels):
 @pytest.mark.parametrize("labels", [[sc.FROM_DIVERGENT], [sc.DIVERGENT]])
 def test_pm_only_synthesis_is_rejected_but_owner_receives_products(tmp_path, labels):
     tracker = FakeTracker()
-    nums = [tracker.create_issue(IssueDraft(title, "outcome", [sc.PROPOSAL, *labels])).number
-            for title in ("control", "visibility")]
+    nums = [
+        tracker.create_issue(IssueDraft(title, "outcome", [sc.PROPOSAL, *labels])).number
+        for title in ("control", "visibility")
+    ]
     artifact = {
-        "title": "unnecessary architecture", "source_proposals": nums,
-        "relationship": "related", "common_tension": "waiting",
-        "structural_direction": "stages", "expected_leverage": "control",
-        "solution_level": "structural_mechanism", "abstraction_rationale": "shared", "covers": nums,
+        "title": "unnecessary architecture",
+        "source_proposals": nums,
+        "relationship": "related",
+        "common_tension": "waiting",
+        "structural_direction": "stages",
+        "expected_leverage": "control",
+        "solution_level": "structural_mechanism",
+        "abstraction_rationale": "shared",
+        "covers": nums,
     }
     store = SessionStore(tmp_path / "sessions")
-    out = _Designer(tracker, store, str(tmp_path), str(tmp_path),
-                    result=json.dumps({"proposals": [artifact]})).propose_once()
+    out = _Designer(
+        tracker, store, str(tmp_path), str(tmp_path), result=json.dumps({"proposals": [artifact]})
+    ).propose_once()
     assert not out.proposal_numbers and out.rejected_proposals
     admitted = Owner(tracker, store, str(tmp_path), str(tmp_path), review=False).admit_once()
     assert set(admitted.admitted) == set(nums)

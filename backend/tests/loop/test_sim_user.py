@@ -6,6 +6,8 @@ issue_artifact 真落 tracker、SessionResult 转 models.Session 落 store、逐
 
 from __future__ import annotations
 
+import pytest
+
 from auto_designer.loop.sim_user import (
     _infer_kind,
     _issue_draft_from_body,
@@ -15,6 +17,7 @@ from auto_designer.loop.sim_user import (
 )
 from auto_designer.models import Persona, SeedScenario, Session, WorkspaceSpec
 from auto_designer.tracker.fake import FakeTracker
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.harness_adapter import ScriptedHarness
 from auto_designer.user.sim.loop import SessionResult, TurnLog
@@ -197,6 +200,52 @@ def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
     assert all(sid is None for _, sid in seen[:-1])
 
 
+def test_recovery_context_supplies_stable_session_id_and_loader(tmp_path) -> None:
+    sp = expert()
+    mp = _model_persona(sp)
+    store = SessionStore(tmp_path)
+    fn = make_sim_run_session_fn(
+        client_factory=ScriptedPersonaClient,
+        tracker=FakeTracker(),
+        store=store,
+        sim_personas={mp.identity: sp},
+    )
+    with bind_usage_context(session_id="op-stable-session", round_no=1):
+        session = fn(mp, SeedScenario(description="task"), ScriptedHarness())
+    assert session.session_id == "op-stable-session"
+    assert fn.load_completed_session("op-stable-session") == session
+
+
+def test_issue_side_effect_is_reconciled_after_crash_before_session_save(tmp_path) -> None:
+    sp = expert()
+    mp = _model_persona(sp)
+    tracker = FakeTracker()
+
+    class FailOnceStore(SessionStore):
+        failed = False
+
+        def save(self, session):
+            if not self.failed:
+                self.failed = True
+                raise RuntimeError("injected after issue create")
+            return super().save(session)
+
+    store = FailOnceStore(tmp_path)
+    fn = make_sim_run_session_fn(
+        client_factory=ScriptedPersonaClient,
+        tracker=tracker,
+        store=store,
+        sim_personas={mp.identity: sp},
+    )
+    with bind_usage_context(session_id="op-stable-session", round_no=1):
+        with pytest.raises(RuntimeError, match="injected"):
+            fn(mp, SeedScenario(description="task"), ScriptedHarness())
+    with bind_usage_context(session_id="op-stable-session", round_no=1):
+        session = fn(mp, SeedScenario(description="task"), ScriptedHarness())
+    assert len(tracker.list_open_issues()) == 1
+    assert len(session.issue_refs) == 1
+
+
 def test_sim_adapter_wraps_harness_in_connector(tmp_path, monkeypatch) -> None:
     """sim_user 只经平台 connector 接入 harness，发给 harness 的仍是 human-like 文本。"""
     sp = expert()
@@ -340,7 +389,7 @@ def test_sim_adapter_flushes_mid_session_issue_notes(tmp_path) -> None:
     open_issues = tracker.list_open_issues()
     assert len(open_issues) == 2
     bodies = [i.body for i in open_issues]
-    assert "mid-session: rounding bug" in bodies
+    assert any("mid-session: rounding bug" in body for body in bodies)
     assert any("terminal voice issue" in b for b in bodies)
     assert len(session.issue_refs) == 2
 

@@ -74,19 +74,22 @@ def _copy_git(*, gitea: dict[str, str], source: str, target: str) -> str:
         generated = [
             Path(value.decode())
             for value in tracked
-            if value and (value.decode().endswith(".pyc") or "__pycache__" in Path(value.decode()).parts)
+            if value
+            and (value.decode().endswith(".pyc") or "__pycache__" in Path(value.decode()).parts)
         ]
         for relative in generated:
             (checkout / relative).unlink(missing_ok=True)
         ignore = checkout / ".gitignore"
         ignore_text = ignore.read_text(encoding="utf-8") if ignore.exists() else ""
-        additions = [pattern for pattern in ("__pycache__/", "*.pyc") if pattern not in ignore_text.splitlines()]
+        additions = [
+            pattern
+            for pattern in ("__pycache__/", "*.pyc")
+            if pattern not in ignore_text.splitlines()
+        ]
         if additions:
             separator = "" if not ignore_text or ignore_text.endswith("\n") else "\n"
             addition_text = "\n".join(additions)
-            ignore.write_text(
-                f"{ignore_text}{separator}{addition_text}\n", encoding="utf-8"
-            )
+            ignore.write_text(f"{ignore_text}{separator}{addition_text}\n", encoding="utf-8")
         if generated or additions:
             subprocess.run(["git", "-C", str(checkout), "add", "-A"], check=True)
             subprocess.run(
@@ -104,7 +107,9 @@ def _copy_git(*, gitea: dict[str, str], source: str, target: str) -> str:
                 ],
                 check=True,
             )
-        subprocess.run(["git", "-C", str(checkout), "remote", "set-url", "origin", target_url], check=True)
+        subprocess.run(
+            ["git", "-C", str(checkout), "remote", "set-url", "origin", target_url], check=True
+        )
         subprocess.run(["git", "-C", str(checkout), "push", "-u", "origin", "main"], check=True)
         return subprocess.run(
             ["git", "-C", str(checkout), "rev-parse", "HEAD"],
@@ -142,18 +147,14 @@ def main() -> int:
         selected=selected,
     )
     _create_repo(gitea=gitea, repo=args.target_repo)
-    main_sha = _copy_git(
-        gitea=gitea, source=args.source_repo, target=args.target_repo
-    )
+    main_sha = _copy_git(gitea=gitea, source=args.source_repo, target=args.target_repo)
     target = tracker(args.target_repo)
     copied: list[dict] = []
     for item in snapshots:
         labels = list(item["labels"])
         if item["number"] not in selected:
             labels = [label for label in labels if label != OPENAGENTS]
-        ref = target.create_issue(
-            IssueDraft(title=item["title"], body=item["body"], labels=labels)
-        )
+        ref = target.create_issue(IssueDraft(title=item["title"], body=item["body"], labels=labels))
         if ref.number != item["number"]:
             raise RuntimeError(f"issue number drift: {item['number']} -> {ref.number}")
         for comment in source.list_comments(number=item["number"]):
@@ -161,7 +162,12 @@ def main() -> int:
         if item["state"] == "closed":
             target.set_state(ref.number, "closed", "")
         copied.append(
-            {"number": ref.number, "state": item["state"], "labels": labels, "deliver": ref.number in selected}
+            {
+                "number": ref.number,
+                "state": item["state"],
+                "labels": labels,
+                "deliver": ref.number in selected,
+            }
         )
 
     args.manifest.parent.mkdir(parents=True, exist_ok=True)

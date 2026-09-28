@@ -30,6 +30,13 @@ def create_manifest(*, path: Path, data: dict[str, Any]) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     except Exception:
         path.unlink(missing_ok=True)
         raise
@@ -38,7 +45,22 @@ def create_manifest(*, path: Path, data: dict[str, Any]) -> None:
 def read_manifest(*, path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise ManifestError(f"缺少 manifest：{path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ManifestError(f"manifest 必须为 JSON object：{path}")
+    return value
+
+
+def recovery_identity(manifest: dict[str, Any]) -> dict[str, str]:
+    """Return the immutable fields shared by controller and demand process."""
+    fields = ("experiment_id", "run_id", "config_hash", "controller_sha", "plan_hash")
+    values = {field: str(manifest.get(field) or "").strip() for field in fields}
+    missing = [field for field, value in values.items() if not value]
+    if missing:
+        raise ManifestError(
+            "manifest 缺恢复身份字段：" + ", ".join(missing) + "；旧实验不能直接细粒度续跑"
+        )
+    return values
 
 
 def assert_immutable(*, path: Path, expected: dict[str, Any]) -> None:

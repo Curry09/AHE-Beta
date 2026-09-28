@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-17T12:28:27Z",
+  "stage": "environment_validation",
+  "included_in_final_score": false,
+  "harness": {
+    "label": "strict-goal-r3-686b5e",
+    "source_experiment": "harness-mixed16-20260916-strict-goal-r3",
+    "archive_sha256": "686b5eda80176a7f938abc6e51da8fa2c04353478045868b2434ff0046449cd4"
+  },
+  "model": "z-ai/glm-5.2",
+  "summary": {
+    "final_trials_launched": 4,
+    "trials_reaching_official_grader": 3,
+    "passed": 2,
+    "task_failures": 1,
+    "harness_failures": 1,
+    "infrastructure_failures": 0,
+    "task_success_rate_among_graded": 0.6666666667,
+    "end_to_end_pass_rate": 0.5,
+    "harness_completion_rate": 0.75,
+    "excluded_controller_attempts": 3
+  },
+  "results": [
+    {
+      "benchmark": "SWE-bench Verified",
+      "task": "psf__requests-6028",
+      "outcome": "task_success",
+      "passed": true,
+      "details": {
+        "fail_to_pass": "2/2",
+        "pass_to_pass": "185/185",
+        "unrelated_environment_errors": 8,
+        "model_patch_bytes": 1364
+      },
+      "grader_isolation": "fresh Daytona sandbox",
+      "run": "runs/20260917T121934Z-psf__requests-6028-harnessv0"
+    },
+    {
+      "benchmark": "Terminal-Bench 4.0",
+      "task": "html-js-filter",
+      "outcome": "harness_failure",
+      "passed": false,
+      "details": {
+        "official_grader_reached": false,
+        "failure": "first harness turn produced no reply within 360 seconds",
+        "successful_model_calls_before_timeout": 32,
+        "model_tokens_before_timeout": 991967,
+        "last_observed_state": "still working with tool activity"
+      },
+      "run": "runs/20260917T113703Z-terminal-html-js-filter-harnessv0-daytona"
+    },
+    {
+      "benchmark": "TUA-Bench",
+      "task": "106-create-charles-ssh-user",
+      "outcome": "task_success",
+      "passed": true,
+      "reward": 1,
+      "grader_isolation": "tests uploaded only after agent exit",
+      "run": "runs/20260917T113436Z-tua-106-create-charles-ssh-user-harnessv0-daytona"
+    },
+    {
+      "benchmark": "tau3-bench Core/Text",
+      "task": "airline/7",
+      "outcome": "task_failure",
+      "passed": false,
+      "reward": 0.0,
+      "details": {
+        "DB": 1.0,
+        "COMMUNICATE": 0.0,
+        "action_checks": "5/5",
+        "missing_communication": "1628",
+        "message_count": 30
+      },
+      "user_simulator": "official tau3 simulator inside Daytona",
+      "run": "runs/20260917T122310Z-tau3-airline-7-harnessv0-daytona"
+    }
+  ],
+  "excluded_attempts": [
+    {
+      "benchmark": "TUA-Bench",
+      "reason": "synchronous Daytona command hit a controller HTTP read timeout",
+      "classification": "infrastructure_invalid"
+    },
+    {
+      "benchmark": "SWE-bench Verified",
+      "reason": "controller read the wrong local env path before creating a sandbox",
+      "classification": "controller_invalid"
+    },
+    {
+      "benchmark": "tau3-bench Core/Text",
+      "reason": "synchronous Daytona bootstrap hit a controller HTTP read timeout",
+      "classification": "infrastructure_invalid"
+    }
+  ]
+}

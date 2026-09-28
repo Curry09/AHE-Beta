@@ -29,9 +29,11 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
+import time
 import uuid
 from pathlib import Path
 
@@ -108,11 +110,19 @@ def _load_seeds(path: Path) -> list:
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
-        ["git", "-C", str(repo), "-c", "user.email=seed@x", "-c", "user.name=seed", *args],
-        check=True,
-        capture_output=True,
-    )
+    command = ["git", "-C", str(repo), "-c", "user.email=seed@x", "-c", "user.name=seed", *args]
+    # A newly-created Gitea repository can accept ls-remote before its git
+    # backend is ready for the first push.  Retry only push operations so this
+    # transient race cannot abort an otherwise valid fresh experiment.
+    attempts = 4 if args and args[0] == "push" else 1
+    for attempt in range(attempts):
+        try:
+            subprocess.run(command, check=True, capture_output=True)
+            return
+        except subprocess.CalledProcessError:
+            if attempt + 1 >= attempts:
+                raise
+            time.sleep(2**attempt)
 
 
 def _gitea_remote_url(gitea: dict[str, str]) -> str:
@@ -295,6 +305,49 @@ def install_role_runs(*, data_root: Path) -> Path:
     return root
 
 
+def experiment_run_mode() -> str:
+    """Return the explicit lifecycle mode used by recoverable experiment runs."""
+    mode = os.environ.get("AUTO_DESIGNER_RUN_MODE", "fresh").strip().lower() or "fresh"
+    if mode not in {"fresh", "resume", "replay"}:
+        raise SystemExit(f"AUTO_DESIGNER_RUN_MODE 必须为 fresh、resume 或 replay：{mode!r}")
+    return mode
+
+
+def load_recovery_store(*, mode: str):
+    """Create/open the shared recovery ledger when an experiment identity is present."""
+    root_raw = os.environ.get("AUTO_DESIGNER_RECOVERY_ROOT", "").strip()
+    identity_names = {
+        "experiment_id": "AUTO_DESIGNER_EXPERIMENT_ID",
+        "run_id": "AUTO_DESIGNER_RUN_ID",
+        "config_hash": "AUTO_DESIGNER_CONFIG_HASH",
+        "controller_sha": "AUTO_DESIGNER_CONTROLLER_SHA",
+        "plan_hash": "AUTO_DESIGNER_PLAN_HASH",
+    }
+    values = {field: os.environ.get(name, "").strip() for field, name in identity_names.items()}
+    configured = bool(root_raw or any(values.values()))
+    if not configured:
+        return None
+    missing = [name for field, name in identity_names.items() if not values[field]]
+    if not root_raw:
+        missing.append("AUTO_DESIGNER_RECOVERY_ROOT")
+    if missing:
+        raise SystemExit("恢复身份环境变量不完整：" + ", ".join(missing))
+    from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore  # noqa: PLC0415
+
+    identity = RecoveryIdentity(**values)
+    root = Path(root_raw).expanduser().resolve()
+    if mode in {"fresh", "replay"}:
+        return RecoveryStore.initialize(root=root, identity=identity)
+    return RecoveryStore.open(root=root, identity=identity)
+
+
+def existing_harness_repo() -> Path:
+    """Return the preserved harness repo required by resume without mutating it."""
+    if not (HARNESS_REPO / ".git").is_dir():
+        raise SystemExit(f"resume 缺少已初始化 harness 仓：{HARNESS_REPO}")
+    return HARNESS_REPO
+
+
 def _alias_current_sessions(*, data_root: Path, sessions_root: Path) -> None:
     """Point data/sessions at this run's sessions without deleting prior role_runs."""
     alias = data_root / "sessions"
@@ -352,11 +405,15 @@ def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
     ci_stage = os.environ.get("VIGIL_CI_STAGE", "").strip().lower()
     if ci_stage in ("agent", "human", "skip"):
         effective["ci"] = ci_stage
+    coordination = os.environ.get("VIGIL_COORDINATION", "soft").strip().lower()
+    if coordination not in {"soft", "off", "dependencies"}:
+        raise ValueError("VIGIL_COORDINATION must be soft, off, or dependencies")
     stages = "\n".join(f"  {stage}: {owner}" for stage, owner in effective.items())
     text = (
         "# 由 backend/run.py 每次 run 生成（Spec-0032/T5），勿手工编辑——改 run.py 的定稿常量。\n"
         "version: 1\n"
         "forge: gitea\n"
+        f"coordination: {coordination}\n"
         "gitea:\n"
         f"  base_url: {gitea['GITEA_URL']}\n"
         f"  owner: {gitea['OWNER']}\n"
@@ -404,6 +461,22 @@ _CLAUDE_CONFIG_ENVS = (
     "ANTHROPIC_MODEL",
     "ANTHROPIC_SMALL_FAST_MODEL",
 )
+
+
+def _subagent_model_lock_env() -> dict[str, str]:
+    """Keep OpenAgents' Claude Code subagents on the delivery session's model.
+
+    FORCE defeats an Agent tool call's explicit ``model=sonnet``/``haiku`` on
+    Claude Code >= 2.1.257.  Pinning the same model as well covers older
+    supported CLIs where SUBAGENT_MODEL itself had higher precedence.
+    """
+    lock = {"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"}
+    model = os.environ.get("ANTHROPIC_MODEL", "").strip()
+    if model:
+        lock["CLAUDE_CODE_SUBAGENT_MODEL"] = model
+    return lock
+
+
 # The product harness is a separate OpenAI-compatible client.  Pass its explicitly scoped GLM
 # configuration into the delivery container under the plain names consumed by scripts/run.sh.
 _HARNESS_LLM_SUFFIXES = ("MODEL", "BASE_URL", "API_KEY")
@@ -515,7 +588,9 @@ def _start_vigil_subprocess(
     GITEA_TOKEN 只经子进程 env 传递（配置文件不落 token）。level-triggered：票何时出现何时接。
     """
     log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随 vigil 进程，stop 时关闭
-    env = {**os.environ, "GITEA_TOKEN": gitea_token}
+    env = {**os.environ, **_subagent_model_lock_env(), "GITEA_TOKEN": gitea_token}
+    if not os.environ.get("ANTHROPIC_MODEL", "").strip():
+        env.pop("CLAUDE_CODE_SUBAGENT_MODEL", None)
     proc = subprocess.Popen(
         ["openagents", "vigil", "--parallel", str(max(1, parallel))],
         cwd=str(repo),
@@ -637,6 +712,8 @@ def _start_vigil_container(
         value = os.environ.get(key, "").strip()
         if value:
             args += ["-e", f"{key}={value}"]
+    for key, value in _subagent_model_lock_env().items():
+        args += ["-e", f"{key}={value}"]
     for suffix in _HARNESS_LLM_SUFFIXES:
         value = os.environ.get(f"HARNESS_LLM_{suffix}", "").strip()
         if value:
@@ -668,6 +745,59 @@ def _stop_managed_proc(*, proc: subprocess.Popen) -> None:
         proc.wait(timeout=5)
 
 
+def _stop_vigil_model_processes(*, vigil_pid: int, proc_root: Path = Path("/proc")) -> None:
+    """Stop CLI agents owned by this run, including ones orphaned by an earlier Vigil.
+
+    Claude Code starts its own process group, so terminating Vigil alone does not
+    terminate an in-flight model call.  Scope orphan discovery to this run ID and
+    direct descendants to this Vigil; never signal the controller's process group.
+    """
+    run_id = os.environ.get("AUTO_DESIGNER_RUN_ID", "").strip()
+    processes: dict[int, tuple[int, int, str, bool]] = {}
+    for entry in proc_root.iterdir() if proc_root.is_dir() else ():
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat = (entry / "stat").read_text().split()
+            command = (
+                (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+            )
+            same_run = bool(run_id) and (
+                f"AUTO_DESIGNER_RUN_ID={run_id}".encode()
+                in (entry / "environ").read_bytes().split(b"\0")
+            )
+            processes[int(entry.name)] = (int(stat[3]), int(stat[4]), command, same_run)
+        except (OSError, ValueError):
+            continue
+    roots = {
+        pid
+        for pid, (parent, _group, command, same_run) in processes.items()
+        if command.startswith("claude -p ") and (parent == vigil_pid or same_run)
+    }
+    descendants = set(roots)
+    while True:
+        expanded = descendants | {
+            pid
+            for pid, (parent, _group, _command, _same_run) in processes.items()
+            if parent in descendants
+        }
+        if expanded == descendants:
+            break
+        descendants = expanded
+    own_group = os.getpgrp()
+    for group in {processes[pid][1] for pid in descendants}:
+        if group > 1 and group != own_group:
+            try:
+                os.killpg(group, signal.SIGKILL)
+            except OSError:
+                pass
+    for pid in descendants:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+
 def stop_vigil(handle: VigilHandle) -> None:
     """Stop the delivery-plane process according to keep_alive.
 
@@ -681,6 +811,10 @@ def stop_vigil(handle: VigilHandle) -> None:
         if handle.mode == "container":
             subprocess.run(["docker", "rm", "-f", _VIGIL_CONTAINER], capture_output=True, text=True)
         _stop_managed_proc(proc=handle.proc)
+        if handle.mode == "subprocess":
+            pid = getattr(handle.proc, "pid", None)
+            if isinstance(pid, int) and pid > 0:
+                _stop_vigil_model_processes(vigil_pid=pid)
     finally:
         try:
             handle.log_handle.close()  # type: ignore[attr-defined]
@@ -719,6 +853,11 @@ def main() -> int:
                 "见 backend/.env.example"
             )
         os.environ[f"LLM_{_suffix}"] = _val
+    _reasoning_effort = os.environ.get("HARNESS_LLM_REASONING_EFFORT", "").strip()
+    if _reasoning_effort:
+        os.environ["LLM_REASONING_EFFORT"] = _reasoning_effort
+    else:
+        os.environ.pop("LLM_REASONING_EFFORT", None)
     gitea = _load_env(GITEA_ENV_FILE)  # GITEA_URL/OWNER/REPO/TOKEN
 
     from auto_designer.loop.roster import load_roster
@@ -762,21 +901,28 @@ def main() -> int:
     from auto_designer.user.sim.persona_io import card_to_personas
 
     print(f"⓪ 输入：persona 卡库={args.persona_library} | 种子卡库={args.seed_cards}")
+    run_mode = experiment_run_mode()
     role_runs = install_role_runs(data_root=DATA)
+    recovery = load_recovery_store(mode=run_mode)
     from auto_designer.invocation import append_round, init_manifest  # noqa: PLC0415
 
-    init_manifest(
-        roster=roster,
-        models={
-            "user": os.environ.get("USER_LLM_MODEL", ""),
-            "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
-            "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
-            "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
-        },
-    )
+    if run_mode == "fresh":
+        init_manifest(
+            roster=roster,
+            models={
+                "user": os.environ.get("USER_LLM_MODEL", ""),
+                "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
+                "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
+                "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
+            },
+        )
     print(f"⓪.6 实验切片 ROLE_RUNS_DIR={role_runs}")
-    print("① 种 harness 本地仓 ...")
-    repo = _seed_harness_repo()
+    if run_mode == "fresh":
+        print("① fresh：种 harness 本地仓 ...")
+        repo = _seed_harness_repo()
+    else:
+        print("① resume：复用现有 harness 本地仓 ...")
+        repo = existing_harness_repo()
 
     print("② 接 Gitea + 本地存储 + launcher ...")
     tracker = GiteaTracker(
@@ -784,9 +930,16 @@ def main() -> int:
     )
     tracker.ensure_labels(["bug", "feature"])
     _set_gitea_remote(repo, gitea)  # 配 origin；推送由开发者 agent 用 git 工具自己做
-    print("②.5 复位到最初状态（Gitea harness→v0 + 关闭遗留 issue + 清空看板）...")
-    _reset_to_initial(repo, tracker)
+    if run_mode == "fresh":
+        print("②.5 fresh：复位 Gitea harness、issue 与 live 投影 ...")
+        _reset_to_initial(repo, tracker)
+    else:
+        print("②.5 resume：保留 Gitea、session、harness 与 live 历史 ...")
     store = SessionStore(role_runs / "sessions")
+    # A resume may contain authoritative session files whose derived index was
+    # not published before an interruption.  Rebuild it before any role can
+    # resolve issue -> session evidence.
+    store.rebuild_index()
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 生成/准入角色 ...")
@@ -848,11 +1001,15 @@ def main() -> int:
         append_agent_log,
         archive_agent,
         clear_live,
+        prepare_live_resume,
         update_agent,
         update_live_run,
     )
 
-    clear_live(data_dir=DATA)  # 一轮 run 开始清空 live 观测投影（agents/run/history）
+    if run_mode == "fresh":
+        clear_live(data_dir=DATA)
+    elif recovery is not None:
+        prepare_live_resume(data_dir=DATA, phase="reconcile")
 
     # 当前轮游标：orchestrator 轮次回调写入，各 agent 活动/归档据此标轮。round_shas 逐轮累计。
     current = {"round": 0}
@@ -865,7 +1022,7 @@ def main() -> int:
             running=True,
             round_no=k,
             total_rounds=TOTAL_ROUNDS,
-            phase="users",
+            phase=orch.recovery_phase(round_no=k) if recovery is not None else "users",
         )
 
     # Spec-0029/T8：背压阈值（proposal/ready 队列深度）。超阈值只告警、不自动扩容——这是
@@ -1019,7 +1176,7 @@ def main() -> int:
 
         return cb
 
-    designers = [  # roster 个创新者 agent：a 之后综合全局 backlog+体感产结构性提案（design 标签），供 dev 领取
+    designers = [
         Designer(
             tracker,
             store,
@@ -1033,6 +1190,9 @@ def main() -> int:
         )
         for i in range(roster["designer"])
     ]
+    from auto_designer.designer.grouped_designer import group_designer_stage
+
+    designers = group_designer_stage(designers, artifact_root=role_runs / "designer_grouping")
 
     def make_divergent_status(agent_id, label):
         def cb(*, running, status, detail=None, proposals=None):
@@ -1098,7 +1258,7 @@ def main() -> int:
 
     from auto_designer.designer.owner import Owner  # noqa: PLC0415
 
-    # Owner 恒 1 实例（唯一准入）；roster owner=0 → review=False，全部提案 hold（无机械旁路）。
+    # Owner 恒 1 个路由实例；默认 roster owner=0 使用零 LLM 机械交接，N_OWNERS=1 才启用模型评审。
     owner = Owner(
         tracker,
         store,
@@ -1141,6 +1301,7 @@ def main() -> int:
         max_parallel_users=max_parallel_users,  # Spec-0017/T3
         integrity_guard=integrity_guard,  # Spec-0021/T2
         fetch_issue=lambda number: tracker.get_issue(number=number),
+        recovery=recovery,
     )
 
     # Spec-0050/T4：TOTAL_ROUNDS=1 只测用户，不启交付面。
@@ -1156,8 +1317,8 @@ def main() -> int:
 
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
-        f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {len(designers)} synthesize "
-        f"→ owner({'评审' if roster['owner'] >= 1 else '禁用准入'})；交付面 vigil --parallel "
+        f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {roster['designer']} synthesize "
+        f"→ owner({'评审' if roster['owner'] >= 1 else '零 LLM 机械交接'})；交付面 vigil --parallel "
         f"{roster['developer']}（末轮只用户；非末轮封口后切轮），"
         f"a 段并发 {max_parallel_users}，背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，"
         "真模型）..."

@@ -21,7 +21,12 @@ from typing import Any
 
 from nexau import BaseTracer, Span, SpanType
 
-from auto_designer.usage import bind_usage_context, record_usage
+from auto_designer.usage import (
+    bind_usage_context,
+    current_time_accounting,
+    provider_wait_scope,
+    record_usage,
+)
 
 # 各类事件文本长度上限：工具入参/输出可能携带整文件内容，摘要后进时间线；
 # assistant 是过程流主体（要完整对话），给宽上限只防极端失控。
@@ -89,6 +94,7 @@ class StepTracer(BaseTracer):
     def __init__(self, on_event: EventFn) -> None:
         self._on_event = on_event
         self._agent_id: str | None = None
+        self._provider_scopes: dict[int, object] = {}
 
     def set_session_id(self, session_id: str) -> None:
         # NexAU creates one canonical session per Agent instance; use it as the
@@ -110,6 +116,10 @@ class StepTracer(BaseTracer):
         attributes: dict[str, Any] | None = None,
     ) -> Span:
         span = Span(id="", name=name, type=span_type)
+        if span_type == SpanType.LLM and current_time_accounting() is not None:
+            scope = provider_wait_scope()
+            scope.__enter__()
+            self._provider_scopes[id(span)] = scope
         if span_type == SpanType.TOOL:
             tool = name.removeprefix("Tool: ")
             params = (inputs or {}).get("parameters") or {}
@@ -128,6 +138,9 @@ class StepTracer(BaseTracer):
         error: Exception | None = None,
         attributes: dict[str, Any] | None = None,
     ) -> None:
+        scope = self._provider_scopes.pop(id(span), None)
+        if scope is not None:
+            scope.__exit__(None, None, None)
         if span.type == SpanType.LLM:
             payload = outputs if isinstance(outputs, dict) else {}
             usage = payload.get("usage") or payload.get("usageMetadata")

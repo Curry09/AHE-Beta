@@ -14,9 +14,11 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 
+from auto_designer.designer.issue_schema import round_label
 from auto_designer.invocation import _redact
 from auto_designer.models import IssueDraft
 from auto_designer.observations.grants import authorized_sessions, grant, is_pm_source
+from auto_designer.usage import current_usage_context
 
 _CURRENT: contextvars.ContextVar = contextvars.ContextVar("observation_gap_service", default=None)
 FIELDS = ("question", "checked", "unknowns", "impact", "desired_capability", "verification")
@@ -131,6 +133,9 @@ class GapService:
                 )
                 body += f"\n\nsource-role: {row['role']}\n{marker}"
                 labels = ["proposal", "observation-gap"]
+                round_no = current_usage_context().round_no
+                if type(round_no) is int and round_no > 0:
+                    labels.append(round_label(round_no))
                 if pm_origin:
                     labels.append("from-divergent")
                 found = self.tracker.create_issue(

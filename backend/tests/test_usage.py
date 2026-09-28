@@ -8,17 +8,27 @@ from auto_designer.usage import UsageStore, bind_usage_context, current_usage_co
 
 
 def test_usage_normalization_preserves_optional_fields() -> None:
-    assert usage_fields({
-        "prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14,
-        "prompt_tokens_details": {"cached_tokens": 3},
-        "completion_tokens_details": {"reasoning_tokens": 2},
-    }) == {
-        "input_tokens": 10, "output_tokens": 4, "reasoning_tokens": 2,
-        "cached_input_tokens": 3, "total_tokens": 14,
+    assert usage_fields(
+        {
+            "prompt_tokens": 10,
+            "completion_tokens": 4,
+            "total_tokens": 14,
+            "prompt_tokens_details": {"cached_tokens": 3},
+            "completion_tokens_details": {"reasoning_tokens": 2},
+        }
+    ) == {
+        "input_tokens": 10,
+        "output_tokens": 4,
+        "reasoning_tokens": 2,
+        "cached_input_tokens": 3,
+        "total_tokens": 14,
     }
     assert usage_fields(None) == {
-        "input_tokens": None, "output_tokens": None, "reasoning_tokens": None,
-        "cached_input_tokens": None, "total_tokens": None,
+        "input_tokens": None,
+        "output_tokens": None,
+        "reasoning_tokens": None,
+        "cached_input_tokens": None,
+        "total_tokens": None,
     }
 
 
@@ -42,15 +52,42 @@ def test_concurrent_context_and_jsonl_append_do_not_cross_or_corrupt(tmp_path) -
 
 def test_summary_is_derived_from_filtered_raw_events(tmp_path) -> None:
     store = UsageStore(tmp_path / "usage.jsonl")
-    store.append({"role": "user", "session_id": "a", "input_tokens": 3, "output_tokens": 2,
-                  "total_tokens": 5, "reasoning_tokens": None, "cached_input_tokens": None,
-                  "usage_source": "reported"})
-    store.append({"role": "designer", "session_id": "b", "input_tokens": 7, "output_tokens": 1,
-                  "total_tokens": 8, "reasoning_tokens": 1, "cached_input_tokens": 2,
-                  "usage_source": "reported"})
-    store.append({"role": "designer", "session_id": "b", "input_tokens": None,
-                  "output_tokens": None, "total_tokens": None, "reasoning_tokens": None,
-                  "cached_input_tokens": None, "usage_source": "unavailable"})
+    store.append(
+        {
+            "role": "user",
+            "session_id": "a",
+            "input_tokens": 3,
+            "output_tokens": 2,
+            "total_tokens": 5,
+            "reasoning_tokens": None,
+            "cached_input_tokens": None,
+            "usage_source": "reported",
+        }
+    )
+    store.append(
+        {
+            "role": "designer",
+            "session_id": "b",
+            "input_tokens": 7,
+            "output_tokens": 1,
+            "total_tokens": 8,
+            "reasoning_tokens": 1,
+            "cached_input_tokens": 2,
+            "usage_source": "reported",
+        }
+    )
+    store.append(
+        {
+            "role": "designer",
+            "session_id": "b",
+            "input_tokens": None,
+            "output_tokens": None,
+            "total_tokens": None,
+            "reasoning_tokens": None,
+            "cached_input_tokens": None,
+            "usage_source": "unavailable",
+        }
+    )
     assert store.summary()["total_tokens"] == 13
     assert store.summary(session_id="a")["total_tokens"] == 5
     assert store.summary()["unavailable_count"] == 1

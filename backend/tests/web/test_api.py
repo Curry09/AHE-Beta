@@ -148,19 +148,49 @@ def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
     store = SessionStore(tmp_path / "sessions")
     client = TestClient(create_app(store=store, tracker=FakeTracker(), usage_store=usage))
     assert client.get("/api/usage/events").json() == {"events": []}
-    usage.append({"session_id": "s1", "instance_id": "i1", "interaction_id": "turn-0",
-                  "role": "user", "round_no": 1, "input_tokens": 4,
-                  "output_tokens": 2, "reasoning_tokens": None, "cached_input_tokens": None,
-                  "total_tokens": 6, "usage_source": "reported"})
-    usage.append({"session_id": "s2", "instance_id": "i2", "role": "designer",
-                  "round_no": 2, "input_tokens": 7,
-                  "output_tokens": 3, "reasoning_tokens": 1, "cached_input_tokens": 2,
-                  "total_tokens": 10, "usage_source": "reported"})
-    usage.append({"session_id": "s2", "instance_id": "i2", "role": "designer",
-                  "round_no": 2, "input_tokens": None,
-                  "output_tokens": None, "reasoning_tokens": None,
-                  "cached_input_tokens": None, "total_tokens": None,
-                  "usage_source": "unavailable"})
+    usage.append(
+        {
+            "session_id": "s1",
+            "instance_id": "i1",
+            "interaction_id": "turn-0",
+            "role": "user",
+            "round_no": 1,
+            "input_tokens": 4,
+            "output_tokens": 2,
+            "reasoning_tokens": None,
+            "cached_input_tokens": None,
+            "total_tokens": 6,
+            "usage_source": "reported",
+        }
+    )
+    usage.append(
+        {
+            "session_id": "s2",
+            "instance_id": "i2",
+            "role": "designer",
+            "round_no": 2,
+            "input_tokens": 7,
+            "output_tokens": 3,
+            "reasoning_tokens": 1,
+            "cached_input_tokens": 2,
+            "total_tokens": 10,
+            "usage_source": "reported",
+        }
+    )
+    usage.append(
+        {
+            "session_id": "s2",
+            "instance_id": "i2",
+            "role": "designer",
+            "round_no": 2,
+            "input_tokens": None,
+            "output_tokens": None,
+            "reasoning_tokens": None,
+            "cached_input_tokens": None,
+            "total_tokens": None,
+            "usage_source": "unavailable",
+        }
+    )
     assert client.get("/api/usage/summary?role=user").json()["total_tokens"] == 6
     summary = client.get("/api/usage/summary?instance_id=i1").json()
     assert summary["by_instance"]["i1"]["total_tokens"] == 6

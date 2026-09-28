@@ -88,7 +88,9 @@ class HarnessSmokeTest(unittest.TestCase):
         )
         worker.start()
         time.sleep(0.05)
-        self.assertTrue(worker.is_alive(), "slow agent must keep running until completion/interrupt")
+        self.assertTrue(
+            worker.is_alive(), "slow agent must keep running until completion/interrupt"
+        )
         release.set()
         worker.join(timeout=2)
         self.assertFalse(worker.is_alive())
@@ -112,12 +114,15 @@ class HarnessSmokeTest(unittest.TestCase):
         entry._OUTPUT_PROTOCOL = entry._V1
         try:
             with contextlib.redirect_stdout(stdout):
-                collector.end_span(span, outputs={
-                    "id": "req-1", "model": "m",
-                    "usage": {"prompt_tokens": 10, "completion_tokens": 4,
-                              "total_tokens": 14},
-                    "choices": [{"message": {"content": "secret answer"}}],
-                })
+                collector.end_span(
+                    span,
+                    outputs={
+                        "id": "req-1",
+                        "model": "m",
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14},
+                        "choices": [{"message": {"content": "secret answer"}}],
+                    },
+                )
         finally:
             entry._OUTPUT_PROTOCOL = old_protocol
         event = json.loads(stdout.getvalue())

@@ -84,6 +84,19 @@ class SWEbenchEvaluator:
 
             dataset = load_dataset("parquet", data_files=str(self.dataset_path), split="train")
             rows = [row for row in dataset if row["instance_id"] == instance_id]
+        elif self.dataset_path.suffix in {".json", ".jsonl"}:
+            # Keep deterministic unit/integration fixtures usable without importing the
+            # optional SWE-bench package. Production Verified inputs remain parquet.
+            if self.dataset_path.suffix == ".jsonl":
+                rows = [
+                    json.loads(line)
+                    for line in self.dataset_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+            else:
+                payload = json.loads(self.dataset_path.read_text(encoding="utf-8"))
+                rows = payload if isinstance(payload, list) else [payload]
+            rows = [row for row in rows if row.get("instance_id") == instance_id]
         else:
             from swebench.harness.utils import load_swebench_dataset
 

@@ -23,6 +23,8 @@ class RunState:
     纯观测游标（每轮末 orchestrator 解析的 main 最新 SHA），不再是 release 版本号、不参与解析。
     """
 
+    schema_version: int = 1
+    recovery_revision: int = 0
     round: int = 0
     phase: str = "a"
     current_release_ref: str = ""  # Spec-0007/T2：语义 = 当前 main HEAD SHA（观测游标）
@@ -32,6 +34,8 @@ class RunState:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "schema_version": self.schema_version,
+            "recovery_revision": self.recovery_revision,
             "round": self.round,
             "phase": self.phase,
             "current_release_ref": self.current_release_ref,
@@ -43,6 +47,8 @@ class RunState:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RunState:
         return cls(
+            schema_version=int(data.get("schema_version", 1)),
+            recovery_revision=int(data.get("recovery_revision", 0)),
             round=data.get("round", 0),
             phase=data.get("phase", "a"),
             current_release_ref=data.get("current_release_ref", ""),
@@ -69,5 +75,14 @@ def write_run_state(state_dir: Path, run_state: RunState) -> None:
     Path(state_dir).mkdir(parents=True, exist_ok=True)
     path = run_state_path(state_dir)
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(run_state.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+    with tmp.open("w", encoding="utf-8") as handle:
+        json.dump(run_state.to_dict(), handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
     os.replace(tmp, path)
+    directory_fd = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)

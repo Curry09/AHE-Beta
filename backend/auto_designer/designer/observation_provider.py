@@ -12,7 +12,7 @@ import fnmatch
 import hashlib
 import json
 import os
-import subprocess
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -202,8 +202,10 @@ class ObservationProvider:
                 raise ValueError("observation file changed to a symlink")
             for selected_path in selected:
                 expected = self.digests.get(selected_path)
-                if expected and (selected_path.stat().st_size > 4_500_000 or
-                        hashlib.sha256(selected_path.read_bytes()).hexdigest() != expected):
+                if expected and (
+                    selected_path.stat().st_size > 4_500_000
+                    or hashlib.sha256(selected_path.read_bytes()).hexdigest() != expected
+                ):
                     raise ValueError("observation integrity mismatch")
             if tool == "read_file":
                 content = self._read(path, parameters=parameters)
@@ -221,7 +223,7 @@ class ObservationProvider:
                 "returnDisplay": "Read-only observation files",
                 "truncated": len(content) > _MAX_CHARS,
             }
-        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        except (OSError, ValueError) as exc:
             result = {
                 "content": f"Observation read unavailable: {type(exc).__name__}",
                 "error": {"type": "OBSERVATION_READ_FAILED"},
@@ -264,33 +266,28 @@ class ObservationProvider:
         ]
         if not selected:
             return "No matching declared files."
-        # Explicit files prevent traversal into unexported files or other sessions.
-        result = subprocess.run(
-            [
-                "rg",
-                "-n",
-                "-H",
-                "-i",
-                "--no-heading",
-                "--color",
-                "never",
-                "--max-count",
-                "40",
-                "--max-columns",
-                "2000",
-                "--max-columns-preview",
-                "--",
-                pattern,
-                *map(str, selected),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        if result.returncode not in (0, 1):
-            raise ValueError("observation search failed")
-        return result.stdout or "No matching lines in declared files."
+        # Explicit files prevent traversal into unexported files or other sessions. Keep this
+        # search self-contained: minimal CI images and sandbox runtimes do not necessarily ship
+        # ripgrep, and a missing optional binary must not turn an allowed read into a fake outage.
+        try:
+            matcher = re.compile(pattern, re.IGNORECASE)
+        except re.error as exc:
+            raise ValueError("observation search failed") from exc
+        matches: list[str] = []
+        for selected_path in selected:
+            try:
+                with selected_path.open(encoding="utf-8", errors="replace") as handle:
+                    for line_no, line in enumerate(handle, start=1):
+                        if matcher.search(line):
+                            rendered = line.rstrip("\r\n")
+                            if len(rendered) > 2000:
+                                rendered = rendered[:2000] + "…"
+                            matches.append(f"{selected_path}:{line_no}:{rendered}")
+                            if len(matches) >= 40:
+                                return "\n".join(matches)
+            except OSError as exc:
+                raise ValueError("observation search failed") from exc
+        return "\n".join(matches) or "No matching lines in declared files."
 
 
 def current_observation_provider() -> ObservationProvider | None:

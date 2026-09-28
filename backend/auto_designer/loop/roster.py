@@ -2,7 +2,7 @@
 
 后端 run.py 据此决定跑几个用户会话 / 几个 triager 分片 / 几个 synthesize / 几个 divergent /
 owner 评审开关 / 交付面并发；前端经 /api/config 读同一份，房间容量与后端一致。默认 用户3 ·
-triager1 · 设计师1 · divergent0 · owner1 · developer1，可用环境变量 N_USERS/N_TRIAGERS/N_DESIGNERS/
+triager1 · 设计师1 · divergent0 · owner0 · developer1，可用环境变量 N_USERS/N_TRIAGERS/N_DESIGNERS/
 N_DIVERGENTS/N_OWNERS/N_DEVELOPERS 覆盖（非负整数）。
 
 Spec-0032/T4：developer 语义从「进程内 nexau dev 个数」改为「交付面并发 K」——直通 OpenAgents
@@ -20,7 +20,7 @@ DEFAULT_ROSTER: dict[str, int] = {
     "triager": 1,  # Spec-0029：分片数——第 k 个 triager 处理 pending[k::n]，真并行
     "designer": 1,
     "divergent": 0,  # 默认关；N_DIVERGENTS=1 开启发散 PM（discovery 轨，产出经 Owner 准入）
-    "owner": 1,  # Spec-0029：唯一准入，恒 0/1——0=禁用准入（全部 hold），≥1 按 1 算
+    "owner": 0,  # 默认零 LLM 机械交接；N_OWNERS=1 才开启 Owner 模型评审
     "developer": 1,  # Spec-0032：交付面并发 K（vigil --parallel）；保守默认串行
 }
 

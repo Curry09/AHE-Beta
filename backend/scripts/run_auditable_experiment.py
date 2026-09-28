@@ -18,7 +18,6 @@ import secrets
 import subprocess
 import sys
 import time
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -47,7 +46,9 @@ from auto_designer.experiment.manifest import (  # noqa: E402
     append_journal,
     last_state,
     read_manifest,
+    recovery_identity,
 )
+from auto_designer.loop.recovery import RecoveryError, RecoveryIdentity, RecoveryStore  # noqa: E402
 
 _REQUIRED_ROSTER = {"user", "triager", "designer", "divergent", "owner", "developer"}
 _PROFILE_KEYS = {
@@ -160,6 +161,8 @@ class FrozenExperiment:
         execution = self.raw.get("execution")
         if not isinstance(execution, dict) or execution.get("runner") != "swebench-closed-loop":
             raise AuditLaunchError("execution.runner 必须为 swebench-closed-loop")
+        if type(execution.get("designer_grouping", False)) is not bool:
+            raise AuditLaunchError("execution.designer_grouping 必须为 boolean")
         rounds = int(execution.get("total_rounds") or 0)
         if self.config.mode == "full-evolution":
             if rounds < 2 or not execution.get("final_round_users_only"):
@@ -310,6 +313,12 @@ def _verify_git_pins(spec: FrozenExperiment) -> dict[str, str]:
     for name, (repository, revision) in repositories.items():
         result = _run(["git", "-C", str(repository), "rev-parse", f"{revision}^{{commit}}"])
         resolved[name] = result.stdout.strip()
+    controller_head = _run(["git", "-C", str(REPOSITORY), "rev-parse", "HEAD"]).stdout.strip()
+    if controller_head != resolved["auto-designer"]:
+        raise AuditLaunchError(
+            "controller HEAD 与 source.auto_designer_sha 不一致："
+            f"head={controller_head} pin={resolved['auto-designer']}"
+        )
     return resolved
 
 
@@ -384,14 +393,43 @@ def _compose(
     return result
 
 
-def _ensure_created(spec: FrozenExperiment) -> None:
+def _ensure_created(spec: FrozenExperiment, *, resume: bool = False) -> None:
     if not spec.root.exists():
+        if resume:
+            raise AuditLaunchError(f"resume 实验不存在：{spec.root}")
         runtime.create(config_path=spec.config_path, root=spec.root.parent)
         return
     manifest = read_manifest(path=spec.paths["manifest"])
     expected = config_hash(data=spec.raw)
     if manifest.get("config_hash") != expected:
         raise AuditLaunchError("已有 experiment_id 的 manifest 与当前配置不一致")
+
+
+def _validate_recovery_identity(spec: FrozenExperiment, *, resume: bool) -> dict[str, str]:
+    manifest = read_manifest(path=spec.paths["manifest"])
+    identity = recovery_identity(manifest)
+    expected = {
+        "experiment_id": spec.experiment_id,
+        "config_hash": config_hash(data=spec.raw),
+        "controller_sha": str(spec.raw["source"]["auto_designer_sha"]),
+        "plan_hash": str(spec.raw["execution"]["plan"]["sha256"]),
+    }
+    drift = {
+        key: (expected[key], identity[key]) for key in expected if expected[key] != identity[key]
+    }
+    if drift:
+        raise AuditLaunchError(f"manifest 恢复身份漂移：{drift}")
+    recovery_path = spec.paths["checkpoints"] / "recovery.json"
+    if resume:
+        try:
+            RecoveryStore.open(
+                root=spec.paths["checkpoints"], identity=RecoveryIdentity(**identity)
+            )
+        except RecoveryError as exc:
+            raise AuditLaunchError(f"recovery state 不可续跑：{exc}") from exc
+    elif recovery_path.exists():
+        raise AuditLaunchError("fresh 发现已有 recovery state；请使用 --resume")
+    return identity
 
 
 def _provision_base(spec: FrozenExperiment) -> None:
@@ -549,7 +587,12 @@ def _write_context(spec: FrozenExperiment, *, credentials: dict[str, str]) -> Pa
 
 
 def _execution_environment(
-    spec: FrozenExperiment, *, profile: dict[str, str], context_path: Path
+    spec: FrozenExperiment,
+    *,
+    profile: dict[str, str],
+    context_path: Path,
+    identity: dict[str, str],
+    run_mode: str = "fresh",
 ) -> dict[str, str]:
     roster = spec.roster
     models = spec.config.models
@@ -568,7 +611,12 @@ def _execution_environment(
             "AUTO_DESIGNER_GITEA_ENV_FILE": str(spec.paths["secrets"] / "demand-gitea.env"),
             "AUTO_DESIGNER_HARNESS_ARCHIVE": str(source["harness"]["path"]),
             "AUTO_DESIGNER_VIGIL_IMAGE": str(spec.config.images["vigil"]),
-            "AUTO_DESIGNER_RUN_ID": uuid.uuid4().hex,
+            "AUTO_DESIGNER_RUN_ID": identity["run_id"],
+            "AUTO_DESIGNER_RUN_MODE": run_mode,
+            "AUTO_DESIGNER_RECOVERY_ROOT": str(spec.paths["checkpoints"]),
+            "AUTO_DESIGNER_CONFIG_HASH": identity["config_hash"],
+            "AUTO_DESIGNER_CONTROLLER_SHA": identity["controller_sha"],
+            "AUTO_DESIGNER_PLAN_HASH": identity["plan_hash"],
             "PERSONA_LIBRARY": str(personas["library"]["path"]),
             "PERSONA_ROSTER": str(personas["roster"]["path"]),
             "SWEBENCH_INSTANCE_FILE": str(workload["pool"]["path"]),
@@ -583,6 +631,7 @@ def _execution_environment(
             "N_USERS": str(roster["user"]),
             "N_TRIAGERS": str(roster["triager"]),
             "N_DESIGNERS": str(roster["designer"]),
+            "DESIGNER_GROUPING": "1" if execution.get("designer_grouping", False) else "0",
             "N_DIVERGENTS": str(roster["divergent"]),
             "N_OWNERS": str(roster["owner"]),
             "N_DEVELOPERS": str(roster["developer"]),
@@ -592,6 +641,8 @@ def _execution_environment(
             "DESIGNER_LLM_MODEL": str(models["designer"]),
             "ANTHROPIC_MODEL": str(models["delivery"]),
             "ANTHROPIC_SMALL_FAST_MODEL": str(models["delivery"]),
+            "CLAUDE_CODE_SUBAGENT_MODEL": str(models["delivery"]),
+            "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1",
             "ANTHROPIC_DEFAULT_HAIKU_MODEL": str(models["delivery"]),
             "ANTHROPIC_DEFAULT_SONNET_MODEL": str(models["delivery"]),
             "ANTHROPIC_DEFAULT_OPUS_MODEL": str(models["delivery"]),
@@ -682,7 +733,11 @@ def check(spec: FrozenExperiment, *, probe: bool) -> dict[str, Any]:
 
 
 def run_experiment(
-    spec: FrozenExperiment, *, probe: bool, allow_dirty_controller: bool = False
+    spec: FrozenExperiment,
+    *,
+    probe: bool,
+    allow_dirty_controller: bool = False,
+    resume: bool = False,
 ) -> int:
     plan = check(spec, probe=probe)
     print(json.dumps({"preflight": plan}, ensure_ascii=False, indent=2), flush=True)
@@ -693,7 +748,8 @@ def run_experiment(
             "先提交并更新 source.auto_designer_sha，开发联调才可显式使用 "
             "--allow-dirty-controller"
         )
-    _ensure_created(spec)
+    _ensure_created(spec, resume=resume)
+    identity = _validate_recovery_identity(spec, resume=resume)
     lock_path = spec.paths["runtime"] / "controller.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+") as lock:
@@ -702,22 +758,57 @@ def run_experiment(
         except BlockingIOError as exc:
             raise AuditLaunchError("已有 controller 正在运行该实验") from exc
         state = last_state(path=spec.paths["journal"])
-        if state in {"RUNNING", "COMPLETED", "ARCHIVED", "DESTROYED"}:
-            raise AuditLaunchError(f"实验当前状态 {state}，拒绝重复启动")
+        allowed = (
+            {"FAILED", "STOPPED", "PROVISIONED", "READY"}
+            if resume
+            else {
+                "CREATED",
+                "PROVISIONED",
+                "READY",
+            }
+        )
+        if state not in allowed:
+            action = "resume" if resume else "fresh"
+            raise AuditLaunchError(f"实验当前状态 {state}，拒绝 {action}")
+        if resume:
+            ledger = RecoveryStore.open(
+                root=spec.paths["checkpoints"], identity=RecoveryIdentity(**identity)
+            )
+            append_journal(
+                path=spec.paths["journal"],
+                action="reconcile-recovery",
+                from_state=state,
+                to_state=state,
+                resources={
+                    "run_id": identity["run_id"],
+                    "recovery_revision": ledger.revision,
+                    "round": ledger.snapshot().get("round", 0),
+                },
+            )
         _provision_base(spec)
         credentials = _bootstrap_gitea(spec)
         context_path = _write_context(spec, credentials=credentials)
         profile = _load_profile(spec.model_profile_path)
-        environment = _execution_environment(spec, profile=profile, context_path=context_path)
+        environment = _execution_environment(
+            spec,
+            profile=profile,
+            context_path=context_path,
+            run_mode="resume" if resume else "fresh",
+            identity=identity,
+        )
         log_path = spec.paths["logs"] / "closed-loop.log"
         pid_path = spec.paths["runtime"] / "demand.pid"
         command = [sys.executable, str(BACKEND / "scripts" / "run_swebench_closed_loop.py")]
         append_journal(
             path=spec.paths["journal"],
-            action="launch-closed-loop",
+            action="resume-closed-loop" if resume else "launch-closed-loop",
             from_state=last_state(path=spec.paths["journal"]),
             to_state="RUNNING",
-            resources={"log": str(log_path), "runner": "swebench-closed-loop"},
+            resources={
+                "log": str(log_path),
+                "runner": "swebench-closed-loop",
+                "run_id": identity["run_id"],
+            },
         )
         with log_path.open("ab") as log:
             process = subprocess.Popen(
@@ -775,6 +866,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--check", action="store_true", help="只做静态/环境预检，不创建实验或启动容器"
     )
     parser.add_argument("--no-probe", action="store_true", help="预检时不调用模型 endpoint")
+    parser.add_argument("--resume", action="store_true", help="复用冻结身份并从 recovery 状态续跑")
     parser.add_argument(
         "--allow-dirty-controller",
         action="store_true",
@@ -795,6 +887,7 @@ def main(argv: list[str] | None = None) -> int:
             spec,
             probe=not args.no_probe,
             allow_dirty_controller=args.allow_dirty_controller,
+            resume=args.resume,
         )
     except (AuditLaunchError, ConfigError) as exc:
         print(f"[auditable-experiment] {exc}", file=sys.stderr)

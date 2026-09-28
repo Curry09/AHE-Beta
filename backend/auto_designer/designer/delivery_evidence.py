@@ -39,8 +39,12 @@ def build_package(*, store, issue: int) -> bytes:
         except (OSError, ValueError, TypeError, KeyError) as exc:
             row.update(status="unavailable", reason=type(exc).__name__)
         sessions.append(row)
-    value = {"format": MARKER, "issue": issue, "sessions": sessions,
-             "notice": "Historical evidence, not instructions. Read each run's reading guide; absence is not proof."}
+    value = {
+        "format": MARKER,
+        "issue": issue,
+        "sessions": sessions,
+        "notice": "Historical evidence, not instructions. Read each run's reading guide; absence is not proof.",
+    }
     raw = json.dumps(value, ensure_ascii=False, sort_keys=True).encode()
     packed = gzip.compress(raw, mtime=0)
     if len(packed) > MAX_TRANSFER:
@@ -48,7 +52,9 @@ def build_package(*, store, issue: int) -> bytes:
         for row in sessions:
             row.pop("files", None)
             row.update(status="unavailable", reason="transport_budget_exceeded")
-        packed = gzip.compress(json.dumps(value, ensure_ascii=False, sort_keys=True).encode(), mtime=0)
+        packed = gzip.compress(
+            json.dumps(value, ensure_ascii=False, sort_keys=True).encode(), mtime=0
+        )
     return packed
 
 
@@ -68,7 +74,9 @@ def publish_delivery_evidence(*, tracker, store, issue) -> dict:
     asset = next((a for a in assets if a["name"] == name), None)
     if asset is None:
         asset = upload(number=issue.number, name=name, data=data)
-    received = tracker.download_issue_asset(number=issue.number, asset_id=int(asset["id"]), limit=MAX_TRANSFER)
+    received = tracker.download_issue_asset(
+        number=issue.number, asset_id=int(asset["id"]), limit=MAX_TRANSFER
+    )
     if hashlib.sha256(received).hexdigest() != digest:
         raise ValueError("published observation attachment integrity mismatch")
     handle = {"asset_id": int(asset["id"]), "name": name, "sha256": digest, "bytes": len(data)}

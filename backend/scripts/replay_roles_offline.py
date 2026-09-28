@@ -51,7 +51,9 @@ def main() -> int:
     sessions = output / "sessions"
     shutil.copytree(args.sessions.resolve(), sessions)
     harness = output / "harness_repo"
-    shutil.copytree(ROOT / "harness_template", harness, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+    shutil.copytree(
+        ROOT / "harness_template", harness, ignore=shutil.ignore_patterns(".git", "__pycache__")
+    )
 
     wis = _env(WORKSPACE / ".env")
     os.environ.update(
@@ -81,20 +83,31 @@ def main() -> int:
             if old in mapping:
                 continue
             reason = str(entry.get("reason", "")).strip()
-            ref = tracker.create_issue(IssueDraft(
-                title=f"用户体验报告：{reason[:80] or '会话体验未达预期'}",
-                body=(f"session_id: {entry['session_id']}\n\n"
-                      f"体验评分：{entry.get('score')}\n\n用户说明：{reason}"),
-                labels=[REPORT, "round-1"],
-            ))
+            ref = tracker.create_issue(
+                IssueDraft(
+                    title=f"用户体验报告：{reason[:80] or '会话体验未达预期'}",
+                    body=(
+                        f"session_id: {entry['session_id']}\n\n"
+                        f"体验评分：{entry.get('score')}\n\n用户说明：{reason}"
+                    ),
+                    labels=[REPORT, "round-1"],
+                )
+            )
             mapping[old] = ref.number
     for entry in index:
-        entry["issue_numbers"] = [mapping[int(n)] for n in entry.get("issue_numbers", []) if int(n) in mapping]
+        entry["issue_numbers"] = [
+            mapping[int(n)] for n in entry.get("issue_numbers", []) if int(n) in mapping
+        ]
         path = sessions / f"{entry['session_id']}.json"
         doc = json.loads(path.read_text(encoding="utf-8"))
         doc["issue_refs"] = [
-            {"number": mapping[int(ref["number"])], "url": f"fake://issues/{mapping[int(ref['number'])]}", "state": "open"}
-            for ref in doc.get("issue_refs", []) if int(ref["number"]) in mapping
+            {
+                "number": mapping[int(ref["number"])],
+                "url": f"fake://issues/{mapping[int(ref['number'])]}",
+                "state": "open",
+            }
+            for ref in doc.get("issue_refs", [])
+            if int(ref["number"]) in mapping
         ]
         path.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
     index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -102,21 +115,38 @@ def main() -> int:
     store = SessionStore(sessions)
     event_path = output / "agent-events.jsonl"
     lock = threading.Lock()
+
     def event(role: str):
         def write(kind: str, text: str) -> None:
             with lock, event_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({"role": role, "kind": kind, "text": text}, ensure_ascii=False) + "\n")
+                handle.write(
+                    json.dumps({"role": role, "kind": kind, "text": text}, ensure_ascii=False)
+                    + "\n"
+                )
+
         return write
 
     common = (tracker, store, str(harness))
     triager = Triager(*common, str(ROOT / "agent_defs/triage_agent"), on_event=event("triager"))
-    pm = Divergent(*common, str(ROOT / "agent_defs/divergent_pm"), on_event=event("pm"), round_provider=lambda: 1)
-    synth = Designer(*common, str(ROOT / "agent_defs/designer"), on_event=event("synthesize"), round_provider=lambda: 1)
+    pm = Divergent(
+        *common,
+        str(ROOT / "agent_defs/divergent_pm"),
+        on_event=event("pm"),
+        round_provider=lambda: 1,
+    )
+    synth = Designer(
+        *common,
+        str(ROOT / "agent_defs/designer"),
+        on_event=event("synthesize"),
+        round_provider=lambda: 1,
+    )
     owner = Owner(*common, str(ROOT / "agent_defs/owner"), on_event=event("owner"))
     run_id = f"spec-0043-offline-{uuid.uuid4().hex}"
+
     def invoke(role: str, operation):
         with bind_usage_context(run_id=run_id, role=role, round_no=1):
             return operation()
+
     with ThreadPoolExecutor(max_workers=2) as pool:
         a = pool.submit(invoke, "triager", triager.triage_once)
         b = pool.submit(invoke, "pm", pm.propose_once)
@@ -127,14 +157,43 @@ def main() -> int:
     for number in range(1, tracker._counter + 1):  # frozen diagnostic snapshot
         item = tracker.issue(number)
         issues.append({"number": number, **item, "plane": plane(item["labels"])})
-    summary = {"model": args.model, "run_id": run_id, "source_sessions": len(index),
-               "derived_report_mapping": mapping, "prompt_sha256": _hashes(),
-               "triage": triage_out.__dict__, "pm": pm_out.__dict__,
-               "synthesize": synth_out.__dict__, "owner": owner_out.__dict__,
-               "usage": default_usage_store().summary(run_id=run_id), "issues": issues,
-               "openagents_started": False, "tracker": "offline-fake"}
-    (output / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({k: summary[k] for k in ("model", "source_sessions", "triage", "pm", "synthesize", "owner", "usage", "openagents_started")}, ensure_ascii=False, indent=2))
+    summary = {
+        "model": args.model,
+        "run_id": run_id,
+        "source_sessions": len(index),
+        "derived_report_mapping": mapping,
+        "prompt_sha256": _hashes(),
+        "triage": triage_out.__dict__,
+        "pm": pm_out.__dict__,
+        "synthesize": synth_out.__dict__,
+        "owner": owner_out.__dict__,
+        "usage": default_usage_store().summary(run_id=run_id),
+        "issues": issues,
+        "openagents_started": False,
+        "tracker": "offline-fake",
+    }
+    (output / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(
+        json.dumps(
+            {
+                k: summary[k]
+                for k in (
+                    "model",
+                    "source_sessions",
+                    "triage",
+                    "pm",
+                    "synthesize",
+                    "owner",
+                    "usage",
+                    "openagents_started",
+                )
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 

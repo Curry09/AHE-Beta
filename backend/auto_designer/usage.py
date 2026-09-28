@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator, Mapping
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -37,6 +37,141 @@ _context: contextvars.ContextVar[UsageContext | None] = contextvars.ContextVar(
     "llm_usage_context", default=None
 )
 _default_run_id = os.environ.get("AUTO_DESIGNER_RUN_ID") or uuid.uuid4().hex
+
+
+@dataclass
+class TimeAccounting:
+    """Separate active execution time from model-provider wait time."""
+
+    enabled: bool
+    started: float
+    _lock: threading.Lock
+    _provider_depth: int = 0
+    _provider_started: float | None = None
+    _provider_wait_seconds: float = 0.0
+    _tool_depth: int = 0
+    _request_starts: dict[str, float] = field(default_factory=dict)
+    _carried_wall_seconds: float = 0.0
+    _carried_active_seconds: float = 0.0
+    _finished: float | None = None
+
+    @classmethod
+    def create(cls, enabled: bool, restored: dict | None = None) -> TimeAccounting:
+        saved = restored or {}
+        return cls(
+            enabled=enabled,
+            started=time.monotonic(),
+            _lock=threading.Lock(),
+            _provider_wait_seconds=float(saved.get("provider_wait_ms", 0)) / 1000,
+            _carried_wall_seconds=float(saved.get("wall_elapsed_ms", 0)) / 1000,
+            _carried_active_seconds=float(saved.get("active_elapsed_ms", 0)) / 1000,
+        )
+
+    def _settle(self, now: float) -> None:
+        if self._provider_started is not None:
+            self._provider_wait_seconds += max(0.0, now - self._provider_started)
+        self._provider_started = now if self._provider_depth and not self._tool_depth else None
+
+    def tool_started(self) -> None:
+        with self._lock:
+            self._tool_depth += 1
+            self._settle(time.monotonic())
+
+    def tool_finished(self) -> None:
+        with self._lock:
+            self._tool_depth = max(0, self._tool_depth - 1)
+            self._settle(time.monotonic())
+
+    def finish(self) -> None:
+        with self._lock:
+            if self._finished is None:
+                self._finished = time.monotonic()
+
+    def request_started(self, call_id: str) -> None:
+        self.provider_started()
+        with self._lock:
+            self._request_starts[call_id] = time.monotonic()
+
+    def request_finished(self, call_id: str) -> None:
+        with self._lock:
+            existed = self._request_starts.pop(call_id, None)
+        if existed is not None:
+            self.provider_finished()
+
+    def provider_started(self) -> None:
+        if not self.enabled:
+            return
+        with self._lock:
+            self._provider_depth += 1
+            self._settle(time.monotonic())
+
+    def provider_finished(self) -> None:
+        if not self.enabled:
+            return
+        with self._lock:
+            if self._provider_depth <= 0:
+                return
+            self._provider_depth -= 1
+            self._settle(time.monotonic())
+
+    def snapshot(self) -> dict[str, object]:
+        with self._lock:
+            now = self._finished if self._finished is not None else time.monotonic()
+            provider = self._provider_wait_seconds
+            if self._provider_started is not None:
+                provider += max(0.0, now - self._provider_started)
+            wall = self._carried_wall_seconds + max(0.0, now - self.started)
+            active = max(self._carried_active_seconds, wall - provider)
+            return {
+                "wall_elapsed_ms": round(wall * 1000, 3),
+                "active_elapsed_ms": round(active * 1000, 3),
+                "provider_wait_ms": round(provider * 1000, 3),
+                "provider_active": self._provider_depth > 0,
+                "provider_only_wait": self._provider_depth > 0 and not self._tool_depth,
+                "oldest_request_ms": round(
+                    max((now - start for start in self._request_starts.values()), default=0) * 1000,
+                    3,
+                ),
+            }
+
+    def active_seconds(self) -> float:
+        return float(self.snapshot()["active_elapsed_ms"] or 0) / 1000
+
+    def wall_seconds(self) -> float:
+        return float(self.snapshot()["wall_elapsed_ms"] or 0) / 1000
+
+
+_time_accounting: contextvars.ContextVar[TimeAccounting | None] = contextvars.ContextVar(
+    "llm_time_accounting", default=None
+)
+
+
+@contextlib.contextmanager
+def bind_time_accounting(
+    *, enabled: bool, restored: dict | None = None
+) -> Iterator[TimeAccounting]:
+    state = TimeAccounting.create(enabled=enabled, restored=restored)
+    token = _time_accounting.set(state)
+    try:
+        yield state
+    finally:
+        _time_accounting.reset(token)
+
+
+def current_time_accounting() -> TimeAccounting | None:
+    return _time_accounting.get()
+
+
+@contextlib.contextmanager
+def provider_wait_scope() -> Iterator[None]:
+    state = current_time_accounting()
+    if state is not None:
+        state.provider_started()
+    try:
+        yield
+    finally:
+        if state is not None:
+            state.provider_finished()
 
 
 @contextlib.contextmanager
@@ -156,24 +291,35 @@ class UsageStore:
 
     def summary(self, **filters: object) -> dict[str, object]:
         events = self.events(**filters)
-        fields = ("input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "total_tokens")
-        totals = {field: sum(e.get(field) or 0 for e in events) for field in fields}
+        fields = (
+            "input_tokens",
+            "output_tokens",
+            "reasoning_tokens",
+            "cached_input_tokens",
+            "total_tokens",
+        )
+        totals = {metric: sum(e.get(metric) or 0 for e in events) for metric in fields}
         unavailable = sum(1 for e in events if e.get("usage_source") == "unavailable")
         groups: dict[str, dict[str, dict[str, int]]] = {
-            "by_role": {}, "by_agent": {}, "by_session": {}, "by_instance": {},
+            "by_role": {},
+            "by_agent": {},
+            "by_session": {},
+            "by_instance": {},
             "by_interaction": {},
         }
         for event in events:
             for group, key in (
-                ("by_role", "role"), ("by_agent", "agent_id"),
-                ("by_session", "session_id"), ("by_instance", "instance_id"),
+                ("by_role", "role"),
+                ("by_agent", "agent_id"),
+                ("by_session", "session_id"),
+                ("by_instance", "instance_id"),
                 ("by_interaction", "interaction_id"),
             ):
                 name = str(event.get(key) or "unknown")
                 bucket = groups[group].setdefault(
                     name,
                     {
-                        **{field: 0 for field in fields},
+                        **{metric: 0 for metric in fields},
                         "event_count": 0,
                         "unavailable_count": 0,
                     },
@@ -181,21 +327,31 @@ class UsageStore:
                 bucket["event_count"] += 1
                 if event.get("usage_source") == "unavailable":
                     bucket["unavailable_count"] += 1
-                for field in fields:
-                    bucket[field] += event.get(field) or 0
+                for metric in fields:
+                    bucket[metric] += event.get(metric) or 0
         return {"event_count": len(events), "unavailable_count": unavailable, **totals, **groups}
 
 
 def default_usage_store() -> UsageStore:
     configured = os.environ.get("AUTO_DESIGNER_USAGE_PATH", "").strip()
-    path = Path(configured) if configured else Path(__file__).resolve().parents[1] / "data" / "usage.jsonl"
+    path = (
+        Path(configured)
+        if configured
+        else Path(__file__).resolve().parents[1] / "data" / "usage.jsonl"
+    )
     return UsageStore(path)
 
 
 def record_usage(
-    *, usage: object = None, provider: str | None = None, model: str | None = None,
-    latency_ms: float | None = None, success: bool = True, error: object = None,
-    request_id: str | None = None, operation: str | None = None,
+    *,
+    usage: object = None,
+    provider: str | None = None,
+    model: str | None = None,
+    latency_ms: float | None = None,
+    success: bool = True,
+    error: object = None,
+    request_id: str | None = None,
+    operation: str | None = None,
 ) -> None:
     try:
         ctx = current_usage_context()
@@ -214,6 +370,9 @@ def record_usage(
             "request_id": request_id,
             "usage_source": "reported" if available else "unavailable",
         }
+        accounting = current_time_accounting()
+        if accounting is not None and accounting.enabled:
+            event["time_accounting"] = accounting.snapshot()
         default_usage_store().append(event)
     except Exception:
         pass
