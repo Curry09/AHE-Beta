@@ -326,12 +326,14 @@ class Orchestrator:
         # 闸成功后的 origin/main = 本轮 sealed SHA（空等待集时可能仍是 user SHA）。
         return self._resolve_head(ref=self._initial_ref)
 
-    def run(self, n_rounds: int) -> list[str]:
+    def run(self, n_rounds: int, *, start_round: int = 1) -> list[str]:
         if n_rounds <= 0:
             raise ValueError(f"n_rounds 须为正：{n_rounds}")
+        if not 1 <= start_round <= n_rounds:
+            raise ValueError(f"start_round 必须在 1..{n_rounds} 内：{start_round}")
         refs: list[str] = []
         ref = self._initial_ref  # 起始游标 = main 分支名；首轮 run_round 即解析其 HEAD SHA
-        for i in range(n_rounds):
+        for i in range(start_round - 1, n_rounds):
             is_last = i == n_rounds - 1
             with bind_usage_context(round_no=i + 1):
                 if self._on_round_start is not None:

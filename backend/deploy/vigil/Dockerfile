@@ -6,7 +6,7 @@
 FROM python:3.12-bookworm
 
 ARG PIP_INDEX_URL
-ARG CLAUDE_CODE_VERSION=2.1.235
+ARG CLAUDE_CODE_VERSION=2.1.261
 
 # 本地 checkout 以非隔离模式构建，避免 pip 为每个项目反复创建并联网填充
 # 临时构建环境。构建后端来自两个 pyproject.toml：OpenAgents=hatchling，

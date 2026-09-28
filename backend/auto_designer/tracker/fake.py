@@ -137,6 +137,9 @@ class FakeTracker:
             "comments": list(snapshot["comments"]),
         }
 
+    def get_issue(self, *, number: int) -> dict[str, Any]:
+        return self.issue(number)
+
     def labels(self) -> set[str]:
         """只读：当前标签集副本。"""
         return set(self._labels)

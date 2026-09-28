@@ -43,6 +43,7 @@ MERGED = "merged"  # 被 Designer 的 covers 吸收后合并关闭（merged-into
 FROM_TRIAGE = "from-triage"
 FROM_SYNTHESIZE = "from-synthesize"
 FROM_DIVERGENT = "from-divergent"
+OBSERVATION_GAP = "observation-gap"
 
 # ---- 旧工作流标签（Spec-0025/0028 写侧已退役；保留常量供读侧映射旧数据，见 plane()）----
 NEEDS_TRIAGE = "needs-triage"  # 旧：用户 sim 新产、待 triage → 映射 report
@@ -101,6 +102,28 @@ def filter_current_round(items, *, round_no: int | None):
     if not any(round_of(item.labels) is not None for item in values):
         return values
     return [item for item in values if round_of(item.labels) == round_no]
+
+
+def filter_designer_round(items, *, round_no: int | None):
+    """Include pending diagnostic proposals even when their creator omitted a round label.
+
+    A gap from an earlier round still needs design.  A future-labelled issue must
+    not enter the current round.  Callers exclude the independent PM route first.
+    """
+    values = list(items)
+    selected = filter_current_round(values, round_no=round_no)
+    seen = {item.number for item in selected}
+    for item in values:
+        issue_round = round_of(item.labels)
+        if (
+            item.number not in seen
+            and OBSERVATION_GAP in item.labels
+            and plane(item.labels) == PROPOSAL
+            and (round_no is None or issue_round is None or issue_round <= round_no)
+        ):
+            selected.append(item)
+            seen.add(item.number)
+    return selected
 
 
 def priority_of(labels: list[str]) -> str | None:

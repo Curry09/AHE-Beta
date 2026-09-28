@@ -641,6 +641,8 @@ def _execution_environment(
             "DESIGNER_LLM_MODEL": str(models["designer"]),
             "ANTHROPIC_MODEL": str(models["delivery"]),
             "ANTHROPIC_SMALL_FAST_MODEL": str(models["delivery"]),
+            "CLAUDE_CODE_SUBAGENT_MODEL": str(models["delivery"]),
+            "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1",
             "ANTHROPIC_DEFAULT_HAIKU_MODEL": str(models["delivery"]),
             "ANTHROPIC_DEFAULT_SONNET_MODEL": str(models["delivery"]),
             "ANTHROPIC_DEFAULT_OPUS_MODEL": str(models["delivery"]),

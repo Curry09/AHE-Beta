@@ -54,6 +54,30 @@ PERSONA_IDS = [
 ]
 
 
+def _start_round(*, run_mode: str, replay_start: int | None, recovery) -> int:
+    """Resume a replay from its frozen/current round, never from round one."""
+    if run_mode == "replay":
+        return replay_start or 1
+    if run_mode == "resume" and replay_start is not None:
+        if recovery is None:
+            raise RuntimeError("replay resume requires a recovery ledger")
+        return max(replay_start, int(recovery.snapshot()["round"]))
+    return 1
+
+
+def _replay_start(*, run_mode: str, explicit: str, manifest_path: str) -> int | None:
+    """Use the frozen replay manifest when a resumed launcher omits its env."""
+    frozen = None
+    if run_mode == "resume" and manifest_path:
+        replay = json.loads(Path(manifest_path).read_text(encoding="utf-8")).get("replay")
+        if replay:
+            frozen = int(replay["start_round"])
+    requested = int(explicit) if explicit else None
+    if requested is not None and frozen is not None and requested != frozen:
+        raise RuntimeError("replay start round conflicts with frozen manifest")
+    return requested if requested is not None else frozen
+
+
 def _load_persona_ids(*, path: Path | None, fallback: list[str]) -> list[str]:
     """Load the frozen persona roster used by an auditable experiment."""
     if path is None:
@@ -323,6 +347,11 @@ def main() -> int:
         if not val:
             raise SystemExit(f"backend/.env 缺 HARNESS_LLM_{suffix}")
         os.environ[f"LLM_{suffix}"] = val
+    reasoning_effort = os.environ.get("HARNESS_LLM_REASONING_EFFORT", "").strip()
+    if reasoning_effort:
+        os.environ["LLM_REASONING_EFFORT"] = reasoning_effort
+    else:
+        os.environ.pop("LLM_REASONING_EFFORT", None)
     gitea_path = Path(
         os.environ.get("AUTO_DESIGNER_GITEA_ENV_FILE", "").strip()
         or str(ROOT / "deploy" / "gitea" / ".env")
@@ -397,7 +426,7 @@ def main() -> int:
     run_mode = run_mod.experiment_run_mode()
     role_runs = run_mod.install_role_runs(data_root=run_mod.DATA)
     recovery = run_mod.load_recovery_store(mode=run_mode)
-    if run_mode == "fresh":
+    if run_mode in {"fresh", "replay"}:
         init_manifest(
             roster=roster,
             models={
@@ -408,7 +437,7 @@ def main() -> int:
             },
         )
     print(f"⓪.6 实验切片 ROLE_RUNS_DIR={role_runs}")
-    if run_mode == "fresh":
+    if run_mode in {"fresh", "replay"}:
         print("① fresh：种 harness 本地仓 ...")
         repo = run_mod._seed_harness_repo()
     else:
@@ -422,6 +451,21 @@ def main() -> int:
     run_mod._set_gitea_remote(repo, gitea)
     if run_mode == "fresh":
         run_mod._reset_to_initial(repo, tracker)
+    elif run_mode == "replay":
+        source_url = os.environ.get("AUTO_DESIGNER_REPLAY_SOURCE_URL", "").strip()
+        base_ref = os.environ.get("AUTO_DESIGNER_REPLAY_BASE_REF", "").strip()
+        if not source_url or not base_ref:
+            raise SystemExit("replay requires AUTO_DESIGNER_REPLAY_SOURCE_URL and AUTO_DESIGNER_REPLAY_BASE_REF")
+        subprocess.run(["git", "remote", "remove", "replay-source"], cwd=repo, check=False)
+        subprocess.run(["git", "remote", "add", "replay-source", source_url], cwd=repo, check=True)
+        fetch = subprocess.run(
+            ["git", "fetch", "--no-tags", "replay-source", base_ref],
+            cwd=repo, text=True, capture_output=True,
+        )
+        if fetch.returncode != 0:
+            raise SystemExit(f"replay source fetch failed: {fetch.stderr[-1000:]}")
+        subprocess.run(["git", "reset", "--hard", "FETCH_HEAD"], cwd=repo, check=True)
+        subprocess.run(["git", "push", "--force", "origin", "HEAD:main"], cwd=repo, check=True)
     if run_mode == "resume" and recovery is not None:
         from auto_designer.loop.live import prepare_live_resume
 
@@ -453,6 +497,10 @@ def main() -> int:
         print(f"\n==== round {k}/{run_mod.TOTAL_ROUNDS} ====")
 
     def on_round_end(k: int, sha: str) -> None:
+        restore_after = os.environ.get("ROUND_DELIVERY_TIMEOUT_RESTORE_AFTER_ROUND", "").strip()
+        if restore_after == str(k):
+            os.environ.pop("ROUND_DELIVERY_TIMEOUT_SEC", None)
+            os.environ.pop("ROUND_DELIVERY_TIMEOUT_RESTORE_AFTER_ROUND", None)
         round_shas[str(k)] = sha
         append_round(round_no=k, user_sha=None, sealed_sha=sha)
         update_live_run(
@@ -711,10 +759,19 @@ def main() -> int:
     )
     refs: list[str] = []
     try:
-        refs = orch.run(run_mod.TOTAL_ROUNDS)
+        replay_start = _replay_start(
+            run_mode=run_mode,
+            explicit=os.environ.get("AUTO_DESIGNER_REPLAY_START_ROUND", "").strip(),
+            manifest_path=os.environ.get("MIXED_TASK_MANIFEST", "").strip(),
+        )
+        start_round = _start_round(run_mode=run_mode, replay_start=replay_start, recovery=recovery)
+        refs = orch.run(run_mod.TOTAL_ROUNDS, start_round=start_round)
     except RoundDeliveryBlocked as exc:
         if vigil is not None:
-            vigil.keep_alive = True
+            # A recoverable experiment has already stopped its controller.  Keeping
+            # subprocess Vigil alive here leaves billable coding agents running
+            # without a round gate; the next resume will reclaim queued work.
+            vigil.keep_alive = recovery is None
         update_live_run(
             data_dir=run_mod.DATA,
             running=False,

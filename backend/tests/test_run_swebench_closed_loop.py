@@ -132,3 +132,29 @@ def test_shared_recovery_loader_reuses_identity_and_rejects_missing_state(
     snapshot.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(Exception, match="identity changed"):
         module.run_mod.load_recovery_store(mode="resume")
+
+
+def test_replay_resume_starts_from_frozen_or_current_round() -> None:
+    module = _module()
+
+    class Recovery:
+        def __init__(self, round_no):
+            self.round_no = round_no
+
+        def snapshot(self):
+            return {"round": self.round_no}
+
+    assert module._start_round(run_mode="replay", replay_start=3, recovery=None) == 3
+    assert module._start_round(run_mode="resume", replay_start=3, recovery=Recovery(3)) == 3
+    assert module._start_round(run_mode="resume", replay_start=3, recovery=Recovery(4)) == 4
+    assert module._start_round(run_mode="resume", replay_start=None, recovery=Recovery(3)) == 1
+
+
+def test_replay_resume_reads_frozen_start_when_launcher_omits_it(tmp_path) -> None:
+    module = _module()
+    manifest = tmp_path / "mixed.json"
+    manifest.write_text('{"replay":{"start_round":3}}', encoding="utf-8")
+    assert module._replay_start(run_mode="resume", explicit="", manifest_path=str(manifest)) == 3
+    assert module._replay_start(run_mode="resume", explicit="3", manifest_path=str(manifest)) == 3
+    with pytest.raises(RuntimeError, match="conflicts"):
+        module._replay_start(run_mode="resume", explicit="1", manifest_path=str(manifest))

@@ -14,6 +14,7 @@ harness 是通用编码助手。具体任务、外部项目和专有参数只能
 
 - 原始报告：提供用户视角的症状和上下文，不直接作为提案标题或正文。
 - 只读 harness 源码：使用 `search_file_content` 后按需 `read_file`，定位相关行为、编排或配置边界。
+- `.openagents`、`.ruff_cache`、`.pytest_cache`、`.mypy_cache` 是运行态或缓存，不是 harness 源码；不要列目录、搜索或读取其中的文件。
 - 会话证据：使用 `get_session_timeline`、`get_harness_beat`、`get_harness_step`，或通过普通文件工具
   从本次观测入口查日志及其阅读说明。仅在存在具体证据缺口时下钻，不直接读取 sessions 原始库，
   不复制大段日志。内部日志可以解释当前报告的事实；内部记录不等于用户看见的活动。

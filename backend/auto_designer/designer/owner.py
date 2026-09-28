@@ -3,7 +3,8 @@
 
 生成器（triage/synthesize/divergent）负责问题诊断、产品发现和结构设计；Owner 不重新判断根因、
 不选择 prompt/runtime 等实现层，也不以交付风险为由压缩目标。模型协调 PM/结构路线的交付重叠，
-补充 handoff 摘要、需保留的能力和独立验收分组。未被模型列出的提案默认直接交接，避免遗漏成为隐性否决。
+补充 handoff 摘要、需保留的能力和独立验收分组。恢复日志先限定机械准入集合；
+集合内未被模型列出的提案默认直接交接，避免遗漏成为隐性否决。
 
 路由动作：
 - admit → 加 `openagents` 交付面交接令牌；
@@ -102,7 +103,7 @@ class Owner:
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
         self._on_event = on_event
-        # review=False = 纯机械交接：不调用模型，全部 proposal 直接交给 OpenAgents。
+        # review=False = 纯机械交接：不调用模型，交接恢复日志确认已设计的 proposal。
         self._review = review
         self._recovery = recovery
 
@@ -111,8 +112,6 @@ class Owner:
         self._recovery = recovery
 
     def admit_once(self) -> AdmitOutcome:
-        from auto_designer.observations.delivery_gaps import ingest_delivery_gaps
-
         recovery_key = self._recovery_key()
         recovery_unit = (
             self._recovery.unit(round_no=self._round_no(), stage="owner", key=recovery_key)
@@ -124,10 +123,12 @@ class Owner:
             backlog = [OpenIssue.from_dict(item) for item in frozen["backlog"]]
             trend = [tuple(item) for item in frozen["trend"]]
         else:
-            ingest_delivery_gaps(store=self._store, tracker=self._tracker)
             backlog = self._tracker.list_open_issues()
             trend = self._feeling_trend()
         proposals = [i for i in backlog if plane(i.labels) == PROPOSAL]
+        if self._recovery is not None:
+            eligible = self._designed_proposal_ids()
+            proposals = [i for i in proposals if i.number in eligible]
         ready = [i for i in backlog if plane(i.labels) == READY]
         if self._recovery is not None:
             recovery_unit = self._recovery.begin_unit(
@@ -186,7 +187,7 @@ class Owner:
                     key=recovery_key,
                     output={"decisions": decisions},
                 )
-        # review=False 或 agent 未列出某项：该项在 pass 2 默认直接交接。
+        # review=False 或 agent 未列出某项：准入集合内的该项在 pass 2 默认直接交接。
 
         reviewable = {i.number for i in review_needed}
         visible_routing = reviewable | {i.number for i in ready}
@@ -332,6 +333,37 @@ class Owner:
                 observed_postconditions=observed,
             )
         return outcome
+
+    def _designed_proposal_ids(self) -> set[int]:
+        """Admit PM output, Designer output, and sources Designer saw but retained.
+
+        The recovery ledger is the authority for what Designer actually saw.  A
+        diagnostic request arriving after its snapshot remains pending for the
+        next design stage, regardless of its labels.
+        """
+        round_state = self._recovery.round_state(round_no=self._round_no()) or {}
+        stages = round_state.get("stages") or {}
+        if (stages.get("designer") or {}).get("status") != "completed":
+            raise RecoveryConflictError("owner requires a completed designer stage")
+
+        pm: set[int] = set()
+        for unit in ((stages.get("divergent") or {}).get("units") or {}).values():
+            if unit.get("status") == "completed":
+                pm.update((unit.get("observed_postconditions") or {}).get("proposal_numbers") or [])
+
+        seen: set[int] = set()
+        merged: set[int] = set()
+        synthesized: set[int] = set()
+        for unit in (stages["designer"].get("units") or {}).values():
+            if unit.get("status") != "completed":
+                continue
+            frozen = unit.get("input") or {}
+            issues = frozen.get("issues") or frozen.get("backlog") or []
+            seen.update(int(item["number"]) for item in issues)
+            observed = unit.get("observed_postconditions") or {}
+            merged.update(observed.get("merged_numbers") or [])
+            synthesized.update(observed.get("proposal_numbers") or [])
+        return pm | synthesized | (seen - merged)
 
     def _round_no(self) -> int:
         value = current_usage_context().round_no

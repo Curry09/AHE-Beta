@@ -86,7 +86,7 @@ def _submit(decisions: list) -> str:
     return json.dumps({"decisions": decisions}, ensure_ascii=False)
 
 
-def _owner_recovery(tmp_path: Path) -> RecoveryStore:
+def _owner_recovery(tmp_path: Path, *, designer_proposals: list[int] | None = None) -> RecoveryStore:
     store = RecoveryStore.initialize(
         root=tmp_path / "recovery",
         identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
@@ -101,7 +101,15 @@ def _owner_recovery(tmp_path: Path) -> RecoveryStore:
             input_value={},
             expected_postconditions={"completed": True},
         )
-        store.complete_unit(round_no=1, stage=stage, key=key)
+        store.complete_unit(
+            round_no=1,
+            stage=stage,
+            key=key,
+            observed_postconditions={
+                "completed": True,
+                **({"proposal_numbers": designer_proposals} if stage == "designer" else {}),
+            },
+        )
         store.complete_stage(round_no=1, stage=stage)
     return store
 
@@ -365,6 +373,58 @@ def test_review_disabled_mechanically_handoffs_every_proposal(tmp_path: Path) ->
     assert o.agent_calls == 0
 
 
+def test_recovery_owner_only_admits_pm_and_designer_processed_proposals(tmp_path: Path) -> None:
+    tracker = FakeTracker()
+
+    def create(title: str, labels: list[str]) -> int:
+        return tracker.create_issue(IssueDraft(title=title, body="summary", labels=labels)).number
+
+    pm = create("PM", [sc.PROPOSAL, sc.FROM_DIVERGENT])
+    synthesized = create("Designer", [sc.PROPOSAL, sc.FROM_SYNTHESIZE])
+    triage = create("retained triage", [sc.PROPOSAL, sc.FROM_TRIAGE, "round-1"])
+    gap = create("retained gap", [sc.PROPOSAL, sc.OBSERVATION_GAP])
+    merged = create("merged source", [sc.PROPOSAL, sc.FROM_TRIAGE, "round-1"])
+    late_gap = create("late gap", [sc.PROPOSAL, sc.OBSERVATION_GAP])
+    stray = create("unseen triage", [sc.PROPOSAL, sc.FROM_TRIAGE, "round-1"])
+    recovery = RecoveryStore.initialize(
+        root=tmp_path / "recovery",
+        identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
+    )
+    recovery.freeze_round(round_no=1, user_sha="user", plan=[])
+    pm_key = operation_key("pm", "output")
+    recovery.begin_unit(round_no=1, stage="divergent", key=pm_key, input_value={})
+    recovery.complete_unit(
+        round_no=1,
+        stage="divergent",
+        key=pm_key,
+        observed_postconditions={"proposal_numbers": [pm]},
+    )
+    recovery.complete_stage(round_no=1, stage="divergent")
+    designer_key = operation_key("designer", "grouping")
+    seen = [i.to_dict() for i in tracker.list_open_issues() if i.number in {triage, gap, merged}]
+    recovery.begin_unit(
+        round_no=1, stage="designer", key=designer_key, input_value={"issues": seen}
+    )
+    recovery.complete_unit(round_no=1, stage="designer", key=designer_key)
+    worker_key = operation_key("designer", "batch")
+    recovery.begin_unit(round_no=1, stage="designer", key=worker_key, input_value={})
+    recovery.complete_unit(
+        round_no=1,
+        stage="designer",
+        key=worker_key,
+        observed_postconditions={"merged_numbers": [merged], "proposal_numbers": [synthesized]},
+    )
+    recovery.complete_stage(round_no=1, stage="designer")
+
+    owner = _owner(tmp_path, tracker, _submit([]), review=False, recovery=recovery)
+    with bind_usage_context(round_no=1, operation="owner-stage"):
+        outcome = owner.admit_once()
+    assert set(outcome.admitted) == {pm, synthesized, triage, gap}
+    assert owner.agent_calls == 0
+    for number in (merged, late_gap, stray):
+        assert sc.PROPOSAL in tracker.issue(number)["labels"]
+
+
 def test_review_prompt_is_handoff_only(tmp_path: Path) -> None:
     tracker = FakeTracker()
     p = _triage_proposal(tracker, "某具体任务中的失败")
@@ -423,7 +483,7 @@ def test_recovery_replays_owner_decisions_after_partial_admission(tmp_path: Path
         tmp_path,
         tracker,
         _submit([{"issue": proposal, "decision": "admit"}]),
-        recovery=_owner_recovery(tmp_path),
+        recovery=_owner_recovery(tmp_path, designer_proposals=[proposal]),
     )
     with bind_usage_context(round_no=1, operation="owner-stage"):
         with pytest.raises(RecoveryConflictError, match="remain incomplete"):

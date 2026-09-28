@@ -15,9 +15,10 @@ from auto_designer.designer.designer import Designer, DesignOutcome
 from auto_designer.designer.issue_schema import (
     DIVERGENT,
     FROM_DIVERGENT,
+    OBSERVATION_GAP,
     PROPOSAL,
     READY,
-    filter_current_round,
+    filter_designer_round,
     plane,
 )
 from auto_designer.designer.proposal_view import normalized_proposal_body
@@ -80,15 +81,19 @@ def classify_once(cards: list[dict]) -> dict:
             max_retries=0,
         ) as client:
             with provider_wait_scope():
-                response = client.chat.completions.create(
-                    model=model,
-                    temperature=0,
-                    max_tokens=GROUPING_MAX_TOKENS,
-                    messages=[
+                request = {
+                    "model": model,
+                    "temperature": 0,
+                    "max_tokens": GROUPING_MAX_TOKENS,
+                    "messages": [
                         {"role": "system", "content": GROUPING_PROMPT},
                         {"role": "user", "content": json.dumps(cards, ensure_ascii=False)},
                     ],
-                )
+                }
+                reasoning_effort = os.environ.get("DESIGNER_LLM_REASONING_EFFORT", "").strip()
+                if reasoning_effort:
+                    request["reasoning_effort"] = reasoning_effort
+                response = client.chat.completions.create(**request)
     except Exception as error:
         record_usage(
             provider="openai",
@@ -135,6 +140,8 @@ def _save(path: Path, value: dict) -> None:
 
 
 class _BatchTracker:
+    designer_batch_scope = True
+
     def __init__(self, tracker, numbers: set[int]):
         self.tracker = tracker
         self.numbers = numbers
@@ -203,12 +210,18 @@ class GroupedDesigner:
             issues = [OpenIssue.from_dict(item) for item in frozen["issues"]]
             cards = [dict(item) for item in frozen["cards"]]
         else:
-            issues = filter_current_round(
+            from auto_designer.observations.delivery_gaps import ingest_delivery_gaps
+
+            ingest_delivery_gaps(store=self.designers[0]._store, tracker=self.tracker)
+            issues = filter_designer_round(
                 (
                     item
                     for item in self.tracker.list_open_issues()
                     if plane(item.labels) in (PROPOSAL, READY)
-                    and not {DIVERGENT, FROM_DIVERGENT}.intersection(item.labels)
+                    and (
+                        OBSERVATION_GAP in item.labels
+                        or not {DIVERGENT, FROM_DIVERGENT}.intersection(item.labels)
+                    )
                 ),
                 round_no=round_no,
             )

@@ -27,6 +27,8 @@ from typing import Any
 
 from nexau.archs.main_sub.execution.hooks import Middleware, ToolCallParams
 
+from auto_designer.usage import current_usage_context
+
 logger = logging.getLogger(__name__)
 
 # 各文件工具里"路径参数"的键名（值可为 str 或 list[str]）；其余参数（old_string/new_string/pattern
@@ -45,6 +47,7 @@ _PATH_PARAMS: dict[str, tuple[str, ...]] = {
 # 写工具：只允许 harness 仓；读工具额外放行 NexAU 源码 + 运行时临时目录。
 _WRITE_TOOLS: frozenset[str] = frozenset({"write_file", "replace", "multiedit_tool"})
 _SHELL_TOOL = "run_shell_command"
+_TRIAGE_RUNTIME_DIRS = frozenset({".openagents", ".ruff_cache", ".pytest_cache", ".mypy_cache"})
 
 # trace 目录名兜底正则：harness_runs 唯一、绝不该出现在 harness 仓内的命令里；sessions 仅当经 `../`
 # 或绝对路径以「路径段」形式出现才算（`grep sessions foo` 这种把 sessions 当搜索词的不误伤）。
@@ -235,6 +238,13 @@ class WorkspaceJailMiddleware(Middleware):
 
         tool = params.tool_name
         if tool in _PATH_PARAMS:
+            if current_usage_context().role == "triager":
+                for raw in _iter_path_values(tool, params.parameters):
+                    path = _resolve_against(work_dir, raw)
+                    if path is not None and path.is_relative_to(work_dir):
+                        parts = path.relative_to(work_dir).parts
+                        if any(part in _TRIAGE_RUNTIME_DIRS for part in parts):
+                            return self._deny(f"triage 运行时目录 {raw!r}")
             roots = [work_dir] if tool in _WRITE_TOOLS else read_roots
             for raw in _iter_path_values(tool, params.parameters):
                 if _escapes_roots(work_dir, roots, raw):

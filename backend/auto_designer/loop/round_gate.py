@@ -16,7 +16,7 @@ NEEDS_HUMAN = "needs-human"
 AUTOMATION_FAILED = "automation-failed"
 # Spec-0062/T1: current and legacy terminal failures outrank even a closed issue.
 _FAILURE_LABELS = frozenset({AUTOMATION_FAILED, NEEDS_HUMAN})
-_DEFAULT_TIMEOUT_SEC = 14400.0
+_DEFAULT_TIMEOUT_SEC = 86400.0
 _DEFAULT_POLL_SEC = 15.0
 
 _STATUS_DONE = "done"

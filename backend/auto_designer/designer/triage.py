@@ -8,9 +8,12 @@ proposal，并把原始报告保存在审计评论中；reject 与 needs_info �
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import requests
 
 from auto_designer.designer.agent_runtime import norm_label, read_submit, run_agent_def
 from auto_designer.designer.evidence_contract import build_evidence_envelope, project_for_role
@@ -45,10 +48,15 @@ from auto_designer.designer.issue_schema import (
 from auto_designer.designer.role_contract import validate_triage
 from auto_designer.loop.recovery import RecoveryConflictError, RecoveryStore, operation_key
 from auto_designer.tracker.base import IssueTracker
+from auto_designer.tracker.gitea import GiteaError, IssueMigrationError
 from auto_designer.usage import bind_usage_context, current_usage_context
 from auto_designer.user.session_store import SessionStore
 
 _TRIAGE_TIMEOUT = 900
+# Leave room below the observed Gitea title boundary for UTF-8 and server
+# normalization.  The full model title remains in the immutable triage receipt.
+_PROPOSAL_TITLE_MAX_BYTES = 240
+_TRACKER_APPLY_ATTEMPTS = 3
 # 工作流标签（平面/终态/provenance/旧工作流/优先级）——重打标签时一并剔除，只保留 round-* 等属性。
 _WORKFLOW_LABELS = frozenset(
     {
@@ -99,10 +107,36 @@ def _proposal_labels(current: list[str], kind: str, priority: str | None) -> lis
     return list(dict.fromkeys(out))
 
 
+def _proposal_title(value: str) -> str:
+    """Return a deterministic UTF-8-safe title that Gitea can round-trip."""
+    title = value.strip()
+    if len(title.encode("utf-8")) <= _PROPOSAL_TITLE_MAX_BYTES:
+        return title
+    limit = _PROPOSAL_TITLE_MAX_BYTES - len("…".encode("utf-8"))
+    chars: list[str] = []
+    size = 0
+    for char in title:
+        width = len(char.encode("utf-8"))
+        if size + width > limit:
+            break
+        chars.append(char)
+        size += width
+    return "".join(chars).rstrip() + "…"
+
+
 def _declined_labels(current: list[str]) -> list[str]:
     """reject/needs_info：保留 type + round-* 等，去平面标签，加 declined 终态。"""
     keep = [x for x in current if x not in (REPORT, NEEDS_TRIAGE, PROPOSAL, TRIAGED)]
     return list(dict.fromkeys([*keep, DECLINED]))
+
+
+def _retryable_tracker_error(exc: Exception) -> bool:
+    """Only transient transport/server errors qualify for replay of a saved output."""
+    if isinstance(exc, IssueMigrationError):
+        return isinstance(exc.primary, Exception) and _retryable_tracker_error(exc.primary)
+    return isinstance(exc, (requests.ConnectionError, requests.Timeout)) or (
+        isinstance(exc, GiteaError) and exc.status in {408, 429, 500, 502, 503, 504}
+    )
 
 
 def _fields_by_label_to_key(kind: str, fields: dict) -> dict:
@@ -233,6 +267,25 @@ class Triager:
                 if target_number != issue.number:
                     continue
                 violations = validate_triage(d, report_number=issue.number)
+                if len(violations) == 1 and violations[0].code == "out-of-product-scope":
+                    # A model can recognize a real user problem while being
+                    # unable to establish that the fix belongs in this product.
+                    # Preserve that finding without publishing a proposal or
+                    # leaving the whole recovery stage failed forever.
+                    target = d["artifact"].get("implementation_target")
+                    d = dict(d)
+                    d["disposition"] = "reject" if target == "outside_harness" else "needs_info"
+                    boundary = (
+                        "实施目标在 harness 范围外"
+                        if target == "outside_harness"
+                        else "尚不能确认实施目标属于 harness"
+                    )
+                    d["reason"] = (
+                        f"{boundary}（原分诊为 accept，implementation_target={target!r}）。"
+                        f"{str(d.get('reason') or '').strip()}"
+                    )
+                    outcome.warnings.setdefault(issue.number, []).append("out-of-product-scope-normalized")
+                    violations = validate_triage(d, report_number=issue.number)
                 if violations:
                     outcome.warnings.setdefault(issue.number, []).extend(v.code for v in violations)
                     outcome.failed[issue.number] = ",".join(v.code for v in violations)
@@ -260,7 +313,7 @@ class Triager:
             for d in valid_dispositions:
                 try:
                     outcome.artifacts[issue.number] = dict(d)
-                    self._apply(
+                    self._apply_with_retry(
                         d,
                         by_number={issue.number: issue},
                         outcome=outcome,
@@ -289,6 +342,31 @@ class Triager:
         if self._recovery is not None and outcome.failed:
             raise RecoveryConflictError(f"triage items remain incomplete: {sorted(outcome.failed)}")
         return outcome
+
+    def _apply_with_retry(
+        self, d: dict, *, by_number: dict, outcome: TriageOutcome,
+        operation_prefix: str | None,
+    ) -> None:
+        # The output receipt is durable before this point.  Do not retry a
+        # write without one: its model decision and intended post-state would
+        # otherwise be unavailable after a process crash.
+        attempts = _TRACKER_APPLY_ATTEMPTS if operation_prefix is not None else 1
+        for attempt in range(attempts):
+            try:
+                self._apply(
+                    d, by_number=by_number, outcome=outcome,
+                    operation_prefix=operation_prefix,
+                )
+                if attempt:
+                    outcome.warnings.setdefault(int(d["issue"]), []).append("tracker-write-retried")
+                return
+            except Exception as exc:
+                if attempt + 1 == attempts or not _retryable_tracker_error(exc):
+                    raise
+                # _apply checks live state before its next mutation.  A lost
+                # response can mean the write succeeded; the next attempt must
+                # reconcile rather than blindly repeat it.
+                time.sleep(0.5 * (2 ** attempt))
 
     def _round_no(self) -> int:
         round_no = current_usage_context().round_no
@@ -416,7 +494,8 @@ class Triager:
                 )
                 return
             fields = _fields_by_label_to_key(kind, d.get("fields") or {})
-            proposal_title = str(d.get("proposal_title", "")).strip()
+            model_title = str(d.get("proposal_title", "")).strip()
+            proposal_title = _proposal_title(model_title)
             if not proposal_title:
                 self._decline(
                     issue,
@@ -439,6 +518,16 @@ class Triager:
             priority = str(d.get("priority", "")).strip().upper()  # 建议值；Owner 准入时可改
             body = schema_render(kind=kind, fields=fields, section="triage")
             evidence = self._evidence_for_issue(issue)
+            proposal_body = _proposal_body(normalized=body, evidence=evidence)
+            proposal_labels = _proposal_labels(list(issue.labels), kind, priority)
+            already_applied = False
+            if operation_prefix is not None:
+                already_applied = self._check_recovery_issue(
+                    issue=issue, model_title=model_title, proposal_title=proposal_title,
+                    proposal_body=proposal_body, proposal_labels=proposal_labels,
+                )
+            if proposal_title != model_title:
+                outcome.warnings.setdefault(num, []).append("proposal-title-shortened")
             # 原始证据先归档；核心 title/body/labels 由 tracker 单次更新，避免半迁移 proposal。
             if not self._safe_comment(
                 num,
@@ -449,15 +538,13 @@ class Triager:
                 ),
             ):
                 outcome.warnings.setdefault(num, []).append("原始报告审计评论写入失败")
-            self._tracker.update_issue(
-                num,
-                title=proposal_title,
-                body=_proposal_body(
-                    normalized=body,
-                    evidence=evidence,
-                ),
-                labels=_proposal_labels(list(issue.labels), kind, priority),
-            )
+            if not already_applied:
+                self._tracker.update_issue(
+                    num,
+                    title=proposal_title,
+                    body=proposal_body,
+                    labels=proposal_labels,
+                )
             outcome.accepted.append(num)
 
         elif disp == "reject":
@@ -478,6 +565,42 @@ class Triager:
             )
         # 未知 disposition：忽略（票仍在 report 平面，下轮再分诊）
 
+    def _check_recovery_issue(
+        self, *, issue, model_title: str, proposal_title: str,
+        proposal_body: str, proposal_labels: list[str],
+    ) -> bool:
+        """Return whether this output is already applied; reject unrelated edits."""
+        read = getattr(self._tracker, "get_issue", None)
+        if not callable(read):
+            return False
+        live = read(number=issue.number)
+        if live.get("state") != "open":
+            raise RecoveryConflictError(f"triage issue #{issue.number} state changed")
+        labels = set(live.get("labels") or [])
+        original = (
+            live.get("title") == issue.title
+            and live.get("body") == issue.body
+            and labels == set(issue.labels)
+        )
+        partial_title = str(live.get("title") or "")
+        title_from_this_output = (
+            partial_title in {model_title, proposal_title}
+            or (partial_title.endswith("…") and model_title.startswith(partial_title[:-1]))
+        )
+        partial = (
+            live.get("body") == proposal_body
+            and labels in (set(issue.labels), set(proposal_labels))
+            and title_from_this_output
+        )
+        applied = (
+            partial_title == proposal_title
+            and live.get("body") == proposal_body
+            and labels == set(proposal_labels)
+        )
+        if not (original or partial):
+            raise RecoveryConflictError(f"triage issue #{issue.number} changed outside this migration")
+        return applied
+
     def _decline(
         self,
         issue,
@@ -488,11 +611,12 @@ class Triager:
         operation_prefix: str | None = None,
     ) -> None:
         """declined 终态 + 写原因 + 关闭。"""
-        self._tracker.transition_issue(
-            issue.number,
-            state="closed",
-            labels=_declined_labels(list(issue.labels)),
-        )
+        labels = _declined_labels(list(issue.labels))
+        already_applied = False
+        if operation_prefix is not None:
+            already_applied = self._check_recovery_decline(issue=issue, labels=labels)
+        if not already_applied:
+            self._tracker.transition_issue(issue.number, state="closed", labels=labels)
         self._safe_comment(
             issue.number,
             f"{head}：{reason or '（未给原因）'}",
@@ -501,6 +625,22 @@ class Triager:
             ),
         )
         bucket.append(issue.number)
+
+    def _check_recovery_decline(self, *, issue, labels: list[str]) -> bool:
+        """Accept only the frozen report or this disposition's partial/final state."""
+        read = getattr(self._tracker, "get_issue", None)
+        if not callable(read):
+            return False
+        live = read(number=issue.number)
+        if live.get("title") != issue.title or live.get("body") != issue.body:
+            raise RecoveryConflictError(f"triage issue #{issue.number} changed outside this migration")
+        live_labels = set(live.get("labels") or [])
+        desired = set(labels)
+        if live.get("state") == "closed" and live_labels == desired:
+            return True
+        if live.get("state") == "open" and live_labels in (set(issue.labels), desired):
+            return False
+        raise RecoveryConflictError(f"triage issue #{issue.number} changed outside this migration")
 
     def _safe_comment(self, number: int, body: str, *, operation_key: str | None = None) -> bool:
         try:

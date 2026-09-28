@@ -12,6 +12,7 @@
 
   ```bash
   ./tools/spec-driven-development/spec new <slug> --issue <N> --title "<标题>" --summary "<人话 TL;DR>"
+  ./tools/spec-driven-development/spec reserve-number --issue <N> --slug <slug>  # 现有 PR 改号前预留
   ./tools/spec-driven-development/spec add-task <NNNN> --id T1 --title ... --priority P1 --files ... --scope ... --acceptance ...
   ./tools/spec-driven-development/spec validate
   ./tools/spec-driven-development/spec render                                      # 生成 OVERVIEW.md
@@ -23,7 +24,7 @@
 
 ## 编号规则
 
-- 组号 = 当前最大号 + 1，由 `spec new` 自动分配。
+- 共享 Git 仓库中，`spec new` 从本地与远端主分支、已有预留号取下一号，并在远端 `spec-reservations/NNNN` 原子预留后创建文件；远端不可用时停止创建。纯本地目录沿用最大号 + 1。
 - 一个组 ≤ 6 个 Task；超了就拆组。
 - 同组内各 Task 的 `files` 必须互不相交（便于并行实现无冲突）。
 - `backend/scripts/check-spec-number-conflicts.py` 校验本地 + open PR 间不撞号（匹配 `NNNN-slug.md`）。

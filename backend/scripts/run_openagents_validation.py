@@ -43,6 +43,8 @@ def gateway_environment(path: Path, model: str) -> dict[str, str]:
         "ANTHROPIC_AUTH_TOKEN": values["wis_api_key"],
         "ANTHROPIC_MODEL": model,
         "ANTHROPIC_SMALL_FAST_MODEL": model,
+        "CLAUDE_CODE_SUBAGENT_MODEL": model,
+        "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1",
     }
 
 

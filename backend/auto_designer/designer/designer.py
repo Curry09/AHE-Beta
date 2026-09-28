@@ -20,13 +20,14 @@ from auto_designer.designer.issue_schema import (
     FROM_SYNTHESIZE,
     MERGED,
     NEEDS_TRIAGE,
+    OBSERVATION_GAP,
     OPENAGENTS,
     PROPOSAL,
     READY,
     REPORT,
     RFC_LABEL,
     TRIAGED,
-    filter_current_round,
+    filter_designer_round,
     format_covers_line,
     plane,
     round_label,
@@ -132,13 +133,18 @@ class Designer:
             backlog = [OpenIssue.from_dict(item) for item in frozen["backlog"]]
             trend = [tuple(item) for item in frozen["trend"]]
         else:
-            # Input isolation, not a prompt exception: PM products (including legacy
-            # and already-ready ones) never enter synthesis or its evidence scope.
-            backlog = filter_current_round(
+            if not getattr(self._tracker, "designer_batch_scope", False):
+                from auto_designer.observations.delivery_gaps import ingest_delivery_gaps
+
+                ingest_delivery_gaps(store=self._store, tracker=self._tracker)
+            # PM products stay on their independent route.  A PM-origin diagnostic
+            # gap is still a design input, despite carrying FROM_DIVERGENT.
+            backlog = filter_designer_round(
                 (
                     i
                     for i in self._tracker.list_open_issues()
-                    if not {FROM_DIVERGENT, DIVERGENT}.intersection(i.labels)
+                    if OBSERVATION_GAP in i.labels
+                    or not {FROM_DIVERGENT, DIVERGENT}.intersection(i.labels)
                 ),
                 round_no=round_no,
             )

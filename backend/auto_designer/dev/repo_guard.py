@@ -14,6 +14,23 @@ from __future__ import annotations
 import subprocess
 
 
+# Python imports in the frozen harness checkout may create bytecode caches while a
+# role is running.  They are runtime by-products, not edits to the orchestration
+# source.  Keep the guard fail-closed for every other untracked path.
+_GENERATED_CACHE_SUFFIXES = ("/__pycache__", ".pyc", ".pyo")
+
+
+def _meaningful_porcelain(value: str) -> str:
+    """Remove interpreter-generated cache entries from a git status snapshot."""
+    lines = []
+    for line in value.splitlines():
+        path = line[3:] if len(line) >= 4 else line
+        if any(path.endswith(suffix) or suffix in path for suffix in _GENERATED_CACHE_SUFFIXES):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+
 class RepoIntegrityError(RuntimeError):
     """编排仓在 run 期间被改动（HEAD 或工作树相对开跑前快照发生变化）。"""
 
@@ -40,7 +57,7 @@ def snapshot_repo(*, repo: str) -> tuple[str, str]:
     出现 `?? …`。既有 untracked（本地 docs / .idea 等）在前后快照里都在，全等即未被触碰。
     """
     head = _git(repo, "rev-parse", "HEAD")
-    porcelain = _git(repo, "status", "--porcelain")
+    porcelain = _meaningful_porcelain(_git(repo, "status", "--porcelain"))
     return (head, porcelain)
 
 

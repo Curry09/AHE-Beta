@@ -661,10 +661,28 @@ class GiteaTracker:
         self._label_ids[name] = data["id"]
 
     def _request(self, method: str, endpoint: str, json_body: dict[str, Any] | None) -> Any:
-        resp = self._session.request(
-            method, self._api + endpoint, json=json_body, timeout=_REQUEST_TIMEOUT
-        )
-        return self._ok(resp, endpoint)
+        # Gitea can briefly reset a read connection while its git backend is
+        # servicing a newly-created repository.  GET is safe to retry; do not
+        # blindly retry POST/PATCH because a server-side write may already
+        # have succeeded.
+        attempts = 4 if method.upper() == "GET" else 1
+        for attempt in range(attempts):
+            try:
+                resp = self._session.request(
+                    method, self._api + endpoint, json=json_body, timeout=_REQUEST_TIMEOUT
+                )
+                if (
+                    method.upper() == "GET"
+                    and resp.status_code in {408, 429, 500, 502, 503, 504}
+                    and attempt + 1 < attempts
+                ):
+                    time.sleep(2 ** attempt)
+                    continue
+                return self._ok(resp, endpoint)
+            except requests.RequestException:
+                if attempt + 1 >= attempts:
+                    raise
+                time.sleep(2 ** attempt)
 
     def _ok(self, resp: requests.Response, endpoint: str) -> Any:
         if not 200 <= resp.status_code < 300:

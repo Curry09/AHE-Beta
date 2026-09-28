@@ -215,6 +215,82 @@ def test_grouping_only_reads_the_active_round(tmp_path):
     assert calls == [[1, 3]]
 
 
+def test_grouping_includes_pending_diagnostic_gaps_across_rounds(tmp_path):
+    tracker = FakeTracker()
+    for title, labels in (
+        ("current", [PROPOSAL, "round-4"]),
+        ("old ordinary", [PROPOSAL, "round-3"]),
+        ("unlabelled gap", [PROPOSAL, "observation-gap"]),
+        ("old gap", [PROPOSAL, "observation-gap", "round-3"]),
+        ("future gap", [PROPOSAL, "observation-gap", "round-5"]),
+        ("PM diagnostic gap", [PROPOSAL, "observation-gap", FROM_DIVERGENT]),
+        ("PM product", [PROPOSAL, FROM_DIVERGENT]),
+    ):
+        tracker.create_issue(IssueDraft(title=title, body="summary", labels=labels))
+
+    class Worker(Designer):
+        def propose_once(self):
+            return DesignOutcome()
+
+    def classify(cards):
+        assert [card["id"] for card in cards] == [1, 3, 4, 6]
+        return response([[1, 3, 4, 6]])
+
+    grouped(tmp_path, tracker, classify, Worker).propose_once()
+    assert [card["id"] for card in receipt(tmp_path)["input"]] == [1, 3, 4, 6]
+
+
+def test_delivery_gap_ingestion_precedes_designer_snapshot(tmp_path, monkeypatch):
+    tracker = FakeTracker()
+    tracker.create_issue(IssueDraft(title="current", body="summary", labels=[PROPOSAL, "round-4"]))
+    calls = []
+
+    def ingest(*, store, tracker):
+        calls.append(1)
+        tracker.create_issue(
+            IssueDraft(title="delivery gap", body="summary", labels=[PROPOSAL, "observation-gap"])
+        )
+        return []
+
+    monkeypatch.setattr("auto_designer.observations.delivery_gaps.ingest_delivery_gaps", ingest)
+
+    class Worker(Designer):
+        def propose_once(self):
+            return DesignOutcome()
+
+    stage = grouped(tmp_path, tracker, lambda cards: response([[1, 2]]), Worker)
+    stage.propose_once()
+    assert calls == [1]
+    assert [card["id"] for card in receipt(tmp_path)["input"]] == [1, 2]
+
+
+def test_single_designer_includes_triage_and_delivery_gaps(tmp_path, monkeypatch):
+    tracker = FakeTracker()
+    tracker.create_issue(IssueDraft(title="current", body="summary", labels=[PROPOSAL, "round-4"]))
+    tracker.create_issue(IssueDraft(title="triage gap", body="summary", labels=[PROPOSAL, "observation-gap"]))
+    tracker.create_issue(IssueDraft(title="old ordinary", body="summary", labels=[PROPOSAL, "round-3"]))
+    seen = []
+
+    def ingest(*, store, tracker):
+        tracker.create_issue(
+            IssueDraft(title="delivery gap", body="summary", labels=[PROPOSAL, "observation-gap"])
+        )
+        return []
+
+    def run_agent(self, *, ready, proposals, trend, runtime):
+        seen.extend(item.number for item in proposals)
+        return '{"proposals": []}'
+
+    monkeypatch.setattr("auto_designer.observations.delivery_gaps.ingest_delivery_gaps", ingest)
+    monkeypatch.setattr(Designer, "_run_agent", run_agent)
+    designer = Designer(
+        tracker, SessionStore(tmp_path / "sessions"), str(tmp_path), str(tmp_path),
+        round_provider=lambda: 4,
+    )
+    designer.propose_once()
+    assert seen == [1, 2, 4]
+
+
 def test_actual_designer_rejects_cross_group_sources(tmp_path, monkeypatch):
     tracker = tracker_with(4)
     barrier = threading.Barrier(2)

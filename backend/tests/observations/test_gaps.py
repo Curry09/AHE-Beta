@@ -13,6 +13,7 @@ from auto_designer.observations.gaps import (
 )
 from auto_designer.observations.grants import authorized_sessions, grant
 from auto_designer.tracker.fake import FakeTracker
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
 
 
@@ -40,6 +41,15 @@ def test_submission_does_not_stop_role_and_is_scoped(tmp_path):
     assert svc.submit(request())["error"] == "invocation_closed"
     assert submit_observation_gap(**request())["error"] == "no_authorized_invocation"
     assert len(svc.tracker.list_open_issues()) == 1
+
+
+def test_gap_created_in_round_has_round_label(tmp_path):
+    svc = service(tmp_path)
+    with bind_usage_context(round_no=2):
+        result = svc.submit(request())
+    assert svc.tracker.issue(result['issue'])['labels'] == [
+        'proposal', 'observation-gap', 'round-2',
+    ]
 
 
 def test_framework_failures_never_create_harness_proposals(tmp_path):

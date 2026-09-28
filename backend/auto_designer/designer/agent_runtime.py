@@ -179,6 +179,9 @@ def run_agent_def(
     from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
     cfg = AgentConfig.from_yaml(config_path=Path(agent_def_dir) / "agent.yaml")
+    reasoning_effort = os.environ.get("DESIGNER_LLM_REASONING_EFFORT", "").strip()
+    if reasoning_effort and getattr(cfg, "llm_config", None) is not None:
+        cfg.llm_config.extra_params["reasoning_effort"] = reasoning_effort
     if max_iterations is not None:
         cfg.max_iterations = min(int(cfg.max_iterations or max_iterations), max_iterations)
     from auto_designer.loop.live_tracer import StepTracer  # noqa: PLC0415  依赖 nexau，懒加载

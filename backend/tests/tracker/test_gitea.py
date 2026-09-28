@@ -444,6 +444,27 @@ def test_non_2xx_raises_with_status() -> None:
     assert ei.value.status == 401
 
 
+def test_transient_get_server_error_retries_without_replaying_writes(monkeypatch) -> None:
+    monkeypatch.setattr("auto_designer.tracker.gitea.time.sleep", lambda _seconds: None)
+    calls: list[str] = []
+
+    def handler(method: str, url: str, json: Any) -> _Resp:
+        calls.append(method)
+        if method == "GET" and calls.count("GET") < 3:
+            return _Resp(502, text="temporary gateway failure")
+        if method == "POST":
+            return _Resp(502, text="write result unknown")
+        return _Resp(200, [])
+
+    tracker = _tracker(handler)
+    assert tracker._request("GET", "/repos/o/r/labels", None) == []
+    assert calls == ["GET", "GET", "GET"]
+    with pytest.raises(GiteaError) as exc:
+        tracker._request("POST", "/repos/o/r/issues", {})
+    assert exc.value.status == 502
+    assert calls == ["GET", "GET", "GET", "POST"]
+
+
 def test_connection_error_propagates() -> None:
     def boom(method: str, url: str, json: Any) -> _Resp:
         raise requests.ConnectionError("unreachable")
