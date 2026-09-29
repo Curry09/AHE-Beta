@@ -41,12 +41,12 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/designer/agent_runtime.py
-      - backend/auto_designer/designer/triage.py
-      - backend/auto_designer/designer/designer.py
-      - backend/auto_designer/designer/divergent.py
-      - backend/auto_designer/designer/owner.py
-      - backend/tests/designer/test_agent_runtime.py
+      - backend/auto_designer/demand/agent_runtime.py
+      - backend/auto_designer/demand/triage.py
+      - backend/auto_designer/demand/synthesizer.py
+      - backend/auto_designer/demand/divergent.py
+      - backend/auto_designer/demand/owner.py
+      - backend/tests/demand/test_agent_runtime.py
     scope: 在唯一 nexau 派发入口记录填好的 message 与 submit 原文/状态；四 driver 传入 subject；round/run_id 读 usage 上下文；超时与未 submit 仍落盘。
     acceptance: 四角色经 run_agent_def 各产生 demand 记录且 subject 非 unknown（triage 为 report 号，其余为 round 或票号）；超时与未 submit 可区分；存储故障不改变 agent.run 返回与异常；既有 read_submit 测试不回归。
   - id: T4
@@ -62,8 +62,8 @@ tasks:
       - backend/run.py
       - backend/deploy/vigil/entrypoint.sh
       - backend/tests/test_run_vigil.py
-      - backend/auto_designer/dev/workspace_jail.py
-      - backend/tests/dev/test_workspace_jail.py
+      - backend/auto_designer/guards/workspace_jail.py
+      - backend/tests/guards/test_workspace_jail.py
     scope: 进程启动钉死 AUTO_DESIGNER_RUN_ID 与 ROLE_RUNS_DIR；SessionStore 与用量 JSONL 写进该 run 目录；实验内 round 之间不得调用 _reset_to_initial；不得删除 role_runs（含其中 sessions）；容器只 rw 挂载本 run 的 delivery 子目录，并在任何 agent/clone 前以短暂 root 入口修正跨 UID owner 后永久降权；配置了 ROLE_RUNS_DIR 却不可写时 fail-closed；jail 把 role_runs 列入禁读目录名。
     acceptance: 同一进程内多 round 后 Gitea main 可前进且 role_runs 仍在；连续两次旧入口启动后上一 run_id 的 sessions/demand/delivery 仍在；看板经当前 run 的 sessions 别名可读；container 挂载不含 sessions/demand；入口把 delivery 交给 UID/GID 1000 后以 setpriv 降权，降权写入探针失败则非零退出；keep-alive 且 run_id 变化时重建容器；读 role_runs 被 jail 拒绝；相关单测绿。
   - id: T5
@@ -129,7 +129,7 @@ tasks:
 
 需求面现状（auto-designer，2026-09-01 代码）：
 
-1. **唯一派发入口**是 `designer/agent_runtime.py` 的 `run_agent_def`。四个 driver（`triage.py` / `designer.py` / `divergent.py` / `owner.py`）各自拼好 `message` 后调用它，再 `read_submit` 取结构化数组写 Gitea。`message` 就是当时的完整输入；submit 回显就是当时的结构化产出。二者都只活在该次函数栈里。
+1. **唯一派发入口**是 `synthesizer/agent_runtime.py` 的 `run_agent_def`。四个 driver（`triage.py` / `synthesizer.py` / `divergent.py` / `owner.py`）各自拼好 `message` 后调用它，再 `read_submit` 取结构化数组写 Gitea。`message` 就是当时的完整输入；submit 回显就是当时的结构化产出。二者都只活在该次函数栈里。
 2. **看板过程流不是实验记录。** `loop/live_tracer.py` 把工具入参截到约 200 字、工具结果约 500 字；`loop/live.py` 的 agent log 上限 500 条。`archive_agent` 写入 `data/live/history.json` 的仍是这份截断投影。每次 `./run.sh` 开头 `clear_live`。
 3. **Token 用量 JSONL 只含计量。** `usage.py` 逐次记录 tokens 与 role/round，fail-open，不含 prompt 与产出。一次用量事件对应一次 LLM HTTP；一次角色调用内部可以有多次用量事件。
 4. **Gitea 只留产品。** proposal body、Owner 评论、标签是治理结果，不是填好的 `message`，也不是被 driver 丢掉的非法 submit。

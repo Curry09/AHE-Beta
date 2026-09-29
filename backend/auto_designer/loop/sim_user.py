@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Callable
 from pathlib import Path
 
-from auto_designer.designer.issue_schema import NEEDS_TRIAGE, round_label
+from auto_designer.demand.issue_schema import NEEDS_TRIAGE, round_label
 from auto_designer.evaluation.swebench import SWEbenchEvaluator, derive_accept_validity
 from auto_designer.harness.connector import HarnessConnector
 from auto_designer.harness.interface import HarnessInterface
@@ -459,7 +459,7 @@ def make_sim_run_session_fn(
         # Spec-0055/T2: materialize the bounded, deterministic user feedback
         # handoff at session close.  Demand roles consume this projection rather
         # than reparsing the complete persona trace.
-        from auto_designer.designer.evidence_contract import build_evidence_envelope
+        from auto_designer.demand.evidence_contract import build_evidence_envelope
 
         session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
         store.save(session)  # 体感 + session 落本地（issue 权威源在 Gitea）
@@ -680,7 +680,7 @@ def make_direct_run_session_fn(
                 objective_evaluation=None,
             ),
         )
-        from auto_designer.designer.evidence_contract import build_evidence_envelope
+        from auto_designer.demand.evidence_contract import build_evidence_envelope
 
         session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
         store.save(session)

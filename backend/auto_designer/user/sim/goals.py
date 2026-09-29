@@ -390,7 +390,7 @@ class GoalLedger:
         """Return a non-gating integrity/content audit for the goal ledger.
 
         This is deliberately observational: malformed model fields should be visible
-        to designers without turning a user conversation into ``evaluator_invalid``.
+        to synthesizers without turning a user conversation into ``evaluator_invalid``.
         """
         warnings: list[str] = []
         if self.baseline_id not in self.goals:

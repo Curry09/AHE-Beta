@@ -16,8 +16,8 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Protocol
 
-from auto_designer.designer.designer import Designer
-from auto_designer.designer.divergent import Divergent
+from auto_designer.demand.divergent import Divergent
+from auto_designer.demand.synthesizer import Synthesizer
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
 from auto_designer.loop.recovery import (
@@ -90,7 +90,7 @@ class Orchestrator:
         run_session_fn: SessionRunner,
         initial_ref: str,
         triagers: list | None = None,
-        designers: list[Designer] | None = None,
+        synthesizers: list[Synthesizer] | None = None,
         divergents: list[Divergent] | None = None,
         owner: object | None = None,
         on_round_start: Callable[[int], None] | None = None,
@@ -107,7 +107,7 @@ class Orchestrator:
         self._fixed_set = fixed_set
         # 生成段两拍：第一拍 triage 分片 ∥ divergent；第二拍 synthesize；然后 Owner 唯一准入。
         self._triagers = triagers or []
-        self._designers = designers or []
+        self._synthesizers = synthesizers or []
         self._divergents = divergents or []
         # Owner（Spec-0029/T6，恒 1）：None = 跳过准入段（提案积压，向后兼容旧测/无 Owner 场景）。
         self._owner = owner
@@ -129,7 +129,7 @@ class Orchestrator:
         # machine.  None preserves the established in-process behavior.
         self._recovery = recovery
         if recovery is not None:
-            for role in [*self._triagers, *self._divergents, *self._designers, self._owner]:
+            for role in [*self._triagers, *self._divergents, *self._synthesizers, self._owner]:
                 bind_recovery = getattr(role, "bind_recovery", None)
                 if callable(bind_recovery):
                     bind_recovery(recovery)
@@ -161,7 +161,7 @@ class Orchestrator:
             "users",
             "triage",
             "divergent",
-            "designer",
+            "synthesizer",
             "owner",
             "delivery_wait",
             "round_sealed",
@@ -262,7 +262,7 @@ class Orchestrator:
 
         # 生成段·第一拍（Spec-0029/T8）：triage 分片 ∥ divergent，同一线程池并行。
         # 二者都只依赖 a 段产物（triage 吃 report、divergent 吃会话证据）、互不依赖；产出全为不可领
-        # proposal（PM 独立交给 Owner，Designer 仅吸收非 PM 来源）→ 分片自由。
+        # proposal（PM 独立交给 Owner，Synthesizer 仅吸收非 PM 来源）→ 分片自由。
         # 单个生成器崩溃记日志跳过、不废整轮。
         beat1: list[tuple[str, Callable[[], object]]] = []
         n_triagers = len(self._triagers)
@@ -293,13 +293,13 @@ class Orchestrator:
 
         # 生成段·第二拍：synthesize（跑在 triage 全部收尾之后——要看本轮新升的 from-triage 提案，
         # 结构综合不滞后一轮）。启用分组时，入口提供一个协调器：全池只分类一次，
-        # 再由已有 Designer workers 领取互斥组，避免多个 worker 各自处理整池。
+        # 再由已有 Synthesizer workers 领取互斥组，避免多个 worker 各自处理整池。
         beat2: list[tuple[str, Callable[[], object]]] = [
-            ("synthesize", designer.propose_once) for designer in self._designers
+            ("synthesize", synthesizer.propose_once) for synthesizer in self._synthesizers
         ]
         self._run_parallel(beat2)
 
-        # Owner 汇合独立 PM 与交付路线，标注交付重叠但保留独立验收；Designer 仅处理非 PM covers。
+        # Owner 汇合独立 PM 与交付路线，标注交付重叠但保留独立验收；Synthesizer 仅处理非 PM covers。
         # Owner 是唯一准入权威；其失败必须阻断本轮，不能以空等待集伪装成功。
         admitted: list[int] = []
         if self._owner is not None:
@@ -596,19 +596,19 @@ class Orchestrator:
             dependencies=("users",),
         )
 
-        designer_jobs = [
+        synthesizer_jobs = [
             (
-                f"designer[{index}]",
-                operation_key(round_no, "designer", index),
+                f"synthesizer[{index}]",
+                operation_key(round_no, "synthesizer", index),
                 {"worker": index},
-                designer.propose_once,
+                synthesizer.propose_once,
             )
-            for index, designer in enumerate(self._designers)
+            for index, synthesizer in enumerate(self._synthesizers)
         ]
         self._run_recovery_jobs(
             round_no=round_no,
-            stage="designer",
-            jobs=designer_jobs,
+            stage="synthesizer",
+            jobs=synthesizer_jobs,
             dependencies=("triage",),
         )
 
@@ -623,7 +623,7 @@ class Orchestrator:
                 round_no=round_no,
                 stage="owner",
                 input_value={"owner": None},
-                dependencies=("divergent", "designer"),
+                dependencies=("divergent", "synthesizer"),
             )
             return []
         key = operation_key(round_no, "owner")
@@ -633,7 +633,7 @@ class Orchestrator:
             key=key,
             input_value={"round": round_no},
             expected_postconditions={"completed": True},
-            dependencies=("divergent", "designer"),
+            dependencies=("divergent", "synthesizer"),
         )
         if unit.get("status") == "completed":
             return [int(number) for number in round_state.get("admitted_issue_ids") or []]

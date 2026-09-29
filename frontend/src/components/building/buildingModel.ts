@@ -25,7 +25,7 @@ export interface FloorModel {
 export const ROLE_COPY: Record<AgentRole, { icon: string; subtitle: string }> = {
   user: { icon: "🧑‍💻", subtitle: "用户实验室 · 真实体感采样" },
   triager: { icon: "🧭", subtitle: "分诊台 · 归类定位与去重" },
-  designer: { icon: "🎨", subtitle: "设计工区 · 结构综合与 RFC" },
+  synthesizer: { icon: "🎨", subtitle: "结构综合工区 · RFC" },
   divergent: { icon: "💡", subtitle: "发散 PM · 产品候选孵化" },
   owner: { icon: "🚪", subtitle: "准入门 · proposal → ready 裁决" },
   developer: { icon: "OA", subtitle: "交付边界 · Owner 准入与 OpenAgents vigil 接管" },
@@ -66,7 +66,7 @@ export function historyLabel(item: HistoryItem): string {
   if (item.kind === "user_session") return item.score != null ? `体感 ${item.score}` : "用户会话";
   if (item.kind === "triager_run") return "分诊完成";
   if (item.kind === "divergent_run") return `${(item.proposals ?? []).length} 候选`;
-  if (item.kind === "designer_run") return `${(item.proposals ?? []).length} RFC`;
+  if (item.kind === "synthesizer_run") return `${(item.proposals ?? []).length} RFC`;
   if (item.kind === "dev_run") return item.tag ? `${item.tag}` : item.committed ? "已推进" : "未推进";
   return "已完成";
 }

@@ -15,8 +15,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/evidence_contract.py
-      - backend/tests/designer/test_evidence_contract.py
+      - backend/auto_designer/demand/evidence_contract.py
+      - backend/tests/demand/test_evidence_contract.py
     scope: 定义 report、user_goal、interaction、objective、harness_source 五类证据及 provenance；定义 L0 report、L1 compact goal-aware summary、L2 timeline、L3 targeted beat、L4 step/objective detail 的字段、字符上限、调用条件和角色权限。L1 必须由落盘数据确定性生成，不新增 LLM 调用。
     acceptance: 每个证据字段有来源、用途和最大大小；L1 不含完整 raw persona prompt、全量 stdout、目标项目源码或 benchmark oracle；缺失字段显式为 unavailable；契约单测覆盖旧 session 兼容、空 goal ledger 和超长截断。
   - id: T2
@@ -30,11 +30,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/triage.py
-      - backend/auto_designer/designer/role_contract.py
+      - backend/auto_designer/demand/triage.py
+      - backend/auto_designer/demand/role_contract.py
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/triage_agent/tools/get_session_timeline.tool.yaml
-      - backend/tests/designer/test_triage.py
+      - backend/tests/demand/test_triage.py
     scope: session 结束时生成可交接的 user_feedback envelope；Triage 的默认输入为当前 report + L1 目标感知摘要 + 该 session 的 feeling/终止原因，L2/L3 只能按当前 report 的证据缺口按需读取。保留单 report 隔离，不向同一调用暴露其他 report、全局聚合或无关 session。
     acceptance: Triage 能看到 B0 初始目标、当前目标、revision before/after/reason、关键 target/action/effect 和用户明确反馈；每个证据带 session/turn 来源；没有证据时能返回 needs_info；Triage 不将 goal met、user accept 或具体目标项目答案当作客观通过；handoff 可被 triage 直接消费且不需重新解析整段聊天。
   - id: T3
@@ -48,10 +48,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/divergent.py
+      - backend/auto_designer/demand/divergent.py
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/divergent_pm/tools/get_session_timeline.tool.yaml
-      - backend/tests/designer/test_divergent_gate.py
+      - backend/tests/demand/test_divergent_gate.py
     scope: PM 保留跨 session 的体验索引和全局观察权，但默认消费 L1/L2 摘要；可引用有 report 或无 report 的 session，比较用户目标、行为、体验矛盾和期望结果。PM 的 artifact 不得携带代码位置、协议字段、固定阈值或实施步骤；重复与否由 Owner 决定。
     acceptance: PM 输入能表达目标变化和用户反馈而非只有 feeling 分数；PM 可以引用多个 session 但每个引用有证据来源；产物字段只包含 user_goal、observed_behaviors、experience_tension、product_opportunity、desired_outcome、evidence_sessions；未报告 session 不因 novelty 规则被拒；PM 不因 trace 过大而默认读取 L3/L4。
   - id: T4
@@ -67,10 +67,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/designer.py
-      - backend/agent_defs/designer/systemprompt.md
-      - backend/auto_designer/designer/session_timeline.py
-      - backend/tests/loop/test_designer.py
+      - backend/auto_designer/demand/synthesizer.py
+      - backend/agent_defs/synthesizer/systemprompt.md
+      - backend/auto_designer/demand/session_timeline.py
+      - backend/tests/loop/test_synthesizer.py
     scope: Synthesize 默认以 ProposalView 和 proposal artifact 关系为输入，仅对已引用 proposal 的 session evidence 做 L2/L3 验证；禁止从无来源 raw session 重新发掘单票需求。目标 ledger 作为引用 proposal 的用户意图证据，不作为实现规格或客观验收。
     acceptance: 每个结构提案至少引用两条本轮可见 proposal 并解释关系；下钻调用包含来源 proposal 和理由；越权 session、无来源需求和具体实现处方被拒或转为可观测 revise；Synthesize 的默认 token 和工具调用量不因全量 trace 线性膨胀。
   - id: T5
@@ -86,7 +86,7 @@ tasks:
     parallel: false
     files:
       - backend/scripts/evaluate_role_traces.py
-      - backend/tests/designer/test_role_contract_flow.py
+      - backend/tests/demand/test_role_contract_flow.py
     scope: 增加同一批 session 的旧输入/新分层输入对照回放，分别记录每角色输入 token、工具调用数、墙钟时间、证据引用、跨题专有名词泄漏和 artifact 语义违规；用户主观结论与 objective evaluator 结果独立评分。
     acceptance: 对照报告能证明 Triage 只消费单 report 证据、PM 保持全局产品视角、Synthesize 只做 proposal 关系综合；L1 默认路径不新增模型调用；L2/L3 超预算或越权读取可观测并降级；trace 中的目标项目文件名/答案不能进入通用 proposal 字段；`accept` 与 objective failed/unverified 的组合不被评为整体成功。
 ---

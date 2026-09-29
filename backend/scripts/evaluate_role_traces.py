@@ -14,11 +14,11 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from auto_designer.designer.evidence_contract import (
+from auto_designer.demand.evidence_contract import (
     project_for_role,
     validate_envelope,
 )
-from auto_designer.designer.role_contract import (
+from auto_designer.demand.role_contract import (
     validate_owner,
     validate_pm,
     validate_synthesis,
@@ -33,7 +33,7 @@ def evaluate(record: dict) -> list[dict[str, str]]:
         violations = validate_triage(artifact, report_number=int(record["report_number"]))
     elif role in ("pm", "divergent"):
         violations = validate_pm(artifact, known_sessions=set(record.get("known_sessions", [])))
-    elif role in ("synthesize", "designer"):
+    elif role == "synthesizer":
         violations = validate_synthesis(
             artifact, visible_proposals=set(record.get("visible_proposals", []))
         )
@@ -51,7 +51,7 @@ def evaluate(record: dict) -> list[dict[str, str]]:
         # A role projection is intentionally smaller than the canonical envelope.
         # These checks catch accidental prompt construction from the unprojected
         # object in replay fixtures.
-        if role.lower() in {"owner", "designer", "synthesize"}:
+        if role.lower() in {"owner", "synthesizer"}:
             for key in ("source_report", "user_evidence", "objective_evidence", "harness_source"):
                 if key in projected:
                     result.append(

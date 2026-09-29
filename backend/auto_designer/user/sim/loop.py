@@ -120,7 +120,7 @@ class TurnLog:
 class _UtteranceLedger:
     """局内用户→harness 指令账本：给每条外发编号，reply 挂回它所关闭的 open 指令。
 
-    Spec-0024/T6：persona 仍可能「看见内容才知真相」；落盘/设计师时间线必须显式配对。
+    Spec-0024/T6：persona 仍可能「看见内容才知真相」；落盘/结构综合时间线必须显式配对。
     """
 
     _seq: int = 0

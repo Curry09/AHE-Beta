@@ -6,7 +6,7 @@ slug: lightweight-delivery-preflight
 summary: 对需求侧 proposal 先做一次分组并把交付侧共享机制、建议顺序与复用提示作为有界软信号，在不合票、不阻塞 worker 的前提下降低并行返工。
 tasks:
   - id: T1
-    title: 需求侧提案分组与并行 Designer
+    title: 需求侧提案分组与并行 Synthesizer
     status: done
     priority: P1
     tags: []
@@ -14,17 +14,17 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/designer/grouped_designer.py
+      - backend/auto_designer/demand/grouped_synthesizer.py
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/tracker/gitea.py
       - backend/run.py
       - backend/scripts/run_auditable_experiment.py
       - backend/scripts/run_swebench_closed_loop.py
-      - backend/tests/designer/test_grouped_designer.py
+      - backend/tests/demand/test_grouped_synthesizer.py
       - backend/tests/test_run_auditable_experiment.py
       - backend/tests/tracker/test_gitea.py
-      - docs/designer-grouping.md
-    scope: 在 Triage 后对本轮 proposal 一次性分类，按互斥组交给已有 Designer workers，失败时确定性退回顺序分批。
+      - docs/synthesizer-grouping.md
+    scope: 在 Triage 后对本轮 proposal 一次性分类，按互斥组交给已有 Synthesizer workers，失败时确定性退回顺序分批。
     acceptance: 每个输入票恰好属于一组且每批不超过六条；同组由单 worker 顺序处理、不同组可并行；分类失败不丢票、不扩大读取范围。
   - id: T2
     title: 交付侧有界前置与软调度
@@ -55,16 +55,16 @@ tasks:
 ## Summary
 
 优化目标是“有效并行交付收益减去协调与返工成本”。需求侧在 Triage 后把同轮 proposal
-做一次有界分组，由已有 Designer workers 按互斥组设计；交付侧在 Owner 独立准入后，对 ready
+做一次有界分组，由已有 Synthesizer workers 按互斥组设计；交付侧在 Owner 独立准入后，对 ready
 队列生成共享机制、建议顺序和复用提示。两次前置都只购买便宜信息，不合并独立需求、不改变验收、
 不把建议变成硬依赖，失败时恢复原有处理路径。
 
-本组已经实现并验证。交付侧实现对应 OpenAgents 的轻量前置版本；Auto Designer 负责启用配置、
+本组已经实现并验证。交付侧实现对应 OpenAgents 的轻量前置版本；Auto Synthesizer 负责启用配置、
 需求侧分组和跨边界接线。
 
 ## Motivation
 
-大量 issue 同轮进入时，完全无协调的多个 Designer 会各自读取整池 proposal，重复分类并可能同时
+大量 issue 同轮进入时，完全无协调的多个 Synthesizer 会各自读取整池 proposal，重复分类并可能同时
 设计重叠机制；交付 worker 也可能并行实现相同底层能力，直到冲突或评审阶段才发现复用机会。
 将所有票先做完整规划或建立强依赖又会产生另一类成本：模型漏判、建议成环或一张慢票会阻塞本可
 独立交付的工作，规划本身还可能比实现更昂贵。
@@ -76,9 +76,9 @@ Owner 保留每张票的独立交接；worker 开始工作后仍须核实当前�
 ## Guide-level explanation
 
 用户先在本轮冻结 main SHA 上交互。非末轮产生的普通报告经 Triage 变成 proposal，PM proposal
-独立到 Owner。启用 `DESIGNER_GROUPING` 时，协调器只读取本轮可见 proposal 的编号、标题和摘要，
+独立到 Owner。启用 `SYNTHESIZER_GROUPING` 时，协调器只读取本轮可见 proposal 的编号、标题和摘要，
 调用一次无工具分类；每个 ID 必须恰好出现一次。组内超过六张时切成连续 batch，同一组固定由一个
-Designer 顺序处理，不同组由现有 Designer 并行领取。分类超时、截断或非法时，按票号切成最多
+Synthesizer 顺序处理，不同组由现有 Synthesizer 并行领取。分类超时、截断或非法时，按票号切成最多
 六张的 batch 串行执行，所有票继续保留。
 
 Owner 对各 proposal 独立准入并打 `openagents`。Vigil 发现后打 ready，soft 模式读取最多 64 张
@@ -89,7 +89,7 @@ Owner 对各 proposal 独立准入并打 `openagents`。Vigil 发现后打 ready
 有空槽就继续派发，同热点或建议成环不阻塞。等待 15 分钟后 FIFO 老化抵消建议偏好。每张票仍走
 独立 worktree、设计、实现、CI/e2e 配置闸、评审、合并与关闭；worker 完成即领下一张，不等整批。
 
-Auto Designer 等本轮全部准入票终态后才开始下一轮用户。任何 `automation-failed`、历史
+Auto Synthesizer 等本轮全部准入票终态后才开始下一轮用户。任何 `automation-failed`、历史
 `needs-human` 或超时仍停止本轮；末轮只做用户观察。
 
 ## Reference-level explanation
@@ -101,7 +101,7 @@ Auto Designer 等本轮全部准入票终态后才开始下一轮用户。任何
 模式。模式在下次启动生效，不修改正在运行的实验。运行镜像必须包含认识 `coordination` 字段的
 OpenAgents 版本。
 
-Designer grouping 使用单次 completion、无工具、16,384 输出 token 上限和 300 秒墙钟预算。
+Synthesizer grouping 使用单次 completion、无工具、16,384 输出 token 上限和 300 秒墙钟预算。
 交付前置使用单轮、无执行工具、8,192 输出 token 上限和 90 秒墙钟预算，不追加协议修复调用。
 交付结果按 issue 内容指纹缓存，失败也缓存；Owner 密集准入时有 120 秒冷却，单纯闭票不触发重算。
 截断、漏判、非法输出和超时均回普通调度，不设置 `automation-failed` 或 `blocked_by`。
@@ -112,11 +112,11 @@ triage/ci/e2e=skip，rfc/conflict/review/merge=agent，CI 可由 `VIGIL_CI_STAGE
 
 ### 任务与验证
 
-T1 与 T2 可独立实现，最终在 Auto Designer 入口和固定 OpenAgents 镜像处汇合：
+T1 与 T2 可独立实现，最终在 Auto Synthesizer 入口和固定 OpenAgents 镜像处汇合：
 
 ```mermaid
 flowchart LR
-    T1[0063/T1 proposal grouping] --> I[Auto Designer integration]
+    T1[0063/T1 proposal grouping] --> I[Auto Synthesizer integration]
     T2[0063/T2 delivery preflight] --> I
 ```
 

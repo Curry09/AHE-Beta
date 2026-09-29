@@ -4,7 +4,7 @@
 flowchart LR
     U[User 模拟用户] --> H[本轮 Harness]
     U --> R[轨迹与用户 report]
-    R --> T[Triage / Designer]
+    R --> T[Triage / Synthesizer]
     R --> P[PM]
     T --> O[Owner 准入]
     P --> O
@@ -15,7 +15,11 @@ flowchart LR
     M --> N[下一轮用户试用]
 ```
 
-auto-designer 控制实验身份、用户会话、需求提案、Owner 准入、轮次屏障和恢复。PM 与 Triage/Designer 是独立需求路径，在 Owner 汇合。用户 report、proposal 与已准入需求不是同一状态。
+auto-designer 控制实验身份、用户会话、需求提案、Owner 准入、轮次屏障和恢复。PM 与 Triage/Synthesizer 是独立需求路径，在 Owner 汇合。用户 report、proposal 与已准入需求不是同一状态。
+
+`auto_designer.demand` 包含四个需求角色及共享证据/运行逻辑；`agent_defs/synthesizer/` 只定义结构综合角色。`auto_designer.guards` 保留需求工具路径检查、编排仓完整性检查和 Harness 提交钩子。旧内置开发角色的两个未接线提交中间件已删除，不将它们描述为 OpenAgents 的等价保障。
+
+角色、恢复阶段、API 和静态导出统一使用 `synthesizer`。恢复流程通过 schema、身份与摘要检查保证记录一致。
 
 OpenAgents 独立运行，负责交付；两仓运行时通过 Gitea 的 issue/标签/PR 与 Harness main SHA 连接，而非相互导入 Python 包。离线契约检查临时导入配置解析器，只用于开发验证。
 

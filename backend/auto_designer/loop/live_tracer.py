@@ -3,13 +3,13 @@
 nexau 在每次工具执行时发 TOOL span（name="Tool: {tool_name}"，inputs.parameters=入参），
 每次模型调用时发 LLM span（end 时 outputs=完整响应）。本 tracer 订阅两类 span，重建
 「assistant 发言 → 工具调用 → 工具结果」的完整过程流，经 on_event(kind, text) 回调写进
-live 注册表的 log 时间线——dev/designer 的黑盒 agent.run 由此变成逐步可观测：
+live 注册表的 log 时间线——dev/synthesizer 的黑盒 agent.run 由此变成逐步可观测：
 
 - LLM end   → kind="assistant"：模型这一步说了什么（全文，宽上限）
 - TOOL start → kind="tool"：🔧 工具名 + 入参摘要
 - TOOL end   → kind="tool_result"：工具输出摘要；失败则 kind="tool_error"（❌）
 
-依赖 nexau，调用方（designer/triage/owner 等 agent driver）须在运行期懒加载本模块。
+依赖 nexau，调用方（synthesizer/triage/owner 等 agent driver）须在运行期懒加载本模块。
 """
 
 from __future__ import annotations

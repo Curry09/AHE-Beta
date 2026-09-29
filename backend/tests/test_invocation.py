@@ -140,3 +140,10 @@ def test_concurrent_records_do_not_tear_index(tmp_path: Path, monkeypatch) -> No
     assert len(lines) == 12
     for line in lines:
         json.loads(line)
+
+
+def test_shared_demand_model_secret_is_redacted(monkeypatch):
+    from auto_designer.invocation import _redact
+
+    monkeypatch.setenv("DEMAND_LLM_API_KEY", "private-model-key-sentinel")
+    assert _redact(text="key=private-model-key-sentinel") == "key=${DEMAND_LLM_API_KEY}"

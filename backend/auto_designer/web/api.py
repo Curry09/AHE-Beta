@@ -17,7 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 from starlette.types import Scope
 
-from auto_designer.designer.issue_schema import (
+from auto_designer.demand.issue_schema import (
     DECLINED,
     NEEDS_INFO,
     REJECTED,

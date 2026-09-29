@@ -14,11 +14,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/role_contract.py
-      - backend/auto_designer/designer/agent_contract.py
-      - backend/auto_designer/designer/submit_tools.py
-      - backend/tests/designer/test_role_contract.py
-      - backend/tests/designer/test_agent_contract.py
+      - backend/auto_designer/demand/role_contract.py
+      - backend/auto_designer/demand/agent_contract.py
+      - backend/auto_designer/demand/submit_tools.py
+      - backend/tests/demand/test_role_contract.py
+      - backend/tests/demand/test_agent_contract.py
     scope: 定义四角色专属 artifact schema、来源引用、确定性不变量与结构化 revise/hold violation；保留 canonical proposal 落库投影，但不再让四角色共享同一认知表单。
     acceptance: 四角色 schema 在字段和语义目的上明确不同；Triage 单 report 来源、PM 用户/产品视角、Synthesize 多 proposal 关系、Owner 投资裁决均有可机检不变量；非法来源、越权票号和缺失关系被拒绝并返回结构化 violation；契约与 submit binding 单测通过。
   - id: T2
@@ -31,10 +31,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/triage.py
+      - backend/auto_designer/demand/triage.py
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml
-      - backend/tests/designer/test_triage.py
+      - backend/tests/demand/test_triage.py
     scope: 将 Triage 调度改为每个 report 独立上下文，可并行但不在同一模型调用暴露其他 report/proposal；产物只界定报告事实、用户影响、边界、证据与不确定项，再投影为 canonical proposal。
     acceptance: 处理 report A 的模型输入和工具作用域不含 B；Triage 不能提交跨票判重、产品机会或实现方案字段；批量运行仍可并发且 outcome 精确归属每票；正反行为测试与现有状态迁移测试通过。
   - id: T3
@@ -47,10 +47,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/divergent.py
+      - backend/auto_designer/demand/divergent.py
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml
-      - backend/tests/designer/test_divergent_gate.py
+      - backend/tests/demand/test_divergent_gate.py
     scope: 保留 PM 对全部体验、已有 report/proposal 和按需会话证据的观察权，将任务改为解释用户目标、行为、体验矛盾、产品机会与期望结果；不把 PM 定义为未报告项扫描器或去重器。
     acceptance: PM 可引用有或无 report 的 session，也可重构已有问题视角；输出必须包含用户目标、观察行为、体验矛盾、产品机会、期望结果和证据引用；不得携带代码位置、协议、阈值或实施步骤；是否重复不在 PM driver 拒绝，而由 Owner 裁决；行为测试覆盖上述正反例。
   - id: T4
@@ -65,11 +65,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/designer.py
-      - backend/agent_defs/designer/agent.yaml
-      - backend/agent_defs/designer/systemprompt.md
-      - backend/agent_defs/designer/tools/submit_rfcs.tool.yaml
-      - backend/tests/loop/test_designer.py
+      - backend/auto_designer/demand/synthesizer.py
+      - backend/agent_defs/synthesizer/agent.yaml
+      - backend/agent_defs/synthesizer/systemprompt.md
+      - backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml
+      - backend/tests/loop/test_synthesizer.py
     scope: 将 Synthesize 的认知对象锁定为 ProposalView 关系：声明来源提案、关系类型、共同矛盾、结构方向与预期杠杆；证据下钻只能验证已引用提案关系，不能脱离 proposal 自行发掘新需求。
     acceptance: 每条结构产物引用至少两条本轮可见 proposal 并解释关系；不存在或越权来源被拒绝；单条改写、无来源 session 派生和具体实现处方不能落为 from-synthesize；covers 仍只是 Owner 的非约束建议；行为及落库测试通过。
   - id: T5
@@ -83,11 +83,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/owner.py
+      - backend/auto_designer/demand/owner.py
       - backend/agent_defs/owner/agent.yaml
       - backend/agent_defs/owner/systemprompt.md
       - backend/agent_defs/owner/tools/submit_admission.tool.yaml
-      - backend/tests/designer/test_owner.py
+      - backend/tests/demand/test_owner.py
     scope: Owner 只基于角色产物、ready queue、体验摘要和证据引用判断用户价值、证据强度、范围内聚、重叠关系、投入风险与优先级；移除自由源码调查和重新诊断路径，保留 admit/merge/decline/hold。
     acceptance: Owner 只能裁决本批输入并为每项给出价值、证据、范围、重叠/风险依据；证据不足、范围不内聚或过早实施化时可观测 hold/revise，不能无理由全量放行；Owner 不调用源码搜索或自由 timeline 重新诊断；决策图和状态迁移回归通过。
   - id: T6
@@ -103,8 +103,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/tests/designer/test_role_contract_flow.py
-      - backend/scripts/replay_design_from_sessions.py
+      - backend/tests/demand/test_role_contract_flow.py
+      - backend/scripts/replay_roles_from_sessions.py
       - backend/scripts/evaluate_role_traces.py
     scope: 建立角色正例、反例与越界样例，验证同一证据经过四种认知任务产生不同 artifact；真实回放冻结完整输入、角色产物、裁决和逐角色合规评分，不以 JSON 合法或状态迁移成功代替行为验收。
     acceptance: 测试证明 Triage 不串票、PM 保持产品视角且不受 novelty 限制、Synthesize 解释多提案关系、Owner 做投资组合裁决并拦截越界产物；trace evaluator 输出逐角色 contract violations 和证据位置；真实回放无 OpenAgents 且完整产物可独立审计；ruff、相关 pytest、spec validate/render/graph 通过。
@@ -208,7 +208,7 @@ Synthesize 产关系解释、Owner 产投资裁决。测试拒绝“字段存在
 | T6 | 跨角色行为评测与真实回放 | T2、T3、T4、T5 |
 
 文件由 frontmatter 的 Task `files` 独占。端到端入口为
-`backend/scripts/evaluate_role_traces.py` 配合 `replay_design_from_sessions.py`：回放运行到 Owner 停止，
+`backend/scripts/evaluate_role_traces.py` 配合 `replay_roles_from_sessions.py`：回放运行到 Owner 停止，
 输出完整 artifact、来源关系、violation、裁决和逐角色评分，不启动 OpenAgents。
 
 ## Drawbacks

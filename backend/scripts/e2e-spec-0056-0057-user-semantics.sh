@@ -9,5 +9,5 @@ exec "$repo_root/.venv/bin/python" -m pytest -q \
   backend/tests/user/sim/test_feedback.py \
   backend/tests/user/sim/test_heartbeat.py \
   backend/tests/user/sim/test_prompt.py \
-  backend/tests/designer/test_terminal_evidence.py \
+  backend/tests/demand/test_terminal_evidence.py \
   backend/tests/evaluation/test_swebench.py

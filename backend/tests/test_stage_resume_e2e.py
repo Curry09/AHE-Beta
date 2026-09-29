@@ -56,7 +56,7 @@ def _run_case(root: Path, failure_stage: str | None) -> dict[str, object]:
     identity = RecoveryIdentity("exp", "run", "config", "controller", "plan")
     recovery = RecoveryStore.initialize(root=root / "checkpoints", identity=identity)
     calls = {
-        stage: 0 for stage in ("users", "triage", "divergent", "designer", "owner", "delivery")
+        stage: 0 for stage in ("users", "triage", "divergent", "synthesizer", "owner", "delivery")
     }
     effects: set[str] = set()
     sessions: dict[str, dict[str, str]] = {}
@@ -133,7 +133,7 @@ def _run_case(root: Path, failure_stage: str | None) -> dict[str, object]:
             initial_ref="main",
             triagers=[Role("triage")],
             divergents=[Role("divergent")],
-            designers=[Role("designer")],
+            synthesizers=[Role("synthesizer")],
             owner=Owner(),
             fetch_issue=fetch_issue,
             wait_delivery=wait_delivery,
@@ -164,7 +164,7 @@ def _run_case(root: Path, failure_stage: str | None) -> dict[str, object]:
 
 
 @pytest.mark.parametrize(
-    "failure_stage", ["users", "triage", "divergent", "designer", "owner", "delivery"]
+    "failure_stage", ["users", "triage", "divergent", "synthesizer", "owner", "delivery"]
 )
 def test_every_stage_resumes_to_the_same_authoritative_result(
     tmp_path: Path, failure_stage: str

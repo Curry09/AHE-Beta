@@ -43,26 +43,26 @@
 ### 0013 Harness 呈现与交互协议：拆信封 · 过程流分层 · 打断/心跳
 把 harness 的对用户呈现与内层过程彻底分层，并补齐慢会话的交互协议：拆 complete_task 信封；内层过程经 steps 只吐观测层；进行中可发 mid-flight {'progress':…} 活动条（stdout 可多行旁路，终态仍为一行含 reply）；control:interrupt 回 [interrupted]；launcher begin/poll/control 分片轮询不盲杀。落点 harness_template + harness/launcher。旁路放宽与 peek 续等见 0019。
 
-### 0014 开发者侧提交纪律：增量落地闸 + 收尾硬闸（含接线 AST）
-用机制（而非软提示）保证 dev agent 每轮产出「干净的已提交增量」：CommitCheckpointMiddleware 逐级施压逼早落已提交最小片；CompletionGateMiddleware 拦 complete_task——硬闸含工作区干净、可观察行为同步 MANUAL、以及对 entry.py 主路径（main/_run_supervised）的 AST「先用后赋」接线扫描；软闸催回归测试，并对含 heartbeat/进度符号却无短等断言的测试催补进度契约测。配套 systemprompt「一次冒烟即止，且冒烟必须覆盖真实接线/对外契约，禁止只测 helper」。落点 backend/auto_designer/dev/ + agent_defs/developer_agent/。
+### 0014 旧内置 Developer 提交纪律（已退役）
+旧内置 Developer 的两个提交中间件及其装配任务已退役，不再作为当前运行保障；历史设计与实现保留在 Git 历史。
 
-### 0015 开发者侧过拟合泄漏隔离：提交边界 + trace 物理隔离 + 工作区 jail
-堵 dev/designer 把「某个具体任务的产物」焊进通用 harness 的过拟合泄漏，三道机制层防线：① harness 仓 pre-commit 提交边界钩子——暂存区出现 harness 本体之外路径即拒；② sandbox 工作目录下沉到独立父目录，断掉相对路径可达 trace；③ WorkspaceJailMiddleware——写只许 harness 仓；读放行 harness 仓 + NexAU 源码 + NexAU 运行时临时目录（nexau_bash_tool_results / nexau_tool_outputs），trace（sessions/harness_runs）仍一律拒。落点 backend/auto_designer/dev/ + run.py。
+### 0015 Harness 边界与需求工具访问：提交拒绝清单、trace 隔离与工作区检查
+保留三项有效边界机制：Harness 提交钩子拒绝密钥与运行态，sandbox 工作目录与原始 trace 分离，需求 Agent 通过 guards 的工具路径检查及显式观测授权读取文件。
 
 ### 0016 设计师根因信号 + 读码效率 + 运行时聚合
-补上设计师的「为什么差」根因信号、机制层对照数字与读码效率：① 体感 reason 随分数落 index 并喂设计师；② search_file_content + 先搜后读；③ runtime_agg 事后扫最近 N 局 Session 聚合 0 步/超时/打断/错误占比与预算钮，注入 propose_once（只观测不归因）。落点 designer/ + user/session_store.py + agent_defs/designer/。
+补上设计师的「为什么差」根因信号、机制层对照数字与读码效率：① 体感 reason 随分数落 index 并喂设计师；② search_file_content + 先搜后读；③ runtime_agg 事后扫最近 N 局 Session 聚合 0 步/超时/打断/错误占比与预算钮，注入 propose_once（只观测不归因）。落点 synthesizer/ + user/session_store.py + agent_defs/synthesizer/。
 
 ### 0017 多用户会话并行化：a 段线程池 + 共享状态加锁
 把闭环 a 段的用户会话从串行改为 ThreadPoolExecutor 并行：并发单元=整局会话（工作区+harness 子进程+client+run_session 一整包），信封内部时序不动；配套修共享状态（client 每局一实例、工作区供给前移、SessionStore/live 加锁），单会话失败降级不废整轮。d/b 段维持串行（同仓 push + 全局 env 的固有约束）。落点 loop/orchestrator + loop/sim_user + run.py + user/session_store + loop/live。
 
 ### 0018 设计师提案拆信封：complete_task 交付不再被静默丢弃
-设计师用 complete_task 交回提案时，nexau 把结果套进 tool 信封（{success,status,output:{result:'[...]'}}），而 _parse_proposals 的平衡括号扫描刻意不进字符串内部，扫不到顶层数组 → 静默返回「本轮无提案」。实测 8 轮长跑 6 条结构性提案 0 条进 backlog；且该缺陷非确定性——agent 听话调 complete_task 就被丢，不听话直接吐裸数组反而入库（第 6 轮侥幸入库的 #6/#7/#8 使 dev 立刻去改 entry.py 与 tools/，证明结构性进化通道本身是通的、只是被这里堵死）。落点：designer/_run_agent 出口拆信封 + 单测覆盖两条路径（带信封 / 裸数组）。
+设计师用 complete_task 交回提案时，nexau 把结果套进 tool 信封（{success,status,output:{result:'[...]'}}），而 _parse_proposals 的平衡括号扫描刻意不进字符串内部，扫不到顶层数组 → 静默返回「本轮无提案」。实测 8 轮长跑 6 条结构性提案 0 条进 backlog；且该缺陷非确定性——agent 听话调 complete_task 就被丢，不听话直接吐裸数组反而入库（第 6 轮侥幸入库的 #6/#7/#8 使 dev 立刻去改 entry.py 与 tools/，证明结构性进化通道本身是通的、只是被这里堵死）。落点：synthesizer/_run_agent 出口拆信封 + 单测覆盖两条路径（带信封 / 裸数组）。
 
 ### 0019 launcher 非 reply 旁路放宽（progress 等）
 放宽 harness stdout 旁路协议（任意非 reply JSON 可收，写入 last_sideband/last_progress）；control() 仍支持旁路 ack 或终态 reply 两种形状（wire 兼容）。用户侧经 control 做 peek/status 的路径已由 0022 取代并 abandon（原 T2）。现行用户等待环见 0022。
 
 ### 0020 覆盖关系兑现 + 开发者领取策略与票种预算
-补全 designer 覆盖判定的执行链（covers 结构化-挂链-降权-连带关闭-前端徽标），开发者领取改可配置分池（design 优先 + 保留 bug 专属 dev），并按票种给初始迭代预算、同票重试自动升级。
+补全 synthesizer 覆盖判定的执行链（covers 结构化-挂链-降权-连带关闭-前端徽标），开发者领取改可配置分池（design 优先 + 保留 bug 专属 dev），并按票种给初始迭代预算、同票重试自动升级。
 
 ### 0021 dev agent 逃逸围堵：凭证隔离 + 编排绊线 + 污染清理
 实测发现 dev agent 经 heredoc 隧道绕过 workspace-jail 的路径扫描，改写编排仓文件并用宿主继承的 GitHub 凭证推送。路径级 jail 关不住能调用解释器的 agent（其 docstring 已自陈），本组不加固扫描，改做纵深：进程级 git 凭证隔离掐断推送落地链、b 段后绊线断言编排仓未被触碰、清理历史逃逸的污染制品。OS 级沙箱留作治本方向。
@@ -77,19 +77,19 @@
 Session.sim_trace 全量落盘上帝视角；设计师按需取证三层——使用事件时间线投影（get_session_timeline，含 utterance↔answers 请求-回复配对）→ 拍级 harness 活动（get_harness_beat）→ 单步展开（get_harness_step）；体感曲线带 session 句柄；jail 仍禁直接读 sessions/。runtime_agg 本组不废弃。
 
 ### 0025 issue triage 漏斗：用户提 issue → triage agent 分类定位 → synthesize agent 出 RFC → dev
-把 issue 流建成真实软件团队的 triage 漏斗，并把现有单一 designer 拆成两个 agent。用户 sim 产出 raw issue（用户端模板填用户可见字段、按 type 标签、needs-triage、盖轮号）；triage agent 就地分类(确认 type)+定位(读 harness 代码 + get_session_timeline 轨迹)+去重+驳回/needs-info；synthesize agent（原 designer 收窄）只做跨 issue 结构综合、产 RFC（独立标签，凌驾 type，consolidate/supersede 局部 issue、最高 dev 预算）。dev 每轮按容量(N dev)顺序领 triaged issue + RFC，未清空的积压到下一轮（backlog = 上轮 carryover + 本轮新 triaged）。预算按 kind 分档、去 0020 分池/retry/stuck。产品/方向层 = distill persona/seed 卡库（人经 CLI，⓪ 层，不设 agent）；PM 职能 = 优先级由体感+频率机制派生。
+把 issue 流建成真实软件团队的 triage 漏斗，并把现有单一 synthesizer 拆成两个 agent。用户 sim 产出 raw issue（用户端模板填用户可见字段、按 type 标签、needs-triage、盖轮号）；triage agent 就地分类(确认 type)+定位(读 harness 代码 + get_session_timeline 轨迹)+去重+驳回/needs-info；synthesize agent（原 synthesizer 收窄）只做跨 issue 结构综合、产 RFC（独立标签，凌驾 type，consolidate/supersede 局部 issue、最高 dev 预算）。dev 每轮按容量(N dev)顺序领 triaged issue + RFC，未清空的积压到下一轮（backlog = 上轮 carryover + 本轮新 triaged）。预算按 kind 分档、去 0020 分池/retry/stuck。产品/方向层 = distill persona/seed 卡库（人经 CLI，⓪ 层，不设 agent）；PM 职能 = 优先级由体感+频率机制派生。
 
 ### 0026 观测看板前端全面重构：浅/深主题可切换 + 分诊(triager)可见 + persona 展示 + 设计 token 化
 观测看板前端从「纯黑底+白字、四栏、只显 SR-001 标识」全面重构为一套有设计系统的界面：① 引入设计 token 层（颜色/间距/字阶/圆角/阴影/层级）+ 浅/深主题可切换（跟随系统、localStorage 持久）；② 看板补齐 triager（分诊）房间——闭环 a→d1(triage)→d2(synthesize)→b 五角色都可见，各角色一致的强调色；③ 用户卡展示 persona（identity + 水平/领域/目标），不只 SR-001；issue/commit 卡在 0025 徽标基础上排版收敛；④ 详情面板信息架构刷新 + persona 块；⑤ 体感/backlog 曲线可视化（消费既有 /api/overview）；⑥ 响应式（页面不横向滚动、宽内容内部滚动）+ 两主题对比度/焦点态。后端仅小改：live 补 triager 排序、用户 agent 活动载荷带 persona 摘要。纯只读观测，不改闭环语义、不引 benchmark。
 
 ### 0027 统一 agent 结构化产出契约：issue_schema 单一真源 + submit-tool 原生校验，去掉第二次 LLM 重排与各自为政的解析
-现状三个产结构化输出的 agent（用户 sim / triage / designer）用了三套完全不同的严格度，且都是补丁摞补丁——issue_schema 的 USER 段是死代码（用户 sim 走自由文本、prompt 无约束、render/validate(section=user) 生产零调用）；triage 靠「第二次 LLM 调用做 json_schema 重排 + 括号扫描 + 一堆别名归一」三层兜底；designer 只用括号扫描 + 容错映射、不用约束解码。本 spec 统一为：issue_schema 收敛成规范化字段的单一真源（去 USER/TRIAGE 分段，用户 body 保持自由文本 = 真实用户），并生成 submit-tool 的 input_schema；triage / designer 各用一个带 input_schema 的 submit 工具原生吐结构化——nexau 在工具调用层用 jsonschema 强校验（违规抛 ToolValidationError→agent 重试），driver 直接读已校验参数。删掉第二次 LLM 重排、括号扫描、per-agent 别名归一，改为一处共享的「读 submit 参数 + 统一降级」。纯重构编排/agent 产出路径，不改闭环 a→d1→d2→b 语义、不引 benchmark。
+现状三个产结构化输出的 agent（用户 sim / triage / synthesizer）用了三套完全不同的严格度，且都是补丁摞补丁——issue_schema 的 USER 段是死代码（用户 sim 走自由文本、prompt 无约束、render/validate(section=user) 生产零调用）；triage 靠「第二次 LLM 调用做 json_schema 重排 + 括号扫描 + 一堆别名归一」三层兜底；synthesizer 只用括号扫描 + 容错映射、不用约束解码。本 spec 统一为：issue_schema 收敛成规范化字段的单一真源（去 USER/TRIAGE 分段，用户 body 保持自由文本 = 真实用户），并生成 submit-tool 的 input_schema；triage / synthesizer 各用一个带 input_schema 的 submit 工具原生吐结构化——nexau 在工具调用层用 jsonschema 强校验（违规抛 ToolValidationError→agent 重试），driver 直接读已校验参数。删掉第二次 LLM 重排、括号扫描、per-agent 别名归一，改为一处共享的「读 submit 参数 + 统一降级」。纯重构编排/agent 产出路径，不改闭环 a→d1→d2→b 语义、不引 benchmark。
 
 ### 0028 divergent PM + gate：产品候选并行通道与晋升评审
-在 0025 triage 漏斗旁并行一条产品候选通道：divergent PM 与 synthesize 同信号并行落 divergent 不可领候选；Designer.gate_once 做语义晋升（promote→feature+triaged / hold / drop）。默认 N_DIVERGENTS=0 关闭；dev 领取硬排除 divergent。
+在 0025 triage 漏斗旁并行一条产品候选通道：divergent PM 与 synthesize 同信号并行落 divergent 不可领候选；Synthesizer.gate_once 做语义晋升（promote→feature+triaged / hold / drop）。默认 N_DIVERGENTS=0 关闭；dev 领取硬排除 divergent。
 
 ### 0029 三平面 issue 流：证据→提案→工作队列，唯一准入 Owner（白名单可领、生成器自由并行、去 gate 特殊通道）
-现行 issue 流的三大病根：①「谁有权把活放进 dev 队列」有三个写手（triage accept、synthesize 直建 RFC 且能 supersede 别人、gate promote），入场规则不统一——synthesize 产出免审进队、divergent 产出要过 gate，纯历史演化无原则可言；② 标签把「工作项资格 / 流程状态 / 属性」压成一个平面，dev 可领判定是一张随新状态不断增长的黑名单（每加 divergent、gate-dropped 都得记得改 dev 排除集）；③ 去重被塞在想并行的生成侧（triage 边规范化边判重），与并行天然打架——此前 triage 分片讨论卡壳的根因。本 spec 重构为三平面单一准入模型：平面1 证据（用户报告/体感/runtime，输入）→ 平面2 提案（proposal，一律不可领；triage/synthesize/divergent 都只是生成器，产出为非约束性提案，故可自由并行、重复无害；且按证据源双轨分工——synthesize 吃规范化 backlog 找结构根因（delivery 轨），divergent 直吃原始会话行为挖未被提为 issue 的能力缺口（discovery 轨），去重靠构造而非 prompt 嘱咐）→ 唯一准入 Owner（每轮一次批量评审：admit→ready / merge 去重合并 / decline / hold；机械模式对字段齐全的单条修复案零 LLM 自动准入）→ 平面3 工作队列（ready 唯一可领白名单，dev 按 priority→age 拉取、只关自己的票——covers 级联在 Owner 准入时以 merge 完成）。配套：公共 agent 运行时抽出（消 triage/divergent 对 designer 私有符号的依赖）、gate/divergent 特殊通道与 superseded/gate-dropped 中间态退役、proposal/ready 队列深度背压告警（= CLAUDE.md 退化信号落地）。不动纯 trunk/直推 main/benchmark held-out/submit-tool 契约（0027 复用，Owner 仅新增 submit_admission）。
+现行 issue 流的三大病根：①「谁有权把活放进 dev 队列」有三个写手（triage accept、synthesize 直建 RFC 且能 supersede 别人、gate promote），入场规则不统一——synthesize 产出免审进队、divergent 产出要过 gate，纯历史演化无原则可言；② 标签把「工作项资格 / 流程状态 / 属性」压成一个平面，dev 可领判定是一张随新状态不断增长的黑名单（每加 divergent、gate-dropped 都得记得改 dev 排除集）；③ 去重被塞在想并行的生成侧（triage 边规范化边判重），与并行天然打架——此前 triage 分片讨论卡壳的根因。本 spec 重构为三平面单一准入模型：平面1 证据（用户报告/体感/runtime，输入）→ 平面2 提案（proposal，一律不可领；triage/synthesize/divergent 都只是生成器，产出为非约束性提案，故可自由并行、重复无害；且按证据源双轨分工——synthesize 吃规范化 backlog 找结构根因（delivery 轨），divergent 直吃原始会话行为挖未被提为 issue 的能力缺口（discovery 轨），去重靠构造而非 prompt 嘱咐）→ 唯一准入 Owner（每轮一次批量评审：admit→ready / merge 去重合并 / decline / hold；机械模式对字段齐全的单条修复案零 LLM 自动准入）→ 平面3 工作队列（ready 唯一可领白名单，dev 按 priority→age 拉取、只关自己的票——covers 级联在 Owner 准入时以 merge 完成）。配套：公共 agent 运行时抽出（消 triage/divergent 对 synthesizer 私有符号的依赖）、gate/divergent 特殊通道与 superseded/gate-dropped 中间态退役、proposal/ready 队列深度背压告警（= CLAUDE.md 退化信号落地）。不动纯 trunk/直推 main/benchmark held-out/submit-tool 契约（0027 复用，Owner 仅新增 submit_admission）。
 
 ### 0030 harness 产品化边界：/help 用户说明、平台侧接口与 connector 适配
 把 harness 收敛为真人可运行产品：harness 模板内只保留 HELP.md 作为 /help 内容源、RUNTIME.md 作为维护说明；README/USER/MANUAL 不再作为模板文档，INTERFACE 归 auto-designer 平台侧；connector 适配 sim-user 到真人接口；launcher/template 支持 stdio-jsonl-v1 并兼容 legacy。
@@ -125,10 +125,10 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 把交付面 stages.rfc 从 skip 改为 agent，让 drafter 在 harness 仓落下施工规格；提交边界从顶层白名单改为拒绝清单（只拦密钥与 vigil 运行态），否则 RFC 写下的 docs/ 会被 smoke 打死。自定义 Anthropic 协议网关域名必须进 egress allowlist。OpenAgents 侧 implement 首轮优先跟 worktree 已有 specs（本仓只镜像描述）。
 
 ### 0041 统一 LLM Token 用量监测与全链路归属
-为 user、triager、designer、divergent、owner、harness 与 developer/vigil 建立统一逐调用 Token 原始事件、并发上下文归属、按题与按轮聚合及看板；上游缺失时显式 unavailable，绝不伪造精确值。
+为 user、triager、synthesizer、divergent、owner、harness 与 developer/vigil 建立统一逐调用 Token 原始事件、并发上下文归属、按题与按轮聚合及看板；上游缺失时显式 unavailable，绝不伪造精确值。
 
 ### 0042 需求面角色契约治理：统一术语、规范化提案投影与可靠状态迁移
-消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Designer/Owner 状态迁移与交接边界，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
+消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Synthesizer/Owner 状态迁移与交接边界，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
 
 ### 0043 需求面角色认知契约：专属产物语言与行为质量门
 在共享证据之上为 Triage、产品 PM、Synthesize 与 Owner 建立不同的认知任务、角色专属产物契约和可执行质量门，防止多角色退化为同一种技术分析 Agent。
@@ -157,8 +157,8 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 ### 0051 会话容器隔离与客观验收证据
 每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；harness 长请求由 90s persona 心跳决定续等或打断；主观接受与新鲜 SWE-bench 客观执行结果分栏落盘，假接受不得计为通过。
 
-### 0052 Designer 提案覆盖与重复合并权责
-由 Designer 基于全量 ProposalView 决定哪些 triage/proposal 被结构提案吸收；covers 作为唯一简化指令，目标提案创建后直接合并关闭被覆盖来源，Owner 只负责交付路由。
+### 0052 Synthesizer 提案覆盖与重复合并权责
+由 Synthesizer 基于全量 ProposalView 决定哪些 triage/proposal 被结构提案吸收；covers 作为唯一简化指令，目标提案创建后直接合并关闭被覆盖来源，Owner 只负责交付路由。
 
 ### 0053 Persona 语义动作契约与可审计终止状态机
 将用户模拟从统一脆弱 JSON 校验改为按动作语义定义契约：消息 required/optional/forbidden、阶段局部字段、可恢复协议修复与不可恢复错误分级；把用户 verdict、交互协议状态、客观 evaluator 结果和容器收尾拆成独立且可审计的状态，并以现有八个交互建立回归门禁。
@@ -176,10 +176,10 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 在原有用户动作中附带自主产品反馈，保留继续、等待、接受或放弃的语义；反馈可达性不依赖工具能力或纠偏策略，格式异常仅警告，不按低分自动提单。
 
 ### 0059 观测文件入口与设计角色按需取证
-让 Triage、独立 PM 与 Designer 通过普通文件工具按职责查阅制品自己的观测文件，保留原有需求产物与角色分工。
+让 Triage、独立 PM 与 Synthesizer 通过普通文件工具按职责查阅制品自己的观测文件，保留原有需求产物与角色分工。
 
 ### 0060 独立 PM 路线与双轨交付协调
-PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer 综合交付路线提案；Owner 显式关联共享工作并保留独立验收。
+PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthesizer 综合交付路线提案；Owner 显式关联共享工作并保留独立验收。
 
 ### 0061 开发侧观测使用与制品日志演进闭环
 制品维护诊断日志和版本说明，平台提供受限证据包；维护者取证缺口形成诊断补强，用户状态反馈走普通产品提案；功能设计分别说明两类影响并独立验收。
@@ -191,7 +191,7 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 对需求侧 proposal 先做一次分组并把交付侧共享机制、建议顺序与复用提示作为有界软信号，在不合票、不阻塞 worker 的前提下降低并行返工。
 
 ### 0064 阶段级可恢复实验运行
-把真实闭环改造成带持久化阶段游标、工作项幂等键和外部状态对账的可重入状态机，使实验失败后从最近完成的用户、Triage、Designer、Owner 或交付节点继续。
+把真实闭环改造成带持久化阶段游标、工作项幂等键和外部状态对账的可重入状态机，使实验失败后从最近完成的用户、Triage、Synthesizer、Owner 或交付节点继续。
 
 ### 0065 标准化 Harness 评测框架
 以不可变计划驱动隔离沙盒中的 Harness 评测，统一官方时间预算、直出与带心跳 LLM 用户模拟、官方 grader、失败分类、恢复和可复现实验报告。
@@ -201,6 +201,9 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 
 ### 0067 混合 Harness E2B Scaling 运行时
 为 N=1/4/8/16/32 建立按 receipt 冻结、可恢复、可并行启动的 E2B 混合任务运行时，并统一 direct 与 simulated-user 结果产物。
+
+### 0068 Synthesizer 角色彻底改名与旧 Developer 遗留清理
+在开发阶段直接统一 Synthesizer、demand 与配置名称；有效边界检查归入 guards，移除旧 Designer/dev 入口及失效提交中间件，不建设迁移或旧版拒绝设施。
 
 ## 全局看板
 
@@ -251,29 +254,26 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0012 | 0012/T2 | 状态耐心模型：任务量起始浮动 + 性格衰减系数 | done | — | backend/auto_designer/user/sim/state.py<br>backend/tests/user/sim/test_state.py |
 | 0013 | 0013/T1 | 拆 complete_task 信封 + 过程流分层 + begin/poll/control 心跳协议 | pending | — | backend/harness_template/entry.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/interface.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/models.py<br>backend/tests/harness/test_template_entry.py<br>backend/tests/harness/test_launcher.py |
 | 0013 | 0013/T2 | v0 种子自测 smoke + MANUAL 呈现契约 | pending | — | backend/harness_template/tests/test_smoke.py<br>backend/harness_template/MANUAL.md |
-| 0014 | 0014/T1 | CommitCheckpointMiddleware：逐级施压逼尽早落已提交增量 | pending | — | backend/auto_designer/dev/commit_checkpoint.py<br>backend/tests/dev/test_commit_checkpoint.py |
-| 0014 | 0014/T2 | CompletionGateMiddleware：收尾硬闸（含接线 AST）+ 软催测试/进度契约 | pending | — | backend/auto_designer/dev/completion_gate.py<br>backend/tests/dev/test_completion_gate.py |
-| 0014 | 0014/T3 | dev agent 配置/提示对齐：迭代预算·硬落地窗口·冒烟须盖接线 | pending | — | backend/agent_defs/developer_agent/agent.yaml<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/agent_defs/developer_agent/MANUAL.md |
-| 0015 | 0015/T1 | harness 仓提交边界硬闸（pre-commit 钩子） | pending | — | backend/auto_designer/dev/harness_boundary.py<br>backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_harness_boundary.py |
+| 0015 | 0015/T1 | harness 仓提交边界硬闸（pre-commit 钩子） | pending | — | backend/auto_designer/guards/harness_boundary.py<br>backend/tests/guards/test_harness_boundary.py |
 | 0015 | 0015/T2 | sandbox 工作目录下沉，物理隔离 trace | pending | — | backend/run.py<br>backend/tests/test_sandbox_isolation.py |
-| 0015 | 0015/T3 | WorkspaceJailMiddleware：写关仓内、读放行 NexAU 源码与运行时临时目录 | pending | — | backend/auto_designer/dev/workspace_jail.py<br>backend/tests/dev/test_workspace_jail.py |
-| 0016 | 0016/T1 | 体感 reason 作根因信号喂设计师 | pending | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_designer.py |
-| 0016 | 0016/T2 | 设计师 grep + 先搜后读，降低读码开销 | pending | — | backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/search_file_content.tool.yaml |
-| 0016 | 0016/T3 | 运行时行为聚合 runtime_agg：机制层观测数字喂设计师 | done | T1 | backend/auto_designer/designer/runtime_agg.py<br>backend/tests/loop/test_runtime_agg.py |
+| 0015 | 0015/T3 | WorkspaceJailMiddleware：写关仓内、读放行 NexAU 源码与运行时临时目录 | pending | — | backend/auto_designer/guards/workspace_jail.py<br>backend/tests/guards/test_workspace_jail.py |
+| 0016 | 0016/T1 | 体感 reason 作根因信号喂设计师 | pending | — | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_synthesizer.py |
+| 0016 | 0016/T2 | 设计师 grep + 先搜后读，降低读码开销 | pending | — | backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/tools/search_file_content.tool.yaml |
+| 0016 | 0016/T3 | 运行时行为聚合 runtime_agg：机制层观测数字喂设计师 | done | T1 | backend/auto_designer/demand/runtime_agg.py<br>backend/tests/loop/test_runtime_agg.py |
 | 0017 | 0017/T1 | 存储与观测投影加锁 | done | — | backend/auto_designer/user/session_store.py<br>backend/auto_designer/loop/live.py<br>backend/tests/user/test_session_store.py<br>backend/tests/loop/test_live.py |
 | 0017 | 0017/T2 | client 每局一实例（工厂注入） | done | — | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/sim/test_workspace.py |
 | 0017 | 0017/T3 | a 段并行化 + 并发度旋钮 | done | T1, T2 | backend/auto_designer/loop/orchestrator.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py |
 | 0017 | 0017/T4 | 并发端到端回归测试 | done | T3 | backend/tests/loop/test_parallel_sessions.py |
 | 0017 | 0017/T5 | harness checkout 并发安全 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 | 0017 | 0017/T6 | tracker HTTP 会话线程安全 | done | — | backend/auto_designer/tracker/gitea.py<br>backend/tests/tracker/test_gitea.py |
-| 0018 | 0018/T1 | _run_agent 出口拆 complete_task 信封 | done | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
+| 0018 | 0018/T1 | _run_agent 出口拆 complete_task 信封 | done | — | backend/auto_designer/demand/synthesizer.py<br>backend/tests/loop/test_synthesizer.py |
 | 0019 | 0019/T1 | launcher：非 reply 旁路一律收 + control 旁路/终结分流 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
-| 0020 | 0020/T1 | designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链 | done | — | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
+| 0020 | 0020/T1 | synthesizer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链 | done | — | backend/auto_designer/demand/synthesizer.py<br>backend/tests/loop/test_synthesizer.py |
 | 0020 | 0020/T2 | dev 领取分池 + 票种预算与重试升档 + 结果回写 comment | done | — | backend/auto_designer/dev/agentic_developer.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/tracker/test_fake.py |
 | 0020 | 0020/T3 | 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮 | done | T2 | backend/run.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_roster.py |
 | 0020 | 0020/T4 | web API：/api/issues 附 covers/covered_by 字段 | done | T1 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
 | 0020 | 0020/T5 | 前端：issue 列表与详情的覆盖徽标 | done | T4 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/types.ts<br>frontend/src/api.ts |
-| 0021 | 0021/T1 | repo_guard 模块 + orchestrator b 段绊线 | done | — | backend/auto_designer/dev/repo_guard.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/dev/test_repo_guard.py<br>backend/tests/loop/test_orchestrator.py |
+| 0021 | 0021/T1 | repo_guard 模块 + orchestrator b 段绊线 | done | — | backend/auto_designer/guards/repo_guard.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/guards/test_repo_guard.py<br>backend/tests/loop/test_orchestrator.py |
 | 0021 | 0021/T2 | run.py 凭证隔离 + 构造并注入编排仓绊线 guard | done | T1 | backend/run.py<br>backend/tests/test_run_git_isolation.py |
 | 0021 | 0021/T3 | 清理历史逃逸污染制品 MANUAL.md | done | — | backend/agent_defs/developer_agent/MANUAL.md |
 | 0022 | 0022/T1 | 内外窗口 + 等待菜单 + emit_message + 开放 intent | done | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/harness/test_launcher.py |
@@ -284,15 +284,15 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0023 | 0023/T3 | 探针：去掉 two 臂与 peek-via-control 心智 | done | T1 | backend/scripts/probe_wait_progress.py<br>backend/scripts/probe_peek_decision_trace.py<br>backend/scripts/probe_persona_wait_matrix.py<br>backend/scripts/probe_ontrack_new_harness.py<br>backend/scripts/probe_wait_signals_to_evolution.py |
 | 0023 | 0023/T4 | launcher.try_reply 非阻塞契约（已落地） | done | — | backend/auto_designer/harness/launcher.py |
 | 0024 | 0024/T1 | Session.sim_trace 落盘（TurnLog→SimTrace） | done | — | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_models.py<br>backend/tests/loop/test_sim_user.py |
-| 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_designer.py<br>backend/tests/user/test_session_store.py |
+| 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_synthesizer.py<br>backend/tests/user/test_session_store.py |
 | 0024 | 0024/T3 | get_session_timeline tool 入口（按需取证通路） | done | T2 | — |
-| 0024 | 0024/T4 | get_session_timeline 使用事件投影（去仿真外壳） | done | T3 | backend/auto_designer/designer/session_timeline.py<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_session_timeline.py |
-| 0024 | 0024/T5 | 设计师渐进下钻 tool 接线（beat/step） | done | T4 | backend/agent_defs/designer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/designer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/auto_designer/designer/designer.py |
+| 0024 | 0024/T4 | get_session_timeline 使用事件投影（去仿真外壳） | done | T3 | backend/auto_designer/demand/session_timeline.py<br>backend/agent_defs/synthesizer/tools/get_session_timeline.tool.yaml<br>backend/tests/demand/test_session_timeline.py |
+| 0024 | 0024/T5 | 设计师渐进下钻 tool 接线（beat/step） | done | T4 | backend/agent_defs/synthesizer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/synthesizer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/auto_designer/demand/synthesizer.py |
 | 0024 | 0024/T6 | 请求-回复配对：heard.answers → utterance | done | T5 | backend/tests/user/sim/test_heartbeat.py |
-| 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
+| 0025 | 0025/T1 | 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render | done | — | backend/auto_designer/demand/issue_schema.py<br>backend/tests/demand/test_issue_schema.py |
 | 0025 | 0025/T2 | 用户 sim 产结构化 raw issue：暂定 type + needs-triage + 轮号 | done | T1 | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py |
-| 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | done | T1, T2, T3a | backend/auto_designer/designer/triage.py<br>backend/tests/designer/test_triage.py |
-| 0025 | 0025/T4 | synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC | done | T3 | backend/auto_designer/designer/designer.py<br>backend/tests/loop/test_designer.py |
+| 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | done | T1, T2, T3a | backend/auto_designer/demand/triage.py<br>backend/tests/demand/test_triage.py |
+| 0025 | 0025/T4 | synthesize agent（原 synthesizer 收窄）：跨 issue 结构综合 → RFC | done | T3 | backend/auto_designer/demand/synthesizer.py<br>backend/tests/loop/test_synthesizer.py |
 | 0025 | 0025/T5 | dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck | done | T4 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
 | 0025 | 0025/T6 | 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster | done | T5 | backend/run.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
 | 0025 | 0025/T7 | web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压) | done | T4 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
@@ -303,20 +303,20 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0026 | 0026/T3 | 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线 | done | T2 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/components/Charts.tsx |
 | 0026 | 0026/T4 | 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛 | done | T1, T3 | frontend/src/components/AgentColumn.tsx<br>frontend/src/components/Card.tsx |
 | 0026 | 0026/T5 | 详情面板信息架构刷新（agent/session/issue/commit + 侧栏）+ persona 块 | done | T2, T3 | frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/SessionDetail.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/components/detail/CommitDetail.tsx<br>frontend/src/components/SidePanel.tsx |
-| 0027 | 0027/T1 | issue_schema 收敛为契约单一真源 + 契约生成/共享校验模块 | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/tests/designer/test_issue_schema.py<br>backend/tests/designer/test_agent_contract.py |
-| 0027 | 0027/T2 | triage 改 submit-tool 原生结构化（去第二次 LLM 重排与别名归一） | done | T1 | backend/auto_designer/designer/triage.py<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/tests/designer/test_triage.py |
-| 0027 | 0027/T3 | designer 改 submit-tool 原生结构化 + 统一 driver-apply | done | T1 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/tests/loop/test_designer.py |
-| 0028 | 0028/T1 | issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径 | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
-| 0028 | 0028/T2 | Divergent 驱动器 + agent_defs/divergent_pm：落不可领产品候选 | done | T1 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/<br>backend/scripts/preview_divergent_pm_rounds.py<br>backend/scripts/preview_gate_on_divergent.py<br>backend/tests/designer/test_divergent_gate.py |
-| 0028 | 0028/T3 | Designer.gate_once：promote/hold/drop 语义晋升 | done | T1 | backend/auto_designer/designer/designer.py |
+| 0027 | 0027/T1 | issue_schema 收敛为契约单一真源 + 契约生成/共享校验模块 | done | — | backend/auto_designer/demand/issue_schema.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/tests/demand/test_issue_schema.py<br>backend/tests/demand/test_agent_contract.py |
+| 0027 | 0027/T2 | triage 改 submit-tool 原生结构化（去第二次 LLM 重排与别名归一） | done | T1 | backend/auto_designer/demand/triage.py<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/tests/demand/test_triage.py |
+| 0027 | 0027/T3 | synthesizer 改 submit-tool 原生结构化 + 统一 driver-apply | done | T1 | backend/auto_designer/demand/synthesizer.py<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/tests/loop/test_synthesizer.py |
+| 0028 | 0028/T1 | issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径 | done | — | backend/auto_designer/demand/issue_schema.py<br>backend/tests/demand/test_issue_schema.py |
+| 0028 | 0028/T2 | Divergent 驱动器 + agent_defs/divergent_pm：落不可领产品候选 | done | T1 | backend/auto_designer/demand/divergent.py<br>backend/agent_defs/divergent_pm/<br>backend/scripts/preview_divergent_pm_rounds.py<br>backend/scripts/preview_gate_on_divergent.py<br>backend/tests/demand/test_divergent_gate.py |
+| 0028 | 0028/T3 | Synthesizer.gate_once：promote/hold/drop 语义晋升 | done | T1 | backend/auto_designer/demand/synthesizer.py |
 | 0028 | 0028/T4 | 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关 | done | T2, T3 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/live.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_roster.py |
 | 0028 | 0028/T5 | dev 领取硬排除 divergent 候选 | done | T1 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
-| 0029 | 0029/T1 | issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射 | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/tests/designer/test_issue_schema.py |
-| 0029 | 0029/T2 | agent_runtime 公共运行时抽出：跑 agent + 读 submit 一处实现 | done | — | backend/auto_designer/designer/agent_runtime.py<br>backend/tests/designer/test_agent_runtime.py |
-| 0029 | 0029/T3 | triage 改纯规范化生成器：accept→就地升 proposal，判重职责移出 | done | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/tests/designer/test_triage.py |
-| 0029 | 0029/T4 | synthesize 收窄为纯生成器：产 proposal(from-synthesize)，gate_once 退役 | done | T1, T2 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/designer/tools/submit_gate.tool.yaml<br>backend/tests/loop/test_designer.py |
-| 0029 | 0029/T5 | divergent 对齐纯生成器：产 proposal(from-divergent)，专属通道退役 | done | T1, T2 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/tests/designer/test_divergent_gate.py |
-| 0029 | 0029/T6 | Owner 唯一准入：机械+评审双模式批量裁决（admit/merge/decline/hold） | done | T1, T2 | backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/designer/submit_tools.py<br>backend/agent_defs/owner/<br>backend/tests/designer/test_owner.py |
+| 0029 | 0029/T1 | issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射 | done | — | backend/auto_designer/demand/issue_schema.py<br>backend/tests/demand/test_issue_schema.py |
+| 0029 | 0029/T2 | agent_runtime 公共运行时抽出：跑 agent + 读 submit 一处实现 | done | — | backend/auto_designer/demand/agent_runtime.py<br>backend/tests/demand/test_agent_runtime.py |
+| 0029 | 0029/T3 | triage 改纯规范化生成器：accept→就地升 proposal，判重职责移出 | done | T1, T2 | backend/auto_designer/demand/triage.py<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/tests/demand/test_triage.py |
+| 0029 | 0029/T4 | synthesize 收窄为纯生成器：产 proposal(from-synthesize)，gate_once 退役 | done | T1, T2 | backend/auto_designer/demand/synthesizer.py<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_gate.tool.yaml<br>backend/tests/loop/test_synthesizer.py |
+| 0029 | 0029/T5 | divergent 对齐纯生成器：产 proposal(from-divergent)，专属通道退役 | done | T1, T2 | backend/auto_designer/demand/divergent.py<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/tests/demand/test_divergent_gate.py |
+| 0029 | 0029/T6 | Owner 唯一准入：机械+评审双模式批量裁决（admit/merge/decline/hold） | done | T1, T2 | backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/demand/submit_tools.py<br>backend/agent_defs/owner/<br>backend/tests/demand/test_owner.py |
 | 0029 | 0029/T7 | dev 白名单领取：ready-only + priority→age 排序 + 级联关闭 | done | T1 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
 | 0029 | 0029/T8 | 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警 | done | T3, T4, T5, T6, T7 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
 | 0029 | 0029/T9 | 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数 | done | T6, T7 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
@@ -324,16 +324,15 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0030 | 0030/T1 | 写 0030 活快照 | done | — | docs/specs/0030-harness-product-interface.md |
 | 0030 | 0030/T2 | harness_template 精简为 HELP/RUNTIME/scripts/deps | done | — | backend/harness_template/LICENSE<br>backend/harness_template/HELP.md<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/.env.example<br>backend/harness_template/requirements.txt<br>backend/harness_template/scripts/run.sh<br>backend/harness_template/scripts/smoke.sh<br>backend/harness_template/scripts/check.sh |
 | 0030 | 0030/T3 | /help slash 与模板自测 | done | T2 | backend/harness_template/entry.py<br>backend/harness_template/agents/main.md<br>backend/harness_template/tests/test_smoke.py |
-| 0030 | 0030/T4 | 边界白名单改为产品区域而非历史文件名 | done | T2 | backend/auto_designer/dev/harness_boundary.py<br>backend/tests/dev/test_harness_boundary.py |
-| 0030 | 0030/T5 | 平台读取 HELP.md 与收尾闸门同步 | done | T2 | backend/auto_designer/dev/completion_gate.py<br>backend/tests/dev/test_completion_gate.py<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/agent_defs/developer_agent/agent.yaml |
-| 0030 | 0030/T6 | connector 与 stdio-jsonl-v1 协议适配 | done | T5 | backend/auto_designer/harness/connector.py<br>backend/tests/harness/test_connector.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py<br>backend/harness_template/params.yaml<br>backend/auto_designer/harness/INTERFACE.md |
+| 0030 | 0030/T4 | 产品提交边界：拒绝密钥与运行态 | done | T2 | backend/auto_designer/guards/harness_boundary.py<br>backend/tests/guards/test_harness_boundary.py |
+| 0030 | 0030/T6 | connector 与 stdio-jsonl-v1 协议适配 | done | T2 | backend/auto_designer/harness/connector.py<br>backend/tests/harness/test_connector.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py<br>backend/harness_template/params.yaml<br>backend/auto_designer/harness/INTERFACE.md |
 | 0031 | 0031/T1 | 写 0031 活快照 | done | — | docs/specs/0031-user-sim-stage-contracts.md |
 | 0031 | 0031/T2 | 拆 prompt：薄 base system 与阶段局部 contract | done | T1 | backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_prompt.py<br>backend/tests/user/sim/test_inner_prompt.py |
 | 0031 | 0031/T3 | loop 集成防回归：主/心跳三跳只按阶段暴露契约 | done | T2 | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py |
 | 0031 | 0031/T4 | persona_client 与 agentic 路径适配阶段契约 | done | T2 | backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_persona_client_agentic.py |
 | 0032 | 0032/T1 | OpenAgents 仓：forge 分发层——alias-import 接缝 + 配置段 + merger 提示词参数化 | done | — | OpenAgents/openagents/utils/forge.py<br>OpenAgents/openagents/utils/agent_config.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/backfill.py<br>OpenAgents/openagents/runtime/gates.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/utils/identity.py<br>OpenAgents/openagents/utils/release.py<br>OpenAgents/openagents/cli.py<br>OpenAgents/openagents/agents/merger.py<br>OpenAgents/tests/test_forge.py |
 | 0032 | 0032/T2 | OpenAgents 仓：Gitea REST driver——github.py 同名公共面对 Gitea /api/v1 | done | T1 | OpenAgents/openagents/utils/gitea.py<br>OpenAgents/tests/test_gitea_driver.py |
-| 0032 | 0032/T3 | 准入交接：Owner 改打 openagents 发现标签，plane READY 收编 {ready, openagents} | done | — | backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/owner.py<br>backend/tests/designer/test_issue_schema.py<br>backend/tests/designer/test_owner.py |
+| 0032 | 0032/T3 | 准入交接：Owner 改打 openagents 发现标签，plane READY 收编 {ready, openagents} | done | — | backend/auto_designer/demand/issue_schema.py<br>backend/auto_designer/demand/owner.py<br>backend/tests/demand/test_issue_schema.py<br>backend/tests/demand/test_owner.py |
 | 0032 | 0032/T4 | dev 侧退役：AgenticDeveloper/developer_agent 删除，orchestrator 去 dev 拍 | done | T3 | backend/auto_designer/dev/agentic_developer.py<br>backend/agent_defs/developer_agent/agent.yaml<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/scripts/probe_wait_signals_to_evolution.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_parallel_sessions.py<br>backend/tests/loop/test_roster.py |
 | 0032 | 0032/T5 | vigil 接线：run.py 写 openagents.yml、管 vigil 子进程生命周期、vK tag 退役 | done | T2, T4 | backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/test_run_vigil.py |
 | 0032 | 0032/T6 | harness 仓最小 CI：Gitea Actions runner + 冒烟 workflow | done | T5 | backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/bootstrap.sh<br>backend/harness_template/.gitea/workflows/smoke.yml |
@@ -372,32 +371,32 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0039 | 0039/T1 | 固化规格与跨仓验收边界 | done | — | docs/specs/0039-issue-state-timeline.md |
 | 0039 | 0039/T2 | 读取并折叠 Gitea issue timeline | done | T1 | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/web/issue_timeline.py<br>backend/tests/tracker/test_gitea_timeline.py |
 | 0039 | 0039/T3 | 扩展 issue 详情 timeline API | done | T2 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
-| 0039 | 0039/T4 | 为 Designer 综合票写入轮次标签 | done | T1 | backend/auto_designer/designer/designer.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_designer.py |
+| 0039 | 0039/T4 | 为 Synthesizer 综合票写入轮次标签 | done | T1 | backend/auto_designer/demand/synthesizer.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_synthesizer.py |
 | 0039 | 0039/T5 | 建立前端标签维度与时间线展示模型 | done | T3 | frontend/src/types.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/components/detail/issueTimelineModel.ts<br>frontend/src/components/detail/issueTimelineModel.test.ts |
 | 0039 | 0039/T6 | 展示 issue 状态演进并完成跨仓验收 | done | T4, T5 | frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/styles.css<br>backend/scripts/e2e-spec-0039-issue-state-timeline.sh |
 | 0040 | 0040/T1 | stages.rfc=agent 定稿 + vigil 缺省 keep-alive | done | — | backend/run.py<br>backend/tests/test_run_vigil.py<br>backend/scripts/run_swebench_closed_loop.py |
-| 0040 | 0040/T2 | 提交边界从白名单改为拒绝清单 | done | — | backend/auto_designer/dev/harness_boundary.py<br>backend/tests/dev/test_harness_boundary.py |
+| 0040 | 0040/T2 | 提交边界从白名单改为拒绝清单 | done | — | backend/auto_designer/guards/harness_boundary.py<br>backend/tests/guards/test_harness_boundary.py |
 | 0040 | 0040/T3 | smoke 拒绝清单与种子 docs/specs 落点 | done | T2 | backend/harness_template/.gitea/workflows/smoke.yml<br>backend/harness_template/docs/specs/README.md |
 | 0040 | 0040/T4 | 自定义 Anthropic 网关域进 egress allowlist | done | — | backend/deploy/gitea/egress-proxy.conf |
 | 0040 | 0040/T5 | OpenAgents 镜像：implement 首轮优先 worktree specs | done | T1 | OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/agents/implementer.py |
 | 0041 | 0041/T1 | 统一事件模型、上下文与 user 精确采集 | done | — | backend/auto_designer/usage.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_usage.py<br>backend/tests/user/sim/test_persona_usage.py |
-| 0041 | 0041/T2 | 后端 NexAU 角色逐调用采集与轮级归属 | done | T1 | backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/designer/test_agent_runtime.py<br>backend/tests/loop/test_live_tracer.py<br>backend/tests/loop/test_orchestrator.py |
+| 0041 | 0041/T2 | 后端 NexAU 角色逐调用采集与轮级归属 | done | T1 | backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/demand/test_agent_runtime.py<br>backend/tests/loop/test_live_tracer.py<br>backend/tests/loop/test_orchestrator.py |
 | 0041 | 0041/T3 | Harness tracer 输出逐调用 usage 旁路 | done | T1 | backend/harness_template/entry.py<br>backend/harness_template/tests/test_smoke.py |
 | 0041 | 0041/T4 | Harness 收端隔离、按题归属与落盘 | done | T1, T3 | backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/connector.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_connector.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/loop/test_parallel_sessions.py |
 | 0041 | 0041/T5 | 分层聚合 API 与看板 | pending | T1, T2, T4 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py<br>frontend/src/api.ts<br>frontend/src/types.ts<br>frontend/src/components/UsagePanel.tsx<br>frontend/src/App.tsx<br>frontend/src/styles.css |
 | 0041 | 0041/T6 | Developer/vigil 精确度审计与结构化扩展口 | done | T1 | backend/run.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>docs/usage-monitoring.md |
 | 0042 | 0042/T1 | 权威术语表、角色职责矩阵与现行流程基线 | done | — | docs/specs/0042-role-contract-governance.md<br>docs/specs/OVERVIEW.md |
-| 0042 | 0042/T2 | Canonical ProposalView 与规范化提案版本 | done | T1 | backend/auto_designer/designer/proposal_view.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/divergent.py<br>backend/tests/designer/test_proposal_view.py |
-| 0042 | 0042/T3 | Triage 可靠规范化迁移与结构化失败结果 | done | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/fake.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/designer/test_triage.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
-| 0042 | 0042/T4 | Owner 决策图验证与可靠批量落库 | done | T1, T2 | backend/auto_designer/designer/owner.py<br>backend/tests/designer/test_owner.py |
-| 0042 | 0042/T5 | 五角色专业化 Prompt 与 Tool 契约统一 | done | T1, T2, T3, T4 | backend/agent_defs/user_agent/prompt.md<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
-| 0042 | 0042/T6 | 跨角色契约测试、规格索引与历史会话回放 | done | T3, T4, T5 | backend/tests/designer/test_role_contract_flow.py<br>backend/scripts/replay_design_from_sessions.py |
-| 0043 | 0043/T1 | 角色产物模型与共享质量门契约 | done | — | backend/auto_designer/designer/role_contract.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/designer/submit_tools.py<br>backend/tests/designer/test_role_contract.py<br>backend/tests/designer/test_agent_contract.py |
-| 0043 | 0043/T2 | Triage 单报告认知隔离与事实型提案 | done | T1 | backend/auto_designer/designer/triage.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/tests/designer/test_triage.py |
-| 0043 | 0043/T3 | 产品 PM 全景洞察契约 | done | T1 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/tests/designer/test_divergent_gate.py |
-| 0043 | 0043/T4 | Synthesize 提案关系综合契约 | done | T1, T2, T3 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/tests/loop/test_designer.py |
-| 0043 | 0043/T5 | Owner 投资判断与组合质量门 | done | T1, T4 | backend/auto_designer/designer/owner.py<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/tests/designer/test_owner.py |
-| 0043 | 0043/T6 | 跨角色行为评测与真实回放验收 | done | T2, T3, T4, T5 | backend/tests/designer/test_role_contract_flow.py<br>backend/scripts/replay_design_from_sessions.py<br>backend/scripts/evaluate_role_traces.py |
+| 0042 | 0042/T2 | Canonical ProposalView 与规范化提案版本 | done | T1 | backend/auto_designer/demand/proposal_view.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/divergent.py<br>backend/tests/demand/test_proposal_view.py |
+| 0042 | 0042/T3 | Triage 可靠规范化迁移与结构化失败结果 | done | T1, T2 | backend/auto_designer/demand/triage.py<br>backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/fake.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/demand/test_triage.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
+| 0042 | 0042/T4 | Owner 决策图验证与可靠批量落库 | done | T1, T2 | backend/auto_designer/demand/owner.py<br>backend/tests/demand/test_owner.py |
+| 0042 | 0042/T5 | 五角色专业化 Prompt 与 Tool 契约统一 | done | T1, T2, T3, T4 | backend/agent_defs/user_agent/prompt.md<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
+| 0042 | 0042/T6 | 跨角色契约测试、规格索引与历史会话回放 | done | T3, T4, T5 | backend/tests/demand/test_role_contract_flow.py<br>backend/scripts/replay_roles_from_sessions.py |
+| 0043 | 0043/T1 | 角色产物模型与共享质量门契约 | done | — | backend/auto_designer/demand/role_contract.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/demand/submit_tools.py<br>backend/tests/demand/test_role_contract.py<br>backend/tests/demand/test_agent_contract.py |
+| 0043 | 0043/T2 | Triage 单报告认知隔离与事实型提案 | done | T1 | backend/auto_designer/demand/triage.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/tests/demand/test_triage.py |
+| 0043 | 0043/T3 | 产品 PM 全景洞察契约 | done | T1 | backend/auto_designer/demand/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/tests/demand/test_divergent_gate.py |
+| 0043 | 0043/T4 | Synthesize 提案关系综合契约 | done | T1, T2, T3 | backend/auto_designer/demand/synthesizer.py<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/tests/loop/test_synthesizer.py |
+| 0043 | 0043/T5 | Owner 投资判断与组合质量门 | done | T1, T4 | backend/auto_designer/demand/owner.py<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/tests/demand/test_owner.py |
+| 0043 | 0043/T6 | 跨角色行为评测与真实回放验收 | done | T2, T3, T4, T5 | backend/tests/demand/test_role_contract_flow.py<br>backend/scripts/replay_roles_from_sessions.py<br>backend/scripts/evaluate_role_traces.py |
 | 0044 | 0044/T1 | Manifest 与供给契约 | done | — | docs/specs/0044-swebench-seed-workspace-supply.md<br>backend/swebench_pools/medium_hard_16.json |
 | 0044 | 0044/T2 | Prebuilt 隔离复制与虚拟环境迁移 | done | T1 | backend/auto_designer/user/sim/sources/prebuilt.py<br>backend/tests/user/sim/test_prebuilt_source.py |
 | 0044 | 0044/T3 | Storage-only Docker seed 供给 | done | T1, T2 | backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/build.sh<br>backend/tests/user/sim/test_docker_seed_source.py |
@@ -424,8 +423,8 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0048 | 0048/T5 | 历史 action 完整性审计与端到端认证 | done | T3 | backend/scripts/audit_sim_action_integrity.py<br>backend/scripts/canary_spec0048_final_check.py<br>backend/tests/scripts/test_audit_sim_action_integrity.py<br>backend/scripts/e2e-spec-0048-final-check-convergence.sh<br>docs/0048-user-sim-final-check-convergence.md |
 | 0049 | 0049/T1 | 调用记录契约与审计基线 | done | — | docs/specs/0049-role-invocation-io-store.md |
 | 0049 | 0049/T2 | InvocationStore、run manifest 与 v1 schema | done | T1 | backend/auto_designer/invocation.py<br>backend/tests/test_invocation.py |
-| 0049 | 0049/T3 | 需求面 run_agent_def 落盘 | done | T2 | backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/owner.py<br>backend/tests/designer/test_agent_runtime.py |
-| 0049 | 0049/T4 | run 生命周期、会话迁入、vigil 导出与 jail | done | T2 | backend/run.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>backend/auto_designer/dev/workspace_jail.py<br>backend/tests/dev/test_workspace_jail.py |
+| 0049 | 0049/T3 | 需求面 run_agent_def 落盘 | done | T2 | backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/owner.py<br>backend/tests/demand/test_agent_runtime.py |
+| 0049 | 0049/T4 | run 生命周期、会话迁入、vigil 导出与 jail | done | T2 | backend/run.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>backend/auto_designer/guards/workspace_jail.py<br>backend/tests/guards/test_workspace_jail.py |
 | 0049 | 0049/T5 | 冻结调用离线重放 | done | T3 | backend/scripts/replay_role_invocations.py<br>backend/tests/scripts/test_replay_role_invocations.py<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh |
 | 0049 | 0049/T6 | 交付面 run_agent 写出同一 schema | done | T2, T4 | OpenAgents/openagents/runtime/engine.py<br>OpenAgents/tests/test_runtime_engine.py<br>backend/tests/test_delivery_invocation_contract.py<br>backend/tests/fixtures/delivery_invocation.v1.json |
 | 0050 | 0050/T1 | 轮次封口契约 | done | — | docs/specs/0050-round-delivery-gate.md |
@@ -438,9 +437,9 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0051 | 0051/T3 | harness 容器执行与强制终止 | done | T2 | backend/auto_designer/harness/launcher.py<br>backend/harness_template/entry.py<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/tests/test_smoke.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_template_entry.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_sim_user.py |
 | 0051 | 0051/T4 | 双结论、客观执行与假接受 | done | T3 | backend/auto_designer/evaluation/swebench.py<br>backend/auto_designer/evaluation/__init__.py<br>backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/evaluation/test_swebench.py<br>backend/tests/user/test_session_store.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/test_models.py<br>pyproject.toml |
 | 0051 | 0051/T5 | 可运行镜像、一键入口与审计冒烟 | done | T4 | backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/runtime.Dockerfile<br>backend/scripts/build_swebench_runtime_image.sh<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh<br>backend/scripts/run-glm52fp8-1m-canary2-isolated.sh<br>backend/scripts/e2e-spec-0051-session-container.sh<br>CLAUDE.md |
-| 0052 | 0052/T1 | Designer covers 合并语义与状态迁移 | done | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/role_contract.py |
-| 0052 | 0052/T2 | Owner 退回纯交付路由 | done | T1 | backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
-| 0052 | 0052/T3 | 覆盖合并回归测试与规格验证 | done | T1, T2 | backend/tests/loop/test_designer.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_role_contract.py<br>backend/tests/designer/test_agent_contract.py<br>docs/specs/0052-designer-covers-consolidation.md |
+| 0052 | 0052/T1 | Synthesizer covers 合并语义与状态迁移 | done | — | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/issue_schema.py<br>backend/auto_designer/demand/role_contract.py |
+| 0052 | 0052/T2 | Owner 退回纯交付路由 | done | T1 | backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
+| 0052 | 0052/T3 | 覆盖合并回归测试与规格验证 | done | T1, T2 | backend/tests/loop/test_synthesizer.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_role_contract.py<br>backend/tests/demand/test_agent_contract.py<br>docs/specs/0052-synthesizer-covers-consolidation.md |
 | 0053 | 0053/T1 | 定义语义动作契约与分层结果模型 | done | — | docs/specs/0053-persona-semantic-action-lifecycle.md |
 | 0053 | 0053/T2 | 实现动作语义契约与阶段局部 schema | done | — | backend/auto_designer/user/sim/actions.py<br>backend/auto_designer/user/sim/action_space.py<br>backend/tests/user/sim/test_action_space.py |
 | 0053 | 0053/T3 | 实现协议解析修复与错误分级 | in-progress | T2 | backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_persona_client_agentic.py<br>backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/test_models.py |
@@ -449,37 +448,37 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0054 | 0054/T1 | 目标账本与修订事件模型 | done | — | backend/auto_designer/user/sim/goals.py<br>backend/tests/user/sim/test_goals.py |
 | 0054 | 0054/T2 | 目标进入用户感知与动作决策 | done | T1 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_persona_client_agentic.py |
 | 0054 | 0054/T3 | 目标结果与主客观结论分离 | done | T1, T2 | backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/test_models.py<br>backend/tests/user/test_session_store.py |
-| 0054 | 0054/T4 | 时间线投影与目标账本完整审计 | done | T2, T3 | backend/auto_designer/designer/session_timeline.py<br>backend/tests/designer/test_session_timeline.py |
-| 0055 | 0055/T1 | 定义目标感知证据包与分层读取契约 | done | 0054/T4 | backend/auto_designer/designer/evidence_contract.py<br>backend/tests/designer/test_evidence_contract.py |
-| 0055 | 0055/T2 | 用户反馈 handoff 与 Triage 单报告输入 | done | T1, 0054/T4 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/role_contract.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_triage.py |
-| 0055 | 0055/T3 | 产品 PM 全局体验输入与产品视角边界 | done | T1, 0054/T4 | backend/auto_designer/designer/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/get_session_timeline.tool.yaml<br>backend/tests/designer/test_divergent_gate.py |
-| 0055 | 0055/T4 | Synthesize 提案关系输入与证据下钻约束 | done | T1, T2, T3, 0054/T4 | backend/auto_designer/designer/designer.py<br>backend/agent_defs/designer/systemprompt.md<br>backend/auto_designer/designer/session_timeline.py<br>backend/tests/loop/test_designer.py |
-| 0055 | 0055/T5 | 角色可见性、过拟合和延迟回归评测 | done | T2, T3, T4 | backend/scripts/evaluate_role_traces.py<br>backend/tests/designer/test_role_contract_flow.py |
+| 0054 | 0054/T4 | 时间线投影与目标账本完整审计 | done | T2, T3 | backend/auto_designer/demand/session_timeline.py<br>backend/tests/demand/test_session_timeline.py |
+| 0055 | 0055/T1 | 定义目标感知证据包与分层读取契约 | done | 0054/T4 | backend/auto_designer/demand/evidence_contract.py<br>backend/tests/demand/test_evidence_contract.py |
+| 0055 | 0055/T2 | 用户反馈 handoff 与 Triage 单报告输入 | done | T1, 0054/T4 | backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/role_contract.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/get_session_timeline.tool.yaml<br>backend/tests/demand/test_triage.py |
+| 0055 | 0055/T3 | 产品 PM 全局体验输入与产品视角边界 | done | T1, 0054/T4 | backend/auto_designer/demand/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/get_session_timeline.tool.yaml<br>backend/tests/demand/test_divergent_gate.py |
+| 0055 | 0055/T4 | Synthesize 提案关系输入与证据下钻约束 | done | T1, T2, T3, 0054/T4 | backend/auto_designer/demand/synthesizer.py<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/auto_designer/demand/session_timeline.py<br>backend/tests/loop/test_synthesizer.py |
+| 0055 | 0055/T5 | 角色可见性、过拟合和延迟回归评测 | done | T2, T3, T4 | backend/scripts/evaluate_role_traces.py<br>backend/tests/demand/test_role_contract_flow.py |
 | 0056 | 0056/T1 | 终止动作与目标账本原子提交 | done | 0054/T4 | backend/auto_designer/user/sim/goals.py<br>backend/tests/user/sim/test_goals.py |
 | 0056 | 0056/T2 | Persona 验收依据与能力对齐 | done | 0053/T4 | backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/persona_client.py |
-| 0056 | 0056/T3 | 可见初始完成条件与客观结果分轨 | done | 0051/T4, 0054/T2 | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/designer/evidence_contract.py<br>backend/auto_designer/designer/session_timeline.py<br>backend/tests/designer/test_terminal_evidence.py |
+| 0056 | 0056/T3 | 可见初始完成条件与客观结果分轨 | done | 0051/T4, 0054/T2 | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/demand/evidence_contract.py<br>backend/auto_designer/demand/session_timeline.py<br>backend/tests/demand/test_terminal_evidence.py |
 | 0056 | 0056/T4 | 终止一致性回归 | done | T1, T2, T3 | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/scripts/e2e-spec-0056-0057-user-semantics.sh |
 | 0057 | 0057/T1 | 主动作伴随反馈与既有提单兼容 | done | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/clauses.py |
 | 0057 | 0057/T2 | 动作兼容与持久化回归 | done | T1 | backend/tests/user/sim/test_feedback.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/sim/test_prompt.py |
-| 0059 | 0059/T1 | 制品观测文件的只读入口和访问审计 | done | — | backend/auto_designer/designer/observation_provider.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/dev/workspace_jail.py |
-| 0059 | 0059/T2 | 独立 PM 和结构综合按需取证与证据引用延续 | done | T1 | backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/proposal_view.py<br>backend/auto_designer/designer/evidence_contract.py<br>backend/auto_designer/designer/session_timeline.py<br>backend/tests/loop/test_designer.py<br>backend/agent_defs/designer<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/triage_agent/systemprompt.md |
-| 0059 | 0059/T3 | 边界回归与真实模型单链路回放 | done | T1, T2 | backend/tests/designer/test_observation_provider.py<br>backend/scripts/replay_observation_design.py |
-| 0060 | 0060/T1 | 双轨角色边界与协调契约 | done | — | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>CLAUDE.md |
-| 0060 | 0060/T2 | 角色与跨轮观测回归和实验审计 | done | T1 | backend/tests/designer/test_role_contract_flow.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_observation_provider.py<br>docs/audits/0060-spec0059-observation-audit.md |
+| 0059 | 0059/T1 | 制品观测文件的只读入口和访问审计 | done | — | backend/auto_designer/demand/observation_provider.py<br>backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/guards/workspace_jail.py |
+| 0059 | 0059/T2 | 独立 PM 和结构综合按需取证与证据引用延续 | done | T1 | backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/proposal_view.py<br>backend/auto_designer/demand/evidence_contract.py<br>backend/auto_designer/demand/session_timeline.py<br>backend/tests/loop/test_synthesizer.py<br>backend/agent_defs/synthesizer<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/triage_agent/systemprompt.md |
+| 0059 | 0059/T3 | 边界回归与真实模型单链路回放 | done | T1, T2 | backend/tests/demand/test_observation_provider.py<br>backend/scripts/replay_observation_synthesis.py |
+| 0060 | 0060/T1 | 双轨角色边界与协调契约 | done | — | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>CLAUDE.md |
+| 0060 | 0060/T2 | 角色与跨轮观测回归和实验审计 | done | T1 | backend/tests/demand/test_role_contract_flow.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_observation_provider.py<br>docs/audits/0060-spec0059-observation-audit.md |
 | 0061 | 0061/T1 | NexAU 起点的制品自有观测包 | done | — | backend/harness_template/entry.py<br>backend/harness_template/observability.py<br>backend/harness_template/OBSERVABILITY.md<br>backend/harness_template/tests/test_observability.py<br>backend/tests/harness/test_template_entry.py<br>backend/harness_template/params.yaml |
-| 0061 | 0061/T2 | 会话收集、版本绑定与历史留存 | done | T1 | backend/auto_designer/user/sim/runtime.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/observations/publication.py<br>backend/auto_designer/observations/__main__.py<br>backend/auto_designer/designer/observation_provider.py<br>backend/tests/observations/test_publication.py |
-| 0061 | 0061/T3 | 跨容器开发证据交接 | done | T2 | backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/auto_designer/observations/grants.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/designer/test_delivery_evidence.py |
+| 0061 | 0061/T2 | 会话收集、版本绑定与历史留存 | done | T1 | backend/auto_designer/user/sim/runtime.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/observations/publication.py<br>backend/auto_designer/observations/__main__.py<br>backend/auto_designer/demand/observation_provider.py<br>backend/tests/observations/test_publication.py |
+| 0061 | 0061/T3 | 跨容器开发证据交接 | done | T2 | backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/delivery_evidence.py<br>backend/auto_designer/observations/grants.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/demand/test_delivery_evidence.py |
 | 0061 | 0061/T4 | 开发设计、实现、评审的观测职责 | done | T3 | backend/harness_template/META_SPEC.md<br>backend/deploy/vigil/observability-overlay.Dockerfile<br>backend/deploy/vigil/observation-runtime.json<br>docs/audits/0061-observation-goal-boundaries.json<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/utils/gitea.py<br>OpenAgents/openagents/observations/evidence.py<br>OpenAgents/tests/test_observation_evidence.py |
-| 0061 | 0061/T5 | 诊断观测缺口提案与可恢复提交 | done | T3 | backend/auto_designer/observations/gaps.py<br>backend/auto_designer/observations/delivery_gaps.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/designer.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml<br>backend/tests/observations/test_gaps.py<br>OpenAgents/openagents/observations/gaps.py<br>OpenAgents/openagents/v02/openagents_adapter.py |
+| 0061 | 0061/T5 | 诊断观测缺口提案与可恢复提交 | done | T3 | backend/auto_designer/observations/gaps.py<br>backend/auto_designer/observations/delivery_gaps.py<br>backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml<br>backend/tests/observations/test_gaps.py<br>OpenAgents/openagents/observations/gaps.py<br>OpenAgents/openagents/v02/openagents_adapter.py |
 | 0061 | 0061/T6 | 跨轮与替代 harness 验证 | done | T1, T2, T3, T4, T5 | backend/tests/observations/fixtures/alternate_v1.py<br>backend/tests/observations/fixtures/alternate_v2.py<br>backend/scripts/replay_observation_lifecycle.py<br>docs/audits/0061-observation-lifecycle-validation.md |
 | 0062 | 0062/T1 | 当前与历史失败终态及闭环回归 | done | — | CLAUDE.md<br>backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_round_gate.py<br>backend/tests/loop/test_orchestrator.py<br>docs/audits/0062-two-user-closure-and-framework-fixes.md |
-| 0063 | 0063/T1 | 需求侧提案分组与并行 Designer | done | — | backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/tracker/gitea.py<br>backend/run.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/tracker/test_gitea.py<br>docs/designer-grouping.md |
+| 0063 | 0063/T1 | 需求侧提案分组与并行 Synthesizer | done | — | backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/tracker/gitea.py<br>backend/run.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/tracker/test_gitea.py<br>docs/synthesizer-grouping.md |
 | 0063 | 0063/T2 | 交付侧有界前置与软调度 | done | — | CLAUDE.md<br>backend/tests/test_run_vigil.py<br>OpenAgents/openagents/runtime/preflight.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/tests/test_preflight.py<br>OpenAgents/tools/preflight_stress.py |
 | 0064 | 0064/T1 | 持久化恢复状态与对账原语 | done | — | backend/auto_designer/loop/recovery.py<br>backend/auto_designer/loop/run_state.py<br>backend/auto_designer/loop/checkpoint.py<br>backend/auto_designer/invocation.py<br>backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/fake.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_run_state.py<br>backend/tests/loop/test_checkpoint.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
 | 0064 | 0064/T2 | 阶段化 Orchestrator 与交付恢复 | done | T1 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/runner.py<br>backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_runner.py<br>backend/tests/loop/test_round_gate.py |
 | 0064 | 0064/T3 | 用户会话工作项级恢复 | done | T1, T2 | backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/test_session_store.py |
-| 0064 | 0064/T4 | Triage 与 Divergent 第一拍恢复 | done | T1, T2 | backend/auto_designer/designer/triage.py<br>backend/auto_designer/designer/divergent.py<br>backend/tests/designer/test_triage.py<br>backend/tests/designer/test_divergent_gate.py |
-| 0064 | 0064/T5 | Designer 与 Owner 输出先存后应用 | done | T1, T2, T4 | backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/tests/loop/test_designer.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_delivery_evidence.py |
+| 0064 | 0064/T4 | Triage 与 Divergent 第一拍恢复 | done | T1, T2 | backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/divergent.py<br>backend/tests/demand/test_triage.py<br>backend/tests/demand/test_divergent_gate.py |
+| 0064 | 0064/T5 | Synthesizer 与 Owner 输出先存后应用 | done | T1, T2, T4 | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/delivery_evidence.py<br>backend/tests/loop/test_synthesizer.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_delivery_evidence.py |
 | 0064 | 0064/T6 | Fresh/resume 入口与故障矩阵验收 | done | T1, T2, T3, T4, T5 | backend/run.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/manifest.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/e2e-stage-resume.sh<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_stage_resume_e2e.py<br>docs/audits/0064-stage-resume-validation.md |
 | 0065 | 0065/T1 | 版本化评测计划与不可变清单 | done | — | evaluation/harness_bench/schema.py<br>evaluation/harness_bench/config.py<br>evaluation/harness_bench/manifest.py<br>evaluation/harness_bench/cli.py<br>evaluation/tests/harness_bench/test_config.py<br>evaluation/tests/harness_bench/test_manifest.py |
 | 0065 | 0065/T2 | 可插拔沙盒提供方与隔离生命周期 | done | — | evaluation/harness_bench/providers/base.py<br>evaluation/harness_bench/providers/daytona.py<br>evaluation/harness_bench/providers/local.py<br>evaluation/harness_bench/sandbox.py<br>evaluation/tests/harness_bench/test_sandbox.py |
@@ -488,13 +487,19 @@ PM 独立交给 Owner，不进入 Designer 的输入和证据授权；Designer �
 | 0065 | 0065/T5 | Benchmark 插件、官方预算与隐藏 grader | done | T1, T2, T3 | evaluation/harness_bench/benchmarks/base.py<br>evaluation/harness_bench/benchmarks/swebench.py<br>evaluation/harness_bench/benchmarks/terminal_bench.py<br>evaluation/harness_bench/benchmarks/tua_bench.py<br>evaluation/harness_bench/benchmarks/tau3.py<br>evaluation/tests/harness_bench/test_benchmarks.py |
 | 0065 | 0065/T6 | 可恢复编排、统一结果与配对报告 | done | T1, T2, T3, T4, T5 | evaluation/harness_bench/orchestrator.py<br>evaluation/harness_bench/state.py<br>evaluation/harness_bench/outcomes.py<br>evaluation/harness_bench/report.py<br>evaluation/tests/harness_bench/test_orchestrator.py<br>evaluation/tests/harness_bench/test_reporting.py |
 | 0066 | 0066/T1 | 统一时间账本与 provider scope | done | — | backend/auto_designer/usage.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/user/sim/persona_client.py |
-| 0066 | 0066/T2 | 角色超时分类与可恢复取消 | done | T1 | backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/loop/sim_user.py |
+| 0066 | 0066/T2 | 角色超时分类与可恢复取消 | done | T1 | backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/loop/sim_user.py |
 | 0066 | 0066/T3 | 官方内层预算与 E2B 配置传播 | done | T1, T2 | evaluation/harness-suite-20260920/configs/scaling-e2b-20260922.json<br>evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.json<br>evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py |
 | 0066 | 0066/T4 | 回归验收与操作文档 | done | T1, T2, T3 | backend/tests/test_time_accounting.py<br>evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md |
 | 0067 | 0067/T1 | 冻结任务、资源和运行身份 | done | — | evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py<br>evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.tasks.json |
 | 0067 | 0067/T2 | E2B mixed executor 与交互边界 | done | T1 | evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>backend/scripts/run_mixed_closed_loop.py<br>backend/auto_designer/loop/sim_user.py |
 | 0067 | 0067/T3 | 单 N 启动、五轮检查点与恢复 | done | T1, T2 | evaluation/harness-suite-20260920/run_scaling_e2b.py<br>evaluation/harness-suite-20260920/start_scaling_n1_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n4_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n8_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n16_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n32_e2b.sh |
 | 0067 | 0067/T4 | 结果规范和迁移手册 | done | T1, T2, T3 | evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md<br>evaluation/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md<br>evaluation/harness-suite-20260920/SPEC-scaling-e2b-launch.md |
+| 0068 | 0068/T1 | 需求包、边界检查与角色名称统一 | done | — | backend/auto_designer/demand/__init__.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/delivery_evidence.py<br>backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/evidence_contract.py<br>backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/demand/issue_schema.py<br>backend/auto_designer/demand/observation_provider.py<br>backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/proposal_view.py<br>backend/auto_designer/demand/role_contract.py<br>backend/auto_designer/demand/runtime_agg.py<br>backend/auto_designer/demand/session_timeline.py<br>backend/auto_designer/demand/submit_tools.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/triage.py<br>backend/auto_designer/designer/__init__.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/evidence_contract.py<br>backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/designer/grouped_synthesizer.py<br>backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/observation_provider.py<br>backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/proposal_view.py<br>backend/auto_designer/designer/role_contract.py<br>backend/auto_designer/designer/runtime_agg.py<br>backend/auto_designer/designer/session_timeline.py<br>backend/auto_designer/designer/submit_tools.py<br>backend/auto_designer/designer/synthesizer.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/dev/__init__.py<br>backend/auto_designer/dev/commit_checkpoint.py<br>backend/auto_designer/dev/completion_gate.py<br>backend/auto_designer/dev/harness_boundary.py<br>backend/auto_designer/dev/repo_guard.py<br>backend/auto_designer/dev/workspace_jail.py<br>backend/auto_designer/guards/__init__.py<br>backend/auto_designer/guards/harness_boundary.py<br>backend/auto_designer/guards/repo_guard.py<br>backend/auto_designer/guards/workspace_jail.py<br>backend/auto_designer/invocation.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/loop/metrics.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/observations/gaps.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/user/sim/goals.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/web/api.py<br>backend/auto_designer/web/issue_timeline.py |
+| 0068 | 0068/T2 | Agent 定义与启动配置切换 | done | T1 | backend/.env.example<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/designer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/tools/list_directory.tool.yaml<br>backend/agent_defs/designer/tools/read_file.tool.yaml<br>backend/agent_defs/designer/tools/search_file_content.tool.yaml<br>backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/synthesizer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/synthesizer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/synthesizer/tools/list_directory.tool.yaml<br>backend/agent_defs/synthesizer/tools/read_file.tool.yaml<br>backend/agent_defs/synthesizer/tools/search_file_content.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/run.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>examples/experiments/synthesizer-mixed-scaling.json<br>examples/experiments/synthesizer-n1-e2b.json<br>examples/experiments/synthesizer-ordinary-five-rounds.json<br>examples/experiments/synthesizer-scaling-e2b.json<br>examples/models.env.example |
+| 0068 | 0068/T3 | 脚本和实验执行入口全量对齐 | done | T2 | backend/scripts/e2e-spec-0039-issue-state-timeline.sh<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh<br>backend/scripts/e2e-spec-0056-0057-user-semantics.sh<br>backend/scripts/e2e-stage-resume.sh<br>backend/scripts/evaluate_role_traces.py<br>backend/scripts/export_experiment_snapshot.py<br>backend/scripts/prepare_openagents_validation.py<br>backend/scripts/probe_timeout_to_designer.py<br>backend/scripts/probe_timeout_to_synthesizer.py<br>backend/scripts/replay_design_from_sessions.py<br>backend/scripts/replay_observation_design.py<br>backend/scripts/replay_observation_lifecycle.py<br>backend/scripts/replay_observation_synthesis.py<br>backend/scripts/replay_owner_from_repo.py<br>backend/scripts/replay_pm_synth_owner_offline.py<br>backend/scripts/replay_pm_synthesizer_owner_offline.py<br>backend/scripts/replay_role_invocations.py<br>backend/scripts/replay_roles_from_sessions.py<br>backend/scripts/replay_roles_offline.py<br>backend/scripts/replay_synthesize_owner_from_repo.py<br>backend/scripts/replay_synthesizer_owner_from_repo.py<br>backend/scripts/run_mixed_closed_loop.py<br>evaluation/harness-suite-20260920/accept_n1_round1_as_canary.py<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py<br>evaluation/harness-suite-20260920/prepare_scaling_resources.py<br>evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py<br>evaluation/harness-suite-20260920/remote_design_delivery_smoke.py<br>evaluation/harness-suite-20260920/remote_real_developer_smoke.py<br>evaluation/harness-suite-20260920/resume_mixed_latency_recovery.py<br>evaluation/harness-suite-20260920/resume_n1_latency_recovery.py<br>evaluation/harness-suite-20260920/run_daytona_design_delivery.py<br>evaluation/harness-suite-20260920/run_n1_e2b.py<br>evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>evaluation/harness-suite-20260920/run_scaling_e2b.py<br>evaluation/harness-suite-20260920/sync_status_vps.py<br>evaluation/harness-suite-20260920/tools/validate_mixed_config.py<br>evaluation/harness-suite-20260920/vps_status_dashboard.py<br>evaluation/harness_bench/harbor_historical_user_agent.py |
+| 0068 | 0068/T4 | 看板角色与显示名称统一 | done | T1 | frontend/README.md<br>frontend/src/App.tsx<br>frontend/src/api.test.ts<br>frontend/src/api.test.tsx<br>frontend/src/api.ts<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.test.tsx<br>frontend/src/components/building/buildingModel.ts<br>frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/issueTimelineModel.test.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/lib/roleLabel.ts<br>frontend/src/styles.css<br>frontend/src/types.ts |
+| 0068 | 0068/T5 | 当前文档与 Spec 索引更新 | done | T3, T4 | CLAUDE.md<br>README.md<br>README.zh-CN.md<br>docs/ARCHITECTURE.md<br>docs/CONFIGURATION.md<br>docs/EXPORTING.md<br>docs/QUICKSTART.md<br>docs/designer-grouping.md<br>docs/specs/0014-dev-commit-discipline.md<br>docs/specs/0015-dev-overfit-isolation.md<br>docs/specs/0016-designer-rootcause-signal.md<br>docs/specs/0016-synthesizer-rootcause-signal.md<br>docs/specs/0017-user-parallel-sessions.md<br>docs/specs/0018-designer-proposal-envelope.md<br>docs/specs/0018-synthesizer-proposal-envelope.md<br>docs/specs/0020-issue-covers-dispatch-budget.md<br>docs/specs/0021-dev-escape-containment.md<br>docs/specs/0024-designer-godview-timeline-tool.md<br>docs/specs/0024-synthesizer-godview-timeline-tool.md<br>docs/specs/0025-issue-triage-funnel.md<br>docs/specs/0026-frontend-observability-redesign.md<br>docs/specs/0027-unified-agent-output-contract.md<br>docs/specs/0028-divergent-pm-gate.md<br>docs/specs/0029-three-plane-issue-flow.md<br>docs/specs/0030-harness-product-interface.md<br>docs/specs/0031-user-sim-stage-contracts.md<br>docs/specs/0032-openagents-gitea-dev-plane.md<br>docs/specs/0034-frontend-agent-company-building.md<br>docs/specs/0035-stdout-visible-harness-state.md<br>docs/specs/0039-issue-state-timeline.md<br>docs/specs/0040-rfc-stage-and-commit-denylist.md<br>docs/specs/0041-unified-llm-token-usage.md<br>docs/specs/0042-role-contract-governance.md<br>docs/specs/0043-role-cognitive-contracts.md<br>docs/specs/0045-vigil-harness-aware-toolchain.md<br>docs/specs/0047-parallel-experiment-runtime.md<br>docs/specs/0049-role-invocation-io-store.md<br>docs/specs/0052-designer-covers-consolidation.md<br>docs/specs/0052-synthesizer-covers-consolidation.md<br>docs/specs/0053-persona-semantic-action-lifecycle.md<br>docs/specs/0054-user-goal-driven-simulation.md<br>docs/specs/0055-goal-aware-demand-evidence-boundaries.md<br>docs/specs/0056-terminal-acceptance-alignment.md<br>docs/specs/0059-observation-evolution-contract.md<br>docs/specs/0060-independent-pm-delivery-route.md<br>docs/specs/0061-delivery-observability-lifecycle.md<br>docs/specs/0063-lightweight-delivery-preflight.md<br>docs/specs/0064-stage-resumable-experiment-runtime.md<br>docs/specs/0066-provider-latency-isolated-timeout.md<br>docs/specs/0067-mixed-e2b-scaling-runtime.md<br>docs/specs/0068-synthesizer-clean-rename.md<br>docs/specs/ARCHITECTURE.md<br>docs/specs/OVERVIEW.md<br>docs/synthesizer-grouping.md<br>docs/usage-monitoring.md |
+| 0068 | 0068/T6 | 行为回归与离线流程验证 | done | T5 | backend/scripts/e2e-synthesizer-naming.sh<br>backend/tests/demand/test_agent_contract.py<br>backend/tests/demand/test_agent_runtime.py<br>backend/tests/demand/test_delivery_evidence.py<br>backend/tests/demand/test_divergent_gate.py<br>backend/tests/demand/test_evidence_contract.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/demand/test_issue_schema.py<br>backend/tests/demand/test_observation_provider.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_proposal_view.py<br>backend/tests/demand/test_role_contract.py<br>backend/tests/demand/test_role_contract_flow.py<br>backend/tests/demand/test_session_timeline.py<br>backend/tests/demand/test_terminal_evidence.py<br>backend/tests/demand/test_triage.py<br>backend/tests/designer/test_agent_contract.py<br>backend/tests/designer/test_agent_runtime.py<br>backend/tests/designer/test_delivery_evidence.py<br>backend/tests/designer/test_divergent_gate.py<br>backend/tests/designer/test_evidence_contract.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/designer/test_issue_schema.py<br>backend/tests/designer/test_observation_provider.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_proposal_view.py<br>backend/tests/designer/test_role_contract.py<br>backend/tests/designer/test_role_contract_flow.py<br>backend/tests/designer/test_session_timeline.py<br>backend/tests/designer/test_synthesizer_compat.py<br>backend/tests/designer/test_terminal_evidence.py<br>backend/tests/designer/test_triage.py<br>backend/tests/dev/test_commit_checkpoint.py<br>backend/tests/dev/test_completion_gate.py<br>backend/tests/dev/test_harness_boundary.py<br>backend/tests/dev/test_repo_guard.py<br>backend/tests/dev/test_workspace_jail.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/experiment/test_config.py<br>backend/tests/experiment/test_manifest.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/guards/test_guard_wiring.py<br>backend/tests/guards/test_harness_boundary.py<br>backend/tests/guards/test_repo_guard.py<br>backend/tests/guards/test_workspace_jail.py<br>backend/tests/loop/test_designer.py<br>backend/tests/loop/test_live.py<br>backend/tests/loop/test_live_tracer.py<br>backend/tests/loop/test_metrics.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_roster.py<br>backend/tests/loop/test_runner.py<br>backend/tests/loop/test_runtime_agg.py<br>backend/tests/loop/test_synthesizer.py<br>backend/tests/observations/test_gaps.py<br>backend/tests/observations/test_publication.py<br>backend/tests/test_export_experiment_snapshot.py<br>backend/tests/test_llm_limits.py<br>backend/tests/test_replay_design_from_sessions.py<br>backend/tests/test_replay_roles_from_sessions.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_sandbox_isolation.py<br>backend/tests/test_stage_resume_e2e.py<br>backend/tests/test_time_accounting.py<br>backend/tests/test_usage.py<br>backend/tests/tracker/test_gitea_timeline.py<br>backend/tests/web/test_api.py<br>evaluation/tests/test_vps_status.py<br>backend/tests/test_invocation.py |
 
 ## 跨 feature 关系图
 
@@ -572,16 +577,13 @@ graph LR
         n0013_T2["T2 v0 种子自测 smoke + MANUAL 呈现契约"]
     end
     subgraph G0014[0014 dev-commit-discipline]
-        n0014_T1["T1 CommitCheckpointMiddleware：逐级施压逼尽早落已提交增量"]
-        n0014_T2["T2 CompletionGateMiddleware：收尾硬闸（含接线 AST）+ 软催测试/进度契约"]
-        n0014_T3["T3 dev agent 配置/提示对齐：迭代预算·硬落地窗口·冒烟须盖接线"]
     end
     subgraph G0015[0015 dev-overfit-isolation]
         n0015_T1["T1 harness 仓提交边界硬闸（pre-commit 钩子）"]
         n0015_T2["T2 sandbox 工作目录下沉，物理隔离 trace"]
         n0015_T3["T3 WorkspaceJailMiddleware：写关仓内、读放行 NexAU 源码与运行时临时目录"]
     end
-    subgraph G0016[0016 designer-rootcause-signal]
+    subgraph G0016[0016 synthesizer-rootcause-signal]
         n0016_T1["T1 体感 reason 作根因信号喂设计师"]
         n0016_T2["T2 设计师 grep + 先搜后读，降低读码开销"]
         n0016_T3["T3 运行时行为聚合 runtime_agg：机制层观测数字喂设计师"]
@@ -594,14 +596,14 @@ graph LR
         n0017_T5["T5 harness checkout 并发安全"]
         n0017_T6["T6 tracker HTTP 会话线程安全"]
     end
-    subgraph G0018[0018 designer-proposal-envelope]
+    subgraph G0018[0018 synthesizer-proposal-envelope]
         n0018_T1["T1 _run_agent 出口拆 complete_task 信封"]
     end
     subgraph G0019[0019 control-sideband-peek-wait]
         n0019_T1["T1 launcher：非 reply 旁路一律收 + control 旁路/终结分流"]
     end
     subgraph G0020[0020 issue-covers-dispatch-budget]
-        n0020_T1["T1 designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链"]
+        n0020_T1["T1 synthesizer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链"]
         n0020_T2["T2 dev 领取分池 + 票种预算与重试升档 + 结果回写 comment"]
         n0020_T3["T3 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮"]
         n0020_T4["T4 web API：/api/issues 附 covers/covered_by 字段"]
@@ -623,7 +625,7 @@ graph LR
         n0023_T3["T3 探针：去掉 two 臂与 peek-via-control 心智"]
         n0023_T4["T4 launcher.try_reply 非阻塞契约（已落地）"]
     end
-    subgraph G0024[0024 designer-godview-timeline-tool]
+    subgraph G0024[0024 synthesizer-godview-timeline-tool]
         n0024_T1["T1 Session.sim_trace 落盘（TurnLog→SimTrace）"]
         n0024_T2["T2 index 扩 issue_numbers + 体感曲线带 session_id"]
         n0024_T3["T3 get_session_timeline tool 入口（按需取证通路）"]
@@ -635,7 +637,7 @@ graph LR
         n0025_T1["T1 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render"]
         n0025_T2["T2 用户 sim 产结构化 raw issue：暂定 type + needs-triage + 轮号"]
         n0025_T3["T3 triage agent（新角色）：就地分类+定位+去重+驳回/needs-info"]
-        n0025_T4["T4 synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC"]
+        n0025_T4["T4 synthesize agent（原 synthesizer 收窄）：跨 issue 结构综合 → RFC"]
         n0025_T5["T5 dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck"]
         n0025_T6["T6 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster"]
         n0025_T7["T7 web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压)"]
@@ -652,12 +654,12 @@ graph LR
     subgraph G0027[0027 unified-agent-output-contract]
         n0027_T1["T1 issue_schema 收敛为契约单一真源 + 契约生成/共享校验模块"]
         n0027_T2["T2 triage 改 submit-tool 原生结构化（去第二次 LLM 重排与别名归一）"]
-        n0027_T3["T3 designer 改 submit-tool 原生结构化 + 统一 driver-apply"]
+        n0027_T3["T3 synthesizer 改 submit-tool 原生结构化 + 统一 driver-apply"]
     end
     subgraph G0028[0028 divergent-pm-gate]
         n0028_T1["T1 issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径"]
         n0028_T2["T2 Divergent 驱动器 + agent_defs/divergent_pm：落不可领产品候选"]
-        n0028_T3["T3 Designer.gate_once：promote/hold/drop 语义晋升"]
+        n0028_T3["T3 Synthesizer.gate_once：promote/hold/drop 语义晋升"]
         n0028_T4["T4 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关"]
         n0028_T5["T5 dev 领取硬排除 divergent 候选"]
     end
@@ -677,8 +679,7 @@ graph LR
         n0030_T1["T1 写 0030 活快照"]
         n0030_T2["T2 harness_template 精简为 HELP/RUNTIME/scripts/deps"]
         n0030_T3["T3 /help slash 与模板自测"]
-        n0030_T4["T4 边界白名单改为产品区域而非历史文件名"]
-        n0030_T5["T5 平台读取 HELP.md 与收尾闸门同步"]
+        n0030_T4["T4 产品提交边界：拒绝密钥与运行态"]
         n0030_T6["T6 connector 与 stdio-jsonl-v1 协议适配"]
     end
     subgraph G0031[0031 user-sim-stage-contracts]
@@ -743,7 +744,7 @@ graph LR
         n0039_T1["T1 固化规格与跨仓验收边界"]
         n0039_T2["T2 读取并折叠 Gitea issue timeline"]
         n0039_T3["T3 扩展 issue 详情 timeline API"]
-        n0039_T4["T4 为 Designer 综合票写入轮次标签"]
+        n0039_T4["T4 为 Synthesizer 综合票写入轮次标签"]
         n0039_T5["T5 建立前端标签维度与时间线展示模型"]
         n0039_T6["T6 展示 issue 状态演进并完成跨仓验收"]
     end
@@ -834,8 +835,8 @@ graph LR
         n0051_T4["T4 双结论、客观执行与假接受"]
         n0051_T5["T5 可运行镜像、一键入口与审计冒烟"]
     end
-    subgraph G0052[0052 designer-covers-consolidation]
-        n0052_T1["T1 Designer covers 合并语义与状态迁移"]
+    subgraph G0052[0052 synthesizer-covers-consolidation]
+        n0052_T1["T1 Synthesizer covers 合并语义与状态迁移"]
         n0052_T2["T2 Owner 退回纯交付路由"]
         n0052_T3["T3 覆盖合并回归测试与规格验证"]
     end
@@ -890,7 +891,7 @@ graph LR
         n0062_T1["T1 当前与历史失败终态及闭环回归"]
     end
     subgraph G0063[0063 lightweight-delivery-preflight]
-        n0063_T1["T1 需求侧提案分组与并行 Designer"]
+        n0063_T1["T1 需求侧提案分组与并行 Synthesizer"]
         n0063_T2["T2 交付侧有界前置与软调度"]
     end
     subgraph G0064[0064 stage-resumable-experiment-runtime]
@@ -898,7 +899,7 @@ graph LR
         n0064_T2["T2 阶段化 Orchestrator 与交付恢复"]
         n0064_T3["T3 用户会话工作项级恢复"]
         n0064_T4["T4 Triage 与 Divergent 第一拍恢复"]
-        n0064_T5["T5 Designer 与 Owner 输出先存后应用"]
+        n0064_T5["T5 Synthesizer 与 Owner 输出先存后应用"]
         n0064_T6["T6 Fresh/resume 入口与故障矩阵验收"]
     end
     subgraph G0065[0065 standardized-harness-evaluation]
@@ -920,6 +921,14 @@ graph LR
         n0067_T2["T2 E2B mixed executor 与交互边界"]
         n0067_T3["T3 单 N 启动、五轮检查点与恢复"]
         n0067_T4["T4 结果规范和迁移手册"]
+    end
+    subgraph G0068[0068 synthesizer-clean-rename]
+        n0068_T1["T1 需求包、边界检查与角色名称统一"]
+        n0068_T2["T2 Agent 定义与启动配置切换"]
+        n0068_T3["T3 脚本和实验执行入口全量对齐"]
+        n0068_T4["T4 看板角色与显示名称统一"]
+        n0068_T5["T5 当前文档与 Spec 索引更新"]
+        n0068_T6["T6 行为回归与离线流程验证"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -1028,8 +1037,7 @@ graph LR
     n0029_T10 --> n0029_T9
     n0030_T3 --> n0030_T2
     n0030_T4 --> n0030_T2
-    n0030_T5 --> n0030_T2
-    n0030_T6 --> n0030_T5
+    n0030_T6 --> n0030_T2
     n0031_T2 --> n0031_T1
     n0031_T3 --> n0031_T2
     n0031_T4 --> n0031_T2
@@ -1236,6 +1244,12 @@ graph LR
     n0067_T4 --> n0067_T1
     n0067_T4 --> n0067_T2
     n0067_T4 --> n0067_T3
+    n0068_T2 --> n0068_T1
+    n0068_T3 --> n0068_T2
+    n0068_T4 --> n0068_T1
+    n0068_T5 --> n0068_T3
+    n0068_T5 --> n0068_T4
+    n0068_T6 --> n0068_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1295,79 +1309,84 @@ graph LR
 
 | 文件 | 涉及组 |
 |----|----|
-| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063 |
+| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068 |
 | OpenAgents/openagents/recipes/stages.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061, 0063 |
 | OpenAgents/openagents/runtime/context.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/runtime/engine.py | 0049, 0061, 0063 |
 | OpenAgents/openagents/utils/gitea.py | 0032, 0061 |
-| backend/agent_defs/designer/agent.yaml | 0016, 0024, 0027, 0029, 0043, 0061 |
-| backend/agent_defs/designer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052, 0055, 0060, 0061 |
-| backend/agent_defs/designer/tools/submit_rfcs.tool.yaml | 0027, 0029, 0042, 0043, 0060 |
-| backend/agent_defs/developer_agent/MANUAL.md | 0014, 0021 |
-| backend/agent_defs/developer_agent/agent.yaml | 0014, 0030, 0032 |
-| backend/agent_defs/developer_agent/systemprompt.md | 0007, 0014, 0030, 0032 |
-| backend/agent_defs/divergent_pm/agent.yaml | 0029, 0061 |
-| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059, 0060, 0061 |
+| backend/agent_defs/developer_agent/systemprompt.md | 0007, 0032 |
+| backend/agent_defs/divergent_pm/agent.yaml | 0029, 0061, 0068 |
+| backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059, 0060, 0061, 0068 |
 | backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml | 0029, 0042, 0043 |
-| backend/agent_defs/owner/agent.yaml | 0043, 0061 |
-| backend/agent_defs/owner/systemprompt.md | 0042, 0043, 0052, 0060, 0061 |
+| backend/agent_defs/owner/agent.yaml | 0043, 0061, 0068 |
+| backend/agent_defs/owner/systemprompt.md | 0042, 0043, 0052, 0060, 0061, 0068 |
 | backend/agent_defs/owner/tools/submit_admission.tool.yaml | 0042, 0043, 0052, 0060 |
-| backend/agent_defs/triage_agent/agent.yaml | 0027, 0029, 0061 |
-| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043, 0055, 0059, 0061 |
-| backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043 |
+| backend/agent_defs/synthesizer/agent.yaml | 0016, 0024, 0027, 0029, 0043, 0061, 0068 |
+| backend/agent_defs/synthesizer/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052, 0055, 0060, 0061, 0068 |
+| backend/agent_defs/synthesizer/tools/get_harness_beat.tool.yaml | 0024, 0068 |
+| backend/agent_defs/synthesizer/tools/get_harness_step.tool.yaml | 0024, 0068 |
+| backend/agent_defs/synthesizer/tools/get_session_timeline.tool.yaml | 0024, 0068 |
+| backend/agent_defs/synthesizer/tools/search_file_content.tool.yaml | 0016, 0068 |
+| backend/agent_defs/synthesizer/tools/submit_observation_gap.tool.yaml | 0061, 0068 |
+| backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml | 0027, 0029, 0042, 0043, 0060, 0068 |
+| backend/agent_defs/triage_agent/agent.yaml | 0027, 0029, 0061, 0068 |
+| backend/agent_defs/triage_agent/systemprompt.md | 0027, 0029, 0042, 0043, 0055, 0059, 0061, 0068 |
+| backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml | 0027, 0029, 0042, 0043, 0068 |
 | backend/agent_defs/user_agent/prompt.md | 0003, 0042 |
-| backend/auto_designer/designer/agent_contract.py | 0027, 0029, 0043, 0052, 0060 |
-| backend/auto_designer/designer/agent_runtime.py | 0029, 0041, 0049, 0059, 0061, 0066 |
-| backend/auto_designer/designer/delivery_evidence.py | 0061, 0064 |
-| backend/auto_designer/designer/designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059, 0060, 0061, 0064 |
-| backend/auto_designer/designer/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059, 0061, 0064 |
-| backend/auto_designer/designer/evidence_contract.py | 0055, 0056, 0059 |
-| backend/auto_designer/designer/grouped_designer.py | 0063, 0064, 0066 |
-| backend/auto_designer/designer/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052 |
-| backend/auto_designer/designer/observation_provider.py | 0059, 0061 |
-| backend/auto_designer/designer/owner.py | 0029, 0032, 0042, 0043, 0049, 0052, 0060, 0061, 0064 |
-| backend/auto_designer/designer/proposal_view.py | 0042, 0059 |
-| backend/auto_designer/designer/role_contract.py | 0043, 0052, 0055 |
-| backend/auto_designer/designer/session_timeline.py | 0024, 0054, 0055, 0056, 0059 |
-| backend/auto_designer/designer/submit_tools.py | 0029, 0043 |
-| backend/auto_designer/designer/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055, 0061, 0064 |
-| backend/auto_designer/dev/agentic_developer.py | 0007, 0015, 0020, 0025, 0028, 0029, 0032 |
-| backend/auto_designer/dev/completion_gate.py | 0014, 0030 |
-| backend/auto_designer/dev/harness_boundary.py | 0015, 0030, 0040 |
-| backend/auto_designer/dev/workspace_jail.py | 0015, 0049, 0059 |
+| backend/auto_designer/demand/agent_contract.py | 0027, 0029, 0043, 0052, 0060, 0068 |
+| backend/auto_designer/demand/agent_runtime.py | 0029, 0041, 0049, 0059, 0061, 0066, 0068 |
+| backend/auto_designer/demand/delivery_evidence.py | 0061, 0064, 0068 |
+| backend/auto_designer/demand/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059, 0061, 0064, 0068 |
+| backend/auto_designer/demand/evidence_contract.py | 0055, 0056, 0059, 0068 |
+| backend/auto_designer/demand/grouped_synthesizer.py | 0063, 0064, 0066, 0068 |
+| backend/auto_designer/demand/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052, 0068 |
+| backend/auto_designer/demand/observation_provider.py | 0059, 0061, 0068 |
+| backend/auto_designer/demand/owner.py | 0029, 0032, 0042, 0043, 0049, 0052, 0060, 0061, 0064, 0068 |
+| backend/auto_designer/demand/proposal_view.py | 0042, 0059, 0068 |
+| backend/auto_designer/demand/role_contract.py | 0043, 0052, 0055, 0068 |
+| backend/auto_designer/demand/runtime_agg.py | 0016, 0068 |
+| backend/auto_designer/demand/session_timeline.py | 0024, 0054, 0055, 0056, 0059, 0068 |
+| backend/auto_designer/demand/submit_tools.py | 0029, 0043, 0068 |
+| backend/auto_designer/demand/synthesizer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059, 0060, 0061, 0064, 0068 |
+| backend/auto_designer/demand/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055, 0061, 0064, 0068 |
+| backend/auto_designer/dev/agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/experiment/cli.py | 0047, 0053, 0064 |
 | backend/auto_designer/experiment/manifest.py | 0047, 0064 |
 | backend/auto_designer/experiment/runtime.py | 0047, 0053, 0064 |
+| backend/auto_designer/guards/harness_boundary.py | 0015, 0030, 0040, 0068 |
+| backend/auto_designer/guards/repo_guard.py | 0021, 0068 |
+| backend/auto_designer/guards/workspace_jail.py | 0015, 0049, 0059, 0068 |
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
 | backend/auto_designer/harness/connector.py | 0030, 0035, 0036, 0041 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
 | backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041, 0051, 0061 |
-| backend/auto_designer/invocation.py | 0049, 0064 |
+| backend/auto_designer/invocation.py | 0049, 0064, 0068 |
 | backend/auto_designer/loop/checkpoint.py | 0004, 0064 |
-| backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053, 0064 |
-| backend/auto_designer/loop/live_tracer.py | 0032, 0041, 0066 |
-| backend/auto_designer/loop/metrics.py | 0003, 0025, 0029 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0063, 0064 |
-| backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032 |
+| backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053, 0064, 0068 |
+| backend/auto_designer/loop/live_tracer.py | 0032, 0041, 0066, 0068 |
+| backend/auto_designer/loop/metrics.py | 0003, 0025, 0029, 0068 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0063, 0064, 0068 |
+| backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032, 0068 |
 | backend/auto_designer/loop/round_gate.py | 0050, 0062, 0064 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007, 0064 |
 | backend/auto_designer/loop/runner.py | 0004, 0064 |
-| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056, 0061, 0064, 0066, 0067 |
+| backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056, 0061, 0064, 0066, 0067, 0068 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054, 0056 |
+| backend/auto_designer/observations/gaps.py | 0061, 0068 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042, 0064 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042, 0064 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042, 0061, 0063, 0064 |
 | backend/auto_designer/usage.py | 0041, 0066 |
-| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051, 0053, 0054, 0064 |
+| backend/auto_designer/user/session_store.py | 0001, 0016, 0017, 0024, 0048, 0051, 0053, 0054, 0064, 0068 |
 | backend/auto_designer/user/sim/action_space.py | 0005, 0035, 0048, 0053 |
 | backend/auto_designer/user/sim/actions.py | 0005, 0035, 0053 |
 | backend/auto_designer/user/sim/clauses.py | 0005, 0008, 0037, 0057 |
 | backend/auto_designer/user/sim/demo.py | 0005, 0037 |
 | backend/auto_designer/user/sim/deps.py | 0009, 0051 |
 | backend/auto_designer/user/sim/dimensions.py | 0005, 0037 |
-| backend/auto_designer/user/sim/goals.py | 0054, 0056 |
-| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048, 0051, 0053, 0054, 0056, 0057 |
+| backend/auto_designer/user/sim/goals.py | 0054, 0056, 0068 |
+| backend/auto_designer/user/sim/loop.py | 0005, 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0041, 0048, 0051, 0053, 0054, 0056, 0057, 0068 |
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054, 0056, 0066 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048, 0054, 0056, 0057 |
@@ -1378,7 +1397,8 @@ graph LR
 | backend/auto_designer/user/sim/state.py | 0005, 0012, 0037, 0053 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022, 0051 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009, 0051 |
-| backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
+| backend/auto_designer/web/api.py | 0020, 0025, 0029, 0032, 0039, 0041, 0068 |
+| backend/auto_designer/web/issue_timeline.py | 0039, 0068 |
 | backend/deploy/gitea/bootstrap.sh | 0002, 0032 |
 | backend/deploy/gitea/docker-compose.yml | 0002, 0032, 0033 |
 | backend/deploy/gitea/egress-proxy.conf | 0033, 0040 |
@@ -1394,52 +1414,77 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041, 0051, 0061 |
 | backend/harness_template/params.yaml | 0003, 0030, 0061 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041, 0051 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0064 |
+| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0064, 0068 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
-| backend/scripts/evaluate_role_traces.py | 0043, 0055 |
+| backend/scripts/e2e-spec-0039-issue-state-timeline.sh | 0039, 0068 |
+| backend/scripts/e2e-spec-0049-role-invocation-io-store.sh | 0049, 0068 |
+| backend/scripts/e2e-spec-0056-0057-user-semantics.sh | 0056, 0068 |
+| backend/scripts/e2e-stage-resume.sh | 0064, 0068 |
+| backend/scripts/evaluate_role_traces.py | 0043, 0055, 0068 |
+| backend/scripts/prepare_openagents_validation.py | 0046, 0068 |
 | backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
-| backend/scripts/replay_design_from_sessions.py | 0042, 0043 |
-| backend/scripts/run_auditable_experiment.py | 0051, 0063, 0064 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051, 0063, 0064 |
-| backend/tests/designer/test_agent_contract.py | 0027, 0043, 0052 |
-| backend/tests/designer/test_agent_runtime.py | 0029, 0041, 0049 |
-| backend/tests/designer/test_delivery_evidence.py | 0061, 0064 |
-| backend/tests/designer/test_divergent_gate.py | 0028, 0029, 0043, 0055, 0064 |
-| backend/tests/designer/test_grouped_designer.py | 0063, 0064 |
-| backend/tests/designer/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032 |
-| backend/tests/designer/test_observation_provider.py | 0059, 0060 |
-| backend/tests/designer/test_owner.py | 0029, 0032, 0042, 0043, 0052, 0060, 0064 |
-| backend/tests/designer/test_role_contract.py | 0043, 0052 |
-| backend/tests/designer/test_role_contract_flow.py | 0042, 0043, 0055, 0060 |
-| backend/tests/designer/test_session_timeline.py | 0024, 0054 |
-| backend/tests/designer/test_triage.py | 0025, 0027, 0029, 0042, 0043, 0055, 0064 |
+| backend/scripts/replay_observation_lifecycle.py | 0061, 0068 |
+| backend/scripts/replay_observation_synthesis.py | 0059, 0068 |
+| backend/scripts/replay_role_invocations.py | 0049, 0068 |
+| backend/scripts/replay_roles_from_sessions.py | 0042, 0043, 0068 |
+| backend/scripts/run_auditable_experiment.py | 0051, 0063, 0064, 0068 |
+| backend/scripts/run_mixed_closed_loop.py | 0067, 0068 |
+| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051, 0063, 0064, 0068 |
+| backend/tests/demand/test_agent_contract.py | 0027, 0043, 0052, 0068 |
+| backend/tests/demand/test_agent_runtime.py | 0029, 0041, 0049, 0068 |
+| backend/tests/demand/test_delivery_evidence.py | 0061, 0064, 0068 |
+| backend/tests/demand/test_divergent_gate.py | 0028, 0029, 0043, 0055, 0064, 0068 |
+| backend/tests/demand/test_evidence_contract.py | 0055, 0068 |
+| backend/tests/demand/test_grouped_synthesizer.py | 0063, 0064, 0068 |
+| backend/tests/demand/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0068 |
+| backend/tests/demand/test_observation_provider.py | 0059, 0060, 0068 |
+| backend/tests/demand/test_owner.py | 0029, 0032, 0042, 0043, 0052, 0060, 0064, 0068 |
+| backend/tests/demand/test_proposal_view.py | 0042, 0068 |
+| backend/tests/demand/test_role_contract.py | 0043, 0052, 0068 |
+| backend/tests/demand/test_role_contract_flow.py | 0042, 0043, 0055, 0060, 0068 |
+| backend/tests/demand/test_session_timeline.py | 0024, 0054, 0068 |
+| backend/tests/demand/test_terminal_evidence.py | 0056, 0068 |
+| backend/tests/demand/test_triage.py | 0025, 0027, 0029, 0042, 0043, 0055, 0064, 0068 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
-| backend/tests/dev/test_completion_gate.py | 0014, 0030 |
-| backend/tests/dev/test_harness_boundary.py | 0015, 0030, 0040 |
-| backend/tests/dev/test_workspace_jail.py | 0015, 0049 |
-| backend/tests/experiment/test_cli.py | 0047, 0053, 0064 |
-| backend/tests/experiment/test_runtime.py | 0047, 0053, 0064 |
+| backend/tests/experiment/test_cli.py | 0047, 0053, 0064, 0068 |
+| backend/tests/experiment/test_config.py | 0047, 0068 |
+| backend/tests/experiment/test_manifest.py | 0047, 0068 |
+| backend/tests/experiment/test_runtime.py | 0047, 0053, 0064, 0068 |
+| backend/tests/guards/test_harness_boundary.py | 0015, 0030, 0040, 0068 |
+| backend/tests/guards/test_repo_guard.py | 0021, 0068 |
+| backend/tests/guards/test_workspace_jail.py | 0015, 0049, 0068 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
 | backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051 |
 | backend/tests/harness/test_template_entry.py | 0013, 0051, 0061 |
 | backend/tests/loop/test_checkpoint.py | 0004, 0064 |
-| backend/tests/loop/test_designer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055, 0059, 0064 |
-| backend/tests/loop/test_live.py | 0017, 0026, 0050, 0064 |
-| backend/tests/loop/test_metrics.py | 0003, 0025, 0029 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062, 0064 |
+| backend/tests/loop/test_live.py | 0017, 0026, 0050, 0064, 0068 |
+| backend/tests/loop/test_live_tracer.py | 0041, 0068 |
+| backend/tests/loop/test_metrics.py | 0003, 0025, 0029, 0068 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062, 0064, 0068 |
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
-| backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032 |
+| backend/tests/loop/test_recovery.py | 0064, 0068 |
+| backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032, 0068 |
 | backend/tests/loop/test_round_gate.py | 0050, 0062, 0064 |
 | backend/tests/loop/test_run_state.py | 0004, 0007, 0064 |
-| backend/tests/loop/test_runner.py | 0004, 0064 |
+| backend/tests/loop/test_runner.py | 0004, 0064, 0068 |
+| backend/tests/loop/test_runtime_agg.py | 0016, 0068 |
 | backend/tests/loop/test_sim_user.py | 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0051, 0064 |
+| backend/tests/loop/test_synthesizer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055, 0059, 0064, 0068 |
+| backend/tests/observations/test_gaps.py | 0061, 0068 |
+| backend/tests/observations/test_publication.py | 0061, 0068 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
+| backend/tests/test_invocation.py | 0049, 0068 |
 | backend/tests/test_models.py | 0001, 0024, 0051, 0053, 0054 |
-| backend/tests/test_run_auditable_experiment.py | 0063, 0064 |
+| backend/tests/test_run_auditable_experiment.py | 0063, 0064, 0068 |
 | backend/tests/test_run_swebench_closed_loop.py | 0044, 0047, 0064 |
-| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050, 0063 |
+| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0068 |
+| backend/tests/test_sandbox_isolation.py | 0015, 0068 |
+| backend/tests/test_stage_resume_e2e.py | 0064, 0068 |
+| backend/tests/test_time_accounting.py | 0066, 0068 |
+| backend/tests/test_usage.py | 0041, 0068 |
 | backend/tests/tracker/test_fake.py | 0001, 0020, 0025, 0042, 0064 |
 | backend/tests/tracker/test_gitea.py | 0002, 0017, 0025, 0042, 0063, 0064 |
+| backend/tests/tracker/test_gitea_timeline.py | 0039, 0068 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048, 0053 |
 | backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
 | backend/tests/user/sim/test_docker_seed_source.py | 0044, 0051 |
@@ -1454,23 +1499,41 @@ graph LR
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051, 0054, 0064 |
-| backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041 |
+| backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041, 0068 |
+| docs/specs/0030-harness-product-interface.md | 0030, 0068 |
+| docs/specs/0031-user-sim-stage-contracts.md | 0031, 0068 |
+| docs/specs/0034-frontend-agent-company-building.md | 0034, 0068 |
+| docs/specs/0035-stdout-visible-harness-state.md | 0035, 0068 |
+| docs/specs/0039-issue-state-timeline.md | 0039, 0068 |
+| docs/specs/0042-role-contract-governance.md | 0042, 0068 |
+| docs/specs/0045-vigil-harness-aware-toolchain.md | 0045, 0068 |
+| docs/specs/0047-parallel-experiment-runtime.md | 0047, 0068 |
+| docs/specs/0049-role-invocation-io-store.md | 0049, 0068 |
+| docs/specs/0052-synthesizer-covers-consolidation.md | 0052, 0068 |
+| docs/specs/0053-persona-semantic-action-lifecycle.md | 0053, 0068 |
+| docs/specs/OVERVIEW.md | 0042, 0068 |
+| docs/synthesizer-grouping.md | 0063, 0068 |
+| docs/usage-monitoring.md | 0041, 0068 |
 | evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md | 0066, 0067 |
-| evaluation/harness-suite-20260920/freeze_scaling_runtime.py | 0066, 0067 |
-| evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py | 0066, 0067 |
-| frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041 |
-| frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041 |
+| evaluation/harness-suite-20260920/freeze_scaling_runtime.py | 0066, 0067, 0068 |
+| evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py | 0067, 0068 |
+| evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py | 0066, 0067, 0068 |
+| evaluation/harness-suite-20260920/run_scaling_e2b.py | 0067, 0068 |
+| frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041, 0068 |
+| frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041, 0068 |
 | frontend/src/components/BuildingView.tsx | 0034, 0038 |
 | frontend/src/components/SidePanel.tsx | 0020, 0025, 0026, 0029, 0032 |
 | frontend/src/components/TopBar.tsx | 0026, 0034, 0038 |
 | frontend/src/components/building/BuildingTower.tsx | 0034, 0038 |
-| frontend/src/components/building/FloorWorkspace.tsx | 0034, 0038 |
-| frontend/src/components/building/buildingModel.ts | 0034, 0038 |
+| frontend/src/components/building/FloorWorkspace.tsx | 0034, 0038, 0068 |
+| frontend/src/components/building/buildingModel.ts | 0034, 0038, 0068 |
+| frontend/src/components/detail/AgentRunDetail.tsx | 0026, 0068 |
 | frontend/src/components/detail/IssueDetail.tsx | 0020, 0025, 0026, 0029, 0039 |
 | frontend/src/components/detail/SessionDetail.tsx | 0026, 0034 |
-| frontend/src/lib/issueMeta.ts | 0025, 0029, 0032, 0039 |
-| frontend/src/styles.css | 0026, 0034, 0038, 0039, 0041 |
-| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038, 0039, 0041 |
+| frontend/src/components/detail/issueTimelineModel.test.ts | 0039, 0068 |
+| frontend/src/lib/issueMeta.ts | 0025, 0029, 0032, 0039, 0068 |
+| frontend/src/styles.css | 0026, 0034, 0038, 0039, 0041, 0068 |
+| frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038, 0039, 0041, 0068 |
 | tools/persona-distill/card-schema.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/SKILL.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/reference.md | 0006, 0037 |
@@ -1827,29 +1890,20 @@ graph LR
     class v_T2_1 st_pending;
 ```
 
-### 0014 开发者侧提交纪律：增量落地闸 + 收尾硬闸（含接线 AST）（issue #0）
+### 0014 旧内置 Developer 提交纪律（已退役）（issue #0）
 
 ```mermaid
 graph LR
-    nT1["T1 CommitCheckpointMiddleware：逐级施压逼尽早落已提交增量"]
-    nT2["T2 CompletionGateMiddleware：收尾硬闸（含接线 AST）+ 软催测试/进度契约"]
-    nT3["T3 dev agent 配置/提示对齐：迭代预算·硬落地窗口·冒烟须盖接线"]
+    empty[空]
 ```
 
 演化图：
 
 ```mermaid
 graph LR
-    v_T1_1["T1 v1"]
-    v_T2_1["T2 v1"]
-    v_T3_1["T3 v1"]
-    classDef st_pending fill:#eeeeee;
-    class v_T1_1 st_pending;
-    class v_T2_1 st_pending;
-    class v_T3_1 st_pending;
 ```
 
-### 0015 开发者侧过拟合泄漏隔离：提交边界 + trace 物理隔离 + 工作区 jail（issue #0）
+### 0015 Harness 边界与需求工具访问：提交拒绝清单、trace 隔离与工作区检查（issue #0）
 
 ```mermaid
 graph LR
@@ -1965,7 +2019,7 @@ graph LR
 
 ```mermaid
 graph LR
-    nT1["T1 designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链"]
+    nT1["T1 synthesizer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链"]
     nT2["T2 dev 领取分池 + 票种预算与重试升档 + 结果回写 comment"]
     nT3["T3 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮"]
     nT4["T4 web API：/api/issues 附 covers/covered_by 字段"]
@@ -2107,7 +2161,7 @@ graph LR
     nT1["T1 平台层 issue schema：per-type 字段(用户填/triage填 分区) + RFC + validate/render"]
     nT2["T2 用户 sim 产结构化 raw issue：暂定 type + needs-triage + 轮号"]
     nT3["T3 triage agent（新角色）：就地分类+定位+去重+驳回/needs-info"]
-    nT4["T4 synthesize agent（原 designer 收窄）：跨 issue 结构综合 → RFC"]
+    nT4["T4 synthesize agent（原 synthesizer 收窄）：跨 issue 结构综合 → RFC"]
     nT5["T5 dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck"]
     nT6["T6 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster"]
     nT7["T7 web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压)"]
@@ -2189,7 +2243,7 @@ graph LR
 graph LR
     nT1["T1 issue_schema 收敛为契约单一真源 + 契约生成/共享校验模块"]
     nT2["T2 triage 改 submit-tool 原生结构化（去第二次 LLM 重排与别名归一）"]
-    nT3["T3 designer 改 submit-tool 原生结构化 + 统一 driver-apply"]
+    nT3["T3 synthesizer 改 submit-tool 原生结构化 + 统一 driver-apply"]
     nT1 --> nT2
     nT1 --> nT3
 ```
@@ -2213,7 +2267,7 @@ graph LR
 graph LR
     nT1["T1 issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径"]
     nT2["T2 Divergent 驱动器 + agent_defs/divergent_pm：落不可领产品候选"]
-    nT3["T3 Designer.gate_once：promote/hold/drop 语义晋升"]
+    nT3["T3 Synthesizer.gate_once：promote/hold/drop 语义晋升"]
     nT4["T4 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关"]
     nT5["T5 dev 领取硬排除 divergent 候选"]
     nT1 --> nT2
@@ -2307,13 +2361,11 @@ graph LR
     nT1["T1 写 0030 活快照"]
     nT2["T2 harness_template 精简为 HELP/RUNTIME/scripts/deps"]
     nT3["T3 /help slash 与模板自测"]
-    nT4["T4 边界白名单改为产品区域而非历史文件名"]
-    nT5["T5 平台读取 HELP.md 与收尾闸门同步"]
+    nT4["T4 产品提交边界：拒绝密钥与运行态"]
     nT6["T6 connector 与 stdio-jsonl-v1 协议适配"]
     nT2 --> nT3
     nT2 --> nT4
-    nT2 --> nT5
-    nT5 --> nT6
+    nT2 --> nT6
 ```
 
 演化图：
@@ -2324,14 +2376,12 @@ graph LR
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
-    v_T5_1["T5 v1"]
     v_T6_1["T6 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
-    class v_T5_1 st_done;
     class v_T6_1 st_done;
 ```
 
@@ -2615,7 +2665,7 @@ graph LR
     nT1["T1 固化规格与跨仓验收边界"]
     nT2["T2 读取并折叠 Gitea issue timeline"]
     nT3["T3 扩展 issue 详情 timeline API"]
-    nT4["T4 为 Designer 综合票写入轮次标签"]
+    nT4["T4 为 Synthesizer 综合票写入轮次标签"]
     nT5["T5 建立前端标签维度与时间线展示模型"]
     nT6["T6 展示 issue 状态演进并完成跨仓验收"]
     nT1 --> nT2
@@ -3068,11 +3118,11 @@ graph LR
     class v_T5_1 st_done;
 ```
 
-### 0052 Designer 提案覆盖与重复合并权责（issue #0）
+### 0052 Synthesizer 提案覆盖与重复合并权责（issue #0）
 
 ```mermaid
 graph LR
-    nT1["T1 Designer covers 合并语义与状态迁移"]
+    nT1["T1 Synthesizer covers 合并语义与状态迁移"]
     nT2["T2 Owner 退回纯交付路由"]
     nT3["T3 覆盖合并回归测试与规格验证"]
     nT1 --> nT2
@@ -3347,7 +3397,7 @@ graph LR
 
 ```mermaid
 graph LR
-    nT1["T1 需求侧提案分组与并行 Designer"]
+    nT1["T1 需求侧提案分组与并行 Synthesizer"]
     nT2["T2 交付侧有界前置与软调度"]
 ```
 
@@ -3370,7 +3420,7 @@ graph LR
     nT2["T2 阶段化 Orchestrator 与交付恢复"]
     nT3["T3 用户会话工作项级恢复"]
     nT4["T4 Triage 与 Divergent 第一拍恢复"]
-    nT5["T5 Designer 与 Owner 输出先存后应用"]
+    nT5["T5 Synthesizer 与 Owner 输出先存后应用"]
     nT6["T6 Fresh/resume 入口与故障矩阵验收"]
     nT1 --> nT2
     nT1 --> nT3
@@ -3507,4 +3557,41 @@ graph LR
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
+```
+
+### 0068 Synthesizer 角色彻底改名与旧 Developer 遗留清理（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 需求包、边界检查与角色名称统一"]
+    nT2["T2 Agent 定义与启动配置切换"]
+    nT3["T3 脚本和实验执行入口全量对齐"]
+    nT4["T4 看板角色与显示名称统一"]
+    nT5["T5 当前文档与 Spec 索引更新"]
+    nT6["T6 行为回归与离线流程验证"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT1 --> nT4
+    nT3 --> nT5
+    nT4 --> nT5
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```

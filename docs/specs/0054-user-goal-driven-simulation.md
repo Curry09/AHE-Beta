@@ -63,8 +63,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/session_timeline.py
-      - backend/tests/designer/test_session_timeline.py
+      - backend/auto_designer/demand/session_timeline.py
+      - backend/tests/demand/test_session_timeline.py
     scope: 将目标摘要、目标变更事件、每轮 target/effect 和 goal_audit 投影到设计面 timeline；保留完整 sim_trace 作为权威落盘，但默认投影只提供有界、可读、带来源的目标证据，不提供完整 persona raw。
     acceptance: timeline 能区分 B0 初始文本、当前文本和每次 revision reason；每轮目标指向与动作可追溯到 turn；goal audit 能报告未知目标、effect mismatch、缺 reason 等问题；旧 timeline 无目标字段时保持兼容并标记 unavailable。
 ---

@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "evaluation" / "harness-suite-20260920"
 ASSIGNMENTS = SUITE / "configs" / "mixed-scaling-20260922.tasks.json"
-MEMBERSHIP = SUITE / "configs" / "mixed-scaling-20260922.json"
+MEMBERSHIP = ROOT / "examples" / "experiments" / "synthesizer-mixed-scaling.json"
 EXPERIMENT_CONFIGS = ROOT.parent / "auto-designer-experiment-configs"
 PUBLIC_SOURCES = (
     EXPERIMENT_CONFIGS

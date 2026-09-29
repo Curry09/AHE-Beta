@@ -43,7 +43,7 @@ def test_list_timeline_pages_and_normalizes_label_direction(monkeypatch):
                     "type": "label",
                     "body": "1",
                     "label": {"name": "ready"},
-                    "user": {"login": "designer"},
+                    "user": {"login": "synthesizer"},
                     "created_at": "2026-08-09T10:00:00Z",
                 },
                 {
@@ -51,7 +51,7 @@ def test_list_timeline_pages_and_normalizes_label_direction(monkeypatch):
                     "type": "label",
                     "body": "",
                     "label": {"name": "proposal"},
-                    "user": {"login": "designer"},
+                    "user": {"login": "synthesizer"},
                     "created_at": "2026-08-09T10:00:00Z",
                 },
             ],
@@ -60,7 +60,7 @@ def test_list_timeline_pages_and_normalizes_label_direction(monkeypatch):
                     "id": 3,
                     "type": "comment",
                     "body": "admit",
-                    "user": {"login": "designer"},
+                    "user": {"login": "synthesizer"},
                     "created_at": "2026-08-09T10:00:01Z",
                 }
             ],
@@ -71,13 +71,13 @@ def test_list_timeline_pages_and_normalizes_label_direction(monkeypatch):
     events = tracker.list_timeline(number=7)
 
     assert [event["operation"] for event in events] == ["add", "remove", "unknown"]
-    assert events[0]["label"] == "ready" and events[0]["actor"] == "designer"
+    assert events[0]["label"] == "ready" and events[0]["actor"] == "synthesizer"
     assert "page=1&limit=2" in session.calls[0]
     assert "page=2&limit=2" in session.calls[1]
 
 
 def _event(
-    label: str, operation: str, created_at: str, *, actor: str = "designer"
+    label: str, operation: str, created_at: str, *, actor: str = "synthesizer"
 ) -> dict[str, Any]:
     return {
         "id": f"{created_at}:{label}:{operation}",

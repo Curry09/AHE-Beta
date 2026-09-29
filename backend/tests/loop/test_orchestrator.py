@@ -438,7 +438,7 @@ def test_integrity_guard_called_once_at_round_end(tmp_path) -> None:
 
 
 def test_integrity_guard_raise_aborts_round(tmp_path) -> None:
-    from auto_designer.dev.repo_guard import RepoIntegrityError
+    from auto_designer.guards.repo_guard import RepoIntegrityError
 
     repo = _seed_repo(tmp_path)
 
@@ -496,7 +496,7 @@ def test_beats_order_triage_divergent_then_synth_then_owner(tmp_path) -> None:
         run_session_fn=run_session_fn,
         initial_ref="main",
         triagers=[t0, t1],
-        designers=[synth],
+        synthesizers=[synth],
         divergents=[div],
         owner=owner,
     )

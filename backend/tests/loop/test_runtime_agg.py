@@ -1,4 +1,4 @@
-# 设计师运行时行为聚合单测：事后扫 Session.steps/reply + harness 预算钮。
+# 结构综合运行时行为聚合单测：事后扫 Session.steps/reply + harness 预算钮。
 """验证 runtime_agg：
 
 - 空库 → 明示无数据；
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from auto_designer.designer.runtime_agg import aggregate_runtime, format_runtime_agg
+from auto_designer.demand.runtime_agg import aggregate_runtime, format_runtime_agg
 from auto_designer.models import (
     FeelingScore,
     Persona,

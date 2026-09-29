@@ -7,6 +7,10 @@ Python 3.12+ · Linux / WSL2 · MIT。建议先运行下方离线演示；真实
 
 auto-designer 模拟用户使用 Harness，把使用轨迹转为需求，再交给独立的 [OpenAgents](https://github.com/Curry09/OpenAgents) 实现。每轮交付封口后，用户试用新的 Harness；末轮只试用，不再交付。体感、技术验收和 留出基准测试 分开记录。
 
+**Synthesizer（结构综合）**综合相关提案，形成结构性改进方向，不负责代码实现。Triage、Synthesizer、PM、Owner 共用 `auto_designer.demand` 包和 `DEMAND_LLM_*` 模型配置。仍有效的文件访问、编排仓完整性与 Harness 提交边界检查位于 `auto_designer.guards`。
+
+当前代码和开发配置直接使用 `synthesizer`、`N_SYNTHESIZERS`、`SYNTHESIZER_GROUPING`。详见[配置说明](docs/CONFIGURATION.md)和[分组综合](docs/synthesizer-grouping.md)。
+
 本仓是**实验控制器**；OpenAgents 是**交付 CLI**；`backend/harness_template/` 是**被进化产品的初始源码**。实验迭代得到的 Harness 应作为带版本的独立产物发布。
 
 ## 安装与离线试用

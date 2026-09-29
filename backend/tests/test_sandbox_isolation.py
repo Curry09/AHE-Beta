@@ -1,8 +1,8 @@
-"""dev/designer sandbox 与 trace 目录的隔离布局断言。
+"""dev/synthesizer sandbox 与 trace 目录的隔离布局断言。
 
 机制硬隔离：把 harness 仓下沉到独立父目录，使 trace（体感/会话 sessions、harness 运行副本
 harness_runs）不再是 sandbox 的 `../` 同级——`../sessions`/`../harness_runs` 相对路径够不着，
-堵住「dev/designer 回看任务轨迹 → 把任务专属产物带进 harness」的过拟合泄漏。
+堵住「dev/synthesizer 回看任务轨迹 → 把任务专属产物带进 harness」的过拟合泄漏。
 """
 
 from __future__ import annotations

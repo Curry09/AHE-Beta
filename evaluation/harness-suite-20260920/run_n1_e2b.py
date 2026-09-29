@@ -26,7 +26,7 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "evaluation" / "harness-suite-20260920"
-DEFAULT_CONFIG = SUITE / "configs" / "n1-e2b-20260922.json"
+DEFAULT_CONFIG = ROOT / "examples" / "experiments" / "synthesizer-n1-e2b.json"
 ARTIFACTS = ROOT.parent / "auto-designer-experiment-artifacts"
 HARNESS_ARCHIVE = ARTIFACTS / "harness-v0-cade14d.tar.gz"
 CLAUDE = Path("/root/.local/share/claude/versions/2.1.261")
@@ -102,7 +102,7 @@ def load_plan(path: Path) -> dict:
         raise LaunchError("N=1 config must contain exactly five rounds")
     if task.get("outer_timeout_seconds") != task.get("official_agent_timeout_seconds", 1800) + 600:
         raise LaunchError("outer timeout must equal official task timeout + 600 seconds")
-    for role in ("harness", "user_simulator", "designer", "developer", "triager"):
+    for role in ("harness", "user_simulator", "synthesizer", "developer", "triager"):
         if not plan.get("roles", {}).get(role, {}).get("model"):
             raise LaunchError(f"missing frozen model configuration for role: {role}")
     archive = Path(plan["harness"]["archive"]).expanduser()
@@ -229,7 +229,7 @@ def remote_files(
     roles = plan["roles"]
     harness_model = roles["harness"]["model"]
     user_model = roles["user_simulator"]["model"]
-    designer_model = roles["designer"]["model"]
+    synthesizer_model = roles["synthesizer"]["model"]
     developer_model = roles["developer"]["model"]
     timing_policy = (plan.get("timeouts") or {}).get("latency_isolated_timeout") or {}
     backend_env = "\n".join(
@@ -240,9 +240,9 @@ def remote_files(
             f"HARNESS_LLM_MODEL={harness_model}",
             f"HARNESS_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
             f"HARNESS_LLM_API_KEY={creds['BOYUE_API_KEY']}",
-            f"DESIGNER_LLM_MODEL={designer_model}",
-            f"DESIGNER_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
-            f"DESIGNER_LLM_API_KEY={creds['BOYUE_API_KEY']}",
+            f"DEMAND_LLM_MODEL={synthesizer_model}",
+            f"DEMAND_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
+            f"DEMAND_LLM_API_KEY={creds['BOYUE_API_KEY']}",
             f"DEVELOPER_LLM_MODEL={developer_model}",
             f"DEVELOPER_LLM_BASE_URL={creds['BOYUE_OPENAI']}",
             f"DEVELOPER_LLM_API_KEY={creds['BOYUE_API_KEY']}",
@@ -437,7 +437,7 @@ def start_remote(sandbox, plan: dict, identity_data: dict[str, str], resume: boo
         "MAX_PARALLEL_USERS": "1",
         "N_USERS": str(roster["user"]),
         "N_TRIAGERS": str(roster["triager"]),
-        "N_DESIGNERS": str(roster["designer"]),
+        "N_SYNTHESIZERS": str(roster["synthesizer"]),
         "N_DIVERGENTS": str(roster["divergent"]),
         "N_OWNERS": str(roster["owner"]),
         "N_DEVELOPERS": str(roster["developer"]),

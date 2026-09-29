@@ -29,7 +29,7 @@ _ROLE_ORDER = {
     "user": 0,
     "triager": 1,
     "divergent": 2,
-    "designer": 3,
+    "synthesizer": 3,
     "owner": 4,
     "developer": 5,
 }
@@ -91,7 +91,7 @@ def update_agent(
     round_no: int | None = None,
     meta: dict[str, Any] | None = None,
 ) -> None:
-    """更新某 agent 的活动槽（upsert）。turns 给会话型 agent，detail 给 dev/designer 最终报告，
+    """更新某 agent 的活动槽（upsert）。turns 给会话型 agent，detail 给 dev/synthesizer 最终报告，
     round_no 标注该活动属于第几轮（前端按轮分组的依据）。
 
     meta（Spec-0026/T1）：可选只读展示载荷（如用户 agent 的 persona 摘要 identity/level/domain/goal）——
@@ -224,7 +224,7 @@ def archive_agent(
 
     槽位每轮被覆盖，归档发生在该 agent 一段活动收尾（running=False）时，把 label/role/status/
     log/turns/detail 全量快照下来，供前端「已完成 · 按轮分组」回看。extra 至少含 kind
-    （user_session/designer_run/dev_run）与各角色专属字段（session_id/issue_number/tag…）。
+    （user_session/synthesizer_run/dev_run）与各角色专属字段（session_id/issue_number/tag…）。
     槽不存在则 no-op（无活动可归档）。
     """
     with _WRITE_LOCK:  # Spec-0017/T1：history 读-追加-写全程持锁，并发归档不丢条目

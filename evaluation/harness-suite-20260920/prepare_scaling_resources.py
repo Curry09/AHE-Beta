@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "evaluation" / "harness-suite-20260920"
-CONFIG = SUITE / "configs" / "scaling-e2b-20260922.json"
+CONFIG = ROOT / "examples" / "experiments" / "synthesizer-scaling-e2b.json"
 OUT = SUITE / "prepared" / "scaling-e2b-20260922"
 
 

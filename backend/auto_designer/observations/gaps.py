@@ -14,7 +14,7 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 
-from auto_designer.designer.issue_schema import round_label
+from auto_designer.demand.issue_schema import round_label
 from auto_designer.invocation import _redact
 from auto_designer.models import IssueDraft
 from auto_designer.observations.grants import authorized_sessions, grant, is_pm_source

@@ -30,8 +30,8 @@ tasks:
         type: extends
     parallel: false
     files:
-      - backend/auto_designer/designer/agent_runtime.py
-      - backend/auto_designer/designer/grouped_designer.py
+      - backend/auto_designer/demand/agent_runtime.py
+      - backend/auto_designer/demand/grouped_synthesizer.py
       - backend/auto_designer/loop/sim_user.py
     scope: 区分 mechanism、provider、infrastructure、controller timeout，并在恢复账本中保存截止证据。
     acceptance: provider 等待不被误报为机制失败；外层 wall guard 仍有限；完成的 operation 不被 resume 重放。
@@ -95,7 +95,7 @@ manifest/receipt 中标记来源。该规则适用于 direct 和 simulated-user 
 
 ## Verification
 
-变更必须通过 time-accounting、direct-session、grouped-designer、infrastructure 和
+变更必须通过 time-accounting、direct-session、grouped-synthesizer、infrastructure 和
 closed-loop 回归测试；启动前 receipt 还必须绑定 config/task/template/payload SHA、
 canary evidence 和 timeout policy。详细实现约束见
 `evaluation/harness-suite-20260920/SPEC-time-accounting-provider-latency.md`。

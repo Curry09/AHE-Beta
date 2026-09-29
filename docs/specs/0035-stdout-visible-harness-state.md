@@ -80,7 +80,7 @@ tasks:
     files:
       - backend/agent_defs/divergent_pm/systemprompt.md
     scope: 给 divergent PM 增加中性分层分析框架：先区分上下文、证据、解释与候选；用户可见契约作为观察 lens，不预设问题或方案；优先跨会话/跨 persona 或强证据模式，避免换名重复候选。
-    acceptance: 相关 designer/PM 测试通过；对同一批 user-only sessions 的自然 PM 回放能产出可追溯 session 证据的候选；不直接喂 soft gap evidence。
+    acceptance: 相关 synthesizer/PM 测试通过；对同一批 user-only sessions 的自然 PM 回放能产出可追溯 session 证据的候选；不直接喂 soft gap evidence。
 ---
 
 # 0035 · stdout 可见 harness 状态与主 loop 等待/打断动作
@@ -218,7 +218,7 @@ error
 type / text / observed_at / source=harness_stdout / raw payload
 ```
 
-接缝层不新增 `answers_utterance_id`、`reply_to`、`pending_user_messages` 等配对推断字段。已有 TurnLog 的 utterance 观测字段可保留作历史兼容，但用户感知与 designer 机制信号不依赖接缝层配对。
+接缝层不新增 `answers_utterance_id`、`reply_to`、`pending_user_messages` 等配对推断字段。已有 TurnLog 的 utterance 观测字段可保留作历史兼容，但用户感知与 synthesizer 机制信号不依赖接缝层配对。
 
 收到 terminal reply 后，接缝层可以短暂 drain 已经到达的旁路 stdout 事件，以捕捉紧邻的 status/progress，例如：
 
@@ -311,7 +311,7 @@ graph LR
 
 ### 为什么选择 stdout 可见事件
 
-stdout 是 harness 对用户的真实界面。真实 CLI 用户不是只看到 final reply，还会看到 progress、queued ack、status、正在运行的命令等流式状态。把这些事件提供给用户模拟，能让用户自然判断是等待、打断还是追问，也能让 designer 从用户行为中看到状态可知性问题。
+stdout 是 harness 对用户的真实界面。真实 CLI 用户不是只看到 final reply，还会看到 progress、queued ack、status、正在运行的命令等流式状态。把这些事件提供给用户模拟，能让用户自然判断是等待、打断还是追问，也能让 synthesizer 从用户行为中看到状态可知性问题。
 
 ### 为什么主 loop 也需要 keep_waiting/interrupt
 

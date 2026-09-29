@@ -11,7 +11,7 @@ Spec-0007/0032：纯 trunk（单 main）语义不变；每局解析 main HEAD SH
      纯观测游标（推进者现在是 vigil 的 merge）。vK tag 体系退役（观测锚点 = merge commit）。
 
 前置：
-  1) backend/.env 有三组独立配置 {USER,DESIGNER,HARNESS}_LLM_{MODEL,BASE_URL,API_KEY}
+  1) backend/.env 有三组独立配置 {USER,DEMAND,HARNESS}_LLM_{MODEL,BASE_URL,API_KEY}
      （前二=编排角色，HARNESS=被进化的产品本体，run.py 据其导出 harness 子进程读的 plain LLM_*）
   2) Gitea 已起并 bootstrap，backend/deploy/gitea/.env 有 GITEA_URL/OWNER/REPO/TOKEN
   3) 交付面 CLI：`openagents` 在 PATH（uv tool install --from <OpenAgents 仓>@<pin> openagents，
@@ -39,11 +39,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent  # backend/
 DATA = ROOT / "data"
-# dev/designer 的 sandbox 工作目录 = harness 仓。把它下沉到一个**只含它自己**的独立父目录
+# dev/synthesizer 的 sandbox 工作目录 = harness 仓。把它下沉到一个**只含它自己**的独立父目录
 # （data/harness_sandbox/harness_repo），使 trace 目录（data/sessions 体感+会话、data/harness_runs
 # harness 运行副本）不再是它的 `../` 同级——`../sessions/*.json`、`../harness_runs/**` 这类相对路径
-# 直接够不着。堵住「dev/designer 回看任务轨迹 → 把该任务专属产物（某库 API/某类文件/预期输出）带进
-# harness」的过拟合泄漏（与提交边界闸同源之患；见 agent_defs/designer/systemprompt.md 硬禁区）。
+# 直接够不着。堵住「dev/synthesizer 回看任务轨迹 → 把该任务专属产物（某库 API/某类文件/预期输出）带进
+# harness」的过拟合泄漏（与提交边界闸同源之患；见 agent_defs/synthesizer/systemprompt.md 硬禁区）。
 # 注：bash 仍可走绝对路径，但相对导航（ls ..）已看不到 trace，堵住了唯一的现实发现路径。
 _SANDBOX_ROOT = DATA / "harness_sandbox"
 HARNESS_REPO = _SANDBOX_ROOT / "harness_repo"
@@ -212,7 +212,7 @@ def _seed_harness_repo() -> Path:
     # 清掉模板复制带来的字节码缓存、写 .gitignore，让 v0 seed 只含 harness 制品。
     # Spec-0032/T5：.openagents/ 是 vigil 的本地运行态（队列 db/claims/配置），随 rmtree 每 run 归零，
     # 且永不入库。
-    from auto_designer.dev.harness_boundary import install_pre_commit  # noqa: PLC0415
+    from auto_designer.guards.harness_boundary import install_pre_commit  # noqa: PLC0415
 
     for pyc in HARNESS_REPO.rglob("__pycache__"):
         shutil.rmtree(pyc, ignore_errors=True)
@@ -836,11 +836,11 @@ def main() -> int:
 
     llm_env = _load_env(
         ROOT / ".env"
-    )  # {USER,DESIGNER,HARNESS}_LLM_*（DEV_LLM_* 随 dev 退役不再消费）
+    )  # {USER,DEMAND,HARNESS}_LLM_*（DEV_LLM_* 随 dev 退役不再消费）
     # 启动命令显式注入的配置优先于仓内 .env，便于临时切换网关/模型且不把密钥写盘。
     _apply_env_defaults(llm_env)
-    # 分角色 LLM 配置：编排角色各用 {USER,DESIGNER}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、无公共
-    # 回落——agent.yaml 的 ${env.DESIGNER_LLM_*} 与 user 侧 ApiPersonaClient 直接读各自角色变量。
+    # 分角色 LLM 配置：编排角色各用 {USER,DEMAND}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、无公共
+    # 回落——agent.yaml 的 ${env.DEMAND_LLM_*} 与 user 侧 ApiPersonaClient 直接读各自角色变量。
     # 交付面（vigil）的 coding 后端是 claude CLI，凭证走宿主 claude 登录态，不经 .env。
     # 被进化的产品本体 harness 是第 4 个独立实体：其（可移植的）agent.yaml 只认 plain LLM_*，不知我们
     # 的角色命名。在此把 HARNESS_LLM_* 写实到 plain LLM_*，让 launcher 起的 harness 子进程（继承
@@ -866,7 +866,7 @@ def main() -> int:
     roster = load_roster()
     user_limit = PERSONA_LIMIT if PERSONA_LIMIT is not None else roster["user"]
     print(
-        f"⓪.5 编制 roster：用户×{roster['user']} · 设计师×{roster['designer']} · "
+        f"⓪.5 编制 roster：用户×{roster['user']} · 设计师×{roster['synthesizer']} · "
         f"交付面并发×{roster['developer']}（vigil --parallel；前端房间容量与此一致）"
     )
 
@@ -875,7 +875,7 @@ def main() -> int:
     bypass = ["localhost", "127.0.0.1"]
     for url in (
         os.environ.get("USER_LLM_BASE_URL"),
-        os.environ.get("DESIGNER_LLM_BASE_URL"),
+        os.environ.get("DEMAND_LLM_BASE_URL"),
         gitea.get("GITEA_URL"),
     ):
         host = urlparse(url).hostname if url else None
@@ -885,8 +885,8 @@ def main() -> int:
     os.environ["NO_PROXY"] = no_proxy
     os.environ["no_proxy"] = no_proxy
 
-    from auto_designer.designer.designer import Designer
-    from auto_designer.designer.triage import Triager
+    from auto_designer.demand.synthesizer import Synthesizer
+    from auto_designer.demand.triage import Triager
     from auto_designer.distill.library import PersonaLibrary
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.metrics import Metrics
@@ -911,7 +911,7 @@ def main() -> int:
             roster=roster,
             models={
                 "user": os.environ.get("USER_LLM_MODEL", ""),
-                "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
+                "synthesizer": os.environ.get("DEMAND_LLM_MODEL", ""),
                 "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
                 "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
             },
@@ -943,8 +943,8 @@ def main() -> int:
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=DATA / "harness_runs")
 
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 生成/准入角色 ...")
-    designer_agent_def = str(
-        ROOT / "agent_defs" / "designer"
+    synthesizer_agent_def = str(
+        ROOT / "agent_defs" / "synthesizer"
     )  # synthesize agent 定义目录（只读工具）
     triager_agent_def = str(
         ROOT / "agent_defs" / "triage_agent"
@@ -1035,7 +1035,7 @@ def main() -> int:
     ready_alarm = _alarm_threshold("READY_DEPTH_ALARM")
 
     def _check_backpressure(round_no):
-        from auto_designer.designer.issue_schema import PROPOSAL, READY, plane  # noqa: PLC0415
+        from auto_designer.demand.issue_schema import PROPOSAL, READY, plane  # noqa: PLC0415
 
         try:
             open_issues = tracker.list_open_issues()
@@ -1154,12 +1154,12 @@ def main() -> int:
         for i in range(roster["triager"])
     ]
 
-    def make_designer_status(agent_id, label):  # 创新者 agent 活动回调（收尾时按轮归档）
+    def make_synthesizer_status(agent_id, label):  # 创新者 agent 活动回调（收尾时按轮归档）
         def cb(*, running, status, detail=None, proposals=None):
             update_agent(
                 data_dir=DATA,
                 agent_id=agent_id,
-                role="designer",
+                role="synthesizer",
                 label=label,
                 running=running,
                 status=status,
@@ -1171,28 +1171,31 @@ def main() -> int:
                     data_dir=DATA,
                     agent_id=agent_id,
                     round_no=current["round"],
-                    extra={"kind": "designer_run", "proposals": proposals or []},
+                    extra={"kind": "synthesizer_run", "proposals": proposals or []},
                 )
 
         return cb
 
-    designers = [
-        Designer(
+    synthesizers = [
+        Synthesizer(
             tracker,
             store,
             str(repo),
-            designer_agent_def,
-            on_status=make_designer_status(
-                f"designer-{i}", "designer" if roster["designer"] == 1 else f"designer#{i + 1}"
+            synthesizer_agent_def,
+            on_status=make_synthesizer_status(
+                f"synthesizer-{i}",
+                "synthesizer" if roster["synthesizer"] == 1 else f"synthesizer#{i + 1}",
             ),
-            on_event=make_event_logger(f"designer-{i}"),
+            on_event=make_event_logger(f"synthesizer-{i}"),
             round_provider=lambda: current["round"] or None,
         )
-        for i in range(roster["designer"])
+        for i in range(roster["synthesizer"])
     ]
-    from auto_designer.designer.grouped_designer import group_designer_stage
+    from auto_designer.demand.grouped_synthesizer import group_synthesizer_stage
 
-    designers = group_designer_stage(designers, artifact_root=role_runs / "designer_grouping")
+    synthesizers = group_synthesizer_stage(
+        synthesizers, artifact_root=role_runs / "synthesizer_grouping"
+    )
 
     def make_divergent_status(agent_id, label):
         def cb(*, running, status, detail=None, proposals=None):
@@ -1216,7 +1219,7 @@ def main() -> int:
 
         return cb
 
-    from auto_designer.designer.divergent import Divergent  # noqa: PLC0415
+    from auto_designer.demand.divergent import Divergent  # noqa: PLC0415
 
     divergents = [
         Divergent(
@@ -1256,7 +1259,7 @@ def main() -> int:
 
         return cb
 
-    from auto_designer.designer.owner import Owner  # noqa: PLC0415
+    from auto_designer.demand.owner import Owner  # noqa: PLC0415
 
     # Owner 恒 1 个路由实例；默认 roster owner=0 使用零 LLM 机械交接，N_OWNERS=1 才启用模型评审。
     owner = Owner(
@@ -1279,7 +1282,7 @@ def main() -> int:
     # Spec-0021/T2：编排仓完整性绊线。run 期间编排仓（ROOT=auto-designer 检出）应全程冻结——只该动
     # harness 沙盒与 data/。开跑前拍一张 (HEAD, porcelain) 快照，每轮 b 段后校验未变；被 dev agent
     # 逃逸改动即抛 RepoIntegrityError 中止（凭证隔离已掐推送，这是第二道独立信道兜底）。
-    from auto_designer.dev.repo_guard import snapshot_repo, verify_unchanged  # noqa: PLC0415
+    from auto_designer.guards.repo_guard import snapshot_repo, verify_unchanged  # noqa: PLC0415
 
     _repo_baseline = snapshot_repo(repo=str(ROOT))
 
@@ -1293,7 +1296,7 @@ def main() -> int:
         run_session_fn=user_run_session_fn,
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
         triagers=triagers,  # Spec-0029：第一拍分片并行（第 k 个处理 pending[k::n]）
-        designers=designers,  # 第二拍 synthesize（吃本轮新升提案）
+        synthesizers=synthesizers,  # 第二拍 synthesize（吃本轮新升提案）
         divergents=divergents,  # 第一拍与 triage 并行（discovery 轨，吃会话证据）
         owner=owner,  # Spec-0029：唯一准入（proposal → ready/merged/declined/hold）
         on_round_start=on_round_start,  # 轮次运行态 → data/live/run.json（看板 /api/state）
@@ -1317,7 +1320,7 @@ def main() -> int:
 
     print(
         f"④ 跑 {TOTAL_ROUNDS} 轮闭环（{len(fixed_set)} 个 persona（distill 卡库）× "
-        f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {roster['designer']} synthesize "
+        f"{len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {roster['synthesizer']} synthesize "
         f"→ owner({'评审' if roster['owner'] >= 1 else '零 LLM 机械交接'})；交付面 vigil --parallel "
         f"{roster['developer']}（末轮只用户；非末轮封口后切轮），"
         f"a 段并发 {max_parallel_users}，背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，"

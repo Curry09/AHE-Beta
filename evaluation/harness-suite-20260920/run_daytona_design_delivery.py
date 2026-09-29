@@ -76,7 +76,7 @@ def main() -> int:
         "suite": "harness-suite-20260920",
         "task_id": "design-delivery-mechanical-owner-smoke",
         "execution": "daytona",
-        "designer_model": "z-ai/glm-5.2",
+        "synthesizer_model": "z-ai/glm-5.2",
         "owner_mode": "review_false_mechanical",
         "developer_stage": "handoff_preflight_only",
         "backend_sha256": hashlib.sha256(
@@ -108,9 +108,9 @@ def main() -> int:
                 ttl_minutes=45,
                 labels={"purpose": "design-delivery-smoke", "owner_mode": "mechanical"},
                 env_vars={
-                    "DESIGNER_LLM_API_KEY": openrouter_key,
-                    "DESIGNER_LLM_BASE_URL": "https://openrouter.ai/api/v1",
-                    "DESIGNER_LLM_MODEL": "z-ai/glm-5.2",
+                    "DEMAND_LLM_API_KEY": openrouter_key,
+                    "DEMAND_LLM_BASE_URL": "https://openrouter.ai/api/v1",
+                    "DEMAND_LLM_MODEL": "z-ai/glm-5.2",
                     "PYTHONUNBUFFERED": "1",
                 },
             ),

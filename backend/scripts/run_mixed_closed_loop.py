@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mixed-task adapter for the existing durable closed-loop orchestrator.
 
-The orchestration, triage, designer, delivery, recovery, and checkpoint
+The orchestration, triage, synthesizer, delivery, recovery, and checkpoint
 semantics remain in ``run_swebench_closed_loop``.  This adapter only replaces
 the SWE-specific task loader/session planner with a frozen mixed-task manifest;
 the session runner dispatches ``simulated_user`` and ``direct`` explicitly.

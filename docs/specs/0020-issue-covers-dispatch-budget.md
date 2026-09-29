@@ -3,10 +3,10 @@ number: "0020"
 title: 覆盖关系兑现 + 开发者领取策略与票种预算
 issue: 0
 slug: issue-covers-dispatch-budget
-summary: 补全 designer 覆盖判定的执行链（covers 结构化-挂链-降权-连带关闭-前端徽标），开发者领取改可配置分池（design 优先 + 保留 bug 专属 dev），并按票种给初始迭代预算、同票重试自动升级。
+summary: 补全 synthesizer 覆盖判定的执行链（covers 结构化-挂链-降权-连带关闭-前端徽标），开发者领取改可配置分池（design 优先 + 保留 bug 专属 dev），并按票种给初始迭代预算、同票重试自动升级。
 tasks:
   - id: T1
-    title: designer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链
+    title: synthesizer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链
     status: done
     priority: P1
     tags: []
@@ -14,9 +14,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/designer.py
-      - backend/tests/loop/test_designer.py
-    scope: "解析提案 JSON 可选 covers: list[int]（非法值静默丢弃，不影响既有 title/body/labels 路径）；propose_once 落库时 body 末尾追加机器可读行 covers: #5 #6（格式 ^covers:((\\s*#\\d+)+)\\s*$，MULTILINE 最后一条为准）；对每张被覆盖的 open bug add_comment 'covered-by: #<design号>'（单条失败不影响其余与提案落库）。designer 权限不变：不 set_state、不关票。"
+      - backend/auto_designer/demand/synthesizer.py
+      - backend/tests/loop/test_synthesizer.py
+    scope: "解析提案 JSON 可选 covers: list[int]（非法值静默丢弃，不影响既有 title/body/labels 路径）；propose_once 落库时 body 末尾追加机器可读行 covers: #5 #6（格式 ^covers:((\\s*#\\d+)+)\\s*$，MULTILINE 最后一条为准）；对每张被覆盖的 open bug add_comment 'covered-by: #<design号>'（单条失败不影响其余与提案落库）。synthesizer 权限不变：不 set_state、不关票。"
     acceptance: 带 covers 的提案落库后 design 票 body 含 covers 行、被覆盖 bug 各有一条 covered-by comment；covers 缺省/为空/含非法值时行为与今天完全一致；covers 指向不存在或已 closed 的号不抛错（跳过）；单测覆盖以上三类。
   - id: T2
     title: dev 领取分池 + 票种预算与重试升档 + 结果回写 comment
@@ -86,10 +86,10 @@ tasks:
 
 ## Summary
 
-实测显示：信号生产端健康（体感 reason 具体、issue 链路通、runtime_agg 已喂 designer），
+实测显示：信号生产端健康（体感 reason 具体、issue 链路通、runtime_agg 已喂 synthesizer），
 瓶颈在**消费端**——设计师的洞察与开发者的劳动无法跨轮复利。本组补三条断链：
 
-1. **覆盖关系兑现（covers）**：designer 的 subsume 判定已存在（重复判定 rubric R3）且提案正文里已
+1. **覆盖关系兑现（covers）**：synthesizer 的 subsume 判定已存在（重复判定 rubric R3）且提案正文里已
    自然写出「综合多张 bug」的整合表述，但无人执行——不结构化、不挂链、不影响领取、修好了也不连带
    关闭。本组把它数据化：
    提案 JSON 带 `covers` 字段 → 落库写入 body 机器可读行 + 被覆盖 bug 挂 comment → 领取时 covered bug
@@ -103,7 +103,7 @@ tasks:
    自动升一档。附带最小版报告回写：work_one 收尾把结果 comment 回 issue（成功=报告全文，
    失败=attempt 标记），既是重试判定的数据源，也止住「follow-up 蒸发」。
 
-不引入 benchmark 信号（held-out 不破）；designer 仍只产「问题+方向」，不获得关票权。
+不引入 benchmark 信号（held-out 不破）；synthesizer 仍只产「问题+方向」，不获得关票权。
 
 ## Motivation
 
@@ -112,14 +112,14 @@ tasks:
 并落地为结构性版本——不是 dev 不会做设计票，是排不上队。「只能局部修改、难产生结构性改进」正是
 CLAUDE.md 里立项要解决的现象，而当前调度把它复刻在了自己的闭环里。
 
-**覆盖判定断在执行层。** designer prompt 已要求「多条 issue 互为重复时用一条整合性提案点明
-#X/#Y 系同一根因」，实测里 designer 也确实在提案正文写出了这类整合表述——但 designer 不碰
+**覆盖判定断在执行层。** synthesizer prompt 已要求「多条 issue 互为重复时用一条整合性提案点明
+#X/#Y 系同一根因」，实测里 synthesizer 也确实在提案正文写出了这类整合表述——但 synthesizer 不碰
 tracker 状态、dev 不读这句话，
 于是同根因的 bug 与 design 票在队列里**互相竞争**：dev 修 bug 是白修一遍（根因在 design 票里），
 同轮两个 dev 撞同一根因还会在 trunk 直推下互相踩。
 
 **预算与任务规模错配。** entry.py 随版本演进持续长大，dev 预算固定 38——实测中结构性改动
-撞满迭代、靠 CommitCheckpoint 硬落地才保住 tag，complete_task 没跑完、报告全丢
+撞满迭代、靠当时的提交催促中间件硬落地才保住 tag，complete_task 没跑完、报告全丢
 （live detail 只剩迭代上限报错）。且报告丢失连带「follow-up 蒸发」：
 prompt/中间件 8 处「剩余写进报告当 follow-up」，但报告只进看板、tracker 无痕，下一轮无人接得住。
 
@@ -128,16 +128,16 @@ prompt/中间件 8 处「剩余写进报告当 follow-up」，但报告只进看
   且激励歪（说难就多给）；改用 label 定初始 + **失败一次才升级**（被现实校准的 escalation）。
 - 「每轮清空所有 issue 再进下一轮」被否：破坏归因粒度（8 改动打包无法信用分配）、拆掉 issue 曲线
   观测指标（恒为 0）、轮时无上界。backlog 有存量是特性，要治的是设计票饿死而非清空。
-- 「designer 直接关重复票」被否：误判 subsume = 静默丢弃真实用户信号，违背「体感是唯一训练信号」
+- 「synthesizer 直接关重复票」被否：误判 subsume = 静默丢弃真实用户信号，违背「体感是唯一训练信号」
   底线；本组用「挂链降权、修好才关」，误判代价只是晚处理、可逆。
 
 ## Guide-level explanation
 
 改完后的一轮（对照 spec-0007 的 a→d→b→c）：
 
-- **d 段**：designer 提案 JSON 每项可带 `"covers": [5, 6]`（可选，缺省不覆盖任何票）。落库时驱动器
+- **d 段**：synthesizer 提案 JSON 每项可带 `"covers": [5, 6]`（可选，缺省不覆盖任何票）。落库时驱动器
   在 design issue body 末尾追加机器可读行 `covers: #5 #6`，并对每张被覆盖的 open bug 挂 comment
-  `covered-by: #<design号>`。designer 权限不变（只 create_issue + add_comment，不改状态）。
+  `covered-by: #<design号>`。synthesizer 权限不变（只 create_issue + add_comment，不改状态）。
 - **b 段**：每个 dev 带 `pick_policy`。`design_first`：先领 design 池（票号升序=最老优先），空则回落
   bug 池；`bug_first` 反之。池内**被覆盖的票沉底**（仍可领，防饿死回落）。领取后按 label 定预算：
   bug=38、design=60（env 可覆盖）；若该票恰有 1 条 attempt 标记（此前领过未修好）→ 升一档
@@ -158,7 +158,7 @@ prompt/中间件 8 处「剩余写进报告当 follow-up」，但报告只进看
 
 ### covers 数据模型（单一真源 = design issue body）
 
-- **产出**：`designer.py` 的 `_parse_proposals` 放行每项可选 `covers: list[int]`（非法值静默丢弃）；
+- **产出**：`synthesizer.py` 的 `_parse_proposals` 放行每项可选 `covers: list[int]`（非法值静默丢弃）；
   `propose_once` 落库时 body 追加 `\n\ncovers: #5 #6`（正则 `^covers:((\s*#\d+)+)\s*$`，
   MULTILINE 取**最后一条**匹配为准）。挂链 comment 仅为 Gitea 可读性，不作解析源。
 - **消费方 1（领取降权）**：`agentic_developer.py` 领取时从 `list_open_issues()` 的 design 票 body
@@ -181,7 +181,7 @@ prompt/中间件 8 处「剩余写进报告当 follow-up」，但报告只进看
 - **为什么封顶两次尝试**：不封顶则最老优先的排序会让修不动的票每轮吃掉一个 dev 名额（无限重试
   堵队列）；封顶后选沉底而非关票——关票=静默丢真实用户信号且污染 issue 曲线，沉底可逆、
   「存在修不动的票」这个事实本身留在 open 集里可被观测。
-- 运行时覆盖：`cfg = AgentConfig.from_yaml(...)` 后 `cfg.max_iterations = budget`（与 designer.py
+- 运行时覆盖：`cfg = AgentConfig.from_yaml(...)` 后 `cfg.max_iterations = budget`（与 synthesizer.py
   设 `cfg.resolved_tracer` 同一模式）。agent_defs yaml 里的 38 保持为缺省文档值。
 - 回写：成功 → `add_comment(number, report_text)`（报告全文，含 dev 自己写的 follow-up 段）；
   未推进 → `add_comment(number, "[dev-attempt] 本轮未推进 main：<原因/diff-stat>")`。
@@ -193,7 +193,7 @@ prompt/中间件 8 处「剩余写进报告当 follow-up」，但报告只进看
 - `agentic_developer.py:84-88` 领取 = 过滤 skip 后取 `[0]`；`gitea.py:92-105` 未指定 sort（Gitea
   默认新→旧）→ 老票沉底。
 - `gitea.py:141` 已有 `list_comments`（观测路径）；`tracker/base.py` 协议含 `add_comment`/`set_state`。
-- `designer.py:244 _parse_proposals` 目前只取 title/body/labels。
+- `synthesizer.py:244 _parse_proposals` 目前只取 title/body/labels。
 - `roster.py` 只管数量；`run.py` 构造 developers 列表处是策略注入点。
 - 前端 `SidePanel.tsx:114` 已渲染 label chips（徽标挂点）；`IssueDetail.tsx` 已有详情面板；
   `/api/issues` 返回 `{number,title,labels,state,...}`（`api.py:65-90`）。
@@ -202,7 +202,7 @@ prompt/中间件 8 处「剩余写进报告当 follow-up」，但报告只进看
 
 ```mermaid
 graph LR
-  T1[T1 designer covers 产出+挂链]
+  T1[T1 synthesizer covers 产出+挂链]
   T2[T2 dev 分池/预算/升级/回写]
   T3[T3 run.py+roster 接线]
   T4[T4 web API covers 计算]
@@ -216,7 +216,7 @@ T1 与 T2 并行（covers 行格式由本 spec 定义，两侧各自按约定实
 
 ### 文件分配（互斥）
 
-- **T1**：`backend/auto_designer/designer/designer.py`、`backend/tests/loop/test_designer.py`
+- **T1**：`backend/auto_designer/demand/synthesizer.py`、`backend/tests/loop/test_synthesizer.py`
 - **T2**：`backend/auto_designer/dev/agentic_developer.py`、`backend/auto_designer/tracker/fake.py`、
   `backend/tests/dev/test_agentic_developer.py`、`backend/tests/tracker/test_fake.py`
 - **T3**：`backend/run.py`、`backend/auto_designer/loop/roster.py`、`backend/tests/loop/test_roster.py`（新建）
@@ -240,16 +240,16 @@ T1 与 T2 并行（covers 行格式由本 spec 定义，两侧各自按约定实
 - **难度自评浮动预算（被否）**：见 Motivation；label 两档 + 失败升档 = 两条规则达成同等自适应，
   且不可被 agent gaming。
 - **每轮清空 backlog（被否）**：见 Motivation 三条（归因/观测指标/轮时）。
-- **designer 获得关票权（被否）**：误判 subsume = 丢真实用户信号；挂链降权方案误判可逆。
+- **synthesizer 获得关票权（被否）**：误判 subsume = 丢真实用户信号；挂链降权方案误判可逆。
 - **covers 存 tracker 之外（被否）**：任何旁路存储（本地 json/独立表）都与「issue 权威源在 Gitea」
   冲突且要做一致性；body 内嵌行零基建。
 - **bug-only 专属 dev（被否）**：bug 池空时空转浪费预算；`bug_first` 带回落语义等价且不空转。
 
 ## Prior art
 
-- **spec-0016（designer 根因信号）**：重复判定 rubric 与「整合性提案点名 #X/#Y」的产出侧已就位，
+- **spec-0016（synthesizer 根因信号）**：重复判定 rubric 与「整合性提案点名 #X/#Y」的产出侧已就位，
   本组是其执行侧补全。
-- **spec-0014（dev commit discipline）**：CommitCheckpoint/CompletionGate 治单轮内纪律；本组治跨轮
+- **旧提交纪律设计（现已退役）**：曾在单轮内催促提交与检查收尾；本组讨论跨轮
   连续性（报告回写、重试升档），互补不重叠。
 - **GitHub duplicate/tracking issue 惯例**：`covered-by`/`tracking` 挂链 + 完成连带关闭是成熟工作流。
 - **实测**：本组全部论据的数据源——设计票饿死、结构改动撞满预算、覆盖判定断链均为实测现象
@@ -258,17 +258,17 @@ T1 与 T2 并行（covers 行格式由本 spec 定义，两侧各自按约定实
 ## Unresolved questions
 
 - 升档系数 1.5 与 design 默认 60 是拍的初值：等后续实测的 runtime_agg（撞顶率）校准。
-- 跨票同根因复发（同一根因在不同票号下反复被开）的检测不在本组：需要 designer 对照 closed issue，
+- 跨票同根因复发（同一根因在不同票号下反复被开）的检测不在本组：需要 synthesizer 对照 closed issue，
   留给后续 spec；本组的「同票重试升档”只覆盖同票号重领。
 - covered bug 沉底后若 design 票长期不被修完，这批 bug 事实上被无限延迟——是否需要「覆盖时效」
   （design 票 N 轮未动则解除降权）？先观察。
 - stuck 票（两次尝试失败沉底）的终局出路：两次升档预算都修不动，往往说明问题比一张 dev 票大——
-  理想去向是转为 designer 的输入证据（其 attempt comment 里有失败原因），但 designer 目前只读
-  issue body 不读 comment；本组先沉底观察，喂 designer 留后续。
+  理想去向是转为 synthesizer 的输入证据（其 attempt comment 里有失败原因），但 synthesizer 目前只读
+  issue body 不读 comment；本组先沉底观察，喂 synthesizer 留后续。
 
 ## Future possibilities
 
-- designer 对照 closed issue 的复发判定（「vK 未解决 #N」→ reopen + 自动升档），补全「修没修好」回路。
+- synthesizer 对照 closed issue 的复发判定（「vK 未解决 #N」→ reopen + 自动升档），补全「修没修好」回路。
 - 设计票附「可观测验收数字」（用 runtime_agg 指标定义完成判据），dev 关票时对照。
 - follow-up 段结构化：报告里 `follow-up:` 行自动转 `create_issue(labels=["follow-up"])` 挂链。
 - backlog 超阈值时弹性加派 dev（软规则），替代清空式冲动。

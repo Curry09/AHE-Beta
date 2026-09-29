@@ -3,7 +3,7 @@ number: "0028"
 title: divergent PM + gate：产品候选并行通道与晋升评审
 issue: 0
 slug: divergent-pm-gate
-summary: 在 0025 triage 漏斗旁并行一条产品候选通道：divergent PM 与 synthesize 同信号并行落 divergent 不可领候选；Designer.gate_once 做语义晋升（promote→feature+triaged / hold / drop）。默认 N_DIVERGENTS=0 关闭；dev 领取硬排除 divergent。
+summary: 在 0025 triage 漏斗旁并行一条产品候选通道：divergent PM 与 synthesize 同信号并行落 divergent 不可领候选；Synthesizer.gate_once 做语义晋升（promote→feature+triaged / hold / drop）。默认 N_DIVERGENTS=0 关闭；dev 领取硬排除 divergent。
 tasks:
   - id: T1
     title: issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径
@@ -14,8 +14,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/issue_schema.py
-      - backend/tests/designer/test_issue_schema.py
+      - backend/auto_designer/demand/issue_schema.py
+      - backend/tests/demand/test_issue_schema.py
     scope: 新增 DIVERGENT / GATE_DROPPED 常量。triage_status 优先级插入 GATE_DROPPED（终态）与 DIVERGENT（候选不可领）。is_backlog_by_labels / is_executable_backlog 排除 divergent 与 gate-dropped，避免候选灌进可执行 backlog 曲线。
     acceptance: 常量可导入；triage_status 对含 divergent/gate-dropped 的标签返回正确单值；可执行 backlog 判定对 divergent 与 promote 后 feature+triaged 正确；单测覆盖。
   - id: T2
@@ -28,15 +28,15 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/divergent.py
+      - backend/auto_designer/demand/divergent.py
       - backend/agent_defs/divergent_pm/
       - backend/scripts/preview_divergent_pm_rounds.py
       - backend/scripts/preview_gate_on_divergent.py
-      - backend/tests/designer/test_divergent_gate.py
+      - backend/tests/demand/test_divergent_gate.py
     scope: 新建 Divergent.propose_once：与 synthesize 同构输入（triaged/RFC/积压候选/体感/runtime_agg），跑 divergent_pm agent，校验 RFC 字段后 create_issue(labels=[divergent, round-N])，每轮硬顶 3 条。不打 triaged/RFC。agent_defs 含 jail+timeline 工具；prompt 强调产品面挖掘、禁题面过拟合。附预览脚本（FakeTracker / 真 LLM）便于离线验 gate。
     acceptance: 候选带 divergent、无 triaged；超顶截断；字段非法不入库；dev 不可领；stub 单测覆盖创建/截断/不可领。
   - id: T3
-    title: Designer.gate_once：promote/hold/drop 语义晋升
+    title: Synthesizer.gate_once：promote/hold/drop 语义晋升
     status: done
     priority: P1
     tags: []
@@ -45,8 +45,8 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/designer/designer.py
-    scope: Designer 增 gate_once：无候选跳过；有则短预算跑晋升任务（候选+RFC+体感，可按需 timeline）。解析 disposition：promote→去 divergent 加 feature+triaged；hold 保持；drop→gate-dropped 关闭。未出现在决策中的候选默认 hold。复用同一 agent_defs/designer，不新建第四角色定义。
+      - backend/auto_designer/demand/synthesizer.py
+    scope: Synthesizer 增 gate_once：无候选跳过；有则短预算跑晋升任务（候选+RFC+体感，可按需 timeline）。解析 disposition：promote→去 divergent 加 feature+triaged；hold 保持；drop→gate-dropped 关闭。未出现在决策中的候选默认 hold。复用同一 agent_defs/synthesizer，不新建第四角色定义。
     acceptance: promote 进可领；hold 仍 divergent；drop 关闭带 gate-dropped；空候选不调 LLM；解析失败默认 hold；单测（见 T2 测试文件）覆盖三路。
   - id: T4
     title: 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关
@@ -65,7 +65,7 @@ tasks:
       - backend/run.py
       - backend/scripts/run_swebench_closed_loop.py
       - backend/tests/loop/test_roster.py
-    scope: orchestrator：triage 后 ThreadPool 并行 synthesize∥divergent，再对每个 designer 调 gate_once（无 designer 则候选积压）。roster 增 divergent 键，DEFAULT=0，N_DIVERGENTS 覆盖。run.py 与 SWE 脚本按编制构造 Divergent 注入。live ROLE_ORDER 插入 divergent。默认关闭不改现有闭环成本。
+    scope: orchestrator：triage 后 ThreadPool 并行 synthesize∥divergent，再对每个 synthesizer 调 gate_once（无 synthesizer 则候选积压）。roster 增 divergent 键，DEFAULT=0，N_DIVERGENTS 覆盖。run.py 与 SWE 脚本按编制构造 Divergent 注入。live ROLE_ORDER 插入 divergent。默认关闭不改现有闭环成本。
     acceptance: 顺序 triage→(synth∥divergent)→gate→dev；N_DIVERGENTS=0 无 divergent 实例；=1 注入并跑；roster 单测覆盖；live 排序含 divergent。
   - id: T5
     title: dev 领取硬排除 divergent 候选
@@ -92,7 +92,7 @@ tasks:
 在 0025 的 triage→synthesize→dev 漏斗旁，增加一条**可选**的产品候选通道：
 
 1. **divergent PM**（新 agent 定义）：与 synthesize **同信号、并行**，从交互挖「用户可感知」的产品面机会，落 `divergent` 标签的 open 候选（**不可领**）。
-2. **gate**（逻辑 Promoter，实现为 `Designer.gate_once`）：对 open divergent 做语义晋升——`promote`→去 `divergent`、加 `feature`+`triaged`；`hold` 积压；`drop`→`gate-dropped` 关闭。
+2. **gate**（逻辑 Promoter，实现为 `Synthesizer.gate_once`）：对 open divergent 做语义晋升——`promote`→去 `divergent`、加 `feature`+`triaged`；`hold` 积压；`drop`→`gate-dropped` 关闭。
 
 默认 `N_DIVERGENTS=0`（零额外成本）；开启后才跑发散与晋升。dev 领取集合硬排除 `divergent`，避免未评审候选直进主干改动。
 
@@ -109,7 +109,7 @@ a(用户) → d1 triage → d2 (synthesize ∥ divergent) → d3 gate → b(dev)
 ```
 
 - 关（默认）：`N_DIVERGENTS=0`，行为与 0025 等价（仍跑 gate，但无候选则立即跳过）。
-- 开：`N_DIVERGENTS=1`（通常配 `N_DESIGNERS≥1`，否则候选只能积压等下轮有 designer 的 gate）。
+- 开：`N_DIVERGENTS=1`（通常配 `N_SYNTHESIZERS≥1`，否则候选只能积压等下轮有 synthesizer 的 gate）。
 
 观测上：`divergent` 不计入可执行 backlog 曲线；promote 后进入与普通 feature 相同的可领集合。
 
@@ -128,14 +128,14 @@ a(用户) → d1 triage → d2 (synthesize ∥ divergent) → d3 gate → b(dev)
 
 ### Divergent（T2）
 
-- 驱动：`backend/auto_designer/designer/divergent.py`
-- 定义：`backend/agent_defs/divergent_pm/`（jail + timeline/beat/step，与 designer 同工具面）
+- 驱动：`backend/auto_designer/demand/divergent.py`
+- 定义：`backend/agent_defs/divergent_pm/`（jail + timeline/beat/step，与 synthesizer 同工具面）
 - 每轮硬顶 3 条；body 走 RFC 五门字段校验；标签仅 `[divergent, round-N?]`
 - 离线预览：`preview_divergent_pm_rounds.py` / `preview_gate_on_divergent.py`
 
 ### Gate（T3）
 
-- `Designer.gate_once`：注入候选全文 + open RFC + 体感曲线；提示可按需 `get_session_timeline`
+- `Synthesizer.gate_once`：注入候选全文 + open RFC + 体感曲线；提示可按需 `get_session_timeline`
 - `complete_task` 交 `[{issue, disposition, note}]`；未列出的候选默认 hold
 - 短 `max_iterations`（≤80）；无候选不调 LLM
 
@@ -143,7 +143,7 @@ a(用户) → d1 triage → d2 (synthesize ∥ divergent) → d3 gate → b(dev)
 
 - `Orchestrator`：`ThreadPoolExecutor` 并行 `propose_once`（synth∥divergent），再串行 `gate_once`
 - `roster`：`divergent` 键，env `N_DIVERGENTS`
-- `live._ROLE_ORDER`：user < triager < designer < divergent < developer
+- `live._ROLE_ORDER`：user < triager < synthesizer < divergent < developer
 
 ### Dev（T5）
 
@@ -159,15 +159,15 @@ T1 → T5 ─┘
 
 ## Drawbacks
 
-- 多一次 LLM 调用（divergent）+ 每 designer 一次 gate；默认关闭可规避。
+- 多一次 LLM 调用（divergent）+ 每 synthesizer 一次 gate；默认关闭可规避。
 - synthesize∥divergent 并行写同一 Fake/Gitea tracker，依赖 tracker 线程安全（现有 Fake/Gitea 调用面短，接受）。
-- gate 复用 designer 定义，systemprompt 仍偏 synthesize；靠任务消息覆盖角色，极端情况下模型可能混淆职责。
+- gate 复用 synthesizer 定义，systemprompt 仍偏 synthesize；靠任务消息覆盖角色，极端情况下模型可能混淆职责。
 
 ## Rationale and alternatives
 
 | 方案 | 取舍 |
 |------|------|
-| **本方案：并行 divergent + Designer.gate_once** | 不污染 synthesize；晋升不新建完整 agent 定义（奥卡姆）；默认可关 |
+| **本方案：并行 divergent + Synthesizer.gate_once** | 不污染 synthesize；晋升不新建完整 agent 定义（奥卡姆）；默认可关 |
 | 把产品挖掘塞进 synthesize | 破坏宁缺毋滥；实测产品面仍会被 reliability 淹没 |
 | 第四个完整 Promoter agent_defs | 多一套 prompt/工具/编制；与 gate「同工具面换任务」收益不成比例 |
 | divergent 直接打 triaged | 无去重/带宽门控，易灌单占满 N_DEVELOPERS |
@@ -182,7 +182,7 @@ T1 → T5 ─┘
 ## Unresolved questions
 
 - gate 是否应强制至少一次 timeline 抽样（现为「可按需」）。
-- 多 designer 时 gate 是否应只跑一次（现：每个 designer 各跑一次；N_DESIGNERS=1 时无歧义）。
+- 多 synthesizer 时 gate 是否应只跑一次（现：每个 synthesizer 各跑一次；N_SYNTHESIZERS=1 时无歧义）。
 - 前端 AgentBoard 是否要为 divergent 单独房间色（roster 已有键；UI 可后续跟）。
 
 ## Future possibilities

@@ -221,10 +221,10 @@ def test_api_sources_use_effective_endpoints_without_exposing_keys():
     relay = load("sync_status_vps")
     sources = relay.api_sources("""HARNESS_LLM_BASE_URL=https://openrouter.ai/api/v1
 USER_LLM_BASE_URL=https://api.boyuerichdata.opensphereai.com/v1
-DESIGNER_LLM_BASE_URL=https://aigateway.paperbypass.com/v1
-DESIGNER_LLM_API_KEY=secret-value
+DEMAND_LLM_BASE_URL=https://aigateway.paperbypass.com/v1
+DEMAND_LLM_API_KEY=secret-value
 """)
-    assert sources == {"harness": "OpenRouter", "user": "Boyue", "designer": "WIS"}
+    assert sources == {"harness": "OpenRouter", "user": "Boyue", "synthesizer": "WIS"}
     assert "secret-value" not in json.dumps(sources)
     dashboard = load("vps_status_dashboard")
     public = dashboard.public_status({"api_sources": {**sources, "token": "secret-value"}})

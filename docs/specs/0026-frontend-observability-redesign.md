@@ -17,8 +17,8 @@ tasks:
       - backend/auto_designer/loop/live.py
       - backend/run.py
       - backend/tests/loop/test_live.py
-    scope: live.py 的 _ROLE_ORDER 加 triager（排在 user 之后、designer 之前）；update_agent 增可选 meta(dict)——只读透传，前端展示用，不参与任何决策；run.py 用户 status 回调传 persona 摘要（identity/level/domain/goal）进 meta；read_agents 排序含 triager。纯观测数据补齐，不动闭环。
-    acceptance: read_agents 里 triager 排在 user 与 designer 之间；用户 agent 槽带 persona 摘要 meta；老调用不传 meta 时退化为 None 不崩；test_live 覆盖排序与 meta 透传。
+    scope: live.py 的 _ROLE_ORDER 加 triager（排在 user 之后、synthesizer 之前）；update_agent 增可选 meta(dict)——只读透传，前端展示用，不参与任何决策；run.py 用户 status 回调传 persona 摘要（identity/level/domain/goal）进 meta；read_agents 排序含 triager。纯观测数据补齐，不动闭环。
+    acceptance: read_agents 里 triager 排在 user 与 synthesizer 之间；用户 agent 槽带 persona 摘要 meta；老调用不传 meta 时退化为 None 不崩；test_live 覆盖排序与 meta 透传。
   - id: T2
     title: 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS
     status: done
@@ -117,7 +117,7 @@ tasks:
 
 ## Reference-level explanation
 
-**后端（T1，最小改动）**：`loop/live.py` 的 `_ROLE_ORDER` 增 `triager`（介于 user 与 designer 之间）；`update_agent` 增一个可选 `meta: dict | None`（只读透传、默认 None、老调用不受影响），落进 agent 槽；`run.py` 的用户 status 回调把 persona 摘要（identity/level/domain/goal）放进 meta。纯观测字段，不进任何决策、不碰 tracker/git。
+**后端（T1，最小改动）**：`loop/live.py` 的 `_ROLE_ORDER` 增 `triager`（介于 user 与 synthesizer 之间）；`update_agent` 增一个可选 `meta: dict | None`（只读透传、默认 None、老调用不受影响），落进 agent 槽；`run.py` 的用户 status 回调把 persona 摘要（identity/level/domain/goal）放进 meta。纯观测字段，不进任何决策、不碰 tracker/git。
 
 **前端设计系统（T2，地基）**：`styles.css` 重构为 CSS 变量 token——色板（bg/surface/surface-raised/border/text/text-dim/text-faint/accent + 四角色强调色）、间距阶、字阶、圆角、阴影、层级。`:root` 定义浅色为基准，`:root[data-theme="dark"]` 覆盖深色；`useTheme` hook 读/写 localStorage、首屏读 `prefers-color-scheme`、在 `<html>` 打 `data-theme`；`ThemeToggle` 挂 TopBar。组件层不再写死颜色，全部走 token。
 

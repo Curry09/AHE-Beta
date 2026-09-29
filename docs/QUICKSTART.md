@@ -58,3 +58,7 @@ uv run --locked python backend/scripts/run_auditable_experiment.py --config "$CO
 ## 4. 前端
 
 在 `frontend/` 执行 `npm ci && npm run build` 构建；开发预览用 `npm run dev -- --host 127.0.0.1`，默认把 `/api` 代理到本机 8000。实时数据需要实际后端；无实验时不应把空看板当作闭环失败。公开静态数据按 [导出说明](EXPORTING.md) 单独准备。
+
+## 结构综合配置
+
+结构综合角色使用 `synthesizer`，四类需求角色共享 `DEMAND_LLM_*`。可从 `examples/experiments/synthesizer-*.json` 准备开发配置，并填写本次源码与资产 pin；完整字段见[配置说明](CONFIGURATION.md)。冻结实验材料保持原样，开发者按需手动准备历史运行所需的输入和源码。

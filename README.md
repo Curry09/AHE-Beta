@@ -9,6 +9,10 @@ auto-designer simulates users interacting with a harness, turns their usage trac
 
 This repository is the **experiment controller**; OpenAgents is the **delivery CLI**; `backend/harness_template/` contains the **initial source code of the product being evolved**. Harnesses produced by experiments should be released as separate, versioned artifacts.
 
+The **Synthesizer** combines related proposals into structural improvements; it does not implement code. Triage, Synthesizer, PM, and Owner share the `auto_designer.demand` package and `DEMAND_LLM_*` model configuration. Active file-access, repository-integrity, and Harness commit-boundary checks live in `auto_designer.guards`.
+
+Current code and development configuration use `synthesizer`, `N_SYNTHESIZERS`, and `SYNTHESIZER_GROUPING` directly. See [configuration](docs/CONFIGURATION.md) and [grouped synthesis](docs/synthesizer-grouping.md) (Chinese).
+
 ## Installation and offline demo
 
 You need Git, Python 3.12+, and uv. Run these commands from the repository root:

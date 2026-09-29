@@ -137,7 +137,7 @@ def test_auditable_resume_launches_demand_controller_instead_of_only_infrastruct
     command, cwd = calls[0]
     assert command[-1] == "--resume"
     assert command[-3:-1] == ["--config", str(tmp_path / "exp-demand" / "config.yaml")]
-    assert cwd.name == "auto-designer"
+    assert cwd == Path(__file__).resolve().parents[3]
 
 
 def test_auditable_resume_rejects_missing_recovery_state(tmp_path: Path, monkeypatch) -> None:

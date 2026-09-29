@@ -126,7 +126,7 @@ def main() -> int:
     selected = set(args.deliver)
     gitea = run_mod._load_env(ROOT / "deploy" / "gitea" / ".env")
 
-    from auto_designer.designer.issue_schema import OPENAGENTS  # noqa: PLC0415
+    from auto_designer.demand.issue_schema import OPENAGENTS  # noqa: PLC0415
     from auto_designer.models import IssueDraft  # noqa: PLC0415
     from auto_designer.tracker.gitea import GiteaTracker  # noqa: PLC0415
 

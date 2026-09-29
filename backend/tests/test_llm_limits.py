@@ -19,7 +19,7 @@ def test_all_nexau_agents_use_256k_local_context() -> None:
     definitions = [
         BACKEND / "harness_template" / "agent.yaml",
         BACKEND / "agent_defs" / "triage_agent" / "agent.yaml",
-        BACKEND / "agent_defs" / "designer" / "agent.yaml",
+        BACKEND / "agent_defs" / "synthesizer" / "agent.yaml",
         BACKEND / "agent_defs" / "divergent_pm" / "agent.yaml",
         BACKEND / "agent_defs" / "owner" / "agent.yaml",
     ]

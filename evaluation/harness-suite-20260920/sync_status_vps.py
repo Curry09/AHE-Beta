@@ -148,7 +148,7 @@ def api_sources(env_text: str) -> dict[str, str]:
     allowed = {
         "HARNESS_LLM_BASE_URL": "harness",
         "USER_LLM_BASE_URL": "user",
-        "DESIGNER_LLM_BASE_URL": "designer",
+        "DEMAND_LLM_BASE_URL": "synthesizer",
         "DEVELOPER_LLM_BASE_URL": "developer",
     }
     for line in env_text.splitlines():
@@ -364,7 +364,7 @@ agents = {key: {field: value.get(field) for field in
           for key, value in agent_source.items() if isinstance(value, dict)}
 env_lines = tail('/opt/hse-round/backend/.env', 64000).splitlines()
 allowed = {'HARNESS_LLM_BASE_URL', 'USER_LLM_BASE_URL',
-           'DESIGNER_LLM_BASE_URL', 'DEVELOPER_LLM_BASE_URL'}
+           'DEMAND_LLM_BASE_URL', 'DEVELOPER_LLM_BASE_URL'}
 env_text = '\\n'.join(line for line in env_lines if line.partition('=')[0].strip() in allowed)
 openagents_running = False
 for path in pathlib.Path('/proc').glob('[0-9]*/cmdline'):
@@ -459,7 +459,7 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
                 "users",
                 "triage",
                 "divergent",
-                "designer",
+                "synthesizer",
                 "owner",
                 "delivery_wait",
                 "round_sealed",
@@ -482,11 +482,11 @@ def snapshot(sandbox, run_id: str, sandbox_id: str) -> tuple[dict, str, str]:
         "user": "users",
         "triager": "triage",
         "pm": "divergent",
-        "designer": "designer",
+        "synthesizer": "synthesizer",
         "owner": "owner",
     }
     components: list[dict] = []
-    for role in ("user", "triager", "pm", "designer", "owner"):
+    for role in ("user", "triager", "pm", "synthesizer", "owner"):
         row = by_role.get(role)
         stage = stages.get(stage_for_role[role]) or {}
         state = _normalized_state(stage, default="")

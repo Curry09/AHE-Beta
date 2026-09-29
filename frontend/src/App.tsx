@@ -34,7 +34,7 @@ const ROLES: { role: AgentRole; name: string }[] = [
   { role: "user", name: "用户" },
   { role: "triager", name: "分诊" },
   { role: "divergent", name: "发散" },
-  { role: "designer", name: "设计师" },
+  { role: "synthesizer", name: "结构综合" },
   { role: "owner", name: "准入" },
   { role: "developer", name: "交付面" },
 ];
@@ -117,6 +117,8 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams();
+    const experiment = new URLSearchParams(location.search).get("experiment");
+    if (experiment) params.set("experiment", experiment);
     if (view === "building") {
       params.set("view", "building");
       params.set("floor", selectedFloor);

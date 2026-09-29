@@ -1,6 +1,6 @@
 // 数据契约：字段名与 backend/auto_designer/web/api.py 的响应一一对应，两侧须同步修改。
 
-export type AgentRole = "user" | "triager" | "divergent" | "designer" | "owner" | "developer";
+export type AgentRole = "user" | "triager" | "divergent" | "synthesizer" | "owner" | "developer";
 export type ViewMode = "dashboard" | "building" | "openagents";
 
 // Spec-0029：三平面投影与提案来源（后端 /api/issues 附带；老后端缺省由 issueMeta 按 labels 兜底）。
@@ -24,7 +24,7 @@ export interface Turn {
 }
 
 // 过程流条目：status(状态变化) / assistant(模型发言) / tool(工具调用) / tool_result / tool_error
-// t 可选：dev/designer 的 live log 带时间戳；harness 内层 steps 无时间戳。
+// t 可选：dev/synthesizer 的 live log 带时间戳；harness 内层 steps 无时间戳。
 export interface LogEntry {
   t?: string;
   kind: string;
@@ -107,7 +107,7 @@ export interface RunState {
 export type HistoryKind =
   | "user_session"
   | "triager_run"
-  | "designer_run"
+  | "synthesizer_run"
   | "divergent_run"
   | "owner_run"
   | "dev_run";
@@ -132,7 +132,7 @@ export interface HistoryItem {
   issue_number?: number | null;
   tag?: string | null;
   committed?: boolean;
-  // designer_run
+  // synthesizer_run
   proposals?: number[];
 }
 
@@ -324,7 +324,7 @@ export interface SessionDetail {
 export interface Roster {
   user: number;
   triager: number;
-  designer: number;
+  synthesizer: number;
   developer: number;
   divergent?: number; // Spec-0028+：discovery 轨生成器（默认 0）
   owner?: number; // Spec-0029：唯一准入（0=纯机械）

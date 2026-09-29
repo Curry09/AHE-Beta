@@ -169,17 +169,17 @@ class SessionStore:
         """
         session = self.load(session_id)
         if session.user_feedback_envelope:
-            from auto_designer.designer.evidence_contract import EvidenceEnvelope
+            from auto_designer.demand.evidence_contract import EvidenceEnvelope
 
             restored = EvidenceEnvelope.from_dict(session.user_feedback_envelope)
             if restored.evidence_categories:
                 return restored.to_dict()
             # Early 0055 snapshots did not carry the category index; rebuild
             # from the same persisted session rather than widening visibility.
-            from auto_designer.designer.evidence_contract import build_evidence_envelope
+            from auto_designer.demand.evidence_contract import build_evidence_envelope
 
             return build_evidence_envelope(session).to_dict()
-        from auto_designer.designer.evidence_contract import build_evidence_envelope
+        from auto_designer.demand.evidence_contract import build_evidence_envelope
 
         return build_evidence_envelope(session).to_dict()
 

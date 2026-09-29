@@ -40,7 +40,7 @@ def main() -> None:
     paths = [
         "backend/auto_designer/usage.py",
         "backend/auto_designer/loop/live_tracer.py",
-        "backend/auto_designer/designer/agent_runtime.py",
+        "backend/auto_designer/demand/agent_runtime.py",
     ]
     updates = {}
     for rel in paths:

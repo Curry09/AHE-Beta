@@ -34,9 +34,9 @@ tasks:
     files:
       - backend/auto_designer/models.py
       - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/designer/evidence_contract.py
-      - backend/auto_designer/designer/session_timeline.py
-      - backend/tests/designer/test_terminal_evidence.py
+      - backend/auto_designer/demand/evidence_contract.py
+      - backend/auto_designer/demand/session_timeline.py
+      - backend/tests/demand/test_terminal_evidence.py
     depends-on:
       - 0051/T4
       - 0054/T2

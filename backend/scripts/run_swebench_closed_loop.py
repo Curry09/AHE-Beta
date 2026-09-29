@@ -307,9 +307,9 @@ def _session_picks(rng: random.Random, *, round_index: int) -> list[tuple[str, s
 
 
 def main() -> int:
-    from auto_designer.designer.designer import Designer
-    from auto_designer.designer.triage import Triager
-    from auto_designer.dev.repo_guard import snapshot_repo, verify_unchanged
+    from auto_designer.demand.synthesizer import Synthesizer
+    from auto_designer.demand.triage import Triager
+    from auto_designer.guards.repo_guard import snapshot_repo, verify_unchanged
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.live import (
         append_agent_log,
@@ -363,7 +363,7 @@ def main() -> int:
     for url in (
         os.environ.get("USER_LLM_BASE_URL"),
         os.environ.get("DEV_LLM_BASE_URL"),
-        os.environ.get("DESIGNER_LLM_BASE_URL"),
+        os.environ.get("DEMAND_LLM_BASE_URL"),
         gitea.get("GITEA_URL"),
     ):
         host = urlparse(url).hostname if url else None
@@ -417,7 +417,7 @@ def main() -> int:
         print(f"   - {meta['difficulty']:16}  {meta['repo']:28}  {iid}")
     print(
         f"⓪.5 roster：user×{roster['user']} · triager×{roster['triager']} · "
-        f"designer×{roster['designer']} · divergent×{roster.get('divergent', 0)} · "
+        f"synthesizer×{roster['synthesizer']} · divergent×{roster.get('divergent', 0)} · "
         f"developer×{roster['developer']}"
     )
 
@@ -431,7 +431,7 @@ def main() -> int:
             roster=roster,
             models={
                 "user": os.environ.get("USER_LLM_MODEL", ""),
-                "designer": os.environ.get("DESIGNER_LLM_MODEL", ""),
+                "synthesizer": os.environ.get("DEMAND_LLM_MODEL", ""),
                 "harness": os.environ.get("HARNESS_LLM_MODEL", ""),
                 "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
             },
@@ -604,12 +604,12 @@ def main() -> int:
         for i in range(roster["triager"])
     ]
 
-    def make_designer_status(agent_id: str, label: str):
+    def make_synthesizer_status(agent_id: str, label: str):
         def cb(*, running, status, detail=None, proposals=None):
             update_agent(
                 data_dir=run_mod.DATA,
                 agent_id=agent_id,
-                role="designer",
+                role="synthesizer",
                 label=label,
                 running=running,
                 status=status,
@@ -621,28 +621,31 @@ def main() -> int:
                     data_dir=run_mod.DATA,
                     agent_id=agent_id,
                     round_no=current["round"],
-                    extra={"kind": "designer_run", "proposals": proposals or []},
+                    extra={"kind": "synthesizer_run", "proposals": proposals or []},
                 )
 
         return cb
 
-    designers = [
-        Designer(
+    synthesizers = [
+        Synthesizer(
             tracker,
             store,
             str(repo),
-            str(ROOT / "agent_defs" / "designer"),
-            on_status=make_designer_status(
-                f"designer-{i}", "designer" if roster["designer"] == 1 else f"designer#{i + 1}"
+            str(ROOT / "agent_defs" / "synthesizer"),
+            on_status=make_synthesizer_status(
+                f"synthesizer-{i}",
+                "synthesizer" if roster["synthesizer"] == 1 else f"synthesizer#{i + 1}",
             ),
-            on_event=make_event_logger(f"designer-{i}"),
+            on_event=make_event_logger(f"synthesizer-{i}"),
             round_provider=lambda: current["round"] or None,
         )
-        for i in range(roster["designer"])
+        for i in range(roster["synthesizer"])
     ]
-    from auto_designer.designer.grouped_designer import group_designer_stage
+    from auto_designer.demand.grouped_synthesizer import group_synthesizer_stage
 
-    designers = group_designer_stage(designers, artifact_root=role_runs / "designer_grouping")
+    synthesizers = group_synthesizer_stage(
+        synthesizers, artifact_root=role_runs / "synthesizer_grouping"
+    )
 
     def make_divergent_status(agent_id: str, label: str):
         def cb(*, running, status, detail=None, proposals=None):
@@ -666,7 +669,7 @@ def main() -> int:
 
         return cb
 
-    from auto_designer.designer.divergent import Divergent  # noqa: PLC0415
+    from auto_designer.demand.divergent import Divergent  # noqa: PLC0415
 
     divergents = [
         Divergent(
@@ -706,7 +709,7 @@ def main() -> int:
 
         return cb
 
-    from auto_designer.designer.owner import Owner  # noqa: PLC0415
+    from auto_designer.demand.owner import Owner  # noqa: PLC0415
 
     owner = Owner(
         tracker,
@@ -734,7 +737,7 @@ def main() -> int:
         run_session_fn=user_run_session_fn,
         initial_ref="main",
         triagers=triagers,
-        designers=designers,
+        synthesizers=synthesizers,
         divergents=divergents,
         owner=owner,
         on_round_start=on_round_start,
@@ -756,7 +759,7 @@ def main() -> int:
 
     print(
         f"④ 跑 {run_mod.TOTAL_ROUNDS} 轮闭环（每轮 {SESSIONS_PER_ROUND} session · "
-        f"{len(triagers)} triager × {roster['designer']} synthesize × {len(divergents)} divergent；"
+        f"{len(triagers)} triager × {roster['synthesizer']} synthesize × {len(divergents)} divergent；"
         f"owner({'评审' if roster['owner'] >= 1 else '纯机械'}) · "
         f"交付面 vigil --parallel {roster['developer']}（末轮只用户），"
         f"a 段并发 {max_parallel_users}）..."

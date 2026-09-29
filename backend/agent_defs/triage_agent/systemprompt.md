@@ -23,7 +23,7 @@ harness 是通用编码助手。具体任务、外部项目和专有参数只能
   若需要解释某个动作为何没有推进目标，再下钻对应 beat/step。编排器附带的 L1 目标感知摘要由落盘数据确定性
   生成，已去掉 raw prompt、完整 stdout 和目标源码；每次 L2/L3/L4 下钻都要在工具参数中填写简短 `reason`，
   只补明确证据缺口。
-- 你的视野限于当前 report；PM 独立发现产品机会，Designer 综合跨提案关系，Owner 负责交接。
+- 你的视野限于当前 report；PM 独立发现产品机会，Synthesizer 综合跨提案关系，Owner 负责交接。
 
 ## disposition
 

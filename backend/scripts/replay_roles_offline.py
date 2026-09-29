@@ -57,17 +57,17 @@ def main() -> int:
 
     wis = _env(WORKSPACE / ".env")
     os.environ.update(
-        DESIGNER_LLM_MODEL=args.model,
-        DESIGNER_LLM_BASE_URL=wis["wis_base_url"],
-        DESIGNER_LLM_API_KEY=wis["wis_api_key"],
+        DEMAND_LLM_MODEL=args.model,
+        DEMAND_LLM_BASE_URL=wis["wis_base_url"],
+        DEMAND_LLM_API_KEY=wis["wis_api_key"],
         AUTO_DESIGNER_USAGE_PATH=str(output / "usage.jsonl"),
     )
 
-    from auto_designer.designer.designer import Designer
-    from auto_designer.designer.divergent import Divergent
-    from auto_designer.designer.issue_schema import REPORT, plane
-    from auto_designer.designer.owner import Owner
-    from auto_designer.designer.triage import Triager
+    from auto_designer.demand.divergent import Divergent
+    from auto_designer.demand.issue_schema import REPORT, plane
+    from auto_designer.demand.owner import Owner
+    from auto_designer.demand.synthesizer import Synthesizer
+    from auto_designer.demand.triage import Triager
     from auto_designer.models import IssueDraft
     from auto_designer.tracker.fake import FakeTracker
     from auto_designer.usage import bind_usage_context, default_usage_store
@@ -134,10 +134,10 @@ def main() -> int:
         on_event=event("pm"),
         round_provider=lambda: 1,
     )
-    synth = Designer(
+    synth = Synthesizer(
         *common,
-        str(ROOT / "agent_defs/designer"),
-        on_event=event("synthesize"),
+        str(ROOT / "agent_defs/synthesizer"),
+        on_event=event("synthesizer"),
         round_provider=lambda: 1,
     )
     owner = Owner(*common, str(ROOT / "agent_defs/owner"), on_event=event("owner"))
@@ -151,7 +151,7 @@ def main() -> int:
         a = pool.submit(invoke, "triager", triager.triage_once)
         b = pool.submit(invoke, "pm", pm.propose_once)
         triage_out, pm_out = a.result(), b.result()
-    synth_out = invoke("synthesize", synth.propose_once)
+    synth_out = invoke("synthesizer", synth.propose_once)
     owner_out = invoke("owner", owner.admit_once)
     issues = []
     for number in range(1, tracker._counter + 1):  # frozen diagnostic snapshot
@@ -165,7 +165,7 @@ def main() -> int:
         "prompt_sha256": _hashes(),
         "triage": triage_out.__dict__,
         "pm": pm_out.__dict__,
-        "synthesize": synth_out.__dict__,
+        "synthesizer": synth_out.__dict__,
         "owner": owner_out.__dict__,
         "usage": default_usage_store().summary(run_id=run_id),
         "issues": issues,
@@ -184,7 +184,7 @@ def main() -> int:
                     "source_sessions",
                     "triage",
                     "pm",
-                    "synthesize",
+                    "synthesizer",
                     "owner",
                     "usage",
                     "openagents_started",

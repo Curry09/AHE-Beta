@@ -51,10 +51,10 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/designer/issue_schema.py
-      - backend/auto_designer/designer/owner.py
-      - backend/tests/designer/test_issue_schema.py
-      - backend/tests/designer/test_owner.py
+      - backend/auto_designer/demand/issue_schema.py
+      - backend/auto_designer/demand/owner.py
+      - backend/tests/demand/test_issue_schema.py
+      - backend/tests/demand/test_owner.py
     scope: issue_schema 新增 `OPENAGENTS = "openagents"`（交付面发现标签，Owner 准入的交接令牌）；plane() 的 READY 平面判定收编为 `ready | openagents`（准入已定、交付面接手中/已接手都算工作队列）；is_ready 随 plane 自动生效（本方案后仅剩 metrics/web 读侧消费）。owner.py `_ready_labels` 改产出 OPENAGENTS（不再直接打 READY）——原因：vigil `_intake` 对已带 ready 的票直接跳过，curator 依赖排序只在「本轮有新准入」时触发，Owner 直打 ready 会让 curator 永不运行、多 worker 并行失去 blocked_by 保护。covers 级联合并/decline/hold 语义全部不动（Owner 仍是唯一准入点）。背压 READY_DEPTH_ALARM 经 plane 自动覆盖两标签。
     acceptance: admit 后 issue 带 openagents 且 plane==READY；vigil 盖 ready 后 plane 仍 READY（幂等）；covers 级联回归测试不变绿；老标签映射不回归。
   - id: T4
