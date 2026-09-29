@@ -38,9 +38,23 @@ GitHub CI 的跨仓 checkout 要求对方仓库可读；首次公开前若仍是
 
 ## 更新联合版本时需要同步的引用
 
-- auto-designer 的 `.github/workflows/ci.yml` 中 `integration` checkout `ref`：固定已验证的 OpenAgents 完整 SHA，不写移动的 `main`。
-- 两仓 `release/compatibility.json` 的 `openagents.integration_commit`：与上述 ref 一致；保留历史 `baseline_commit` 供追溯。
+- auto-designer 的 `.github/workflows/ci.yml` 中 `integration` 从清单选择已验证的 OpenAgents 完整 SHA，不写移动的 `main`。
+- 两仓 `release/compatibility.json` 的 `openagents.integration_commit`：保持配置基线一致；启用新证据发行时再固定 `observation_transport.reader_release_commit`，CI 优先使用该新 reader SHA；保留历史 `baseline_commit` 供追溯。
 - Quickstart 的 clone/checkout 示例：采用同一兼容组合；正式发布后补版本 tag 与对应 SHA。
 - 构建镜像时使用该 OpenAgents checkout；发行资产记录实际镜像 digest，不能仅更新 Git ref 就宣称旧镜像含有新代码。
 
 流程为：合并整理改动 → 更新包版本与发布说明 → 固定候选提交并验证 → 打不可变 tag、构建和验收 Release 资产。候选提交到正式 tag 若有变化，应重新验证；已有正式 tag 不移动。
+
+## Gitea.com 配套升级门禁
+
+<!-- Spec-0070/T5 -->
+
+OpenAgents 0092 必须先于新发布端上线：旧 reader 不理解 ZIP，不能靠 publisher 上传成功判断交付成功。当前实现是配套工作树候选，`observation_transport.reader_release_commit` 保持 `null`，没有捏造尚未发布的提交。`observation-runtime.json` 中历史 runtime pin 仍属于 gzip 基线，`hosted_candidate` 只记录本次实际构建的评审镜像。
+
+1. 审阅并合并 OpenAgents reader，取得真实完整 SHA；用它构建新镜像并通过镜像内能力检查。
+2. 在 auto-designer 的 CI 手动触发 `workflow_dispatch`，输入该 SHA 运行真实 producer/reader 的 gzip/ZIP 离线契约。未填写新 release pin 时，普通 PR CI 仍只运行旧配置契约，会明确提示未覆盖 ZIP；不能把这项旧基线绿灯当成新功能验收。
+3. 对新容器/代理及 E2B 分别执行显式真人探针，确认真实 `prepare` 返回授权 session，历史文件和摘要一致且权限为 `0400`。记录环境、版本与结果，脱敏后保存；不调用模型。
+4. 把已验证 SHA 填入 `observation_transport.reader_release_commit`，同步 Quickstart 与镜像发行记录。此后普通 PR CI 自动跑新编码契约。运行时使用实际镜像 digest，而不是仅更新宿主 checkout。
+5. 保留旧 gzip/direct 兼容组合。旧实验恢复继续原冻结 profile；新实验才使用新托管路径。
+
+附件链路验收与完整闭环 canary 分开记录；前者不代替 R1 交付、R2 复测和停止/恢复的模型实验。

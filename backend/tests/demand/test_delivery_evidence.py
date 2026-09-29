@@ -125,3 +125,90 @@ def test_attachment_read_has_an_absolute_deadline_even_if_bytes_keep_arriving(mo
     with pytest.raises(ValueError, match="budget"):
         tracker._observation_bytes(url="http://trusted/attachments/id", limit=100)
     assert calls[0]["allow_redirects"] is False
+
+
+def test_zip_is_deterministic_single_file_and_reuses_verified_asset(tmp_path):
+    import io
+    import zipfile
+
+    from auto_designer.observations.transport import make_transport_profile
+
+    store, tracker, issue = setup(tmp_path)
+    tracker.observation_transport = make_transport_profile(
+        repository="https://gitea.com/api/v1/repos/o/r",
+        encoding="zip",
+        download_policy="gitea-com-r2-v1",
+    )
+    zipped = build_package(store=store, issue=issue.number, encoding="zip")
+    assert zipped == build_package(store=store, issue=issue.number, encoding="zip")
+    with zipfile.ZipFile(io.BytesIO(zipped)) as archive:
+        assert archive.namelist() == ["evidence.json"]
+        entry = archive.infolist()[0]
+        assert entry.date_time == (1980, 1, 1, 0, 0, 0)
+        assert entry.compress_type == zipfile.ZIP_DEFLATED
+        assert entry.external_attr >> 16 == 0o100644
+        assert archive.read(entry) == gzip.decompress(
+            build_package(store=store, issue=issue.number)
+        )
+    first = publish_delivery_evidence(tracker=tracker, store=store, issue=issue)
+    second = publish_delivery_evidence(tracker=tracker, store=store, issue=issue)
+    assert first == second
+    assert first["encoding"] == "zip"
+    assert first["name"].endswith(".zip")
+    assert len(tracker.assets[issue.number]) == 1
+    assert (
+        json.loads(
+            tracker.issue(issue.number)["body"]
+            .split("auto-designer:observation-evidence-v1 ")[1]
+            .split(" -->")[0]
+        )["encoding"]
+        == "zip"
+    )
+
+
+def test_gzip_original_bytes_and_footer_remain_unchanged(tmp_path):
+    store, tracker, issue = setup(tmp_path)
+    packed = build_package(store=store, issue=issue.number)
+    value = json.loads(gzip.decompress(packed))
+    assert packed == gzip.compress(
+        json.dumps(value, ensure_ascii=False, sort_keys=True).encode(), mtime=0
+    )
+    result = publish_delivery_evidence(tracker=tracker, store=store, issue=issue)
+    assert "encoding" not in result
+    assert (
+        result["name"] == "observation-evidence-" + hashlib.sha256(packed).hexdigest() + ".json.gz"
+    )
+
+
+def test_failed_zip_readback_preserves_issue_and_retry_reuses_asset(tmp_path, monkeypatch):
+    from auto_designer.observations.transport import make_transport_profile
+
+    store, tracker, issue = setup(tmp_path)
+    tracker.observation_transport = make_transport_profile(
+        repository="https://gitea.com/api/v1/repos/o/r", encoding="zip"
+    )
+    original = tracker.download_issue_asset
+    body = tracker.issue(issue.number)["body"]
+    monkeypatch.setattr(tracker, "download_issue_asset", lambda **kw: b"wrong")
+    with pytest.raises(ValueError, match="integrity"):
+        publish_delivery_evidence(tracker=tracker, store=store, issue=issue)
+    assert tracker.issue(issue.number)["body"] == body
+    monkeypatch.setattr(tracker, "download_issue_asset", original)
+    publish_delivery_evidence(tracker=tracker, store=store, issue=issue)
+    assert len(tracker.assets[issue.number]) == 1
+
+
+@pytest.mark.parametrize("encoding", ["gzip", "zip"])
+def test_final_serialized_package_expanded_limit_enforced(tmp_path, monkeypatch, encoding):
+    from auto_designer.demand import delivery_evidence as module
+
+    store, tracker, issue = setup(tmp_path)
+    monkeypatch.setattr(module, "MAX_EXPANDED", 100)
+    with pytest.raises(ValueError, match="budget"):
+        build_package(store=store, issue=issue.number, encoding=encoding)
+
+
+def test_unknown_encoding_is_not_guessed(tmp_path):
+    store, tracker, issue = setup(tmp_path)
+    with pytest.raises(ValueError, match="encoding"):
+        build_package(store=store, issue=issue.number, encoding="tar")

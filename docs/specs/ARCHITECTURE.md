@@ -127,7 +127,9 @@ _Artifact-owned observations with platform-owned collection and authorization._
 | `delivery_gaps.py` | Ingest only authenticated delivery requests, never arbitrary comments or logs. |
 | `gaps.py` | Spec-0061: scoped maintainer diagnostic gaps with a durable outbox. |
 | `grants.py` | Persist evidence authority separately from model-authored issue text. |
+| `preflight.py` | Spec-0070/T3: freeze transport and verify the actual delivery reader before models run. |
 | `publication.py` | Collect bounded opaque artifact files and publish immutable session evidence. |
+| `transport.py` | Spec-0070/T2: freeze transport separately from the historical framework contract. |
 
 ### auto_designer.tracker
 
@@ -136,6 +138,7 @@ _Issue-tracker integration and proposal state management._
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | Issue-tracker integration and proposal state management. |
+| `attachment_transport.py` | Spec-0070/T1: explicit formats and the fixed Gitea.com signed-download boundary. |
 | `base.py` | IssueTracker 协议（spec-0001/T5）：issue 提交去向的抽象，用户侧不绑定具体后端。 |
 | `fake.py` | FakeTracker（spec-0001/T5）：IssueTracker 的内存实现，供单测与无 Gitea 环境端到端跑通。 |
 | `gitea.py` | GiteaTracker（spec-0002/T2）：spec-0001/T5 IssueTracker 接口的真后端。 |
@@ -267,8 +270,11 @@ graph LR
     nauto_designer_observations_delivery_gaps["observations.delivery_gaps"]
     nauto_designer_observations_gaps["observations.gaps"]
     nauto_designer_observations_grants["observations.grants"]
+    nauto_designer_observations_preflight["observations.preflight"]
     nauto_designer_observations_publication["observations.publication"]
+    nauto_designer_observations_transport["observations.transport"]
     nauto_designer_tracker["auto_designer.tracker"]
+    nauto_designer_tracker_attachment_transport["tracker.attachment_transport"]
     nauto_designer_tracker_base["tracker.base"]
     nauto_designer_tracker_fake["tracker.fake"]
     nauto_designer_tracker_gitea["tracker.gitea"]
@@ -318,6 +324,7 @@ graph LR
     nauto_designer_demand_agent_runtime --> nauto_designer_user_session_store
     nauto_designer_demand_delivery_evidence --> nauto_designer_observations_grants
     nauto_designer_demand_delivery_evidence --> nauto_designer_observations_publication
+    nauto_designer_demand_delivery_evidence --> nauto_designer_observations_transport
     nauto_designer_demand_divergent --> nauto_designer_demand_agent_runtime
     nauto_designer_demand_divergent --> nauto_designer_demand_evidence_contract
     nauto_designer_demand_divergent --> nauto_designer_demand_issue_schema
@@ -430,7 +437,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_harness_interface
     nauto_designer_loop_sim_user --> nauto_designer_loop_recovery
     nauto_designer_loop_sim_user --> nauto_designer_models
-    nauto_designer_loop_sim_user --> nauto_designer_observations_publication
+    nauto_designer_loop_sim_user --> nauto_designer_observations_preflight
     nauto_designer_loop_sim_user --> nauto_designer_tracker_base
     nauto_designer_loop_sim_user --> nauto_designer_usage
     nauto_designer_loop_sim_user --> nauto_designer_user_session_store
@@ -450,11 +457,15 @@ graph LR
     nauto_designer_observations_gaps --> nauto_designer_observations_grants
     nauto_designer_observations_gaps --> nauto_designer_usage
     nauto_designer_observations_grants --> nauto_designer_observations_publication
+    nauto_designer_observations_preflight --> nauto_designer_observations_publication
+    nauto_designer_observations_preflight --> nauto_designer_observations_transport
     nauto_designer_observations_publication --> nauto_designer_invocation
     nauto_designer_tracker_base --> nauto_designer_models
     nauto_designer_tracker_fake --> nauto_designer_models
     nauto_designer_tracker_fake --> nauto_designer_tracker_base
     nauto_designer_tracker_gitea --> nauto_designer_models
+    nauto_designer_tracker_gitea --> nauto_designer_observations_transport
+    nauto_designer_tracker_gitea --> nauto_designer_tracker_attachment_transport
     nauto_designer_tracker_gitea --> nauto_designer_tracker_base
     nauto_designer_user_session_store --> nauto_designer_demand_evidence_contract
     nauto_designer_user_session_store --> nauto_designer_models

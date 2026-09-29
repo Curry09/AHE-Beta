@@ -4,6 +4,14 @@
 
 issue 与 harness 仓的家。单服务 + sqlite，最小运维面；非生产化（无 TLS/外部 DB/HA）。
 
+## 已有 Gitea 与 Gitea.com
+
+证据传输支持自建 Gitea 的原 gzip 路径，以及配套 OpenAgents 0092 reader 的 Gitea.com ZIP/R2 路径。使用 Gitea.com 时，账号自己托管仓库；无需为它启动这里的 Gitea 服务。现有实验启动器的其他准备步骤仍需完成，详见 [Quickstart](../../../docs/QUICKSTART.md)。
+
+默认代理权限保持原样。托管附件需在 Compose 启动环境显式设置 `AUTO_DESIGNER_EGRESS_CONFIG=./egress-gitea-com.conf`，仅增加 `gitea.com:443` 与规定 R2 主机名的访问。本旧模板还配置了开发机上游 `cache_peer 172.22.64.1:7890`；使用前应将其改成自己可达的上游。每实验模板没有该固定上游，本次真实代理往返使用的是每实验模板。
+
+新 reader 需先构建和验收，再启用发布端；实际 executable/image 会在模型调用前预检。凭证、镜像记录与恢复规则见 [配置说明](../../../docs/CONFIGURATION.md#giteacom-证据传输)。
+
 ## 启动
 
 ```bash

@@ -26,7 +26,8 @@ class _TimelineSession:
         self.pages = pages
         self.calls: list[str] = []
 
-    def request(self, method: str, url: str, json=None, timeout=None):
+    def request(self, method: str, url: str, json=None, timeout=None, allow_redirects=False):
+        assert allow_redirects is False
         assert method == "GET" and timeout is not None
         self.calls.append(url)
         return _Resp(self.pages[len(self.calls) - 1])

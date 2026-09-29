@@ -11,5 +11,74 @@
   "validation_date": "2026-09-08",
   "validation": "installed module digest matches committed source; all eight delivery roles receive the revised contract in a network-disabled container without host bind mounts; controlled forge, not a new lifecycle integration run",
   "result_file": "docs/audits/0061-observation-goal-boundaries.json",
-  "deployment": "Prepared for new experiments. Existing running experiments and the latest tag were not replaced."
+  "deployment": "Prepared for new experiments. Existing running experiments and the latest tag were not replaced.",
+  "observation_transport": {
+    "encodings": [
+      "gzip"
+    ],
+    "download_policies": [
+      "same-origin-v1"
+    ],
+    "hosted_profile_validated": false,
+    "note": "Historical pin; Gitea.com requires a separately built and capability-validated reader. Do not reuse this image as proof of ZIP/R2 support."
+  },
+  "hosted_candidate": {
+    "schema": "observation-runtime-build-v1",
+    "image_tag": "auto-designer-vigil:gitea-com-review-20260929",
+    "image_id": "sha256:34a9bcafe9850fb9d8e8ee46cc9c93b09a1360c2bcf42f78a7eee3238b7fd271",
+    "openagents": {
+      "commit": "ee87df3acab036213cecbc35cdea01339a5dd988",
+      "dirty": true,
+      "source_sha256": "f8046d481e42448c0faea57704d6d62142fe00c52766fd6a768eeeff43f54325",
+      "digest_scope": "git-tracked-and-unignored-files-v1"
+    },
+    "nexau": {
+      "commit": "5cd791b1382f1163621c9ff0b50c2cf01c4ba923",
+      "dirty": false,
+      "source_sha256": "a05a940bf235d6ddd1365ab419fa091a8d841c857a88f44f1687cd4cbd89af32",
+      "digest_scope": "git-tracked-and-unignored-files-v1"
+    },
+    "capabilities": {
+      "download_policies": [
+        "same-origin-v1",
+        "gitea-com-r2-v1"
+      ],
+      "encodings": [
+        "gzip",
+        "zip"
+      ],
+      "marker": "auto-designer:observation-evidence-v1",
+      "max_expanded_bytes": 24000000,
+      "max_transfer_bytes": 4000000,
+      "schema": "openagents-observation-reader-capabilities-v1",
+      "zip_profile": "single-evidence-json-v1"
+    },
+    "validation": "offline image capability command; network none",
+    "deployment": "Not deployed; does not replace the historical runtime pin.",
+    "review_only": true,
+    "release_pin": false,
+    "validation_date": "2026-09-29",
+    "live_validation": [
+      {
+        "mode": "self-hosted-probe",
+        "via_proxy": false,
+        "files_checked": 7,
+        "authorized_sessions": [
+          "authorized-session"
+        ],
+        "status": "passed",
+        "no_model_calls": true
+      },
+      {
+        "mode": "gitea-com-probe",
+        "via_proxy": true,
+        "files_checked": 7,
+        "authorized_sessions": [
+          "authorized-session"
+        ],
+        "status": "passed",
+        "no_model_calls": true
+      }
+    ]
+  }
 }

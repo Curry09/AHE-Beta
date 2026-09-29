@@ -26,6 +26,16 @@
   "controller_generated_flow": "standard",
   "explicit_alternative_flow": "v0.2",
   "seed_harness_path": "backend/harness_template",
+  "observation_transport": {
+    "status": "review-candidate-not-a-release",
+    "publisher_spec": "0070",
+    "reader_spec": "0092",
+    "reader_release_commit": null,
+    "legacy_integration_scope": "configuration contract; existing gzip and same-origin behavior",
+    "candidate_validation": "Run check_observation_contract.py with the paired reviewed OpenAgents checkout; CI workflow_dispatch requires its full remote commit SHA.",
+    "image_record": "backend/deploy/vigil/observation-runtime.json#hosted_candidate",
+    "release_gate": "Merge and publish the reader first, fill reader_release_commit with its verified immutable commit, rebuild the reader image, and rerun the joint contract before enabling the hosted release."
+  },
   "release_commits": null,
   "container_digests": null,
   "live_canary": "not-run"

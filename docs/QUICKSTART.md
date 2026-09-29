@@ -23,6 +23,36 @@ uv run --locked openagents --help
 
 需要把交付 CLI 安装到 PATH 时，在 OpenAgents 根目录执行 `uv tool install --from . openagents`；更换源码后用 `--force` 重装。NexAU 后端见 OpenAgents 的 `docs/AUTO_DESIGNER.md`，默认 Claude Code 后端不需要安装这个 extra。
 
+### Gitea.com 证据支持候选版
+
+上面的 `ee87df3…` 是旧配置契约基线，**不具备本次新增的 ZIP/R2 证据读取能力**。评审 Gitea.com 支持时，需要同时使用 auto-designer 0070 和 OpenAgents 0092 的实施 checkout；两侧候选分支为 `feat/gitea-com-evidence`。本地工作树未发布前，远端不会有该实现。正式 reader 提交尚未填写在 `release/compatibility.json`，不要把当前候选镜像当成正式发行版本。
+
+切换到配套源码后，先运行无模型、无凭证的真实编码与读取契约：
+
+```bash
+# auto-designer 根目录；参数指向配套 OpenAgents 源码。
+uv run --locked python backend/scripts/check_observation_contract.py --openagents ../OpenAgents
+# 应包含 gzip、zip 两种 accepted 结果，各自读到授权文件。
+```
+
+实际执行的 OpenAgents 也必须来自该版本；仅更新 sibling 源码不等于更新 PATH 里的 CLI。宿主/E2B 的 `VIGIL_MODE=subprocess` 路径可重新安装 CLI 后验证：
+
+```bash
+uv tool install --force --from ../OpenAgents openagents
+OPENAGENTS_NO_SELF_UPDATE=1 openagents observation-capabilities --json
+```
+
+需要单独验证账号和网络时，准备权限为 0600 的私密 env 文件，填写 `GITEA_URL`、`GITEA_USER`、`GITEA_TOKEN`。token 需要创建仓库、Issue、上传附件和读取私有仓库的权限。执行下面的显式探针会新建一个带 `observation-transport-probe` 前缀的私有仓库，发布合成证据，校验重试复用，再调用真实 OpenAgents `prepare` 核对 session 范围、历史文件、摘要和 `0400` 权限；结束关闭 Issue，保留探针仓库供审计。
+
+```bash
+uv run --locked python backend/scripts/check_gitea_evidence_transport.py \
+  --live --openagents ../OpenAgents \
+  --env-file /absolute/path/private-gitea.env \
+  --output-dir /absolute/path/new-probe-results
+```
+
+自建 Gitea 通常选择 gzip；Gitea.com 选择 ZIP，并通过严格限制的 R2 单次跳转下载。探针通过证明证据链路可用，不代表完整模型实验已通过。容器构建和代理开关见[配置说明](CONFIGURATION.md#giteacom-证据传输)。E2B 仍需原有 E2B 凭证和运行环境，这次变更没有增加通用一键 E2B 启动器。
+
 ## 2. 准备真实实验
 
 真实闭环会调用付费模型、创建 Gitea issue/PR 并自动修改和合并 Harness，需单独的实验仓及受信任 Docker 主机。

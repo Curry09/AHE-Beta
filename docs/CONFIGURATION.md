@@ -49,3 +49,36 @@
 首发目标是 Linux/WSL2 的受信任本地部署。实时 API 不是匿名公网服务；Gitea 本地映射绑定 loopback。runner 挂载 Docker socket，具有相应宿主权限；Vigil 的网络限制不等于整个实验系统可安全执行任意不可信代码。
 
 容器模式还需要配置模型域名的 egress allowlist；改 API URL 后连接失败，应同时核对协议、凭证和网络出口。宿主 subprocess 模式缺少容器边界，仅用于有人观察的调试。
+
+## Gitea.com 证据传输
+
+<!-- Spec-0070/T5 -->
+
+附件格式按服务器公布的允许类型选择：优先 gzip，否则 ZIP；权限错误或网络错误会明确失败，不会触发格式回退。Gitea.com 使用 ZIP 和 `gitea-com-r2-v1` 下载策略。原自建 Gitea 的 gzip 字节、机器句柄及直接下载路径保持兼容。
+
+实验在模型运行前写入观测目录的 `.transport-profile.json`，固定仓库、编码、下载策略和预算。`.framework-contract.json` 保持旧结构。恢复旧目录且没有 profile 时按 gzip/direct 解释；不能通过删文件把同一实验切换到新格式。站点不再支持原路径时需新建实验身份。
+
+ZIP 或 R2 路径要求实际交付运行时的 `openagents observation-capabilities --json` 通过检查；stdout 上限 16 KiB、限时 10 秒。预检及正式交付都关闭 OpenAgents 自更新。subprocess 使用检查过的 executable；容器使用检查过的 immutable image ID；复用容器会检查盒内 reader，并要求原进程已设 `OPENAGENTS_NO_SELF_UPDATE=1`，否则须重新创建容器。`.reader-capabilities.json` 保存能力和实际运行时身份，不存 token/签名 URL。
+
+构建支持该路径的独立候选镜像：
+
+```bash
+VIGIL_OBSERVATION_PROFILE=gitea-com-r2-v1 \
+VIGIL_IMAGE_TAG=auto-designer-vigil:hosted-candidate \
+VIGIL_OBSERVATION_RECORD=/absolute/path/new-image-record.json \
+  bash backend/deploy/vigil/build.sh ../OpenAgents ../NexAU
+```
+
+构建脚本要求显式非 `latest` tag，比较构建前后源码摘要，并在新镜像内断网执行能力检查后才写记录。记录包含真实 image ID、两份源码 HEAD/dirty/content digest；有未提交改动的镜像只能作为评审候选。正式部署把 `AUTO_DESIGNER_VIGIL_IMAGE` 设为该次验证记录中的 image ID 或发布的 digest。
+
+两个 Compose 模板默认沿用原出口规则。托管路径需显式选择代理配置，并重新创建对应 proxy 服务使挂载生效：
+
+```bash
+AUTO_DESIGNER_EGRESS_CONFIG=./egress-gitea-com.conf \
+  docker compose -f backend/deploy/experiment/docker-compose.yml config
+# 使用该模板的实验启动环境也须保留同一个变量。
+```
+
+扩展只放行 HTTPS 443 的 `gitea.com` 与精确 32 位十六进制 R2 主机名；客户端还会校验附件确属当前 Issue、最多一次跳转和总时间/大小预算。R2 请求不携带 Gitea token、Cookie 或 netrc 认证。此开关不放行额外模型网关。
+
+Gitea.com 的容器内默认地址为公网 `https://gitea.com`；自建本地实例仍映射为 `http://gitea:3000`。`VIGIL_GITEA_INTERNAL_URL` 的显式覆盖保持生效。旧 `backend/deploy/gitea/egress-proxy.conf` 还包含开发环境的上游 `cache_peer`，使用该单实例模板前应配置可达的上游；本次实测托管链路使用每实验的 `backend/deploy/experiment/` 模板。

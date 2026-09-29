@@ -387,6 +387,8 @@ def apply_experiment_context(*, ctx: object) -> None:
     _SANDBOX_ROOT = DATA / "harness_sandbox"
     HARNESS_REPO = Path(ctx.harness_repo)  # type: ignore[attr-defined]
     _VIGIL_CONTAINER = str(ctx.vigil_container)  # type: ignore[attr-defined]
+    # Spec-0070/T3: early session preflight must resolve the same reusable container.
+    os.environ["AUTO_DESIGNER_VIGIL_CONTAINER"] = _VIGIL_CONTAINER
     _VIGIL_NETWORK = str(ctx.vigil_network)  # type: ignore[attr-defined]
     _VIGIL_CONFIG_STAGING = Path(ctx.vigil_config_root)  # type: ignore[attr-defined]
     GITEA_ENV_FILE = DATA.parent / "secrets" / "demand-gitea.env"
@@ -445,7 +447,9 @@ def ensure_openagents_cli() -> None:
 _VIGIL_IMAGE = (
     os.environ.get("AUTO_DESIGNER_VIGIL_IMAGE", "").strip() or "auto-designer-vigil:latest"
 )
-_VIGIL_CONTAINER = "auto-designer-vigil"
+_VIGIL_CONTAINER = (
+    os.environ.get("AUTO_DESIGNER_VIGIL_CONTAINER", "").strip() or "auto-designer-vigil"
+)
 _VIGIL_NETWORK = "auto-designer-vigil-net"  # deploy/gitea compose 里的 internal 网络（按名引用）
 _VIGIL_PROXY_URL = "http://egress-proxy:3128"  # 盒内唯一外网通道（allowlist 见 egress-proxy.conf）
 _VIGIL_CONFIG_STAGING = DATA / "vigil_config"  # 容器模式的配置 staging（只读挂载进 /config）
@@ -521,20 +525,77 @@ def _vigil_internal_gitea_url() -> str:
     return os.environ.get("VIGIL_GITEA_INTERNAL_URL", "").strip() or "http://gitea:3000"
 
 
+def _vigil_gitea_url(*, gitea: dict[str, str]) -> str:
+    """Spec-0070/T3: only hosted Gitea defaults to its public address in the container."""
+    from auto_designer.tracker.attachment_transport import download_policy
+
+    override = os.environ.get("VIGIL_GITEA_INTERNAL_URL", "").strip()
+    if override:
+        return override
+    if download_policy(gitea["GITEA_URL"]) == "gitea-com-r2-v1":
+        return gitea["GITEA_URL"].rstrip("/")
+    return _vigil_internal_gitea_url()
+
+
+def _prepare_vigil_evidence(*, gitea: dict[str, str], mode: str) -> dict | None:
+    """Spec-0070/T3: check the real reader before dispatch or reuse, without changing legacy runs."""
+    from auto_designer.observations.preflight import (
+        needs_reader_capabilities,
+        prepare_observations,
+        probe_reader,
+        write_reader_record,
+    )
+    from auto_designer.observations.transport import load_transport_profile
+    from auto_designer.tracker.attachment_transport import download_policy
+    from auto_designer.tracker.gitea import GiteaTracker
+
+    runs = Path(os.environ.get("ROLE_RUNS_DIR", "").strip() or str(DATA))
+    root = Path(os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(runs / "observations")))
+    repository = f"{gitea['GITEA_URL'].rstrip('/')}/api/v1/repos/{gitea['OWNER']}/{gitea['REPO']}"
+    profile = load_transport_profile(root=root, repository=repository)
+    if profile is None and download_policy(gitea["GITEA_URL"]) == "same-origin-v1":
+        return None
+    if profile is not None and not needs_reader_capabilities(profile=profile):
+        return None
+    container = None
+    if mode == "container":
+        running, existing_run, experiment = _container_state(name=_VIGIL_CONTAINER)
+        ours = os.environ.get("AUTO_DESIGNER_EXPERIMENT_ID", "").strip()
+        run_id = os.environ.get("AUTO_DESIGNER_RUN_ID", "").strip()
+        if running and experiment and experiment != ours:
+            raise ValueError("refusing to probe another experiment's delivery container")
+        if running and (not run_id or existing_run == run_id):
+            container = _VIGIL_CONTAINER
+    result = probe_reader(mode=mode, image=_VIGIL_IMAGE, container=container)
+    if profile is None:
+        tracker = GiteaTracker(
+            base_url=gitea["GITEA_URL"],
+            owner=gitea["OWNER"],
+            repo=gitea["REPO"],
+            token=gitea["TOKEN"],
+        )
+        profile = prepare_observations(tracker=tracker, root=root, reader_probe=lambda: result)
+    write_reader_record(root=root, profile=profile, result=result)
+    return {**result, "profile": profile}
+
+
 def _ensure_vigil_container_prereqs() -> None:
     """container 模式预检（fail-loud）：docker 可用 + 镜像已构建 + claude 凭证就位。"""
     if shutil.which("docker") is None:
         raise SystemExit(
             "PATH 上找不到 docker（VIGIL_MODE=container 需要；或 VIGIL_MODE=subprocess 联调）"
         )
-    inspect = subprocess.run(
-        ["docker", "image", "inspect", _VIGIL_IMAGE], capture_output=True, text=True
-    )
-    if inspect.returncode != 0:
-        raise SystemExit(
-            f"缺 vigil 镜像 {_VIGIL_IMAGE}——先构建：backend/deploy/vigil/build.sh "
-            "<OpenAgents 仓路径> <NexAU 仓路径>"
+    running, existing_run, _experiment = _container_state(name=_VIGIL_CONTAINER)
+    run_id = os.environ.get("AUTO_DESIGNER_RUN_ID", "").strip()
+    if not (running and (not run_id or existing_run == run_id)):
+        inspect = subprocess.run(
+            ["docker", "image", "inspect", _VIGIL_IMAGE], capture_output=True, text=True
         )
+        if inspect.returncode != 0:
+            raise SystemExit(
+                f"缺 vigil 镜像 {_VIGIL_IMAGE}——先构建：backend/deploy/vigil/build.sh "
+                "<OpenAgents 仓路径> <NexAU 仓路径>"
+            )
     if not any(os.environ.get(key, "").strip() for key in _CLAUDE_CRED_ENVS):
         raise SystemExit(
             "缺 claude 凭证：设 ANTHROPIC_API_KEY（API 计费）/ ANTHROPIC_AUTH_TOKEN（网关 Bearer，"
@@ -559,6 +620,7 @@ def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: P
             "仅限盯屏联调，长跑闭环用 container 模式（Spec-0033）"
         )
         ensure_openagents_cli()
+        observation_runtime = _prepare_vigil_evidence(gitea=gitea, mode=mode)
         write_openagents_config(repo=repo, gitea=gitea)
         return _start_vigil_subprocess(
             repo=repo,
@@ -566,22 +628,33 @@ def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: P
             gitea_token=gitea["TOKEN"],
             log_path=log_path,
             keep_alive=keep_alive,
+            observation_runtime=observation_runtime,
         )
     _ensure_vigil_container_prereqs()
+    observation_runtime = _prepare_vigil_evidence(gitea=gitea, mode=mode)
     staging = _VIGIL_CONFIG_STAGING
     # 同一份配置、两个可达性域的唯一分叉点：容器内 base_url 用内网服务名地址。
-    write_openagents_config(repo=staging, gitea={**gitea, "GITEA_URL": _vigil_internal_gitea_url()})
+    write_openagents_config(
+        repo=staging, gitea={**gitea, "GITEA_URL": _vigil_gitea_url(gitea=gitea)}
+    )
     return _start_vigil_container(
         parallel=parallel,
         gitea=gitea,
         staging=staging,
         log_path=log_path,
         keep_alive=keep_alive,
+        observation_runtime=observation_runtime,
     )
 
 
 def _start_vigil_subprocess(
-    *, repo: Path, parallel: int, gitea_token: str, log_path: Path, keep_alive: bool
+    *,
+    repo: Path,
+    parallel: int,
+    gitea_token: str,
+    log_path: Path,
+    keep_alive: bool,
+    observation_runtime: dict | None,
 ) -> VigilHandle:
     """宿主直跑：`openagents vigil --parallel K`（cwd=harness 仓，日志落 log_path）。
 
@@ -589,10 +662,17 @@ def _start_vigil_subprocess(
     """
     log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随 vigil 进程，stop 时关闭
     env = {**os.environ, **_subagent_model_lock_env(), "GITEA_TOKEN": gitea_token}
+    executable = "openagents"
+    if observation_runtime is not None:
+        executable = observation_runtime["runtime"]["executable"]
+        env["OPENAGENTS_NO_SELF_UPDATE"] = "1"
+        env["AUTO_DESIGNER_OBSERVATION_DOWNLOAD_POLICY"] = observation_runtime["profile"][
+            "download_policy"
+        ]
     if not os.environ.get("ANTHROPIC_MODEL", "").strip():
         env.pop("CLAUDE_CODE_SUBAGENT_MODEL", None)
     proc = subprocess.Popen(
-        ["openagents", "vigil", "--parallel", str(max(1, parallel))],
+        [executable, "vigil", "--parallel", str(max(1, parallel))],
         cwd=str(repo),
         env=env,
         stdout=log_handle,
@@ -638,7 +718,13 @@ def _attach_container_logs(*, log_path: Path, keep_alive: bool) -> VigilHandle:
 
 
 def _start_vigil_container(
-    *, parallel: int, gitea: dict[str, str], staging: Path, log_path: Path, keep_alive: bool
+    *,
+    parallel: int,
+    gitea: dict[str, str],
+    staging: Path,
+    log_path: Path,
+    keep_alive: bool,
+    observation_runtime: dict | None,
 ) -> VigilHandle:
     """围堵盒：docker run -d --rm 起 vigil 容器，日志经 `docker logs -f` 跟随进 log_path。
 
@@ -663,7 +749,7 @@ def _start_vigil_container(
     if running:
         print(f"[vigil] 容器 {_VIGIL_CONTAINER} run_id 已变（{existing_run}→{run_id}），重建")
         subprocess.run(["docker", "rm", "-f", _VIGIL_CONTAINER], capture_output=True, text=True)
-    repo_url = _gitea_remote_url({**gitea, "GITEA_URL": _vigil_internal_gitea_url()})
+    repo_url = _gitea_remote_url({**gitea, "GITEA_URL": _vigil_gitea_url(gitea=gitea)})
     args = [
         "docker", "run", "-d", "--rm",
         "--name", _VIGIL_CONTAINER,
@@ -718,7 +804,17 @@ def _start_vigil_container(
         value = os.environ.get(f"HARNESS_LLM_{suffix}", "").strip()
         if value:
             args += ["-e", f"LLM_{suffix}={value}"]
-    args += [_VIGIL_IMAGE, "bash", "/entrypoint.sh"]
+    image = _VIGIL_IMAGE
+    if observation_runtime is not None:
+        image = observation_runtime["runtime"]["image_id"]
+        args += [
+            "-e",
+            "OPENAGENTS_NO_SELF_UPDATE=1",
+            "-e",
+            "AUTO_DESIGNER_OBSERVATION_DOWNLOAD_POLICY="
+            + observation_runtime["profile"]["download_policy"],
+        ]
+    args += [image, "bash", "/entrypoint.sh"]
     started = subprocess.run(args, capture_output=True, text=True)
     if started.returncode != 0:
         raise SystemExit(f"vigil 容器启动失败：{started.stderr.strip()[:300]}")

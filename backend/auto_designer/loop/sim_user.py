@@ -8,7 +8,6 @@ Orchestrator 只认 run_session_fn(persona, scenario, harness)（返回值不管
 
 from __future__ import annotations
 
-import json
 import os
 import uuid
 from collections.abc import Callable
@@ -285,16 +284,10 @@ def make_sim_run_session_fn(
     observation_root = Path(
         os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations"))
     )
-    from auto_designer.observations.publication import preflight_root
+    # Spec-0070/T3: preserve the old framework contract while freezing checked transport.
+    from auto_designer.observations.preflight import prepare_observations
 
-    preflight_root(observation_root)
-    preflight = getattr(tracker, "preflight_observations", None)
-    if preflight is not None:
-        contract = preflight()
-        binding = observation_root / ".framework-contract.json"
-        if binding.exists() and json.loads(binding.read_text()) != contract:
-            raise ValueError("observation root already belongs to a different repository/contract")
-        binding.write_text(json.dumps(contract))
+    prepare_observations(tracker=tracker, root=observation_root)
 
     def run(
         persona: Persona,
@@ -495,16 +488,10 @@ def make_direct_run_session_fn(
     observation_root = Path(
         os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations"))
     )
-    from auto_designer.observations.publication import preflight_root
+    # Spec-0070/T3: preserve the old framework contract while freezing checked transport.
+    from auto_designer.observations.preflight import prepare_observations
 
-    preflight_root(observation_root)
-    preflight = getattr(tracker, "preflight_observations", None)
-    if preflight is not None:
-        contract = preflight()
-        binding = observation_root / ".framework-contract.json"
-        if binding.exists() and json.loads(binding.read_text()) != contract:
-            raise ValueError("observation root already belongs to a different repository/contract")
-        binding.write_text(json.dumps(contract))
+    prepare_observations(tracker=tracker, root=observation_root)
 
     def run(
         persona: Persona,

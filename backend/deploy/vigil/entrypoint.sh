@@ -7,6 +7,11 @@
 #   /config/openagents.yml 只读挂载（forge=gitea + stages 定稿，token 只在 env 不在盘）
 set -euo pipefail
 
+# Spec-0070/T4: preserve the reader verified before dispatch throughout this run.
+if [[ "${AUTO_DESIGNER_OBSERVATION_DOWNLOAD_POLICY:-same-origin-v1}" == "gitea-com-r2-v1" ]]; then
+  export OPENAGENTS_NO_SELF_UPDATE=1
+fi
+
 : "${VIGIL_REPO_URL:?缺 VIGIL_REPO_URL（内网 clone 地址）}"
 : "${VIGIL_PARALLEL:=1}"
 test -f /config/openagents.yml || { echo "缺 /config/openagents.yml 挂载" >&2; exit 1; }

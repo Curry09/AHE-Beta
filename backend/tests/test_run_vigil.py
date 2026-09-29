@@ -582,3 +582,136 @@ def test_stop_vigil_kills_on_timeout(tmp_path: Path) -> None:
         run.VigilHandle(mode="subprocess", proc=_Stuck(), log_handle=_Log(), keep_alive=False)
     )
     assert events == ["terminate", "wait-timeout", "killed", "wait-after-kill", "log-closed"]
+
+
+# Spec-0070/T3: the checked runtime is the runtime used for actual delivery.
+def _hosted_profile(tmp_path, monkeypatch):
+    from auto_designer.observations.transport import (
+        freeze_transport_profile,
+        make_transport_profile,
+    )
+
+    root = tmp_path / "observations"
+    monkeypatch.setenv("AUTO_DESIGNER_OBSERVATION_ROOT", str(root))
+    hosted = {**_GITEA, "GITEA_URL": "https://gitea.com"}
+    profile = make_transport_profile(
+        repository="https://gitea.com/api/v1/repos/harness/harness",
+        encoding="zip",
+        download_policy="gitea-com-r2-v1",
+    )
+    freeze_transport_profile(root=root, profile=profile)
+    return hosted, profile
+
+
+def _reader_capabilities():
+    return {
+        "schema": "openagents-observation-reader-capabilities-v1",
+        "marker": "auto-designer:observation-evidence-v1",
+        "encodings": ["gzip", "zip"],
+        "zip_profile": "single-evidence-json-v1",
+        "download_policies": ["same-origin-v1", "gitea-com-r2-v1"],
+        "max_transfer_bytes": 4_000_000,
+        "max_expanded_bytes": 24_000_000,
+    }
+
+
+def test_hosted_container_uses_checked_image_public_url_and_no_updates(tmp_path, monkeypatch):
+    from auto_designer.observations import preflight
+
+    calls = _container_rig(monkeypatch, tmp_path)
+    hosted, _ = _hosted_profile(tmp_path, monkeypatch)
+    identity = "sha256:" + "c" * 64
+    monkeypatch.setattr(
+        preflight,
+        "probe_reader",
+        lambda **kw: {
+            "capabilities": _reader_capabilities(),
+            "runtime": {"mode": "container", "image_id": identity},
+        },
+    )
+    run.start_vigil(repo=tmp_path / "repo", parallel=1, gitea=hosted, log_path=tmp_path / "d/v.log")
+    argv = next(a for a in calls["runs"] if a[:2] == ["docker", "run"])
+    assert identity in argv and run._VIGIL_IMAGE not in argv
+    assert "OPENAGENTS_NO_SELF_UPDATE=1" in argv
+    assert "AUTO_DESIGNER_OBSERVATION_DOWNLOAD_POLICY=gitea-com-r2-v1" in argv
+    data = _load_yaml(tmp_path / "staging/.openagents/openagents.yml")
+    assert data["gitea"]["base_url"] == "https://gitea.com"
+    assert any("@gitea.com/" in a for a in argv)
+
+
+def test_hosted_subprocess_uses_exact_checked_executable(tmp_path, monkeypatch):
+    from auto_designer.observations import preflight
+
+    hosted, _ = _hosted_profile(tmp_path, monkeypatch)
+    monkeypatch.setenv("VIGIL_MODE", "subprocess")
+    monkeypatch.setattr(run, "ensure_openagents_cli", lambda: None)
+    monkeypatch.setattr(
+        preflight,
+        "probe_reader",
+        lambda **kw: {
+            "capabilities": _reader_capabilities(),
+            "runtime": {"mode": "subprocess", "executable": "/verified/bin/openagents"},
+        },
+    )
+    calls = {}
+
+    def spawn(argv, **kw):
+        calls.update(argv=argv, env=kw["env"])
+        return _FakeProc(calls)
+
+    monkeypatch.setattr(run.subprocess, "Popen", spawn)
+    run.start_vigil(repo=tmp_path / "repo", parallel=1, gitea=hosted, log_path=tmp_path / "d/v.log")
+    assert calls["argv"][0] == "/verified/bin/openagents"
+    assert calls["env"]["OPENAGENTS_NO_SELF_UPDATE"] == "1"
+
+
+def test_bad_hosted_reader_cannot_start_vigil_or_write_config(tmp_path, monkeypatch):
+    from auto_designer.observations import preflight
+
+    calls = _container_rig(monkeypatch, tmp_path)
+    hosted, _ = _hosted_profile(tmp_path, monkeypatch)
+    monkeypatch.setattr(preflight, "probe_reader", lambda **kw: {"capabilities": {}})
+    with pytest.raises(ValueError, match="capability"):
+        run.start_vigil(
+            repo=tmp_path / "repo", parallel=1, gitea=hosted, log_path=tmp_path / "d/v.log"
+        )
+    assert not any(a[:2] == ["docker", "run"] for a in calls["runs"])
+    assert not (tmp_path / "staging/.openagents/openagents.yml").exists()
+
+
+def test_hosted_reuse_probes_actual_container(tmp_path, monkeypatch):
+    from auto_designer.observations import preflight
+
+    _container_rig(monkeypatch, tmp_path)
+    hosted, _ = _hosted_profile(tmp_path, monkeypatch)
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "our-run")
+    monkeypatch.delenv("AUTO_DESIGNER_EXPERIMENT_ID", raising=False)
+    monkeypatch.setattr(run, "_container_state", lambda **kw: (True, "our-run", ""))
+    seen = []
+
+    def probe(**kw):
+        seen.append(kw)
+        return {
+            "capabilities": _reader_capabilities(),
+            "runtime": {"image_id": "sha256:" + "d" * 64},
+        }
+
+    monkeypatch.setattr(preflight, "probe_reader", probe)
+    run._prepare_vigil_evidence(gitea=hosted, mode="container")
+    assert seen[0]["container"] == run._VIGIL_CONTAINER
+
+
+def test_hosted_public_url_keeps_explicit_override(monkeypatch):
+    monkeypatch.setenv("VIGIL_GITEA_INTERNAL_URL", "https://explicit.example")
+    assert (
+        run._vigil_gitea_url(gitea={**_GITEA, "GITEA_URL": "https://gitea.com"})
+        == "https://explicit.example"
+    )
+
+
+def test_reused_container_prereqs_do_not_require_old_local_image_tag(tmp_path, monkeypatch):
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "our-run")
+    monkeypatch.setattr(run, "_container_state", lambda **kw: (True, "our-run", ""))
+    run._ensure_vigil_container_prereqs()
+    assert not any(a[:3] == ["docker", "image", "inspect"] for a in calls["runs"])

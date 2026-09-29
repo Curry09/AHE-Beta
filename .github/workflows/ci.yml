@@ -7,6 +7,12 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      observation_reader_commit:
+        description: 'Full OpenAgents commit SHA for the gzip/ZIP candidate contract'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -67,15 +73,34 @@ jobs:
         working-directory: frontend
 
   integration:
-    name: OpenAgents configuration contract
+    name: OpenAgents configuration and evidence contracts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Spec-0070/T5: the published baseline stays usable while the reader PR is reviewed.
+      # A candidate must use an explicit immutable remote commit, never a moving branch.
+      - name: Select the immutable reader
+        id: reader
+        env:
+          CANDIDATE_READER: ${{ inputs.observation_reader_commit }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          manifest = json.loads(Path('release/compatibility.json').read_text())
+          hosted = manifest['observation_transport']['reader_release_commit']
+          candidate = os.environ.get('CANDIDATE_READER', '')
+          ref = candidate or hosted or manifest['openagents']['integration_commit']
+          if not re.fullmatch('[a-f0-9]{40}', ref):
+              raise SystemExit('Reader pin must be a full commit SHA')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'ref={ref}\n')
+              output.write(f'hosted={str(bool(candidate or hosted)).lower()}\n')
+          PY
       - uses: actions/checkout@v4
         with:
           repository: Curry09/OpenAgents
-          # OpenAgents main after PR #186; matches openagents.integration_commit.
-          ref: ee87df3acab036213cecbc35cdea01339a5dd988
+          ref: ${{ steps.reader.outputs.ref }}
           path: .ci/OpenAgents
           token: ${{ secrets.OPENAGENTS_READ_TOKEN || github.token }}
           persist-credentials: false
@@ -84,9 +109,16 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --extra dev
       - run: uv run --locked --extra dev python backend/scripts/check_openagents_contract.py --openagents .ci/OpenAgents
+      - name: Real gzip and ZIP producer-reader contract
+        if: steps.reader.outputs.hosted == 'true'
+        run: uv run --locked --extra dev python backend/scripts/check_observation_contract.py --openagents .ci/OpenAgents
+      - name: Report baseline-only coverage
+        if: steps.reader.outputs.hosted != 'true'
+        run: echo 'Hosted evidence release pin is pending; configuration baseline only. Run workflow_dispatch with the reader candidate SHA to validate ZIP.'
 
   commitlint:
     name: Commit Lint
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -114,6 +146,7 @@ jobs:
 
   spec-conflicts:
     name: Spec Number Conflicts
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
