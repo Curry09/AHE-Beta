@@ -246,6 +246,11 @@ def _load_instances() -> dict[str, dict]:
 def _to_scenario(meta: dict):
     from auto_designer.models import SeedScenario, WorkspaceSpec
 
+    if os.environ.get("AUTO_DESIGNER_TASK_PACKAGE"):
+        # Spec-0069/T2: the backend provides the verified frozen workspace.
+        from auto_designer.experiment.context import frozen_scenario
+
+        return frozen_scenario()
     seed_root_raw = os.environ.get("SWEBENCH_SEED_ROOT", "").strip()
     if seed_root_raw:
         prepared = (
@@ -334,18 +339,17 @@ def main() -> int:
 
     context_path = os.environ.get("AUTO_DESIGNER_EXPERIMENT_CONTEXT", "").strip()
     if context_path:
-        from auto_designer.experiment.runtime import ExperimentContext
+        from auto_designer.experiment.context import load_controller_context
 
-        context = ExperimentContext.load(path=Path(context_path))
+        context = load_controller_context(context_path)
         run_mod.apply_experiment_context(ctx=context)
     run_mod._isolate_git_credentials()
-    llm_env = run_mod._load_env(ROOT / ".env")
-    # 启动命令显式注入的配置优先于仓内 .env，便于临时切换网关/模型且不把密钥写盘。
-    run_mod._apply_env_defaults(llm_env)
+    if not context_path:
+        run_mod._apply_env_defaults(run_mod._load_env(ROOT / ".env"))
     for suffix in ("MODEL", "BASE_URL", "API_KEY"):
         val = os.environ.get(f"HARNESS_LLM_{suffix}")
         if not val:
-            raise SystemExit(f"backend/.env 缺 HARNESS_LLM_{suffix}")
+            raise SystemExit(f"运行配置缺 HARNESS_LLM_{suffix}")
         os.environ[f"LLM_{suffix}"] = val
     reasoning_effort = os.environ.get("HARNESS_LLM_REASONING_EFFORT", "").strip()
     if reasoning_effort:
@@ -765,6 +769,7 @@ def main() -> int:
         f"a 段并发 {max_parallel_users}）..."
     )
     refs: list[str] = []
+    stopped = False
     try:
         replay_start = _replay_start(
             run_mode=run_mode,
@@ -773,6 +778,11 @@ def main() -> int:
         )
         start_round = _start_round(run_mode=run_mode, replay_start=replay_start, recovery=recovery)
         refs = orch.run(run_mod.TOTAL_ROUNDS, start_round=start_round)
+    except KeyboardInterrupt:
+        stopped = True
+        if vigil is not None:
+            vigil.keep_alive = False
+        return 130
     except RoundDeliveryBlocked as exc:
         if vigil is not None:
             # A recoverable experiment has already stopped its controller.  Keeping
@@ -799,6 +809,7 @@ def main() -> int:
             round_no=current["round"],
             total_rounds=run_mod.TOTAL_ROUNDS,
             round_shas=round_shas,
+            **({"phase": "stopped"} if stopped else {}),
         )
 
     plan_path = run_mod.DATA / "swebench_session_plans.json"

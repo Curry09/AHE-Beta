@@ -77,3 +77,36 @@ def test_real_venv_python_survives_copy_when_available(tmp_path: Path) -> None:
         text=True,
     )
     assert proc.stdout.strip() == str(copied / ".venv")
+
+
+def test_unified_prebuilt_shell_and_script_use_copied_task_venv(tmp_path: Path) -> None:
+    import json
+
+    from auto_designer.user.sim import seed_source
+    from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+
+    source = tmp_path / "source"
+    subprocess.run([sys.executable, "-m", "venv", str(source / ".venv")], check=True)
+    # Editable import metadata and script shebangs must point at this session's copy.
+    site = next((source / ".venv/lib").glob("python*/site-packages"))
+    (source / "task_module.py").write_text("from pathlib import Path\nROOT=Path(__file__).parent\n")
+    (site / "task.pth").write_text(str(source) + "\n")
+    tool = source / ".venv/bin/task-tool"
+    tool.write_text(f"#!{source}/.venv/bin/python\nimport task_module; print(task_module.ROOT)\n")
+    tool.chmod(0o755)
+    runtime = seed_source.provision(
+        WorkspaceSpec(
+            kind="prebuilt",
+            params={"source": str(source), "activate_venv": True, "harness_python": sys.executable},
+        ),
+        str(tmp_path / "session"),
+    )
+    assert isinstance(runtime, LocalWorkspaceRuntime)
+    result = runtime.run(
+        "python -c 'import json,sys,task_module;print(json.dumps([sys.prefix,str(task_module.ROOT)]))'"
+    )
+    assert result["returncode"] == 0
+    assert json.loads(result["stdout"]) == [runtime.cwd + "/.venv", runtime.cwd]
+    assert runtime.run("task-tool")["stdout"].strip() == runtime.cwd
+    assert runtime.evidence["harness_python"] == sys.executable
+    assert runtime.cwd != str(source)

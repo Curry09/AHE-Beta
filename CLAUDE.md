@@ -7,7 +7,7 @@
 2. `nexau` 作为 agent 实现，同时兼容 claude code / codex 接入。
 
 ### 项目文档
-用户入口见 README.md；当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
+用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。历史 evaluation launcher 仅用于对应冻结版本的复现。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
@@ -51,7 +51,7 @@
 - **双轨（spec-0060）**：PM 独立到 Owner；Triage 经 Synthesizer 到 Owner。Synthesizer 的 proposal/ready 输入排除 PM，证据授权只来自筛选后的可见提案；两路线仅在 Owner 汇合。
 - **Owner / Delivery Router**：默认 admit 并打 `openagents` 令牌；用 `delivery_overlaps` 协调双轨共享工作，双方仍独立交接与验收，交付侧决定实现复用。仅保留历史精确去重兼容，不选择实现层、不压缩独立能力与验收目标。
 
-交付面 = OpenAgents vigil：以独立 CLI 接入（不 vendor 不 import），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。运行形态（spec-0033）：**容器围堵为缺省**——vigil 跑在专用容器（deploy/vigil 镜像，容器内自 clone harness 仓、零宿主挂载），网络只挂 internal vigil-net、外网经 egress 代理 allowlist（仅 Anthropic API），claude 凭证（ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN）与 Gitea token 只经容器 env；`VIGIL_MODE=subprocess` 为无围堵的宿主直跑，仅限盯屏联调。
+交付面 = OpenAgents vigil：以独立 CLI 接入（不 vendor 不 import），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。运行形态（spec-0033）：**容器围堵为缺省**——vigil 跑在专用容器（deploy/vigil 镜像，容器内自 clone harness 仓、零宿主挂载），网络只挂 internal vigil-net、外网经 egress 代理 allowlist（仅 Anthropic API），claude 凭证（ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN）与 Gitea token 只经容器 env；`VIGIL_MODE=subprocess` 只适用于盯屏宿主联调，或经统一入口验证身份的 E2B 整实验沙箱；后者使用沙箱内进程而非嵌套 Docker，不宣称每 session 容器隔离。
 
 > 无体感门禁角色——体感只作观测，benchmark 全程 held-out。
 

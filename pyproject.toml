@@ -21,6 +21,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Spec-0069/T6: both unified experiment backends and frozen SWE task materials.
+experiments = [
+    "pyarrow==21.0.0",
+    "e2b==2.51.0",
+]
 evaluation = [
     # 4.1 is the official runner compatible with the pinned Verified parquet
     # schema and prebuilt swebench/sweb.eval images used by this experiment.

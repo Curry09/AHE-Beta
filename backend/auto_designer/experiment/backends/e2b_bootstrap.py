@@ -1,0 +1,96 @@
+"""Spec-0069/T4: portable frozen-input bootstrap, without developer home files."""
+
+from __future__ import annotations
+
+import shlex
+from pathlib import Path
+from typing import Any
+
+UV_VERSION = "0.11.28"
+PYTHON_VERSION = "3.12.13"
+UV_SHA256 = "e490a6464492183c5d4534a5527fb4440f7f2bb2f228162ad7e4afe076dc0224"
+CLAUDE_VERSION = "2.1.284"
+CLAUDE_SHA256 = "5cd90aabd83f8a15136c35aa37bb1d92b348993573316643dc3fe4e04afbf88f"
+
+# This program runs with the template's system Python before any project imports.
+BOOTSTRAP_PROGRAM = r"""
+import hashlib,json,os,pathlib,shutil,subprocess,sys,tarfile,urllib.request
+root=pathlib.Path(sys.argv[1]); manifest=json.loads((root/'manifest.json').read_text())
+def run(args,**kw): subprocess.run(args,check=True,**kw)
+def download(url,digest,dest):
+    urllib.request.urlretrieve(url,dest)
+    if hashlib.sha256(dest.read_bytes()).hexdigest()!=digest: raise RuntimeError('Runtime download checksum mismatch')
+def extract(archive,dest):
+    dest.mkdir(parents=True,exist_ok=True)
+    with tarfile.open(archive) as tar:
+        for member in tar.getmembers():
+            p=pathlib.PurePosixPath(member.name)
+            if p.is_absolute() or '..' in p.parts or member.issym() or member.islnk() or not(member.isfile() or member.isdir()):
+                raise RuntimeError('Unsafe frozen source archive')
+        tar.extractall(dest,filter='data')
+for key,record in manifest['materials'].items():
+    p=root/record['path']
+    if not p.resolve().is_relative_to(root.resolve()) or p.is_symlink() or hashlib.sha256(p.read_bytes()).hexdigest()!=record['sha256']:
+        raise RuntimeError('Frozen material mismatch: '+key)
+cache=root/'runtime/downloads'; cache.mkdir(parents=True,exist_ok=True)
+binroot=root/'runtime/bin';binroot.mkdir(parents=True,exist_ok=True)
+uvtar=cache/'uv.tar.gz';download('https://github.com/astral-sh/uv/releases/download/0.11.28/uv-x86_64-unknown-linux-gnu.tar.gz','UV_SHA',uvtar)
+extract(uvtar,cache/'uv');uv=cache/'uv/uv-x86_64-unknown-linux-gnu/uv'
+run([str(uv),'python','install','3.12.13'])
+python=subprocess.check_output([str(uv),'python','find','3.12.13'],text=True).strip()
+if subprocess.check_output([python,'--version'],text=True).strip()!='Python 3.12.13': raise RuntimeError('Python runtime mismatch')
+controller=root/'source/controller';oa=root/'source/openagents'; task=root/'workspace/task'
+for path in (controller,oa,task):
+    if path.is_symlink(): raise RuntimeError('Linked bootstrap destination')
+    shutil.rmtree(path,ignore_errors=True)
+extract(root/manifest['materials']['controller_source_archive']['path'],controller)
+extract(root/manifest['materials']['openagents_source_archive']['path'],oa)
+for name,digest in manifest['source_snapshot']['files'].items():
+    if hashlib.sha256((controller/name).read_bytes()).hexdigest()!=digest: raise RuntimeError('Controller snapshot mismatch')
+run(['git','init','-b','main',str(controller)])
+run(['git','-C',str(controller),'add','.'])
+run(['git','-C',str(controller),'-c','user.name=Experiment','-c','user.email=experiment@localhost','-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null','commit','-m','Frozen controller snapshot'])
+env=dict(os.environ);env.pop('VIRTUAL_ENV',None);env['UV_PYTHON']=python
+run([str(uv),'sync','--locked','--extra','experiments','--extra','dev','--python',python],cwd=controller,env=env)
+run([str(uv),'sync','--locked','--extra','nexau','--extra','dev','--python',python],cwd=oa,env=env)
+claude=binroot/'claude';download('https://downloads.claude.ai/claude-code-releases/2.1.284/linux-x64/claude','CLAUDE_SHA',claude);claude.chmod(0o755)
+package=manifest['task_package']; source=package['source'];task.mkdir(parents=True,exist_ok=True)
+if source['kind']=='git':
+    run(['git','init',str(task)])
+    run(['git','-C',str(task),'remote','add','origin',source['url']])
+    run(['git','-C',str(task),'fetch','--depth','1','origin',source['revision']])
+    run(['git','-C',str(task),'checkout','--detach',source['revision']])
+extract(root/manifest['materials']['task_source_archive']['path'],task)
+if source['kind']=='git':
+    if subprocess.check_output(['git','-C',str(task),'rev-parse','HEAD'],text=True).strip()!=source['revision']: raise RuntimeError('Task revision differs')
+    if subprocess.check_output(['git','-C',str(task),'status','--porcelain'],text=True).strip(): raise RuntimeError('Task archive differs from fixed Git revision')
+else:
+    run(['git','init',str(task)]);run(['git','-C',str(task),'add','.']);run(['git','-C',str(task),'-c','user.name=Experiment','-c','user.email=experiment@localhost','commit','-m','Frozen task source'])
+lock=str(root/manifest['materials']['requirements_lock']['path'])
+env.update(TASK_ROOT=str(task),TASK_PYTHON=python,REQUIREMENTS_LOCK=lock,AUTO_DESIGNER_TASK_REQUIREMENTS=lock,VIRTUAL_ENV=str(task/'.venv'),UV_BIN=str(uv))
+run(['bash',str(root/manifest['materials']['script']['path'])],cwd=task,env=env)
+if not(task/'.venv/bin/python').is_file(): raise RuntimeError('Task setup did not produce its isolated Python environment')
+# Keep task venv selection across explicit bash login shells without activating it for controller/vigil.
+pathlib.Path('/etc/profile.d/auto-designer-task.sh').write_text('if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then export PATH="$VIRTUAL_ENV/bin:$PATH"; fi\n')
+receipt={'python':python,'uv':str(uv),'controller_python':str(controller/'.venv/bin/python'),'openagents_bin':str(oa/'.venv/bin'),'bin':str(binroot),'task_root':str(task),'python_version':'3.12.13','uv_version':'0.11.28','claude_version':'2.1.284'}
+(root/'runtime/bootstrap.json').write_text(json.dumps(receipt,indent=2)+'\n')
+""".replace("UV_SHA", UV_SHA256).replace("CLAUDE_SHA", CLAUDE_SHA256)
+
+
+def bootstrap_command(root: str) -> str:
+    return f"python3 {shlex.quote(root + '/runtime/bootstrap.py')} {shlex.quote(root)}"
+
+
+def upload_frozen_inputs(sandbox: Any, *, run_dir: Path, manifest: dict, root: str) -> None:
+    """Upload immutable manifest bytes and only checksum-verified frozen materials."""
+    from auto_designer.experiment.materials import verify_materials
+
+    verify_materials(manifest)
+    paths = ["manifest.json", *(entry["path"] for entry in manifest["materials"].values())]
+    for relative in paths:
+        sandbox.files.write(root + "/" + relative, (run_dir / relative).read_bytes(), user="root")
+    sandbox.files.write(root + "/runtime/bootstrap.py", BOOTSTRAP_PROGRAM, user="root")
+
+
+def json_command(program: str, *args: str) -> str:
+    return "python3 -c " + shlex.quote(program) + " " + " ".join(map(shlex.quote, args))

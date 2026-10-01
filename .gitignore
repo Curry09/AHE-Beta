@@ -49,3 +49,6 @@ backend/.env
 .boyue
 .profiles/
 auto-designer-experiments/
+
+# Spec-0069/T6: frozen runs, credentials and private experiment artifacts.
+.experiments/

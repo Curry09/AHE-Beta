@@ -651,6 +651,26 @@ def main() -> int:
     args = parser.parse_args()
     args.config = args.config.expanduser().resolve()
     try:
+        # Spec-0069/T5: retain historical reproduction, route public v2 checks.
+        definition = json.loads(args.config.read_text())
+        if definition.get("schema_version") == 2:
+            os.sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
+            from auto_designer.experiment.cli import dispatch
+
+            if args.dry_run:
+                return dispatch(["--json", "check", "--config", str(args.config), "--offline"])
+            if args.run_id:
+                prefix = ["--secrets-file", str(args.gitea_env)] if args.gitea_env else []
+                return dispatch(prefix + ["resume" if args.resume else "run", args.run_id])
+            print(
+                "Use backend/scripts/experiment.py prepare --config <file>, then run <run_id>",
+                file=os.sys.stderr,
+            )
+            return 2
+        print(
+            "Historical N1 launcher; public v2 experiments use backend/scripts/experiment.py",
+            file=os.sys.stderr,
+        )
         plan = load_plan(args.config)
         if args.dry_run:
             print(json.dumps(redacted(plan), ensure_ascii=False, indent=2))

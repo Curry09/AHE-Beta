@@ -13,6 +13,8 @@ from auto_designer.experiment.config import ConfigError, compose_project
 
 LABEL_EXPERIMENT = "io.openagents.experiment_id"
 LABEL_MANIFEST = "io.openagents.manifest_sha"
+# Spec-0069/T3: Canonical Ubuntu 24.04 LTS channel, actual Squid 6.13 build.
+DEFAULT_EGRESS_IMAGE = "ubuntu/squid:6.6-24.04_beta@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029"
 COMPOSE_TEMPLATE = (
     Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "docker-compose.yml"
 )
@@ -34,7 +36,10 @@ def render_stack(
     manifest_sha: str,
     vigil_image: str,
     images: dict[str, str] | None = None,
+    gitea_host_port: int = 0,
 ) -> Path:
+    if type(gitea_host_port) is not int or not 0 <= gitea_host_port <= 65535:
+        raise InfrastructureError("Gitea host port must be 0 (allocate) or a valid TCP port")
     dest.mkdir(parents=True, exist_ok=True)
     compose_src = COMPOSE_TEMPLATE.read_text(encoding="utf-8")
     if "container_name:" in compose_src:
@@ -51,8 +56,9 @@ def render_stack(
                 f"EXPERIMENT_ID={experiment_id}",
                 f"MANIFEST_SHA={manifest_sha}",
                 f"GITEA_IMAGE={resolved_images.get('gitea', 'gitea/gitea:1.22')}",
+                f"GITEA_HOST_PORT={gitea_host_port}",
                 f"RUNNER_IMAGE={resolved_images.get('runner', 'gitea/act_runner:0.2.11')}",
-                f"EGRESS_IMAGE={resolved_images.get('egress', 'ubuntu/squid:6.13')}",
+                f"EGRESS_IMAGE={resolved_images.get('egress', DEFAULT_EGRESS_IMAGE)}",
                 f"VIGIL_IMAGE={vigil_image}",
                 f"COMPOSE_PROJECT_NAME={compose_project(experiment_id=experiment_id, cfg_hash=manifest_sha)}",
             ]

@@ -124,3 +124,67 @@ def test_docker_seed_rejects_storage_only_image(monkeypatch: pytest.MonkeyPatch)
                 params={"image": "seed:old", "instance_id": "instance-1"},
             )
         )
+
+
+def test_unified_seed_binds_task_environment_and_owned_harness_interpreter(monkeypatch):
+    """Spec-0069/T3: plain task python cannot take over Harness's NexAU interpreter."""
+    from auto_designer.user.sim.sources import docker_seed
+
+    calls = []
+
+    def docker(args):
+        calls.append(args)
+        if args[:2] == ["image", "inspect"]:
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Id": "sha256:seed",
+                            "Config": {
+                                "Labels": {"org.auto-designer.seed-runtime": "1"},
+                                "Env": ["PATH=/opt/controller/.venv/bin:/usr/bin:/bin"],
+                            },
+                        }
+                    ]
+                ),
+                "",
+            )
+        if args[0] == "run":
+            return subprocess.CompletedProcess(args, 0, "container-id", "")
+        if args[:3] == ["exec", "container-id", "cat"]:
+            return subprocess.CompletedProcess(args, 0, '{"instances":{"task":{}}}', "")
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(docker_seed, "_docker", docker)
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-123")
+    monkeypatch.setenv("AUTO_DESIGNER_EXPERIMENT_ID", "run-123")
+    monkeypatch.setenv("AUTO_DESIGNER_CONFIG_HASH", "fixed-config")
+    result = docker_seed.DockerSeedSource().provision(
+        WorkspaceSpec(
+            kind="docker-seed",
+            params={
+                "image": "fixed-image",
+                "instance_id": "task",
+                "harness_python": "/opt/controller/.venv/bin/python",
+                "network": "owned_vigil_net",
+                "env": {
+                    "HTTP_PROXY": "http://egress-proxy:3128",
+                    "HTTPS_PROXY": "http://egress-proxy:3128",
+                    "NO_PROXY": "gitea,127.0.0.1,localhost",
+                },
+            },
+        )
+    )
+    started = next(argv for argv in calls if argv[0] == "run")
+    assert "PATH=/workspace/task/repo/.venv/bin:/opt/controller/.venv/bin:/usr/bin:/bin" in started
+    assert "VIRTUAL_ENV=/workspace/task/repo/.venv" in started
+    assert "io.auto-designer.run_id=run-123" in started
+    assert "io.openagents.manifest_sha=fixed-config" in started
+    assert result.evidence["harness_python"] == "/opt/controller/.venv/bin/python"
+    assert started[started.index("--network") + 1] == "owned_vigil_net"
+    assert "HTTP_PROXY=http://egress-proxy:3128" in started
+    assert "HTTPS_PROXY=http://egress-proxy:3128" in started
+    assert "NO_PROXY=gitea,127.0.0.1,localhost" in started
+    assert result.evidence["proxy_environment"]["HTTPS_PROXY"] == "http://egress-proxy:3128"

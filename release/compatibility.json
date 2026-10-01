@@ -34,9 +34,21 @@
     "legacy_integration_scope": "configuration contract; existing gzip and same-origin behavior",
     "candidate_validation": "Run check_observation_contract.py with the paired reviewed OpenAgents checkout; CI workflow_dispatch requires its full remote commit SHA.",
     "image_record": "backend/deploy/vigil/observation-runtime.json#hosted_candidate",
-    "release_gate": "Merge and publish the reader first, fill reader_release_commit with its verified immutable commit, rebuild the reader image, and rerun the joint contract before enabling the hosted release."
+    "release_gate": "Merge and publish the reader first, fill reader_release_commit with its verified immutable commit, rebuild the reader image, and rerun the joint contract before enabling the hosted release.",
+    "reader_candidate_commit": "a752e8830a13f44d97a3043d1f3e8dd16bd8d8aa"
   },
   "release_commits": null,
   "container_digests": null,
-  "live_canary": "not-run"
+  "live_canary": "not-run",
+  "experiment_runtime": {
+    "spec": "0069",
+    "python": "3.12.13",
+    "uv": "0.11.28",
+    "claude_code": {
+      "version": "2.1.284",
+      "linux_x64_sha256": "5cd90aabd83f8a15136c35aa37bb1d92b348993573316643dc3fe4e04afbf88f"
+    },
+    "e2b": "2.51.0",
+    "pyarrow": "21.0.0"
+  }
 }

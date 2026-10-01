@@ -1,5 +1,6 @@
+# Spec-0069/T3: only infrastructure; the controller owns Vigil.
 # Spec-0047/T3：每实验 Compose 模板。禁止 container_name / 全局网络名 / 共享 named volume。
-# 宿主端口由 Docker 动态分配（127.0.0.1::3000）；凭证不进本文件。
+# 首次 GITEA_HOST_PORT=0 由 Docker 分配；之后保持已记录的端口。凭证不进本文件。
 services:
   gitea:
     image: ${GITEA_IMAGE:-gitea/gitea:1.22}
@@ -15,36 +16,19 @@ services:
       GITEA__server__HTTP_PORT: "3000"
       GITEA__security__INSTALL_LOCK: "true"
       GITEA__service__DISABLE_REGISTRATION: "true"
-      GITEA__actions__ENABLED: "true"
+      GITEA__actions__ENABLED: "false"
+      GITEA__attachment__ALLOWED_TYPES: "*/*"
+      GITEA__attachment__MAX_SIZE: "100"
     volumes:
       - gitea_data:/data
     networks:
       - ci
       - vigil_net
     ports:
-      - "127.0.0.1::3000"
-
-  act-runner:
-    image: ${RUNNER_IMAGE:-gitea/act_runner:0.2.11}
-    restart: unless-stopped
-    depends_on:
-      - gitea
-    labels:
-      io.openagents.experiment_id: "${EXPERIMENT_ID}"
-      io.openagents.manifest_sha: "${MANIFEST_SHA}"
-      io.openagents.role: runner
-    environment:
-      GITEA_INSTANCE_URL: http://gitea:3000
-      GITEA_RUNNER_REGISTRATION_TOKEN: ${RUNNER_TOKEN:-}
-      GITEA_RUNNER_NAME: ${EXPERIMENT_ID}-runner
-    volumes:
-      - runner_data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - ci
+      - "127.0.0.1:${GITEA_HOST_PORT:-0}:3000"
 
   egress-proxy:
-    image: ${EGRESS_IMAGE:-ubuntu/squid:6.13}
+    image: ${EGRESS_IMAGE:-ubuntu/squid:6.6-24.04_beta@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029}
     restart: unless-stopped
     labels:
       io.openagents.experiment_id: "${EXPERIMENT_ID}"
@@ -58,28 +42,16 @@ services:
       - ci
       - vigil_net
 
-  vigil:
-    image: ${VIGIL_IMAGE}
-    restart: unless-stopped
-    depends_on:
-      - gitea
-      - egress-proxy
-    labels:
-      io.openagents.experiment_id: "${EXPERIMENT_ID}"
-      io.openagents.manifest_sha: "${MANIFEST_SHA}"
-      io.openagents.role: vigil
-    environment:
-      HTTPS_PROXY: http://egress-proxy:3128
-      HTTP_PROXY: http://egress-proxy:3128
-      NO_PROXY: gitea,localhost,127.0.0.1
-    networks:
-      - vigil_net
 
 networks:
   ci:
+    labels: &ownership
+      io.openagents.experiment_id: "${EXPERIMENT_ID}"
+      io.openagents.manifest_sha: "${MANIFEST_SHA}"
   vigil_net:
     internal: true
+    labels: *ownership
 
 volumes:
   gitea_data:
-  runner_data:
+    labels: *ownership

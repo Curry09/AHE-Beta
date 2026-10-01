@@ -588,9 +588,22 @@ class HarnessLauncher:
         runtime = as_runtime(workspace_dir) if workspace_dir is not None else None
         is_docker = isinstance(runtime, DockerWorkspaceRuntime)
         if argv[0] in ("python", "python3"):
-            argv[0] = "python3" if is_docker else sys.executable
+            # Spec-0069/T3: task shell Python and Harness/NexAU use separate environments.
+            argv[0] = (
+                str(runtime.evidence.get("harness_python") or "python3")
+                if is_docker
+                else sys.executable
+            )
         cwd = dest / params["cwd"] if params.get("cwd") else dest
         env = {str(k): str(v) for k, v in (params.get("env") or {}).items()}
+        if runtime is not None and not is_docker and runtime.evidence.get("task_virtual_env"):
+            # Spec-0069/T3: E2B's task shell inherits its relocated environment,
+            # while the entry uses the controller's absolute NexAU interpreter.
+            task_venv = str(runtime.evidence["task_virtual_env"])
+            env["VIRTUAL_ENV"] = task_venv
+            env["PATH"] = task_venv + "/bin" + os.pathsep + os.environ.get("PATH", "")
+            if argv[0] == sys.executable and runtime.evidence.get("harness_python"):
+                argv[0] = str(runtime.evidence["harness_python"])
         protocol = str(params.get("protocol") or params.get("interface") or "legacy")
         if protocol not in ("legacy", "stdio-jsonl-v1"):
             raise ValueError(f"params.yaml 的 protocol/interface 不支持：{protocol!r}")
@@ -639,7 +652,22 @@ class HarnessLauncher:
                 if key.startswith(("LLM_", "NEXAU_", "AUTO_DESIGNER_"))
                 or key in {"NO_PROXY", "no_proxy", "HTTP_PROXY", "HTTPS_PROXY"}
             }
-            argv = runtime.popen_argv(argv, cwd=container_cwd, env={**inherited, **env})
+            child_environment = {**inherited, **env}
+            proxy_environment = runtime.evidence.get("proxy_environment")
+            if proxy_environment:
+                # Spec-0069/T3: host NO_PROXY contains direct model gateways; it
+                # must not bypass the owned egress proxy inside an internal network.
+                for key in (
+                    "HTTP_PROXY",
+                    "HTTPS_PROXY",
+                    "NO_PROXY",
+                    "http_proxy",
+                    "https_proxy",
+                    "no_proxy",
+                ):
+                    child_environment.pop(key, None)
+                child_environment.update(proxy_environment)
+            argv = runtime.popen_argv(argv, cwd=container_cwd, env=child_environment)
             # Environment/workdir are encoded in docker exec argv.  The docker client
             # itself runs from the immutable host checkout and needs only host env.
             host_cwd = dest

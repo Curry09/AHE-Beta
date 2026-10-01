@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "kind": "swebench",
+  "id": "pvlib__pvlib-python-1478",
+  "instruction_file": "instruction.md",
+  "source": {
+    "kind": "git",
+    "url": "https://github.com/pvlib/pvlib-python.git",
+    "revision": "3f397ed44075b01f4ba535750356859195a51b2d",
+    "repo": "pvlib/pvlib-python"
+  },
+  "setup": {
+    "script": "setup.sh",
+    "requirements_lock": "requirements.lock"
+  },
+  "difficulty": "15 min - 1 hour"
+}

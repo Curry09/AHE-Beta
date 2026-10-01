@@ -506,12 +506,12 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0068 | 0068/T4 | 看板角色与显示名称统一 | done | T1 | frontend/README.md<br>frontend/src/App.tsx<br>frontend/src/api.test.ts<br>frontend/src/api.test.tsx<br>frontend/src/api.ts<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.test.tsx<br>frontend/src/components/building/buildingModel.ts<br>frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/issueTimelineModel.test.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/lib/roleLabel.ts<br>frontend/src/styles.css<br>frontend/src/types.ts |
 | 0068 | 0068/T5 | 当前文档与 Spec 索引更新 | done | T3, T4 | CLAUDE.md<br>README.md<br>README.zh-CN.md<br>docs/ARCHITECTURE.md<br>docs/CONFIGURATION.md<br>docs/EXPORTING.md<br>docs/QUICKSTART.md<br>docs/designer-grouping.md<br>docs/specs/0014-dev-commit-discipline.md<br>docs/specs/0015-dev-overfit-isolation.md<br>docs/specs/0016-designer-rootcause-signal.md<br>docs/specs/0016-synthesizer-rootcause-signal.md<br>docs/specs/0017-user-parallel-sessions.md<br>docs/specs/0018-designer-proposal-envelope.md<br>docs/specs/0018-synthesizer-proposal-envelope.md<br>docs/specs/0020-issue-covers-dispatch-budget.md<br>docs/specs/0021-dev-escape-containment.md<br>docs/specs/0024-designer-godview-timeline-tool.md<br>docs/specs/0024-synthesizer-godview-timeline-tool.md<br>docs/specs/0025-issue-triage-funnel.md<br>docs/specs/0026-frontend-observability-redesign.md<br>docs/specs/0027-unified-agent-output-contract.md<br>docs/specs/0028-divergent-pm-gate.md<br>docs/specs/0029-three-plane-issue-flow.md<br>docs/specs/0030-harness-product-interface.md<br>docs/specs/0031-user-sim-stage-contracts.md<br>docs/specs/0032-openagents-gitea-dev-plane.md<br>docs/specs/0034-frontend-agent-company-building.md<br>docs/specs/0035-stdout-visible-harness-state.md<br>docs/specs/0039-issue-state-timeline.md<br>docs/specs/0040-rfc-stage-and-commit-denylist.md<br>docs/specs/0041-unified-llm-token-usage.md<br>docs/specs/0042-role-contract-governance.md<br>docs/specs/0043-role-cognitive-contracts.md<br>docs/specs/0045-vigil-harness-aware-toolchain.md<br>docs/specs/0047-parallel-experiment-runtime.md<br>docs/specs/0049-role-invocation-io-store.md<br>docs/specs/0052-designer-covers-consolidation.md<br>docs/specs/0052-synthesizer-covers-consolidation.md<br>docs/specs/0053-persona-semantic-action-lifecycle.md<br>docs/specs/0054-user-goal-driven-simulation.md<br>docs/specs/0055-goal-aware-demand-evidence-boundaries.md<br>docs/specs/0056-terminal-acceptance-alignment.md<br>docs/specs/0059-observation-evolution-contract.md<br>docs/specs/0060-independent-pm-delivery-route.md<br>docs/specs/0061-delivery-observability-lifecycle.md<br>docs/specs/0063-lightweight-delivery-preflight.md<br>docs/specs/0064-stage-resumable-experiment-runtime.md<br>docs/specs/0066-provider-latency-isolated-timeout.md<br>docs/specs/0067-mixed-e2b-scaling-runtime.md<br>docs/specs/0068-synthesizer-clean-rename.md<br>docs/specs/ARCHITECTURE.md<br>docs/specs/OVERVIEW.md<br>docs/synthesizer-grouping.md<br>docs/usage-monitoring.md |
 | 0068 | 0068/T6 | 行为回归与离线流程验证 | done | T5 | backend/scripts/e2e-synthesizer-naming.sh<br>backend/tests/demand/test_agent_contract.py<br>backend/tests/demand/test_agent_runtime.py<br>backend/tests/demand/test_delivery_evidence.py<br>backend/tests/demand/test_divergent_gate.py<br>backend/tests/demand/test_evidence_contract.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/demand/test_issue_schema.py<br>backend/tests/demand/test_observation_provider.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_proposal_view.py<br>backend/tests/demand/test_role_contract.py<br>backend/tests/demand/test_role_contract_flow.py<br>backend/tests/demand/test_session_timeline.py<br>backend/tests/demand/test_terminal_evidence.py<br>backend/tests/demand/test_triage.py<br>backend/tests/designer/test_agent_contract.py<br>backend/tests/designer/test_agent_runtime.py<br>backend/tests/designer/test_delivery_evidence.py<br>backend/tests/designer/test_divergent_gate.py<br>backend/tests/designer/test_evidence_contract.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/designer/test_issue_schema.py<br>backend/tests/designer/test_observation_provider.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_proposal_view.py<br>backend/tests/designer/test_role_contract.py<br>backend/tests/designer/test_role_contract_flow.py<br>backend/tests/designer/test_session_timeline.py<br>backend/tests/designer/test_synthesizer_compat.py<br>backend/tests/designer/test_terminal_evidence.py<br>backend/tests/designer/test_triage.py<br>backend/tests/dev/test_commit_checkpoint.py<br>backend/tests/dev/test_completion_gate.py<br>backend/tests/dev/test_harness_boundary.py<br>backend/tests/dev/test_repo_guard.py<br>backend/tests/dev/test_workspace_jail.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/experiment/test_config.py<br>backend/tests/experiment/test_manifest.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/guards/test_guard_wiring.py<br>backend/tests/guards/test_harness_boundary.py<br>backend/tests/guards/test_repo_guard.py<br>backend/tests/guards/test_workspace_jail.py<br>backend/tests/loop/test_designer.py<br>backend/tests/loop/test_live.py<br>backend/tests/loop/test_live_tracer.py<br>backend/tests/loop/test_metrics.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_roster.py<br>backend/tests/loop/test_runner.py<br>backend/tests/loop/test_runtime_agg.py<br>backend/tests/loop/test_synthesizer.py<br>backend/tests/observations/test_gaps.py<br>backend/tests/observations/test_publication.py<br>backend/tests/test_export_experiment_snapshot.py<br>backend/tests/test_llm_limits.py<br>backend/tests/test_replay_design_from_sessions.py<br>backend/tests/test_replay_roles_from_sessions.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_sandbox_isolation.py<br>backend/tests/test_stage_resume_e2e.py<br>backend/tests/test_time_accounting.py<br>backend/tests/test_usage.py<br>backend/tests/tracker/test_gitea_timeline.py<br>backend/tests/web/test_api.py<br>evaluation/tests/test_vps_status.py<br>backend/tests/test_invocation.py |
-| 0069 | 0069/T1 | 统一实验 schema 与材料冻结 | pending | — | backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/materials.py<br>backend/auto_designer/experiment/schemas/experiment-v2.json<br>backend/auto_designer/experiment/schemas/task-package-v1.json<br>backend/tests/test_experiment_config_v2.py<br>backend/tests/test_experiment_materials.py |
-| 0069 | 0069/T2 | 共用 controller context 与后端协议 | pending | T1 | backend/auto_designer/experiment/engine.py<br>backend/auto_designer/experiment/context.py<br>backend/auto_designer/experiment/backends/__init__.py<br>backend/auto_designer/experiment/backends/base.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/test_experiment_engine.py |
-| 0069 | 0069/T3 | 本地 Docker 与 localhost Gitea 适配 | pending | T2 | backend/auto_designer/experiment/backends/local.py<br>backend/auto_designer/experiment/infrastructure.py<br>backend/auto_designer/experiment/health.py<br>backend/deploy/experiment/docker-compose.yml<br>backend/deploy/vigil/Dockerfile<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_experiment_local_backend.py |
-| 0069 | 0069/T4 | E2B 与 Gitea.com 执行适配 | pending | T2 | backend/auto_designer/experiment/backends/e2b.py<br>backend/auto_designer/experiment/backends/e2b_bootstrap.py<br>backend/auto_designer/experiment/backends/e2b_template.py<br>backend/tests/test_experiment_e2b_backend.py |
-| 0069 | 0069/T5 | 统一 CLI 和生命周期管理 | pending | T3, T4 | backend/scripts/experiment.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/manifest.py<br>backend/auto_designer/experiment/collection.py<br>backend/scripts/run_auditable_experiment.py<br>evaluation/harness-suite-20260920/run_n1_e2b.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/test_experiment_lifecycle_v2.py |
-| 0069 | 0069/T6 | 双语教程与两路径完整验收 | pending | T5 | README.md<br>README.zh-CN.md<br>CLAUDE.md<br>.gitignore<br>pyproject.toml<br>uv.lock<br>release/compatibility.json<br>examples/experiment.env.example<br>examples/experiments/synthesizer-n1-e2b.json<br>examples/experiments/synthesizer-n1-local.json<br>examples/tasks/pvlib-1478/task.json<br>examples/tasks/pvlib-1478/instruction.md<br>examples/tasks/pvlib-1478/setup.sh<br>examples/tasks/pvlib-1478/requirements.lock<br>examples/personas/n1.json<br>THIRD_PARTY_NOTICES.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/tutorials/n1-experiment.md<br>docs/tutorials/n1-experiment.zh-CN.md<br>docs/validation/spec-0069-new-user.md<br>backend/scripts/e2e-spec-0069-experiment-entry.sh<br>backend/tests/test_experiment_public_examples.py<br>.github/workflows/experiment-contract.yml |
+| 0069 | 0069/T1 | 统一实验 schema 与材料冻结 | done | — | backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/materials.py<br>backend/auto_designer/experiment/schemas/experiment-v2.json<br>backend/auto_designer/experiment/schemas/task-package-v1.json<br>backend/tests/test_experiment_config_v2.py<br>backend/tests/test_experiment_materials.py |
+| 0069 | 0069/T2 | 共用 controller context 与后端协议 | done | T1 | backend/auto_designer/experiment/engine.py<br>backend/auto_designer/experiment/context.py<br>backend/auto_designer/experiment/backends/__init__.py<br>backend/auto_designer/experiment/backends/base.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/test_experiment_engine.py |
+| 0069 | 0069/T3 | 本地 Docker 与 localhost Gitea 适配 | done | T2 | backend/auto_designer/experiment/backends/local.py<br>backend/auto_designer/experiment/infrastructure.py<br>backend/auto_designer/experiment/health.py<br>backend/deploy/experiment/docker-compose.yml<br>backend/deploy/vigil/Dockerfile<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_experiment_local_backend.py<br>backend/tests/experiment/test_infrastructure.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/tests/user/sim/test_docker_seed_source.py |
+| 0069 | 0069/T4 | E2B 与 Gitea.com 执行适配 | done | T2 | backend/auto_designer/experiment/backends/e2b.py<br>backend/auto_designer/experiment/backends/e2b_bootstrap.py<br>backend/auto_designer/experiment/backends/e2b_template.py<br>backend/auto_designer/user/sim/sources/prebuilt.py<br>backend/auto_designer/user/sim/runtime.py<br>backend/tests/user/sim/test_prebuilt_source.py<br>backend/tests/user/sim/test_workspace_runtime.py<br>backend/tests/test_experiment_e2b_backend.py |
+| 0069 | 0069/T5 | 统一 CLI 和生命周期管理 | done | T2 | backend/scripts/experiment.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/manifest.py<br>backend/auto_designer/experiment/collection.py<br>backend/scripts/run_auditable_experiment.py<br>evaluation/harness-suite-20260920/run_n1_e2b.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/test_experiment_lifecycle_v2.py |
+| 0069 | 0069/T6 | 双语教程与两路径完整验收 | done | T3, T4, T5 | README.md<br>README.zh-CN.md<br>CLAUDE.md<br>.gitignore<br>pyproject.toml<br>uv.lock<br>release/compatibility.json<br>examples/experiment.env.example<br>examples/experiments/synthesizer-n1-e2b.json<br>examples/experiments/synthesizer-n1-local.json<br>examples/tasks/pvlib-1478/task.json<br>examples/tasks/pvlib-1478/instruction.md<br>examples/tasks/pvlib-1478/setup.sh<br>examples/tasks/pvlib-1478/requirements.lock<br>examples/personas/n1.json<br>THIRD_PARTY.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/tutorials/n1-experiment.md<br>docs/tutorials/n1-experiment.zh-CN.md<br>docs/validation/spec-0069-new-user.md<br>backend/scripts/e2e-spec-0069-experiment-entry.sh<br>backend/tests/test_experiment_public_examples.py<br>.github/workflows/experiment-contract.yml |
 | 0070 | 0070/T1 | 附件能力解析与受限下载 | done | — | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/tracker/attachment_transport.py<br>backend/tests/tracker/test_gitea_evidence_transport.py<br>backend/tests/tracker/test_gitea.py<br>backend/tests/tracker/test_gitea_observe.py<br>backend/tests/tracker/test_gitea_timeline.py |
 | 0070 | 0070/T2 | 双格式发布与冻结传输记录 | done | T1 | backend/auto_designer/demand/delivery_evidence.py<br>backend/auto_designer/observations/transport.py<br>backend/tests/demand/test_delivery_evidence.py<br>backend/tests/observations/test_transport_profile.py |
 | 0070 | 0070/T3 | 实际交付运行时能力预检 | done | T1, T2 | backend/run.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/observations/preflight.py<br>backend/tests/test_run_vigil.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/observations/test_transport_preflight.py |
@@ -1285,8 +1285,9 @@ graph LR
     n0069_T2 --> n0069_T1
     n0069_T3 --> n0069_T2
     n0069_T4 --> n0069_T2
-    n0069_T5 --> n0069_T3
-    n0069_T5 --> n0069_T4
+    n0069_T5 --> n0069_T2
+    n0069_T6 --> n0069_T3
+    n0069_T6 --> n0069_T4
     n0069_T6 --> n0069_T5
     n0070_T2 --> n0070_T1
     n0070_T3 --> n0070_T1
@@ -1410,7 +1411,7 @@ graph LR
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
 | backend/auto_designer/harness/connector.py | 0030, 0035, 0036, 0041 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041, 0051, 0061 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041, 0051, 0061, 0069 |
 | backend/auto_designer/invocation.py | 0049, 0064, 0068 |
 | backend/auto_designer/loop/checkpoint.py | 0004, 0064 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053, 0064, 0068 |
@@ -1440,10 +1441,11 @@ graph LR
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054, 0056, 0066 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048, 0054, 0056, 0057 |
-| backend/auto_designer/user/sim/runtime.py | 0051, 0061 |
+| backend/auto_designer/user/sim/runtime.py | 0051, 0061, 0069 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009, 0051 |
 | backend/auto_designer/user/sim/seed_source.py | 0009, 0051 |
-| backend/auto_designer/user/sim/sources/docker_seed.py | 0044, 0051 |
+| backend/auto_designer/user/sim/sources/docker_seed.py | 0044, 0051, 0069 |
+| backend/auto_designer/user/sim/sources/prebuilt.py | 0044, 0069 |
 | backend/auto_designer/user/sim/state.py | 0005, 0012, 0037, 0053 |
 | backend/auto_designer/user/sim/tools.py | 0008, 0022, 0051 |
 | backend/auto_designer/user/sim/workspace.py | 0008, 0009, 0051 |
@@ -1503,6 +1505,7 @@ graph LR
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/experiment/test_cli.py | 0047, 0053, 0064, 0068 |
 | backend/tests/experiment/test_config.py | 0047, 0068 |
+| backend/tests/experiment/test_infrastructure.py | 0047, 0069 |
 | backend/tests/experiment/test_manifest.py | 0047, 0068 |
 | backend/tests/experiment/test_runtime.py | 0047, 0053, 0064, 0068 |
 | backend/tests/guards/test_harness_boundary.py | 0015, 0030, 0040, 0068 |
@@ -1543,17 +1546,19 @@ graph LR
 | backend/tests/tracker/test_gitea_timeline.py | 0039, 0068, 0070 |
 | backend/tests/user/sim/test_action_space.py | 0005, 0035, 0048, 0053 |
 | backend/tests/user/sim/test_dimensions.py | 0005, 0037 |
-| backend/tests/user/sim/test_docker_seed_source.py | 0044, 0051 |
+| backend/tests/user/sim/test_docker_seed_source.py | 0044, 0051, 0069 |
 | backend/tests/user/sim/test_goals.py | 0054, 0056 |
 | backend/tests/user/sim/test_heartbeat.py | 0022, 0023, 0024, 0030, 0031, 0035, 0036, 0037, 0048, 0053, 0057 |
 | backend/tests/user/sim/test_inner_prompt.py | 0008, 0031, 0048 |
 | backend/tests/user/sim/test_loop.py | 0005, 0012, 0023, 0031, 0036, 0048, 0051, 0053, 0054, 0056 |
 | backend/tests/user/sim/test_persona_client_agentic.py | 0008, 0022, 0031, 0048, 0053, 0054 |
 | backend/tests/user/sim/test_persona_io.py | 0006, 0037 |
+| backend/tests/user/sim/test_prebuilt_source.py | 0044, 0069 |
 | backend/tests/user/sim/test_prompt.py | 0005, 0023, 0031, 0048, 0057 |
 | backend/tests/user/sim/test_state.py | 0005, 0012, 0037 |
 | backend/tests/user/sim/test_tools.py | 0008, 0022 |
 | backend/tests/user/sim/test_workspace.py | 0008, 0009, 0017 |
+| backend/tests/user/sim/test_workspace_runtime.py | 0051, 0069 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051, 0054, 0064 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041, 0068 |
 | docs/CONFIGURATION.md | 0068, 0069, 0070 |
@@ -3671,8 +3676,9 @@ graph LR
     nT1 --> nT2
     nT2 --> nT3
     nT2 --> nT4
-    nT3 --> nT5
-    nT4 --> nT5
+    nT2 --> nT5
+    nT3 --> nT6
+    nT4 --> nT6
     nT5 --> nT6
 ```
 
@@ -3686,13 +3692,13 @@ graph LR
     v_T4_1["T4 v1"]
     v_T5_1["T5 v1"]
     v_T6_1["T6 v1"]
-    classDef st_pending fill:#eeeeee;
-    class v_T1_1 st_pending;
-    class v_T2_1 st_pending;
-    class v_T3_1 st_pending;
-    class v_T4_1 st_pending;
-    class v_T5_1 st_pending;
-    class v_T6_1 st_pending;
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```
 
 ### 0070 兼容 Gitea.com 的证据发布与联合预检（issue #0）

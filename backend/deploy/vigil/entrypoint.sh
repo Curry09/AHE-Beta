@@ -7,6 +7,9 @@
 #   /config/openagents.yml 只读挂载（forge=gitea + stages 定稿，token 只在 env 不在盘）
 set -euo pipefail
 
+# Spec-0069/T3: delivery must retain the installed frozen toolchain.
+export DISABLE_UPDATES=1 OPENAGENTS_NO_SELF_UPDATE=1
+
 # Spec-0070/T4: preserve the reader verified before dispatch throughout this run.
 if [[ "${AUTO_DESIGNER_OBSERVATION_DOWNLOAD_POLICY:-same-origin-v1}" == "gitea-com-r2-v1" ]]; then
   export OPENAGENTS_NO_SELF_UPDATE=1

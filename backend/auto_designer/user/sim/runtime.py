@@ -7,6 +7,7 @@ directory.  Docker workspaces never expose their repository as a host path.
 from __future__ import annotations
 
 import hashlib
+import os
 import shlex
 import shutil
 import subprocess
@@ -83,9 +84,24 @@ class LocalWorkspaceRuntime:
 
     def run(self, cmd: str, timeout: float = 10.0) -> dict[str, Any]:
         started = utc_now()
+        # Spec-0069/T4: unified cloud task shells opt into their session-local venv.
+        environment = None
+        task_venv = self.evidence.get("task_virtual_env")
+        if task_venv:
+            environment = {
+                **os.environ,
+                "VIRTUAL_ENV": str(task_venv),
+                "PATH": str(task_venv) + "/bin:" + os.environ.get("PATH", "/usr/bin:/bin"),
+            }
         try:
             proc = subprocess.run(
-                cmd, shell=True, cwd=self.cwd, capture_output=True, text=True, timeout=timeout
+                cmd,
+                shell=True,
+                cwd=self.cwd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=environment,
             )
         except subprocess.TimeoutExpired as exc:
             return {

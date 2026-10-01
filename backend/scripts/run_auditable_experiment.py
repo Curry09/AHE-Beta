@@ -862,6 +862,9 @@ def run_experiment(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="配置驱动的可审计闭环实验启动器")
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--secrets-file", type=Path)
+    parser.add_argument("--runs-dir", type=Path)
+    parser.add_argument("--run-id")
     parser.add_argument(
         "--check", action="store_true", help="只做静态/环境预检，不创建实验或启动容器"
     )
@@ -877,6 +880,39 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # Spec-0069/T5: v2 definitions share the public CLI instead of a second runner.
+    try:
+        definition = json.loads(args.config.read_text())
+    except (OSError, ValueError):
+        definition = {}
+    if definition.get("schema_version") == 2:
+        from auto_designer.experiment.cli import dispatch
+
+        prefix = ["--json"]
+        if args.runs_dir:
+            prefix += ["--runs-dir", str(args.runs_dir)]
+        if args.secrets_file:
+            prefix += ["--secrets-file", str(args.secrets_file)]
+        if args.check:
+            return dispatch(
+                prefix
+                + ["check", "--config", str(args.config)]
+                + (["--probe-models"] if not args.no_probe else [])
+            )
+        if args.resume:
+            if not args.run_id:
+                print(
+                    "v2 resume requires --run-id; use experiment.py resume <run_id>",
+                    file=sys.stderr,
+                )
+                return 2
+            return dispatch(prefix + ["resume", args.run_id])
+        print("Use experiment.py prepare --config <file>, then run <run_id> (v2)", file=sys.stderr)
+        return 2
+    print(
+        "Legacy auditable v1 runner; new experiments use backend/scripts/experiment.py",
+        file=sys.stderr,
+    )
     root = experiments_root()
     try:
         spec = FrozenExperiment.load(config_path=args.config, root=root)

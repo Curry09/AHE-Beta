@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 from auto_designer.models import WorkspaceSpec
+from auto_designer.user.sim.runtime import LocalWorkspaceRuntime, Workspace
 from auto_designer.user.sim.seed_source import register
 
 _TEXT_SUFFIXES = {".pth", ".egg-link", ".py", ".json"}
@@ -22,7 +23,7 @@ _TEXT_SUFFIXES = {".pth", ".egg-link", ".py", ".json"}
 class PrebuiltSource:
     kind = "prebuilt"
 
-    def provision(self, spec: WorkspaceSpec, dest_root: str | None = None) -> str:
+    def provision(self, spec: WorkspaceSpec, dest_root: str | None = None) -> Workspace:
         source_raw = spec.params.get("source")
         if not source_raw:
             raise ValueError("prebuilt 源需要非空 params.source")
@@ -39,6 +40,16 @@ class PrebuiltSource:
             ignore=shutil.ignore_patterns(".venv.stale-*"),
         )
         _relocate_venv(dest=dest, old_root=source)
+        if spec.params.get("activate_venv") is True:
+            if not (dest / ".venv/bin/python").is_file():
+                raise ValueError("Unified prebuilt workspace requires a prepared task virtualenv")
+            # Spec-0069/T4: the Harness interpreter is independent of task shell Python.
+            runtime = LocalWorkspaceRuntime(root=str(dest.resolve()), owns_tmp=dest_root is None)
+            runtime.evidence.update(
+                task_virtual_env=str(dest.resolve() / ".venv"),
+                harness_python=str(spec.params.get("harness_python") or ""),
+            )
+            return runtime
         return str(dest.resolve())
 
 

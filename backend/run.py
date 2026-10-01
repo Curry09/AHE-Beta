@@ -464,6 +464,9 @@ _CLAUDE_CONFIG_ENVS = (
     "ANTHROPIC_BASE_URL",
     "ANTHROPIC_MODEL",
     "ANTHROPIC_SMALL_FAST_MODEL",
+    # Spec-0069/T2: candidate versions stay pinned inside delivery containers too.
+    "DISABLE_UPDATES",
+    "OPENAGENTS_NO_SELF_UPDATE",
 )
 
 
@@ -615,10 +618,15 @@ def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: P
     keep_alive = vigil_keep_alive()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     if mode == "subprocess":
-        print(
-            "[vigil] ⚠ subprocess 模式无围堵（嵌套 agent 可读宿主全文件系统、出网无限制）——"
-            "仅限盯屏联调，长跑闭环用 container 模式（Spec-0033）"
-        )
+        if os.environ.get("AUTO_DESIGNER_EXECUTION_BACKEND") == "e2b" and os.environ.get(
+            "AUTO_DESIGNER_SANDBOX_ID"
+        ):
+            print("[vigil] E2B sandbox 内 subprocess；隔离边界为整场 sandbox，各角色共享其文件系统")
+        else:
+            print(
+                "[vigil] ⚠ subprocess 模式无围堵（嵌套 agent 可读宿主全文件系统、出网无限制）——"
+                "仅限盯屏联调，长跑闭环用 container 模式（Spec-0033）"
+            )
         ensure_openagents_cli()
         observation_runtime = _prepare_vigil_evidence(gitea=gitea, mode=mode)
         write_openagents_config(repo=repo, gitea=gitea)
@@ -784,6 +792,9 @@ def _start_vigil_container(
         ]
     if ours:
         args += ["--label", f"io.openagents.experiment_id={ours}"]
+    manifest_sha = os.environ.get("AUTO_DESIGNER_CONFIG_HASH", "").strip()
+    if manifest_sha:
+        args += ["--label", f"io.openagents.manifest_sha={manifest_sha}"]
     delivery = _vigil_delivery_mount()
     if delivery is not None:
         args += [
@@ -922,6 +933,12 @@ def main() -> int:
     from urllib.parse import urlparse
 
     args = _parse_args(argv=sys.argv[1:])
+    # Spec-0069/T2: both ordinary and SWE runners receive the same frozen context.
+    context_path = os.environ.get("AUTO_DESIGNER_EXPERIMENT_CONTEXT", "").strip()
+    if context_path:
+        from auto_designer.experiment.context import load_controller_context
+
+        apply_experiment_context(ctx=load_controller_context(context_path))
     if not os.environ.get("AUTO_DESIGNER_EXPERIMENT_ID", "").strip():
         print(
             "[run.py] 单例 ./run.sh 已弃用：并行隔离实验请用 backend/scripts/experiment.py",
@@ -930,11 +947,8 @@ def main() -> int:
 
     _isolate_git_credentials()  # Spec-0021/T2：进程级 git 凭证隔离（多信道封堵，见函数注释）
 
-    llm_env = _load_env(
-        ROOT / ".env"
-    )  # {USER,DEMAND,HARNESS}_LLM_*（DEV_LLM_* 随 dev 退役不再消费）
-    # 启动命令显式注入的配置优先于仓内 .env，便于临时切换网关/模型且不把密钥写盘。
-    _apply_env_defaults(llm_env)
+    if not context_path:
+        _apply_env_defaults(_load_env(ROOT / ".env"))
     # 分角色 LLM 配置：编排角色各用 {USER,DEMAND}_LLM_{MODEL,API_KEY,BASE_URL}，彼此独立、无公共
     # 回落——agent.yaml 的 ${env.DEMAND_LLM_*} 与 user 侧 ApiPersonaClient 直接读各自角色变量。
     # 交付面（vigil）的 coding 后端是 claude CLI，凭证走宿主 claude 登录态，不经 .env。
@@ -944,10 +958,7 @@ def main() -> int:
     for _suffix in ("MODEL", "BASE_URL", "API_KEY"):
         _val = os.environ.get(f"HARNESS_LLM_{_suffix}")
         if not _val:
-            raise SystemExit(
-                f"backend/.env 缺 HARNESS_LLM_{_suffix}（harness 本体的独立 LLM 配置）；"
-                "见 backend/.env.example"
-            )
+            raise SystemExit(f"运行配置缺 HARNESS_LLM_{_suffix}（harness 本体的独立 LLM 配置）")
         os.environ[f"LLM_{_suffix}"] = _val
     _reasoning_effort = os.environ.get("HARNESS_LLM_REASONING_EFFORT", "").strip()
     if _reasoning_effort:
@@ -1065,10 +1076,17 @@ def main() -> int:
     sim_persona_list = card_to_personas(
         PersonaLibrary(args.persona_library)
     )  # persona 卡库 → sim persona
-    sim_persona_list = sim_persona_list[
-        :user_limit
-    ]  # 用户会话数 = roster 用户数（或 PERSONA_LIMIT）
-    seeds = _load_seeds(args.seed_cards)
+    frozen_task = bool(os.environ.get("AUTO_DESIGNER_TASK_PACKAGE"))
+    if not frozen_task:
+        sim_persona_list = sim_persona_list[:user_limit]
+    # Spec-0069/T2: ordinary task packages use a real prepared workspace;
+    # they do not forge Git-backed distill seed cards or benchmark provenance.
+    if frozen_task:
+        from auto_designer.experiment.context import frozen_scenario
+
+        seeds = [frozen_scenario()]
+    else:
+        seeds = _load_seeds(args.seed_cards)
     # 配对：persona[i] × seed[i % len(seeds)]，每轮 = len(personas) 局用户会话，覆盖全部锚点 persona。
     fixed_set: list[tuple[Persona, SeedScenario]] = []
     sim_personas: dict[str, SimPersona] = {}  # 展示用 identity -> 9 维 sim persona（权威画像）
@@ -1092,6 +1110,19 @@ def main() -> int:
             "domain": mp.domain,
             "goal": mp.goal,
         }
+
+    planned_set = fixed_set
+    if frozen_task:
+        import json
+
+        plan = json.loads(Path(os.environ["AUTO_DESIGNER_INTERACTION_PLAN"]).read_text())
+        by_identity = {persona.identity: persona for persona, _scenario in fixed_set}
+        if len(plan) != TOTAL_ROUNDS:
+            raise SystemExit("Frozen interaction plan does not match TOTAL_ROUNDS")
+
+        def planned_set():
+            picks = plan[current["round"] - 1]
+            return [(by_identity[persona_id], seeds[0]) for persona_id, _task_id in picks]
 
     from auto_designer.loop.live import (
         append_agent_log,
@@ -1388,7 +1419,7 @@ def main() -> int:
     orch = Orchestrator(
         launcher=launcher,
         harness_repo=str(repo),  # Spec-0007/T4：每局解析 main HEAD SHA 用
-        fixed_set=fixed_set,
+        fixed_set=planned_set,
         run_session_fn=user_run_session_fn,
         initial_ref="main",  # Spec-0007/T4：纯 trunk，跟踪 main 分支
         triagers=triagers,  # Spec-0029：第一拍分片并行（第 k 个处理 pending[k::n]）
@@ -1424,13 +1455,22 @@ def main() -> int:
     )
     refs: list[str] = []
     exit_code = 0
+    terminal_phase = "failed"
     try:
         refs = orch.run(TOTAL_ROUNDS)
+        terminal_phase = "done"
+    except KeyboardInterrupt:
+        # The supervisor forwards SIGINT to allow checkpoint and Vigil cleanup.
+        exit_code = 130
+        terminal_phase = "stopped"
+        if vigil is not None:
+            vigil.keep_alive = False
     except RoundDeliveryBlocked as exc:
         # Spec-0050/T4：卡死留 vigil 容器等人；进程非 0 退出。
         exit_code = 1
+        terminal_phase = "blocked"
         if vigil is not None:
-            vigil.keep_alive = True
+            vigil.keep_alive = recovery is None
         update_live_run(
             data_dir=DATA,
             running=False,
@@ -1450,9 +1490,11 @@ def main() -> int:
             round_no=current["round"],
             total_rounds=TOTAL_ROUNDS,
             round_shas=round_shas,
-            phase="blocked" if exit_code else "done",
+            phase=terminal_phase,
         )
 
+    if terminal_phase == "stopped":
+        return exit_code
     print("\n=== 结果 ===")
     print("各轮 main HEAD SHA:", refs)  # Spec-0007/T4：观测游标（main 最新 SHA）
     m = Metrics(tracker, store)

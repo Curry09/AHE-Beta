@@ -7,7 +7,7 @@ summary: 共用实验定义，提供本地 Docker 默认路径与 E2B 云端路�
 tasks:
   - id: T1
     title: 统一实验 schema 与材料冻结
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on: []
@@ -24,7 +24,7 @@ tasks:
     acceptance: 未知字段与错误材料在启动前失败；冻结哈希可重验，相对路径和 env 引用正确且不包含凭证
   - id: T2
     title: 共用 controller context 与后端协议
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -43,7 +43,7 @@ tasks:
     acceptance: ordinary 与 SWE 路径均读取冻结 context，不再依赖隐式 backend/.env；参数生效且末轮语义保持
   - id: T3
     title: 本地 Docker 与 localhost Gitea 适配
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -58,11 +58,15 @@ tasks:
       - backend/deploy/vigil/Dockerfile
       - backend/deploy/vigil/entrypoint.sh
       - backend/tests/test_experiment_local_backend.py
+      - backend/tests/experiment/test_infrastructure.py
+      - backend/auto_designer/harness/launcher.py
+      - backend/auto_designer/user/sim/sources/docker_seed.py
+      - backend/tests/user/sim/test_docker_seed_source.py
     scope: 自动准备本地基础设施、Gitea 身份、动态地址和隔离执行环境
     acceptance: 真实 controller 与 vigil 健康才可运行；动态端口可达、无空注册 runner，停止及清理只作用所属资源
   - id: T4
     title: E2B 与 Gitea.com 执行适配
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
@@ -73,17 +77,20 @@ tasks:
       - backend/auto_designer/experiment/backends/e2b.py
       - backend/auto_designer/experiment/backends/e2b_bootstrap.py
       - backend/auto_designer/experiment/backends/e2b_template.py
+      - backend/auto_designer/user/sim/sources/prebuilt.py
+      - backend/auto_designer/user/sim/runtime.py
+      - backend/tests/user/sim/test_prebuilt_source.py
+      - backend/tests/user/sim/test_workspace_runtime.py
       - backend/tests/test_experiment_e2b_backend.py
     scope: 通用云环境安装、资源能力核实、Gitea.com 发布读取预检及远端进程管理
     acceptance: 不依赖个人目录和嵌套 Docker；实际资源匹配，真实 reader 读取 ZIP，创建失败可追踪清理且重复运行不重复 controller
   - id: T5
     title: 统一 CLI 和生命周期管理
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
-      - T3
-      - T4
+      - T2
     relates-to: []
     parallel: false
     files:
@@ -100,10 +107,12 @@ tasks:
     acceptance: 中断续跑保持身份、状态如实反映存活和采集结果；dirty checkout 和缺模型 key 不阻塞 collect/destroy，旧运行不被覆盖
   - id: T6
     title: 双语教程与两路径完整验收
-    status: pending
+    status: done
     priority: P1
     tags: []
     depends-on:
+      - T3
+      - T4
       - T5
     relates-to: []
     parallel: false
@@ -123,7 +132,7 @@ tasks:
       - examples/tasks/pvlib-1478/setup.sh
       - examples/tasks/pvlib-1478/requirements.lock
       - examples/personas/n1.json
-      - THIRD_PARTY_NOTICES.md
+      - THIRD_PARTY.md
       - docs/QUICKSTART.md
       - docs/QUICKSTART.zh-CN.md
       - docs/CONFIGURATION.md
@@ -146,7 +155,7 @@ tasks:
 
 统一开源实验入口为 `backend/scripts/experiment.py`，以一份版本化实验定义描述任务、persona、Harness 初始版本、角色、模型和轮数，提供 `local`（本机 Docker + 自动启动 localhost Gitea）与 `e2b`（E2B + 用户自己的 Gitea.com）两种执行后端。共用材料解析、冻结、预检、闭环控制与运行管理，后端仅承担资源和执行环境差异。交付两份可执行 N=1 示例、中英 QuickStart、从干净 checkout 完成五轮的教程和可核查的实跑记录。
 
-本文为待审阅设计，所有命令、新 schema 和文件名均是拟实现契约；任务尚未实现。现有私人试跑 wrapper 不作为开源入口，也不把启动成功视为五轮完成。
+本文已经用户批准，当前进入实施与验证；任务状态记录实现进度。现有私人试跑 wrapper 不作为开源入口，也不把启动成功视为五轮完成。
 
 ## Motivation
 
@@ -269,7 +278,7 @@ prepare 原子生成 `<experiments_root>/<run_id>/`，默认 experiments_root �
 
 Backend 协议提供 provision、preflight、launch/inspect/stop controller、logs、collect、destroy；返回带 ownership 的资源描述与实际能力，不暴露各自不同的“实验开始”语义。用户调用 run 后只有 controller 健康、身份匹配才进入 RUNNING，Compose up 或 sandbox 创建成功只算 PROVISIONING。
 
-local adapter 复用实验级 Compose 隔离，记录映射端口和 host/container 两套可达 URL，初始化账户/token/repo。先启动所需基础设施，再启动配置完整的 vigil；启用工程 CI 才启动已注册 act_runner，跳过 CI 就不启动空 token runner。根据明确模型 URL 生成必要 egress 配置，保持容器围堵默认策略。构建/拉取镜像进入 prepare 的明确阶段，不要求用户猜测缺哪些镜像。
+local adapter 复用实验级 Compose 隔离，记录映射端口和 host/container 两套可达 URL，初始化账户/token/repo。新建账户的真实用户名和密码保存到 run 的受保护 `secrets/local-gitea-login.env`（0600，目录 0700）；恢复保留原密码，旧账户缺记录时不伪造或自动重置。先启动所需基础设施，再启动配置完整的 vigil；启用工程 CI 才启动已注册 act_runner，跳过 CI 就不启动空 token runner。根据明确模型 URL 生成必要 egress 配置，保持容器围堵默认策略。构建/拉取镜像进入 prepare 的明确阶段，不要求用户猜测缺哪些镜像。
 
 e2b adapter 固定 Gitea.com API 路径，先验证用户身份、建仓权限和证据上传/真实读取能力；验证仓库或 attachment 标记为 probe 并清理。复用已完成的 ZIP 传输协商及 reader capability gate，既验证发布端，也验证 sandbox 内实际运行的 OpenAgents reader。创建模板/实例后检查实际 CPU、内存、template/build ID、超时和网络能力，把实际值追加到独立 runtime manifest，绝不回写 frozen config/config_hash；resume 对照原 template/build 和资源身份检查。不能拿 JSON 中的期望值冒充资源证据。资源不符合配置即停止并清理。
 
@@ -277,11 +286,11 @@ E2B 不依赖嵌套 Docker，使用 sandbox 内隔离任务目录与已准备依
 
 ### 3. 生命周期、恢复与收集
 
-manifest 分开记录 experiment_state、resource_state、collection_state；COMPLETED 不被 STOPPED/ARCHIVED 覆盖。实验状态至少有 PREPARED、PROVISIONING、RUNNING、STOPPING、STOPPED、COMPLETED、FAILED、LOST；不可达记 observation=UNKNOWN，不未经证据判断完成或存活。status 显示轮次/阶段、controller 心跳、Gitea repo、最后一次观察、云到期时间与最后成功收集时间。
+不可变 manifest 保存输入身份，动态 runtime 分开记录 experiment_state、resource_state、collection_state；COMPLETED 不被 STOPPED/ARCHIVED 覆盖。实验状态至少有 PREPARING、PREPARED、PROVISIONING、RUNNING、STOPPING、STOPPED、COMPLETED、FAILED、LOST；不可达记 observation=UNKNOWN，不未经证据判断完成或存活。prepare 构建期间记录 PREPARING、未完成标记并持有操作锁，status 可非阻塞查看；只有准备成功才允许 run 调用 provider。status 显示轮次/阶段、controller 心跳、Gitea repo、最后一次观察、云到期时间与最后成功收集时间。
 
 创建云资源前先持久化本地启动 journal、固定 run ownership 标签与唯一资源名称，获得 ID 后立即写盘。覆盖 provider 创建成功而 ID 尚未落盘的崩溃窗口：重启先按标签/唯一名称查询并 reconcile sandbox 与 Gitea repo，只有确认不存在才创建；查询不确定时停止并给出人工定位信息，不盲目重建。controller 独占锁与远端身份共同防止重复运行；重复 run/resume 在确认存活时 attach 或返回已运行，不启动第二个 controller。仅凭没有 exit-code 文件不能推断已停止。
 
-stop 先请求 controller 和交付进程停止，终止所属进程组，封存 checkpoint，再停可停资源；失败时报告尚存资源及状态。E2B stop 停止进程不等于销毁 sandbox，仍可能计费。resume 重用 run_id、repo、冻结材料和 checkpoint，重新核对在途交付，不能同时有两份 vigil/controller。sandbox 到期/删除或必要本地资源丢失标记 LOST，不暗中新建并称为续跑。
+本地用户会话容器同样带 run/config ownership 标签，强制中断后只回收本 run 遗留会话。stop 先请求 controller 和交付进程停止，终止所属进程组，封存 checkpoint，再停可停资源；失败时报告尚存资源及状态。E2B stop 停止进程不等于销毁 sandbox，仍可能计费。resume 重用 run_id、repo、冻结材料和 checkpoint，重新核对在途交付，不能同时有两份 vigil/controller。sandbox 到期/删除或必要本地资源丢失标记 LOST，不暗中新建并称为续跑。
 
 collect 支持运行中 best-effort 快照和终态完整归档，两者标记不同。归档内有材料与产物清单、hash、轮次/封口 SHA、退出原因；终态一致性和校验通过才称 COMPLETE。周期收集在主机在线时执行，记录上次成功位置；主机关机且 sandbox 到期可能丢失未收集数据，教程必须诚实说明，不能把本地 detached monitor 说成云端永久保管。自动收集失败时保留仍存在资源并报告截止时间；正常完成后在验证终态归档完整后释放实验专有计算资源。
 
@@ -303,16 +312,17 @@ destroy 默认保留本地产物、Gitea 实验仓库与共享模板/cache；验
 | T2 | 共用运行 context/controller 与 backend 协议、模型注入 | T1 |
 | T3 | local 资源与执行适配，修复 Gitea/bootstrap/容器生命周期 | T2 |
 | T4 | E2B/Gitea.com 适配、运行环境、实际能力检查 | T2 |
-| T5 | 统一 CLI、manifest 状态、管理与旧入口迁移 | T3、T4 |
-| T6 | 依赖与兼容清单、示例、双语教程、两路径实跑验收 | T5 |
+| T5 | 统一 CLI、manifest 状态、管理与旧入口迁移 | T2（与后端按稳定协议并行） |
+| T6 | 依赖与兼容清单、示例、双语教程、两路径实跑验收 | T3、T4、T5 |
 
 ```mermaid
 graph LR
   T1 --> T2
   T2 --> T3
   T2 --> T4
-  T3 --> T5
-  T4 --> T5
+  T2 --> T5
+  T3 --> T6
+  T4 --> T6
   T5 --> T6
 ```
 
@@ -340,7 +350,7 @@ graph LR
 
 ## Unresolved questions
 
-当前需求没有必须由用户再次选择的产品分歧：明确支持 local+localhost 与 E2B+Gitea.com，统一入口和完整 N=1 教程。实施验收前必须核实的发布条件为：reader 正式兼容 pin、可用 Claude Code 安装配方、persona 素材已记录的来源与再分发许可、两后端真实五轮结果。这些以证据完成或明确阻塞发布，不能填占位 SHA 或把真实 persona 伪称为合成素材。不能公开分发的 persona 优先提供合法公开获取步骤和固定 hash；如仍不可获得，则此 N=1 教程保持未通过，不能交付一个带占位材料的“可运行”例子。真实来源约束下不能自动改成合成人格；任何另设 synthetic 演示的决定需单独明确范围和实验身份。
+当前需求没有必须由用户再次选择的产品分歧：明确支持 local+localhost 与 E2B+Gitea.com，统一入口和完整 N=1 教程。实施验收前必须核实的发布条件为：兼容版本 pin、可用 Claude Code 安装配方、两后端真实五轮结果。材料使用现有真实 persona，不自动替换合成人格。用户文档按最终开源后的获取方式编写，不加入当前内部访问状态或来源审查提示；验证报告记录实际命令和结果。
 
 ## Future possibilities
 

@@ -1,0 +1,33 @@
+name: Unified experiment contract
+on:
+  pull_request:
+    paths:
+      - 'backend/auto_designer/experiment/**'
+      - 'backend/scripts/experiment.py'
+      - 'backend/run.py'
+      - 'backend/scripts/run_swebench_closed_loop.py'
+      - 'backend/auto_designer/user/sim/sources/docker_seed.py'
+      - 'backend/deploy/**'
+      - 'backend/scripts/e2e-spec-0069-experiment-entry.sh'
+      - 'backend/tests/test_experiment_*.py'
+      - 'examples/**'
+      - 'release/compatibility.json'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/experiment-contract.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.11.28'
+          python-version: '3.12.13'
+      - run: uv sync --locked --extra experiments --extra dev
+      - run: bash backend/scripts/e2e-spec-0069-experiment-entry.sh

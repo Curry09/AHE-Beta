@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Spec-0047/T4：experiment CLI 入口。
+# Spec-0069/T5: unified local/E2B experiment CLI; v1 infrastructure aliases remain.
 from __future__ import annotations
 
 import sys

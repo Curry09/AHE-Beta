@@ -68,12 +68,29 @@ _Per-experiment isolation: config, manifest, compose, CLI, capacity._
 |----|----|
 | `__init__.py` | Per-experiment isolation: config, manifest, compose, CLI, capacity. |
 | `capacity.py` | File-locked lease registry under EXPERIMENTS_ROOT. Expired leases reclaim only if pid is dead. |
-| `cli.py` | Operator-facing commands. Mutating commands print a secret-free plan first. |
+| `cli.py` | Operator-facing commands with credential-free lifecycle receipts. |
+| `collection.py` | Spec-0069/T5: portable, checksummed evidence collection independent of model keys. |
 | `config.py` | ExperimentConfig is the operator input; secrets never belong here. |
+| `context.py` | Spec-0069/T2: one credential-free context and model mapping for both runners. |
+| `engine.py` | Spec-0069/T2: supervise the existing controller, with owned PIDs and receipts. |
 | `health.py` | Rolling success/error window. Trip pauses this experiment, not the shared endpoint. |
 | `infrastructure.py` | Provision, stop, and destroy experiment infrastructure via Compose project. |
 | `manifest.py` | create is exclusive; later facts go to journal.jsonl, never rewrite manifest. |
+| `materials.py` | Spec-0069/T1: compile operator inputs into a checksummed, credential-free run bundle. |
 | `runtime.py` | create/plan/preflight/start/stop/resume/archive/destroy. Manifest stays frozen. |
+
+### auto_designer.experiment.backends
+
+_Spec-0069/T2: execution adapters implement the same experiment lifecycle._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Spec-0069/T2: execution adapters implement the same experiment lifecycle. |
+| `base.py` | Spec-0069/T2: provider resources are mutable facts, never frozen config fields. |
+| `e2b.py` | Spec-0069/T4: identity-owned E2B execution and user-owned Gitea.com evidence. |
+| `e2b_bootstrap.py` | Spec-0069/T4: portable frozen-input bootstrap, without developer home files. |
+| `e2b_template.py` | Spec-0069/T4: cache a verified build identity, then inspect actual sandbox resources. |
+| `local.py` | Spec-0069/T3: frozen local toolchains and an experiment-owned Docker stack. |
 
 ### auto_designer.guards
 
@@ -235,12 +252,22 @@ graph LR
     nauto_designer_evaluation["auto_designer.evaluation"]
     nauto_designer_evaluation_swebench["evaluation.swebench"]
     nauto_designer_experiment["auto_designer.experiment"]
+    nauto_designer_experiment_backends["experiment.backends"]
+    nauto_designer_experiment_backends_base["backends.base"]
+    nauto_designer_experiment_backends_e2b["backends.e2b"]
+    nauto_designer_experiment_backends_e2b_bootstrap["backends.e2b_bootstrap"]
+    nauto_designer_experiment_backends_e2b_template["backends.e2b_template"]
+    nauto_designer_experiment_backends_local["backends.local"]
     nauto_designer_experiment_capacity["experiment.capacity"]
     nauto_designer_experiment_cli["experiment.cli"]
+    nauto_designer_experiment_collection["experiment.collection"]
     nauto_designer_experiment_config["experiment.config"]
+    nauto_designer_experiment_context["experiment.context"]
+    nauto_designer_experiment_engine["experiment.engine"]
     nauto_designer_experiment_health["experiment.health"]
     nauto_designer_experiment_infrastructure["experiment.infrastructure"]
     nauto_designer_experiment_manifest["experiment.manifest"]
+    nauto_designer_experiment_materials["experiment.materials"]
     nauto_designer_experiment_runtime["experiment.runtime"]
     nauto_designer_guards["auto_designer.guards"]
     nauto_designer_guards_harness_boundary["guards.harness_boundary"]
@@ -392,17 +419,47 @@ graph LR
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
     nauto_designer_evaluation --> nauto_designer_evaluation_swebench
+    nauto_designer_experiment_backends --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_base --> nauto_designer_experiment_config
+    nauto_designer_experiment_backends_e2b --> nauto_designer_demand_delivery_evidence
+    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_bootstrap
+    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_template
+    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_materials
+    nauto_designer_experiment_backends_e2b_template --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_collection
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_context
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_engine
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_infrastructure
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_materials
+    nauto_designer_experiment_backends_local --> nauto_designer_observations_transport
     nauto_designer_experiment_capacity --> nauto_designer_experiment_config
     nauto_designer_experiment_cli --> nauto_designer_experiment
     nauto_designer_experiment_cli --> nauto_designer_experiment_config
     nauto_designer_experiment_cli --> nauto_designer_experiment_manifest
     nauto_designer_experiment_cli --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_collection --> nauto_designer_experiment_config
+    nauto_designer_experiment_collection --> nauto_designer_experiment_materials
+    nauto_designer_experiment_context --> nauto_designer_experiment_config
+    nauto_designer_experiment_context --> nauto_designer_models
+    nauto_designer_experiment_engine --> nauto_designer_experiment_config
+    nauto_designer_experiment_engine --> nauto_designer_experiment_context
+    nauto_designer_experiment_engine --> nauto_designer_experiment_materials
     nauto_designer_experiment_health --> nauto_designer_experiment_config
     nauto_designer_experiment_infrastructure --> nauto_designer_experiment_config
     nauto_designer_experiment_manifest --> nauto_designer_experiment_config
+    nauto_designer_experiment_materials --> nauto_designer_distill_library
+    nauto_designer_experiment_materials --> nauto_designer_experiment_config
+    nauto_designer_experiment_materials --> nauto_designer_user_sim_persona_io
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_e2b
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_local
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_collection
     nauto_designer_experiment_runtime --> nauto_designer_experiment_config
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_engine
     nauto_designer_experiment_runtime --> nauto_designer_experiment_infrastructure
     nauto_designer_experiment_runtime --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_materials
     nauto_designer_experiment_runtime --> nauto_designer_loop_recovery
     nauto_designer_guards_workspace_jail --> nauto_designer_demand_observation_provider
     nauto_designer_guards_workspace_jail --> nauto_designer_usage
@@ -539,6 +596,7 @@ graph LR
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_workspace
     nauto_designer_user_sim_sources_prebuilt --> nauto_designer_models
+    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_state --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_tools --> nauto_designer_user_sim_dimensions
