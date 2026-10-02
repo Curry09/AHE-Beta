@@ -2,7 +2,7 @@
 
 English | [简体中文](CONFIGURATION.zh-CN.md)
 
-New experiments use JSON with `schema_version: 2` and the unified entry described in [Quickstart](QUICKSTART.md). Copy either [local](../examples/experiments/synthesizer-n1-local.json) or [E2B](../examples/experiments/synthesizer-n1-e2b.json) example. Unknown fields are rejected; old evaluation schemas are not automatically converted.
+New experiments use JSON with `schema_version: 2` and the unified entry described in [Quickstart](QUICKSTART.md). Copy either [local](../examples/experiments/synthesizer-n1-local.json) or [E2B](../examples/experiments/synthesizer-n1-e2b.json) example. Unknown fields are rejected; old evaluation schemas and v1 lifecycle commands are rejected before provider operations.
 
 ## Files you supply
 
@@ -15,6 +15,8 @@ New experiments use JSON with `schema_version: 2` and the unified entry describe
 | Task dependencies | Fully pinned requirements with SHA-256 hashes | `examples/tasks/pvlib-1478/requirements.lock` |
 | Personas | JSON array following the repository persona schema | `examples/personas/n1.json` |
 | Credentials | Explicit environment variables or a mode-0600 env file | `examples/experiment.env.example` |
+
+The N1 example uses `examples/personas/n1.json`. The maintained general persona library is `examples/personas/library.json`; selecting another library does not enable multi-task scheduling.
 
 Paths in the experiment are relative to that JSON; task paths are relative to the task package. `prepare` generates the roster, task pool, interaction plan, single-instance SWE Parquet when needed, source/Harness archives and hash manifest. You do not need to handcraft these.
 
@@ -35,7 +37,7 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `evaluation.official_grading` | `false`; official grading runs separately |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
-The initial single-task schema supports one session per round. Personas may rotate across rounds. The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
+The current single-task schema requires `rounds.sessions_per_round: 1`. Multi-task N4/N8 plans and importing historical results to append a round are not supported by the unified entry. Personas may rotate across rounds. The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
 
 `builtin` freezes this checkout's `backend/harness_template/`. It is not the historical `cade14d` Harness. To reproduce that baseline, supply its actual archive and checksum explicitly.
 
@@ -93,6 +95,6 @@ Frozen `manifest.json` describes inputs. Mutable `runtime.json` and provider/con
 
 Use global `--runs-dir /absolute/path/runs` before the command to select another run root. Always use the same root for subsequent management. Editing the original JSON or source checkout after preparation does not change an existing run. For a changed experiment, prepare a new run.
 
-Historical `backend/.env`, model profiles and evaluation launchers are retained for their original schemas. They are not an alternative configuration source for v2.
+Use `examples/experiment.env.example` as the experiment credential template. Historical profiles and launchers are indexed in [research](../research/README.md) and require their original checkout; they do not supply current v2 configuration. Developer diagnostics have separate, explicit inputs documented in [tools/dev](../tools/dev/README.md). Existing prepared v2 runs retain their frozen source and input hashes when managed after this cleanup; `resume` does not upgrade their controller.
 
 The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest for user-side checks.

@@ -15,9 +15,10 @@ from auto_designer.experiment.materials import check_materials
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.parametrize("backend", ["local", "e2b"])
-def test_public_example_has_complete_offline_materials(backend):
-    path = ROOT / f"examples/experiments/synthesizer-n1-{backend}.json"
+@pytest.mark.parametrize(
+    "path", sorted((ROOT / "examples/experiments").glob("*.json")), ids=lambda path: path.name
+)
+def test_public_example_has_complete_offline_materials(path):
     report = check_materials(path)
     assert report["ok"]
     assert report["persona_ids"] == ["sr-15-swyx"]

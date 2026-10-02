@@ -51,11 +51,10 @@ tasks:
         type: note
     parallel: true
     files:
-      - backend/scripts/probe_wait_progress.py
-      - backend/scripts/probe_peek_decision_trace.py
-      - backend/scripts/probe_persona_wait_matrix.py
-      - backend/scripts/probe_ontrack_new_harness.py
-      - backend/scripts/probe_wait_signals_to_evolution.py
+      - tools/dev/probes/probe_wait_progress.py
+      - tools/dev/probes/probe_peek_decision_trace.py
+      - tools/dev/probes/probe_persona_wait_matrix.py
+      - tools/dev/probes/probe_ontrack_new_harness.py
     scope: 探针只跑 three + 0022 菜单（send_message/interrupt/give_up）；删除或改写 waiting_mode two 对比与 control peek/status 假设；fixture 字符串不含 invoke_control。
     acceptance: 所列脚本不再传 waiting_mode=two；不再示范用户经 control 做 peek/status；文档字符串与 0022 菜单一致。
   - id: T4
@@ -173,7 +172,7 @@ graph LR
 | T3 | 探针去掉 two 对比与 peek-via-control 心智；保留 three + 0022 菜单 | 下列 `probe_*.py` |
 | T4 | `try_reply` 非阻塞契约（已落地，快照钉死） | `launcher.py` |
 
-e2e / 探针路径：`backend/scripts/probe_wait_progress.py`（改写或删 two 臂）、`probe_peek_decision_trace.py`、`probe_persona_wait_matrix.py`、`probe_ontrack_new_harness.py`、`probe_wait_signals_to_evolution.py`。
+e2e / 探针路径：`tools/dev/probes/probe_wait_progress.py`（改写或删 two 臂）、`probe_peek_decision_trace.py`、`probe_persona_wait_matrix.py`、`probe_ontrack_new_harness.py`、`probe_wait_signals_to_evolution.py`。
 
 ### 与相邻活快照的关系（复述要点）
 

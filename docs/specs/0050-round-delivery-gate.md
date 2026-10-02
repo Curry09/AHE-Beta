@@ -55,8 +55,8 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/run.py
-      - backend/scripts/run_swebench_closed_loop.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/auto_designer/loop/live.py
       - backend/tests/loop/test_live.py
       - backend/tests/test_run_vigil.py

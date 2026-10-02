@@ -15,9 +15,8 @@ tasks:
     parallel: false
     files:
       - docs/specs/0044-swebench-seed-workspace-supply.md
-      - backend/swebench_pools/medium_hard_16.json
-    scope: 定义题池 manifest、instance_id 唯一性、难度元数据核验、存储边界与实例归属；具体题目集合是可替换实验配置，不是产品规则。
-    acceptance: Spec 九段完整；manifest 非空、instance_id 唯一且与权威数据集难度一致；spec validate/render/graph 通过。
+    scope: 定义显式题池 manifest、instance_id 唯一性、存储边界与实例归属；固定 medium_hard_16 题池已归档，不作为当前公共实验默认。
+    acceptance: Spec 明确可替换题池与当前 v2 单任务边界；manifest 格式由当前构建和供给测试验证，不依赖归档题池启动。
   - id: T2
     title: Prebuilt 隔离复制与虚拟环境迁移
     status: done
@@ -78,7 +77,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/scripts/run_swebench_closed_loop.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/auto_designer/loop/sim_user.py
       - backend/tests/loop/test_sim_user.py
       - backend/tests/test_run_swebench_closed_loop.py
@@ -91,6 +90,8 @@ tasks:
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
+
+> 0071 清理后的当前映射：供给、构建与实例归属逻辑仍由当前包内 controller 和工作区 source 使用，固定 medium_hard_16 题池已归档。下文批量题池能力是底层供给接口，不使当前公共 v2 task-package 入口支持多任务；公开入口仍每轮只接受一个 session。
 
 为需要真实历史仓库与依赖环境的用户模拟预先构建工作区，并以两种可替换供给方式交给每个 session：
 `prebuilt` 从宿主缓存复制，`docker-seed` 从只存储文件的镜像提取。每次供给仍产生独立目录，虚拟环境中

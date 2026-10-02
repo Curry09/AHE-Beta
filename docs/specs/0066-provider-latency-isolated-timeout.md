@@ -35,43 +35,27 @@ tasks:
       - backend/auto_designer/loop/sim_user.py
     scope: 区分 mechanism、provider、infrastructure、controller timeout，并在恢复账本中保存截止证据。
     acceptance: provider 等待不被误报为机制失败；外层 wall guard 仍有限；完成的 operation 不被 resume 重放。
-  - id: T3
-    title: 官方内层预算与 E2B 配置传播
-    status: done
-    priority: P0
-    tags: [evaluation, e2b]
-    depends-on: [T1, T2]
-    relates-to:
-      - ref: 0065/T5
-        type: extends
-    parallel: false
-    files:
-      - evaluation/harness-suite-20260920/configs/scaling-e2b-20260922.json
-      - evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.json
-      - evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py
-      - evaluation/harness-suite-20260920/freeze_scaling_runtime.py
-    scope: 从 task metadata 读取 official agent timeout；无官方值时使用并标记 1800 秒 fallback；outer=inner+600。
-    acceptance: manifest、receipt、远端 run.sh 和运行环境包含同一 timeout policy；配置漂移 fail-closed。
   - id: T4
-    title: 回归验收与操作文档
+    title: 时间分类回归验收
     status: done
     priority: P1
     tags: [tests, docs]
-    depends-on: [T1, T2, T3]
-    relates-to:
-      - ref: 0067/T4
-        type: note
+    depends-on:
+      - T1
+      - T2
+    relates-to: []
     parallel: false
     files:
       - backend/tests/test_time_accounting.py
-      - evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md
-    scope: 覆盖时间分类、直接交互和 E2B 启动前检查，并给出恢复与结果解释方式。
-    acceptance: 回归测试通过；quickstart 不要求把凭证写入配置或命令行。
+    scope: 保留当前 wall/active/provider-wait 分类与 timeout 回归；历史 scaling 配置传播和研究 quickstart 已归档，不作为当前启动合同。
+    acceptance: 当前时间分类测试通过，不依赖归档 launcher；历史运行记录的原 timeout policy 保持原样。
 ---
 
 # 0066 · Provider latency 隔离与官方预算超时
 
 ## Summary
+
+> 0071 清理后的当前契约：保留当前时间账本、角色取消和时间分类测试。仅服务历史 scaling 的配置/远端传播 T3 已退出 living task 列表；下文关于历史远端 run.sh、固定 scaling 配置及其 quickstart 的描述为原研究记录，不作为当前 v2 启动要求。原资料从 research/inventory.json 与冻结 checkout 追溯。
 
 评测必须同时保留原始 wall time 和可解释的 active time。模型服务排队、首 token
 延迟、流式读取和重试属于 provider wait；本地工具、解析、工作区操作、检查点和

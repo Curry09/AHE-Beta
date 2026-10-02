@@ -1,2 +1,2 @@
-# Spec-0047/T2：实验运行时包。
-"""Per-experiment isolation: config, manifest, compose, CLI, capacity."""
+# Spec-0071/T3: unified experiment package.
+"""Frozen materials, controllers and local/E2B resource lifecycles."""

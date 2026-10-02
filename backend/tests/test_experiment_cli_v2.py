@@ -3,8 +3,35 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from auto_designer.experiment import cli, runtime
 from auto_designer.experiment.config import ConfigError
+
+
+@pytest.mark.parametrize("command", ["create", "plan", "preflight", "start", "archive"])
+def test_retired_commands_reject_before_runtime(command, monkeypatch):
+    # Spec-0071/T3: old commands cannot provision anything through an alias.
+    monkeypatch.setattr(
+        runtime, "backend_v2", lambda **kwargs: pytest.fail("provider must not be constructed")
+    )
+    with pytest.raises(SystemExit) as exc:
+        cli.dispatch([command])
+    assert exc.value.code == 2
+
+
+@pytest.mark.parametrize("command", ["status", "stop", "resume", "collect", "logs"])
+def test_old_manifest_requires_frozen_checkout(command, monkeypatch, tmp_path, capsys):
+    directory = tmp_path / "historical"
+    directory.mkdir()
+    (directory / "manifest.json").write_text(
+        json.dumps({"schema_version": 1, "run_id": "historical"})
+    )
+    monkeypatch.setattr(
+        runtime, "backend_v2", lambda **kwargs: pytest.fail("provider must not be constructed")
+    )
+    assert cli.dispatch(["--json", "--runs-dir", str(tmp_path), command, "historical"]) == 2
+    assert "frozen checkout" in json.loads(capsys.readouterr().out)["error"]
 
 
 def test_check_offline_doesnt_require_credentials_or_provider(monkeypatch, capsys):

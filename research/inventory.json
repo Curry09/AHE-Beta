@@ -1,0 +1,2885 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+  "source_scopes": [
+    "backend/scripts/",
+    "backend/deploy/",
+    "evaluation/",
+    "examples/",
+    "backend/swebench_pools/",
+    "frontend/public/experiments/"
+  ],
+  "source_files": [
+    "backend/.env.example",
+    "backend/auto_designer/experiment/capacity.py",
+    "backend/auto_designer/experiment/health.py",
+    "backend/persona_library.json",
+    "backend/persona_library_github.json",
+    "backend/persona_library_selfreport.json",
+    "backend/run.py",
+    "backend/scripts/migrate_trunk_main.py",
+    "backend/scripts/run_auditable_experiment.py",
+    "backend/scripts/run_mixed_closed_loop.py",
+    "backend/seeds.json",
+    "backend/tests/experiment/test_capacity.py",
+    "backend/tests/experiment/test_cli.py",
+    "backend/tests/experiment/test_config.py",
+    "backend/tests/experiment/test_health.py",
+    "backend/tests/experiment/test_runtime.py",
+    "backend/tests/test_migrate_trunk_main.py",
+    "backend/tests/test_run_auditable_experiment.py",
+    "examples/models.env.example",
+    "run.sh"
+  ],
+  "files": [
+    {
+      "original_path": "backend/.env.example",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/.env.example",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f753e89f51a969c531c755c5e5343902d9019759ed36b481e72f7cb3ebeeca18",
+      "destination_sha256": "f753e89f51a969c531c755c5e5343902d9019759ed36b481e72f7cb3ebeeca18"
+    },
+    {
+      "original_path": "backend/auto_designer/experiment/capacity.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/auto_designer/experiment/capacity.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fb2531de0b0c2edd4ff2f9fe9f000ae5e59dff1573adfea13e8bdc6d4812e732",
+      "destination_sha256": "fb2531de0b0c2edd4ff2f9fe9f000ae5e59dff1573adfea13e8bdc6d4812e732"
+    },
+    {
+      "original_path": "backend/auto_designer/experiment/health.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/auto_designer/experiment/health.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e53f1cfcf0e7272ab4f29e7f73423ffa7dff16ad65c772e2f111bb56ecd78a12",
+      "destination_sha256": "e53f1cfcf0e7272ab4f29e7f73423ffa7dff16ad65c772e2f111bb56ecd78a12"
+    },
+    {
+      "original_path": "backend/deploy/experiment/docker-compose.yml",
+      "disposition": "maintained",
+      "destination": "backend/deploy/experiment/docker-compose.yml",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d6a2ee2832c94605a7981105271df6742e13fe7ee8ef7555a0e66cc6f457324a",
+      "destination_sha256": "d6a2ee2832c94605a7981105271df6742e13fe7ee8ef7555a0e66cc6f457324a"
+    },
+    {
+      "original_path": "backend/deploy/experiment/egress-gitea-com.conf",
+      "disposition": "maintained",
+      "destination": "backend/deploy/experiment/egress-gitea-com.conf",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "448e4abb83f69bb03a0aa640e70d7e2d341517b4a0d05ae96cd98a182f03abe4",
+      "destination_sha256": "448e4abb83f69bb03a0aa640e70d7e2d341517b4a0d05ae96cd98a182f03abe4"
+    },
+    {
+      "original_path": "backend/deploy/experiment/egress-proxy.conf",
+      "disposition": "maintained",
+      "destination": "backend/deploy/experiment/egress-proxy.conf",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0656c1df8ed095035f4b82a4fd585eb7e29faf2c6b34baeb7ed0a876c250f9ca",
+      "destination_sha256": "0656c1df8ed095035f4b82a4fd585eb7e29faf2c6b34baeb7ed0a876c250f9ca"
+    },
+    {
+      "original_path": "backend/deploy/gitea/README.md",
+      "disposition": "maintained",
+      "destination": "backend/deploy/gitea/README.md",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "59fdb9330cd8efe981cab408ce3d9d0c054f28d70a432b40f49b547d3ac0edb5",
+      "destination_sha256": "59fdb9330cd8efe981cab408ce3d9d0c054f28d70a432b40f49b547d3ac0edb5"
+    },
+    {
+      "original_path": "backend/deploy/gitea/bootstrap.sh",
+      "disposition": "maintained",
+      "destination": "backend/deploy/gitea/bootstrap.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9202cd4f11088f4196392dfe7077516118640724ec4fc75b5f48019f2f07010c",
+      "destination_sha256": "799f5c597a3ac112f27bfde5d36291d3076af1e7c1738be706459c2093af8f50"
+    },
+    {
+      "original_path": "backend/deploy/gitea/docker-compose.yml",
+      "disposition": "maintained",
+      "destination": "backend/deploy/gitea/docker-compose.yml",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "df226d029bc7c015abcbbc87d35f9c477e38145e8411f85b91017c9365d47732",
+      "destination_sha256": "df226d029bc7c015abcbbc87d35f9c477e38145e8411f85b91017c9365d47732"
+    },
+    {
+      "original_path": "backend/deploy/gitea/egress-gitea-com.conf",
+      "disposition": "maintained",
+      "destination": "backend/deploy/gitea/egress-gitea-com.conf",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "448e4abb83f69bb03a0aa640e70d7e2d341517b4a0d05ae96cd98a182f03abe4",
+      "destination_sha256": "448e4abb83f69bb03a0aa640e70d7e2d341517b4a0d05ae96cd98a182f03abe4"
+    },
+    {
+      "original_path": "backend/deploy/gitea/egress-proxy.conf",
+      "disposition": "maintained",
+      "destination": "backend/deploy/gitea/egress-proxy.conf",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "008efac99c9f517b2c7e323ee60ccea0326eb6932a6493c605ea738110bcf73f",
+      "destination_sha256": "008efac99c9f517b2c7e323ee60ccea0326eb6932a6493c605ea738110bcf73f"
+    },
+    {
+      "original_path": "backend/deploy/gitea/runner-config.yaml",
+      "disposition": "maintained",
+      "destination": "backend/deploy/gitea/runner-config.yaml",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1dedf96c4fbacd38e087d0bf2d38746e0117fec16f92fafc70cca9c891f83e3b",
+      "destination_sha256": "1dedf96c4fbacd38e087d0bf2d38746e0117fec16f92fafc70cca9c891f83e3b"
+    },
+    {
+      "original_path": "backend/deploy/swebench-seed/Dockerfile",
+      "disposition": "maintained",
+      "destination": "backend/deploy/swebench-seed/Dockerfile",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1efa5895da6a34f5fc3a729dfeaeb84ac0bfb6cfbda1c08ac730efd988d6ce49",
+      "destination_sha256": "1efa5895da6a34f5fc3a729dfeaeb84ac0bfb6cfbda1c08ac730efd988d6ce49"
+    },
+    {
+      "original_path": "backend/deploy/swebench-seed/build.sh",
+      "disposition": "maintained",
+      "destination": "backend/deploy/swebench-seed/build.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d57fe8f82f08e9a5cfac2ebe4944a14f8b02597d5bf7179a38fddfc5c5b17e5a",
+      "destination_sha256": "ef1f6d37a2eeb0d594602476bef9c2e40ff7cfadf92789648e5896c327bdb412"
+    },
+    {
+      "original_path": "backend/deploy/swebench-seed/runtime.Dockerfile",
+      "disposition": "maintained",
+      "destination": "backend/deploy/swebench-seed/runtime.Dockerfile",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ee079ce3ed39721a86da669b228be02157423c9df7bae5bd09d943656c902797",
+      "destination_sha256": "481d0e3f84efbcb00addb2d3a8e4aa4e40a9b2fe2d23bfa304a7e55c3b3e3c3d"
+    },
+    {
+      "original_path": "backend/deploy/vigil/Dockerfile",
+      "disposition": "maintained",
+      "destination": "backend/deploy/vigil/Dockerfile",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b79075d2184108c165fe3b508bc980954b9ea8fbcb91cb696291885c10b95ccf",
+      "destination_sha256": "b79075d2184108c165fe3b508bc980954b9ea8fbcb91cb696291885c10b95ccf"
+    },
+    {
+      "original_path": "backend/deploy/vigil/build.sh",
+      "disposition": "maintained",
+      "destination": "backend/deploy/vigil/build.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "68549a789a681c2a7665b0024f2840a2f2b11d476f4bf944cca3e72fef27567f",
+      "destination_sha256": "68549a789a681c2a7665b0024f2840a2f2b11d476f4bf944cca3e72fef27567f"
+    },
+    {
+      "original_path": "backend/deploy/vigil/entrypoint.sh",
+      "disposition": "maintained",
+      "destination": "backend/deploy/vigil/entrypoint.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e02e6dcc921e2b9f1b22079f80993834bdb43bb652787478d86519607cf0f39f",
+      "destination_sha256": "e02e6dcc921e2b9f1b22079f80993834bdb43bb652787478d86519607cf0f39f"
+    },
+    {
+      "original_path": "backend/deploy/vigil/observability-overlay.Dockerfile",
+      "disposition": "maintained",
+      "destination": "backend/deploy/vigil/observability-overlay.Dockerfile",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "18499483d173cc44ca50a0923df05f9a8debf89d50f4d37a4db8c04483bd1055",
+      "destination_sha256": "18499483d173cc44ca50a0923df05f9a8debf89d50f4d37a4db8c04483bd1055"
+    },
+    {
+      "original_path": "backend/deploy/vigil/observation-runtime.json",
+      "disposition": "maintained",
+      "destination": "backend/deploy/vigil/observation-runtime.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b275c7591671d5942144e14498b6cb6309ebc8c3108fa03a7cbb3f18496e0445",
+      "destination_sha256": "b275c7591671d5942144e14498b6cb6309ebc8c3108fa03a7cbb3f18496e0445"
+    },
+    {
+      "original_path": "backend/persona_library.json",
+      "disposition": "moved",
+      "destination": "examples/personas/library.json",
+      "reason": "Explicit reusable persona material, outside controller source",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0ad1c21b171eafbfcd40ab7d55246b8b4d8db423e322bb91626c1c44c2c1ab6c",
+      "destination_sha256": "0ad1c21b171eafbfcd40ab7d55246b8b4d8db423e322bb91626c1c44c2c1ab6c"
+    },
+    {
+      "original_path": "backend/persona_library_github.json",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-materials/persona_library_github.json",
+      "reason": "Historical source material and default pool",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "7e0dd6d5e8a70d869ab22114a8c571c85c1097c769a5eceea8d7718546e4009d",
+      "destination_sha256": "7e0dd6d5e8a70d869ab22114a8c571c85c1097c769a5eceea8d7718546e4009d"
+    },
+    {
+      "original_path": "backend/persona_library_selfreport.json",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-materials/persona_library_selfreport.json",
+      "reason": "Historical source material and default pool",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "818e8976a69d9b81f4c2f41a9d46012f75013a0f817096d2e4b79a7ddadc53ad",
+      "destination_sha256": "818e8976a69d9b81f4c2f41a9d46012f75013a0f817096d2e4b79a7ddadc53ad"
+    },
+    {
+      "original_path": "backend/run.py",
+      "disposition": "moved",
+      "destination": "backend/auto_designer/experiment/controllers/ordinary.py",
+      "reason": "Active controller becomes a package module",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "66fe9f2e95febdc18ef804694f5b823803d1df513b3cc941ea26349b0c0041be",
+      "destination_sha256": "c629817306e8f4983c8f871463bfc8103d4c2f527672455fda3650eb949d8745"
+    },
+    {
+      "original_path": "backend/scripts/audit_sim_action_integrity.py",
+      "disposition": "moved",
+      "destination": "tools/dev/audit/audit_sim_action_integrity.py",
+      "reason": "Maintained developer audit",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bb35fd704544631873ec1ad16bbab61b700ae54a2bd4d2f7c70a5910c61133f0",
+      "destination_sha256": "bb35fd704544631873ec1ad16bbab61b700ae54a2bd4d2f7c70a5910c61133f0"
+    },
+    {
+      "original_path": "backend/scripts/bootstrap_harness.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/bootstrap_harness.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2e5c3edf4f5789d0a0f8857a1df665ebcda93b4eb70b2654b815b375738e2127",
+      "destination_sha256": "2e5c3edf4f5789d0a0f8857a1df665ebcda93b4eb70b2654b815b375738e2127"
+    },
+    {
+      "original_path": "backend/scripts/build_swebench_runtime_image.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/build_swebench_runtime_image.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8cd4d66e2066af8cc2a47c5f93e2b716a19f1d2d553a5c93b56bfcb27431ca3e",
+      "destination_sha256": "6f9674ce21647af8272530691df93ec9c04d45b36a8dba1213624741547d2b61"
+    },
+    {
+      "original_path": "backend/scripts/build_swebench_seed_workspaces.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/build_swebench_seed_workspaces.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "23b19699e999cbfefc1115e944b7ff3ccae0a3ffb0a50f90538df1ffc1e6402a",
+      "destination_sha256": "3c959d9a8c876f2946f0568a784a5aa4ab754b52bd098e529f7b73e1ac9283f7"
+    },
+    {
+      "original_path": "backend/scripts/canary_spec0048_final_check.py",
+      "disposition": "moved",
+      "destination": "tools/dev/audit/canary_spec0048_final_check.py",
+      "reason": "Maintained developer audit",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "eeac5e8f3249cda1ccff17c4509f6ba2a06edb2176a317d741195aad1bbd70cb",
+      "destination_sha256": "a82a5643e24beda2643466a19e03d2ced96671002c1294dc9edc2f23894136db"
+    },
+    {
+      "original_path": "backend/scripts/check-spec-number-conflicts.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/check-spec-number-conflicts.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c13dd147f8a39edc6e5502e3e70563333b2aea1e1b4b62a21ff3483ce923233d",
+      "destination_sha256": "c13dd147f8a39edc6e5502e3e70563333b2aea1e1b4b62a21ff3483ce923233d"
+    },
+    {
+      "original_path": "backend/scripts/check_gitea_evidence_transport.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/check_gitea_evidence_transport.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fc668f7f0f680c7478c82c37b41bb967b6571d29aaa3d219e661e27043461b5b",
+      "destination_sha256": "fc668f7f0f680c7478c82c37b41bb967b6571d29aaa3d219e661e27043461b5b"
+    },
+    {
+      "original_path": "backend/scripts/check_observation_contract.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/check_observation_contract.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "023456aece9959a3fd9cf33dae3c131ed52410ccfefb42fa21b46fa0f93180f6",
+      "destination_sha256": "023456aece9959a3fd9cf33dae3c131ed52410ccfefb42fa21b46fa0f93180f6"
+    },
+    {
+      "original_path": "backend/scripts/check_openagents_contract.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/check_openagents_contract.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "83fb4498f91d5c8bea65d02dc33d03099132eda3d76eff21909dd3d1fa7c011f",
+      "destination_sha256": "ad6490fc5b3af299ef1c819843a1121ef09b43642594d64f6f430962b127d2d4"
+    },
+    {
+      "original_path": "backend/scripts/e2e-spec-0039-issue-state-timeline.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-spec-0039-issue-state-timeline.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8fc33cc3c5ac03daf935c33c7393117c42fb655b95e799e869ac519d54960b70",
+      "destination_sha256": "8fc33cc3c5ac03daf935c33c7393117c42fb655b95e799e869ac519d54960b70"
+    },
+    {
+      "original_path": "backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "54de1371622b359078dbc0f2a60d02eb64fa1abccd454552d6aff23fe4c78e0a",
+      "destination_sha256": "c176e3059c5d513d91e18fb10944dc6f1c090a347c07313b227872d017261bf5"
+    },
+    {
+      "original_path": "backend/scripts/e2e-spec-0048-final-check-convergence.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-spec-0048-final-check-convergence.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d2f11464e8242ba92124db47cbb2ada59b07cf271f3e56c875104b0083b8e13e",
+      "destination_sha256": "dad6691085c22008d56a263fb321b0d62db2e8fbfce93b40c9f3595558be24a8"
+    },
+    {
+      "original_path": "backend/scripts/e2e-spec-0049-role-invocation-io-store.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-spec-0049-role-invocation-io-store.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9a86fb06ceb5ddde042c8b8324bd65a9cfe0383297bb044ad286307d45266e2a",
+      "destination_sha256": "fe6ce878d0f6c99834b3a81c93731025a97aa5a437f6ed55e0ffeaddda289091"
+    },
+    {
+      "original_path": "backend/scripts/e2e-spec-0050-round-delivery-gate.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-spec-0050-round-delivery-gate.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0b442f62f42224f814883a643962620ff0b1d9d0c38a34c3915c479f90332ff7",
+      "destination_sha256": "0b442f62f42224f814883a643962620ff0b1d9d0c38a34c3915c479f90332ff7"
+    },
+    {
+      "original_path": "backend/scripts/e2e-spec-0051-session-container.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-spec-0051-session-container.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9323b6f0335388eb1bede851958e2290e420518e24019b30e83e300caa21a750",
+      "destination_sha256": "9323b6f0335388eb1bede851958e2290e420518e24019b30e83e300caa21a750"
+    },
+    {
+      "original_path": "backend/scripts/e2e-spec-0056-0057-user-semantics.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-spec-0056-0057-user-semantics.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9e741f438401b964018dfca9ed1a0f0632bd9bd325a0278f56ebb5607634ea6e",
+      "destination_sha256": "9e741f438401b964018dfca9ed1a0f0632bd9bd325a0278f56ebb5607634ea6e"
+    },
+    {
+      "original_path": "backend/scripts/e2e-spec-0069-experiment-entry.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-spec-0069-experiment-entry.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "cfcc8ea0bb3e233912e7d5c8db8cd7585cb9f1fcec5c50376e8b277061632144",
+      "destination_sha256": "cfcc8ea0bb3e233912e7d5c8db8cd7585cb9f1fcec5c50376e8b277061632144"
+    },
+    {
+      "original_path": "backend/scripts/e2e-stage-resume.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-stage-resume.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bb51755037ec85d2a62c1e9432b922a38762f8d9d98767a490e8eb64ea471df0",
+      "destination_sha256": "bb51755037ec85d2a62c1e9432b922a38762f8d9d98767a490e8eb64ea471df0"
+    },
+    {
+      "original_path": "backend/scripts/e2e-synthesizer-naming.sh",
+      "disposition": "maintained",
+      "destination": "backend/scripts/e2e-synthesizer-naming.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "477fff8a786013c02c1edad60667ff732aea9f6a4543d6675bcf0562040e5b8f",
+      "destination_sha256": "477fff8a786013c02c1edad60667ff732aea9f6a4543d6675bcf0562040e5b8f"
+    },
+    {
+      "original_path": "backend/scripts/evaluate_role_traces.py",
+      "disposition": "moved",
+      "destination": "tools/dev/audit/evaluate_role_traces.py",
+      "reason": "Maintained developer audit",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "a33e19cf7f36359d7bdd9dc1b4809aa222aa0535caad2427b97ade1ce16e43f5",
+      "destination_sha256": "a33e19cf7f36359d7bdd9dc1b4809aa222aa0535caad2427b97ade1ce16e43f5"
+    },
+    {
+      "original_path": "backend/scripts/experiment.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/experiment.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c562e39cd9e87d43bf3c666b2990184146ce537ad0f335e279a658e6f84fbf77",
+      "destination_sha256": "398ea21305038afb5924f046ae9db6109217fedde9413e0759ced3c3a74ac4e6"
+    },
+    {
+      "original_path": "backend/scripts/export_experiment_snapshot.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/export_experiment_snapshot.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "058daec708a633e2e965d0d69cad33163730d6ebf0bb2f8ce64e28eebaf9a64f",
+      "destination_sha256": "058daec708a633e2e965d0d69cad33163730d6ebf0bb2f8ce64e28eebaf9a64f"
+    },
+    {
+      "original_path": "backend/scripts/migrate_trunk_main.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/scripts/migrate_trunk_main.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1371679dff329833b4506604a002981a44819c73906df0470ebb93194c18543f",
+      "destination_sha256": "1371679dff329833b4506604a002981a44819c73906df0470ebb93194c18543f"
+    },
+    {
+      "original_path": "backend/scripts/offline_demo.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/offline_demo.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e9929f9da5abd6f998dc76e3fd638444677fc03866280ff9af563533396c4b51",
+      "destination_sha256": "e9929f9da5abd6f998dc76e3fd638444677fc03866280ff9af563533396c4b51"
+    },
+    {
+      "original_path": "backend/scripts/prepare_openagents_from_summary.py",
+      "disposition": "moved",
+      "destination": "tools/dev/delivery/prepare_openagents_from_summary.py",
+      "reason": "Explicit run-scoped delivery validation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "efcc2e5184905004e90cd2116723316e4f21809ad929a9f0c9370459574e8cec",
+      "destination_sha256": "493262806f50ff2dccf6e12db3a26023c610ed38d5e61e4ca5a918e9098a69ac"
+    },
+    {
+      "original_path": "backend/scripts/prepare_openagents_validation.py",
+      "disposition": "moved",
+      "destination": "tools/dev/delivery/prepare_openagents_validation.py",
+      "reason": "Explicit run-scoped delivery validation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ad1f497d4ee772cd7ea69ec17a024d050c868956a88730ccea8718eb3b465e1e",
+      "destination_sha256": "a3ab7dd4aa24871669356da3feb0621b4b1453d23bb4359ee4c59dd6323aab7c"
+    },
+    {
+      "original_path": "backend/scripts/prepare_swebench_runtime_tree.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/prepare_swebench_runtime_tree.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2305cfe9ac11c8895c29a4420f60d07abcb019ab931bbeb46dea4735d48866ce",
+      "destination_sha256": "2305cfe9ac11c8895c29a4420f60d07abcb019ab931bbeb46dea4735d48866ce"
+    },
+    {
+      "original_path": "backend/scripts/probe_d43_quality_fail.py",
+      "disposition": "moved",
+      "destination": "tools/dev/probes/probe_d43_quality_fail.py",
+      "reason": "Developer probe with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ac0616a68621320b9d878f648d4f47fbc7b47dd3a97055f09a80df073ba5838c",
+      "destination_sha256": "a58a6806b638839741d0ff5f23bf2a23e7f3f8ee1f75c2e3baf04e837c8b41cf"
+    },
+    {
+      "original_path": "backend/scripts/probe_ontrack_new_harness.py",
+      "disposition": "moved",
+      "destination": "tools/dev/probes/probe_ontrack_new_harness.py",
+      "reason": "Developer probe with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f8655052d3f2b347c2482970d66ecd7aa74d047a8829063068c5522ce47699ba",
+      "destination_sha256": "3b491d378dc90dd93726b4dab838cac6494def07fa6d616b6c663a71d632ffaf"
+    },
+    {
+      "original_path": "backend/scripts/probe_peek_decision_trace.py",
+      "disposition": "moved",
+      "destination": "tools/dev/probes/probe_peek_decision_trace.py",
+      "reason": "Developer probe with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "3f9be5f460ad3c8b711f1680daf757e5b2890a98ac5bba0b9c9a847b3c36f456",
+      "destination_sha256": "f2bbe09d115e91844d0eced3c1faf931a07a44a58e650c411f0669426f356b83"
+    },
+    {
+      "original_path": "backend/scripts/probe_persona_reframe.py",
+      "disposition": "moved",
+      "destination": "tools/dev/probes/probe_persona_reframe.py",
+      "reason": "Developer probe with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e2b29092200c824d20dbc0a8510a1e98bd947ad4b46bf9e1143fdd8e88dcabd2",
+      "destination_sha256": "93ed22d3623f6b12c2494ef29e5b008a2b2b80b17c9c5187bc2d3ca3138c6855"
+    },
+    {
+      "original_path": "backend/scripts/probe_persona_wait_matrix.py",
+      "disposition": "moved",
+      "destination": "tools/dev/probes/probe_persona_wait_matrix.py",
+      "reason": "Developer probe with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "383222291c3047d025cc094d6b9d586ef010eb9e6643073ce46aab35e7767f4c",
+      "destination_sha256": "61ced9bd2d8171bae818892ed3596c7bf5206cb65ef9efdf1ef5e64a8a576ecc"
+    },
+    {
+      "original_path": "backend/scripts/probe_swebench_persona.py",
+      "disposition": "moved",
+      "destination": "tools/dev/probes/probe_swebench_persona.py",
+      "reason": "Developer probe with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "68119e24c3fcdd8903f23bafac17c24e143671b18fb55a01ac49f865fef71a23",
+      "destination_sha256": "750ea8e162e06b4aae93e6119ab88a0e3974b92520c214e0377292e696b57b93"
+    },
+    {
+      "original_path": "backend/scripts/probe_timeout_to_synthesizer.py",
+      "disposition": "moved",
+      "destination": "tools/dev/probes/probe_timeout_to_synthesizer.py",
+      "reason": "Developer probe with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e867cc531d4b319983f924034d1ac053ee9e890cbc8c6babdf93fb96a4140e7a",
+      "destination_sha256": "68a6b05a7a83f6b3196afd06d0c3ad92bdfba0e641f20962e1a9e66cb6e7bd4d"
+    },
+    {
+      "original_path": "backend/scripts/probe_wait_progress.py",
+      "disposition": "moved",
+      "destination": "tools/dev/probes/probe_wait_progress.py",
+      "reason": "Developer probe with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0967435448139adddaea843949167298082b76eb92d335e3c3e69d5241569dd9",
+      "destination_sha256": "95120ff0a989b1e1817cb145f116f38e86d80c04bb4b67028d012becb12d5cac"
+    },
+    {
+      "original_path": "backend/scripts/replay_observation_lifecycle.py",
+      "disposition": "moved",
+      "destination": "tools/dev/replay/replay_observation_lifecycle.py",
+      "reason": "Developer replay with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "5d58c9ddc5e8c8766cff894c6d4dc324af09696cc2bebbc61db92180cd0103f5",
+      "destination_sha256": "12d1d5f7fa674bd16ea8d9c4b5006ba08647fb3511c9c58b7173d8c8b27ce2ad"
+    },
+    {
+      "original_path": "backend/scripts/replay_observation_synthesis.py",
+      "disposition": "moved",
+      "destination": "tools/dev/replay/replay_observation_synthesis.py",
+      "reason": "Developer replay with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8761c2744b48def8748cb93ead256bd2cd2b6bedf8ffb560b27953bdd944efc3",
+      "destination_sha256": "d8c0f3fd5bf752b921134e1a37a5382b8f8b1d9d3dc05de1f85d3b45b8b1ff1d"
+    },
+    {
+      "original_path": "backend/scripts/replay_owner_from_repo.py",
+      "disposition": "moved",
+      "destination": "tools/dev/replay/replay_owner_from_repo.py",
+      "reason": "Developer replay with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9435a5b8b8769d61ca104bfbd2c15cc6ca2893665b91be46c62b095d6369324a",
+      "destination_sha256": "27cb0fc1825a2d1f920427bc754977314e40cfc3b8a5c3dd5d9c5b1ac59662a8"
+    },
+    {
+      "original_path": "backend/scripts/replay_pm_synthesizer_owner_offline.py",
+      "disposition": "moved",
+      "destination": "tools/dev/replay/replay_pm_synthesizer_owner_offline.py",
+      "reason": "Developer replay with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "621f6660875f754763c917a08416c5408376d1df08aaad89d7af30c6d553f4a7",
+      "destination_sha256": "467a7f7d0996d643d75e020d901dd504b1e44220c1e3ccd75a7bfcb99a8b64e9"
+    },
+    {
+      "original_path": "backend/scripts/replay_role_invocations.py",
+      "disposition": "moved",
+      "destination": "tools/dev/replay/replay_role_invocations.py",
+      "reason": "Developer replay with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b3aff8d8f47a512a4c1e41380a0ef0371baea2e134a5455e7744c585ea871f6a",
+      "destination_sha256": "776475b00dcbb2149304e28911740ae3b8a6da3f906d0c522fe53d79c138b113"
+    },
+    {
+      "original_path": "backend/scripts/replay_roles_from_sessions.py",
+      "disposition": "moved",
+      "destination": "tools/dev/replay/replay_roles_from_sessions.py",
+      "reason": "Developer replay with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0ae5aed9e42094aa076a05690ed399f2098aa9b95f911fc5fafee57b4e953322",
+      "destination_sha256": "ed6bd30cc4e724c73099b6a0f71b9ed5455ca38b7a368ed0d902859944affb31"
+    },
+    {
+      "original_path": "backend/scripts/replay_roles_offline.py",
+      "disposition": "moved",
+      "destination": "tools/dev/replay/replay_roles_offline.py",
+      "reason": "Developer replay with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2bf524585749a48255ffdf5402abff160ebc4b341b523bf004bc4cae053ae542",
+      "destination_sha256": "c2e44a7be56a74495235057ddb09d85a79978d8dbb87830beaec55b99d9b1262"
+    },
+    {
+      "original_path": "backend/scripts/replay_synthesizer_owner_from_repo.py",
+      "disposition": "moved",
+      "destination": "tools/dev/replay/replay_synthesizer_owner_from_repo.py",
+      "reason": "Developer replay with explicit inputs",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "a397de25541069ea27c8500acae4821a46b2a76283e5a334f3c1dc9ebab12ed0",
+      "destination_sha256": "cadad03defda623ebce8cc540b720e2f41ea8c699bf5bc60c51240badd4e92db"
+    },
+    {
+      "original_path": "backend/scripts/run-glm52fp8-1m-canary2-isolated.sh",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired duplicate entry or personal experiment shortcut",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ebfef4e5014e8b37d080fde2083d3d7689ba1434a3074889f7078c1560a2ddc6"
+    },
+    {
+      "original_path": "backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired duplicate entry or personal experiment shortcut",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b7ab16414d981e56de65f9fc6044bbdbfaf950bfd8785acf26933c11d9958581"
+    },
+    {
+      "original_path": "backend/scripts/run-glm52fp8-1m-hard16-r5.sh",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired duplicate entry or personal experiment shortcut",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bf9aecd6f2b58c9ee19eec68ca21b357ec175deb5cb790ef0b2244304f73644d"
+    },
+    {
+      "original_path": "backend/scripts/run_auditable_experiment.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/scripts/run_auditable_experiment.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9128aa1aa2b4a3516f585d864235961adfe39dd6a6e581f0fea78d6977439cde",
+      "destination_sha256": "9128aa1aa2b4a3516f585d864235961adfe39dd6a6e581f0fea78d6977439cde"
+    },
+    {
+      "original_path": "backend/scripts/run_mixed_closed_loop.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/scripts/run_mixed_closed_loop.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b1f4738d4770bd48bbbc0adeeba4a06f41e84c45a306344a121d2097996c77ab",
+      "destination_sha256": "b1f4738d4770bd48bbbc0adeeba4a06f41e84c45a306344a121d2097996c77ab"
+    },
+    {
+      "original_path": "backend/scripts/run_openagents_validation.py",
+      "disposition": "moved",
+      "destination": "tools/dev/delivery/run_openagents_validation.py",
+      "reason": "Explicit run-scoped delivery validation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e7ef771634074cb175422d2fee624d9c437dfce49d658b65acb5a69fac1dad97",
+      "destination_sha256": "5bd028e60e3b10068fa6f95890315e2a9c7d1ff7226100fe3c105cabd0fb7f99"
+    },
+    {
+      "original_path": "backend/scripts/run_swebench_closed_loop.py",
+      "disposition": "moved",
+      "destination": "backend/auto_designer/experiment/controllers/swebench.py",
+      "reason": "Active controller becomes a package module",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bd88086c3ddbe8786946c5c533149ade5a9877906b2830de814aa9242b0fb89a",
+      "destination_sha256": "b645c25bee2639a2f92b22015ad8439282d5566a50c2d1c0023a4723af4066c4"
+    },
+    {
+      "original_path": "backend/scripts/swebench_seed_sitecustomize.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/swebench_seed_sitecustomize.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9d37355e6e7e054693cda08d9d27b92a509cbe1e31a7e80049aabe5a73078c75",
+      "destination_sha256": "9d37355e6e7e054693cda08d9d27b92a509cbe1e31a7e80049aabe5a73078c75"
+    },
+    {
+      "original_path": "backend/scripts/validate_swebench_seed_image.py",
+      "disposition": "maintained",
+      "destination": "backend/scripts/validate_swebench_seed_image.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "845a32aea3c7619c6f018b6e8b359bc3d565c06e851ac2b5fff5fcc22f27025c",
+      "destination_sha256": "845a32aea3c7619c6f018b6e8b359bc3d565c06e851ac2b5fff5fcc22f27025c"
+    },
+    {
+      "original_path": "backend/seeds.json",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-materials/seeds.json",
+      "reason": "Historical source material and default pool",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "92625381b281018e5153f1b24679a2de7da1703b8454c77190f9b972101a675a",
+      "destination_sha256": "92625381b281018e5153f1b24679a2de7da1703b8454c77190f9b972101a675a"
+    },
+    {
+      "original_path": "backend/swebench_pools/dev_balanced_64.json",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-materials/swebench_pools/dev_balanced_64.json",
+      "reason": "Historical source material and default pool",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "6826b5533c8a0a46dd6853c0c013c67820c8c61b7523ffeeb484e20fa1901fdf",
+      "destination_sha256": "6826b5533c8a0a46dd6853c0c013c67820c8c61b7523ffeeb484e20fa1901fdf"
+    },
+    {
+      "original_path": "backend/swebench_pools/medium_hard_16.json",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-materials/swebench_pools/medium_hard_16.json",
+      "reason": "Historical source material and default pool",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ef84feb6943a71417750950114281f774f66a5439ea789659711d648392ef2c8",
+      "destination_sha256": "ef84feb6943a71417750950114281f774f66a5439ea789659711d648392ef2c8"
+    },
+    {
+      "original_path": "backend/tests/experiment/test_capacity.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/tests/experiment/test_capacity.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "950337835822f4ef51c42cb8baad9c71b849bc2eb2436c860e621521e347fa04",
+      "destination_sha256": "950337835822f4ef51c42cb8baad9c71b849bc2eb2436c860e621521e347fa04"
+    },
+    {
+      "original_path": "backend/tests/experiment/test_cli.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/tests/experiment/test_cli.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "aee5d00ca509d83d4d3aa049bb319b3f417711f9798c51d72d76ce10d2ba884c",
+      "destination_sha256": "aee5d00ca509d83d4d3aa049bb319b3f417711f9798c51d72d76ce10d2ba884c"
+    },
+    {
+      "original_path": "backend/tests/experiment/test_config.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/tests/experiment/test_config.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "cf88b34647b1a22320dd0e07fba19bb3494bf2adb09d886e546462c878698ab5",
+      "destination_sha256": "cf88b34647b1a22320dd0e07fba19bb3494bf2adb09d886e546462c878698ab5"
+    },
+    {
+      "original_path": "backend/tests/experiment/test_health.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/tests/experiment/test_health.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ba5842b73a599af3906205abe001ef9f887d9e5b92ccfc63c47fba7b03144ac4",
+      "destination_sha256": "ba5842b73a599af3906205abe001ef9f887d9e5b92ccfc63c47fba7b03144ac4"
+    },
+    {
+      "original_path": "backend/tests/experiment/test_runtime.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/tests/experiment/test_runtime.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9055e428a3579be760f916ac99862c59d8e79175e9b668d9e43476653e6f2d22",
+      "destination_sha256": "9055e428a3579be760f916ac99862c59d8e79175e9b668d9e43476653e6f2d22"
+    },
+    {
+      "original_path": "backend/tests/test_migrate_trunk_main.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/tests/test_migrate_trunk_main.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "db03efbd458adb6f540a07b49f2b47b5553ddd153d6dc8a03543265f13b4b248",
+      "destination_sha256": "db03efbd458adb6f540a07b49f2b47b5553ddd153d6dc8a03543265f13b4b248"
+    },
+    {
+      "original_path": "backend/tests/test_run_auditable_experiment.py",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/backend/tests/test_run_auditable_experiment.py",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "af3a34d14c1ed2949f105c60ec16d7e9bd73c255eb5cc3f589b53abcebf72a6b",
+      "destination_sha256": "af3a34d14c1ed2949f105c60ec16d7e9bd73c255eb5cc3f589b53abcebf72a6b"
+    },
+    {
+      "original_path": "evaluation/__init__.py",
+      "disposition": "maintained",
+      "destination": "evaluation/__init__.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "516d2d88448de532fb31c463db21859eb09785c2c278ee33e31d0da9f1847594",
+      "destination_sha256": "516d2d88448de532fb31c463db21859eb09785c2c278ee33e31d0da9f1847594"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/EXPERIMENT-MATRIX.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/EXPERIMENT-MATRIX.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c431929f4e3a0bc2cd9720abc1069c6313dc398fdd709daa4eec2a6ecfcb4336",
+      "destination_sha256": "c431929f4e3a0bc2cd9720abc1069c6313dc398fdd709daa4eec2a6ecfcb4336"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/EXPERIMENT-QUICKSTART.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "a3e40652f41dae4ccf39117828ebd58356341bffc1912c2a7fcad5f8b35ff77a",
+      "destination_sha256": "a3e40652f41dae4ccf39117828ebd58356341bffc1912c2a7fcad5f8b35ff77a"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/EXPERIMENT-RUNBOOK-ordinary-1-4-five-rounds.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/EXPERIMENT-RUNBOOK-ordinary-1-4-five-rounds.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9a0999fed92acd1bc38e5b33e6cc47a38eb1b3e1d5a14589efb9a32d9041d328",
+      "destination_sha256": "9a0999fed92acd1bc38e5b33e6cc47a38eb1b3e1d5a14589efb9a32d9041d328"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/N1-E2B-RUNBOOK.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/N1-E2B-RUNBOOK.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "aa76d6564fc9806bc4b0fb10dac7b29cb9fa4fc8ba6154a5236c28a32bdc58d7",
+      "destination_sha256": "aa76d6564fc9806bc4b0fb10dac7b29cb9fa4fc8ba6154a5236c28a32bdc58d7"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/README.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/README.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d4906afe875b0b3dd0913a826975bede08e3509f85d805344195fdc25be4fa2d",
+      "destination_sha256": "d4906afe875b0b3dd0913a826975bede08e3509f85d805344195fdc25be4fa2d"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/SPEC-experiment-preparation-and-sandbox-execution.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/SPEC-experiment-preparation-and-sandbox-execution.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d81e0fad1fd23749d144244d272a558101cd087ca615ac8f59ac4beb9580d4df",
+      "destination_sha256": "d81e0fad1fd23749d144244d272a558101cd087ca615ac8f59ac4beb9580d4df"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0408ede609063ee73c70c7e7b41ffad6592e255e7cf43f66f9a5cd87f90eb5b0",
+      "destination_sha256": "0408ede609063ee73c70c7e7b41ffad6592e255e7cf43f66f9a5cd87f90eb5b0"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/SPEC-scaling-e2b-launch.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/SPEC-scaling-e2b-launch.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f83495cc559aa1702ec18dbc3fa890dd75360090256704978d06531d5646c03d",
+      "destination_sha256": "f83495cc559aa1702ec18dbc3fa890dd75360090256704978d06531d5646c03d"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/SPEC-time-accounting-provider-latency.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/SPEC-time-accounting-provider-latency.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1212d2b9135cbecdc7b248c7e53286c50c0a887f5a31277bd4f58c258a3475e3",
+      "destination_sha256": "1212d2b9135cbecdc7b248c7e53286c50c0a887f5a31277bd4f58c258a3475e3"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/accept_n1_round1_as_canary.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/accept_n1_round1_as_canary.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "5190ee2e8d67d7e552f255ee96013b426fc040e6d6ef20d60b4d4f5cfd1f4972",
+      "destination_sha256": "5190ee2e8d67d7e552f255ee96013b426fc040e6d6ef20d60b4d4f5cfd1f4972"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/build_e2b_template.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/build_e2b_template.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b827df1d064e660d98bc707c5d26f295128d98f67cd03067b8992f189b8100b1",
+      "destination_sha256": "b827df1d064e660d98bc707c5d26f295128d98f67cd03067b8992f189b8100b1"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/configs/mixed-scaling-20260922.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "a2bca9ef8f9c9d65fe8fdbc3d208c8ae495b4de2090cc184fdb304d93d87bce4",
+      "destination_sha256": "a2bca9ef8f9c9d65fe8fdbc3d208c8ae495b4de2090cc184fdb304d93d87bce4"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.tasks.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/configs/mixed-scaling-20260922.tasks.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "7b91d6266f96e177ab4fed31082fc5357fa7f66649c4402ed8ee52b97e4777ce",
+      "destination_sha256": "7b91d6266f96e177ab4fed31082fc5357fa7f66649c4402ed8ee52b97e4777ce"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/configs/n1-e2b-20260922.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/configs/n1-e2b-20260922.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fe0fa16f59af53ec47bd62514e5489e72c40dc9ca816921587328c24d2fab5af",
+      "destination_sha256": "fe0fa16f59af53ec47bd62514e5489e72c40dc9ca816921587328c24d2fab5af"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/configs/ordinary-1-4-five-rounds.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/configs/ordinary-1-4-five-rounds.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0db4509a926a2c04544e3f9dc5a274a7b6120d206c465fe4a26eb89bd79399b9",
+      "destination_sha256": "0db4509a926a2c04544e3f9dc5a274a7b6120d206c465fe4a26eb89bd79399b9"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/configs/ordinary-pilot.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/configs/ordinary-pilot.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b08151353441438c2f361ac4f2b90d373b124214661ad3bc343db7ccdda61c1a",
+      "destination_sha256": "b08151353441438c2f361ac4f2b90d373b124214661ad3bc343db7ccdda61c1a"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/configs/ordinary-scaling-1-4-8.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/configs/ordinary-scaling-1-4-8.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "7d732b7a5e1048e41445d64eeaa021ab4f088e47314838b7c933d7029da67c48",
+      "destination_sha256": "7d732b7a5e1048e41445d64eeaa021ab4f088e47314838b7c933d7029da67c48"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/configs/scaling-e2b-20260922.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/configs/scaling-e2b-20260922.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bef261c2f1b857b963d421acec21900c3b60a3239f82e5df81dc8ae7770abc84",
+      "destination_sha256": "bef261c2f1b857b963d421acec21900c3b60a3239f82e5df81dc8ae7770abc84"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/freeze-record.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/freeze-record.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "967004331cd697ac544297680f0707a281b35fafc31da01a6b5eeb79deafc51d",
+      "destination_sha256": "967004331cd697ac544297680f0707a281b35fafc31da01a6b5eeb79deafc51d"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/freeze_scaling_runtime.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/freeze_scaling_runtime.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2ab6a77aea823d0208763a90abb6b9a15eb0408ecd21fad738b1bb4ac14a16b8",
+      "destination_sha256": "2ab6a77aea823d0208763a90abb6b9a15eb0408ecd21fad738b1bb4ac14a16b8"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-canary/environment/Dockerfile",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-canary/environment/Dockerfile",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "12ace7eaae2a61e1ff39f953cb2fa7b25d4e535f048f66f905d5b04e3e14db2c",
+      "destination_sha256": "12ace7eaae2a61e1ff39f953cb2fa7b25d4e535f048f66f905d5b04e3e14db2c"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-canary/instruction.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-canary/instruction.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1c2c147ad828d1a2ade9e914af77a5893aaa0f80fa01eaa096816e4b1f378732",
+      "destination_sha256": "1c2c147ad828d1a2ade9e914af77a5893aaa0f80fa01eaa096816e4b1f378732"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-canary/task.toml",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-canary/task.toml",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "574e776696c2d6d5f1c407c33e23539f80014f54476f27c88be093024466263c",
+      "destination_sha256": "574e776696c2d6d5f1c407c33e23539f80014f54476f27c88be093024466263c"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-canary/tests/test.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-canary/tests/test.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9f9befc0fa9192f5a685bcc7759484499679f7a70846e865c6bc0fdc00069177",
+      "destination_sha256": "9f9befc0fa9192f5a685bcc7759484499679f7a70846e865c6bc0fdc00069177"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-integration-canary-20260920.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-integration-canary-20260920.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "83ce18017551c3de67699b50ead0407c826d226fe01a9c7fd96ea7c818346226",
+      "destination_sha256": "83ce18017551c3de67699b50ead0407c826d226fe01a9c7fd96ea7c818346226"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-ordinary-o03/config.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-ordinary-o03/config.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "88be54dae4a5e97eba07427af71ba270d7a8ae756bcf5321aa4f25f7896adc34",
+      "destination_sha256": "88be54dae4a5e97eba07427af71ba270d7a8ae756bcf5321aa4f25f7896adc34"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-ordinary-o03/environment/Dockerfile",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-ordinary-o03/environment/Dockerfile",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0cc9c1111ad37ea590cb6434b7a4b2d9b0730a9e51aeb2be336fbf80dc63c2f6",
+      "destination_sha256": "0cc9c1111ad37ea590cb6434b7a4b2d9b0730a9e51aeb2be336fbf80dc63c2f6"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-ordinary-o03/instruction.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-ordinary-o03/instruction.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "5875487f412b0fe900fae2a24a64e757113131dee64ad8dcb77d7c600e064209",
+      "destination_sha256": "5875487f412b0fe900fae2a24a64e757113131dee64ad8dcb77d7c600e064209"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-ordinary-o03/task.toml",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-ordinary-o03/task.toml",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "249ec12342f09901a36f9092bdf33417a0656c1f6db2a75924ead52833d68bbf",
+      "destination_sha256": "249ec12342f09901a36f9092bdf33417a0656c1f6db2a75924ead52833d68bbf"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/harbor-ordinary-o03/tests/test.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/harbor-ordinary-o03/tests/test.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2cb7d36bf4128d9e37250c27d2f0ab5301cebd759e7bcbe2cd6ccafe1d27f8fe",
+      "destination_sha256": "2cb7d36bf4128d9e37250c27d2f0ab5301cebd759e7bcbe2cd6ccafe1d27f8fe"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/evaluation.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/evaluation.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b67b9c068600d2d63186608bdcdbd185c58fb58f383b53834002b4091fd1bc8c",
+      "destination_sha256": "b67b9c068600d2d63186608bdcdbd185c58fb58f383b53834002b4091fd1bc8c"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/public/TASK.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/public/TASK.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "17a751f59b1db12eb6b97343ed32f638c44cee585f19e69b6cd22f04b846eb5d",
+      "destination_sha256": "17a751f59b1db12eb6b97343ed32f638c44cee585f19e69b6cd22f04b846eb5d"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/public/legacy_client.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/public/legacy_client.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "697123fbc0ae92c16a8373a28f06f0ee8cce597de4464de3eb3ecc02cc1e0ac8",
+      "destination_sha256": "697123fbc0ae92c16a8373a28f06f0ee8cce597de4464de3eb3ecc02cc1e0ac8"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/public/migrate.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/public/migrate.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "79e347182bcf6789c190f0d114040f969ebef3e63489403fe69bfff723bd77da",
+      "destination_sha256": "79e347182bcf6789c190f0d114040f969ebef3e63489403fe69bfff723bd77da"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/public/schema.sql",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/public/schema.sql",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b86e951f0f72e1e681a10c50dd5881a2e31713a733674b8ba0e8d2313ecad225",
+      "destination_sha256": "b86e951f0f72e1e681a10c50dd5881a2e31713a733674b8ba0e8d2313ecad225"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/public/setup_workspace.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/public/setup_workspace.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "6459600b60c2c19c179aa895e232ac57a70adcc81acffbfef53fc51f559b1968",
+      "destination_sha256": "6459600b60c2c19c179aa895e232ac57a70adcc81acffbfef53fc51f559b1968"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/public/test_contract.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/public/test_contract.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9df1d4a62a18f3c6748d1fe6ade0e508f2efc3904311ecb07be32519f3a91b36",
+      "destination_sha256": "9df1d4a62a18f3c6748d1fe6ade0e508f2efc3904311ecb07be32519f3a91b36"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/public/verify.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/public/verify.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "529cd742ef0610b00b39444280896227e7ef96deb1ce96bcb35425856972eb7d",
+      "destination_sha256": "529cd742ef0610b00b39444280896227e7ef96deb1ce96bcb35425856972eb7d"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/reference/migrate.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/reference/migrate.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9481f7b9faaa7d1deb477a4426d2a3225894cae9ed96004c416ac68b071d7a50",
+      "destination_sha256": "9481f7b9faaa7d1deb477a4426d2a3225894cae9ed96004c416ac68b071d7a50"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M05/user_context.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M05/user_context.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9db7be0c4d861b1f57cf4d783971f2384c9fa6063b801401f6932eac8e2857ae",
+      "destination_sha256": "9db7be0c4d861b1f57cf4d783971f2384c9fa6063b801401f6932eac8e2857ae"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/evaluation.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/evaluation.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "eda78606d1f685b4df55d6d34e70097fdcbfbb5aacaf788fbc72883e7df7eb20",
+      "destination_sha256": "eda78606d1f685b4df55d6d34e70097fdcbfbb5aacaf788fbc72883e7df7eb20"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/public/TASK.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/public/TASK.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e2c55c32d9ddac62d0cc53d25ee3423d52de98e242a37797b81316432c477f17",
+      "destination_sha256": "e2c55c32d9ddac62d0cc53d25ee3423d52de98e242a37797b81316432c477f17"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/public/clients/billing.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/public/clients/billing.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "791f265220e0cff0bc87d4688d3b0f70d0b76dc26db3bcab02a4dc5df119e89c",
+      "destination_sha256": "791f265220e0cff0bc87d4688d3b0f70d0b76dc26db3bcab02a4dc5df119e89c"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/public/clients/dashboard.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/public/clients/dashboard.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e6eae507445d5bfd22d77adb45b7f5a5825c97e10e8a976b7e9a06f986799ed8",
+      "destination_sha256": "e6eae507445d5bfd22d77adb45b7f5a5825c97e10e8a976b7e9a06f986799ed8"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/public/exporter.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/public/exporter.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "a368993e4ea9a1d4ed428f86f8cd7e190d1c7f50016d852bdfb7e45496671de5",
+      "destination_sha256": "a368993e4ea9a1d4ed428f86f8cd7e190d1c7f50016d852bdfb7e45496671de5"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/public/fixtures.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/public/fixtures.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "7678d1b5d8f7b99fae668c29aef6054695a351d75c9336d35225510b9fe64a35",
+      "destination_sha256": "7678d1b5d8f7b99fae668c29aef6054695a351d75c9336d35225510b9fe64a35"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/public/test_contract.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/public/test_contract.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d3e4eaed532879bc24125b93432a2d299d053acb26902826db2d1b892c2dd4f8",
+      "destination_sha256": "d3e4eaed532879bc24125b93432a2d299d053acb26902826db2d1b892c2dd4f8"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/public/verify.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/public/verify.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "529cd742ef0610b00b39444280896227e7ef96deb1ce96bcb35425856972eb7d",
+      "destination_sha256": "529cd742ef0610b00b39444280896227e7ef96deb1ce96bcb35425856972eb7d"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/reference/clients/dashboard.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/reference/clients/dashboard.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e5a9228f2c46fa7954500939407b3d74a6358d34b5097b4b12f161de7f789801",
+      "destination_sha256": "e5a9228f2c46fa7954500939407b3d74a6358d34b5097b4b12f161de7f789801"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/reference/exporter.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/reference/exporter.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ae7d22132c9b6bb5139207eb450f7cd83ce42665a483bd143298cb5b9e8ee70b",
+      "destination_sha256": "ae7d22132c9b6bb5139207eb450f7cd83ce42665a483bd143298cb5b9e8ee70b"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/user_context.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M07/user_context.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9b9a94676c50cc3186b5220491feb33f8e1c93ec4ce8e28c245eb3cb7cf2e9c5",
+      "destination_sha256": "9b9a94676c50cc3186b5220491feb33f8e1c93ec4ce8e28c245eb3cb7cf2e9c5"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/evaluation.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/evaluation.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "669923c178b5b2a225a2c3b06e1baf92bfbf80035af4eb4e5748c55f853d65e6",
+      "destination_sha256": "669923c178b5b2a225a2c3b06e1baf92bfbf80035af4eb4e5748c55f853d65e6"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/public/TASK.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/public/TASK.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "7973e2257e02daa9e1d9025fc4b0a166f97b1e0882440161ceff5398054ee2e3",
+      "destination_sha256": "7973e2257e02daa9e1d9025fc4b0a166f97b1e0882440161ceff5398054ee2e3"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/public/daily_sales.csv",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/public/daily_sales.csv",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "6d9e0d2c741643f991e1726e427496acf858d3ddead5da74b80f575192975aaa",
+      "destination_sha256": "6d9e0d2c741643f991e1726e427496acf858d3ddead5da74b80f575192975aaa"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/public/pipeline.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/public/pipeline.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0b49b06aab732ddd7fe5c979cf446324c217aceaaa5ab976923d4588c8ba7c1a",
+      "destination_sha256": "0b49b06aab732ddd7fe5c979cf446324c217aceaaa5ab976923d4588c8ba7c1a"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/public/report.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/public/report.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b162399e1154798466b2f754e48c5b876f69be5ccd3ba2053195674741d6fe7c",
+      "destination_sha256": "b162399e1154798466b2f754e48c5b876f69be5ccd3ba2053195674741d6fe7c"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/public/schedule.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/public/schedule.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8bc7f203bfd193e7c3b819fc78c6b4f8d0516e76cd8f2f02273b4215b7b6d1c7",
+      "destination_sha256": "8bc7f203bfd193e7c3b819fc78c6b4f8d0516e76cd8f2f02273b4215b7b6d1c7"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/public/test_contract.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/public/test_contract.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "3de595f0b35b1afe6c8c9dcb151601bcec7d69d7450a3f27ecac7a529554169a",
+      "destination_sha256": "3de595f0b35b1afe6c8c9dcb151601bcec7d69d7450a3f27ecac7a529554169a"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/public/test_pipeline.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/public/test_pipeline.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "cc644e27442ad163eefe663b1c8cf73e547b0cbe9a52aac00547c3e4000086b0",
+      "destination_sha256": "cc644e27442ad163eefe663b1c8cf73e547b0cbe9a52aac00547c3e4000086b0"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/public/verify.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/public/verify.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "6d4d0f8af473d2d93e1d601872e26f3092a9e53e39d1f0f474ec4b64b6d6bcbc",
+      "destination_sha256": "6d4d0f8af473d2d93e1d601872e26f3092a9e53e39d1f0f474ec4b64b6d6bcbc"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/reference/pipeline.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/reference/pipeline.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8cc64d86a68d25fa2461a1c1528887b35569727e2d238229e7abf00ae6383ad1",
+      "destination_sha256": "8cc64d86a68d25fa2461a1c1528887b35569727e2d238229e7abf00ae6383ad1"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/reference/report.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/reference/report.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f5898962562aef9bd74bd7239abea7c94267b21ee9fdac93c98ba061e820644a",
+      "destination_sha256": "f5898962562aef9bd74bd7239abea7c94267b21ee9fdac93c98ba061e820644a"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/user_context.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M09/user_context.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "5d0a140a535eb379830cfe76f0ef62dffd07cb9bbe335b15072c50144f04c73e",
+      "destination_sha256": "5d0a140a535eb379830cfe76f0ef62dffd07cb9bbe335b15072c50144f04c73e"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/evaluation.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/evaluation.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2783b57e82e71ed4c4985c78f54fe768d946f5bed573b8599e33982e89659898",
+      "destination_sha256": "2783b57e82e71ed4c4985c78f54fe768d946f5bed573b8599e33982e89659898"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/public/SYNC_CONTRACT.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/public/SYNC_CONTRACT.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f89052b8fc0241c08418a8b21214521b85bca1d2624882d1f5145a44a28206d2",
+      "destination_sha256": "f89052b8fc0241c08418a8b21214521b85bca1d2624882d1f5145a44a28206d2"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/public/TASK.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/public/TASK.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "27af5a1ba6a3d1e3085cb2193ecab407495bf1b04e644fcafe519dfbf8c3ea90",
+      "destination_sha256": "27af5a1ba6a3d1e3085cb2193ecab407495bf1b04e644fcafe519dfbf8c3ea90"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/public/messages.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/public/messages.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "38e9ef984816a1b771776dbc217dcdb0637cf51edbb605854a0037043470c47d",
+      "destination_sha256": "38e9ef984816a1b771776dbc217dcdb0637cf51edbb605854a0037043470c47d"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/public/sync.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/public/sync.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8ef020f0d7457e42685f70e472c50543f4d22d147dc9dfc3987e34f5f86fc163",
+      "destination_sha256": "8ef020f0d7457e42685f70e472c50543f4d22d147dc9dfc3987e34f5f86fc163"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/public/test_fixture.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/public/test_fixture.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b531861f7f3528be751ad72598ec7ca49ec572f1a48413b8d46887ecd30d1fcb",
+      "destination_sha256": "b531861f7f3528be751ad72598ec7ca49ec572f1a48413b8d46887ecd30d1fcb"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/public/test_regression.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/public/test_regression.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d9b9bf9da78d8e05b7b6f8a8302bdda90bcb69c51af497e7b5fa9cfd419130eb",
+      "destination_sha256": "d9b9bf9da78d8e05b7b6f8a8302bdda90bcb69c51af497e7b5fa9cfd419130eb"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/public/test_smoke.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/public/test_smoke.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "381cb83acd7a5562500b30104f725cfe733c3e1be7cb1278d1bdfbc6b0112bbc",
+      "destination_sha256": "381cb83acd7a5562500b30104f725cfe733c3e1be7cb1278d1bdfbc6b0112bbc"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/public/verify.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/public/verify.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "baed819adbee75674d289f26bbf3170b4396582226207366d4771d2a425ebb46",
+      "destination_sha256": "baed819adbee75674d289f26bbf3170b4396582226207366d4771d2a425ebb46"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/reference/sync.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/reference/sync.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "950ceb9f112b45d3464941679d7e16cb07325b39a610113e193b40a76953c106",
+      "destination_sha256": "950ceb9f112b45d3464941679d7e16cb07325b39a610113e193b40a76953c106"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/user_context.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/M10/user_context.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "98a5a184a428c6a51f70841a08842011e21b50f888135a8bc7357493c74e6874",
+      "destination_sha256": "98a5a184a428c6a51f70841a08842011e21b50f888135a8bc7357493c74e6874"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/README.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/README.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b10592a065264f20e8baba62ee12150bc777bd255c86c2074263aefd053e4a54",
+      "destination_sha256": "b10592a065264f20e8baba62ee12150bc777bd255c86c2074263aefd053e4a54"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/SPEC.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/SPEC.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1d5b9e70ec3c6ae68e285a5e46daeb46731e3b4133791ab6e3c81c59e6df6cde",
+      "destination_sha256": "1d5b9e70ec3c6ae68e285a5e46daeb46731e3b4133791ab6e3c81c59e6df6cde"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/check_manifest.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/check_manifest.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "7140250e7d7d4c33f19b573d1d6a711a88d6a98754bdacfdec94e18a95f5481f",
+      "destination_sha256": "7140250e7d7d4c33f19b573d1d6a711a88d6a98754bdacfdec94e18a95f5481f"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/manifest.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/mechanism-seeds/manifest.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "cf4f7c823823253fd1a9a34c35f2ebbcc75365e507869d32aa87577662d93c27",
+      "destination_sha256": "cf4f7c823823253fd1a9a34c35f2ebbcc75365e507869d32aa87577662d93c27"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/migrate_n1_oom.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/migrate_n1_oom.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "602fbdc17d81f7926598b6c2101361be5cea97a3b7fd9e27535b448372d6700e",
+      "destination_sha256": "602fbdc17d81f7926598b6c2101361be5cea97a3b7fd9e27535b448372d6700e"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/monitor_scaling_runs.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/monitor_scaling_runs.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1f36b0919f664eaa48dc4b0acdf56af659c88a63353f1b82ba245b610b1e7a66",
+      "destination_sha256": "1f36b0919f664eaa48dc4b0acdf56af659c88a63353f1b82ba245b610b1e7a66"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/n8-preflight-20260921.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/n8-preflight-20260921.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "a43f0a7c089860ca6e4ad7d7c1abad9fb0ec8df36faad34864a99350215f1877",
+      "destination_sha256": "a43f0a7c089860ca6e4ad7d7c1abad9fb0ec8df36faad34864a99350215f1877"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/prepare_scaling_resources.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/prepare_scaling_resources.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fa5b837703252364b5662a68c5d9490da2f526330dfa1b697a807ba684670d2a",
+      "destination_sha256": "fa5b837703252364b5662a68c5d9490da2f526330dfa1b697a807ba684670d2a"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/prepare_scaling_runtime_bundles.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "dedfab6af5b0dc7314bbe5a2b1206fc370d1d7e5e164e035c7439dde8b6183f3",
+      "destination_sha256": "dedfab6af5b0dc7314bbe5a2b1206fc370d1d7e5e164e035c7439dde8b6183f3"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/prompts/swebench-dev/marshmallow-code__marshmallow-2123.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/prompts/swebench-dev/marshmallow-code__marshmallow-2123.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2d11c43cbd760c470d0e7a9cfbf96bfa65aa13898d7b8954930eb6a56f283e4d",
+      "destination_sha256": "2d11c43cbd760c470d0e7a9cfbf96bfa65aa13898d7b8954930eb6a56f283e4d"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/prompts/swebench-dev/pylint-dev__astroid-1030.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/prompts/swebench-dev/pylint-dev__astroid-1030.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "89e66006b95d6b46b2174560a7139b753fe3f842341b09c721421097e36c1b2a",
+      "destination_sha256": "89e66006b95d6b46b2174560a7139b753fe3f842341b09c721421097e36c1b2a"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/prompts/swebench-dev/sqlfluff__sqlfluff-3608.md",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/prompts/swebench-dev/sqlfluff__sqlfluff-3608.md",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "43a4cbf33c30b3d4693b53d87377ae8fd65d54487ff4c8b2046aab4a554f1442",
+      "destination_sha256": "43a4cbf33c30b3d4693b53d87377ae8fd65d54487ff4c8b2046aab4a554f1442"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/remote_design_delivery_smoke.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/remote_design_delivery_smoke.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "368653bdac61b937d950a9fe84d776e98b0fd0b56246f44d45669ab5ec52f294",
+      "destination_sha256": "368653bdac61b937d950a9fe84d776e98b0fd0b56246f44d45669ab5ec52f294"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/remote_historical_billing.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/remote_historical_billing.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c5ce36701520e68d61a537e5d651878a9c602942d5cc2d0b33eb9baae19b5468",
+      "destination_sha256": "c5ce36701520e68d61a537e5d651878a9c602942d5cc2d0b33eb9baae19b5468"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/remote_real_developer_smoke.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/remote_real_developer_smoke.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bf6aaf5857309adf464fb5253687b365cf4a0b3a0621b593c2ba403cdf2ee6ae",
+      "destination_sha256": "bf6aaf5857309adf464fb5253687b365cf4a0b3a0621b593c2ba403cdf2ee6ae"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_mixed_latency_recovery.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_mixed_latency_recovery.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "708bc6eb08173cd6fb42b295abf3d33c79bf0a4f07456eddb550f1e8cf239b71",
+      "destination_sha256": "708bc6eb08173cd6fb42b295abf3d33c79bf0a4f07456eddb550f1e8cf239b71"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_n1_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_n1_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9d7afe3d4bf8d660fa0693d522c9800a381c446f338365271a41819893cf0eb5",
+      "destination_sha256": "9d7afe3d4bf8d660fa0693d522c9800a381c446f338365271a41819893cf0eb5"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_n1_latency_recovery.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_n1_latency_recovery.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "63cb95a3959a3fec9070d626e61700478ed42f898dc034875fba925ed738b371",
+      "destination_sha256": "63cb95a3959a3fec9070d626e61700478ed42f898dc034875fba925ed738b371"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_scaling_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_scaling_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ea3e389c676f374458b38368085a813b5eb5c94daa9e37fcf2cdf42dabb2f0bb",
+      "destination_sha256": "ea3e389c676f374458b38368085a813b5eb5c94daa9e37fcf2cdf42dabb2f0bb"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_scaling_n16_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_scaling_n16_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bbb95576d6ca0784e58cd6a21b01ff6b2f050bce171d0e62b1c6b8798762f0a6",
+      "destination_sha256": "bbb95576d6ca0784e58cd6a21b01ff6b2f050bce171d0e62b1c6b8798762f0a6"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_scaling_n1_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_scaling_n1_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f12d0107dd7078b6755cee6ab84919c40e3f04e4e64c1e95f124519f516cdabe",
+      "destination_sha256": "f12d0107dd7078b6755cee6ab84919c40e3f04e4e64c1e95f124519f516cdabe"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_scaling_n32_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_scaling_n32_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "74289f0de92cd8b65aad77c1e38dcf11bc4e4e283498fece438043bbefd3d3bd",
+      "destination_sha256": "74289f0de92cd8b65aad77c1e38dcf11bc4e4e283498fece438043bbefd3d3bd"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_scaling_n4_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_scaling_n4_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2b820124ec4923d71a847404071089d008ab688c43a72fecd1ca80f8164fbead",
+      "destination_sha256": "2b820124ec4923d71a847404071089d008ab688c43a72fecd1ca80f8164fbead"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/resume_scaling_n8_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/resume_scaling_n8_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1d1d1c2f20ee26e551112c025049453459d0d5ab19840ca71be883a650e2a749",
+      "destination_sha256": "1d1d1c2f20ee26e551112c025049453459d0d5ab19840ca71be883a650e2a749"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/run_canary_with_n1_gitea.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/run_canary_with_n1_gitea.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1d2993b8016af01599007a657fa63806c7fe858380e7f4b4329cb2c1cbb69870",
+      "destination_sha256": "1d2993b8016af01599007a657fa63806c7fe858380e7f4b4329cb2c1cbb69870"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/run_daytona_design_delivery.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/run_daytona_design_delivery.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "afbd81b0f22749183e737bc229a8db1993bbabc66cc2ff7ebb6af3c4a83ceafa",
+      "destination_sha256": "afbd81b0f22749183e737bc229a8db1993bbabc66cc2ff7ebb6af3c4a83ceafa"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/run_daytona_historical_billing.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/run_daytona_historical_billing.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "deb0fc14be0092b3d89b0e3931cda60ec56c6a3bf914504ada99f31673e41bf0",
+      "destination_sha256": "deb0fc14be0092b3d89b0e3931cda60ec56c6a3bf914504ada99f31673e41bf0"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/run_daytona_real_developer.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/run_daytona_real_developer.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "42a0588abb17c1652602a44238dc28351f0d1b1078835d9b2fdd9b083ef75121",
+      "destination_sha256": "42a0588abb17c1652602a44238dc28351f0d1b1078835d9b2fdd9b083ef75121"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/run_e2b_full_loop_canary.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/run_e2b_full_loop_canary.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "7708e18577027a13c0784eb0b00cd672173d313ceb83539403bdc0ccda98012c",
+      "destination_sha256": "7708e18577027a13c0784eb0b00cd672173d313ceb83539403bdc0ccda98012c"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/run_n1_e2b.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/run_n1_e2b.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b133edf8c9b89a9f89ca0aff4942fbde059b882746ed68fc41b58edcc27c9fb6",
+      "destination_sha256": "b133edf8c9b89a9f89ca0aff4942fbde059b882746ed68fc41b58edcc27c9fb6"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/run_scaling_bundle_e2b.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "6c1e0a2aae6e146e0af2e49e69923205475e22d611eb22fe1676adcecc89f8a4",
+      "destination_sha256": "6c1e0a2aae6e146e0af2e49e69923205475e22d611eb22fe1676adcecc89f8a4"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/run_scaling_e2b.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/run_scaling_e2b.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "877a6613078cf41617980a9134daf5ecf588f3630b798a05fe6b61b01380f6b4",
+      "destination_sha256": "877a6613078cf41617980a9134daf5ecf588f3630b798a05fe6b61b01380f6b4"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/schemas/batch-result.schema.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/schemas/batch-result.schema.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fffaddac9c0c3ae6a0acc4b5d487b1c107df0d5a95825800249bde2e8c41bc37",
+      "destination_sha256": "fffaddac9c0c3ae6a0acc4b5d487b1c107df0d5a95825800249bde2e8c41bc37"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/schemas/checkpoint.schema.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/schemas/checkpoint.schema.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "12a612ba35bcf88308eb15799006620aecd6b9020e3317b4036494e2aa1489f0",
+      "destination_sha256": "12a612ba35bcf88308eb15799006620aecd6b9020e3317b4036494e2aa1489f0"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/schemas/trial-result.schema.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/schemas/trial-result.schema.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b4c62d94af9b13116593cf746322fe2d4b5a474c0c9cdd3b22c44321758d4b9e",
+      "destination_sha256": "b4c62d94af9b13116593cf746322fe2d4b5a474c0c9cdd3b22c44321758d4b9e"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/start_n1_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/start_n1_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "6552fa11b8b78d75901b57e754da3445474cfe19f6cdbbcebe04f32276afbccf",
+      "destination_sha256": "6552fa11b8b78d75901b57e754da3445474cfe19f6cdbbcebe04f32276afbccf"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/start_scaling_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/start_scaling_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "69b72dd7b61a45e284379520f36cae38fce9c9b25c34f53d4adc293296efc4f6",
+      "destination_sha256": "69b72dd7b61a45e284379520f36cae38fce9c9b25c34f53d4adc293296efc4f6"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/start_scaling_n16_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/start_scaling_n16_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "3c421e49f218033df68469c83b2db823bf3ade3e2690dd1cb29c4094dcde1683",
+      "destination_sha256": "3c421e49f218033df68469c83b2db823bf3ade3e2690dd1cb29c4094dcde1683"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/start_scaling_n1_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/start_scaling_n1_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2a00a715efa2864e3e922b25951133df247fb899b703fbe3ea25d1e7bd27234c",
+      "destination_sha256": "2a00a715efa2864e3e922b25951133df247fb899b703fbe3ea25d1e7bd27234c"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/start_scaling_n32_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/start_scaling_n32_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "4bfb021157fba904e3ea7407e636c19f980f80efbaf83d20ced2e3c41e7d04b9",
+      "destination_sha256": "4bfb021157fba904e3ea7407e636c19f980f80efbaf83d20ced2e3c41e7d04b9"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/start_scaling_n4_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/start_scaling_n4_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1440f85aaa2a38543af45010637373fbbb0ba67a30c529c20cacf2ffdfe9ba04",
+      "destination_sha256": "1440f85aaa2a38543af45010637373fbbb0ba67a30c529c20cacf2ffdfe9ba04"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/start_scaling_n8_e2b.sh",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/start_scaling_n8_e2b.sh",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "958f672ed5a21c81d758b8625619263b3d624650bed69906cb0ae3b7c94a11b8",
+      "destination_sha256": "958f672ed5a21c81d758b8625619263b3d624650bed69906cb0ae3b7c94a11b8"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/sync_status_vps.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/sync_status_vps.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "70b4aaab0862abe9a2ad397219cfb9c8235e2e91ce4908176e8cf86bd527e3bd",
+      "destination_sha256": "70b4aaab0862abe9a2ad397219cfb9c8235e2e91ce4908176e8cf86bd527e3bd"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/task-manifest.json",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/task-manifest.json",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "663ee8abd354671434b172494a6e261cd04f39458d8f3dc9ea7424712f0cb0e7",
+      "destination_sha256": "663ee8abd354671434b172494a6e261cd04f39458d8f3dc9ea7424712f0cb0e7"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/tools/checkpoint_store.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/tools/checkpoint_store.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1dda07e5f578b4284a7c0a3d4c046c45baad51216ae337652d26e28e983415d5",
+      "destination_sha256": "1dda07e5f578b4284a7c0a3d4c046c45baad51216ae337652d26e28e983415d5"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/tools/summarize_results.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/tools/summarize_results.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "5b470d7894175ca4b22d0f96fd7e3d84ecb2956b08bfec4be5fe2ffa5ec2b242",
+      "destination_sha256": "5b470d7894175ca4b22d0f96fd7e3d84ecb2956b08bfec4be5fe2ffa5ec2b242"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/tools/validate_mixed_config.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/tools/validate_mixed_config.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "366dba4d0a0e84a44f8943074a50c3d194bea30db4d096ffb76ec6f8fd635ec9",
+      "destination_sha256": "366dba4d0a0e84a44f8943074a50c3d194bea30db4d096ffb76ec6f8fd635ec9"
+    },
+    {
+      "original_path": "evaluation/harness-suite-20260920/vps_status_dashboard.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/vps_status_dashboard.py",
+      "reason": "Frozen historical research; reproduce with recorded checkout",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "774c191ba5d6425a1bc7e66ee70f7b23f10df8011bd69f6c61450eb65e65f7ed",
+      "destination_sha256": "774c191ba5d6425a1bc7e66ee70f7b23f10df8011bd69f6c61450eb65e65f7ed"
+    },
+    {
+      "original_path": "evaluation/harness_bench/README.md",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/README.md",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "a929db9a8f2d0045fc21ccd091dbdcf8653e57cb7e537d45832f0f90ef9979d9",
+      "destination_sha256": "a929db9a8f2d0045fc21ccd091dbdcf8653e57cb7e537d45832f0f90ef9979d9"
+    },
+    {
+      "original_path": "evaluation/harness_bench/__init__.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/__init__.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "663597b33788aa6854d0d31c7060b14d15af48f863cad2cd9c5af2f415f16912",
+      "destination_sha256": "663597b33788aa6854d0d31c7060b14d15af48f863cad2cd9c5af2f415f16912"
+    },
+    {
+      "original_path": "evaluation/harness_bench/benchmarks/__init__.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/benchmarks/__init__.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ad5a866c18a2f7e09a9b0a67480cc862be193326efa1bea7d4c2c4e64e3b7501",
+      "destination_sha256": "ad5a866c18a2f7e09a9b0a67480cc862be193326efa1bea7d4c2c4e64e3b7501"
+    },
+    {
+      "original_path": "evaluation/harness_bench/benchmarks/base.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/benchmarks/base.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ac99f6471c23ba1ed732e2670bf79e5f2220128f5028bbfb8fac3f6e634c31cc",
+      "destination_sha256": "ac99f6471c23ba1ed732e2670bf79e5f2220128f5028bbfb8fac3f6e634c31cc"
+    },
+    {
+      "original_path": "evaluation/harness_bench/benchmarks/swebench.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/benchmarks/swebench.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2ecf41428a10e02cf7eb90797e4b7e4a152d93f576b9645aa9225150e2023a19",
+      "destination_sha256": "2ecf41428a10e02cf7eb90797e4b7e4a152d93f576b9645aa9225150e2023a19"
+    },
+    {
+      "original_path": "evaluation/harness_bench/benchmarks/tau3.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/benchmarks/tau3.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "abf1144642bc00daf2f79cfc00064ce4b84fab70c715666233c9a2aa3f479d29",
+      "destination_sha256": "abf1144642bc00daf2f79cfc00064ce4b84fab70c715666233c9a2aa3f479d29"
+    },
+    {
+      "original_path": "evaluation/harness_bench/benchmarks/terminal_bench.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/benchmarks/terminal_bench.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "3975b11bf23f254baed0c9bca84fa37f5e945bd99ae93001c84ea6585a72afaf",
+      "destination_sha256": "3975b11bf23f254baed0c9bca84fa37f5e945bd99ae93001c84ea6585a72afaf"
+    },
+    {
+      "original_path": "evaluation/harness_bench/benchmarks/tua_bench.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/benchmarks/tua_bench.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "10d56d22a43f1facdc2a63d9a121af0f1f42290f5c04f0dbbe8a1cce11fdec4c",
+      "destination_sha256": "10d56d22a43f1facdc2a63d9a121af0f1f42290f5c04f0dbbe8a1cce11fdec4c"
+    },
+    {
+      "original_path": "evaluation/harness_bench/cli.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/cli.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c4bb55e2bd1baf9aafab18e4e65c2d35d860751744444b16ad41e2d98b39a0c8",
+      "destination_sha256": "c4bb55e2bd1baf9aafab18e4e65c2d35d860751744444b16ad41e2d98b39a0c8"
+    },
+    {
+      "original_path": "evaluation/harness_bench/config.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/config.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8b4fa416ff10b3fdcdb9c0f26bf22ac3928e934b941c3568b82ac721f185ce89",
+      "destination_sha256": "8b4fa416ff10b3fdcdb9c0f26bf22ac3928e934b941c3568b82ac721f185ce89"
+    },
+    {
+      "original_path": "evaluation/harness_bench/harbor_historical_user_agent.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/harbor_historical_user_agent.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "836a18fd618435c82d537bbcdf78ef6a49efe794c01735791e109f577aa509d3",
+      "destination_sha256": "836a18fd618435c82d537bbcdf78ef6a49efe794c01735791e109f577aa509d3"
+    },
+    {
+      "original_path": "evaluation/harness_bench/harbor_historical_user_driver.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/harbor_historical_user_driver.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1c973ac58aee4f354224fdee1d6ea14b475d36f0b37339ab7b877d9783b9ce10",
+      "destination_sha256": "1c973ac58aee4f354224fdee1d6ea14b475d36f0b37339ab7b877d9783b9ce10"
+    },
+    {
+      "original_path": "evaluation/harness_bench/harbor_v0_agent.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/harbor_v0_agent.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d22bf31d0e3ca36c215cf944ae4d038a6d6a9ddd33bde0f0da06669caa99a3ca",
+      "destination_sha256": "3100212b276750f43ef3dcda74dc3eb4bec4ab3582b81f2c1527af1d4669641e"
+    },
+    {
+      "original_path": "evaluation/harness_bench/harbor_v0_driver.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/harbor_v0_driver.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f48b5e816d5eca5caef9816ab6f4d98e3203983a92e6f1a0deeb32e27aae07f7",
+      "destination_sha256": "f48b5e816d5eca5caef9816ab6f4d98e3203983a92e6f1a0deeb32e27aae07f7"
+    },
+    {
+      "original_path": "evaluation/harness_bench/harness/__init__.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/harness/__init__.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "681476c35328e915b41a6a1936a5dab47227b71546e76b87208903343187627b",
+      "destination_sha256": "681476c35328e915b41a6a1936a5dab47227b71546e76b87208903343187627b"
+    },
+    {
+      "original_path": "evaluation/harness_bench/harness/adapters.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/harness/adapters.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "3ff47ccbfde7cadec26b5aca3ae89d43c90f1e2716765b32c2aa9d232166a605",
+      "destination_sha256": "3ff47ccbfde7cadec26b5aca3ae89d43c90f1e2716765b32c2aa9d232166a605"
+    },
+    {
+      "original_path": "evaluation/harness_bench/harness/protocol.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/harness/protocol.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "7c6ed0c9e4485be97ac8bd473ae2e120a2b46e8c0f70518887096be2404c54a4",
+      "destination_sha256": "7c6ed0c9e4485be97ac8bd473ae2e120a2b46e8c0f70518887096be2404c54a4"
+    },
+    {
+      "original_path": "evaluation/harness_bench/harness/session.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/harness/session.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "438aa5dbb11336b1b0b8ededb95f91e75dbb90e78d0c40efa1bbd75edf0b2b0b",
+      "destination_sha256": "438aa5dbb11336b1b0b8ededb95f91e75dbb90e78d0c40efa1bbd75edf0b2b0b"
+    },
+    {
+      "original_path": "evaluation/harness_bench/interactions/__init__.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/interactions/__init__.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bbb4f66e8ede4a6960f40f089e45b3393b62d8423ae6fcf801868c2e66b7686d",
+      "destination_sha256": "bbb4f66e8ede4a6960f40f089e45b3393b62d8423ae6fcf801868c2e66b7686d"
+    },
+    {
+      "original_path": "evaluation/harness_bench/interactions/base.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/interactions/base.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1e0c29a35cdfe528272363403dccb1f4cfe1d04e5adf4e0849ada50105056d52",
+      "destination_sha256": "1e0c29a35cdfe528272363403dccb1f4cfe1d04e5adf4e0849ada50105056d52"
+    },
+    {
+      "original_path": "evaluation/harness_bench/interactions/direct.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/interactions/direct.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "db847af9ad001d94cfe4aabff5550e28e26aaa35536b818fa3af62c1f376ff26",
+      "destination_sha256": "db847af9ad001d94cfe4aabff5550e28e26aaa35536b818fa3af62c1f376ff26"
+    },
+    {
+      "original_path": "evaluation/harness_bench/interactions/native_user.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/interactions/native_user.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "82f93d609056808c2d1b065464f85b796b207f98966b63d94ecc3d0d42d5e6cf",
+      "destination_sha256": "82f93d609056808c2d1b065464f85b796b207f98966b63d94ecc3d0d42d5e6cf"
+    },
+    {
+      "original_path": "evaluation/harness_bench/interactions/simulated_user.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/interactions/simulated_user.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e5098f400b05baeb7fd5c6c7dfb0693c30034ffc19b82498a6149ae116e3923e",
+      "destination_sha256": "e5098f400b05baeb7fd5c6c7dfb0693c30034ffc19b82498a6149ae116e3923e"
+    },
+    {
+      "original_path": "evaluation/harness_bench/manifest.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/manifest.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "39d0accb11a32301273824544a5ea078b8f44c4f53b031a98b6eecc5f8ee6ad7",
+      "destination_sha256": "39d0accb11a32301273824544a5ea078b8f44c4f53b031a98b6eecc5f8ee6ad7"
+    },
+    {
+      "original_path": "evaluation/harness_bench/orchestrator.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/orchestrator.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "637977f25beac348b349c3ae2d55416233165e2d958964170337d874dd9ecc40",
+      "destination_sha256": "637977f25beac348b349c3ae2d55416233165e2d958964170337d874dd9ecc40"
+    },
+    {
+      "original_path": "evaluation/harness_bench/outcomes.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/outcomes.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c628d1627dfd04e7829149780fcb67dae23aa0a25df49c05aab9e300728e176e",
+      "destination_sha256": "c628d1627dfd04e7829149780fcb67dae23aa0a25df49c05aab9e300728e176e"
+    },
+    {
+      "original_path": "evaluation/harness_bench/providers/__init__.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/providers/__init__.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "847deb0a4c0f8b08004de73e0f203552bc9971f97c872d9faaa807d3954f1788",
+      "destination_sha256": "847deb0a4c0f8b08004de73e0f203552bc9971f97c872d9faaa807d3954f1788"
+    },
+    {
+      "original_path": "evaluation/harness_bench/providers/base.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/providers/base.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f2c3874a9720062fe189e12ec7c97122307468d04827716f9e7e1ac10715e39e",
+      "destination_sha256": "f2c3874a9720062fe189e12ec7c97122307468d04827716f9e7e1ac10715e39e"
+    },
+    {
+      "original_path": "evaluation/harness_bench/providers/daytona.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/providers/daytona.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ca15c836c247ca8035b26af7a03061017e0a219cf346eae057987418dd082184",
+      "destination_sha256": "ca15c836c247ca8035b26af7a03061017e0a219cf346eae057987418dd082184"
+    },
+    {
+      "original_path": "evaluation/harness_bench/providers/local.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/providers/local.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f36b2569188e2196ef87a2335e48bcb8d844ef72ea5c16904f8e0335c55e2bff",
+      "destination_sha256": "f36b2569188e2196ef87a2335e48bcb8d844ef72ea5c16904f8e0335c55e2bff"
+    },
+    {
+      "original_path": "evaluation/harness_bench/remote_driver.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/remote_driver.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "86b82a197707432a4c5ac84a22260ce8f0fce51963aedba90ade199720870e17",
+      "destination_sha256": "86b82a197707432a4c5ac84a22260ce8f0fce51963aedba90ade199720870e17"
+    },
+    {
+      "original_path": "evaluation/harness_bench/report.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/report.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "646c5e713bf7f3e7a41bbff365a069dbcb2da21c3f7162625c6e50dad3a509f7",
+      "destination_sha256": "646c5e713bf7f3e7a41bbff365a069dbcb2da21c3f7162625c6e50dad3a509f7"
+    },
+    {
+      "original_path": "evaluation/harness_bench/sandbox.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/sandbox.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "644b62f56f7656d826bb2470d3830e2fd64ad571834366afeecad7ad653d2209",
+      "destination_sha256": "644b62f56f7656d826bb2470d3830e2fd64ad571834366afeecad7ad653d2209"
+    },
+    {
+      "original_path": "evaluation/harness_bench/schema.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/schema.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e73da5d7cb00885d2ad3a162ae60edb9ba4ac458e250387633d14d0778802022",
+      "destination_sha256": "e73da5d7cb00885d2ad3a162ae60edb9ba4ac458e250387633d14d0778802022"
+    },
+    {
+      "original_path": "evaluation/harness_bench/state.py",
+      "disposition": "maintained",
+      "destination": "evaluation/harness_bench/state.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fd905b9e292a282c81a753ec344d3769a1a11d54d1100d997f942445434a3609",
+      "destination_sha256": "fd905b9e292a282c81a753ec344d3769a1a11d54d1100d997f942445434a3609"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/.gitignore",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/.gitignore",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "dcac4e4c9275ef07b4c30730fc27372734e380573a686ed66d2043be90de1926",
+      "destination_sha256": "dcac4e4c9275ef07b4c30730fc27372734e380573a686ed66d2043be90de1926"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/README.md",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/README.md",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d80a07f334ce73e523f261c63bd03694cc50622cefd52b6dea31d05d9baa467e",
+      "destination_sha256": "d80a07f334ce73e523f261c63bd03694cc50622cefd52b6dea31d05d9baa467e"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/adapters/__init__.py",
+      "disposition": "moved",
+      "destination": "evaluation/adapters/__init__.py",
+      "reason": "Adapter still used by independent evaluation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "93cdfb94a45487478355f2f251d32bc3709610daf99e957d7aad1bc836bc9ab2",
+      "destination_sha256": "93cdfb94a45487478355f2f251d32bc3709610daf99e957d7aad1bc836bc9ab2"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/__init__.py",
+      "disposition": "moved",
+      "destination": "evaluation/adapters/harness_v0/__init__.py",
+      "reason": "Adapter still used by independent evaluation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ff0db777331b7c1f0ab5e2a719db48b90e566331e5459c2db034ac99b021ccf3",
+      "destination_sha256": "ff0db777331b7c1f0ab5e2a719db48b90e566331e5459c2db034ac99b021ccf3"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/harbor_driver.py",
+      "disposition": "moved",
+      "destination": "evaluation/adapters/harness_v0/harbor_driver.py",
+      "reason": "Adapter still used by independent evaluation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "1c76031f5d1901c069014bacf779a200bbf901b5123d61b4d9ccd36d55e47655",
+      "destination_sha256": "1c76031f5d1901c069014bacf779a200bbf901b5123d61b4d9ccd36d55e47655"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/llm_user_simulator.py",
+      "disposition": "moved",
+      "destination": "evaluation/adapters/harness_v0/llm_user_simulator.py",
+      "reason": "Adapter still used by independent evaluation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2bd2b7c511c96c14d3ed7d715892440d8e392aa831d7d46dfb8cfef0f9c8926a",
+      "destination_sha256": "2bd2b7c511c96c14d3ed7d715892440d8e392aa831d7d46dfb8cfef0f9c8926a"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/stdio.py",
+      "disposition": "moved",
+      "destination": "evaluation/adapters/harness_v0/stdio.py",
+      "reason": "Adapter still used by independent evaluation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "11cafe3b07fd77860ddd88f92c4654c4603c1782930e0ec25c91926d968c7869",
+      "destination_sha256": "11cafe3b07fd77860ddd88f92c4654c4603c1782930e0ec25c91926d968c7869"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/tau3.py",
+      "disposition": "moved",
+      "destination": "evaluation/adapters/harness_v0/tau3.py",
+      "reason": "Adapter still used by independent evaluation",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c6b63ad320ca549cf0006142bde29228c985cfae3e15ed5f2ae44536508a0ea2",
+      "destination_sha256": "c6b63ad320ca549cf0006142bde29228c985cfae3e15ed5f2ae44536508a0ea2"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/daytona_common.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/daytona_common.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e5bf83033645fe193641e0413850188758558d3a446ad84073d970a54f12fa51",
+      "destination_sha256": "e5bf83033645fe193641e0413850188758558d3a446ad84073d970a54f12fa51"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/expanded8-comparison-ds4-flash.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/expanded8-comparison-ds4-flash.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "6b1bb2d316c2586946619d28fddd96fb38262982968ff2166e15784c52b44129",
+      "destination_sha256": "6b1bb2d316c2586946619d28fddd96fb38262982968ff2166e15784c52b44129"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/expanded8-comparison-v0-vs-strict-goal-r3.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/expanded8-comparison-v0-vs-strict-goal-r3.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b0531110fa8c16e99ebb5fb7e9d692ac6fec5407d0d7ce9228213e0d425bd6d6",
+      "destination_sha256": "b0531110fa8c16e99ebb5fb7e9d692ac6fec5407d0d7ce9228213e0d425bd6d6"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/expanded8-results-strict-goal-r3.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/expanded8-results-strict-goal-r3.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d876bbd70c7d4de6cb4d047832b2da8e17331dd5fdd4068f0aeb693f801fdb55",
+      "destination_sha256": "d876bbd70c7d4de6cb4d047832b2da8e17331dd5fdd4068f0aeb693f801fdb55"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/fetch_and_prepare.sh",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/fetch_and_prepare.sh",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "4c3fd316eb040a4d29820b04bb72f652f382df518d1aede1a176035c8fb4fb13",
+      "destination_sha256": "4c3fd316eb040a4d29820b04bb72f652f382df518d1aede1a176035c8fb4fb13"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/grade_requests6028_daytona.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/grade_requests6028_daytona.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0013dd9cc6bc0aca7faecc904aab81324d9be43a29c93181662baaa1a346a5c1",
+      "destination_sha256": "0013dd9cc6bc0aca7faecc904aab81324d9be43a29c93181662baaa1a346a5c1"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/llm-user-comparison-glm52.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/llm-user-comparison-glm52.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fa8c5426c3ffd6de90384a64671be953ddb8335d79c74138f46db304343a7ba0",
+      "destination_sha256": "fa8c5426c3ffd6de90384a64671be953ddb8335d79c74138f46db304343a7ba0"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/preflight-results-strict-goal-r3.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/preflight-results-strict-goal-r3.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "df172d6cd52ddde01f73b21c52e4581fd291d805954a86f1032bc8841307a759",
+      "destination_sha256": "df172d6cd52ddde01f73b21c52e4581fd291d805954a86f1032bc8841307a759"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/preflight-results.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/preflight-results.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0733461f817d217398f7bf36322d0bc5f0c3fce08d99881abc9acbcf8f8953f3",
+      "destination_sha256": "0733461f817d217398f7bf36322d0bc5f0c3fce08d99881abc9acbcf8f8953f3"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/prepare_evalset.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/prepare_evalset.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "354e36673fd484a737f5dc5f7d72376952c01cff90b721cbabddf28a86f599f9",
+      "destination_sha256": "354e36673fd484a737f5dc5f7d72376952c01cff90b721cbabddf28a86f599f9"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/protocol.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/protocol.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "82c6bb625a1baed34a457bed1785233dd75ad0fa007373711903235c734db646",
+      "destination_sha256": "82c6bb625a1baed34a457bed1785233dd75ad0fa007373711903235c734db646"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/remote_tau3_runner.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/remote_tau3_runner.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "3ac943750a14a0347b254868024164a1867cafce89e0874874c90c67ac271668",
+      "destination_sha256": "3ac943750a14a0347b254868024164a1867cafce89e0874874c90c67ac271668"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_expanded8.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_expanded8.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c724c0950714015c3ecce59c3da485cc86253418acda66d1c5eec6f0fdc7df35",
+      "destination_sha256": "c724c0950714015c3ecce59c3da485cc86253418acda66d1c5eec6f0fdc7df35"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_harnessv0_requests6028.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_harnessv0_requests6028.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "87104058ac24e2979f036a2139b63ec433dcb2c0caa683f66be152450e4d520b",
+      "destination_sha256": "87104058ac24e2979f036a2139b63ec433dcb2c0caa683f66be152450e4d520b"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_llm_user_suite.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_llm_user_suite.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fd152e88d3065b1b792b750b80008861440a3ca6744f231e7591f86f72add412",
+      "destination_sha256": "fd152e88d3065b1b792b750b80008861440a3ca6744f231e7591f86f72add412"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_swe_case.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_swe_case.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2bd3eab63dc7327bdb4d58298e772cb7478ec6f11196931bf5580926559baaa7",
+      "destination_sha256": "2bd3eab63dc7327bdb4d58298e772cb7478ec6f11196931bf5580926559baaa7"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_tau3_preflight.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_tau3_preflight.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "326303e60f6d71b137dba8605109911576464d34bd40accce034f87edcea1ae0",
+      "destination_sha256": "326303e60f6d71b137dba8605109911576464d34bd40accce034f87edcea1ae0"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_terminal_case.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_terminal_case.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d08828942efa6a824f6551a5f77a29b5a0b3373d11e5cdaac1e6c553bf49401a",
+      "destination_sha256": "d08828942efa6a824f6551a5f77a29b5a0b3373d11e5cdaac1e6c553bf49401a"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_terminal_preflight.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_terminal_preflight.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "83d5c51b106bab1e68e80e4485ca1b4ba2baa3ed40f4703c229dfe01cc7001e7",
+      "destination_sha256": "83d5c51b106bab1e68e80e4485ca1b4ba2baa3ed40f4703c229dfe01cc7001e7"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_tua_case.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_tua_case.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fdc3460734e2236827d605d6b2f2b9ca4429ea8191cb791562b9648649f61c50",
+      "destination_sha256": "fdc3460734e2236827d605d6b2f2b9ca4429ea8191cb791562b9648649f61c50"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/run_daytona_tua_preflight.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/run_daytona_tua_preflight.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "cf0ceeccdc0cddc60d5aff4c0dc055f85ab7d4c9d58f4c641fd2dd38b408f08c",
+      "destination_sha256": "cf0ceeccdc0cddc60d5aff4c0dc055f85ab7d4c9d58f4c641fd2dd38b408f08c"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/selection.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/selection.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "621425b9f973adc4e08e58bbeedc139626d902f614b975674b27c7f6e31a7503",
+      "destination_sha256": "621425b9f973adc4e08e58bbeedc139626d902f614b975674b27c7f6e31a7503"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/standard6-results-baseline-v0-glm52.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/standard6-results-baseline-v0-glm52.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "fb9525d67711c2acb133302ee7b6772e82bcb6fa28c002553dbff3d9cf1fa737",
+      "destination_sha256": "fb9525d67711c2acb133302ee7b6772e82bcb6fa28c002553dbff3d9cf1fa737"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/standard6-results-strict-goal-r3-glm52.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/standard6-results-strict-goal-r3-glm52.json",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "24c60564989ef1716cbc22a63314ad16ac72b40f213efdca0c2eebaaee44639b",
+      "destination_sha256": "24c60564989ef1716cbc22a63314ad16ac72b40f213efdca0c2eebaaee44639b"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/tests/test_harness_v0_adapters.py",
+      "disposition": "moved",
+      "destination": "evaluation/tests/test_harness_v0_adapters.py",
+      "reason": "Keep behavior tests for the maintained adapters",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d74fa131bdf326f199176d5db5ef6133a428e81a952457f095eacee8b2aa8c32",
+      "destination_sha256": "a3c07ef5241de82e5dbc183ad9c31b26b09691077411f977feb182a33defca1f"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/tests/test_timeout_policy.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/tests/test_timeout_policy.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "045ef48271558fe1bbcba7fd7affb4ecff9c91c9447b336715ffb094c7e7073d",
+      "destination_sha256": "045ef48271558fe1bbcba7fd7affb4ecff9c91c9447b336715ffb094c7e7073d"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/timeout_policy.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/timeout_policy.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "4dc3cfe6c067c33d74af8ddaa6865e94b0afda597ebebd699d610071164ddfe5",
+      "destination_sha256": "4dc3cfe6c067c33d74af8ddaa6865e94b0afda597ebebd699d610071164ddfe5"
+    },
+    {
+      "original_path": "evaluation/public-bench-pilot/validate_evalset.py",
+      "disposition": "archived",
+      "destination": "research/archives/public-bench-pilot/validate_evalset.py",
+      "reason": "Historical pilot implementation and evidence",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "47dafd286df10e80cd90bf238a407d78bae690d232b24084bef6731833c16889",
+      "destination_sha256": "47dafd286df10e80cd90bf238a407d78bae690d232b24084bef6731833c16889"
+    },
+    {
+      "original_path": "evaluation/tests/__init__.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/__init__.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e917850b780ca02431f58dabba786ba3636b3e4c94b7bd27df7a5c33136099e9",
+      "destination_sha256": "e917850b780ca02431f58dabba786ba3636b3e4c94b7bd27df7a5c33136099e9"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/__init__.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/__init__.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "397384ee08b8ee42695a21e54cc99008a5074b81f10077b0957210076e395065",
+      "destination_sha256": "397384ee08b8ee42695a21e54cc99008a5074b81f10077b0957210076e395065"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/test_benchmarks.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/test_benchmarks.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "524ae753ff96d4bbf885ae4a6565f9d43f2a1c16b9cec7ae9cff0e82d1abde01",
+      "destination_sha256": "524ae753ff96d4bbf885ae4a6565f9d43f2a1c16b9cec7ae9cff0e82d1abde01"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/test_config.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/test_config.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "85c58363ba06b5b57ad0d45b67230745803bd7d62b54a1ac77dbf52addbbaeb4",
+      "destination_sha256": "85c58363ba06b5b57ad0d45b67230745803bd7d62b54a1ac77dbf52addbbaeb4"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/test_harness_session.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/test_harness_session.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b32d57fdf03aa9eedbd88f26b49cc2294bddfa0a1a39890cf411be3beaa2f8a5",
+      "destination_sha256": "b32d57fdf03aa9eedbd88f26b49cc2294bddfa0a1a39890cf411be3beaa2f8a5"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/test_interactions.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/test_interactions.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "aacbbf5632329bb8b5d154b056dffc84ba0a97aec8433279cc1af94ec6847b53",
+      "destination_sha256": "aacbbf5632329bb8b5d154b056dffc84ba0a97aec8433279cc1af94ec6847b53"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/test_manifest.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/test_manifest.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "174ccd241d804f7b9679addf0e245303173185a3234a9b5fcd53e23f47e55100",
+      "destination_sha256": "174ccd241d804f7b9679addf0e245303173185a3234a9b5fcd53e23f47e55100"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/test_orchestrator.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/test_orchestrator.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "417998d9f9a7f839ab4b08cb9aec3e6e869314268f079603c33a3e870b7bf7c7",
+      "destination_sha256": "417998d9f9a7f839ab4b08cb9aec3e6e869314268f079603c33a3e870b7bf7c7"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/test_reporting.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/test_reporting.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "9b16c61805e79d9068bd4f27a3da1e7419ec786e581fe0153b7f5d9c8fb327ad",
+      "destination_sha256": "9b16c61805e79d9068bd4f27a3da1e7419ec786e581fe0153b7f5d9c8fb327ad"
+    },
+    {
+      "original_path": "evaluation/tests/harness_bench/test_sandbox.py",
+      "disposition": "maintained",
+      "destination": "evaluation/tests/harness_bench/test_sandbox.py",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8c721a2f9ead54ead9c24637cc5d5e76847afc70bbba48d1483805cddd5d3912",
+      "destination_sha256": "8c721a2f9ead54ead9c24637cc5d5e76847afc70bbba48d1483805cddd5d3912"
+    },
+    {
+      "original_path": "evaluation/tests/test_vps_proposals.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/tests/test_vps_proposals.py",
+      "reason": "Tests solely for the historical VPS operators",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8c6ff0261406459a58a3b289d11666cc031e90647cae7610473d7760bc236d20",
+      "destination_sha256": "8c6ff0261406459a58a3b289d11666cc031e90647cae7610473d7760bc236d20"
+    },
+    {
+      "original_path": "evaluation/tests/test_vps_status.py",
+      "disposition": "archived",
+      "destination": "research/archives/harness-suite-20260920/tests/test_vps_status.py",
+      "reason": "Tests solely for the historical VPS operators",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "4a6e27d66a17884d33830879ffb0ff0669dfa2117bd03cee6e4fd5a911964f5b",
+      "destination_sha256": "4a6e27d66a17884d33830879ffb0ff0669dfa2117bd03cee6e4fd5a911964f5b"
+    },
+    {
+      "original_path": "examples/experiment.env.example",
+      "disposition": "maintained",
+      "destination": "examples/experiment.env.example",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "a1f4ff3e248365d8149e31aa61f5bfad72230c3039ab3aee8b0231a5e0132c2f",
+      "destination_sha256": "28dc7ed0f6bdd063ebba3ddc8188d20dcf2f7ca5dc756739cdb3060d9e54143e"
+    },
+    {
+      "original_path": "examples/experiments/synthesizer-mixed-scaling.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-templates/synthesizer-mixed-scaling.json",
+      "reason": "Old-format template, distinct from frozen research config",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2b46551e0e5adddc8a79856f614d2ec820742e8e28e10ac623c1546f45342522",
+      "destination_sha256": "2b46551e0e5adddc8a79856f614d2ec820742e8e28e10ac623c1546f45342522"
+    },
+    {
+      "original_path": "examples/experiments/synthesizer-n1-e2b.json",
+      "disposition": "maintained",
+      "destination": "examples/experiments/synthesizer-n1-e2b.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "e121fa6da18030f9eff184e10a3a10f9c9ef491ea3c69b9671ce74eec34080d9",
+      "destination_sha256": "e121fa6da18030f9eff184e10a3a10f9c9ef491ea3c69b9671ce74eec34080d9"
+    },
+    {
+      "original_path": "examples/experiments/synthesizer-n1-local.json",
+      "disposition": "maintained",
+      "destination": "examples/experiments/synthesizer-n1-local.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "d0fc2d867f83618c4a6e4c4ce038243880ae8fbb61befea05aa1384eb0e565e0",
+      "destination_sha256": "d0fc2d867f83618c4a6e4c4ce038243880ae8fbb61befea05aa1384eb0e565e0"
+    },
+    {
+      "original_path": "examples/experiments/synthesizer-ordinary-five-rounds.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-templates/synthesizer-ordinary-five-rounds.json",
+      "reason": "Old-format template, distinct from frozen research config",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "adb8c87dd164bcc75b0ab5bb83efd2ea6d5e6891ebe3d29d13065e15a9beba9b",
+      "destination_sha256": "adb8c87dd164bcc75b0ab5bb83efd2ea6d5e6891ebe3d29d13065e15a9beba9b"
+    },
+    {
+      "original_path": "examples/experiments/synthesizer-scaling-e2b.json",
+      "disposition": "archived",
+      "destination": "research/archives/public-templates/synthesizer-scaling-e2b.json",
+      "reason": "Old-format template, distinct from frozen research config",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "3c874cb4617d3a3fe10fbe6ada2080cad6aeda59a0b025177816e221c5d98b55",
+      "destination_sha256": "3c874cb4617d3a3fe10fbe6ada2080cad6aeda59a0b025177816e221c5d98b55"
+    },
+    {
+      "original_path": "examples/models.env.example",
+      "disposition": "archived",
+      "destination": "research/archives/legacy-runtime/examples/models.env.example",
+      "reason": "Former v1 runtime, configuration or one-time migration",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "c92def115627480e708e2ce83c2dcbb097404dffa2b0886449f0ed9ffbccf926",
+      "destination_sha256": "c92def115627480e708e2ce83c2dcbb097404dffa2b0886449f0ed9ffbccf926"
+    },
+    {
+      "original_path": "examples/openagents-v02-nexau.yml",
+      "disposition": "maintained",
+      "destination": "examples/openagents-v02-nexau.yml",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "2e85b49193ef8f6b2ff1584fb7516a81e8af4756c6d0f9a1cadcc760a11ca14f",
+      "destination_sha256": "2e85b49193ef8f6b2ff1584fb7516a81e8af4756c6d0f9a1cadcc760a11ca14f"
+    },
+    {
+      "original_path": "examples/personas/n1.json",
+      "disposition": "maintained",
+      "destination": "examples/personas/n1.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f7869a09b2c5a6b69d79a46715e84012ec53e87810a261bb272c6f7b4c711bf7",
+      "destination_sha256": "f7869a09b2c5a6b69d79a46715e84012ec53e87810a261bb272c6f7b4c711bf7"
+    },
+    {
+      "original_path": "examples/tasks/pvlib-1478/instruction.md",
+      "disposition": "maintained",
+      "destination": "examples/tasks/pvlib-1478/instruction.md",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "5875487f412b0fe900fae2a24a64e757113131dee64ad8dcb77d7c600e064209",
+      "destination_sha256": "5875487f412b0fe900fae2a24a64e757113131dee64ad8dcb77d7c600e064209"
+    },
+    {
+      "original_path": "examples/tasks/pvlib-1478/requirements.lock",
+      "disposition": "maintained",
+      "destination": "examples/tasks/pvlib-1478/requirements.lock",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "09e5f1a2a2db40a645e566fe869fa42c9caead422c15dab3e89e8334455bf74b",
+      "destination_sha256": "09e5f1a2a2db40a645e566fe869fa42c9caead422c15dab3e89e8334455bf74b"
+    },
+    {
+      "original_path": "examples/tasks/pvlib-1478/setup.sh",
+      "disposition": "maintained",
+      "destination": "examples/tasks/pvlib-1478/setup.sh",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "bb5affe87c52f3dfcce0b05e2bf7ebbdd93d2ac715c02294572bd50e176d3e11",
+      "destination_sha256": "bb5affe87c52f3dfcce0b05e2bf7ebbdd93d2ac715c02294572bd50e176d3e11"
+    },
+    {
+      "original_path": "examples/tasks/pvlib-1478/task.json",
+      "disposition": "maintained",
+      "destination": "examples/tasks/pvlib-1478/task.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "48d0200383d315a7f22c68ae218bec1359e6834e3d74b2c3b13187e4dfca8922",
+      "destination_sha256": "48d0200383d315a7f22c68ae218bec1359e6834e3d74b2c3b13187e4dfca8922"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/agents.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/agents.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "51d68b681e21b06ffbafca119e4db1332c3fed596a30943a4567b73ee5599a7f",
+      "destination_sha256": "51d68b681e21b06ffbafca119e4db1332c3fed596a30943a4567b73ee5599a7f"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/commits.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/commits.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "90c8287f1b69808dc3ee3e42c6577db63de92c16fc16c1dbc626e07e8b81deed",
+      "destination_sha256": "90c8287f1b69808dc3ee3e42c6577db63de92c16fc16c1dbc626e07e8b81deed"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/config.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/config.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "8513592c3f795361386b2a0d757dd29bc2b312dd50549e04c43af51d1b44def1",
+      "destination_sha256": "8513592c3f795361386b2a0d757dd29bc2b312dd50549e04c43af51d1b44def1"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/delivery.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/delivery.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "406c2f7df22a23f59fffc549094267c8ed16b1e2b879bd1ab73604b23e912462",
+      "destination_sha256": "406c2f7df22a23f59fffc549094267c8ed16b1e2b879bd1ab73604b23e912462"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/history.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/history.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "0343639fac1511a32a4c9a92c7655a6e9f9ad3a600fc6f30b5bdad6806160a97",
+      "destination_sha256": "0343639fac1511a32a4c9a92c7655a6e9f9ad3a600fc6f30b5bdad6806160a97"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/issues.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/issues.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "ac198bfbbe7d37ab2194634469915da15d876be61500883ec953e3ba7a88cad4",
+      "destination_sha256": "ac198bfbbe7d37ab2194634469915da15d876be61500883ec953e3ba7a88cad4"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/overview.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/overview.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "b251a058856af1fe344cf4921c103e4409237d155993e8fa2016cf5a54fae5aa",
+      "destination_sha256": "b251a058856af1fe344cf4921c103e4409237d155993e8fa2016cf5a54fae5aa"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/state.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/state.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "5e43ef73934ac15b0656093f0b2ced7d9bc644e6de5a576776cac9711f933f9c",
+      "destination_sha256": "5e43ef73934ac15b0656093f0b2ced7d9bc644e6de5a576776cac9711f933f9c"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/latest.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/latest.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "f09575c458a965a3a318ab2f0cec9d8407a09e4e3b81de2701a0388c5ae92942",
+      "destination_sha256": "f09575c458a965a3a318ab2f0cec9d8407a09e4e3b81de2701a0388c5ae92942"
+    },
+    {
+      "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/timeline.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/timeline.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "cde78d095f35ed32cc1453e2cae69df0944bc7dee7182ee01d73b3091d1f63f4",
+      "destination_sha256": "cde78d095f35ed32cc1453e2cae69df0944bc7dee7182ee01d73b3091d1f63f4"
+    },
+    {
+      "original_path": "frontend/public/experiments/index.json",
+      "disposition": "maintained",
+      "destination": "frontend/public/experiments/index.json",
+      "reason": "Current maintained input, helper or evaluation component",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "3c302dbd28bb989fa598d0cd4d00a135ff7a4db1a28dc6601940194941354c4f",
+      "destination_sha256": "6f48c050038ee9272b2f0e09ad5c55c8f1563cecaf4d10cf41e00d7ceecab2eb"
+    },
+    {
+      "original_path": "run.sh",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired duplicate entry or personal experiment shortcut",
+      "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
+      "source_sha256": "5ebd6260dbef8f352139a37b496d6d9dcb3ef70cacf9ebb03690a38c4ec0a6b7"
+    }
+  ]
+}

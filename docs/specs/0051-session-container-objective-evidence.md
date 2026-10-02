@@ -85,7 +85,7 @@ tasks:
     scope: 保留 persona end_reason，同时在新鲜官方实例容器执行 canonical evaluator 并落 stdout/stderr/exit/hash；派生 valid_accept/false_accept/unverified_accept。
     acceptance: 超时后 accept 必为 false_accept；未配置 evaluator 必为 unverified_accept；只有 fresh evaluator passed 才是 valid_accept；索引默认不把假接受当通过。
   - id: T5
-    title: 可运行镜像、一键入口与审计冒烟
+    title: 可运行镜像、包内控制器与审计冒烟
     status: done
     priority: P1
     tags: []
@@ -97,14 +97,11 @@ tasks:
       - backend/deploy/swebench-seed/Dockerfile
       - backend/deploy/swebench-seed/runtime.Dockerfile
       - backend/scripts/build_swebench_runtime_image.sh
-      - backend/scripts/run_auditable_experiment.py
-      - backend/scripts/run_swebench_closed_loop.py
-      - backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh
-      - backend/scripts/run-glm52fp8-1m-canary2-isolated.sh
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/scripts/e2e-spec-0051-session-container.sh
       - CLAUDE.md
-    scope: 提供从现有 seed 资产构建可运行镜像的入口，并让一键实验 fail-closed 校验 image；用冒烟脚本证明无宿主工作区泄漏、结果证据可追溯。
-    acceptance: 一键入口启动前检查 runnable image 标签/协议；e2e 不访问真实 LLM，验证容器名、diff hash、请求结果和客观判定落盘。
+    scope: 保留从显式 seed 资产构建 runnable 镜像的辅助脚本与 SWE controller 检查；公开实验由 v2 统一入口启动，模型专用 shell 和旧 auditable wrapper 已退出。
+    acceptance: runnable 镜像协议与用户容器隔离检查继续有效；e2e 无真实 LLM，验证容器名、diff hash、请求结果和客观判定落盘。
 ---
 
 # 0051 · 会话容器隔离与客观验收证据

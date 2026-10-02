@@ -4,6 +4,10 @@ English | [简体中文](n1-experiment.zh-CN.md)
 
 This walkthrough uses the checked-in pvlib task and `sr-15-swyx` persona. Local and E2B examples have the same task, persona, seed, roles, models and five-round semantics. Select infrastructure once; the remaining commands are identical. Actual verification results are recorded separately in [the validation report](../validation/spec-0069-new-user.md).
 
+This cleanup has offline verification but no new live local/E2B run. The earlier N1 live record remains a baseline; see the [cleanup verification report](../validation/spec0071-experiment-cleanup.md) for current coverage.
+
+This is a single-task N=1 workflow: `rounds.sessions_per_round` must be `1`. Multi-task N4/N8 runs and importing a historical run to append another round are not supported here. Existing-run `resume` continues the same frozen identity; it is not historical-result import.
+
 ## 1. Start from the repository
 
 ```bash
@@ -142,3 +146,5 @@ Retry resume after the original port is free. Do not edit `manifest.json`, `reso
 There is no fixed duration guarantee: model latency, retries, task interactions and delivery steps vary. Use recorded timestamps and provider billing for actual runtime/cost. This tutorial describes the full workflow; the validation report states which paths and rounds have actually been exercised.
 
 The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest and pytest-mock for user-side checks. The unmodified task baseline was tested in a fresh environment: all 155 ModelChain tests passed, including 35 cases using the `mocker` fixture. This is task-environment validation, not official SWE-bench grading.
+
+Historical experiments and their source revisions are indexed in [research](../../research/README.md). For standalone diagnostics or evidence replay, see [developer tools](../../tools/dev/README.md); their outputs are not another round of this experiment.

@@ -104,7 +104,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/deploy/vigil/entrypoint.sh
       - backend/tests/test_run_vigil.py
       - docs/usage-monitoring.md

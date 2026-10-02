@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Spec-0047：并行实验运行时离线验收（无真实 GLM、不启双栈 live cert）。
-# T6 真实模型认证另议；本脚本只跑配置/manifest/compose mock/CLI/容量/健康/run.py 拒 attach。
+# Spec-0047 current shared contracts after Spec-0071 retired the v1 runtime.
+# Offline only: manifest journals, context binding and foreign-container isolation.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

@@ -1,4 +1,5 @@
 import type { RunState, ViewMode } from "../types";
+import type { ExperimentSummary } from "../api";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function TopBar(props: {
@@ -11,6 +12,8 @@ export function TopBar(props: {
   round: "all" | number;
   rounds: number[];
   onRound: (r: "all" | number) => void;
+  historical?: boolean;
+  snapshot?: ExperimentSummary;
 }) {
   const { state, openCount, view, onView, showDone, onShowDone, round, rounds, onRound } = props;
   const running = state?.running ?? false;
@@ -23,11 +26,14 @@ export function TopBar(props: {
   return (
     <header className="topbar">
       <div className="title">
-        auto-designer <span>观测看板</span>
+        auto-designer <span>{props.historical ? "历史快照" : "观测看板"}</span>
       </div>
       <div className="run-chip">
-        <span className={running ? "dot on" : "dot"} />
-        {running ? `运行中 · ${chip}` : chip}
+        {/* Spec-0071/T5: preserve the observed state without suggesting a live run. */}
+        <span className={!props.historical && running ? "dot on" : "dot"} />
+        {props.historical
+          ? `当时状态 ${props.snapshot?.status ?? (state ? (running ? "RUNNING" : "未运行") : "读取中…")} · ${chip}`
+          : running ? `运行中 · ${chip}` : chip}
       </div>
       <div className="spacer" />
       <div className="seg" role="group" aria-label="视图切换">

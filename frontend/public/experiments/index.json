@@ -2,7 +2,7 @@
   "experiments": [
     {
       "id": "harness-mixed16-20260909-r3",
-      "title": "Harness mixed16 r3 · 当前实验",
+      "title": "Harness mixed16 r3",
       "status": "RUNNING",
       "updated_at": "2026-09-09T13:32:43.525735+00:00",
       "source": "static"

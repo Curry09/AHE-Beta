@@ -80,10 +80,10 @@ tasks:
       - backend/auto_designer/experiment/runtime.py
       - backend/auto_designer/experiment/cli.py
       - backend/auto_designer/loop/live.py
-      - backend/tests/experiment/test_runtime.py
-      - backend/tests/experiment/test_cli.py
-    scope: 统一写入 session 事件链和实验最终 manifest，记录 raw_model_response、parsed/normalized decision、validation/repair、objective evaluator、终止动作与容器生命周期；停止/异常路径原子更新 journal 与 live snapshot；将 v2/v3 八个 session 固化为离线回归 fixture，验证协议结论与客观结论不互相覆盖。
-    acceptance: 事件 seq 单调且可重放；最终 manifest 与 journal 状态一致；异常退出无孤儿状态；八会话回归明确区分 valid_accept、protocol_repaired、protocol_unrecoverable、objective passed/failed/not_run；spec validate、相关 pytest、静态检查通过。
+      - backend/tests/test_experiment_cli_v2.py
+      - backend/tests/test_experiment_lifecycle_v2.py
+    scope: 在当前 v2 runtime/CLI、live 记录中规划结果状态与事件溯源审计，保留八会话离线回归目标；不再扩展已经退出的 v1 生命周期。
+    acceptance: 事件与结果状态互不覆盖，当前 v2 生命周期测试和用户状态回归分别验证；本任务原未完成部分保持待实现，不将工具迁移视为验收通过。
 ---
 
 # 0053 · Persona 语义动作契约与可审计终止状态机

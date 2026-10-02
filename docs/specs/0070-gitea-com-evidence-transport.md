@@ -49,7 +49,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/auto_designer/loop/sim_user.py
       - backend/auto_designer/observations/preflight.py
       - backend/tests/test_run_vigil.py
@@ -169,7 +169,7 @@ OpenAgents 旧读取端固定 gzip；即使发布端上传 ZIP 成功，读取�
 |---|---|---|---|
 | T1 | Gitea 能力解析、MIME、受限下载 | tracker/gitea.py、新附件传输模块及专门 tracker 测试 | 无 |
 | T2 | 双编码发布、profile 持久化与旧恢复 | demand/delivery_evidence.py、新 observations/transport.py、发布/profile 测试 | T1 |
-| T3 | 实际 reader 能力预检、生命周期接线 | backend/run.py、loop/sim_user.py、新 observations/preflight.py、生命周期测试 | T1、T2 |
+| T3 | 实际 reader 能力预检、生命周期接线 | backend/auto_designer/experiment/controllers/ordinary.py、loop/sim_user.py、新 observations/preflight.py、生命周期测试 | T1、T2 |
 | T4 | 容器公网接线与按需出口 | 两套部署代理/Compose、vigil 构建/入口/镜像记录、部署测试 | T3 |
 | T5 | 跨仓 CI、真实探针、联合版本与文档 | 联合检查脚本、集成测试、CI、release/compatibility.json、使用/发布文档 | T2、T3、T4 |
 

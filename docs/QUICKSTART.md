@@ -9,7 +9,7 @@ Run all commands from the auto-designer repository root. One entry point starts 
 | `local` | Local Docker containers | A dedicated localhost Gitea started automatically | A running Docker daemon and model credentials |
 | `e2b` | One E2B sandbox per experiment | Your own Gitea.com account | Model credentials, `E2B_API_KEY`, `GITEA_TOKEN` |
 
-The example runs one simulated user per round for five rounds. R1–R4 include requirements and OpenAgents delivery; R5 only tries the final Harness. It evolves the Harness, using pvlib as a user task. It does not evolve the auto-designer or pvlib repository. Official SWE-bench grading is separate.
+The current task-package schema supports one task and `rounds.sessions_per_round: 1`; N4/N8 multi-task plans and importing historical results for an extra round are not yet supported. The example runs one simulated user per round for five rounds. R1–R4 include requirements and OpenAgents delivery; R5 only tries the final Harness. It evolves the Harness, using pvlib as a user task. It does not evolve the auto-designer or pvlib repository. Official SWE-bench grading is separate.
 
 ## 1. Install
 
@@ -87,4 +87,4 @@ uv sync --locked --extra experiments --extra dev
 uv run --locked --extra experiments --extra dev pytest -q
 ```
 
-Historical evaluation launchers preserve their original frozen runs; new experiments use the unified entry above. The optional frontend is described in [the README](../README.md).
+The public examples directory contains only current v2 definitions. [Developer tools](../tools/dev/README.md) are separate diagnostics, not alternate experiment launchers. [Historical research](../research/README.md) is archived with source revisions and an inventory; reproduction uses the recorded version in a separate checkout. New experiments use the unified entry above. The optional frontend is described in [the README](../README.md).

@@ -31,31 +31,6 @@ tasks:
       - backend/auto_designer/demand/submit_tools.py
       - backend/auto_designer/demand/synthesizer.py
       - backend/auto_designer/demand/triage.py
-      - backend/auto_designer/designer/__init__.py
-      - backend/auto_designer/designer/agent_contract.py
-      - backend/auto_designer/designer/agent_runtime.py
-      - backend/auto_designer/designer/delivery_evidence.py
-      - backend/auto_designer/designer/designer.py
-      - backend/auto_designer/designer/divergent.py
-      - backend/auto_designer/designer/evidence_contract.py
-      - backend/auto_designer/designer/grouped_designer.py
-      - backend/auto_designer/designer/grouped_synthesizer.py
-      - backend/auto_designer/designer/issue_schema.py
-      - backend/auto_designer/designer/observation_provider.py
-      - backend/auto_designer/designer/owner.py
-      - backend/auto_designer/designer/proposal_view.py
-      - backend/auto_designer/designer/role_contract.py
-      - backend/auto_designer/designer/runtime_agg.py
-      - backend/auto_designer/designer/session_timeline.py
-      - backend/auto_designer/designer/submit_tools.py
-      - backend/auto_designer/designer/synthesizer.py
-      - backend/auto_designer/designer/triage.py
-      - backend/auto_designer/dev/__init__.py
-      - backend/auto_designer/dev/commit_checkpoint.py
-      - backend/auto_designer/dev/completion_gate.py
-      - backend/auto_designer/dev/harness_boundary.py
-      - backend/auto_designer/dev/repo_guard.py
-      - backend/auto_designer/dev/workspace_jail.py
       - backend/auto_designer/guards/__init__.py
       - backend/auto_designer/guards/harness_boundary.py
       - backend/auto_designer/guards/repo_guard.py
@@ -85,17 +60,6 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/.env.example
-      - backend/agent_defs/designer/agent.yaml
-      - backend/agent_defs/designer/systemprompt.md
-      - backend/agent_defs/designer/tools/get_harness_beat.tool.yaml
-      - backend/agent_defs/designer/tools/get_harness_step.tool.yaml
-      - backend/agent_defs/designer/tools/get_session_timeline.tool.yaml
-      - backend/agent_defs/designer/tools/list_directory.tool.yaml
-      - backend/agent_defs/designer/tools/read_file.tool.yaml
-      - backend/agent_defs/designer/tools/search_file_content.tool.yaml
-      - backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml
-      - backend/agent_defs/designer/tools/submit_rfcs.tool.yaml
       - backend/agent_defs/divergent_pm/agent.yaml
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/owner/agent.yaml
@@ -113,18 +77,13 @@ tasks:
       - backend/agent_defs/triage_agent/agent.yaml
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml
-      - backend/run.py
-      - backend/scripts/run_auditable_experiment.py
-      - backend/scripts/run_swebench_closed_loop.py
-      - examples/experiments/synthesizer-mixed-scaling.json
+      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - examples/experiments/synthesizer-n1-e2b.json
-      - examples/experiments/synthesizer-ordinary-five-rounds.json
-      - examples/experiments/synthesizer-scaling-e2b.json
-      - examples/models.env.example
-    scope: 迁移 agent_defs/synthesizer，启动脚本和示例直接使用新角色键及 DEMAND_LLM_*；四类需求 Agent 的 middleware binding 及入口 repo_guard/hook 调用改为 guards。冻结历史配置不改写。
-    acceptance: YAML 工具 binding 可解析；新配置可运行，无旧变量回退或双写，模型参数与凭证脱敏不变；不专门检测旧变量或混用字段。seed 提交后继续安装钩子，完整性检查位置不变。
+    scope: 当前 Agent 定义、包内 controller 与 v2 示例统一使用 synthesizer 及共享需求模型参数；旧 env 模板、auditable wrapper 和 scaling 示例已归档，不再映射为活入口。
+    acceptance: 现行定义可加载，两个 v2 示例离线校验通过；角色和环境字段为新名称，归档配置不进入当前运行输入。
   - id: T3
-    title: 脚本和实验执行入口全量对齐
+    title: 当前开发工具与执行接口命名
     status: done
     priority: P1
     tags: []
@@ -137,42 +96,21 @@ tasks:
       - backend/scripts/e2e-spec-0049-role-invocation-io-store.sh
       - backend/scripts/e2e-spec-0056-0057-user-semantics.sh
       - backend/scripts/e2e-stage-resume.sh
-      - backend/scripts/evaluate_role_traces.py
+      - tools/dev/audit/evaluate_role_traces.py
       - backend/scripts/export_experiment_snapshot.py
-      - backend/scripts/prepare_openagents_validation.py
-      - backend/scripts/probe_timeout_to_designer.py
-      - backend/scripts/probe_timeout_to_synthesizer.py
-      - backend/scripts/replay_design_from_sessions.py
-      - backend/scripts/replay_observation_design.py
-      - backend/scripts/replay_observation_lifecycle.py
-      - backend/scripts/replay_observation_synthesis.py
-      - backend/scripts/replay_owner_from_repo.py
-      - backend/scripts/replay_pm_synth_owner_offline.py
-      - backend/scripts/replay_pm_synthesizer_owner_offline.py
-      - backend/scripts/replay_role_invocations.py
-      - backend/scripts/replay_roles_from_sessions.py
-      - backend/scripts/replay_roles_offline.py
-      - backend/scripts/replay_synthesize_owner_from_repo.py
-      - backend/scripts/replay_synthesizer_owner_from_repo.py
-      - backend/scripts/run_mixed_closed_loop.py
-      - evaluation/harness-suite-20260920/accept_n1_round1_as_canary.py
-      - evaluation/harness-suite-20260920/freeze_scaling_runtime.py
-      - evaluation/harness-suite-20260920/prepare_scaling_resources.py
-      - evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py
-      - evaluation/harness-suite-20260920/remote_design_delivery_smoke.py
-      - evaluation/harness-suite-20260920/remote_real_developer_smoke.py
-      - evaluation/harness-suite-20260920/resume_mixed_latency_recovery.py
-      - evaluation/harness-suite-20260920/resume_n1_latency_recovery.py
-      - evaluation/harness-suite-20260920/run_daytona_design_delivery.py
-      - evaluation/harness-suite-20260920/run_n1_e2b.py
-      - evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py
-      - evaluation/harness-suite-20260920/run_scaling_e2b.py
-      - evaluation/harness-suite-20260920/sync_status_vps.py
-      - evaluation/harness-suite-20260920/tools/validate_mixed_config.py
-      - evaluation/harness-suite-20260920/vps_status_dashboard.py
+      - tools/dev/delivery/prepare_openagents_validation.py
+      - tools/dev/probes/probe_timeout_to_synthesizer.py
+      - tools/dev/replay/replay_observation_lifecycle.py
+      - tools/dev/replay/replay_observation_synthesis.py
+      - tools/dev/replay/replay_owner_from_repo.py
+      - tools/dev/replay/replay_pm_synthesizer_owner_offline.py
+      - tools/dev/replay/replay_role_invocations.py
+      - tools/dev/replay/replay_roles_from_sessions.py
+      - tools/dev/replay/replay_roles_offline.py
+      - tools/dev/replay/replay_synthesizer_owner_from_repo.py
       - evaluation/harness_bench/harbor_historical_user_agent.py
-    scope: 重命名角色相关 replay/probe 脚本，修正静态/动态加载、CLI、输出及 evaluation 活跃入口和状态同步；导出直接使用新角色名称。脚本引用的有效边界检查改为 guards，不添加旧实验识别或迁移门禁。
-    acceptance: 保留脚本 import、动态 patch 和离线 smoke 通过，当前入口与示例使用新名称；不添加角色版本标签或针对旧输入的专门拒绝逻辑。
+    scope: 保留维护中的 tools/dev 回放、探针和交付验证的 Synthesizer 命名；历史研究 launchers 与 mixed wrapper 已归档，不注册为当前实验入口。
+    acceptance: 当前开发工具名称和 imports 一致，显式凭证与输入生效；帮助可加载，产物不被当作新一轮用户评估。
   - id: T4
     title: 看板角色与显示名称统一
     status: done
@@ -186,7 +124,6 @@ tasks:
       - frontend/README.md
       - frontend/src/App.tsx
       - frontend/src/api.test.ts
-      - frontend/src/api.test.tsx
       - frontend/src/api.ts
       - frontend/src/components/building/FloorWorkspace.tsx
       - frontend/src/components/building/buildingModel.test.tsx
@@ -194,7 +131,6 @@ tasks:
       - frontend/src/components/detail/AgentRunDetail.tsx
       - frontend/src/components/detail/issueTimelineModel.test.ts
       - frontend/src/lib/issueMeta.ts
-      - frontend/src/lib/roleLabel.ts
       - frontend/src/styles.css
       - frontend/src/types.ts
     scope: 统一前端角色、roster、history、楼层和 CSS，删除旧标签转换；直接消费新字段，不添加版本握手、快照迁移或旧快照拒绝界面。
@@ -217,17 +153,13 @@ tasks:
       - docs/CONFIGURATION.md
       - docs/EXPORTING.md
       - docs/QUICKSTART.md
-      - docs/designer-grouping.md
       - docs/specs/0014-dev-commit-discipline.md
       - docs/specs/0015-dev-overfit-isolation.md
-      - docs/specs/0016-designer-rootcause-signal.md
       - docs/specs/0016-synthesizer-rootcause-signal.md
       - docs/specs/0017-user-parallel-sessions.md
-      - docs/specs/0018-designer-proposal-envelope.md
       - docs/specs/0018-synthesizer-proposal-envelope.md
       - docs/specs/0020-issue-covers-dispatch-budget.md
       - docs/specs/0021-dev-escape-containment.md
-      - docs/specs/0024-designer-godview-timeline-tool.md
       - docs/specs/0024-synthesizer-godview-timeline-tool.md
       - docs/specs/0025-issue-triage-funnel.md
       - docs/specs/0026-frontend-observability-redesign.md
@@ -247,7 +179,6 @@ tasks:
       - docs/specs/0045-vigil-harness-aware-toolchain.md
       - docs/specs/0047-parallel-experiment-runtime.md
       - docs/specs/0049-role-invocation-io-store.md
-      - docs/specs/0052-designer-covers-consolidation.md
       - docs/specs/0052-synthesizer-covers-consolidation.md
       - docs/specs/0053-persona-semantic-action-lifecycle.md
       - docs/specs/0054-user-goal-driven-simulation.md
@@ -293,36 +224,11 @@ tasks:
       - backend/tests/demand/test_session_timeline.py
       - backend/tests/demand/test_terminal_evidence.py
       - backend/tests/demand/test_triage.py
-      - backend/tests/designer/test_agent_contract.py
-      - backend/tests/designer/test_agent_runtime.py
-      - backend/tests/designer/test_delivery_evidence.py
-      - backend/tests/designer/test_divergent_gate.py
-      - backend/tests/designer/test_evidence_contract.py
-      - backend/tests/designer/test_grouped_designer.py
-      - backend/tests/designer/test_issue_schema.py
-      - backend/tests/designer/test_observation_provider.py
-      - backend/tests/designer/test_owner.py
-      - backend/tests/designer/test_proposal_view.py
-      - backend/tests/designer/test_role_contract.py
-      - backend/tests/designer/test_role_contract_flow.py
-      - backend/tests/designer/test_session_timeline.py
-      - backend/tests/designer/test_synthesizer_compat.py
-      - backend/tests/designer/test_terminal_evidence.py
-      - backend/tests/designer/test_triage.py
-      - backend/tests/dev/test_commit_checkpoint.py
-      - backend/tests/dev/test_completion_gate.py
-      - backend/tests/dev/test_harness_boundary.py
-      - backend/tests/dev/test_repo_guard.py
-      - backend/tests/dev/test_workspace_jail.py
-      - backend/tests/experiment/test_cli.py
-      - backend/tests/experiment/test_config.py
       - backend/tests/experiment/test_manifest.py
-      - backend/tests/experiment/test_runtime.py
       - backend/tests/guards/test_guard_wiring.py
       - backend/tests/guards/test_harness_boundary.py
       - backend/tests/guards/test_repo_guard.py
       - backend/tests/guards/test_workspace_jail.py
-      - backend/tests/loop/test_designer.py
       - backend/tests/loop/test_live.py
       - backend/tests/loop/test_live_tracer.py
       - backend/tests/loop/test_metrics.py
@@ -336,9 +242,7 @@ tasks:
       - backend/tests/observations/test_publication.py
       - backend/tests/test_export_experiment_snapshot.py
       - backend/tests/test_llm_limits.py
-      - backend/tests/test_replay_design_from_sessions.py
       - backend/tests/test_replay_roles_from_sessions.py
-      - backend/tests/test_run_auditable_experiment.py
       - backend/tests/test_run_vigil.py
       - backend/tests/test_sandbox_isolation.py
       - backend/tests/test_stage_resume_e2e.py
@@ -346,10 +250,9 @@ tasks:
       - backend/tests/test_usage.py
       - backend/tests/tracker/test_gitea_timeline.py
       - backend/tests/web/test_api.py
-      - evaluation/tests/test_vps_status.py
       - backend/tests/test_invocation.py
-    scope: 迁移现有测试路径并保留需求流程、恢复、YAML 接线和 guards 行为回归；删除旧兼容和专门的命名迁移/拒绝测试。一次性搜索核对残留，不建立永久扫描器或命名专用 CI；离线脚本运行有实际行为断言的既有测试。
-    acceptance: 全量 Python、前端、lint/spec 与离线流程通过；新名称实际接线正确，guards 放行/拒绝、hook 和 repo_guard 中止行为不回退；冻结历史保持不变。删除命名门禁及专用扫描维护负担，验证结果在本轮复测后记录。
+    scope: 保留当前需求、恢复、API 和开发工具命名行为回归；旧 designer/dev 已删除文件与 v1/scaling 测试不再属于活文件映射。
+    acceptance: 当前命名回归、阶段恢复、工具帮助与两个公开 v2 示例通过；历史归档原始记录不改写，不将未执行的历史流程标为已验收。
 ---
 
 # 0068 · Synthesizer 角色彻底改名与旧 Developer 遗留清理
@@ -357,6 +260,8 @@ tasks:
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
+
+> 0071 清理后的当前映射：living tasks 仅保留已经存在的新需求包、Agent 定义、包内 controller、维护工具、当前文档与测试。旧名称左侧路径、已删除 dev 中间件、历史研究 launcher、旧 schema 模板与 v1 测试不再映射为活代码；下文命名迁移表保留原前后对照与动机。历史资料与原源码版本从 research/inventory.json 追溯，不作为当前执行入口。
 
 用户于 2026-09-29 审阅通过，并补充明确：项目仍在开发阶段、尚无实际用户，直接统一新名称即可，不建设版本迁移、兼容或旧输入拒绝设施。实施分支 `refactor/synthesizer-clean-rename`。用户复查通过，授权完成最终名称检查后提交 commit。
 

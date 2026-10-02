@@ -130,7 +130,7 @@ tasks:
     files:
       - backend/tests/observations/fixtures/alternate_v1.py
       - backend/tests/observations/fixtures/alternate_v2.py
-      - backend/scripts/replay_observation_lifecycle.py
+      - tools/dev/replay/replay_observation_lifecycle.py
       - docs/audits/0061-observation-lifecycle-validation.md
     scope: 先合成双轮测试，再真实交付一项观测补强并在新版本会话复查；用非 NexAU 起点验证平台不解析内部事件。
     acceptance: v1 缺口到 proposal、Owner、交付、v2 实际观测形成闭环；旧包保留；泄漏、乱序、缺包、预算与恶意输入有负例；不使用 benchmark 作开发信号。

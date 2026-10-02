@@ -116,23 +116,19 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/auto_designer/loop/live.py
       - backend/auto_designer/experiment/runtime.py
       - backend/auto_designer/experiment/cli.py
       - backend/auto_designer/experiment/manifest.py
-      - backend/scripts/run_auditable_experiment.py
-      - backend/scripts/run_swebench_closed_loop.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/scripts/e2e-stage-resume.sh
-      - backend/tests/experiment/test_runtime.py
-      - backend/tests/experiment/test_cli.py
       - backend/tests/loop/test_live.py
-      - backend/tests/test_run_auditable_experiment.py
       - backend/tests/test_run_swebench_closed_loop.py
       - backend/tests/test_stage_resume_e2e.py
       - docs/audits/0064-stage-resume-validation.md
-    scope: 统一审计 controller、实验 CLI 与真实闭环的 fresh/resume 语义，恢复基础设施和需求进程，保留 live/history 并执行全阶段故障注入。
-    acceptance: fresh 才能复位，resume 必须复用稳定 run id 和冻结 manifest；每个副作用前后强退再恢复的最终 SessionStore、Gitea、admitted 集、manifest 与 sealed SHA 等价于无故障基线，漂移和业务失败负例通过。
+    scope: 统一包内 ordinary/SWE controller 和当前 v2 生命周期的 fresh/resume 语义，保留 live/history 与阶段级恢复故障矩阵；旧 auditable/v1 入口及其测试已退出。
+    acceptance: fresh 才能复位，resume 复用稳定 run id 和冻结 manifest；当前阶段恢复、controller 与 v2 生命周期故障矩阵通过；历史记录不重写。
 ---
 
 # 0064 · 阶段级可恢复实验运行

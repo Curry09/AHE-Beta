@@ -9,7 +9,13 @@ import pytest
 
 
 def _module():
-    path = Path(__file__).resolve().parents[1] / "scripts" / "run_swebench_closed_loop.py"
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "auto_designer"
+        / "experiment"
+        / "controllers"
+        / "swebench.py"
+    )
     spec = importlib.util.spec_from_file_location("run_swebench_closed_loop_test", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

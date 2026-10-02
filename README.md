@@ -15,7 +15,7 @@ Current code and development configuration use `synthesizer`, `N_SYNTHESIZERS`, 
 
 ## Run an experiment
 
-Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use one entry point and the same experiment format. The checked-in N=1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
+Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use `backend/scripts/experiment.py` and the same v2 experiment format. The current task-package schema supports one task and one user session per round; multi-task N4/N8 plans and adding a round to imported historical results are not supported by this entry. The checked-in N=1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
 
 ```bash
 uv sync --locked --extra experiments
@@ -43,6 +43,8 @@ Run from source; a PyPI entry point is not yet available. `uv.lock` pins NexAU a
 - [Configuration](docs/CONFIGURATION.md): v2 JSON, task packages, personas and credentials.
 - [Architecture](docs/ARCHITECTURE.md): requirements, delivery and artifact boundaries (Chinese).
 - [Public snapshots](docs/EXPORTING.md): publish coarse progress while keeping raw conversations local (Chinese).
+- [Developer tools](tools/dev/README.md): probes, evidence replay and delivery validation.
+- [Research archive](research/README.md): historical configurations, source versions and migration inventory.
 - [Joint release checklist](docs/RELEASING.md): version freezing and publication (Chinese).
 - [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), [Third-party sources](THIRD_PARTY.md) and [Changelog](CHANGELOG.md).
 
@@ -51,9 +53,22 @@ uv sync --locked --extra experiments --extra dev
 uv run --locked --extra experiments --extra dev pytest -q
 ```
 
-Frontend development requires Node.js 22: run `npm ci`, `npm test` and `npm run build` in `frontend/`. The live API is intended for a trusted local environment; static Pages publication is separate.
+Frontend development requires Node.js 22: run `npm ci`, `npm test` and `npm run build` in `frontend/`. The live API is intended for a trusted local environment; static Pages publication is separate. The default development API does not automatically select a v2 run; use experiment `status`/`logs` for current progress. See the [frontend guide](frontend/README.md).
 
-`docs/specs/` stores design contracts and task mappings. `evaluation/` and dated scripts preserve historical research workflows and their frozen versions; use the unified entry for new experiments. User impressions and closed-loop completion do not imply official benchmark success; held-out grading remains a separate workflow.
+Repository layout:
+
+```text
+examples/experiments/                    # Runnable v2 local/E2B definitions
+examples/tasks/, examples/personas/      # Task packages and persona inputs
+backend/auto_designer/experiment/        # Lifecycle and internal controllers
+backend/scripts/                        # Public entry, demo, export, CI/build checks
+tools/dev/                              # Maintained diagnostics and replay tools
+evaluation/                             # Independent held-out grading and adapters
+research/archives/                      # Frozen historical research records
+.experiments/                           # Ignored run outputs
+```
+
+`docs/specs/` stores design contracts and task mappings. Historical research is indexed in `research/inventory.json`; reproduce it using its recorded source revision in a separate checkout, rather than running archived launchers from the current tree. User impressions and closed-loop completion do not imply official benchmark success; held-out grading remains a separate workflow.
 
 ## License
 

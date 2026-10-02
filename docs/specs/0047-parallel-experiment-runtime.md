@@ -3,10 +3,10 @@ number: "0047"
 title: 并行实验运行时与真实模型认证
 issue: 0
 slug: parallel-experiment-runtime
-summary: 以单一实验配置生成隔离的目录、Gitea、容器、网络、模型配额和可审计生命周期，并以真实模型认证门保证多条进化谱系可安全并发和便捷启停。
+summary: 保留当前实验身份、不可变 manifest、隔离本地基础设施与 v2 生命周期接线；旧 v1 命令、容量保护与认证设计已退出并归档。
 tasks:
   - id: T1
-    title: 并行实验运行时契约
+    title: 当前实验身份与隔离契约
     status: done
     priority: P0
     tags: []
@@ -15,10 +15,10 @@ tasks:
     parallel: false
     files:
       - docs/specs/0047-parallel-experiment-runtime.md
-    scope: 定义实验身份、隔离边界、生命周期、模型容量和真实模型认证的完整契约；明确默认强隔离与兼容边界。
-    acceptance: 九段 Spec 自包含，包含资源矩阵、状态机、Task DAG、失败语义和至少一个备选方案；spec validate/render/graph 通过。
+    scope: 保留当前 v2 实验身份、资源所有权、不可变输入和可审计管理边界；旧 v1 生命周期、容量租约与认证方案已由 0071 退出。
+    acceptance: 当前公开流程仅 check/prepare/run/status/logs/stop/resume/collect/destroy；单任务限制和两后端差异明确，历史契约不作为当前启动条件。
   - id: T2
-    title: 实验配置与不可变 Manifest
+    title: 不可变 Manifest 与共享身份原语
     status: done
     priority: P0
     tags: []
@@ -30,12 +30,12 @@ tasks:
       - backend/auto_designer/experiment/__init__.py
       - backend/auto_designer/experiment/config.py
       - backend/auto_designer/experiment/manifest.py
-      - backend/tests/experiment/test_config.py
       - backend/tests/experiment/test_manifest.py
-    scope: 新增 ExperimentConfig、模型矩阵、源码与镜像 pin、路径/资源派生和 append-only manifest/journal；fresh create 且凭证不落盘。
-    acceptance: 实验 ID、路径和资源名非法或碰撞时 API 前 fail closed；manifest 原子创建且不可覆盖，记录全部 pin/模型/并发/端口/状态而不含密钥；序列化、漂移和并发创建测试通过。
+      - backend/tests/test_experiment_config_v2.py
+    scope: 保留实验 ID、config hash、Compose project 派生与不可变 manifest/journal 原语，供当前 v2 生命周期调用；旧 v1 配置解析器已退出。
+    acceptance: manifest 拒绝覆盖和输入漂移，追加 journal 与恢复身份可重验；现行 v2 配置及 manifest 测试通过。
   - id: T3
-    title: 每实验独立基础设施栈
+    title: 每实验独立本地基础设施
     status: done
     priority: P0
     tags: []
@@ -48,10 +48,10 @@ tasks:
       - backend/deploy/experiment/egress-proxy.conf
       - backend/auto_designer/experiment/infrastructure.py
       - backend/tests/experiment/test_infrastructure.py
-    scope: 以 Compose project 为每个实验创建独立 Gitea、Runner、egress proxy、Vigil、网络、卷、用户/token 和动态宿主端口；镜像按 digest 复用只读层。
-    acceptance: 两个实验的容器、网络、卷、端口、Gitea 数据与 token 全异；所有资源带 experiment_id label；同 ID 不误复用、错误 label 拒绝；stop 不删数据，destroy 只命中本实验且需显式确认；compose 与 mock Docker 测试通过。
+    scope: 保留 Compose 项目、Gitea/egress 网络和卷的所有权检查，供 v2 local 后端使用；当前流程不启动未注册的 CI runner。
+    acceptance: 本地资源按实验隔离，错误 label 拒绝；stop 保留数据，destroy 仅作用所属资源；基础设施测试通过。
   - id: T4
-    title: 统一实验 CLI 与闭环接线
+    title: 当前 v2 生命周期与闭环接线
     status: done
     priority: P0
     tags: []
@@ -64,51 +64,15 @@ tasks:
       - backend/auto_designer/experiment/runtime.py
       - backend/auto_designer/experiment/cli.py
       - backend/scripts/experiment.py
-      - backend/run.py
-      - backend/scripts/run_swebench_closed_loop.py
-      - backend/tests/experiment/test_runtime.py
-      - backend/tests/experiment/test_cli.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/tests/test_run_vigil.py
       - backend/tests/test_run_swebench_closed_loop.py
-    scope: 提供 create/plan/preflight/start/status/stop/resume/archive/destroy 命令，把 run.py 固定 DATA/HARNESS/Vigil 全局量改由 ExperimentContext 注入，并保留单实验旧入口兼容。
-    acceptance: 操作者只需配置文件和实验 ID 即可启动；start 前输出无密钥 plan；重复命令幂等且不跨实验 attach；每阶段写 checkpoint，stop 可恢复、archive 只读冻结；既有单实验测试与新 CLI 生命周期测试通过。
-  - id: T5
-    title: 共享模型容量租约与故障保护
-    status: done
-    priority: P0
-    tags: []
-    depends-on:
-      - T2
-    relates-to: []
-    parallel: false
-    files:
-      - backend/auto_designer/experiment/capacity.py
-      - backend/auto_designer/experiment/health.py
-      - backend/tests/experiment/test_capacity.py
-      - backend/tests/experiment/test_health.py
-    scope: 为共享 GLM/其他端点建立跨进程容量租约、每实验并发预算、心跳、过期回收和滚动错误率保护；所有调用归属实验/轮次/角色。
-    acceptance: 并行 start 的总预留不超过端点容量，超额者在 API 前排队或拒绝；进程异常后的租约可安全回收；错误率保护只暂停本实验；遥测能区分排队、上游失败和本地取消；并发与故障注入测试通过。
-  - id: T6
-    title: OpenAgents 真实模型认证与双栈并行验收
-    status: pending
-    priority: P0
-    tags: []
-    depends-on:
-      - T3
-      - T4
-      - T5
-    relates-to: []
-    parallel: false
-    files:
-      - backend/auto_designer/experiment/certification.py
+      - backend/tests/test_experiment_cli_v2.py
+      - backend/tests/test_experiment_lifecycle_v2.py
       - backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh
-      - backend/tests/experiment/test_certification.py
-      - docs/0047-parallel-experiment-runtime.md
-      - OpenAgents/scripts/live-experiment-runtime-certification.sh
-      - OpenAgents/scripts/live_experiment_runtime_certification.py
-      - OpenAgents/tests/test_experiment_runtime_certification.py
-    scope: OpenAgents 在其仓另立对应 Spec，提供真实 GLM 角色协议、真实 Git 修改和隔离 Gitea issue→PR→merge canary，产出 certification.json；Auto Synthesizer 强制消费认证，并以两套并行实验完成最终验收。
-    acceptance: 精确 OpenAgents SHA/镜像 digest/模型 profile 的角色协议 canary 连续 3 次通过，最小真实交付连续 2 次无人介入完成；两套实验同时运行时仓库、状态、日志和停止操作零串扰；未认证或认证漂移的镜像不得启动正式实验；e2e、pytest、Ruff 和脱敏证据通过。
+    scope: 通过 v2 check/prepare/run 和管理命令启动冻结 controller，复用隔离基础设施与恢复身份；旧 create/plan/preflight/start/archive、单例入口、容量保护和认证门不再受支持。
+    acceptance: 重复启动不创建第二个 controller；停止和恢复保持冻结身份；旧命令在 provider 操作前拒绝；当前 v2 CLI、生命周期及隔离测试通过。
 ---
 
 # 0047 · 并行实验运行时与真实模型认证
@@ -116,6 +80,8 @@ tasks:
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
+
+> 0071 清理后的当前契约：保留身份/manifest、local 隔离基础设施与 v2 生命周期接线；容量租约/health 实现 T5 与未落地真实认证 T6 已退出 living task 列表。当前入口由 0069/0071 约束，仅 check/prepare/run/status/logs/stop/resume/collect/destroy，local+localhost 或 E2B+Gitea.com，任务包每轮一个 session。以下原设计中的 v1 命令、共享模型容量与认证强制门是历史背景，不是当前支持或验收承诺；原实现及记录从 research/inventory.json 和 Git 追溯。
 
 将“跑一次闭环”升级为可复用的实验运行时。操作者只提交一份不含密钥的实验配置，系统便为该实验派生
 独立目录、固定源码 worktree、Harness 起点、Gitea/Runner/egress/Vigil 容器、网络、卷、动态端口、

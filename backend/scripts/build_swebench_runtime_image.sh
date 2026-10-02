@@ -3,9 +3,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
-seed_image="${SWEBENCH_STORAGE_SEED_IMAGE:-auto-designer-seed:swebench-medium-hard-16}"
-runtime_image="${SWEBENCH_RUNTIME_SEED_IMAGE:-auto-designer-seed:swebench-medium-hard-16-runtime-v1}"
-nexau_source="${NEXAU_SOURCE:-$(cd "$repo_root/.." && pwd)/NexAU}"
+seed_image="${SWEBENCH_STORAGE_SEED_IMAGE:?Set the immutable storage seed image}"
+runtime_image="${SWEBENCH_RUNTIME_SEED_IMAGE:?Set the output runtime image}"
+nexau_source="${NEXAU_SOURCE:?Set the pinned NexAU checkout}"
 builder_python="${NEXAU_BUILD_PYTHON:-$repo_root/.venv/bin/python}"
 build_context="$(mktemp -d /tmp/auto-designer-runtime-image.XXXXXX)"
 cleanup() { rm -rf -- "$build_context"; }

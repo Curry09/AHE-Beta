@@ -48,8 +48,6 @@ from auto_designer.models import WorkspaceSpec
 from auto_designer.user.sim.seed_source import provision
 
 BACKEND = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = BACKEND / "swebench_pools" / "medium_hard_16.json"
-DEFAULT_OUTPUT = BACKEND / "data" / "swebench_seed" / "medium-hard-16"
 STATE_NAME = "build-state.json"
 DEPS_MARKER = ".seed-deps-v6"
 SCIENTIFIC_DEPS_MARKER = ".seed-deps-v7"
@@ -60,7 +58,7 @@ LEGACY_COMPAT_REPOS = {"psf/requests", "sympy/sympy"}
 
 def _args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--manifest", type=Path, required=True)
     configured_parquet = os.environ.get("SWEBENCH_PARQUET", "").strip()
     parser.add_argument(
         "--parquet",
@@ -68,7 +66,7 @@ def _args() -> argparse.Namespace:
         default=Path(configured_parquet) if configured_parquet else None,
         help="SWE-bench Verified parquet path (or set SWEBENCH_PARQUET).",
     )
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--instance", action="append", default=[])
     parser.add_argument("--validate-only", action="store_true")
     stages = parser.add_mutually_exclusive_group()

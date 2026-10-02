@@ -134,7 +134,7 @@ tasks:
     files:
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/loop/roster.py
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_roster.py
     scope: run_round 重排为 a → 生成段**两拍**——第一拍 triage 分片×N_TRIAGERS ∥ divergent（线程池并行：triage 吃 report、divergent 吃会话证据，二者都只依赖 a 段产物、互不依赖；判重已移 Owner 故分片自由）、第二拍 synthesize（跑在 triage 全部收尾之后，输入含**本轮**新升的 from-triage 提案，结构综合不滞后一轮）→ Owner.admit_once（恒 1）→ b dev → c；gate 段删除。roster 加 owner（默认 1；0=纯机械准入、不跑 LLM 评审段），退役 gate 语义。run.py 接线 Owner、背压告警：proposal 深度与 ready 深度超过阈值（env PROPOSAL_DEPTH_ALARM/READY_DEPTH_ALARM，缺省各 20）→ 状态回调+stdout 告警（不自动扩容，人工介入信号 = CLAUDE.md「issue 长期不降=退化」的落地）。单 agent 崩溃记日志跳过照旧。

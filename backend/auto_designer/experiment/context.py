@@ -118,6 +118,45 @@ def load_controller_context(path: str | Path) -> SimpleNamespace:
     return SimpleNamespace(**document)
 
 
+def require_controller_context(*, swebench: bool = False) -> SimpleNamespace:
+    """Internal controllers require explicit inputs prepared by the public CLI."""
+    required = [
+        "AUTO_DESIGNER_EXPERIMENT_CONTEXT",
+        "AUTO_DESIGNER_EXPERIMENT_ID",
+        "AUTO_DESIGNER_RUN_ID",
+        "AUTO_DESIGNER_CONFIG_HASH",
+        "AUTO_DESIGNER_CONTROLLER_SHA",
+        "AUTO_DESIGNER_PLAN_HASH",
+        "AUTO_DESIGNER_RUN_MODE",
+        "AUTO_DESIGNER_EXECUTION_BACKEND",
+        "AUTO_DESIGNER_RECOVERY_ROOT",
+        "AUTO_DESIGNER_HARNESS_ARCHIVE",
+        "AUTO_DESIGNER_TASK_PACKAGE",
+        "AUTO_DESIGNER_WORKSPACE_FILE",
+        "AUTO_DESIGNER_GITEA_ENV_FILE",
+        "PERSONA_LIBRARY",
+        "AUTO_DESIGNER_INTERACTION_PLAN",
+        "TOTAL_ROUNDS",
+    ]
+    if swebench:
+        required.extend(
+            [
+                "SWEBENCH_PARQUET",
+                "SWEBENCH_INSTANCE_FILE",
+                "PERSONA_ROSTER",
+                "SWEBENCH_INTERACTION_PLAN",
+                "SESSIONS_PER_ROUND",
+            ]
+        )
+    missing = [key for key in required if not os.environ.get(key, "").strip()]
+    if missing:
+        raise ConfigError(
+            "Controller requires frozen inputs from experiment.py prepare/run: "
+            + ", ".join(missing)
+        )
+    return load_controller_context(os.environ["AUTO_DESIGNER_EXPERIMENT_CONTEXT"])
+
+
 def build_controller_environment(
     *,
     run_dir: Path,

@@ -3,11 +3,11 @@
 ## 项目设计
 
 ### 底座
-1. `harbor` 作为 rollout 底座。
+1. 新实验由统一 local/E2B 生命周期运行；`harbor` 仅在独立 held-out 评估适配器与历史研究中使用。
 2. `nexau` 作为 agent 实现，同时兼容 claude code / codex 接入。
 
 ### 项目文档
-用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。历史 evaluation launcher 仅用于对应冻结版本的复现。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
+用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；当前任务包每轮只支持一个 session，N4/N8 多任务和历史产物追加轮尚未接入。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
@@ -42,7 +42,7 @@
 2. 真实数据盘点（确认蒸馏模块的输入）。
 3. 体感观测的样本量与回归分析口径（单点比较 vs 分布比较）。
 
-## 架构（MVP）
+## 当前架构
 
 ### 运行时：需求面 nexau + 交付面 OpenAgents（spec-0032）
 需求面角色为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」，固定角色定义置于 `agent_defs/`：
@@ -66,13 +66,15 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 - **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
 
 ### 闭环
-`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；`TOTAL_ROUNDS=1` 不启 vigil。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。并行隔离实验用 `backend/scripts/experiment.py`（spec-0047）；`./run.sh` 单例入口已弃用，并拒绝 attach 实验托管的 vigil。
+`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；`TOTAL_ROUNDS=1` 不启 vigil。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。监督器启动 `auto_designer.experiment.controllers.ordinary` 或 `.swebench` 包内控制器；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
 
 ### 目录结构
 前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 提供只读观测看板，项目级文档/工具与配置留根。
 ```
 backend/                 # 后端（编排框架）
   auto_designer/         # 包（编排框架本体）
+    experiment/          # v2 配置、材料冻结、local/E2B 生命周期与监督器
+      controllers/       # ordinary.py / swebench.py：包内控制器，不是公开入口
     models.py            # 共享数据结构（两侧共用）
     nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
     harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
@@ -83,15 +85,20 @@ backend/                 # 后端（编排框架）
     guards/              # workspace_jail + repo_guard + harness_boundary；不含内置开发角色
     loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
     web/                 # 只读观测看板 FastAPI（/api/overview /api/delivery /api/sessions ...）
-  tests/                 # 测试（pytest testpaths=backend/tests）
+  tests/                 # 后端测试；根 pyproject 同时包含 evaluation/tests
   agent_defs/            # 需求面角色 nexau 定义（数据）：user_agent/ triage_agent/ synthesizer/ divergent_pm/ owner/
   harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml + .gitea/workflows/smoke.yml
   deploy/gitea/          # 基建：docker-compose.yml(Gitea+act_runner+egress-proxy+双网络) + bootstrap.sh
   deploy/vigil/          # 交付面围堵盒（spec-0033）：Dockerfile + entrypoint.sh(自 clone) + build.sh
-  scripts/               # bootstrap + 实验入口 + runnable SWE-bench seed 构建/验收脚本
+  scripts/               # 唯一实验入口、offline demo、导出、CI 与构建检查
 frontend/                # 前端：React+Vite+TS 只读观测看板（消费 backend web API）
 docs/specs/              # 设计 specs（spec-driven-development 源，项目级）
-tools/                   # vendored spec CLI（外来工具，不纳入 lint）
+examples/                # 当前实验定义、任务包、persona 主库和唯一凭证模板
+evaluation/              # 独立 held-out 评估、共享适配器与测试
+research/                # 历史归档、冻结版本和路径/哈希 inventory
+tools/dev/               # 当前维护的探针、审计、回放与交付验证
+tools/spec-driven-development/ # vendored spec CLI
+.experiments/            # 忽略的实验身份、冻结输入与运行产物
 backend/data/            # 运行产物(.gitignore)：sessions/ harness_runs/
 ```
 根目录配置：`pyproject.toml`（管 backend 子树）、`.github/`、`.gitignore`、`.commitlintrc.yml`、`CLAUDE.md`。

@@ -3,80 +3,30 @@ number: "0067"
 title: 混合 Harness E2B Scaling 运行时
 issue: 0
 slug: mixed-e2b-scaling-runtime
-summary: 为 N=1/4/8/16/32 建立按 receipt 冻结、可恢复、可并行启动的 E2B 混合任务运行时，并统一 direct 与 simulated-user 结果产物。
+summary: 保留当前底层 direct 会话与终端 review 契约；历史 mixed E2B scaling 运行时归档，不扩展当前 v2 单任务入口。
 tasks:
-  - id: T1
-    title: 冻结任务、资源和运行身份
-    status: done
-    priority: P0
-    tags: [evaluation, reproducibility]
-    depends-on: []
-    relates-to:
-      - ref: 0065/T1
-        type: extends
-    parallel: false
-    files:
-      - evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py
-      - evaluation/harness-suite-20260920/freeze_scaling_runtime.py
-      - evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.tasks.json
-    scope: 按 N 生成 agent/grader 分离的 payload inventory，并冻结任务 revision、prompt、grader、模型、资源、timeout 和 canary evidence。
-    acceptance: receipt 缺字段、SHA 漂移、held-out 数据泄漏或 canary 不通过时 launch gate fail-closed。
   - id: T2
-    title: E2B mixed executor 与交互边界
+    title: 底层 direct 会话与终端 review 契约
     status: done
     priority: P0
     tags: [e2b, interaction]
-    depends-on: [T1]
+    depends-on: []
     relates-to:
       - ref: 0065/T4
         type: extends
     parallel: false
     files:
-      - evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py
-      - backend/scripts/run_mixed_closed_loop.py
       - backend/auto_designer/loop/sim_user.py
-    scope: 一个 N 对应一个 sandbox、Gitea repository 和 recovery identity；simulated-user 保留 heartbeat，direct 只发一条 harness 输入并做一次终端 review。
-    acceptance: 不混用 OpenRouter fallback；direct 不产生 heartbeat/follow-up；两种模式都输出 session、trace、grader 和 user outcome。
-  - id: T3
-    title: 单 N 启动、五轮检查点与恢复
-    status: done
-    priority: P0
-    tags: [recovery, checkpoint]
-    depends-on: [T1, T2]
-    relates-to:
-      - ref: 0064/T2
-        type: extends
-    parallel: false
-    files:
-      - evaluation/harness-suite-20260920/run_scaling_e2b.py
-      - evaluation/harness-suite-20260920/start_scaling_n1_e2b.sh
-      - evaluation/harness-suite-20260920/start_scaling_n4_e2b.sh
-      - evaluation/harness-suite-20260920/start_scaling_n8_e2b.sh
-      - evaluation/harness-suite-20260920/start_scaling_n16_e2b.sh
-      - evaluation/harness-suite-20260920/start_scaling_n32_e2b.sh
-    scope: 每个 N 在独立终端启动 5 轮；轮后和 release 后写 checkpoint；resume 复用原 sandbox、Gitea repo、run_id 和 recovery identity。
-    acceptance: 启动/恢复只接受单个 N；预检先完成再创建资源；重复 controller、替换 sandbox 和已完成 operation 重放均被拒绝。
-  - id: T4
-    title: 结果规范和迁移手册
-    status: done
-    priority: P1
-    tags: [reporting, docs]
-    depends-on: [T1, T2, T3]
-    relates-to:
-      - ref: 0065/T6
-        type: extends
-    parallel: false
-    files:
-      - evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md
-      - evaluation/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md
-      - evaluation/harness-suite-20260920/SPEC-scaling-e2b-launch.md
-    scope: 统一记录 official correctness、harness completion、user acceptance、timeout class、wall/active/provider wait，并排除生成物和凭证。
-    acceptance: 新执行者能按 quickstart 完成物化、冻结、check-launch、启动和 resume；结果可追溯到 receipt 与原始 artifact。
+      - backend/tests/user/test_direct_session.py
+    scope: 保留 sim_user 中 direct 单次 Harness 输入与有界终端 review 的底层接口，与 simulated-user 心跳交互分开；旧 mixed executor 已归档，该接口不使当前 v2 单任务入口支持 N4/N8。
+    acceptance: direct 不产生 heartbeat/follow-up，终端 review 与 issue/session 记录可追溯；direct 会话测试通过；当前公共配置继续拒绝多任务计划。
 ---
 
 # 0067 · 混合 Harness E2B Scaling 运行时
 
 ## Summary
+
+> 0071 清理后的当前契约：旧 mixed E2B 物化、启动、恢复与研究手册 T1/T3/T4 已退出 living task 列表，原实现归档。仅保留 sim_user 中已存在的 direct 输入/终端 review 接口；这不等于当前 v2 入口已支持 direct scaling 或 N4/N8。以下 E2B+Boyue、N=1/4/8/16/32 及续跑操作是历史设计记录，复现须使用 research/inventory.json 所记录的冻结 checkout，不从归档目录或当前 CLI 运行。
 
 正式 scaling 使用 E2B + Boyue。N=1、4、8、16、32 是五个互相隔离的实验单元：每个单元
 拥有自己的 controller、sandbox、Gitea repository、run ID 和 recovery identity，运行五轮。

@@ -2,7 +2,7 @@
 
 [English](CONFIGURATION.md) | 简体中文
 
-新实验采用 `schema_version: 2` 的 JSON，通过[快速开始](QUICKSTART.zh-CN.md)里的统一入口运行。复制[本地示例](../examples/experiments/synthesizer-n1-local.json)或 [E2B 示例](../examples/experiments/synthesizer-n1-e2b.json)。未知字段会报错，历史 evaluation schema 不会被自动猜测或转换。
+新实验采用 `schema_version: 2` 的 JSON，通过[快速开始](QUICKSTART.zh-CN.md)里的统一入口运行。复制[本地示例](../examples/experiments/synthesizer-n1-local.json)或 [E2B 示例](../examples/experiments/synthesizer-n1-e2b.json)。未知字段会报错，历史 evaluation schema 与 v1 生命周期命令在 provider 操作前拒绝执行。
 
 ## 用户需要提供的文件
 
@@ -15,6 +15,8 @@
 | 任务依赖 | 完整固定版本及 SHA-256 的 requirements | `examples/tasks/pvlib-1478/requirements.lock` |
 | Persona | 符合仓内 persona schema 的 JSON 数组 | `examples/personas/n1.json` |
 | 凭证 | 显式环境变量，或权限 0600 的 env 文件 | `examples/experiment.env.example` |
+
+N1 示例使用 `examples/personas/n1.json`；通用 persona 主库位于 `examples/personas/library.json`。选择另一份库不会开启多任务调度。
 
 实验中的路径相对于实验 JSON；任务包中的路径相对于任务 JSON。prepare 自动生成 roster、任务池、逐轮计划、所需单实例 SWE Parquet、源码/Harness 归档与哈希清单，不需要用户手工拼装。
 
@@ -35,7 +37,7 @@
 | `evaluation.official_grading` | `false`，官方评分单独运行 |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
-当前单任务 schema 支持每轮一次 session，可以按轮切换 persona。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
+当前单任务 schema 要求 `rounds.sessions_per_round: 1`；统一入口尚不支持 N4/N8 多任务计划或导入历史结果后追加一轮。可以按轮切换 persona。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
 
 `builtin` 冻结当前 checkout 的 `backend/harness_template/`，不是历史 `cade14d` Harness。复现旧基线必须显式提供那份归档和真实校验和。
 
@@ -93,6 +95,6 @@ E2B 在一个沙箱内运行 controller 与交付进程，不依赖嵌套 Docker
 
 用全局 `--runs-dir /absolute/path/runs` 放在子命令前可改运行根目录，后续管理始终使用同一根目录。prepare 后编辑原 JSON 或源码 checkout 不影响既有 run；改变实验定义应重新 prepare。
 
-历史 `backend/.env`、model profile、evaluation launcher 只服务各自原 schema，不是 v2 的另一套隐式配置来源。
+实验凭证统一使用 `examples/experiment.env.example` 模板。历史 profile 和 launcher 从[研究索引](../research/README.zh-CN.md)查找，需使用原 checkout，不作为当前 v2 配置来源。[开发维护工具](../tools/dev/README.md)各自要求显式输入。已准备的 v2 实验在本次清理后继续保留冻结源码和输入哈希；resume 不升级其中的 controller。
 
 pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest，供用户侧检查。

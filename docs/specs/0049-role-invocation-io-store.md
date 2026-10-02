@@ -59,7 +59,7 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/deploy/vigil/entrypoint.sh
       - backend/tests/test_run_vigil.py
       - backend/auto_designer/guards/workspace_jail.py
@@ -76,7 +76,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/scripts/replay_role_invocations.py
+      - tools/dev/replay/replay_role_invocations.py
       - backend/tests/scripts/test_replay_role_invocations.py
       - backend/scripts/e2e-spec-0049-role-invocation-io-store.sh
     scope: 从 role_runs 读取 demand 判断角色的 input.prompt，注入新 agent_def 再跑 run_agent_def；对比新旧 output.structured；不重放文件写入、不启 Gitea/vigil。
@@ -105,6 +105,8 @@ tasks:
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
+
+> 0071 清理后的当前映射：包内 ordinary controller 保留 role_runs 和阶段恢复的证据寿命；根目录单例 run.sh 已退出。下文有关单例重置与旧入口寿命的描述为设计时背景，不是当前启动方式。新运行与已有 v2 管理由统一入口管理。
 
 第一性原理：**日志必须能还原出这一次实验**，否则无法事后判定问题出在用户模拟、需求面某一角色，还是交付面某一角色。
 

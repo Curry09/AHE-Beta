@@ -23,7 +23,7 @@ def prepared_inputs(tmp_path, monkeypatch):
     (tmp_path / "setup.sh").write_text("#!/bin/sh\npython -m venv .venv\n")
     (tmp_path / "requirements.lock").write_text("# no external dependencies\n")
     write(tmp_path / "task.json", package())
-    card_root = Path(__file__).resolve().parents[1] / "persona_library.json"
+    card_root = Path(__file__).resolve().parents[2] / "examples/personas/library.json"
     cards = json.loads(card_root.read_text())
     write(tmp_path / "personas.json", [card for card in cards if card["id"] == "sr-15-swyx"])
     oa = tmp_path / "oa"
@@ -85,6 +85,19 @@ def test_freeze_generates_plan_archives_and_records_dirty_tree(prepared_inputs, 
     assert len(manifest["controller_sha"]) == 40
     assert manifest["source_snapshot"]["files"]["backend/auto_designer/experiment/materials.py"]
     assert isinstance(manifest["source_snapshot"]["dirty"], bool)
+    files = manifest["source_snapshot"]["files"]
+    assert manifest["source_snapshot"]["entrypoint"] == {
+        "kind": "module",
+        "module": "auto_designer.experiment.controllers.ordinary",
+    }
+    assert "backend/auto_designer/experiment/controllers/ordinary.py" in files
+    assert "backend/deploy/vigil/Dockerfile" in files
+    assert "backend/deploy/vigil/entrypoint.sh" in files
+    assert "backend/scripts/prepare_swebench_runtime_tree.py" in files
+    assert not any(name.startswith(("research/", "tools/", "examples/")) for name in files)
+    assert "backend/run.py" not in files
+    assert "backend/scripts/run_swebench_closed_loop.py" not in files
+    assert "backend/scripts/experiment.py" not in files
     run = Path(manifest["run_dir"])
     plan = json.loads((run / manifest["materials"]["interaction_plan"]["path"]).read_text())
     assert len(plan) == 5

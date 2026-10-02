@@ -1,5 +1,5 @@
 # Spec-0047/T2：不可变 manifest 与 append-only journal。
-"""create is exclusive; later facts go to journal.jsonl, never rewrite manifest."""
+"""Spec-0071/T3: immutable input manifests and shared append-only runtime facts."""
 
 from __future__ import annotations
 

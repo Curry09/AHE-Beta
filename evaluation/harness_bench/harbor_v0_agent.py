@@ -16,10 +16,19 @@ from harbor.agents.base import AgentContext, BaseAgent
 from harbor.environments.base import BaseEnvironment
 
 ROOT = Path(__file__).resolve().parents[2]
-ADAPTER_ROOT = ROOT / "evaluation/public-bench-pilot/adapters/harness_v0"
+ADAPTER_ROOT = ROOT / "evaluation/adapters/harness_v0"
 DRIVER = Path(__file__).with_name("harbor_v0_driver.py")
-HARNESS_ARCHIVE = Path("/root/src/auto-designer-experiment-artifacts/harness-v0-cade14d.tar.gz")
-NEXAU_WHEEL = Path("/tmp/nexau-wheel/nexau-0.4.1-py3-none-any.whl")
+
+
+# Spec-0071/T1: historical baseline materials are explicit operator inputs.
+def baseline_material(name: str) -> Path:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise FileNotFoundError(f"Set {name} to the frozen baseline material path")
+    path = Path(value).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"Missing {name} material: {path}")
+    return path
 
 
 class HarnessV0Agent(BaseAgent):
@@ -34,10 +43,8 @@ class HarnessV0Agent(BaseAgent):
 
     @classmethod
     def preflight(cls, kwargs=None, env=None) -> None:
-        if not HARNESS_ARCHIVE.is_file():
-            raise FileNotFoundError(f"missing frozen harness archive: {HARNESS_ARCHIVE}")
-        if not NEXAU_WHEEL.is_file():
-            raise FileNotFoundError(f"missing pinned NexAU wheel: {NEXAU_WHEEL}")
+        baseline_material("HARNESS_BASELINE_ARCHIVE")
+        baseline_material("NEXAU_BASELINE_WHEEL")
 
     async def setup(self, environment: BaseEnvironment) -> None:
         await environment.exec(
@@ -45,8 +52,12 @@ class HarnessV0Agent(BaseAgent):
             timeout_sec=30,
             user="root",
         )
-        await environment.upload_file(HARNESS_ARCHIVE, "/tmp/harness-v0.tar.gz")
-        await environment.upload_file(NEXAU_WHEEL, "/tmp/nexau-0.4.1-py3-none-any.whl")
+        await environment.upload_file(
+            baseline_material("HARNESS_BASELINE_ARCHIVE"), "/tmp/harness-v0.tar.gz"
+        )
+        await environment.upload_file(
+            baseline_material("NEXAU_BASELINE_WHEEL"), "/tmp/nexau-0.4.1-py3-none-any.whl"
+        )
         await environment.upload_file(ADAPTER_ROOT / "stdio.py", "/opt/hse-v0/stdio.py")
         await environment.upload_file(DRIVER, "/opt/hse-v0/driver.py")
         result = await environment.exec(

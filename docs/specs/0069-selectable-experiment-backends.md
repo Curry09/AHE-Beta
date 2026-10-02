@@ -20,7 +20,7 @@ tasks:
       - backend/auto_designer/experiment/schemas/task-package-v1.json
       - backend/tests/test_experiment_config_v2.py
       - backend/tests/test_experiment_materials.py
-    scope: 实现严格 v2 配置与任务包解析、自动生成计划及冻结输入，保留显式旧版本识别
+    scope: 实现严格 v2 配置与任务包解析、自动生成计划及冻结输入；旧 schema 显式拒绝，不启用兼容运行链路
     acceptance: 未知字段与错误材料在启动前失败；冻结哈希可重验，相对路径和 env 引用正确且不包含凭证
   - id: T2
     title: 共用 controller context 与后端协议
@@ -36,8 +36,8 @@ tasks:
       - backend/auto_designer/experiment/context.py
       - backend/auto_designer/experiment/backends/__init__.py
       - backend/auto_designer/experiment/backends/base.py
-      - backend/run.py
-      - backend/scripts/run_swebench_closed_loop.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/tests/test_experiment_engine.py
     scope: 共用现有闭环、注入全部受支持模型参数和材料，定义生命周期后端接口
     acceptance: ordinary 与 SWE 路径均读取冻结 context，不再依赖隐式 backend/.env；参数生效且末轮语义保持
@@ -53,7 +53,6 @@ tasks:
     files:
       - backend/auto_designer/experiment/backends/local.py
       - backend/auto_designer/experiment/infrastructure.py
-      - backend/auto_designer/experiment/health.py
       - backend/deploy/experiment/docker-compose.yml
       - backend/deploy/vigil/Dockerfile
       - backend/deploy/vigil/entrypoint.sh
@@ -62,7 +61,7 @@ tasks:
       - backend/auto_designer/harness/launcher.py
       - backend/auto_designer/user/sim/sources/docker_seed.py
       - backend/tests/user/sim/test_docker_seed_source.py
-    scope: 自动准备本地基础设施、Gitea 身份、动态地址和隔离执行环境
+    scope: 自动准备本地基础设施、Gitea 身份、动态地址和隔离执行环境；健康观察由当前 local backend 完成，旧 health 模块已退出。
     acceptance: 真实 controller 与 vigil 健康才可运行；动态端口可达、无空注册 runner，停止及清理只作用所属资源
   - id: T4
     title: E2B 与 Gitea.com 执行适配
@@ -99,12 +98,10 @@ tasks:
       - backend/auto_designer/experiment/runtime.py
       - backend/auto_designer/experiment/manifest.py
       - backend/auto_designer/experiment/collection.py
-      - backend/scripts/run_auditable_experiment.py
-      - evaluation/harness-suite-20260920/run_n1_e2b.py
       - backend/tests/test_experiment_cli_v2.py
       - backend/tests/test_experiment_lifecycle_v2.py
-    scope: 接通 check/prepare/run 与统一管理，分离状态并迁移旧入口提示
-    acceptance: 中断续跑保持身份、状态如实反映存活和采集结果；dirty checkout 和缺模型 key 不阻塞 collect/destroy，旧运行不被覆盖
+    scope: 接通 check/prepare/run 与统一管理，分离状态；旧 v1 生命周期、转发 wrapper 和历史 launcher 已退出，现行命令仅服务 v2。
+    acceptance: 已有 v2 运行保持身份及冻结输入，状态如实反映存活与采集；dirty checkout 和缺模型 key 不阻塞 collect/destroy；旧命令或 schema 在 provider 操作前拒绝。
   - id: T6
     title: 双语教程与两路径完整验收
     status: done
@@ -152,6 +149,8 @@ tasks:
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
+
+> 0071 清理后的当前契约：v1 生命周期兼容、create/start/preflight/archive 别名和 auditable wrapper 已退出；现行仅支持 v2 check/prepare/run/status/logs/stop/resume/collect/destroy。已准备 v2 run 保留原冻结源码和哈希，不升级其 controller。下文 Motivation 中旧入口描述是历史背景，当前任务包每轮仍只支持一个 session。
 
 统一开源实验入口为 `backend/scripts/experiment.py`，以一份版本化实验定义描述任务、persona、Harness 初始版本、角色、模型和轮数，提供 `local`（本机 Docker + 自动启动 localhost Gitea）与 `e2b`（E2B + 用户自己的 Gitea.com）两种执行后端。共用材料解析、冻结、预检、闭环控制与运行管理，后端仅承担资源和执行环境差异。交付两份可执行 N=1 示例、中英 QuickStart、从干净 checkout 完成五轮的教程和可核查的实跑记录。
 
@@ -298,7 +297,7 @@ destroy 默认保留本地产物、Gitea 实验仓库与共享模板/cache；验
 
 ### 4. 入口收敛与迁移
 
-新的公开教程只出现 experiment.py。现有 create/start/preflight/archive 可以作为有限期薄别名，明确映射与提示；旧 schema 必须经显式版本适配或给出可操作迁移错误，禁止新解析器默默猜测历史字段。原本 infra-only 的 start 不再报告完整实验 RUNNING。`run_auditable_experiment.py` 退为共用链路 wrapper；历史 evaluation launchers 保留复现实验用途，帮助与文档明确非新实验入口，迁移新入口无需删除历史证据。
+当前公开实验仅使用 experiment.py 的 v2 命令。旧 create/start/preflight/archive 命令和 v1 schema 在 provider 操作前拒绝；不提供转发 wrapper 或新 main 调旧 launcher 的兼容链路。历史实现、配置和材料集中在 research/archives，通过 inventory 指定的冻结 checkout 复现。当前和已准备 v2 实验使用各自冻结 controller，保留身份和输入哈希；多任务及历史导入追加轮尚未接入。
 
 现有运行目录仍可由旧路径管理；新入口检测旧 manifest 明确提示适用命令，不直接覆写为 v2。历史固定身份实验不得自动转换为新 schema 并沿用原 run_id。
 

@@ -1,4 +1,4 @@
-// fetch 客户端：本地/后端托管模式走 /api；GitHub Pages 模式走当前实验的静态 API 快照。
+// fetch 客户端：本地/后端托管模式走 /api；GitHub Pages 模式走历史实验的静态 API 快照。
 
 import type {
   AgentsResponse,
@@ -28,16 +28,24 @@ export interface ExperimentSummary {
 const staticSite = import.meta.env.VITE_STATIC_SITE === "1";
 const baseUrl = import.meta.env.BASE_URL;
 
-function selectedExperiment(): string | null {
+export function getSelectedExperimentId(): string | null {
   const query = new URLSearchParams(window.location.search).get("experiment");
   if (query) return query;
   const match = window.location.pathname.match(/\/experiments\/([^/]+)/);
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+// Spec-0071/T5: index.updated_at is the snapshot record time, not a live heartbeat.
+export function formatSnapshotTime(recordedAt: string): string {
+  const time = new Date(recordedAt);
+  return Number.isNaN(time.getTime())
+    ? "记录时间未知"
+    : `${time.toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
 function apiRoot(): string {
   if (!staticSite) return "/api";
-  const id = selectedExperiment() || "_default";
+  const id = getSelectedExperimentId() || "_default";
   return `${baseUrl}experiments/${encodeURIComponent(id)}/api`;
 }
 

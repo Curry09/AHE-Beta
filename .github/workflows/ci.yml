@@ -54,6 +54,8 @@ jobs:
         run: uv sync --locked --extra dev
       - name: Backend and evaluation tests
         run: uv run --locked --extra dev pytest -q
+      - name: Public experiment directory contract
+        run: uv run --locked python backend/scripts/check_experiment_repository.py
       - name: Offline demo
         run: uv run --locked python backend/scripts/offline_demo.py
 

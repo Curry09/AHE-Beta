@@ -33,21 +33,8 @@ tasks:
       - backend/auto_designer/loop/run_state.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_run_state.py
-    scope: 去掉 release_ref 链：run_round 不再把 outcome.tag 链式回灌。phase-a 每局会话开始解析 harness 仓 main 的 HEAD SHA、按该 SHA launch（launcher 已支持按 SHA checkout，保证单会话内 harness 不在脚下变 = 会话级快照）；dev 直推 main 后，下一局自然解析到更新后的 main HEAD（对用户永远「最新 main」）。回灌语义从「release 链」简化为「main 最新 SHA」；run_state.current_release_ref 语义改为「当前 main SHA」（观测游标，字段名可保留或重命名）。run/run_round 签名与命名相应调整。不动 dev、launcher。
-    acceptance: run_round 不再读 outcome.tag 作链式 ref；每局 launch 的 ref 解析自 harness 仓 main 当前 HEAD SHA；同一会话内多轮 send 跑同一 SHA 快照；dev 推进 main 后下一局解析到新的 main HEAD。run_state 持久化「当前 main SHA」语义、读写往返一致。单测（mock launcher/developer + 临时 git 仓）覆盖：无 dev 发版时下一局仍取 main 最新；dev 推进后 SHA 前进；run_state to_dict/from_dict 往返。
-  - id: T3
-    title: 一次性迁移脚本：main ← release + 清理分支
-    status: pending
-    priority: P1
-    tags: []
-    depends-on: []
-    relates-to: []
-    parallel: false
-    files:
-      - backend/scripts/migrate_trunk_main.py
-      - backend/tests/test_migrate_trunk_main.py
-    scope: 新增一次性迁移脚本，把演化成果从 release 收敛到 main 且不丢东西：`git branch -f main release`（main 移到 release 当前 tip，保留全部历史与内容）→ 删除 release 分支、4 条孤儿 fix/issue-* 分支、4 条已合并分支 → push main、删除远端 release、确认 Gitea 默认分支为 main。幂等：已迁移（main 已含 release tip、无 release 分支）则 no-op、不报错。对意外仓状态（无 release、main 非 release 祖先）安全退出并提示，不强行破坏。
-    acceptance: 在含 main(空种子)+release(领先)+孤儿 fix/issue-* 分支的 fixture 仓上运行后：main 指向旧 release tip（内容与历史全保留、git log 可见 release 历史）、release 及孤儿/已合并分支均删除、本地仅剩 main 一条线。重复运行幂等无副作用、不报错。当 release 不存在或 main 不是 release 祖先时安全跳过并打印原因，不执行 -f/删除。
+    scope: 保留 main SHA 观测游标与按 SHA 启动会话的快照语义；当前闭环在轮次交付屏障后解析 sealed SHA，不再依赖内置 dev 直推或 vK tag。具体阶段恢复和封口由当前 round gate 契约约束。
+    acceptance: 同一会话保持同一 Harness SHA，main SHA 与 run_state 可往返持久化；下一轮只使用完成交付的封口版本，不依赖已退出的 migration 或内置开发角色。
   - id: T4
     title: 去 release：种子/bootstrap/e2e trunk 化
     status: pending
@@ -59,11 +46,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/scripts/bootstrap_harness.py
       - backend/tests/test_bootstrap_harness.py
-    scope: 把建仓与 e2e 从「main + release」收敛到单 main：run.py 的 _seed_harness_repo 不再 `git branch release`（仅 main）、Orchestrator initial_ref 由 release 改 main、结果打印从「release_ref 链」改「main SHA / 分支 + tags」；bootstrap_harness.py 不再创建 release 分支、确保 Gitea 默认分支为 main。与 T1/T2 的直推 main + main SHA 回灌对齐。
-    acceptance: run.py 种出的本地仓只有 main 分支、initial_ref=main；跑通后仓内仅 main + vK tags、无 release。bootstrap_harness.py 不创建 release、默认分支为 main。test_bootstrap_harness 断言只建 main、无 release。e2e 结果打印反映 main SHA / tags 而非 release_ref 链。
+    scope: 包内 ordinary controller 与 bootstrap 工具初始化 main 作为 Harness 主干，保留固定起点和 main SHA 观测；不创建旧 release 主干或要求 vK tag，正式实验由统一 v2 入口初始化。
+    acceptance: seed/bootstrap 默认主干为 main，不创建 release；当前 bootstrap 与 controller 测试验证初始化和版本边界，原一次性迁移不进入当前实验流程。
 ---
 
 # 0007 · 开发者侧改为纯 trunk(main) 自进化
@@ -71,6 +58,8 @@ tasks:
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
+
+> 0071 清理后的当前映射：一次性迁移任务 T3 已退出 living task 列表，原脚本及测试归档，历史设计通过 Git 与 research/inventory.json 追溯。下文 release→main 迁移段落是原设计背景，不是当前操作入口；现行交付由 OpenAgents PR 合并，main SHA 观测仍保留。
 
 去掉 harness 仓的 `release` 常驻分支、发版、体感门禁与回退，改纯 **trunk（单 `main`）** 自进化：user agent 永远使用最新 `main`（会话开始锁定其 HEAD SHA、整局跑该快照），dev agent 不分 bug/feature、直接 commit 到 `main`。每次成功推进给 `main` 打轻量 `vK` tag，**仅作观测锚点，不是发版**。一往无前，不回退。
 
@@ -152,7 +141,7 @@ T3（一次性迁移）与 T1 无代码依赖，可并行；T4 总装 e2e，依�
 
 ### e2e 脚本
 
-`backend/run.py` —— 真实端到端跑一轮闭环（a→b→c，真 nexau + 真 Gitea + 本地 git 仓）。T4 改其种子（只种 `main`）、`initial_ref="main"` 与结果打印（「main SHA / 分支」取代「release_ref 链」）。
+`backend/auto_designer/experiment/controllers/ordinary.py` —— 真实端到端跑一轮闭环（a→b→c，真 nexau + 真 Gitea + 本地 git 仓）。T4 改其种子（只种 `main`）、`initial_ref="main"` 与结果打印（「main SHA / 分支」取代「release_ref 链」）。
 
 ## Drawbacks
 
@@ -189,4 +178,3 @@ T3（一次性迁移）与 T1 无代码依赖，可并行；T4 总装 e2e，依�
 - benchmark held-out 评测挂钩到选定 `vK` 的 SHA，事后验证体感驱动进化是否带来真实能力提升。
 - 坏 commit 的「软回退」观测：标记（而非 `revert`）退化点，保持「一往无前」的同时可视化退化。
 - 多 dev 并发直推 `main` 的冲突合并策略（当前串行各领不同 issue）。
-

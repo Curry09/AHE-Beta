@@ -85,7 +85,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/scripts/evaluate_role_traces.py
+      - tools/dev/audit/evaluate_role_traces.py
       - backend/tests/demand/test_role_contract_flow.py
     scope: 增加同一批 session 的旧输入/新分层输入对照回放，分别记录每角色输入 token、工具调用数、墙钟时间、证据引用、跨题专有名词泄漏和 artifact 语义违规；用户主观结论与 objective evaluator 结果独立评分。
     acceptance: 对照报告能证明 Triage 只消费单 report 证据、PM 保持全局产品视角、Synthesize 只做 proposal 关系综合；L1 默认路径不新增模型调用；L2/L3 超预算或越权读取可观测并降级；trace 中的目标项目文件名/答案不能进入通用 proposal 字段；`accept` 与 objective failed/unverified 的组合不被评为整体成功。

@@ -73,7 +73,6 @@ tasks:
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/loop/roster.py
       - backend/auto_designer/loop/live_tracer.py
-      - backend/scripts/probe_wait_signals_to_evolution.py
       - backend/tests/dev/test_agentic_developer.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_parallel_sessions.py
@@ -91,8 +90,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
-      - backend/scripts/run_swebench_closed_loop.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/tests/test_run_vigil.py
     scope: run.py：种子推送后在 HARNESS_REPO 写 `.openagents/openagents.yml`（forge=gitea + deploy/gitea 的 base_url/owner/repo/token_env、stages 定稿 triage=skip / rfc=skip(起步，显式告警可接受) / conflict=agent / ci=skip(T6 就位后改 agent) / e2e=skip / review=agent / merge=agent、labels=[openagents]、interval=30、release=manual）；以 subprocess.Popen 启动 `openagents vigil --parallel K`（cwd=HARNESS_REPO，K=roster developer 数，stdout/stderr 落 data/vigil.log），run 退出时 terminate+wait 兜底 kill。openagents 以独立 CLI 接入（uv tool install 钉版本，不 vendor 不 import，见正文 §4.3 部署形态），run.py 启动前预检 `openagents` 命令存在。vigil 的本地状态（.openagents/ 下 sqlite 队列、claims flock、runtime-state）随 _seed_harness_repo 的 rmtree 每次 run 自然重置，无跨 run 脏状态。退役 vK tag 全链路：dev 预算 env（DEV_BUDGET_*）、_next_version/ls-remote tags 逻辑、banner 文案更新。平台注记：vigil 依赖 fcntl.flock，交付面仅 Linux/macOS 可跑（生产环境 Linux 满足）；Windows 本地只跑单测。凭证注记：交付面 coding 后端是 claude CLI（OpenAgents claude_code backend），DEV_LLM_* 不再消费，宿主需登录 claude CLI；Gitea token 经 GITEA_TOKEN env 传给 vigil 子进程。
     acceptance: 单测（mock Popen）断言 yml 内容与 stages 定稿一致、vigil 启停与日志路径正确、异常退出有兜底；banner/预算 env 无 vK 残留；Linux 生产环境手工冒烟一轮闭环（Owner admit → vigil 开 PR → merge → c 步游标前移）。

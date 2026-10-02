@@ -30,7 +30,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/tests/test_run_git_isolation.py
     scope: '两处（同文件一并落）：① 凭证隔离 _isolate_git_credentials()——多信道封堵（单关终端提示不够，实测 VS Code 注入的 GIT_ASKPASS 会绕过）：GIT_SSH_COMMAND=false（setdefault）+ GIT_TERMINAL_PROMPT=0 + 清 GIT_ASKPASS/SSH_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* + 经 GIT_CONFIG_* 空值重置 credential.helper；Gitea HTTP（token in URL）与本地无传输 git 不受影响。② 绊线接线——构造 developers 后、orch.run 前 before=snapshot_repo(repo=str(ROOT))，integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before) 注入 Orchestrator（ROOT=编排仓根=逃逸目标；run 期间编排仓应全程冻结）。'
     acceptance: 启动后 GIT_SSH_COMMAND=='false'（未显式覆盖时）、GIT_TERMINAL_PROMPT=='0'、GIT_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* 全清、GIT_CONFIG_* 注入空 credential.helper（追加不覆盖既有）；单测覆盖以上分支。harness seed/reset 与 dev 推 Gitea 的 HTTP 流程不受影响。orch 收到非 None integrity_guard；正常跑（编排仓未被动）不抛；人工写改编排仓后再跑，run 抛 RepoIntegrityError 且 finally 落 running=False。
@@ -206,7 +206,7 @@ T2 依赖 T1（用 repo_guard）；T3 独立。凭证隔离与绊线接线是两
 
 - **T1**：`backend/auto_designer/guards/repo_guard.py`、`backend/auto_designer/loop/orchestrator.py`、
   `backend/tests/guards/test_repo_guard.py`、`backend/tests/loop/test_orchestrator.py`
-- **T2**：`backend/run.py`（凭证隔离 env 段 + orchestrator 接线段）、
+- **T2**：`backend/auto_designer/experiment/controllers/ordinary.py`（凭证隔离 env 段 + orchestrator 接线段）、
   `backend/tests/test_run_git_isolation.py`
 - **T3**：`backend/agent_defs/developer_agent/MANUAL.md`（删除）
 

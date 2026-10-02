@@ -14,9 +14,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/tests/test_run_vigil.py
-      - backend/scripts/run_swebench_closed_loop.py
+      - backend/auto_designer/experiment/controllers/swebench.py
     scope: run.py 的 _VIGIL_STAGES 把 rfc 从 skip 改为 agent（drafter 先落 docs/specs，再 implement；spec CLI 在 vigil 镜像内，不进 harness 仓依赖）。打开 RFC 拉长 solve，需求面 TOTAL_ROUNDS 收尾时交付面往往还在跑：VIGIL_KEEP_ALIVE 缺省常驻，仅显式 0/false/no/off 才在需求面收尾拆 vigil。write_openagents_config 与单测断言 stages 定稿一致；swebench 闭环脚本随 start_vigil 同源 keep-alive。
     acceptance: test_run_vigil 断言 yml stages.rfc=agent；VIGIL_KEEP_ALIVE 缺省 True、显式关闭才 docker rm / 杀 subprocess；容器复用已在跑实例不重复 docker run。pytest backend/tests/test_run_vigil.py 绿。
   - id: T2
@@ -133,7 +133,7 @@ OpenAgents 侧契约（本仓镜像描述，不 vendor 其源码）：rfc:agent 
 
 ### T1：`stages.rfc=agent` 与 vigil keep-alive
 
-`backend/run.py` 的 `_VIGIL_STAGES` 是写入 `.openagents/openagents.yml` 的单一出处（每次 run 生成，勿手改 yml）。定稿：
+`backend/auto_designer/experiment/controllers/ordinary.py` 的 `_VIGIL_STAGES` 是写入 `.openagents/openagents.yml` 的单一出处（每次 run 生成，勿手改 yml）。定稿：
 
 ```text
 triage: skip      # 准入已由 Owner 完成
@@ -147,7 +147,7 @@ merge: agent
 
 `rfc:skip` 起步时的注释（harness 无 spec 工具链、显式告警可接受）作废，改为「spec CLI 在镜像内」。
 
-`VIGIL_KEEP_ALIVE`：缺省常驻。仅环境变量显式 `0` / `false` / `no` / `off` 时，需求面 `finally` 才 `docker rm` / 杀 subprocess。keep-alive 时 `stop_vigil` 只拆日志跟随器（`docker logs -f`），不拆 vigil 容器；再次 `start_vigil` 复用已在跑实例，不重复 `docker run`。`backend/scripts/run_swebench_closed_loop.py` 经同一 `start_vigil`，行为同源。
+`VIGIL_KEEP_ALIVE`：缺省常驻。仅环境变量显式 `0` / `false` / `no` / `off` 时，需求面 `finally` 才 `docker rm` / 杀 subprocess。keep-alive 时 `stop_vigil` 只拆日志跟随器（`docker logs -f`），不拆 vigil 容器；再次 `start_vigil` 复用已在跑实例，不重复 `docker run`。`backend/auto_designer/experiment/controllers/swebench.py` 经同一 `start_vigil`，行为同源。
 
 单测：`backend/tests/test_run_vigil.py` 断言 yml `stages.rfc == agent`、keep-alive 缺省/关闭、容器复用。
 
@@ -198,7 +198,7 @@ T1 / T2 / T4 无互依赖，可并行。T3 依赖 T2（先定拒绝清单再抄�
 
 | Task | 本仓 files | 备注 |
 |---|---|---|
-| T1 | `backend/run.py`、`backend/tests/test_run_vigil.py`、`backend/scripts/run_swebench_closed_loop.py` | stages 单一出处 |
+| T1 | `backend/auto_designer/experiment/controllers/ordinary.py`、`backend/tests/test_run_vigil.py`、`backend/auto_designer/experiment/controllers/swebench.py` | stages 单一出处 |
 | T2 | `backend/auto_designer/guards/harness_boundary.py`、`backend/tests/guards/test_harness_boundary.py` | 钩子生成源 |
 | T3 | `backend/harness_template/.gitea/workflows/smoke.yml`、`backend/harness_template/docs/specs/README.md` | 与 T2 字面同步 |
 | T4 | `backend/deploy/gitea/egress-proxy.conf` | 部署实例域可换 |

@@ -17,15 +17,13 @@ tasks:
       - backend/auto_designer/demand/grouped_synthesizer.py
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/tracker/gitea.py
-      - backend/run.py
-      - backend/scripts/run_auditable_experiment.py
-      - backend/scripts/run_swebench_closed_loop.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/tests/demand/test_grouped_synthesizer.py
-      - backend/tests/test_run_auditable_experiment.py
       - backend/tests/tracker/test_gitea.py
       - docs/synthesizer-grouping.md
-    scope: 在 Triage 后对本轮 proposal 一次性分类，按互斥组交给已有 Synthesizer workers，失败时确定性退回顺序分批。
-    acceptance: 每个输入票恰好属于一组且每批不超过六条；同组由单 worker 顺序处理、不同组可并行；分类失败不丢票、不扩大读取范围。
+    scope: '保留包内 ordinary/SWE controller 生成 coordination: soft 的交付配置、需求接线和共享 tracker 行为；旧 auditable wrapper 已归档，不作为交付入口。'
+    acceptance: 当前 controller 的轻量前置参数生效，coordination 关闭可回普通队列；相关需求、tracker 与 controller 测试通过。
   - id: T2
     title: 交付侧有界前置与软调度
     status: done
@@ -96,7 +94,7 @@ Auto Synthesizer 等本轮全部准入票终态后才开始下一轮用户。任
 
 ### 配置与预算
 
-`backend/run.py` 生成 `coordination: soft`，同一份 `openagents.yml` 用于 subprocess 和 vigil
+`backend/auto_designer/experiment/controllers/ordinary.py` 生成 `coordination: soft`，同一份 `openagents.yml` 用于 subprocess 和 vigil
 容器。`VIGIL_COORDINATION=off` 关闭前置并恢复普通优先级/FIFO；`dependencies` 显式选择强依赖
 模式。模式在下次启动生效，不修改正在运行的实验。运行镜像必须包含认识 `coordination` 字段的
 OpenAgents 版本。

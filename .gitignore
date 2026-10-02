@@ -12,13 +12,6 @@ venv/
 # Runtime artifacts (sessions, harness checkouts)
 data/
 
-# Evaluation runtime artifacts are materialized from frozen configs and are not
-# source-controlled: payload archives, receipts, live run state, and canary
-# logs can be regenerated with the preparation/launch commands.
-evaluation/harness-suite-20260920/prepared/
-evaluation/harness-suite-20260920/runs/
-evaluation/harness-suite-20260920/harbor-canary-jobs/
-
 # openagents 本地运行态（worktrees + state.json，本机专属）
 .openagents/
 

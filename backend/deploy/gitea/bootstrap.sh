@@ -102,5 +102,5 @@ echo "[bootstrap] 完成，连接信息写入 $ENV_FILE"
 if [[ -n "${RUNNER_TOKEN:-}" ]]; then
   echo "[bootstrap] 启动 Actions runner ..."
   $COMPOSE up -d act-runner
-  echo "[bootstrap] runner 就绪后可把交付面 ci 闸开为 agent（VIGIL_CI_STAGE=agent，见 backend/run.py）"
+  echo "[bootstrap] runner 就绪后可把交付面 ci 闸开为 agent（VIGIL_CI_STAGE=agent，见包内 ordinary 控制器；新实验从 experiment.py 启动）"
 fi

@@ -143,7 +143,7 @@ spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypass
 将冻结需求面 summary 或只读 Gitea 快照复制到全新验证仓库，选择性保留交付令牌并生成不可覆盖 manifest；随后以显式 Anthropic-compatible 网关配置启动隔离 vigil，保证实验可复用且不污染来源。
 
 ### 0047 并行实验运行时与真实模型认证
-以单一实验配置生成隔离的目录、Gitea、容器、网络、模型配额和可审计生命周期，并以真实模型认证门保证多条进化谱系可安全并发和便捷启停。
+保留当前实验身份、不可变 manifest、隔离本地基础设施与 v2 生命周期接线；旧 v1 命令、容量保护与认证设计已退出并归档。
 
 ### 0048 用户模拟最终查验分支与动作协议失效保护
 当模拟用户在意图阶段仍需证据时，仅允许一次有界 final check，随后强制无工具 re-judge→intent→act；阶段级语义校验阻止非法输出和 evaluator 故障再次伪装成 Accept。
@@ -200,7 +200,7 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 保留完整 wall time，同时把模型提供方等待从机制 active-time 预算中隔离，并统一官方任务内层预算与外层加 600 秒规则。
 
 ### 0067 混合 Harness E2B Scaling 运行时
-为 N=1/4/8/16/32 建立按 receipt 冻结、可恢复、可并行启动的 E2B 混合任务运行时，并统一 direct 与 simulated-user 结果产物。
+保留当前底层 direct 会话与终端 review 契约；历史 mixed E2B scaling 运行时归档，不扩展当前 v2 单任务入口。
 
 ### 0068 Synthesizer 角色彻底改名与旧 Developer 遗留清理
 在开发阶段直接统一 Synthesizer、demand 与配置名称；有效边界检查归入 guards，移除旧 Designer/dev 入口及失效提交中间件，不建设迁移或旧版拒绝设施。
@@ -210,6 +210,9 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 
 ### 0070 兼容 Gitea.com 的证据发布与联合预检
 保留自建 Gitea 的 gzip 行为，增加 ZIP 发布、受限签名下载和读取端能力验证，保证旧证据与恢复兼容。
+
+### 0071 统一实验入口后的仓库清理与历史研究归档
+收拢公开示例、内部控制器和开发工具，退出旧启动入口与隐式配置，将历史实验资料集中归档并保持现有 v2 实验可恢复。
 
 ## 全局看板
 
@@ -243,8 +246,7 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0006 | 0006/T3 | 观测型 persona spoke：SO / GitHub 收编（含局限声明） | done | T1 | tools/persona-distill/extract-stackoverflow-persona/SKILL.md<br>tools/persona-distill/extract-stackoverflow-persona/reference.md<br>tools/persona-distill/extract-github-persona/SKILL.md<br>tools/persona-distill/extract-github-persona/reference.md<br>tools/persona-distill/extract-github-persona/recruitment/domains.md<br>tools/persona-distill/extract-github-persona/recruitment/swe-bench.md<br>tools/persona-distill/extract-github-persona/recruitment/terminal-bench.md |
 | 0007 | 0007/T1 | 开发者侧直推 main（去 branch/merge） | pending | — | backend/auto_designer/dev/agentic_developer.py<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/tests/dev/test_agentic_developer.py |
 | 0007 | 0007/T2 | 编排去 release 链 · 会话级 main SHA 快照回灌 | pending | T1 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/run_state.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_run_state.py |
-| 0007 | 0007/T3 | 一次性迁移脚本：main ← release + 清理分支 | pending | — | backend/scripts/migrate_trunk_main.py<br>backend/tests/test_migrate_trunk_main.py |
-| 0007 | 0007/T4 | 去 release：种子/bootstrap/e2e trunk 化 | pending | T1, T2 | backend/run.py<br>backend/scripts/bootstrap_harness.py<br>backend/tests/test_bootstrap_harness.py |
+| 0007 | 0007/T4 | 去 release：种子/bootstrap/e2e trunk 化 | pending | T1, T2 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/scripts/bootstrap_harness.py<br>backend/tests/test_bootstrap_harness.py |
 | 0008 | 0008/T1 | seed 工作区扩展与共享注入（harness/用户 agent 同目录） | done | — | backend/auto_designer/user/sim/workspace.py<br>backend/seed_workspaces/billing-split/project/billing/core.py<br>backend/seed_workspaces/billing-split/manifest.yaml<br>backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/user/sim/test_workspace.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/loop/test_orchestrator.py |
 | 0008 | 0008/T2 | 内层原子工具与 sandbox | done | T1 | backend/auto_designer/user/sim/tools.py<br>backend/auto_designer/user/sim/sandbox.py<br>backend/tests/user/sim/test_tools.py |
 | 0008 | 0008/T3 | prompt 行为框架（可选核实）与 skill 占位接口 | done | — | backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/clauses.py<br>backend/auto_designer/user/sim/skills.py<br>backend/tests/user/sim/test_inner_prompt.py |
@@ -261,14 +263,14 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0013 | 0013/T1 | 拆 complete_task 信封 + 过程流分层 + begin/poll/control 心跳协议 | pending | — | backend/harness_template/entry.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/interface.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/models.py<br>backend/tests/harness/test_template_entry.py<br>backend/tests/harness/test_launcher.py |
 | 0013 | 0013/T2 | v0 种子自测 smoke + MANUAL 呈现契约 | pending | — | backend/harness_template/tests/test_smoke.py<br>backend/harness_template/MANUAL.md |
 | 0015 | 0015/T1 | harness 仓提交边界硬闸（pre-commit 钩子） | pending | — | backend/auto_designer/guards/harness_boundary.py<br>backend/tests/guards/test_harness_boundary.py |
-| 0015 | 0015/T2 | sandbox 工作目录下沉，物理隔离 trace | pending | — | backend/run.py<br>backend/tests/test_sandbox_isolation.py |
+| 0015 | 0015/T2 | sandbox 工作目录下沉，物理隔离 trace | pending | — | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/tests/test_sandbox_isolation.py |
 | 0015 | 0015/T3 | WorkspaceJailMiddleware：写关仓内、读放行 NexAU 源码与运行时临时目录 | pending | — | backend/auto_designer/guards/workspace_jail.py<br>backend/tests/guards/test_workspace_jail.py |
 | 0016 | 0016/T1 | 体感 reason 作根因信号喂设计师 | pending | — | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_synthesizer.py |
 | 0016 | 0016/T2 | 设计师 grep + 先搜后读，降低读码开销 | pending | — | backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/tools/search_file_content.tool.yaml |
 | 0016 | 0016/T3 | 运行时行为聚合 runtime_agg：机制层观测数字喂设计师 | done | T1 | backend/auto_designer/demand/runtime_agg.py<br>backend/tests/loop/test_runtime_agg.py |
 | 0017 | 0017/T1 | 存储与观测投影加锁 | done | — | backend/auto_designer/user/session_store.py<br>backend/auto_designer/loop/live.py<br>backend/tests/user/test_session_store.py<br>backend/tests/loop/test_live.py |
 | 0017 | 0017/T2 | client 每局一实例（工厂注入） | done | — | backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/sim/test_workspace.py |
-| 0017 | 0017/T3 | a 段并行化 + 并发度旋钮 | done | T1, T2 | backend/auto_designer/loop/orchestrator.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py |
+| 0017 | 0017/T3 | a 段并行化 + 并发度旋钮 | done | T1, T2 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/tests/loop/test_orchestrator.py |
 | 0017 | 0017/T4 | 并发端到端回归测试 | done | T3 | backend/tests/loop/test_parallel_sessions.py |
 | 0017 | 0017/T5 | harness checkout 并发安全 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 | 0017 | 0017/T6 | tracker HTTP 会话线程安全 | done | — | backend/auto_designer/tracker/gitea.py<br>backend/tests/tracker/test_gitea.py |
@@ -276,18 +278,18 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0019 | 0019/T1 | launcher：非 reply 旁路一律收 + control 旁路/终结分流 | done | — | backend/auto_designer/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
 | 0020 | 0020/T1 | synthesizer covers 产出：提案字段解析 + body 机器行 + 被覆盖 bug 挂链 | done | — | backend/auto_designer/demand/synthesizer.py<br>backend/tests/loop/test_synthesizer.py |
 | 0020 | 0020/T2 | dev 领取分池 + 票种预算与重试升档 + 结果回写 comment | done | — | backend/auto_designer/dev/agentic_developer.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/tracker/test_fake.py |
-| 0020 | 0020/T3 | 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮 | done | T2 | backend/run.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_roster.py |
+| 0020 | 0020/T3 | 编排接线：run.py 构造带策略/预算的 dev + 配置旋钮 | done | T2 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_roster.py |
 | 0020 | 0020/T4 | web API：/api/issues 附 covers/covered_by 字段 | done | T1 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
 | 0020 | 0020/T5 | 前端：issue 列表与详情的覆盖徽标 | done | T4 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/types.ts<br>frontend/src/api.ts |
 | 0021 | 0021/T1 | repo_guard 模块 + orchestrator b 段绊线 | done | — | backend/auto_designer/guards/repo_guard.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/tests/guards/test_repo_guard.py<br>backend/tests/loop/test_orchestrator.py |
-| 0021 | 0021/T2 | run.py 凭证隔离 + 构造并注入编排仓绊线 guard | done | T1 | backend/run.py<br>backend/tests/test_run_git_isolation.py |
+| 0021 | 0021/T2 | run.py 凭证隔离 + 构造并注入编排仓绊线 guard | done | T1 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/tests/test_run_git_isolation.py |
 | 0021 | 0021/T3 | 清理历史逃逸污染制品 MANUAL.md | done | — | backend/agent_defs/developer_agent/MANUAL.md |
 | 0022 | 0022/T1 | 内外窗口 + 等待菜单 + emit_message + 开放 intent | done | — | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/harness/launcher.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/harness/test_launcher.py |
 | 0022 | 0022/T2 | 中途 report_issue tool（可闲置）+ issue_notes flush | done | — | backend/auto_designer/user/sim/tools.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/user/sim/test_tools.py<br>backend/tests/user/sim/test_persona_client_agentic.py<br>backend/tests/loop/test_sim_user.py |
 | 0022 | 0022/T3 | 初始 harness：/exit\|/quit slash 内部分发 + MANUAL | done | — | backend/harness_template/entry.py<br>backend/harness_template/MANUAL.md<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/tests/test_smoke.py |
 | 0023 | 0023/T1 | loop：只留 three · 清 MAIN_GAP/死常量/stalled | done | — | backend/auto_designer/user/sim/loop.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py |
 | 0023 | 0023/T2 | prompt：删除 one/two 合并 builder · 单测改打 three | done | T1 | backend/auto_designer/user/sim/prompt.py<br>backend/tests/user/sim/test_prompt.py |
-| 0023 | 0023/T3 | 探针：去掉 two 臂与 peek-via-control 心智 | done | T1 | backend/scripts/probe_wait_progress.py<br>backend/scripts/probe_peek_decision_trace.py<br>backend/scripts/probe_persona_wait_matrix.py<br>backend/scripts/probe_ontrack_new_harness.py<br>backend/scripts/probe_wait_signals_to_evolution.py |
+| 0023 | 0023/T3 | 探针：去掉 two 臂与 peek-via-control 心智 | done | T1 | tools/dev/probes/probe_wait_progress.py<br>tools/dev/probes/probe_peek_decision_trace.py<br>tools/dev/probes/probe_persona_wait_matrix.py<br>tools/dev/probes/probe_ontrack_new_harness.py |
 | 0023 | 0023/T4 | launcher.try_reply 非阻塞契约（已落地） | done | — | backend/auto_designer/harness/launcher.py |
 | 0024 | 0024/T1 | Session.sim_trace 落盘（TurnLog→SimTrace） | done | — | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/test_models.py<br>backend/tests/loop/test_sim_user.py |
 | 0024 | 0024/T2 | index 扩 issue_numbers + 体感曲线带 session_id | done | T1 | backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_synthesizer.py<br>backend/tests/user/test_session_store.py |
@@ -300,11 +302,11 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0025 | 0025/T3 | triage agent（新角色）：就地分类+定位+去重+驳回/needs-info | done | T1, T2, T3a | backend/auto_designer/demand/triage.py<br>backend/tests/demand/test_triage.py |
 | 0025 | 0025/T4 | synthesize agent（原 synthesizer 收窄）：跨 issue 结构综合 → RFC | done | T3 | backend/auto_designer/demand/synthesizer.py<br>backend/tests/loop/test_synthesizer.py |
 | 0025 | 0025/T5 | dev 简化：按容量领 triaged/RFC、未清空积压，预算按 kind 分档，去分池/retry/stuck | done | T4 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
-| 0025 | 0025/T6 | 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster | done | T5 | backend/run.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
+| 0025 | 0025/T6 | 编排接线：d 段 triage→synthesize 两 agent + round 透传 + priority 机制派生 + roster | done | T5 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
 | 0025 | 0025/T7 | web+metrics：issue 附 kind/round/状态/priority + 曲线盯可执行 backlog(含积压) | done | T4 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
 | 0025 | 0025/T8 | 前端：issue 列表按 type/状态 + RFC 区 + 覆盖/取代/积压展示 | done | T7 | frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/lib/issueMeta.ts<br>frontend/src/types.ts<br>frontend/src/api.ts |
 | 0025 | 0025/T3a | tracker 补 set_labels：整组替换已有 issue 标签 | done | T1 | backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/tracker/fake.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
-| 0026 | 0026/T1 | 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要 | done | — | backend/auto_designer/loop/live.py<br>backend/run.py<br>backend/tests/loop/test_live.py |
+| 0026 | 0026/T1 | 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要 | done | — | backend/auto_designer/loop/live.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/tests/loop/test_live.py |
 | 0026 | 0026/T2 | 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS | done | — | frontend/src/styles.css<br>frontend/src/hooks/useTheme.ts<br>frontend/src/components/ThemeToggle.tsx |
 | 0026 | 0026/T3 | 应用外壳 + 类型（AgentRole triager / Agent.meta）+ TopBar（主题开关）+ 概览曲线 | done | T2 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/components/Charts.tsx |
 | 0026 | 0026/T4 | 角色列 + 卡片：triager 房间渲染 + 角色强调色 + 用户卡 persona + issue/commit 卡收敛 | done | T1, T3 | frontend/src/components/AgentColumn.tsx<br>frontend/src/components/Card.tsx |
@@ -315,7 +317,7 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0028 | 0028/T1 | issue_schema：divergent/gate-dropped 标签与可执行 backlog 口径 | done | — | backend/auto_designer/demand/issue_schema.py<br>backend/tests/demand/test_issue_schema.py |
 | 0028 | 0028/T2 | Divergent 驱动器 + agent_defs/divergent_pm：落不可领产品候选 | done | T1 | backend/auto_designer/demand/divergent.py<br>backend/agent_defs/divergent_pm/<br>backend/scripts/preview_divergent_pm_rounds.py<br>backend/scripts/preview_gate_on_divergent.py<br>backend/tests/demand/test_divergent_gate.py |
 | 0028 | 0028/T3 | Synthesizer.gate_once：promote/hold/drop 语义晋升 | done | T1 | backend/auto_designer/demand/synthesizer.py |
-| 0028 | 0028/T4 | 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关 | done | T2, T3 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/live.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_roster.py |
+| 0028 | 0028/T4 | 编排接线：d2 synthesize∥divergent → d3 gate；roster/run 默认关 | done | T2, T3 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/tests/loop/test_roster.py |
 | 0028 | 0028/T5 | dev 领取硬排除 divergent 候选 | done | T1 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
 | 0029 | 0029/T1 | issue_schema 三平面标签收敛：report/proposal/ready 白名单 + 老标签读侧映射 | done | — | backend/auto_designer/demand/issue_schema.py<br>backend/tests/demand/test_issue_schema.py |
 | 0029 | 0029/T2 | agent_runtime 公共运行时抽出：跑 agent + 读 submit 一处实现 | done | — | backend/auto_designer/demand/agent_runtime.py<br>backend/tests/demand/test_agent_runtime.py |
@@ -324,7 +326,7 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0029 | 0029/T5 | divergent 对齐纯生成器：产 proposal(from-divergent)，专属通道退役 | done | T1, T2 | backend/auto_designer/demand/divergent.py<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/tests/demand/test_divergent_gate.py |
 | 0029 | 0029/T6 | Owner 唯一准入：机械+评审双模式批量裁决（admit/merge/decline/hold） | done | T1, T2 | backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/demand/submit_tools.py<br>backend/agent_defs/owner/<br>backend/tests/demand/test_owner.py |
 | 0029 | 0029/T7 | dev 白名单领取：ready-only + priority→age 排序 + 级联关闭 | done | T1 | backend/auto_designer/dev/agentic_developer.py<br>backend/tests/dev/test_agentic_developer.py |
-| 0029 | 0029/T8 | 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警 | done | T3, T4, T5, T6, T7 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/run.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
+| 0029 | 0029/T8 | 编排/roster/run 接线：生成段全并行（triage 可分片）→ Owner → dev + 背压告警 | done | T3, T4, T5, T6, T7 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_roster.py |
 | 0029 | 0029/T9 | 观测后端适配：plane 字段 + ready 深度曲线 + 漏斗计数 | done | T6, T7 | backend/auto_designer/web/api.py<br>backend/auto_designer/loop/metrics.py<br>backend/tests/web/test_api.py<br>backend/tests/loop/test_metrics.py |
 | 0029 | 0029/T10 | 前端适配：三平面分组 + Owner 房间 + 漏斗与背压展示 | done | T9 | frontend/src/types.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/components/SidePanel.tsx<br>frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/App.tsx<br>frontend/src/api.ts |
 | 0030 | 0030/T1 | 写 0030 活快照 | done | — | docs/specs/0030-harness-product-interface.md |
@@ -339,13 +341,13 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0032 | 0032/T1 | OpenAgents 仓：forge 分发层——alias-import 接缝 + 配置段 + merger 提示词参数化 | done | — | OpenAgents/openagents/utils/forge.py<br>OpenAgents/openagents/utils/agent_config.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/backfill.py<br>OpenAgents/openagents/runtime/gates.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/utils/identity.py<br>OpenAgents/openagents/utils/release.py<br>OpenAgents/openagents/cli.py<br>OpenAgents/openagents/agents/merger.py<br>OpenAgents/tests/test_forge.py |
 | 0032 | 0032/T2 | OpenAgents 仓：Gitea REST driver——github.py 同名公共面对 Gitea /api/v1 | done | T1 | OpenAgents/openagents/utils/gitea.py<br>OpenAgents/tests/test_gitea_driver.py |
 | 0032 | 0032/T3 | 准入交接：Owner 改打 openagents 发现标签，plane READY 收编 {ready, openagents} | done | — | backend/auto_designer/demand/issue_schema.py<br>backend/auto_designer/demand/owner.py<br>backend/tests/demand/test_issue_schema.py<br>backend/tests/demand/test_owner.py |
-| 0032 | 0032/T4 | dev 侧退役：AgenticDeveloper/developer_agent 删除，orchestrator 去 dev 拍 | done | T3 | backend/auto_designer/dev/agentic_developer.py<br>backend/agent_defs/developer_agent/agent.yaml<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/scripts/probe_wait_signals_to_evolution.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_parallel_sessions.py<br>backend/tests/loop/test_roster.py |
-| 0032 | 0032/T5 | vigil 接线：run.py 写 openagents.yml、管 vigil 子进程生命周期、vK tag 退役 | done | T2, T4 | backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/test_run_vigil.py |
+| 0032 | 0032/T4 | dev 侧退役：AgenticDeveloper/developer_agent 删除，orchestrator 去 dev 拍 | done | T3 | backend/auto_designer/dev/agentic_developer.py<br>backend/agent_defs/developer_agent/agent.yaml<br>backend/agent_defs/developer_agent/systemprompt.md<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/tests/dev/test_agentic_developer.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_parallel_sessions.py<br>backend/tests/loop/test_roster.py |
+| 0032 | 0032/T5 | vigil 接线：run.py 写 openagents.yml、管 vigil 子进程生命周期、vK tag 退役 | done | T2, T4 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/tests/test_run_vigil.py |
 | 0032 | 0032/T6 | harness 仓最小 CI：Gitea Actions runner + 冒烟 workflow | done | T5 | backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/bootstrap.sh<br>backend/harness_template/.gitea/workflows/smoke.yml |
 | 0032 | 0032/T7 | 交付面观测：GiteaTracker PR 读路径 + web API + 前端交付面视图 | done | T5 | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py<br>frontend/src/types.ts<br>frontend/src/api.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/App.tsx<br>frontend/src/components/SidePanel.tsx<br>frontend/src/components/DeliveryPanel.tsx |
 | 0032 | 0032/T8 | 文档收尾：CLAUDE.md 架构段与 spec 制品再生成 | done | T5 | CLAUDE.md |
 | 0033 | 0033/T1 | vigil 容器与网络基建：Dockerfile/entrypoint/build + internal 网络 + egress 代理 allowlist | done | — | backend/deploy/vigil/Dockerfile<br>backend/deploy/vigil/entrypoint.sh<br>backend/deploy/vigil/build.sh<br>backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/egress-proxy.conf |
-| 0033 | 0033/T2 | run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in | done | T1 | backend/run.py<br>backend/tests/test_run_vigil.py |
+| 0033 | 0033/T2 | run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in | done | T1 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/tests/test_run_vigil.py |
 | 0033 | 0033/T3 | 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地） | done | — | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py |
 | 0033 | 0033/T4 | 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph | done | T2 | CLAUDE.md |
 | 0034 | 0034/T1 | 写 0034 活快照 | done | — | docs/specs/0034-frontend-agent-company-building.md |
@@ -366,7 +368,7 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0037 | 0037/T3 | hub：card-schema 增 D7 与语义注记 | done | T1 | tools/persona-distill/card-schema.md |
 | 0037 | 0037/T4 | 注入：card_to_persona 读 D7→tempo | done | T1, T2, T3 | backend/auto_designer/user/sim/persona_io.py<br>backend/tests/user/sim/test_persona_io.py |
 | 0037 | 0037/T5 | 蒸馏 spoke 对齐 D7 与人轴语义 | done | T1, T3 | tools/persona-distill/extract-selfreport-persona/SKILL.md<br>tools/persona-distill/extract-selfreport-persona/reference.md<br>tools/persona-distill/extract-github-persona/SKILL.md<br>tools/persona-distill/extract-github-persona/reference.md<br>tools/persona-distill/extract-stackoverflow-persona/SKILL.md<br>tools/persona-distill/extract-stackoverflow-persona/reference.md |
-| 0037 | 0037/T6 | 探针：tempo / 过程卷入 / d43 正交可观测 | done | T2, T4 | backend/scripts/probe_persona_reframe.py<br>backend/scripts/probe_swebench_persona.py<br>backend/scripts/probe_d43_quality_fail.py |
+| 0037 | 0037/T6 | 探针：tempo / 过程卷入 / d43 正交可观测 | done | T2, T4 | tools/dev/probes/probe_persona_reframe.py<br>tools/dev/probes/probe_swebench_persona.py<br>tools/dev/probes/probe_d43_quality_fail.py |
 | 0038 | 0038/T1 | 写 0038 活快照 | done | — | docs/specs/0038-openagents-frontend-delivery-view.md |
 | 0038 | 0038/T2 | OpenAgents 入口、URL 状态与页面装配 | done | T1 | frontend/src/types.ts<br>frontend/src/App.tsx<br>frontend/src/components/TopBar.tsx |
 | 0038 | 0038/T3 | OpenAgents 数据聚合模型 | done | T1 | frontend/src/components/openagents/openAgentsModel.ts |
@@ -377,10 +379,10 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0039 | 0039/T1 | 固化规格与跨仓验收边界 | done | — | docs/specs/0039-issue-state-timeline.md |
 | 0039 | 0039/T2 | 读取并折叠 Gitea issue timeline | done | T1 | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/web/issue_timeline.py<br>backend/tests/tracker/test_gitea_timeline.py |
 | 0039 | 0039/T3 | 扩展 issue 详情 timeline API | done | T2 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py |
-| 0039 | 0039/T4 | 为 Synthesizer 综合票写入轮次标签 | done | T1 | backend/auto_designer/demand/synthesizer.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/loop/test_synthesizer.py |
+| 0039 | 0039/T4 | 为 Synthesizer 综合票写入轮次标签 | done | T1 | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/tests/loop/test_synthesizer.py |
 | 0039 | 0039/T5 | 建立前端标签维度与时间线展示模型 | done | T3 | frontend/src/types.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/components/detail/issueTimelineModel.ts<br>frontend/src/components/detail/issueTimelineModel.test.ts |
 | 0039 | 0039/T6 | 展示 issue 状态演进并完成跨仓验收 | done | T4, T5 | frontend/src/components/detail/IssueDetail.tsx<br>frontend/src/styles.css<br>backend/scripts/e2e-spec-0039-issue-state-timeline.sh |
-| 0040 | 0040/T1 | stages.rfc=agent 定稿 + vigil 缺省 keep-alive | done | — | backend/run.py<br>backend/tests/test_run_vigil.py<br>backend/scripts/run_swebench_closed_loop.py |
+| 0040 | 0040/T1 | stages.rfc=agent 定稿 + vigil 缺省 keep-alive | done | — | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/tests/test_run_vigil.py<br>backend/auto_designer/experiment/controllers/swebench.py |
 | 0040 | 0040/T2 | 提交边界从白名单改为拒绝清单 | done | — | backend/auto_designer/guards/harness_boundary.py<br>backend/tests/guards/test_harness_boundary.py |
 | 0040 | 0040/T3 | smoke 拒绝清单与种子 docs/specs 落点 | done | T2 | backend/harness_template/.gitea/workflows/smoke.yml<br>backend/harness_template/docs/specs/README.md |
 | 0040 | 0040/T4 | 自定义 Anthropic 网关域进 egress allowlist | done | — | backend/deploy/gitea/egress-proxy.conf |
@@ -390,59 +392,57 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0041 | 0041/T3 | Harness tracer 输出逐调用 usage 旁路 | done | T1 | backend/harness_template/entry.py<br>backend/harness_template/tests/test_smoke.py |
 | 0041 | 0041/T4 | Harness 收端隔离、按题归属与落盘 | done | T1, T3 | backend/auto_designer/harness/launcher.py<br>backend/auto_designer/harness/connector.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_connector.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/loop/test_parallel_sessions.py |
 | 0041 | 0041/T5 | 分层聚合 API 与看板 | pending | T1, T2, T4 | backend/auto_designer/web/api.py<br>backend/tests/web/test_api.py<br>frontend/src/api.ts<br>frontend/src/types.ts<br>frontend/src/components/UsagePanel.tsx<br>frontend/src/App.tsx<br>frontend/src/styles.css |
-| 0041 | 0041/T6 | Developer/vigil 精确度审计与结构化扩展口 | done | T1 | backend/run.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>docs/usage-monitoring.md |
+| 0041 | 0041/T6 | Developer/vigil 精确度审计与结构化扩展口 | done | T1 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>docs/usage-monitoring.md |
 | 0042 | 0042/T1 | 权威术语表、角色职责矩阵与现行流程基线 | done | — | docs/specs/0042-role-contract-governance.md<br>docs/specs/OVERVIEW.md |
 | 0042 | 0042/T2 | Canonical ProposalView 与规范化提案版本 | done | T1 | backend/auto_designer/demand/proposal_view.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/divergent.py<br>backend/tests/demand/test_proposal_view.py |
 | 0042 | 0042/T3 | Triage 可靠规范化迁移与结构化失败结果 | done | T1, T2 | backend/auto_designer/demand/triage.py<br>backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/fake.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/demand/test_triage.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
 | 0042 | 0042/T4 | Owner 决策图验证与可靠批量落库 | done | T1, T2 | backend/auto_designer/demand/owner.py<br>backend/tests/demand/test_owner.py |
 | 0042 | 0042/T5 | 五角色专业化 Prompt 与 Tool 契约统一 | done | T1, T2, T3, T4 | backend/agent_defs/user_agent/prompt.md<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
-| 0042 | 0042/T6 | 跨角色契约测试、规格索引与历史会话回放 | done | T3, T4, T5 | backend/tests/demand/test_role_contract_flow.py<br>backend/scripts/replay_roles_from_sessions.py |
+| 0042 | 0042/T6 | 跨角色契约测试、规格索引与历史会话回放 | done | T3, T4, T5 | backend/tests/demand/test_role_contract_flow.py<br>tools/dev/replay/replay_roles_from_sessions.py |
 | 0043 | 0043/T1 | 角色产物模型与共享质量门契约 | done | — | backend/auto_designer/demand/role_contract.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/demand/submit_tools.py<br>backend/tests/demand/test_role_contract.py<br>backend/tests/demand/test_agent_contract.py |
 | 0043 | 0043/T2 | Triage 单报告认知隔离与事实型提案 | done | T1 | backend/auto_designer/demand/triage.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/tests/demand/test_triage.py |
 | 0043 | 0043/T3 | 产品 PM 全景洞察契约 | done | T1 | backend/auto_designer/demand/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml<br>backend/tests/demand/test_divergent_gate.py |
 | 0043 | 0043/T4 | Synthesize 提案关系综合契约 | done | T1, T2, T3 | backend/auto_designer/demand/synthesizer.py<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/tests/loop/test_synthesizer.py |
 | 0043 | 0043/T5 | Owner 投资判断与组合质量门 | done | T1, T4 | backend/auto_designer/demand/owner.py<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/tests/demand/test_owner.py |
-| 0043 | 0043/T6 | 跨角色行为评测与真实回放验收 | done | T2, T3, T4, T5 | backend/tests/demand/test_role_contract_flow.py<br>backend/scripts/replay_roles_from_sessions.py<br>backend/scripts/evaluate_role_traces.py |
-| 0044 | 0044/T1 | Manifest 与供给契约 | done | — | docs/specs/0044-swebench-seed-workspace-supply.md<br>backend/swebench_pools/medium_hard_16.json |
+| 0043 | 0043/T6 | 跨角色行为评测与真实回放验收 | done | T2, T3, T4, T5 | backend/tests/demand/test_role_contract_flow.py<br>tools/dev/replay/replay_roles_from_sessions.py<br>tools/dev/audit/evaluate_role_traces.py |
+| 0044 | 0044/T1 | Manifest 与供给契约 | done | — | docs/specs/0044-swebench-seed-workspace-supply.md |
 | 0044 | 0044/T2 | Prebuilt 隔离复制与虚拟环境迁移 | done | T1 | backend/auto_designer/user/sim/sources/prebuilt.py<br>backend/tests/user/sim/test_prebuilt_source.py |
 | 0044 | 0044/T3 | Storage-only Docker seed 供给 | done | T1, T2 | backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/build.sh<br>backend/tests/user/sim/test_docker_seed_source.py |
 | 0044 | 0044/T4 | 可恢复批量构建与镜像校验 | done | T1, T2, T3 | backend/scripts/build_swebench_seed_workspaces.py<br>backend/scripts/validate_swebench_seed_image.py<br>backend/tests/test_swebench_seed_builder.py |
-| 0044 | 0044/T5 | 闭环题池选择与稳定实例归属 | done | T1, T2, T3 | backend/scripts/run_swebench_closed_loop.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/test_run_swebench_closed_loop.py |
+| 0044 | 0044/T5 | 闭环题池选择与稳定实例归属 | done | T1, T2, T3 | backend/auto_designer/experiment/controllers/swebench.py<br>backend/auto_designer/loop/sim_user.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/test_run_swebench_closed_loop.py |
 | 0045 | 0045/T1 | 工具链边界与双 pin 契约 | done | — | docs/specs/0045-vigil-harness-aware-toolchain.md |
 | 0045 | 0045/T2 | 双 checkout 镜像与只读 NexAU 工具链 | done | T1 | backend/deploy/vigil/Dockerfile |
 | 0045 | 0045/T3 | 显式构建镜像源、版本与代理配置 | done | T2 | backend/deploy/vigil/build.sh<br>backend/tests/test_vigil_build.py |
-| 0045 | 0045/T4 | 运行入口接线与配置优先级 | done | T2 | backend/run.py<br>backend/tests/test_run_vigil.py |
+| 0045 | 0045/T4 | 运行入口接线与配置优先级 | done | T2 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/tests/test_run_vigil.py |
 | 0046 | 0046/T1 | Fresh-target 与不可变 Manifest 契约 | done | — | docs/specs/0046-frozen-openagents-validation-handoff.md |
-| 0046 | 0046/T2 | 冻结 Summary 物化为验证仓库 | done | T1 | backend/scripts/prepare_openagents_from_summary.py<br>backend/tests/test_prepare_openagents_from_summary.py |
-| 0046 | 0046/T3 | 只读 Gitea 快照的选择性交付复制 | done | T1 | backend/scripts/prepare_openagents_validation.py<br>backend/tests/test_prepare_openagents_validation.py |
-| 0046 | 0046/T4 | 隔离 Vigil 启动与网关协议转换 | done | T1, T3 | backend/scripts/run_openagents_validation.py<br>backend/tests/test_run_openagents_validation.py |
-| 0047 | 0047/T1 | 并行实验运行时契约 | done | — | docs/specs/0047-parallel-experiment-runtime.md |
-| 0047 | 0047/T2 | 实验配置与不可变 Manifest | done | T1 | backend/auto_designer/experiment/__init__.py<br>backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/manifest.py<br>backend/tests/experiment/test_config.py<br>backend/tests/experiment/test_manifest.py |
-| 0047 | 0047/T3 | 每实验独立基础设施栈 | done | T2 | backend/deploy/experiment/docker-compose.yml<br>backend/deploy/experiment/egress-proxy.conf<br>backend/auto_designer/experiment/infrastructure.py<br>backend/tests/experiment/test_infrastructure.py |
-| 0047 | 0047/T4 | 统一实验 CLI 与闭环接线 | done | T2, T3 | backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/scripts/experiment.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_run_swebench_closed_loop.py |
-| 0047 | 0047/T5 | 共享模型容量租约与故障保护 | done | T2 | backend/auto_designer/experiment/capacity.py<br>backend/auto_designer/experiment/health.py<br>backend/tests/experiment/test_capacity.py<br>backend/tests/experiment/test_health.py |
-| 0047 | 0047/T6 | OpenAgents 真实模型认证与双栈并行验收 | pending | T3, T4, T5 | backend/auto_designer/experiment/certification.py<br>backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh<br>backend/tests/experiment/test_certification.py<br>docs/0047-parallel-experiment-runtime.md<br>OpenAgents/scripts/live-experiment-runtime-certification.sh<br>OpenAgents/scripts/live_experiment_runtime_certification.py<br>OpenAgents/tests/test_experiment_runtime_certification.py |
+| 0046 | 0046/T2 | 冻结 Summary 物化为验证仓库 | done | T1 | tools/dev/delivery/prepare_openagents_from_summary.py<br>backend/tests/test_prepare_openagents_from_summary.py |
+| 0046 | 0046/T3 | 只读 Gitea 快照的选择性交付复制 | done | T1 | tools/dev/delivery/prepare_openagents_validation.py<br>backend/tests/test_prepare_openagents_validation.py |
+| 0046 | 0046/T4 | 隔离 Vigil 启动与网关协议转换 | done | T1, T3 | tools/dev/delivery/run_openagents_validation.py<br>backend/tests/test_run_openagents_validation.py |
+| 0047 | 0047/T1 | 当前实验身份与隔离契约 | done | — | docs/specs/0047-parallel-experiment-runtime.md |
+| 0047 | 0047/T2 | 不可变 Manifest 与共享身份原语 | done | T1 | backend/auto_designer/experiment/__init__.py<br>backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/manifest.py<br>backend/tests/experiment/test_manifest.py<br>backend/tests/test_experiment_config_v2.py |
+| 0047 | 0047/T3 | 每实验独立本地基础设施 | done | T2 | backend/deploy/experiment/docker-compose.yml<br>backend/deploy/experiment/egress-proxy.conf<br>backend/auto_designer/experiment/infrastructure.py<br>backend/tests/experiment/test_infrastructure.py |
+| 0047 | 0047/T4 | 当前 v2 生命周期与闭环接线 | done | T2, T3 | backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/scripts/experiment.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/test_experiment_lifecycle_v2.py<br>backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh |
 | 0048 | 0048/T1 | Spec 与实验根因证据契约 | done | — | docs/specs/0048-user-sim-final-check-convergence.md |
 | 0048 | 0048/T2 | PersonaClient 阶段语义契约与工具重分发 | done | T1 | backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_persona_client_agentic.py |
 | 0048 | 0048/T3 | 一次性 final-check 与强制重新判断状态机 | done | T2, T4 | backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/user/sim/test_prompt.py<br>backend/tests/user/sim/test_inner_prompt.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/test_session_store.py |
 | 0048 | 0048/T4 | Action 边界 fail-closed | done | T1 | backend/auto_designer/user/sim/action_space.py<br>backend/tests/user/sim/test_action_space.py |
-| 0048 | 0048/T5 | 历史 action 完整性审计与端到端认证 | done | T3 | backend/scripts/audit_sim_action_integrity.py<br>backend/scripts/canary_spec0048_final_check.py<br>backend/tests/scripts/test_audit_sim_action_integrity.py<br>backend/scripts/e2e-spec-0048-final-check-convergence.sh<br>docs/0048-user-sim-final-check-convergence.md |
+| 0048 | 0048/T5 | 历史 action 完整性审计与端到端认证 | done | T3 | tools/dev/audit/audit_sim_action_integrity.py<br>tools/dev/audit/canary_spec0048_final_check.py<br>backend/tests/scripts/test_audit_sim_action_integrity.py<br>backend/scripts/e2e-spec-0048-final-check-convergence.sh<br>docs/0048-user-sim-final-check-convergence.md |
 | 0049 | 0049/T1 | 调用记录契约与审计基线 | done | — | docs/specs/0049-role-invocation-io-store.md |
 | 0049 | 0049/T2 | InvocationStore、run manifest 与 v1 schema | done | T1 | backend/auto_designer/invocation.py<br>backend/tests/test_invocation.py |
 | 0049 | 0049/T3 | 需求面 run_agent_def 落盘 | done | T2 | backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/owner.py<br>backend/tests/demand/test_agent_runtime.py |
-| 0049 | 0049/T4 | run 生命周期、会话迁入、vigil 导出与 jail | done | T2 | backend/run.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>backend/auto_designer/guards/workspace_jail.py<br>backend/tests/guards/test_workspace_jail.py |
-| 0049 | 0049/T5 | 冻结调用离线重放 | done | T3 | backend/scripts/replay_role_invocations.py<br>backend/tests/scripts/test_replay_role_invocations.py<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh |
+| 0049 | 0049/T4 | run 生命周期、会话迁入、vigil 导出与 jail | done | T2 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_run_vigil.py<br>backend/auto_designer/guards/workspace_jail.py<br>backend/tests/guards/test_workspace_jail.py |
+| 0049 | 0049/T5 | 冻结调用离线重放 | done | T3 | tools/dev/replay/replay_role_invocations.py<br>backend/tests/scripts/test_replay_role_invocations.py<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh |
 | 0049 | 0049/T6 | 交付面 run_agent 写出同一 schema | done | T2, T4 | OpenAgents/openagents/runtime/engine.py<br>OpenAgents/tests/test_runtime_engine.py<br>backend/tests/test_delivery_invocation_contract.py<br>backend/tests/fixtures/delivery_invocation.v1.json |
 | 0050 | 0050/T1 | 轮次封口契约 | done | — | docs/specs/0050-round-delivery-gate.md |
 | 0050 | 0050/T2 | 本轮准入票终态闸 | done | T1 | backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_round_gate.py |
 | 0050 | 0050/T3 | 编排：末轮跳过需求交付、非末轮准入后封口 | done | T2 | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py |
-| 0050 | 0050/T4 | run 接线、看板阶段、卡死保活 | done | T3 | backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/auto_designer/loop/live.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_vigil.py |
+| 0050 | 0050/T4 | run 接线、看板阶段、卡死保活 | done | T3 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/auto_designer/loop/live.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_vigil.py |
 | 0050 | 0050/T5 | 架构说明与封口 e2e 脚本 | done | T3 | CLAUDE.md<br>backend/scripts/e2e-spec-0050-round-delivery-gate.sh |
 | 0051 | 0051/T1 | 隔离与验收契约 | done | — | docs/specs/0051-session-container-objective-evidence.md |
 | 0051 | 0051/T2 | 会话运行时与容器 seed | done | T1 | backend/auto_designer/user/sim/runtime.py<br>backend/auto_designer/user/sim/workspace.py<br>backend/auto_designer/user/sim/seed_source.py<br>backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/auto_designer/user/sim/deps.py<br>backend/auto_designer/user/sim/sandbox.py<br>backend/auto_designer/user/sim/tools.py<br>backend/tests/user/sim/test_docker_seed_source.py<br>backend/tests/user/sim/test_workspace_runtime.py<br>backend/scripts/prepare_swebench_runtime_tree.py |
 | 0051 | 0051/T3 | harness 容器执行与强制终止 | done | T2 | backend/auto_designer/harness/launcher.py<br>backend/harness_template/entry.py<br>backend/harness_template/RUNTIME.md<br>backend/harness_template/tests/test_smoke.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/harness/test_template_entry.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_sim_user.py |
 | 0051 | 0051/T4 | 双结论、客观执行与假接受 | done | T3 | backend/auto_designer/evaluation/swebench.py<br>backend/auto_designer/evaluation/__init__.py<br>backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/user/sim/loop.py<br>backend/tests/evaluation/test_swebench.py<br>backend/tests/user/test_session_store.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/test_models.py<br>pyproject.toml |
-| 0051 | 0051/T5 | 可运行镜像、一键入口与审计冒烟 | done | T4 | backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/runtime.Dockerfile<br>backend/scripts/build_swebench_runtime_image.sh<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh<br>backend/scripts/run-glm52fp8-1m-canary2-isolated.sh<br>backend/scripts/e2e-spec-0051-session-container.sh<br>CLAUDE.md |
+| 0051 | 0051/T5 | 可运行镜像、包内控制器与审计冒烟 | done | T4 | backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/runtime.Dockerfile<br>backend/scripts/build_swebench_runtime_image.sh<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/scripts/e2e-spec-0051-session-container.sh<br>CLAUDE.md |
 | 0052 | 0052/T1 | Synthesizer covers 合并语义与状态迁移 | done | — | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/issue_schema.py<br>backend/auto_designer/demand/role_contract.py |
 | 0052 | 0052/T2 | Owner 退回纯交付路由 | done | T1 | backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml |
 | 0052 | 0052/T3 | 覆盖合并回归测试与规格验证 | done | T1, T2 | backend/tests/loop/test_synthesizer.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_role_contract.py<br>backend/tests/demand/test_agent_contract.py<br>docs/specs/0052-synthesizer-covers-consolidation.md |
@@ -450,7 +450,7 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0053 | 0053/T2 | 实现动作语义契约与阶段局部 schema | done | — | backend/auto_designer/user/sim/actions.py<br>backend/auto_designer/user/sim/action_space.py<br>backend/tests/user/sim/test_action_space.py |
 | 0053 | 0053/T3 | 实现协议解析修复与错误分级 | in-progress | T2 | backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_persona_client_agentic.py<br>backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/test_models.py |
 | 0053 | 0053/T4 | 接入独立结果状态与优雅终止状态机 | pending | T2, T3 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/state.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_heartbeat.py |
-| 0053 | 0053/T5 | 补齐事件溯源审计与八会话回归门禁 | pending | T3, T4 | backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/loop/live.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py |
+| 0053 | 0053/T5 | 补齐事件溯源审计与八会话回归门禁 | pending | T3, T4 | backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/loop/live.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/test_experiment_lifecycle_v2.py |
 | 0054 | 0054/T1 | 目标账本与修订事件模型 | done | — | backend/auto_designer/user/sim/goals.py<br>backend/tests/user/sim/test_goals.py |
 | 0054 | 0054/T2 | 目标进入用户感知与动作决策 | done | T1 | backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/persona_client.py<br>backend/tests/user/sim/test_loop.py<br>backend/tests/user/sim/test_persona_client_agentic.py |
 | 0054 | 0054/T3 | 目标结果与主客观结论分离 | done | T1, T2 | backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/test_models.py<br>backend/tests/user/test_session_store.py |
@@ -459,7 +459,7 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0055 | 0055/T2 | 用户反馈 handoff 与 Triage 单报告输入 | done | T1, 0054/T4 | backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/role_contract.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/get_session_timeline.tool.yaml<br>backend/tests/demand/test_triage.py |
 | 0055 | 0055/T3 | 产品 PM 全局体验输入与产品视角边界 | done | T1, 0054/T4 | backend/auto_designer/demand/divergent.py<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/tools/get_session_timeline.tool.yaml<br>backend/tests/demand/test_divergent_gate.py |
 | 0055 | 0055/T4 | Synthesize 提案关系输入与证据下钻约束 | done | T1, T2, T3, 0054/T4 | backend/auto_designer/demand/synthesizer.py<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/auto_designer/demand/session_timeline.py<br>backend/tests/loop/test_synthesizer.py |
-| 0055 | 0055/T5 | 角色可见性、过拟合和延迟回归评测 | done | T2, T3, T4 | backend/scripts/evaluate_role_traces.py<br>backend/tests/demand/test_role_contract_flow.py |
+| 0055 | 0055/T5 | 角色可见性、过拟合和延迟回归评测 | done | T2, T3, T4 | tools/dev/audit/evaluate_role_traces.py<br>backend/tests/demand/test_role_contract_flow.py |
 | 0056 | 0056/T1 | 终止动作与目标账本原子提交 | done | 0054/T4 | backend/auto_designer/user/sim/goals.py<br>backend/tests/user/sim/test_goals.py |
 | 0056 | 0056/T2 | Persona 验收依据与能力对齐 | done | 0053/T4 | backend/auto_designer/user/sim/prompt.py<br>backend/auto_designer/user/sim/persona_client.py |
 | 0056 | 0056/T3 | 可见初始完成条件与客观结果分轨 | done | 0051/T4, 0054/T2 | backend/auto_designer/models.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/demand/evidence_contract.py<br>backend/auto_designer/demand/session_timeline.py<br>backend/tests/demand/test_terminal_evidence.py |
@@ -468,7 +468,7 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0057 | 0057/T2 | 动作兼容与持久化回归 | done | T1 | backend/tests/user/sim/test_feedback.py<br>backend/tests/user/sim/test_heartbeat.py<br>backend/tests/user/sim/test_prompt.py |
 | 0059 | 0059/T1 | 制品观测文件的只读入口和访问审计 | done | — | backend/auto_designer/demand/observation_provider.py<br>backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/guards/workspace_jail.py |
 | 0059 | 0059/T2 | 独立 PM 和结构综合按需取证与证据引用延续 | done | T1 | backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/proposal_view.py<br>backend/auto_designer/demand/evidence_contract.py<br>backend/auto_designer/demand/session_timeline.py<br>backend/tests/loop/test_synthesizer.py<br>backend/agent_defs/synthesizer<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/triage_agent/systemprompt.md |
-| 0059 | 0059/T3 | 边界回归与真实模型单链路回放 | done | T1, T2 | backend/tests/demand/test_observation_provider.py<br>backend/scripts/replay_observation_synthesis.py |
+| 0059 | 0059/T3 | 边界回归与真实模型单链路回放 | done | T1, T2 | backend/tests/demand/test_observation_provider.py<br>tools/dev/replay/replay_observation_synthesis.py |
 | 0060 | 0060/T1 | 双轨角色边界与协调契约 | done | — | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/tools/submit_admission.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>CLAUDE.md |
 | 0060 | 0060/T2 | 角色与跨轮观测回归和实验审计 | done | T1 | backend/tests/demand/test_role_contract_flow.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_observation_provider.py<br>docs/audits/0060-spec0059-observation-audit.md |
 | 0061 | 0061/T1 | NexAU 起点的制品自有观测包 | done | — | backend/harness_template/entry.py<br>backend/harness_template/observability.py<br>backend/harness_template/OBSERVABILITY.md<br>backend/harness_template/tests/test_observability.py<br>backend/tests/harness/test_template_entry.py<br>backend/harness_template/params.yaml |
@@ -476,16 +476,16 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0061 | 0061/T3 | 跨容器开发证据交接 | done | T2 | backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/delivery_evidence.py<br>backend/auto_designer/observations/grants.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/demand/test_delivery_evidence.py |
 | 0061 | 0061/T4 | 开发设计、实现、评审的观测职责 | done | T3 | backend/harness_template/META_SPEC.md<br>backend/deploy/vigil/observability-overlay.Dockerfile<br>backend/deploy/vigil/observation-runtime.json<br>docs/audits/0061-observation-goal-boundaries.json<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/openagents/utils/gitea.py<br>OpenAgents/openagents/observations/evidence.py<br>OpenAgents/tests/test_observation_evidence.py |
 | 0061 | 0061/T5 | 诊断观测缺口提案与可恢复提交 | done | T3 | backend/auto_designer/observations/gaps.py<br>backend/auto_designer/observations/delivery_gaps.py<br>backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml<br>backend/tests/observations/test_gaps.py<br>OpenAgents/openagents/observations/gaps.py<br>OpenAgents/openagents/v02/openagents_adapter.py |
-| 0061 | 0061/T6 | 跨轮与替代 harness 验证 | done | T1, T2, T3, T4, T5 | backend/tests/observations/fixtures/alternate_v1.py<br>backend/tests/observations/fixtures/alternate_v2.py<br>backend/scripts/replay_observation_lifecycle.py<br>docs/audits/0061-observation-lifecycle-validation.md |
+| 0061 | 0061/T6 | 跨轮与替代 harness 验证 | done | T1, T2, T3, T4, T5 | backend/tests/observations/fixtures/alternate_v1.py<br>backend/tests/observations/fixtures/alternate_v2.py<br>tools/dev/replay/replay_observation_lifecycle.py<br>docs/audits/0061-observation-lifecycle-validation.md |
 | 0062 | 0062/T1 | 当前与历史失败终态及闭环回归 | done | — | CLAUDE.md<br>backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_round_gate.py<br>backend/tests/loop/test_orchestrator.py<br>docs/audits/0062-two-user-closure-and-framework-fixes.md |
-| 0063 | 0063/T1 | 需求侧提案分组与并行 Synthesizer | done | — | backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/tracker/gitea.py<br>backend/run.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/tracker/test_gitea.py<br>docs/synthesizer-grouping.md |
+| 0063 | 0063/T1 | 需求侧提案分组与并行 Synthesizer | done | — | backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/tracker/test_gitea.py<br>docs/synthesizer-grouping.md |
 | 0063 | 0063/T2 | 交付侧有界前置与软调度 | done | — | CLAUDE.md<br>backend/tests/test_run_vigil.py<br>OpenAgents/openagents/runtime/preflight.py<br>OpenAgents/openagents/runtime/context.py<br>OpenAgents/openagents/runtime/engine.py<br>OpenAgents/openagents/recipes/stages.py<br>OpenAgents/openagents/recipes/vigil.py<br>OpenAgents/tests/test_preflight.py<br>OpenAgents/tools/preflight_stress.py |
 | 0064 | 0064/T1 | 持久化恢复状态与对账原语 | done | — | backend/auto_designer/loop/recovery.py<br>backend/auto_designer/loop/run_state.py<br>backend/auto_designer/loop/checkpoint.py<br>backend/auto_designer/invocation.py<br>backend/auto_designer/tracker/base.py<br>backend/auto_designer/tracker/fake.py<br>backend/auto_designer/tracker/gitea.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_run_state.py<br>backend/tests/loop/test_checkpoint.py<br>backend/tests/tracker/test_fake.py<br>backend/tests/tracker/test_gitea.py |
 | 0064 | 0064/T2 | 阶段化 Orchestrator 与交付恢复 | done | T1 | backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/runner.py<br>backend/auto_designer/loop/round_gate.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_runner.py<br>backend/tests/loop/test_round_gate.py |
 | 0064 | 0064/T3 | 用户会话工作项级恢复 | done | T1, T2 | backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/user/session_store.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/user/test_session_store.py |
 | 0064 | 0064/T4 | Triage 与 Divergent 第一拍恢复 | done | T1, T2 | backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/divergent.py<br>backend/tests/demand/test_triage.py<br>backend/tests/demand/test_divergent_gate.py |
 | 0064 | 0064/T5 | Synthesizer 与 Owner 输出先存后应用 | done | T1, T2, T4 | backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/delivery_evidence.py<br>backend/tests/loop/test_synthesizer.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_delivery_evidence.py |
-| 0064 | 0064/T6 | Fresh/resume 入口与故障矩阵验收 | done | T1, T2, T3, T4, T5 | backend/run.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/manifest.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/scripts/e2e-stage-resume.sh<br>backend/tests/experiment/test_runtime.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_stage_resume_e2e.py<br>docs/audits/0064-stage-resume-validation.md |
+| 0064 | 0064/T6 | Fresh/resume 入口与故障矩阵验收 | done | T1, T2, T3, T4, T5 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/manifest.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/scripts/e2e-stage-resume.sh<br>backend/tests/loop/test_live.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_stage_resume_e2e.py<br>docs/audits/0064-stage-resume-validation.md |
 | 0065 | 0065/T1 | 版本化评测计划与不可变清单 | done | — | evaluation/harness_bench/schema.py<br>evaluation/harness_bench/config.py<br>evaluation/harness_bench/manifest.py<br>evaluation/harness_bench/cli.py<br>evaluation/tests/harness_bench/test_config.py<br>evaluation/tests/harness_bench/test_manifest.py |
 | 0065 | 0065/T2 | 可插拔沙盒提供方与隔离生命周期 | done | — | evaluation/harness_bench/providers/base.py<br>evaluation/harness_bench/providers/daytona.py<br>evaluation/harness_bench/providers/local.py<br>evaluation/harness_bench/sandbox.py<br>evaluation/tests/harness_bench/test_sandbox.py |
 | 0065 | 0065/T3 | Harness 持久会话与流式控制协议 | done | — | evaluation/harness_bench/harness/protocol.py<br>evaluation/harness_bench/harness/session.py<br>evaluation/harness_bench/harness/adapters.py<br>evaluation/tests/harness_bench/test_harness_session.py |
@@ -494,29 +494,31 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0065 | 0065/T6 | 可恢复编排、统一结果与配对报告 | done | T1, T2, T3, T4, T5 | evaluation/harness_bench/orchestrator.py<br>evaluation/harness_bench/state.py<br>evaluation/harness_bench/outcomes.py<br>evaluation/harness_bench/report.py<br>evaluation/tests/harness_bench/test_orchestrator.py<br>evaluation/tests/harness_bench/test_reporting.py |
 | 0066 | 0066/T1 | 统一时间账本与 provider scope | done | — | backend/auto_designer/usage.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/user/sim/persona_client.py |
 | 0066 | 0066/T2 | 角色超时分类与可恢复取消 | done | T1 | backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/loop/sim_user.py |
-| 0066 | 0066/T3 | 官方内层预算与 E2B 配置传播 | done | T1, T2 | evaluation/harness-suite-20260920/configs/scaling-e2b-20260922.json<br>evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.json<br>evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py |
-| 0066 | 0066/T4 | 回归验收与操作文档 | done | T1, T2, T3 | backend/tests/test_time_accounting.py<br>evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md |
-| 0067 | 0067/T1 | 冻结任务、资源和运行身份 | done | — | evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py<br>evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.tasks.json |
-| 0067 | 0067/T2 | E2B mixed executor 与交互边界 | done | T1 | evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>backend/scripts/run_mixed_closed_loop.py<br>backend/auto_designer/loop/sim_user.py |
-| 0067 | 0067/T3 | 单 N 启动、五轮检查点与恢复 | done | T1, T2 | evaluation/harness-suite-20260920/run_scaling_e2b.py<br>evaluation/harness-suite-20260920/start_scaling_n1_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n4_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n8_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n16_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n32_e2b.sh |
-| 0067 | 0067/T4 | 结果规范和迁移手册 | done | T1, T2, T3 | evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md<br>evaluation/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md<br>evaluation/harness-suite-20260920/SPEC-scaling-e2b-launch.md |
-| 0068 | 0068/T1 | 需求包、边界检查与角色名称统一 | done | — | backend/auto_designer/demand/__init__.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/delivery_evidence.py<br>backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/evidence_contract.py<br>backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/demand/issue_schema.py<br>backend/auto_designer/demand/observation_provider.py<br>backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/proposal_view.py<br>backend/auto_designer/demand/role_contract.py<br>backend/auto_designer/demand/runtime_agg.py<br>backend/auto_designer/demand/session_timeline.py<br>backend/auto_designer/demand/submit_tools.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/triage.py<br>backend/auto_designer/designer/__init__.py<br>backend/auto_designer/designer/agent_contract.py<br>backend/auto_designer/designer/agent_runtime.py<br>backend/auto_designer/designer/delivery_evidence.py<br>backend/auto_designer/designer/designer.py<br>backend/auto_designer/designer/divergent.py<br>backend/auto_designer/designer/evidence_contract.py<br>backend/auto_designer/designer/grouped_designer.py<br>backend/auto_designer/designer/grouped_synthesizer.py<br>backend/auto_designer/designer/issue_schema.py<br>backend/auto_designer/designer/observation_provider.py<br>backend/auto_designer/designer/owner.py<br>backend/auto_designer/designer/proposal_view.py<br>backend/auto_designer/designer/role_contract.py<br>backend/auto_designer/designer/runtime_agg.py<br>backend/auto_designer/designer/session_timeline.py<br>backend/auto_designer/designer/submit_tools.py<br>backend/auto_designer/designer/synthesizer.py<br>backend/auto_designer/designer/triage.py<br>backend/auto_designer/dev/__init__.py<br>backend/auto_designer/dev/commit_checkpoint.py<br>backend/auto_designer/dev/completion_gate.py<br>backend/auto_designer/dev/harness_boundary.py<br>backend/auto_designer/dev/repo_guard.py<br>backend/auto_designer/dev/workspace_jail.py<br>backend/auto_designer/guards/__init__.py<br>backend/auto_designer/guards/harness_boundary.py<br>backend/auto_designer/guards/repo_guard.py<br>backend/auto_designer/guards/workspace_jail.py<br>backend/auto_designer/invocation.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/loop/metrics.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/observations/gaps.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/user/sim/goals.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/web/api.py<br>backend/auto_designer/web/issue_timeline.py |
-| 0068 | 0068/T2 | Agent 定义与启动配置切换 | done | T1 | backend/.env.example<br>backend/agent_defs/designer/agent.yaml<br>backend/agent_defs/designer/systemprompt.md<br>backend/agent_defs/designer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/designer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/designer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/designer/tools/list_directory.tool.yaml<br>backend/agent_defs/designer/tools/read_file.tool.yaml<br>backend/agent_defs/designer/tools/search_file_content.tool.yaml<br>backend/agent_defs/designer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/designer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/synthesizer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/synthesizer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/synthesizer/tools/list_directory.tool.yaml<br>backend/agent_defs/synthesizer/tools/read_file.tool.yaml<br>backend/agent_defs/synthesizer/tools/search_file_content.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/run.py<br>backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_swebench_closed_loop.py<br>examples/experiments/synthesizer-mixed-scaling.json<br>examples/experiments/synthesizer-n1-e2b.json<br>examples/experiments/synthesizer-ordinary-five-rounds.json<br>examples/experiments/synthesizer-scaling-e2b.json<br>examples/models.env.example |
-| 0068 | 0068/T3 | 脚本和实验执行入口全量对齐 | done | T2 | backend/scripts/e2e-spec-0039-issue-state-timeline.sh<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh<br>backend/scripts/e2e-spec-0056-0057-user-semantics.sh<br>backend/scripts/e2e-stage-resume.sh<br>backend/scripts/evaluate_role_traces.py<br>backend/scripts/export_experiment_snapshot.py<br>backend/scripts/prepare_openagents_validation.py<br>backend/scripts/probe_timeout_to_designer.py<br>backend/scripts/probe_timeout_to_synthesizer.py<br>backend/scripts/replay_design_from_sessions.py<br>backend/scripts/replay_observation_design.py<br>backend/scripts/replay_observation_lifecycle.py<br>backend/scripts/replay_observation_synthesis.py<br>backend/scripts/replay_owner_from_repo.py<br>backend/scripts/replay_pm_synth_owner_offline.py<br>backend/scripts/replay_pm_synthesizer_owner_offline.py<br>backend/scripts/replay_role_invocations.py<br>backend/scripts/replay_roles_from_sessions.py<br>backend/scripts/replay_roles_offline.py<br>backend/scripts/replay_synthesize_owner_from_repo.py<br>backend/scripts/replay_synthesizer_owner_from_repo.py<br>backend/scripts/run_mixed_closed_loop.py<br>evaluation/harness-suite-20260920/accept_n1_round1_as_canary.py<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py<br>evaluation/harness-suite-20260920/prepare_scaling_resources.py<br>evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py<br>evaluation/harness-suite-20260920/remote_design_delivery_smoke.py<br>evaluation/harness-suite-20260920/remote_real_developer_smoke.py<br>evaluation/harness-suite-20260920/resume_mixed_latency_recovery.py<br>evaluation/harness-suite-20260920/resume_n1_latency_recovery.py<br>evaluation/harness-suite-20260920/run_daytona_design_delivery.py<br>evaluation/harness-suite-20260920/run_n1_e2b.py<br>evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>evaluation/harness-suite-20260920/run_scaling_e2b.py<br>evaluation/harness-suite-20260920/sync_status_vps.py<br>evaluation/harness-suite-20260920/tools/validate_mixed_config.py<br>evaluation/harness-suite-20260920/vps_status_dashboard.py<br>evaluation/harness_bench/harbor_historical_user_agent.py |
-| 0068 | 0068/T4 | 看板角色与显示名称统一 | done | T1 | frontend/README.md<br>frontend/src/App.tsx<br>frontend/src/api.test.ts<br>frontend/src/api.test.tsx<br>frontend/src/api.ts<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.test.tsx<br>frontend/src/components/building/buildingModel.ts<br>frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/issueTimelineModel.test.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/lib/roleLabel.ts<br>frontend/src/styles.css<br>frontend/src/types.ts |
-| 0068 | 0068/T5 | 当前文档与 Spec 索引更新 | done | T3, T4 | CLAUDE.md<br>README.md<br>README.zh-CN.md<br>docs/ARCHITECTURE.md<br>docs/CONFIGURATION.md<br>docs/EXPORTING.md<br>docs/QUICKSTART.md<br>docs/designer-grouping.md<br>docs/specs/0014-dev-commit-discipline.md<br>docs/specs/0015-dev-overfit-isolation.md<br>docs/specs/0016-designer-rootcause-signal.md<br>docs/specs/0016-synthesizer-rootcause-signal.md<br>docs/specs/0017-user-parallel-sessions.md<br>docs/specs/0018-designer-proposal-envelope.md<br>docs/specs/0018-synthesizer-proposal-envelope.md<br>docs/specs/0020-issue-covers-dispatch-budget.md<br>docs/specs/0021-dev-escape-containment.md<br>docs/specs/0024-designer-godview-timeline-tool.md<br>docs/specs/0024-synthesizer-godview-timeline-tool.md<br>docs/specs/0025-issue-triage-funnel.md<br>docs/specs/0026-frontend-observability-redesign.md<br>docs/specs/0027-unified-agent-output-contract.md<br>docs/specs/0028-divergent-pm-gate.md<br>docs/specs/0029-three-plane-issue-flow.md<br>docs/specs/0030-harness-product-interface.md<br>docs/specs/0031-user-sim-stage-contracts.md<br>docs/specs/0032-openagents-gitea-dev-plane.md<br>docs/specs/0034-frontend-agent-company-building.md<br>docs/specs/0035-stdout-visible-harness-state.md<br>docs/specs/0039-issue-state-timeline.md<br>docs/specs/0040-rfc-stage-and-commit-denylist.md<br>docs/specs/0041-unified-llm-token-usage.md<br>docs/specs/0042-role-contract-governance.md<br>docs/specs/0043-role-cognitive-contracts.md<br>docs/specs/0045-vigil-harness-aware-toolchain.md<br>docs/specs/0047-parallel-experiment-runtime.md<br>docs/specs/0049-role-invocation-io-store.md<br>docs/specs/0052-designer-covers-consolidation.md<br>docs/specs/0052-synthesizer-covers-consolidation.md<br>docs/specs/0053-persona-semantic-action-lifecycle.md<br>docs/specs/0054-user-goal-driven-simulation.md<br>docs/specs/0055-goal-aware-demand-evidence-boundaries.md<br>docs/specs/0056-terminal-acceptance-alignment.md<br>docs/specs/0059-observation-evolution-contract.md<br>docs/specs/0060-independent-pm-delivery-route.md<br>docs/specs/0061-delivery-observability-lifecycle.md<br>docs/specs/0063-lightweight-delivery-preflight.md<br>docs/specs/0064-stage-resumable-experiment-runtime.md<br>docs/specs/0066-provider-latency-isolated-timeout.md<br>docs/specs/0067-mixed-e2b-scaling-runtime.md<br>docs/specs/0068-synthesizer-clean-rename.md<br>docs/specs/ARCHITECTURE.md<br>docs/specs/OVERVIEW.md<br>docs/synthesizer-grouping.md<br>docs/usage-monitoring.md |
-| 0068 | 0068/T6 | 行为回归与离线流程验证 | done | T5 | backend/scripts/e2e-synthesizer-naming.sh<br>backend/tests/demand/test_agent_contract.py<br>backend/tests/demand/test_agent_runtime.py<br>backend/tests/demand/test_delivery_evidence.py<br>backend/tests/demand/test_divergent_gate.py<br>backend/tests/demand/test_evidence_contract.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/demand/test_issue_schema.py<br>backend/tests/demand/test_observation_provider.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_proposal_view.py<br>backend/tests/demand/test_role_contract.py<br>backend/tests/demand/test_role_contract_flow.py<br>backend/tests/demand/test_session_timeline.py<br>backend/tests/demand/test_terminal_evidence.py<br>backend/tests/demand/test_triage.py<br>backend/tests/designer/test_agent_contract.py<br>backend/tests/designer/test_agent_runtime.py<br>backend/tests/designer/test_delivery_evidence.py<br>backend/tests/designer/test_divergent_gate.py<br>backend/tests/designer/test_evidence_contract.py<br>backend/tests/designer/test_grouped_designer.py<br>backend/tests/designer/test_issue_schema.py<br>backend/tests/designer/test_observation_provider.py<br>backend/tests/designer/test_owner.py<br>backend/tests/designer/test_proposal_view.py<br>backend/tests/designer/test_role_contract.py<br>backend/tests/designer/test_role_contract_flow.py<br>backend/tests/designer/test_session_timeline.py<br>backend/tests/designer/test_synthesizer_compat.py<br>backend/tests/designer/test_terminal_evidence.py<br>backend/tests/designer/test_triage.py<br>backend/tests/dev/test_commit_checkpoint.py<br>backend/tests/dev/test_completion_gate.py<br>backend/tests/dev/test_harness_boundary.py<br>backend/tests/dev/test_repo_guard.py<br>backend/tests/dev/test_workspace_jail.py<br>backend/tests/experiment/test_cli.py<br>backend/tests/experiment/test_config.py<br>backend/tests/experiment/test_manifest.py<br>backend/tests/experiment/test_runtime.py<br>backend/tests/guards/test_guard_wiring.py<br>backend/tests/guards/test_harness_boundary.py<br>backend/tests/guards/test_repo_guard.py<br>backend/tests/guards/test_workspace_jail.py<br>backend/tests/loop/test_designer.py<br>backend/tests/loop/test_live.py<br>backend/tests/loop/test_live_tracer.py<br>backend/tests/loop/test_metrics.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_roster.py<br>backend/tests/loop/test_runner.py<br>backend/tests/loop/test_runtime_agg.py<br>backend/tests/loop/test_synthesizer.py<br>backend/tests/observations/test_gaps.py<br>backend/tests/observations/test_publication.py<br>backend/tests/test_export_experiment_snapshot.py<br>backend/tests/test_llm_limits.py<br>backend/tests/test_replay_design_from_sessions.py<br>backend/tests/test_replay_roles_from_sessions.py<br>backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_sandbox_isolation.py<br>backend/tests/test_stage_resume_e2e.py<br>backend/tests/test_time_accounting.py<br>backend/tests/test_usage.py<br>backend/tests/tracker/test_gitea_timeline.py<br>backend/tests/web/test_api.py<br>evaluation/tests/test_vps_status.py<br>backend/tests/test_invocation.py |
+| 0066 | 0066/T4 | 时间分类回归验收 | done | T1, T2 | backend/tests/test_time_accounting.py |
+| 0067 | 0067/T2 | 底层 direct 会话与终端 review 契约 | done | — | backend/auto_designer/loop/sim_user.py<br>backend/tests/user/test_direct_session.py |
+| 0068 | 0068/T1 | 需求包、边界检查与角色名称统一 | done | — | backend/auto_designer/demand/__init__.py<br>backend/auto_designer/demand/agent_contract.py<br>backend/auto_designer/demand/agent_runtime.py<br>backend/auto_designer/demand/delivery_evidence.py<br>backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/evidence_contract.py<br>backend/auto_designer/demand/grouped_synthesizer.py<br>backend/auto_designer/demand/issue_schema.py<br>backend/auto_designer/demand/observation_provider.py<br>backend/auto_designer/demand/owner.py<br>backend/auto_designer/demand/proposal_view.py<br>backend/auto_designer/demand/role_contract.py<br>backend/auto_designer/demand/runtime_agg.py<br>backend/auto_designer/demand/session_timeline.py<br>backend/auto_designer/demand/submit_tools.py<br>backend/auto_designer/demand/synthesizer.py<br>backend/auto_designer/demand/triage.py<br>backend/auto_designer/guards/__init__.py<br>backend/auto_designer/guards/harness_boundary.py<br>backend/auto_designer/guards/repo_guard.py<br>backend/auto_designer/guards/workspace_jail.py<br>backend/auto_designer/invocation.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/loop/live_tracer.py<br>backend/auto_designer/loop/metrics.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/roster.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/observations/gaps.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/user/sim/goals.py<br>backend/auto_designer/user/sim/loop.py<br>backend/auto_designer/web/api.py<br>backend/auto_designer/web/issue_timeline.py |
+| 0068 | 0068/T2 | Agent 定义与启动配置切换 | done | T1 | backend/agent_defs/divergent_pm/agent.yaml<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/owner/agent.yaml<br>backend/agent_defs/owner/systemprompt.md<br>backend/agent_defs/synthesizer/agent.yaml<br>backend/agent_defs/synthesizer/systemprompt.md<br>backend/agent_defs/synthesizer/tools/get_harness_beat.tool.yaml<br>backend/agent_defs/synthesizer/tools/get_harness_step.tool.yaml<br>backend/agent_defs/synthesizer/tools/get_session_timeline.tool.yaml<br>backend/agent_defs/synthesizer/tools/list_directory.tool.yaml<br>backend/agent_defs/synthesizer/tools/read_file.tool.yaml<br>backend/agent_defs/synthesizer/tools/search_file_content.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_observation_gap.tool.yaml<br>backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml<br>backend/agent_defs/triage_agent/agent.yaml<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>examples/experiments/synthesizer-n1-e2b.json |
+| 0068 | 0068/T3 | 当前开发工具与执行接口命名 | done | T2 | backend/scripts/e2e-spec-0039-issue-state-timeline.sh<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh<br>backend/scripts/e2e-spec-0056-0057-user-semantics.sh<br>backend/scripts/e2e-stage-resume.sh<br>tools/dev/audit/evaluate_role_traces.py<br>backend/scripts/export_experiment_snapshot.py<br>tools/dev/delivery/prepare_openagents_validation.py<br>tools/dev/probes/probe_timeout_to_synthesizer.py<br>tools/dev/replay/replay_observation_lifecycle.py<br>tools/dev/replay/replay_observation_synthesis.py<br>tools/dev/replay/replay_owner_from_repo.py<br>tools/dev/replay/replay_pm_synthesizer_owner_offline.py<br>tools/dev/replay/replay_role_invocations.py<br>tools/dev/replay/replay_roles_from_sessions.py<br>tools/dev/replay/replay_roles_offline.py<br>tools/dev/replay/replay_synthesizer_owner_from_repo.py<br>evaluation/harness_bench/harbor_historical_user_agent.py |
+| 0068 | 0068/T4 | 看板角色与显示名称统一 | done | T1 | frontend/README.md<br>frontend/src/App.tsx<br>frontend/src/api.test.ts<br>frontend/src/api.ts<br>frontend/src/components/building/FloorWorkspace.tsx<br>frontend/src/components/building/buildingModel.test.tsx<br>frontend/src/components/building/buildingModel.ts<br>frontend/src/components/detail/AgentRunDetail.tsx<br>frontend/src/components/detail/issueTimelineModel.test.ts<br>frontend/src/lib/issueMeta.ts<br>frontend/src/styles.css<br>frontend/src/types.ts |
+| 0068 | 0068/T5 | 当前文档与 Spec 索引更新 | done | T3, T4 | CLAUDE.md<br>README.md<br>README.zh-CN.md<br>docs/ARCHITECTURE.md<br>docs/CONFIGURATION.md<br>docs/EXPORTING.md<br>docs/QUICKSTART.md<br>docs/specs/0014-dev-commit-discipline.md<br>docs/specs/0015-dev-overfit-isolation.md<br>docs/specs/0016-synthesizer-rootcause-signal.md<br>docs/specs/0017-user-parallel-sessions.md<br>docs/specs/0018-synthesizer-proposal-envelope.md<br>docs/specs/0020-issue-covers-dispatch-budget.md<br>docs/specs/0021-dev-escape-containment.md<br>docs/specs/0024-synthesizer-godview-timeline-tool.md<br>docs/specs/0025-issue-triage-funnel.md<br>docs/specs/0026-frontend-observability-redesign.md<br>docs/specs/0027-unified-agent-output-contract.md<br>docs/specs/0028-divergent-pm-gate.md<br>docs/specs/0029-three-plane-issue-flow.md<br>docs/specs/0030-harness-product-interface.md<br>docs/specs/0031-user-sim-stage-contracts.md<br>docs/specs/0032-openagents-gitea-dev-plane.md<br>docs/specs/0034-frontend-agent-company-building.md<br>docs/specs/0035-stdout-visible-harness-state.md<br>docs/specs/0039-issue-state-timeline.md<br>docs/specs/0040-rfc-stage-and-commit-denylist.md<br>docs/specs/0041-unified-llm-token-usage.md<br>docs/specs/0042-role-contract-governance.md<br>docs/specs/0043-role-cognitive-contracts.md<br>docs/specs/0045-vigil-harness-aware-toolchain.md<br>docs/specs/0047-parallel-experiment-runtime.md<br>docs/specs/0049-role-invocation-io-store.md<br>docs/specs/0052-synthesizer-covers-consolidation.md<br>docs/specs/0053-persona-semantic-action-lifecycle.md<br>docs/specs/0054-user-goal-driven-simulation.md<br>docs/specs/0055-goal-aware-demand-evidence-boundaries.md<br>docs/specs/0056-terminal-acceptance-alignment.md<br>docs/specs/0059-observation-evolution-contract.md<br>docs/specs/0060-independent-pm-delivery-route.md<br>docs/specs/0061-delivery-observability-lifecycle.md<br>docs/specs/0063-lightweight-delivery-preflight.md<br>docs/specs/0064-stage-resumable-experiment-runtime.md<br>docs/specs/0066-provider-latency-isolated-timeout.md<br>docs/specs/0067-mixed-e2b-scaling-runtime.md<br>docs/specs/0068-synthesizer-clean-rename.md<br>docs/specs/ARCHITECTURE.md<br>docs/specs/OVERVIEW.md<br>docs/synthesizer-grouping.md<br>docs/usage-monitoring.md |
+| 0068 | 0068/T6 | 行为回归与离线流程验证 | done | T5 | backend/scripts/e2e-synthesizer-naming.sh<br>backend/tests/demand/test_agent_contract.py<br>backend/tests/demand/test_agent_runtime.py<br>backend/tests/demand/test_delivery_evidence.py<br>backend/tests/demand/test_divergent_gate.py<br>backend/tests/demand/test_evidence_contract.py<br>backend/tests/demand/test_grouped_synthesizer.py<br>backend/tests/demand/test_issue_schema.py<br>backend/tests/demand/test_observation_provider.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_proposal_view.py<br>backend/tests/demand/test_role_contract.py<br>backend/tests/demand/test_role_contract_flow.py<br>backend/tests/demand/test_session_timeline.py<br>backend/tests/demand/test_terminal_evidence.py<br>backend/tests/demand/test_triage.py<br>backend/tests/experiment/test_manifest.py<br>backend/tests/guards/test_guard_wiring.py<br>backend/tests/guards/test_harness_boundary.py<br>backend/tests/guards/test_repo_guard.py<br>backend/tests/guards/test_workspace_jail.py<br>backend/tests/loop/test_live.py<br>backend/tests/loop/test_live_tracer.py<br>backend/tests/loop/test_metrics.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_roster.py<br>backend/tests/loop/test_runner.py<br>backend/tests/loop/test_runtime_agg.py<br>backend/tests/loop/test_synthesizer.py<br>backend/tests/observations/test_gaps.py<br>backend/tests/observations/test_publication.py<br>backend/tests/test_export_experiment_snapshot.py<br>backend/tests/test_llm_limits.py<br>backend/tests/test_replay_roles_from_sessions.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_sandbox_isolation.py<br>backend/tests/test_stage_resume_e2e.py<br>backend/tests/test_time_accounting.py<br>backend/tests/test_usage.py<br>backend/tests/tracker/test_gitea_timeline.py<br>backend/tests/web/test_api.py<br>backend/tests/test_invocation.py |
 | 0069 | 0069/T1 | 统一实验 schema 与材料冻结 | done | — | backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/materials.py<br>backend/auto_designer/experiment/schemas/experiment-v2.json<br>backend/auto_designer/experiment/schemas/task-package-v1.json<br>backend/tests/test_experiment_config_v2.py<br>backend/tests/test_experiment_materials.py |
-| 0069 | 0069/T2 | 共用 controller context 与后端协议 | done | T1 | backend/auto_designer/experiment/engine.py<br>backend/auto_designer/experiment/context.py<br>backend/auto_designer/experiment/backends/__init__.py<br>backend/auto_designer/experiment/backends/base.py<br>backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/tests/test_experiment_engine.py |
-| 0069 | 0069/T3 | 本地 Docker 与 localhost Gitea 适配 | done | T2 | backend/auto_designer/experiment/backends/local.py<br>backend/auto_designer/experiment/infrastructure.py<br>backend/auto_designer/experiment/health.py<br>backend/deploy/experiment/docker-compose.yml<br>backend/deploy/vigil/Dockerfile<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_experiment_local_backend.py<br>backend/tests/experiment/test_infrastructure.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/tests/user/sim/test_docker_seed_source.py |
+| 0069 | 0069/T2 | 共用 controller context 与后端协议 | done | T1 | backend/auto_designer/experiment/engine.py<br>backend/auto_designer/experiment/context.py<br>backend/auto_designer/experiment/backends/__init__.py<br>backend/auto_designer/experiment/backends/base.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/tests/test_experiment_engine.py |
+| 0069 | 0069/T3 | 本地 Docker 与 localhost Gitea 适配 | done | T2 | backend/auto_designer/experiment/backends/local.py<br>backend/auto_designer/experiment/infrastructure.py<br>backend/deploy/experiment/docker-compose.yml<br>backend/deploy/vigil/Dockerfile<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_experiment_local_backend.py<br>backend/tests/experiment/test_infrastructure.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/user/sim/sources/docker_seed.py<br>backend/tests/user/sim/test_docker_seed_source.py |
 | 0069 | 0069/T4 | E2B 与 Gitea.com 执行适配 | done | T2 | backend/auto_designer/experiment/backends/e2b.py<br>backend/auto_designer/experiment/backends/e2b_bootstrap.py<br>backend/auto_designer/experiment/backends/e2b_template.py<br>backend/auto_designer/user/sim/sources/prebuilt.py<br>backend/auto_designer/user/sim/runtime.py<br>backend/tests/user/sim/test_prebuilt_source.py<br>backend/tests/user/sim/test_workspace_runtime.py<br>backend/tests/test_experiment_e2b_backend.py |
-| 0069 | 0069/T5 | 统一 CLI 和生命周期管理 | done | T2 | backend/scripts/experiment.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/manifest.py<br>backend/auto_designer/experiment/collection.py<br>backend/scripts/run_auditable_experiment.py<br>evaluation/harness-suite-20260920/run_n1_e2b.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/test_experiment_lifecycle_v2.py |
+| 0069 | 0069/T5 | 统一 CLI 和生命周期管理 | done | T2 | backend/scripts/experiment.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/manifest.py<br>backend/auto_designer/experiment/collection.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/test_experiment_lifecycle_v2.py |
 | 0069 | 0069/T6 | 双语教程与两路径完整验收 | done | T3, T4, T5 | README.md<br>README.zh-CN.md<br>CLAUDE.md<br>.gitignore<br>pyproject.toml<br>uv.lock<br>release/compatibility.json<br>examples/experiment.env.example<br>examples/experiments/synthesizer-n1-e2b.json<br>examples/experiments/synthesizer-n1-local.json<br>examples/tasks/pvlib-1478/task.json<br>examples/tasks/pvlib-1478/instruction.md<br>examples/tasks/pvlib-1478/setup.sh<br>examples/tasks/pvlib-1478/requirements.lock<br>examples/personas/n1.json<br>THIRD_PARTY.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/tutorials/n1-experiment.md<br>docs/tutorials/n1-experiment.zh-CN.md<br>docs/validation/spec-0069-new-user.md<br>backend/scripts/e2e-spec-0069-experiment-entry.sh<br>backend/tests/test_experiment_public_examples.py<br>.github/workflows/experiment-contract.yml |
 | 0070 | 0070/T1 | 附件能力解析与受限下载 | done | — | backend/auto_designer/tracker/gitea.py<br>backend/auto_designer/tracker/attachment_transport.py<br>backend/tests/tracker/test_gitea_evidence_transport.py<br>backend/tests/tracker/test_gitea.py<br>backend/tests/tracker/test_gitea_observe.py<br>backend/tests/tracker/test_gitea_timeline.py |
 | 0070 | 0070/T2 | 双格式发布与冻结传输记录 | done | T1 | backend/auto_designer/demand/delivery_evidence.py<br>backend/auto_designer/observations/transport.py<br>backend/tests/demand/test_delivery_evidence.py<br>backend/tests/observations/test_transport_profile.py |
-| 0070 | 0070/T3 | 实际交付运行时能力预检 | done | T1, T2 | backend/run.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/observations/preflight.py<br>backend/tests/test_run_vigil.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/observations/test_transport_preflight.py |
+| 0070 | 0070/T3 | 实际交付运行时能力预检 | done | T1, T2 | backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/observations/preflight.py<br>backend/tests/test_run_vigil.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/observations/test_transport_preflight.py |
 | 0070 | 0070/T4 | 按需公网出口与镜像接线 | done | T3 | backend/deploy/gitea/docker-compose.yml<br>backend/deploy/gitea/egress-proxy.conf<br>backend/deploy/gitea/egress-gitea-com.conf<br>backend/deploy/experiment/docker-compose.yml<br>backend/deploy/experiment/egress-proxy.conf<br>backend/deploy/experiment/egress-gitea-com.conf<br>backend/deploy/vigil/entrypoint.sh<br>backend/deploy/vigil/build.sh<br>backend/deploy/vigil/observation-runtime.json<br>backend/tests/test_vigil_build.py<br>backend/tests/experiment/test_evidence_egress.py |
 | 0070 | 0070/T5 | 跨仓验收与联合发布 | done | T2, T3, T4 | backend/scripts/check_observation_contract.py<br>backend/scripts/check_gitea_evidence_transport.py<br>backend/tests/test_observation_contract.py<br>.github/workflows/ci.yml<br>release/compatibility.json<br>docs/QUICKSTART.md<br>docs/CONFIGURATION.md<br>docs/RELEASING.md<br>backend/deploy/gitea/README.md |
+| 0071 | 0071/T1 | 历史研究归档与活评分依赖分离 | done | — | evaluation/harness-suite-20260920/EXPERIMENT-MATRIX.md<br>evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md<br>evaluation/harness-suite-20260920/EXPERIMENT-RUNBOOK-ordinary-1-4-five-rounds.md<br>evaluation/harness-suite-20260920/N1-E2B-RUNBOOK.md<br>evaluation/harness-suite-20260920/README.md<br>evaluation/harness-suite-20260920/SPEC-experiment-preparation-and-sandbox-execution.md<br>evaluation/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md<br>evaluation/harness-suite-20260920/SPEC-scaling-e2b-launch.md<br>evaluation/harness-suite-20260920/SPEC-time-accounting-provider-latency.md<br>evaluation/harness-suite-20260920/accept_n1_round1_as_canary.py<br>evaluation/harness-suite-20260920/build_e2b_template.py<br>evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.json<br>evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.tasks.json<br>evaluation/harness-suite-20260920/configs/n1-e2b-20260922.json<br>evaluation/harness-suite-20260920/configs/ordinary-1-4-five-rounds.json<br>evaluation/harness-suite-20260920/configs/ordinary-pilot.json<br>evaluation/harness-suite-20260920/configs/ordinary-scaling-1-4-8.json<br>evaluation/harness-suite-20260920/configs/scaling-e2b-20260922.json<br>evaluation/harness-suite-20260920/freeze-record.json<br>evaluation/harness-suite-20260920/freeze_scaling_runtime.py<br>evaluation/harness-suite-20260920/harbor-canary/environment/Dockerfile<br>evaluation/harness-suite-20260920/harbor-canary/instruction.md<br>evaluation/harness-suite-20260920/harbor-canary/task.toml<br>evaluation/harness-suite-20260920/harbor-canary/tests/test.sh<br>evaluation/harness-suite-20260920/harbor-integration-canary-20260920.json<br>evaluation/harness-suite-20260920/harbor-ordinary-o03/config.json<br>evaluation/harness-suite-20260920/harbor-ordinary-o03/environment/Dockerfile<br>evaluation/harness-suite-20260920/harbor-ordinary-o03/instruction.md<br>evaluation/harness-suite-20260920/harbor-ordinary-o03/task.toml<br>evaluation/harness-suite-20260920/harbor-ordinary-o03/tests/test.sh<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/evaluation.json<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/public/TASK.md<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/public/legacy_client.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/public/migrate.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/public/schema.sql<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/public/setup_workspace.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/public/test_contract.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/public/verify.sh<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/reference/migrate.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M05/user_context.md<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/evaluation.json<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/public/TASK.md<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/public/clients/billing.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/public/clients/dashboard.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/public/exporter.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/public/fixtures.json<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/public/test_contract.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/public/verify.sh<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/reference/clients/dashboard.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/reference/exporter.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M07/user_context.md<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/evaluation.json<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/public/TASK.md<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/public/daily_sales.csv<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/public/pipeline.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/public/report.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/public/schedule.json<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/public/test_contract.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/public/test_pipeline.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/public/verify.sh<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/reference/pipeline.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/reference/report.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M09/user_context.md<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/evaluation.json<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/public/SYNC_CONTRACT.md<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/public/TASK.md<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/public/messages.json<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/public/sync.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/public/test_fixture.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/public/test_regression.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/public/test_smoke.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/public/verify.sh<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/reference/sync.py<br>evaluation/harness-suite-20260920/mechanism-seeds/M10/user_context.md<br>evaluation/harness-suite-20260920/mechanism-seeds/README.md<br>evaluation/harness-suite-20260920/mechanism-seeds/SPEC.md<br>evaluation/harness-suite-20260920/mechanism-seeds/check_manifest.py<br>evaluation/harness-suite-20260920/mechanism-seeds/manifest.json<br>evaluation/harness-suite-20260920/migrate_n1_oom.py<br>evaluation/harness-suite-20260920/monitor_scaling_runs.py<br>evaluation/harness-suite-20260920/n8-preflight-20260921.json<br>evaluation/harness-suite-20260920/prepare_scaling_resources.py<br>evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py<br>evaluation/harness-suite-20260920/prompts/swebench-dev/marshmallow-code__marshmallow-2123.md<br>evaluation/harness-suite-20260920/prompts/swebench-dev/pylint-dev__astroid-1030.md<br>evaluation/harness-suite-20260920/prompts/swebench-dev/sqlfluff__sqlfluff-3608.md<br>evaluation/harness-suite-20260920/remote_design_delivery_smoke.py<br>evaluation/harness-suite-20260920/remote_historical_billing.py<br>evaluation/harness-suite-20260920/remote_real_developer_smoke.py<br>evaluation/harness-suite-20260920/resume_mixed_latency_recovery.py<br>evaluation/harness-suite-20260920/resume_n1_e2b.sh<br>evaluation/harness-suite-20260920/resume_n1_latency_recovery.py<br>evaluation/harness-suite-20260920/resume_scaling_e2b.sh<br>evaluation/harness-suite-20260920/resume_scaling_n16_e2b.sh<br>evaluation/harness-suite-20260920/resume_scaling_n1_e2b.sh<br>evaluation/harness-suite-20260920/resume_scaling_n32_e2b.sh<br>evaluation/harness-suite-20260920/resume_scaling_n4_e2b.sh<br>evaluation/harness-suite-20260920/resume_scaling_n8_e2b.sh<br>evaluation/harness-suite-20260920/run_canary_with_n1_gitea.py<br>evaluation/harness-suite-20260920/run_daytona_design_delivery.py<br>evaluation/harness-suite-20260920/run_daytona_historical_billing.py<br>evaluation/harness-suite-20260920/run_daytona_real_developer.py<br>evaluation/harness-suite-20260920/run_e2b_full_loop_canary.py<br>evaluation/harness-suite-20260920/run_n1_e2b.py<br>evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py<br>evaluation/harness-suite-20260920/run_scaling_e2b.py<br>evaluation/harness-suite-20260920/schemas/batch-result.schema.json<br>evaluation/harness-suite-20260920/schemas/checkpoint.schema.json<br>evaluation/harness-suite-20260920/schemas/trial-result.schema.json<br>evaluation/harness-suite-20260920/start_n1_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n16_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n1_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n32_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n4_e2b.sh<br>evaluation/harness-suite-20260920/start_scaling_n8_e2b.sh<br>evaluation/harness-suite-20260920/sync_status_vps.py<br>evaluation/harness-suite-20260920/task-manifest.json<br>evaluation/harness-suite-20260920/tools/checkpoint_store.py<br>evaluation/harness-suite-20260920/tools/summarize_results.py<br>evaluation/harness-suite-20260920/tools/validate_mixed_config.py<br>evaluation/harness-suite-20260920/vps_status_dashboard.py<br>research/archives/harness-suite-20260920/EXPERIMENT-MATRIX.md<br>research/archives/harness-suite-20260920/EXPERIMENT-QUICKSTART.md<br>research/archives/harness-suite-20260920/EXPERIMENT-RUNBOOK-ordinary-1-4-five-rounds.md<br>research/archives/harness-suite-20260920/N1-E2B-RUNBOOK.md<br>research/archives/harness-suite-20260920/README.md<br>research/archives/harness-suite-20260920/SPEC-experiment-preparation-and-sandbox-execution.md<br>research/archives/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md<br>research/archives/harness-suite-20260920/SPEC-scaling-e2b-launch.md<br>research/archives/harness-suite-20260920/SPEC-time-accounting-provider-latency.md<br>research/archives/harness-suite-20260920/accept_n1_round1_as_canary.py<br>research/archives/harness-suite-20260920/build_e2b_template.py<br>research/archives/harness-suite-20260920/configs/mixed-scaling-20260922.json<br>research/archives/harness-suite-20260920/configs/mixed-scaling-20260922.tasks.json<br>research/archives/harness-suite-20260920/configs/n1-e2b-20260922.json<br>research/archives/harness-suite-20260920/configs/ordinary-1-4-five-rounds.json<br>research/archives/harness-suite-20260920/configs/ordinary-pilot.json<br>research/archives/harness-suite-20260920/configs/ordinary-scaling-1-4-8.json<br>research/archives/harness-suite-20260920/configs/scaling-e2b-20260922.json<br>research/archives/harness-suite-20260920/freeze-record.json<br>research/archives/harness-suite-20260920/freeze_scaling_runtime.py<br>research/archives/harness-suite-20260920/harbor-canary/environment/Dockerfile<br>research/archives/harness-suite-20260920/harbor-canary/instruction.md<br>research/archives/harness-suite-20260920/harbor-canary/task.toml<br>research/archives/harness-suite-20260920/harbor-canary/tests/test.sh<br>research/archives/harness-suite-20260920/harbor-integration-canary-20260920.json<br>research/archives/harness-suite-20260920/harbor-ordinary-o03/config.json<br>research/archives/harness-suite-20260920/harbor-ordinary-o03/environment/Dockerfile<br>research/archives/harness-suite-20260920/harbor-ordinary-o03/instruction.md<br>research/archives/harness-suite-20260920/harbor-ordinary-o03/task.toml<br>research/archives/harness-suite-20260920/harbor-ordinary-o03/tests/test.sh<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/evaluation.json<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/public/TASK.md<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/public/legacy_client.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/public/migrate.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/public/schema.sql<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/public/setup_workspace.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/public/test_contract.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/public/verify.sh<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/reference/migrate.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M05/user_context.md<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/evaluation.json<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/public/TASK.md<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/public/clients/billing.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/public/clients/dashboard.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/public/exporter.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/public/fixtures.json<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/public/test_contract.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/public/verify.sh<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/reference/clients/dashboard.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/reference/exporter.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M07/user_context.md<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/evaluation.json<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/public/TASK.md<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/public/daily_sales.csv<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/public/pipeline.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/public/report.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/public/schedule.json<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/public/test_contract.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/public/test_pipeline.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/public/verify.sh<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/reference/pipeline.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/reference/report.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M09/user_context.md<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/evaluation.json<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/public/SYNC_CONTRACT.md<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/public/TASK.md<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/public/messages.json<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/public/sync.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/public/test_fixture.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/public/test_regression.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/public/test_smoke.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/public/verify.sh<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/reference/sync.py<br>research/archives/harness-suite-20260920/mechanism-seeds/M10/user_context.md<br>research/archives/harness-suite-20260920/mechanism-seeds/README.md<br>research/archives/harness-suite-20260920/mechanism-seeds/SPEC.md<br>research/archives/harness-suite-20260920/mechanism-seeds/check_manifest.py<br>research/archives/harness-suite-20260920/mechanism-seeds/manifest.json<br>research/archives/harness-suite-20260920/migrate_n1_oom.py<br>research/archives/harness-suite-20260920/monitor_scaling_runs.py<br>research/archives/harness-suite-20260920/n8-preflight-20260921.json<br>research/archives/harness-suite-20260920/prepare_scaling_resources.py<br>research/archives/harness-suite-20260920/prepare_scaling_runtime_bundles.py<br>research/archives/harness-suite-20260920/prompts/swebench-dev/marshmallow-code__marshmallow-2123.md<br>research/archives/harness-suite-20260920/prompts/swebench-dev/pylint-dev__astroid-1030.md<br>research/archives/harness-suite-20260920/prompts/swebench-dev/sqlfluff__sqlfluff-3608.md<br>research/archives/harness-suite-20260920/remote_design_delivery_smoke.py<br>research/archives/harness-suite-20260920/remote_historical_billing.py<br>research/archives/harness-suite-20260920/remote_real_developer_smoke.py<br>research/archives/harness-suite-20260920/resume_mixed_latency_recovery.py<br>research/archives/harness-suite-20260920/resume_n1_e2b.sh<br>research/archives/harness-suite-20260920/resume_n1_latency_recovery.py<br>research/archives/harness-suite-20260920/resume_scaling_e2b.sh<br>research/archives/harness-suite-20260920/resume_scaling_n16_e2b.sh<br>research/archives/harness-suite-20260920/resume_scaling_n1_e2b.sh<br>research/archives/harness-suite-20260920/resume_scaling_n32_e2b.sh<br>research/archives/harness-suite-20260920/resume_scaling_n4_e2b.sh<br>research/archives/harness-suite-20260920/resume_scaling_n8_e2b.sh<br>research/archives/harness-suite-20260920/run_canary_with_n1_gitea.py<br>research/archives/harness-suite-20260920/run_daytona_design_delivery.py<br>research/archives/harness-suite-20260920/run_daytona_historical_billing.py<br>research/archives/harness-suite-20260920/run_daytona_real_developer.py<br>research/archives/harness-suite-20260920/run_e2b_full_loop_canary.py<br>research/archives/harness-suite-20260920/run_n1_e2b.py<br>research/archives/harness-suite-20260920/run_scaling_bundle_e2b.py<br>research/archives/harness-suite-20260920/run_scaling_e2b.py<br>research/archives/harness-suite-20260920/schemas/batch-result.schema.json<br>research/archives/harness-suite-20260920/schemas/checkpoint.schema.json<br>research/archives/harness-suite-20260920/schemas/trial-result.schema.json<br>research/archives/harness-suite-20260920/start_n1_e2b.sh<br>research/archives/harness-suite-20260920/start_scaling_e2b.sh<br>research/archives/harness-suite-20260920/start_scaling_n16_e2b.sh<br>research/archives/harness-suite-20260920/start_scaling_n1_e2b.sh<br>research/archives/harness-suite-20260920/start_scaling_n32_e2b.sh<br>research/archives/harness-suite-20260920/start_scaling_n4_e2b.sh<br>research/archives/harness-suite-20260920/start_scaling_n8_e2b.sh<br>research/archives/harness-suite-20260920/sync_status_vps.py<br>research/archives/harness-suite-20260920/task-manifest.json<br>research/archives/harness-suite-20260920/tools/checkpoint_store.py<br>research/archives/harness-suite-20260920/tools/summarize_results.py<br>research/archives/harness-suite-20260920/tools/validate_mixed_config.py<br>research/archives/harness-suite-20260920/vps_status_dashboard.py<br>evaluation/public-bench-pilot/.gitignore<br>research/archives/public-bench-pilot/.gitignore<br>evaluation/public-bench-pilot/README.md<br>research/archives/public-bench-pilot/README.md<br>evaluation/public-bench-pilot/adapters/__init__.py<br>evaluation/adapters/__init__.py<br>evaluation/public-bench-pilot/adapters/harness_v0/__init__.py<br>evaluation/adapters/harness_v0/__init__.py<br>evaluation/public-bench-pilot/adapters/harness_v0/harbor_driver.py<br>evaluation/adapters/harness_v0/harbor_driver.py<br>evaluation/public-bench-pilot/adapters/harness_v0/llm_user_simulator.py<br>evaluation/adapters/harness_v0/llm_user_simulator.py<br>evaluation/public-bench-pilot/adapters/harness_v0/stdio.py<br>evaluation/adapters/harness_v0/stdio.py<br>evaluation/public-bench-pilot/adapters/harness_v0/tau3.py<br>evaluation/adapters/harness_v0/tau3.py<br>evaluation/public-bench-pilot/daytona_common.py<br>research/archives/public-bench-pilot/daytona_common.py<br>evaluation/public-bench-pilot/expanded8-comparison-ds4-flash.json<br>research/archives/public-bench-pilot/expanded8-comparison-ds4-flash.json<br>evaluation/public-bench-pilot/expanded8-comparison-v0-vs-strict-goal-r3.json<br>research/archives/public-bench-pilot/expanded8-comparison-v0-vs-strict-goal-r3.json<br>evaluation/public-bench-pilot/expanded8-results-strict-goal-r3.json<br>research/archives/public-bench-pilot/expanded8-results-strict-goal-r3.json<br>evaluation/public-bench-pilot/fetch_and_prepare.sh<br>research/archives/public-bench-pilot/fetch_and_prepare.sh<br>evaluation/public-bench-pilot/grade_requests6028_daytona.py<br>research/archives/public-bench-pilot/grade_requests6028_daytona.py<br>evaluation/public-bench-pilot/llm-user-comparison-glm52.json<br>research/archives/public-bench-pilot/llm-user-comparison-glm52.json<br>evaluation/public-bench-pilot/preflight-results-strict-goal-r3.json<br>research/archives/public-bench-pilot/preflight-results-strict-goal-r3.json<br>evaluation/public-bench-pilot/preflight-results.json<br>research/archives/public-bench-pilot/preflight-results.json<br>evaluation/public-bench-pilot/prepare_evalset.py<br>research/archives/public-bench-pilot/prepare_evalset.py<br>evaluation/public-bench-pilot/protocol.json<br>research/archives/public-bench-pilot/protocol.json<br>evaluation/public-bench-pilot/remote_tau3_runner.py<br>research/archives/public-bench-pilot/remote_tau3_runner.py<br>evaluation/public-bench-pilot/run_daytona_expanded8.py<br>research/archives/public-bench-pilot/run_daytona_expanded8.py<br>evaluation/public-bench-pilot/run_daytona_harnessv0_requests6028.py<br>research/archives/public-bench-pilot/run_daytona_harnessv0_requests6028.py<br>evaluation/public-bench-pilot/run_daytona_llm_user_suite.py<br>research/archives/public-bench-pilot/run_daytona_llm_user_suite.py<br>evaluation/public-bench-pilot/run_daytona_swe_case.py<br>research/archives/public-bench-pilot/run_daytona_swe_case.py<br>evaluation/public-bench-pilot/run_daytona_tau3_preflight.py<br>research/archives/public-bench-pilot/run_daytona_tau3_preflight.py<br>evaluation/public-bench-pilot/run_daytona_terminal_case.py<br>research/archives/public-bench-pilot/run_daytona_terminal_case.py<br>evaluation/public-bench-pilot/run_daytona_terminal_preflight.py<br>research/archives/public-bench-pilot/run_daytona_terminal_preflight.py<br>evaluation/public-bench-pilot/run_daytona_tua_case.py<br>research/archives/public-bench-pilot/run_daytona_tua_case.py<br>evaluation/public-bench-pilot/run_daytona_tua_preflight.py<br>research/archives/public-bench-pilot/run_daytona_tua_preflight.py<br>evaluation/public-bench-pilot/selection.json<br>research/archives/public-bench-pilot/selection.json<br>evaluation/public-bench-pilot/standard6-results-baseline-v0-glm52.json<br>research/archives/public-bench-pilot/standard6-results-baseline-v0-glm52.json<br>evaluation/public-bench-pilot/standard6-results-strict-goal-r3-glm52.json<br>research/archives/public-bench-pilot/standard6-results-strict-goal-r3-glm52.json<br>evaluation/public-bench-pilot/tests/test_harness_v0_adapters.py<br>evaluation/tests/test_harness_v0_adapters.py<br>evaluation/public-bench-pilot/tests/test_timeout_policy.py<br>research/archives/public-bench-pilot/tests/test_timeout_policy.py<br>evaluation/public-bench-pilot/timeout_policy.py<br>research/archives/public-bench-pilot/timeout_policy.py<br>evaluation/public-bench-pilot/validate_evalset.py<br>research/archives/public-bench-pilot/validate_evalset.py<br>evaluation/tests/test_vps_proposals.py<br>research/archives/harness-suite-20260920/tests/test_vps_proposals.py<br>evaluation/tests/test_vps_status.py<br>research/archives/harness-suite-20260920/tests/test_vps_status.py<br>examples/experiments/synthesizer-ordinary-five-rounds.json<br>research/archives/public-templates/synthesizer-ordinary-five-rounds.json<br>examples/experiments/synthesizer-mixed-scaling.json<br>research/archives/public-templates/synthesizer-mixed-scaling.json<br>examples/experiments/synthesizer-scaling-e2b.json<br>research/archives/public-templates/synthesizer-scaling-e2b.json<br>backend/persona_library.json<br>examples/personas/library.json<br>backend/persona_library_github.json<br>research/archives/legacy-materials/persona_library_github.json<br>backend/persona_library_selfreport.json<br>research/archives/legacy-materials/persona_library_selfreport.json<br>backend/seeds.json<br>research/archives/legacy-materials/seeds.json<br>backend/swebench_pools/dev_balanced_64.json<br>research/archives/legacy-materials/swebench_pools/dev_balanced_64.json<br>backend/swebench_pools/medium_hard_16.json<br>research/archives/legacy-materials/swebench_pools/medium_hard_16.json<br>research/README.md<br>research/README.zh-CN.md<br>research/archives/README.md<br>evaluation/README.md<br>evaluation/harness_bench/harbor_v0_agent.py<br>pyproject.toml |
+| 0071 | 0071/T2 | 控制器入包与冻结 v2 运行管理 | done | T1 | backend/run.py<br>backend/scripts/run_swebench_closed_loop.py<br>backend/auto_designer/experiment/controllers/__init__.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/auto_designer/experiment/engine.py<br>backend/auto_designer/experiment/context.py<br>backend/auto_designer/experiment/materials.py<br>backend/auto_designer/experiment/backends/local.py<br>backend/auto_designer/experiment/backends/e2b.py<br>backend/auto_designer/experiment/backends/e2b_bootstrap.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_run_git_isolation.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_sandbox_isolation.py<br>backend/tests/distill/test_seed_adapter.py<br>backend/tests/test_experiment_engine.py<br>backend/tests/test_experiment_materials.py<br>backend/tests/test_experiment_local_backend.py<br>backend/tests/test_experiment_e2b_backend.py<br>backend/scripts/build_swebench_seed_workspaces.py<br>backend/scripts/build_swebench_runtime_image.sh<br>backend/scripts/prepare_swebench_runtime_tree.py<br>backend/scripts/swebench_seed_sitecustomize.py<br>backend/scripts/validate_swebench_seed_image.py<br>backend/deploy/swebench-seed/Dockerfile<br>backend/deploy/swebench-seed/runtime.Dockerfile<br>backend/deploy/swebench-seed/build.sh<br>backend/tests/test_swebench_seed_builder.py<br>backend/scripts/check_openagents_contract.py<br>backend/tests/guards/test_guard_wiring.py |
+| 0071 | 0071/T3 | 退出 v1 生命周期和旧启动配置 | done | T2 | run.sh<br>backend/scripts/experiment.py<br>backend/auto_designer/experiment/__init__.py<br>backend/auto_designer/experiment/cli.py<br>backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/manifest.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/test_experiment_config_v2.py<br>backend/tests/test_experiment_lifecycle_v2.py<br>backend/scripts/run_auditable_experiment.py<br>research/archives/legacy-runtime/backend/scripts/run_auditable_experiment.py<br>backend/scripts/run_mixed_closed_loop.py<br>research/archives/legacy-runtime/backend/scripts/run_mixed_closed_loop.py<br>backend/scripts/migrate_trunk_main.py<br>research/archives/legacy-runtime/backend/scripts/migrate_trunk_main.py<br>backend/auto_designer/experiment/capacity.py<br>research/archives/legacy-runtime/backend/auto_designer/experiment/capacity.py<br>backend/auto_designer/experiment/health.py<br>research/archives/legacy-runtime/backend/auto_designer/experiment/health.py<br>backend/tests/test_run_auditable_experiment.py<br>research/archives/legacy-runtime/backend/tests/test_run_auditable_experiment.py<br>backend/tests/test_migrate_trunk_main.py<br>research/archives/legacy-runtime/backend/tests/test_migrate_trunk_main.py<br>backend/tests/experiment/test_capacity.py<br>research/archives/legacy-runtime/backend/tests/experiment/test_capacity.py<br>backend/tests/experiment/test_cli.py<br>research/archives/legacy-runtime/backend/tests/experiment/test_cli.py<br>backend/tests/experiment/test_config.py<br>research/archives/legacy-runtime/backend/tests/experiment/test_config.py<br>backend/tests/experiment/test_evidence_egress.py<br>research/archives/legacy-runtime/backend/tests/experiment/test_evidence_egress.py<br>backend/tests/experiment/test_health.py<br>research/archives/legacy-runtime/backend/tests/experiment/test_health.py<br>backend/tests/experiment/test_manifest.py<br>research/archives/legacy-runtime/backend/tests/experiment/test_manifest.py<br>backend/tests/experiment/test_runtime.py<br>research/archives/legacy-runtime/backend/tests/experiment/test_runtime.py<br>examples/models.env.example<br>research/archives/legacy-runtime/examples/models.env.example<br>backend/.env.example<br>research/archives/legacy-runtime/backend/.env.example<br>backend/scripts/run-glm52fp8-1m-canary2-isolated.sh<br>backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh<br>backend/scripts/run-glm52fp8-1m-hard16-r5.sh |
+| 0071 | 0071/T4 | 开发工具收拢与显式输入 | done | T2, T3 | tools/dev/README.md<br>tools/dev/__init__.py<br>tools/dev/probes/__init__.py<br>tools/dev/replay/__init__.py<br>tools/dev/delivery/__init__.py<br>tools/dev/audit/__init__.py<br>backend/scripts/audit_sim_action_integrity.py<br>tools/dev/audit/audit_sim_action_integrity.py<br>backend/scripts/canary_spec0048_final_check.py<br>tools/dev/audit/canary_spec0048_final_check.py<br>backend/scripts/evaluate_role_traces.py<br>tools/dev/audit/evaluate_role_traces.py<br>backend/scripts/prepare_openagents_from_summary.py<br>tools/dev/delivery/prepare_openagents_from_summary.py<br>backend/scripts/prepare_openagents_validation.py<br>tools/dev/delivery/prepare_openagents_validation.py<br>backend/scripts/probe_d43_quality_fail.py<br>tools/dev/probes/probe_d43_quality_fail.py<br>backend/scripts/probe_ontrack_new_harness.py<br>tools/dev/probes/probe_ontrack_new_harness.py<br>backend/scripts/probe_peek_decision_trace.py<br>tools/dev/probes/probe_peek_decision_trace.py<br>backend/scripts/probe_persona_reframe.py<br>tools/dev/probes/probe_persona_reframe.py<br>backend/scripts/probe_persona_wait_matrix.py<br>tools/dev/probes/probe_persona_wait_matrix.py<br>backend/scripts/probe_swebench_persona.py<br>tools/dev/probes/probe_swebench_persona.py<br>backend/scripts/probe_timeout_to_synthesizer.py<br>tools/dev/probes/probe_timeout_to_synthesizer.py<br>backend/scripts/probe_wait_progress.py<br>tools/dev/probes/probe_wait_progress.py<br>backend/scripts/replay_observation_lifecycle.py<br>tools/dev/replay/replay_observation_lifecycle.py<br>backend/scripts/replay_observation_synthesis.py<br>tools/dev/replay/replay_observation_synthesis.py<br>backend/scripts/replay_owner_from_repo.py<br>tools/dev/replay/replay_owner_from_repo.py<br>backend/scripts/replay_pm_synthesizer_owner_offline.py<br>tools/dev/replay/replay_pm_synthesizer_owner_offline.py<br>backend/scripts/replay_role_invocations.py<br>tools/dev/replay/replay_role_invocations.py<br>backend/scripts/replay_roles_from_sessions.py<br>tools/dev/replay/replay_roles_from_sessions.py<br>backend/scripts/replay_roles_offline.py<br>tools/dev/replay/replay_roles_offline.py<br>backend/scripts/replay_synthesizer_owner_from_repo.py<br>tools/dev/replay/replay_synthesizer_owner_from_repo.py<br>backend/scripts/run_openagents_validation.py<br>tools/dev/delivery/run_openagents_validation.py<br>backend/tests/test_prepare_openagents_validation.py<br>backend/tests/test_prepare_openagents_from_summary.py<br>backend/tests/test_run_openagents_validation.py<br>backend/tests/test_replay_roles_from_sessions.py<br>backend/tests/scripts/test_audit_sim_action_integrity.py<br>backend/tests/scripts/test_replay_role_invocations.py<br>backend/scripts/e2e-spec-0048-final-check-convergence.sh<br>backend/scripts/e2e-spec-0049-role-invocation-io-store.sh |
+| 0071 | 0071/T5 | 历史快照展示语义 | done | — | frontend/public/experiments/index.json<br>frontend/src/api.ts<br>frontend/src/api.test.ts<br>frontend/src/App.tsx<br>frontend/src/components/ExperimentPicker.tsx<br>frontend/src/components/TopBar.tsx<br>frontend/src/styles.css |
+| 0071 | 0071/T6 | 目录契约 CI、双语文档与综合验收 | done | T1, T2, T3, T4, T5 | research/inventory.json<br>backend/scripts/check_experiment_repository.py<br>backend/scripts/e2e-spec-0071-experiment-cleanup.sh<br>backend/tests/test_experiment_repository.py<br>backend/tests/test_experiment_public_examples.py<br>backend/scripts/e2e-spec-0069-experiment-entry.sh<br>.github/workflows/experiment-contract.yml<br>.github/workflows/ci.yml<br>.gitignore<br>README.md<br>README.zh-CN.md<br>CLAUDE.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/ARCHITECTURE.md<br>docs/EXPORTING.md<br>docs/tutorials/n1-experiment.md<br>docs/tutorials/n1-experiment.zh-CN.md<br>docs/validation/spec0071-experiment-cleanup.md<br>frontend/README.md<br>examples/experiment.env.example<br>examples/experiments/synthesizer-n1-local.json<br>examples/experiments/synthesizer-n1-e2b.json<br>backend/scripts/e2e-synthesizer-naming.sh<br>docs/specs/0001-user-agent-harness-usage.md<br>docs/specs/0002-gitea-tracker-and-infra.md<br>docs/specs/0003-dev-side-and-loop.md<br>docs/specs/0004-harbor-run-and-checkpoint.md<br>docs/specs/0005-user-sim-and-feeling.md<br>docs/specs/0006-persona-pipeline.md<br>docs/specs/0007-dev-trunk-main.md<br>docs/specs/0008-user-agent-inner-tooluse.md<br>docs/specs/0009-seed-source-pluggable.md<br>docs/specs/0010-seed-scenario-pipeline.md<br>docs/specs/0011-agentboard-cartoon-page.md<br>docs/specs/0012-user-wait-realism.md<br>docs/specs/0013-harness-present-protocol.md<br>docs/specs/0014-dev-commit-discipline.md<br>docs/specs/0015-dev-overfit-isolation.md<br>docs/specs/0016-synthesizer-rootcause-signal.md<br>docs/specs/0017-user-parallel-sessions.md<br>docs/specs/0018-synthesizer-proposal-envelope.md<br>docs/specs/0019-control-sideband-peek-wait.md<br>docs/specs/0020-issue-covers-dispatch-budget.md<br>docs/specs/0021-dev-escape-containment.md<br>docs/specs/0022-user-harness-io-boundary.md<br>docs/specs/0023-event-driven-wait-cleanup.md<br>docs/specs/0024-synthesizer-godview-timeline-tool.md<br>docs/specs/0025-issue-triage-funnel.md<br>docs/specs/0026-frontend-observability-redesign.md<br>docs/specs/0027-unified-agent-output-contract.md<br>docs/specs/0028-divergent-pm-gate.md<br>docs/specs/0029-three-plane-issue-flow.md<br>docs/specs/0030-harness-product-interface.md<br>docs/specs/0031-user-sim-stage-contracts.md<br>docs/specs/0032-openagents-gitea-dev-plane.md<br>docs/specs/0033-vigil-container-containment.md<br>docs/specs/0034-frontend-agent-company-building.md<br>docs/specs/0035-stdout-visible-harness-state.md<br>docs/specs/0036-unify-harness-stdin-write.md<br>docs/specs/0037-persona-time-temperament-reframe.md<br>docs/specs/0038-openagents-frontend-delivery-view.md<br>docs/specs/0039-issue-state-timeline.md<br>docs/specs/0040-rfc-stage-and-commit-denylist.md<br>docs/specs/0041-unified-llm-token-usage.md<br>docs/specs/0042-role-contract-governance.md<br>docs/specs/0043-role-cognitive-contracts.md<br>docs/specs/0044-swebench-seed-workspace-supply.md<br>docs/specs/0045-vigil-harness-aware-toolchain.md<br>docs/specs/0046-frozen-openagents-validation-handoff.md<br>docs/specs/0047-parallel-experiment-runtime.md<br>docs/specs/0048-user-sim-final-check-convergence.md<br>docs/specs/0049-role-invocation-io-store.md<br>docs/specs/0050-round-delivery-gate.md<br>docs/specs/0051-session-container-objective-evidence.md<br>docs/specs/0052-synthesizer-covers-consolidation.md<br>docs/specs/0053-persona-semantic-action-lifecycle.md<br>docs/specs/0054-user-goal-driven-simulation.md<br>docs/specs/0055-goal-aware-demand-evidence-boundaries.md<br>docs/specs/0056-terminal-acceptance-alignment.md<br>docs/specs/0057-voluntary-product-feedback.md<br>docs/specs/0059-observation-evolution-contract.md<br>docs/specs/0060-independent-pm-delivery-route.md<br>docs/specs/0061-delivery-observability-lifecycle.md<br>docs/specs/0062-delivery-failure-terminal.md<br>docs/specs/0063-lightweight-delivery-preflight.md<br>docs/specs/0064-stage-resumable-experiment-runtime.md<br>docs/specs/0065-standardized-harness-evaluation.md<br>docs/specs/0066-provider-latency-isolated-timeout.md<br>docs/specs/0067-mixed-e2b-scaling-runtime.md<br>docs/specs/0068-synthesizer-clean-rename.md<br>docs/specs/0069-selectable-experiment-backends.md<br>docs/specs/0070-gitea-com-evidence-transport.md<br>docs/specs/ARCHITECTURE.md<br>docs/specs/OVERVIEW.md<br>docs/specs/0071-experiment-repository-cleanup.md<br>backend/auto_designer/distill/seed_library.py<br>docs/0048-user-sim-final-check-convergence.md<br>docs/synthesizer-grouping.md<br>docs/audits/0061-observation-lifecycle-validation.md<br>backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh<br>backend/deploy/gitea/bootstrap.sh<br>docs/audits/unified-entry-capability-migration-20261003.md |
 
 ## 跨 feature 关系图
 
@@ -563,7 +565,6 @@ graph LR
     subgraph G0007[0007 dev-trunk-main]
         n0007_T1["T1 开发者侧直推 main（去 branch/merge）"]
         n0007_T2["T2 编排去 release 链 · 会话级 main SHA 快照回灌"]
-        n0007_T3["T3 一次性迁移脚本：main ← release + 清理分支"]
         n0007_T4["T4 去 release：种子/bootstrap/e2e trunk 化"]
     end
     subgraph G0008[0008 user-agent-inner-tooluse]
@@ -816,12 +817,10 @@ graph LR
         n0046_T4["T4 隔离 Vigil 启动与网关协议转换"]
     end
     subgraph G0047[0047 parallel-experiment-runtime]
-        n0047_T1["T1 并行实验运行时契约"]
-        n0047_T2["T2 实验配置与不可变 Manifest"]
-        n0047_T3["T3 每实验独立基础设施栈"]
-        n0047_T4["T4 统一实验 CLI 与闭环接线"]
-        n0047_T5["T5 共享模型容量租约与故障保护"]
-        n0047_T6["T6 OpenAgents 真实模型认证与双栈并行验收"]
+        n0047_T1["T1 当前实验身份与隔离契约"]
+        n0047_T2["T2 不可变 Manifest 与共享身份原语"]
+        n0047_T3["T3 每实验独立本地基础设施"]
+        n0047_T4["T4 当前 v2 生命周期与闭环接线"]
     end
     subgraph G0048[0048 user-sim-final-check-convergence]
         n0048_T1["T1 Spec 与实验根因证据契约"]
@@ -850,7 +849,7 @@ graph LR
         n0051_T2["T2 会话运行时与容器 seed"]
         n0051_T3["T3 harness 容器执行与强制终止"]
         n0051_T4["T4 双结论、客观执行与假接受"]
-        n0051_T5["T5 可运行镜像、一键入口与审计冒烟"]
+        n0051_T5["T5 可运行镜像、包内控制器与审计冒烟"]
     end
     subgraph G0052[0052 synthesizer-covers-consolidation]
         n0052_T1["T1 Synthesizer covers 合并语义与状态迁移"]
@@ -930,19 +929,15 @@ graph LR
     subgraph G0066[0066 provider-latency-isolated-timeout]
         n0066_T1["T1 统一时间账本与 provider scope"]
         n0066_T2["T2 角色超时分类与可恢复取消"]
-        n0066_T3["T3 官方内层预算与 E2B 配置传播"]
-        n0066_T4["T4 回归验收与操作文档"]
+        n0066_T4["T4 时间分类回归验收"]
     end
     subgraph G0067[0067 mixed-e2b-scaling-runtime]
-        n0067_T1["T1 冻结任务、资源和运行身份"]
-        n0067_T2["T2 E2B mixed executor 与交互边界"]
-        n0067_T3["T3 单 N 启动、五轮检查点与恢复"]
-        n0067_T4["T4 结果规范和迁移手册"]
+        n0067_T2["T2 底层 direct 会话与终端 review 契约"]
     end
     subgraph G0068[0068 synthesizer-clean-rename]
         n0068_T1["T1 需求包、边界检查与角色名称统一"]
         n0068_T2["T2 Agent 定义与启动配置切换"]
-        n0068_T3["T3 脚本和实验执行入口全量对齐"]
+        n0068_T3["T3 当前开发工具与执行接口命名"]
         n0068_T4["T4 看板角色与显示名称统一"]
         n0068_T5["T5 当前文档与 Spec 索引更新"]
         n0068_T6["T6 行为回归与离线流程验证"]
@@ -961,6 +956,14 @@ graph LR
         n0070_T3["T3 实际交付运行时能力预检"]
         n0070_T4["T4 按需公网出口与镜像接线"]
         n0070_T5["T5 跨仓验收与联合发布"]
+    end
+    subgraph G0071[0071 experiment-repository-cleanup]
+        n0071_T1["T1 历史研究归档与活评分依赖分离"]
+        n0071_T2["T2 控制器入包与冻结 v2 运行管理"]
+        n0071_T3["T3 退出 v1 生命周期和旧启动配置"]
+        n0071_T4["T4 开发工具收拢与显式输入"]
+        n0071_T5["T5 历史快照展示语义"]
+        n0071_T6["T6 目录契约 CI、双语文档与综合验收"]
     end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
@@ -1172,10 +1175,6 @@ graph LR
     n0047_T3 --> n0047_T2
     n0047_T4 --> n0047_T2
     n0047_T4 --> n0047_T3
-    n0047_T5 --> n0047_T2
-    n0047_T6 --> n0047_T3
-    n0047_T6 --> n0047_T4
-    n0047_T6 --> n0047_T5
     n0048_T2 --> n0048_T1
     n0048_T3 --> n0048_T2
     n0048_T3 --> n0048_T4
@@ -1265,17 +1264,8 @@ graph LR
     n0065_T6 --> n0065_T4
     n0065_T6 --> n0065_T5
     n0066_T2 --> n0066_T1
-    n0066_T3 --> n0066_T1
-    n0066_T3 --> n0066_T2
     n0066_T4 --> n0066_T1
     n0066_T4 --> n0066_T2
-    n0066_T4 --> n0066_T3
-    n0067_T2 --> n0067_T1
-    n0067_T3 --> n0067_T1
-    n0067_T3 --> n0067_T2
-    n0067_T4 --> n0067_T1
-    n0067_T4 --> n0067_T2
-    n0067_T4 --> n0067_T3
     n0068_T2 --> n0068_T1
     n0068_T3 --> n0068_T2
     n0068_T4 --> n0068_T1
@@ -1296,6 +1286,15 @@ graph LR
     n0070_T5 --> n0070_T2
     n0070_T5 --> n0070_T3
     n0070_T5 --> n0070_T4
+    n0071_T2 --> n0071_T1
+    n0071_T3 --> n0071_T2
+    n0071_T4 --> n0071_T2
+    n0071_T4 --> n0071_T3
+    n0071_T6 --> n0071_T1
+    n0071_T6 --> n0071_T2
+    n0071_T6 --> n0071_T3
+    n0071_T6 --> n0071_T4
+    n0071_T6 --> n0071_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1343,26 +1342,24 @@ graph LR
     n0037_T5 -.extends.-> n0006_T1
     n0037_T5 -.extends.-> n0006_T3
     n0066_T2 -.extends.-> n0064_T2
-    n0066_T3 -.extends.-> n0065_T5
-    n0066_T4 -.note.-> n0067_T4
-    n0067_T1 -.extends.-> n0065_T1
     n0067_T2 -.extends.-> n0065_T4
-    n0067_T3 -.extends.-> n0064_T2
-    n0067_T4 -.extends.-> n0065_T6
 ```
 
 ## 文件冲突报告
 
 | 文件 | 涉及组 |
 |----|----|
-| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069 |
+| .github/workflows/ci.yml | 0070, 0071 |
+| .github/workflows/experiment-contract.yml | 0069, 0071 |
+| .gitignore | 0069, 0071 |
+| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069, 0071 |
 | OpenAgents/openagents/recipes/stages.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061, 0063 |
 | OpenAgents/openagents/runtime/context.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/runtime/engine.py | 0049, 0061, 0063 |
 | OpenAgents/openagents/utils/gitea.py | 0032, 0061 |
-| README.md | 0068, 0069 |
-| README.zh-CN.md | 0068, 0069 |
+| README.md | 0068, 0069, 0071 |
+| README.zh-CN.md | 0068, 0069, 0071 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0032 |
 | backend/agent_defs/divergent_pm/agent.yaml | 0029, 0061, 0068 |
 | backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059, 0060, 0061, 0068 |
@@ -1399,12 +1396,21 @@ graph LR
 | backend/auto_designer/demand/synthesizer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059, 0060, 0061, 0064, 0068 |
 | backend/auto_designer/demand/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055, 0061, 0064, 0068 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
-| backend/auto_designer/experiment/cli.py | 0047, 0053, 0064, 0069 |
-| backend/auto_designer/experiment/config.py | 0047, 0069 |
-| backend/auto_designer/experiment/health.py | 0047, 0069 |
+| backend/auto_designer/distill/seed_library.py | 0010, 0071 |
+| backend/auto_designer/experiment/__init__.py | 0047, 0071 |
+| backend/auto_designer/experiment/backends/e2b.py | 0069, 0071 |
+| backend/auto_designer/experiment/backends/e2b_bootstrap.py | 0069, 0071 |
+| backend/auto_designer/experiment/backends/local.py | 0069, 0071 |
+| backend/auto_designer/experiment/cli.py | 0047, 0053, 0064, 0069, 0071 |
+| backend/auto_designer/experiment/config.py | 0047, 0069, 0071 |
+| backend/auto_designer/experiment/context.py | 0069, 0071 |
+| backend/auto_designer/experiment/controllers/ordinary.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0064, 0068, 0069, 0070, 0071 |
+| backend/auto_designer/experiment/controllers/swebench.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051, 0063, 0064, 0068, 0069, 0071 |
+| backend/auto_designer/experiment/engine.py | 0069, 0071 |
 | backend/auto_designer/experiment/infrastructure.py | 0047, 0069 |
-| backend/auto_designer/experiment/manifest.py | 0047, 0064, 0069 |
-| backend/auto_designer/experiment/runtime.py | 0047, 0053, 0064, 0069 |
+| backend/auto_designer/experiment/manifest.py | 0047, 0064, 0069, 0071 |
+| backend/auto_designer/experiment/materials.py | 0069, 0071 |
+| backend/auto_designer/experiment/runtime.py | 0047, 0053, 0064, 0069, 0071 |
 | backend/auto_designer/guards/harness_boundary.py | 0015, 0030, 0040, 0068 |
 | backend/auto_designer/guards/repo_guard.py | 0021, 0068 |
 | backend/auto_designer/guards/workspace_jail.py | 0015, 0049, 0059, 0068 |
@@ -1454,10 +1460,12 @@ graph LR
 | backend/deploy/experiment/docker-compose.yml | 0047, 0069, 0070 |
 | backend/deploy/experiment/egress-proxy.conf | 0047, 0070 |
 | backend/deploy/gitea/README.md | 0002, 0070 |
-| backend/deploy/gitea/bootstrap.sh | 0002, 0032 |
+| backend/deploy/gitea/bootstrap.sh | 0002, 0032, 0071 |
 | backend/deploy/gitea/docker-compose.yml | 0002, 0032, 0033, 0070 |
 | backend/deploy/gitea/egress-proxy.conf | 0033, 0040, 0070 |
-| backend/deploy/swebench-seed/Dockerfile | 0044, 0051 |
+| backend/deploy/swebench-seed/Dockerfile | 0044, 0051, 0071 |
+| backend/deploy/swebench-seed/build.sh | 0044, 0071 |
+| backend/deploy/swebench-seed/runtime.Dockerfile | 0051, 0071 |
 | backend/deploy/vigil/Dockerfile | 0033, 0045, 0069 |
 | backend/deploy/vigil/build.sh | 0033, 0045, 0070 |
 | backend/deploy/vigil/entrypoint.sh | 0033, 0041, 0049, 0069, 0070 |
@@ -1470,23 +1478,20 @@ graph LR
 | backend/harness_template/entry.py | 0003, 0013, 0022, 0030, 0035, 0041, 0051, 0061 |
 | backend/harness_template/params.yaml | 0003, 0030, 0061 |
 | backend/harness_template/tests/test_smoke.py | 0013, 0022, 0030, 0035, 0041, 0051 |
-| backend/run.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0064, 0068, 0069, 0070 |
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
+| backend/scripts/build_swebench_runtime_image.sh | 0051, 0071 |
+| backend/scripts/build_swebench_seed_workspaces.py | 0044, 0071 |
 | backend/scripts/e2e-spec-0039-issue-state-timeline.sh | 0039, 0068 |
-| backend/scripts/e2e-spec-0049-role-invocation-io-store.sh | 0049, 0068 |
+| backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh | 0047, 0071 |
+| backend/scripts/e2e-spec-0048-final-check-convergence.sh | 0048, 0071 |
+| backend/scripts/e2e-spec-0049-role-invocation-io-store.sh | 0049, 0068, 0071 |
 | backend/scripts/e2e-spec-0056-0057-user-semantics.sh | 0056, 0068 |
+| backend/scripts/e2e-spec-0069-experiment-entry.sh | 0069, 0071 |
 | backend/scripts/e2e-stage-resume.sh | 0064, 0068 |
-| backend/scripts/evaluate_role_traces.py | 0043, 0055, 0068 |
-| backend/scripts/experiment.py | 0047, 0069 |
-| backend/scripts/prepare_openagents_validation.py | 0046, 0068 |
-| backend/scripts/probe_wait_signals_to_evolution.py | 0023, 0032 |
-| backend/scripts/replay_observation_lifecycle.py | 0061, 0068 |
-| backend/scripts/replay_observation_synthesis.py | 0059, 0068 |
-| backend/scripts/replay_role_invocations.py | 0049, 0068 |
-| backend/scripts/replay_roles_from_sessions.py | 0042, 0043, 0068 |
-| backend/scripts/run_auditable_experiment.py | 0051, 0063, 0064, 0068, 0069 |
-| backend/scripts/run_mixed_closed_loop.py | 0067, 0068 |
-| backend/scripts/run_swebench_closed_loop.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051, 0063, 0064, 0068, 0069 |
+| backend/scripts/e2e-synthesizer-naming.sh | 0068, 0071 |
+| backend/scripts/experiment.py | 0047, 0069, 0071 |
+| backend/scripts/prepare_swebench_runtime_tree.py | 0051, 0071 |
+| backend/scripts/validate_swebench_seed_image.py | 0044, 0071 |
 | backend/tests/demand/test_agent_contract.py | 0027, 0043, 0052, 0068 |
 | backend/tests/demand/test_agent_runtime.py | 0029, 0041, 0049, 0068 |
 | backend/tests/demand/test_delivery_evidence.py | 0061, 0064, 0068, 0070 |
@@ -1503,11 +1508,11 @@ graph LR
 | backend/tests/demand/test_terminal_evidence.py | 0056, 0068 |
 | backend/tests/demand/test_triage.py | 0025, 0027, 0029, 0042, 0043, 0055, 0064, 0068 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
-| backend/tests/experiment/test_cli.py | 0047, 0053, 0064, 0068 |
-| backend/tests/experiment/test_config.py | 0047, 0068 |
+| backend/tests/distill/test_seed_adapter.py | 0010, 0071 |
+| backend/tests/experiment/test_evidence_egress.py | 0070, 0071 |
 | backend/tests/experiment/test_infrastructure.py | 0047, 0069 |
-| backend/tests/experiment/test_manifest.py | 0047, 0068 |
-| backend/tests/experiment/test_runtime.py | 0047, 0053, 0064, 0068 |
+| backend/tests/experiment/test_manifest.py | 0047, 0068, 0071 |
+| backend/tests/guards/test_guard_wiring.py | 0068, 0071 |
 | backend/tests/guards/test_harness_boundary.py | 0015, 0030, 0040, 0068 |
 | backend/tests/guards/test_repo_guard.py | 0021, 0068 |
 | backend/tests/guards/test_workspace_jail.py | 0015, 0049, 0068 |
@@ -1530,14 +1535,29 @@ graph LR
 | backend/tests/loop/test_synthesizer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0029, 0039, 0043, 0052, 0055, 0059, 0064, 0068 |
 | backend/tests/observations/test_gaps.py | 0061, 0068 |
 | backend/tests/observations/test_publication.py | 0061, 0068 |
+| backend/tests/scripts/test_audit_sim_action_integrity.py | 0048, 0071 |
+| backend/tests/scripts/test_replay_role_invocations.py | 0049, 0071 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
+| backend/tests/test_experiment_cli_v2.py | 0047, 0053, 0069, 0071 |
+| backend/tests/test_experiment_config_v2.py | 0047, 0069, 0071 |
+| backend/tests/test_experiment_e2b_backend.py | 0069, 0071 |
+| backend/tests/test_experiment_engine.py | 0069, 0071 |
+| backend/tests/test_experiment_lifecycle_v2.py | 0047, 0053, 0069, 0071 |
+| backend/tests/test_experiment_local_backend.py | 0069, 0071 |
+| backend/tests/test_experiment_materials.py | 0069, 0071 |
+| backend/tests/test_experiment_public_examples.py | 0069, 0071 |
 | backend/tests/test_invocation.py | 0049, 0068 |
 | backend/tests/test_models.py | 0001, 0024, 0051, 0053, 0054 |
-| backend/tests/test_run_auditable_experiment.py | 0063, 0064, 0068 |
-| backend/tests/test_run_swebench_closed_loop.py | 0044, 0047, 0064 |
-| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0068, 0070 |
-| backend/tests/test_sandbox_isolation.py | 0015, 0068 |
+| backend/tests/test_prepare_openagents_from_summary.py | 0046, 0071 |
+| backend/tests/test_prepare_openagents_validation.py | 0046, 0071 |
+| backend/tests/test_replay_roles_from_sessions.py | 0068, 0071 |
+| backend/tests/test_run_git_isolation.py | 0021, 0071 |
+| backend/tests/test_run_openagents_validation.py | 0046, 0071 |
+| backend/tests/test_run_swebench_closed_loop.py | 0044, 0047, 0064, 0071 |
+| backend/tests/test_run_vigil.py | 0032, 0033, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0068, 0070, 0071 |
+| backend/tests/test_sandbox_isolation.py | 0015, 0068, 0071 |
 | backend/tests/test_stage_resume_e2e.py | 0064, 0068 |
+| backend/tests/test_swebench_seed_builder.py | 0044, 0071 |
 | backend/tests/test_time_accounting.py | 0066, 0068 |
 | backend/tests/test_usage.py | 0041, 0068 |
 | backend/tests/test_vigil_build.py | 0045, 0070 |
@@ -1561,34 +1581,77 @@ graph LR
 | backend/tests/user/sim/test_workspace_runtime.py | 0051, 0069 |
 | backend/tests/user/test_session_store.py | 0001, 0017, 0024, 0048, 0051, 0054, 0064 |
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041, 0068 |
-| docs/CONFIGURATION.md | 0068, 0069, 0070 |
-| docs/QUICKSTART.md | 0068, 0069, 0070 |
-| docs/specs/0030-harness-product-interface.md | 0030, 0068 |
-| docs/specs/0031-user-sim-stage-contracts.md | 0031, 0068 |
-| docs/specs/0034-frontend-agent-company-building.md | 0034, 0068 |
-| docs/specs/0035-stdout-visible-harness-state.md | 0035, 0068 |
-| docs/specs/0039-issue-state-timeline.md | 0039, 0068 |
-| docs/specs/0042-role-contract-governance.md | 0042, 0068 |
-| docs/specs/0045-vigil-harness-aware-toolchain.md | 0045, 0068 |
-| docs/specs/0047-parallel-experiment-runtime.md | 0047, 0068 |
-| docs/specs/0049-role-invocation-io-store.md | 0049, 0068 |
-| docs/specs/0052-synthesizer-covers-consolidation.md | 0052, 0068 |
-| docs/specs/0053-persona-semantic-action-lifecycle.md | 0053, 0068 |
-| docs/specs/OVERVIEW.md | 0042, 0068 |
-| docs/synthesizer-grouping.md | 0063, 0068 |
+| docs/0048-user-sim-final-check-convergence.md | 0048, 0071 |
+| docs/ARCHITECTURE.md | 0068, 0071 |
+| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071 |
+| docs/CONFIGURATION.zh-CN.md | 0069, 0071 |
+| docs/EXPORTING.md | 0068, 0071 |
+| docs/QUICKSTART.md | 0068, 0069, 0070, 0071 |
+| docs/QUICKSTART.zh-CN.md | 0069, 0071 |
+| docs/audits/0061-observation-lifecycle-validation.md | 0061, 0071 |
+| docs/specs/0014-dev-commit-discipline.md | 0068, 0071 |
+| docs/specs/0015-dev-overfit-isolation.md | 0068, 0071 |
+| docs/specs/0016-synthesizer-rootcause-signal.md | 0068, 0071 |
+| docs/specs/0017-user-parallel-sessions.md | 0068, 0071 |
+| docs/specs/0018-synthesizer-proposal-envelope.md | 0068, 0071 |
+| docs/specs/0020-issue-covers-dispatch-budget.md | 0068, 0071 |
+| docs/specs/0021-dev-escape-containment.md | 0068, 0071 |
+| docs/specs/0024-synthesizer-godview-timeline-tool.md | 0068, 0071 |
+| docs/specs/0025-issue-triage-funnel.md | 0068, 0071 |
+| docs/specs/0026-frontend-observability-redesign.md | 0068, 0071 |
+| docs/specs/0027-unified-agent-output-contract.md | 0068, 0071 |
+| docs/specs/0028-divergent-pm-gate.md | 0068, 0071 |
+| docs/specs/0029-three-plane-issue-flow.md | 0068, 0071 |
+| docs/specs/0030-harness-product-interface.md | 0030, 0068, 0071 |
+| docs/specs/0031-user-sim-stage-contracts.md | 0031, 0068, 0071 |
+| docs/specs/0032-openagents-gitea-dev-plane.md | 0068, 0071 |
+| docs/specs/0034-frontend-agent-company-building.md | 0034, 0068, 0071 |
+| docs/specs/0035-stdout-visible-harness-state.md | 0035, 0068, 0071 |
+| docs/specs/0036-unify-harness-stdin-write.md | 0036, 0071 |
+| docs/specs/0037-persona-time-temperament-reframe.md | 0037, 0071 |
+| docs/specs/0038-openagents-frontend-delivery-view.md | 0038, 0071 |
+| docs/specs/0039-issue-state-timeline.md | 0039, 0068, 0071 |
+| docs/specs/0040-rfc-stage-and-commit-denylist.md | 0068, 0071 |
+| docs/specs/0041-unified-llm-token-usage.md | 0068, 0071 |
+| docs/specs/0042-role-contract-governance.md | 0042, 0068, 0071 |
+| docs/specs/0043-role-cognitive-contracts.md | 0068, 0071 |
+| docs/specs/0044-swebench-seed-workspace-supply.md | 0044, 0071 |
+| docs/specs/0045-vigil-harness-aware-toolchain.md | 0045, 0068, 0071 |
+| docs/specs/0046-frozen-openagents-validation-handoff.md | 0046, 0071 |
+| docs/specs/0047-parallel-experiment-runtime.md | 0047, 0068, 0071 |
+| docs/specs/0048-user-sim-final-check-convergence.md | 0048, 0071 |
+| docs/specs/0049-role-invocation-io-store.md | 0049, 0068, 0071 |
+| docs/specs/0050-round-delivery-gate.md | 0050, 0071 |
+| docs/specs/0051-session-container-objective-evidence.md | 0051, 0071 |
+| docs/specs/0052-synthesizer-covers-consolidation.md | 0052, 0068, 0071 |
+| docs/specs/0053-persona-semantic-action-lifecycle.md | 0053, 0068, 0071 |
+| docs/specs/0054-user-goal-driven-simulation.md | 0068, 0071 |
+| docs/specs/0055-goal-aware-demand-evidence-boundaries.md | 0068, 0071 |
+| docs/specs/0056-terminal-acceptance-alignment.md | 0068, 0071 |
+| docs/specs/0059-observation-evolution-contract.md | 0068, 0071 |
+| docs/specs/0060-independent-pm-delivery-route.md | 0068, 0071 |
+| docs/specs/0061-delivery-observability-lifecycle.md | 0068, 0071 |
+| docs/specs/0063-lightweight-delivery-preflight.md | 0068, 0071 |
+| docs/specs/0064-stage-resumable-experiment-runtime.md | 0068, 0071 |
+| docs/specs/0066-provider-latency-isolated-timeout.md | 0068, 0071 |
+| docs/specs/0067-mixed-e2b-scaling-runtime.md | 0068, 0071 |
+| docs/specs/0068-synthesizer-clean-rename.md | 0068, 0071 |
+| docs/specs/ARCHITECTURE.md | 0068, 0071 |
+| docs/specs/OVERVIEW.md | 0042, 0068, 0071 |
+| docs/synthesizer-grouping.md | 0063, 0068, 0071 |
+| docs/tutorials/n1-experiment.md | 0069, 0071 |
+| docs/tutorials/n1-experiment.zh-CN.md | 0069, 0071 |
 | docs/usage-monitoring.md | 0041, 0068 |
-| evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md | 0066, 0067 |
-| evaluation/harness-suite-20260920/freeze_scaling_runtime.py | 0066, 0067, 0068 |
-| evaluation/harness-suite-20260920/prepare_scaling_runtime_bundles.py | 0067, 0068 |
-| evaluation/harness-suite-20260920/run_n1_e2b.py | 0068, 0069 |
-| evaluation/harness-suite-20260920/run_scaling_bundle_e2b.py | 0066, 0067, 0068 |
-| evaluation/harness-suite-20260920/run_scaling_e2b.py | 0067, 0068 |
-| examples/experiments/synthesizer-n1-e2b.json | 0068, 0069 |
-| frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041, 0068 |
-| frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041, 0068 |
+| examples/experiment.env.example | 0069, 0071 |
+| examples/experiments/synthesizer-n1-e2b.json | 0068, 0069, 0071 |
+| examples/experiments/synthesizer-n1-local.json | 0069, 0071 |
+| frontend/README.md | 0068, 0071 |
+| frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041, 0068, 0071 |
+| frontend/src/api.test.ts | 0068, 0071 |
+| frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041, 0068, 0071 |
 | frontend/src/components/BuildingView.tsx | 0034, 0038 |
 | frontend/src/components/SidePanel.tsx | 0020, 0025, 0026, 0029, 0032 |
-| frontend/src/components/TopBar.tsx | 0026, 0034, 0038 |
+| frontend/src/components/TopBar.tsx | 0026, 0034, 0038, 0071 |
 | frontend/src/components/building/BuildingTower.tsx | 0034, 0038 |
 | frontend/src/components/building/FloorWorkspace.tsx | 0034, 0038, 0068 |
 | frontend/src/components/building/buildingModel.ts | 0034, 0038, 0068 |
@@ -1597,10 +1660,32 @@ graph LR
 | frontend/src/components/detail/SessionDetail.tsx | 0026, 0034 |
 | frontend/src/components/detail/issueTimelineModel.test.ts | 0039, 0068 |
 | frontend/src/lib/issueMeta.ts | 0025, 0029, 0032, 0039, 0068 |
-| frontend/src/styles.css | 0026, 0034, 0038, 0039, 0041, 0068 |
+| frontend/src/styles.css | 0026, 0034, 0038, 0039, 0041, 0068, 0071 |
 | frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038, 0039, 0041, 0068 |
-| pyproject.toml | 0051, 0069 |
+| pyproject.toml | 0051, 0069, 0071 |
 | release/compatibility.json | 0069, 0070 |
+| tools/dev/audit/audit_sim_action_integrity.py | 0048, 0071 |
+| tools/dev/audit/canary_spec0048_final_check.py | 0048, 0071 |
+| tools/dev/audit/evaluate_role_traces.py | 0043, 0055, 0068, 0071 |
+| tools/dev/delivery/prepare_openagents_from_summary.py | 0046, 0071 |
+| tools/dev/delivery/prepare_openagents_validation.py | 0046, 0068, 0071 |
+| tools/dev/delivery/run_openagents_validation.py | 0046, 0071 |
+| tools/dev/probes/probe_d43_quality_fail.py | 0037, 0071 |
+| tools/dev/probes/probe_ontrack_new_harness.py | 0023, 0071 |
+| tools/dev/probes/probe_peek_decision_trace.py | 0023, 0071 |
+| tools/dev/probes/probe_persona_reframe.py | 0037, 0071 |
+| tools/dev/probes/probe_persona_wait_matrix.py | 0023, 0071 |
+| tools/dev/probes/probe_swebench_persona.py | 0037, 0071 |
+| tools/dev/probes/probe_timeout_to_synthesizer.py | 0068, 0071 |
+| tools/dev/probes/probe_wait_progress.py | 0023, 0071 |
+| tools/dev/replay/replay_observation_lifecycle.py | 0061, 0068, 0071 |
+| tools/dev/replay/replay_observation_synthesis.py | 0059, 0068, 0071 |
+| tools/dev/replay/replay_owner_from_repo.py | 0068, 0071 |
+| tools/dev/replay/replay_pm_synthesizer_owner_offline.py | 0068, 0071 |
+| tools/dev/replay/replay_role_invocations.py | 0049, 0068, 0071 |
+| tools/dev/replay/replay_roles_from_sessions.py | 0042, 0043, 0068, 0071 |
+| tools/dev/replay/replay_roles_offline.py | 0068, 0071 |
+| tools/dev/replay/replay_synthesizer_owner_from_repo.py | 0068, 0071 |
 | tools/persona-distill/card-schema.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/SKILL.md | 0006, 0037 |
 | tools/persona-distill/extract-github-persona/reference.md | 0006, 0037 |
@@ -1804,7 +1889,6 @@ graph LR
 graph LR
     nT1["T1 开发者侧直推 main（去 branch/merge）"]
     nT2["T2 编排去 release 链 · 会话级 main SHA 快照回灌"]
-    nT3["T3 一次性迁移脚本：main ← release + 清理分支"]
     nT4["T4 去 release：种子/bootstrap/e2e trunk 化"]
     nT1 --> nT2
     nT1 --> nT4
@@ -1817,12 +1901,10 @@ graph LR
 graph LR
     v_T1_1["T1 v1"]
     v_T2_1["T2 v1"]
-    v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
     classDef st_pending fill:#eeeeee;
     class v_T1_1 st_pending;
     class v_T2_1 st_pending;
-    class v_T3_1 st_pending;
     class v_T4_1 st_pending;
 ```
 
@@ -3015,20 +3097,14 @@ graph LR
 
 ```mermaid
 graph LR
-    nT1["T1 并行实验运行时契约"]
-    nT2["T2 实验配置与不可变 Manifest"]
-    nT3["T3 每实验独立基础设施栈"]
-    nT4["T4 统一实验 CLI 与闭环接线"]
-    nT5["T5 共享模型容量租约与故障保护"]
-    nT6["T6 OpenAgents 真实模型认证与双栈并行验收"]
+    nT1["T1 当前实验身份与隔离契约"]
+    nT2["T2 不可变 Manifest 与共享身份原语"]
+    nT3["T3 每实验独立本地基础设施"]
+    nT4["T4 当前 v2 生命周期与闭环接线"]
     nT1 --> nT2
     nT2 --> nT3
     nT2 --> nT4
     nT3 --> nT4
-    nT2 --> nT5
-    nT3 --> nT6
-    nT4 --> nT6
-    nT5 --> nT6
 ```
 
 演化图：
@@ -3039,16 +3115,11 @@ graph LR
     v_T2_1["T2 v1"]
     v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
-    v_T5_1["T5 v1"]
-    v_T6_1["T6 v1"]
     classDef st_done fill:#b7e4c7;
-    classDef st_pending fill:#eeeeee;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
-    class v_T5_1 st_done;
-    class v_T6_1 st_pending;
 ```
 
 ### 0048 用户模拟最终查验分支与动作协议失效保护（issue #0）
@@ -3161,7 +3232,7 @@ graph LR
     nT2["T2 会话运行时与容器 seed"]
     nT3["T3 harness 容器执行与强制终止"]
     nT4["T4 双结论、客观执行与假接受"]
-    nT5["T5 可运行镜像、一键入口与审计冒烟"]
+    nT5["T5 可运行镜像、包内控制器与审计冒烟"]
     nT1 --> nT2
     nT2 --> nT3
     nT3 --> nT4
@@ -3570,14 +3641,10 @@ graph LR
 graph LR
     nT1["T1 统一时间账本与 provider scope"]
     nT2["T2 角色超时分类与可恢复取消"]
-    nT3["T3 官方内层预算与 E2B 配置传播"]
-    nT4["T4 回归验收与操作文档"]
+    nT4["T4 时间分类回归验收"]
     nT1 --> nT2
-    nT1 --> nT3
-    nT2 --> nT3
     nT1 --> nT4
     nT2 --> nT4
-    nT3 --> nT4
 ```
 
 演化图：
@@ -3586,12 +3653,10 @@ graph LR
 graph LR
     v_T1_1["T1 v1"]
     v_T2_1["T2 v1"]
-    v_T3_1["T3 v1"]
     v_T4_1["T4 v1"]
     classDef st_done fill:#b7e4c7;
     class v_T1_1 st_done;
     class v_T2_1 st_done;
-    class v_T3_1 st_done;
     class v_T4_1 st_done;
 ```
 
@@ -3599,31 +3664,16 @@ graph LR
 
 ```mermaid
 graph LR
-    nT1["T1 冻结任务、资源和运行身份"]
-    nT2["T2 E2B mixed executor 与交互边界"]
-    nT3["T3 单 N 启动、五轮检查点与恢复"]
-    nT4["T4 结果规范和迁移手册"]
-    nT1 --> nT2
-    nT1 --> nT3
-    nT2 --> nT3
-    nT1 --> nT4
-    nT2 --> nT4
-    nT3 --> nT4
+    nT2["T2 底层 direct 会话与终端 review 契约"]
 ```
 
 演化图：
 
 ```mermaid
 graph LR
-    v_T1_1["T1 v1"]
     v_T2_1["T2 v1"]
-    v_T3_1["T3 v1"]
-    v_T4_1["T4 v1"]
     classDef st_done fill:#b7e4c7;
-    class v_T1_1 st_done;
     class v_T2_1 st_done;
-    class v_T3_1 st_done;
-    class v_T4_1 st_done;
 ```
 
 ### 0068 Synthesizer 角色彻底改名与旧 Developer 遗留清理（issue #0）
@@ -3632,7 +3682,7 @@ graph LR
 graph LR
     nT1["T1 需求包、边界检查与角色名称统一"]
     nT2["T2 Agent 定义与启动配置切换"]
-    nT3["T3 脚本和实验执行入口全量对齐"]
+    nT3["T3 当前开发工具与执行接口命名"]
     nT4["T4 看板角色与显示名称统一"]
     nT5["T5 当前文档与 Spec 索引更新"]
     nT6["T6 行为回归与离线流程验证"]
@@ -3734,4 +3784,44 @@ graph LR
     class v_T3_1 st_done;
     class v_T4_1 st_done;
     class v_T5_1 st_done;
+```
+
+### 0071 统一实验入口后的仓库清理与历史研究归档（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 历史研究归档与活评分依赖分离"]
+    nT2["T2 控制器入包与冻结 v2 运行管理"]
+    nT3["T3 退出 v1 生命周期和旧启动配置"]
+    nT4["T4 开发工具收拢与显式输入"]
+    nT5["T5 历史快照展示语义"]
+    nT6["T6 目录契约 CI、双语文档与综合验收"]
+    nT1 --> nT2
+    nT2 --> nT3
+    nT2 --> nT4
+    nT3 --> nT4
+    nT1 --> nT6
+    nT2 --> nT6
+    nT3 --> nT6
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```

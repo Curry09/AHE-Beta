@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
-run = importlib.import_module("run")
+run = importlib.import_module("auto_designer.experiment.controllers.ordinary")
 
 _GITEA = {
     "GITEA_URL": "http://localhost:3000",
@@ -26,21 +26,6 @@ _GITEA = {
 
 def _load_yaml(path: Path):
     return YAML(typ="safe").load(path.read_text(encoding="utf-8"))
-
-
-def test_repository_env_only_supplies_missing_process_values(monkeypatch) -> None:
-    monkeypatch.setenv("DEMAND_LLM_MODEL", "explicit-model")
-    monkeypatch.delenv("USER_LLM_MODEL", raising=False)
-
-    run._apply_env_defaults(
-        {
-            "DEMAND_LLM_MODEL": "repository-model",
-            "USER_LLM_MODEL": "repository-user-model",
-        }
-    )
-
-    assert run.os.environ["DEMAND_LLM_MODEL"] == "explicit-model"
-    assert run.os.environ["USER_LLM_MODEL"] == "repository-user-model"
 
 
 # --------------------------------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Spec-0069/T5: unified local/E2B experiment CLI; v1 infrastructure aliases remain.
+# Spec-0071/T3: the only public experiment CLI.
 from __future__ import annotations
 
 import sys

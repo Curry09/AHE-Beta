@@ -91,3 +91,21 @@ complete 是收集校验与制品声明，不是全知记录或功能成功。�
 已实现按票分发和摘要检查，不等于在同一个持有仓库 token 的终端上建成多租户权限沙箱。
 取回记录也不等于模型实际阅读或理解；真实模型是否提出恰当补强，仍需下一次多轮实验观察。
 历史票没有可信授权时不从正文回补权限；源码与镜像的更新也不追溯改写旧实验。
+
+## 当前版本调用（Spec-0071）
+
+上面的命令、源码路径、时间和结果记录保留当时的验证事实。当前工具已迁移到
+`tools/dev/replay/`，需显式指定一个已有的 v2 run 目录、凭证文件与 OpenAgents 源码：
+
+```bash
+PYTHONPATH=backend uv run --locked --extra experiments python -m tools.dev.replay.replay_observation_lifecycle \
+  --run-dir .experiments/RUN_ID \
+  --secrets-file /path/to/experiment.env \
+  --openagents-source /path/to/OpenAgents \
+  --output-root /path/to/validation-output
+```
+
+此工具会创建独立测试仓库并运行 Docker；它不是新的实验启动入口。可选的
+`--delivery-image` 验证须提供 run 中的网络或显式 `--delivery-network`；容器访问地址可用
+`--internal-url` 指定。运行前请查看 `--help` 和 [开发工具说明](../../tools/dev/README.md)。
+此次目录清理未重新执行上面的在线验证，原验收记录仍属于原冻结版本。

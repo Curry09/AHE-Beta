@@ -148,10 +148,28 @@ def _exclude_generated_runtime(source: Path) -> None:
 def controller_command(
     manifest: dict[str, Any], source_root: Path, python: str = sys.executable
 ) -> list[str]:
-    """Use the original Orchestrator runners, with all paths configured before import."""
+    """Select only an entrypoint proven to belong to this run's frozen source.
+
+    Older v2 manifests keep their original script launch recipe. This fallback
+    never refers to a script in the current checkout or rewrites frozen hashes.
+    """
     backend = Path(source_root) / "backend"
-    if manifest["config"]["workload"]["kind"] == "swebench":
-        return [python, str(backend / "scripts/run_swebench_closed_loop.py")]
+    kind = manifest["config"]["workload"]["kind"]
+    files = manifest["source_snapshot"]["files"]
+    recipe = manifest["source_snapshot"].get("entrypoint")
+    if recipe is not None:
+        expected_module = f"auto_designer.experiment.controllers.{'swebench' if kind == 'swebench' else 'ordinary'}"
+        relative = "backend/" + expected_module.replace(".", "/") + ".py"
+        if recipe != {"kind": "module", "module": expected_module} or relative not in files:
+            raise ConfigError("Frozen controller entrypoint does not match its source snapshot")
+        return [python, "-m", expected_module]
+    script = (
+        "backend/scripts/run_swebench_closed_loop.py" if kind == "swebench" else "backend/run.py"
+    )
+    if script not in files:
+        raise ConfigError("Frozen v2 source does not contain its original controller script")
+    if kind == "swebench":
+        return [python, str(Path(source_root) / script)]
     run_dir = Path(manifest["run_dir"])
     return [
         python,

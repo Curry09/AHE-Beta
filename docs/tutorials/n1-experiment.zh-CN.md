@@ -4,9 +4,11 @@
 
 本教程使用仓内 pvlib 任务和 `sr-15-swyx` persona。本地与 E2B 示例的任务、persona、seed、角色、模型和五轮语义完全一致，只选一次基础设施，后续操作相同。真实验证结果单独记录在[验证报告](../validation/spec-0069-new-user.md)。
 
+本次清理完成了离线验证，尚未重新执行 local/E2B 实跑；之前的 N1 实跑记录仍是基线。当前覆盖范围见[清理验收报告](../validation/spec0071-experiment-cleanup.md)。
+
+本教程是单任务 N=1 流程，`rounds.sessions_per_round` 必须为 `1`；尚不支持 N4/N8 多任务或导入历史实验后追加一轮。resume 继续同一冻结身份的实验，不是历史产物导入。
+
 ## 1. 从仓库开始
-utorials
-n1-experiment.zh-CN.md
 
 ```bash
 git clone https://github.com/Curry09/auto-designer.git
@@ -144,3 +146,5 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 没有固定完成时间保证，模型延迟、重试、用户交互、交付步骤均会变化。实际耗时与费用看时间记录和 provider 账单。本教程描述完整操作流程，验证报告逐项说明已实际执行的路径与轮次。
 
 pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest 和 pytest-mock，供用户侧检查。未修改任务基线在全新环境中验证：155 个 ModelChain 测试全部通过，其中 35 个使用 `mocker` fixture。这是任务环境验证，不是官方 SWE-bench 评分。
+
+历史实验及对应源码版本见[研究索引](../../research/README.zh-CN.md)。独立诊断或证据回放见[开发维护工具](../../tools/dev/README.md)，这些工具的输出不算本实验的新一轮试用。

@@ -15,7 +15,7 @@ auto-designer 模拟用户使用 Harness，把使用轨迹转为需求，再交�
 
 ## 运行实验
 
-选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用同一入口、相同实验格式。仓内 N=1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
+选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用 `backend/scripts/experiment.py` 和相同的 v2 实验格式。当前任务包 schema 支持一个任务、每轮一次用户 session；统一入口尚不支持 N4/N8 多任务计划或从历史结果导入后追加一轮。仓内 N=1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
 
 ```bash
 uv sync --locked --extra experiments
@@ -43,6 +43,8 @@ uv run --locked python backend/scripts/offline_demo.py
 - [配置说明](docs/CONFIGURATION.zh-CN.md)：v2 JSON、任务包、persona、凭证。
 - [当前架构](docs/ARCHITECTURE.md)：需求面、交付面和产物边界。
 - [公开快照](docs/EXPORTING.md)：发布粗粒度进度，原始会话留本地。
+- [开发维护工具](tools/dev/README.md)：探针、证据回放和交付验证。
+- [历史研究索引](research/README.zh-CN.md)：旧配置、源码版本和迁移清单。
 - [联合发布清单](docs/RELEASING.md)：版本冻结与发布步骤。
 - [贡献指南](CONTRIBUTING.zh-CN.md)、[安全说明](SECURITY.zh-CN.md)、[第三方来源](THIRD_PARTY.md)、[变更记录](CHANGELOG.md)。
 
@@ -51,9 +53,22 @@ uv sync --locked --extra experiments --extra dev
 uv run --locked --extra experiments --extra dev pytest -q
 ```
 
-前端开发需要 Node.js 22，在 `frontend/` 执行 `npm ci`、`npm test`、`npm run build`。实时 API 面向本地受信环境，静态 Pages 是另一条发布路径。
+前端开发需要 Node.js 22，在 `frontend/` 执行 `npm ci`、`npm test`、`npm run build`。实时 API 面向本地受信环境，静态 Pages 是另一条发布路径。默认开发 API 不自动选择 v2 run；当前实验进度使用统一入口的 `status`/`logs`，详见[前端说明](frontend/README.md)。
 
-`docs/specs/` 保存设计契约和任务映射，`evaluation/` 与带日期脚本保留历史研究流程和各自冻结版本。新实验使用统一入口。用户体感、闭环完成不等于官方 benchmark 通过，留出评分仍独立执行。
+目录分工：
+
+```text
+examples/experiments/                    # 可运行的 v2 local/E2B 实验定义
+examples/tasks/、examples/personas/      # 任务包和 persona 输入
+backend/auto_designer/experiment/        # 生命周期与包内控制器
+backend/scripts/                        # 公开入口、演示、导出、CI/构建检查
+tools/dev/                              # 当前维护的诊断与回放工具
+evaluation/                             # 独立留出评分与适配器
+research/archives/                      # 冻结的历史研究记录
+.experiments/                           # 忽略的运行输出
+```
+
+`docs/specs/` 保存设计契约和任务映射，`research/inventory.json` 记录历史资料的版本与迁移位置。复现历史实验时使用对应源码版本的独立 checkout，不在当前目录执行归档 launcher。用户体感、闭环完成不等于官方 benchmark 通过，留出评分仍独立执行。
 
 ## 许可证
 

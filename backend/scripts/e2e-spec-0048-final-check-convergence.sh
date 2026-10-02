@@ -13,5 +13,5 @@ PYTHONPATH=backend .venv/bin/pytest -q \
 
 if [[ -n "${USER_LLM_BASE_URL:-}" && -n "${USER_LLM_API_KEY:-}" && -n "${USER_LLM_MODEL:-}" ]]; then
   timeout "${SPEC0048_CANARY_MAX_WALL:-1800}" \
-    env PYTHONPATH=backend .venv/bin/python backend/scripts/canary_spec0048_final_check.py
+    env PYTHONPATH=backend .venv/bin/python -m tools.dev.audit.canary_spec0048_final_check
 fi

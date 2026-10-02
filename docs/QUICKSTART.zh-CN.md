@@ -9,7 +9,7 @@
 | `local` | 本机 Docker 容器 | 程序自动启动独立的 localhost Gitea | 可用的 Docker 服务、模型凭证 |
 | `e2b` | 每个实验一个 E2B 沙箱 | 用户自己的 Gitea.com 账户 | 模型凭证、`E2B_API_KEY`、`GITEA_TOKEN` |
 
-示例是每轮一位模拟用户、共五轮：R1–R4 包含需求处理与 OpenAgents 交付，R5 仅试用最终 Harness。被进化的对象是 Harness；pvlib 是用户的试用任务，auto-designer 是实验控制器。官方 SWE-bench 评分是独立的事后步骤。
+当前任务包 schema 支持一个任务和 `rounds.sessions_per_round: 1`；尚不支持 N4/N8 多任务计划或导入历史结果后追加一轮。示例是每轮一位模拟用户、共五轮：R1–R4 包含需求处理与 OpenAgents 交付，R5 仅试用最终 Harness。被进化的对象是 Harness；pvlib 是用户的试用任务，auto-designer 是实验控制器。官方 SWE-bench 评分是独立的事后步骤。
 
 ## 1. 安装
 
@@ -87,4 +87,4 @@ uv sync --locked --extra experiments --extra dev
 uv run --locked --extra experiments --extra dev pytest -q
 ```
 
-历史 evaluation launcher 保留原冻结实验的复现用途，新实验走上述统一入口。可选前端见 [README](../README.zh-CN.md)。
+公开 examples 目录只放当前 v2 实验定义。[开发维护工具](../tools/dev/README.md)用于独立诊断，不是另一套实验入口。[历史研究](../research/README.zh-CN.md)集中归档并记录源码版本和迁移清单，复现时使用对应版本的独立 checkout。新实验走上述统一入口。可选前端见 [README](../README.zh-CN.md)。

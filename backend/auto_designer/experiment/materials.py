@@ -29,12 +29,10 @@ _SOURCE_ROOTS = (
     ".gitignore",
     "backend/auto_designer",
     "backend/agent_defs",
-    "backend/scripts",
+    # Include runtime build dependencies explicitly, not historical/dev entrypoints.
+    "backend/scripts/prepare_swebench_runtime_tree.py",
     "backend/deploy",
-    "backend/run.py",
     "backend/harness_template",
-    "backend/persona_library.json",
-    "examples",
     "release",
     "pyproject.toml",
     "uv.lock",
@@ -325,6 +323,11 @@ def prepare_materials(
                 "base_commit": controller_sha,
                 "dirty": _git_dirty(root=controller),
                 "files": snapshot,
+                "entrypoint": {
+                    "kind": "module",
+                    "module": "auto_designer.experiment.controllers."
+                    + ("swebench" if task["kind"] == "swebench" else "ordinary"),
+                },
             },
             "task_source_snapshot": {
                 "revision": task_source.get("revision"),

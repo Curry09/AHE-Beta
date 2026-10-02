@@ -62,8 +62,8 @@ tasks:
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/loop/roster.py
       - backend/auto_designer/loop/live.py
-      - backend/run.py
-      - backend/scripts/run_swebench_closed_loop.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/tests/loop/test_roster.py
     scope: orchestrator：triage 后 ThreadPool 并行 synthesize∥divergent，再对每个 synthesizer 调 gate_once（无 synthesizer 则候选积压）。roster 增 divergent 键，DEFAULT=0，N_DIVERGENTS 覆盖。run.py 与 SWE 脚本按编制构造 Divergent 注入。live ROLE_ORDER 插入 divergent。默认关闭不改现有闭环成本。
     acceptance: 顺序 triage→(synth∥divergent)→gate→dev；N_DIVERGENTS=0 无 divergent 实例；=1 注入并跑；roster 单测覆盖；live 排序含 divergent。

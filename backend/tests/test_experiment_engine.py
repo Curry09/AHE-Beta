@@ -176,7 +176,7 @@ def test_context_rejects_wrong_backend_workspace_or_missing_keys(prepared):
 
 
 def test_ordinary_runner_reads_context_without_repository_env(prepared, monkeypatch):
-    import run as run_mod
+    from auto_designer.experiment.controllers import ordinary as run_mod
 
     root, manifest, credentials, resources = prepared
     env = build_controller_environment(
@@ -221,7 +221,9 @@ def test_swe_runner_prefers_explicit_frozen_scenario(prepared, monkeypatch):
     for key in ("AUTO_DESIGNER_TASK_PACKAGE", "AUTO_DESIGNER_WORKSPACE_FILE"):
         monkeypatch.setenv(key, env[key])
     monkeypatch.setenv("SWEBENCH_SEED_IMAGE", "unrelated:ignored")
-    script = Path(__file__).resolve().parents[1] / "scripts/run_swebench_closed_loop.py"
+    script = (
+        Path(__file__).resolve().parents[1] / "auto_designer/experiment/controllers/swebench.py"
+    )
     specification = importlib.util.spec_from_file_location("unified_swe_test", script)
     module = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(module)
@@ -465,3 +467,89 @@ def test_attempt_signalling_does_not_signal_reused_process_identity(monkeypatch)
     assert engine._signal_owned_attempt("attempt", signal.SIGKILL) == 0
     send.assert_not_called()
     kill.assert_not_called()
+
+
+@pytest.mark.parametrize("kind,controller", [("ordinary", "ordinary"), ("swebench", "swebench")])
+def test_frozen_module_launch_uses_source_recipe_and_keeps_manifest_identity(
+    tmp_path, kind, controller
+):
+    source = tmp_path / "frozen"
+    module = f"auto_designer.experiment.controllers.{controller}"
+    relative = "backend/" + module.replace(".", "/") + ".py"
+    path = source / relative
+    path.parent.mkdir(parents=True)
+    path.write_text("print('frozen module executed')\n")
+    manifest = {
+        "run_id": "saved-run",
+        "experiment_id": "saved-run",
+        "controller_sha": "fixed-revision",
+        "config_hash": "fixed-config",
+        "plan_hash": "fixed-plan",
+        "config": {"workload": {"kind": kind}},
+        "source_snapshot": {
+            "files": {relative: hashlib.sha256(path.read_bytes()).hexdigest()},
+            "entrypoint": {"kind": "module", "module": module},
+        },
+    }
+    before = json.dumps(manifest, sort_keys=True)
+    command = controller_command(manifest, source)
+    assert command == [sys.executable, "-m", module]
+    result = subprocess.run(
+        command,
+        env={**os.environ, "PYTHONPATH": str(source / "backend")},
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "frozen module executed"
+    assert json.dumps(manifest, sort_keys=True) == before
+
+
+@pytest.mark.parametrize(
+    "kind,script",
+    [
+        ("ordinary", "backend/run.py"),
+        ("swebench", "backend/scripts/run_swebench_closed_loop.py"),
+    ],
+)
+def test_old_v2_launch_requires_frozen_script_and_preserves_manifest(tmp_path, kind, script):
+    manifest = {
+        "run_dir": str(tmp_path),
+        "config": {"workload": {"kind": kind}},
+        "source_snapshot": {"files": {script: "unchanged-frozen-hash"}},
+        "materials": {"persona_library": {"path": "personas.json"}},
+    }
+    (tmp_path / "personas.json").write_text("[]")
+    before = json.dumps(manifest, sort_keys=True)
+    assert controller_command(manifest, tmp_path)[1] == str(tmp_path / script)
+    assert json.dumps(manifest, sort_keys=True) == before
+    manifest["source_snapshot"]["files"].clear()
+    with pytest.raises(ConfigError, match="original controller script"):
+        controller_command(manifest, tmp_path)
+
+
+def test_module_recipe_cannot_launch_unfrozen_or_unrelated_module(tmp_path):
+    manifest = {
+        "config": {"workload": {"kind": "ordinary"}},
+        "source_snapshot": {
+            "files": {},
+            "entrypoint": {
+                "kind": "module",
+                "module": "auto_designer.experiment.controllers.ordinary",
+            },
+        },
+    }
+    with pytest.raises(ConfigError, match="entrypoint"):
+        controller_command(manifest, tmp_path)
+    manifest["source_snapshot"]["entrypoint"]["module"] = "arbitrary.module"
+    with pytest.raises(ConfigError, match="entrypoint"):
+        controller_command(manifest, tmp_path)
+
+
+@pytest.mark.parametrize("module", ["ordinary", "swebench"])
+def test_internal_controller_refuses_implicit_repository_configuration(monkeypatch, module):
+    monkeypatch.delenv("AUTO_DESIGNER_EXPERIMENT_CONTEXT", raising=False)
+    controller = importlib.import_module(f"auto_designer.experiment.controllers.{module}")
+    with pytest.raises(ConfigError, match="frozen inputs"):
+        controller.main()

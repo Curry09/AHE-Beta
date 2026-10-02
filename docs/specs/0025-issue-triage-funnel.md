@@ -86,7 +86,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/auto_designer/loop/orchestrator.py
       - backend/auto_designer/loop/roster.py
       - backend/tests/loop/test_orchestrator.py

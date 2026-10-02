@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getExperiments,
+  getSelectedExperimentId,
   getAgents,
   getCommits,
   getConfig,
@@ -72,7 +73,9 @@ function parseFloor(raw: string | null): AgentRole {
 export default function App() {
   const [experiments, setExperiments] = useState<Awaited<ReturnType<typeof getExperiments>>>([]);
   const staticSite = import.meta.env.VITE_STATIC_SITE === "1";
-  const selectedExperiment = new URLSearchParams(location.search).get("experiment");
+  const selectedExperiment = getSelectedExperimentId();
+  const snapshot = experiments.find((item) => item.id === selectedExperiment)
+    ?? (selectedExperiment ? undefined : experiments[0]);
 
   useEffect(() => {
     if (!staticSite) return;
@@ -165,6 +168,8 @@ export default function App() {
         }}
       />
       <TopBar
+        historical={staticSite}
+        snapshot={snapshot}
         state={state}
         openCount={openCount}
         view={view}
