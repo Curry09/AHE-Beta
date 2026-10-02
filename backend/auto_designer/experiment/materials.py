@@ -62,6 +62,43 @@ def sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def _interaction_plan(*, config: dict[str, Any], task_id: str) -> list[list[list[str]]]:
+    """Validate every round before freezing, or generate the default rotating plan."""
+    workload = config["workload"]
+    personas = workload["persona_ids"]
+    rounds = config["rounds"]["count"]
+    plan = workload.get("interaction_plan")
+    if plan is None:
+        return [[[personas[index % len(personas)], task_id]] for index in range(rounds)]
+    if not isinstance(plan, list) or len(plan) != rounds:
+        raise ConfigError(f"workload.interaction_plan must contain {rounds} rounds")
+    for round_no, picks in enumerate(plan, start=1):
+        label = f"workload.interaction_plan round {round_no}"
+        if not isinstance(picks, list) or not picks:
+            raise ConfigError(f"{label} must contain sessions")
+        seen_personas: set[str] = set()
+        seen_tasks: set[str] = set()
+        for pair in picks:
+            if (
+                not isinstance(pair, list)
+                or len(pair) != 2
+                or not all(isinstance(value, str) for value in pair)
+            ):
+                raise ConfigError(f"{label} must contain [persona_id, task_id] pairs")
+            persona, task = pair
+            if persona not in personas:
+                raise ConfigError(f"{label} references unselected persona {persona}")
+            if task != task_id:
+                raise ConfigError(f"{label} references unknown task {task}")
+            if persona in seen_personas or task in seen_tasks:
+                raise ConfigError(f"{label} contains duplicate persona or task")
+            seen_personas.add(persona)
+            seen_tasks.add(task)
+        if len(picks) != config["rounds"]["sessions_per_round"]:
+            raise ConfigError(f"{label} does not match rounds.sessions_per_round")
+    return plan
+
+
 def check_materials(config_path: str | Path) -> dict[str, Any]:
     """Offline validation: no cloud calls, repository cloning, directories, or model requests."""
     config = load_config_v2(config_path)
@@ -123,6 +160,7 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
         "task_package": task,
         "persona_ids": selected,
         "persona_cards": [by_id[value] for value in selected],
+        "interaction_plan": _interaction_plan(config=config, task_id=task["id"]),
         "network_required_for_prepare": True,
     }
 
@@ -229,15 +267,11 @@ def prepare_materials(
             for card in cards
         ]
         distribution = dict(Counter(record["strategy"] for record in roster))
-        plan = [
-            [[cards[index % len(cards)]["id"], task["id"]]]
-            for index in range(config["rounds"]["count"])
-        ]
         documents = {
             "persona_library": cards,
             "persona_roster": {"personas": roster, "distribution": distribution},
             "pool": {"instances": [{"instance_id": task["id"]}]},
-            "interaction_plan": plan,
+            "interaction_plan": report["interaction_plan"],
             "task_package": task,
             "config": config,
         }

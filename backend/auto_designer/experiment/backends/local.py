@@ -1089,14 +1089,23 @@ print(json.dumps({'status':'verified','issue':package['issue'],'sha256':value['s
                 continue
             program = """import os
 from pathlib import Path
-ready=any(b'openagents' in p.read_bytes() and b'vigil' in p.read_bytes()
-          for p in Path('/proc').glob('[0-9]*/cmdline') if p.parent.name != str(os.getpid()))
+expected=int(os.environ.get('VIGIL_EXEC_UID','1000'))
+def worker(p):
+    try:
+        command=p.read_bytes()
+        uid=next(line.split()[1] for line in (p.parent/'status').read_text().splitlines() if line.startswith('Uid:'))
+        return expected>0 and int(uid)==expected and b'openagents' in command and b'vigil' in command
+    except (OSError,StopIteration,ValueError): return False
+ready=any(worker(p) for p in Path('/proc').glob('[0-9]*/cmdline') if p.parent.name != str(os.getpid()))
 assert ready and Path('/work/harness/.openagents/openagents.yml').is_file()
 print('ready')
 """
             try:
                 return (
-                    _command(["docker", "exec", fact["Id"], "python", "-c", program], timeout=10)
+                    _command(
+                        ["docker", "exec", "--user", "root", fact["Id"], "python", "-c", program],
+                        timeout=10,
+                    )
                     == "ready"
                 )
             except BackendError:
@@ -1122,6 +1131,10 @@ print('ready')
             env=env,
         )
         self._save(controller=result)
+        # Spec-0072/T3: one round only evaluates users; neither controller starts
+        # Vigil in that case. A successful owned runner needs no delivery receipt.
+        if self.manifest["config"]["rounds"]["count"] == 1:
+            return result
         deadline = time.monotonic() + 180
         while result.get("running") and time.monotonic() < deadline:
             if self._vigil_ready():

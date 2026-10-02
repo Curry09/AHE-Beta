@@ -115,3 +115,47 @@ def test_destroy_discard_is_explicit(monkeypatch):
         == 0
     )
     assert seen["discard_uncollected"] is True
+
+
+def test_dashboard_routes_explicit_run_and_server_options(monkeypatch):
+    from auto_designer.experiment import dashboard
+
+    seen = {}
+    monkeypatch.setattr(dashboard, "serve_dashboard", lambda **kwargs: seen.update(kwargs))
+    assert (
+        cli.dispatch(
+            [
+                "--runs-dir",
+                "/tmp/runs",
+                "dashboard",
+                "selected-run",
+                "--host",
+                "localhost",
+                "--port",
+                "8123",
+                "--secrets-file",
+                "/tmp/private.env",
+            ]
+        )
+        == 0
+    )
+    assert seen == {
+        "run_id": "selected-run",
+        "root": Path("/tmp/runs"),
+        "secrets_file": Path("/tmp/private.env"),
+        "host": "localhost",
+        "port": 8123,
+    }
+
+
+def test_dashboard_uncollected_error_is_actionable(monkeypatch, capsys):
+    from auto_designer.experiment import dashboard
+
+    def fail(**kwargs):
+        raise ConfigError(
+            "E2B dashboard requires local artifacts; run experiment collect RUN_ID first"
+        )
+
+    monkeypatch.setattr(dashboard, "serve_dashboard", fail)
+    assert cli.dispatch(["--json", "dashboard", "selected-run"]) == 2
+    assert "collect RUN_ID" in json.loads(capsys.readouterr().out)["error"]

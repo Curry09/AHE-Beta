@@ -9,7 +9,7 @@ commit 全文+diff），支持 issue/tag/commit 交叉跳转。
 
 ## 开发默认看板
 
-下面的默认 API 读取 `backend/data/sessions`，不会自动选择 `.experiments/<run_id>`，也不会自动加载该 run 的 Gitea 配置。它用于开发现有看板；直接启动它不等于连接新的 v2 实验。当前 v2 实验用统一入口的 `status` / `logs` 查看进度，用 `collect` 收集证据。按 run 选择实时 API 尚未接入。
+统一入口现可绑定指定实验。在仓库根运行 `uv run --locked --extra experiments python backend/scripts/experiment.py dashboard RUN_ID --secrets-file .env.experiment`：local 读取该 run 的实时 sessions/live/usage；E2B 先 collect，显示已收集快照。没有 Gitea token 也可看本地产物，但不会显示为已连接。下面的默认开发 API 仍读取 `backend/data/sessions`，供独立开发使用，不自动选择 v2 run。
 
 ```bash
 # 后端（数据源，:8000）

@@ -8,13 +8,14 @@ ASYNC 告警）。create_app 注入依赖（测试传 Fake，运行时传真）�
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 from starlette.types import Scope
 
 from auto_designer.demand.issue_schema import (
@@ -231,10 +232,47 @@ def create_app(
     board_url: str | None = None,
     repo_url: str | None = None,
     usage_store: UsageStore | None = None,
+    data_dir: Path | None = None,
+    roster: dict[str, int] | None = None,
+    runmeta: dict[str, object] | None = None,
+    observation_guard: Callable[[], tuple[dict[str, object], object]] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="auto-designer observation dashboard", version="0.1.0")
     commits_url = f"{repo_url.rstrip('/')}/commits/branch/main" if repo_url else None
     usage_store = usage_store or default_usage_store()
+    # Spec-0072/T4: a selected v2 run supplies its data root independently of sessions.
+    live_root = data_dir if data_dir is not None else store.root.parent
+    app.state.runmeta = dict(runmeta or {})
+
+    if observation_guard is not None:
+
+        @app.middleware("http")
+        async def guard_observations(request: Request, call_next):
+            if not request.url.path.startswith("/api/"):
+                return await call_next(request)
+
+            def unavailable():
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": "Observation snapshot is changing or unavailable; retry after collect completes"
+                    },
+                )
+
+            try:
+                metadata, generation = observation_guard()
+                app.state.runmeta.update(metadata)
+            except (OSError, ValueError):
+                return unavailable()
+            response = await call_next(request)
+            try:
+                metadata, after = observation_guard()
+                app.state.runmeta.update(metadata)
+                if generation != after:
+                    raise ValueError("Snapshot changed during request")
+                return response
+            except (OSError, ValueError):
+                return unavailable()
 
     app.add_middleware(
         CORSMiddleware,
@@ -246,6 +284,10 @@ def create_app(
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/runmeta")
+    def run_metadata() -> dict[str, object]:
+        return dict(app.state.runmeta)
 
     @app.get("/api/overview")
     def overview() -> dict[str, object]:
@@ -282,22 +324,22 @@ def create_app(
     @app.get("/api/state")
     def state() -> dict[str, object]:
         # 整条 run 的运行态（data/live/run.json）：running/当前轮/总轮数/各轮 main SHA。
-        return read_live_run(data_dir=store.root.parent)
+        return read_live_run(data_dir=live_root)
 
     @app.get("/api/history")
     def history() -> dict[str, object]:
         # 按轮归档的已完成工作项（data/live/history.json），前端按 round 分组回看。
-        return {"items": read_history(data_dir=store.root.parent)}
+        return {"items": read_history(data_dir=live_root)}
 
     @app.get("/api/config")
     def config() -> dict[str, object]:
         # 编制（单一真源，与后端 run.py 同一份 roster）：前端据此定三个房间的容量。
-        return {"roster": load_roster()}
+        return {"roster": roster if roster is not None else load_roster()}
 
     @app.get("/api/agents")
     def agents() -> dict[str, object]:
         # 多 agent 活动注册表（data/live/agents.json，与 data/sessions 同级），跑闭环时各 agent 实时更新。
-        return {"agents": read_agents(data_dir=store.root.parent)}
+        return {"agents": read_agents(data_dir=live_root)}
 
     @app.get("/api/sessions")
     def sessions() -> list[dict[str, object]]:

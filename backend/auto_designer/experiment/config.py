@@ -87,6 +87,9 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
         url = urlsplit(source["repository"])
         if url.scheme != "https" or not url.hostname or url.username or url.password or url.query:
             raise ConfigError("source repository must be credential-free HTTPS")
+    # Spec-0072/T1: defaults become part of the frozen, hashed public configuration.
+    data["policies"] = runtime_policies(data)
+    data["models"]["delivery"]["auth_type"] = delivery_auth_type(data["models"]["delivery"])
     return data
 
 
@@ -117,6 +120,7 @@ def load_task_package(path: str | Path) -> dict[str, Any]:
         raise ConfigError("ordinary task must explicitly declare not_in_benchmark=true")
     if data["kind"] == "swebench" and "not_in_benchmark" in data:
         raise ConfigError("SWE-bench must not declare not_in_benchmark")
+    data.setdefault("interaction", "simulated_user")
     return data
 
 
@@ -157,3 +161,37 @@ def _reject_plaintext_credentials(*, node: Any, location: str) -> None:
             _reject_plaintext_credentials(node=value, location=f"{location}[{index}]")
     elif isinstance(node, str) and _looks_like_secret(text=node):
         raise ConfigError(f"Possible plaintext credential at {location}")
+
+
+# Spec-0072/T1: reuse defaults when reading old frozen v2 without modifying its identity.
+def runtime_policies(config: dict[str, Any]) -> dict[str, Any]:
+    defaults = {
+        "synthesizer_grouping": False,
+        "timing": {"latency_isolated": False, "wall_guard_seconds": 0},
+        "delivery": {
+            "timeout_seconds": 86400,
+            "poll_seconds": 15,
+            "coordination": "soft",
+            "permission_mode": "bypassPermissions",
+            "idle_timeout_seconds": 300,
+        },
+        "alarms": {"proposal_depth": 20, "ready_depth": 20},
+    }
+    supplied = config.get("policies", {})
+    defaults["synthesizer_grouping"] = supplied.get("synthesizer_grouping", False)
+    for section in ("timing", "delivery", "alarms"):
+        defaults[section].update(supplied.get(section, {}))
+    return defaults
+
+
+def delivery_auth_type(model: dict[str, Any]) -> str:
+    """Explicit protocol is independent of credential name; retain old v2 defaults."""
+    value = model.get("auth_type")
+    if value is None:
+        value = {
+            "ANTHROPIC_API_KEY": "api-key",
+            "CLAUDE_CODE_OAUTH_TOKEN": "oauth",
+        }.get(model["api_key_env"], "bearer")
+    if value not in {"api-key", "bearer", "oauth"}:
+        raise ConfigError("Unsupported delivery auth_type")
+    return value

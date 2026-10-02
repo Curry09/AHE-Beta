@@ -61,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "destroy":
             item.add_argument("--confirm", required=True)
             item.add_argument("--discard-uncollected", action="store_true")
+    dashboard = sub.add_parser("dashboard", help="View one local run or collected E2B snapshot")
+    dashboard.add_argument("run_id")
+    dashboard.add_argument("--host", default="127.0.0.1")
+    dashboard.add_argument("--port", type=int, default=8000)
+    dashboard.add_argument("--secrets-file", type=Path, default=argparse.SUPPRESS)
     return parser
 
 
@@ -118,6 +123,11 @@ def dispatch(argv: list[str] | None = None) -> int:
                 result = runtime.destroy_v2(
                     **common, confirm=args.confirm, discard_uncollected=args.discard_uncollected
                 )
+            elif args.cmd == "dashboard":
+                from auto_designer.experiment.dashboard import serve_dashboard
+
+                serve_dashboard(**common, host=args.host, port=args.port)
+                return 0
             elif args.cmd == "logs":
                 if args.tail < 1:
                     raise ConfigError("--tail must be positive")

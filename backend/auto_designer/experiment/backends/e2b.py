@@ -17,6 +17,7 @@ import requests
 
 from auto_designer.experiment.backends.base import BackendError
 from auto_designer.experiment.backends.e2b_bootstrap import (
+    EXECUTION_USER,
     bootstrap_command,
     json_command,
     upload_frozen_inputs,
@@ -94,8 +95,10 @@ class E2BBackend:
             }
         return sandbox
 
-    def _command(self, sandbox, command: str, *, timeout: int = 120, envs=None) -> str:
-        result = sandbox.commands.run(command, timeout=timeout, user="root", envs=envs)
+    def _command(
+        self, sandbox, command: str, *, timeout: int = 120, envs=None, user: str = "root"
+    ) -> str:
+        result = sandbox.commands.run(command, timeout=timeout, user=user, envs=envs)
         if result.exit_code != 0:
             raise BackendError(
                 f"E2B command failed (exit {result.exit_code}); inspect sandbox/bootstrap logs"
@@ -380,6 +383,21 @@ print(json.dumps({'sha256':value['sha256'],'issue':package['issue'],'status':'ve
     def launch(self, *, mode: str = "fresh") -> dict:
         sandbox = self._sandbox()
         resources = _read(self.resource_file)
+        bootstrap = resources["bootstrap"]
+        # Spec-0072/T3: preserve genuinely frozen pre-policy runs; never let a new
+        # run without a verified worker receipt fall back to privileged delivery.
+        legacy = "policies" not in self.manifest["config"] and not bootstrap.get("execution_user")
+        if not legacy and (
+            bootstrap.get("execution_user") != EXECUTION_USER
+            or type(bootstrap.get("execution_uid")) is not int
+            or bootstrap["execution_uid"] <= 0
+            or type(bootstrap.get("execution_gid")) is not int
+            or bootstrap["execution_gid"] <= 0
+            or bootstrap.get("execution_home") != self.root + "/runtime/home"
+        ):
+            raise BackendError(
+                "Non-root bootstrap identity is missing or unsafe; prepare a new run"
+            )
         # Credentials are sent through the API, never interpolated into shell commands or receipts.
         private = self.root + "/secrets/launch.json"
         sandbox.files.write(
@@ -394,16 +412,48 @@ print(json.dumps({'sha256':value['sha256'],'issue':package['issue'],'status':'ve
             + " && chmod 600 "
             + shlex.quote(private),
         )
+        if not legacy:
+            # Root may write fresh private files during resume. Hand only these
+            # owned paths to the recorded worker, checking the live Unix account.
+            ownership = """import json,os,pathlib,pwd,sys
+root=pathlib.Path(sys.argv[1]); expected=json.loads(sys.argv[2]); account=pwd.getpwnam(expected['execution_user'])
+if account.pw_uid==0 or account.pw_gid==0 or (account.pw_uid,account.pw_gid)!=(expected['execution_uid'],expected['execution_gid']): raise RuntimeError('Execution account identity changed')
+for relative,mode in [('',0o700),('secrets',0o700),('secrets/launch.json',0o600),('runtime/home',0o700)]:
+    path=root/relative
+    if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()): raise RuntimeError('Unsafe execution path')
+    os.chown(path,account.pw_uid,account.pw_gid);path.chmod(mode)
+"""
+            self._command(sandbox, json_command(ownership, self.root, json.dumps(bootstrap)))
         program = """import json,os,pathlib,sys
 root=pathlib.Path(sys.argv[1]);sys.path.insert(0,str(root/'source/controller/backend'))
 from auto_designer.experiment.context import build_controller_environment
 from auto_designer.experiment.engine import launch_controller,controller_command
 manifest=json.loads((root/'manifest.json').read_text()); value=json.loads((root/'secrets/launch.json').read_text());(root/'secrets/launch.json').chmod(0o600)
-b=value['resources']['bootstrap'];env=build_controller_environment(run_dir=root,manifest=manifest,credentials=value['credentials'],resources=value['resources'],execution_root=root,mode=value['mode']);env['PATH']=b['openagents_bin']+':'+b['bin']+':'+env.get('PATH','/usr/bin:/bin')
+b=value['resources']['bootstrap']
+if b.get('execution_user'):
+    if os.geteuid()==0 or os.geteuid()!=b['execution_uid']: raise RuntimeError('Controller must run as the recorded non-root worker')
+    os.environ.update(HOME=b['execution_home'],USER=b['execution_user'],LOGNAME=b['execution_user'])
+env=build_controller_environment(run_dir=root,manifest=manifest,credentials=value['credentials'],resources=value['resources'],execution_root=root,mode=value['mode']);env['PATH']=b['openagents_bin']+':'+b['bin']+':'+env.get('PATH','/usr/bin:/bin')
+if b.get('execution_user'):
+    env.update(HOME=b['execution_home'],USER=b['execution_user'],LOGNAME=b['execution_user'],UV_PYTHON_INSTALL_DIR=str(root/'runtime/python'),UV_CACHE_DIR=str(root/'runtime/uv-cache'))
 manifest['run_dir']=str(root)
 print(json.dumps(launch_controller(run_dir=root,command=controller_command(manifest,root/'source/controller',b['controller_python']),env=env)))
 """
-        receipt = json.loads(self._command(sandbox, self._python(resources, program, self.root)))
+        command = self._python(resources, program, self.root)
+        receipt = json.loads(
+            self._command(sandbox, command)
+            if legacy
+            else self._command(
+                sandbox,
+                command,
+                user=EXECUTION_USER,
+                envs={
+                    "HOME": bootstrap["execution_home"],
+                    "USER": EXECUTION_USER,
+                    "LOGNAME": EXECUTION_USER,
+                },
+            )
+        )
         if receipt.get("state") != "RUNNING" or not receipt.get("runner_pid"):
             raise BackendError("E2B controller failed to acknowledge a live owned runner")
         return receipt
@@ -638,18 +688,25 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
 
 
 COLLECTION_PROGRAM = r"""
-import hashlib,json,pathlib,tarfile,sys
+import hashlib,json,os,pathlib,tarfile,sys
 root=pathlib.Path(sys.argv[1]); output=root/'runtime/collection.tar.gz'
 excluded={'secrets','.venv','.git','.openagents','__pycache__','source','cloud-snapshot','downloads','bin'}
+private_runtime={('runtime','home'),('runtime','python'),('runtime','uv-cache')}
 def paths():
     result=[]
     for area in ['data','logs','checkpoints','telemetry','runtime']:
         base=root/area
-        if not base.is_dir(): continue
-        for path in sorted(base.rglob('*')):
-            rel=path.relative_to(root)
-            if path.is_file() and not path.is_symlink() and not any(p in excluded for p in rel.parts) and path!=output and path.name != 'bootstrap.py' and not path.name.endswith('.lock'):
-                result.append(path)
+        if not base.is_dir() or base.is_symlink(): continue
+        area_paths=[]
+        for directory,dirs,files in os.walk(base,topdown=True,followlinks=False):
+            parent=pathlib.Path(directory);relative=parent.relative_to(root)
+            # Spec-0072/T3: prune private caches before scandir ever enters them.
+            dirs[:]=sorted(name for name in dirs if name not in excluded and relative.parts+(name,) not in private_runtime and not (parent/name).is_symlink())
+            for name in sorted(files):
+                path=parent/name;rel=path.relative_to(root)
+                if path.is_file() and not path.is_symlink() and not any(p in excluded for p in rel.parts) and path!=output and path.name != 'bootstrap.py' and not path.name.endswith('.lock'):
+                    area_paths.append(path)
+        result.extend(sorted(area_paths))
     return result
 files={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths()}
 with tarfile.open(output,'w:gz',dereference=True) as tar:

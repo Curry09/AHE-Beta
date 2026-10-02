@@ -32,7 +32,7 @@ N1 示例使用 `examples/personas/n1.json`；通用 persona 主库位于 `examp
 | `harness.source` | `builtin`，或 `archive` 加归档路径及 SHA-256 |
 | `workload` | kind、任务包、persona 库及实际存在的 persona IDs |
 | `rounds` | 轮数、每轮 session 数、最大用户并发数 |
-| `roles` | Triage/Synthesizer/divergent/developer 数量；`owner_mode: mechanical` |
+| `roles` | Triage/Synthesizer/divergent/developer 数量；`owner_mode: mechanical` / `llm` |
 | `models` | User、Harness、共享需求面、Claude Code 交付模型 |
 | `evaluation.official_grading` | `false`，官方评分单独运行 |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
@@ -54,7 +54,7 @@ N1 示例使用 `examples/personas/n1.json`；通用 persona 主库位于 `examp
 | E2B 基础设施 | `E2B_API_KEY` | E2B API |
 | Gitea.com | `GITEA_TOKEN`；可选 `GITEA_USER` | 通过 API 解析账户 |
 
-使用标准 Anthropic API key 时，把交付 JSON 的 `api_key_env` 改成 `ANTHROPIC_API_KEY`，并提供该变量。交付端不能填只支持 Chat Completions 的地址。同一供应商密钥可以重复填入所需 env 变量；文件不启用 dotenv 变量插值。
+使用标准 Anthropic API key 时，将交付 JSON 的 `auth_type` 设为 `api-key`，`api_key_env` 填存放该密钥的变量名，并提供该变量。交付端不能填只支持 Chat Completions 的地址。同一供应商密钥可以重复填入所需 env 变量；文件不启用 dotenv 变量插值。
 
 显式 `--secrets-file` 覆盖同名进程变量，不隐式读取 `backend/.env`、个人 Claude 配置或试跑目录。程序可以记录受保护凭证文件的路径，内容不进入材料快照或归档。迁移凭证时管理命令可用新的 `--secrets-file`。status、collect、destroy 不要求模型密钥，但云操作仍需基础设施凭证。
 
@@ -98,3 +98,55 @@ E2B 在一个沙箱内运行 controller 与交付进程，不依赖嵌套 Docker
 实验凭证统一使用 `examples/experiment.env.example` 模板。历史 profile 和 launcher 从[研究索引](../research/README.zh-CN.md)查找，需使用原 checkout，不作为当前 v2 配置来源。[开发维护工具](../tools/dev/README.md)各自要求显式输入。已准备的 v2 实验在本次清理后继续保留冻结源码和输入哈希；resume 不升级其中的 controller。
 
 pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest，供用户侧检查。
+
+## 运行策略与能力迁移
+
+可选 `policies` 控制运行行为，`prepare` 会补齐默认值并冻结进 manifest。这些设置不放在 env 文件，也不继承宿主机的同名变量。
+
+| 字段 | 默认值与行为 |
+| --- | --- |
+| `policies.synthesizer_grouping` | `false`；`true` 启用已有分组调度，N1 也可使用 |
+| `models.user.reasoning_effort`、`models.demand.reasoning_effort` | 可选，例如 `high`；分别交给用户客户端及共享需求角色，供应商须支持该值 |
+| `policies.timing.latency_isolated` | `false`；启用后需求角色计时排除已标记的 provider 等待 |
+| `policies.timing.wall_guard_seconds` | 额外宽限秒数；`0` 使用已有默认 600 秒。开启隔离时，总墙钟上限 = 角色预算 + 宽限；正整数覆盖宽限 |
+| `policies.delivery.timeout_seconds`、`poll_seconds` | `86400`、`15`；本轮准入票终态等待与轮询 |
+| `policies.delivery.coordination` | `soft`；也可选 `off` 或 `dependencies` |
+| `policies.delivery.permission_mode` | `bypassPermissions`；也可选 `acceptEdits`、`default`。交付进程以非 root 执行；改变权限会影响无人值守的 git 操作 |
+| `policies.delivery.idle_timeout_seconds` | `300`；`0` 关闭 Claude 无活动超时 |
+| `policies.alarms.proposal_depth`、`ready_depth` | `20`、`20`，均须为正整数；告警阈值，不是队列容量限制或自动扩容 |
+| `roles.owner_mode` | 示例为 `mechanical`；`llm` 启用已有 Owner 模型评审，共用 DEMAND 模型 |
+
+例如在实验 JSON 增加以下片段（不替代完整实验定义）：
+
+```json
+{
+  "policies": {
+    "synthesizer_grouping": true,
+    "timing": {"latency_isolated": true, "wall_guard_seconds": 7200},
+    "delivery": {"timeout_seconds": 3600, "poll_seconds": 5, "coordination": "dependencies"}
+  }
+}
+```
+
+交付模型用 `models.delivery.auth_type` 明确选择 `api-key`、`bearer` 或 `oauth`；`api_key_env` 只负责寻找凭证，即使名称是 `MY_KEY` 也不会覆盖显式协议。OAuth 指 Claude `setup-token`，导出为 `CLAUDE_CODE_OAUTH_TOKEN`。旧配置未写 auth_type 时保留标准变量名的默认映射；新示例显式写 `bearer`。OAuth 可正常配置运行，但 `check --probe-models` 的 SDK 探针不支持订阅协议，会在 provider 请求前报错；用普通 check，再由实际 Claude Code 验证，不会把 SDK 探测包装成 OAuth 验证。
+
+任务包可设 `interaction: "direct"`，由 Harness 直接完成任务；默认 `simulated_user` 使用模拟用户逐步交互。两者都保留证据与会话恢复。单任务也可显式配置 `workload.interaction_plan`；下面片段要求 count=4，且两个 persona 都已列入 persona_ids：
+
+```json
+{
+  "workload": {
+    "interaction_plan": [
+      [["persona-a", "your-task-id"]],
+      [["persona-a", "your-task-id"]],
+      [["persona-b", "your-task-id"]],
+      [["persona-b", "your-task-id"]]
+    ]
+  }
+}
+```
+
+计划严格校验轮数、会话数、persona 与 task ID。省略时仍按 persona 顺序轮换。当前每轮一个 session；这不等于多任务/N4/N8 已迁入。`rounds.count: 1` 可只试用用户，不等待 Vigil；多轮仍须验证交付进程就绪。
+
+`experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
+
+本次已迁入上述设置、交互和看板；工程 CI、入口内官方评分、多任务/N4/N8、历史产物追加轮、旧 seed 库及纯文本任务仍待实现。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。

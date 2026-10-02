@@ -505,3 +505,72 @@ def test_forge_terminal_cache_must_match_controller_attempt(run, monkeypatch):
         controller_nonce="old-attempt",
     )
     assert same["complete"] is True
+
+
+# Spec-0072/T1: live model preflight must choose the same explicit auth as execution.
+@pytest.mark.parametrize("auth_type", ["api-key", "bearer"])
+def test_model_probe_uses_explicit_protocol_and_excludes_other_host_auth(
+    tmp_path, monkeypatch, auth_type
+):
+    from types import SimpleNamespace
+
+    import anthropic
+    import openai
+
+    from auto_designer.experiment import materials
+    from test_experiment_config_v2 import definition
+
+    config = definition()
+    config["models"]["delivery"].update(auth_type=auth_type, api_key_env="CUSTOM_AUTH")
+    config["models"]["user"]["reasoning_effort"] = "high"
+    monkeypatch.setattr(materials, "check_materials", lambda _: {"config": config, "ok": True})
+    monkeypatch.setattr(
+        runtime,
+        "credentials_v2",
+        lambda **_: {
+            "MODEL_BASE_URL": "https://fixture.example",
+            "MODEL_API_KEY": "fixture",
+            "CUSTOM_AUTH": "selected-secret",
+        },
+    )
+    monkeypatch.setattr(runtime.subprocess, "run", lambda *args, **_: SimpleNamespace(returncode=0))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "wrong-host-key")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "wrong-host-token")
+    calls, requests = [], []
+
+    def openai_client(**kwargs):
+        return SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=lambda **kw: requests.append(kw))
+            )
+        )
+
+    def anthropic_client(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(messages=SimpleNamespace(create=lambda **kw: None))
+
+    monkeypatch.setattr(openai, "OpenAI", openai_client)
+    monkeypatch.setattr(anthropic, "Anthropic", anthropic_client)
+    assert (
+        runtime.check_v2(config_path=tmp_path / "not-read.json", probe_models=True)["model_probes"]
+        is True
+    )
+    assert requests[0]["reasoning_effort"] == "high"
+    assert calls[0]["api_key"] == ("selected-secret" if auth_type == "api-key" else "")
+    assert calls[0]["auth_token"] == ("selected-secret" if auth_type == "bearer" else "")
+
+
+def test_oauth_sdk_probe_is_rejected_before_provider_calls(tmp_path, monkeypatch):
+    from auto_designer.experiment import materials
+    from test_experiment_config_v2 import definition
+
+    config = definition()
+    config["models"]["delivery"]["auth_type"] = "oauth"
+    monkeypatch.setattr(materials, "check_materials", lambda _: {"config": config, "ok": True})
+
+    def forbidden(**kwargs):
+        raise AssertionError("unsupported OAuth SDK probe contacted provider")
+
+    monkeypatch.setattr(runtime, "credentials_v2", forbidden)
+    with pytest.raises(ConfigError, match="OAuth delivery must be validated by Claude Code"):
+        runtime.check_v2(config_path=tmp_path / "not-read.json", probe_models=True)

@@ -112,6 +112,43 @@ def test_frozen_plan_loads_roster_and_rejects_drift(tmp_path) -> None:
         )
 
 
+def test_configured_frozen_aabb_plan_overrides_random_selection(tmp_path, monkeypatch) -> None:
+    module = _module()
+    values = {
+        "SWEBENCH_PARQUET": "dataset.parquet",
+        "PERSONA_LIBRARY": "library.json",
+        "SWEBENCH_INSTANCE_FILE": "pool.json",
+        "PERSONA_ROSTER": "roster.json",
+        "SWEBENCH_INTERACTION_PLAN": "plan.json",
+    }
+    (tmp_path / "pool.json").write_text('{"instances":[{"instance_id":"one"}]}')
+    (tmp_path / "roster.json").write_text('{"personas":[{"id":"a"},{"id":"b"}]}')
+    (tmp_path / "plan.json").write_text(
+        json.dumps([[[persona, "one"]] for persona in ("a", "a", "b", "b")])
+    )
+    for key, name in values.items():
+        monkeypatch.setenv(key, str(tmp_path / name))
+    monkeypatch.setenv("TOTAL_ROUNDS", "4")
+    monkeypatch.setenv("SESSIONS_PER_ROUND", "1")
+    monkeypatch.setattr(module.run_mod, "TOTAL_ROUNDS", 0)
+    module._configure_frozen_inputs()
+    monkeypatch.setattr(module, "ALL_ONCE", True)
+
+    class NoRandom:
+        def shuffle(self, *args):
+            raise AssertionError("Frozen plan must not shuffle")
+
+        def choice(self, *args):
+            raise AssertionError("Frozen plan must not sample")
+
+    assert [module._session_picks(NoRandom(), round_index=i) for i in range(4)] == [
+        [("a", "one")],
+        [("a", "one")],
+        [("b", "one")],
+        [("b", "one")],
+    ]
+
+
 def test_shared_recovery_loader_reuses_identity_and_rejects_missing_state(
     tmp_path: Path, monkeypatch
 ) -> None:

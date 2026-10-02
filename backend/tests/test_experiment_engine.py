@@ -553,3 +553,88 @@ def test_internal_controller_refuses_implicit_repository_configuration(monkeypat
     controller = importlib.import_module(f"auto_designer.experiment.controllers.{module}")
     with pytest.raises(ConfigError, match="frozen inputs"):
         controller.main()
+
+
+# Spec-0072/T1: both backends use frozen settings rather than silently ignoring old knobs.
+@pytest.mark.parametrize("backend", ["local", "e2b"])
+def test_frozen_policy_environment_overrides_host_settings(prepared, monkeypatch, backend):
+    root, manifest, credentials, resources = prepared
+    manifest["config"]["runtime"]["backend"] = backend
+    if backend == "e2b":
+        resources["sandbox_id"] = "owned-sandbox"
+        resources["workspace"] = {"kind": "prebuilt", "params": {"source": "/workspace"}}
+    manifest["config"]["policies"] = {
+        "synthesizer_grouping": True,
+        "timing": {"latency_isolated": True, "wall_guard_seconds": 4000},
+        "delivery": {
+            "timeout_seconds": 1800,
+            "poll_seconds": 0.5,
+            "coordination": "dependencies",
+            "permission_mode": "acceptEdits",
+            "idle_timeout_seconds": 0,
+        },
+        "alarms": {"proposal_depth": 7, "ready_depth": 8},
+    }
+    manifest["config"]["roles"]["owner_mode"] = "llm"
+    manifest["config"]["models"]["user"]["reasoning_effort"] = "high"
+    manifest["config"]["models"]["demand"]["reasoning_effort"] = "medium"
+    expected = {
+        "SYNTHESIZER_GROUPING": "1",
+        "AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT": "1",
+        "AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS": "4000",
+        "ROUND_DELIVERY_TIMEOUT_SEC": "1800",
+        "ROUND_DELIVERY_POLL_SEC": "0.5",
+        "VIGIL_COORDINATION": "dependencies",
+        "OPENAGENTS_PERMISSION_MODE": "acceptEdits",
+        "OPENAGENTS_CLAUDE_IDLE_TIMEOUT": "0",
+        "PROPOSAL_DEPTH_ALARM": "7",
+        "READY_DEPTH_ALARM": "8",
+        "N_OWNERS": "1",
+        "USER_LLM_REASONING_EFFORT": "high",
+        "DEMAND_LLM_REASONING_EFFORT": "medium",
+    }
+    for key in expected:
+        monkeypatch.setenv(key, "unrelated-host-value")
+        credentials[key] = "unrelated-env-profile-value"
+    env = build_controller_environment(
+        run_dir=root, manifest=manifest, credentials=credentials, resources=resources
+    )
+    assert {key: env[key] for key in expected} == expected
+    assert not any("unrelated" in value for value in env.values())
+
+
+@pytest.mark.parametrize(
+    "auth_type, target",
+    [
+        ("api-key", "ANTHROPIC_API_KEY"),
+        ("bearer", "ANTHROPIC_AUTH_TOKEN"),
+        ("oauth", "CLAUDE_CODE_OAUTH_TOKEN"),
+    ],
+)
+def test_explicit_delivery_auth_is_independent_of_source_name(
+    prepared, monkeypatch, auth_type, target
+):
+    root, manifest, credentials, resources = prepared
+    manifest["config"]["models"]["delivery"].update(
+        api_key_env="CUSTOM_DELIVERY_SECRET", auth_type=auth_type
+    )
+    credentials["CUSTOM_DELIVERY_SECRET"] = "selected-secret"
+    auth_vars = {"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"}
+    for key in auth_vars:
+        monkeypatch.setenv(key, "wrong-host-secret")
+    env = build_controller_environment(
+        run_dir=root, manifest=manifest, credentials=credentials, resources=resources
+    )
+    assert auth_vars.intersection(env) == {target}
+    assert env[target] == "selected-secret"
+
+
+def test_old_frozen_config_does_not_silently_enable_bypass_permissions(prepared):
+    root, manifest, credentials, resources = prepared
+    assert "policies" not in manifest["config"]
+    before = json.dumps(manifest, sort_keys=True)
+    env = build_controller_environment(
+        run_dir=root, manifest=manifest, credentials=credentials, resources=resources
+    )
+    assert "OPENAGENTS_PERMISSION_MODE" not in env
+    assert json.dumps(manifest, sort_keys=True) == before

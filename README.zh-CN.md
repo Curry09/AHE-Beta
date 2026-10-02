@@ -73,3 +73,5 @@ research/archives/                      # 冻结的历史研究记录
 ## 许可证
 
 项目代码采用 [MIT 许可证](LICENSE)。第三方材料保留各自的许可条款，详见[第三方来源说明](THIRD_PARTY.md)。
+
+统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/N4/N8 和历史实验追加轮仍待迁入。

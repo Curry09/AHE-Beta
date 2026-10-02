@@ -79,6 +79,85 @@ def test_offline_check_has_no_resource_or_directory_side_effects(
     assert before == {str(path) for path in tmp_path.rglob("*")}
 
 
+@pytest.fixture
+def aabb_inputs(prepared_inputs, tmp_path):
+    library = Path(__file__).resolve().parents[2] / "examples/personas/library.json"
+    cards = json.loads(library.read_text())
+    ids = ["sr-15-swyx", "sr-01-willison"]
+    write(tmp_path / "personas.json", [card for card in cards if card["id"] in ids])
+    document = json.loads(prepared_inputs.read_text())
+    document["workload"]["persona_ids"] = ids
+    document["rounds"]["count"] = 4
+    document["workload"]["interaction_plan"] = [
+        [[persona, "simple-task"]] for persona in [ids[0], ids[0], ids[1], ids[1]]
+    ]
+    write(prepared_inputs, document)
+    return prepared_inputs
+
+
+def test_explicit_plan_and_direct_mode_are_frozen_against_original_input_changes(
+    aabb_inputs, tmp_path
+):
+    task_path = tmp_path / "task.json"
+    task = json.loads(task_path.read_text())
+    task["interaction"] = "direct"
+    write(task_path, task)
+    expected = json.loads(aabb_inputs.read_text())["workload"]["interaction_plan"]
+    report = materials.check_materials(aabb_inputs)
+    assert report["interaction_plan"] == expected
+    manifest = materials.prepare_materials(aabb_inputs, tmp_path / "runs")
+    root = Path(manifest["run_dir"])
+    plan_path = root / manifest["materials"]["interaction_plan"]["path"]
+    frozen_task_path = root / manifest["materials"]["task_package"]["path"]
+    assert json.loads(plan_path.read_text()) == expected
+    assert json.loads(frozen_task_path.read_text())["interaction"] == "direct"
+    assert manifest["plan_hash"] == materials.sha256_file(plan_path)
+    write(task_path, {"invalid": "replacement"})
+    write(aabb_inputs, {"invalid": "replacement"})
+    write(tmp_path / "personas.json", [])
+    materials.verify_materials(manifest)
+    assert json.loads(plan_path.read_text()) == expected
+    assert json.loads(frozen_task_path.read_text())["interaction"] == "direct"
+
+
+def test_omitted_plan_keeps_rotation_and_changes_hash_from_explicit_aabb(aabb_inputs, tmp_path):
+    explicit = materials.prepare_materials(aabb_inputs, tmp_path / "runs")
+    document = json.loads(aabb_inputs.read_text())
+    document["workload"].pop("interaction_plan")
+    write(aabb_inputs, document)
+    personas = document["workload"]["persona_ids"]
+    assert materials.check_materials(aabb_inputs)["interaction_plan"] == [
+        [[persona, "simple-task"]]
+        for persona in (personas[0], personas[1], personas[0], personas[1])
+    ]
+    default = materials.prepare_materials(aabb_inputs, tmp_path / "runs")
+    assert default["plan_hash"] != explicit["plan_hash"]
+
+
+@pytest.mark.parametrize(
+    ("plan", "message"),
+    [
+        ([[["sr-15-swyx", "simple-task"]]], "4 rounds"),
+        ([[["sr-02-ronacher", "simple-task"]]] * 4, "unselected persona"),
+        ([[["sr-15-swyx", "other-task"]]] * 4, "unknown task"),
+        (
+            [[["sr-15-swyx", "simple-task"], ["sr-01-willison", "simple-task"]]] * 4,
+            "duplicate",
+        ),
+        (
+            [[["sr-15-swyx", "simple-task"]]] * 3 + [[["unknown", "simple-task"]]],
+            "round 4",
+        ),
+    ],
+)
+def test_check_validates_every_explicit_plan_round(aabb_inputs, plan, message):
+    document = json.loads(aabb_inputs.read_text())
+    document["workload"]["interaction_plan"] = plan
+    write(aabb_inputs, document)
+    with pytest.raises(ConfigError, match=message):
+        materials.check_materials(aabb_inputs)
+
+
 def test_freeze_generates_plan_archives_and_records_dirty_tree(prepared_inputs, tmp_path):
     manifest = materials.prepare_materials(prepared_inputs, tmp_path / "runs")
     assert manifest["experiment_id"] == manifest["run_id"]

@@ -88,3 +88,13 @@ uv run --locked --extra experiments --extra dev pytest -q
 ```
 
 公开 examples 目录只放当前 v2 实验定义。[开发维护工具](../tools/dev/README.md)用于独立诊断，不是另一套实验入口。[历史研究](../research/README.zh-CN.md)集中归档并记录源码版本和迁移清单，复现时使用对应版本的独立 checkout。新实验走上述统一入口。可选前端见 [README](../README.zh-CN.md)。
+
+## 指定实验的观测看板
+
+```bash
+uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment
+```
+
+local 看板读取该 run 的实时产物。E2B 先执行 collect，再启动 dashboard；显示最后一次收集快照，云端继续运行时需重新 collect 刷新。若前端未构建，在另一个终端运行 `cd frontend && npm ci && npm run dev`；构建前端后可直接访问 `http://127.0.0.1:8000`。默认开发 API 不会自动选择实验，建议使用此命令。
+
+分组、推理强度、延迟隔离、交付参数、Owner 模型评审、direct 与显式逐轮计划见[配置说明](CONFIGURATION.zh-CN.md)。改变这些设置后需 prepare 新实验，已有 run 不升级。

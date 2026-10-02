@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from auto_designer.experiment.config import ConfigError
+from auto_designer.experiment.config import ConfigError, delivery_auth_type, runtime_policies
 
 
 def material_path(run_dir: Path, manifest: dict[str, Any], key: str) -> Path:
@@ -205,7 +205,7 @@ def build_controller_environment(
             "SESSIONS_PER_ROUND": str(config["rounds"]["sessions_per_round"]),
             "N_USERS": str(config["rounds"]["sessions_per_round"]),
             "MAX_PARALLEL_USERS": str(config["rounds"]["max_parallel_users"]),
-            "N_OWNERS": "0",
+            "N_OWNERS": "1" if config["roles"].get("owner_mode") == "llm" else "0",
             "VIGIL_KEEP_ALIVE": "0",
             "VIGIL_CI_STAGE": "skip",
             "AUTO_DESIGNER_OBJECTIVE_EVALUATION": "0",
@@ -219,6 +219,26 @@ def build_controller_environment(
             "CLAUDE_CONFIG_DIR": str(root / "secrets/claude"),
         }
     )
+    # Spec-0072/T1: public policies, not host variables or credential profile settings.
+    policies = runtime_policies(config)
+    timing, delivery, alarms = (policies[key] for key in ("timing", "delivery", "alarms"))
+    if "policies" in config:
+        env.update(
+            {
+                "SYNTHESIZER_GROUPING": "1" if policies["synthesizer_grouping"] else "0",
+                "AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT": "1"
+                if timing["latency_isolated"]
+                else "0",
+                "AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS": str(timing["wall_guard_seconds"]),
+                "ROUND_DELIVERY_TIMEOUT_SEC": str(delivery["timeout_seconds"]),
+                "ROUND_DELIVERY_POLL_SEC": str(delivery["poll_seconds"]),
+                "VIGIL_COORDINATION": delivery["coordination"],
+                "OPENAGENTS_PERMISSION_MODE": delivery["permission_mode"],
+                "OPENAGENTS_CLAUDE_IDLE_TIMEOUT": str(delivery["idle_timeout_seconds"]),
+                "PROPOSAL_DEPTH_ALARM": str(alarms["proposal_depth"]),
+                "READY_DEPTH_ALARM": str(alarms["ready_depth"]),
+            }
+        )
     (root / "secrets/claude").mkdir(mode=0o700, exist_ok=True)
     for field in ("experiment_id", "run_id", "config_hash", "controller_sha", "plan_hash"):
         env[f"AUTO_DESIGNER_{field.upper()}"] = str(manifest[field])
@@ -243,12 +263,12 @@ def build_controller_environment(
                 ANTHROPIC_MODEL=model["model"],
                 ANTHROPIC_SMALL_FAST_MODEL=model["model"],
             )
-            # Standard Anthropic keys and gateway bearer tokens use different headers.
-            auth_name = (
-                "ANTHROPIC_API_KEY"
-                if model["api_key_env"] == "ANTHROPIC_API_KEY"
-                else "ANTHROPIC_AUTH_TOKEN"
-            )
+            # Spec-0072/T1: variable names locate secrets; auth_type defines their protocol.
+            auth_name = {
+                "api-key": "ANTHROPIC_API_KEY",
+                "bearer": "ANTHROPIC_AUTH_TOKEN",
+                "oauth": "CLAUDE_CODE_OAUTH_TOKEN",
+            }[delivery_auth_type(model)]
             env[auth_name] = key
         else:
             prefix = role.upper() + "_LLM_"
@@ -259,6 +279,8 @@ def build_controller_environment(
                     prefix + "API_KEY": key,
                 }
             )
+            if model.get("reasoning_effort"):
+                env[prefix + "REASONING_EFFORT"] = model["reasoning_effort"]
     if config["workload"]["kind"] == "swebench":
         env["SWEBENCH_PARQUET"] = str(material_path(root, manifest, "dataset"))
         env["SWEBENCH_INSTANCE_FILE"] = str(material_path(root, manifest, "pool"))
@@ -288,6 +310,9 @@ def frozen_scenario():
     workspace = json.loads(Path(os.environ["AUTO_DESIGNER_WORKSPACE_FILE"]).read_text())
     specification = WorkspaceSpec.from_dict(workspace)
     specification.params.setdefault("instance_id", package["id"])
+    specification.params.setdefault("task_id", package["id"])
+    specification.params.setdefault("task_key", package["id"])
+    specification.params["interaction"] = package.get("interaction", "simulated_user")
     return SeedScenario(
         description=instruction.read_text(encoding="utf-8"), workspace=specification
     )

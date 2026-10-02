@@ -392,9 +392,45 @@ def test_container_mounts_only_delivery_role_runs(tmp_path: Path, monkeypatch) -
     assert f"{(run_root / 'delivery').resolve()}:/role_runs" in joined
     assert "ROLE_RUNS_DIR=/role_runs" in joined
     assert "--user root" in joined
+    assert f"VIGIL_EXEC_UID={os.getuid() or 1000}" in docker_run
+    assert f"VIGIL_EXEC_GID={os.getgid() or 1000}" in docker_run
     assert "io.auto-designer.run_id=run-a" in joined
     assert "sessions" not in joined
     assert "/demand" not in joined
+
+
+@pytest.mark.parametrize("uid,gid", [(1201, 1302), (0, 0)])
+def test_delivery_mount_execution_identity_matches_host_without_running_as_root(
+    tmp_path: Path, monkeypatch, uid: int, gid: int
+) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("ROLE_RUNS_DIR", str(tmp_path / "role_runs" / "run-a"))
+    monkeypatch.setattr(run.os, "getuid", lambda: uid)
+    monkeypatch.setattr(run.os, "getgid", lambda: gid)
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    docker_run = next(argv for argv in calls["runs"] if argv[:2] == ["docker", "run"])
+    assert f"VIGIL_EXEC_UID={uid or 1000}" in docker_run
+    assert f"VIGIL_EXEC_GID={gid or 1000}" in docker_run
+    assert "VIGIL_EXEC_UID=0" not in docker_run
+    assert "VIGIL_EXEC_GID=0" not in docker_run
+
+
+@pytest.mark.parametrize("seconds", ["37", "0"])
+def test_container_passes_explicit_claude_idle_timeout_and_permissions(
+    tmp_path: Path, monkeypatch, seconds: str
+) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("OPENAGENTS_CLAUDE_IDLE_TIMEOUT", seconds)
+    monkeypatch.setenv("OPENAGENTS_PERMISSION_MODE", "acceptEdits")
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    docker_run = next(argv for argv in calls["runs"] if argv[:2] == ["docker", "run"])
+    assert f"OPENAGENTS_CLAUDE_IDLE_TIMEOUT={seconds}" in docker_run
+    assert "OPENAGENTS_PERMISSION_MODE=acceptEdits" in docker_run
+    assert "OPENAGENTS_PERMISSION_MODE=bypassPermissions" not in docker_run
 
 
 def test_container_rebuilds_when_run_id_changes(tmp_path: Path, monkeypatch) -> None:

@@ -56,10 +56,29 @@
       "backend": "claude-code",
       "model": "claude-opus-5-5",
       "base_url_env": "ANTHROPIC_BASE_URL",
-      "api_key_env": "ANTHROPIC_AUTH_TOKEN"
+      "api_key_env": "ANTHROPIC_AUTH_TOKEN",
+      "auth_type": "bearer"
     }
   },
   "evaluation": {
     "official_grading": false
+  },
+  "policies": {
+    "synthesizer_grouping": false,
+    "timing": {
+      "latency_isolated": false,
+      "wall_guard_seconds": 0
+    },
+    "delivery": {
+      "timeout_seconds": 86400,
+      "poll_seconds": 15,
+      "coordination": "soft",
+      "permission_mode": "bypassPermissions",
+      "idle_timeout_seconds": 300
+    },
+    "alarms": {
+      "proposal_depth": 20,
+      "ready_depth": 20
+    }
   }
 }

@@ -149,6 +149,30 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "interaction_plan": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "string",
+                  "minLength": 1
+                }
+              ],
+              "items": false
+            }
+          }
         }
       },
       "required": [
@@ -198,7 +222,10 @@
           "minimum": 0
         },
         "owner_mode": {
-          "const": "mechanical"
+          "enum": [
+            "mechanical",
+            "llm"
+          ]
         },
         "developer": {
           "type": "integer",
@@ -232,6 +259,12 @@
             "api_key_env": {
               "type": "string",
               "pattern": "^[A-Z][A-Z0-9_]*$"
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^\\S+$"
             }
           },
           "required": [
@@ -278,6 +311,12 @@
             "api_key_env": {
               "type": "string",
               "pattern": "^[A-Z][A-Z0-9_]*$"
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^\\S+$"
             }
           },
           "required": [
@@ -304,6 +343,13 @@
             },
             "backend": {
               "const": "claude-code"
+            },
+            "auth_type": {
+              "enum": [
+                "api-key",
+                "bearer",
+                "oauth"
+              ]
             }
           },
           "required": [
@@ -375,6 +421,74 @@
         }
       },
       "required": []
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "synthesizer_grouping": {
+          "type": "boolean"
+        },
+        "timing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "latency_isolated": {
+              "type": "boolean"
+            },
+            "wall_guard_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "delivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "poll_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "coordination": {
+              "enum": [
+                "soft",
+                "off",
+                "dependencies"
+              ]
+            },
+            "permission_mode": {
+              "enum": [
+                "bypassPermissions",
+                "acceptEdits",
+                "default"
+              ]
+            },
+            "idle_timeout_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "alarms": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "proposal_depth": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ready_depth": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
     }
   },
   "required": [

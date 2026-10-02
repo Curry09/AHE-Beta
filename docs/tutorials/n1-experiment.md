@@ -148,3 +148,13 @@ There is no fixed duration guarantee: model latency, retries, task interactions 
 The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest and pytest-mock for user-side checks. The unmodified task baseline was tested in a fresh environment: all 155 ModelChain tests passed, including 35 cases using the `mocker` fixture. This is task-environment validation, not official SWE-bench grading.
 
 Historical experiments and their source revisions are indexed in [research](../../research/README.md). For standalone diagnostics or evidence replay, see [developer tools](../../tools/dev/README.md); their outputs are not another round of this experiment.
+
+## View the selected experiment
+
+```bash
+uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment
+```
+
+Local dashboards read live artifacts from the selected run. For E2B, collect first, then start dashboard: it shows the latest collected snapshot. Collect again to refresh artifacts while the cloud run continues. Without a frontend build, run `cd frontend && npm ci && npm run dev` in another terminal; with a build, visit `http://127.0.0.1:8000` directly. The default development API does not automatically select a run; use this command.
+
+See [configuration](../CONFIGURATION.md) for grouping, reasoning effort, latency isolation, delivery settings, Owner model review, direct interaction and explicit round plans. Prepare a new experiment after changing them; existing runs are not upgraded.

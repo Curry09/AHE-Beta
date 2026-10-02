@@ -140,3 +140,59 @@ def test_git_task_rejects_credential_url(tmp_path):
     }
     with pytest.raises(ConfigError, match="credential-free"):
         load_task_package(write(tmp_path / "task.json", document))
+
+
+# Spec-0072/T1: accepted policies must survive normalization and become hashable inputs.
+def test_policy_defaults_and_explicit_auth_protocol_are_frozen(tmp_path):
+    from auto_designer.experiment.config import config_hash
+
+    document = definition()
+    document["models"]["delivery"].update(auth_type="api-key", api_key_env="MY_PRIVATE_KEY")
+    document["policies"] = {"synthesizer_grouping": True, "delivery": {"poll_seconds": 0.25}}
+    document["roles"]["owner_mode"] = "llm"
+    loaded = load_config_v2(write(tmp_path / "config.json", document))
+    assert loaded["policies"]["synthesizer_grouping"] is True
+    assert loaded["policies"]["delivery"]["poll_seconds"] == 0.25
+    assert loaded["policies"]["delivery"]["timeout_seconds"] == 86400
+    assert loaded["policies"]["timing"]["latency_isolated"] is False
+    assert loaded["models"]["delivery"]["auth_type"] == "api-key"
+    changed = copy.deepcopy(loaded)
+    changed["policies"]["timing"]["latency_isolated"] = True
+    assert config_hash(data=changed) != config_hash(data=loaded)
+
+
+@pytest.mark.parametrize(
+    "policies",
+    [
+        {"synthesizer_grouping": "1"},
+        {"timing": {"wall_guard_seconds": -1}},
+        {"delivery": {"timeout_seconds": 0}},
+        {"delivery": {"poll_seconds": 0}},
+        {"delivery": {"idle_timeout_seconds": -1}},
+        {"delivery": {"permission_mode": "invented"}},
+        {"delivery": {"coordination": "invented"}},
+        {"alarms": {"ready_depth": -1}},
+        {"alarms": {"proposal_depth": 0}},
+        {"delivery": {"unknown_override": True}},
+    ],
+)
+def test_policy_errors_fail_before_any_provider(tmp_path, policies):
+    document = definition()
+    document["policies"] = policies
+    with pytest.raises(ConfigError):
+        load_config_v2(write(tmp_path / "config.json", document))
+
+
+@pytest.mark.parametrize("role", ["user", "demand"])
+def test_reasoning_effort_is_validated_and_preserved(tmp_path, role):
+    document = definition()
+    document["models"][role]["reasoning_effort"] = "high"
+    assert (
+        load_config_v2(write(tmp_path / "config.json", document))["models"][role][
+            "reasoning_effort"
+        ]
+        == "high"
+    )
+    document["models"][role]["reasoning_effort"] = "high\nwrong"
+    with pytest.raises(ConfigError):
+        load_config_v2(write(tmp_path / "config.json", document))

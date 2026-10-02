@@ -26,6 +26,7 @@ PUBLIC_COMMANDS = {
     "resume",
     "collect",
     "destroy",
+    "dashboard",  # Spec-0072/T5: the same entry binds a selected run for observation.
 }
 RETIRED_PATHS = (
     "run.sh",

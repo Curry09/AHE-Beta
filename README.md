@@ -73,3 +73,5 @@ research/archives/                      # Frozen historical research records
 ## License
 
 Project code is licensed under the [MIT License](LICENSE). Third-party material retains its own terms; see [THIRD_PARTY.md](THIRD_PARTY.md).
+
+The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/N4/N8 and historical round import remain pending.

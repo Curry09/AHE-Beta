@@ -88,3 +88,13 @@ uv run --locked --extra experiments --extra dev pytest -q
 ```
 
 The public examples directory contains only current v2 definitions. [Developer tools](../tools/dev/README.md) are separate diagnostics, not alternate experiment launchers. [Historical research](../research/README.md) is archived with source revisions and an inventory; reproduction uses the recorded version in a separate checkout. New experiments use the unified entry above. The optional frontend is described in [the README](../README.md).
+
+## View the selected experiment
+
+```bash
+uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment
+```
+
+Local dashboards read live artifacts from the selected run. For E2B, collect first, then start dashboard: it shows the latest collected snapshot. Collect again to refresh artifacts while the cloud run continues. Without a frontend build, run `cd frontend && npm ci && npm run dev` in another terminal; with a build, visit `http://127.0.0.1:8000` directly. The default development API does not automatically select a run; use this command.
+
+See [configuration](CONFIGURATION.md) for grouping, reasoning effort, latency isolation, delivery settings, Owner model review, direct interaction and explicit round plans. Prepare a new experiment after changing them; existing runs are not upgraded.

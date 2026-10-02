@@ -10,6 +10,7 @@ import sys
 import tarfile
 import time
 import uuid
+from functools import partial
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]  # frozen backend source
@@ -395,6 +396,7 @@ _CLAUDE_CONFIG_ENVS = (
     # Spec-0069/T2: candidate versions stay pinned inside delivery containers too.
     "DISABLE_UPDATES",
     "OPENAGENTS_NO_SELF_UPDATE",
+    "OPENAGENTS_CLAUDE_IDLE_TIMEOUT",
 )
 
 
@@ -725,6 +727,8 @@ def _start_vigil_container(
         args += ["--label", f"io.openagents.manifest_sha={manifest_sha}"]
     delivery = _vigil_delivery_mount()
     if delivery is not None:
+        # Root only prepares the host evidence mount. The entrypoint then drops to vigil
+        # before cloning or starting OpenAgents/Claude, including bypassPermissions mode.
         args += [
             "--user",
             "root",
@@ -732,6 +736,10 @@ def _start_vigil_container(
             f"{delivery}:/role_runs",
             "-e",
             "ROLE_RUNS_DIR=/role_runs",
+            "-e",
+            f"VIGIL_EXEC_UID={os.getuid() or 1000}",
+            "-e",
+            f"VIGIL_EXEC_GID={os.getgid() or 1000}",
         ]
     for key in (*_CLAUDE_CRED_ENVS, *_CLAUDE_CONFIG_ENVS):
         value = os.environ.get(key, "").strip()
@@ -768,6 +776,67 @@ def _vigil_delivery_mount() -> str | None:
     delivery = root / "delivery"
     delivery.mkdir(parents=True, exist_ok=True)
     return str(delivery.resolve())
+
+
+def _make_user_run_session_fn(**kwargs):
+    """Both controllers dispatch the frozen task's interaction mode through one factory."""
+    from auto_designer.loop.sim_user import make_mixed_run_session_fn
+
+    return make_mixed_run_session_fn(**kwargs)
+
+
+def _planned_session_set(*, plan, round_no: int, personas, scenarios):
+    """Resolve both IDs from the frozen plan without rotating or resampling them."""
+    if round_no < 1 or round_no > len(plan):
+        raise RuntimeError(f"Frozen interaction plan has no round {round_no}")
+    return [
+        (personas[persona_id], scenarios[task_id]) for persona_id, task_id in plan[round_no - 1]
+    ]
+
+
+def _alarm_threshold(env_key: str) -> int:
+    raw = os.environ.get(env_key, "").strip()
+    return int(raw) if raw.isdigit() and int(raw) > 0 else 20
+
+
+def _check_backpressure(*, tracker, round_no: int) -> None:
+    """Warn on the shared proposal/ready queue depths without blocking a completed round."""
+    from auto_designer.demand.issue_schema import PROPOSAL, READY, plane
+
+    try:
+        open_issues = tracker.list_open_issues()
+    except Exception:  # noqa: BLE001 - observation failure must not block rounds
+        return
+    proposal_alarm = _alarm_threshold("PROPOSAL_DEPTH_ALARM")
+    ready_alarm = _alarm_threshold("READY_DEPTH_ALARM")
+    p_depth = sum(1 for issue in open_issues if plane(issue.labels) == PROPOSAL)
+    r_depth = sum(1 for issue in open_issues if plane(issue.labels) == READY)
+    if p_depth > proposal_alarm:
+        print(
+            f"[背压告警] 第 {round_no} 轮末 proposal 深度 {p_depth} > {proposal_alarm}："
+            "准入太严或生成太滥，请人工介入（调 hold 口径 / 减生成器）。"
+        )
+    if r_depth > ready_alarm:
+        print(
+            f"[背压告警] 第 {round_no} 轮末 ready 深度 {r_depth} > {ready_alarm}："
+            "dev 消化不动（积压不降=退化信号），请人工介入（加 dev / 收紧准入）。"
+        )
+
+
+def _on_round_end(k: int, sha: str, *, tracker, round_shas: list[str]) -> None:
+    from auto_designer.invocation import append_round
+    from auto_designer.loop.live import update_live_run
+
+    round_shas.append(sha)
+    append_round(round_no=k, user_sha=None, sealed_sha=sha)
+    update_live_run(
+        data_dir=DATA,
+        running=True,
+        round_no=k,
+        total_rounds=TOTAL_ROUNDS,
+        round_shas=round_shas,
+    )
+    _check_backpressure(tracker=tracker, round_no=k)
 
 
 def _stop_managed_proc(*, proc: subprocess.Popen) -> None:
@@ -918,7 +987,7 @@ def main() -> int:
     from auto_designer.loop.metrics import Metrics
     from auto_designer.loop.orchestrator import Orchestrator
     from auto_designer.loop.round_gate import RoundDeliveryBlocked
-    from auto_designer.loop.sim_user import make_sim_run_session_fn, result_to_turns
+    from auto_designer.loop.sim_user import result_to_turns
     from auto_designer.models import Persona, SeedScenario
     from auto_designer.tracker.gitea import GiteaTracker
     from auto_designer.user.session_store import SessionStore
@@ -930,7 +999,7 @@ def main() -> int:
     run_mode = experiment_run_mode()
     role_runs = install_role_runs(data_root=DATA)
     recovery = load_recovery_store(mode=run_mode)
-    from auto_designer.invocation import append_round, init_manifest  # noqa: PLC0415
+    from auto_designer.invocation import init_manifest  # noqa: PLC0415
 
     if run_mode == "fresh":
         init_manifest(
@@ -1024,13 +1093,18 @@ def main() -> int:
     import json
 
     plan = json.loads(Path(os.environ["AUTO_DESIGNER_INTERACTION_PLAN"]).read_text())
+    task_id = json.loads(Path(os.environ["AUTO_DESIGNER_TASK_PACKAGE"]).read_text())["id"]
     by_identity = {persona.identity: persona for persona, _scenario in fixed_set}
     if len(plan) != TOTAL_ROUNDS:
         raise SystemExit("Frozen interaction plan does not match TOTAL_ROUNDS")
 
     def planned_set():
-        picks = plan[current["round"] - 1]
-        return [(by_identity[persona_id], seeds[0]) for persona_id, _task_id in picks]
+        return _planned_session_set(
+            plan=plan,
+            round_no=current["round"],
+            personas=by_identity,
+            scenarios={task_id: seeds[0]},
+        )
 
     from auto_designer.loop.live import (
         append_agent_log,
@@ -1060,46 +1134,9 @@ def main() -> int:
             phase=orch.recovery_phase(round_no=k) if recovery is not None else "users",
         )
 
-    # Spec-0029/T8：背压阈值（proposal/ready 队列深度）。超阈值只告警、不自动扩容——这是
-    # CLAUDE.md「issue 长期不降=退化」观测指标的可执行化，处置（调轮次/加 dev/收紧准入）由人定。
-    def _alarm_threshold(env_key: str) -> int:
-        raw = os.environ.get(env_key, "").strip()
-        return int(raw) if raw.isdigit() and int(raw) > 0 else 20
-
     proposal_alarm = _alarm_threshold("PROPOSAL_DEPTH_ALARM")
     ready_alarm = _alarm_threshold("READY_DEPTH_ALARM")
-
-    def _check_backpressure(round_no):
-        from auto_designer.demand.issue_schema import PROPOSAL, READY, plane  # noqa: PLC0415
-
-        try:
-            open_issues = tracker.list_open_issues()
-        except Exception:  # noqa: BLE001  读失败不拦轮次
-            return
-        p_depth = sum(1 for i in open_issues if plane(i.labels) == PROPOSAL)
-        r_depth = sum(1 for i in open_issues if plane(i.labels) == READY)
-        if p_depth > proposal_alarm:
-            print(
-                f"[背压告警] 第 {round_no} 轮末 proposal 深度 {p_depth} > {proposal_alarm}："
-                "准入太严或生成太滥，请人工介入（调 hold 口径 / 减生成器）。"
-            )
-        if r_depth > ready_alarm:
-            print(
-                f"[背压告警] 第 {round_no} 轮末 ready 深度 {r_depth} > {ready_alarm}："
-                "dev 消化不动（积压不降=退化信号），请人工介入（加 dev / 收紧准入）。"
-            )
-
-    def on_round_end(k, sha):
-        round_shas.append(sha)
-        append_round(round_no=k, user_sha=None, sealed_sha=sha)
-        update_live_run(
-            data_dir=DATA,
-            running=True,
-            round_no=k,
-            total_rounds=TOTAL_ROUNDS,
-            round_shas=round_shas,
-        )
-        _check_backpressure(k)
+    on_round_end = partial(_on_round_end, tracker=tracker, round_shas=round_shas)
 
     def make_event_logger(
         agent_id,
@@ -1143,7 +1180,7 @@ def main() -> int:
                 },
             )
 
-    user_run_session_fn = make_sim_run_session_fn(
+    user_run_session_fn = _make_user_run_session_fn(
         client_factory=client_factory,
         tracker=tracker,
         store=store,

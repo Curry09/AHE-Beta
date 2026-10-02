@@ -71,6 +71,7 @@ _Frozen materials, controllers and local/E2B resource lifecycles._
 | `collection.py` | Spec-0069/T5: portable, checksummed evidence collection independent of model keys. |
 | `config.py` | Spec-0071/T3: strict public v2 configuration and shared identity helpers. |
 | `context.py` | Spec-0069/T2: one credential-free context and model mapping for both runners. |
+| `dashboard.py` | Spec-0072/T4: read-only dashboard bound to a prepared run, without provider discovery. |
 | `engine.py` | Spec-0069/T2: supervise the existing controller, with owned PIDs and receipts. |
 | `infrastructure.py` | Provision, stop, and destroy experiment infrastructure via Compose project. |
 | `manifest.py` | Spec-0071/T3: immutable input manifests and shared append-only runtime facts. |
@@ -273,6 +274,7 @@ graph LR
     nauto_designer_experiment_controllers["experiment.controllers"]
     nauto_designer_experiment_controllers_ordinary["controllers.ordinary"]
     nauto_designer_experiment_controllers_swebench["controllers.swebench"]
+    nauto_designer_experiment_dashboard["experiment.dashboard"]
     nauto_designer_experiment_engine["experiment.engine"]
     nauto_designer_experiment_infrastructure["experiment.infrastructure"]
     nauto_designer_experiment_manifest["experiment.manifest"]
@@ -445,6 +447,7 @@ graph LR
     nauto_designer_experiment_backends_local --> nauto_designer_observations_transport
     nauto_designer_experiment_cli --> nauto_designer_experiment
     nauto_designer_experiment_cli --> nauto_designer_experiment_config
+    nauto_designer_experiment_cli --> nauto_designer_experiment_dashboard
     nauto_designer_experiment_cli --> nauto_designer_experiment_runtime
     nauto_designer_experiment_collection --> nauto_designer_experiment_config
     nauto_designer_experiment_collection --> nauto_designer_experiment_materials
@@ -500,6 +503,14 @@ graph LR
     nauto_designer_experiment_controllers_swebench --> nauto_designer_user_session_store
     nauto_designer_experiment_controllers_swebench --> nauto_designer_user_sim_persona_client
     nauto_designer_experiment_controllers_swebench --> nauto_designer_user_sim_persona_io
+    nauto_designer_experiment_dashboard --> nauto_designer_experiment_config
+    nauto_designer_experiment_dashboard --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_dashboard --> nauto_designer_experiment_materials
+    nauto_designer_experiment_dashboard --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_dashboard --> nauto_designer_tracker_gitea
+    nauto_designer_experiment_dashboard --> nauto_designer_usage
+    nauto_designer_experiment_dashboard --> nauto_designer_user_session_store
+    nauto_designer_experiment_dashboard --> nauto_designer_web_api
     nauto_designer_experiment_engine --> nauto_designer_experiment_config
     nauto_designer_experiment_engine --> nauto_designer_experiment_context
     nauto_designer_experiment_engine --> nauto_designer_experiment_materials

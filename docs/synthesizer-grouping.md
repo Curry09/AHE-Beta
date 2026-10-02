@@ -23,7 +23,7 @@ ordinary 和 SWE 控制器共用 `auto_designer.demand.grouped_synthesizer`。�
 分组是已有功能：旧入口可用 `SYNTHESIZER_GROUPING=1`，旧审计配置可用
 `execution.synthesizer_grouping: true`。它对待综合提案分组，不要求多用户；N1 产生多条提案时也可使用。
 
-当前公开 schema 2 尚未迁入这个开关，监督器也不传递宿主机或 env 文件中的
+当前 schema 2 已迁入分组：在实验 JSON 设置 `policies.synthesizer_grouping: true`，再 prepare 新 run。该值冻结进入 manifest，通过两后端传给实际分组调度；宿主或凭证文件中的 `SYNTHESIZER_GROUPING` 不覆盖它。分组不要求多用户，N1 产生多条提案时也可使用。旧 v2 run 不会因本次修改自动启用；历史实验的执行开关与来源仍保留于原冻结 checkout。见[配置说明](CONFIGURATION.zh-CN.md)与[验收报告](validation/spec0072-capability-migration.md)。
 `SYNTHESIZER_GROUPING`，因此公开示例使用默认编排。这是统一入口的配置迁移缺口，
 不是分组功能已经废弃或只适用于历史实验。当前不能向配置添加旧 `execution` 或 `roster`
 字段绕过校验；历史冻结 checkout 可以复现原运行，但不能替代正式迁移。

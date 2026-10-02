@@ -5,12 +5,18 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
+import pwd
+import shlex
 import subprocess
 import sys
 import tarfile
+import time
+from contextlib import redirect_stdout
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -320,3 +326,187 @@ def test_cloud_engine_program_reads_progress_without_model_or_provider_calls(bac
     assert receipt["progress"]["current_round"] == 3
     assert "progress_v2(root)" in observed[0]
     assert "grace_seconds=2.0" in observed[0]
+
+
+def test_new_run_refuses_missing_nonroot_identity_before_upload(backend, monkeypatch):
+    # Spec-0072/T3: a missing worker receipt cannot silently restore root execution.
+    backend.manifest["config"]["policies"] = {}
+    _write(backend.resource_file, {"bootstrap": {"controller_python": sys.executable}})
+    sandbox = Mock()
+    monkeypatch.setattr(backend, "_sandbox", lambda: sandbox)
+    with pytest.raises(BackendError, match="Non-root bootstrap"):
+        backend.launch()
+    sandbox.files.write.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "unsafe",
+    [
+        {"execution_user": "root"},
+        {"execution_uid": 0},
+        {"execution_uid": True},
+        {"execution_gid": 0},
+        {"execution_home": "/root"},
+    ],
+)
+def test_worker_receipt_rejects_privileged_or_unowned_identity(backend, monkeypatch, unsafe):
+    backend.manifest["config"]["policies"] = {}
+    bootstrap = {
+        "controller_python": sys.executable,
+        "execution_user": "user",
+        "execution_uid": 1000,
+        "execution_gid": 1000,
+        "execution_home": backend.root + "/runtime/home",
+        **unsafe,
+    }
+    _write(backend.resource_file, {"bootstrap": bootstrap})
+    sandbox = Mock()
+    monkeypatch.setattr(backend, "_sandbox", lambda: sandbox)
+    with pytest.raises(BackendError, match="Non-root bootstrap"):
+        backend.launch()
+    sandbox.files.write.assert_not_called()
+
+
+def test_frozen_prepolicy_run_preserves_legacy_root_launch(backend, monkeypatch):
+    _write(backend.resource_file, {"bootstrap": {"controller_python": sys.executable}})
+    sandbox = Mock()
+    monkeypatch.setattr(backend, "_sandbox", lambda: sandbox)
+    sandbox.commands.run.return_value = SimpleNamespace(
+        exit_code=0, stdout='{"state":"RUNNING","runner_pid":42}'
+    )
+    before = json.dumps(backend.manifest, sort_keys=True)
+    assert backend.launch(mode="resume")["runner_pid"] == 42
+    assert all(call.kwargs["user"] == "root" for call in sandbox.commands.run.call_args_list)
+    assert all(call.kwargs["envs"] is None for call in sandbox.commands.run.call_args_list)
+    assert json.dumps(backend.manifest, sort_keys=True) == before
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="SDK emulator executes as the local non-root account")
+def test_worker_launch_and_root_management_use_real_owned_process_and_files(
+    backend, tmp_path, monkeypatch
+):
+    # The SDK boundary records root/user; real supervision, files, stop and collection
+    # execute locally. A provider test must additionally verify the Unix UID switch.
+    remote = tmp_path / "remote"
+    remote.mkdir()
+    backend.root = str(remote)
+    backend.manifest["config"].update(policies={}, rounds={"count": 1})
+    (remote / "manifest.json").write_text(json.dumps(backend.manifest))
+    (remote / "runtime/home").mkdir(parents=True)
+    (remote / "runtime/home/login-cache").write_text("private-session-cache")
+    (remote / "runtime/python").mkdir()
+    (remote / "runtime/python/interpreter").write_text("runtime-dependency")
+    (remote / "runtime/uv-cache").mkdir()
+    (remote / "runtime/uv-cache/package").write_text("cached-package")
+    bootstrap = {
+        "controller_python": sys.executable,
+        "openagents_bin": str(remote / "bin"),
+        "bin": str(remote / "bin"),
+        "execution_user": "user",
+        "execution_uid": os.geteuid(),
+        "execution_gid": os.getegid(),
+        "execution_home": str(remote / "runtime/home"),
+    }
+    _write(
+        backend.resource_file,
+        {"bootstrap": bootstrap, "bootstrap_complete": True, "sandbox_id": "owned"},
+    )
+    identity = SimpleNamespace(pw_uid=os.geteuid(), pw_gid=os.getegid())
+    monkeypatch.setattr(pwd, "getpwnam", lambda name: identity)
+    observed = []
+
+    def write(path, data, *, user):
+        observed.append(("write", user))
+        destination = Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(data)
+
+    def command(command, *, user, envs, timeout):
+        observed.append(("command", user))
+        argv = shlex.split(command)
+        if "-c" not in argv:
+            # chmod is a shell command with &&; execute it only in this owned fixture.
+            result = subprocess.run(
+                command, shell=True, capture_output=True, text=True, timeout=timeout
+            )
+            return SimpleNamespace(exit_code=result.returncode, stdout=result.stdout)
+        script = argv[argv.index("-c") + 1]
+        arguments = argv[argv.index("-c") + 2 :]
+        output = io.StringIO()
+        with patch.object(sys, "argv", ["remote-program", *arguments]):
+            with patch.dict(os.environ, envs or {}), redirect_stdout(output):
+                exec(compile(script, "remote-program", "exec"), {"__name__": "__main__"})
+        return SimpleNamespace(exit_code=0, stdout=output.getvalue())
+
+    sandbox = SimpleNamespace(
+        commands=SimpleNamespace(run=command),
+        files=SimpleNamespace(
+            write=write,
+            read=lambda path, **kwargs: Path(path).read_bytes(),
+        ),
+    )
+    monkeypatch.setattr(backend, "_sandbox", lambda: sandbox)
+    from auto_designer.experiment import context, engine
+
+    monkeypatch.setattr(
+        context,
+        "build_controller_environment",
+        lambda **kwargs: {
+            "PATH": "/usr/bin:/bin",
+            "OPENAGENTS_PERMISSION_MODE": "bypassPermissions",
+        },
+    )
+    worker = """import json,os,pathlib,sys,time
+root=pathlib.Path(sys.argv[1]);out=root/'data/worker.json';out.parent.mkdir()
+out.write_text(json.dumps({'uid':os.geteuid(),'home':os.environ['HOME'],'user':os.environ['USER'],'permission':os.environ['OPENAGENTS_PERMISSION_MODE']}))
+time.sleep(60)
+"""
+    monkeypatch.setattr(
+        engine, "controller_command", lambda *args: [sys.executable, "-c", worker, str(remote)]
+    )
+    before = (remote / "manifest.json").read_bytes()
+    try:
+        receipt = backend.launch()
+        assert receipt["running"]
+        deadline = time.monotonic() + 5
+        while not (remote / "data/worker.json").is_file() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        worker_receipt = json.loads((remote / "data/worker.json").read_text())
+        assert worker_receipt == {
+            "uid": os.geteuid(),
+            "home": bootstrap["execution_home"],
+            "user": "user",
+            "permission": "bypassPermissions",
+        }
+        assert (remote / "secrets/launch.json").stat().st_mode & 0o777 == 0o600
+        assert backend.inspect()["controller"]["running"]
+        assert backend.stop(grace_seconds=1)["state"] == "STOPPED"
+        original_scandir = os.scandir
+        scans = []
+        private_runtime = {
+            remote / "runtime/home",
+            remote / "runtime/python",
+            remote / "runtime/uv-cache",
+        }
+
+        def scandir(path):
+            candidate = Path(path)
+            scans.append(candidate)
+            if any(candidate.is_relative_to(private) for private in private_runtime):
+                raise AssertionError("Collector entered a private runtime subtree")
+            return original_scandir(path)
+
+        monkeypatch.setattr(os, "scandir", scandir)
+        collection = backend.collect()
+        assert remote / "runtime" in scans
+        assert "data/worker.json" in collection["files"]
+        assert not any(path.startswith("secrets/") for path in collection["files"])
+        assert not any(
+            path.startswith(("runtime/home/", "runtime/python/", "runtime/uv-cache/"))
+            for path in collection["files"]
+        )
+        assert observed.count(("command", "user")) == 1
+        assert observed[-1] == ("command", "root")
+        assert (remote / "manifest.json").read_bytes() == before
+    finally:
+        engine.stop_controller(remote, grace_seconds=1)

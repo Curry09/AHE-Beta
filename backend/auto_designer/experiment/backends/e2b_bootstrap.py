@@ -11,12 +11,21 @@ PYTHON_VERSION = "3.12.13"
 UV_SHA256 = "e490a6464492183c5d4534a5527fb4440f7f2bb2f228162ad7e4afe076dc0224"
 CLAUDE_VERSION = "2.1.284"
 CLAUDE_SHA256 = "5cd90aabd83f8a15136c35aa37bb1d92b348993573316643dc3fe4e04afbf88f"
+EXECUTION_USER = "user"
 
 # This program runs with the template's system Python before any project imports.
 BOOTSTRAP_PROGRAM = r"""
-import hashlib,json,os,pathlib,shutil,subprocess,sys,tarfile,urllib.request
+import hashlib,json,os,pathlib,pwd,shutil,subprocess,sys,tarfile,urllib.request
 root=pathlib.Path(sys.argv[1]); manifest=json.loads((root/'manifest.json').read_text())
 def run(args,**kw): subprocess.run(args,check=True,**kw)
+# Spec-0072/T3: management remains root; only this run is handed to the worker.
+try: account=pwd.getpwnam('user')
+except KeyError:
+    run(['useradd','--create-home','--shell','/bin/bash','user']);account=pwd.getpwnam('user')
+if account.pw_uid==0 or account.pw_gid==0: raise RuntimeError('Execution account must be non-root')
+home=root/'runtime/home';home.mkdir(parents=True,exist_ok=True,mode=0o700)
+install_env=dict(os.environ);install_env.pop('VIRTUAL_ENV',None)
+install_env.update(HOME=str(home),USER='user',LOGNAME='user',UV_PYTHON_INSTALL_DIR=str(root/'runtime/python'),UV_CACHE_DIR=str(root/'runtime/uv-cache'))
 def download(url,digest,dest):
     urllib.request.urlretrieve(url,dest)
     if hashlib.sha256(dest.read_bytes()).hexdigest()!=digest: raise RuntimeError('Runtime download checksum mismatch')
@@ -36,8 +45,8 @@ cache=root/'runtime/downloads'; cache.mkdir(parents=True,exist_ok=True)
 binroot=root/'runtime/bin';binroot.mkdir(parents=True,exist_ok=True)
 uvtar=cache/'uv.tar.gz';download('https://github.com/astral-sh/uv/releases/download/0.11.28/uv-x86_64-unknown-linux-gnu.tar.gz','UV_SHA',uvtar)
 extract(uvtar,cache/'uv');uv=cache/'uv/uv-x86_64-unknown-linux-gnu/uv'
-run([str(uv),'python','install','3.12.13'])
-python=subprocess.check_output([str(uv),'python','find','3.12.13'],text=True).strip()
+run([str(uv),'python','install','3.12.13'],env=install_env)
+python=subprocess.check_output([str(uv),'python','find','3.12.13'],text=True,env=install_env).strip()
 if subprocess.check_output([python,'--version'],text=True).strip()!='Python 3.12.13': raise RuntimeError('Python runtime mismatch')
 controller=root/'source/controller';oa=root/'source/openagents'; task=root/'workspace/task'
 for path in (controller,oa,task):
@@ -50,7 +59,7 @@ for name,digest in manifest['source_snapshot']['files'].items():
 run(['git','init','-b','main',str(controller)])
 run(['git','-C',str(controller),'add','.'])
 run(['git','-C',str(controller),'-c','user.name=Experiment','-c','user.email=experiment@localhost','-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null','commit','-m','Frozen controller snapshot'])
-env=dict(os.environ);env.pop('VIRTUAL_ENV',None);env['UV_PYTHON']=python
+env=dict(install_env);env['UV_PYTHON']=python
 run([str(uv),'sync','--locked','--extra','experiments','--extra','dev','--python',python],cwd=controller,env=env)
 run([str(uv),'sync','--locked','--extra','nexau','--extra','dev','--python',python],cwd=oa,env=env)
 claude=binroot/'claude';download('https://downloads.claude.ai/claude-code-releases/2.1.284/linux-x64/claude','CLAUDE_SHA',claude);claude.chmod(0o755)
@@ -72,8 +81,13 @@ run(['bash',str(root/manifest['materials']['script']['path'])],cwd=task,env=env)
 if not(task/'.venv/bin/python').is_file(): raise RuntimeError('Task setup did not produce its isolated Python environment')
 # Keep task venv selection across explicit bash login shells without activating it for controller/vigil.
 pathlib.Path('/etc/profile.d/auto-designer-task.sh').write_text('if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then export PATH="$VIRTUAL_ENV/bin:$PATH"; fi\n')
-receipt={'python':python,'uv':str(uv),'controller_python':str(controller/'.venv/bin/python'),'openagents_bin':str(oa/'.venv/bin'),'bin':str(binroot),'task_root':str(task),'python_version':'3.12.13','uv_version':'0.11.28','claude_version':'2.1.284'}
+receipt={'python':python,'uv':str(uv),'controller_python':str(controller/'.venv/bin/python'),'openagents_bin':str(oa/'.venv/bin'),'bin':str(binroot),'task_root':str(task),'python_version':'3.12.13','uv_version':'0.11.28','claude_version':'2.1.284','execution_user':'user','execution_uid':account.pw_uid,'execution_gid':account.pw_gid,'execution_home':str(home)}
 (root/'runtime/bootstrap.json').write_text(json.dumps(receipt,indent=2)+'\n')
+# Do not open /root or chown outside the owned run (including symlink targets).
+for directory,dirs,files in os.walk(root,followlinks=False):
+    for item in [pathlib.Path(directory),*(pathlib.Path(directory)/name for name in dirs+files)]:
+        os.chown(item,account.pw_uid,account.pw_gid,follow_symlinks=False)
+root.chmod(0o700);home.chmod(0o700)
 """.replace("UV_SHA", UV_SHA256).replace("CLAUDE_SHA", CLAUDE_SHA256)
 
 

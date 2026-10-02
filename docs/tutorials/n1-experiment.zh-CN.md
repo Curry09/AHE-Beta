@@ -148,3 +148,13 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest 和 pytest-mock，供用户侧检查。未修改任务基线在全新环境中验证：155 个 ModelChain 测试全部通过，其中 35 个使用 `mocker` fixture。这是任务环境验证，不是官方 SWE-bench 评分。
 
 历史实验及对应源码版本见[研究索引](../../research/README.zh-CN.md)。独立诊断或证据回放见[开发维护工具](../../tools/dev/README.md)，这些工具的输出不算本实验的新一轮试用。
+
+## 指定实验的观测看板
+
+```bash
+uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment
+```
+
+local 看板读取该 run 的实时产物。E2B 先执行 collect，再启动 dashboard；显示最后一次收集快照，云端继续运行时需重新 collect 刷新。若前端未构建，在另一个终端运行 `cd frontend && npm ci && npm run dev`；构建前端后可直接访问 `http://127.0.0.1:8000`。默认开发 API 不会自动选择实验，建议使用此命令。
+
+分组、推理强度、延迟隔离、交付参数、Owner 模型评审、direct 与显式逐轮计划见[配置说明](../CONFIGURATION.zh-CN.md)。改变这些设置后需 prepare 新实验，已有 run 不升级。

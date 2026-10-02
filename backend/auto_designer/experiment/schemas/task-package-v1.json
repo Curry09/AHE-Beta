@@ -92,6 +92,12 @@
     },
     "not_in_benchmark": {
       "const": true
+    },
+    "interaction": {
+      "enum": [
+        "simulated_user",
+        "direct"
+      ]
     }
   },
   "required": [

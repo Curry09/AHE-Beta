@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import sys
+import time
 
 import pytest
 
@@ -16,6 +18,7 @@ def backend(tmp_path, monkeypatch):
     run_id = "20260930T123000Z-1234abcd"
     digest = "a" * 64
     config = {
+        "rounds": {"count": 2},
         "runtime": {
             "backend": "local",
             "gitea": {"provider": "localhost", "repository_prefix": "n1"},
@@ -776,7 +779,7 @@ def test_vigil_ready_checks_actual_process_and_workspace_not_only_docker_state(
     seen = []
 
     def command(argv, **kwargs):
-        if argv[:3] == ["docker", "exec", "vigil-id"]:
+        if argv[:5] == ["docker", "exec", "--user", "root", "vigil-id"]:
             seen.append(argv[-1])
             return "ready"
         return original(argv, **kwargs)
@@ -785,6 +788,43 @@ def test_vigil_ready_checks_actual_process_and_workspace_not_only_docker_state(
     assert selected._vigil_ready()
     assert "str(os.getpid())" in seen[0]
     assert "/work/harness/.openagents/openagents.yml" in seen[0]
+    assert "int(uid)==expected" in seen[0]
+
+
+def test_vigil_ready_script_rejects_root_or_wrong_worker_uid(backend, tmp_path, monkeypatch):
+    selected, _, facts, labels = backend
+    selected.provision()
+    facts["containers"].append(
+        {
+            "Id": "vigil-id",
+            "Name": "/" + selected.resources["vigil"]["container"],
+            "Config": {"Labels": {**labels, "io.auto-designer.run_id": selected.run_id}},
+            "State": {"Running": True},
+        }
+    )
+    proc = tmp_path / "proc/987654321"
+    proc.mkdir(parents=True)
+    (proc / "cmdline").write_bytes(b"openagents\x00vigil\x00")
+    config = tmp_path / "openagents.yml"
+    config.write_text("version: 1\n")
+    monkeypatch.setenv("VIGIL_EXEC_UID", "1201")
+    original = local._command
+
+    def command(argv, **kwargs):
+        if argv[:5] != ["docker", "exec", "--user", "root", "vigil-id"]:
+            return original(argv, **kwargs)
+        script = argv[-1].replace("Path('/proc')", f"Path({str(proc.parent)!r})")
+        script = script.replace("'/work/harness/.openagents/openagents.yml'", repr(str(config)))
+        try:
+            exec(compile(script, "readiness", "exec"), {})
+        except AssertionError as exc:
+            raise BackendError("Not ready") from exc
+        return "ready"
+
+    monkeypatch.setattr(local, "_command", command)
+    for uid in (0, 1000, 1201):
+        (proc / "status").write_text(f"Uid:\t{uid}\t{uid}\t{uid}\t{uid}\n")
+        assert selected._vigil_ready() is (uid == 1201)
 
 
 def test_cloud_prebuilt_harness_inherits_task_shell_env_with_controller_interpreter(
@@ -862,6 +902,44 @@ def test_launch_rejects_controller_that_exits_before_vigil_ready(backend, monkey
     monkeypatch.setattr(local.time, "sleep", lambda seconds: None)
     with pytest.raises(BackendError, match="exited before"):
         selected.launch()
+
+
+def test_single_round_finishes_without_waiting_for_absent_vigil(backend, monkeypatch):
+    # Spec-0072/T3: a real supervised runner seals its only round with no delivery.
+    selected, _, _, _ = backend
+    selected.provision()
+    selected.manifest["config"]["rounds"]["count"] = 1
+    (selected.root / "manifest.json").write_text(json.dumps(selected.manifest))
+    selected.resources["controller_python"] = sys.executable
+    program = """import json,pathlib,sys,time
+root=pathlib.Path(sys.argv[1]);run_id=sys.argv[2]
+time.sleep(0.2)
+target=root/'data/role_runs'/run_id;target.mkdir(parents=True)
+(target/'manifest.json').write_text(json.dumps({'rounds':[{'round':1,'sealed_sha':'done'}]}))
+(root/'checkpoints').mkdir()
+(root/'checkpoints/recovery.json').write_text(json.dumps({'rounds':{'1':{'status':'completed','sealed_sha':'done'}}}))
+"""
+    monkeypatch.setattr(local, "build_controller_environment", lambda **kwargs: {})
+    monkeypatch.setattr(
+        local,
+        "controller_command",
+        lambda *args: [sys.executable, "-c", program, str(selected.root), selected.run_id],
+    )
+    readiness = pytest.fail
+    monkeypatch.setattr(selected, "_vigil_ready", readiness)
+    try:
+        selected.launch()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            receipt = local.inspect_controller(selected.root)
+            if "exit_code" in receipt:
+                break
+            time.sleep(0.05)
+        assert receipt["exit_code"] == 0
+        assert receipt["experiment_complete"] is True
+        assert receipt["sealed_rounds"] == [1]
+    finally:
+        local.stop_controller(selected.root, grace_seconds=1)
 
 
 def test_vigil_toolchain_rejects_wrong_actual_nexau_pin(tmp_path, monkeypatch):

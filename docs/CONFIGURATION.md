@@ -32,7 +32,7 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `harness.source` | `builtin`, or `archive` with an archive path and SHA-256 |
 | `workload` | `kind`, task package, persona library and actual persona IDs |
 | `rounds` | `count`, `sessions_per_round`, `max_parallel_users` |
-| `roles` | Triage/Synthesizer/divergent/developer counts; `owner_mode: mechanical` |
+| `roles` | Triage/Synthesizer/divergent/developer counts; `owner_mode: mechanical` / `llm` |
 | `models` | User, Harness, shared demand and Claude Code delivery settings |
 | `evaluation.official_grading` | `false`; official grading runs separately |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
@@ -54,7 +54,7 @@ Each model setting contains a model name, `base_url_env` and `api_key_env`. Thes
 | E2B infrastructure | `E2B_API_KEY` | E2B API |
 | Gitea.com | `GITEA_TOKEN`; optional `GITEA_USER` | Account resolved by API |
 
-For standard Anthropic API keys change delivery's `api_key_env` to `ANTHROPIC_API_KEY` and provide that variable. Do not put a Chat Completions-only endpoint in the delivery setting. A shared provider key can be repeated in the required env variables; dotenv interpolation is not enabled.
+For standard Anthropic API keys set delivery's `auth_type` to `api-key` and `api_key_env` to the variable containing that key. Do not put a Chat Completions-only endpoint in the delivery setting. A shared provider key can be repeated in the required env variables; dotenv interpolation is not enabled.
 
 The explicit `--secrets-file` overrides identically named process variables. No implicit `backend/.env`, user Claude settings or personal trial directory is read. The protected file path may be recorded for later management; secret contents are excluded from material snapshots and archives. To move credentials, pass another `--secrets-file` to the management command. Status, collection and destruction do not require model keys, but cloud operations still need provider credentials.
 
@@ -98,3 +98,55 @@ Use global `--runs-dir /absolute/path/runs` before the command to select another
 Use `examples/experiment.env.example` as the experiment credential template. Historical profiles and launchers are indexed in [research](../research/README.md) and require their original checkout; they do not supply current v2 configuration. Developer diagnostics have separate, explicit inputs documented in [tools/dev](../tools/dev/README.md). Existing prepared v2 runs retain their frozen source and input hashes when managed after this cleanup; `resume` does not upgrade their controller.
 
 The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest for user-side checks.
+
+## Runtime policies and migrated capabilities
+
+Optional `policies` control execution. `prepare` fills defaults and freezes them into the manifest. Put these settings in JSON; neither an env credential file nor identically named host variables override them.
+
+| Field | Default and behavior |
+| --- | --- |
+| `policies.synthesizer_grouping` | `false`; `true` enables existing grouped scheduling, including N1 |
+| `models.user.reasoning_effort`, `models.demand.reasoning_effort` | Optional, e.g. `high`; passed to the user client/shared demand roles. The provider must support the chosen value |
+| `policies.timing.latency_isolated` | `false`; excludes instrumented provider waits from demand role execution budgets |
+| `policies.timing.wall_guard_seconds` | Additional grace seconds; `0` retains the existing 600-second default. With isolation, the wall cap is role budget plus grace; positive values override the grace |
+| `policies.delivery.timeout_seconds`, `poll_seconds` | `86400`, `15`; admitted-ticket terminal wait and polling interval |
+| `policies.delivery.coordination` | `soft`; alternatives: `off`, `dependencies` |
+| `policies.delivery.permission_mode` | `bypassPermissions`; alternatives: `acceptEdits`, `default`. Delivery runs as a non-root user. This choice affects unattended Git operations |
+| `policies.delivery.idle_timeout_seconds` | `300`; `0` disables Claude's inactivity timeout |
+| `policies.alarms.proposal_depth`, `ready_depth` | `20`, `20`, positive integers; alarm thresholds, not queue capacities or automatic scaling |
+| `roles.owner_mode` | Examples use `mechanical`; `llm` enables existing model review using the shared DEMAND model |
+
+An optional fragment to merge into your complete experiment JSON:
+
+```json
+{
+  "policies": {
+    "synthesizer_grouping": true,
+    "timing": {"latency_isolated": true, "wall_guard_seconds": 7200},
+    "delivery": {"timeout_seconds": 3600, "poll_seconds": 5, "coordination": "dependencies"}
+  }
+}
+```
+
+Choose `models.delivery.auth_type` explicitly: `api-key`, `bearer` or `oauth`. `api_key_env` only locates the credential; even a custom name such as `MY_KEY` cannot override the explicit protocol. OAuth means a Claude `setup-token` exported as `CLAUDE_CODE_OAUTH_TOKEN`. Definitions without auth_type retain conventional-variable defaults for older v2 inputs; new examples explicitly use `bearer`. OAuth runs are supported, but the SDK-based `check --probe-models` rejects subscription OAuth before provider requests. Use ordinary check, then validate it through actual Claude Code; an SDK request is not presented as OAuth validation.
+
+Set task-package `interaction: "direct"` for Harness-driven execution; the default `simulated_user` uses stepwise simulated-user interaction. Both retain evidence and recovery. A single task can also use explicit `workload.interaction_plan`; this fragment requires count=4 and both personas in persona_ids:
+
+```json
+{
+  "workload": {
+    "interaction_plan": [
+      [["persona-a", "your-task-id"]],
+      [["persona-a", "your-task-id"]],
+      [["persona-b", "your-task-id"]],
+      [["persona-b", "your-task-id"]]
+    ]
+  }
+}
+```
+
+The plan validates round/session counts and selected persona/task IDs. Omitting it preserves persona rotation. Each round still contains one session; this does not enable multi-task/N4/N8 runs. `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds still require delivery readiness.
+
+`experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
+
+These settings, interactions and dashboard binding are migrated. Engineering CI, in-entry official grading, multi-task/N4/N8, historical round import, legacy seed libraries and text-only tasks remain pending. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.

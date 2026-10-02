@@ -11,7 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from auto_designer.experiment.config import ConfigError
+from auto_designer.experiment.config import ConfigError, delivery_auth_type
 from auto_designer.experiment.manifest import read_manifest
 
 
@@ -110,6 +110,12 @@ def check_v2(
     from auto_designer.experiment.materials import check_materials
 
     report = check_materials(config_path)
+    # Spec-0072/T1: subscription OAuth is a Claude Code protocol, not a generic SDK probe.
+    if probe_models and delivery_auth_type(report["config"]["models"]["delivery"]) == "oauth":
+        raise ConfigError(
+            "OAuth delivery must be validated by Claude Code during run; "
+            "--probe-models supports api-key/bearer delivery only"
+        )
     if offline:
         if probe_models:
             raise ConfigError("--probe-models cannot be combined with --offline")
@@ -176,6 +182,11 @@ def check_v2(
                     model=role["model"],
                     messages=[{"role": "user", "content": "Reply OK."}],
                     max_tokens=8,
+                    **(
+                        {"reasoning_effort": role["reasoning_effort"]}
+                        if role.get("reasoning_effort")
+                        else {}
+                    ),
                 )
             except Exception as exc:
                 raise ConfigError(
@@ -187,9 +198,9 @@ def check_v2(
         try:
             key = credentials[role["api_key_env"]]
             kwargs = (
-                {"api_key": key}
-                if role["api_key_env"] == "ANTHROPIC_API_KEY"
-                else {"api_key": None, "auth_token": key}
+                {"api_key": key, "auth_token": ""}
+                if delivery_auth_type(role) == "api-key"
+                else {"api_key": "", "auth_token": key}
             )
             client = Anthropic(
                 base_url=credentials[role["base_url_env"]], timeout=45, max_retries=0, **kwargs

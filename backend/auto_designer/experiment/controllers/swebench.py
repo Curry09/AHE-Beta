@@ -6,6 +6,7 @@ import json
 import os
 import random
 import subprocess
+from functools import partial
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -246,6 +247,33 @@ def _session_picks(rng: random.Random, *, round_index: int) -> list[tuple[str, s
     return [(rng.choice(PERSONA_IDS), rng.choice(INSTANCE_IDS)) for _ in range(SESSIONS_PER_ROUND)]
 
 
+def _session_set(*, rng, round_no: int, personas, scenarios, pair_log):
+    picks = _session_picks(rng, round_index=round_no - 1)
+    pair_log[round_no] = list(picks)
+    return [(personas[persona_id], scenarios[task_id]) for persona_id, task_id in picks]
+
+
+def _on_round_end(k: int, sha: str, *, tracker, round_shas: dict[str, str]) -> None:
+    from auto_designer.invocation import append_round
+    from auto_designer.loop.live import update_live_run
+
+    restore_after = os.environ.get("ROUND_DELIVERY_TIMEOUT_RESTORE_AFTER_ROUND", "").strip()
+    if restore_after == str(k):
+        os.environ.pop("ROUND_DELIVERY_TIMEOUT_SEC", None)
+        os.environ.pop("ROUND_DELIVERY_TIMEOUT_RESTORE_AFTER_ROUND", None)
+    round_shas[str(k)] = sha
+    append_round(round_no=k, user_sha=None, sealed_sha=sha)
+    update_live_run(
+        data_dir=run_mod.DATA,
+        running=True,
+        round_no=k,
+        total_rounds=run_mod.TOTAL_ROUNDS,
+        round_shas=round_shas,
+    )
+    print(f"==== round {k} done · main={sha[:12]} ====")
+    run_mod._check_backpressure(tracker=tracker, round_no=k)
+
+
 def main() -> int:
     from auto_designer.demand.synthesizer import Synthesizer
     from auto_designer.demand.triage import Triager
@@ -262,11 +290,7 @@ def main() -> int:
     from auto_designer.loop.orchestrator import Orchestrator
     from auto_designer.loop.roster import load_roster
     from auto_designer.loop.round_gate import RoundDeliveryBlocked
-    from auto_designer.loop.sim_user import (
-        make_mixed_run_session_fn,
-        make_sim_run_session_fn,
-        result_to_turns,
-    )
+    from auto_designer.loop.sim_user import result_to_turns
     from auto_designer.models import Persona
     from auto_designer.tracker.gitea import GiteaTracker
     from auto_designer.user.session_store import SessionStore
@@ -335,10 +359,16 @@ def main() -> int:
 
     def session_plan():
         round_no = current["round"]
-        picks = _session_picks(rng, round_index=round_no - 1)
-        pair_log[round_no] = list(picks)
+        sessions = _session_set(
+            rng=rng,
+            round_no=round_no,
+            personas=display,
+            scenarios=scenarios,
+            pair_log=pair_log,
+        )
+        picks = pair_log[round_no]
         print(f"  session plan ({len(picks)}): {picks}")
-        return [(display[pid], scenarios[iid]) for pid, iid in picks]
+        return sessions
 
     print(
         f"⓪ SWE-bench 闭环：persona×{len(PERSONA_IDS)} · instance×{len(INSTANCE_IDS)} · "
@@ -353,7 +383,7 @@ def main() -> int:
         f"developer×{roster['developer']}"
     )
 
-    from auto_designer.invocation import append_round, init_manifest  # noqa: PLC0415
+    from auto_designer.invocation import init_manifest  # noqa: PLC0415
 
     run_mode = run_mod.experiment_run_mode()
     role_runs = run_mod.install_role_runs(data_root=run_mod.DATA)
@@ -432,21 +462,7 @@ def main() -> int:
         )
         print(f"\n==== round {k}/{run_mod.TOTAL_ROUNDS} ====")
 
-    def on_round_end(k: int, sha: str) -> None:
-        restore_after = os.environ.get("ROUND_DELIVERY_TIMEOUT_RESTORE_AFTER_ROUND", "").strip()
-        if restore_after == str(k):
-            os.environ.pop("ROUND_DELIVERY_TIMEOUT_SEC", None)
-            os.environ.pop("ROUND_DELIVERY_TIMEOUT_RESTORE_AFTER_ROUND", None)
-        round_shas[str(k)] = sha
-        append_round(round_no=k, user_sha=None, sealed_sha=sha)
-        update_live_run(
-            data_dir=run_mod.DATA,
-            running=True,
-            round_no=k,
-            total_rounds=run_mod.TOTAL_ROUNDS,
-            round_shas=round_shas,
-        )
-        print(f"==== round {k} done · main={sha[:12]} ====")
+    on_round_end = partial(_on_round_end, tracker=tracker, round_shas=round_shas)
 
     def make_event_logger(agent_id: str):
         return lambda kind, text: append_agent_log(
@@ -486,12 +502,7 @@ def main() -> int:
                 },
             )
 
-    session_factory = (
-        make_mixed_run_session_fn
-        if os.environ.get("MIXED_TASK_MANIFEST", "").strip()
-        else make_sim_run_session_fn
-    )
-    user_run_session_fn = session_factory(
+    user_run_session_fn = run_mod._make_user_run_session_fn(
         client_factory=client_factory,
         tracker=tracker,
         store=store,
