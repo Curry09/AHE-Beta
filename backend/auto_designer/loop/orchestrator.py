@@ -9,11 +9,13 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import subprocess
 import threading
 import traceback
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from types import MappingProxyType
 from typing import Any, Protocol
 
 from auto_designer.demand.divergent import Divergent
@@ -27,7 +29,14 @@ from auto_designer.loop.recovery import (
     operation_key,
 )
 from auto_designer.loop.round_gate import RoundDeliveryBlocked, classify_issue, wait_round_delivery
-from auto_designer.models import OpenIssue, Persona, SeedScenario
+from auto_designer.models import (
+    OpenIssue,
+    Persona,
+    SeedScenario,
+    Session,
+    bound_session_provenance,
+    validate_session_provenance,
+)
 from auto_designer.usage import bind_usage_context, current_usage_context
 from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.runtime import WorkspaceRuntime, as_runtime, make_empty_runtime
@@ -100,6 +109,11 @@ class Orchestrator:
         fetch_issue: Callable[[int], Mapping[str, Any]] | None = None,
         wait_delivery: Callable[..., None] | None = None,
         recovery: RecoveryStore | None = None,
+        frozen_session_plan: Callable[[int], Sequence[Mapping[str, Any]]] | None = None,
+        resolve_session: Callable[[Mapping[str, Any]], SessionPair] | None = None,
+        task_kinds: Mapping[str, str] | None = None,
+        on_session_event: Callable[[str, Persona, SeedScenario, Session | None], None]
+        | None = None,
     ) -> None:
         self._launcher = launcher
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
@@ -128,6 +142,15 @@ class Orchestrator:
         # Spec-0064/T2: when present, run_round delegates to the durable stage
         # machine.  None preserves the established in-process behavior.
         self._recovery = recovery
+        if (frozen_session_plan is None) != (resolve_session is None):
+            raise ValueError("logical session plan and resolver must be supplied together")
+        if frozen_session_plan is not None and recovery is None:
+            raise ValueError("logical frozen sessions require a recovery store")
+        # Spec-0073/T4: logical identity is frozen independently of provider coordinates.
+        self._frozen_session_plan = frozen_session_plan
+        self._resolve_session = resolve_session
+        self._task_kinds = dict(task_kinds or {})
+        self._on_session_event = on_session_event
         if recovery is not None:
             for role in [*self._triagers, *self._divergents, *self._synthesizers, self._owner]:
                 bind_recovery = getattr(role, "bind_recovery", None)
@@ -359,7 +382,19 @@ class Orchestrator:
                 raise RecoveryConflictError(f"completed round {round_no} has no sealed SHA")
             return sealed
 
-        if saved_round is None:
+        if self._frozen_session_plan is not None:
+            plan_payload = self._logical_plan(round_no=round_no)
+            if saved_round is None:
+                user_sha = self._resolve_head(ref=self._initial_ref)
+                saved_round = recovery.freeze_round(
+                    round_no=round_no, user_sha=user_sha, plan=plan_payload
+                )
+            else:
+                user_sha = str(saved_round.get("user_sha") or "")
+                if not user_sha or saved_round.get("plan") != plan_payload:
+                    raise RecoveryConflictError("saved round differs from the frozen logical plan")
+            planned = []
+        elif saved_round is None:
             user_sha = self._resolve_head(ref=self._initial_ref)
             planned = list(self._session_plan())
             plan_payload = [
@@ -367,28 +402,29 @@ class Orchestrator:
                 for persona, scenario in planned
             ]
             saved_round = recovery.freeze_round(
-                round_no=round_no,
-                user_sha=user_sha,
-                plan=plan_payload,
+                round_no=round_no, user_sha=user_sha, plan=plan_payload
             )
         else:
             user_sha = str(saved_round.get("user_sha") or "")
             if not user_sha:
                 raise RecoveryConflictError(f"round {round_no} has no frozen user SHA")
             planned = [
-                (
-                    Persona.from_dict(item["persona"]),
-                    SeedScenario.from_dict(item["scenario"]),
-                )
+                (Persona.from_dict(item["persona"]), SeedScenario.from_dict(item["scenario"]))
                 for item in saved_round.get("plan") or []
             ]
+            plan_payload = None
         self._assert_commit_available(user_sha)
         self._mark_recovery_stage(
             round_no=round_no,
             stage="round_started",
             input_value={"user_sha": user_sha, "plan": saved_round.get("plan") or []},
         )
-        self._run_recovery_users(round_no=round_no, user_sha=user_sha, planned=planned)
+        self._run_recovery_users(
+            round_no=round_no,
+            user_sha=user_sha,
+            planned=planned,
+            bindings=plan_payload if self._frozen_session_plan is not None else None,
+        )
 
         if deliver:
             self._run_recovery_demand(round_no=round_no)
@@ -411,13 +447,61 @@ class Orchestrator:
         recovery.seal_round(round_no=round_no, sealed_sha=sealed_sha)
         return sealed_sha
 
+    def _logical_plan(self, *, round_no: int) -> list[dict[str, Any]]:
+        """Spec-0073/T4: use the same immutable binding for round, key and input."""
+        assert self._frozen_session_plan is not None
+        plan = json.loads(json.dumps(list(self._frozen_session_plan(round_no))))
+        keys = {"round_no", "slot", "persona_id", "task_id", "task_digest", "interaction"}
+        personas = set()
+        for index, binding in enumerate(plan):
+            if (
+                not isinstance(binding, dict)
+                or set(binding) != keys
+                or type(binding["round_no"]) is not int
+                or type(binding["slot"]) is not int
+                or binding["round_no"] != round_no
+                or binding["slot"] != index
+                or not all(
+                    isinstance(binding[key], str) and binding[key]
+                    for key in ("persona_id", "task_id", "task_digest", "interaction")
+                )
+                or binding["interaction"] not in {"direct", "simulated_user"}
+                or binding["persona_id"] in personas
+                or self._task_kinds.get(binding["task_id"]) not in {"ordinary", "swebench"}
+            ):
+                raise RecoveryConflictError("invalid frozen logical session binding")
+            personas.add(binding["persona_id"])
+        return plan
+
+    def _resolve_logical_session(self, binding: Mapping[str, Any]) -> SessionPair:
+        assert self._resolve_session is not None
+        persona, scenario = self._resolve_session(MappingProxyType(dict(binding)))
+        params = scenario.workspace.params if scenario.workspace is not None else {}
+        if (
+            persona.identity != binding["persona_id"]
+            or any(
+                params.get(key) != binding[key] for key in ("task_id", "task_digest", "interaction")
+            )
+            or params.get("task_kind") != self._task_kinds[binding["task_id"]]
+        ):
+            raise RecoveryConflictError("resolved session does not match its frozen binding")
+        return persona, scenario
+
     def _run_recovery_users(
-        self, *, round_no: int, user_sha: str, planned: Sequence[SessionPair]
+        self,
+        *,
+        round_no: int,
+        user_sha: str,
+        planned: Sequence[SessionPair],
+        bindings: Sequence[Mapping[str, Any]] | None,
     ) -> None:
         recovery = self._require_recovery()
-        if recovery.stage_status(round_no=round_no, stage="users") == "completed":
+        if (
+            recovery.stage_status(round_no=round_no, stage="users") == "completed"
+            and bindings is None
+        ):
             return
-        if not planned:
+        if not planned and not bindings:
             self._mark_recovery_stage(
                 round_no=round_no,
                 stage="users",
@@ -425,26 +509,30 @@ class Orchestrator:
                 dependencies=("round_started",),
             )
             return
-
-        # Recoverable runs must retain the configured session fan-out.  The
-        # original implementation executed this loop inline, so a resumed
-        # round silently degraded to one user at a time even when
-        # ``max_parallel_users`` was set to 16.  We freeze every unit intent
-        # first, then execute the independent session envelopes concurrently.
-        # Recovery mutations are kept behind one lock because RecoveryStore's
-        # revisioned snapshot is intentionally single-writer; model/tool work
-        # remains outside that lock.
         failures: list[str] = []
         recovery_lock = threading.RLock()
-        pending: list[tuple[str, Persona, SeedScenario]] = []
-        for index, (persona, scenario) in enumerate(planned):
-            key = operation_key(round_no, "users", index, persona.to_dict(), scenario.to_dict())
-            input_value = {
-                "index": index,
-                "persona": persona.to_dict(),
-                "scenario": scenario.to_dict(),
-                "user_sha": user_sha,
-            }
+        pending = []
+        run_id = str(recovery.snapshot()["identity"]["run_id"])
+        pairs = [(None, None)] * len(bindings) if bindings is not None else planned
+        for index, (persona, scenario) in enumerate(pairs):
+            binding = dict(bindings[index]) if bindings is not None else None
+            if binding is not None:
+                key = operation_key(run_id, "users", binding)
+                input_value = {"binding": binding, "user_sha": user_sha}
+            else:
+                key = operation_key(round_no, "users", index, persona.to_dict(), scenario.to_dict())
+                input_value = {
+                    "index": index,
+                    "persona": persona.to_dict(),
+                    "scenario": scenario.to_dict(),
+                    "user_sha": user_sha,
+                }
+            # The frozen round already fixes every slot/key. A queued future is
+            # not running until it acquires a worker (Spec-0073/T4 live validation).
+            pending.append((key, persona, scenario, binding, input_value))
+
+        def run_one(item) -> None:
+            key, persona, scenario, binding, input_value = item
             with recovery_lock:
                 unit = recovery.begin_unit(
                     round_no=round_no,
@@ -454,72 +542,98 @@ class Orchestrator:
                     expected_postconditions={"completed": True},
                     dependencies=("round_started",),
                 )
-            if unit.get("status") == "completed":
-                continue
-            pending.append((key, persona, scenario))
-
-        def run_one(item: tuple[str, Persona, SeedScenario]) -> None:
-            key, persona, scenario = item
+            if unit.get("status") == "completed" and binding is None:
+                return
             workspace_dir: WorkspaceRuntime | None = None
-            try:
-                load_completed = getattr(self._run_session, "load_completed_session", None)
-                existing = load_completed(key) if callable(load_completed) else None
-                if existing is not None:
+            context = {"session_id": key, "round_no": round_no, "run_id": run_id}
+            if binding is not None:
+                context.update(
+                    persona_id=binding["persona_id"],
+                    task_id=binding["task_id"],
+                    task_digest=binding["task_digest"],
+                    task_kind=self._task_kinds[binding["task_id"]],
+                    interaction_mode=binding["interaction"],
+                    slot=binding["slot"],
+                    instance_id=binding["task_id"],
+                    harness_sha=user_sha,
+                    attempt=int(unit["attempt"]),
+                )
+            with bind_usage_context(**context):
+                try:
+                    expected = bound_session_provenance()
+                    load_completed = getattr(self._run_session, "load_completed_session", None)
+                    existing = load_completed(key) if callable(load_completed) else None
+                    if existing is not None:
+                        if binding is not None:
+                            if not isinstance(existing, Session) or existing.session_id != key:
+                                raise RecoveryConflictError(
+                                    "cached result is not the bound session"
+                                )
+                            validate_session_provenance(existing, expected)
+                        result = existing
+                        if binding is not None:
+                            persona, scenario = existing.persona, existing.scenario
+                    else:
+                        if binding is not None and unit.get("status") == "completed":
+                            raise RecoveryConflictError(
+                                "completed unit has no authoritative session"
+                            )
+                        if binding is not None:
+                            persona, scenario = self._resolve_logical_session(binding)
+                        if self._on_session_event is not None:
+                            self._on_session_event("running", persona, scenario, None)
+                        if scenario.workspace is not None:
+                            workspace_dir = as_runtime(
+                                materialize_workspace(scenario.workspace), owns_tmp=True
+                            )
+                            ensure_deps(workspace_dir, scenario.workspace)
+                        else:
+                            workspace_dir = make_empty_runtime()
+                        harness = self._launcher.launch(user_sha, workspace_dir=workspace_dir)
+                        result = self._run_session(
+                            persona, scenario, harness, workspace_dir=workspace_dir
+                        )
+                        if binding is not None:
+                            if not isinstance(result, Session) or result.session_id != key:
+                                raise RecoveryConflictError(
+                                    "runner returned a different session identity"
+                                )
+                            validate_session_provenance(result, expected)
                     with recovery_lock:
-                        recovery.save_output(
-                            round_no=round_no,
-                            stage="users",
-                            key=key,
-                            output=_result_payload(existing),
-                        )
-                        recovery.complete_unit(
-                            round_no=round_no,
-                            stage="users",
-                            key=key,
-                            observed_postconditions={"completed": True, "session_id": key},
-                        )
-                    return
-                if scenario.workspace is not None:
-                    workspace_dir = as_runtime(
-                        materialize_workspace(scenario.workspace), owns_tmp=True
-                    )
-                    ensure_deps(workspace_dir, scenario.workspace)
-                else:
-                    workspace_dir = make_empty_runtime()
-                harness = self._launcher.launch(user_sha, workspace_dir=workspace_dir)
-                with bind_usage_context(session_id=key, round_no=round_no):
-                    result = self._run_session(
-                        persona,
-                        scenario,
-                        harness,
-                        workspace_dir=workspace_dir,
-                    )
-                with recovery_lock:
-                    recovery.save_output(
-                        round_no=round_no,
-                        stage="users",
-                        key=key,
-                        output=_result_payload(result),
-                    )
-                    recovery.complete_unit(
-                        round_no=round_no,
-                        stage="users",
-                        key=key,
-                        observed_postconditions={"completed": True},
-                    )
-            except Exception as exc:  # noqa: BLE001
-                with recovery_lock:
-                    recovery.fail_unit(
-                        round_no=round_no,
-                        stage="users",
-                        key=key,
-                        error=f"{type(exc).__name__}: {exc}",
-                    )
-                    failures.append(key)
-                traceback.print_exc()
-            finally:
-                if workspace_dir is not None:
-                    workspace_dir.close()
+                        if unit.get("status") != "completed":
+                            recovery.save_output(
+                                round_no=round_no,
+                                stage="users",
+                                key=key,
+                                output=_result_payload(result),
+                            )
+                            recovery.complete_unit(
+                                round_no=round_no,
+                                stage="users",
+                                key=key,
+                                observed_postconditions={"completed": True, "session_id": key},
+                            )
+                    if self._on_session_event is not None:
+                        self._on_session_event("completed", persona, scenario, result)
+                except Exception as exc:  # noqa: BLE001
+                    with recovery_lock:
+                        if unit.get("status") != "completed":
+                            recovery.fail_unit(
+                                round_no=round_no,
+                                stage="users",
+                                key=key,
+                                error=f"{type(exc).__name__}: {exc}",
+                            )
+                        failures.append(key)
+                    if self._on_session_event is not None:
+                        if persona is None:
+                            persona = Persona(binding["persona_id"], "", "", "", "")
+                            scenario = SeedScenario("")
+                        self._on_session_event("failed", persona, scenario, None)
+                    traceback.print_exc()
+                finally:
+                    if workspace_dir is not None:
+                        workspace_dir.close()
 
         if pending:
             with ThreadPoolExecutor(
@@ -527,8 +641,6 @@ class Orchestrator:
             ) as pool:
                 futures = [pool.submit(run_one, item) for item in pending]
                 for future in futures:
-                    # Exceptions are recorded by run_one; this retrieval also
-                    # prevents an unexpected worker error from being hidden.
                     future.result()
         if failures:
             raise RoundDeliveryBlocked(numbers=[], reason="user-sessions-incomplete")

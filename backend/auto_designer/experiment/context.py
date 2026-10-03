@@ -57,9 +57,19 @@ def write_controller_context(
     backend = manifest["config"]["runtime"]["backend"]
     gitea = resources.get("gitea") or {}
     vigil = resources.get("vigil") or {}
+    # Spec-0073/T1: new runs bind a complete catalog, legacy contexts retain their shape.
+    contract = manifest.get("workload_contract_version")
     workspace = resources.get("workspace") or {}
     expected_workspace = "docker-seed" if backend == "local" else "prebuilt"
-    if workspace.get("kind") != expected_workspace:
+    if "workload_contract_version" in manifest:
+        from auto_designer.experiment.workload import read_task_catalog, verify_task_workspaces
+
+        catalog = read_task_catalog(root, manifest)
+        workspaces = resources.get("task_workspaces") or {}
+        verify_task_workspaces(catalog, workspaces)
+        if any(item["kind"] != expected_workspace for item in workspaces.values()):
+            raise ConfigError(f"{backend} requires prepared {expected_workspace} task workspaces")
+    elif workspace.get("kind") != expected_workspace:
         raise ConfigError(f"{backend} requires a prepared {expected_workspace} workspace")
     token = credentials.get("GITEA_TOKEN", "")
     required = {
@@ -96,7 +106,18 @@ def write_controller_context(
     }
     path = root / "runtime/controller-context.json"
     _write_private(path, json.dumps(values, ensure_ascii=False, indent=2) + "\n")
-    _write_private(root / "runtime/workspace.json", json.dumps(workspace, indent=2) + "\n")
+    if "workload_contract_version" in manifest:
+        values.update(
+            workload_contract_version=contract,
+            catalog_hash=manifest["catalog_hash"],
+            plan_hash=manifest["plan_hash"],
+        )
+        _write_private(path, json.dumps(values, ensure_ascii=False, indent=2) + "\n")
+        _write_private(
+            root / "runtime/task-workspaces.json", json.dumps(workspaces, indent=2) + "\n"
+        )
+    else:
+        _write_private(root / "runtime/workspace.json", json.dumps(workspace, indent=2) + "\n")
     return path
 
 
@@ -138,6 +159,24 @@ def require_controller_context(*, swebench: bool = False) -> SimpleNamespace:
         "AUTO_DESIGNER_INTERACTION_PLAN",
         "TOTAL_ROUNDS",
     ]
+    if os.environ.get("AUTO_DESIGNER_WORKLOAD_CONTRACT_VERSION"):
+        if os.environ["AUTO_DESIGNER_WORKLOAD_CONTRACT_VERSION"] != "1":
+            raise ConfigError("Unknown workload_contract_version")
+        for legacy in (
+            "AUTO_DESIGNER_TASK_PACKAGE",
+            "AUTO_DESIGNER_WORKSPACE_FILE",
+            "AUTO_DESIGNER_INTERACTION_PLAN",
+        ):
+            required.remove(legacy)
+        required.extend(
+            [
+                "AUTO_DESIGNER_TASK_CATALOG",
+                "AUTO_DESIGNER_SESSION_PLAN",
+                "AUTO_DESIGNER_TASK_WORKSPACES_FILE",
+                "AUTO_DESIGNER_FROZEN_MANIFEST",
+            ]
+        )
+        swebench = False
     if swebench:
         required.extend(
             [
@@ -193,11 +232,6 @@ def build_controller_environment(
             "AUTO_DESIGNER_RUN_MODE": mode,
             "AUTO_DESIGNER_RECOVERY_ROOT": str(root / "checkpoints"),
             "AUTO_DESIGNER_HARNESS_ARCHIVE": str(material_path(root, manifest, "harness_archive")),
-            "AUTO_DESIGNER_TASK_PACKAGE": str(material_path(root, manifest, "task_package")),
-            "AUTO_DESIGNER_WORKSPACE_FILE": str(root / "runtime/workspace.json"),
-            "AUTO_DESIGNER_INTERACTION_PLAN": str(
-                material_path(root, manifest, "interaction_plan")
-            ),
             "AUTO_DESIGNER_GITEA_ENV_FILE": str(root / "secrets/demand-gitea.env"),
             "PERSONA_LIBRARY": str(material_path(root, manifest, "persona_library")),
             "PERSONA_ROSTER": str(material_path(root, manifest, "persona_roster")),
@@ -219,6 +253,29 @@ def build_controller_environment(
             "CLAUDE_CONFIG_DIR": str(root / "secrets/claude"),
         }
     )
+    if "workload_contract_version" in manifest:
+        env.update(
+            {
+                "AUTO_DESIGNER_WORKLOAD_CONTRACT_VERSION": str(
+                    manifest["workload_contract_version"]
+                ),
+                "AUTO_DESIGNER_TASK_CATALOG": str(material_path(root, manifest, "task_catalog")),
+                "AUTO_DESIGNER_SESSION_PLAN": str(material_path(root, manifest, "session_plan")),
+                "AUTO_DESIGNER_TASK_WORKSPACES_FILE": str(root / "runtime/task-workspaces.json"),
+                "AUTO_DESIGNER_FROZEN_MANIFEST": str(root / "manifest.json"),
+                "AUTO_DESIGNER_CATALOG_HASH": manifest["catalog_hash"],
+            }
+        )
+    else:
+        env.update(
+            {
+                "AUTO_DESIGNER_TASK_PACKAGE": str(material_path(root, manifest, "task_package")),
+                "AUTO_DESIGNER_WORKSPACE_FILE": str(root / "runtime/workspace.json"),
+                "AUTO_DESIGNER_INTERACTION_PLAN": str(
+                    material_path(root, manifest, "interaction_plan")
+                ),
+            }
+        )
     # Spec-0072/T1: public policies, not host variables or credential profile settings.
     policies = runtime_policies(config)
     timing, delivery, alarms = (policies[key] for key in ("timing", "delivery", "alarms"))
@@ -281,7 +338,7 @@ def build_controller_environment(
             )
             if model.get("reasoning_effort"):
                 env[prefix + "REASONING_EFFORT"] = model["reasoning_effort"]
-    if config["workload"]["kind"] == "swebench":
+    if "workload_contract_version" not in manifest and config["workload"]["kind"] == "swebench":
         env["SWEBENCH_PARQUET"] = str(material_path(root, manifest, "dataset"))
         env["SWEBENCH_INSTANCE_FILE"] = str(material_path(root, manifest, "pool"))
         env["SWEBENCH_INTERACTION_PLAN"] = env["AUTO_DESIGNER_INTERACTION_PLAN"]
@@ -297,22 +354,59 @@ def build_controller_environment(
     return env
 
 
-def frozen_scenario():
+def frozen_scenario(task_id: str | None = None):
     """Load the task instruction and backend-supplied prepared workspace directly."""
     from auto_designer.models import SeedScenario, WorkspaceSpec
 
-    package_path = Path(os.environ["AUTO_DESIGNER_TASK_PACKAGE"])
-    package = json.loads(package_path.read_text(encoding="utf-8"))
-    root = package_path.parent.parent
+    if os.environ.get("AUTO_DESIGNER_WORKLOAD_CONTRACT_VERSION"):
+        catalog, _, workspaces = frozen_workload()
+        tasks = {task["id"]: task for task in catalog["tasks"]}
+        if task_id not in tasks:
+            raise ConfigError(f"Frozen scenario requires a known explicit task_id: {task_id}")
+        package = tasks[task_id]["package"]
+        root = Path(os.environ["AUTO_DESIGNER_TASK_CATALOG"]).parent.parent
+        workspace = workspaces[task_id]
+    else:
+        package_path = Path(os.environ["AUTO_DESIGNER_TASK_PACKAGE"])
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+        root = package_path.parent.parent
+        workspace = json.loads(Path(os.environ["AUTO_DESIGNER_WORKSPACE_FILE"]).read_text())
     instruction = root / package["instruction_file"]
-    if not instruction.resolve().is_relative_to(root.resolve()):
+    if instruction.is_symlink() or not instruction.resolve().is_relative_to(root.resolve()):
         raise ConfigError("Task instruction escapes frozen run")
-    workspace = json.loads(Path(os.environ["AUTO_DESIGNER_WORKSPACE_FILE"]).read_text())
     specification = WorkspaceSpec.from_dict(workspace)
-    specification.params.setdefault("instance_id", package["id"])
-    specification.params.setdefault("task_id", package["id"])
-    specification.params.setdefault("task_key", package["id"])
+    if os.environ.get("AUTO_DESIGNER_WORKLOAD_CONTRACT_VERSION"):
+        specification.params.update(
+            instance_id=package["id"],
+            task_id=package["id"],
+            task_key=package["id"],
+            task_digest=tasks[task_id]["digest"],
+            task_kind=tasks[task_id]["kind"],
+            benchmark="swebench" if package["kind"] == "swebench" else "ordinary",
+            not_in_benchmark=package.get("not_in_benchmark", False),
+        )
+    else:
+        specification.params.setdefault("instance_id", package["id"])
+        specification.params.setdefault("task_id", package["id"])
+        specification.params.setdefault("task_key", package["id"])
     specification.params["interaction"] = package.get("interaction", "simulated_user")
     return SeedScenario(
         description=instruction.read_text(encoding="utf-8"), workspace=specification
     )
+
+
+def frozen_workload() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Spec-0073/T1: read validated logical bindings and prepared provider workspaces."""
+    from auto_designer.experiment.workload import (
+        read_session_plan,
+        read_task_catalog,
+        verify_task_workspaces,
+    )
+
+    root = Path(os.environ["AUTO_DESIGNER_TASK_CATALOG"]).parent.parent
+    manifest = json.loads(Path(os.environ["AUTO_DESIGNER_FROZEN_MANIFEST"]).read_text())
+    catalog = read_task_catalog(root, manifest)
+    plan = read_session_plan(root, manifest)
+    workspaces = json.loads(Path(os.environ["AUTO_DESIGNER_TASK_WORKSPACES_FILE"]).read_text())
+    verify_task_workspaces(catalog, workspaces)
+    return catalog, plan, workspaces

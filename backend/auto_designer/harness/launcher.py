@@ -30,7 +30,12 @@ from typing import Any
 from ruamel.yaml import YAML
 
 from auto_designer.harness.interface import HarnessInterface
-from auto_designer.user.sim.runtime import DockerWorkspaceRuntime, Workspace, as_runtime
+from auto_designer.user.sim.runtime import (
+    DockerWorkspaceRuntime,
+    LocalWorkspaceRuntime,
+    Workspace,
+    as_runtime,
+)
 
 _PARAMS_FILE = "params.yaml"
 
@@ -596,12 +601,21 @@ class HarnessLauncher:
             )
         cwd = dest / params["cwd"] if params.get("cwd") else dest
         env = {str(k): str(v) for k, v in (params.get("env") or {}).items()}
+        if isinstance(runtime, LocalWorkspaceRuntime) and runtime.environment:
+            # Spec-0073/T3: tools inherit this session's HOME/cache/attempt identity,
+            # overriding Harness defaults without changing the controller environment.
+            env.update(runtime.environment)
         if runtime is not None and not is_docker and runtime.evidence.get("task_virtual_env"):
             # Spec-0069/T3: E2B's task shell inherits its relocated environment,
             # while the entry uses the controller's absolute NexAU interpreter.
             task_venv = str(runtime.evidence["task_virtual_env"])
             env["VIRTUAL_ENV"] = task_venv
-            env["PATH"] = task_venv + "/bin" + os.pathsep + os.environ.get("PATH", "")
+            shell_path = (
+                runtime.environment.get("PATH", os.environ.get("PATH", ""))
+                if isinstance(runtime, LocalWorkspaceRuntime) and runtime.environment
+                else os.environ.get("PATH", "")
+            )
+            env["PATH"] = task_venv + "/bin" + os.pathsep + shell_path
             if argv[0] == sys.executable and runtime.evidence.get("harness_python"):
                 argv[0] = str(runtime.evidence["harness_python"])
         protocol = str(params.get("protocol") or params.get("interface") or "legacy")

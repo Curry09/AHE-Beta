@@ -28,7 +28,7 @@ from tools.dev.delivery import git_remote_url, run_git
 ROOT = Path(__file__).resolve().parents[3] / "backend"
 sys.path.insert(0, str(ROOT))
 
-from auto_designer.experiment.controllers import ordinary as run_mod  # noqa: E402
+from auto_designer.experiment.controllers import runtime as run_mod  # noqa: E402
 
 
 def _args() -> argparse.Namespace:

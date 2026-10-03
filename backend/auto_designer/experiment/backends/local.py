@@ -24,6 +24,7 @@ from urllib.parse import urlsplit
 import requests
 
 from auto_designer.experiment.backends.base import BackendError
+from auto_designer.experiment.config import config_hash
 from auto_designer.experiment.context import build_controller_environment, material_path
 from auto_designer.experiment.engine import (
     controller_command,
@@ -94,7 +95,7 @@ Path('/etc/profile.d/auto-designer-task.sh').write_text(
     + 'export VIRTUAL_ENV="' + str(repo / '.venv') + '"\n')
 env = dict(os.environ, TASK_ROOT=str(repo), TASK_PYTHON='/usr/local/bin/python3',
            REQUIREMENTS_LOCK=str(build / 'requirements.lock'), VIRTUAL_ENV=str(repo / '.venv'),
-           UV_BIN='/usr/local/bin/uv', AUTO_DESIGNER_TASK_REQUIREMENTS=str(build / 'requirements.lock'))
+           UV_BIN='/usr/local/bin/uv', UV_LINK_MODE='copy', AUTO_DESIGNER_TASK_REQUIREMENTS=str(build / 'requirements.lock'))
 subprocess.run(['bash', str(build / 'setup.sh')], cwd=repo, env=env, check=True)
 if not (repo / '.venv/bin/python').is_file():
     raise RuntimeError('task setup did not create its isolated .venv')
@@ -223,15 +224,80 @@ print(json.dumps({'verified':True,'openagents_files':len(expected['files']),'nex
     return result
 
 
+# Spec-0073/T2: compatibility ends at the frozen task/material boundary.
+def _image_tasks(*, root: Path, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    if manifest.get("workload_contract_version") is not None:
+        from auto_designer.experiment.workload import catalog_tasks, read_task_catalog
+
+        return catalog_tasks(read_task_catalog(root, manifest))
+    return [
+        {
+            "id": manifest["task_package"]["id"],
+            "package": manifest["task_package"],
+            "source_snapshot": manifest["task_source_snapshot"],
+            "digest": None,
+            "materials": {
+                "source_archive": "task_source_archive",
+                "script": "script",
+                "requirements_lock": "requirements_lock",
+            },
+        }
+    ]
+
+
+def _prepare_task_build(
+    *, root: Path, manifest: dict[str, Any], task: dict[str, Any], destination: Path
+) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for name, filename in (
+        ("source_archive", "task-source.tar.gz"),
+        ("script", "setup.sh"),
+        ("requirements_lock", "requirements.lock"),
+    ):
+        shutil.copyfile(
+            material_path(root, manifest, task["materials"][name]), destination / filename
+        )
+    _write(
+        destination / "task-build.json",
+        {
+            "id": task["id"],
+            "source": task["package"]["source"],
+            "files": task["source_snapshot"]["files"],
+            "task_digest": task["digest"],
+        },
+    )
+    (destination / "task-bootstrap.py").write_text(TASK_BOOTSTRAP)
+
+
+def _prepared_image(
+    *, ref: str, custom: bool, dockerfile: Path, target: str, context: Path, log_path: Path
+) -> dict[str, Any]:
+    if custom:
+        try:
+            info = _image(ref)
+        except BackendError:
+            _command(["docker", "pull", ref], log_path=log_path)
+            info = _image(ref)
+    else:
+        _command(
+            ["docker", "build", "--target", target, "-f", str(dockerfile), "-t", ref, str(context)],
+            timeout=3600,
+            log_path=log_path,
+        )
+        info = _image(ref)
+    if (
+        target == "unified-seed"
+        and ((info.get("Config") or {}).get("Labels") or {}).get("org.auto-designer.seed-runtime")
+        != "1"
+    ):
+        raise BackendError("Seed image does not implement runnable seed v1")
+    return {"reference": ref, "image_id": info["Id"], "repo_digests": info.get("RepoDigests") or []}
+
+
 def prepare_images(
     run_dir: Path, manifest: dict[str, Any], credentials: Mapping[str, str] | None = None
 ) -> dict[str, Any]:
-    """Build/pull fixed runtime images and a frozen host environment, without resources.
-
-    Supplied image references are used only after inspection. Task image overrides
-    must expose the runnable seed contract; the actual task base is checked later.
-    Build caches are shared by material hashes, never by mutable developer trees.
-    """
+    """Build one shared toolchain and a content-addressed runnable image per task."""
     root = Path(run_dir).resolve()
     verify_materials(manifest=manifest)
     if manifest["config"]["runtime"]["backend"] != "local":
@@ -268,7 +334,6 @@ def prepare_images(
     )
     context = root / "runtime/image-build"
     context.mkdir(parents=True, exist_ok=True)
-    # No provider/model credentials enter the build context or Docker build arguments.
     for key, destination in (
         ("controller_source_archive", "controller"),
         ("openagents_source_archive", "openagents"),
@@ -277,85 +342,90 @@ def prepare_images(
         if target.exists():
             shutil.rmtree(target)
         _extract(material_path(root, manifest, key), target)
-    for key, name in (
-        ("task_source_archive", "task-source.tar.gz"),
-        ("script", "setup.sh"),
-        ("requirements_lock", "requirements.lock"),
-    ):
-        shutil.copyfile(material_path(root, manifest, key), context / name)
-    _write(
-        context / "task-build.json",
-        {
-            "id": manifest["task_package"]["id"],
-            "source": manifest["task_package"]["source"],
-            "files": manifest["task_source_snapshot"]["files"],
-        },
-    )
-    (context / "task-bootstrap.py").write_text(TASK_BOOTSTRAP)
-    dockerfile = source / "backend/deploy/vigil/Dockerfile"
-    digest = hashlib.sha256(
-        json.dumps(
-            {
-                "recipe": RECIPE_VERSION,
-                "dockerfile": sha256_file(dockerfile),
-                "bootstrap": hashlib.sha256(TASK_BOOTSTRAP.encode()).hexdigest(),
-                "materials": {
-                    key: value["sha256"]
-                    for key, value in manifest["materials"].items()
-                    if key
-                    in {
-                        "controller_source_archive",
-                        "openagents_source_archive",
-                        "task_source_archive",
-                        "script",
-                        "requirements_lock",
-                    }
-                },
-            },
-            sort_keys=True,
-        ).encode()
-    ).hexdigest()[:20]
+    tasks = _image_tasks(root=root, manifest=manifest)
+    modern = manifest.get("workload_contract_version") == 1
     options = manifest["config"]["runtime"].get("local") or {}
-    images: dict[str, dict[str, Any]] = {}
-    for name, target in (("vigil", "unified-vigil"), ("seed", "unified-seed")):
-        custom = options.get(name + "_image")
-        ref = str(custom or f"auto-designer-{name}:unified-{digest}")
-        if custom:
-            try:
-                info = _image(ref)
-            except BackendError:
-                _command(["docker", "pull", ref], log_path=build_log)
-                info = _image(ref)
+    if len(tasks) > 1 and options.get("seed_image"):
+        raise BackendError("A single seed_image cannot override multiple task packages")
+    dockerfile = source / "backend/deploy/vigil/Dockerfile"
+    base_recipe = {
+        "recipe": "unified-local-tasks-v1" if modern else RECIPE_VERSION,
+        "dockerfile": sha256_file(dockerfile),
+        "bootstrap": hashlib.sha256(TASK_BOOTSTRAP.encode()).hexdigest(),
+        "python": PYTHON_VERSION,
+        "platform": "linux/amd64",
+        "materials": {
+            key: manifest["materials"][key]["sha256"]
+            for key in ("controller_source_archive", "openagents_source_archive")
+        },
+    }
+    if not modern:
+        for key in ("task_source_archive", "script", "requirements_lock"):
+            base_recipe["materials"][key] = manifest["materials"][key]["sha256"]
+        _prepare_task_build(root=root, manifest=manifest, task=tasks[0], destination=context)
+    base_hash = hashlib.sha256(json.dumps(base_recipe, sort_keys=True).encode()).hexdigest()
+    images = {
+        "vigil": _prepared_image(
+            ref=str(options.get("vigil_image") or f"auto-designer-vigil:unified-{base_hash[:20]}"),
+            custom=bool(options.get("vigil_image")),
+            dockerfile=dockerfile,
+            target="unified-vigil",
+            context=context,
+            log_path=build_log,
+        )
+    }
+    task_images = {}
+    for task in tasks:
+        task_hash = hashlib.sha256(
+            json.dumps({"base_recipe": base_hash, "task": task["digest"]}, sort_keys=True).encode()
+        ).hexdigest()
+        if modern:
+            task_path = context / "tasks" / task["id"]
+            _prepare_task_build(root=root, manifest=manifest, task=task, destination=task_path)
+            original = "COPY task-source.tar.gz setup.sh requirements.lock task-build.json task-bootstrap.py /opt/task-build/"
+            replacement = (
+                "COPY "
+                + " ".join(
+                    "tasks/" + task["id"] + "/" + name
+                    for name in (
+                        "task-source.tar.gz",
+                        "setup.sh",
+                        "requirements.lock",
+                        "task-build.json",
+                        "task-bootstrap.py",
+                    )
+                )
+                + " /opt/task-build/"
+            )
+            text = dockerfile.read_text()
+            if text.count(original) != 1:
+                raise BackendError("Frozen Dockerfile lacks the known task seed build contract")
+            task_dockerfile = task_path / "Dockerfile"
+            task_dockerfile.write_text(text.replace(original, replacement))
         else:
-            _command(
-                [
-                    "docker",
-                    "build",
-                    "--target",
-                    target,
-                    "-f",
-                    str(dockerfile),
-                    "-t",
-                    ref,
-                    str(context),
-                ],
-                timeout=3600,
+            task_dockerfile = dockerfile
+        try:
+            image = _prepared_image(
+                ref=str(
+                    options.get("seed_image") or f"auto-designer-seed:unified-{task_hash[:20]}"
+                ),
+                custom=bool(options.get("seed_image")),
+                dockerfile=task_dockerfile,
+                target="unified-seed",
+                context=context,
                 log_path=build_log,
             )
-            info = _image(ref)
-        if (
-            name == "seed"
-            and ((info.get("Config") or {}).get("Labels") or {}).get(
-                "org.auto-designer.seed-runtime"
-            )
-            != "1"
-        ):
-            raise BackendError("Seed image does not implement runnable seed v1")
-        images[name] = {
-            "reference": ref,
-            "image_id": info["Id"],
-            "repo_digests": info.get("RepoDigests") or [],
+        except BackendError as exc:
+            raise BackendError(f"Task {task['id']} image preparation failed: {exc}") from exc
+        task_images[task["id"]] = {
+            **image,
+            "task_digest": task["digest"],
+            "recipe_hash": task_hash,
+            "source_revision": task["source_snapshot"].get("revision"),
+            "source_hash": config_hash(data=task["source_snapshot"]["files"]),
         }
+        if not modern:
+            images["seed"] = image
     for name, default in (("gitea", "gitea/gitea:1.22.6"), ("egress", DEFAULT_EGRESS_IMAGE)):
         ref = str(options.get(name + "_image") or default)
         _command(["docker", "pull", ref], log_path=build_log)
@@ -390,8 +460,8 @@ def prepare_images(
     ):
         raise BackendError("Installed OpenAgents lacks local evidence-reader capabilities")
     result = {
-        "recipe": RECIPE_VERSION,
-        "recipe_hash": digest,
+        "recipe": "unified-local-tasks-v1" if modern else RECIPE_VERSION,
+        "recipe_hash": base_hash,
         "images": images,
         "controller_python": str(python),
         "source_root": str(source),
@@ -399,6 +469,8 @@ def prepare_images(
         "installed_toolchain": installed,
         "prepared_at": _now(),
     }
+    if modern:
+        result["task_images"] = task_images
     _write(root / "runtime/local-images.json", result)
     return result
 
@@ -665,11 +737,78 @@ class LocalBackend:
             return recorded
         return self._loopback_port(previous["url"]) if previous.get("url") else 0
 
+    # Spec-0073/T2: provider coordinates never define the logical session identity.
+    def _workspace_resources(self) -> dict[str, Any]:
+        network = f"{self.project}_vigil_net"
+        common = {
+            "harness_python": "/opt/controller/.venv/bin/python",
+            "network": network,
+            "env": {
+                "HTTP_PROXY": "http://egress-proxy:3128",
+                "HTTPS_PROXY": "http://egress-proxy:3128",
+                "NO_PROXY": "gitea,127.0.0.1,localhost",
+            },
+        }
+        if self.manifest.get("workload_contract_version") is None:
+            return {
+                "workspace": {
+                    "kind": "docker-seed",
+                    "params": {
+                        **common,
+                        "image": self.images["images"]["seed"]["image_id"],
+                        "instance_id": self.manifest["task_package"]["id"],
+                    },
+                }
+            }
+        from auto_designer.experiment.workload import (
+            catalog_tasks,
+            read_task_catalog,
+            verify_task_workspaces,
+        )
+
+        catalog = read_task_catalog(self.root, self.manifest)
+        receipts = self.images.get("task_images") or {}
+        tasks = catalog_tasks(catalog)
+        if self.images.get("recipe") != "unified-local-tasks-v1" or set(receipts) != {
+            task["id"] for task in tasks
+        }:
+            raise BackendError("Prepared local task image receipts do not match frozen catalog")
+        workspaces = {}
+        for task in tasks:
+            receipt = receipts[task["id"]]
+            expected_recipe = hashlib.sha256(
+                json.dumps(
+                    {"base_recipe": self.images["recipe_hash"], "task": task["digest"]},
+                    sort_keys=True,
+                ).encode()
+            ).hexdigest()
+            if receipt.get("recipe_hash") != expected_recipe or not receipt.get("image_id"):
+                raise BackendError(f"Task {task['id']} image recipe or identity changed")
+            workspaces[task["id"]] = {
+                "kind": "docker-seed",
+                "setup": [],
+                "params": {
+                    **common,
+                    "image": receipt["image_id"],
+                    "instance_id": task["id"],
+                    "task_id": task["id"],
+                    "task_digest": task["digest"],
+                },
+                "task_digest": receipt.get("task_digest"),
+                "recipe_hash": receipt["recipe_hash"],
+                "source_revision": receipt.get("source_revision"),
+                "source_hash": receipt.get("source_hash"),
+                "status": "prepared",
+            }
+        verify_task_workspaces(catalog, workspaces)
+        return {"task_workspaces": workspaces}
+
     def provision(self) -> dict[str, Any]:
         if not self.images.get("images"):
             raise BackendError("Local images are not prepared; run prepare first")
         if self.resources.get("resource_state") == "DESTROYED":
             raise BackendError("Destroyed local resources cannot be resumed")
+        self._workspace_resources()
         # Preserve the provider identity through every provisional resource receipt.
         # Older development runs recorded the same identity under repo_id.
         previous_gitea = self.resources.get("gitea") or {}
@@ -774,20 +913,7 @@ class LocalBackend:
                 "network": f"{self.project}_vigil_net",
                 "image": refs["vigil"],
             },
-            workspace={
-                "kind": "docker-seed",
-                "params": {
-                    "image": refs["seed"],
-                    "instance_id": self.manifest["task_package"]["id"],
-                    "harness_python": "/opt/controller/.venv/bin/python",
-                    "network": f"{self.project}_vigil_net",
-                    "env": {
-                        "HTTP_PROXY": "http://egress-proxy:3128",
-                        "HTTPS_PROXY": "http://egress-proxy:3128",
-                        "NO_PROXY": "gitea,127.0.0.1,localhost",
-                    },
-                },
-            },
+            **self._workspace_resources(),
             source_root=self.images["source_root"],
             controller_python=self.images["controller_python"],
         )
@@ -951,45 +1077,108 @@ class LocalBackend:
             "encodings", []
         ) or "same-origin-v1" not in capabilities.get("download_policies", []):
             raise BackendError("Local reader capability check failed")
-        # Prove task image HEAD and task environment without invoking a model.
-        workspace = self.resources["workspace"]["params"]
-        base = _command(
-            [
-                "docker",
-                "run",
-                "--rm",
-                "--network",
-                "none",
-                "-w",
-                f"/workspace/{workspace['instance_id']}/repo",
-                workspace["image"],
-                "git",
-                "rev-parse",
-                "HEAD",
-            ]
-        )
-        expected = self.manifest["task_package"]["source"].get("revision")
-        if expected and base != expected:
-            raise BackendError("Prepared task image has the wrong upstream base commit")
-        _command(
-            [
-                "docker",
-                "run",
-                "--rm",
-                "--network",
-                "none",
-                workspace["image"],
-                f"/workspace/{workspace['instance_id']}/repo/.venv/bin/python",
-                "-c",
-                "import sys; print(sys.version)",
-            ]
-        )
+        # Prove every task's source and interpreter, not merely a receipt's ID.
+        task_checks = {}
+        if self.manifest.get("workload_contract_version") is not None:
+            from auto_designer.experiment.workload import (
+                catalog_tasks,
+                read_task_catalog,
+                verify_task_workspaces,
+            )
+
+            catalog = read_task_catalog(self.root, self.manifest)
+            expected_map = self._workspace_resources()["task_workspaces"]
+            actual_map = self.resources.get("task_workspaces")
+            verify_task_workspaces(catalog, actual_map)
+            if actual_map != expected_map:
+                raise BackendError("Recorded task image bindings changed since preparation")
+            for task in catalog_tasks(catalog):
+                workspace = actual_map[task["id"]]["params"]
+                program = """import hashlib,json,subprocess,sys
+from pathlib import Path
+expected=json.loads(sys.argv[1]);root=Path.cwd()
+for relative,digest in expected['files'].items():
+    path=root/relative
+    assert not path.is_symlink() and hashlib.sha256(path.read_bytes()).hexdigest()==digest, 'task source differs: '+relative
+head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+assert not expected['revision'] or head==expected['revision'], 'task base commit differs'
+assert Path(sys.executable).parent==root/'.venv/bin', 'task interpreter differs'
+print(json.dumps({'base_commit':head,'verified_files':len(expected['files']),'python':sys.version.split()[0]}))
+"""
+                try:
+                    observed = json.loads(
+                        _command(
+                            [
+                                "docker",
+                                "run",
+                                "--rm",
+                                "--network",
+                                "none",
+                                "-w",
+                                f"/workspace/{task['id']}/repo",
+                                workspace["image"],
+                                f"/workspace/{task['id']}/repo/.venv/bin/python",
+                                "-c",
+                                program,
+                                json.dumps(
+                                    {
+                                        "files": task["source_snapshot"]["files"],
+                                        "revision": task["source_snapshot"].get("revision"),
+                                    }
+                                ),
+                            ]
+                        )
+                    )
+                except (BackendError, ValueError) as exc:
+                    raise BackendError(f"Task {task['id']} preflight failed: {exc}") from exc
+                if observed.get("python") != PYTHON_VERSION or observed.get(
+                    "verified_files"
+                ) != len(task["source_snapshot"]["files"]):
+                    raise BackendError(
+                        f"Task {task['id']} source/environment probe was not verified"
+                    )
+                task_checks[task["id"]] = {**observed, "task_digest": task["digest"]}
+            base = None
+        else:
+            workspace = self.resources["workspace"]["params"]
+            base = _command(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--network",
+                    "none",
+                    "-w",
+                    f"/workspace/{workspace['instance_id']}/repo",
+                    workspace["image"],
+                    "git",
+                    "rev-parse",
+                    "HEAD",
+                ]
+            )
+            expected = self.manifest["task_package"]["source"].get("revision")
+            if expected and base != expected:
+                raise BackendError("Prepared task image has the wrong upstream base commit")
+            _command(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--network",
+                    "none",
+                    workspace["image"],
+                    f"/workspace/{workspace['instance_id']}/repo/.venv/bin/python",
+                    "-c",
+                    "import sys; print(sys.version)",
+                ]
+            )
         probe = self._probe()
         return self._save(
             preflight={
                 "ok": True,
                 "reader_capabilities": capabilities,
                 "task_base_commit": base,
+                "tasks": task_checks,
                 "evidence_probe": probe,
                 "checked_at": _now(),
             }

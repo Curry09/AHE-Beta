@@ -148,17 +148,24 @@ def _exclude_generated_runtime(source: Path) -> None:
 def controller_command(
     manifest: dict[str, Any], source_root: Path, python: str = sys.executable
 ) -> list[str]:
-    """Select only an entrypoint proven to belong to this run's frozen source.
-
-    Older v2 manifests keep their original script launch recipe. This fallback
-    never refers to a script in the current checkout or rewrites frozen hashes.
-    """
+    """Spec-0073/T5: launch this run's original frozen contract and source."""
     backend = Path(source_root) / "backend"
-    kind = manifest["config"]["workload"]["kind"]
     files = manifest["source_snapshot"]["files"]
     recipe = manifest["source_snapshot"].get("entrypoint")
+    if "workload_contract_version" in manifest:
+        version = manifest["workload_contract_version"]
+        if type(version) is not int or version != 1:
+            raise ConfigError("Unknown frozen workload contract version")
+        expected_module = "auto_designer.experiment.controllers.unified"
+        relative = "backend/" + expected_module.replace(".", "/") + ".py"
+        if recipe != {"kind": "module", "module": expected_module} or relative not in files:
+            raise ConfigError("Frozen controller entrypoint does not match its workload contract")
+        return [python, "-m", expected_module]
+    kind = manifest.get("config", {}).get("workload", {}).get("kind")
+    if kind not in {"ordinary", "swebench"}:
+        raise ConfigError("Unknown legacy frozen workload kind")
     if recipe is not None:
-        expected_module = f"auto_designer.experiment.controllers.{'swebench' if kind == 'swebench' else 'ordinary'}"
+        expected_module = f"auto_designer.experiment.controllers.{kind}"
         relative = "backend/" + expected_module.replace(".", "/") + ".py"
         if recipe != {"kind": "module", "module": expected_module} or relative not in files:
             raise ConfigError("Frozen controller entrypoint does not match its source snapshot")

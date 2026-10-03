@@ -188,3 +188,58 @@ def test_unified_seed_binds_task_environment_and_owned_harness_interpreter(monke
     assert "HTTPS_PROXY=http://egress-proxy:3128" in started
     assert "NO_PROXY=gitea,127.0.0.1,localhost" in started
     assert result.evidence["proxy_environment"]["HTTPS_PROXY"] == "http://egress-proxy:3128"
+
+
+# Spec-0073/T2: the runtime receipt and Docker labels share the logical session identity.
+def test_docker_session_carries_bound_task_round_and_stable_session(monkeypatch):
+    from auto_designer.usage import bind_usage_context
+    from auto_designer.user.sim.sources import docker_seed
+
+    calls = []
+
+    def docker(args, **_kwargs):
+        calls.append(args)
+        if args[:2] == ["image", "inspect"]:
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Id": "sha256:fixed",
+                            "Config": {"Labels": {"org.auto-designer.seed-runtime": "1"}},
+                        }
+                    ]
+                ),
+                "",
+            )
+        if args[0] == "run":
+            return subprocess.CompletedProcess(args, 0, "container\n", "")
+        if args[:3] == ["exec", "container", "cat"]:
+            return subprocess.CompletedProcess(args, 0, json.dumps({"instances": {"one": {}}}), "")
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(docker_seed, "_docker", docker)
+    monkeypatch.setattr(
+        docker_seed.subprocess,
+        "run",
+        lambda args, **_kwargs: subprocess.CompletedProcess(args, 0, "", ""),
+    )
+    spec = WorkspaceSpec(
+        kind="docker-seed",
+        params={
+            "image": "sha256:fixed",
+            "instance_id": "one",
+            "task_id": "one",
+            "task_digest": "a" * 64,
+        },
+    )
+    with bind_usage_context(session_id="stable-session", round_no=2):
+        runtime = docker_seed.DockerSeedSource().provision(spec)
+    run = next(args for args in calls if args[0] == "run")
+    assert "io.auto-designer.session_id=stable-session" in run
+    assert "io.auto-designer.task_id=one" in run
+    assert "io.auto-designer.round_no=2" in run
+    assert runtime.evidence["session_id"] == "stable-session"
+    assert runtime.evidence["task_digest"] == "a" * 64
+    runtime.close()

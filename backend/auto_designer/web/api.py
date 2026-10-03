@@ -65,6 +65,7 @@ def _open_issue_count(*, tracker: IssueTracker | None) -> int | None:
 
 def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
     """index 行 + 从全量补 persona_identity 与截断后的 scenario，组装列表摘要 DTO。"""
+    # Spec-0073/T5: project provenance from the full authoritative session.
     session = store.load(row["session_id"])
     scenario = session.scenario.description
     return {
@@ -73,6 +74,11 @@ def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
         "score": row["score"],
         "n_issues": row["n_issues"],
         "persona_identity": session.persona.identity,
+        **(
+            {"session_provenance": dict(session.session_provenance)}
+            if session.session_provenance
+            else {}
+        ),
         "scenario": scenario[:80],
     }
 

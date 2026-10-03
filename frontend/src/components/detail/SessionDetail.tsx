@@ -106,10 +106,12 @@ export function SessionDetailView(props: {
 }) {
   const { item, onSelect, onBack } = props;
   const sessionId = item.session_id ?? null;
-  const session = useFetch(sessionId ? () => getSession(sessionId) : null, [sessionId]);
+  const loaded = useFetch(sessionId ? () => getSession(sessionId) : null, [sessionId]);
+  const session = loaded?.session_id === sessionId ? loaded : null;
 
   const turns = session?.transcript.turns ?? item.turns;
   const score = session?.feeling.score ?? item.score;
+  const origin = session?.session_provenance ?? item.session_provenance;
 
   return (
     <div className="detail">
@@ -124,7 +126,18 @@ export function SessionDetailView(props: {
       <div className="detail-body">
         <dl className="kv">
           <dt>轮次</dt>
-          <dd>第 {item.round} 轮</dd>
+          <dd>第 {origin?.round_no ?? item.round} 轮</dd>
+          {sessionId && <><dt>会话</dt><dd>{sessionId}</dd></>}
+          {origin && (
+            <>
+              <dt>任务</dt><dd>{origin.task_id} · {origin.task_kind}</dd>
+              <dt>Persona ID</dt><dd>{origin.persona_id}</dd>
+              <dt>交互方式</dt><dd>{origin.interaction}</dd>
+              <dt>槽位</dt><dd>{origin.slot}</dd>
+              <dt>Harness SHA</dt><dd>{origin.harness_sha}</dd>
+              <dt>任务摘要</dt><dd>{origin.task_digest}</dd>
+            </>
+          )}
           <dt>状态</dt>
           <dd>{item.status}</dd>
           {item.end_reason && (

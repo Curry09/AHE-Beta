@@ -207,6 +207,71 @@ def test_portable_bootstrap_program_compiles_and_pins_downloads():
     assert bootstrap_command("/tmp/a b").endswith("'/tmp/a b'")
 
 
+def test_task_workspace_receipt_binds_complete_catalog_and_actual_owned_paths(backend):
+    from auto_designer.experiment.backends.e2b_bootstrap import task_workspace_record
+    from auto_designer.experiment.config import ConfigError
+    from auto_designer.experiment.workload import task_digest
+
+    backend.manifest["workload_contract_version"] = 1
+    tasks, registry = [], {}
+    for task_id in ("ordinary", "swe"):
+        task = {
+            "id": task_id,
+            "kind": "ordinary",
+            "interaction": "direct",
+            "package": {
+                "id": task_id,
+                "kind": "ordinary",
+                "interaction": "direct",
+                "source": {"kind": "local", "path": "source/tasks/" + task_id},
+            },
+            "source_snapshot": {"revision": None, "files": {"task.py": "a" * 64}},
+            "content_hashes": {},
+            "materials": {},
+        }
+        for name in ("package", "instruction", "script", "requirements_lock", "source_archive"):
+            key = f"task:{task_id}:{name}"
+            task["materials"][name] = key
+            relative = f"materials/tasks/{task_id}/{name}"
+            path = backend.run_dir / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(task["package"]) if name == "package" else "frozen " + name)
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            registry[key] = {"path": relative, "sha256": digest}
+            if name in {"instruction", "script", "requirements_lock"}:
+                task["content_hashes"][name] = digest
+        task["digest"] = task_digest(task)
+        tasks.append(task)
+    catalog = {"contract_version": 1, "tasks": tasks}
+    catalog_path = backend.run_dir / "materials/task-catalog.json"
+    catalog_path.parent.mkdir(exist_ok=True)
+    catalog_path.write_text(json.dumps(catalog))
+    digest = hashlib.sha256(catalog_path.read_bytes()).hexdigest()
+    registry["task_catalog"] = {"path": "materials/task-catalog.json", "sha256": digest}
+    backend.manifest.update(catalog_hash=digest, materials=registry)
+    tools = {
+        "python": backend.root + "/runtime/python/bin/python",
+        "uv": backend.root + "/runtime/bin/uv",
+        "controller_python": backend.root + "/source/controller/.venv/bin/python",
+        "execution_uid": 1000,
+        "execution_gid": 1000,
+    }
+    records = {
+        task["id"]: task_workspace_record(task, backend.manifest, backend.root, tools)
+        for task in tasks
+    }
+    receipt = {**tools, "task_workspaces": records}
+    assert backend._task_workspaces(receipt) == records
+    assert all(record["params"]["workload_contract_version"] == 1 for record in records.values())
+    assert records["ordinary"]["recipe_hash"] != records["swe"]["recipe_hash"]
+    records["ordinary"]["params"]["source"] = "/another-run/source"
+    with pytest.raises(BackendError, match="owned paths"):
+        backend._task_workspaces(receipt)
+    records.pop("ordinary")
+    with pytest.raises(ConfigError, match="catalog"):
+        backend._task_workspaces(receipt)
+
+
 def test_destroyed_resource_retains_completed_exit_receipt(backend, monkeypatch):
     _write(backend.resource_file, {"sandbox_id": "owned", "resource_state": "DESTROYED"})
     _write(
@@ -398,6 +463,13 @@ def test_worker_launch_and_root_management_use_real_owned_process_and_files(
     (remote / "runtime/python/interpreter").write_text("runtime-dependency")
     (remote / "runtime/uv-cache").mkdir()
     (remote / "runtime/uv-cache/package").write_text("cached-package")
+    (remote / "runtime/task-cache/recipe").mkdir(parents=True)
+    (remote / "runtime/task-cache/recipe/wheel").write_text("private-wheel-cache")
+    for private in ("workspace/tasks/one/source", "workspace/sessions/user/attempt-1/home"):
+        (remote / private).mkdir(parents=True)
+        (remote / private / "private.txt").write_text("private-baseline-or-home")
+    (remote / "runtime/workspace-receipts").mkdir()
+    (remote / "runtime/workspace-receipts/task.json").write_text('{"task_id":"one"}')
     bootstrap = {
         "controller_python": sys.executable,
         "openagents_bin": str(remote / "bin"),
@@ -487,6 +559,8 @@ time.sleep(60)
             remote / "runtime/home",
             remote / "runtime/python",
             remote / "runtime/uv-cache",
+            remote / "runtime/task-cache",
+            remote / "workspace",
         }
 
         def scandir(path):
@@ -500,9 +574,18 @@ time.sleep(60)
         collection = backend.collect()
         assert remote / "runtime" in scans
         assert "data/worker.json" in collection["files"]
+        assert "runtime/workspace-receipts/task.json" in collection["files"]
         assert not any(path.startswith("secrets/") for path in collection["files"])
         assert not any(
-            path.startswith(("runtime/home/", "runtime/python/", "runtime/uv-cache/"))
+            path.startswith(
+                (
+                    "runtime/home/",
+                    "runtime/python/",
+                    "runtime/uv-cache/",
+                    "runtime/task-cache/",
+                    "workspace/",
+                )
+            )
             for path in collection["files"]
         )
         assert observed.count(("command", "user")) == 1

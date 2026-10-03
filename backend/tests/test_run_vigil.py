@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
-run = importlib.import_module("auto_designer.experiment.controllers.ordinary")
+run = importlib.import_module("auto_designer.experiment.controllers.runtime")
 
 _GITEA = {
     "GITEA_URL": "http://localhost:3000",

@@ -9,7 +9,7 @@
 | `local` | 本机 Docker 容器 | 程序自动启动独立的 localhost Gitea | 可用的 Docker 服务、模型凭证 |
 | `e2b` | 每个实验一个 E2B 沙箱 | 用户自己的 Gitea.com 账户 | 模型凭证、`E2B_API_KEY`、`GITEA_TOKEN` |
 
-当前任务包 schema 支持一个任务和 `rounds.sessions_per_round: 1`；尚不支持 N4/N8 多任务计划或导入历史结果后追加一轮。示例是每轮一位模拟用户、共五轮：R1–R4 包含需求处理与 OpenAgents 交付，R5 仅试用最终 Harness。被进化的对象是 Harness；pvlib 是用户的试用任务，auto-designer 是实验控制器。官方 SWE-bench 评分是独立的事后步骤。
+可选 N1：每轮一位用户试用一个任务；或 N4：每轮四位用户试用两个任务，并发上限为二。N4 共两轮，首轮包含交付，末轮只试用。任务包列表和显式 persona/任务计划使用同一入口。历史结果导入后追加一轮仍不支持。N1 示例是每轮一位模拟用户、共五轮：R1–R4 包含需求处理与 OpenAgents 交付，R5 仅试用最终 Harness。被进化的对象是 Harness；pvlib 是用户的试用任务，auto-designer 是实验控制器。官方 SWE-bench 评分是独立的事后步骤。
 
 ## 1. 安装
 
@@ -30,6 +30,9 @@ uv sync --locked --extra experiments
 CONFIG=examples/experiments/synthesizer-n1-local.json
 # 或者 E2B + 用户自己的 Gitea.com：
 # CONFIG=examples/experiments/synthesizer-n1-e2b.json
+# 四位用户、两个任务：选择对应后端。
+# CONFIG=examples/experiments/synthesizer-n4-local.json
+# CONFIG=examples/experiments/synthesizer-n4-e2b.json
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
 ```
@@ -68,9 +71,9 @@ uv run --locked --extra experiments python backend/scripts/experiment.py destroy
 
 stop 保留实验身份、仓库与 recovery checkpoint。本地会停止 Gitea/egress、清理执行容器并保留 Gitea 数据；resume 恢复原 loopback 端口和仓库。原端口被占用时，应排除冲突后重试 resume，不修改冻结地址。E2B 停进程后沙箱仍被分配，仍可能计费。resume 使用同一份冻结输入和仍存活的资源；到期或被删除的沙箱会标为 `LOST`，不会悄悄新建后声称续跑。destroy 保留已收集产物、Gitea 仓库和共享构建缓存；没有完整收集时默认拒绝删除。
 
-默认目录为 `.experiments/<run_id>/`。实验结果、资源状态、收集状态分别记录：五轮封口和 controller 完成才是 `COMPLETED`；收集的 `COMPLETE` 不代表实验成功。主机在线时后台 monitor 周期收集。终态收集完成前应保持主机在线，云沙箱到期可能丢失尚未收集的数据。
+默认目录为 `.experiments/<run_id>/`。实验结果、资源状态、收集状态分别记录：配置的轮次全部封口和 controller 完成才是 `COMPLETED`；收集的 `COMPLETE` 不代表实验成功。主机在线时后台 monitor 周期收集。终态收集完成前应保持主机在线，云沙箱到期可能丢失尚未收集的数据。
 
-[完整 N=1 教程](tutorials/n1-experiment.zh-CN.md)说明所有输入、预期结果、中断边界和证据；实际验证结果见[验证报告](validation/spec-0069-new-user.md)。
+[完整 N=1 教程](tutorials/n1-experiment.zh-CN.md)说明所有输入、预期结果、中断边界和证据；[多用户教程](tutorials/multi-user-experiment.zh-CN.md)提供两个任务、固定跨轮计划和停止/恢复的 N4 流程；实际验证结果见[N1 报告](validation/spec-0069-new-user.md)和[多用户报告](validation/spec0073-multi-task-users.md)。
 
 ## 离线演示和开发
 

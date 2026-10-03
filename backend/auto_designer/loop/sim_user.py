@@ -29,6 +29,8 @@ from auto_designer.models import (
     SimTurn,
     Transcript,
     Turn,
+    bound_session_provenance,
+    validate_session_provenance,
 )
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.usage import bind_usage_context, current_usage_context
@@ -301,6 +303,7 @@ def make_sim_run_session_fn(
         # Direct/legacy callers retain a random per-session identity.
         bound_session_id = current_usage_context().session_id
         session_id = bound_session_id or uuid.uuid4().hex
+        provenance = bound_session_provenance()
         client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
 
         # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
@@ -320,18 +323,26 @@ def make_sim_run_session_fn(
 
         def progress(partial: SessionResult) -> None:
             if on_turn is not None:
-                on_turn(persona.identity, sim_persona, partial, True, session_id=None)
+                on_turn(
+                    persona.identity,
+                    sim_persona,
+                    partial,
+                    True,
+                    session_id=session_id if provenance else None,
+                )
 
         connector = HarnessConnector(harness)
         instance_id = None
         if scenario.workspace is not None:
             instance_id = scenario.workspace.params.get("instance_id")
-        round_no = round_provider() if round_provider is not None else None
+        round_no = (
+            round_provider() if round_provider is not None else current_usage_context().round_no
+        )
         with bind_usage_context(
             session_id=session_id,
             instance_id=instance_id,
             role="user",
-            agent_id=f"user-{persona.identity}",
+            agent_id=f"user-{session_id}" if provenance else f"user-{persona.identity}",
             round_no=round_no,
             operation="persona",
         ):
@@ -422,12 +433,8 @@ def make_sim_run_session_fn(
             "",
         )
 
-        round_no = round_provider() if round_provider is not None else None
-        issue_refs = _flush_issues(
-            tracker,
-            res,
-            round_no=round_no,
-            session_id=session_id if bound_session_id else None,
+        round_no = (
+            round_provider() if round_provider is not None else current_usage_context().round_no
         )
         feel = res.feeling or res.feeling_derived
         session = Session(
@@ -435,7 +442,8 @@ def make_sim_run_session_fn(
             scenario=scenario,
             transcript=Transcript(turns=result_to_turns(res)),
             feeling=FeelingScore(score=feel.score, reason=feel.reason),
-            issue_refs=issue_refs,
+            issue_refs=[],
+            session_provenance=provenance,
             sim_trace=result_to_sim_trace(res),
             session_id=session_id,
             user_outcome={"end_reason": res.end_reason, "terminal_note": terminal_note},
@@ -448,6 +456,10 @@ def make_sim_run_session_fn(
                 request_outcomes=request_outcomes,
                 objective_evaluation=objective_evaluation,
             ),
+        )
+        validate_session_provenance(session, provenance)
+        session.issue_refs = _flush_issues(
+            tracker, res, round_no=round_no, session_id=session_id if bound_session_id else None
         )
         # Spec-0055/T2: materialize the bounded, deterministic user feedback
         # handoff at session close.  Demand roles consume this projection rather
@@ -463,7 +475,10 @@ def make_sim_run_session_fn(
 
     # The orchestrator uses this read path to reconcile a crash after SessionStore
     # committed but before the recovery completion marker was published.
-    run.load_completed_session = store.reconcile
+    def load_completed_session(session_id):
+        return store.reconcile(session_id, expected_provenance=bound_session_provenance())
+
+    run.load_completed_session = load_completed_session
     return run
 
 
@@ -504,6 +519,7 @@ def make_direct_run_session_fn(
         task_key = str(params.get("task_key") or persona.identity or "direct-task")
         benchmark = str(params.get("benchmark") or "unknown")
         session_id = current_usage_context().session_id or uuid.uuid4().hex
+        provenance = bound_session_provenance()
         connector = HarnessConnector(harness)
         reply = ""
         harness_error: str | None = None
@@ -516,7 +532,7 @@ def make_direct_run_session_fn(
                 instance_id=params.get("task_id") or task_key,
                 role="direct",
                 agent_id=f"direct-{task_key}",
-                round_no=round_provider() if round_provider else None,
+                round_no=round_provider() if round_provider else current_usage_context().round_no,
             ):
                 reply = connector.send(scenario.description)
         except Exception as exc:  # noqa: BLE001 - preserve an auditable infrastructure failure
@@ -582,8 +598,8 @@ def make_direct_run_session_fn(
                 session_id=session_id,
                 instance_id=params.get("task_id") or task_key,
                 role="user",
-                agent_id=f"user-{persona.identity}",
-                round_no=round_provider() if round_provider else None,
+                agent_id=f"user-{session_id}" if provenance else f"user-{persona.identity}",
+                round_no=round_provider() if round_provider else current_usage_context().round_no,
                 operation="direct_review",
             ):
                 review = dict(review_client.respond(review_system, review_prompt) or {})
@@ -607,7 +623,9 @@ def make_direct_run_session_fn(
             f"Harness final reply:\n{reply}\n"
             f"\nUser terminal review ({verdict}):\n{review_issue}\n"
         )
-        round_no = round_provider() if round_provider is not None else None
+        round_no = (
+            round_provider() if round_provider is not None else current_usage_context().round_no
+        )
         labels = ["bug", NEEDS_TRIAGE, "direct"]
         if round_no is not None:
             labels.append(round_label(round_no))
@@ -616,17 +634,6 @@ def make_direct_run_session_fn(
             body=body,
             labels=labels,
         )
-        create_once = getattr(tracker, "create_issue_once", None)
-        if callable(create_once):
-            issue_refs = [
-                create_once(
-                    draft,
-                    operation_key=operation_key("direct-session-issue", session_id),
-                )
-            ]
-        else:
-            issue_refs = [tracker.create_issue(draft)]
-
         session = Session(
             persona=persona,
             scenario=scenario,
@@ -640,7 +647,8 @@ def make_direct_run_session_fn(
             feeling=FeelingScore(
                 score=score, reason=str(review.get("reason") or "terminal user review")
             ),
-            issue_refs=issue_refs,
+            issue_refs=[],
+            session_provenance=provenance,
             session_id=session_id,
             user_outcome={
                 "interaction_mode": "direct",
@@ -667,13 +675,29 @@ def make_direct_run_session_fn(
                 objective_evaluation=None,
             ),
         )
+        validate_session_provenance(session, provenance)
+        create_once = getattr(tracker, "create_issue_once", None)
+        if callable(create_once):
+            issue_refs = [
+                create_once(
+                    draft,
+                    operation_key=operation_key("direct-session-issue", session_id),
+                )
+            ]
+        else:
+            issue_refs = [tracker.create_issue(draft)]
+
+        session.issue_refs = issue_refs
         from auto_designer.demand.evidence_contract import build_evidence_envelope
 
         session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
         store.save(session)
         return session
 
-    run.load_completed_session = store.reconcile
+    def load_completed_session(session_id):
+        return store.reconcile(session_id, expected_provenance=bound_session_provenance())
+
+    run.load_completed_session = load_completed_session
     return run
 
 

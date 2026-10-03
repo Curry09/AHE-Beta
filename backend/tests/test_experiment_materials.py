@@ -107,16 +107,22 @@ def test_explicit_plan_and_direct_mode_are_frozen_against_original_input_changes
     assert report["interaction_plan"] == expected
     manifest = materials.prepare_materials(aabb_inputs, tmp_path / "runs")
     root = Path(manifest["run_dir"])
-    plan_path = root / manifest["materials"]["interaction_plan"]["path"]
-    frozen_task_path = root / manifest["materials"]["task_package"]["path"]
-    assert json.loads(plan_path.read_text()) == expected
+    plan_path = root / manifest["materials"]["session_plan"]["path"]
+    frozen_task_path = root / manifest["materials"]["task:simple-task:package"]["path"]
+    assert [
+        [[entry["persona_id"], entry["task_id"]] for entry in picks]
+        for picks in json.loads(plan_path.read_text())["rounds"]
+    ] == expected
     assert json.loads(frozen_task_path.read_text())["interaction"] == "direct"
     assert manifest["plan_hash"] == materials.sha256_file(plan_path)
     write(task_path, {"invalid": "replacement"})
     write(aabb_inputs, {"invalid": "replacement"})
     write(tmp_path / "personas.json", [])
     materials.verify_materials(manifest)
-    assert json.loads(plan_path.read_text()) == expected
+    assert [
+        [[entry["persona_id"], entry["task_id"]] for entry in picks]
+        for picks in json.loads(plan_path.read_text())["rounds"]
+    ] == expected
     assert json.loads(frozen_task_path.read_text())["interaction"] == "direct"
 
 
@@ -142,7 +148,7 @@ def test_omitted_plan_keeps_rotation_and_changes_hash_from_explicit_aabb(aabb_in
         ([[["sr-15-swyx", "other-task"]]] * 4, "unknown task"),
         (
             [[["sr-15-swyx", "simple-task"], ["sr-01-willison", "simple-task"]]] * 4,
-            "duplicate",
+            "sessions_per_round",
         ),
         (
             [[["sr-15-swyx", "simple-task"]]] * 3 + [[["unknown", "simple-task"]]],
@@ -167,9 +173,9 @@ def test_freeze_generates_plan_archives_and_records_dirty_tree(prepared_inputs, 
     files = manifest["source_snapshot"]["files"]
     assert manifest["source_snapshot"]["entrypoint"] == {
         "kind": "module",
-        "module": "auto_designer.experiment.controllers.ordinary",
+        "module": "auto_designer.experiment.controllers.unified",
     }
-    assert "backend/auto_designer/experiment/controllers/ordinary.py" in files
+    assert "backend/auto_designer/experiment/controllers/unified.py" in files
     assert "backend/deploy/vigil/Dockerfile" in files
     assert "backend/deploy/vigil/entrypoint.sh" in files
     assert "backend/scripts/prepare_swebench_runtime_tree.py" in files
@@ -178,11 +184,14 @@ def test_freeze_generates_plan_archives_and_records_dirty_tree(prepared_inputs, 
     assert "backend/scripts/run_swebench_closed_loop.py" not in files
     assert "backend/scripts/experiment.py" not in files
     run = Path(manifest["run_dir"])
-    plan = json.loads((run / manifest["materials"]["interaction_plan"]["path"]).read_text())
-    assert len(plan) == 5
-    assert plan[0] == [["sr-15-swyx", "simple-task"]]
-    assert manifest["plan_hash"] == manifest["materials"]["interaction_plan"]["sha256"]
-    with tarfile.open(run / manifest["materials"]["task_source_archive"]["path"]) as archive:
+    plan = json.loads((run / manifest["materials"]["session_plan"]["path"]).read_text())
+    assert len(plan["rounds"]) == 5
+    assert plan["rounds"][0][0]["persona_id"] == "sr-15-swyx"
+    assert plan["rounds"][0][0]["task_id"] == "simple-task"
+    assert manifest["plan_hash"] == manifest["materials"]["session_plan"]["sha256"]
+    with tarfile.open(
+        run / manifest["materials"]["task:simple-task:source_archive"]["path"]
+    ) as archive:
         assert archive.getnames() == ["main.py"]
     with tarfile.open(run / manifest["materials"]["harness_archive"]["path"]) as archive:
         assert "entry.py" in archive.getnames()
@@ -288,8 +297,13 @@ def test_legitimate_task_data_is_preserved(prepared_inputs, tmp_path):
     data.mkdir()
     (data / "weather.csv").write_text("time,temperature\n0,20\n")
     manifest = materials.prepare_materials(prepared_inputs, tmp_path / "runs")
-    assert "data/weather.csv" in manifest["task_source_snapshot"]["files"]
-    path = Path(manifest["run_dir"]) / manifest["materials"]["task_source_archive"]["path"]
+    catalog = json.loads(
+        (Path(manifest["run_dir"]) / manifest["materials"]["task_catalog"]["path"]).read_text()
+    )
+    assert "data/weather.csv" in catalog["tasks"][0]["source_snapshot"]["files"]
+    path = (
+        Path(manifest["run_dir"]) / manifest["materials"]["task:simple-task:source_archive"]["path"]
+    )
     with tarfile.open(path) as archive:
         assert "data/weather.csv" in archive.getnames()
 

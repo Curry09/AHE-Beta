@@ -1213,3 +1213,242 @@ def test_occupied_canonical_port_fails_without_changing_identity_or_profile(back
     assert selected.resources["gitea"]["host_port"] == first["host_port"]
     assert selected.resources["gitea"]["repository_id"] == first["repository_id"]
     assert profile.read_bytes() == original
+
+
+# Spec-0073/T2: compile actual multi-task materials and exercise the provider boundary.
+@pytest.fixture
+def local_multitask_bundle(tmp_path, monkeypatch):
+    from auto_designer.experiment.materials import prepare_materials
+    from test_experiment_workload import multiple_inputs, prepared_inputs
+
+    first = prepared_inputs.__wrapped__(tmp_path, monkeypatch)
+    inputs = multiple_inputs.__wrapped__(first, tmp_path)
+    manifest = prepare_materials(inputs, tmp_path / "runs")
+    return manifest, __import__("pathlib").Path(manifest["run_dir"])
+
+
+def test_prepare_multitask_seeds_use_distinct_sources_and_one_shared_toolchain(
+    local_multitask_bundle, monkeypatch
+):
+    import tarfile
+    from pathlib import Path
+
+    from auto_designer.experiment import engine, workload
+
+    manifest, root = local_multitask_bundle
+    source = engine.materialize_controller_source(root, manifest)
+    monkeypatch.setattr(local, "materialize_controller_source", lambda *_args: source)
+    monkeypatch.setattr(local.shutil, "which", lambda _name: "/usr/local/bin/uv")
+    builds = []
+
+    def command(argv, **kwargs):
+        if argv[0].endswith("/uv") and "--version" in argv:
+            return "uv 0.11.28"
+        if argv[:3] == ["docker", "image", "inspect"]:
+            return json.dumps(
+                [
+                    {
+                        "Id": "sha256:" + argv[-1],
+                        "Config": {"Labels": {"org.auto-designer.seed-runtime": "1"}},
+                    }
+                ]
+            )
+        if "--target" in argv:
+            target = argv[argv.index("--target") + 1]
+            if target == "unified-seed":
+                build = Path(argv[argv.index("-f") + 1]).parent
+                record = json.loads((build / "task-build.json").read_text())
+                with tarfile.open(build / "task-source.tar.gz") as archive:
+                    files = {
+                        member.name: archive.extractfile(member).read()
+                        for member in archive.getmembers()
+                        if member.isfile()
+                    }
+                builds.append(
+                    (
+                        target,
+                        record,
+                        files,
+                        (build / "setup.sh").read_text(),
+                        (build / "requirements.lock").read_text(),
+                    )
+                )
+                assert "tasks/" + record["id"] + "/setup.sh" in (build / "Dockerfile").read_text()
+            else:
+                builds.append((target,))
+        if "observation-capabilities" in argv:
+            return json.dumps({"encodings": ["gzip"], "download_policies": ["same-origin-v1"]})
+        if argv[:2] == ["docker", "run"] and "-c" in argv:
+            return json.dumps(
+                {"verified": True, "nexau_commit": manifest["source_pins"]["nexau"]["revision"]}
+            )
+        assert "never-in-build" not in repr(argv) + repr(kwargs)
+        return ""
+
+    monkeypatch.setattr(local, "_command", command)
+    result = local.prepare_images(root, manifest, {"GITEA_TOKEN": "never-in-build"})
+    assert sum(build[0] == "unified-vigil" for build in builds) == 1
+    seeds = [build for build in builds if build[0] == "unified-seed"]
+    assert [build[1]["id"] for build in seeds] == ["simple-task", "second-task"]
+    assert seeds[0][2] != seeds[1][2]
+    assert seeds[0][3] != seeds[1][3]
+    assert seeds[0][4] != seeds[1][4]
+    assert (
+        result["task_images"]["simple-task"]["image_id"]
+        != result["task_images"]["second-task"]["image_id"]
+    )
+    assert "seed" not in result["images"]
+    selected = local.LocalBackend(root, manifest, {})
+    bindings = selected._workspace_resources()["task_workspaces"]
+    workload.verify_task_workspaces(workload.read_task_catalog(root, manifest), bindings)
+    assert bindings["second-task"]["params"]["instance_id"] == "second-task"
+    assert (
+        bindings["simple-task"]["params"]["image"]
+        == result["task_images"]["simple-task"]["image_id"]
+    )
+
+
+def test_multitask_second_build_failure_never_publishes_ready_image_receipts(
+    local_multitask_bundle, monkeypatch
+):
+    from auto_designer.experiment import engine
+
+    manifest, root = local_multitask_bundle
+    source = engine.materialize_controller_source(root, manifest)
+    monkeypatch.setattr(local, "materialize_controller_source", lambda *_args: source)
+    monkeypatch.setattr(local.shutil, "which", lambda _name: "/usr/local/bin/uv")
+    seeds = []
+
+    def command(argv, **_kwargs):
+        if argv[0].endswith("/uv") and "--version" in argv:
+            return "uv 0.11.28"
+        if argv[:3] == ["docker", "image", "inspect"]:
+            return json.dumps(
+                [
+                    {
+                        "Id": "sha256:" + argv[-1],
+                        "Config": {"Labels": {"org.auto-designer.seed-runtime": "1"}},
+                    }
+                ]
+            )
+        if "--target" in argv and argv[argv.index("--target") + 1] == "unified-seed":
+            seeds.append(argv)
+            if len(seeds) == 2:
+                raise BackendError("dependency build failed")
+        return ""
+
+    monkeypatch.setattr(local, "_command", command)
+    with pytest.raises(BackendError, match="Task second-task image preparation failed"):
+        local.prepare_images(root, manifest)
+    assert len(seeds) == 2
+    assert not (root / "runtime/local-images.json").exists()
+
+
+def test_multitask_bindings_refuse_task_digest_or_recipe_tampering(local_multitask_bundle):
+    import copy
+
+    from auto_designer.experiment.config import ConfigError, config_hash
+    from auto_designer.experiment.workload import read_task_catalog
+
+    manifest, root = local_multitask_bundle
+    catalog = read_task_catalog(root, manifest)
+    base_hash = "b" * 64
+    receipts = {}
+    for task in catalog["tasks"]:
+        receipts[task["id"]] = {
+            "image_id": "sha256:" + task["id"],
+            "task_digest": task["digest"],
+            "source_revision": task["source_snapshot"]["revision"],
+            "source_hash": config_hash(data=task["source_snapshot"]["files"]),
+            "recipe_hash": local.hashlib.sha256(
+                json.dumps(
+                    {"base_recipe": base_hash, "task": task["digest"]}, sort_keys=True
+                ).encode()
+            ).hexdigest(),
+        }
+    selected = local.LocalBackend(root, manifest, {})
+    selected.images = {
+        "recipe": "unified-local-tasks-v1",
+        "recipe_hash": base_hash,
+        "task_images": receipts,
+    }
+    baseline = copy.deepcopy(selected.images)
+    assert set(selected._workspace_resources()["task_workspaces"]) == {"simple-task", "second-task"}
+    selected.images["task_images"]["second-task"]["task_digest"] = "wrong-task"
+    with pytest.raises(ConfigError, match="second-task"):
+        selected._workspace_resources()
+    selected.images = copy.deepcopy(baseline)
+    selected.images["task_images"]["second-task"]["recipe_hash"] = "wrong-recipe"
+    with pytest.raises(BackendError, match="second-task"):
+        selected._workspace_resources()
+    selected.images = copy.deepcopy(baseline)
+    selected.images["task_images"].pop("second-task")
+    with pytest.raises(BackendError, match="receipts"):
+        selected._workspace_resources()
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_multitask_preflight_checks_every_selected_image_before_readiness(
+    local_multitask_bundle, monkeypatch, corrupt
+):
+    from auto_designer.experiment.workload import read_task_catalog
+    from test_experiment_workload import task_resources
+
+    manifest, root = local_multitask_bundle
+    catalog = read_task_catalog(root, manifest)
+    bindings = task_resources(catalog)
+    for task_id, binding in bindings.items():
+        binding["params"].update(instance_id=task_id)
+    selected = local.LocalBackend(root, manifest, {})
+    selected.resources = {
+        "gitea": {"owner": "experiment"},
+        "vigil": {"image": "vigil"},
+        "task_workspaces": bindings,
+    }
+    monkeypatch.setattr(selected, "_workspace_resources", lambda: {"task_workspaces": bindings})
+    monkeypatch.setattr(
+        selected,
+        "_owned",
+        lambda _kind: [
+            {"Config": {"Labels": {"io.openagents.role": role}}, "State": {"Running": True}}
+            for role in ("gitea", "egress")
+        ],
+    )
+    monkeypatch.setattr(selected, "_api", lambda *_args: {"login": "experiment"})
+    probed = []
+
+    def command(argv, **_kwargs):
+        if "observation-capabilities" in argv:
+            return json.dumps({"encodings": ["gzip"], "download_policies": ["same-origin-v1"]})
+        task_id = argv[argv.index("-w") + 1].split("/")[2]
+        probed.append(task_id)
+        assert argv[argv.index("-w") + 2] == bindings[task_id]["params"]["image"]
+        expected = json.loads(argv[-1])
+        task = next(t for t in catalog["tasks"] if t["id"] == task_id)
+        assert expected["files"] == task["source_snapshot"]["files"]
+        if corrupt and task_id == "second-task":
+            raise BackendError("task source differs: second.py")
+        return json.dumps(
+            {
+                "base_commit": "b" * 40,
+                "verified_files": len(expected["files"]),
+                "python": local.PYTHON_VERSION,
+            }
+        )
+
+    monkeypatch.setattr(local, "_command", command)
+    evidence = []
+    monkeypatch.setattr(selected, "_probe", lambda: evidence.append(True) or {"verified": True})
+    if corrupt:
+        with pytest.raises(BackendError, match="second-task preflight failed"):
+            selected.preflight()
+        assert evidence == []
+        assert "preflight" not in selected.resources
+    else:
+        result = selected.preflight()
+        assert set(result["preflight"]["tasks"]) == {"simple-task", "second-task"}
+        assert (
+            result["preflight"]["tasks"]["second-task"]["task_digest"]
+            == catalog["tasks"][1]["digest"]
+        )
+    assert probed == ["simple-task", "second-task"]

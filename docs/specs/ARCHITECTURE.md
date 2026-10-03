@@ -77,6 +77,7 @@ _Frozen materials, controllers and local/E2B resource lifecycles._
 | `manifest.py` | Spec-0071/T3: immutable input manifests and shared append-only runtime facts. |
 | `materials.py` | Spec-0069/T1: compile operator inputs into a checksummed, credential-free run bundle. |
 | `runtime.py` | Manage prepared experiments without rewriting their frozen identities. |
+| `workload.py` | Spec-0073/T1: logical task catalog and session plan, independent of providers. |
 
 ### auto_designer.experiment.backends
 
@@ -93,13 +94,13 @@ _Spec-0069/T2: execution adapters implement the same experiment lifecycle._
 
 ### auto_designer.experiment.controllers
 
-_Internal controllers launched from prepared experiment materials._
+_Spec-0073/T4: one unified controller backed by shared experiment runtime._
 
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
-| `__init__.py` | Internal controllers launched from prepared experiment materials. |
-| `ordinary.py` | Ordinary task controller. Start through the unified experiment CLI. |
-| `swebench.py` | SWE task controller. Start through the unified experiment CLI. |
+| `__init__.py` | Spec-0073/T4: one unified controller backed by shared experiment runtime. |
+| `runtime.py` | Spec-0073/T4: shared experiment runtime: repository, delivery process and round receipts. |
+| `unified.py` | Spec-0073/T4: unified frozen-task experiment controller. Start through the experiment CLI. |
 
 ### auto_designer.guards
 
@@ -220,7 +221,7 @@ _SeedSource 实现子包（spec-0009/T1）。_
 | `empty.py` | empty SeedSource（spec-0009/T2）。 |
 | `git.py` | git SeedSource（spec-0009/T4）。 |
 | `local_fixture.py` | local-fixture SeedSource（spec-0009/T1）。 |
-| `prebuilt.py` | Prebuilt SeedSource: copy a prepared workspace and relocate its venv. |
+| `prebuilt.py` | Spec-0073/T3: copy pure task source and rebuild each managed session's venv. |
 
 ### auto_designer.web
 
@@ -272,14 +273,15 @@ graph LR
     nauto_designer_experiment_config["experiment.config"]
     nauto_designer_experiment_context["experiment.context"]
     nauto_designer_experiment_controllers["experiment.controllers"]
-    nauto_designer_experiment_controllers_ordinary["controllers.ordinary"]
-    nauto_designer_experiment_controllers_swebench["controllers.swebench"]
+    nauto_designer_experiment_controllers_runtime["controllers.runtime"]
+    nauto_designer_experiment_controllers_unified["controllers.unified"]
     nauto_designer_experiment_dashboard["experiment.dashboard"]
     nauto_designer_experiment_engine["experiment.engine"]
     nauto_designer_experiment_infrastructure["experiment.infrastructure"]
     nauto_designer_experiment_manifest["experiment.manifest"]
     nauto_designer_experiment_materials["experiment.materials"]
     nauto_designer_experiment_runtime["experiment.runtime"]
+    nauto_designer_experiment_workload["experiment.workload"]
     nauto_designer_guards["auto_designer.guards"]
     nauto_designer_guards_harness_boundary["guards.harness_boundary"]
     nauto_designer_guards_repo_guard["guards.repo_guard"]
@@ -436,14 +438,18 @@ graph LR
     nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_base
     nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_bootstrap
     nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_template
+    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_workload
+    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_config
     nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_materials
     nauto_designer_experiment_backends_e2b_template --> nauto_designer_experiment_backends_base
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_base
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_collection
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_config
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_context
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_engine
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_infrastructure
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_materials
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_workload
     nauto_designer_experiment_backends_local --> nauto_designer_observations_transport
     nauto_designer_experiment_cli --> nauto_designer_experiment
     nauto_designer_experiment_cli --> nauto_designer_experiment_config
@@ -452,57 +458,42 @@ graph LR
     nauto_designer_experiment_collection --> nauto_designer_experiment_config
     nauto_designer_experiment_collection --> nauto_designer_experiment_materials
     nauto_designer_experiment_context --> nauto_designer_experiment_config
+    nauto_designer_experiment_context --> nauto_designer_experiment_workload
     nauto_designer_experiment_context --> nauto_designer_models
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_demand_divergent
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_demand_grouped_synthesizer
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_demand_issue_schema
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_demand_owner
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_demand_synthesizer
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_demand_triage
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_distill_library
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_experiment_context
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_guards_harness_boundary
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_guards_repo_guard
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_harness_launcher
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_invocation
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_loop_live
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_loop_metrics
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_loop_orchestrator
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_loop_recovery
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_loop_roster
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_loop_round_gate
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_loop_sim_user
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_models
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_observations_preflight
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_observations_transport
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_tracker_attachment_transport
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_tracker_gitea
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_user_session_store
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_user_sim_dimensions
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_user_sim_persona_client
-    nauto_designer_experiment_controllers_ordinary --> nauto_designer_user_sim_persona_io
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_demand_divergent
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_demand_grouped_synthesizer
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_demand_owner
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_demand_synthesizer
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_demand_triage
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_experiment_context
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_experiment_controllers
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_experiment_controllers_ordinary
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_guards_repo_guard
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_harness_launcher
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_invocation
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_loop_live
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_loop_metrics
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_loop_orchestrator
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_loop_roster
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_loop_round_gate
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_loop_sim_user
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_models
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_tracker_gitea
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_user_session_store
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_user_sim_persona_client
-    nauto_designer_experiment_controllers_swebench --> nauto_designer_user_sim_persona_io
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_demand_issue_schema
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_guards_harness_boundary
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_invocation
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_live
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_recovery
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_sim_user
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_observations_preflight
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_observations_transport
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_tracker_attachment_transport
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_tracker_gitea
+    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_divergent
+    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_grouped_synthesizer
+    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_owner
+    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_synthesizer
+    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_triage
+    nauto_designer_experiment_controllers_unified --> nauto_designer_distill_library
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_context
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers_runtime
+    nauto_designer_experiment_controllers_unified --> nauto_designer_guards_repo_guard
+    nauto_designer_experiment_controllers_unified --> nauto_designer_harness_launcher
+    nauto_designer_experiment_controllers_unified --> nauto_designer_invocation
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_live
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_metrics
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_orchestrator
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_roster
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_round_gate
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_sim_user
+    nauto_designer_experiment_controllers_unified --> nauto_designer_models
+    nauto_designer_experiment_controllers_unified --> nauto_designer_tracker_gitea
+    nauto_designer_experiment_controllers_unified --> nauto_designer_usage
+    nauto_designer_experiment_controllers_unified --> nauto_designer_user_session_store
+    nauto_designer_experiment_controllers_unified --> nauto_designer_user_sim_persona_client
+    nauto_designer_experiment_controllers_unified --> nauto_designer_user_sim_persona_io
     nauto_designer_experiment_dashboard --> nauto_designer_experiment_config
     nauto_designer_experiment_dashboard --> nauto_designer_experiment_manifest
     nauto_designer_experiment_dashboard --> nauto_designer_experiment_materials
@@ -518,6 +509,7 @@ graph LR
     nauto_designer_experiment_manifest --> nauto_designer_experiment_config
     nauto_designer_experiment_materials --> nauto_designer_distill_library
     nauto_designer_experiment_materials --> nauto_designer_experiment_config
+    nauto_designer_experiment_materials --> nauto_designer_experiment_workload
     nauto_designer_experiment_materials --> nauto_designer_user_sim_persona_io
     nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_e2b
     nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_local
@@ -526,6 +518,10 @@ graph LR
     nauto_designer_experiment_runtime --> nauto_designer_experiment_engine
     nauto_designer_experiment_runtime --> nauto_designer_experiment_manifest
     nauto_designer_experiment_runtime --> nauto_designer_experiment_materials
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_workload
+    nauto_designer_experiment_workload --> nauto_designer_experiment_config
+    nauto_designer_experiment_workload --> nauto_designer_experiment_context
+    nauto_designer_experiment_workload --> nauto_designer_experiment_materials
     nauto_designer_guards_workspace_jail --> nauto_designer_demand_observation_provider
     nauto_designer_guards_workspace_jail --> nauto_designer_usage
     nauto_designer_harness_connector --> nauto_designer_harness_interface
@@ -570,6 +566,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_prompt
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_runtime
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_workspace
+    nauto_designer_models --> nauto_designer_usage
     nauto_designer_observations___main__ --> nauto_designer_observations_publication
     nauto_designer_observations_delivery_gaps --> nauto_designer_observations_gaps
     nauto_designer_observations_delivery_gaps --> nauto_designer_observations_grants
@@ -651,6 +648,7 @@ graph LR
     nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_sources
     nauto_designer_user_sim_skills --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_models
+    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_usage
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_empty --> nauto_designer_models
@@ -661,6 +659,8 @@ graph LR
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_workspace
     nauto_designer_user_sim_sources_prebuilt --> nauto_designer_models
+    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_usage
+    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_deps
     nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_state --> nauto_designer_user_sim_dimensions

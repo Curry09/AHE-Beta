@@ -20,6 +20,7 @@ from auto_designer.experiment.backends.e2b_bootstrap import (
     EXECUTION_USER,
     bootstrap_command,
     json_command,
+    task_workspace_record,
     upload_frozen_inputs,
 )
 from auto_designer.experiment.backends.e2b_template import resolve_template, sandbox_facts
@@ -241,15 +242,16 @@ class E2BBackend:
         _write(self.resource_file, resources)
         resources["gitea"] = self._gitea()
         resources["source_root"] = self.root + "/source/controller"
-        resources["workspace"] = {
-            "kind": "prebuilt",
-            "params": {
-                "source": self.root + "/workspace/task",
-                "instance_id": self.manifest["task_package"]["id"],
-                "activate_venv": True,
-                "harness_python": self.root + "/source/controller/.venv/bin/python",
-            },
-        }
+        if self.manifest.get("workload_contract_version") is None:
+            resources["workspace"] = {
+                "kind": "prebuilt",
+                "params": {
+                    "source": self.root + "/workspace/task",
+                    "instance_id": self.manifest["task_package"]["id"],
+                    "activate_venv": True,
+                    "harness_python": self.root + "/source/controller/.venv/bin/python",
+                },
+            }
         resources["vigil"] = {"mode": "subprocess"}
         _write(self.resource_file, resources)
         if not resources.get("bootstrap_complete"):
@@ -274,7 +276,31 @@ class E2BBackend:
             )
             resources["bootstrap_complete"] = True
             _write(self.resource_file, resources)
+        if self.manifest.get("workload_contract_version") is not None:
+            resources["task_workspaces"] = self._task_workspaces(resources["bootstrap"])
+            resources.pop("workspace", None)
+            _write(self.resource_file, resources)
         return resources
+
+    def _task_workspaces(self, bootstrap: dict) -> dict:
+        from auto_designer.experiment.workload import (
+            catalog_tasks,
+            read_task_catalog,
+            verify_task_workspaces,
+        )
+
+        catalog = read_task_catalog(self.run_dir, self.manifest)
+        actual = bootstrap.get("task_workspaces")
+        verify_task_workspaces(catalog, actual)
+        expected = {
+            task["id"]: task_workspace_record(task, self.manifest, self.root, bootstrap)
+            for task in catalog_tasks(catalog)
+        }
+        if actual != expected:
+            raise BackendError(
+                "E2B task preparation recipe or owned paths differ from frozen inputs"
+            )
+        return actual
 
     def _python(self, resources: dict, program: str, *args: str) -> str:
         return (
@@ -289,6 +315,10 @@ class E2BBackend:
         sandbox = self._sandbox()
         resources = _read(self.resource_file)
         bootstrap = resources["bootstrap"]
+        if self.manifest.get("workload_contract_version") is not None:
+            prepared = self._task_workspaces(bootstrap)
+            if resources.get("task_workspaces") != prepared:
+                raise BackendError("E2B task workspace resources differ from bootstrap receipt")
         caps = self._command(
             sandbox,
             shlex.quote(bootstrap["openagents_bin"] + "/openagents")
@@ -311,6 +341,20 @@ class E2BBackend:
             "evidence_probe": probe,
             "observed_at": timestamp(),
         }
+        if self.manifest.get("workload_contract_version") is not None:
+            receipt["task_workspaces"] = {
+                task_id: {
+                    name: record[name]
+                    for name in (
+                        "task_digest",
+                        "recipe_hash",
+                        "status",
+                        "source_revision",
+                        "source_hash",
+                    )
+                }
+                for task_id, record in prepared.items()
+            }
         _write(self.run_dir / "runtime/preflight.json", receipt)
         return receipt
 
@@ -691,7 +735,7 @@ COLLECTION_PROGRAM = r"""
 import hashlib,json,os,pathlib,tarfile,sys
 root=pathlib.Path(sys.argv[1]); output=root/'runtime/collection.tar.gz'
 excluded={'secrets','.venv','.git','.openagents','__pycache__','source','cloud-snapshot','downloads','bin'}
-private_runtime={('runtime','home'),('runtime','python'),('runtime','uv-cache')}
+private_runtime={('runtime','home'),('runtime','python'),('runtime','uv-cache'),('runtime','task-cache')}
 def paths():
     result=[]
     for area in ['data','logs','checkpoints','telemetry','runtime']:

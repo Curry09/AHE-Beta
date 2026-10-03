@@ -16,9 +16,9 @@ New experiments use JSON with `schema_version: 2` and the unified entry describe
 | Personas | JSON array following the repository persona schema | `examples/personas/n1.json` |
 | Credentials | Explicit environment variables or a mode-0600 env file | `examples/experiment.env.example` |
 
-The N1 example uses `examples/personas/n1.json`. The maintained general persona library is `examples/personas/library.json`; selecting another library does not enable multi-task scheduling.
+The N1 example uses `examples/personas/n1.json`. N4 uses four real cards from the maintained `examples/personas/library.json`. Select IDs present in the library; the number of distinct selected personas must cover sessions_per_round.
 
-Paths in the experiment are relative to that JSON; task paths are relative to the task package. `prepare` generates the roster, task pool, interaction plan, single-instance SWE Parquet when needed, source/Harness archives and hash manifest. You do not need to handcraft these.
+Paths in the experiment are relative to that JSON; task paths are relative to the task package. `check --offline` shows an unfrozen allocation preview without fetching Git. `prepare` freezes each task's package, instruction, setup, dependency lock and verified source archive, then creates `materials/task-catalog.json`, `materials/session-plan.json`, the persona roster, Harness archive and hash manifest. You do not need to handcraft these.
 
 ## Experiment fields
 
@@ -30,14 +30,14 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `runtime.local` | Optional image overrides and `ci_enabled: false`; enabling an unregistered CI runner is unsupported |
 | `runtime.e2b` | Requested `cpu_count`, `memory_mb`, `timeout_seconds` (300–86400); optional compatible template |
 | `harness.source` | `builtin`, or `archive` with an archive path and SHA-256 |
-| `workload` | `kind`, task package, persona library and actual persona IDs |
+| `workload` | `task_packages` list, or legacy `kind` + `task_package`; persona library, actual persona IDs and optional interaction_plan |
 | `rounds` | `count`, `sessions_per_round`, `max_parallel_users` |
 | `roles` | Triage/Synthesizer/divergent/developer counts; `owner_mode: mechanical` / `llm` |
 | `models` | User, Harness, shared demand and Claude Code delivery settings |
 | `evaluation.official_grading` | `false`; official grading runs separately |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
-The current single-task schema requires `rounds.sessions_per_round: 1`. Multi-task N4/N8 plans and importing historical results to append a round are not supported by the unified entry. Personas may rotate across rounds. The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
+Choose one or more task packages and set sessions_per_round up to the number of selected personas; max_parallel_users must not exceed sessions_per_round. Different personas may use the same task in one round. Each package supplies its own kind and interaction. Importing historical results to append a round remains unsupported. The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
 
 `builtin` freezes this checkout's `backend/harness_template/`. It is not the historical `cade14d` Harness. To reproduce that baseline, supply its actual archive and checksum explicitly.
 
@@ -79,7 +79,7 @@ The public example contains:
 }
 ```
 
-An ordinary custom task uses `kind: ordinary`, explicitly sets `not_in_benchmark: true`, and can use fixed Git source or `source: {"kind": "local", "path": "./my-task"}`. A SWE task must use a fixed Git revision and must not declare `not_in_benchmark`. Both the workload and task package must declare the same kind.
+An ordinary custom task uses `kind: ordinary`, explicitly sets `not_in_benchmark: true`, and can use fixed Git source or `source: {"kind": "local", "path": "./my-task"}`. A SWE task must use a fixed Git revision and must not declare `not_in_benchmark`. In the legacy single-package form, workload.kind must match the package. The task_packages list branch has no global kind.
 
 Setup runs in the task checkout with `TASK_ROOT`, `TASK_PYTHON`, `REQUIREMENTS_LOCK`, `VIRTUAL_ENV` and `UV_BIN` provided. `TASK_PYTHON` is the managed interpreter; `VIRTUAL_ENV` points to the task's independent `.venv`. Install the hash-locked task dependencies there, then install the task source without downloading undeclared dependencies. Controller and OpenAgents have separate locked environments.
 
@@ -145,8 +145,16 @@ Set task-package `interaction: "direct"` for Harness-driven execution; the defau
 }
 ```
 
-The plan validates round/session counts and selected persona/task IDs. Omitting it preserves persona rotation. Each round still contains one session; this does not enable multi-task/N4/N8 runs. `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds still require delivery readiness.
+The plan validates every round's session count and selected persona/task IDs. Personas must be unique within a round; tasks may repeat. If omitted, global slot k=(round_no-1)*sessions_per_round+slot selects persona_ids[k % P] and task_packages[k % T] in their configured order. This simple rotation does not guarantee all persona × task combinations; use an explicit plan for AABB, fixed groups or cross-task coverage. `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds still require delivery readiness.
 
 `experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-These settings, interactions and dashboard binding are migrated. Engineering CI, in-entry official grading, multi-task/N4/N8, historical round import, legacy seed libraries and text-only tasks remain pending. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+These settings, interactions and dashboard binding are migrated. Engineering CI, in-entry official grading, historical round import, legacy seed libraries and text-only tasks remain pending. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+
+## Multiple task packages
+
+Use `workload.task_packages` for new multi-task definitions. It is mutually exclusive with `kind` and `task_package`; do not add a global kind to this branch. Each package uses task-package-v1 and has a globally unique, safe ID, including ordinary `order-service` and SWE IDs such as `pvlib__pvlib-python-1478`. The existing single-package form is converted once during new preparation. Already frozen runs keep their original config, hash and archived controller. Unknown workload contract versions are refused.
+
+`runtime.local.seed_image` remains a single-task override and is rejected when more than one task package is selected. Automatic per-task image building handles mixed tasks. Local sessions use independent containers; E2B copies each task's pure baseline source and recreates its venv at the final session directory. Download/wheel caches may be shared, writable repos and installed environments are not. E2B's single Unix user does not provide malicious cross-directory isolation equivalent to Docker.
+
+See [the complete N4 tutorial](tutorials/multi-user-experiment.md) for a two-task explicit plan, cost expectations and evidence paths.

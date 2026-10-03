@@ -21,17 +21,37 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_public_example_has_complete_offline_materials(path):
     report = check_materials(path)
     assert report["ok"]
-    assert report["persona_ids"] == ["sr-15-swyx"]
+    n_users = 1 if "-n1-" in path.name else 4
+    assert len(report["persona_ids"]) == n_users
+    assert report["preview"] == {"frozen": False}
     config = load_config_v2(path)
-    assert config["rounds"] == {"count": 5, "sessions_per_round": 1, "max_parallel_users": 1}
-    task = load_task_package(config["workload"]["task_package"])
-    assert task["source"]["revision"] == "3f397ed44075b01f4ba535750356859195a51b2d"
-    assert "not_in_benchmark" not in task
+    assert config["rounds"] == {
+        "count": 5 if n_users == 1 else 2,
+        "sessions_per_round": n_users,
+        "max_parallel_users": 1 if n_users == 1 else 2,
+    }
+    tasks = [load_task_package(value) for value in config["workload"]["task_packages"]]
+    assert tasks[0]["source"]["revision"] == "3f397ed44075b01f4ba535750356859195a51b2d"
+    assert "not_in_benchmark" not in tasks[0]
+    if n_users == 4:
+        assert {task["kind"] for task in tasks} == {"swebench", "ordinary"}
+        assert tasks[1]["id"] == "order-service" and tasks[1]["not_in_benchmark"]
+        expected_pairs = {
+            (persona, task["id"]) for persona in report["persona_ids"] for task in tasks
+        }
+        assert {
+            tuple(pair) for picks in report["interaction_plan"] for pair in picks
+        } == expected_pairs
+    else:
+        assert report["persona_ids"] == ["sr-15-swyx"]
+        # The old public N1 input remains accepted unchanged at the loader boundary.
+        assert json.loads(path.read_text())["workload"]["task_package"]
 
 
-def test_two_backends_keep_identical_experiment_semantics():
+@pytest.mark.parametrize("n_users", [1, 4])
+def test_two_backends_keep_identical_experiment_semantics(n_users):
     configs = [
-        load_config_v2(ROOT / f"examples/experiments/synthesizer-n1-{backend}.json")
+        load_config_v2(ROOT / f"examples/experiments/synthesizer-n{n_users}-{backend}.json")
         for backend in ("local", "e2b")
     ]
     normalized = []
@@ -60,8 +80,8 @@ def test_task_requirements_include_hashes_for_every_pinned_dependency():
 def test_public_examples_only_reference_listed_env_variables():
     template = (ROOT / "examples/experiment.env.example").read_text()
     variables = set(re.findall(r"(?m)^([A-Z][A-Z0-9_]*)=", template))
-    for backend in ("local", "e2b"):
-        config = load_config_v2(ROOT / f"examples/experiments/synthesizer-n1-{backend}.json")
+    for path in (ROOT / "examples/experiments").glob("*.json"):
+        config = load_config_v2(path)
         for model in config["models"].values():
             assert model["base_url_env"] in variables
             assert model["api_key_env"] in variables
@@ -85,6 +105,10 @@ def test_compatibility_and_experiment_extras_are_pinned():
         ("docs/QUICKSTART.md", "docs/QUICKSTART.zh-CN.md"),
         ("docs/tutorials/n1-experiment.md", "docs/tutorials/n1-experiment.zh-CN.md"),
         ("README.md", "README.zh-CN.md"),
+        (
+            "docs/tutorials/multi-user-experiment.md",
+            "docs/tutorials/multi-user-experiment.zh-CN.md",
+        ),
     ],
 )
 def test_bilingual_cli_commands_match_and_parse(english, chinese):
@@ -103,3 +127,25 @@ def test_bilingual_cli_commands_match_and_parse(english, chinese):
     for command in english_commands:
         args = shlex.split(command.split("backend/scripts/experiment.py", 1)[1])
         build_parser().parse_args(args)
+
+
+def test_order_service_dependency_lock_matches_frozen_controller_lock():
+    lock = tomllib.loads((ROOT / "uv.lock").read_text())
+    packages = {package["name"]: package for package in lock["package"]}
+    text = (ROOT / "examples/tasks/order-service/requirements.lock").read_text()
+    requirements = re.split(r"(?m)(?=^[A-Za-z0-9][A-Za-z0-9_.-]*==)", text)[1:]
+    assert len(requirements) == 5
+    for requirement in requirements:
+        name, version = re.match(r"([A-Za-z0-9_.-]+)==([^\s]+)", requirement).groups()
+        package = packages[name]
+        assert package["version"] == version
+        artifacts = [package.get("sdist", {}), *package.get("wheels", [])]
+        allowed = {artifact["hash"] for artifact in artifacts if artifact.get("hash")}
+        hashes = {
+            "sha256:" + value for value in re.findall(r"--hash=sha256:([a-f0-9]{64})", requirement)
+        }
+        assert hashes and hashes <= allowed
+    assert "UV_LINK_MODE=copy" in (ROOT / "examples/tasks/order-service/setup.sh").read_text()
+    assert (ROOT / "examples/tasks/order-service/source/LICENSE").read_text() == (
+        ROOT / "LICENSE"
+    ).read_text()

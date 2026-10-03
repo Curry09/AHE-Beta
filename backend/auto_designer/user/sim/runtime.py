@@ -7,12 +7,15 @@ directory.  Docker workspaces never expose their repository as a host path.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shlex
 import shutil
+import signal
 import subprocess
 import tarfile
 import tempfile
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -60,6 +63,10 @@ class LocalWorkspaceRuntime:
     owns_tmp: bool = False
     runtime_id: str = field(default_factory=lambda: f"local-{uuid.uuid4().hex}")
     evidence: dict[str, Any] = field(default_factory=dict)
+    # Spec-0073/T3: managed cloud attempts own repo, HOME and all shell descendants.
+    attempt_root: str | None = None
+    environment: dict[str, str] = field(default_factory=dict)
+    _closed: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self.cwd = str(Path(self.root).resolve())
@@ -83,27 +90,47 @@ class LocalWorkspaceRuntime:
         return str(target)
 
     def run(self, cmd: str, timeout: float = 10.0) -> dict[str, Any]:
+        if self._closed or (self.attempt_root and self.evidence.get("invalid_reason")):
+            raise RuntimeError("workspace attempt is closed or invalid")
         started = utc_now()
         # Spec-0069/T4: unified cloud task shells opt into their session-local venv.
-        environment = None
+        environment = {**os.environ, **self.environment} if self.environment else None
         task_venv = self.evidence.get("task_virtual_env")
         if task_venv:
             environment = {
-                **os.environ,
+                **(environment or os.environ),
                 "VIRTUAL_ENV": str(task_venv),
-                "PATH": str(task_venv) + "/bin:" + os.environ.get("PATH", "/usr/bin:/bin"),
+                "PATH": str(task_venv)
+                + "/bin:"
+                + (environment or os.environ).get("PATH", "/usr/bin:/bin"),
             }
         try:
-            proc = subprocess.run(
+            child = subprocess.Popen(
                 cmd,
                 shell=True,
                 cwd=self.cwd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout,
                 env=environment,
+                start_new_session=True,
             )
+            stdout, stderr = child.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
+            # The shell alone is not an execution boundary. Kill its entire group,
+            # including grandchildren that retain stdout after the shell exits.
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            contained = stop_owned_processes(self.environment.get("AUTO_DESIGNER_ATTEMPT_NONCE"))
+            try:
+                child.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                contained = False
+            if self.attempt_root:
+                self.invalidate(f"command timeout >{timeout}s")
+                self.evidence["timeout_contained"] = contained
             return {
                 "ok": False,
                 "status": "timed_out",
@@ -117,9 +144,9 @@ class LocalWorkspaceRuntime:
         return {
             "ok": True,
             "status": "completed",
-            "stdout": proc.stdout[:_MAX_OUTPUT],
-            "stderr": proc.stderr[:_MAX_OUTPUT],
-            "returncode": proc.returncode,
+            "stdout": stdout[:_MAX_OUTPUT],
+            "stderr": stderr[:_MAX_OUTPUT],
+            "returncode": child.returncode,
             "started_at": started,
             "finished_at": utc_now(),
         }
@@ -147,9 +174,80 @@ class LocalWorkspaceRuntime:
         self.evidence.update({"invalidated_at": utc_now(), "invalid_reason": reason})
 
     def close(self) -> None:
+        if self._closed:
+            return
+        if self.attempt_root:
+            owner = Path(self.attempt_root) / "owner.json"
+            expected = self.evidence["attempt_identity"]
+            if owner.is_symlink() or json.loads(owner.read_text()) != expected:
+                raise RuntimeError("Workspace attempt ownership changed; refusing cleanup")
+            stopped = stop_owned_processes(self.environment["AUTO_DESIGNER_ATTEMPT_NONCE"])
+            self.evidence["descendants_stopped"] = stopped
+            if not stopped or self.evidence.get("timeout_contained") is False:
+                self.invalidate("Attempt descendants could not be confirmed stopped")
+                self.save_receipt()
+                raise RuntimeError("Uncontained workspace attempt retained for inspection")
+            self.evidence.setdefault("closed_at", utc_now())
+            self.save_receipt()
+            shutil.rmtree(self.attempt_root)
+            self._closed = True
+            return
         self.evidence.setdefault("closed_at", utc_now())
         if self.owns_tmp:
             shutil.rmtree(self.cwd, ignore_errors=True)
+        self._closed = True
+
+    def save_receipt(self) -> None:
+        """Publish diagnostics outside the reclaimed attempt, without its environment."""
+        path = self.evidence.get("receipt_path")
+        if path:
+            target = Path(path)
+            target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            temporary = target.with_suffix(".tmp")
+            temporary.write_text(json.dumps(self.evidence, indent=2) + "\n")
+            temporary.chmod(0o600)
+            temporary.replace(target)
+
+
+def _owned_processes(nonce: str) -> list[int]:
+    matches = []
+    marker = ("AUTO_DESIGNER_ATTEMPT_NONCE=" + nonce).encode()
+    for directory in Path("/proc").iterdir():
+        if not directory.name.isdigit():
+            continue
+        try:
+            if directory.stat().st_uid != os.getuid():
+                continue
+            state = (directory / "stat").read_text().rsplit(")", 1)[1].split()[0]
+            if state != "Z" and marker in (directory / "environ").read_bytes().split(b"\0"):
+                matches.append(int(directory.name))
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            continue
+    return matches
+
+
+def stop_owned_processes(nonce: str | None) -> bool:
+    """Stop only this attempt's processes; pidfds prevent PID reuse races on Linux."""
+    if not nonce:
+        return True
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for pid in _owned_processes(nonce):
+            try:
+                descriptor = os.pidfd_open(pid)
+                try:
+                    # Re-check ownership after obtaining the stable process handle.
+                    if pid in _owned_processes(nonce):
+                        signal.pidfd_send_signal(descriptor, sig)
+                finally:
+                    os.close(descriptor)
+            except ProcessLookupError:
+                continue
+        until = time.monotonic() + 1
+        while time.monotonic() < until:
+            if not _owned_processes(nonce):
+                return True
+            time.sleep(0.02)
+    return not _owned_processes(nonce)
 
 
 @dataclass

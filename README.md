@@ -15,7 +15,7 @@ Current code and development configuration use `synthesizer`, `N_SYNTHESIZERS`, 
 
 ## Run an experiment
 
-Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use `backend/scripts/experiment.py` and the same v2 experiment format. The current task-package schema supports one task and one user session per round; multi-task N4/N8 plans and adding a round to imported historical results are not supported by this entry. The checked-in N=1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
+Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use `backend/scripts/experiment.py` and the same v2 experiment format. Use the N1 examples for one user on one task, or the N4 examples for four users on ordinary and SWE tasks. Each round may repeat a task with distinct personas; sessions have independent writable workspaces. Importing historical results to append a round is still unsupported. The checked-in N=1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
 
 ```bash
 uv sync --locked --extra experiments
@@ -28,7 +28,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py prepare
 uv run --locked --extra experiments python backend/scripts/experiment.py run <run_id>
 ```
 
-Start with [Quickstart](docs/QUICKSTART.md), then follow the [complete N=1 tutorial](docs/tutorials/n1-experiment.md). They explain the required materials, model protocols, provider credentials, progress, stop/resume, collection and cleanup. Preparation fetches pinned OpenAgents automatically; no sibling checkout is required. The [validation report](docs/validation/spec-0069-new-user.md) records actual checks separately from the documented workflow.
+Start with [Quickstart](docs/QUICKSTART.md), then follow the [complete N=1 tutorial](docs/tutorials/n1-experiment.md). They explain the required materials, model protocols, provider credentials, progress, stop/resume, collection and cleanup. For a complete two-round, four-user example, follow the [multi-user tutorial](docs/tutorials/multi-user-experiment.md). Preparation fetches pinned OpenAgents automatically; no sibling checkout is required. The [N1 validation report](docs/validation/spec-0069-new-user.md) and [multi-user validation report](docs/validation/spec0073-multi-task-users.md) record actual checks separately from the documented workflow.
 
 For an offline scripted demo without models or infrastructure:
 
@@ -74,4 +74,4 @@ research/archives/                      # Frozen historical research records
 
 Project code is licensed under the [MIT License](LICENSE). Third-party material retains its own terms; see [THIRD_PARTY.md](THIRD_PARTY.md).
 
-The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/N4/N8 and historical round import remain pending.
+The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/N4/N8 uses the same frozen workload contract; historical round import remains pending. See [multi-user validation](docs/validation/spec0073-multi-task-users.md).

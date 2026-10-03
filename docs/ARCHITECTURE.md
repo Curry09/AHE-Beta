@@ -33,11 +33,15 @@ NexAU 是 agent 运行时依赖。OpenAgents 可选择 Claude Code、Codex 或 N
 
 新实验只使用 `backend/scripts/experiment.py`，v2 配置通过 check → prepare → run 进入完整闭环，后续用 status/logs/stop/resume/collect/destroy 管理。两种受支持部署为 local Docker + 自动启动的 localhost Gitea、E2B 单沙箱 + 用户自己的 Gitea.com。E2B 不依赖嵌套 Docker，隔离语义不同于本地每会话容器。
 
-监督器在冻结源码中启动 `auto_designer.experiment.controllers.ordinary` 或 `.swebench`，包内模块不提供第二套公开配置入口。已准备 v2 实验继续使用原冻结源码与哈希；清理工作不升级其 controller。目前任务包只支持一个任务、每轮一次用户 session，N4/N8 多任务和历史产物追加轮尚未接入统一入口。
+新 run 冻结 workload contract 1 的 TaskCatalog/SessionPlan，监督器启动同一 `auto_designer.experiment.controllers.unified`。普通/SWE 与 direct/simulated 差异留在任务包、工作区准备和会话工厂；多个任务围绕同一 Harness 迭代，同轮可由多个不同 persona 试用同一任务。已准备 v2 实验继续使用原冻结源码、旧 module/script 配方及 hash，不升级 controller。历史产物导入追加轮仍未接入。
+
+逻辑会话绑定为 run/round/slot/persona/task digest/interaction；session ID 只由 Orchestrator/RecoveryStore 生成。资源坐标不参与用户恢复输入，完整结果必须匹配冻结归属才可复用。Local task baseline 为不可变镜像，各 session 独立容器；E2B 任务基线为纯源码，各 session 最终目录重建独立 venv，下载缓存可共享。E2B 单 Unix 用户不宣称 Docker 等价恶意隔离。
+
+观察与证据沿同一 session/task/persona/round/Harness SHA 关联，live 用户槽不再以 persona 唯一。status 从恢复账本给逐轮已完成/运行中/待运行/失败数量，无账本时明确 unknown；E2B 看板展示最近 collect 的快照与时间。
 
 | 目录 | 当前职责 |
 | --- | --- |
-| `examples/experiments/` | 两份可校验的 v2 N1 定义 |
+| `examples/experiments/` | N1 与两轮 N4 的 local/E2B 可校验定义 |
 | `examples/tasks/`、`examples/personas/` | 任务与 persona 材料；主库为 `examples/personas/library.json` |
 | `backend/scripts/` | 公开入口、演示、静态导出、CI 与构建检查 |
 | `tools/dev/` | 维护中的诊断与回放，见[工具说明](../tools/dev/README.md) |

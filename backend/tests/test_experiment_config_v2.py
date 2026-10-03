@@ -64,11 +64,22 @@ def write(path, document):
     return path
 
 
+def load_fixture_config(path):
+    document = json.loads(path.read_text())
+    workload = document.get("workload", {})
+    if "task_package" in workload:
+        target = (path.parent / workload["task_package"]).resolve()
+        if not target.exists():
+            write(target, package())
+    return load_config_v2(path)
+
+
 def test_paths_resolve_against_configuration_not_cwd(tmp_path, monkeypatch):
     path = write(tmp_path / "configs/example.json", definition())
     monkeypatch.chdir("/")
-    config = load_config_v2(path)
-    assert config["workload"]["task_package"] == str(tmp_path / "task.json")
+    config = load_fixture_config(path)
+    assert config["workload"]["task_packages"] == [str(tmp_path / "task.json")]
+    assert "kind" not in config["workload"]
     assert config["models"]["user"]["api_key_env"] == "MODEL_API_KEY"
 
 
@@ -82,7 +93,7 @@ def test_unknown_fields_fail_at_every_public_boundary(tmp_path, location):
         parent = parent[field]
     parent["pretend_option"] = "ignored-before"
     with pytest.raises(ConfigError, match="Additional properties"):
-        load_config_v2(write(tmp_path / "config.json", document))
+        load_fixture_config(write(tmp_path / "config.json", document))
 
 
 @pytest.mark.parametrize(
@@ -102,12 +113,12 @@ def test_incompatible_settings_fail(tmp_path, mutation):
     document = definition()
     mutation(document)
     with pytest.raises(ConfigError):
-        load_config_v2(write(tmp_path / "config.json", document))
+        load_fixture_config(write(tmp_path / "config.json", document))
 
 
 def test_legacy_schema_is_explicitly_identified(tmp_path):
     with pytest.raises(ConfigError, match="migration"):
-        load_config_v2(write(tmp_path / "config.json", {"schema_version": 1}))
+        load_fixture_config(write(tmp_path / "config.json", {"schema_version": 1}))
 
 
 def test_task_paths_and_provenance(tmp_path):
@@ -150,7 +161,7 @@ def test_policy_defaults_and_explicit_auth_protocol_are_frozen(tmp_path):
     document["models"]["delivery"].update(auth_type="api-key", api_key_env="MY_PRIVATE_KEY")
     document["policies"] = {"synthesizer_grouping": True, "delivery": {"poll_seconds": 0.25}}
     document["roles"]["owner_mode"] = "llm"
-    loaded = load_config_v2(write(tmp_path / "config.json", document))
+    loaded = load_fixture_config(write(tmp_path / "config.json", document))
     assert loaded["policies"]["synthesizer_grouping"] is True
     assert loaded["policies"]["delivery"]["poll_seconds"] == 0.25
     assert loaded["policies"]["delivery"]["timeout_seconds"] == 86400
@@ -180,7 +191,7 @@ def test_policy_errors_fail_before_any_provider(tmp_path, policies):
     document = definition()
     document["policies"] = policies
     with pytest.raises(ConfigError):
-        load_config_v2(write(tmp_path / "config.json", document))
+        load_fixture_config(write(tmp_path / "config.json", document))
 
 
 @pytest.mark.parametrize("role", ["user", "demand"])
@@ -188,11 +199,11 @@ def test_reasoning_effort_is_validated_and_preserved(tmp_path, role):
     document = definition()
     document["models"][role]["reasoning_effort"] = "high"
     assert (
-        load_config_v2(write(tmp_path / "config.json", document))["models"][role][
+        load_fixture_config(write(tmp_path / "config.json", document))["models"][role][
             "reasoning_effort"
         ]
         == "high"
     )
     document["models"][role]["reasoning_effort"] = "high\nwrong"
     with pytest.raises(ConfigError):
-        load_config_v2(write(tmp_path / "config.json", document))
+        load_fixture_config(write(tmp_path / "config.json", document))

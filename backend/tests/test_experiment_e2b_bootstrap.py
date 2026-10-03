@@ -7,6 +7,7 @@ import io
 import json
 import os
 import pwd
+import site
 import subprocess
 import sys
 import tarfile
@@ -23,7 +24,10 @@ from auto_designer.experiment.backends.e2b_bootstrap import (
 )
 
 
-def test_bootstrap_installs_run_local_python_and_transfers_only_owned_tree(tmp_path, monkeypatch):
+@pytest.mark.parametrize("multitask", [False, True])
+def test_bootstrap_installs_run_local_python_and_transfers_only_owned_tree(
+    tmp_path, monkeypatch, multitask
+):
     root = tmp_path / "run"
     materials = root / "materials"
     materials.mkdir(parents=True)
@@ -43,16 +47,56 @@ def test_bootstrap_installs_run_local_python_and_transfers_only_owned_tree(tmp_p
                 bundle.addfile(info, io.BytesIO(data))
         return output.getvalue()
 
-    material("controller_source_archive", archive([("README", b"controller", 0o644)]))
+    controller_entries = [("README", b"controller", 0o644)]
+    if multitask:
+        package_root = Path(__file__).parents[1] / "auto_designer"
+        controller_entries.extend(
+            (
+                "backend/auto_designer/" + str(path.relative_to(package_root)),
+                path.read_bytes(),
+                0o644,
+            )
+            for path in sorted(package_root.rglob("*.py"))
+        )
+        # A poisonous ambient source proves bootstrap selects only its frozen
+        # controller tree, even when uv sync has not installed auto_designer.
+        ambient = tmp_path / "ambient/auto_designer"
+        ambient.mkdir(parents=True)
+        (ambient / "__init__.py").write_text(
+            "raise AssertionError('ambient controller imported')\n"
+        )
+        monkeypatch.setenv("PYTHONPATH", str(ambient.parent))
+    material("controller_source_archive", archive(controller_entries))
     material("openagents_source_archive", archive([("README", b"openagents", 0o644)]))
     material("task_source_archive", archive([("task.py", b"print('task')\n", 0o644)]))
     material("requirements_lock", b"# frozen\n")
-    material("script", b'mkdir -p .venv/bin\nln -s "$TASK_PYTHON" .venv/bin/python\n')
+    material("script", b'"$TASK_PYTHON" -m venv --without-pip "$VIRTUAL_ENV"\n')
     manifest = {
         "materials": records,
         "source_snapshot": {"files": {}},
         "task_package": {"source": {"kind": "local"}},
     }
+    if multitask:
+        tasks = []
+        for task_id in ("ordinary", "swe"):
+            tasks.append(
+                {
+                    "id": task_id,
+                    "digest": hashlib.sha256(task_id.encode()).hexdigest(),
+                    "package": {"source": {"kind": "local", "path": "source/tasks/" + task_id}},
+                    "source_snapshot": {
+                        "revision": None,
+                        "files": {"task.py": hashlib.sha256(b"print('task')\n").hexdigest()},
+                    },
+                    "materials": {
+                        "source_archive": "task_source_archive",
+                        "script": "script",
+                        "requirements_lock": "requirements_lock",
+                    },
+                }
+            )
+        material("task_catalog", json.dumps({"contract_version": 1, "tasks": tasks}).encode())
+        manifest.update(workload_contract_version=1, run_id="run-1", config_hash="f" * 64)
     (root / "manifest.json").write_text(json.dumps(manifest))
     uv = (
         f"#!{sys.executable}\n"
@@ -65,8 +109,13 @@ if sys.argv[1:3]==['python','install']:
 elif sys.argv[1:3]==['python','find']: print(python)
 elif sys.argv[1]=='sync':
     dest=pathlib.Path.cwd()/'.venv/bin';dest.mkdir(parents=True);(dest/'python').symlink_to(python)
+    venv=dest.parent
+    (venv/'pyvenv.cfg').write_text('home = '+str(pathlib.Path(sys.base_prefix)/'bin')+'\\ninclude-system-site-packages = false\\n')
+    packages=venv/'lib'/('python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor))/'site-packages'
+    packages.mkdir(parents=True)
+    (packages/'fixture-dependencies.pth').write_text('\\n'.join(DEPENDENCY_SITES)+'\\n')
 """
-    )
+    ).replace("DEPENDENCY_SITES", repr(site.getsitepackages()))
     uv_archive = archive([("uv-x86_64-unknown-linux-gnu/uv", uv.encode(), 0o755)])
     claude = b"#!/bin/sh\necho '2.1.284'\n"
 
@@ -85,6 +134,24 @@ elif sys.argv[1]=='sync':
         transfers.append((Path(path), follow_symlinks))
 
     monkeypatch.setattr(os, "chown", chown)
+    worker_calls = []
+    original_check_output = subprocess.check_output
+
+    def check_output(args, **kwargs):
+        if "user" in kwargs:
+            # The cloud manager is root. This fixture is already non-root and
+            # cannot call setgroups; retain and assert the real worker identity
+            # while emulating only that root-management transition.
+            worker_calls.append((kwargs["user"], kwargs["group"], kwargs["extra_groups"]))
+            kwargs = {
+                key: value
+                for key, value in kwargs.items()
+                if key not in {"user", "group", "extra_groups"}
+            }
+            assert kwargs["env"]["PYTHONPATH"] == str(root / "source/controller/backend")
+        return original_check_output(args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "check_output", check_output)
     profile = tmp_path / "task-profile.sh"
     program = (
         BOOTSTRAP_PROGRAM.replace(UV_SHA256, hashlib.sha256(uv_archive).hexdigest())
@@ -121,6 +188,30 @@ elif sys.argv[1]=='sync':
     assert transfers and all(
         path.is_relative_to(root) and follow is False for path, follow in transfers
     )
+    if multitask:
+        assert worker_calls == [(os.getuid(), os.getgid(), [])] * 2
+        assert list((root / "source/controller/backend/auto_designer").rglob("prebuilt.*.pyc"))
+        assert set(receipt["task_workspaces"]) == {"ordinary", "swe"}
+        for task_id, record in receipt["task_workspaces"].items():
+            baseline = root / "workspace/tasks" / task_id / "source"
+            assert (baseline / "task.py").read_text() == "print('task')\n"
+            assert not (baseline / ".venv").exists()
+            assert record["params"]["source"] == str(baseline)
+            assert record["params"]["workload_contract_version"] == 1
+            assert record["setup"] == []
+        assert not list((root / "workspace/sessions").glob("*/attempt-*"))
+        saved = [
+            json.loads(p.read_text())
+            for p in (root / "runtime/workspace-receipts").glob("*/*.json")
+        ]
+        assert len(saved) == 2
+        assert all(item["descendants_stopped"] and item["setup_completed_at"] for item in saved)
+        # Root management never hands shared interpreter/baseline files to the worker.
+        assert all(not p.is_relative_to(root / "runtime/python") for p, _ in transfers)
+        assert all(not p.is_relative_to(root / "workspace/tasks") for p, _ in transfers)
+    else:
+        assert "task_workspaces" not in receipt
+        assert (root / "workspace/task/.venv/bin/python").is_file()
 
 
 @pytest.mark.parametrize("uid,gid", [(1000, 1000), (12345, 12346)])

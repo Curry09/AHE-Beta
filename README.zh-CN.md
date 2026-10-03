@@ -15,7 +15,7 @@ auto-designer 模拟用户使用 Harness，把使用轨迹转为需求，再交�
 
 ## 运行实验
 
-选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用 `backend/scripts/experiment.py` 和相同的 v2 实验格式。当前任务包 schema 支持一个任务、每轮一次用户 session；统一入口尚不支持 N4/N8 多任务计划或从历史结果导入后追加一轮。仓内 N=1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
+选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用 `backend/scripts/experiment.py` 和相同的 v2 实验格式。N1 示例是一位用户试用一个任务；N4 示例是四位用户试用普通任务和 SWE 任务。同轮可由不同 persona 重复试用同一任务，每个会话有独立可写工作区。历史结果导入后追加一轮仍不支持。仓内 N=1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
 
 ```bash
 uv sync --locked --extra experiments
@@ -28,7 +28,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py prepare
 uv run --locked --extra experiments python backend/scripts/experiment.py run <run_id>
 ```
 
-先看[快速开始](docs/QUICKSTART.zh-CN.md)，再按[完整 N=1 教程](docs/tutorials/n1-experiment.zh-CN.md)操作，了解材料、模型协议、provider 凭证、进度、停止/恢复、收集与清理。prepare 自动获取固定版本 OpenAgents，不需要提前放置 sibling checkout。[验证报告](docs/validation/spec-0069-new-user.md)独立记录实际检查结果。
+先看[快速开始](docs/QUICKSTART.zh-CN.md)，再按[完整 N=1 教程](docs/tutorials/n1-experiment.zh-CN.md)操作，了解材料、模型协议、provider 凭证、进度、停止/恢复、收集与清理。两轮四用户的完整示例见[多用户教程](docs/tutorials/multi-user-experiment.zh-CN.md)。prepare 自动获取固定版本 OpenAgents，不需要提前放置 sibling checkout。[N1 验证报告](docs/validation/spec-0069-new-user.md)和[多用户验证报告](docs/validation/spec0073-multi-task-users.md)独立记录实际检查结果。
 
 无需模型或基础设施的脚本演示：
 
@@ -74,4 +74,4 @@ research/archives/                      # 冻结的历史研究记录
 
 项目代码采用 [MIT 许可证](LICENSE)。第三方材料保留各自的许可条款，详见[第三方来源说明](THIRD_PARTY.md)。
 
-统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/N4/N8 和历史实验追加轮仍待迁入。
+统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/N4/N8 已使用同一冻结 workload 契约；历史实验追加轮仍待迁入。见[多用户验收](docs/validation/spec0073-multi-task-users.md)。

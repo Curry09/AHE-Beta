@@ -6,7 +6,7 @@
 
 本次清理完成了离线验证，尚未重新执行 local/E2B 实跑；之前的 N1 实跑记录仍是基线。当前覆盖范围见[清理验收报告](../validation/spec0071-experiment-cleanup.md)。
 
-本教程是单任务 N=1 流程，`rounds.sessions_per_round` 必须为 `1`；尚不支持 N4/N8 多任务或导入历史实验后追加一轮。resume 继续同一冻结身份的实验，不是历史产物导入。
+本教程使用一个任务、每轮一位用户（`rounds.sessions_per_round: 1`）；四位用户、两个任务请看[多用户教程](multi-user-experiment.zh-CN.md)。历史实验导入后追加一轮仍不支持。resume 继续同一冻结身份的实验，不是历史产物导入。
 
 ## 1. 从仓库开始
 

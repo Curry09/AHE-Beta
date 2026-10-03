@@ -176,6 +176,7 @@ def dashboard_app(
         runmeta={
             "run_id": run_id,
             "backend": backend,
+            "workload_contract_version": manifest.get("workload_contract_version"),
             "source": "local-live" if backend == "local" else "collected-snapshot",
             "collected_at": receipt.get("collected_at"),
             "consistent": receipt.get("consistent") if receipt else None,

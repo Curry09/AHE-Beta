@@ -42,12 +42,17 @@ def frozen_policy_environment(request, tmp_path, monkeypatch):
     prepared_inputs.write_text(json.dumps(config))
     manifest = prepare_materials(prepared_inputs, tmp_path / "runs")
     root = Path(manifest["run_dir"])
+    from auto_designer.experiment.workload import read_task_catalog
+    from test_experiment_workload import task_resources
+
     resources = {
         "gitea": {"url": "https://gitea.example", "owner": "fixture", "repo": "owned"},
-        "workspace": {"kind": "docker-seed" if backend == "local" else "prebuilt", "params": {}},
+        "task_workspaces": task_resources(read_task_catalog(root, manifest)),
     }
     if backend == "e2b":
         resources["sandbox_id"] = "owned-sandbox"
+        for workspace in resources["task_workspaces"].values():
+            workspace["kind"] = "prebuilt"
     env = build_controller_environment(
         run_dir=root,
         manifest=manifest,
@@ -169,7 +174,7 @@ def test_demand_reasoning_and_timing_reach_agent_runtime(
 
 
 def test_coordination_reaches_delivery_configuration(frozen_policy_environment, tmp_path):
-    from auto_designer.experiment.controllers.ordinary import write_openagents_config
+    from auto_designer.experiment.controllers.runtime import write_openagents_config
 
     root, manifest, env = frozen_policy_environment
     target = write_openagents_config(

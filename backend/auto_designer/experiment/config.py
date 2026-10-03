@@ -68,10 +68,24 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
         harness["archive"] = resolve_input_path(value=harness["archive"], base=config_path.parent)
     elif set(harness) != {"source"}:
         raise ConfigError("builtin Harness forbids archive/sha256 settings")
-    for field in ("task_package", "persona_library"):
-        data["workload"][field] = resolve_input_path(
-            value=data["workload"][field], base=config_path.parent
-        )
+    # Spec-0073/T1: normalize only new operator inputs; frozen manifests bypass this loader.
+    workload = data["workload"]
+    workload["persona_library"] = resolve_input_path(
+        value=workload["persona_library"], base=config_path.parent
+    )
+    if "task_package" in workload:
+        task_path = resolve_input_path(value=workload.pop("task_package"), base=config_path.parent)
+        expected_kind = workload.pop("kind")
+        if load_task_package(task_path)["kind"] != expected_kind:
+            raise ConfigError("task package kind differs from workload.kind")
+        workload["task_packages"] = [task_path]
+    else:
+        workload["task_packages"] = [
+            resolve_input_path(value=value, base=config_path.parent)
+            for value in workload["task_packages"]
+        ]
+    if len(workload["task_packages"]) > 1 and runtime.get("local", {}).get("seed_image"):
+        raise ConfigError("runtime.local.seed_image is only supported for a single task")
     rounds = data["rounds"]
     sessions = rounds["sessions_per_round"]
     if sessions > len(data["workload"]["persona_ids"]):

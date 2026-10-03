@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "kind": "ordinary",
+  "id": "order-service",
+  "instruction_file": "instruction.md",
+  "source": {
+    "kind": "local",
+    "path": "source"
+  },
+  "setup": {
+    "script": "setup.sh",
+    "requirements_lock": "requirements.lock"
+  },
+  "interaction": "simulated_user",
+  "not_in_benchmark": true
+}

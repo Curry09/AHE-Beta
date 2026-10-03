@@ -9,7 +9,7 @@ Run all commands from the auto-designer repository root. One entry point starts 
 | `local` | Local Docker containers | A dedicated localhost Gitea started automatically | A running Docker daemon and model credentials |
 | `e2b` | One E2B sandbox per experiment | Your own Gitea.com account | Model credentials, `E2B_API_KEY`, `GITEA_TOKEN` |
 
-The current task-package schema supports one task and `rounds.sessions_per_round: 1`; N4/N8 multi-task plans and importing historical results for an extra round are not yet supported. The example runs one simulated user per round for five rounds. R1–R4 include requirements and OpenAgents delivery; R5 only tries the final Harness. It evolves the Harness, using pvlib as a user task. It does not evolve the auto-designer or pvlib repository. Official SWE-bench grading is separate.
+Choose N1 for one task and one user per round, or N4 for four users on two tasks with a concurrency limit of two. N4 runs two rounds: the first includes delivery, the second is user-only. Task-package lists and explicit persona/task plans use the same entry. Historical-result import for an extra round remains unsupported. The N1 example runs one simulated user per round for five rounds. R1–R4 include requirements and OpenAgents delivery; R5 only tries the final Harness. It evolves the Harness, using pvlib as a user task. It does not evolve the auto-designer or pvlib repository. Official SWE-bench grading is separate.
 
 ## 1. Install
 
@@ -30,6 +30,9 @@ The runtime recipes pin uv 0.11.28, Python 3.12.13 and Claude Code 2.1.284. Open
 CONFIG=examples/experiments/synthesizer-n1-local.json
 # Alternatively, E2B + your Gitea.com account:
 # CONFIG=examples/experiments/synthesizer-n1-e2b.json
+# For four users and two tasks, select the matching backend:
+# CONFIG=examples/experiments/synthesizer-n4-local.json
+# CONFIG=examples/experiments/synthesizer-n4-e2b.json
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
 ```
@@ -68,9 +71,9 @@ uv run --locked --extra experiments python backend/scripts/experiment.py destroy
 
 `stop` retains the identity, repository and recovery checkpoint. Locally it stops Gitea/egress and removes execution containers while retaining Gitea data; resume restores the original loopback port and repository. If that port is occupied, resolve the conflict and retry resume rather than editing the frozen address. An E2B sandbox remains allocated after stopping its processes. Resume uses the same frozen inputs and surviving resources; an expired or deleted sandbox is `LOST` and cannot be silently replaced. Destruction preserves collected artifacts, the Gitea repository and shared build caches; it refuses to discard uncollected results unless explicitly requested.
 
-Runs live under `.experiments/<run_id>/`. Experiment outcome, resource state and collection state are separate: `COMPLETED` requires all five sealed rounds and controller completion; `COMPLETE` collection alone does not mean experiment success. The host monitor collects periodically while the host is online. Keep it online until terminal collection succeeds; cloud expiry can lose data not yet collected.
+Runs live under `.experiments/<run_id>/`. Experiment outcome, resource state and collection state are separate: `COMPLETED` requires every configured round to be sealed and the controller to finish; `COMPLETE` collection alone does not mean experiment success. The host monitor collects periodically while the host is online. Keep it online until terminal collection succeeds; cloud expiry can lose data not yet collected.
 
-The [complete N=1 tutorial](tutorials/n1-experiment.md) explains every input, expected outputs, interruption boundaries and evidence. Actual validation results are recorded in [the validation report](validation/spec-0069-new-user.md).
+The [complete N=1 tutorial](tutorials/n1-experiment.md) explains every input, expected outputs, interruption boundaries and evidence. The [multi-user tutorial](tutorials/multi-user-experiment.md) runs N4 with two tasks, a fixed cross-round plan and stop/resume. Actual validation results are recorded in the [N1 report](validation/spec-0069-new-user.md) and [multi-user report](validation/spec0073-multi-task-users.md).
 
 ## Offline demo and development
 

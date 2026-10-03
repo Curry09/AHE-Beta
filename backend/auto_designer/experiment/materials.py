@@ -24,6 +24,16 @@ from auto_designer.experiment.config import (
     load_task_package,
     read_json_document,
 )
+from auto_designer.experiment.workload import (
+    CONTRACT_VERSION,
+    compile_session_plan,
+    interaction_plan,
+    read_session_plan,
+    read_task_catalog,
+    task_digest,
+    task_material_path,
+    validate_task_ids,
+)
 
 _SOURCE_ROOTS = (
     ".gitignore",
@@ -62,64 +72,21 @@ def sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
-def _interaction_plan(*, config: dict[str, Any], task_id: str) -> list[list[list[str]]]:
-    """Validate every round before freezing, or generate the default rotating plan."""
-    workload = config["workload"]
-    personas = workload["persona_ids"]
-    rounds = config["rounds"]["count"]
-    plan = workload.get("interaction_plan")
-    if plan is None:
-        return [[[personas[index % len(personas)], task_id]] for index in range(rounds)]
-    if not isinstance(plan, list) or len(plan) != rounds:
-        raise ConfigError(f"workload.interaction_plan must contain {rounds} rounds")
-    for round_no, picks in enumerate(plan, start=1):
-        label = f"workload.interaction_plan round {round_no}"
-        if not isinstance(picks, list) or not picks:
-            raise ConfigError(f"{label} must contain sessions")
-        seen_personas: set[str] = set()
-        seen_tasks: set[str] = set()
-        for pair in picks:
-            if (
-                not isinstance(pair, list)
-                or len(pair) != 2
-                or not all(isinstance(value, str) for value in pair)
-            ):
-                raise ConfigError(f"{label} must contain [persona_id, task_id] pairs")
-            persona, task = pair
-            if persona not in personas:
-                raise ConfigError(f"{label} references unselected persona {persona}")
-            if task != task_id:
-                raise ConfigError(f"{label} references unknown task {task}")
-            if persona in seen_personas or task in seen_tasks:
-                raise ConfigError(f"{label} contains duplicate persona or task")
-            seen_personas.add(persona)
-            seen_tasks.add(task)
-        if len(picks) != config["rounds"]["sessions_per_round"]:
-            raise ConfigError(f"{label} does not match rounds.sessions_per_round")
-    return plan
-
-
 def check_materials(config_path: str | Path) -> dict[str, Any]:
     """Offline validation: no cloud calls, repository cloning, directories, or model requests."""
     config = load_config_v2(config_path)
-    task = load_task_package(config["workload"]["task_package"])
-    if task["kind"] != config["workload"]["kind"]:
-        raise ConfigError("task package kind differs from workload.kind")
-    # The current public task package contains one task. SWE's frozen plan requires unique
-    # instances in a round: refuse broader-looking configuration until a task-pool schema exists.
-    if config["rounds"]["sessions_per_round"] != 1:
-        raise ConfigError(
-            "task-package-v1 supports sessions_per_round=1; multi-task pools are not yet supported"
-        )
-    for path in [task["instruction_file"], *task["setup"].values()]:
-        _require_file(path=Path(path))
-    if not Path(task["instruction_file"]).read_text(encoding="utf-8").strip():
-        raise ConfigError("Task instruction must not be empty")
-    if task["source"]["kind"] == "local":
-        directory = Path(task["source"]["path"])
-        if not directory.is_dir():
-            raise ConfigError(f"Task source directory missing: {directory}")
-        _snapshot_files(root=directory, paths=None)
+    tasks = [load_task_package(path) for path in config["workload"]["task_packages"]]
+    validate_task_ids(tasks)
+    for task in tasks:
+        for path in [task["instruction_file"], *task["setup"].values()]:
+            _require_file(path=Path(path))
+        if not Path(task["instruction_file"]).read_text(encoding="utf-8").strip():
+            raise ConfigError(f"Task {task['id']} instruction must not be empty")
+        if task["source"]["kind"] == "local":
+            directory = Path(task["source"]["path"])
+            if not directory.is_dir():
+                raise ConfigError(f"Task {task['id']} source directory missing: {directory}")
+            _snapshot_files(root=directory, paths=None)
     cards = read_json_document(path=Path(config["workload"]["persona_library"]))
     if not isinstance(cards, list) or not all(isinstance(card, dict) for card in cards):
         raise ConfigError("persona_library must contain a JSON array of persona cards")
@@ -157,10 +124,11 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
         "ok": True,
         "config": config,
         "config_hash": config_hash(data=config),
-        "task_package": task,
+        "task_packages": tasks,
+        "preview": {"frozen": False},
         "persona_ids": selected,
         "persona_cards": [by_id[value] for value in selected],
-        "interaction_plan": _interaction_plan(config=config, task_id=task["id"]),
+        "interaction_plan": interaction_plan(config, tasks),
         "network_required_for_prepare": True,
     }
 
@@ -207,48 +175,19 @@ def prepare_materials(
             path=stage / "materials/controller-source.tar.gz",
             stage=stage,
         )
-        task = json.loads(json.dumps(report["task_package"]))
-        task_source = task["source"]
-        source_directory = stage / "source/task"
-        if task_source["kind"] == "git":
-            _checkout_git(
-                url=task_source["url"],
-                revision=task_source["revision"],
-                destination=source_directory,
-            )
-        else:
-            source_directory.mkdir()
-            _copy_snapshot(
-                root=Path(task_source["path"]),
-                files=_snapshot_files(root=Path(task_source["path"]), paths=None),
-                destination=source_directory,
-            )
-        source_files = _snapshot_files(root=source_directory, paths=None)
-        _archive_snapshot(
-            root=source_directory,
-            files=source_files,
-            destination=stage / "materials/task-source.tar.gz",
-        )
-        _register(
-            materials=materials,
-            key="task_source_archive",
-            path=stage / "materials/task-source.tar.gz",
-            stage=stage,
-        )
-        for field, key in (("instruction_file", "task_instruction"),):
-            target = stage / "materials/instruction.md"
-            shutil.copyfile(task[field], target)
-            task[field] = str(target.relative_to(stage))
-            _register(materials=materials, key=key, path=target, stage=stage)
-        for field in ("script", "requirements_lock"):
-            target = (
-                stage / "materials" / ("setup.sh" if field == "script" else "requirements.lock")
-            )
-            shutil.copyfile(task["setup"][field], target)
-            task["setup"][field] = str(target.relative_to(stage))
-            _register(materials=materials, key=field, path=target, stage=stage)
-        if task_source["kind"] == "local":
-            task_source["path"] = "source/task"
+        # Spec-0073/T1: every task is fully frozen before finalizing logical bindings.
+        tasks = [
+            _freeze_task(stage=stage, task=task, materials=materials)
+            for task in report["task_packages"]
+        ]
+        catalog = {"contract_version": CONTRACT_VERSION, "tasks": tasks}
+        catalog_path = stage / "materials/task-catalog.json"
+        _write_json(path=catalog_path, value=catalog)
+        _register(materials=materials, key="task_catalog", path=catalog_path, stage=stage)
+        plan = compile_session_plan(config, catalog, materials["task_catalog"]["sha256"])
+        plan_path = stage / "materials/session-plan.json"
+        _write_json(path=plan_path, value=plan)
+        _register(materials=materials, key="session_plan", path=plan_path, stage=stage)
         harness_path = stage / "materials/harness.tar.gz"
         if config["harness"]["source"] == "archive":
             shutil.copyfile(config["harness"]["archive"], harness_path)
@@ -270,40 +209,12 @@ def prepare_materials(
         documents = {
             "persona_library": cards,
             "persona_roster": {"personas": roster, "distribution": distribution},
-            "pool": {"instances": [{"instance_id": task["id"]}]},
-            "interaction_plan": report["interaction_plan"],
-            "task_package": task,
             "config": config,
         }
         for key, document in documents.items():
             target = stage / "materials" / f"{key}.json"
             _write_json(path=target, value=document)
             _register(materials=materials, key=key, path=target, stage=stage)
-        if task["kind"] == "swebench":
-            _write_dataset(
-                task=task,
-                instruction=(stage / task["instruction_file"]).read_text(),
-                destination=stage / "materials/instances.parquet",
-            )
-            _register(
-                materials=materials,
-                key="dataset",
-                path=stage / "materials/instances.parquet",
-                stage=stage,
-            )
-        else:
-            # Existing ordinary seed cards retain provenance. Runtime's context maps the
-            # frozen source snapshot into a prebuilt workspace; it must not re-clone HEAD.
-            seed_card = {
-                "id": task["id"],
-                "task": {"prompt": (stage / task["instruction_file"]).read_text()},
-                "source": {"not_in_benchmark": True},
-                "env": {"snapshot": "source/task", "setup_script": task["setup"]["script"]},
-            }
-            _write_json(path=stage / "materials/seeds.json", value=[seed_card])
-            _register(
-                materials=materials, key="seeds", path=stage / "materials/seeds.json", stage=stage
-            )
         source_pins = _source_pins(config=config, controller=controller)
         openagents = source_pins["openagents"]
         oa_source = stage / "source/openagents"
@@ -345,8 +256,9 @@ def prepare_materials(
             "config": config,
             "config_hash": report["config_hash"],
             "controller_sha": controller_sha,
-            "plan_hash": materials["interaction_plan"]["sha256"],
-            "task_package": task,
+            "workload_contract_version": CONTRACT_VERSION,
+            "catalog_hash": materials["task_catalog"]["sha256"],
+            "plan_hash": materials["session_plan"]["sha256"],
             "created_at": datetime.now(UTC).isoformat(),
             "experiment_state": "PREPARED",
             "resource_state": "ABSENT",
@@ -359,13 +271,8 @@ def prepare_materials(
                 "files": snapshot,
                 "entrypoint": {
                     "kind": "module",
-                    "module": "auto_designer.experiment.controllers."
-                    + ("swebench" if task["kind"] == "swebench" else "ordinary"),
+                    "module": "auto_designer.experiment.controllers.unified",
                 },
-            },
-            "task_source_snapshot": {
-                "revision": task_source.get("revision"),
-                "files": source_files,
             },
             "secrets_file": str(secret_path) if secret_path else None,
         }
@@ -389,6 +296,115 @@ def verify_materials(manifest: dict[str, Any]) -> None:
             raise ConfigError(f"Frozen material missing or hash mismatch: {key}")
     if config_hash(data=manifest["config"]) != manifest["config_hash"]:
         raise ConfigError("Frozen configuration hash mismatch")
+
+    version = manifest.get("workload_contract_version")
+    if "workload_contract_version" in manifest:
+        if type(version) is not int or version != CONTRACT_VERSION:
+            raise ConfigError("Unknown workload_contract_version")
+        read_session_plan(run_dir, manifest)
+        catalog = read_task_catalog(run_dir, manifest)
+        for task in catalog["tasks"]:
+            _verify_task_archive(
+                path=task_material_path(run_dir, manifest, task, "source_archive"),
+                expected=task["source_snapshot"]["files"],
+                task_id=task["id"],
+            )
+
+
+def _verify_task_archive(*, path: Path, expected: dict[str, str], task_id: str) -> None:
+    actual = {}
+    try:
+        with tarfile.open(path, "r:*") as archive:
+            for member in archive.getmembers():
+                relative = Path(member.name)
+                if (
+                    relative.is_absolute()
+                    or ".." in relative.parts
+                    or not member.isfile()
+                    or member.name in actual
+                    or not _safe_path(path=relative)
+                ):
+                    raise ConfigError(f"Unsafe task source archive member: {task_id}/{member.name}")
+                stream = archive.extractfile(member)
+                if stream is None:
+                    raise ConfigError(
+                        f"Unreadable task source archive member: {task_id}/{member.name}"
+                    )
+                with stream:
+                    digest = hashlib.file_digest(stream, "sha256").hexdigest()
+                actual[member.name] = digest
+    except (tarfile.TarError, OSError) as exc:
+        raise ConfigError(f"Invalid frozen task source archive: {task_id}") from exc
+    if actual != expected:
+        raise ConfigError(f"Frozen task source inventory mismatch: {task_id}")
+
+
+def _freeze_task(*, stage: Path, task: dict[str, Any], materials: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return _freeze_task_contents(stage=stage, task=task, materials=materials)
+    except (ConfigError, OSError) as exc:
+        raise ConfigError(f"Task {task['id']} freeze failed: {exc}") from exc
+
+
+def _freeze_task_contents(
+    *, stage: Path, task: dict[str, Any], materials: dict[str, Any]
+) -> dict[str, Any]:
+    task = json.loads(json.dumps(task))
+    task_id = task["id"]
+    directory = stage / "materials/tasks" / task_id
+    directory.mkdir(parents=True)
+    source = task["source"]
+    source_dir = stage / "source/tasks" / task_id
+    source_dir.parent.mkdir(parents=True, exist_ok=True)
+    if source["kind"] == "git":
+        _checkout_git(url=source["url"], revision=source["revision"], destination=source_dir)
+        if _git_head(root=source_dir) != source["revision"]:
+            raise ConfigError(f"Task {task_id} fetched revision differs from fixed source")
+    else:
+        source_dir.mkdir()
+        _copy_snapshot(
+            root=Path(source["path"]),
+            files=_snapshot_files(root=Path(source["path"]), paths=None),
+            destination=source_dir,
+        )
+        source["path"] = str(source_dir.relative_to(stage))
+    files = _snapshot_files(root=source_dir, paths=None)
+    refs = {}
+    hashes = {}
+    for name, original, filename in (
+        ("instruction", task["instruction_file"], "instruction.md"),
+        ("script", task["setup"]["script"], "setup.sh"),
+        ("requirements_lock", task["setup"]["requirements_lock"], "requirements.lock"),
+    ):
+        target = directory / filename
+        shutil.copyfile(original, target)
+        key = f"task:{task_id}:{name}"
+        _register(materials=materials, key=key, path=target, stage=stage)
+        refs[name] = key
+        hashes[name] = materials[key]["sha256"]
+        if name == "instruction":
+            task["instruction_file"] = str(target.relative_to(stage))
+        else:
+            task["setup"][name] = str(target.relative_to(stage))
+    archive = directory / "source.tar.gz"
+    _archive_snapshot(root=source_dir, files=files, destination=archive)
+    refs["source_archive"] = f"task:{task_id}:source_archive"
+    _register(materials=materials, key=refs["source_archive"], path=archive, stage=stage)
+    package_path = directory / "package.json"
+    _write_json(path=package_path, value=task)
+    refs["package"] = f"task:{task_id}:package"
+    _register(materials=materials, key=refs["package"], path=package_path, stage=stage)
+    record = {
+        "id": task_id,
+        "kind": task["kind"],
+        "interaction": task["interaction"],
+        "package": task,
+        "source_snapshot": {"revision": source.get("revision"), "files": files},
+        "content_hashes": hashes,
+        "materials": refs,
+    }
+    record["digest"] = task_digest(record)
+    return record
 
 
 def _controller_root() -> Path:

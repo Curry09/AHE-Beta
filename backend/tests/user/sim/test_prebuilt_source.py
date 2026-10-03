@@ -110,3 +110,23 @@ def test_unified_prebuilt_shell_and_script_use_copied_task_venv(tmp_path: Path) 
     assert runtime.run("task-tool")["stdout"].strip() == runtime.cwd
     assert runtime.evidence["harness_python"] == sys.executable
     assert runtime.cwd != str(source)
+
+
+def test_legacy_linked_metadata_is_copied_without_mutating_shared_targets(tmp_path):
+    from auto_designer.user.sim import seed_source
+
+    source = tmp_path / "source"
+    site = source / ".venv/lib/python3.12/site-packages"
+    site.mkdir(parents=True)
+    shared = tmp_path / "shared.pth"
+    shared.write_text(str(source) + "\n")
+    (site / "editable.pth").symlink_to(shared)
+    copied = Path(
+        seed_source.provision(WorkspaceSpec(kind="prebuilt", params={"source": str(source)}))
+    )
+    target = copied / ".venv/lib/python3.12/site-packages/editable.pth"
+    assert not target.is_symlink()
+    assert target.read_text().strip() == str(copied)
+    assert shared.read_text().strip() == str(source)
+    target.write_text("session edit")
+    assert shared.read_text().strip() == str(source)

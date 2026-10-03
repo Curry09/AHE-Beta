@@ -26,6 +26,14 @@ class UsageContext:
     round_no: int | None = None
     session_id: str | None = None
     instance_id: str | None = None
+    persona_id: str | None = None
+    task_id: str | None = None
+    task_digest: str | None = None
+    task_kind: str | None = None
+    interaction_mode: str | None = None
+    slot: int | None = None
+    harness_sha: str | None = None
+    attempt: int | None = None
     interaction_id: str | None = None
     turn_no: int | None = None
     agent_id: str | None = None

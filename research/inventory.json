@@ -242,11 +242,15 @@
     {
       "original_path": "backend/run.py",
       "disposition": "moved",
-      "destination": "backend/auto_designer/experiment/controllers/ordinary.py",
-      "reason": "Active controller becomes a package module",
+      "destination": "backend/auto_designer/experiment/controllers/unified.py",
+      "reason": "Historical entry was moved to the ordinary/SWE package controller in Spec0071; Spec0073 merges current execution into unified.py with shared runtime.py. Original source and prior migration hashes retain their historical meaning; neither asserts byte equality with the current controller.",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "66fe9f2e95febdc18ef804694f5b823803d1df513b3cc941ea26349b0c0041be",
-      "destination_sha256": "c629817306e8f4983c8f871463bfc8103d4c2f527672455fda3650eb949d8745"
+      "previous_destination": {
+        "path": "backend/auto_designer/experiment/controllers/ordinary.py",
+        "spec": "0071",
+        "sha256": "c629817306e8f4983c8f871463bfc8103d4c2f527672455fda3650eb949d8745"
+      }
     },
     {
       "original_path": "backend/scripts/audit_sim_action_integrity.py",
@@ -689,11 +693,15 @@
     {
       "original_path": "backend/scripts/run_swebench_closed_loop.py",
       "disposition": "moved",
-      "destination": "backend/auto_designer/experiment/controllers/swebench.py",
-      "reason": "Active controller becomes a package module",
+      "destination": "backend/auto_designer/experiment/controllers/unified.py",
+      "reason": "Historical entry was moved to the ordinary/SWE package controller in Spec0071; Spec0073 merges current execution into unified.py with shared runtime.py. Original source and prior migration hashes retain their historical meaning; neither asserts byte equality with the current controller.",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "bd88086c3ddbe8786946c5c533149ade5a9877906b2830de814aa9242b0fb89a",
-      "destination_sha256": "b645c25bee2639a2f92b22015ad8439282d5566a50c2d1c0023a4723af4066c4"
+      "previous_destination": {
+        "path": "backend/auto_designer/experiment/controllers/swebench.py",
+        "spec": "0071",
+        "sha256": "b645c25bee2639a2f92b22015ad8439282d5566a50c2d1c0023a4723af4066c4"
+      }
     },
     {
       "original_path": "backend/scripts/swebench_seed_sitecustomize.py",

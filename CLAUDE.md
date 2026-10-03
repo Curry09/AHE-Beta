@@ -7,7 +7,7 @@
 2. `nexau` 作为 agent 实现，同时兼容 claude code / codex 接入。
 
 ### 项目文档
-用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；当前任务包每轮只支持一个 session，N4/N8 多任务和历史产物追加轮尚未接入。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
+用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；支持冻结任务列表、同任务多用户与 ordinary/SWE 混合计划；N1/N4 公开示例涵盖两后端。历史产物导入追加轮仍未接入。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
@@ -66,7 +66,7 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 - **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
 
 ### 闭环
-`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；`TOTAL_ROUNDS=1` 不启 vigil。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。监督器启动 `auto_designer.experiment.controllers.ordinary` 或 `.swebench` 包内控制器；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
+`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；`TOTAL_ROUNDS=1` 不启 vigil。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。新 workload contract 1 由监督器启动 `auto_designer.experiment.controllers.unified`；旧 schema-2 module/script run 从原 archive 配方执行；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
 
 ### 目录结构
 前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 提供只读观测看板，项目级文档/工具与配置留根。
@@ -74,7 +74,7 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 backend/                 # 后端（编排框架）
   auto_designer/         # 包（编排框架本体）
     experiment/          # v2 配置、材料冻结、local/E2B 生命周期与监督器
-      controllers/       # ordinary.py / swebench.py：包内控制器，不是公开入口
+      controllers/       # unified.py + runtime.py：统一控制器与共享设施，不是公开入口
     models.py            # 共享数据结构（两侧共用）
     nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
     harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)

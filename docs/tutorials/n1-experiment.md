@@ -6,7 +6,7 @@ This walkthrough uses the checked-in pvlib task and `sr-15-swyx` persona. Local 
 
 This cleanup has offline verification but no new live local/E2B run. The earlier N1 live record remains a baseline; see the [cleanup verification report](../validation/spec0071-experiment-cleanup.md) for current coverage.
 
-This is a single-task N=1 workflow: `rounds.sessions_per_round` must be `1`. Multi-task N4/N8 runs and importing a historical run to append another round are not supported here. Existing-run `resume` continues the same frozen identity; it is not historical-result import.
+This tutorial uses one task and one user per round (`rounds.sessions_per_round: 1`). For four users and two tasks, use the [multi-user tutorial](multi-user-experiment.md). Importing a historical run to append another round remains unsupported. Existing-run `resume` continues the same frozen identity; it is not historical-result import.
 
 ## 1. Start from the repository
 

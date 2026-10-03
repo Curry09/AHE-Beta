@@ -31,6 +31,8 @@ PUBLIC_COMMANDS = {
 RETIRED_PATHS = (
     "run.sh",
     "backend/run.py",
+    "backend/auto_designer/experiment/controllers/ordinary.py",
+    "backend/auto_designer/experiment/controllers/swebench.py",
     "backend/scripts/run_auditable_experiment.py",
     "backend/scripts/run_mixed_closed_loop.py",
     "backend/scripts/run_swebench_closed_loop.py",
@@ -119,11 +121,18 @@ def maintained_import_errors(root: Path) -> list[str]:
                     modules = [x.name for x in node.names]
                 elif isinstance(node, ast.ImportFrom):
                     modules = [node.module or ""]
+                    if node.module == "auto_designer.experiment.controllers":
+                        modules.extend(f"{node.module}.{name.name}" for name in node.names)
                 for module in modules:
                     if (
                         module == "run"
                         or module == "run_swebench_closed_loop"
                         or module == "run_auditable_experiment"
+                        or module
+                        in {
+                            "auto_designer.experiment.controllers.ordinary",
+                            "auto_designer.experiment.controllers.swebench",
+                        }
                         or module.startswith("research.")
                     ):
                         errors.append(

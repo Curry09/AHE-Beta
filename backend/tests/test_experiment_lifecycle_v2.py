@@ -2,6 +2,7 @@
 
 import json
 import tarfile
+from pathlib import Path
 
 import pytest
 
@@ -574,3 +575,175 @@ def test_oauth_sdk_probe_is_rejected_before_provider_calls(tmp_path, monkeypatch
     monkeypatch.setattr(runtime, "credentials_v2", forbidden)
     with pytest.raises(ConfigError, match="OAuth delivery must be validated by Claude Code"):
         runtime.check_v2(config_path=tmp_path / "not-read.json", probe_models=True)
+
+
+# Spec-0073/T5: observations are evidence from recovery units, not configured capacity.
+def test_multitask_progress_counts_only_recorded_units(tmp_path):
+    binding = {
+        "round_no": 1,
+        "slot": 0,
+        "persona_id": "a",
+        "task_id": "orders",
+        "task_digest": "digest-a",
+        "interaction": "direct",
+    }
+    (tmp_path / "checkpoints").mkdir()
+    (tmp_path / "checkpoints/recovery.json").write_text(
+        json.dumps(
+            {
+                "round": 1,
+                "rounds": {
+                    "1": {
+                        "status": "running",
+                        "user_sha": "initial-harness",
+                        "sealed_sha": None,
+                        "plan": [
+                            binding,
+                            {**binding, "slot": 1, "persona_id": "b"},
+                            {**binding, "slot": 2, "persona_id": "c"},
+                            {**binding, "slot": 3, "persona_id": "d"},
+                        ],
+                        "stages": {
+                            "users": {
+                                "status": "running",
+                                "units": {
+                                    "done": {
+                                        "status": "completed",
+                                        "attempt": 1,
+                                        "input": {"binding": binding},
+                                    },
+                                    "retry": {
+                                        "status": "failed",
+                                        "attempt": 2,
+                                        "input": {"binding": {**binding, "slot": 1}},
+                                    },
+                                    "working": {
+                                        "status": "running",
+                                        "attempt": 1,
+                                        "input": {"binding": {**binding, "slot": 2}},
+                                    },
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        )
+    )
+    (tmp_path / "resources.json").write_text(
+        json.dumps(
+            {
+                "task_workspaces": {
+                    "orders": {
+                        "status": "prepared",
+                        "task_digest": "digest-a",
+                        "recipe_hash": "recipe",
+                        "params": {"source": "/PRIVATE/WORKSPACE", "token": "PRIVATE-SECRET"},
+                    }
+                },
+            }
+        )
+    )
+    report = runtime.progress_v2(tmp_path)
+    users = report["rounds"]["1"]["users"]
+    assert {
+        name: users[name]
+        for name in ("expected", "started", "completed", "failed", "running", "pending")
+    } == {
+        "expected": 4,
+        "started": 3,
+        "completed": 1,
+        "failed": 1,
+        "running": 1,
+        "pending": 1,
+    }
+    assert users["sessions"][0]["binding"] == binding
+    assert report["rounds"]["1"]["user_sha"] == "initial-harness"
+    assert report["tasks"]["orders"]["status"] == "prepared"
+    assert "PRIVATE" not in json.dumps(report)
+
+
+def test_missing_or_corrupt_ledger_reports_unknown_not_configured_success(tmp_path):
+    assert runtime.progress_v2(tmp_path)["observation"] == "UNKNOWN"
+    (tmp_path / "checkpoints").mkdir()
+    (tmp_path / "checkpoints/recovery.json").write_text("invalid")
+    assert runtime.progress_v2(tmp_path)["observation"] == "UNKNOWN"
+    assert runtime.progress_v2(tmp_path)["rounds"] == {}
+
+
+def test_legacy_round_without_plan_has_unknown_expected_count(tmp_path):
+    (tmp_path / "checkpoints").mkdir()
+    (tmp_path / "checkpoints/recovery.json").write_text(
+        json.dumps(
+            {
+                "round": 1,
+                "rounds": {
+                    "1": {
+                        "status": "completed",
+                        "stages": {
+                            "users": {
+                                "status": "completed",
+                                "units": {"saved": {"status": "completed"}},
+                            },
+                        },
+                    }
+                },
+            }
+        )
+    )
+    users = runtime.progress_v2(tmp_path)["rounds"]["1"]["users"]
+    assert users["completed"] == 1
+    assert users["expected"] is None
+    assert users["pending"] is None
+
+
+def test_provider_unknown_retains_previous_ledger_facts_as_last_observed(run, monkeypatch):
+    base, directory, manifest, adapter = run
+    prior = {
+        "current_round": 2,
+        "rounds": {"1": {"status": "completed", "users": {"completed": 4}}},
+    }
+    update_runtime(run_dir=directory, action="observed-ledger", changes={"progress": prior})
+    monkeypatch.setattr(adapter, "inspect", lambda: (_ for _ in ()).throw(OSError("offline")))
+    report = runtime.status_v2(run_id=manifest["run_id"], root=base)
+    assert report["progress"]["rounds"] == prior["rounds"]
+    assert report["progress"]["observation"] == "UNKNOWN"
+    assert report["progress"]["source"] == "LAST_OBSERVED"
+
+
+def test_new_task_preparation_unknown_until_matching_receipt_and_stale_task_rejected(
+    tmp_path, monkeypatch
+):
+    from auto_designer.experiment import materials, workload
+    from auto_designer.experiment.config import config_hash
+    from test_experiment_workload import multiple_inputs, prepared_inputs
+
+    config = multiple_inputs.__wrapped__(
+        prepared_inputs.__wrapped__(tmp_path, monkeypatch), tmp_path
+    )
+    manifest = materials.prepare_materials(config, tmp_path / "runs")
+    directory = Path(manifest["run_dir"])
+    tasks = workload.catalog_tasks(workload.read_task_catalog(directory, manifest))
+    pending = runtime.progress_v2(directory)["tasks"]
+    assert set(pending) == {task["id"] for task in tasks}
+    assert all(record["status"] == "UNKNOWN" for record in pending.values())
+    receipts = {
+        task["id"]: {
+            "task_digest": task["digest"],
+            "recipe_hash": "a" * 64,
+            "source_revision": task["source_snapshot"]["revision"],
+            "source_hash": config_hash(data=task["source_snapshot"]["files"]),
+            "params": {"source": "/PRIVATE"},
+        }
+        for task in tasks
+    }
+    image_file = directory / "runtime/local-images.json"
+    image_file.write_text(json.dumps({"task_images": receipts}))
+    observed = runtime.progress_v2(directory)["tasks"]
+    assert all(record["status"] == "prepared" for record in observed.values())
+    assert "PRIVATE" not in json.dumps(observed)
+    receipts[tasks[1]["id"]]["task_digest"] = "stale-other-task"
+    image_file.write_text(json.dumps({"task_images": receipts}))
+    observed = runtime.progress_v2(directory)["tasks"]
+    assert observed[tasks[0]["id"]]["status"] == "prepared"
+    assert observed[tasks[1]["id"]]["status"] == "UNKNOWN"

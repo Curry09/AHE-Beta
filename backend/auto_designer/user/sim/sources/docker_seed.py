@@ -13,6 +13,7 @@ import subprocess
 import uuid
 
 from auto_designer.models import WorkspaceSpec
+from auto_designer.usage import current_usage_context
 from auto_designer.user.sim.runtime import DockerWorkspaceRuntime
 from auto_designer.user.sim.seed_source import register
 
@@ -95,6 +96,18 @@ class DockerSeedSource:
         ):
             if os.environ.get(key):
                 ownership.extend(["--label", f"{label}={os.environ[key]}"])
+        # Spec-0073/T2: bind disposable containers to a logical session before setup.
+        context = current_usage_context()
+        if context.session_id:
+            for label, value in (
+                ("io.auto-designer.session_id", context.session_id),
+                ("io.auto-designer.task_id", spec.params.get("task_id") or instance_id),
+                ("io.auto-designer.task_digest", spec.params.get("task_digest")),
+                ("io.auto-designer.round_no", context.round_no),
+                ("io.auto-designer.attempt", getattr(context, "attempt", None)),
+            ):
+                if value is not None:
+                    ownership.extend(["--label", f"{label}={value}"])
         harness_python = str(spec.params.get("harness_python") or "")
         task_environment = []
         if harness_python:
@@ -179,6 +192,15 @@ class DockerSeedSource:
             {
                 "instance_id": instance_id,
                 "workspace_scope": "single_instance",
+                **(
+                    {
+                        "session_id": context.session_id,
+                        "task_id": spec.params.get("task_id") or instance_id,
+                        "task_digest": spec.params.get("task_digest"),
+                    }
+                    if context.session_id
+                    else {}
+                ),
             }
         )
         return runtime

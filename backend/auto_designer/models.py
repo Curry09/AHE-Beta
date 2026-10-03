@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -516,6 +517,8 @@ class Session:
     # Spec-0055: deterministic user→demand handoff.  Kept optional for old
     # sessions; SessionStore can reconstruct an unavailable/legacy envelope.
     user_feedback_envelope: dict[str, Any] = field(default_factory=dict)
+    # Spec-0073/T4: one frozen source of session, task and persona ownership.
+    session_provenance: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -540,6 +543,8 @@ class Session:
         d["accept_validity"] = self.accept_validity
         if self.audit_events:
             d["audit_events"] = [dict(row) for row in self.audit_events]
+        if self.session_provenance:
+            d["session_provenance"] = dict(self.session_provenance)
         if self.user_feedback_envelope:
             d["user_feedback_envelope"] = dict(self.user_feedback_envelope)
         return d
@@ -567,4 +572,100 @@ class Session:
             accept_validity=str(data.get("accept_validity") or "not_applicable"),
             audit_events=[dict(row) for row in data.get("audit_events", [])],
             user_feedback_envelope=dict(data.get("user_feedback_envelope") or {}),
+            session_provenance=dict(data.get("session_provenance") or {}),
         )
+
+
+def bound_session_provenance() -> dict[str, Any]:
+    """Read the immutable experiment binding; legacy sessions have no binding."""
+    from auto_designer.usage import current_usage_context
+
+    ctx = current_usage_context()
+    if ctx.task_digest is None:
+        return {}
+    result = {
+        "contract_version": 1,
+        **{
+            name: getattr(ctx, name)
+            for name in (
+                "run_id",
+                "round_no",
+                "slot",
+                "persona_id",
+                "task_id",
+                "task_digest",
+                "task_kind",
+                "harness_sha",
+            )
+        },
+    }
+    # Interaction belongs to the frozen task, and is bound before provisioning.
+    result["interaction"] = ctx.interaction_mode
+    if any(value is None for value in result.values()):
+        raise ValueError("incomplete logical session provenance")
+    return result
+
+
+def validate_session_provenance(
+    session: Session, expected: Mapping[str, Any] | None = None
+) -> None:
+    """Reject wrong-task results before authoritative save, index repair or admission."""
+    provenance = session.session_provenance
+    if not provenance:
+        if expected:
+            raise ValueError("session has no frozen provenance")
+        return
+    required = {
+        "contract_version",
+        "run_id",
+        "round_no",
+        "slot",
+        "persona_id",
+        "task_id",
+        "task_digest",
+        "task_kind",
+        "interaction",
+        "harness_sha",
+    }
+    if (
+        set(provenance) != required
+        or type(provenance.get("contract_version")) is not int
+        or provenance.get("contract_version") != 1
+    ):
+        raise ValueError("invalid session provenance contract")
+    if (
+        isinstance(provenance["round_no"], bool)
+        or not isinstance(provenance["round_no"], int)
+        or provenance["round_no"] < 1
+        or isinstance(provenance["slot"], bool)
+        or not isinstance(provenance["slot"], int)
+        or provenance["slot"] < 0
+    ):
+        raise ValueError("invalid session provenance round/slot")
+    if session.persona.identity != provenance["persona_id"] or session.scenario.workspace is None:
+        raise ValueError("session persona/workspace provenance mismatch")
+    if (
+        any(
+            not isinstance(provenance[key], str) or not provenance[key]
+            for key in (
+                "run_id",
+                "persona_id",
+                "task_id",
+                "task_digest",
+                "task_kind",
+                "interaction",
+                "harness_sha",
+            )
+        )
+        or provenance["task_kind"] not in {"ordinary", "swebench"}
+        or provenance["interaction"] not in {"direct", "simulated_user"}
+    ):
+        raise ValueError("invalid session provenance identities")
+    if session.sim_trace is not None and session.sim_trace.persona_id != provenance["persona_id"]:
+        raise ValueError("session trace persona provenance mismatch")
+    params = session.scenario.workspace.params
+    for key in ("task_id", "task_digest", "task_kind", "interaction"):
+        if params.get(key) != provenance[key]:
+            raise ValueError(f"session {key} provenance mismatch")
+    if expected and dict(expected) != provenance:
+        raise ValueError("session does not match its immutable logical binding")

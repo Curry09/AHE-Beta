@@ -13,6 +13,111 @@ CLAUDE_VERSION = "2.1.284"
 CLAUDE_SHA256 = "5cd90aabd83f8a15136c35aa37bb1d92b348993573316643dc3fe4e04afbf88f"
 EXECUTION_USER = "user"
 
+
+def task_workspace_record(task: dict, manifest: dict, root: str, tools: dict) -> dict:
+    """Spec-0073/T3: provider coordinates do not enter the task's logical digest."""
+    from auto_designer.experiment.config import config_hash
+
+    recipe = config_hash(
+        data={
+            "version": 1,
+            "task_digest": task["digest"],
+            "python": PYTHON_VERSION,
+            "uv": UV_VERSION,
+            "platform": "linux-x86_64",
+            "link_mode": "copy",
+        }
+    )
+    params = {
+        "workload_contract_version": 1,
+        "run_root": root,
+        "run_id": manifest["run_id"],
+        "config_hash": manifest["config_hash"],
+        "task_id": task["id"],
+        "task_digest": task["digest"],
+        "recipe_hash": recipe,
+        "source": root + "/workspace/tasks/" + task["id"] + "/source",
+        "source_files": task["source_snapshot"]["files"],
+        "session_root": root + "/workspace/sessions",
+        "cache_root": root + "/runtime/task-cache",
+        "managed_python": tools["python"],
+        "uv": tools["uv"],
+        "harness_python": tools["controller_python"],
+        "execution_uid": tools["execution_uid"],
+        "execution_gid": tools["execution_gid"],
+    }
+    for name, material in (("setup_script", "script"), ("requirements_lock", "requirements_lock")):
+        entry = manifest["materials"][task["materials"][material]]
+        params[name] = root + "/" + entry["path"]
+        params[name + "_sha256"] = entry["sha256"]
+    return {
+        "kind": "prebuilt",
+        "params": params,
+        "setup": [],
+        "task_digest": task["digest"],
+        "recipe_hash": recipe,
+        "status": "prepared",
+        "source_revision": task["source_snapshot"]["revision"],
+        "source_hash": config_hash(data=task["source_snapshot"]["files"]),
+    }
+
+
+_MULTITASK_BOOTSTRAP = r"""
+tools={'python':python,'uv':str(uv),'controller_python':str(controller/'.venv/bin/python'),'execution_uid':account.pw_uid,'execution_gid':account.pw_gid}
+catalog=json.loads((root/manifest['materials']['task_catalog']['path']).read_text())
+if catalog.get('contract_version')!=1: raise RuntimeError('Unknown task catalog contract')
+task_workspaces={}
+for task_record in catalog['tasks']:
+    task_id=task_record['id'];package=task_record['package'];source=package['source']
+    task=root/'workspace/tasks'/task_id/'source'
+    if task.is_symlink(): raise RuntimeError('Linked task baseline destination')
+    shutil.rmtree(task,ignore_errors=True);task.mkdir(parents=True)
+    if source['kind']=='git':
+        run(['git','init',str(task)]);run(['git','-C',str(task),'remote','add','origin',source['url']])
+        run(['git','-C',str(task),'fetch','--depth','1','origin',source['revision']])
+        run(['git','-C',str(task),'checkout','--detach',source['revision']])
+    extract(root/manifest['materials'][task_record['materials']['source_archive']]['path'],task)
+    for name,digest in task_record['source_snapshot']['files'].items():
+        if hashlib.sha256((task/name).read_bytes()).hexdigest()!=digest: raise RuntimeError('Task baseline snapshot mismatch')
+    if source['kind']=='git':
+        if subprocess.check_output(['git','-C',str(task),'rev-parse','HEAD'],text=True).strip()!=source['revision']: raise RuntimeError('Task revision differs')
+        if subprocess.check_output(['git','-C',str(task),'status','--porcelain'],text=True).strip(): raise RuntimeError('Task archive differs from fixed Git revision')
+    else:
+        run(['git','init',str(task)]);run(['git','-C',str(task),'add','.'])
+        run(['git','-C',str(task),'-c','user.name=Experiment','-c','user.email=experiment@localhost','commit','-m','Frozen task source'])
+# Hand writable run directories to the worker before executing its frozen setup.
+# Baselines and shared interpreters remain management-owned, readable but not writable.
+protected=(root/'runtime/python',root/'workspace/tasks')
+for directory,dirs,files in os.walk(root,followlinks=False):
+    here=pathlib.Path(directory)
+    dirs[:]=[name for name in dirs if not any((here/name)==p for p in protected)]
+    for item in [here,*(here/name for name in dirs+files)]: os.chown(item,account.pw_uid,account.pw_gid,follow_symlinks=False)
+program='import json,sys;from auto_designer.experiment.backends.e2b_bootstrap import task_workspace_record;from auto_designer.user.sim.sources.prebuilt import validate_task_baseline;task,manifest,root,tools=json.loads(sys.argv[1]);record=task_workspace_record(task,manifest,root,tools);validate_task_baseline(record["params"]);print(json.dumps(record))'
+worker_env={**install_env,'PYTHONPATH':str(controller/'backend')}
+for task_record in catalog['tasks']:
+    output=subprocess.check_output([str(controller/'.venv/bin/python'),'-c',program,json.dumps([task_record,manifest,str(root),tools])],cwd=controller,env=worker_env,text=True,user=account.pw_uid,group=account.pw_gid,extra_groups=[],timeout=660)
+    task_workspaces[task_record['id']]=json.loads(output.strip().splitlines()[-1])
+"""
+
+_SINGLE_TASK_BOOTSTRAP = r"""
+package=manifest['task_package']; source=package['source'];task.mkdir(parents=True,exist_ok=True)
+if source['kind']=='git':
+    run(['git','init',str(task)])
+    run(['git','-C',str(task),'remote','add','origin',source['url']])
+    run(['git','-C',str(task),'fetch','--depth','1','origin',source['revision']])
+    run(['git','-C',str(task),'checkout','--detach',source['revision']])
+extract(root/manifest['materials']['task_source_archive']['path'],task)
+if source['kind']=='git':
+    if subprocess.check_output(['git','-C',str(task),'rev-parse','HEAD'],text=True).strip()!=source['revision']: raise RuntimeError('Task revision differs')
+    if subprocess.check_output(['git','-C',str(task),'status','--porcelain'],text=True).strip(): raise RuntimeError('Task archive differs from fixed Git revision')
+else:
+    run(['git','init',str(task)]);run(['git','-C',str(task),'add','.']);run(['git','-C',str(task),'-c','user.name=Experiment','-c','user.email=experiment@localhost','commit','-m','Frozen task source'])
+lock=str(root/manifest['materials']['requirements_lock']['path'])
+env.update(TASK_ROOT=str(task),TASK_PYTHON=python,REQUIREMENTS_LOCK=lock,AUTO_DESIGNER_TASK_REQUIREMENTS=lock,VIRTUAL_ENV=str(task/'.venv'),UV_BIN=str(uv))
+run(['bash',str(root/manifest['materials']['script']['path'])],cwd=task,env=env)
+if not(task/'.venv/bin/python').is_file(): raise RuntimeError('Task setup did not produce its isolated Python environment')
+"""
+
 # This program runs with the template's system Python before any project imports.
 BOOTSTRAP_PROGRAM = r"""
 import hashlib,json,os,pathlib,pwd,shutil,subprocess,sys,tarfile,urllib.request
@@ -63,32 +168,30 @@ env=dict(install_env);env['UV_PYTHON']=python
 run([str(uv),'sync','--locked','--extra','experiments','--extra','dev','--python',python],cwd=controller,env=env)
 run([str(uv),'sync','--locked','--extra','nexau','--extra','dev','--python',python],cwd=oa,env=env)
 claude=binroot/'claude';download('https://downloads.claude.ai/claude-code-releases/2.1.284/linux-x64/claude','CLAUDE_SHA',claude);claude.chmod(0o755)
-package=manifest['task_package']; source=package['source'];task.mkdir(parents=True,exist_ok=True)
-if source['kind']=='git':
-    run(['git','init',str(task)])
-    run(['git','-C',str(task),'remote','add','origin',source['url']])
-    run(['git','-C',str(task),'fetch','--depth','1','origin',source['revision']])
-    run(['git','-C',str(task),'checkout','--detach',source['revision']])
-extract(root/manifest['materials']['task_source_archive']['path'],task)
-if source['kind']=='git':
-    if subprocess.check_output(['git','-C',str(task),'rev-parse','HEAD'],text=True).strip()!=source['revision']: raise RuntimeError('Task revision differs')
-    if subprocess.check_output(['git','-C',str(task),'status','--porcelain'],text=True).strip(): raise RuntimeError('Task archive differs from fixed Git revision')
-else:
-    run(['git','init',str(task)]);run(['git','-C',str(task),'add','.']);run(['git','-C',str(task),'-c','user.name=Experiment','-c','user.email=experiment@localhost','commit','-m','Frozen task source'])
-lock=str(root/manifest['materials']['requirements_lock']['path'])
-env.update(TASK_ROOT=str(task),TASK_PYTHON=python,REQUIREMENTS_LOCK=lock,AUTO_DESIGNER_TASK_REQUIREMENTS=lock,VIRTUAL_ENV=str(task/'.venv'),UV_BIN=str(uv))
-run(['bash',str(root/manifest['materials']['script']['path'])],cwd=task,env=env)
-if not(task/'.venv/bin/python').is_file(): raise RuntimeError('Task setup did not produce its isolated Python environment')
+TASK_SETUP
 # Keep task venv selection across explicit bash login shells without activating it for controller/vigil.
 pathlib.Path('/etc/profile.d/auto-designer-task.sh').write_text('if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then export PATH="$VIRTUAL_ENV/bin:$PATH"; fi\n')
 receipt={'python':python,'uv':str(uv),'controller_python':str(controller/'.venv/bin/python'),'openagents_bin':str(oa/'.venv/bin'),'bin':str(binroot),'task_root':str(task),'python_version':'3.12.13','uv_version':'0.11.28','claude_version':'2.1.284','execution_user':'user','execution_uid':account.pw_uid,'execution_gid':account.pw_gid,'execution_home':str(home)}
+if manifest.get('workload_contract_version')==1: receipt['task_workspaces']=task_workspaces
 (root/'runtime/bootstrap.json').write_text(json.dumps(receipt,indent=2)+'\n')
 # Do not open /root or chown outside the owned run (including symlink targets).
 for directory,dirs,files in os.walk(root,followlinks=False):
+    if manifest.get('workload_contract_version')==1:
+        dirs[:]=[name for name in dirs if pathlib.Path(directory)/name not in protected]
     for item in [pathlib.Path(directory),*(pathlib.Path(directory)/name for name in dirs+files)]:
         os.chown(item,account.pw_uid,account.pw_gid,follow_symlinks=False)
 root.chmod(0o700);home.chmod(0o700)
 """.replace("UV_SHA", UV_SHA256).replace("CLAUDE_SHA", CLAUDE_SHA256)
+
+# Old frozen single-task resources retain their original preparation protocol.
+BOOTSTRAP_PROGRAM = BOOTSTRAP_PROGRAM.replace(
+    "TASK_SETUP",
+    "if manifest.get('workload_contract_version') is not None:\n"
+    "    if type(manifest['workload_contract_version']) is not int or manifest['workload_contract_version']!=1: raise RuntimeError('Unknown workload contract')\n"
+    + "\n".join("    " + line for line in _MULTITASK_BOOTSTRAP.strip().splitlines())
+    + "\nelse:\n"
+    + "\n".join("    " + line for line in _SINGLE_TASK_BOOTSTRAP.strip().splitlines()),
+)
 
 
 def bootstrap_command(root: str) -> str:

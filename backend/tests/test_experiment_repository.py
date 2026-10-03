@@ -34,7 +34,7 @@ def inventory(root, content=b"historical source\n"):
 def test_current_repository_has_only_supported_public_materials():
     result = checker.check_repository(ROOT)
     assert result["ok"], result["errors"]
-    assert len(result["examples"]) == 2
+    assert len(result["examples"]) == 4
 
 
 def test_archive_content_cannot_be_silently_rewritten(tmp_path):
@@ -76,6 +76,8 @@ def test_archive_destination_cannot_escape_via_symlink(tmp_path):
     "code",
     [
         "import run",
+        "from auto_designer.experiment.controllers import ordinary",
+        "import auto_designer.experiment.controllers.swebench",
         "from research.archives import old",
         "import importlib\nimportlib.import_module('run')",
     ],

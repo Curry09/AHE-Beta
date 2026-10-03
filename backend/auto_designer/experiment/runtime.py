@@ -324,10 +324,19 @@ def _status_v2_unlocked(
     controller = receipt.get("controller") or receipt
     observation = receipt.get("observation", "OBSERVED")
     state = controller.get("state")
+    progress = receipt.get("progress") or progress_v2(directory)
+    if observation == "UNKNOWN" and progress.get("observation") == "UNKNOWN":
+        historical = previous.get("progress") or {}
+        if historical.get("rounds"):
+            progress = {**historical, "observation": "UNKNOWN", "source": "LAST_OBSERVED"}
     changes: dict[str, Any] = {
         "observation": observation,
         "provider": receipt,
-        "progress": receipt.get("progress") or progress_v2(directory),
+        "progress": progress,
+        "configured": {
+            key: manifest["config"].get("rounds", {}).get(key)
+            for key in ("count", "sessions_per_round", "max_parallel_users")
+        },
     }
     changes.update(_gitea_facts(directory))
     resource = receipt.get("resource_state")
@@ -389,20 +398,126 @@ def status_v2(
         }
 
 
+def _task_preparation(run_dir: Path) -> dict[str, Any]:
+    """Spec-0073/T5: task facts without workspace paths or provider secrets."""
+
+    def read(relative):
+        try:
+            value = json.loads((run_dir / relative).read_text())
+            return value if isinstance(value, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    manifest = read("manifest.json")
+    resources = read("resources.json")
+    mapping = (
+        resources.get("task_workspaces")
+        or read("runtime/bootstrap.json").get("task_workspaces")
+        or {}
+    )
+    prepared_images = read("runtime/local-images.json").get("task_images") or {}
+    tasks = []
+    if "workload_contract_version" in manifest:
+        from auto_designer.experiment.workload import catalog_tasks, read_task_catalog
+
+        try:
+            tasks = catalog_tasks(read_task_catalog(run_dir, manifest))
+        except (ConfigError, OSError, ValueError):
+            return {}
+    fields = ("status", "task_digest", "recipe_hash", "source_revision", "source_hash")
+    if not tasks:
+        return (
+            {
+                task_id: {key: record[key] for key in fields if key in record}
+                for task_id, record in mapping.items()
+                if isinstance(record, dict)
+            }
+            if isinstance(mapping, dict)
+            else {}
+        )
+    from auto_designer.experiment.config import config_hash
+
+    result = {}
+    for task in tasks:
+        record = mapping.get(task["id"]) if isinstance(mapping, dict) else None
+        if not isinstance(record, dict):
+            image = prepared_images.get(task["id"]) if isinstance(prepared_images, dict) else None
+            record = {**image, "status": "prepared"} if isinstance(image, dict) else {}
+        matching = (
+            record.get("task_digest") == task["digest"]
+            and record.get("source_revision") == task["source_snapshot"]["revision"]
+            and record.get("source_hash") == config_hash(data=task["source_snapshot"]["files"])
+            and isinstance(record.get("recipe_hash"), str)
+            and len(record["recipe_hash"]) == 64
+            and all(char in "0123456789abcdef" for char in record["recipe_hash"])
+        )
+        result[task["id"]] = (
+            {key: record[key] for key in fields if key in record}
+            if matching
+            else {"status": "UNKNOWN", "task_digest": task["digest"]}
+        )
+    return result
+
+
+def _user_progress(item: dict[str, Any]) -> dict[str, Any]:
+    """Counts describe recorded recovery units, never guessed model/process activity."""
+    stage = item.get("stages", {}).get("users", {})
+    units = stage.get("units", {})
+    units = units if isinstance(units, dict) else {}
+    plan = item.get("plan")
+    # New plans contain only immutable logical bindings; old fixed-set plans
+    # remain readable but do not provide per-task provenance.
+    bindings = plan if isinstance(plan, list) else None
+    counts = {
+        status: sum(unit.get("status") == status for unit in units.values())
+        for status in ("completed", "failed", "running")
+    }
+    expected = len(bindings) if bindings is not None else None
+    return {
+        "observation": "RECOVERY_LEDGER",
+        "expected": expected,
+        "started": len(units),
+        **counts,
+        "pending": max(0, expected - len(units)) if expected is not None else None,
+        "sessions": [
+            {
+                "key": key,
+                "status": unit.get("status"),
+                "attempt": unit.get("attempt"),
+                "binding": unit.get("input", {}).get("binding"),
+            }
+            for key, unit in units.items()
+        ],
+    }
+
+
 def progress_v2(run_dir: Path) -> dict[str, Any]:
     path = run_dir / "checkpoints/recovery.json"
+    tasks = _task_preparation(run_dir)
     if not path.is_file():
-        return {"current_round": None, "rounds": {}}
-    value = json.loads(path.read_text())
-    rounds = {
-        key: {
-            "status": item.get("status"),
-            "sealed_sha": item.get("sealed_sha"),
-            "stages": {name: stage.get("status") for name, stage in item.get("stages", {}).items()},
+        return {"current_round": None, "rounds": {}, "observation": "UNKNOWN", "tasks": tasks}
+    try:
+        value = json.loads(path.read_text())
+        rounds = {
+            key: {
+                "status": item.get("status"),
+                "user_sha": item.get("user_sha"),
+                "sealed_sha": item.get("sealed_sha"),
+                "stages": {
+                    name: stage.get("status") for name, stage in item.get("stages", {}).items()
+                },
+                "users": _user_progress(item),
+            }
+            for key, item in value.get("rounds", {}).items()
         }
-        for key, item in value.get("rounds", {}).items()
+    except (OSError, ValueError, AttributeError, TypeError):
+        return {"current_round": None, "rounds": {}, "observation": "UNKNOWN", "tasks": tasks}
+    return {
+        "current_round": value.get("round"),
+        "rounds": rounds,
+        "observation": "RECOVERY_LEDGER",
+        "tasks": tasks,
     }
-    return {"current_round": value.get("round"), "rounds": rounds}
 
 
 def run_v2(

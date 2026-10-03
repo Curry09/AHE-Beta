@@ -16,9 +16,9 @@
 | Persona | 符合仓内 persona schema 的 JSON 数组 | `examples/personas/n1.json` |
 | 凭证 | 显式环境变量，或权限 0600 的 env 文件 | `examples/experiment.env.example` |
 
-N1 示例使用 `examples/personas/n1.json`；通用 persona 主库位于 `examples/personas/library.json`。选择另一份库不会开启多任务调度。
+N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/personas/library.json` 选择四张真实卡片。ID 必须存在于所选库中，不同 persona 的数量必须至少覆盖 sessions_per_round。
 
-实验中的路径相对于实验 JSON；任务包中的路径相对于任务 JSON。prepare 自动生成 roster、任务池、逐轮计划、所需单实例 SWE Parquet、源码/Harness 归档与哈希清单，不需要用户手工拼装。
+实验中的路径相对于实验 JSON；任务包中的路径相对于任务 JSON。`check --offline` 只给尚未冻结的分配预览，不拉取 Git。`prepare` 冻结每个任务的包、指令、setup、依赖锁及已验证源码 archive，再生成 `materials/task-catalog.json`、`materials/session-plan.json`、persona roster、Harness archive 和哈希清单，无需手工拼装。
 
 ## 实验字段
 
@@ -30,14 +30,14 @@ N1 示例使用 `examples/personas/n1.json`；通用 persona 主库位于 `examp
 | `runtime.local` | 可选镜像覆盖、`ci_enabled: false`；不支持启用尚未注册的 CI runner |
 | `runtime.e2b` | `cpu_count`、`memory_mb`、`timeout_seconds`（300–86400）；可选兼容 template |
 | `harness.source` | `builtin`，或 `archive` 加归档路径及 SHA-256 |
-| `workload` | kind、任务包、persona 库及实际存在的 persona IDs |
+| `workload` | `task_packages` 列表，或旧 `kind` + `task_package`；persona 库、实际 ID 及可选 interaction_plan |
 | `rounds` | 轮数、每轮 session 数、最大用户并发数 |
 | `roles` | Triage/Synthesizer/divergent/developer 数量；`owner_mode: mechanical` / `llm` |
 | `models` | User、Harness、共享需求面、Claude Code 交付模型 |
 | `evaluation.official_grading` | `false`，官方评分单独运行 |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
-当前单任务 schema 要求 `rounds.sessions_per_round: 1`；统一入口尚不支持 N4/N8 多任务计划或导入历史结果后追加一轮。可以按轮切换 persona。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
+可选一个或多个任务包；sessions_per_round 不超过所选不同 persona 的数量，max_parallel_users 不超过 sessions_per_round。同轮不同 persona 可使用同一任务，各包自行声明 kind 和 interaction。历史结果导入后追加一轮仍不支持。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
 
 `builtin` 冻结当前 checkout 的 `backend/harness_template/`，不是历史 `cade14d` Harness。复现旧基线必须显式提供那份归档和真实校验和。
 
@@ -79,7 +79,7 @@ N1 示例使用 `examples/personas/n1.json`；通用 persona 主库位于 `examp
 }
 ```
 
-自有普通任务用 `kind: ordinary`，显式声明 `not_in_benchmark: true`，代码来源可为固定 Git 或 `source: {"kind": "local", "path": "./my-task"}`。SWE 任务必须使用固定 Git revision，不能声明 `not_in_benchmark`。实验 workload 和任务包的 kind 必须一致。
+自有普通任务用 `kind: ordinary`，显式声明 `not_in_benchmark: true`，代码来源可为固定 Git 或 `source: {"kind": "local", "path": "./my-task"}`。SWE 任务必须使用固定 Git revision，不能声明 `not_in_benchmark`。旧单包形式的 workload.kind 必须与包一致；task_packages 列表分支不填全局 kind。
 
 安装脚本在任务 checkout 中运行，程序注入 `TASK_ROOT`、`TASK_PYTHON`、`REQUIREMENTS_LOCK`、`VIRTUAL_ENV`、`UV_BIN`。TASK_PYTHON 是受管解释器，VIRTUAL_ENV 指向任务自己的 `.venv`。先安装带 hash 的任务依赖，再安装任务源码且不额外下载未声明依赖。controller 和 OpenAgents 分别使用自己的锁定环境。
 
@@ -145,8 +145,16 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 }
 ```
 
-计划严格校验轮数、会话数、persona 与 task ID。省略时仍按 persona 顺序轮换。当前每轮一个 session；这不等于多任务/N4/N8 已迁入。`rounds.count: 1` 可只试用用户，不等待 Vigil；多轮仍须验证交付进程就绪。
+计划校验每轮 session 数量及已选 persona/task ID。同轮 persona 不重复，task 可以重复。省略计划时，按全局槽 k=(round_no-1)*sessions_per_round+slot，从配置顺序取 persona_ids[k % P] 和 task_packages[k % T]。这种简单轮转不保证覆盖全部 persona × task 组合；AABB、固定分组和交叉任务覆盖请写显式计划。`rounds.count: 1` 可只试用用户，不等待 Vigil；多轮仍须验证交付进程就绪。
 
 `experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 
-本次已迁入上述设置、交互和看板；工程 CI、入口内官方评分、多任务/N4/N8、历史产物追加轮、旧 seed 库及纯文本任务仍待实现。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+本次已迁入上述设置、交互和看板；工程 CI、入口内官方评分、历史产物追加轮、旧 seed 库及纯文本任务仍待实现。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+
+## 多任务包
+
+新多任务定义用 `workload.task_packages`；它与 `kind`、`task_package` 互斥，这个分支不填全局 kind。各包沿用 task-package-v1，并拥有全局唯一的安全 ID，如普通任务 `order-service` 和 SWE 的 `pvlib__pvlib-python-1478`。原单包形式在新 prepare 的输入边界转换一次；已冻结 run 保留原 config、hash 及 archive 内的 controller，未知 workload 契约版本拒绝。
+
+`runtime.local.seed_image` 保留单任务覆盖含义，选择多个包时填写会报错；自动逐任务构建支持混合任务。本地 session 使用独立容器；E2B 复制各任务纯源码基线，在最终 session 目录重建 venv。下载/wheel 缓存可共享，可写 repo 和已安装环境不共享。E2B 同一 Unix 用户不提供等同 Docker 的恶意跨目录访问防护。
+
+两个任务的显式计划、成本及证据路径见[完整 N4 教程](tutorials/multi-user-experiment.zh-CN.md)。

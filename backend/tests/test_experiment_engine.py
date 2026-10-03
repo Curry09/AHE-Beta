@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import os
 import signal
@@ -175,18 +174,16 @@ def test_context_rejects_wrong_backend_workspace_or_missing_keys(prepared):
         )
 
 
-def test_ordinary_runner_reads_context_without_repository_env(prepared, monkeypatch):
-    from auto_designer.experiment.controllers import ordinary as run_mod
+# Spec-0073/T5: the shared runtime accepts original context paths, without host defaults.
+def test_shared_runtime_reads_explicit_context_without_repository_env(prepared, monkeypatch):
+    from auto_designer.experiment.context import load_controller_context
+    from auto_designer.experiment.controllers import runtime as run_mod
 
     root, manifest, credentials, resources = prepared
     env = build_controller_environment(
         run_dir=root, manifest=manifest, credentials=credentials, resources=resources
     )
-    for key, value in env.items():
-        monkeypatch.setenv(key, value)
-    monkeypatch.setattr(sys, "argv", ["run.py"])
-    monkeypatch.setattr(run_mod, "_isolate_git_credentials", lambda: None)
-    for key in (
+    for name in (
         "DATA",
         "HARNESS_REPO",
         "_SANDBOX_ROOT",
@@ -195,42 +192,14 @@ def test_ordinary_runner_reads_context_without_repository_env(prepared, monkeypa
         "_VIGIL_CONFIG_STAGING",
         "GITEA_ENV_FILE",
     ):
-        monkeypatch.setattr(run_mod, key, getattr(run_mod, key))
-
-    class ReachedGitea(Exception):
-        pass
-
-    seen = []
-
-    def read_env(path):
-        seen.append(path)
-        raise ReachedGitea
-
-    monkeypatch.setattr(run_mod, "_load_env", read_env)
-    with pytest.raises(ReachedGitea):
-        run_mod.main()
-    assert seen == [root / "secrets/demand-gitea.env"]
+        monkeypatch.setattr(run_mod, name, getattr(run_mod, name))
+    for name in ("AUTO_DESIGNER_EXPERIMENT_ID", "AUTO_DESIGNER_VIGIL_CONTAINER"):
+        monkeypatch.setenv(name, os.environ.get(name, ""))
+    run_mod.apply_experiment_context(
+        ctx=load_controller_context(Path(env["AUTO_DESIGNER_EXPERIMENT_CONTEXT"]))
+    )
     assert run_mod.DATA == root / "data"
-
-
-def test_swe_runner_prefers_explicit_frozen_scenario(prepared, monkeypatch):
-    root, manifest, credentials, resources = prepared
-    env = build_controller_environment(
-        run_dir=root, manifest=manifest, credentials=credentials, resources=resources
-    )
-    for key in ("AUTO_DESIGNER_TASK_PACKAGE", "AUTO_DESIGNER_WORKSPACE_FILE"):
-        monkeypatch.setenv(key, env[key])
-    monkeypatch.setenv("SWEBENCH_SEED_IMAGE", "unrelated:ignored")
-    script = (
-        Path(__file__).resolve().parents[1] / "auto_designer/experiment/controllers/swebench.py"
-    )
-    specification = importlib.util.spec_from_file_location("unified_swe_test", script)
-    module = importlib.util.module_from_spec(specification)
-    specification.loader.exec_module(module)
-    scenario = module._to_scenario({"instance_id": "task-1"})
-    assert scenario.description == "Repair the task"
-    assert scenario.workspace.kind == "docker-seed"
-    assert scenario.workspace.params["image"] == "seed:pin"
+    assert run_mod.GITEA_ENV_FILE == root / "secrets/demand-gitea.env"
 
 
 def _wait_exit(root: Path, timeout: float = 8):
@@ -547,12 +516,12 @@ def test_module_recipe_cannot_launch_unfrozen_or_unrelated_module(tmp_path):
         controller_command(manifest, tmp_path)
 
 
-@pytest.mark.parametrize("module", ["ordinary", "swebench"])
-def test_internal_controller_refuses_implicit_repository_configuration(monkeypatch, module):
+def test_internal_controller_refuses_implicit_repository_configuration(monkeypatch):
     monkeypatch.delenv("AUTO_DESIGNER_EXPERIMENT_CONTEXT", raising=False)
-    controller = importlib.import_module(f"auto_designer.experiment.controllers.{module}")
+    from auto_designer.experiment.controllers import unified
+
     with pytest.raises(ConfigError, match="frozen inputs"):
-        controller.main()
+        unified.main()
 
 
 # Spec-0072/T1: both backends use frozen settings rather than silently ignoring old knobs.
@@ -638,3 +607,66 @@ def test_old_frozen_config_does_not_silently_enable_bypass_permissions(prepared)
     )
     assert "OPENAGENTS_PERMISSION_MODE" not in env
     assert json.dumps(manifest, sort_keys=True) == before
+
+
+# Spec-0073/T5: new launch contracts coexist with immutable legacy recipes.
+def test_new_controller_launch_uses_frozen_unified_module_without_global_kind(tmp_path):
+    module = "auto_designer.experiment.controllers.unified"
+    relative = "backend/" + module.replace(".", "/") + ".py"
+    source = tmp_path / "frozen"
+    path = source / relative
+    path.parent.mkdir(parents=True)
+    path.write_text("print('unified frozen source')\n")
+    manifest = {
+        "workload_contract_version": 1,
+        "config": {"workload": {"task_packages": ["frozen-a", "frozen-b"]}},
+        "source_snapshot": {
+            "files": {relative: hashlib.sha256(path.read_bytes()).hexdigest()},
+            "entrypoint": {"kind": "module", "module": module},
+        },
+    }
+    before = json.dumps(manifest, sort_keys=True)
+    command = controller_command(manifest, source)
+    result = subprocess.run(
+        command,
+        cwd=tmp_path,
+        env={**os.environ, "PYTHONPATH": str(source / "backend")},
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "unified frozen source"
+    assert json.dumps(manifest, sort_keys=True) == before
+
+
+@pytest.mark.parametrize("version", [True, False, "1", None, 0, 2])
+def test_unknown_workload_contract_never_falls_back_to_legacy(tmp_path, version):
+    manifest = {
+        "workload_contract_version": version,
+        "config": {"workload": {"kind": "ordinary"}},
+        "source_snapshot": {"files": {"backend/run.py": "legacy"}},
+    }
+    with pytest.raises(ConfigError, match="contract version"):
+        controller_command(manifest, tmp_path)
+
+
+def test_new_contract_refuses_legacy_recipe_even_if_source_contains_it(tmp_path):
+    manifest = {
+        "workload_contract_version": 1,
+        "config": {"workload": {"task_packages": ["task-a"]}},
+        "source_snapshot": {
+            "files": {"backend/auto_designer/experiment/controllers/ordinary.py": "frozen"},
+            "entrypoint": {
+                "kind": "module",
+                "module": "auto_designer.experiment.controllers.ordinary",
+            },
+        },
+    }
+    with pytest.raises(ConfigError, match="entrypoint"):
+        controller_command(manifest, tmp_path)
+
+
+def test_legacy_unknown_kind_is_not_guessed_as_ordinary(tmp_path):
+    manifest = {"config": {"workload": {"kind": "mixed"}}, "source_snapshot": {"files": {}}}
+    with pytest.raises(ConfigError, match="legacy frozen workload kind"):
+        controller_command(manifest, tmp_path)

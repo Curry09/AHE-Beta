@@ -694,3 +694,44 @@ def test_config_exposes_synthesizer_roster(monkeypatch, tmp_path):
     monkeypatch.setenv("N_SYNTHESIZERS", "3")
     data = _client(tmp_path, tracker=None).get("/api/config").json()
     assert data["roster"]["synthesizer"] == 3
+
+
+# Spec-0073/T5: summaries and detail expose the same authoritative frozen identity.
+def test_multitask_api_keeps_persona_task_session_and_harness_attribution(tmp_path):
+    from auto_designer.models import WorkspaceSpec
+
+    store = SessionStore(tmp_path / "sessions")
+    expected = {}
+    for slot, task_id in enumerate(("orders", "pvlib")):
+        session = _session(score=3, n_issues=0)
+        session.session_id = f"bound-session-{slot}"
+        session.persona.identity = f"persona-{slot}"
+        origin = {
+            "contract_version": 1,
+            "run_id": "selected-run",
+            "round_no": 2,
+            "slot": slot,
+            "persona_id": session.persona.identity,
+            "task_id": task_id,
+            "task_digest": f"digest-{task_id}",
+            "task_kind": "ordinary",
+            "interaction": "direct",
+            "harness_sha": "round-two-harness",
+        }
+        session.scenario.workspace = WorkspaceSpec(
+            params={
+                key: origin[key] for key in ("task_id", "task_digest", "task_kind", "interaction")
+            }
+        )
+        session.session_provenance = origin
+        store.save(session)
+        expected[session.session_id] = origin
+    client = TestClient(create_app(store=store, tracker=FakeTracker()))
+    rows = client.get("/api/sessions").json()
+    assert {row["session_id"]: row["session_provenance"] for row in rows} == expected
+    for session_id, origin in expected.items():
+        body = client.get(f"/api/sessions/{session_id}").json()
+        assert body["session_id"] == session_id
+        assert body["session_provenance"] == origin
+        assert body["persona"]["identity"] == origin["persona_id"]
+        assert body["scenario"]["workspace"]["params"]["task_id"] == origin["task_id"]

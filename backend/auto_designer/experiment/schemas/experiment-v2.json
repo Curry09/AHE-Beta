@@ -173,13 +173,52 @@
               "items": false
             }
           }
+        },
+        "task_packages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "required": [
-        "kind",
-        "task_package",
         "persona_library",
         "persona_ids"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "kind",
+            "task_package"
+          ],
+          "not": {
+            "required": [
+              "task_packages"
+            ]
+          }
+        },
+        {
+          "required": [
+            "task_packages"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "required": [
+                  "task_package"
+                ]
+              }
+            ]
+          }
+        }
       ]
     },
     "rounds": {

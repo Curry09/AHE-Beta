@@ -21,7 +21,7 @@ from tools.dev import add_inputs, role_environment, run_inputs
 ROOT = Path(__file__).resolve().parents[3] / "backend"
 sys.path.insert(0, str(ROOT))
 
-from auto_designer.experiment.controllers import ordinary as run_mod  # noqa: E402
+from auto_designer.experiment.controllers import runtime as run_mod  # noqa: E402
 
 
 def main() -> int:
