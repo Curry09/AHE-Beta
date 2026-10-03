@@ -61,7 +61,15 @@
               "minLength": 1
             },
             "ci_enabled": {
-              "const": false
+              "type": "boolean"
+            },
+            "runner_image": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ci_job_image": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": []

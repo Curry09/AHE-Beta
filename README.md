@@ -34,6 +34,8 @@ To queue several complete experiments, use the [batch tutorial](docs/tutorials/b
 
 After complete terminal collection, use `grade RUN_ID --dataset PATH --dataset-sha256 SHA` to score saved SWE session patches with the official evaluator on a local Docker host. This also applies to E2B archives and does not score new held-out Harness tasks or feed results into evolution. See the [post-run grading tutorial](docs/tutorials/post-run-grading.md); older hash-only predictions cannot be reconstructed for grading.
 
+For trusted Harness code on local Docker + localhost Gitea, enable optional engineering CI with `runtime.local.ci_enabled: true`. Each run has its own runner, privileged Docker daemon and job storage; it must pass a real PR smoke before OpenAgents enables its CI gate. CI calls no models and runs no benchmarks. Default configurations keep CI disabled, and E2B CI remains unsupported. The [local CI tutorial](docs/tutorials/local-engineering-ci.md) covers configuration, status and runner cleanup; [validation](docs/validation/local-engineering-ci.md) records actual verification separately.
+
 For your own non-benchmark seed library or text instruction, use `task import-seeds` or `task from-text` to create ordinary task packages without models, providers or setup execution. Copy the returned absolute `task_packages` array into an experiment JSON, then use check/prepare/run. The [seed/text import tutorial](docs/tutorials/seed-task-import.md) includes a synthetic card, an editable user task and complete offline checks for local/E2B configurations; importing does not reproduce old images/services or prove task success.
 
 For an offline scripted demo without models or infrastructure:

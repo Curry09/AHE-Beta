@@ -61,6 +61,13 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
             raise ConfigError("local requires localhost Gitea and forbids e2b settings")
     elif "local" in runtime or "e2b" not in runtime or runtime["gitea"]["provider"] != "gitea.com":
         raise ConfigError("e2b requires e2b settings and Gitea.com; local settings are forbidden")
+    # Spec-0077/T1: optional CI inputs do not add defaults to old frozen identities.
+    local = runtime.get("local", {})
+    for field in ("runner_image", "ci_job_image"):
+        if field in local:
+            if not local_ci_enabled(data):
+                raise ConfigError(f"runtime.local.{field} requires ci_enabled=true")
+            _validate_ci_image_reference(local[field])
     harness = data["harness"]
     if harness["source"] == "archive":
         if "archive" not in harness or "sha256" not in harness:
@@ -209,3 +216,39 @@ def delivery_auth_type(model: dict[str, Any]) -> str:
     if value not in {"api-key", "bearer", "oauth"}:
         raise ConfigError("Unsupported delivery auth_type")
     return value
+
+
+def local_ci_enabled(config: dict[str, Any]) -> bool:
+    """Spec-0077/T1: read the optional flag without mutating frozen configurations."""
+    runtime = config.get("runtime", {})
+    value = runtime.get("local", {}).get("ci_enabled", False)
+    if type(value) is not bool:
+        raise ConfigError("runtime.local.ci_enabled must be a boolean")
+    if value and (
+        runtime["backend"] != "local" or runtime.get("gitea", {}).get("provider") != "localhost"
+    ):
+        raise ConfigError("Local CI requires local backend and localhost Gitea")
+    return value
+
+
+def _validate_ci_image_reference(image: str) -> None:
+    """Require an explicit Docker tag or SHA-256 digest, safe for Compose inputs."""
+    repository, separator, digest = image.partition("@")
+    final = repository.rsplit("/", 1)[-1]
+    name, tagged, tag = final.partition(":")
+    image_name = repository[: -(len(tag) + 1)] if tagged else repository
+    if (
+        not re.fullmatch(r"[a-z0-9][a-z0-9._:/-]*", image_name)
+        or "//" in repository
+        or not name
+        or (
+            tagged
+            and (
+                not re.fullmatch(r"[\w][\w.-]{0,127}", tag, re.ASCII)
+                or (tag == "latest" and not separator)
+            )
+        )
+        or (separator and not re.fullmatch(r"sha256:[a-f0-9]{64}", digest))
+        or (not separator and not tagged)
+    ):
+        raise ConfigError("CI image references must use an explicit version or SHA-256 digest")

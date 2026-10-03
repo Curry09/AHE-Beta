@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import tarfile
 import tempfile
@@ -21,6 +22,7 @@ _EXCLUDED = {
     ".venv",
     "__pycache__",
     ".openagents",
+    ".runner",  # Spec-0077/T4: act_runner registration contains a private credential.
     "archive",
     "source",
     "cloud-snapshot",
@@ -85,6 +87,11 @@ def export_gitea_snapshot(
             "terminal": terminal,
             "controller_nonce": controller_nonce,
         }
+        # Spec-0077/T4: preserve facts for each current head, never reuse an old PR green.
+        if (resources.get("ci") or {}).get("enabled") is True:
+            document["ci"] = _ci_evidence(
+                ci=resources["ci"], branches=document["branches"], pulls=pulls, get=get
+            )
         for item in [*issues, *pulls]:
             index = str(int(item["number"]))
             document["comments"][index] = pages("/issues/" + index + "/comments")
@@ -114,6 +121,40 @@ def export_gitea_snapshot(
                 "path": str(destination),
             }
         return {"applicable": True, "complete": False, "terminal": False}
+
+
+def _ci_evidence(*, ci: Mapping[str, Any], branches: list, pulls: list, get: Any) -> dict:
+    """Spec-0077/T4: archive public runner facts and actual commit-status observations."""
+    heads = set()
+    for item in branches:
+        heads.add((item.get("commit") or {}).get("id"))
+    for item in pulls:
+        heads.add((item.get("head") or {}).get("sha"))
+    if any(not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha) for sha in heads):
+        raise ConfigError("Gitea CI evidence has an invalid current commit identity")
+    statuses = {}
+    for sha in sorted(heads):
+        result = get("/commits/" + sha + "/status")
+        if not isinstance(result, dict) or not isinstance(result.get("statuses"), list):
+            raise ConfigError("Gitea CI evidence has an invalid combined status response")
+        statuses[sha] = result
+    runner = ci.get("runner") or {}
+    daemon = ci.get("daemon") or {}
+    readiness = ci.get("readiness") or {}
+    # Registration credentials and opaque future fields are not public evidence.
+    return {
+        "enabled": True,
+        **{
+            key: ci.get(key)
+            for key in ("state", "run_id", "config_hash", "network", "job_image_id")
+        },
+        "runner": {key: runner.get(key) for key in ("id", "name", "image_id")},
+        "daemon": {key: daemon.get(key) for key in ("container_id", "image_id")},
+        "readiness": {
+            key: readiness.get(key) for key in ("head_sha", "status_count", "state", "checked_at")
+        },
+        "commit_statuses": statuses,
+    }
 
 
 def _public_file(relative: Path) -> bool:

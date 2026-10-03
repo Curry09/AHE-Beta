@@ -1,6 +1,7 @@
 # Spec-0069/T3: only infrastructure; the controller owns Vigil.
 # Spec-0047/T3：每实验 Compose 模板。禁止 container_name / 全局网络名 / 共享 named volume。
 # 首次 GITEA_HOST_PORT=0 由 Docker 分配；之后保持已记录的端口。凭证不进本文件。
+# Spec-0077/T2: render_stack conditionally adds the owned runner and enables Actions.
 services:
   gitea:
     image: ${GITEA_IMAGE:-gitea/gitea:1.22}

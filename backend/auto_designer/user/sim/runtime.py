@@ -6,9 +6,11 @@ directory.  Docker workspaces never expose their repository as a host path.
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -288,11 +290,11 @@ def stop_owned_processes(nonce: str | None) -> bool:
     for sig in (signal.SIGTERM, signal.SIGKILL):
         for pid in _owned_processes(nonce):
             try:
-                descriptor = os.pidfd_open(pid)
+                descriptor = _open_pidfd(pid=pid)
                 try:
                     # Re-check ownership after obtaining the stable process handle.
                     if pid in _owned_processes(nonce):
-                        signal.pidfd_send_signal(descriptor, sig)
+                        _send_pidfd_signal(descriptor=descriptor, signum=sig)
                 finally:
                     os.close(descriptor)
             except ProcessLookupError:
@@ -303,6 +305,43 @@ def stop_owned_processes(nonce: str | None) -> bool:
                 return True
             time.sleep(0.02)
     return not _owned_processes(nonce)
+
+
+def _pidfd_syscall(*, number: int, arguments: tuple) -> int:
+    """Spec-0077/T4: use stable Linux handles when Python lacks the optional APIs."""
+    if platform.system() != "Linux" or platform.machine() not in {"x86_64", "aarch64"}:
+        raise RuntimeError("Safe attempt cleanup requires Linux pidfd support on this platform")
+    # Linux x86_64 and asm-generic/aarch64 assign 434/424 to open/send_signal.
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.syscall.restype = ctypes.c_long
+    result = libc.syscall(ctypes.c_long(number), *arguments)
+    if result < 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+    return int(result)
+
+
+def _open_pidfd(*, pid: int) -> int:
+    native = getattr(os, "pidfd_open", None)
+    if native is not None:
+        return native(pid)
+    return _pidfd_syscall(number=434, arguments=(ctypes.c_int(pid), ctypes.c_uint(0)))
+
+
+def _send_pidfd_signal(*, descriptor: int, signum: int) -> None:
+    native = getattr(signal, "pidfd_send_signal", None)
+    if native is not None:
+        native(descriptor, signum)
+        return
+    _pidfd_syscall(
+        number=424,
+        arguments=(
+            ctypes.c_int(descriptor),
+            ctypes.c_int(signum),
+            ctypes.c_void_p(),
+            ctypes.c_uint(0),
+        ),
+    )
 
 
 @dataclass

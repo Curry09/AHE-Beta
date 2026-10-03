@@ -174,4 +174,18 @@ Spec-0075 已于提交 `7a8176a` 完成评分实测更新；上文的离线与�
 
 Spec-0076 将旧 seed 卡库和明确非 benchmark 的文本指令接入现有 ordinary 任务包：统一入口新增 `task import-seeds` / `task from-text`，转换返回绝对 `task_packages` 数组供原 workload 使用。输出 `tasks.json` 只作相对路径索引，不新增运行入口；后续仍用 check/prepare/run，并冻结既有任务/source/setup 合同。无仓库输入使用带说明 README 的 scratch 源目录，不写答案；oracle、env.test_cmd、gates、provenance 不进入包或 sidecar。旧 setup 依赖不自动锁定，旧 base image、外部服务和元数据未自动复现，不能把输入迁入等同于原研究环境通过复现门。
 
-公开示例仅使用一张明确非 benchmark 的合成文本卡和一份用户任务指令；真实历史七卡不搬入主 examples。双语[输入教程](../tutorials/seed-task-import.zh-CN.md)提供将转换数组写入 local/E2B N1 配置副本的精确命令和完整离线检查。转换与离线验收不代表真实双 provider 实验已运行，也不代表任务通过；实际执行覆盖由本组独立验收记录。工程 CI runner 注册/生命周期、历史产物 continuation 仍待迁入；不恢复旧 wrapper、隐式私人配置或任意宿主 env 透传。
+公开示例仅使用一张明确非 benchmark 的合成文本卡和一份用户任务指令；真实历史七卡不搬入主 examples。双语[输入教程](../tutorials/seed-task-import.zh-CN.md)提供将转换数组写入 local/E2B N1 配置副本的精确命令和完整离线检查。转换与离线验收不代表真实双 provider 实验已运行，也不代表任务通过；实际执行覆盖由本组独立验收记录。历史产物 continuation 仍待设计；不恢复旧 wrapper、隐式私人配置或任意宿主 env 透传。
+
+### Spec-0076 真实 local 补记与 Spec-0077 工程 CI
+
+Spec-0076 提交 `6a75254` 已包含真实 local 输入链路验收：run `20261003T115105Z-81ecc091` 使用转换后的两个任务包完成单轮两会话，达到 COMPLETED / collection COMPLETE，产生完整会话补丁并在独立 Docker 中复验，随后清理到 DESTROYED。此实证没有交付轮，不能作为多轮演化、E2B provider 或模型自动修复证明。原始证据和准确接受状态见[输入验收](../validation/seed-task-import.md)。
+
+Spec-0077 为 local + localhost 迁入可选工程 CI，`runtime.local.ci_enabled=true` 沿用原 check/prepare/run/status/stop/resume/collect/destroy，不增加实验入口。默认关闭保持原语义；E2B + Gitea.com CI 仍不支持。可选 runner/job 镜像必须使用显式版本或摘要，并只在启用时允许；准备固定实际 image ID。每个 run 使用独占的 privileged Docker daemon、job 存储和工具缓存；内部 docker:27.5.1-dind 配方固定实际 image ID。runner 通过内部 DOCKER_HOST 连接，不挂宿主 Docker socket、不发布 daemon 宿主端口；job 的 host 网络模式属于私有 daemon 网络命名空间。该配置用于可信 Harness 工程代码，不提供恶意代码隔离。冻结 Harness 要有兼容 PR 工作流；后端核验注册、所有权、网络及镜像，真实 PR checkout/Python smoke 在当前 head 至少一项检查且成功后才发就绪收据。只有匹配的已核验收据能开启 OpenAgents `ci: agent`；失败或超时保留诊断，不能静默 skip。
+
+状态与收集保存 CI 身份、就绪和 main/PR 当前提交状态，不能复用旧 head 的绿灯。stop 暂停所属 runner、处理所属 job 并停止私有 daemon，保留恢复所需存储与注册；resume 复用原 daemon/存储/注册身份、再次探测；destroy 只清理核验属于此 run 的执行资源并移除 CI job 存储，保留并列明 Gitea 和 runner 私密注册卷，注册秘密不进入普通归档。工程 CI 不调用模型、不运行 benchmark，与独立事后 SWE `grade` 及 Harness 留出评估分开。
+
+以上记录配置与实现契约，不预先宣称真实 Docker 验收通过。双语[CI 教程](../tutorials/local-engineering-ci.zh-CN.md)提供精确命令；本组的离线回归、真实 PR 红绿和生命周期证据以[工程 CI 验收](../validation/local-engineering-ci.md)为准。人工制造红绿状态不能记为模型自动修复。当前剩余独立范围为历史产物 continuation、E2B CI 托管契约及此前明确收窄的 provider/backend 选择。
+
+首轮真实 canary 已观察到 main 成功、人工红 PR 失败、修订 head 转绿，但也暴露 act_runner 0.2.11 的 job 名称和工具缓存会跨 run 共享，实施因此改为每 run 独立 daemon。该初步红绿结果不能代替独立 daemon 最终实现的验收；最终拓扑及生命周期实证仍以上述验收报告为准。
+
+最终实测已完成：两个独立 daemon 同时运行相同 job/cache 名称而未冲突；完整候选通过公开 stop/resume，复用原注册与容器身份，重新得到真实 PR 红绿及固定 OpenAgents 的一致判定，最终 COMPLETED / COMPLETE / DESTROYED。归档保留当前 Harness 提交的非空 CI success，注册凭证未入归档。过程中修复 dotenv 引号造成的 reader 401、短暂 pending 和自动删容器竞态，证据及测试边界见验收报告；没有将技术红绿探针记为模型自动修复。

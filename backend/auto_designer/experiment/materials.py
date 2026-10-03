@@ -22,6 +22,7 @@ from auto_designer.experiment.config import (
     config_hash,
     load_config_v2,
     load_task_package,
+    local_ci_enabled,
     read_json_document,
 )
 from auto_designer.experiment.workload import (
@@ -115,11 +116,22 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
         _require_file(path=archive)
         if sha256_file(archive) != harness["sha256"]:
             raise ConfigError("Harness archive SHA-256 mismatch")
-        _check_archive(path=archive)
+        if local_ci_enabled(config):
+            _check_ci_archive(path=archive)
+        else:
+            _check_archive(path=archive)
     else:
         seed = _controller_root() / "backend/harness_template"
         _require_file(path=seed / "entry.py")
-        _snapshot_files(root=seed, paths=None)
+        files = _snapshot_files(root=seed, paths=None)
+        if local_ci_enabled(config):
+            _check_ci_workflows(
+                workflows={
+                    name: (seed / name).read_bytes()
+                    for name in files
+                    if _is_ci_workflow(Path(name))
+                }
+            )
     return {
         "ok": True,
         "config": config,
@@ -197,6 +209,9 @@ def prepare_materials(
                 root=seed, files=_snapshot_files(root=seed, paths=None), destination=harness_path
             )
         _register(materials=materials, key="harness_archive", path=harness_path, stage=stage)
+        if local_ci_enabled(config):
+            # Validate the actual frozen Harness before any provider/repository fetch.
+            _check_ci_archive(path=harness_path)
         cards = report["persona_cards"]
         roster = [
             {
@@ -296,6 +311,8 @@ def verify_materials(manifest: dict[str, Any]) -> None:
             raise ConfigError(f"Frozen material missing or hash mismatch: {key}")
     if config_hash(data=manifest["config"]) != manifest["config_hash"]:
         raise ConfigError("Frozen configuration hash mismatch")
+    if local_ci_enabled(manifest["config"]):
+        _check_ci_archive(path=run_dir / manifest["materials"]["harness_archive"]["path"])
 
     version = manifest.get("workload_contract_version")
     if "workload_contract_version" in manifest:
@@ -468,9 +485,20 @@ def _archive_snapshot(*, root: Path, files: dict[str, str], destination: Path) -
 
 
 def _check_archive(*, path: Path) -> None:
+    _validate_harness_archive(path=path, require_ci=False)
+
+
+def _check_ci_archive(*, path: Path) -> None:
+    _validate_harness_archive(path=path, require_ci=True)
+
+
+def _validate_harness_archive(*, path: Path, require_ci: bool) -> None:
     try:
         with tarfile.open(path, "r:*") as archive:
             names = set()
+            ci_names = set()
+            workflows = {}
+            root_entry = False
             for member in archive.getmembers():
                 relative = Path(member.name)
                 if (
@@ -481,10 +509,98 @@ def _check_archive(*, path: Path) -> None:
                 ):
                     raise ConfigError(f"Unsafe Harness archive member: {member.name}")
                 names.add(member.name.lstrip("./"))
+                if require_ci:
+                    # Spec-0077/T1: inspect without extraction; reject overwrite ambiguity.
+                    normalized = str(relative)
+                    if normalized in ci_names:
+                        raise ConfigError(f"Duplicate Harness archive member: {member.name}")
+                    ci_names.add(normalized)
+                    root_entry = root_entry or (normalized == "entry.py" and member.isfile())
+                    if member.isfile() and _is_ci_workflow(relative):
+                        if member.size > 1024 * 1024:
+                            raise ConfigError(f"Harness CI workflow is too large: {member.name}")
+                        stream = archive.extractfile(member)
+                        if stream is None:
+                            raise ConfigError(f"Unreadable Harness CI workflow: {member.name}")
+                        with stream:
+                            workflows[normalized] = stream.read(1024 * 1024 + 1)
             if not any(name == "entry.py" or name.endswith("/entry.py") for name in names):
                 raise ConfigError("Harness archive must contain entry.py")
+            if require_ci:
+                if not root_entry:
+                    raise ConfigError("CI Harness archive requires entry.py at the repository root")
+                _check_ci_workflows(workflows=workflows)
     except (tarfile.TarError, OSError) as exc:
         raise ConfigError(f"Invalid Harness archive {path}: {exc}") from exc
+
+
+def _is_ci_workflow(path: Path) -> bool:
+    return path.parent == Path(".gitea/workflows") and path.suffix.lower() in {".yml", ".yaml"}
+
+
+def _check_ci_workflows(*, workflows: dict[str, bytes]) -> None:
+    """Spec-0077/T1: structural precheck only; real execution readiness belongs to T2."""
+    from ruamel.yaml import YAML
+    from ruamel.yaml.error import YAMLError
+
+    usable = False
+    for name, content in workflows.items():
+        if len(content) > 1024 * 1024:
+            raise ConfigError(f"Harness CI workflow is too large: {name}")
+        try:
+            # YAML 1.2 keeps the Actions 'on' key a string and rejects duplicate keys.
+            document = YAML(typ="safe").load(content.decode("utf-8"))
+        except (YAMLError, UnicodeError, ValueError) as exc:
+            raise ConfigError(f"Invalid Harness CI workflow: {name}") from exc
+        if not isinstance(document, dict):
+            raise ConfigError(f"Unsupported Harness CI workflow: {name}")
+        trigger = document.get("on")
+        if isinstance(trigger, str):
+            covers_pr = trigger == "pull_request"
+        elif isinstance(trigger, list):
+            covers_pr = "pull_request" in trigger and all(
+                isinstance(event, str) for event in trigger
+            )
+        elif isinstance(trigger, dict):
+            # Event filters can skip a current PR entirely; do not approve that gate.
+            covers_pr = "pull_request" in trigger and trigger["pull_request"] in (None, {})
+        else:
+            covers_pr = False
+        jobs = document.get("jobs")
+        if not covers_pr or not isinstance(jobs, dict) or not jobs:
+            continue
+        for job in jobs.values():
+            if not isinstance(job, dict):
+                continue
+            steps = job.get("steps")
+            if (
+                job.get("runs-on") == "ubuntu-latest"
+                and job.get("if", True) is True
+                and not job.get("strategy")
+                and not job.get("continue-on-error")
+                and isinstance(steps, list)
+                and steps
+                and all(_is_ci_step(step) for step in steps)
+            ):
+                usable = True
+    if not usable:
+        raise ConfigError(
+            "CI Harness requires a usable .gitea/workflows YAML workflow covering "
+            "pull_request with an unconditional ubuntu-latest job and executable steps"
+        )
+
+
+def _is_ci_step(step: Any) -> bool:
+    if not isinstance(step, dict):
+        return False
+    commands = [step.get(key) for key in ("run", "uses") if key in step]
+    return (
+        len(commands) == 1
+        and isinstance(commands[0], str)
+        and bool(commands[0].strip())
+        and step.get("if", True) is True
+        and not step.get("continue-on-error")
+    )
 
 
 def _git_head(*, root: Path) -> str:

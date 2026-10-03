@@ -96,6 +96,7 @@ _Spec-0069/T2: execution adapters implement the same experiment lifecycle._
 | `e2b_bootstrap.py` | Spec-0069/T4: portable frozen-input bootstrap, without developer home files. |
 | `e2b_template.py` | Spec-0069/T4: cache a verified build identity, then inspect actual sandbox resources. |
 | `local.py` | Spec-0069/T3: frozen local toolchains and an experiment-owned Docker stack. |
+| `local_ci.py` | Spec-0077/T2: private registration and real PR readiness for an owned runner. |
 
 ### auto_designer.experiment.controllers
 
@@ -274,6 +275,7 @@ graph LR
     nauto_designer_experiment_backends_e2b_bootstrap["backends.e2b_bootstrap"]
     nauto_designer_experiment_backends_e2b_template["backends.e2b_template"]
     nauto_designer_experiment_backends_local["backends.local"]
+    nauto_designer_experiment_backends_local_ci["backends.local_ci"]
     nauto_designer_experiment_batch["experiment.batch"]
     nauto_designer_experiment_batch_config["experiment.batch_config"]
     nauto_designer_experiment_batch_store["experiment.batch_store"]
@@ -454,7 +456,9 @@ graph LR
     nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_config
     nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_materials
     nauto_designer_experiment_backends_e2b_template --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_local_ci
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_collection
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_config
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_context
@@ -463,6 +467,8 @@ graph LR
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_materials
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_workload
     nauto_designer_experiment_backends_local --> nauto_designer_observations_transport
+    nauto_designer_experiment_backends_local_ci --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local_ci --> nauto_designer_experiment_infrastructure
     nauto_designer_experiment_batch --> nauto_designer_experiment
     nauto_designer_experiment_batch --> nauto_designer_experiment_batch_config
     nauto_designer_experiment_batch --> nauto_designer_experiment_batch_store
@@ -543,6 +549,7 @@ graph LR
     nauto_designer_experiment_grading --> nauto_designer_experiment_workload
     nauto_designer_experiment_grading --> nauto_designer_loop_recovery
     nauto_designer_experiment_grading --> nauto_designer_models
+    nauto_designer_experiment_infrastructure --> nauto_designer_experiment_backends_local_ci
     nauto_designer_experiment_infrastructure --> nauto_designer_experiment_config
     nauto_designer_experiment_manifest --> nauto_designer_experiment_config
     nauto_designer_experiment_materials --> nauto_designer_distill_library

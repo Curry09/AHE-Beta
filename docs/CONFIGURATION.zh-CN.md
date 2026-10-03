@@ -27,7 +27,7 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 | `name` | 显示名称，程序自动生成唯一 `run_id` |
 | `runtime.backend` | `local` 或 `e2b` |
 | `runtime.gitea` | 本地用 `localhost`，E2B 用 `gitea.com`；另填仓库名前缀 |
-| `runtime.local` | 可选镜像覆盖、`ci_enabled: false`；不支持启用尚未注册的 CI runner |
+| `runtime.local` | 可选镜像覆盖、`ci_enabled`（默认 `false`）；本地工程 CI 必须使用已核验的专属 runner |
 | `runtime.e2b` | `cpu_count`、`memory_mb`、`timeout_seconds`（300–86400）；可选兼容 template |
 | `harness.source` | `builtin`，或 `archive` 加归档路径及 SHA-256 |
 | `workload` | `task_packages` 列表，或旧 `kind` + `task_package`；persona 库、实际 ID 及可选 interaction_plan |
@@ -85,7 +85,7 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 
 ## 后端边界和生命周期
 
-本地路径启动每实验独立的 Gitea 和 egress proxy，然后启动所属 Vigil、用户 session 容器。Gitea 宿主端口动态分配并绑定 loopback，status 提供实际地址。模型域名、端口从显式 endpoint 生成。当前工程 CI 跳过，不启动空 token runner。
+本地路径启动每实验独立的 Gitea 和 egress proxy，然后启动所属 Vigil、用户 session 容器。Gitea 宿主端口动态分配并绑定 loopback，status 提供实际地址。模型域名、端口从显式 endpoint 生成。工程 CI 可选且默认关闭；关闭时不创建 runner。
 
 E2B 在一个沙箱内运行 controller 与交付进程，不依赖嵌套 Docker；任务目录在沙箱内隔离，与本地每 session 容器的隔离不同。程序核对实际 CPU、内存、template/build 身份和到期时间并记录。示例请求 4 CPU、8192 MiB；耗时和费用由模型及云资源运行决定。
 
@@ -149,7 +149,25 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 `experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 
-本次已迁入上述设置、交互和看板；工程 CI、历史产物追加轮仍待实现；旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。官方 SWE 任务评分已提供独立事后命令，演化循环内评分仍按设计关闭。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+本次已迁入上述设置、交互和看板；可选本地工程 CI 见下方说明，历史产物追加轮仍待实现。旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。官方 SWE 任务评分已提供独立事后命令，演化循环内评分仍按设计关闭。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+
+## 本地工程 CI
+
+在 local + localhost 配置中设置 `runtime.local.ci_enabled: true`，启用现有 OpenAgents 工程 CI 门禁。省略或设为 `false` 沿用原有行为，不向旧冻结配置加入 CI 默认字段。E2B + Gitea.com 不支持此 CI runner 契约；E2B 配置不能包含 `runtime.local`。
+
+| 字段 | 默认值与行为 |
+| --- | --- |
+| `runtime.local.ci_enabled` | `false`；`true` 请求专属 Gitea Actions runner，并核验就绪 |
+| `runtime.local.runner_image` | 可选覆盖；默认 `gitea/act_runner:0.2.11`；必须使用显式版本标签或摘要 |
+| `runtime.local.ci_job_image` | 可选覆盖；默认使用固定摘要的 `catthehacker/ubuntu`；必须使用显式版本标签或摘要 |
+
+两个镜像覆盖字段都要求 `ci_enabled: true`；`:latest` 和无版本引用会被拒绝。准备阶段记录实际 image ID。冻结 Harness 必须包含使用 `ubuntu-latest` 的 PR 工作流，runner 将此标签映射到固定 job 镜像。后端核验注册、镜像、所有权和网络身份，再执行包含 checkout 与 Python smoke 的真实探针 PR。只有该 PR 当前 head SHA 的检查成功后，才发放就绪收据并启用 OpenAgents 的 `ci: agent` stage。失败或超时阻止启动并保留诊断；启用后不能静默退回 `skip`。
+
+每个 run 还使用私有 Docker daemon 和 job 存储，内部 `docker:27.5.1-dind` 配方按实际 image ID 固定。runner 的内部 `DOCKER_HOST` 连接此 daemon，不发布 daemon 宿主端口、不向 runner 挂载宿主 Docker socket。job 容器、名称和工具缓存都在此 run 的 daemon 内。job 的 `host` 网络模式指的是位于 run 的 CI 网络上的私有 daemon 网络命名空间。本地 Docker 必须支持该 privileged daemon 容器；preflight 核验其身份及就绪。此执行边界面向可信代码，不提供恶意代码隔离。
+
+`status RUN_ID` 单独报告 CI。收集保存就绪收据和 main/PR 当前提交状态；旧 head 的绿灯不能证明新提交通过。`stop` 暂停所属 runner、处理所属 job 并停止私有 daemon，保留其存储和注册以供恢复。`resume` 核验原 daemon、镜像、存储及注册身份，再重新检查就绪，不注册替代 runner。`destroy` 移除所属执行资源和 CI job 存储，保留列明名称的 Gitea 和 runner 私密注册卷；收据列出保留卷。runner 注册凭据保存在私有卷内，不进入普通收集产物。
+
+CI 只对可信 Harness 代码做工程检查，不调用模型、不运行 benchmark。官方 SWE 任务 `grade` 和 Harness 留出评估继续作为独立事后流程。命令及实际核验范围见[本地 CI 教程](tutorials/local-engineering-ci.zh-CN.md)和[验收报告](validation/local-engineering-ci.md)。
 
 ## seed 卡库与文本指令
 

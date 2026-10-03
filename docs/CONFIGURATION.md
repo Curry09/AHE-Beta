@@ -27,7 +27,7 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `name` | Display name; a unique `run_id` is generated automatically |
 | `runtime.backend` | `local` or `e2b` |
 | `runtime.gitea` | Provider `localhost` for local, `gitea.com` for E2B; repository prefix |
-| `runtime.local` | Optional image overrides and `ci_enabled: false`; enabling an unregistered CI runner is unsupported |
+| `runtime.local` | Optional image overrides and `ci_enabled` (default `false`); local engineering CI requires a verified dedicated runner |
 | `runtime.e2b` | Requested `cpu_count`, `memory_mb`, `timeout_seconds` (300–86400); optional compatible template |
 | `harness.source` | `builtin`, or `archive` with an archive path and SHA-256 |
 | `workload` | `task_packages` list, or legacy `kind` + `task_package`; persona library, actual persona IDs and optional interaction_plan |
@@ -85,7 +85,7 @@ Setup runs in the task checkout with `TASK_ROOT`, `TASK_PYTHON`, `REQUIREMENTS_L
 
 ## Backend boundaries and lifecycle
 
-Local execution starts per-experiment Gitea and an egress proxy, then owned Vigil and user-session containers. Gitea's host port is dynamically allocated on loopback; status reports its actual URL. Model domains/ports come from the explicit endpoints. Engineering CI is skipped in this version; no empty-token runner is started.
+Local execution starts per-experiment Gitea and an egress proxy, then owned Vigil and user-session containers. Gitea's host port is dynamically allocated on loopback; status reports its actual URL. Model domains/ports come from the explicit endpoints. Engineering CI is optional and disabled by default; disabled runs create no runner.
 
 E2B runs the controller and delivery processes inside one sandbox without nested Docker. Task directories are isolated within that sandbox; this differs from local per-session container isolation. Actual CPU, memory, template/build identity and expiry are checked and recorded. The default example requests 4 CPUs and 8192 MiB. Model usage and cloud runtime determine cost and duration.
 
@@ -149,7 +149,25 @@ The plan validates every round's session count and selected persona/task IDs. Pe
 
 `experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-These settings, interactions and dashboard binding are migrated. Engineering CI and historical round import remain pending; seed libraries and text instructions now convert to ordinary packages as described below. Official SWE task grading is available as a separate post-run command; in-loop grading remains disabled by design. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+These settings, interactions and dashboard binding are migrated. Optional local engineering CI is described below; historical round import remains pending. Seed libraries and text instructions now convert to ordinary packages as described below. Official SWE task grading is available as a separate post-run command; in-loop grading remains disabled by design. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+
+## Local engineering CI
+
+Set `runtime.local.ci_enabled: true` in a local + localhost configuration to enable the existing OpenAgents engineering CI gate. Omission or `false` retains the previous behavior and does not add CI defaults to older frozen configurations. E2B + Gitea.com does not support this CI runner contract; E2B configurations cannot include `runtime.local`.
+
+| Field | Default and behavior |
+| --- | --- |
+| `runtime.local.ci_enabled` | `false`; `true` requests a dedicated Gitea Actions runner and verified readiness |
+| `runtime.local.runner_image` | Optional override; default `gitea/act_runner:0.2.11`; an explicit version tag or digest is required |
+| `runtime.local.ci_job_image` | Optional override; default uses a pinned `catthehacker/ubuntu` digest; an explicit version tag or digest is required |
+
+Both image overrides require `ci_enabled: true`; `:latest` and unversioned references are rejected. Preparation records actual image IDs. The frozen Harness must contain a PR workflow using `ubuntu-latest`, which this runner maps to the fixed job image. The backend verifies registration, images, ownership and network identity, then runs a real probe PR with checkout and Python smoke. Only a successful check for that PR's current head SHA permits a readiness receipt and the OpenAgents `ci: agent` stage. Failure or timeout blocks startup and retains diagnostics; an enabled configuration cannot silently fall back to `skip`.
+
+Each run also uses a private Docker daemon and job storage, with the internal `docker:27.5.1-dind` recipe frozen by actual image ID. The runner's internal `DOCKER_HOST` connects to that daemon, with no published daemon port or host Docker socket mounted into the runner. Job containers, names and tool caches stay within the run's daemon. Job network mode `host` refers to the private daemon's network namespace on the run's CI network. Local Docker must support this privileged daemon container; preflight checks its identity and readiness. This is a trusted-code execution boundary, without hostile-code isolation.
+
+`status RUN_ID` reports CI separately. Collection preserves readiness and current main/PR commit statuses; a green status from an older head is not evidence for a newer commit. `stop` pauses the owned runner, handles its owned jobs and stops the private daemon while preserving its storage and registration for recovery. `resume` verifies the same daemon, images, storage and registration, then rechecks readiness without registering a replacement. `destroy` removes owned execution resources and CI job storage, retaining the named Gitea and private runner registration volumes; receipts list retained volumes. Runner registration credentials stay in the private volume, outside ordinary collected artifacts.
+
+CI performs engineering checks on trusted Harness code without model calls or benchmark execution. Official SWE task `grade` and held-out Harness evaluation remain separate post-run workflows. See the [local CI tutorial](tutorials/local-engineering-ci.md) and [validation report](validation/local-engineering-ci.md) for commands and the recorded verification scope.
 
 ## Seed libraries and text instructions
 

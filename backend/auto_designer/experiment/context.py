@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from auto_designer.experiment.config import ConfigError, delivery_auth_type, runtime_policies
+from auto_designer.experiment.config import (
+    ConfigError,
+    compose_project,
+    delivery_auth_type,
+    local_ci_enabled,
+    runtime_policies,
+)
 
 
 def material_path(run_dir: Path, manifest: dict[str, Any], key: str) -> Path:
@@ -208,6 +216,7 @@ def build_controller_environment(
     """Return a complete child environment; never inherit unrelated host model keys."""
     root = Path(execution_root or run_dir).resolve()
     config = manifest["config"]
+    ci_stage = _controller_ci_stage(manifest=manifest, resources=resources)
     context_path = write_controller_context(
         run_dir=run_dir,
         manifest=manifest,
@@ -241,7 +250,7 @@ def build_controller_environment(
             "MAX_PARALLEL_USERS": str(config["rounds"]["max_parallel_users"]),
             "N_OWNERS": "1" if config["roles"].get("owner_mode") == "llm" else "0",
             "VIGIL_KEEP_ALIVE": "0",
-            "VIGIL_CI_STAGE": "skip",
+            "VIGIL_CI_STAGE": ci_stage,
             "AUTO_DESIGNER_OBJECTIVE_EVALUATION": "0",
             "DISABLE_UPDATES": "1",
             "OPENAGENTS_NO_SELF_UPDATE": "1",
@@ -352,6 +361,77 @@ def build_controller_environment(
             raise ConfigError("E2B context requires the actual sandbox identity")
         env["AUTO_DESIGNER_SANDBOX_ID"] = str(resources["sandbox_id"])
     return env
+
+
+def _controller_ci_stage(*, manifest: dict[str, Any], resources: Mapping[str, Any]) -> str:
+    """Spec-0077/T1: require an owned successful receipt; provider rechecks live facts."""
+    if not local_ci_enabled(manifest["config"]):
+        return "skip"
+    ci = resources.get("ci")
+    if not isinstance(ci, Mapping):
+        raise ConfigError("Enabled local CI requires a verified READY resource receipt")
+    project = compose_project(
+        experiment_id=manifest["run_id"].lower(), cfg_hash=manifest["config_hash"]
+    )
+    if (
+        ci.get("enabled") is not True
+        or ci.get("state") != "READY"
+        or ci.get("run_id") != manifest["run_id"]
+        or ci.get("config_hash") != manifest["config_hash"]
+        or ci.get("network") != project + "_ci"
+        or ci.get("topology") != "private-docker-daemon-v1"
+        or ci.get("job_network") != "host"
+        or ("compose_project" in resources and resources["compose_project"] != project)
+    ):
+        raise ConfigError("Local CI resource receipt identity/state differs from this frozen run")
+    daemon = ci.get("daemon")
+    if (
+        not isinstance(daemon, Mapping)
+        or not _receipt_string(daemon.get("container_id"))
+        or not _receipt_string(daemon.get("image_id"))
+        or daemon.get("network") != project + "_ci"
+        or daemon.get("storage_volume") != project + "_ci_docker_data"
+    ):
+        raise ConfigError("Local CI resource receipt is missing private daemon identity/bindings")
+    runner = ci.get("runner")
+    if (
+        not isinstance(runner, Mapping)
+        or type(runner.get("id")) is not int
+        or runner["id"] <= 0
+        or any(not _receipt_string(runner.get(key)) for key in ("name", "container_id", "image_id"))
+        or not _receipt_string(ci.get("job_image_id"))
+    ):
+        raise ConfigError("Local CI resource receipt is missing runner/image identity")
+    readiness = ci.get("readiness")
+    if (
+        not isinstance(readiness, Mapping)
+        or not isinstance(readiness.get("head_sha"), str)
+        or not re.fullmatch(r"[a-f0-9]{40}", readiness["head_sha"])
+        or type(readiness.get("status_count")) is not int
+        or readiness["status_count"] <= 0
+        or readiness.get("state") != "success"
+        or not _receipt_string(readiness.get("checked_at"))
+    ):
+        raise ConfigError(
+            "Local CI readiness requires a current head and nonempty success statuses"
+        )
+    try:
+        checked_at = datetime.fromisoformat(readiness["checked_at"])
+        if "T" not in readiness["checked_at"] or checked_at.utcoffset() is None:
+            raise ValueError("Timestamp must have a time and timezone")
+    except ValueError as exc:
+        raise ConfigError(
+            "Local CI readiness checked_at must be an ISO timestamp with timezone"
+        ) from exc
+    return "agent"
+
+
+def _receipt_string(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and not any(ord(character) < 32 for character in value)
+    )
 
 
 def frozen_scenario(task_id: str | None = None):

@@ -23,6 +23,7 @@ from urllib.parse import urlsplit
 
 import requests
 
+from auto_designer.experiment.backends import local_ci
 from auto_designer.experiment.backends.base import BackendError
 from auto_designer.experiment.config import config_hash
 from auto_designer.experiment.context import build_controller_environment, material_path
@@ -435,6 +436,24 @@ def prepare_images(
             "image_id": info["Id"],
             "repo_digests": info.get("RepoDigests") or [],
         }
+    # Spec-0077/T2: resolve both execution images only for opted-in new runs.
+    if local_ci.enabled(manifest):
+        for name, option, default in (
+            ("runner", "runner_image", local_ci.DEFAULT_RUNNER_IMAGE),
+            ("ci_job", "ci_job_image", local_ci.DEFAULT_JOB_IMAGE),
+            ("ci_daemon", "ci_daemon_image", local_ci.DEFAULT_DAEMON_IMAGE),
+        ):
+            ref = str(options.get(option) or default)
+            try:
+                info = _image(ref)
+            except BackendError:
+                _command(["docker", "pull", ref], log_path=build_log)
+                info = _image(ref)
+            images[name] = {
+                "reference": ref,
+                "image_id": info["Id"],
+                "repo_digests": info.get("RepoDigests") or [],
+            }
     installed = _verify_toolchain(
         images["vigil"]["image_id"],
         context / "openagents",
@@ -576,6 +595,10 @@ class LocalBackend:
         return _command(
             compose_argv(dest=self.dest, project=self.project, extra=list(extra)), timeout=120
         )
+
+    def _ci_command(self, argv: list[str]) -> str:
+        """Spec-0077/T2: public Docker facts, never private registration bytes."""
+        return _command(argv, timeout=60)
 
     def _inspect_ids(self, kind: str, ids: list[str]) -> list[dict[str, Any]]:
         if not ids:
@@ -844,6 +867,7 @@ class LocalBackend:
             vigil_image=refs["vigil"],
             images=refs,
             gitea_host_port=host_port,
+            ci_enabled=local_ci.enabled(self.manifest),
         )
         # render_stack's legacy project casing is irrelevant: all calls pass the
         # canonical v2 project explicitly. Update the env for human inspection too.
@@ -967,6 +991,13 @@ class LocalBackend:
         if type(repository_id) is not int or repository_id < 1:
             raise BackendError("Local Gitea repository has no durable provider identity")
         self.resources["gitea"]["repository_id"] = repository_id
+        if local_ci.enabled(self.manifest):
+            try:
+                local_ci.provision(self)
+            except BackendError:
+                if self.resources.get("ci"):
+                    self._save(ci={**self.resources["ci"], "state": "FAILED"})
+                raise
         return self._save(resource_state="RUNNING", provisioned_at=_now())
 
     def _bootstrap_account(self, container: str) -> None:
@@ -1055,6 +1086,8 @@ class LocalBackend:
         for role in ("gitea", "egress"):
             if not (roles.get(role, {}).get("State") or {}).get("Running"):
                 raise BackendError(f"Owned {role} container is not running")
+        if local_ci.enabled(self.manifest):
+            local_ci.readiness(self)
         if self._api("GET", "/user").get("login") != self.resources["gitea"]["owner"]:
             raise BackendError("Local Gitea identity check failed")
         vigil = self.resources["vigil"]
@@ -1362,6 +1395,19 @@ print('ready')
                 else "STOPPED"
             )
         vigil = self.resources.get("vigil") or {}
+        if local_ci.enabled(self.manifest) and self.resources.get("ci"):
+            try:
+                self._save(ci=local_ci.inspect(self, containers))
+            except BackendError as exc:
+                self._save(ci={**self.resources["ci"], "state": "INVALID", "error": str(exc)})
+                return {
+                    **self.resources,
+                    "resource_state": "UNKNOWN",
+                    "observation": "UNKNOWN",
+                    "controller": controller,
+                    "error": str(exc),
+                    "observed_at": _now(),
+                }
         running_vigil = next(
             (
                 value
@@ -1395,6 +1441,8 @@ print('ready')
         controller = stop_controller(self.root, grace_seconds=grace_seconds)
         if controller.get("running"):
             raise BackendError("Controller remains alive; refusing to stop its infrastructure")
+        if local_ci.enabled(self.manifest) and self.resources.get("ci"):
+            local_ci.stop(self)
         from auto_designer.experiment.collection import export_gitea_snapshot
 
         if self.resources.get("gitea"):
@@ -1482,10 +1530,17 @@ print('ready')
         self._owned("container")
         self._owned("network")
         volumes = self._owned("volume")
+        if local_ci.enabled(self.manifest) and self.resources.get("ci"):
+            local_ci.stop(self)
         self._remove_execution_containers()
         if self.dest.is_dir():
             # No --volumes: these contain the local Gitea experiment repository.
             self._compose("down", "--remove-orphans")
+        if local_ci.enabled(self.manifest) and self.resources.get("ci"):
+            local_ci.destroy_storage(self)
+            volumes = [
+                value for value in volumes if value["Name"] != self.project + "_ci_docker_data"
+            ]
         return self._save(
             resource_state="DESTROYED",
             destroyed_at=_now(),
