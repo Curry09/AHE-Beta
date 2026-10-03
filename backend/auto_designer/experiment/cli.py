@@ -134,6 +134,21 @@ def build_parser() -> argparse.ArgumentParser:
     grade.add_argument("--round", dest="round_no", type=int)
     grade.add_argument("--timeout-seconds", type=int, default=1800)
     grade.add_argument("--offline", action="store_true")
+    # Spec-0076/T2: source adapters emit the existing task recipe, without provisioning.
+    task = sub.add_parser("task", help="Convert seed cards or text into ordinary task packages")
+    task_commands = task.add_subparsers(dest="task_cmd", required=True)
+    seeds = task_commands.add_parser("import-seeds", help="Import explicitly provided seed cards")
+    seeds.add_argument("library", type=Path)
+    seeds.add_argument("--seed", dest="seed_ids", action="append")
+    text = task_commands.add_parser("from-text", help="Create a task from a text instruction")
+    text.add_argument("--instruction", type=Path, required=True)
+    text.add_argument("--id", dest="task_id", required=True)
+    text.add_argument("--not-in-benchmark", action="store_true", required=True)
+    for item in (seeds, text):
+        item.add_argument("--output", type=Path, required=True)
+        item.add_argument(
+            "--interaction", choices=("direct", "simulated_user"), default="simulated_user"
+        )
     # Spec-0074/T3: explicit lists, without a second launcher or executor DSL.
     batch = sub.add_parser("batch", help="Manage a frozen list of experiment configurations")
     commands = batch.add_subparsers(dest="batch_cmd", required=True)
@@ -157,7 +172,27 @@ def dispatch(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.cmd == "batch":
+        if args.cmd == "task":
+            from auto_designer.experiment.task_import import import_seed_tasks, import_text_task
+
+            if args.task_cmd == "import-seeds":
+                result = import_seed_tasks(
+                    library=args.library,
+                    output=args.output,
+                    seed_ids=args.seed_ids,
+                    interaction=args.interaction,
+                )
+            else:
+                result = import_text_task(
+                    instruction=args.instruction,
+                    task_id=args.task_id,
+                    output=args.output,
+                    not_in_benchmark=args.not_in_benchmark,
+                    interaction=args.interaction,
+                )
+            _emit(payload=result, as_json=args.json)
+            return 0
+        elif args.cmd == "batch":
             result = _dispatch_batch(args)
             _emit(payload=result, as_json=args.json)
             if result.get("batch_state") == "INTERRUPTED":

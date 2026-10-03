@@ -1,0 +1,22 @@
+{
+  "note": "One synthetic plaintext documentation example, explicitly not from a benchmark. Historical research cards are not included.",
+  "seeds": [
+    {
+      "id": "plaintext-checklist",
+      "source": {
+        "not_in_benchmark": true
+      },
+      "task": {
+        "prompt": "Create a small Python command-line program that reads UTF-8 text from stdin and prints each non-empty line as a Markdown checklist item. Preserve the line order, trim surrounding whitespace, and write a short README with a usage example. Use only the Python standard library. This is a synthetic documentation example, not a benchmark task."
+      },
+      "domain": "dev-tooling",
+      "capability_probed": [
+        "scope-discipline",
+        "tool-use-verification"
+      ],
+      "env": {
+        "setup": []
+      }
+    }
+  ]
+}

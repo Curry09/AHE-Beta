@@ -34,6 +34,8 @@ To queue several complete experiments, use the [batch tutorial](docs/tutorials/b
 
 After complete terminal collection, use `grade RUN_ID --dataset PATH --dataset-sha256 SHA` to score saved SWE session patches with the official evaluator on a local Docker host. This also applies to E2B archives and does not score new held-out Harness tasks or feed results into evolution. See the [post-run grading tutorial](docs/tutorials/post-run-grading.md); older hash-only predictions cannot be reconstructed for grading.
 
+For your own non-benchmark seed library or text instruction, use `task import-seeds` or `task from-text` to create ordinary task packages without models, providers or setup execution. Copy the returned absolute `task_packages` array into an experiment JSON, then use check/prepare/run. The [seed/text import tutorial](docs/tutorials/seed-task-import.md) includes a synthetic card, an editable user task and complete offline checks for local/E2B configurations; importing does not reproduce old images/services or prove task success.
+
 For an offline scripted demo without models or infrastructure:
 
 ```bash

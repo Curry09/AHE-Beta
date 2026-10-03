@@ -81,6 +81,7 @@ _Frozen materials, controllers and local/E2B resource lifecycles._
 | `manifest.py` | Spec-0071/T3: immutable input manifests and shared append-only runtime facts. |
 | `materials.py` | Spec-0069/T1: compile operator inputs into a checksummed, credential-free run bundle. |
 | `runtime.py` | Manage prepared experiments without rewriting their frozen identities. |
+| `task_import.py` | Spec-0076/T1: offline conversion into the existing ordinary task package contract. |
 | `workload.py` | Spec-0073/T1: logical task catalog and session plan, independent of providers. |
 
 ### auto_designer.experiment.backends
@@ -290,6 +291,7 @@ graph LR
     nauto_designer_experiment_manifest["experiment.manifest"]
     nauto_designer_experiment_materials["experiment.materials"]
     nauto_designer_experiment_runtime["experiment.runtime"]
+    nauto_designer_experiment_task_import["experiment.task_import"]
     nauto_designer_experiment_workload["experiment.workload"]
     nauto_designer_guards["auto_designer.guards"]
     nauto_designer_guards_harness_boundary["guards.harness_boundary"]
@@ -482,6 +484,7 @@ graph LR
     nauto_designer_experiment_cli --> nauto_designer_experiment_dashboard
     nauto_designer_experiment_cli --> nauto_designer_experiment_grading
     nauto_designer_experiment_cli --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_cli --> nauto_designer_experiment_task_import
     nauto_designer_experiment_collection --> nauto_designer_experiment_config
     nauto_designer_experiment_collection --> nauto_designer_experiment_materials
     nauto_designer_experiment_context --> nauto_designer_experiment_config
@@ -554,6 +557,9 @@ graph LR
     nauto_designer_experiment_runtime --> nauto_designer_experiment_manifest
     nauto_designer_experiment_runtime --> nauto_designer_experiment_materials
     nauto_designer_experiment_runtime --> nauto_designer_experiment_workload
+    nauto_designer_experiment_task_import --> nauto_designer_distill_seed_library
+    nauto_designer_experiment_task_import --> nauto_designer_experiment_config
+    nauto_designer_experiment_task_import --> nauto_designer_experiment_workload
     nauto_designer_experiment_workload --> nauto_designer_experiment_config
     nauto_designer_experiment_workload --> nauto_designer_experiment_context
     nauto_designer_experiment_workload --> nauto_designer_experiment_materials

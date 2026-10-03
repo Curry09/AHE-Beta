@@ -226,6 +226,9 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 ### 0075 统一入口的实验后官方 SWE 评分
 保留完整会话补丁，校验冻结任务与归档后独立运行官方 fresh-container 评分，结果不回流演化或改写原实验。
 
+### 0076 旧 seed 卡库与纯文本任务导入
+把明确提供的 seed 卡或文本指令转换成既有 ordinary task package，经同一冻结与 local/E2B 生命周期执行，不恢复旧入口或携带隐藏评估字段。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -551,6 +554,10 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0075 | 0075/T2 | 已收集输入绑定与独立官方评分 | done | T1 | backend/auto_designer/experiment/grading.py<br>backend/auto_designer/evaluation/swebench.py<br>backend/tests/test_experiment_grading.py<br>backend/tests/evaluation/test_swebench.py |
 | 0075 | 0075/T4 | 双语教程与历史能力状态 | done | — | docs/tutorials/post-run-grading.md<br>docs/tutorials/post-run-grading.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>README.md<br>README.zh-CN.md<br>docs/audits/unified-entry-capability-migration-20261003.md<br>CLAUDE.md |
 | 0075 | 0075/T3 | 统一评分CLI与完整生产验收 | done | T2, T4 | backend/auto_designer/experiment/cli.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/test_experiment_grading_e2e.py<br>backend/scripts/e2e-spec-0075-post-run-grading.sh<br>docs/validation/post-run-grading.md<br>backend/scripts/check_experiment_repository.py |
+| 0076 | 0076/T1 | 旧卡与文本材料转换 | done | — | backend/auto_designer/experiment/task_import.py<br>backend/tests/test_experiment_task_import.py |
+| 0076 | 0076/T2 | 统一任务CLI与公开命令检查 | done | — | backend/auto_designer/experiment/cli.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/scripts/check_experiment_repository.py<br>backend/tests/test_experiment_repository.py |
+| 0076 | 0076/T3 | 双语输入教程与当前示例 | done | — | docs/tutorials/seed-task-import.md<br>docs/tutorials/seed-task-import.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>README.md<br>README.zh-CN.md<br>examples/seed-inputs/library.json<br>examples/seed-inputs/instruction.md<br>docs/audits/unified-entry-capability-migration-20261003.md<br>CLAUDE.md |
+| 0076 | 0076/T4 | 转换到冻结与真实工作区验收 | done | T1, T2, T3 | backend/tests/test_experiment_task_import_e2e.py<br>backend/scripts/e2e-spec-0076-seed-task-import.sh<br>docs/validation/seed-task-import.md<br>.github/workflows/experiment-contract.yml |
 
 ## 跨 feature 关系图
 
@@ -1025,6 +1032,12 @@ graph LR
         n0075_T4["T4 双语教程与历史能力状态"]
         n0075_T3["T3 统一评分CLI与完整生产验收"]
     end
+    subgraph G0076[0076 seed-task-import]
+        n0076_T1["T1 旧卡与文本材料转换"]
+        n0076_T2["T2 统一任务CLI与公开命令检查"]
+        n0076_T3["T3 双语输入教程与当前示例"]
+        n0076_T4["T4 转换到冻结与真实工作区验收"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1375,6 +1388,9 @@ graph LR
     n0075_T2 --> n0075_T1
     n0075_T3 --> n0075_T2
     n0075_T3 --> n0075_T4
+    n0076_T4 --> n0076_T1
+    n0076_T4 --> n0076_T2
+    n0076_T4 --> n0076_T3
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1430,16 +1446,16 @@ graph LR
 | 文件 | 涉及组 |
 |----|----|
 | .github/workflows/ci.yml | 0070, 0071 |
-| .github/workflows/experiment-contract.yml | 0069, 0071 |
+| .github/workflows/experiment-contract.yml | 0069, 0071, 0076 |
 | .gitignore | 0069, 0071 |
-| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069, 0071, 0073, 0075 |
+| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069, 0071, 0073, 0075, 0076 |
 | OpenAgents/openagents/recipes/stages.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061, 0063 |
 | OpenAgents/openagents/runtime/context.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/runtime/engine.py | 0049, 0061, 0063 |
 | OpenAgents/openagents/utils/gitea.py | 0032, 0061 |
-| README.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075 |
-| README.zh-CN.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075 |
+| README.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076 |
+| README.zh-CN.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0032 |
 | backend/agent_defs/divergent_pm/agent.yaml | 0029, 0061, 0068 |
 | backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059, 0060, 0061, 0068 |
@@ -1482,7 +1498,7 @@ graph LR
 | backend/auto_designer/experiment/backends/e2b.py | 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/backends/e2b_bootstrap.py | 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/backends/local.py | 0069, 0071, 0072, 0073 |
-| backend/auto_designer/experiment/cli.py | 0047, 0053, 0064, 0069, 0071, 0072, 0074, 0075 |
+| backend/auto_designer/experiment/cli.py | 0047, 0053, 0064, 0069, 0071, 0072, 0074, 0075, 0076 |
 | backend/auto_designer/experiment/config.py | 0047, 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/context.py | 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/controllers/__init__.py | 0071, 0073 |
@@ -1566,7 +1582,7 @@ graph LR
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/build_swebench_runtime_image.sh | 0051, 0071 |
 | backend/scripts/build_swebench_seed_workspaces.py | 0044, 0071 |
-| backend/scripts/check_experiment_repository.py | 0071, 0072, 0073, 0074, 0075 |
+| backend/scripts/check_experiment_repository.py | 0071, 0072, 0073, 0074, 0075, 0076 |
 | backend/scripts/check_openagents_contract.py | 0071, 0073 |
 | backend/scripts/e2e-spec-0039-issue-state-timeline.sh | 0039, 0068 |
 | backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh | 0047, 0071 |
@@ -1627,7 +1643,7 @@ graph LR
 | backend/tests/scripts/test_replay_role_invocations.py | 0049, 0071 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_experiment_capability_migration.py | 0072, 0073 |
-| backend/tests/test_experiment_cli_v2.py | 0047, 0053, 0069, 0071, 0072, 0073, 0074, 0075 |
+| backend/tests/test_experiment_cli_v2.py | 0047, 0053, 0069, 0071, 0072, 0073, 0074, 0075, 0076 |
 | backend/tests/test_experiment_config_v2.py | 0047, 0069, 0071, 0072, 0073 |
 | backend/tests/test_experiment_dashboard.py | 0072, 0073 |
 | backend/tests/test_experiment_e2b_backend.py | 0069, 0071, 0072, 0073 |
@@ -1638,7 +1654,7 @@ graph LR
 | backend/tests/test_experiment_local_backend.py | 0069, 0071, 0072, 0073 |
 | backend/tests/test_experiment_materials.py | 0069, 0071, 0072, 0073 |
 | backend/tests/test_experiment_public_examples.py | 0069, 0071, 0073 |
-| backend/tests/test_experiment_repository.py | 0071, 0072, 0073, 0074 |
+| backend/tests/test_experiment_repository.py | 0071, 0072, 0073, 0074, 0076 |
 | backend/tests/test_invocation.py | 0049, 0068 |
 | backend/tests/test_models.py | 0001, 0024, 0051, 0053, 0054 |
 | backend/tests/test_prepare_openagents_from_summary.py | 0046, 0071 |
@@ -1676,13 +1692,13 @@ graph LR
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041, 0068, 0073 |
 | docs/0048-user-sim-final-check-convergence.md | 0048, 0071 |
 | docs/ARCHITECTURE.md | 0068, 0071, 0073 |
-| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075 |
-| docs/CONFIGURATION.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075 |
+| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075, 0076 |
+| docs/CONFIGURATION.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075, 0076 |
 | docs/EXPORTING.md | 0068, 0071 |
 | docs/QUICKSTART.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075 |
 | docs/QUICKSTART.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075 |
 | docs/audits/0061-observation-lifecycle-validation.md | 0061, 0071 |
-| docs/audits/unified-entry-capability-migration-20261003.md | 0071, 0072, 0075 |
+| docs/audits/unified-entry-capability-migration-20261003.md | 0071, 0072, 0075, 0076 |
 | docs/specs/0014-dev-commit-discipline.md | 0068, 0071 |
 | docs/specs/0015-dev-overfit-isolation.md | 0068, 0071 |
 | docs/specs/0016-synthesizer-rootcause-signal.md | 0068, 0071 |
@@ -4037,6 +4053,34 @@ graph LR
     nT1 --> nT2
     nT2 --> nT3
     nT4 --> nT3
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+```
+
+### 0076 旧 seed 卡库与纯文本任务导入（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 旧卡与文本材料转换"]
+    nT2["T2 统一任务CLI与公开命令检查"]
+    nT3["T3 双语输入教程与当前示例"]
+    nT4["T4 转换到冻结与真实工作区验收"]
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
 ```
 
 演化图：

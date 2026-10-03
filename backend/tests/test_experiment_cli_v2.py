@@ -9,6 +9,100 @@ from auto_designer.experiment import cli, runtime
 from auto_designer.experiment.config import ConfigError
 
 
+@pytest.mark.parametrize("interaction", ["direct", "simulated_user"])
+def test_task_text_emits_existing_package_without_credentials(
+    tmp_path, monkeypatch, capsys, interaction
+):
+    # Spec-0076/T2: material preparation must never enter the provider lifecycle.
+    from auto_designer.experiment.config import load_task_package
+
+    monkeypatch.setattr(
+        runtime, "credentials_v2", lambda **kwargs: pytest.fail("no credentials for task import")
+    )
+    monkeypatch.setattr(
+        runtime, "backend_v2", lambda **kwargs: pytest.fail("no provider for task import")
+    )
+    instruction = tmp_path / "instruction.md"
+    original = "实现一个小工具。\r\nPreserve the user's text.\r\n".encode()
+    instruction.write_bytes(original)
+    output = tmp_path / "converted"
+    assert (
+        cli.dispatch(
+            [
+                "--json",
+                "--secrets-file",
+                "/missing-unneeded.env",
+                "task",
+                "from-text",
+                "--instruction",
+                str(instruction),
+                "--id",
+                "text-task",
+                "--output",
+                str(output),
+                "--not-in-benchmark",
+                "--interaction",
+                interaction,
+            ]
+        )
+        == 0
+    )
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["ok"] is True and len(receipt["task_packages"]) == 1
+    package = load_task_package(receipt["task_packages"][0])
+    assert package["kind"] == "ordinary" and package["interaction"] == interaction
+    assert Path(package["instruction_file"]).read_bytes() == original
+    assert instruction.read_bytes() == original
+
+
+def test_task_from_text_requires_explicit_nonbenchmark_declaration(tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        cli.dispatch(
+            [
+                "task",
+                "from-text",
+                "--instruction",
+                "task.md",
+                "--id",
+                "text-task",
+                "--output",
+                str(tmp_path / "converted"),
+            ]
+        )
+    assert exc.value.code == 2 and not (tmp_path / "converted").exists()
+
+
+def test_task_seeds_respects_selection_order_and_reports_existing_output(tmp_path, capsys):
+    # Spec-0076/T2: selection belongs to this conversion, not a hidden runtime flag.
+    cards = [
+        {"id": name, "source": {"not_in_benchmark": True}, "task": {"prompt": name}}
+        for name in ("first", "second")
+    ]
+    library = tmp_path / "library.json"
+    library.write_text(json.dumps({"seeds": cards}))
+    output = tmp_path / "converted"
+    args = [
+        "--json",
+        "task",
+        "import-seeds",
+        str(library),
+        "--output",
+        str(output),
+        "--seed",
+        "second",
+        "--seed",
+        "first",
+    ]
+    assert cli.dispatch(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    # Original library order defines the workload rotation, even when selecting IDs.
+    assert [Path(path).parent.name for path in result["task_packages"]] == ["first", "second"]
+    saved = Path(result["index_file"]).read_bytes()
+    assert cli.dispatch(args) == 2
+    assert "error" in json.loads(capsys.readouterr().out)
+    assert Path(result["index_file"]).read_bytes() == saved
+
+
 @pytest.mark.parametrize("offline", [False, True])
 def test_grade_routes_pinned_dataset_without_credentials(monkeypatch, capsys, tmp_path, offline):
     # Spec-0075/T3: global credentials are deliberately absent from the grading API.

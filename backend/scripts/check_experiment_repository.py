@@ -30,8 +30,10 @@ PUBLIC_COMMANDS = {
     "dashboard",  # Spec-0072/T5: the same entry binds a selected run for observation.
     "batch",  # Spec-0074/T3: lists reuse the maintained single-run entry.
     "grade",  # Spec-0075/T3: independent grading consumes collected run artifacts.
+    "task",  # Spec-0076/T2: input conversion produces existing task packages.
 }
 BATCH_COMMANDS = {"check", "prepare", "run", "status", "stop", "resume", "collect"}
+TASK_COMMANDS = {"import-seeds", "from-text"}
 RETIRED_PATHS = (
     "run.sh",
     "backend/run.py",
@@ -202,6 +204,14 @@ def check_repository(root: Path) -> dict:
     )
     if not batch_actions or set(batch_actions[0].choices) != BATCH_COMMANDS:
         errors.append("Unexpected public batch commands")
+    task_parser = command_actions[0].choices.get("task")
+    task_actions = (
+        [a for a in task_parser._actions if isinstance(a, argparse._SubParsersAction)]
+        if task_parser
+        else []
+    )
+    if not task_actions or set(task_actions[0].choices) != TASK_COMMANDS:
+        errors.append("Unexpected public task commands")
     if any(
         p.startswith(("examples", "research", "tools/dev")) or p == "backend/scripts"
         for p in _SOURCE_ROOTS

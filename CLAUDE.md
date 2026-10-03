@@ -11,6 +11,8 @@
 
 完整实验列表通过同入口的 batch check/prepare/run/status/stop/resume/collect 管理，成员仍沿用单 run 身份与冻结配置。实验后官方 SWE 任务评分使用 grade RUN_ID --dataset PATH --dataset-sha256 SHA；两后端均完整 collect 后在本机 Docker 评分，--offline 只校验输入。新会话原子保存完整 patch 与 receipt；旧冻结 controller 的 hash-only 预测不补造。每次评分写独立 evaluation attempt，不改 Session、manifest、checkpoint、seal 或 archive；不读取 provider 凭证，不把 gold/test 数据或分数送回演化。evaluation.official_grading 继续 false；这些用户任务成绩与独立 held-out Harness 泛化评估分开。双语教程见 docs/tutorials/post-run-grading.md / .zh-CN.md。
 
+旧 seed 卡库与自有文本通过统一入口的 task import-seeds LIBRARY --output DIR [--seed ID ...] / task from-text --instruction PATH --id ID --output DIR --not-in-benchmark 转为 ordinary v1 包；两者支持 --interaction direct|simulated_user 和父级 --json。转换不联网、不读模型/provider 凭证、不执行 setup。JSON 结果提供绝对 task_packages 数组，应移除旧 workload.kind/task_package/interaction_plan 后接入 workload.task_packages；tasks.json 仅为输出目录相对路径索引，不是新的运行入口。无 repo 使用带初始 README 的 scratch，不携带答案。oracle、env.test_cmd、gates、provenance 不复制到包或 sidecar；旧 setup 不自动锁依赖，旧镜像、外部服务不自动复现。公开 examples/seed-inputs/ 仅放明确非 benchmark 的小型合成卡与用户指令；历史七卡留在研究归档。双语教程见 docs/tutorials/seed-task-import.md / .zh-CN.md，实验仍走 check/prepare/run。工程 CI runner 治理、历史 continuation 仍待迁入；转换和离线检查不证明真实双 provider 实验或任务通过。
+
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
 

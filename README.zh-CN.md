@@ -34,6 +34,8 @@ uv run --locked --extra experiments python backend/scripts/experiment.py run <ru
 
 终态完整收集后，用 `grade RUN_ID --dataset PATH --dataset-sha256 SHA` 在本机 Docker 上通过官方 evaluator 评分已保存的 SWE 会话补丁，E2B 归档也使用此路径。这不是新的 Harness 留出测试，结果不回流演化。详见[事后评分教程](docs/tutorials/post-run-grading.zh-CN.md)；只有 hash 的旧预测不能猜回补丁评分。
 
+自己的非 benchmark seed 卡库或文本指令可用 `task import-seeds` / `task from-text` 转为 ordinary 任务包，转换不请求模型/provider，不执行 setup。将返回的绝对 `task_packages` 数组写入实验 JSON 后，继续使用 check/prepare/run。[seed/文本导入教程](docs/tutorials/seed-task-import.zh-CN.md) 提供合成卡、可编辑的用户任务和 local/E2B 配置的完整离线检查；导入不复现旧镜像/服务，也不证明任务通过。
+
 无需模型或基础设施的脚本演示：
 
 ```bash

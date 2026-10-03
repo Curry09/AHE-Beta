@@ -14,6 +14,7 @@ on:
       - 'research/**'
       - 'backend/scripts/check_experiment_repository.py'
       - 'backend/scripts/e2e-spec-0071-experiment-cleanup.sh'
+      - 'backend/scripts/e2e-spec-0076-seed-task-import.sh'
       - 'release/compatibility.json'
       - 'pyproject.toml'
       - 'uv.lock'
@@ -34,3 +35,4 @@ jobs:
           python-version: '3.12.13'
       - run: uv sync --locked --extra experiments --extra dev
       - run: bash backend/scripts/e2e-spec-0071-experiment-cleanup.sh
+      - run: bash backend/scripts/e2e-spec-0076-seed-task-import.sh

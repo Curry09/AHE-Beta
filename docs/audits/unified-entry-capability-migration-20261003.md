@@ -167,3 +167,11 @@ v1 命令名、私人模型快捷脚本、无 context 的单例启动、隐式�
 事后任务成绩不是对 Harness 的新留出泛化测试。官方 dataset 的 gold patch/test_patch 不进入演化输入，成绩不反馈为需求、proposal、Issue 或工程 CI 门禁。评分接线的离线替身验收与实际官方 Docker 成绩分开记录；不能把前者称作官方测试通过。
 
 剩余范围仍需单独设计或保持明确收窄：工程 CI runner 注册与生命周期、历史产物导入追加轮、旧 seed 卡库/纯文本输入适配。自定义 Gitea provider 仍是公开 local+localhost 与 E2B+Gitea.com 两模式之外的选择；替代 OpenAgents backend 不因独立项目有此能力就自动成为本仓控制器接口。当前 resume 仍只续原身份未完成的 run，不导入历史实验、不升级冻结 controller。已批准退出的旧 wrapper、隐式私人配置和任意宿主 env 透传不恢复。
+
+### Spec-0075 实测边界补记与 Spec-0076 输入迁移
+
+Spec-0075 已于提交 `7a8176a` 完成评分实测更新；上文的离线与官方运行区分继续有效。官方 Verified 的 `psf__requests-6028` 正对照由验收 Harness 施加 gold patch，负对照只新增无关文件，真实官方结果为一项 passed、一项 failed；这不是模型能力成绩。重复评分前后，原实验的 642 个文件逐一 SHA-256 一致。公开 pvlib dev 任务的官方镜像因 NumPy 2 移除 `np.Inf` 而在 conftest 启动阶段失败，重新分类为 `crashed / official_test_start_failed`，不能计为任务失败或修复通过。详见[评分验收](../validation/post-run-grading.md)，原始证据保存在仓外。
+
+Spec-0076 将旧 seed 卡库和明确非 benchmark 的文本指令接入现有 ordinary 任务包：统一入口新增 `task import-seeds` / `task from-text`，转换返回绝对 `task_packages` 数组供原 workload 使用。输出 `tasks.json` 只作相对路径索引，不新增运行入口；后续仍用 check/prepare/run，并冻结既有任务/source/setup 合同。无仓库输入使用带说明 README 的 scratch 源目录，不写答案；oracle、env.test_cmd、gates、provenance 不进入包或 sidecar。旧 setup 依赖不自动锁定，旧 base image、外部服务和元数据未自动复现，不能把输入迁入等同于原研究环境通过复现门。
+
+公开示例仅使用一张明确非 benchmark 的合成文本卡和一份用户任务指令；真实历史七卡不搬入主 examples。双语[输入教程](../tutorials/seed-task-import.zh-CN.md)提供将转换数组写入 local/E2B N1 配置副本的精确命令和完整离线检查。转换与离线验收不代表真实双 provider 实验已运行，也不代表任务通过；实际执行覆盖由本组独立验收记录。工程 CI runner 注册/生命周期、历史产物 continuation 仍待迁入；不恢复旧 wrapper、隐式私人配置或任意宿主 env 透传。

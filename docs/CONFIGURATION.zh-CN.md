@@ -149,7 +149,20 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 `experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 
-本次已迁入上述设置、交互和看板；工程 CI、历史产物追加轮、旧 seed 库及纯文本任务仍待实现。官方 SWE 任务评分已提供独立事后命令，演化循环内评分仍按设计关闭。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+本次已迁入上述设置、交互和看板；工程 CI、历史产物追加轮仍待实现；旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。官方 SWE 任务评分已提供独立事后命令，演化循环内评分仍按设计关闭。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+
+## seed 卡库与文本指令
+
+`task import-seeds LIBRARY --output DIR [--seed ID ...]` 和 `task from-text --instruction PATH --id ID --output DIR --not-in-benchmark` 将明确提供的非 benchmark 输入转为 ordinary 任务包。两个命令都支持 `--interaction direct|simulated_user` 和父级 `--json`；不读凭证、不请求网络/模型/provider、不执行 setup。输出目录必须尚不存在。
+
+```bash
+uv run --locked --extra experiments python backend/scripts/experiment.py --json task import-seeds examples/seed-inputs/library.json --output /absolute/path/to/new-seed-tasks
+uv run --locked --extra experiments python backend/scripts/experiment.py --json task from-text --instruction examples/seed-inputs/instruction.md --id weekly-notes --output /absolute/path/to/new-text-task --not-in-benchmark
+```
+
+结果的 `task_packages` 是绝对路径数组：移除 `workload.kind`、`task_package` 及不再适用的 `interaction_plan` 后，赋给 `workload.task_packages`。生成的 `tasks.json` 只是以输出目录为基准的相对路径索引，不是可运行实验，也不能替代该数组。复制实验 JSON 时，persona/Harness 等相对路径也须按原 JSON 目录解析。[完整导入教程](tutorials/seed-task-import.zh-CN.md) 提供将数组写入两个当前 N1 后端模板的精确 Python 命令及离线检查。
+
+无仓库卡和文本指令使用本地 scratch 源目录，其中初始 README 不包含答案。有仓库卡支持转为 GitHub HTTPS 的 owner/repo 标识或无凭证 HTTPS 地址，并要求固定的 40 位小写 SHA。导入只映射 prompt/source/setup，不把 oracle、env.test_cmd、gates、provenance 复制到材料或 sidecar；不会自动锁定旧 setup 依赖，也不恢复旧镜像/外部服务。prepare 前审阅生成的 setup 和 requirements。导入或离线检查成功不证明任务通过或历史环境可复现；实验仍使用 check/prepare/run。
 
 ## 多任务包
 

@@ -38,6 +38,33 @@ def test_current_repository_has_only_supported_public_materials():
     assert len(result["batches"]) == 2
 
 
+def test_unpublished_task_subcommand_is_rejected(monkeypatch):
+    # Spec-0076/T2: adapters cannot quietly turn into another experiment launcher.
+    from auto_designer.experiment import cli
+
+    build_parser = cli.build_parser
+
+    def parser_with_extra_task():
+        parser = build_parser()
+        commands = next(
+            action
+            for action in parser._actions
+            if isinstance(action, checker.argparse._SubParsersAction)
+        )
+        tasks = next(
+            action
+            for action in commands.choices["task"]._actions
+            if isinstance(action, checker.argparse._SubParsersAction)
+        )
+        tasks.add_parser("legacy-run")
+        return parser
+
+    monkeypatch.setattr(cli, "build_parser", parser_with_extra_task)
+    result = checker.check_repository(ROOT)
+    assert not result["ok"]
+    assert "Unexpected public task commands" in result["errors"]
+
+
 def test_archive_content_cannot_be_silently_rewritten(tmp_path):
     archived = inventory(tmp_path)
     assert checker.inventory_errors(tmp_path) == []

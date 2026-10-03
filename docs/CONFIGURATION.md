@@ -149,7 +149,20 @@ The plan validates every round's session count and selected persona/task IDs. Pe
 
 `experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-These settings, interactions and dashboard binding are migrated. Engineering CI, historical round import, legacy seed libraries and text-only tasks remain pending. Official SWE task grading is available as a separate post-run command; in-loop grading remains disabled by design. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+These settings, interactions and dashboard binding are migrated. Engineering CI and historical round import remain pending; seed libraries and text instructions now convert to ordinary packages as described below. Official SWE task grading is available as a separate post-run command; in-loop grading remains disabled by design. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+
+## Seed libraries and text instructions
+
+`task import-seeds LIBRARY --output DIR [--seed ID ...]` and `task from-text --instruction PATH --id ID --output DIR --not-in-benchmark` convert explicitly supplied non-benchmark input into ordinary task packages. Both accept `--interaction direct|simulated_user` and the parent `--json`; they do not read credentials, call networks/models/providers, or execute setup. Output directories must not already exist.
+
+```bash
+uv run --locked --extra experiments python backend/scripts/experiment.py --json task import-seeds examples/seed-inputs/library.json --output /absolute/path/to/new-seed-tasks
+uv run --locked --extra experiments python backend/scripts/experiment.py --json task from-text --instruction examples/seed-inputs/instruction.md --id weekly-notes --output /absolute/path/to/new-text-task --not-in-benchmark
+```
+
+The result's `task_packages` is an absolute path array: assign it to `workload.task_packages` after removing `kind`, `task_package` and any obsolete `interaction_plan`. The generated `tasks.json` only indexes relative paths from the output directory; it is not a runnable experiment or a replacement for that array. When copying an experiment JSON, also resolve its relative persona/Harness paths from the original JSON directory. The [complete import tutorial](tutorials/seed-task-import.md) provides exact Python commands for both maintained N1 backend templates and offline checks.
+
+Cards without repositories and text instructions use a local scratch source directory with an initial README, containing no solution. Repository cards accept an owner/repo identifier resolved to GitHub HTTPS or a credential-free HTTPS URL, with an immutable 40-character lowercase SHA. The importer preserves prompt/source/setup mappings but does not copy oracle, env.test_cmd, gates or provenance into materials or sidecars. Old setup dependencies are not automatically locked, and old images/external services are not restored. Review the generated setup and requirements before preparation. Importing or offline checking is not proof of task success or a reproducible historical environment. Experiments still run through check/prepare/run.
 
 ## Multiple task packages
 
