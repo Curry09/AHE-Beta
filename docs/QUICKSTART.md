@@ -75,6 +75,19 @@ Runs live under `.experiments/<run_id>/`. Experiment outcome, resource state and
 
 The [complete N=1 tutorial](tutorials/n1-experiment.md) explains every input, expected outputs, interruption boundaries and evidence. The [multi-user tutorial](tutorials/multi-user-experiment.md) runs N4 with two tasks, a fixed cross-round plan and stop/resume. Actual validation results are recorded in the [N1 report](validation/spec-0069-new-user.md) and [multi-user report](validation/spec0073-multi-task-users.md).
 
+## Grade saved SWE task patches
+
+After complete terminal collection, install the evaluation extra and provide an independently verified local official dataset. Local and E2B archives are both scored on this host with Docker; `grade` needs no model or provider credentials.
+
+```bash
+uv sync --locked --extra experiments --extra dev --extra evaluation
+DATASET=/absolute/path/to/official-dataset.parquet
+DATASET_SHA256=REPLACE_WITH_VERIFIED_SHA256
+uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py grade "$RUN_ID" --dataset "$DATASET" --dataset-sha256 "$DATASET_SHA256" --offline
+```
+
+Run the same command without `--offline` for official fresh-container evaluation. The default is the configured final round; `--round 1` selects an earlier sealed round. These are scores for user-task patches, not a new held-out Harness evaluation, and they never enter the evolution loop. Each grading attempt preserves original artifacts. Older controllers without full prediction receipts need a new experiment. See the [grading tutorial](tutorials/post-run-grading.md) for dataset formats, hashes, output and failure states.
+
 ## Run a list of experiments
 
 After filling the same `.env.experiment`, choose a batch list instead of one run configuration:

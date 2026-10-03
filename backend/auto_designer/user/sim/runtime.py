@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -17,6 +18,7 @@ import tarfile
 import tempfile
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -55,6 +57,51 @@ def _safe_relative(path: str) -> str:
     return str(candidate)
 
 
+def _capture_patch_base(
+    runtime: Any, execute: Callable[[list[str]], subprocess.CompletedProcess[str]]
+) -> None:
+    """Spec-0075/T1: freeze original HEAD before the Harness can create commits."""
+    if runtime._patch_base_failed:
+        raise RuntimeError("original patch base could not be captured")
+    if runtime._patch_base_commit is not None:
+        return
+    try:
+        proc = execute(["git", "rev-parse", "--verify", "HEAD^{commit}"])
+        base = proc.stdout.strip()
+        if proc.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", base):
+            raise RuntimeError(proc.stderr.strip() or "cannot capture original Git HEAD")
+    except Exception as exc:  # noqa: BLE001 - never fall back to a later HEAD
+        runtime._patch_base_failed = True
+        runtime.evidence["diff_base_error"] = type(exc).__name__
+        raise
+    runtime._patch_base_commit = base
+    runtime.evidence["diff_base_commit"] = base
+
+
+def _prediction_patch_argv(base_commit: str | None) -> list[str]:
+    if base_commit is None:
+        # Legacy stand-alone exporters retain the original tracked-only contract.
+        return ["git", "diff", "--binary", "--no-ext-diff", "--no-textconv"]
+    quoted_base = shlex.quote(base_commit)
+    # An isolated index includes staged, committed and new nonignored files,
+    # while leaving the user's actual index untouched. The directory never sits
+    # in the task tree and the trap removes it on both successful and failed exports.
+    script = (
+        "set -eu\n"
+        "prediction_index_dir=$(mktemp -d)\n"
+        "trap 'rm -rf -- \"$prediction_index_dir\"' EXIT\n"
+        'export GIT_INDEX_FILE="$prediction_index_dir/index"\n'
+        f"git read-tree {quoted_base}\n"
+        # These paths are created by task setup/Python execution, not task source.
+        # Pathspec exclusions only affect this disposable index; the real index
+        # and task ignore rules are never modified.
+        "git add -A -- . ':(glob,exclude)**/.venv/**' "
+        "':(glob,exclude)**/__pycache__/**' ':(glob,exclude)**/*.py[cod]'\n"
+        f"git diff --cached --binary --no-ext-diff --no-textconv {quoted_base} --\n"
+    )
+    return ["sh", "-c", script]
+
+
 @dataclass
 class LocalWorkspaceRuntime:
     """Compatibility runtime for fixtures and developer-only local scenarios."""
@@ -67,6 +114,8 @@ class LocalWorkspaceRuntime:
     attempt_root: str | None = None
     environment: dict[str, str] = field(default_factory=dict)
     _closed: bool = field(default=False, init=False)
+    _patch_base_commit: str | None = field(default=None, init=False)
+    _patch_base_failed: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self.cwd = str(Path(self.root).resolve())
@@ -160,14 +209,20 @@ class LocalWorkspaceRuntime:
     def popen_argv(self, argv: list[str], *, cwd: str, env: dict[str, str]) -> list[str]:
         return list(argv)
 
+    def _git_export(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(argv, cwd=self.cwd, capture_output=True, text=True)
+
+    def freeze_patch_base(self) -> None:
+        _capture_patch_base(self, self._git_export)
+
     def export_patch(self) -> tuple[str, str]:
-        proc = subprocess.run(
-            ["git", "diff", "--binary", "--no-ext-diff"],
-            cwd=self.cwd,
-            capture_output=True,
-            text=True,
-        )
-        patch = proc.stdout if proc.returncode == 0 else ""
+        if self._patch_base_failed:
+            raise RuntimeError("original patch base could not be captured")
+        proc = self._git_export(_prediction_patch_argv(self._patch_base_commit))
+        # Spec-0075/T1: a failed export is not a successful empty prediction.
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr.strip() or "git diff failed")
+        patch = proc.stdout
         return patch, hashlib.sha256(patch.encode()).hexdigest()
 
     def invalidate(self, reason: str) -> None:
@@ -263,6 +318,8 @@ class DockerWorkspaceRuntime:
     evidence: dict[str, Any] = field(default_factory=dict)
     _closed: bool = False
     _invalid: bool = False
+    _patch_base_commit: str | None = field(default=None, init=False)
+    _patch_base_failed: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self.evidence.update(
@@ -386,8 +443,13 @@ class DockerWorkspaceRuntime:
             command.extend(["-e", f"{key}={value}"])
         return [*command, self.container_id, *argv]
 
+    def freeze_patch_base(self) -> None:
+        _capture_patch_base(self, self._exec)
+
     def export_patch(self) -> tuple[str, str]:
-        proc = self._exec(["git", "diff", "--binary", "--no-ext-diff"])
+        if self._patch_base_failed:
+            raise RuntimeError("original patch base could not be captured")
+        proc = self._exec(_prediction_patch_argv(self._patch_base_commit))
         if proc.returncode != 0:
             raise RuntimeError(proc.stderr.strip() or "git diff failed")
         patch = proc.stdout

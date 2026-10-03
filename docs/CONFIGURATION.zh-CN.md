@@ -34,7 +34,7 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 | `rounds` | 轮数、每轮 session 数、最大用户并发数 |
 | `roles` | Triage/Synthesizer/divergent/developer 数量；`owner_mode: mechanical` / `llm` |
 | `models` | User、Harness、共享需求面、Claude Code 交付模型 |
-| `evaluation.official_grading` | `false`，官方评分单独运行 |
+| `evaluation.official_grading` | `false`，演化期间不评分；独立事后评分用 `grade` 命令 |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
 可选一个或多个任务包；sessions_per_round 不超过所选不同 persona 的数量，max_parallel_users 不超过 sessions_per_round。同轮不同 persona 可使用同一任务，各包自行声明 kind 和 interaction。历史结果导入后追加一轮仍不支持。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
@@ -149,7 +149,7 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 `experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 
-本次已迁入上述设置、交互和看板；工程 CI、入口内官方评分、历史产物追加轮、旧 seed 库及纯文本任务仍待实现。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+本次已迁入上述设置、交互和看板；工程 CI、历史产物追加轮、旧 seed 库及纯文本任务仍待实现。官方 SWE 任务评分已提供独立事后命令，演化循环内评分仍按设计关闭。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
 
 ## 多任务包
 
@@ -189,3 +189,9 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 批次位于 `<runs-dir>/.batches/<batch_id>/`；各成员沿用正常 run 目录，存放在 `children/<entry_id>/<run_id>/`。`intent.json`、`manifest.json` 保留不可变输入身份，runtime receipt 和 journal 保存观测。直接管理成员时，在单实验命令前指定 `--runs-dir <runs-dir>/.batches/<batch_id>/children/<entry_id>`；batch status 在 `entries` 中报告子实验 run ID，在 `child_roots` 中报告目录，再结合教程的管理和清理命令使用。修改原配置不会改变已冻结批次。
 
 并发上限不是账户全局上限，也不是已分配资源数上限；停止/完成的沙箱及其他批次可能仍占配额。批次管理不自动销毁计算或删除仓库，顺序执行也可能耗尽仓库名额。按[批次教程](tutorials/batch-experiment.zh-CN.md)逐项收集并显式清理。
+
+## 实验后 SWE 评分
+
+评分输入独立于实验 JSON。`grade RUN_ID` 必填 `--dataset PATH`（本地 JSON/JSONL/parquet）和 `--dataset-sha256 SHA`；`--round` 选择正整数且已封口的轮次，默认 `config.rounds.count`。`--timeout-seconds` 默认每会话 `1800` 秒。`--offline` 只验证绑定，不调用 Docker、不写评分结果。自定义根目录或批次成员使用全局 `--runs-dir`，机器可读输出用 `--json`。此命令不读凭证文件。
+
+安装 `uv sync --locked --extra experiments --extra dev --extra evaluation`。local 与 E2B 均在操作者的 Docker 主机上，以经过验证的终态 COMPLETE 归档评分，并要求新控制器保存的完整预测回执。每次结果写入独立的 `evaluation/<attempt_id>/`，原实验产物不改。gold patch 与隐藏测试是外部评分输入，不能成为冻结演化材料。只有 hash 的旧会话无法还原。详见[事后评分教程](tutorials/post-run-grading.zh-CN.md)和[验收报告](validation/post-run-grading.md)。这些用户任务成绩与 Harness 留出泛化测试分开，不进入反馈或 CI 门禁。

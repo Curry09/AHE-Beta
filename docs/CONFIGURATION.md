@@ -34,7 +34,7 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `rounds` | `count`, `sessions_per_round`, `max_parallel_users` |
 | `roles` | Triage/Synthesizer/divergent/developer counts; `owner_mode: mechanical` / `llm` |
 | `models` | User, Harness, shared demand and Claude Code delivery settings |
-| `evaluation.official_grading` | `false`; official grading runs separately |
+| `evaluation.official_grading` | `false`; evolution stays ungraded; use the independent post-run `grade` command |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
 Choose one or more task packages and set sessions_per_round up to the number of selected personas; max_parallel_users must not exceed sessions_per_round. Different personas may use the same task in one round. Each package supplies its own kind and interaction. Importing historical results to append a round remains unsupported. The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
@@ -149,7 +149,7 @@ The plan validates every round's session count and selected persona/task IDs. Pe
 
 `experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-These settings, interactions and dashboard binding are migrated. Engineering CI, in-entry official grading, historical round import, legacy seed libraries and text-only tasks remain pending. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+These settings, interactions and dashboard binding are migrated. Engineering CI, historical round import, legacy seed libraries and text-only tasks remain pending. Official SWE task grading is available as a separate post-run command; in-loop grading remains disabled by design. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
 
 ## Multiple task packages
 
@@ -189,3 +189,9 @@ All members must use the same backend. Unknown fields, partial configuration ove
 A batch lives under `<runs-dir>/.batches/<batch_id>/`; each member's normal run directory is `children/<entry_id>/<run_id>/`. `intent.json` and `manifest.json` retain immutable input identities; runtime receipts and journal store observations. To manage a child directly, specify `--runs-dir <runs-dir>/.batches/<batch_id>/children/<entry_id>` before its single-run command. Batch status reports child run IDs in `entries` and their directories in `child_roots`; use them with the tutorial's management and cleanup commands. Editing source configurations never changes a frozen batch.
 
 The parallel limit is not an account-wide limit or allocated-resource cap. Stopped/completed sandboxes and other batches may still consume quota. Batch management does not automatically destroy compute or delete repositories; even sequential runs may exhaust repository limits. Use the [batch tutorial](tutorials/batch-experiment.md) to collect and explicitly clean up each member.
+
+## Post-run SWE grading
+
+Grading inputs are separate from experiment JSON. `grade RUN_ID` requires `--dataset PATH` (local JSON/JSONL/parquet) and `--dataset-sha256 SHA`; `--round` selects a positive sealed round and defaults to `config.rounds.count`. `--timeout-seconds` defaults to `1800` per session. `--offline` validates bindings without Docker or result writes. Use global `--runs-dir` for a custom root or batch child root, and `--json` for machine-readable output. The command does not read a secrets file.
+
+Install `uv sync --locked --extra experiments --extra dev --extra evaluation`. Both local and E2B runs are scored on the operator’s Docker host from a verified terminal COMPLETE archive, using complete prediction receipts from new controllers. Results go into independent `evaluation/<attempt_id>/` directories; original experiment artifacts remain unchanged. Gold patches and hidden tests are external grading inputs, never frozen evolution materials. Old hash-only sessions are not reconstructible. See the [post-run grading tutorial](tutorials/post-run-grading.md) and [validation report](validation/post-run-grading.md). These user-task scores are separate from held-out Harness generalization tests and do not become feedback or CI gates.

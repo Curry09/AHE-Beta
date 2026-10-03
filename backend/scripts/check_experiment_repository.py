@@ -29,6 +29,7 @@ PUBLIC_COMMANDS = {
     "destroy",
     "dashboard",  # Spec-0072/T5: the same entry binds a selected run for observation.
     "batch",  # Spec-0074/T3: lists reuse the maintained single-run entry.
+    "grade",  # Spec-0075/T3: independent grading consumes collected run artifacts.
 }
 BATCH_COMMANDS = {"check", "prepare", "run", "status", "stop", "resume", "collect"}
 RETIRED_PATHS = (

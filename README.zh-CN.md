@@ -23,7 +23,6 @@ cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
 # 填写凭证；本地 Docker 改用 synthesizer-n1-local.json。
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-e2b.json --offline
-examples/batches/                        # 同一后端的完整实验配置列表
 uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config examples/experiments/synthesizer-n1-e2b.json --secrets-file .env.experiment
 # 复制生成的 run ID：
 uv run --locked --extra experiments python backend/scripts/experiment.py run <run_id>
@@ -32,6 +31,8 @@ uv run --locked --extra experiments python backend/scripts/experiment.py run <ru
 先看[快速开始](docs/QUICKSTART.zh-CN.md)，再按[完整 N=1 教程](docs/tutorials/n1-experiment.zh-CN.md)操作，了解材料、模型协议、provider 凭证、进度、停止/恢复、收集与清理。两轮四用户的完整示例见[多用户教程](docs/tutorials/multi-user-experiment.zh-CN.md)。prepare 自动获取固定版本 OpenAgents，不需要提前放置 sibling checkout。[N1 验证报告](docs/validation/spec-0069-new-user.md)和[多用户验证报告](docs/validation/spec0073-multi-task-users.md)独立记录实际检查结果。
 
 连续执行多个完整实验时，使用[批量教程](docs/tutorials/batch-experiment.zh-CN.md)及 `examples/batches/` 的 local/E2B 列表。批次沿用成员各自的单实验生命周期，监督到终态收集才释放并发名额；Ctrl+C 退出监督，`batch stop` 才停止已启动成员。N1/N4 列表保留各自五轮/两轮的不同设置，演示执行方式，不构成公平的因果对照。
+
+终态完整收集后，用 `grade RUN_ID --dataset PATH --dataset-sha256 SHA` 在本机 Docker 上通过官方 evaluator 评分已保存的 SWE 会话补丁，E2B 归档也使用此路径。这不是新的 Harness 留出测试，结果不回流演化。详见[事后评分教程](docs/tutorials/post-run-grading.zh-CN.md)；只有 hash 的旧预测不能猜回补丁评分。
 
 无需模型或基础设施的脚本演示：
 

@@ -152,3 +152,18 @@ v1 命令名、私人模型快捷脚本、无 context 的单例启动、隐式�
 用户于 2026-10-03 授权实施；清理基线独立提交为 `81b3f56`。随后 Spec-0072 补齐本报告中的分组、推理强度、计时、交付策略、告警、Owner 模型评审、direct、显式计划和看板接线，修复两个已复现问题，并将新交付运行路径改为非 root。新增策略进入冻结配置，旧 run 不升级。
 
 上述正文保留审计当时的结论；实现与测试边界见[能力迁移验收](../validation/spec0072-capability-migration.md)。工程 CI、多任务/N4/N8、历史续跑导入及其他列明范围仍待迁入；真实云端非空交付也尚未验收，不能据离线测试称全部迁移完成。
+
+### Spec-0073—0075 后的更新
+
+上段是 Spec-0072 完成时的状态，不代表后续能力仍未迁入。按当前统一入口分别记录：
+
+| 能力 | 当前处置与验收边界 |
+| --- | --- |
+| 分组、reasoning、计时、交付策略、告警、Owner 模型评审、direct、显式计划、看板 | Spec-0072 已迁入冻结配置；见对应验收，不能仅凭字段存在扩大真实 provider 覆盖 |
+| 多任务、同轮多用户、ordinary/SWE 混合及 N4/N8 | Spec-0073 已迁入同一 workload 契约。真实 local/E2B N4 各完成八个会话及停止/恢复；这两次运行未产生准入交付票，不能作为真实非空 OpenAgents 交付证明。见[多任务验收](../validation/spec0073-multi-task-users.md) |
+| 批量实验管理 | Spec-0074 已提供同后端完整配置列表与 check/prepare/run/status/stop/resume/collect。真实 local 两成员批次完成并清理；E2B 批次未实测。它不是跨账户容量调度或参数矩阵。见[批次验收](../validation/batch-experiments.md) |
+| 官方 SWE 任务评分 | Spec-0075 通过独立事后 `grade` 命令接入终态完整归档与官方 evaluator。新控制器保存完整会话补丁；旧 hash-only 会话不可还原。`evaluation.official_grading` 仍为 false，不开启循环内评分。见[评分教程](../tutorials/post-run-grading.zh-CN.md)及[评分验收](../validation/post-run-grading.md) |
+
+事后任务成绩不是对 Harness 的新留出泛化测试。官方 dataset 的 gold patch/test_patch 不进入演化输入，成绩不反馈为需求、proposal、Issue 或工程 CI 门禁。评分接线的离线替身验收与实际官方 Docker 成绩分开记录；不能把前者称作官方测试通过。
+
+剩余范围仍需单独设计或保持明确收窄：工程 CI runner 注册与生命周期、历史产物导入追加轮、旧 seed 卡库/纯文本输入适配。自定义 Gitea provider 仍是公开 local+localhost 与 E2B+Gitea.com 两模式之外的选择；替代 OpenAgents backend 不因独立项目有此能力就自动成为本仓控制器接口。当前 resume 仍只续原身份未完成的 run，不导入历史实验、不升级冻结 controller。已批准退出的旧 wrapper、隐式私人配置和任意宿主 env 透传不恢复。

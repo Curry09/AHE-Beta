@@ -9,6 +9,8 @@
 ### 项目文档
 用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；支持冻结任务列表、同任务多用户与 ordinary/SWE 混合计划；N1/N4 公开示例涵盖两后端。历史产物导入追加轮仍未接入。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
+完整实验列表通过同入口的 batch check/prepare/run/status/stop/resume/collect 管理，成员仍沿用单 run 身份与冻结配置。实验后官方 SWE 任务评分使用 grade RUN_ID --dataset PATH --dataset-sha256 SHA；两后端均完整 collect 后在本机 Docker 评分，--offline 只校验输入。新会话原子保存完整 patch 与 receipt；旧冻结 controller 的 hash-only 预测不补造。每次评分写独立 evaluation attempt，不改 Session、manifest、checkpoint、seal 或 archive；不读取 provider 凭证，不把 gold/test 数据或分数送回演化。evaluation.official_grading 继续 false；这些用户任务成绩与独立 held-out Harness 泛化评估分开。双语教程见 docs/tutorials/post-run-grading.md / .zh-CN.md。
+
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
 

@@ -76,6 +76,7 @@ _Frozen materials, controllers and local/E2B resource lifecycles._
 | `context.py` | Spec-0069/T2: one credential-free context and model mapping for both runners. |
 | `dashboard.py` | Spec-0072/T4: read-only dashboard bound to a prepared run, without provider discovery. |
 | `engine.py` | Spec-0069/T2: supervise the existing controller, with owned PIDs and receipts. |
+| `grading.py` | Spec-0075/T2: grade immutable collected sessions without resuming an experiment. |
 | `infrastructure.py` | Provision, stop, and destroy experiment infrastructure via Compose project. |
 | `manifest.py` | Spec-0071/T3: immutable input manifests and shared append-only runtime facts. |
 | `materials.py` | Spec-0069/T1: compile operator inputs into a checksummed, credential-free run bundle. |
@@ -180,6 +181,7 @@ _User simulation, personas, and interaction evidence collection._
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | User simulation, personas, and interaction evidence collection. |
+| `patches.py` | Immutable full session predictions for post-run grading (Spec-0075/T1). |
 | `session_store.py` | 本地 SessionStore（spec-0001/T6）：一局 Session 全量落盘 + 单一总索引。 |
 
 ### auto_designer.user.sim
@@ -283,6 +285,7 @@ graph LR
     nauto_designer_experiment_controllers_unified["controllers.unified"]
     nauto_designer_experiment_dashboard["experiment.dashboard"]
     nauto_designer_experiment_engine["experiment.engine"]
+    nauto_designer_experiment_grading["experiment.grading"]
     nauto_designer_experiment_infrastructure["experiment.infrastructure"]
     nauto_designer_experiment_manifest["experiment.manifest"]
     nauto_designer_experiment_materials["experiment.materials"]
@@ -326,6 +329,7 @@ graph LR
     nauto_designer_tracker_gitea["tracker.gitea"]
     nauto_designer_usage["auto_designer.usage"]
     nauto_designer_user["auto_designer.user"]
+    nauto_designer_user_patches["user.patches"]
     nauto_designer_user_session_store["user.session_store"]
     nauto_designer_user_sim["user.sim"]
     nauto_designer_user_sim_action_space["sim.action_space"]
@@ -476,6 +480,7 @@ graph LR
     nauto_designer_experiment_cli --> nauto_designer_experiment_batch
     nauto_designer_experiment_cli --> nauto_designer_experiment_config
     nauto_designer_experiment_cli --> nauto_designer_experiment_dashboard
+    nauto_designer_experiment_cli --> nauto_designer_experiment_grading
     nauto_designer_experiment_cli --> nauto_designer_experiment_runtime
     nauto_designer_experiment_collection --> nauto_designer_experiment_config
     nauto_designer_experiment_collection --> nauto_designer_experiment_materials
@@ -527,6 +532,14 @@ graph LR
     nauto_designer_experiment_engine --> nauto_designer_experiment_config
     nauto_designer_experiment_engine --> nauto_designer_experiment_context
     nauto_designer_experiment_engine --> nauto_designer_experiment_materials
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_swebench
+    nauto_designer_experiment_grading --> nauto_designer_experiment_config
+    nauto_designer_experiment_grading --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_grading --> nauto_designer_experiment_materials
+    nauto_designer_experiment_grading --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_grading --> nauto_designer_experiment_workload
+    nauto_designer_experiment_grading --> nauto_designer_loop_recovery
+    nauto_designer_experiment_grading --> nauto_designer_models
     nauto_designer_experiment_infrastructure --> nauto_designer_experiment_config
     nauto_designer_experiment_manifest --> nauto_designer_experiment_config
     nauto_designer_experiment_materials --> nauto_designer_distill_library
@@ -580,6 +593,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_observations_preflight
     nauto_designer_loop_sim_user --> nauto_designer_tracker_base
     nauto_designer_loop_sim_user --> nauto_designer_usage
+    nauto_designer_loop_sim_user --> nauto_designer_user_patches
     nauto_designer_loop_sim_user --> nauto_designer_user_session_store
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_deps
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_dimensions

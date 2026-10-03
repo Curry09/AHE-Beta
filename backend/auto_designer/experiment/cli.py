@@ -124,6 +124,16 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--host", default="127.0.0.1")
     dashboard.add_argument("--port", type=int, default=8000)
     dashboard.add_argument("--secrets-file", type=Path, default=argparse.SUPPRESS)
+    # Spec-0075/T3: post-run grading never starts a controller or reads credentials.
+    grade = sub.add_parser(
+        "grade", help="Grade collected SWE predictions with the official harness"
+    )
+    grade.add_argument("run_id")
+    grade.add_argument("--dataset", type=Path, required=True)
+    grade.add_argument("--dataset-sha256", required=True)
+    grade.add_argument("--round", dest="round_no", type=int)
+    grade.add_argument("--timeout-seconds", type=int, default=1800)
+    grade.add_argument("--offline", action="store_true")
     # Spec-0074/T3: explicit lists, without a second launcher or executor DSL.
     batch = sub.add_parser("batch", help="Manage a frozen list of experiment configurations")
     commands = batch.add_subparsers(dest="batch_cmd", required=True)
@@ -152,6 +162,20 @@ def dispatch(argv: list[str] | None = None) -> int:
             _emit(payload=result, as_json=args.json)
             if result.get("batch_state") == "INTERRUPTED":
                 return 130
+            return 1 if result.get("ok") is False else 0
+        elif args.cmd == "grade":
+            from auto_designer.experiment.grading import grade_run
+
+            result = grade_run(
+                run_id=args.run_id,
+                root=args.runs_dir,
+                dataset=args.dataset,
+                dataset_sha256=args.dataset_sha256,
+                round_no=args.round_no,
+                timeout_seconds=args.timeout_seconds,
+                offline=args.offline,
+            )
+            _emit(payload=result, as_json=args.json)
             return 1 if result.get("ok") is False else 0
         elif args.cmd == "check":
             result = runtime.check_v2(

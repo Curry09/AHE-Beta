@@ -34,6 +34,7 @@ from auto_designer.models import (
 )
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.usage import bind_usage_context, current_usage_context
+from auto_designer.user.patches import preserve_prediction
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.dimensions import Persona as SimPersona
@@ -103,6 +104,62 @@ def _audit_events(
             },
         )
     return events
+
+
+def _freeze_prediction_base(workspace: Workspace) -> None:
+    """Freeze before any Harness tools, without extending legacy runtime protocols."""
+    freeze = getattr(workspace, "freeze_patch_base", None)
+    if not callable(freeze):
+        return
+    try:
+        freeze()
+    except Exception as exc:  # noqa: BLE001 - still retain user interaction and failure evidence
+        workspace.evidence["diff_base_error"] = type(exc).__name__
+
+
+def _export_prediction(
+    *, workspace: Workspace, store: SessionStore, session_id: str, evidence: dict
+) -> tuple[str, str]:
+    """Spec-0075/T1: export and preserve full bytes before session save/cleanup."""
+    evidence.update(dict(getattr(workspace, "evidence", {}) or {}))
+    evidence.pop("prediction", None)
+    try:
+        if evidence.get("diff_base_error"):
+            raise RuntimeError("original patch base could not be captured")
+        patch, patch_sha = workspace.export_patch()
+    except Exception as exc:  # noqa: BLE001 - retain the session without a fake prediction
+        evidence["patch_export_error"] = str(exc)
+        evidence["prediction_error"] = {"status": "export_failed", "error_type": type(exc).__name__}
+        for key in (
+            "diff_sha256",
+            "diff_bytes",
+            "patch_sha256",
+            "patch_bytes",
+            "patch_exported_at",
+        ):
+            evidence.pop(key, None)
+        return "", ""
+    try:
+        receipt = preserve_prediction(
+            sessions_root=store.root, session_id=session_id, patch=patch, patch_sha256=patch_sha
+        )
+    except Exception as exc:  # noqa: BLE001 - write/digest failure must not claim persistence
+        evidence["prediction_error"] = {
+            "status": "preservation_failed",
+            "error_type": type(exc).__name__,
+        }
+    else:
+        evidence["prediction"] = receipt
+        evidence.pop("prediction_error", None)
+    evidence.pop("patch_export_error", None)
+    evidence.update(
+        {
+            "diff_sha256": patch_sha,
+            "diff_bytes": len(patch.encode("utf-8")),
+            "patch_exported_at": utc_now(),
+        }
+    )
+    return patch, patch_sha
 
 
 def result_to_turns(res: SessionResult) -> list[Turn]:
@@ -318,6 +375,8 @@ def make_sim_run_session_fn(
             # 使这条生产接缝「建了工作区即备好依赖」，不静默缺依赖。orchestrator 已传 workspace_dir
             # 的主路径依赖由 orchestrator 就位，故仅在此回落分支 ensure，不重复调。
             ensure_deps(ws, scenario.workspace)
+        if ws is not None:
+            _freeze_prediction_base(ws)
         if ws is not None and hasattr(client, "bind_session"):
             client.bind_session(persona=sim_persona, workspace_dir=ws)
 
@@ -373,20 +432,21 @@ def make_sim_run_session_fn(
         patch = ""
         patch_sha = ""
         workspace_evidence: dict = {}
+        if ws is None:
+            workspace_evidence["prediction_error"] = {
+                "status": "unavailable",
+                "reason": "no_workspace",
+            }
         if ws is not None:
-            try:
-                patch, patch_sha = ws.export_patch()
-                workspace_evidence["patch_exported_at"] = utc_now()
-            except Exception as exc:  # noqa: BLE001 - evidence must fail closed
-                workspace_evidence["patch_export_error"] = str(exc)
-            workspace_evidence.update(dict(getattr(ws, "evidence", {}) or {}))
-            if patch_sha:
-                workspace_evidence["diff_sha256"] = patch_sha
-                workspace_evidence["diff_bytes"] = len(patch.encode())
+            patch, patch_sha = _export_prediction(
+                workspace=ws, store=store, session_id=session_id, evidence=workspace_evidence
+            )
             # The interaction boundary is no longer needed once its patch is exported.
             # Close before the fresh official evaluation so stop evidence is durable.
             ws.close()
-            workspace_evidence.update(dict(getattr(ws, "evidence", {}) or {}))
+            for key, value in dict(getattr(ws, "evidence", {}) or {}).items():
+                if key not in {"prediction", "diff_sha256", "diff_bytes"}:
+                    workspace_evidence[key] = value
 
         objective_evaluation = None
         active_evaluator = evaluator if evaluator is not None else SWEbenchEvaluator.from_env()
@@ -525,6 +585,8 @@ def make_direct_run_session_fn(
         harness_error: str | None = None
         workspace_evidence: dict = {}
         patch_text = ""
+        if workspace_dir is not None:
+            _freeze_prediction_base(workspace_dir)
         try:
             connector.reset()
             with bind_usage_context(
@@ -548,20 +610,23 @@ def make_direct_run_session_fn(
                         root=observation_root, session_id=session_id
                     )
 
+        if workspace_dir is None:
+            workspace_evidence["prediction_error"] = {
+                "status": "unavailable",
+                "reason": "no_workspace",
+            }
         if workspace_dir is not None:
-            try:
-                patch, patch_sha = workspace_dir.export_patch()
-                patch_text = patch[:12_000]
+            patch, patch_sha = _export_prediction(
+                workspace=workspace_dir,
+                store=store,
+                session_id=session_id,
+                evidence=workspace_evidence,
+            )
+            patch_text = patch[:12_000]
+            if patch_sha:
                 workspace_evidence.update(
-                    {
-                        "patch_sha256": patch_sha,
-                        "patch_bytes": len(patch.encode()),
-                        "patch_exported_at": utc_now(),
-                    }
+                    {"patch_sha256": patch_sha, "patch_bytes": len(patch.encode())}
                 )
-            except Exception as exc:  # noqa: BLE001 - evidence is still retained
-                workspace_evidence["patch_export_error"] = str(exc)
-            workspace_evidence.update(dict(getattr(workspace_dir, "evidence", {}) or {}))
 
         # Direct mode still has a user-side terminal review. It is deliberately
         # one bounded persona call after the harness reply: no tool/heartbeat/

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
+import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import uuid
@@ -73,6 +76,26 @@ class SWEbenchEvaluator:
         return cls(dataset, root)
 
     @staticmethod
+    def preflight() -> str | None:
+        """Spec-0075/T2: check optional runtime and Docker without allocating instances."""
+        try:
+            if importlib.util.find_spec("swebench") is None:
+                return "evaluation extra is not installed"
+            if importlib.metadata.version("swebench") != "4.1.0":
+                return "evaluation requires locked swebench 4.1.0"
+            result = subprocess.run(
+                ["docker", "info", "--format", "{{.ServerVersion}}"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                return "Docker daemon is unavailable"
+        except (OSError, subprocess.TimeoutExpired, importlib.metadata.PackageNotFoundError):
+            return "evaluation dependencies or Docker are unavailable"
+        return None
+
+    @staticmethod
     def image_for(instance_id: str) -> str:
         safe = instance_id.replace("__", "_1776_")
         return f"swebench/sweb.eval.x86_64.{safe}:latest"
@@ -137,6 +160,10 @@ class SWEbenchEvaluator:
             "run_id": run_id,
             "dataset": str(self.dataset_path),
             "evaluation_dataset": str(evaluation_dataset),
+            "evaluation_dataset_sha256": hashlib.sha256(
+                evaluation_dataset.read_bytes()
+            ).hexdigest(),
+            "prediction_sha256": hashlib.sha256(prediction_path.read_bytes()).hexdigest(),
             "image": image,
             "fresh": True,
             "patch_sha256": patch_sha,
@@ -171,12 +198,33 @@ class SWEbenchEvaluator:
         ]
         evidence["command"] = command
         try:
+            evidence["evaluator_version"] = importlib.metadata.version("swebench")
+        except importlib.metadata.PackageNotFoundError:
+            evidence["evaluator_version"] = "unavailable"
+        try:
             proc = subprocess.run(
                 command,
                 cwd=run_root,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout + 300,
+                env={
+                    key: value
+                    for key, value in os.environ.items()
+                    if key
+                    in {
+                        "PATH",
+                        "HOME",
+                        "LANG",
+                        "LC_ALL",
+                        "TMPDIR",
+                        "SYSTEMROOT",
+                        "DOCKER_HOST",
+                        "DOCKER_TLS_VERIFY",
+                        "DOCKER_CERT_PATH",
+                        "DOCKER_CONFIG",
+                    }
+                },
             )
         except subprocess.TimeoutExpired as exc:
             return {
@@ -193,7 +241,7 @@ class SWEbenchEvaluator:
         if report_path.is_file():
             try:
                 report = json.loads(report_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, UnicodeError, OSError):
                 report = None
         if proc.returncode != 0 or not isinstance(report, dict):
             return {
@@ -207,7 +255,55 @@ class SWEbenchEvaluator:
                 "stderr": proc.stderr[-20_000:],
                 "finished_at": _now(),
             }
-        passed = instance_id in set(report.get("resolved_ids") or [])
+        # Spec-0075/T2: absence from resolved is not evidence of an official failure.
+        classification = _report_outcome(report=report, instance_id=instance_id)
+        # Spec-0075/T2: official 4.1 can label a pytest startup failure unresolved.
+        # A summary without executed tests must not become a technical failure score.
+        startup_error = _official_test_start_error(
+            run_root=run_root, run_id=run_id, instance_id=instance_id
+        )
+        if startup_error is not None:
+            return {
+                **evidence,
+                "status": "crashed",
+                "passed": False,
+                "exit_code": proc.returncode,
+                "stdout": proc.stdout[-20_000:],
+                "stderr": proc.stderr[-20_000:],
+                "official_report_path": str(report_path),
+                "official_report": report,
+                "reason": "official_test_start_failed",
+                "test_start_error": startup_error,
+                "finished_at": _now(),
+            }
+        if classification is None:
+            return {
+                **evidence,
+                "status": "crashed",
+                "passed": False,
+                "exit_code": proc.returncode,
+                "stdout": proc.stdout[-20_000:],
+                "stderr": proc.stderr[-20_000:],
+                "official_report_path": str(report_path),
+                "official_report": report,
+                "reason": "unclassified_official_report",
+                "finished_at": _now(),
+            }
+        if classification == "empty":
+            return {
+                **evidence,
+                "status": "not_evaluated",
+                "passed": None,
+                "fresh": False,
+                "reason": "official_empty_prediction",
+                "exit_code": proc.returncode,
+                "stdout": proc.stdout[-20_000:],
+                "stderr": proc.stderr[-20_000:],
+                "official_report_path": str(report_path),
+                "official_report": report,
+                "finished_at": _now(),
+            }
+        passed = classification
         return {
             **evidence,
             "status": "completed",
@@ -219,3 +315,55 @@ class SWEbenchEvaluator:
             "official_report": report,
             "finished_at": _now(),
         }
+
+
+def _official_test_start_error(*, run_root: Path, run_id: str, instance_id: str) -> str | None:
+    """Identify explicit pytest startup diagnostics, without replacing official grading."""
+    output_path = (
+        run_root
+        / "logs/run_evaluation"
+        / run_id
+        / "auto-designer"
+        / instance_id
+        / "test_output.txt"
+    )
+    if not output_path.resolve().is_relative_to(run_root.resolve()) or not output_path.is_file():
+        return None
+    output = output_path.read_text(encoding="utf-8", errors="replace")
+    if ">>>>> Start Test Output" not in output:
+        return None
+    section = output.split(">>>>> Start Test Output", 1)[1].split(">>>>> End Test Output", 1)[0]
+    for line in section.splitlines():
+        if re.match(r"^(?:ImportError while loading conftest|(?:_+ )?ERROR collecting )", line):
+            return line[:500]
+    return None
+
+
+def _report_outcome(*, report: dict[str, Any], instance_id: str) -> bool | str | None:
+    """Accept an explicit resolved/unresolved target only, rejecting error/incomplete rows."""
+    sets: dict[str, set[str]] = {}
+    for key in (
+        "resolved_ids",
+        "unresolved_ids",
+        "error_ids",
+        "incomplete_ids",
+        "missing_ids",
+        "empty_patch_ids",
+    ):
+        values = report.get(key, [])
+        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+            return None
+        if len(set(values)) != len(values):
+            return None
+        sets[key] = set(values)
+    if any(instance_id in sets[key] for key in ("error_ids", "incomplete_ids", "missing_ids")):
+        return None
+    resolved = instance_id in sets["resolved_ids"]
+    unresolved = instance_id in sets["unresolved_ids"]
+    # SWE-bench 4.1 reporting explicitly skips empty patches before fresh execution.
+    # https://github.com/SWE-bench/SWE-bench/blob/v4.1.0/swebench/harness/reporting.py
+    if instance_id in sets["empty_patch_ids"]:
+        return "empty" if not resolved and not unresolved else None
+    if resolved == unresolved:
+        return None
+    return resolved

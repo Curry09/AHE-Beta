@@ -9,6 +9,74 @@ from auto_designer.experiment import cli, runtime
 from auto_designer.experiment.config import ConfigError
 
 
+@pytest.mark.parametrize("offline", [False, True])
+def test_grade_routes_pinned_dataset_without_credentials(monkeypatch, capsys, tmp_path, offline):
+    # Spec-0075/T3: global credentials are deliberately absent from the grading API.
+    from auto_designer.experiment import grading
+
+    seen = {}
+
+    def grade(**kwargs):
+        seen.update(kwargs)
+        return {"ok": True, "run_id": kwargs["run_id"], "offline": kwargs["offline"]}
+
+    monkeypatch.setattr(grading, "grade_run", grade)
+    arguments = [
+        "--json",
+        "--runs-dir",
+        str(tmp_path),
+        "--secrets-file",
+        "/does-not-exist.env",
+        "grade",
+        "same-run",
+        "--dataset",
+        "verified.json",
+        "--dataset-sha256",
+        "a" * 64,
+        "--round",
+        "2",
+        "--timeout-seconds",
+        "60",
+    ]
+    if offline:
+        arguments.append("--offline")
+    assert cli.dispatch(arguments) == 0
+    assert seen == {
+        "run_id": "same-run",
+        "root": tmp_path,
+        "dataset": Path("verified.json"),
+        "dataset_sha256": "a" * 64,
+        "round_no": 2,
+        "timeout_seconds": 60,
+        "offline": offline,
+    }
+    assert json.loads(capsys.readouterr().out)["ok"] is True
+
+
+def test_grade_incomplete_evidence_returns_business_failure(monkeypatch, capsys):
+    from auto_designer.experiment import grading
+
+    monkeypatch.setattr(
+        grading, "grade_run", lambda **kwargs: {"ok": False, "entries": [{"status": "ungradable"}]}
+    )
+    assert (
+        cli.dispatch(
+            ["--json", "grade", "same-run", "--dataset", "d.json", "--dataset-sha256", "a" * 64]
+        )
+        == 1
+    )
+    assert json.loads(capsys.readouterr().out)["entries"][0]["status"] == "ungradable"
+
+
+def test_grade_defaults_to_last_round(monkeypatch):
+    from auto_designer.experiment import grading
+
+    seen = {}
+    monkeypatch.setattr(grading, "grade_run", lambda **kwargs: seen.update(kwargs) or {"ok": True})
+    assert cli.dispatch(["grade", "run", "--dataset", "d.json", "--dataset-sha256", "a" * 64]) == 0
+    assert seen["round_no"] is None and seen["timeout_seconds"] == 1800
+
+
 @pytest.mark.parametrize("command", ["create", "plan", "preflight", "start", "archive"])
 def test_retired_commands_reject_before_runtime(command, monkeypatch):
     # Spec-0071/T3: old commands cannot provision anything through an alias.

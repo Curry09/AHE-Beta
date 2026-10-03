@@ -75,6 +75,19 @@ stop 保留实验身份、仓库与 recovery checkpoint。本地会停止 Gitea/
 
 [完整 N=1 教程](tutorials/n1-experiment.zh-CN.md)说明所有输入、预期结果、中断边界和证据；[多用户教程](tutorials/multi-user-experiment.zh-CN.md)提供两个任务、固定跨轮计划和停止/恢复的 N4 流程；实际验证结果见[N1 报告](validation/spec-0069-new-user.md)和[多用户报告](validation/spec0073-multi-task-users.md)。
 
+## 对已保存的 SWE 任务补丁评分
+
+终态完整收集后，安装 evaluation extra，独立提供经过核验的本地官方数据集。local 与 E2B 归档都在本机用 Docker 评分；`grade` 不需要模型或 provider 凭证。
+
+```bash
+uv sync --locked --extra experiments --extra dev --extra evaluation
+DATASET=/absolute/path/to/official-dataset.parquet
+DATASET_SHA256=REPLACE_WITH_VERIFIED_SHA256
+uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py grade "$RUN_ID" --dataset "$DATASET" --dataset-sha256 "$DATASET_SHA256" --offline
+```
+
+删除同一命令的 `--offline` 即执行官方新容器评分。默认选择配置的末轮；`--round 1` 可选择更早的已封口轮次。它评的是用户任务补丁，不是新的 Harness 留出测试，结果不进入演化循环。每次评分保留原实验产物；没有完整预测回执的旧控制器需新跑实验。数据集格式、哈希、输出和失败状态见[评分教程](tutorials/post-run-grading.zh-CN.md)。
+
 ## 运行一组实验
 
 填好同一份 `.env.experiment` 后，选择批次列表，替代单个实验配置：
