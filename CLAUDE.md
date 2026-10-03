@@ -7,13 +7,16 @@
 2. `nexau` 作为 agent 实现，同时兼容 claude code / codex 接入。
 
 ### 项目文档
-用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；支持冻结任务列表、同任务多用户与 ordinary/SWE 混合计划；N1/N4 公开示例涵盖两后端。历史产物导入追加轮仍未接入。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
+用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；支持冻结任务列表、同任务多用户与 ordinary/SWE 混合计划；N1/N4 公开示例涵盖两后端。带当前 continuation export 的完整归档可通过同入口继承到新 run 追加轮次，双语教程见 docs/tutorials/experiment-continuation.md / .zh-CN.md。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
 完整实验列表通过同入口的 batch check/prepare/run/status/stop/resume/collect 管理，成员仍沿用单 run 身份与冻结配置。实验后官方 SWE 任务评分使用 grade RUN_ID --dataset PATH --dataset-sha256 SHA；两后端均完整 collect 后在本机 Docker 评分，--offline 只校验输入。新会话原子保存完整 patch 与 receipt；旧冻结 controller 的 hash-only 预测不补造。每次评分写独立 evaluation attempt，不改 Session、manifest、checkpoint、seal 或 archive；不读取 provider 凭证，不把 gold/test 数据或分数送回演化。evaluation.official_grading 继续 false；这些用户任务成绩与独立 held-out Harness 泛化评估分开。双语教程见 docs/tutorials/post-run-grading.md / .zh-CN.md。
 
-旧 seed 卡库与自有文本通过统一入口的 task import-seeds LIBRARY --output DIR [--seed ID ...] / task from-text --instruction PATH --id ID --output DIR --not-in-benchmark 转为 ordinary v1 包；两者支持 --interaction direct|simulated_user 和父级 --json。转换不联网、不读模型/provider 凭证、不执行 setup。JSON 结果提供绝对 task_packages 数组，应移除旧 workload.kind/task_package/interaction_plan 后接入 workload.task_packages；tasks.json 仅为输出目录相对路径索引，不是新的运行入口。无 repo 使用带初始 README 的 scratch，不携带答案。oracle、env.test_cmd、gates、provenance 不复制到包或 sidecar；旧 setup 不自动锁依赖，旧镜像、外部服务不自动复现。公开 examples/seed-inputs/ 仅放明确非 benchmark 的小型合成卡与用户指令；历史七卡留在研究归档。双语教程见 docs/tutorials/seed-task-import.md / .zh-CN.md，实验仍走 check/prepare/run。历史 continuation 仍待设计；转换和离线检查不证明真实双 provider 实验或任务通过，实际 local 会话验收见 docs/validation/seed-task-import.md。
+旧 seed 卡库与自有文本通过统一入口的 task import-seeds LIBRARY --output DIR [--seed ID ...] / task from-text --instruction PATH --id ID --output DIR --not-in-benchmark 转为 ordinary v1 包；两者支持 --interaction direct|simulated_user 和父级 --json。转换不联网、不读模型/provider 凭证、不执行 setup。JSON 结果提供绝对 task_packages 数组，应移除旧 workload.kind/task_package/interaction_plan 后接入 workload.task_packages；tasks.json 仅为输出目录相对路径索引，不是新的运行入口。无 repo 使用带初始 README 的 scratch，不携带答案。oracle、env.test_cmd、gates、provenance 不复制到包或 sidecar；旧 setup 不自动锁依赖，旧镜像、外部服务不自动复现。公开 examples/seed-inputs/ 仅放明确非 benchmark 的小型合成卡与用户指令；历史七卡留在研究归档。双语教程见 docs/tutorials/seed-task-import.md / .zh-CN.md，实验仍走 check/prepare/run。seed 转换与归档 continuation 是两个输入功能；转换和离线检查不证明真实双 provider 实验或任务通过，实际 local 会话验收见 docs/validation/seed-task-import.md。
 
 local + localhost 的工程 CI 由 runtime.local.ci_enabled=true 可选开启，默认关闭，不改旧冻结 run；E2B CI 不支持。runner_image、ci_job_image 可选且只在开启时允许，必须带显式版本或摘要，不能用 :latest；默认镜像及实际 image ID 按 run 固定；内部 docker:27.5.1-dind daemon 配方也固定实际 image ID。冻结 Harness 需有 ubuntu-latest PR 工作流；后端核验专属 runner 身份并通过真实 PR checkout/Python smoke 后才发就绪收据，context 仅接受匹配的已核验收据以设置 OpenAgents ci:agent，失败不降级 skip。status/collect 保存 CI 就绪与当前 main/PR SHA 状态，不沿用旧 head 绿灯。每个 run 独占自己的 privileged Docker daemon、job 存储及工具缓存，runner 通过内部 DOCKER_HOST 连接，不挂宿主 Docker socket、不发布 daemon 宿主端口；job 的 host 网络属于私有 daemon 的网络命名空间。stop 处理所属 runner/job 并停止 daemon，保留恢复数据；resume 复用 daemon/存储/注册并重验；destroy 移除有所有权证据的执行资源与 CI job 存储，明确保留 Gitea 和 runner 私密注册卷；注册凭据不进入普通归档。此配置用于可信 Harness 工程代码，不提供恶意代码隔离；CI 不调模型、不跑 benchmark，与事后 SWE grade 和 Harness 留出评估分开。双语教程见 docs/tutorials/local-engineering-ci.md / .zh-CN.md；真实验收范围以 docs/validation/local-engineering-ci.md 为准，人工红绿对照不能称作模型自动修复。
+
+### 当前归档追加
+当前归档 continuation 使用 harness.source=continuation、workload.source=parent 和 archive/sha256 三项来源声明创建新 run，不修改父配置后 resume。父末轮配对、材料、persona 和完整会话按冻结 hash 继承，count 只表示新增用户轮。先以独立 checkpoints/continuation-bootstrap 恢复域处理父反馈并交付，再运行本次 1..N 用户轮；两阶段共用 loop/feedback_pipeline，最后新增轮仍只用户。父会话不进入子 SessionStore 索引或新增指标，报告通过 source namespace/issue map 进入新仓，observations 保留原身份并重新授予访问。父 commit 与子 seed commit SHA 不同，但按 inventory 精确构造同一 tree；collector 不用工作树 HEAD 猜最终代码。当前 export/schema 和 source validator 是唯一契约，不增旧格式 adapter、转调脚本或第二套监督器。子 collect 可再次继承，逻辑轮号累计，grade/batch 仍用本地轮号；全链路真实覆盖见 docs/validation/experiment-continuation.md，不能以零准入或离线合同测试冒充真实代码交付。
 
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
@@ -72,7 +75,7 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 - **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
 
 ### 闭环
-`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；`TOTAL_ROUNDS=1` 不启 vigil。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。新 workload contract 1 由监督器启动 `auto_designer.experiment.controllers.unified`；旧 schema-2 module/script run 从原 archive 配方执行；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
+`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；普通 `TOTAL_ROUNDS=1` 不启 vigil；continuation 初始化按统一 delivery_required 语义启用交付，即使只追加一个用户轮。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。新 workload contract 1 由监督器启动 `auto_designer.experiment.controllers.unified`；旧 schema-2 module/script run 从原 archive 配方执行；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
 
 ### 目录结构
 前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 提供只读观测看板，项目级文档/工具与配置留根。
@@ -80,7 +83,7 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 backend/                 # 后端（编排框架）
   auto_designer/         # 包（编排框架本体）
     experiment/          # v2 配置、材料冻结、local/E2B 生命周期与监督器
-      controllers/       # unified.py + runtime.py：统一控制器与共享设施，不是公开入口
+      controllers/       # unified.py + feedback.py + runtime.py：统一装配与共享设施，不是公开入口
     models.py            # 共享数据结构（两侧共用）
     nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
     harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)

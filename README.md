@@ -15,7 +15,7 @@ Current code and development configuration use `synthesizer`, `N_SYNTHESIZERS`, 
 
 ## Run an experiment
 
-Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use `backend/scripts/experiment.py` and the same v2 experiment format. Use the N1 examples for one user on one task, or the N4 examples for four users on ordinary and SWE tasks. Each round may repeat a task with distinct personas; sessions have independent writable workspaces. Importing historical results to append a round is still unsupported. The checked-in N=1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
+Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use `backend/scripts/experiment.py` and the same v2 experiment format. Use the N1 examples for one user on one task, or the N4 examples for four users on ordinary and SWE tasks. Each round may repeat a task with distinct personas; sessions have independent writable workspaces. Use a complete current archive to [append new rounds](docs/tutorials/experiment-continuation.md) in a new run, with delivery of its final feedback before new users start. The checked-in N=1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
 
 ```bash
 uv sync --locked --extra experiments
@@ -82,4 +82,4 @@ research/archives/                      # Frozen historical research records
 
 Project code is licensed under the [MIT License](LICENSE). Third-party material retains its own terms; see [THIRD_PARTY.md](THIRD_PARTY.md).
 
-The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/N4/N8 uses the same frozen workload contract; historical round import remains pending. See [multi-user validation](docs/validation/spec0073-multi-task-users.md).
+The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/N4/N8 uses the same frozen workload contract; current archives with a continuation export can seed a new run with additional rounds. See the [continuation tutorial](docs/tutorials/experiment-continuation.md). See [multi-user validation](docs/validation/spec0073-multi-task-users.md).

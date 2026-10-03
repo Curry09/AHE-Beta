@@ -736,3 +736,33 @@ def test_recovery_reuses_saved_output_after_previous_tracker_outage(tmp_path, mo
     assert result.accepted == [number] and result.failed == {}
     assert resumed.agent_calls == 0
     assert len(tracker.issue(number)["comments"]) == 1
+
+
+def test_imported_feedback_uses_its_actual_stage_dependency(tmp_path):
+    """Spec-0079/T3: role-level recovery must agree with bootstrap's stage DAG."""
+    tracker = FakeTracker()
+    number = _report(tracker, "historical report")
+    triager = _triager(
+        tmp_path,
+        tracker,
+        _submit([{"issue": number, "disposition": "reject", "reason": "duplicate"}]),
+    )
+    recovery = RecoveryStore.initialize(
+        root=tmp_path / "bootstrap",
+        identity=RecoveryIdentity("exp", "child", "config", "controller", "bootstrap"),
+    )
+    recovery.freeze_round(round_no=1, user_sha="seed", plan=[])
+    key = operation_key("feedback-imported")
+    recovery.begin_unit(round_no=1, stage="feedback_imported", key=key, input_value={})
+    recovery.complete_unit(round_no=1, stage="feedback_imported", key=key)
+    recovery.complete_stage(round_no=1, stage="feedback_imported")
+    triager.bind_recovery(recovery)
+    triager.bind_feedback_dependency("feedback_imported")
+    with bind_usage_context(round_no=1, operation="continuation-bootstrap-triage"):
+        result = triager.triage_once()
+    assert result.rejected == [number]
+    state = recovery.round_state(round_no=1)
+    assert state["stages"]["triage"]["dependencies"] == ["feedback_imported"]
+    assert "users" not in state["stages"]
+    triager.bind_feedback_dependency("users")
+    assert triager._feedback_dependency == "users"

@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import subprocess
 import threading
@@ -22,15 +21,15 @@ from auto_designer.demand.divergent import Divergent
 from auto_designer.demand.synthesizer import Synthesizer
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
+from auto_designer.loop.feedback_pipeline import FeedbackPipeline, _result_payload
 from auto_designer.loop.recovery import (
     RecoveryConflictError,
     RecoveryIdentity,
     RecoveryStore,
     operation_key,
 )
-from auto_designer.loop.round_gate import RoundDeliveryBlocked, classify_issue, wait_round_delivery
+from auto_designer.loop.round_gate import RoundDeliveryBlocked, wait_round_delivery
 from auto_designer.models import (
-    OpenIssue,
     Persona,
     SeedScenario,
     Session,
@@ -44,31 +43,6 @@ from auto_designer.user.sim.workspace import materialize as materialize_workspac
 
 type SessionPair = tuple[Persona, SeedScenario]
 type SessionPlan = Sequence[SessionPair] | Callable[[], Sequence[SessionPair]]
-
-
-def _result_payload(value: Any) -> Any:
-    """Convert role/session returns into deterministic JSON receipts."""
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return _result_payload(dataclasses.asdict(value))
-    if isinstance(value, Mapping):
-        return {str(key): _result_payload(item) for key, item in value.items()}
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [_result_payload(item) for item in value]
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    for method_name in ("model_dump", "to_dict"):
-        method = getattr(value, method_name, None)
-        if callable(method):
-            return _result_payload(method())
-    return {"type": f"{type(value).__module__}.{type(value).__qualname__}"}
-
-
-def _issue_labels(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [
-        str(item.get("name") or "") if isinstance(item, Mapping) else str(item) for item in value
-    ]
 
 
 class SessionRunner(Protocol):
@@ -151,11 +125,21 @@ class Orchestrator:
         self._resolve_session = resolve_session
         self._task_kinds = dict(task_kinds or {})
         self._on_session_event = on_session_event
-        if recovery is not None:
-            for role in [*self._triagers, *self._divergents, *self._synthesizers, self._owner]:
-                bind_recovery = getattr(role, "bind_recovery", None)
-                if callable(bind_recovery):
-                    bind_recovery(recovery)
+        self._feedback_pipeline = self._make_feedback_pipeline() if recovery is not None else None
+
+    def _make_feedback_pipeline(self) -> FeedbackPipeline:
+        return FeedbackPipeline(
+            recovery=self._require_recovery(),
+            triagers=self._triagers,
+            synthesizers=self._synthesizers,
+            divergents=self._divergents,
+            owner=self._owner,
+            resolve_head=lambda: self._resolve_head(ref=self._initial_ref),
+            assert_descendant=self._assert_descendant,
+            integrity_guard=self._integrity_guard,
+            fetch_issue=self._fetch_issue,
+            wait_delivery=self._wait_delivery,
+        )
 
     @property
     def recovery_enabled(self) -> bool:
@@ -171,6 +155,7 @@ class Orchestrator:
             return
         identity = RecoveryIdentity(**self._recovery.snapshot()["identity"])
         self._recovery = RecoveryStore.open(root=self._recovery.root, identity=identity)
+        self._feedback_pipeline = self._make_feedback_pipeline()
 
     def recovery_phase(self, *, round_no: int) -> str:
         """Return the first incomplete durable stage for the legacy RunState projection."""
@@ -426,26 +411,10 @@ class Orchestrator:
             bindings=plan_payload if self._frozen_session_plan is not None else None,
         )
 
+        assert self._feedback_pipeline is not None
         if deliver:
-            self._run_recovery_demand(round_no=round_no)
-            admitted = self._run_recovery_owner(round_no=round_no)
-            self._run_recovery_delivery(round_no=round_no, admitted=admitted)
-            seal_dependencies = ("delivery_wait",)
-        else:
-            seal_dependencies = ("users",)
-
-        if self._integrity_guard is not None:
-            self._integrity_guard()
-        sealed_sha = self._resolve_head(ref=self._initial_ref)
-        self._assert_descendant(ancestor=user_sha, descendant=sealed_sha)
-        self._mark_recovery_stage(
-            round_no=round_no,
-            stage="round_sealed",
-            input_value={"user_sha": user_sha, "sealed_sha": sealed_sha},
-            dependencies=seal_dependencies,
-        )
-        recovery.seal_round(round_no=round_no, sealed_sha=sealed_sha)
-        return sealed_sha
+            return self._feedback_pipeline.run(round_no=round_no, user_sha=user_sha)
+        return self._feedback_pipeline.seal(round_no=round_no, user_sha=user_sha)
 
     def _logical_plan(self, *, round_no: int) -> list[dict[str, Any]]:
         """Spec-0073/T4: use the same immutable binding for round, key and input."""
@@ -646,328 +615,6 @@ class Orchestrator:
             raise RoundDeliveryBlocked(numbers=[], reason="user-sessions-incomplete")
         recovery.complete_stage(round_no=round_no, stage="users")
 
-    def _run_recovery_demand(self, *, round_no: int) -> None:
-        recovery = self._require_recovery()
-        triage_jobs: list[tuple[str, str, Any, Callable[[], object]]] = []
-        n_triagers = len(self._triagers)
-        pending_shards: list[list[OpenIssue]] | None = None
-        if n_triagers and recovery.stage_status(round_no=round_no, stage="triage") == "pending":
-            if hasattr(self._triagers[0], "snapshot_pending"):
-                pending = self._triagers[0].snapshot_pending()
-                pending_shards = [pending[index::n_triagers] for index in range(n_triagers)]
-        for index, triager in enumerate(self._triagers):
-            key = operation_key(round_no, "triage", index)
-            existing = recovery.unit(round_no=round_no, stage="triage", key=key)
-            if existing is not None:
-                triage_input = existing["input"]
-            elif pending_shards is not None:
-                triage_input = {
-                    "worker": index,
-                    "mode": "snapshot",
-                    "pending": [issue.to_dict() for issue in pending_shards[index]],
-                }
-            else:
-                triage_input = {
-                    "worker": index,
-                    "mode": "shard",
-                    "shard": [index, n_triagers],
-                }
-            if triage_input["mode"] == "snapshot":
-                frozen_pending = [OpenIssue.from_dict(item) for item in triage_input["pending"]]
-
-                def call(t=triager, p=frozen_pending):
-                    return t.triage_once(pending=p)
-
-            else:
-                shard = tuple(triage_input["shard"])
-
-                def call(t=triager, s=shard):
-                    return t.triage_once(shard=s)
-
-            triage_jobs.append((f"triage[{index}]", key, triage_input, call))
-        self._run_recovery_jobs(
-            round_no=round_no,
-            stage="triage",
-            jobs=triage_jobs,
-            dependencies=("users",),
-        )
-
-        divergent_jobs = [
-            (
-                f"divergent[{index}]",
-                operation_key(round_no, "divergent", index),
-                {"worker": index},
-                divergent.propose_once,
-            )
-            for index, divergent in enumerate(self._divergents)
-        ]
-        self._run_recovery_jobs(
-            round_no=round_no,
-            stage="divergent",
-            jobs=divergent_jobs,
-            dependencies=("users",),
-        )
-
-        synthesizer_jobs = [
-            (
-                f"synthesizer[{index}]",
-                operation_key(round_no, "synthesizer", index),
-                {"worker": index},
-                synthesizer.propose_once,
-            )
-            for index, synthesizer in enumerate(self._synthesizers)
-        ]
-        self._run_recovery_jobs(
-            round_no=round_no,
-            stage="synthesizer",
-            jobs=synthesizer_jobs,
-            dependencies=("triage",),
-        )
-
-    def _run_recovery_owner(self, *, round_no: int) -> list[int]:
-        recovery = self._require_recovery()
-        round_state = recovery.round_state(round_no=round_no) or {}
-        if recovery.stage_status(round_no=round_no, stage="owner") == "completed":
-            return [int(number) for number in round_state.get("admitted_issue_ids") or []]
-        if self._owner is None:
-            recovery.set_admitted_issue_ids(round_no=round_no, issue_ids=[])
-            self._mark_recovery_stage(
-                round_no=round_no,
-                stage="owner",
-                input_value={"owner": None},
-                dependencies=("divergent", "synthesizer"),
-            )
-            return []
-        key = operation_key(round_no, "owner")
-        unit = recovery.begin_unit(
-            round_no=round_no,
-            stage="owner",
-            key=key,
-            input_value={"round": round_no},
-            expected_postconditions={"completed": True},
-            dependencies=("divergent", "synthesizer"),
-        )
-        if unit.get("status") == "completed":
-            return [int(number) for number in round_state.get("admitted_issue_ids") or []]
-        try:
-            outcome = self._owner.admit_once()
-            admitted = sorted(set(int(n) for n in (getattr(outcome, "admitted", None) or [])))
-            recovery.save_output(
-                round_no=round_no,
-                stage="owner",
-                key=key,
-                output=_result_payload(outcome),
-            )
-            recovery.set_admitted_issue_ids(round_no=round_no, issue_ids=admitted)
-            recovery.complete_unit(
-                round_no=round_no,
-                stage="owner",
-                key=key,
-                observed_postconditions={"completed": True},
-            )
-            recovery.complete_stage(round_no=round_no, stage="owner")
-            return admitted
-        except Exception as exc:  # noqa: BLE001
-            recovery.fail_unit(
-                round_no=round_no,
-                stage="owner",
-                key=key,
-                error=f"{type(exc).__name__}: {exc}",
-            )
-            raise RoundDeliveryBlocked(
-                numbers=[], reason="owner-failed:admission did not complete"
-            ) from exc
-
-    def _run_recovery_delivery(self, *, round_no: int, admitted: Sequence[int]) -> None:
-        recovery = self._require_recovery()
-        if recovery.stage_status(round_no=round_no, stage="delivery_wait") == "completed":
-            return
-        if not admitted:
-            self._mark_recovery_stage(
-                round_no=round_no,
-                stage="delivery_wait",
-                input_value={"issues": []},
-                dependencies=("owner",),
-            )
-            return
-        inflight: list[tuple[int, str]] = []
-        blocked_numbers: list[int] = []
-        for number in admitted:
-            key = operation_key(round_no, "delivery", int(number))
-            unit = recovery.begin_unit(
-                round_no=round_no,
-                stage="delivery_wait",
-                key=key,
-                input_value={"issue": int(number)},
-                expected_postconditions={"classification": "done"},
-                dependencies=("owner",),
-            )
-            if unit.get("status") == "completed":
-                continue
-            if self._fetch_issue is not None:
-                snapshot = self._fetch_issue(int(number))
-                classification = classify_issue(
-                    state=str(snapshot.get("state") or ""),
-                    labels=_issue_labels(snapshot.get("labels")),
-                )
-                if classification == "done":
-                    recovery.complete_unit(
-                        round_no=round_no,
-                        stage="delivery_wait",
-                        key=key,
-                        observed_postconditions={"classification": "done", "issue": snapshot},
-                    )
-                    continue
-                if classification == "blocked":
-                    recovery.fail_unit(
-                        round_no=round_no,
-                        stage="delivery_wait",
-                        key=key,
-                        error="delivery terminal failure",
-                        blocked=True,
-                    )
-                    blocked_numbers.append(int(number))
-                    continue
-            inflight.append((int(number), key))
-        # Reconcile the complete admitted set before failing closed.  Raising
-        # on the first terminal failure left later merged issues stale in the
-        # durable ledger and made every subsequent resume stop at the same
-        # ticket without projecting forge truth for the rest of the round.
-        if blocked_numbers:
-            raise RoundDeliveryBlocked(numbers=blocked_numbers, reason="delivery-failed")
-        if inflight:
-            try:
-                self._await_round_delivery(numbers=[number for number, _ in inflight])
-            except RoundDeliveryBlocked as exc:
-                affected = set(int(number) for number in exc.numbers)
-                for number, key in inflight:
-                    if self._fetch_issue is not None:
-                        snapshot = self._fetch_issue(number)
-                        classification = classify_issue(
-                            state=str(snapshot.get("state") or ""),
-                            labels=_issue_labels(snapshot.get("labels")),
-                        )
-                        if classification == "done":
-                            recovery.complete_unit(
-                                round_no=round_no,
-                                stage="delivery_wait",
-                                key=key,
-                                observed_postconditions={
-                                    "classification": "done",
-                                    "issue": snapshot,
-                                },
-                            )
-                            continue
-                        if classification == "blocked":
-                            recovery.fail_unit(
-                                round_no=round_no,
-                                stage="delivery_wait",
-                                key=key,
-                                error=f"delivery terminal failure for issue #{number}",
-                                blocked=True,
-                            )
-                            affected.add(number)
-                            continue
-                    # The gate reports only the tickets responsible for the
-                    # stop.  Leave unrelated in-flight units retryable instead
-                    # of falsely stamping the whole original wait set failed.
-                    if number in affected:
-                        recovery.fail_unit(
-                            round_no=round_no,
-                            stage="delivery_wait",
-                            key=key,
-                            error=f"delivery {exc.reason} for issue #{number}",
-                            blocked=exc.reason != "timeout",
-                        )
-                raise
-            for number, key in inflight:
-                observed: dict[str, Any] = {"classification": "done"}
-                if self._fetch_issue is not None:
-                    snapshot = self._fetch_issue(number)
-                    classification = classify_issue(
-                        state=str(snapshot.get("state") or ""),
-                        labels=_issue_labels(snapshot.get("labels")),
-                    )
-                    if classification != "done":
-                        recovery.fail_unit(
-                            round_no=round_no,
-                            stage="delivery_wait",
-                            key=key,
-                            error=f"delivery wait returned before issue #{number} was done",
-                            blocked=True,
-                        )
-                        raise RoundDeliveryBlocked(
-                            numbers=[number], reason="postcondition-mismatch"
-                        )
-                    observed["issue"] = snapshot
-                recovery.complete_unit(
-                    round_no=round_no,
-                    stage="delivery_wait",
-                    key=key,
-                    observed_postconditions=observed,
-                )
-        recovery.complete_stage(round_no=round_no, stage="delivery_wait")
-
-    def _run_recovery_jobs(
-        self,
-        *,
-        round_no: int,
-        stage: str,
-        jobs: Sequence[tuple[str, str, Any, Callable[[], object]]],
-        dependencies: Sequence[str],
-    ) -> None:
-        recovery = self._require_recovery()
-        if recovery.stage_status(round_no=round_no, stage=stage) == "completed":
-            return
-        if not jobs:
-            self._mark_recovery_stage(
-                round_no=round_no,
-                stage=stage,
-                input_value={"jobs": []},
-                dependencies=dependencies,
-            )
-            return
-        failures: list[str] = []
-        for name, key, input_value, call in jobs:
-            unit = recovery.begin_unit(
-                round_no=round_no,
-                stage=stage,
-                key=key,
-                input_value=input_value,
-                expected_postconditions={"completed": True},
-                dependencies=dependencies,
-            )
-            if unit.get("status") == "completed":
-                continue
-            try:
-                with bind_usage_context(operation=key, role=stage, round_no=round_no):
-                    result = call()
-                recovery.save_output(
-                    round_no=round_no,
-                    stage=stage,
-                    key=key,
-                    output=_result_payload(result),
-                )
-                recovery.complete_unit(
-                    round_no=round_no,
-                    stage=stage,
-                    key=key,
-                    observed_postconditions={"completed": True},
-                )
-            except Exception as exc:  # noqa: BLE001
-                print(f"[orchestrator] {name} 异常，恢复账本保留该工作项：")
-                traceback.print_exc()
-                recovery.fail_unit(
-                    round_no=round_no,
-                    stage=stage,
-                    key=key,
-                    error=f"{type(exc).__name__}: {exc}",
-                )
-                failures.append(key)
-        if failures:
-            raise RoundDeliveryBlocked(numbers=[], reason=f"{stage}-incomplete")
-        recovery.complete_stage(round_no=round_no, stage=stage)
-
     def _mark_recovery_stage(
         self,
         *,
@@ -976,24 +623,10 @@ class Orchestrator:
         input_value: Any,
         dependencies: Sequence[str] = (),
     ) -> None:
-        recovery = self._require_recovery()
-        key = operation_key(round_no, stage, "stage-marker")
-        unit = recovery.begin_unit(
-            round_no=round_no,
-            stage=stage,
-            key=key,
-            input_value=input_value,
-            expected_postconditions={"completed": True},
-            dependencies=dependencies,
+        assert self._feedback_pipeline is not None
+        self._feedback_pipeline.mark_stage(
+            round_no=round_no, stage=stage, input_value=input_value, dependencies=dependencies
         )
-        if unit.get("status") != "completed":
-            recovery.complete_unit(
-                round_no=round_no,
-                stage=stage,
-                key=key,
-                observed_postconditions={"completed": True},
-            )
-        recovery.complete_stage(round_no=round_no, stage=stage)
 
     def _require_recovery(self) -> RecoveryStore:
         if self._recovery is None:

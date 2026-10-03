@@ -15,7 +15,7 @@ auto-designer 模拟用户使用 Harness，把使用轨迹转为需求，再交�
 
 ## 运行实验
 
-选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用 `backend/scripts/experiment.py` 和相同的 v2 实验格式。N1 示例是一位用户试用一个任务；N4 示例是四位用户试用普通任务和 SWE 任务。同轮可由不同 persona 重复试用同一任务，每个会话有独立可写工作区。历史结果导入后追加一轮仍不支持。仓内 N=1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
+选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用 `backend/scripts/experiment.py` 和相同的 v2 实验格式。N1 示例是一位用户试用一个任务；N4 示例是四位用户试用普通任务和 SWE 任务。同轮可由不同 persona 重复试用同一任务，每个会话有独立可写工作区。完整当前归档可在新 run 中[追加轮次](docs/tutorials/experiment-continuation.zh-CN.md)，先交付父末轮反馈再开始新用户。仓内 N=1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
 
 ```bash
 uv sync --locked --extra experiments
@@ -82,4 +82,4 @@ research/archives/                      # 冻结的历史研究记录
 
 项目代码采用 [MIT 许可证](LICENSE)。第三方材料保留各自的许可条款，详见[第三方来源说明](THIRD_PARTY.md)。
 
-统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/N4/N8 已使用同一冻结 workload 契约；历史实验追加轮仍待迁入。见[多用户验收](docs/validation/spec0073-multi-task-users.md)。
+统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/N4/N8 已使用同一冻结 workload 契约；带 continuation export 的当前归档可继承到新 run 并追加轮次，见[追加教程](docs/tutorials/experiment-continuation.zh-CN.md)。见[多用户验收](docs/validation/spec0073-multi-task-users.md)。

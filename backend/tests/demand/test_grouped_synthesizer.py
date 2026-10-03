@@ -421,6 +421,80 @@ def test_recovery_reuses_grouping_receipt_after_batch_failure(tmp_path):
     assert len(list((tmp_path / "grouping").glob("*/grouping.json"))) == 1
 
 
+@pytest.mark.parametrize("logical_round", [None, 1])
+def test_grouped_recovery_preserves_logical_filter_and_replays_saved_design(
+    tmp_path, logical_round
+):
+    tracker = tracker_with(2)
+    source_round = "round-5" if logical_round is None else "round-1"
+    for number in (1, 2):
+        tracker.update_issue(
+            number, title=f"Proposal {number}", body="summary", labels=[PROPOSAL, source_round]
+        )
+    calls = {"grouping": 0, "model": 0, "failed_merge": 0}
+    contexts = []
+
+    class Worker(Synthesizer):
+        def _run_agent(self, **kwargs):
+            calls["model"] += 1
+            contexts.append((current_usage_context().round_no, self._round_provider()))
+            assert [item.number for item in kwargs["proposals"]] == [1, 2]
+            return json.dumps(
+                {
+                    "proposals": [
+                        dict(
+                            title="Shared mechanism",
+                            source_proposals=[1, 2],
+                            solution_level="structural_mechanism",
+                            covers=[1, 2],
+                            relationship="shared",
+                            common_tension="same",
+                            structural_direction="mechanism",
+                            expected_leverage="both sources",
+                        )
+                    ]
+                }
+            )
+
+        def _merge_covered(self, source, **kwargs):
+            if source.number == 1 and calls["failed_merge"] == 0:
+                calls["failed_merge"] += 1
+                raise RuntimeError("merge response unavailable after saved design")
+            return super()._merge_covered(source, **kwargs)
+
+    def classify(cards):
+        calls["grouping"] += 1
+        assert current_usage_context().round_no == 1
+        assert [card["id"] for card in cards] == [1, 2]
+        return response([[1, 2]])
+
+    worker = Worker(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path),
+        str(tmp_path),
+        round_provider=lambda: logical_round,
+    )
+    stage = GroupedSynthesizer([worker], artifact_root=tmp_path / "grouping", classify=classify)
+    recovery = recovery_for_synthesizer(tmp_path)
+    stage.bind_recovery(recovery)
+    namespace = "continuation-bootstrap" if logical_round is None else "ordinary"
+    with bind_usage_context(round_no=1, operation=operation_key(namespace, "synthesizer")):
+        with pytest.raises(RecoveryConflictError, match="batches remain incomplete"):
+            stage.propose_once()
+        units = recovery.round_state(round_no=1)["stages"]["synthesizer"]["units"].values()
+        assert any(item.get("status") == "failed" and item.get("output_digest") for item in units)
+        result = stage.propose_once()
+    assert calls == {"grouping": 1, "model": 1, "failed_merge": 1}
+    assert contexts == [(1, logical_round)]
+    assert result.proposal_numbers == [3] and sorted(result.merged_numbers) == [1, 2]
+    assert tracker.issue(1)["state"] == tracker.issue(2)["state"] == "closed"
+    assert len(tracker.list_open_issues()) == 1
+    round_labels = {label for label in tracker.issue(3)["labels"] if label.startswith("round-")}
+    assert round_labels == (set() if logical_round is None else {"round-1"})
+    assert set(recovery.snapshot()["rounds"]) == {"1"}
+
+
 def test_entry_point_switch_preserves_workers_and_disabled_roster(tmp_path, monkeypatch):
     existing = workers(tmp_path, tracker_with(0))
     monkeypatch.delenv("SYNTHESIZER_GROUPING", raising=False)

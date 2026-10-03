@@ -189,3 +189,13 @@ Spec-0077 为 local + localhost 迁入可选工程 CI，`runtime.local.ci_enable
 首轮真实 canary 已观察到 main 成功、人工红 PR 失败、修订 head 转绿，但也暴露 act_runner 0.2.11 的 job 名称和工具缓存会跨 run 共享，实施因此改为每 run 独立 daemon。该初步红绿结果不能代替独立 daemon 最终实现的验收；最终拓扑及生命周期实证仍以上述验收报告为准。
 
 最终实测已完成：两个独立 daemon 同时运行相同 job/cache 名称而未冲突；完整候选通过公开 stop/resume，复用原注册与容器身份，重新得到真实 PR 红绿及固定 OpenAgents 的一致判定，最终 COMPLETED / COMPLETE / DESTROYED。归档保留当前 Harness 提交的非空 CI success，注册凭证未入归档。过程中修复 dotenv 引号造成的 reader 401、短暂 pending 和自动删容器竞态，证据及测试边界见验收报告；没有将技术红绿探针记为模型自动修复。
+
+### Spec-0079：当前归档继承与追加
+
+用户明确收窄范围为当前统一入口的完整归档，无需兼容旧版实验产物。此前“历史 continuation 待迁”的记录描述当时范围；本组的处置是支持带新 export 的当前 schema 2 / workload contract 1 归档，不追溯改写历史结果或升级旧冻结 controller。
+
+当前继承输入由 `harness.source=continuation`、`workload.source=parent`、`continuation.archive/sha256` 共同声明，仍使用 check/prepare/run/status/stop/resume/collect/destroy。父来源要求 COMPLETE、实验完成和 continuation_ready；末轮精确 Git tree、材料、配对、persona、会话及报告由版本化 export 和 source validator 核验。可运行材料改变时拒绝；缺失或不能核验的 native observations 保持 unavailable。子配置显式选择模型、runtime、角色、策略及凭证，父身份、账本、资源、凭证和授权不搬入子执行身份。
+
+子初始化通过独立 bootstrap 恢复域处理父末轮反馈并等待准入交付，再启动新增用户轮；与普通轮共用反馈 pipeline，即使只追加一轮也启用交付。count 只计新增用户，最后新增轮仍只试用。父逻辑 R5 加两轮显示子本地 R1/R2、逻辑 R6/R7；该子完整收集后再加一轮显示逻辑 R8。父会话不计入子新增指标，祖先只保留身份/hash 摘要，不递归打包完整归档。
+
+双语[追加教程](../tutorials/experiment-continuation.zh-CN.md)提供从当前 N1 两后端模板生成完整子配置的命令、独立 profile、停止恢复及再次追加流程。此补记记录当前实现与支持边界；真实 local/E2B 非空交付、生命周期和二次追加覆盖由独立[验收记录](../validation/experiment-continuation.md)列明。离线合同通过或零准入封口不能代替真实 OpenAgents 交付证据；Spec-0077 的已完成实测记录保持原义。

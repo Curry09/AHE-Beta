@@ -198,6 +198,9 @@ class GroupedSynthesizer:
 
     def propose_once(self) -> SynthesisOutcome:
         round_no = self.round_provider() if self.round_provider else None
+        # Filtering can intentionally span inherited rounds. Preserve the
+        # caller's recovery round separately before worker contexts override it.
+        execution_round_no = self._recovery_round_no() if self.recovery is not None else round_no
         grouping_key = self._recovery_key()
         recovery_unit = (
             self.recovery.unit(
@@ -279,7 +282,7 @@ class GroupedSynthesizer:
                 if self.on_event:
                     self.on_event("text", f"一次性分组：{len(numbers)} 条提案")
                 with bind_usage_context(
-                    round_no=round_no,
+                    round_no=execution_round_no,
                     agent_id="synthesizer-grouping",
                     role="synthesizer",
                     operation="proposal_grouping",
@@ -362,7 +365,9 @@ class GroupedSynthesizer:
 
         def run_batches(worker_id, synthesizer, scope, results):
             with bind_usage_context(
-                round_no=round_no, agent_id=f"synthesizer-{worker_id}", role="synthesizer"
+                round_no=execution_round_no,
+                agent_id=f"synthesizer-{worker_id}",
+                role="synthesizer",
             ):
                 while True:
                     try:

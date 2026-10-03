@@ -512,12 +512,34 @@ def progress_v2(run_dir: Path) -> dict[str, Any]:
         }
     except (OSError, ValueError, AttributeError, TypeError):
         return {"current_round": None, "rounds": {}, "observation": "UNKNOWN", "tasks": tasks}
-    return {
+    result = {
         "current_round": value.get("round"),
         "rounds": rounds,
         "observation": "RECOVERY_LEDGER",
         "tasks": tasks,
     }
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {}
+    if "continuation" in manifest.get("config", {}):
+        base = manifest["lineage"]["base_round"]
+        for key, row in rounds.items():
+            row.update(local_round=int(key), lineage_round=base + int(key))
+        bootstrap_path = run_dir / "checkpoints/continuation-bootstrap/recovery.json"
+        bootstrap = json.loads(bootstrap_path.read_text()) if bootstrap_path.is_file() else {}
+        boundary = bootstrap.get("rounds", {}).get("1", {})
+        result["continuation_bootstrap"] = {
+            "phase": "continuation-bootstrap",
+            "status": boundary.get("status", "pending"),
+            "sealed_sha": boundary.get("sealed_sha"),
+            "stages": {
+                key: stage.get("status") for key, stage in boundary.get("stages", {}).items()
+            },
+        }
+        result["base_round"] = base
+        local_round = value.get("round") or None
+        result["local_round"] = local_round
+        result["lineage_round"] = base + local_round if local_round is not None else None
+    return result
 
 
 def run_v2(

@@ -25,7 +25,7 @@ import requests
 
 from auto_designer.experiment.backends import local_ci
 from auto_designer.experiment.backends.base import BackendError
-from auto_designer.experiment.config import config_hash
+from auto_designer.experiment.config import config_hash, delivery_required
 from auto_designer.experiment.context import build_controller_environment, material_path
 from auto_designer.experiment.engine import (
     controller_command,
@@ -1355,7 +1355,7 @@ print('ready')
         self._save(controller=result)
         # Spec-0072/T3: one round only evaluates users; neither controller starts
         # Vigil in that case. A successful owned runner needs no delivery receipt.
-        if self.manifest["config"]["rounds"]["count"] == 1:
+        if not delivery_required(self.manifest["config"]):
             return result
         deadline = time.monotonic() + 180
         while result.get("running") and time.monotonic() < deadline:

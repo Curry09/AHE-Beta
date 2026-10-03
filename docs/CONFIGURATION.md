@@ -29,17 +29,40 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `runtime.gitea` | Provider `localhost` for local, `gitea.com` for E2B; repository prefix |
 | `runtime.local` | Optional image overrides and `ci_enabled` (default `false`); local engineering CI requires a verified dedicated runner |
 | `runtime.e2b` | Requested `cpu_count`, `memory_mb`, `timeout_seconds` (300–86400); optional compatible template |
-| `harness.source` | `builtin`, or `archive` with an archive path and SHA-256 |
-| `workload` | `task_packages` list, or legacy `kind` + `task_package`; persona library, actual persona IDs and optional interaction_plan |
-| `rounds` | `count`, `sessions_per_round`, `max_parallel_users` |
+| `harness.source` | `builtin`, `archive` with a path and SHA-256, or `continuation` with the matching parent source |
+| `workload` | Task packages with persona inputs/optional interaction_plan, or exactly `{"source":"parent"}` for continuation |
+| `rounds` | `count`, `sessions_per_round`, `max_parallel_users`; continuation count means added user rounds |
+| `continuation` | Optional current parent `archive` path and expected `sha256`; requires both parent input selectors |
 | `roles` | Triage/Synthesizer/divergent/developer counts; `owner_mode: mechanical` / `llm` |
 | `models` | User, Harness, shared demand and Claude Code delivery settings |
 | `evaluation.official_grading` | `false`; evolution stays ungraded; use the independent post-run `grade` command |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
-Choose one or more task packages and set sessions_per_round up to the number of selected personas; max_parallel_users must not exceed sessions_per_round. Different personas may use the same task in one round. Each package supplies its own kind and interaction. Importing historical results to append a round remains unsupported. The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
+Choose one or more task packages and set sessions_per_round up to the number of selected personas; max_parallel_users must not exceed sessions_per_round. Different personas may use the same task in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
 
 `builtin` freezes this checkout's `backend/harness_template/`. It is not the historical `cade14d` Harness. To reproduce that baseline, supply its actual archive and checksum explicitly.
+
+## Continue from a current completed archive
+
+Merge the following input selectors into a complete v2 definition; the [continuation tutorial](tutorials/experiment-continuation.md) generates full local/E2B configurations from existing templates.
+
+```json
+{
+  "harness": {"source": "continuation"},
+  "workload": {"source": "parent"},
+  "continuation": {
+    "archive": "/absolute/path/to/parent/artifacts.tar.gz",
+    "sha256": "EXPECTED_64_CHARACTER_SHA256"
+  },
+  "rounds": {"count": 2, "sessions_per_round": 4, "max_parallel_users": 2}
+}
+```
+
+All three selectors are required together. `continuation` accepts only `archive` and `sha256`; paths resolve relative to the child JSON. The parent must have collection `COMPLETE`, `controller.experiment_complete=true` and `continuation_ready=true`, including the versioned final-tree export. Unsupported or missing exports are rejected before provisioning; old frozen controllers are not upgraded.
+
+Every added round inherits the parent's final task/persona/interaction pairs, including `direct` sessions. `sessions_per_round` equals that boundary's size; `max_parallel_users` may be smaller. Workload overrides are forbidden. Pending reports require Triage and Synthesizer counts of at least one. Models, runtime, roles, policies and credentials are explicit child choices; optional CI uses the child's normal local-only contract.
+
+The child first runs an independent feedback initialization and waits for delivery, even when count is one. `count` then counts new users; the final new round remains users-only. Parent logical R5 plus count two gives child local R1/R2 at logical R6/R7; another one-round child starts logical R8. Stop/resume targets the new run. Parent evidence and ratings stay outside new-user metrics; grade and batch use local round numbers. The [separate validation record](validation/experiment-continuation.md) distinguishes contract checks from actual backend execution.
 
 ## Models and credentials
 
@@ -145,11 +168,11 @@ Set task-package `interaction: "direct"` for Harness-driven execution; the defau
 }
 ```
 
-The plan validates every round's session count and selected persona/task IDs. Personas must be unique within a round; tasks may repeat. If omitted, global slot k=(round_no-1)*sessions_per_round+slot selects persona_ids[k % P] and task_packages[k % T] in their configured order. This simple rotation does not guarantee all persona × task combinations; use an explicit plan for AABB, fixed groups or cross-task coverage. `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds still require delivery readiness.
+The plan validates every round's session count and selected persona/task IDs. Personas must be unique within a round; tasks may repeat. If omitted, global slot k=(round_no-1)*sessions_per_round+slot selects persona_ids[k % P] and task_packages[k % T] in their configured order. This simple rotation does not guarantee all persona × task combinations; use an explicit plan for AABB, fixed groups or cross-task coverage. Ordinary `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds and continuation initialization require delivery readiness.
 
 `experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-These settings, interactions and dashboard binding are migrated. Optional local engineering CI is described below; historical round import remains pending. Seed libraries and text instructions now convert to ordinary packages as described below. Official SWE task grading is available as a separate post-run command; in-loop grading remains disabled by design. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+These settings, interactions and dashboard binding are migrated. Optional local engineering CI is described below; current archive continuation is described in the [append-round tutorial](tutorials/experiment-continuation.md). Seed libraries and text instructions now convert to ordinary packages as described below. Official SWE task grading is available as a separate post-run command; in-loop grading remains disabled by design. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
 
 ## Local engineering CI
 

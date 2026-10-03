@@ -136,6 +136,11 @@ def _seed_harness_repo() -> Path:
     subprocess.run(
         ["git", "init", "-b", "main", str(HARNESS_REPO)], check=True, capture_output=True
     )
+    # Spec-0079/T4: inherited trees bypass git add and clean filters entirely.
+    inherited_path = os.environ.get("AUTO_DESIGNER_CONTINUATION_INPUT", "").strip()
+    if inherited_path:
+        _seed_inherited_tree(input_path=Path(inherited_path))
+        return HARNESS_REPO
     # 清掉模板复制带来的字节码缓存、写 .gitignore，让 v0 seed 只含 harness 制品。
     # Spec-0032/T5：.openagents/ 是 vigil 的本地运行态（队列 db/claims/配置），随 rmtree 每 run 归零，
     # 且永不入库。
@@ -817,7 +822,14 @@ def _on_round_end(k: int, sha: str, *, tracker, round_shas: list[str]) -> None:
     from auto_designer.loop.live import update_live_run
 
     round_shas.append(sha)
-    append_round(round_no=k, user_sha=None, sealed_sha=sha)
+    user_sha = None
+    recovery_root = os.environ.get("AUTO_DESIGNER_RECOVERY_ROOT", "").strip()
+    if recovery_root:
+        import json
+
+        ledger = json.loads((Path(recovery_root) / "recovery.json").read_text())
+        user_sha = ledger["rounds"][str(k)]["user_sha"]
+    append_round(round_no=k, user_sha=user_sha, sealed_sha=sha)
     update_live_run(
         data_dir=DATA,
         running=True,
@@ -913,3 +925,50 @@ def stop_vigil(handle: VigilHandle) -> None:
             handle.log_handle.close()  # type: ignore[attr-defined]
         except Exception:  # noqa: BLE001  关日志失败不影响收尾
             pass
+
+
+# Spec-0079/T4: build an exact index from raw blobs, preserving ignored tracked paths.
+def _seed_inherited_tree(*, input_path: Path) -> None:
+    import hashlib
+    import json
+
+    from auto_designer.guards.harness_boundary import install_pre_commit
+
+    inherited = json.loads(input_path.read_text())
+    harness = inherited["export"]["harness"]
+    entries = []
+    for relative, record in sorted(harness["files"].items()):
+        path = HARNESS_REPO / relative
+        if not path.is_file() or path.is_symlink():
+            raise SystemExit("Inherited Harness is missing a regular tracked file")
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != record["sha256"]:
+            raise SystemExit("Inherited Harness file content differs from export")
+        oid = (
+            subprocess.check_output(
+                ["git", "-C", str(HARNESS_REPO), "hash-object", "-w", "--stdin"], input=data
+            )
+            .decode()
+            .strip()
+        )
+        if oid != record["blob_oid"] or record["mode"] not in {"100644", "100755"}:
+            raise SystemExit("Inherited Harness blob identity or mode differs")
+        path.chmod(0o755 if record["mode"] == "100755" else 0o644)
+        entries.append(f"{record['mode']} {oid}\t{relative}\0".encode())
+    subprocess.run(
+        ["git", "-C", str(HARNESS_REPO), "update-index", "-z", "--index-info"],
+        input=b"".join(entries),
+        check=True,
+        capture_output=True,
+    )
+    actual_tree = subprocess.check_output(
+        ["git", "-C", str(HARNESS_REPO), "write-tree"], text=True
+    ).strip()
+    if actual_tree != harness["tree_id"]:
+        raise SystemExit("Inherited Harness seed tree differs from parent tree")
+    _git(HARNESS_REPO, "commit", "-m", "seed: inherited Harness tree")
+    # Exclusions are runtime metadata; the tracked parent .gitignore is untouched.
+    (HARNESS_REPO / ".git/info/exclude").write_text(
+        "__pycache__/\n*.pyc\n.openagents/\n", encoding="utf-8"
+    )
+    install_pre_commit(HARNESS_REPO)

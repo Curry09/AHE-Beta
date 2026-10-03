@@ -862,3 +862,31 @@ def test_recovery_users_preserve_configured_parallelism(tmp_path) -> None:
     )
     orch.run_round("main", round_no=1, deliver=False)
     assert max_active == 2
+
+
+def test_recovery_refresh_rebinds_feedback_roles_to_restored_ledger(tmp_path):
+    """Spec-0079/T3: both stage owner and role units use the restored store."""
+    repo = _seed_repo(tmp_path)
+    bound = []
+
+    class Role:
+        def bind_recovery(self, recovery):
+            bound.append(recovery)
+
+        def bind_feedback_dependency(self, prerequisite):
+            assert prerequisite == "users"
+
+    orch = Orchestrator(
+        launcher=_Launcher([]),
+        harness_repo=str(repo),
+        fixed_set=[],
+        run_session_fn=lambda *args, **kwargs: None,
+        initial_ref="main",
+        triagers=[Role()],
+        recovery=_recovery(tmp_path),
+    )
+    original = orch._recovery
+    orch.refresh_recovery()
+    assert orch._recovery is not original
+    assert bound == [original, orch._recovery]
+    assert orch._feedback_pipeline._recovery is orch._recovery

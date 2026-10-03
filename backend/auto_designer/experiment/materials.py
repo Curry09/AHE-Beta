@@ -76,6 +76,8 @@ def sha256_file(path: str | Path) -> str:
 def check_materials(config_path: str | Path) -> dict[str, Any]:
     """Offline validation: no cloud calls, repository cloning, directories, or model requests."""
     config = load_config_v2(config_path)
+    if "continuation" in config:
+        return _check_parent_materials(config=config)
     tasks = [load_task_package(path) for path in config["workload"]["task_packages"]]
     validate_task_ids(tasks)
     for task in tasks:
@@ -188,20 +190,32 @@ def prepare_materials(
             stage=stage,
         )
         # Spec-0073/T1: every task is fully frozen before finalizing logical bindings.
-        tasks = [
-            _freeze_task(stage=stage, task=task, materials=materials)
-            for task in report["task_packages"]
-        ]
+        inherited = None
+        if "continuation" in config:
+            inherited = _freeze_parent_materials(stage=stage, config=config, materials=materials)
+            tasks = inherited["tasks"]
+        else:
+            tasks = [
+                _freeze_task(stage=stage, task=task, materials=materials)
+                for task in report["task_packages"]
+            ]
         catalog = {"contract_version": CONTRACT_VERSION, "tasks": tasks}
         catalog_path = stage / "materials/task-catalog.json"
         _write_json(path=catalog_path, value=catalog)
         _register(materials=materials, key="task_catalog", path=catalog_path, stage=stage)
-        plan = compile_session_plan(config, catalog, materials["task_catalog"]["sha256"])
+        plan = compile_session_plan(
+            config,
+            catalog,
+            materials["task_catalog"]["sha256"],
+            inherited["pairs"] if inherited else None,
+        )
         plan_path = stage / "materials/session-plan.json"
         _write_json(path=plan_path, value=plan)
         _register(materials=materials, key="session_plan", path=plan_path, stage=stage)
         harness_path = stage / "materials/harness.tar.gz"
-        if config["harness"]["source"] == "archive":
+        if inherited:
+            shutil.copyfile(stage / inherited["harness_path"], harness_path)
+        elif config["harness"]["source"] == "archive":
             shutil.copyfile(config["harness"]["archive"], harness_path)
         else:
             seed = controller / "backend/harness_template"
@@ -291,6 +305,8 @@ def prepare_materials(
             },
             "secrets_file": str(secret_path) if secret_path else None,
         }
+        if inherited:
+            manifest["lineage"] = inherited["lineage"]
         _write_json(path=stage / "manifest.json", value=manifest)
         stage.chmod(0o700)
         stage.rename(final_dir)
@@ -725,3 +741,121 @@ def _locked_nexau_source(*, controller: Path) -> dict[str, str]:
     ):
         raise ConfigError("NexAU pyproject declaration and uv.lock immutable revision disagree")
     return {"repository": repository, "revision": revision}
+
+
+# Spec-0079/T4: source validation is shared by offline check and atomic prepare.
+def _check_parent_materials(*, config: dict[str, Any]) -> dict[str, Any]:
+    from auto_designer.experiment.continuation.source import load_continuation_source
+
+    source = load_continuation_source(**config["continuation"])
+    if len(source.pairs) != config["rounds"]["sessions_per_round"]:
+        raise ConfigError("sessions_per_round must equal the selected parent boundary")
+    from auto_designer.experiment.continuation.forge import pending_report
+
+    if any(pending_report(report) for report in source.reports) and any(
+        config["roles"][key] < 1 for key in ("triager", "synthesizer")
+    ):
+        raise ConfigError("Pending parent reports require at least one triager and synthesizer")
+    if local_ci_enabled(config):
+        import io
+
+        with tarfile.open(
+            fileobj=io.BytesIO(source.read(source.export["harness"]["archive"]))
+        ) as bundle:
+            workflows = {
+                member.name: bundle.extractfile(member).read()
+                for member in bundle.getmembers()
+                if member.isfile() and _is_ci_workflow(Path(member.name))
+            }
+        _check_ci_workflows(workflows=workflows)
+    pairs = [[pair["persona_id"], pair["task_id"]] for pair in source.pairs]
+    return {
+        "ok": True,
+        "config": config,
+        "config_hash": config_hash(data=config),
+        "task_packages": source.tasks,
+        "persona_cards": source.personas,
+        "persona_ids": [pair["persona_id"] for pair in source.pairs],
+        "interaction_plan": [pairs for _ in range(config["rounds"]["count"])],
+        "preview": {"frozen": False},
+        "continuation": source.summary(),
+        "network_required_for_prepare": True,
+    }
+
+
+def _freeze_parent_materials(
+    *, stage: Path, config: dict[str, Any], materials: dict[str, Any]
+) -> dict[str, Any]:
+    from auto_designer.experiment.continuation.source import load_continuation_source
+
+    source = load_continuation_source(**config["continuation"])
+    parent_root = Path("materials/continuation/parent")
+    selected_paths = {
+        "manifest.json",
+        "collection.json",
+        "checkpoints/recovery.json",
+        "runtime/continuation-export.json",
+        source.export["harness"]["archive"],
+        source.export["forge"]["path"],
+    }
+    selected_paths.update(record["path"] for record in source.export["boundary"]["sessions"])
+    for record in source.export["boundary"]["sessions"]:
+        observation = record.get("observation_path")
+        if observation:
+            selected_paths.update(
+                path
+                for path in source.files
+                if path == observation or path.startswith(observation.rstrip("/") + "/")
+            )
+    for key in source.export["material_keys"]:
+        selected_paths.add(source.manifest["materials"][key]["path"])
+    for path in sorted(selected_paths):
+        target = stage / parent_root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read(path))
+        _register(materials=materials, key="continuation:" + path, path=target, stage=stage)
+    # Tasks keep their exact original records and registry key identities.
+    for task in source.tasks:
+        for key in task["materials"].values():
+            record = source.manifest["materials"][key]
+            target = stage / record["path"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.read(record["path"]))
+            _register(materials=materials, key=key, path=target, stage=stage)
+        # Runtime source recipe reads the same frozen archive; restore its logical directory.
+        archive_path = stage / materials[task["materials"]["source_archive"]]["path"]
+        destination = stage / "source/tasks" / task["id"]
+        destination.mkdir(parents=True)
+        with tarfile.open(archive_path, "r:gz") as bundle:
+            bundle.extractall(destination, filter="data")
+    parent = source.manifest
+    lineage = {
+        "parent_run_id": parent["run_id"],
+        "parent_config_hash": parent["config_hash"],
+        "parent_controller_sha": parent["controller_sha"],
+        "parent_plan_hash": parent["plan_hash"],
+        "parent_archive_sha256": source.archive_sha256,
+        "base_round": source.export["boundary"]["lineage_round"],
+        "parent_user_sha": source.export["boundary"]["user_sha"],
+        "parent_tree_id": source.export["harness"]["tree_id"],
+        "differences": {
+            key: {"parent": parent["config"].get(key), "child": config.get(key)}
+            for key in ("models", "runtime", "policies")
+            if parent["config"].get(key) != config.get(key)
+        },
+    }
+    inherited = {
+        "export": source.export,
+        "pairs": source.pairs,
+        "lineage": lineage,
+        "parent_root": parent_root.as_posix(),
+        "source_summary": source.summary(),
+    }
+    target = stage / "materials/continuation/input.json"
+    _write_json(path=target, value=inherited)
+    _register(materials=materials, key="continuation_input", path=target, stage=stage)
+    return {
+        **inherited,
+        "tasks": source.tasks,
+        "harness_path": (parent_root / source.export["harness"]["archive"]).as_posix(),
+    }

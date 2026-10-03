@@ -1,0 +1,371 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "continuation-export-v1.json",
+  "title": "Current completed experiment continuation export v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "status": {
+          "const": "ready"
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "config_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "controller_sha": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "plan_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "run_id",
+            "experiment_id",
+            "config_hash",
+            "controller_sha",
+            "plan_hash"
+          ]
+        },
+        "boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "local_round": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "lineage_round": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "user_sha": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "sealed_sha": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "sessions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "binding": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "round_no": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "slot": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "persona_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "task_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "task_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "interaction": {
+                        "enum": [
+                          "simulated_user",
+                          "direct"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "round_no",
+                      "slot",
+                      "persona_id",
+                      "task_id",
+                      "task_digest",
+                      "interaction"
+                    ]
+                  },
+                  "persona_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "observation_path": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "session_id",
+                  "path",
+                  "sha256",
+                  "binding",
+                  "persona_sha256"
+                ]
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "local_round",
+            "lineage_round",
+            "user_sha",
+            "sealed_sha",
+            "sessions"
+          ]
+        },
+        "harness": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "tree_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "archive": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "files": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "blob_oid": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{40}$"
+                  },
+                  "mode": {
+                    "enum": [
+                      "100644",
+                      "100755"
+                    ]
+                  },
+                  "size_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "sha256",
+                  "blob_oid",
+                  "mode",
+                  "size_bytes"
+                ]
+              }
+            }
+          },
+          "required": [
+            "commit",
+            "tree_id",
+            "archive",
+            "sha256",
+            "files"
+          ]
+        },
+        "material_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "forge": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "path",
+            "sha256"
+          ]
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1
+              },
+              "state": {
+                "enum": [
+                  "open",
+                  "closed"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "session_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "number",
+              "url",
+              "state",
+              "title",
+              "body",
+              "labels",
+              "session_ids",
+              "sha256"
+            ]
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "identity",
+        "boundary",
+        "harness",
+        "material_keys",
+        "forge",
+        "reports"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "status": {
+          "const": "unavailable"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "config_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "controller_sha": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "plan_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "run_id",
+            "experiment_id",
+            "config_hash",
+            "controller_sha",
+            "plan_hash"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "reason"
+      ]
+    }
+  ]
+}

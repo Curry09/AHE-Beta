@@ -115,7 +115,8 @@
         "source": {
           "enum": [
             "builtin",
-            "archive"
+            "archive",
+            "continuation"
           ]
         },
         "archive": {
@@ -190,42 +191,60 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "source": {
+          "const": "parent"
         }
       },
-      "required": [
-        "persona_library",
-        "persona_ids"
-      ],
       "oneOf": [
         {
           "required": [
-            "kind",
-            "task_package"
+            "persona_library",
+            "persona_ids"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "kind",
+                "task_package"
+              ],
+              "not": {
+                "required": [
+                  "task_packages"
+                ]
+              }
+            },
+            {
+              "required": [
+                "task_packages"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "task_package"
+                    ]
+                  }
+                ]
+              }
+            }
           ],
           "not": {
             "required": [
-              "task_packages"
+              "source"
             ]
           }
         },
         {
           "required": [
-            "task_packages"
+            "source"
           ],
-          "not": {
-            "anyOf": [
-              {
-                "required": [
-                  "kind"
-                ]
-              },
-              {
-                "required": [
-                  "task_package"
-                ]
-              }
-            ]
-          }
+          "maxProperties": 1
         }
       ]
     },
@@ -536,6 +555,24 @@
           }
         }
       }
+    },
+    "continuation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "archive": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "archive",
+        "sha256"
+      ]
     }
   },
   "required": [

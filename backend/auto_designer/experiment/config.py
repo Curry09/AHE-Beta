@@ -68,6 +68,18 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
             if not local_ci_enabled(data):
                 raise ConfigError(f"runtime.local.{field} requires ci_enabled=true")
             _validate_ci_image_reference(local[field])
+    # Spec-0079/T4: three input selectors are one atomic public contract.
+    continuation = data.get("continuation")
+    parent_workload = data["workload"].get("source") == "parent"
+    parent_harness = data["harness"]["source"] == "continuation"
+    if any((continuation is not None, parent_workload, parent_harness)):
+        if not (continuation is not None and parent_workload and parent_harness):
+            raise ConfigError(
+                "continuation requires harness.source=continuation and workload.source=parent"
+            )
+        continuation["archive"] = resolve_input_path(
+            value=continuation["archive"], base=config_path.parent
+        )
     harness = data["harness"]
     if harness["source"] == "archive":
         if "archive" not in harness or "sha256" not in harness:
@@ -77,25 +89,28 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
         raise ConfigError("builtin Harness forbids archive/sha256 settings")
     # Spec-0073/T1: normalize only new operator inputs; frozen manifests bypass this loader.
     workload = data["workload"]
-    workload["persona_library"] = resolve_input_path(
-        value=workload["persona_library"], base=config_path.parent
-    )
-    if "task_package" in workload:
-        task_path = resolve_input_path(value=workload.pop("task_package"), base=config_path.parent)
-        expected_kind = workload.pop("kind")
-        if load_task_package(task_path)["kind"] != expected_kind:
-            raise ConfigError("task package kind differs from workload.kind")
-        workload["task_packages"] = [task_path]
-    else:
-        workload["task_packages"] = [
-            resolve_input_path(value=value, base=config_path.parent)
-            for value in workload["task_packages"]
-        ]
-    if len(workload["task_packages"]) > 1 and runtime.get("local", {}).get("seed_image"):
-        raise ConfigError("runtime.local.seed_image is only supported for a single task")
+    if not parent_workload:
+        workload["persona_library"] = resolve_input_path(
+            value=workload["persona_library"], base=config_path.parent
+        )
+        if "task_package" in workload:
+            task_path = resolve_input_path(
+                value=workload.pop("task_package"), base=config_path.parent
+            )
+            expected_kind = workload.pop("kind")
+            if load_task_package(task_path)["kind"] != expected_kind:
+                raise ConfigError("task package kind differs from workload.kind")
+            workload["task_packages"] = [task_path]
+        else:
+            workload["task_packages"] = [
+                resolve_input_path(value=value, base=config_path.parent)
+                for value in workload["task_packages"]
+            ]
+        if len(workload["task_packages"]) > 1 and runtime.get("local", {}).get("seed_image"):
+            raise ConfigError("runtime.local.seed_image is only supported for a single task")
     rounds = data["rounds"]
     sessions = rounds["sessions_per_round"]
-    if sessions > len(data["workload"]["persona_ids"]):
+    if not parent_workload and sessions > len(workload["persona_ids"]):
         raise ConfigError("sessions_per_round cannot exceed the number of unique persona_ids")
     if rounds["max_parallel_users"] > sessions:
         raise ConfigError("max_parallel_users cannot exceed sessions_per_round")
@@ -252,3 +267,8 @@ def _validate_ci_image_reference(image: str) -> None:
         or (not separator and not tagged)
     ):
         raise ConfigError("CI image references must use an explicit version or SHA-256 digest")
+
+
+def delivery_required(config: dict[str, Any]) -> bool:
+    """Spec-0079/T4: parent feedback requires delivery even for one new user round."""
+    return config["rounds"]["count"] > 1 or "continuation" in config

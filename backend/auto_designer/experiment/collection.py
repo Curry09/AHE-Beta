@@ -206,6 +206,7 @@ def collect_archive(
     with tempfile.TemporaryDirectory(prefix="collection-stage-", dir=run_dir / "runtime") as tmp:
         stage = Path(tmp)
         files: dict[str, str] = {}
+        public_projections: dict[str, dict[str, str]] = {}
 
         def copy(path: Path, relative: Path) -> None:
             nonlocal consistent
@@ -228,7 +229,15 @@ def collect_archive(
             )
             if raw_relative in expected and expected[raw_relative] != after:
                 consistent = False
-            files[relative.as_posix()] = hashlib.sha256(data).hexdigest()
+            archived_hash = hashlib.sha256(data).hexdigest()
+            files[relative.as_posix()] = archived_hash
+            if before != archived_hash:
+                # Spec-0079/T2: preserve the projection's provenance without secret values.
+                public_projections[relative.as_posix()] = {
+                    "original_sha256": before,
+                    "archive_sha256": archived_hash,
+                    "reason": "credential_redaction",
+                }
 
         for path in list(source.rglob("*")):
             relative = path.relative_to(source)
@@ -255,6 +264,11 @@ def collect_archive(
             "controller": snapshot.get("controller"),
             "collected_at": datetime.now(UTC).isoformat(),
             "files": files,
+            "public_projections": public_projections,
+            "continuation_ready": state == "COMPLETE"
+            and _continuation_ready(
+                stage=stage, manifest=manifest, controller=snapshot.get("controller")
+            ),
         }
         (stage / "collection.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
         temporary = archive_root / ".artifacts.tar.gz.tmp"
@@ -271,3 +285,30 @@ def collect_archive(
         )
         shutil.copy2(archive_root / "collection.json", run_dir / "runtime/collection.json")
         return receipt
+
+
+def _continuation_ready(*, stage: Path, manifest: dict, controller: Any) -> bool:
+    """Spec-0079/T2: code inputs must remain exact; completeness alone is insufficient."""
+    from auto_designer.experiment.continuation.export import EXPORT_PATH
+
+    if not isinstance(controller, dict) or controller.get("experiment_complete") is not True:
+        return False
+    try:
+        export = json.loads((stage / EXPORT_PATH).read_text())
+        identity = {
+            key: manifest[key]
+            for key in ("experiment_id", "run_id", "config_hash", "controller_sha", "plan_hash")
+        }
+        if export.get("status") != "ready" or export["identity"] != identity:
+            return False
+        harness = export["harness"]
+        if sha256_file(stage / harness["archive"]) != harness["sha256"]:
+            return False
+        # Registry inputs include task code/persona/controller inputs. A redacted
+        # trajectory is evidence; redacted executable input cannot seed a child.
+        return all(
+            sha256_file(stage / record["path"]) == record["sha256"]
+            for record in manifest["materials"].values()
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        return False

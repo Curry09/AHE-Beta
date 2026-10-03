@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - 'backend/auto_designer/experiment/**'
+      - 'backend/auto_designer/loop/**'
+      - 'backend/auto_designer/demand/**'
+      - 'backend/auto_designer/observations/**'
+      - 'backend/auto_designer/user/session_store.py'
       - 'backend/scripts/experiment.py'
       - 'backend/auto_designer/user/sim/sources/docker_seed.py'
       - 'backend/deploy/**'
@@ -16,6 +20,8 @@ on:
       - 'backend/scripts/e2e-spec-0071-experiment-cleanup.sh'
       - 'backend/scripts/e2e-spec-0076-seed-task-import.sh'
       - 'backend/scripts/e2e-spec-0077-local-engineering-ci.sh'
+      - 'backend/scripts/e2e-spec-0079-experiment-continuation.sh'
+      - 'backend/tests/fixtures/continuation/**'
       - 'release/compatibility.json'
       - 'pyproject.toml'
       - 'uv.lock'
@@ -38,3 +44,4 @@ jobs:
       - run: bash backend/scripts/e2e-spec-0071-experiment-cleanup.sh
       - run: bash backend/scripts/e2e-spec-0076-seed-task-import.sh
       - run: bash backend/scripts/e2e-spec-0077-local-engineering-ci.sh
+      - run: bash backend/scripts/e2e-spec-0079-experiment-continuation.sh

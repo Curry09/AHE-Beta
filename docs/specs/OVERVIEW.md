@@ -232,6 +232,9 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 ### 0077 本地工程 CI runner 生命周期
 可选启用本地实验专属 Gitea Actions runner，核验就绪后才开启 OpenAgents CI 门禁，并纳入资源所有权和清理。
 
+### 0079 当前实验归档继承与追加迭代
+当前完整归档作为冻结父输入，新run先交付末轮反馈再追加用户轮，复用统一入口与恢复机制，不兼容旧版产物。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -565,6 +568,12 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0077 | 0077/T2 | 专属 runner 与执行生命周期 | done | — | backend/auto_designer/experiment/backends/local_ci.py<br>backend/auto_designer/experiment/backends/local.py<br>backend/auto_designer/experiment/infrastructure.py<br>backend/deploy/experiment/docker-compose.yml<br>backend/tests/test_experiment_local_ci.py |
 | 0077 | 0077/T3 | 双语工程 CI 使用文档 | done | — | docs/tutorials/local-engineering-ci.md<br>docs/tutorials/local-engineering-ci.zh-CN.md<br>docs/tutorials/seed-task-import.md<br>docs/tutorials/seed-task-import.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>README.md<br>README.zh-CN.md<br>docs/audits/unified-entry-capability-migration-20261003.md<br>CLAUDE.md |
 | 0077 | 0077/T4 | 工程状态采集和端到端实证 | done | T1, T2, T3 | backend/auto_designer/experiment/collection.py<br>backend/tests/test_experiment_ci_collection.py<br>backend/auto_designer/user/sim/runtime.py<br>backend/tests/user/sim/test_process_cleanup.py<br>backend/scripts/e2e-spec-0077-local-engineering-ci.sh<br>docs/validation/local-engineering-ci.md<br>.github/workflows/experiment-contract.yml |
+| 0079 | 0079/T1 | 当前归档来源与契约核验 | done | — | backend/auto_designer/experiment/continuation/__init__.py<br>backend/auto_designer/experiment/continuation/source.py<br>backend/auto_designer/experiment/schemas/continuation-export-v1.json<br>backend/tests/test_experiment_continuation_source.py |
+| 0079 | 0079/T2 | 规范导出与父证据报告投影 | done | T1 | backend/auto_designer/experiment/continuation/export.py<br>backend/auto_designer/experiment/continuation/evidence.py<br>backend/auto_designer/experiment/continuation/forge.py<br>backend/auto_designer/experiment/collection.py<br>backend/tests/test_experiment_continuation_export.py<br>backend/tests/test_experiment_continuation_evidence.py<br>backend/tests/test_experiment_continuation_forge.py |
+| 0079 | 0079/T3 | 共用反馈交付阶段 | done | — | backend/auto_designer/loop/feedback_pipeline.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/demand/triage.py<br>backend/auto_designer/demand/divergent.py<br>backend/auto_designer/demand/grouped_synthesizer.py<br>backend/tests/loop/test_feedback_pipeline.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/demand/test_triage.py<br>backend/tests/demand/test_divergent_gate.py<br>backend/tests/demand/test_grouped_synthesizer.py |
+| 0079 | 0079/T4 | 冻结继承配置及统一执行恢复 | done | T1, T2, T3 | backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/schemas/experiment-v2.json<br>backend/auto_designer/experiment/materials.py<br>backend/auto_designer/experiment/context.py<br>backend/auto_designer/experiment/workload.py<br>backend/auto_designer/experiment/controllers/unified.py<br>backend/auto_designer/experiment/controllers/feedback.py<br>backend/auto_designer/experiment/controllers/runtime.py<br>backend/auto_designer/experiment/engine.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/backends/local.py<br>backend/tests/test_experiment_continuation_config.py<br>backend/tests/test_experiment_continuation_lifecycle.py<br>backend/tests/test_experiment_continuation_workload.py |
+| 0079 | 0079/T5 | 双语追加实验教程 | done | T4 | docs/tutorials/experiment-continuation.md<br>docs/tutorials/experiment-continuation.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/audits/unified-entry-capability-migration-20261003.md<br>README.md<br>README.zh-CN.md<br>CLAUDE.md |
+| 0079 | 0079/T6 | 合同与真实双后端验收 | done | T4, T5 | backend/scripts/e2e-spec-0079-experiment-continuation.sh<br>backend/tests/test_experiment_continuation_contract.py<br>backend/tests/fixtures/continuation/current-parent-v1.json<br>docs/validation/experiment-continuation.md<br>.github/workflows/experiment-contract.yml |
 
 ## 跨 feature 关系图
 
@@ -1051,6 +1060,14 @@ graph LR
         n0077_T3["T3 双语工程 CI 使用文档"]
         n0077_T4["T4 工程状态采集和端到端实证"]
     end
+    subgraph G0079[0079 experiment-continuation]
+        n0079_T1["T1 当前归档来源与契约核验"]
+        n0079_T2["T2 规范导出与父证据报告投影"]
+        n0079_T3["T3 共用反馈交付阶段"]
+        n0079_T4["T4 冻结继承配置及统一执行恢复"]
+        n0079_T5["T5 双语追加实验教程"]
+        n0079_T6["T6 合同与真实双后端验收"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1407,6 +1424,13 @@ graph LR
     n0077_T4 --> n0077_T1
     n0077_T4 --> n0077_T2
     n0077_T4 --> n0077_T3
+    n0079_T2 --> n0079_T1
+    n0079_T4 --> n0079_T1
+    n0079_T4 --> n0079_T2
+    n0079_T4 --> n0079_T3
+    n0079_T5 --> n0079_T4
+    n0079_T6 --> n0079_T4
+    n0079_T6 --> n0079_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1462,16 +1486,16 @@ graph LR
 | 文件 | 涉及组 |
 |----|----|
 | .github/workflows/ci.yml | 0070, 0071 |
-| .github/workflows/experiment-contract.yml | 0069, 0071, 0076, 0077 |
+| .github/workflows/experiment-contract.yml | 0069, 0071, 0076, 0077, 0079 |
 | .gitignore | 0069, 0071 |
-| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069, 0071, 0073, 0075, 0076, 0077 |
+| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069, 0071, 0073, 0075, 0076, 0077, 0079 |
 | OpenAgents/openagents/recipes/stages.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061, 0063 |
 | OpenAgents/openagents/runtime/context.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/runtime/engine.py | 0049, 0061, 0063 |
 | OpenAgents/openagents/utils/gitea.py | 0032, 0061 |
-| README.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077 |
-| README.zh-CN.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077 |
+| README.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079 |
+| README.zh-CN.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0032 |
 | backend/agent_defs/divergent_pm/agent.yaml | 0029, 0061, 0068 |
 | backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059, 0060, 0061, 0068 |
@@ -1494,9 +1518,9 @@ graph LR
 | backend/auto_designer/demand/agent_contract.py | 0027, 0029, 0043, 0052, 0060, 0068 |
 | backend/auto_designer/demand/agent_runtime.py | 0029, 0041, 0049, 0059, 0061, 0066, 0068 |
 | backend/auto_designer/demand/delivery_evidence.py | 0061, 0064, 0068, 0070 |
-| backend/auto_designer/demand/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059, 0061, 0064, 0068 |
+| backend/auto_designer/demand/divergent.py | 0028, 0029, 0042, 0043, 0049, 0055, 0059, 0061, 0064, 0068, 0079 |
 | backend/auto_designer/demand/evidence_contract.py | 0055, 0056, 0059, 0068, 0073 |
-| backend/auto_designer/demand/grouped_synthesizer.py | 0063, 0064, 0066, 0068 |
+| backend/auto_designer/demand/grouped_synthesizer.py | 0063, 0064, 0066, 0068, 0079 |
 | backend/auto_designer/demand/issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0052, 0068 |
 | backend/auto_designer/demand/observation_provider.py | 0059, 0061, 0068 |
 | backend/auto_designer/demand/owner.py | 0029, 0032, 0042, 0043, 0049, 0052, 0060, 0061, 0064, 0068 |
@@ -1506,29 +1530,32 @@ graph LR
 | backend/auto_designer/demand/session_timeline.py | 0024, 0054, 0055, 0056, 0059, 0068 |
 | backend/auto_designer/demand/submit_tools.py | 0029, 0043, 0068 |
 | backend/auto_designer/demand/synthesizer.py | 0016, 0018, 0020, 0024, 0025, 0027, 0028, 0029, 0039, 0042, 0043, 0049, 0052, 0055, 0059, 0060, 0061, 0064, 0068 |
-| backend/auto_designer/demand/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055, 0061, 0064, 0068 |
+| backend/auto_designer/demand/triage.py | 0025, 0027, 0029, 0042, 0043, 0049, 0055, 0061, 0064, 0068, 0079 |
 | backend/auto_designer/dev/agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/auto_designer/distill/seed_library.py | 0010, 0071 |
 | backend/auto_designer/evaluation/swebench.py | 0051, 0075 |
 | backend/auto_designer/experiment/__init__.py | 0047, 0071 |
 | backend/auto_designer/experiment/backends/e2b.py | 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/backends/e2b_bootstrap.py | 0069, 0071, 0072, 0073 |
-| backend/auto_designer/experiment/backends/local.py | 0069, 0071, 0072, 0073, 0077 |
+| backend/auto_designer/experiment/backends/local.py | 0069, 0071, 0072, 0073, 0077, 0079 |
 | backend/auto_designer/experiment/cli.py | 0047, 0053, 0064, 0069, 0071, 0072, 0074, 0075, 0076 |
-| backend/auto_designer/experiment/collection.py | 0069, 0077 |
-| backend/auto_designer/experiment/config.py | 0047, 0069, 0071, 0072, 0073, 0077 |
-| backend/auto_designer/experiment/context.py | 0069, 0071, 0072, 0073, 0077 |
+| backend/auto_designer/experiment/collection.py | 0069, 0077, 0079 |
+| backend/auto_designer/experiment/config.py | 0047, 0069, 0071, 0072, 0073, 0077, 0079 |
+| backend/auto_designer/experiment/context.py | 0069, 0071, 0072, 0073, 0077, 0079 |
 | backend/auto_designer/experiment/controllers/__init__.py | 0071, 0073 |
 | backend/auto_designer/experiment/controllers/ordinary.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0064, 0068, 0069, 0070, 0071, 0072, 0073 |
+| backend/auto_designer/experiment/controllers/runtime.py | 0073, 0079 |
 | backend/auto_designer/experiment/controllers/swebench.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051, 0063, 0064, 0068, 0069, 0071, 0072, 0073 |
+| backend/auto_designer/experiment/controllers/unified.py | 0073, 0079 |
 | backend/auto_designer/experiment/dashboard.py | 0072, 0073 |
-| backend/auto_designer/experiment/engine.py | 0069, 0071, 0073 |
+| backend/auto_designer/experiment/engine.py | 0069, 0071, 0073, 0079 |
 | backend/auto_designer/experiment/infrastructure.py | 0047, 0069, 0077 |
 | backend/auto_designer/experiment/manifest.py | 0047, 0064, 0069, 0071 |
-| backend/auto_designer/experiment/materials.py | 0069, 0071, 0072, 0073, 0077 |
-| backend/auto_designer/experiment/runtime.py | 0047, 0053, 0064, 0069, 0071, 0072, 0073 |
-| backend/auto_designer/experiment/schemas/experiment-v2.json | 0069, 0072, 0073, 0077 |
+| backend/auto_designer/experiment/materials.py | 0069, 0071, 0072, 0073, 0077, 0079 |
+| backend/auto_designer/experiment/runtime.py | 0047, 0053, 0064, 0069, 0071, 0072, 0073, 0079 |
+| backend/auto_designer/experiment/schemas/experiment-v2.json | 0069, 0072, 0073, 0077, 0079 |
 | backend/auto_designer/experiment/schemas/task-package-v1.json | 0069, 0072 |
+| backend/auto_designer/experiment/workload.py | 0073, 0079 |
 | backend/auto_designer/guards/harness_boundary.py | 0015, 0030, 0040, 0068 |
 | backend/auto_designer/guards/repo_guard.py | 0021, 0068 |
 | backend/auto_designer/guards/workspace_jail.py | 0015, 0049, 0059, 0068 |
@@ -1541,7 +1568,7 @@ graph LR
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053, 0064, 0068, 0073 |
 | backend/auto_designer/loop/live_tracer.py | 0032, 0041, 0066, 0068 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029, 0068 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0063, 0064, 0068, 0073 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0063, 0064, 0068, 0073, 0079 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032, 0068 |
 | backend/auto_designer/loop/round_gate.py | 0050, 0062, 0064 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007, 0064 |
@@ -1615,9 +1642,9 @@ graph LR
 | backend/tests/demand/test_agent_contract.py | 0027, 0043, 0052, 0068 |
 | backend/tests/demand/test_agent_runtime.py | 0029, 0041, 0049, 0068 |
 | backend/tests/demand/test_delivery_evidence.py | 0061, 0064, 0068, 0070 |
-| backend/tests/demand/test_divergent_gate.py | 0028, 0029, 0043, 0055, 0064, 0068 |
+| backend/tests/demand/test_divergent_gate.py | 0028, 0029, 0043, 0055, 0064, 0068, 0079 |
 | backend/tests/demand/test_evidence_contract.py | 0055, 0068, 0073 |
-| backend/tests/demand/test_grouped_synthesizer.py | 0063, 0064, 0068 |
+| backend/tests/demand/test_grouped_synthesizer.py | 0063, 0064, 0068, 0079 |
 | backend/tests/demand/test_issue_schema.py | 0025, 0027, 0028, 0029, 0032, 0068 |
 | backend/tests/demand/test_observation_provider.py | 0059, 0060, 0068 |
 | backend/tests/demand/test_owner.py | 0029, 0032, 0042, 0043, 0052, 0060, 0064, 0068 |
@@ -1626,7 +1653,7 @@ graph LR
 | backend/tests/demand/test_role_contract_flow.py | 0042, 0043, 0055, 0060, 0068 |
 | backend/tests/demand/test_session_timeline.py | 0024, 0054, 0068 |
 | backend/tests/demand/test_terminal_evidence.py | 0056, 0068 |
-| backend/tests/demand/test_triage.py | 0025, 0027, 0029, 0042, 0043, 0055, 0064, 0068 |
+| backend/tests/demand/test_triage.py | 0025, 0027, 0029, 0042, 0043, 0055, 0064, 0068, 0079 |
 | backend/tests/dev/test_agentic_developer.py | 0007, 0020, 0025, 0028, 0029, 0032 |
 | backend/tests/distill/test_seed_adapter.py | 0010, 0071 |
 | backend/tests/evaluation/test_swebench.py | 0051, 0075 |
@@ -1644,7 +1671,7 @@ graph LR
 | backend/tests/loop/test_live.py | 0017, 0026, 0050, 0064, 0068, 0073 |
 | backend/tests/loop/test_live_tracer.py | 0041, 0068 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029, 0068 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062, 0064, 0068, 0073 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062, 0064, 0068, 0073, 0079 |
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
 | backend/tests/loop/test_recovery.py | 0064, 0068, 0073 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032, 0068 |
@@ -1709,13 +1736,13 @@ graph LR
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041, 0068, 0073 |
 | docs/0048-user-sim-final-check-convergence.md | 0048, 0071 |
 | docs/ARCHITECTURE.md | 0068, 0071, 0073 |
-| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075, 0076, 0077 |
-| docs/CONFIGURATION.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077 |
+| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079 |
+| docs/CONFIGURATION.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079 |
 | docs/EXPORTING.md | 0068, 0071 |
 | docs/QUICKSTART.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075 |
 | docs/QUICKSTART.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075 |
 | docs/audits/0061-observation-lifecycle-validation.md | 0061, 0071 |
-| docs/audits/unified-entry-capability-migration-20261003.md | 0071, 0072, 0075, 0076, 0077 |
+| docs/audits/unified-entry-capability-migration-20261003.md | 0071, 0072, 0075, 0076, 0077, 0079 |
 | docs/specs/0014-dev-commit-discipline.md | 0068, 0071 |
 | docs/specs/0015-dev-overfit-isolation.md | 0068, 0071 |
 | docs/specs/0016-synthesizer-rootcause-signal.md | 0068, 0071 |
@@ -4143,4 +4170,42 @@ graph LR
     class v_T2_1 st_done;
     class v_T3_1 st_done;
     class v_T4_1 st_done;
+```
+
+### 0079 当前实验归档继承与追加迭代（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 当前归档来源与契约核验"]
+    nT2["T2 规范导出与父证据报告投影"]
+    nT3["T3 共用反馈交付阶段"]
+    nT4["T4 冻结继承配置及统一执行恢复"]
+    nT5["T5 双语追加实验教程"]
+    nT6["T6 合同与真实双后端验收"]
+    nT1 --> nT2
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+    nT4 --> nT5
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
+    class v_T6_1 st_done;
 ```

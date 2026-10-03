@@ -191,10 +191,17 @@ class Triager:
         self._on_status = on_status
         self._on_event = on_event
         self._recovery = recovery
+        self._feedback_dependency = "users"
 
     def bind_recovery(self, recovery: RecoveryStore) -> None:
         """Attach the experiment ledger after role construction."""
         self._recovery = recovery
+
+    def bind_feedback_dependency(self, prerequisite: str) -> None:
+        """Spec-0079/T3: share the outer feedback stage prerequisite."""
+        if prerequisite not in {"users", "feedback_imported"}:
+            raise ValueError("unsupported feedback prerequisite")
+        self._feedback_dependency = prerequisite
 
     def triage_once(
         self, pending: list | None = None, shard: tuple[int, int] | None = None
@@ -395,7 +402,7 @@ class Triager:
             key=key,
             input_value={"report": issue.to_dict()},
             expected_postconditions={"completed": True},
-            dependencies=("users",),
+            dependencies=(self._feedback_dependency,),
         )
 
     def _fail_recovery_item(self, *, key: str, error: str) -> None:

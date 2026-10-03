@@ -98,6 +98,18 @@ _Spec-0069/T2: execution adapters implement the same experiment lifecycle._
 | `local.py` | Spec-0069/T3: frozen local toolchains and an experiment-owned Docker stack. |
 | `local_ci.py` | Spec-0077/T2: private registration and real PR readiness for an owned runner. |
 
+### auto_designer.experiment.continuation
+
+_Current, frozen experiment archive continuation contracts._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Current, frozen experiment archive continuation contracts. |
+| `evidence.py` | Spec-0079/T2: parent evidence stays read-only and outside child session metrics. |
+| `export.py` | Spec-0079/T2: export the ledger-selected final Git tree and evidence boundary. |
+| `forge.py` | Spec-0079/T2: project only selected pending reports into the child's fresh forge. |
+| `source.py` | Read and validate current collect archives without executing their contents. |
+
 ### auto_designer.experiment.controllers
 
 _Spec-0073/T4: one unified controller backed by shared experiment runtime._
@@ -105,6 +117,7 @@ _Spec-0073/T4: one unified controller backed by shared experiment runtime._
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | Spec-0073/T4: one unified controller backed by shared experiment runtime. |
+| `feedback.py` | Spec-0079/T4: concrete phase role assembly and inherited feedback initialization. |
 | `runtime.py` | Spec-0073/T4: shared experiment runtime: repository, delivery process and round receipts. |
 | `unified.py` | Spec-0073/T4: unified frozen-task experiment controller. Start through the experiment CLI. |
 
@@ -138,6 +151,7 @@ _Conversation-loop coordination, tracing, and lifecycle management._
 |----|----|
 | `__init__.py` | Conversation-loop coordination, tracing, and lifecycle management. |
 | `checkpoint.py` | checkpoint 存取（spec-0004/T1）：把自包含 STATE_DIR 打包成可下载 artifact，反向还原。 |
+| `feedback_pipeline.py` | Spec-0079/T3: one recoverable feedback and delivery cycle. |
 | `live.py` | 多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/。 |
 | `live_tracer.py` | StepTracer：把 nexau agent 运行中的过程流成看板可见的结构化事件。 |
 | `metrics.py` | metrics（spec-0003/T6，曲线口径 spec-0025/T7）：统计体感与 issue backlog 随时间的曲线。 |
@@ -283,7 +297,13 @@ graph LR
     nauto_designer_experiment_collection["experiment.collection"]
     nauto_designer_experiment_config["experiment.config"]
     nauto_designer_experiment_context["experiment.context"]
+    nauto_designer_experiment_continuation["experiment.continuation"]
+    nauto_designer_experiment_continuation_evidence["continuation.evidence"]
+    nauto_designer_experiment_continuation_export["continuation.export"]
+    nauto_designer_experiment_continuation_forge["continuation.forge"]
+    nauto_designer_experiment_continuation_source["continuation.source"]
     nauto_designer_experiment_controllers["experiment.controllers"]
+    nauto_designer_experiment_controllers_feedback["controllers.feedback"]
     nauto_designer_experiment_controllers_runtime["controllers.runtime"]
     nauto_designer_experiment_controllers_unified["controllers.unified"]
     nauto_designer_experiment_dashboard["experiment.dashboard"]
@@ -306,6 +326,7 @@ graph LR
     nauto_designer_invocation["auto_designer.invocation"]
     nauto_designer_loop["auto_designer.loop"]
     nauto_designer_loop_checkpoint["loop.checkpoint"]
+    nauto_designer_loop_feedback_pipeline["loop.feedback_pipeline"]
     nauto_designer_loop_live["loop.live"]
     nauto_designer_loop_live_tracer["loop.live_tracer"]
     nauto_designer_loop_metrics["loop.metrics"]
@@ -492,10 +513,43 @@ graph LR
     nauto_designer_experiment_cli --> nauto_designer_experiment_runtime
     nauto_designer_experiment_cli --> nauto_designer_experiment_task_import
     nauto_designer_experiment_collection --> nauto_designer_experiment_config
+    nauto_designer_experiment_collection --> nauto_designer_experiment_continuation_export
     nauto_designer_experiment_collection --> nauto_designer_experiment_materials
     nauto_designer_experiment_context --> nauto_designer_experiment_config
     nauto_designer_experiment_context --> nauto_designer_experiment_workload
     nauto_designer_experiment_context --> nauto_designer_models
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_demand_evidence_contract
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_models
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_observations_grants
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_observations_publication
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_user_session_store
+    nauto_designer_experiment_continuation_export --> nauto_designer_demand_issue_schema
+    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_materials
+    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_workload
+    nauto_designer_experiment_continuation_export --> nauto_designer_loop_recovery
+    nauto_designer_experiment_continuation_forge --> nauto_designer_demand_issue_schema
+    nauto_designer_experiment_continuation_forge --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_forge --> nauto_designer_loop_recovery
+    nauto_designer_experiment_continuation_forge --> nauto_designer_models
+    nauto_designer_experiment_continuation_forge --> nauto_designer_tracker_base
+    nauto_designer_experiment_continuation_source --> nauto_designer_demand_issue_schema
+    nauto_designer_experiment_continuation_source --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_source --> nauto_designer_experiment_workload
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_divergent
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_grouped_synthesizer
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_owner
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_synthesizer
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_triage
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_config
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_context
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_continuation_evidence
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_continuation_forge
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_materials
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_loop_feedback_pipeline
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_loop_recovery
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_observations_grants
     nauto_designer_experiment_controllers_runtime --> nauto_designer_demand_issue_schema
     nauto_designer_experiment_controllers_runtime --> nauto_designer_guards_harness_boundary
     nauto_designer_experiment_controllers_runtime --> nauto_designer_invocation
@@ -506,14 +560,13 @@ graph LR
     nauto_designer_experiment_controllers_runtime --> nauto_designer_observations_transport
     nauto_designer_experiment_controllers_runtime --> nauto_designer_tracker_attachment_transport
     nauto_designer_experiment_controllers_runtime --> nauto_designer_tracker_gitea
-    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_divergent
-    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_grouped_synthesizer
-    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_owner
-    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_synthesizer
-    nauto_designer_experiment_controllers_unified --> nauto_designer_demand_triage
     nauto_designer_experiment_controllers_unified --> nauto_designer_distill_library
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_collection
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_config
     nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_context
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_continuation_export
     nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers_feedback
     nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers_runtime
     nauto_designer_experiment_controllers_unified --> nauto_designer_guards_repo_guard
     nauto_designer_experiment_controllers_unified --> nauto_designer_harness_launcher
@@ -554,6 +607,8 @@ graph LR
     nauto_designer_experiment_manifest --> nauto_designer_experiment_config
     nauto_designer_experiment_materials --> nauto_designer_distill_library
     nauto_designer_experiment_materials --> nauto_designer_experiment_config
+    nauto_designer_experiment_materials --> nauto_designer_experiment_continuation_forge
+    nauto_designer_experiment_materials --> nauto_designer_experiment_continuation_source
     nauto_designer_experiment_materials --> nauto_designer_experiment_workload
     nauto_designer_experiment_materials --> nauto_designer_user_sim_persona_io
     nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_e2b
@@ -578,6 +633,10 @@ graph LR
     nauto_designer_harness_launcher --> nauto_designer_observations_publication
     nauto_designer_harness_launcher --> nauto_designer_user_sim_runtime
     nauto_designer_invocation --> nauto_designer_usage
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_loop_recovery
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_loop_round_gate
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_models
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_usage
     nauto_designer_loop_live_tracer --> nauto_designer_usage
     nauto_designer_loop_metrics --> nauto_designer_demand_issue_schema
     nauto_designer_loop_metrics --> nauto_designer_tracker_base
@@ -586,6 +645,7 @@ graph LR
     nauto_designer_loop_orchestrator --> nauto_designer_demand_synthesizer
     nauto_designer_loop_orchestrator --> nauto_designer_harness_interface
     nauto_designer_loop_orchestrator --> nauto_designer_harness_launcher
+    nauto_designer_loop_orchestrator --> nauto_designer_loop_feedback_pipeline
     nauto_designer_loop_orchestrator --> nauto_designer_loop_recovery
     nauto_designer_loop_orchestrator --> nauto_designer_loop_round_gate
     nauto_designer_loop_orchestrator --> nauto_designer_models

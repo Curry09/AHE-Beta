@@ -337,10 +337,15 @@ def _completion(root: Path) -> dict[str, Any]:
             for number in range(1, expected + 1)
         )
     )
+    bootstrap = {}
+    if "continuation" in manifest.get("config", {}):
+        bootstrap = _bootstrap_completion(root=root, manifest=manifest, rounds=saved)
+        complete = complete and bootstrap.get("complete") is True
     return {
         "expected_rounds": expected,
         "sealed_rounds": sorted(sealed),
         "experiment_complete": bool(complete),
+        **({"continuation_bootstrap": bootstrap} if bootstrap else {}),
     }
 
 
@@ -510,6 +515,45 @@ def main(argv: list[str] | None = None) -> int:
         result = launch_controller(run_dir=args.run_dir, command=command, env=env)
     print(json.dumps(result, ensure_ascii=False))
     return 0
+
+
+# Spec-0079/T4: completion must prove new users actually tested the bootstrap result.
+def _bootstrap_completion(*, root: Path, manifest: dict[str, Any], rounds: dict) -> dict:
+    receipt = _json(root / "runtime/continuation-bootstrap.json")
+    ledger = _json(root / "checkpoints/continuation-bootstrap/recovery.json")
+    try:
+        input_path = material_path(root, manifest, "continuation_input")
+        expected_input = manifest["materials"]["continuation_input"]["sha256"]
+        identity = {
+            key: manifest[key]
+            for key in ("run_id", "experiment_id", "config_hash", "controller_sha")
+        }
+        identity["plan_hash"] = expected_input
+        bootstrap = (ledger.get("rounds") or {}).get("1") or {}
+        seal = bootstrap.get("sealed_sha")
+        issue_map_path = root / "runtime/continuation-issue-map.json"
+        projection = _json(issue_map_path)
+        complete = (
+            sha256_file(input_path) == expected_input
+            and ledger.get("identity") == identity
+            and receipt.get("identity") == identity
+            and receipt.get("phase") == "continuation-bootstrap"
+            and receipt.get("status") == "completed"
+            and receipt.get("input_sha256") == expected_input
+            and receipt.get("issue_map_sha256") == sha256_file(issue_map_path)
+            and projection.get("complete") is True
+            and bootstrap.get("status") == "completed"
+            and seal == receipt.get("sealed_sha")
+            and isinstance(seal, str)
+            and len(seal) == 40
+            and (rounds.get("1") or {}).get("user_sha") == seal
+            and (bootstrap.get("stages", {}).get("feedback_imported") or {}).get("status")
+            == "completed"
+            and (bootstrap.get("stages", {}).get("round_sealed") or {}).get("status") == "completed"
+        )
+        return {"complete": bool(complete), "phase": "continuation-bootstrap", "sealed_sha": seal}
+    except (OSError, KeyError, ConfigError):
+        return {"complete": False, "phase": "continuation-bootstrap"}
 
 
 if __name__ == "__main__":

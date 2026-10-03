@@ -76,11 +76,34 @@ def task_digest(task: dict[str, Any]) -> str:
 
 
 def compile_session_plan(
-    config: dict[str, Any], catalog: dict[str, Any], catalog_hash: str
+    config: dict[str, Any],
+    catalog: dict[str, Any],
+    catalog_hash: str,
+    inherited_pairs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     tasks = catalog_tasks(catalog)
     by_id = {task["id"]: task for task in tasks}
-    pairs = interaction_plan(config, tasks)
+    if config["workload"].get("source") == "parent":
+        if not inherited_pairs:
+            raise ConfigError("Inherited workload requires frozen parent pairs")
+        if len(inherited_pairs) != config["rounds"]["sessions_per_round"]:
+            raise ConfigError("Inherited pair count differs from sessions_per_round")
+        picks = []
+        seen = set()
+        for pair in inherited_pairs:
+            task_id, persona = pair["task_id"], pair["persona_id"]
+            if task_id not in by_id or persona in seen:
+                raise ConfigError("Inherited workload contains unknown task or duplicate persona")
+            if (pair["task_digest"], pair["interaction"]) != (
+                by_id[task_id]["digest"],
+                by_id[task_id]["interaction"],
+            ):
+                raise ConfigError("Inherited task binding identity differs from catalog")
+            seen.add(persona)
+            picks.append([persona, task_id])
+        pairs = [picks for _ in range(config["rounds"]["count"])]
+    else:
+        pairs = interaction_plan(config, tasks)
     return {
         "contract_version": CONTRACT_VERSION,
         "catalog_hash": catalog_hash,
@@ -190,7 +213,13 @@ def read_session_plan(run_dir: Path, manifest: dict[str, Any]) -> dict[str, Any]
         or plan["contract_version"] != CONTRACT_VERSION
     ):
         raise ConfigError("Unknown session plan contract_version")
-    expected = compile_session_plan(manifest["config"], catalog, manifest["catalog_hash"])
+    inherited_pairs = None
+    if manifest["config"]["workload"].get("source") == "parent":
+        inherited = read_json_document(path=_material_path(run_dir, manifest, "continuation_input"))
+        inherited_pairs = inherited["pairs"]
+    expected = compile_session_plan(
+        manifest["config"], catalog, manifest["catalog_hash"], inherited_pairs
+    )
     # JSON hashing preserves scalar types: True/1 and 1.0/1 must not compare equal.
     if config_hash(data=plan) != config_hash(data=expected):
         raise ConfigError("Frozen session plan does not match logical task/persona bindings")

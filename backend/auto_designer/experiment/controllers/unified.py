@@ -112,8 +112,6 @@ def main() -> int:
     no_proxy = ",".join(bypass)
     os.environ["NO_PROXY"] = no_proxy
     os.environ["no_proxy"] = no_proxy
-    from auto_designer.demand.synthesizer import Synthesizer
-    from auto_designer.demand.triage import Triager
     from auto_designer.distill.library import PersonaLibrary
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.loop.metrics import Metrics
@@ -162,10 +160,6 @@ def main() -> int:
     store = SessionStore(role_runs / "sessions")
     launcher = HarnessLauncher(harness_repo=str(repo), runs_root=runtime.DATA / "harness_runs")
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 生成/准入角色 ...")
-    synthesizer_agent_def = str(runtime.ROOT / "agent_defs" / "synthesizer")
-    triager_agent_def = str(runtime.ROOT / "agent_defs" / "triage_agent")
-    divergent_agent_def = str(runtime.ROOT / "agent_defs" / "divergent_pm")
-    owner_agent_def = str(runtime.ROOT / "agent_defs" / "owner")
     api = ApiPersonaClient()
 
     def client_factory() -> AgenticPersonaClient:
@@ -195,7 +189,6 @@ def main() -> int:
 
     from auto_designer.loop.live import (
         append_agent_log,
-        archive_agent,
         clear_live,
         prepare_live_resume,
         update_agent,
@@ -255,160 +248,27 @@ def main() -> int:
         round_provider=lambda: current["round"] or None,
     )
 
-    def make_triager_status(agent_id, label):
+    from auto_designer.experiment.controllers.feedback import assemble_feedback_roles
 
-        def cb(*, running, status, detail=None, **kw):
-            update_agent(
-                data_dir=runtime.DATA,
-                agent_id=agent_id,
-                role="triager",
-                label=label,
-                running=running,
-                status=status,
-                detail=detail,
-                round_no=current["round"],
-            )
-            if not running:
-                archive_agent(
-                    data_dir=runtime.DATA,
-                    agent_id=agent_id,
-                    round_no=current["round"],
-                    extra={"kind": "triager_run"},
-                )
-
-        return cb
-
-    triagers = [
-        Triager(
-            tracker,
-            store,
-            str(repo),
-            triager_agent_def,
-            on_status=make_triager_status(
-                f"triager-{i}", "triager" if roster["triager"] == 1 else f"triager#{i + 1}"
-            ),
-            on_event=make_event_logger(f"triager-{i}"),
-        )
-        for i in range(roster["triager"])
-    ]
-
-    def make_synthesizer_status(agent_id, label):
-
-        def cb(*, running, status, detail=None, proposals=None):
-            update_agent(
-                data_dir=runtime.DATA,
-                agent_id=agent_id,
-                role="synthesizer",
-                label=label,
-                running=running,
-                status=status,
-                detail=detail,
-                round_no=current["round"],
-            )
-            if not running:
-                archive_agent(
-                    data_dir=runtime.DATA,
-                    agent_id=agent_id,
-                    round_no=current["round"],
-                    extra={"kind": "synthesizer_run", "proposals": proposals or []},
-                )
-
-        return cb
-
-    synthesizers = [
-        Synthesizer(
-            tracker,
-            store,
-            str(repo),
-            synthesizer_agent_def,
-            on_status=make_synthesizer_status(
-                f"synthesizer-{i}",
-                "synthesizer" if roster["synthesizer"] == 1 else f"synthesizer#{i + 1}",
-            ),
-            on_event=make_event_logger(f"synthesizer-{i}"),
-            round_provider=lambda: current["round"] or None,
-        )
-        for i in range(roster["synthesizer"])
-    ]
-    from auto_designer.demand.grouped_synthesizer import group_synthesizer_stage
-
-    synthesizers = group_synthesizer_stage(
-        synthesizers, artifact_root=role_runs / "synthesizer_grouping"
+    feedback_roles = assemble_feedback_roles(
+        tracker=tracker,
+        store=store,
+        repo=repo,
+        definitions_root=runtime.ROOT / "agent_defs",
+        roster=roster,
+        round_provider=lambda: current["round"] or None,
+        artifact_root=role_runs / "synthesizer_grouping",
+        status_factory=lambda role, agent_id, label: _role_status(
+            role=role,
+            agent_id=agent_id,
+            label=label,
+            data_dir=runtime.DATA,
+            round_provider=lambda: current["round"],
+        ),
+        event_factory=make_event_logger,
     )
-
-    def make_divergent_status(agent_id, label):
-
-        def cb(*, running, status, detail=None, proposals=None):
-            update_agent(
-                data_dir=runtime.DATA,
-                agent_id=agent_id,
-                role="divergent",
-                label=label,
-                running=running,
-                status=status,
-                detail=detail,
-                round_no=current["round"],
-            )
-            if not running:
-                archive_agent(
-                    data_dir=runtime.DATA,
-                    agent_id=agent_id,
-                    round_no=current["round"],
-                    extra={"kind": "divergent_run", "proposals": proposals or []},
-                )
-
-        return cb
-
-    from auto_designer.demand.divergent import Divergent
-
-    divergents = [
-        Divergent(
-            tracker,
-            store,
-            str(repo),
-            divergent_agent_def,
-            on_status=make_divergent_status(
-                f"divergent-{i}", "divergent" if roster["divergent"] == 1 else f"divergent#{i + 1}"
-            ),
-            on_event=make_event_logger(f"divergent-{i}"),
-            round_provider=lambda: current["round"] or None,
-        )
-        for i in range(roster["divergent"])
-    ]
-
-    def make_owner_status(agent_id, label):
-
-        def cb(*, running, status, detail=None, proposals=None):
-            update_agent(
-                data_dir=runtime.DATA,
-                agent_id=agent_id,
-                role="owner",
-                label=label,
-                running=running,
-                status=status,
-                detail=detail,
-                round_no=current["round"],
-            )
-            if not running:
-                archive_agent(
-                    data_dir=runtime.DATA,
-                    agent_id=agent_id,
-                    round_no=current["round"],
-                    extra={"kind": "owner_run", "proposals": proposals or []},
-                )
-
-        return cb
-
-    from auto_designer.demand.owner import Owner
-
-    owner = Owner(
-        tracker,
-        store,
-        str(repo),
-        owner_agent_def,
-        on_status=make_owner_status("owner-0", "owner"),
-        on_event=make_event_logger("owner-0"),
-        review=roster["owner"] >= 1,
+    triagers, synthesizers, divergents, owner = (
+        feedback_roles[key] for key in ("triagers", "synthesizers", "divergents", "owner")
     )
     raw_parallel = os.environ.get("MAX_PARALLEL_USERS", "").strip()
     max_parallel_users = int(raw_parallel) if raw_parallel.isdigit() else len(plan["rounds"][0])
@@ -442,7 +302,11 @@ def main() -> int:
         recovery=recovery,
     )
     vigil = None
-    if runtime.TOTAL_ROUNDS > 1:
+    from auto_designer.experiment.config import delivery_required, read_json_document
+
+    frozen_manifest = read_json_document(path=Path(os.environ["AUTO_DESIGNER_FROZEN_MANIFEST"]))
+    run_root = Path(os.environ["AUTO_DESIGNER_FROZEN_MANIFEST"]).parent
+    if delivery_required(frozen_manifest["config"]):
         print(f"③.5 起交付面 vigil（OpenAgents，mode={runtime.vigil_mode()}）...")
         vigil = runtime.start_vigil(
             repo=repo,
@@ -457,7 +321,61 @@ def main() -> int:
     exit_code = 0
     terminal_phase = "failed"
     try:
+        if "continuation" in frozen_manifest["config"]:
+            from auto_designer.experiment.controllers.feedback import run_continuation_bootstrap
+
+            print(
+                "[continuation-bootstrap] processing parent feedback · "
+                f"parent logical round {frozen_manifest['lineage']['base_round']}"
+            )
+            update_live_run(
+                data_dir=runtime.DATA,
+                running=True,
+                round_no=0,
+                total_rounds=runtime.TOTAL_ROUNDS,
+                phase="continuation-bootstrap",
+            )
+            run_continuation_bootstrap(
+                run_root=run_root,
+                manifest=frozen_manifest,
+                tracker=tracker,
+                child_store=store,
+                repo=repo,
+                definitions_root=runtime.ROOT / "agent_defs",
+                roster=roster,
+                resolve_head=partial(orch._resolve_head, ref="main"),
+                assert_descendant=orch._assert_descendant,
+                integrity_guard=integrity_guard,
+                status_factory=lambda role, agent_id, label: _role_status(
+                    role=role,
+                    agent_id=agent_id,
+                    label=label,
+                    data_dir=runtime.DATA,
+                    round_provider=lambda: 0,
+                ),
+                event_factory=make_event_logger,
+            )
         refs = orch.run(runtime.TOTAL_ROUNDS)
+        from auto_designer.experiment.collection import export_gitea_snapshot
+        from auto_designer.experiment.continuation.export import export_continuation
+
+        export_gitea_snapshot(
+            run_dir=run_root,
+            resources={
+                "gitea": {"url": gitea["GITEA_URL"], "owner": gitea["OWNER"], "repo": gitea["REPO"]}
+            },
+            credentials={"GITEA_TOKEN": gitea["TOKEN"]},
+            terminal=True,
+            controller_nonce=os.environ.get("AUTO_DESIGNER_CONTROLLER_NONCE"),
+        )
+        export_continuation(
+            root=run_root,
+            harness_repo=repo,
+            manifest=frozen_manifest,
+            recovery=recovery,
+            sessions_root=store.root,
+            forge_path=run_root / "runtime/gitea-evidence.json",
+        )
         terminal_phase = "done"
     except KeyboardInterrupt:
         exit_code = 130
@@ -501,6 +419,33 @@ def main() -> int:
     print("本地仓分支:", end=" ")
     subprocess.run(["git", "-C", str(repo), "branch", "--format=%(refname:short)"])
     return exit_code
+
+
+# Spec-0079/T4: phase assembly shares concrete UI callbacks without mutating roles.
+def _role_status(*, role, agent_id, label, data_dir, round_provider):
+    from auto_designer.loop.live import archive_agent, update_agent
+
+    def callback(*, running, status, detail=None, proposals=None, **kwargs):
+        number = round_provider()
+        update_agent(
+            data_dir=data_dir,
+            agent_id=agent_id,
+            role=role,
+            label=label,
+            running=running,
+            status=status,
+            detail=detail,
+            round_no=number,
+        )
+        if not running:
+            archive_agent(
+                data_dir=data_dir,
+                agent_id=agent_id,
+                round_no=number,
+                extra={"kind": role + "_run", "proposals": proposals or []},
+            )
+
+    return callback
 
 
 if __name__ == "__main__":

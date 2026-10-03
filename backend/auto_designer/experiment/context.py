@@ -15,6 +15,7 @@ from auto_designer.experiment.config import (
     ConfigError,
     compose_project,
     delivery_auth_type,
+    delivery_required,
     local_ci_enabled,
     runtime_policies,
 )
@@ -262,6 +263,12 @@ def build_controller_environment(
             "CLAUDE_CONFIG_DIR": str(root / "secrets/claude"),
         }
     )
+    # Spec-0079/T4: no host inheritance; bind frozen parent material explicitly.
+    env["AUTO_DESIGNER_DELIVERY_REQUIRED"] = "1" if delivery_required(config) else "0"
+    if "continuation" in config:
+        env["AUTO_DESIGNER_CONTINUATION_INPUT"] = str(
+            material_path(root, manifest, "continuation_input")
+        )
     if "workload_contract_version" in manifest:
         env.update(
             {

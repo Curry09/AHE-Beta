@@ -29,17 +29,40 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 | `runtime.gitea` | 本地用 `localhost`，E2B 用 `gitea.com`；另填仓库名前缀 |
 | `runtime.local` | 可选镜像覆盖、`ci_enabled`（默认 `false`）；本地工程 CI 必须使用已核验的专属 runner |
 | `runtime.e2b` | `cpu_count`、`memory_mb`、`timeout_seconds`（300–86400）；可选兼容 template |
-| `harness.source` | `builtin`，或 `archive` 加归档路径及 SHA-256 |
-| `workload` | `task_packages` 列表，或旧 `kind` + `task_package`；persona 库、实际 ID 及可选 interaction_plan |
-| `rounds` | 轮数、每轮 session 数、最大用户并发数 |
+| `harness.source` | `builtin`、`archive` 加路径和 SHA-256，或配合父来源的 `continuation` |
+| `workload` | 任务包与 persona 输入及可选 interaction_plan，或继承时仅填 `{"source":"parent"}` |
+| `rounds` | 轮数、每轮 session 数、最大用户并发数；继承时轮数表示新增用户轮 |
+| `continuation` | 可选的当前父 `archive` 路径和预期 `sha256`；须同时声明两个父输入来源 |
 | `roles` | Triage/Synthesizer/divergent/developer 数量；`owner_mode: mechanical` / `llm` |
 | `models` | User、Harness、共享需求面、Claude Code 交付模型 |
 | `evaluation.official_grading` | `false`，演化期间不评分；独立事后评分用 `grade` 命令 |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
-可选一个或多个任务包；sessions_per_round 不超过所选不同 persona 的数量，max_parallel_users 不超过 sessions_per_round。同轮不同 persona 可使用同一任务，各包自行声明 kind 和 interaction。历史结果导入后追加一轮仍不支持。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
+可选一个或多个任务包；sessions_per_round 不超过所选不同 persona 的数量，max_parallel_users 不超过 sessions_per_round。同轮不同 persona 可使用同一任务，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
 
 `builtin` 冻结当前 checkout 的 `backend/harness_template/`，不是历史 `cade14d` Harness。复现旧基线必须显式提供那份归档和真实校验和。
+
+## 继承当前完整归档
+
+把下面的输入声明合入完整 v2 定义；[追加教程](tutorials/experiment-continuation.zh-CN.md)提供从现有模板生成完整 local/E2B 子配置的命令。
+
+```json
+{
+  "harness": {"source": "continuation"},
+  "workload": {"source": "parent"},
+  "continuation": {
+    "archive": "/absolute/path/to/parent/artifacts.tar.gz",
+    "sha256": "EXPECTED_64_CHARACTER_SHA256"
+  },
+  "rounds": {"count": 2, "sessions_per_round": 4, "max_parallel_users": 2}
+}
+```
+
+三项来源声明必须同时出现。`continuation` 只接受 `archive` 与 `sha256`，路径按子 JSON 所在目录解析。父来源必须是 collection `COMPLETE`、`controller.experiment_complete=true`、`continuation_ready=true`，并具有版本化最终 tree export。缺失或不支持的 export 在资源创建前拒绝，旧冻结 controller 不升级。
+
+每个新增轮继承父末轮 task/persona/interaction 配对，包括 `direct` 会话。`sessions_per_round` 等于该边界人数，`max_parallel_users` 可降低；workload 不能混入覆盖项。有 pending report 时 Triage 和 Synthesizer 各至少一个。模型、runtime、角色、策略和凭证由子配置显式决定；可选 CI 沿用子实验的本地契约。
+
+子实验先在独立恢复域处理父反馈并等待交付，即使 count 为一也执行初始化。随后 `count` 只计新增用户轮，最后一个新增轮仍只试用。父逻辑 R5 加两轮，对应子本地 R1/R2 和逻辑 R6/R7；再追加一轮从逻辑 R8 开始。stop/resume 操作新 run，父证据与评分不混入新增用户指标；grade 和 batch 使用本地轮号。独立[验收记录](validation/experiment-continuation.md)区分合同检查与真实后端执行。
 
 ## 模型和凭证
 
@@ -145,11 +168,11 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 }
 ```
 
-计划校验每轮 session 数量及已选 persona/task ID。同轮 persona 不重复，task 可以重复。省略计划时，按全局槽 k=(round_no-1)*sessions_per_round+slot，从配置顺序取 persona_ids[k % P] 和 task_packages[k % T]。这种简单轮转不保证覆盖全部 persona × task 组合；AABB、固定分组和交叉任务覆盖请写显式计划。`rounds.count: 1` 可只试用用户，不等待 Vigil；多轮仍须验证交付进程就绪。
+计划校验每轮 session 数量及已选 persona/task ID。同轮 persona 不重复，task 可以重复。省略计划时，按全局槽 k=(round_no-1)*sessions_per_round+slot，从配置顺序取 persona_ids[k % P] 和 task_packages[k % T]。这种简单轮转不保证覆盖全部 persona × task 组合；AABB、固定分组和交叉任务覆盖请写显式计划。普通实验的 `rounds.count: 1` 可只试用用户，不等待 Vigil；多轮和继承初始化仍须验证交付进程就绪。
 
 `experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 
-本次已迁入上述设置、交互和看板；可选本地工程 CI 见下方说明，历史产物追加轮仍待实现。旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。官方 SWE 任务评分已提供独立事后命令，演化循环内评分仍按设计关闭。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+本次已迁入上述设置、交互和看板；可选本地工程 CI 见下方说明，当前归档追加已接入，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。官方 SWE 任务评分已提供独立事后命令，演化循环内评分仍按设计关闭。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
 
 ## 本地工程 CI
 

@@ -70,10 +70,17 @@ class Divergent:
         self._on_event = on_event
         self._round_provider = round_provider
         self._recovery = recovery
+        self._feedback_dependency = "users"
 
     def bind_recovery(self, recovery: RecoveryStore) -> None:
         """Attach the experiment ledger after role construction."""
         self._recovery = recovery
+
+    def bind_feedback_dependency(self, prerequisite: str) -> None:
+        """Spec-0079/T3: share the outer feedback stage prerequisite."""
+        if prerequisite not in {"users", "feedback_imported"}:
+            raise ValueError("unsupported feedback prerequisite")
+        self._feedback_dependency = prerequisite
 
     def propose_once(self) -> DivergentOutcome:
         recovery_key = self._recovery_key()
@@ -101,7 +108,7 @@ class Divergent:
                     "reference": [item.to_dict() for item in reference],
                 },
                 expected_postconditions={"completed": True},
-                dependencies=("users",),
+                dependencies=(self._feedback_dependency,),
             )
             if recovery_unit.get("status") == "completed":
                 saved = self._recovery.read_output(
