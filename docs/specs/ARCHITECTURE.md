@@ -67,6 +67,9 @@ _Frozen materials, controllers and local/E2B resource lifecycles._
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | Frozen materials, controllers and local/E2B resource lifecycles. |
+| `batch.py` | Spec-0074/T2: foreground batches reuse single-run lifecycle and durable leases. |
+| `batch_config.py` | Spec-0074/T1: strict batch inputs and identities using the existing material compiler. |
+| `batch_store.py` | Spec-0074/T1: immutable batch intent, atomic receipts and owned child roots. |
 | `cli.py` | Operator-facing commands with credential-free lifecycle receipts. |
 | `collection.py` | Spec-0069/T5: portable, checksummed evidence collection independent of model keys. |
 | `config.py` | Spec-0071/T3: strict public v2 configuration and shared identity helpers. |
@@ -268,6 +271,9 @@ graph LR
     nauto_designer_experiment_backends_e2b_bootstrap["backends.e2b_bootstrap"]
     nauto_designer_experiment_backends_e2b_template["backends.e2b_template"]
     nauto_designer_experiment_backends_local["backends.local"]
+    nauto_designer_experiment_batch["experiment.batch"]
+    nauto_designer_experiment_batch_config["experiment.batch_config"]
+    nauto_designer_experiment_batch_store["experiment.batch_store"]
     nauto_designer_experiment_cli["experiment.cli"]
     nauto_designer_experiment_collection["experiment.collection"]
     nauto_designer_experiment_config["experiment.config"]
@@ -451,7 +457,23 @@ graph LR
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_materials
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_workload
     nauto_designer_experiment_backends_local --> nauto_designer_observations_transport
+    nauto_designer_experiment_batch --> nauto_designer_experiment
+    nauto_designer_experiment_batch --> nauto_designer_experiment_batch_config
+    nauto_designer_experiment_batch --> nauto_designer_experiment_batch_store
+    nauto_designer_experiment_batch --> nauto_designer_experiment_config
+    nauto_designer_experiment_batch --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_batch --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_batch_config --> nauto_designer_experiment
+    nauto_designer_experiment_batch_config --> nauto_designer_experiment_config
+    nauto_designer_experiment_batch_config --> nauto_designer_experiment_materials
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_config
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_materials
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_workload
     nauto_designer_experiment_cli --> nauto_designer_experiment
+    nauto_designer_experiment_cli --> nauto_designer_experiment_batch
     nauto_designer_experiment_cli --> nauto_designer_experiment_config
     nauto_designer_experiment_cli --> nauto_designer_experiment_dashboard
     nauto_designer_experiment_cli --> nauto_designer_experiment_runtime

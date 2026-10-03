@@ -23,12 +23,15 @@ cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
 # Fill credentials; choose synthesizer-n1-local.json for local Docker.
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-e2b.json --offline
+examples/batches/                        # Lists of complete same-backend experiments
 uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config examples/experiments/synthesizer-n1-e2b.json --secrets-file .env.experiment
 # Copy the generated run ID:
 uv run --locked --extra experiments python backend/scripts/experiment.py run <run_id>
 ```
 
 Start with [Quickstart](docs/QUICKSTART.md), then follow the [complete N=1 tutorial](docs/tutorials/n1-experiment.md). They explain the required materials, model protocols, provider credentials, progress, stop/resume, collection and cleanup. For a complete two-round, four-user example, follow the [multi-user tutorial](docs/tutorials/multi-user-experiment.md). Preparation fetches pinned OpenAgents automatically; no sibling checkout is required. The [N1 validation report](docs/validation/spec-0069-new-user.md) and [multi-user validation report](docs/validation/spec0073-multi-task-users.md) record actual checks separately from the documented workflow.
+
+To queue several complete experiments, use the [batch tutorial](docs/tutorials/batch-experiment.md) and the local/E2B lists in `examples/batches/`. Batch supervision retains each member's single-run lifecycle and limits active runs until terminal collection; Ctrl+C detaches supervision, while `batch stop` stops started members. The N1/N4 lists preserve their different five-round/two-round settings and demonstrate execution rather than a fair causal comparison.
 
 For an offline scripted demo without models or infrastructure:
 

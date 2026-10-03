@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "name": "synthesizer-n1-n4-local",
+  "max_parallel_runs": 1,
+  "entries": [
+    {
+      "id": "n1",
+      "config": "../experiments/synthesizer-n1-local.json"
+    },
+    {
+      "id": "n4",
+      "config": "../experiments/synthesizer-n4-local.json"
+    }
+  ]
+}

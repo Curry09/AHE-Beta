@@ -159,3 +159,127 @@ def test_dashboard_uncollected_error_is_actionable(monkeypatch, capsys):
     monkeypatch.setattr(dashboard, "serve_dashboard", fail)
     assert cli.dispatch(["--json", "dashboard", "selected-run"]) == 2
     assert "collect RUN_ID" in json.loads(capsys.readouterr().out)["error"]
+
+
+@pytest.mark.parametrize(
+    "command", ["check", "prepare", "run", "resume", "status", "stop", "collect"]
+)
+def test_batch_verbs_preserve_explicit_root_and_credentials(command, monkeypatch, capsys):
+    # Spec-0074/T3: all management verbs accept credentials after the verb.
+    from auto_designer.experiment import batch
+
+    seen = {}
+
+    def handle(**kwargs):
+        seen.update(kwargs)
+        progress = kwargs.get("progress")
+        if progress:
+            progress({"batch_id": "selected-batch", "phase": "PREPARING", "entry_id": "n1"})
+        return {"batch_id": "selected-batch", "ok": True, "batch_state": "READY"}
+
+    target = "run" if command == "resume" else command
+    monkeypatch.setattr(batch, target + "_batch", handle)
+    argv = ["--json", "--runs-dir", "/tmp/runs", "--secrets-file", "global.env", "batch", command]
+    argv += ["--config", "list.json"] if command in {"check", "prepare"} else ["selected-batch"]
+    argv += ["--secrets-file", "override.env"]
+    assert cli.dispatch(argv) == 0
+    output = capsys.readouterr()
+    assert json.loads(output.out)["batch_id"] == "selected-batch"
+    assert seen["secrets_file"] == Path("override.env")
+    if command == "check":
+        assert seen["offline"] is False and seen["config_path"] == Path("list.json")
+    else:
+        assert seen["root"] == Path("/tmp/runs")
+    if command in {"run", "resume"}:
+        assert seen["resume_batch"] is (command == "resume")
+    if "progress" in seen:
+        assert "[batch] selected-batch" in output.err
+        assert "[batch]" not in output.out
+
+
+@pytest.mark.parametrize(
+    "state,ok,exit_code",
+    [
+        ("COMPLETED", True, 0),
+        ("PAUSED", True, 0),
+        ("BLOCKED_LOST", False, 1),
+        ("INTERRUPTED", True, 130),
+    ],
+)
+def test_batch_exit_codes_distinguish_completion_blocking_and_detach(
+    state, ok, exit_code, monkeypatch, capsys
+):
+    from auto_designer.experiment import batch
+
+    monkeypatch.setattr(batch, "run_batch", lambda **kwargs: {"batch_state": state, "ok": ok})
+    monkeypatch.setattr(runtime, "stop_v2", lambda **kwargs: pytest.fail("detach must not stop"))
+    assert cli.dispatch(["--json", "batch", "run", "chosen"]) == exit_code
+    assert json.loads(capsys.readouterr().out)["batch_state"] == state
+
+
+def test_batch_check_offline_routes_without_loading_credentials(monkeypatch, capsys):
+    from auto_designer.experiment import batch
+
+    seen = {}
+
+    def check(**kwargs):
+        seen.update(kwargs)
+        return {"ok": True, "offline": kwargs["offline"]}
+
+    monkeypatch.setattr(batch, "check_batch", check)
+    assert cli.dispatch(["--json", "batch", "check", "--config", "list.json", "--offline"]) == 0
+    assert seen["offline"] is True and seen["secrets_file"] is None
+    assert json.loads(capsys.readouterr().out)["offline"] is True
+
+
+def test_batch_provider_exception_cannot_leak_credential_text(monkeypatch, capsys):
+    from auto_designer.experiment import batch
+
+    def fail(**kwargs):
+        raise OSError("sensitive-provider-value")
+
+    monkeypatch.setattr(batch, "status_batch", fail)
+    assert cli.dispatch(["--json", "batch", "status", "chosen"]) == 2
+    output = capsys.readouterr()
+    assert "sensitive-provider-value" not in output.out + output.err
+    assert "error" in json.loads(output.out)
+
+
+def test_batch_progress_shows_user_completion_without_polluting_json(capsys):
+    cli._batch_progress(
+        {
+            "batch_id": "chosen",
+            "batch_state": "RUNNING",
+            "counts": {"active": 1, "pending": 1, "completed": 0},
+            "entries": {
+                "n4": {
+                    "last_status": {
+                        "progress": {
+                            "current_round": 2,
+                            "rounds": {
+                                "2": {"users": {"expected": 4, "completed": 3, "running": 1}}
+                            },
+                        }
+                    }
+                }
+            },
+        }
+    )
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "n4 R2: 3/4 sessions completed, 1 running" in output.err
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["batch"],
+        ["batch", "run"],
+        ["batch", "destroy", "x"],
+        ["batch", "run", "--config", "list.json"],
+    ],
+)
+def test_batch_rejects_missing_identity_and_second_launcher_options(args):
+    with pytest.raises(SystemExit) as exc:
+        cli.dispatch(args)
+    assert exc.value.code == 2

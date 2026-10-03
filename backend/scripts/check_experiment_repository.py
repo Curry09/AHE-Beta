@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
+from auto_designer.experiment.batch_config import load_batch_config  # noqa: E402
 from auto_designer.experiment.config import ConfigError  # noqa: E402
 from auto_designer.experiment.materials import check_materials  # noqa: E402
 
@@ -27,7 +28,9 @@ PUBLIC_COMMANDS = {
     "collect",
     "destroy",
     "dashboard",  # Spec-0072/T5: the same entry binds a selected run for observation.
+    "batch",  # Spec-0074/T3: lists reuse the maintained single-run entry.
 }
+BATCH_COMMANDS = {"check", "prepare", "run", "status", "stop", "resume", "collect"}
 RETIRED_PATHS = (
     "run.sh",
     "backend/run.py",
@@ -173,6 +176,14 @@ def check_repository(root: Path) -> dict:
             check_materials(path)
         except (ConfigError, OSError, ValueError) as exc:
             errors.append(f"{path.relative_to(root)}: {exc}")
+    batches = sorted((root / "examples/batches").glob("*.json"))
+    if not batches:
+        errors.append("No public batch definitions")
+    for path in batches:
+        try:
+            load_batch_config(path)
+        except (ConfigError, OSError, ValueError) as exc:
+            errors.append(f"{path.relative_to(root)}: {exc}")
     errors.extend(maintained_import_errors(root))
     from auto_designer.experiment.cli import build_parser
     from auto_designer.experiment.materials import _SOURCE_ROOTS
@@ -182,6 +193,14 @@ def check_repository(root: Path) -> dict:
     commands = set(command_actions[0].choices)
     if commands != PUBLIC_COMMANDS:
         errors.append(f"Unexpected public commands: {sorted(commands)}")
+    batch_parser = command_actions[0].choices.get("batch")
+    batch_actions = (
+        [a for a in batch_parser._actions if isinstance(a, argparse._SubParsersAction)]
+        if batch_parser
+        else []
+    )
+    if not batch_actions or set(batch_actions[0].choices) != BATCH_COMMANDS:
+        errors.append("Unexpected public batch commands")
     if any(
         p.startswith(("examples", "research", "tools/dev")) or p == "backend/scripts"
         for p in _SOURCE_ROOTS
@@ -193,6 +212,7 @@ def check_repository(root: Path) -> dict:
     return {
         "ok": not errors,
         "examples": [p.relative_to(root).as_posix() for p in examples],
+        "batches": [p.relative_to(root).as_posix() for p in batches],
         "errors": errors,
     }
 

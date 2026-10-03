@@ -35,6 +35,7 @@ def test_current_repository_has_only_supported_public_materials():
     result = checker.check_repository(ROOT)
     assert result["ok"], result["errors"]
     assert len(result["examples"]) == 4
+    assert len(result["batches"]) == 2
 
 
 def test_archive_content_cannot_be_silently_rewritten(tmp_path):
@@ -106,3 +107,23 @@ def test_new_public_json_is_validated_without_an_allowlist(tmp_path):
     result = checker.check_repository(tmp_path)
     assert not result["ok"]
     assert any("examples/experiments/unexpected-legacy.json:" in e for e in result["errors"])
+
+
+def test_new_batch_json_cannot_bypass_public_contract_validation(tmp_path):
+    # Spec-0074/T3: every public list is validated, not only the maintained filenames.
+    inventory(tmp_path)
+    path = tmp_path / "examples/batches/extra.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "name": "extra",
+                "entries": [{"id": "n1", "config": "missing.json"}],
+                "executor": "old-launcher",
+            }
+        )
+    )
+    result = checker.check_repository(tmp_path)
+    assert not result["ok"]
+    assert any("examples/batches/extra.json:" in e for e in result["errors"])

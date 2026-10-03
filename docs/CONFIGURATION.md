@@ -158,3 +158,34 @@ Use `workload.task_packages` for new multi-task definitions. It is mutually excl
 `runtime.local.seed_image` remains a single-task override and is rejected when more than one task package is selected. Automatic per-task image building handles mixed tasks. Local sessions use independent containers; E2B copies each task's pure baseline source and recreates its venv at the final session directory. Download/wheel caches may be shared, writable repos and installed environments are not. E2B's single Unix user does not provide malicious cross-directory isolation equivalent to Docker.
 
 See [the complete N4 tutorial](tutorials/multi-user-experiment.md) for a two-task explicit plan, cost expectations and evidence paths.
+
+## Batch configuration
+
+A batch list is separate from the member's v2 experiment JSON. The public [local](../examples/batches/n1-n4-local.json) and [E2B](../examples/batches/n1-n4-e2b.json) examples reference complete existing N1/N4 configurations. The N1 configuration has five rounds; N4 has two, so this is a scheduling example rather than a fair causal comparison.
+
+```json
+{
+  "schema_version": 1,
+  "name": "synthesizer-n1-n4-local",
+  "max_parallel_runs": 1,
+  "entries": [
+    {"id": "n1", "config": "../experiments/synthesizer-n1-local.json"},
+    {"id": "n4", "config": "../experiments/synthesizer-n4-local.json"}
+  ]
+}
+```
+
+| Field | Contract |
+| --- | --- |
+| `schema_version` | Integer `1`; booleans are rejected |
+| `name` | Nonempty display name; preparation generates a unique batch ID |
+| `max_parallel_runs` | Positive integer, default `1`; covers this batch's active and uncertain run leases through terminal collection |
+| `entries` | Nonempty ordered list; unique `id` uses lowercase letters/digits separated by hyphens (up to 48 characters); complete experiment `config` paths are relative to the batch JSON |
+
+All members must use the same backend. Unknown fields, partial configuration overrides, shell executors and parameter matrices are rejected. Models, roles, materials and per-run user concurrency stay in each member configuration. Credentials use the existing explicit env file/process variables and are excluded from frozen batch materials.
+
+`batch check --offline` validates all local members without providers or credentials. Online checking reports repository capacity as unknown when it cannot be established; it does not prove the account has enough quota. `batch prepare` freezes all members sequentially before any run starts. The foreground `batch run` retains the execution lease after a startup acknowledgement, through uncertain observations and terminal collection. Ctrl+C detaches supervision without stopping children; `batch stop` and `batch resume` use the same member identities and recovery data. Failed/LOST members block new pending starts; partial terminal collection retains its lease. Success requires every member experiment COMPLETED and collection COMPLETE.
+
+A batch lives under `<runs-dir>/.batches/<batch_id>/`; each member's normal run directory is `children/<entry_id>/<run_id>/`. `intent.json` and `manifest.json` retain immutable input identities; runtime receipts and journal store observations. To manage a child directly, specify `--runs-dir <runs-dir>/.batches/<batch_id>/children/<entry_id>` before its single-run command. Batch status reports child run IDs in `entries` and their directories in `child_roots`; use them with the tutorial's management and cleanup commands. Editing source configurations never changes a frozen batch.
+
+The parallel limit is not an account-wide limit or allocated-resource cap. Stopped/completed sandboxes and other batches may still consume quota. Batch management does not automatically destroy compute or delete repositories; even sequential runs may exhaust repository limits. Use the [batch tutorial](tutorials/batch-experiment.md) to collect and explicitly clean up each member.

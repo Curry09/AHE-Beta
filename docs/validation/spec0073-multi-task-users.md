@@ -1,6 +1,6 @@
 # Spec0073 multi-task, multi-user validation
 
-Recorded on 2026-10-03 on `feat/unified-experiment-entry`, before committing Spec0073. This report separates offline execution from provider verification. The [tutorial](../tutorials/multi-user-experiment.md) and [中文教程](../tutorials/multi-user-experiment.zh-CN.md) use the same commands and plan.
+Recorded on 2026-10-03 on `feat/unified-experiment-entry`. Implementation commit: `2de6b26`; the live section was updated after both provider runs completed. This report separates offline execution from provider verification. The [tutorial](../tutorials/multi-user-experiment.md) and [中文教程](../tutorials/multi-user-experiment.zh-CN.md) use the same commands and plan.
 
 ## Reproduce offline verification
 
@@ -33,7 +33,7 @@ The targeted script passed **136 tests in 28.30 seconds**. The whole-repository 
 
 The ordinary example's actual hashed setup also ran in a fresh temporary venv with `UV_OFFLINE=1`. It installed the five locked packages, imported the task module and ran its visible tests: **4 passed, 2 failed**. The two expected failures reproduce the missing quantity multiplication in a multi-unit order and a mixed cart. The checked-in source intentionally preserves this task fault for the user to repair.
 
-## Live verification in progress
+## Completed live provider verification
 
 On 2026-10-03 Docker became available (engine 27.5.1, Compose v2.32.4). The operator explicitly authorized deleting one named old Gitea.com test repository; its Git mirror and API metadata were backed up before deletion. Only an empty repository created by this verification's failed bootstrap was subsequently removed to retry; unrelated repositories and sandboxes were retained.
 
@@ -41,6 +41,15 @@ The first E2B launch exposed a real bootstrap import error: its task-preflight s
 
 The first local launch exposed an observation error: all four user units were marked running before the two-worker pool dispatched them. `begin_unit` now runs after a worker is acquired. A real thread barrier verifies two running/two pending slots, no started event or incremented attempt for a queued slot, and four completed slots after release. The related controller/recovery suite passed 65 tests.
 
-The initial frozen runs were retained as evidence and their compute was destroyed. New runs freeze both fixes: local `20261003T045007Z-38f9ccbb` and E2B `20261003T045007Z-da1645b2`. Both maintained N4 configurations passed online checks, preparation, provider preflight and controller startup with their configured `claude-opus-5-5` models. Both entered R1 with two running and two pending sessions; the E2B run produced a real Harness reply. Both subsequently saved complete user sessions. Local stop/resume preserved the first two complete session files byte for byte and retried unfinished users. E2B stop/resume retained its sandbox/repository, preserved both complete session files and their attempt-one ledger entries, and retried only the unfinished users. A real cloud session automatically published a source-feedback Issue with its evidence; the local and collected-cloud dashboard read routes passed against actual run artifacts. These are **provider/session/recovery checks, not a completed two-round acceptance**.
+The initial frozen runs were retained as evidence and their compute was destroyed. New runs freeze both fixes: local `20261003T045007Z-38f9ccbb` and E2B `20261003T045007Z-da1645b2`. Both maintained N4 configurations passed online checks, preparation, provider preflight and controller startup with their configured `claude-opus-5-5` models. Both entered R1 with two running and two pending sessions. Local stop/resume preserved the first two complete session files byte for byte and retried unfinished users. E2B stop/resume retained its sandbox/repository, preserved both complete session files and their attempt-one ledger entries, and retried only the unfinished users.
 
-The remaining live acceptance is check → prepare → run → status/logs → stop/resume → collect/dashboard → destroy, retaining actual session/round seals, nonempty R1 delivery and the R2 Harness SHA. Successful offline tests, startup or collection alone cannot replace those records. This section must be updated with actual terminal evidence before claiming that coverage.
+| Backend | Run ID | Saved sessions | Experiment | Collection | Compute |
+| --- | --- | --- | --- | --- | --- |
+| Local + localhost Gitea | `20261003T045007Z-38f9ccbb` | 8 | COMPLETED | COMPLETE | DESTROYED |
+| E2B + Gitea.com | `20261003T045007Z-da1645b2` | 8 | COMPLETED | COMPLETE | DESTROYED |
+
+Final checks read the actual recovery ledgers, SessionStore files and terminal archives. Each run has four completed logical bindings in each of two completed rounds. All eight results match their frozen round/slot, task digest, persona and Harness SHA, including the second-round task swap. The two session files saved before each stop remain byte-for-byte identical after completion. Both runs use the R1 sealed SHA for R2: local `a39b71bf6cf4ab451c20ac7397013b91e684147f`, cloud `aeb2440e8b2a3b0e7ad6404b001549247b778ae6`.
+
+The actual local and collected-cloud dashboard health, metadata, agents and sessions routes returned HTTP 200. Terminal collection completed before explicit compute destruction; archives and the cloud Gitea repository remain available. The actual lifecycle exercised check → prepare → run → status/logs → stop/resume → collect/dashboard → destroy. Provider success and completed simulations do not constitute an official benchmark grade or prove that every user goal was satisfied.
+
+**Live delivery boundary:** neither R1 admitted a delivery ticket. Local R1 had no admitted feedback; cloud R1 automatically published source Issue #2 with evidence, and the real triage ledger records it as rejected. Synthesis produced no proposal and Owner admitted no ticket. Their sealed SHAs therefore equal their R1 user SHAs. Cloud R2 also published source feedback, but the final round is intentionally user-only. These runs prove live multi-task sessions, real feedback publication, conditional demand stages, recovery, round handoff, collection and cleanup; they do **not** prove live nonempty OpenAgents code delivery. The nonempty proposal → delivery → changed sealed SHA path is verified by the offline integration described above and remains a separate live coverage gap.

@@ -75,6 +75,22 @@ Runs live under `.experiments/<run_id>/`. Experiment outcome, resource state and
 
 The [complete N=1 tutorial](tutorials/n1-experiment.md) explains every input, expected outputs, interruption boundaries and evidence. The [multi-user tutorial](tutorials/multi-user-experiment.md) runs N4 with two tasks, a fixed cross-round plan and stop/resume. Actual validation results are recorded in the [N1 report](validation/spec-0069-new-user.md) and [multi-user report](validation/spec0073-multi-task-users.md).
 
+## Run a list of experiments
+
+After filling the same `.env.experiment`, choose a batch list instead of one run configuration:
+
+```bash
+BATCH_CONFIG=examples/batches/n1-n4-local.json
+# BATCH_CONFIG=examples/batches/n1-n4-e2b.json
+uv run --locked --extra experiments python backend/scripts/experiment.py batch check --config "$BATCH_CONFIG" --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py batch prepare --config "$BATCH_CONFIG" --secrets-file .env.experiment
+BATCH_ID=REPLACE_WITH_PRINTED_BATCH_ID
+uv run --locked --extra experiments python backend/scripts/experiment.py batch run "$BATCH_ID" --secrets-file .env.experiment
+```
+
+The examples use one active run at a time. `batch run` stays in the foreground through terminal collection; Ctrl+C detaches supervision and leaves started children running. Use `batch stop` to stop them, and `batch resume` to continue the original members. N1 runs five rounds and N4 two rounds, so these lists demonstrate scheduling, not a fair causal comparison. See the [complete batch tutorial](tutorials/batch-experiment.md) for status, child-specific `--runs-dir`, collection, costs and explicit cleanup. Batch management does not automatically destroy compute or delete repositories; E2B stop still retains its sandbox.
+
+
 ## Offline demo and development
 
 For a short scripted interaction without models or Docker:

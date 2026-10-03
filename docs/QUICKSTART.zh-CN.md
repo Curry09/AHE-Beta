@@ -75,6 +75,22 @@ stop 保留实验身份、仓库与 recovery checkpoint。本地会停止 Gitea/
 
 [完整 N=1 教程](tutorials/n1-experiment.zh-CN.md)说明所有输入、预期结果、中断边界和证据；[多用户教程](tutorials/multi-user-experiment.zh-CN.md)提供两个任务、固定跨轮计划和停止/恢复的 N4 流程；实际验证结果见[N1 报告](validation/spec-0069-new-user.md)和[多用户报告](validation/spec0073-multi-task-users.md)。
 
+## 运行一组实验
+
+填好同一份 `.env.experiment` 后，选择批次列表，替代单个实验配置：
+
+```bash
+BATCH_CONFIG=examples/batches/n1-n4-local.json
+# BATCH_CONFIG=examples/batches/n1-n4-e2b.json
+uv run --locked --extra experiments python backend/scripts/experiment.py batch check --config "$BATCH_CONFIG" --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py batch prepare --config "$BATCH_CONFIG" --secrets-file .env.experiment
+BATCH_ID=REPLACE_WITH_PRINTED_BATCH_ID
+uv run --locked --extra experiments python backend/scripts/experiment.py batch run "$BATCH_ID" --secrets-file .env.experiment
+```
+
+示例每次只运行一个活动实验。`batch run` 在前台监督到终态收集；Ctrl+C 退出监督，已启动成员继续运行。停止成员用 `batch stop`，接回原成员用 `batch resume`。N1 为五轮、N4 为两轮，因此这些列表演示调度，不构成公平的因果对照。状态、子实验专属 `--runs-dir`、收集、成本和显式清理见[完整批次教程](tutorials/batch-experiment.zh-CN.md)。批次管理不自动销毁计算资源或删除仓库；E2B stop 后沙箱仍保留。
+
+
 ## 离线演示和开发
 
 只查看一次不调用模型、不使用 Docker 的脚本交互：

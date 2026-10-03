@@ -158,3 +158,34 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 `runtime.local.seed_image` 保留单任务覆盖含义，选择多个包时填写会报错；自动逐任务构建支持混合任务。本地 session 使用独立容器；E2B 复制各任务纯源码基线，在最终 session 目录重建 venv。下载/wheel 缓存可共享，可写 repo 和已安装环境不共享。E2B 同一 Unix 用户不提供等同 Docker 的恶意跨目录访问防护。
 
 两个任务的显式计划、成本及证据路径见[完整 N4 教程](tutorials/multi-user-experiment.zh-CN.md)。
+
+## 批次配置
+
+批次列表独立于成员的 v2 实验 JSON。公开的 [local](../examples/batches/n1-n4-local.json)和 [E2B](../examples/batches/n1-n4-e2b.json)示例引用现有完整 N1/N4 配置。N1 为五轮、N4 为两轮，因此它们是调度示例，不构成公平的因果对照。
+
+```json
+{
+  "schema_version": 1,
+  "name": "synthesizer-n1-n4-local",
+  "max_parallel_runs": 1,
+  "entries": [
+    {"id": "n1", "config": "../experiments/synthesizer-n1-local.json"},
+    {"id": "n4", "config": "../experiments/synthesizer-n4-local.json"}
+  ]
+}
+```
+
+| 字段 | 契约 |
+| --- | --- |
+| `schema_version` | 整数 `1`，拒绝布尔值 |
+| `name` | 非空显示名称；prepare 自动生成唯一 batch ID |
+| `max_parallel_runs` | 正整数，默认 `1`；覆盖本批次活动和不确定的运行租约，持续到终态收集 |
+| `entries` | 非空有序列表；唯一 `id` 用小写字母/数字及分隔连字符，最多 48 字符；完整实验 `config` 路径相对批次 JSON |
+
+同批所有成员必须使用同一后端。未知字段、局部配置覆盖、shell executor 和参数矩阵拒绝。模型、角色、材料及每个 run 的用户并发仍在各成员配置中；凭证使用已有显式 env 文件/进程变量，不进入冻结批次材料。
+
+`batch check --offline` 验证全部本地成员，不读凭证、不调用 provider。在线检查无法确认剩余仓库配额时报告容量未知，不证明名额足够。`batch prepare` 顺序冻结所有成员，全部成功后才可启动。前台 `batch run` 在启动确认之后继续持有运行租约，覆盖不确定观测和终态收集。Ctrl+C 退出监督但不停止子实验；`batch stop`、`batch resume` 沿用相同成员身份与恢复数据。FAILED/LOST 成员阻止其余 pending 启动；终态收集不完整时仍占名额。成功要求全部成员实验 COMPLETED、收集 COMPLETE。
+
+批次位于 `<runs-dir>/.batches/<batch_id>/`；各成员沿用正常 run 目录，存放在 `children/<entry_id>/<run_id>/`。`intent.json`、`manifest.json` 保留不可变输入身份，runtime receipt 和 journal 保存观测。直接管理成员时，在单实验命令前指定 `--runs-dir <runs-dir>/.batches/<batch_id>/children/<entry_id>`；batch status 在 `entries` 中报告子实验 run ID，在 `child_roots` 中报告目录，再结合教程的管理和清理命令使用。修改原配置不会改变已冻结批次。
+
+并发上限不是账户全局上限，也不是已分配资源数上限；停止/完成的沙箱及其他批次可能仍占配额。批次管理不自动销毁计算或删除仓库，顺序执行也可能耗尽仓库名额。按[批次教程](tutorials/batch-experiment.zh-CN.md)逐项收集并显式清理。

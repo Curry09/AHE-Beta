@@ -32,6 +32,64 @@ def _prepare_progress(payload: dict) -> None:
     )
 
 
+def _batch_progress(payload: dict) -> None:
+    """Spec-0074/T3: progress stays on stderr, leaving JSON stdout parseable."""
+    counts = payload.get("counts", {})
+    detail = (
+        f"active {counts.get('active', 0)} · pending {counts.get('pending', 0)} · "
+        f"completed {counts.get('completed', 0)}"
+        if counts
+        else payload.get("entry_id", "freezing members")
+    )
+    for entry_id, item in payload.get("entries", {}).items():
+        progress = item.get("last_status", {}).get("progress", {})
+        round_no = progress.get("current_round")
+        current = progress.get("rounds", {}).get(str(round_no), {})
+        users = current.get("users", {})
+        if users.get("expected"):
+            detail += (
+                f" · {entry_id} R{round_no}: {users.get('completed', 0)}/{users['expected']}"
+                f" sessions completed, {users.get('running', 0)} running"
+            )
+    print(
+        f"[batch] {payload['batch_id']} · "
+        f"{payload.get('batch_state', payload.get('phase', 'working'))} · {detail}",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+def _dispatch_batch(args: argparse.Namespace) -> dict:
+    # Spec-0074/T3: the existing entry owns both single-run and batch commands.
+    from auto_designer.experiment import batch
+
+    if args.batch_cmd == "check":
+        return batch.check_batch(
+            config_path=args.config, offline=args.offline, secrets_file=args.secrets_file
+        )
+    if args.batch_cmd == "prepare":
+        return batch.prepare_batch(
+            config_path=args.config,
+            root=args.runs_dir,
+            secrets_file=args.secrets_file,
+            progress=_batch_progress,
+        )
+    common = {
+        "batch_id": args.batch_id,
+        "root": args.runs_dir,
+        "secrets_file": args.secrets_file,
+    }
+    if args.batch_cmd in {"run", "resume"}:
+        return batch.run_batch(
+            **common, resume_batch=args.batch_cmd == "resume", progress=_batch_progress
+        )
+    return {
+        "status": batch.status_batch,
+        "stop": batch.stop_batch,
+        "collect": batch.collect_batch,
+    }[args.batch_cmd](**common)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="experiment", description="Unified local/E2B experiment controller"
@@ -66,6 +124,18 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--host", default="127.0.0.1")
     dashboard.add_argument("--port", type=int, default=8000)
     dashboard.add_argument("--secrets-file", type=Path, default=argparse.SUPPRESS)
+    # Spec-0074/T3: explicit lists, without a second launcher or executor DSL.
+    batch = sub.add_parser("batch", help="Manage a frozen list of experiment configurations")
+    commands = batch.add_subparsers(dest="batch_cmd", required=True)
+    for name in ("check", "prepare", "run", "status", "stop", "resume", "collect"):
+        item = commands.add_parser(name)
+        item.add_argument("--secrets-file", type=Path, default=argparse.SUPPRESS)
+        if name in {"check", "prepare"}:
+            item.add_argument("--config", type=Path, required=True)
+        else:
+            item.add_argument("batch_id")
+        if name == "check":
+            item.add_argument("--offline", action="store_true")
     return parser
 
 
@@ -77,7 +147,13 @@ def dispatch(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.cmd == "check":
+        if args.cmd == "batch":
+            result = _dispatch_batch(args)
+            _emit(payload=result, as_json=args.json)
+            if result.get("batch_state") == "INTERRUPTED":
+                return 130
+            return 1 if result.get("ok") is False else 0
+        elif args.cmd == "check":
             result = runtime.check_v2(
                 config_path=args.config,
                 offline=args.offline,

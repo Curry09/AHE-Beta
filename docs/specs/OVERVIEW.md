@@ -220,6 +220,9 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 ### 0073 统一入口的多任务与多用户实验
 将任务目录和逐轮会话计划冻结到统一实验入口，支持同任务多用户与普通任务/SWE 混合编排，并隔离每个会话的工作区。
 
+### 0074 统一入口的批量实验管理
+用显式配置列表冻结批次成员，按真实运行状态限流并复用单 run 的检查、启动、收集与停止恢复。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -536,6 +539,11 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0073 | 0073/T4 | 合并控制器并贯通逻辑会话身份 | done | T1, T2, T3 | backend/auto_designer/experiment/controllers/__init__.py<br>backend/auto_designer/experiment/controllers/unified.py<br>backend/auto_designer/experiment/controllers/runtime.py<br>backend/auto_designer/experiment/controllers/ordinary.py<br>backend/auto_designer/experiment/controllers/swebench.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/loop/sim_user.py<br>backend/auto_designer/loop/live.py<br>backend/auto_designer/models.py<br>backend/auto_designer/user/session_store.py<br>backend/auto_designer/usage.py<br>backend/auto_designer/demand/evidence_contract.py<br>backend/scripts/check_openagents_contract.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/loop/test_sim_user.py<br>backend/tests/loop/test_live.py<br>backend/tests/user/test_session_store.py<br>backend/tests/demand/test_evidence_contract.py<br>backend/tests/test_experiment_interactions.py<br>backend/tests/test_experiment_capability_migration.py<br>backend/tests/test_experiment_multitask_controller.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_run_git_isolation.py<br>backend/tests/test_sandbox_isolation.py<br>backend/tests/guards/test_guard_wiring.py<br>tools/dev/replay/replay_synthesizer_owner_from_repo.py<br>tools/dev/replay/replay_roles_from_sessions.py<br>tools/dev/replay/replay_owner_from_repo.py |
 | 0073 | 0073/T5 | 生命周期兼容与多任务观察 | done | T4 | backend/auto_designer/experiment/engine.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/dashboard.py<br>backend/auto_designer/web/api.py<br>backend/tests/test_experiment_engine.py<br>backend/tests/test_experiment_lifecycle_v2.py<br>backend/tests/test_experiment_dashboard.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/tests/web/test_api.py<br>frontend/src/types.ts<br>frontend/src/components/AgentColumn.tsx<br>frontend/src/components/detail/SessionDetail.tsx<br>frontend/src/components/detail/SessionDetail.test.tsx |
 | 0073 | 0073/T6 | 公开 N4 示例与双后端闭环验收 | done | T5 | examples/experiments/synthesizer-n4-local.json<br>examples/experiments/synthesizer-n4-e2b.json<br>examples/tasks/order-service/task.json<br>examples/tasks/order-service/instruction.md<br>examples/tasks/order-service/setup.sh<br>examples/tasks/order-service/requirements.lock<br>examples/tasks/order-service/source/orders.py<br>examples/tasks/order-service/source/test_orders.py<br>examples/tasks/order-service/source/LICENSE<br>README.md<br>README.zh-CN.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/tutorials/n1-experiment.md<br>docs/tutorials/n1-experiment.zh-CN.md<br>docs/tutorials/multi-user-experiment.md<br>docs/tutorials/multi-user-experiment.zh-CN.md<br>docs/ARCHITECTURE.md<br>backend/scripts/check_experiment_repository.py<br>backend/scripts/e2e-spec-0073-multi-task-users.sh<br>backend/tests/test_experiment_public_examples.py<br>backend/tests/test_experiment_repository.py<br>backend/tests/test_experiment_multitask_e2e.py<br>docs/validation/spec0073-multi-task-users.md<br>CLAUDE.md<br>research/inventory.json |
+| 0074 | 0074/T1 | 批次输入与冻结成员账本 | done | — | backend/auto_designer/experiment/batch_config.py<br>backend/auto_designer/experiment/batch_store.py<br>backend/auto_designer/experiment/schemas/batch-v1.json<br>backend/tests/test_experiment_batch_config.py<br>backend/tests/test_experiment_batch_store.py |
+| 0074 | 0074/T2 | 复用单run的批次调度与恢复 | done | T1 | backend/auto_designer/experiment/batch.py<br>backend/tests/test_experiment_batch.py |
+| 0074 | 0074/T3 | 统一CLI批次子命令与仓库契约 | done | T1 | backend/auto_designer/experiment/cli.py<br>backend/tests/test_experiment_cli_v2.py<br>backend/scripts/check_experiment_repository.py<br>backend/tests/test_experiment_repository.py |
+| 0074 | 0074/T4 | 批次示例与双语教程 | done | T1 | examples/batches/n1-n4-local.json<br>examples/batches/n1-n4-e2b.json<br>README.md<br>README.zh-CN.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/tutorials/batch-experiment.md<br>docs/tutorials/batch-experiment.zh-CN.md<br>backend/tests/test_experiment_batch_examples.py |
+| 0074 | 0074/T5 | 批次闭环故障恢复验收 | done | T2, T3, T4 | backend/tests/test_experiment_batch_e2e.py<br>backend/scripts/e2e-spec-0074-batch-experiments.sh<br>docs/validation/batch-experiments.md |
 
 ## 跨 feature 关系图
 
@@ -997,6 +1005,13 @@ graph LR
         n0073_T5["T5 生命周期兼容与多任务观察"]
         n0073_T6["T6 公开 N4 示例与双后端闭环验收"]
     end
+    subgraph G0074[0074 batch-experiments]
+        n0074_T1["T1 批次输入与冻结成员账本"]
+        n0074_T2["T2 复用单run的批次调度与恢复"]
+        n0074_T3["T3 统一CLI批次子命令与仓库契约"]
+        n0074_T4["T4 批次示例与双语教程"]
+        n0074_T5["T5 批次闭环故障恢复验收"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1338,6 +1353,12 @@ graph LR
     n0073_T4 --> n0073_T3
     n0073_T5 --> n0073_T4
     n0073_T6 --> n0073_T5
+    n0074_T2 --> n0074_T1
+    n0074_T3 --> n0074_T1
+    n0074_T4 --> n0074_T1
+    n0074_T5 --> n0074_T2
+    n0074_T5 --> n0074_T3
+    n0074_T5 --> n0074_T4
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1401,8 +1422,8 @@ graph LR
 | OpenAgents/openagents/runtime/context.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/runtime/engine.py | 0049, 0061, 0063 |
 | OpenAgents/openagents/utils/gitea.py | 0032, 0061 |
-| README.md | 0068, 0069, 0071, 0072, 0073 |
-| README.zh-CN.md | 0068, 0069, 0071, 0072, 0073 |
+| README.md | 0068, 0069, 0071, 0072, 0073, 0074 |
+| README.zh-CN.md | 0068, 0069, 0071, 0072, 0073, 0074 |
 | backend/agent_defs/developer_agent/systemprompt.md | 0007, 0032 |
 | backend/agent_defs/divergent_pm/agent.yaml | 0029, 0061, 0068 |
 | backend/agent_defs/divergent_pm/systemprompt.md | 0029, 0035, 0042, 0043, 0055, 0059, 0060, 0061, 0068 |
@@ -1444,7 +1465,7 @@ graph LR
 | backend/auto_designer/experiment/backends/e2b.py | 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/backends/e2b_bootstrap.py | 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/backends/local.py | 0069, 0071, 0072, 0073 |
-| backend/auto_designer/experiment/cli.py | 0047, 0053, 0064, 0069, 0071, 0072 |
+| backend/auto_designer/experiment/cli.py | 0047, 0053, 0064, 0069, 0071, 0072, 0074 |
 | backend/auto_designer/experiment/config.py | 0047, 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/context.py | 0069, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/controllers/__init__.py | 0071, 0073 |
@@ -1528,7 +1549,7 @@ graph LR
 | backend/scripts/bootstrap_harness.py | 0002, 0007 |
 | backend/scripts/build_swebench_runtime_image.sh | 0051, 0071 |
 | backend/scripts/build_swebench_seed_workspaces.py | 0044, 0071 |
-| backend/scripts/check_experiment_repository.py | 0071, 0072, 0073 |
+| backend/scripts/check_experiment_repository.py | 0071, 0072, 0073, 0074 |
 | backend/scripts/check_openagents_contract.py | 0071, 0073 |
 | backend/scripts/e2e-spec-0039-issue-state-timeline.sh | 0039, 0068 |
 | backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh | 0047, 0071 |
@@ -1588,7 +1609,7 @@ graph LR
 | backend/tests/scripts/test_replay_role_invocations.py | 0049, 0071 |
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_experiment_capability_migration.py | 0072, 0073 |
-| backend/tests/test_experiment_cli_v2.py | 0047, 0053, 0069, 0071, 0072, 0073 |
+| backend/tests/test_experiment_cli_v2.py | 0047, 0053, 0069, 0071, 0072, 0073, 0074 |
 | backend/tests/test_experiment_config_v2.py | 0047, 0069, 0071, 0072, 0073 |
 | backend/tests/test_experiment_dashboard.py | 0072, 0073 |
 | backend/tests/test_experiment_e2b_backend.py | 0069, 0071, 0072, 0073 |
@@ -1599,7 +1620,7 @@ graph LR
 | backend/tests/test_experiment_local_backend.py | 0069, 0071, 0072, 0073 |
 | backend/tests/test_experiment_materials.py | 0069, 0071, 0072, 0073 |
 | backend/tests/test_experiment_public_examples.py | 0069, 0071, 0073 |
-| backend/tests/test_experiment_repository.py | 0071, 0072, 0073 |
+| backend/tests/test_experiment_repository.py | 0071, 0072, 0073, 0074 |
 | backend/tests/test_invocation.py | 0049, 0068 |
 | backend/tests/test_models.py | 0001, 0024, 0051, 0053, 0054 |
 | backend/tests/test_prepare_openagents_from_summary.py | 0046, 0071 |
@@ -1637,11 +1658,11 @@ graph LR
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041, 0068, 0073 |
 | docs/0048-user-sim-final-check-convergence.md | 0048, 0071 |
 | docs/ARCHITECTURE.md | 0068, 0071, 0073 |
-| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071, 0072, 0073 |
-| docs/CONFIGURATION.zh-CN.md | 0069, 0071, 0072, 0073 |
+| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074 |
+| docs/CONFIGURATION.zh-CN.md | 0069, 0071, 0072, 0073, 0074 |
 | docs/EXPORTING.md | 0068, 0071 |
-| docs/QUICKSTART.md | 0068, 0069, 0070, 0071, 0072, 0073 |
-| docs/QUICKSTART.zh-CN.md | 0069, 0071, 0072, 0073 |
+| docs/QUICKSTART.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074 |
+| docs/QUICKSTART.zh-CN.md | 0069, 0071, 0072, 0073, 0074 |
 | docs/audits/0061-observation-lifecycle-validation.md | 0061, 0071 |
 | docs/audits/unified-entry-capability-migration-20261003.md | 0071, 0072 |
 | docs/specs/0014-dev-commit-discipline.md | 0068, 0071 |
@@ -3951,4 +3972,38 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0074 统一入口的批量实验管理（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 批次输入与冻结成员账本"]
+    nT2["T2 复用单run的批次调度与恢复"]
+    nT3["T3 统一CLI批次子命令与仓库契约"]
+    nT4["T4 批次示例与双语教程"]
+    nT5["T5 批次闭环故障恢复验收"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT1 --> nT4
+    nT2 --> nT5
+    nT3 --> nT5
+    nT4 --> nT5
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+    class v_T5_1 st_done;
 ```
