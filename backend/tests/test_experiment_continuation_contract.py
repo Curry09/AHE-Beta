@@ -319,3 +319,40 @@ def test_current_three_generations_preserve_selected_inputs_and_reach_logical_r8
         assert not any(key.startswith("continuation:") for key in parent.export["material_keys"])
     assert boundaries == fixture["expected_lineage_rounds"]
     assert initial_archive.read_bytes() == parent_original
+
+
+# Spec-0080/T3: collect -> source -> child keeps repeated slots, not repeated cards.
+def test_reused_persona_and_pair_archive_roundtrip(tmp_path, prepared_inputs, monkeypatch):
+    fixture = json.loads(FIXTURE.read_text())
+    raw = json.loads(prepared_inputs.read_text())
+    raw["rounds"] = {"count": 1, "sessions_per_round": 3, "max_parallel_users": 2}
+    raw["workload"]["interaction_plan"] = [[["sr-15-swyx", "simple-task"]] * 3]
+    write(prepared_inputs, raw)
+    parent_manifest = materials.prepare_materials(prepared_inputs, tmp_path / "runs")
+    repo = seed_parent(Path(parent_manifest["run_dir"]), fixture)
+    receipt, parent = complete_fixture_users(parent_manifest, repo)
+    archive = Path(receipt["archive"])
+    original = archive.read_bytes()
+    assert len(parent.pairs) == 3 and len(parent.personas) == 1
+    assert len(parent.export["boundary"]["sessions"]) == 3
+    child_config = copy.deepcopy(raw)
+    child_config.update(
+        harness={"source": "continuation"},
+        workload={"source": "parent"},
+        continuation={"archive": str(archive), "sha256": receipt["archive_sha256"]},
+        rounds={"count": 2, "sessions_per_round": 3, "max_parallel_users": 2},
+    )
+    path = write(tmp_path / "configs/reused-child.json", child_config)
+    preview = materials.check_materials(path)
+    assert preview["persona_ids"] == ["sr-15-swyx"]
+    assert preview["interaction_plan"] == [[["sr-15-swyx", "simple-task"]] * 3] * 2
+    child = materials.prepare_materials(path, tmp_path / "runs")
+    root = Path(child["run_dir"])
+    plan = workload.read_session_plan(root, child)
+    assert all([b["slot"] for b in picks] == [0, 1, 2] for picks in plan["rounds"])
+    cards = json.loads((root / child["materials"]["persona_library"]["path"]).read_text())
+    assert len(cards) == 1
+    repo, _ = seed_child(child, monkeypatch)
+    _, reloaded = complete_fixture_users(child, repo)
+    assert len(reloaded.pairs) == 3 and len(reloaded.personas) == 1
+    assert archive.read_bytes() == original

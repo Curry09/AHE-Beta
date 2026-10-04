@@ -81,7 +81,6 @@ def test_inherited_plan_repeats_exact_parent_pairs_with_new_round_and_session_id
         lambda pairs: pairs[0].update(task_id="unknown"),
         lambda pairs: pairs[0].update(task_digest="changed"),
         lambda pairs: pairs[0].update(interaction="simulated_user"),
-        lambda pairs: pairs[1].update(persona_id=pairs[0]["persona_id"]),
     ],
 )
 def test_inherited_plan_rejects_changed_content_identity(mutation):
@@ -151,3 +150,50 @@ def test_ordinary_compiler_retains_global_rotation_and_explicit_pairs():
     config["workload"]["interaction_plan"] = [[["b", "review-task"], ["a", "code-task"]]] * 2
     explicit = workload.compile_session_plan(config, catalog, "catalog")
     assert all([pick["persona_id"] for pick in picks] == ["b", "a"] for picks in explicit["rounds"])
+
+
+# Spec-0080/T3: repeated personas and complete pairs survive inherited compilation.
+def test_inherited_plan_preserves_repeated_pairs_and_distinct_slot_keys():
+    catalog = _catalog()
+    pairs = _pairs(catalog)
+    pairs[1] = {**pairs[0], "slot": 1}
+    plan = workload.compile_session_plan(_config(), catalog, "catalog", pairs)
+    keys = set()
+    for bindings in plan["rounds"]:
+        assert [b["persona_id"] for b in bindings] == ["persona-b", "persona-b"]
+        assert [b["task_id"] for b in bindings] == ["code-task", "code-task"]
+        keys.update(operation_key("child-run", "users", b) for b in bindings)
+    assert len(keys) == 6
+
+
+# Spec-0080/T1: golden identities captured from the pre-change compiler (684dd9b).
+@pytest.mark.parametrize(
+    "count,expected_config,expected_plan",
+    [
+        (
+            1,
+            "bdfaebf09a3d8e7481bae67ecca0cbd7f87e294c0b27a69bab207c5f0f28976a",
+            "49ca2be1c6e41360161a9efddb1c87b31f49cf8214be824cf3956d9112cea3de",
+        ),
+        (
+            4,
+            "37d50f464dd4e659b3698680c85e30feb858bac018eb128ca6af3e5d30744fcc",
+            "0147cf10f214d4251f5b8626bd84ec96da8dc03b8bb1b821ddca9a61c5cd4e2f",
+        ),
+    ],
+)
+def test_existing_n1_n4_plan_hashes_and_session_keys_unchanged(
+    count, expected_config, expected_plan
+):
+    from auto_designer.experiment.config import config_hash
+
+    config = {
+        "workload": {"persona_ids": [f"p-{i}" for i in range(count)]},
+        "rounds": {"count": 2, "sessions_per_round": count},
+    }
+    plan = workload.compile_session_plan(config, _catalog(), "unchanged-catalog")
+    assert config_hash(data=config) == expected_config
+    assert config_hash(data=plan) == expected_plan
+    assert operation_key("run", "users", plan["rounds"][0][0]) == (
+        "op-673c0f5328a01d1cce1f6fd967c9adc3"
+    )

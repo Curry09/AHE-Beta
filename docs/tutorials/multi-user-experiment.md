@@ -37,7 +37,7 @@ The personas are real cards from `examples/personas/library.json`. The explicit 
 
 Each round has four sessions, with `max_parallel_users: 2`. R1 waits for all terminal user sessions, runs Triage/Synthesizer/Owner, and waits for admitted delivery tickets to reach terminal state before sealing. R2 only tries the sealed Harness; it does not generate another delivery batch. Outcomes, user satisfaction and infrastructure failures remain distinct.
 
-For another experiment, select existing persona IDs and unique task-package IDs. `task_packages` is mutually exclusive with the old `kind` + `task_package` input. If omitting interaction_plan, global slot k=(round_no-1)*sessions_per_round+slot chooses persona k % P and task k % T. This simple rotation does not guarantee all persona × task pairs; write an explicit plan for coverage or fixed groups. Personas must be unique within a round, while tasks may repeat.
+For another experiment, select existing persona IDs and unique task-package IDs. `task_packages` is mutually exclusive with the old `kind` + `task_package` input. If omitting interaction_plan, global slot k=(round_no-1)*sessions_per_round+slot chooses persona k % P and task k % T. This simple rotation does not guarantee all persona × task pairs; write an explicit plan for coverage or fixed groups. The selected persona IDs remain unique; the execution list may reuse a card or complete persona/task pair. sessions_per_round counts slots, not distinct cards. Each slot has independent conversation, client, workspace and recovery identity. Repeated cards do not represent independent human samples.
 
 ## 3. Check, freeze and prepare every task
 

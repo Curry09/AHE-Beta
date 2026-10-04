@@ -110,8 +110,7 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
             raise ConfigError("runtime.local.seed_image is only supported for a single task")
     rounds = data["rounds"]
     sessions = rounds["sessions_per_round"]
-    if not parent_workload and sessions > len(workload["persona_ids"]):
-        raise ConfigError("sessions_per_round cannot exceed the number of unique persona_ids")
+    # Spec-0080/T1: persona selection is unique; execution slots may reuse it.
     if rounds["max_parallel_users"] > sessions:
         raise ConfigError("max_parallel_users cannot exceed sessions_per_round")
     for image in runtime.get("local", {}).values():

@@ -235,6 +235,12 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 ### 0079 当前实验归档继承与追加迭代
 当前完整归档作为冻结父输入，新run先交付末轮反馈再追加用户轮，复用统一入口与恢复机制，不兼容旧版产物。
 
+### 0080 同一 persona 的独立会话编排
+以现有 round/slot/session 身份区分并发会话，允许复用同一 persona 和配对，保持冻结计划、恢复及追加归档一致，不复制 persona 卡片。
+
+### 0081 E2B 独立任务环境与 N8 交互对照
+在统一入口冻结非代码输入、环境配方及任务来源，为 E2B 会话建立可核验的独立文件与服务环境，复用现有闭环并生成 N8 混合及全 direct 对照材料；local 明确拒绝不支持的环境。
+
 ## 全局看板
 
 | 组 | 任务 | 标题 | 状态 | 依赖 | 涉及文件 |
@@ -574,6 +580,16 @@ PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthes
 | 0079 | 0079/T4 | 冻结继承配置及统一执行恢复 | done | T1, T2, T3 | backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/schemas/experiment-v2.json<br>backend/auto_designer/experiment/materials.py<br>backend/auto_designer/experiment/context.py<br>backend/auto_designer/experiment/workload.py<br>backend/auto_designer/experiment/controllers/unified.py<br>backend/auto_designer/experiment/controllers/feedback.py<br>backend/auto_designer/experiment/controllers/runtime.py<br>backend/auto_designer/experiment/engine.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/backends/local.py<br>backend/tests/test_experiment_continuation_config.py<br>backend/tests/test_experiment_continuation_lifecycle.py<br>backend/tests/test_experiment_continuation_workload.py |
 | 0079 | 0079/T5 | 双语追加实验教程 | done | T4 | docs/tutorials/experiment-continuation.md<br>docs/tutorials/experiment-continuation.zh-CN.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/audits/unified-entry-capability-migration-20261003.md<br>README.md<br>README.zh-CN.md<br>CLAUDE.md |
 | 0079 | 0079/T6 | 合同与真实双后端验收 | done | T4, T5 | backend/scripts/e2e-spec-0079-experiment-continuation.sh<br>backend/tests/test_experiment_continuation_contract.py<br>backend/tests/fixtures/continuation/current-parent-v1.json<br>docs/validation/experiment-continuation.md<br>.github/workflows/experiment-contract.yml |
+| 0080 | 0080/T1 | 配置与配对编译器允许画像复用 | done | — | backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/workload.py<br>backend/tests/test_experiment_config_v2.py<br>backend/tests/test_experiment_workload.py |
+| 0080 | 0080/T2 | 独立会话执行与部分失败恢复 | done | T1 | backend/auto_designer/loop/orchestrator.py<br>backend/tests/loop/test_orchestrator.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/test_reusable_persona_sessions.py |
+| 0080 | 0080/T3 | 重复配对的归档及继承往返 | done | T1, T2 | backend/auto_designer/experiment/materials.py<br>backend/tests/test_experiment_continuation_workload.py<br>backend/tests/test_experiment_continuation_contract.py<br>backend/tests/test_experiment_continuation_export.py<br>backend/tests/test_experiment_continuation_source.py |
+| 0080 | 0080/T4 | 文档及独立会话验收 | done | T2, T3 | docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/tutorials/multi-user-experiment.md<br>docs/tutorials/multi-user-experiment.zh-CN.md<br>docs/validation/reusable-persona-sessions.md<br>backend/scripts/e2e-spec-0080-reusable-persona-sessions.sh |
+| 0081 | 0081/T1 | 当前任务及环境材料契约 | pending | 0080/T3 | backend/auto_designer/experiment/config.py<br>backend/auto_designer/experiment/schemas/task-package-v1.json<br>backend/auto_designer/experiment/environment.py<br>backend/auto_designer/experiment/materials.py<br>backend/tests/test_experiment_environment_config.py<br>backend/tests/test_experiment_environment_materials.py |
+| 0081 | 0081/T2 | 工作区进程与观测统一边界 | pending | T1 | backend/auto_designer/user/sim/runtime.py<br>backend/auto_designer/harness/launcher.py<br>backend/auto_designer/observations/publication.py<br>backend/tests/harness/test_launcher.py<br>backend/tests/user/sim/test_environment_runtime.py<br>backend/tests/observations/test_environment_collection.py |
+| 0081 | 0081/T3 | E2B 所属任务根与服务管理 | pending | T1, T2 | backend/auto_designer/experiment/environments/__init__.py<br>backend/auto_designer/experiment/environments/registry.py<br>backend/auto_designer/experiment/environments/broker.py<br>backend/auto_designer/experiment/environments/namespace.py<br>backend/auto_designer/experiment/environments/services.py<br>backend/auto_designer/user/sim/sources/namespaced.py<br>backend/tests/test_environment_registry.py<br>backend/tests/test_environment_namespace.py<br>backend/tests/test_environment_services.py |
+| 0081 | 0081/T4 | 接入统一生命周期及当前归档 | pending | T1, T2, T3 | backend/auto_designer/experiment/backends/e2b.py<br>backend/auto_designer/experiment/backends/e2b_bootstrap.py<br>backend/auto_designer/experiment/backends/e2b_template.py<br>backend/auto_designer/experiment/context.py<br>backend/auto_designer/experiment/workload.py<br>backend/auto_designer/experiment/runtime.py<br>backend/auto_designer/experiment/collection.py<br>backend/auto_designer/experiment/controllers/unified.py<br>backend/auto_designer/loop/orchestrator.py<br>backend/auto_designer/experiment/continuation/source.py<br>backend/auto_designer/experiment/continuation/export.py<br>backend/tests/test_experiment_environment_lifecycle.py<br>backend/tests/test_experiment_environment_continuation.py |
+| 0081 | 0081/T5 | 当前 N8 配对材料与双语启动教程 | pending | T4, 0080/T4 | examples/task-environments/README.md<br>examples/task-environments/README.zh-CN.md<br>examples/task-environments/isolated-files/task.json<br>examples/task-environments/isolated-files/source/README.md<br>examples/task-environments/isolated-files/instruction.md<br>examples/task-environments/isolated-files/setup.sh<br>examples/task-environments/isolated-files/requirements.lock<br>examples/task-environments/isolated-files/runtime-lock.json<br>examples/task-environments/isolated-files/initialize.sh<br>examples/task-environments/isolated-files/verify.sh<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/tutorials/n8-interaction-control.md<br>docs/tutorials/n8-interaction-control.zh-CN.md<br>docs/audits/unified-entry-capability-migration-20261003.md<br>CLAUDE.md |
+| 0081 | 0081/T6 | 环境与完整 N8 路径实测 | pending | T4, T5 | backend/scripts/e2e-spec-0081-e2b-task-environments.sh<br>backend/tests/test_experiment_environment_contract.py<br>backend/tests/test_n8_interaction_control.py<br>docs/validation/e2b-task-environments.md<br>.github/workflows/experiment-contract.yml |
 
 ## 跨 feature 关系图
 
@@ -1068,6 +1084,20 @@ graph LR
         n0079_T5["T5 双语追加实验教程"]
         n0079_T6["T6 合同与真实双后端验收"]
     end
+    subgraph G0080[0080 reusable-persona-sessions]
+        n0080_T1["T1 配置与配对编译器允许画像复用"]
+        n0080_T2["T2 独立会话执行与部分失败恢复"]
+        n0080_T3["T3 重复配对的归档及继承往返"]
+        n0080_T4["T4 文档及独立会话验收"]
+    end
+    subgraph G0081[0081 e2b-task-environments]
+        n0081_T1["T1 当前任务及环境材料契约"]
+        n0081_T2["T2 工作区进程与观测统一边界"]
+        n0081_T3["T3 E2B 所属任务根与服务管理"]
+        n0081_T4["T4 接入统一生命周期及当前归档"]
+        n0081_T5["T5 当前 N8 配对材料与双语启动教程"]
+        n0081_T6["T6 环境与完整 N8 路径实测"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1431,6 +1461,22 @@ graph LR
     n0079_T5 --> n0079_T4
     n0079_T6 --> n0079_T4
     n0079_T6 --> n0079_T5
+    n0080_T2 --> n0080_T1
+    n0080_T3 --> n0080_T1
+    n0080_T3 --> n0080_T2
+    n0080_T4 --> n0080_T2
+    n0080_T4 --> n0080_T3
+    n0081_T1 --> n0080_T3
+    n0081_T2 --> n0081_T1
+    n0081_T3 --> n0081_T1
+    n0081_T3 --> n0081_T2
+    n0081_T4 --> n0081_T1
+    n0081_T4 --> n0081_T2
+    n0081_T4 --> n0081_T3
+    n0081_T5 --> n0081_T4
+    n0081_T5 --> n0080_T4
+    n0081_T6 --> n0081_T4
+    n0081_T6 --> n0081_T5
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1486,9 +1532,9 @@ graph LR
 | 文件 | 涉及组 |
 |----|----|
 | .github/workflows/ci.yml | 0070, 0071 |
-| .github/workflows/experiment-contract.yml | 0069, 0071, 0076, 0077, 0079 |
+| .github/workflows/experiment-contract.yml | 0069, 0071, 0076, 0077, 0079, 0081 |
 | .gitignore | 0069, 0071 |
-| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069, 0071, 0073, 0075, 0076, 0077, 0079 |
+| CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069, 0071, 0073, 0075, 0076, 0077, 0079, 0081 |
 | OpenAgents/openagents/recipes/stages.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061, 0063 |
 | OpenAgents/openagents/runtime/context.py | 0032, 0061, 0063 |
@@ -1535,40 +1581,43 @@ graph LR
 | backend/auto_designer/distill/seed_library.py | 0010, 0071 |
 | backend/auto_designer/evaluation/swebench.py | 0051, 0075 |
 | backend/auto_designer/experiment/__init__.py | 0047, 0071 |
-| backend/auto_designer/experiment/backends/e2b.py | 0069, 0071, 0072, 0073 |
-| backend/auto_designer/experiment/backends/e2b_bootstrap.py | 0069, 0071, 0072, 0073 |
+| backend/auto_designer/experiment/backends/e2b.py | 0069, 0071, 0072, 0073, 0081 |
+| backend/auto_designer/experiment/backends/e2b_bootstrap.py | 0069, 0071, 0072, 0073, 0081 |
+| backend/auto_designer/experiment/backends/e2b_template.py | 0069, 0081 |
 | backend/auto_designer/experiment/backends/local.py | 0069, 0071, 0072, 0073, 0077, 0079 |
 | backend/auto_designer/experiment/cli.py | 0047, 0053, 0064, 0069, 0071, 0072, 0074, 0075, 0076 |
-| backend/auto_designer/experiment/collection.py | 0069, 0077, 0079 |
-| backend/auto_designer/experiment/config.py | 0047, 0069, 0071, 0072, 0073, 0077, 0079 |
-| backend/auto_designer/experiment/context.py | 0069, 0071, 0072, 0073, 0077, 0079 |
+| backend/auto_designer/experiment/collection.py | 0069, 0077, 0079, 0081 |
+| backend/auto_designer/experiment/config.py | 0047, 0069, 0071, 0072, 0073, 0077, 0079, 0080, 0081 |
+| backend/auto_designer/experiment/context.py | 0069, 0071, 0072, 0073, 0077, 0079, 0081 |
+| backend/auto_designer/experiment/continuation/export.py | 0079, 0081 |
+| backend/auto_designer/experiment/continuation/source.py | 0079, 0081 |
 | backend/auto_designer/experiment/controllers/__init__.py | 0071, 0073 |
 | backend/auto_designer/experiment/controllers/ordinary.py | 0007, 0015, 0017, 0020, 0021, 0025, 0026, 0028, 0029, 0032, 0033, 0039, 0040, 0041, 0045, 0047, 0049, 0050, 0063, 0064, 0068, 0069, 0070, 0071, 0072, 0073 |
 | backend/auto_designer/experiment/controllers/runtime.py | 0073, 0079 |
 | backend/auto_designer/experiment/controllers/swebench.py | 0028, 0032, 0039, 0040, 0044, 0047, 0050, 0051, 0063, 0064, 0068, 0069, 0071, 0072, 0073 |
-| backend/auto_designer/experiment/controllers/unified.py | 0073, 0079 |
+| backend/auto_designer/experiment/controllers/unified.py | 0073, 0079, 0081 |
 | backend/auto_designer/experiment/dashboard.py | 0072, 0073 |
 | backend/auto_designer/experiment/engine.py | 0069, 0071, 0073, 0079 |
 | backend/auto_designer/experiment/infrastructure.py | 0047, 0069, 0077 |
 | backend/auto_designer/experiment/manifest.py | 0047, 0064, 0069, 0071 |
-| backend/auto_designer/experiment/materials.py | 0069, 0071, 0072, 0073, 0077, 0079 |
-| backend/auto_designer/experiment/runtime.py | 0047, 0053, 0064, 0069, 0071, 0072, 0073, 0079 |
+| backend/auto_designer/experiment/materials.py | 0069, 0071, 0072, 0073, 0077, 0079, 0080, 0081 |
+| backend/auto_designer/experiment/runtime.py | 0047, 0053, 0064, 0069, 0071, 0072, 0073, 0079, 0081 |
 | backend/auto_designer/experiment/schemas/experiment-v2.json | 0069, 0072, 0073, 0077, 0079 |
-| backend/auto_designer/experiment/schemas/task-package-v1.json | 0069, 0072 |
-| backend/auto_designer/experiment/workload.py | 0073, 0079 |
+| backend/auto_designer/experiment/schemas/task-package-v1.json | 0069, 0072, 0081 |
+| backend/auto_designer/experiment/workload.py | 0073, 0079, 0080, 0081 |
 | backend/auto_designer/guards/harness_boundary.py | 0015, 0030, 0040, 0068 |
 | backend/auto_designer/guards/repo_guard.py | 0021, 0068 |
 | backend/auto_designer/guards/workspace_jail.py | 0015, 0049, 0059, 0068 |
 | backend/auto_designer/harness/INTERFACE.md | 0030, 0036 |
 | backend/auto_designer/harness/connector.py | 0030, 0035, 0036, 0041 |
 | backend/auto_designer/harness/interface.py | 0001, 0013 |
-| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041, 0051, 0061, 0069, 0073 |
+| backend/auto_designer/harness/launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0023, 0030, 0035, 0036, 0041, 0051, 0061, 0069, 0073, 0081 |
 | backend/auto_designer/invocation.py | 0049, 0064, 0068 |
 | backend/auto_designer/loop/checkpoint.py | 0004, 0064 |
 | backend/auto_designer/loop/live.py | 0017, 0026, 0028, 0050, 0053, 0064, 0068, 0073 |
 | backend/auto_designer/loop/live_tracer.py | 0032, 0041, 0066, 0068 |
 | backend/auto_designer/loop/metrics.py | 0003, 0025, 0029, 0068 |
-| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0063, 0064, 0068, 0073, 0079 |
+| backend/auto_designer/loop/orchestrator.py | 0003, 0007, 0008, 0009, 0017, 0021, 0025, 0028, 0029, 0032, 0033, 0041, 0050, 0051, 0060, 0063, 0064, 0068, 0073, 0079, 0080, 0081 |
 | backend/auto_designer/loop/roster.py | 0020, 0025, 0028, 0029, 0032, 0068 |
 | backend/auto_designer/loop/round_gate.py | 0050, 0062, 0064 |
 | backend/auto_designer/loop/run_state.py | 0004, 0007, 0064 |
@@ -1576,6 +1625,7 @@ graph LR
 | backend/auto_designer/loop/sim_user.py | 0008, 0009, 0013, 0017, 0022, 0024, 0025, 0030, 0041, 0044, 0048, 0051, 0053, 0056, 0061, 0064, 0066, 0067, 0068, 0070, 0073, 0075 |
 | backend/auto_designer/models.py | 0001, 0008, 0009, 0013, 0024, 0035, 0048, 0051, 0053, 0054, 0056, 0073 |
 | backend/auto_designer/observations/gaps.py | 0061, 0068 |
+| backend/auto_designer/observations/publication.py | 0061, 0081 |
 | backend/auto_designer/tracker/base.py | 0001, 0025, 0042, 0064 |
 | backend/auto_designer/tracker/fake.py | 0001, 0020, 0025, 0042, 0064 |
 | backend/auto_designer/tracker/gitea.py | 0002, 0017, 0025, 0032, 0039, 0042, 0061, 0063, 0064, 0070 |
@@ -1592,7 +1642,7 @@ graph LR
 | backend/auto_designer/user/sim/persona_client.py | 0005, 0008, 0022, 0024, 0031, 0041, 0048, 0051, 0053, 0054, 0056, 0066 |
 | backend/auto_designer/user/sim/persona_io.py | 0006, 0037 |
 | backend/auto_designer/user/sim/prompt.py | 0005, 0008, 0022, 0023, 0031, 0035, 0048, 0054, 0056, 0057 |
-| backend/auto_designer/user/sim/runtime.py | 0051, 0061, 0069, 0073, 0075, 0077 |
+| backend/auto_designer/user/sim/runtime.py | 0051, 0061, 0069, 0073, 0075, 0077, 0081 |
 | backend/auto_designer/user/sim/sandbox.py | 0008, 0009, 0051 |
 | backend/auto_designer/user/sim/seed_source.py | 0009, 0051 |
 | backend/auto_designer/user/sim/sources/docker_seed.py | 0044, 0051, 0069, 0073 |
@@ -1665,15 +1715,15 @@ graph LR
 | backend/tests/guards/test_repo_guard.py | 0021, 0068 |
 | backend/tests/guards/test_workspace_jail.py | 0015, 0049, 0068 |
 | backend/tests/harness/test_connector.py | 0030, 0035, 0036, 0041 |
-| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051, 0073 |
+| backend/tests/harness/test_launcher.py | 0003, 0008, 0013, 0017, 0019, 0022, 0030, 0035, 0036, 0041, 0051, 0073, 0081 |
 | backend/tests/harness/test_template_entry.py | 0013, 0051, 0061 |
 | backend/tests/loop/test_checkpoint.py | 0004, 0064 |
 | backend/tests/loop/test_live.py | 0017, 0026, 0050, 0064, 0068, 0073 |
 | backend/tests/loop/test_live_tracer.py | 0041, 0068 |
 | backend/tests/loop/test_metrics.py | 0003, 0025, 0029, 0068 |
-| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062, 0064, 0068, 0073, 0079 |
+| backend/tests/loop/test_orchestrator.py | 0003, 0007, 0008, 0017, 0021, 0025, 0029, 0032, 0033, 0041, 0050, 0051, 0062, 0064, 0068, 0073, 0079, 0080 |
 | backend/tests/loop/test_parallel_sessions.py | 0017, 0032, 0041 |
-| backend/tests/loop/test_recovery.py | 0064, 0068, 0073 |
+| backend/tests/loop/test_recovery.py | 0064, 0068, 0073, 0080 |
 | backend/tests/loop/test_roster.py | 0020, 0025, 0028, 0029, 0032, 0068 |
 | backend/tests/loop/test_round_gate.py | 0050, 0062, 0064 |
 | backend/tests/loop/test_run_state.py | 0004, 0007, 0064 |
@@ -1688,7 +1738,11 @@ graph LR
 | backend/tests/test_bootstrap_harness.py | 0002, 0007 |
 | backend/tests/test_experiment_capability_migration.py | 0072, 0073 |
 | backend/tests/test_experiment_cli_v2.py | 0047, 0053, 0069, 0071, 0072, 0073, 0074, 0075, 0076 |
-| backend/tests/test_experiment_config_v2.py | 0047, 0069, 0071, 0072, 0073 |
+| backend/tests/test_experiment_config_v2.py | 0047, 0069, 0071, 0072, 0073, 0080 |
+| backend/tests/test_experiment_continuation_contract.py | 0079, 0080 |
+| backend/tests/test_experiment_continuation_export.py | 0079, 0080 |
+| backend/tests/test_experiment_continuation_source.py | 0079, 0080 |
+| backend/tests/test_experiment_continuation_workload.py | 0079, 0080 |
 | backend/tests/test_experiment_dashboard.py | 0072, 0073 |
 | backend/tests/test_experiment_e2b_backend.py | 0069, 0071, 0072, 0073 |
 | backend/tests/test_experiment_e2b_bootstrap.py | 0072, 0073 |
@@ -1699,6 +1753,7 @@ graph LR
 | backend/tests/test_experiment_materials.py | 0069, 0071, 0072, 0073 |
 | backend/tests/test_experiment_public_examples.py | 0069, 0071, 0073 |
 | backend/tests/test_experiment_repository.py | 0071, 0072, 0073, 0074, 0076 |
+| backend/tests/test_experiment_workload.py | 0073, 0080 |
 | backend/tests/test_invocation.py | 0049, 0068 |
 | backend/tests/test_models.py | 0001, 0024, 0051, 0053, 0054 |
 | backend/tests/test_prepare_openagents_from_summary.py | 0046, 0071 |
@@ -1736,13 +1791,13 @@ graph LR
 | backend/tests/web/test_api.py | 0020, 0025, 0029, 0032, 0039, 0041, 0068, 0073 |
 | docs/0048-user-sim-final-check-convergence.md | 0048, 0071 |
 | docs/ARCHITECTURE.md | 0068, 0071, 0073 |
-| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079 |
-| docs/CONFIGURATION.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079 |
+| docs/CONFIGURATION.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079, 0080, 0081 |
+| docs/CONFIGURATION.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079, 0080, 0081 |
 | docs/EXPORTING.md | 0068, 0071 |
 | docs/QUICKSTART.md | 0068, 0069, 0070, 0071, 0072, 0073, 0074, 0075 |
 | docs/QUICKSTART.zh-CN.md | 0069, 0071, 0072, 0073, 0074, 0075 |
 | docs/audits/0061-observation-lifecycle-validation.md | 0061, 0071 |
-| docs/audits/unified-entry-capability-migration-20261003.md | 0071, 0072, 0075, 0076, 0077, 0079 |
+| docs/audits/unified-entry-capability-migration-20261003.md | 0071, 0072, 0075, 0076, 0077, 0079, 0081 |
 | docs/specs/0014-dev-commit-discipline.md | 0068, 0071 |
 | docs/specs/0015-dev-overfit-isolation.md | 0068, 0071 |
 | docs/specs/0016-synthesizer-rootcause-signal.md | 0068, 0071 |
@@ -1793,6 +1848,8 @@ graph LR
 | docs/specs/ARCHITECTURE.md | 0068, 0071 |
 | docs/specs/OVERVIEW.md | 0042, 0068, 0071 |
 | docs/synthesizer-grouping.md | 0063, 0068, 0071, 0072 |
+| docs/tutorials/multi-user-experiment.md | 0073, 0080 |
+| docs/tutorials/multi-user-experiment.zh-CN.md | 0073, 0080 |
 | docs/tutorials/n1-experiment.md | 0069, 0071, 0072, 0073 |
 | docs/tutorials/n1-experiment.zh-CN.md | 0069, 0071, 0072, 0073 |
 | docs/tutorials/seed-task-import.md | 0076, 0077 |
@@ -4208,4 +4265,74 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_done;
+```
+
+### 0080 同一 persona 的独立会话编排（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 配置与配对编译器允许画像复用"]
+    nT2["T2 独立会话执行与部分失败恢复"]
+    nT3["T3 重复配对的归档及继承往返"]
+    nT4["T4 文档及独立会话验收"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT2 --> nT4
+    nT3 --> nT4
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
+    class v_T4_1 st_done;
+```
+
+### 0081 E2B 独立任务环境与 N8 交互对照（issue #0）
+
+```mermaid
+graph LR
+    nT1["T1 当前任务及环境材料契约"]
+    nT2["T2 工作区进程与观测统一边界"]
+    nT3["T3 E2B 所属任务根与服务管理"]
+    nT4["T4 接入统一生命周期及当前归档"]
+    nT5["T5 当前 N8 配对材料与双语启动教程"]
+    nT6["T6 环境与完整 N8 路径实测"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+    nT1 --> nT4
+    nT2 --> nT4
+    nT3 --> nT4
+    nT4 --> nT5
+    nT4 --> nT6
+    nT5 --> nT6
+```
+
+演化图：
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    v_T4_1["T4 v1"]
+    v_T5_1["T5 v1"]
+    v_T6_1["T6 v1"]
+    classDef st_pending fill:#eeeeee;
+    class v_T1_1 st_pending;
+    class v_T2_1 st_pending;
+    class v_T3_1 st_pending;
+    class v_T4_1 st_pending;
+    class v_T5_1 st_pending;
+    class v_T6_1 st_pending;
 ```

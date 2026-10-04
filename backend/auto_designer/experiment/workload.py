@@ -44,7 +44,6 @@ def interaction_plan(config: dict[str, Any], tasks: list[dict[str, Any]]) -> lis
         raise ConfigError(f"workload.interaction_plan must contain {count} rounds")
     for round_no, picks in enumerate(plan, 1):
         label = f"workload.interaction_plan round {round_no}"
-        seen = set()
         if not isinstance(picks, list) or len(picks) != sessions:
             raise ConfigError(f"{label} does not match rounds.sessions_per_round")
         for pair in picks:
@@ -59,9 +58,6 @@ def interaction_plan(config: dict[str, Any], tasks: list[dict[str, Any]]) -> lis
                 raise ConfigError(f"{label} references unselected persona {persona}")
             if task not in task_ids:
                 raise ConfigError(f"{label} references unknown task {task}")
-            if persona in seen:
-                raise ConfigError(f"{label} contains duplicate persona {persona}")
-            seen.add(persona)
     return json.loads(json.dumps(plan))
 
 
@@ -89,17 +85,16 @@ def compile_session_plan(
         if len(inherited_pairs) != config["rounds"]["sessions_per_round"]:
             raise ConfigError("Inherited pair count differs from sessions_per_round")
         picks = []
-        seen = set()
         for pair in inherited_pairs:
             task_id, persona = pair["task_id"], pair["persona_id"]
-            if task_id not in by_id or persona in seen:
-                raise ConfigError("Inherited workload contains unknown task or duplicate persona")
+            # Spec-0080/T1: parent pairs are an ordered execution list, not a set.
+            if task_id not in by_id:
+                raise ConfigError("Inherited workload contains unknown task")
             if (pair["task_digest"], pair["interaction"]) != (
                 by_id[task_id]["digest"],
                 by_id[task_id]["interaction"],
             ):
                 raise ConfigError("Inherited task binding identity differs from catalog")
-            seen.add(persona)
             picks.append([persona, task_id])
         pairs = [picks for _ in range(config["rounds"]["count"])]
     else:

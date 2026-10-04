@@ -207,3 +207,19 @@ def test_reasoning_effort_is_validated_and_preserved(tmp_path, role):
     document["models"][role]["reasoning_effort"] = "high\nwrong"
     with pytest.raises(ConfigError):
         load_fixture_config(write(tmp_path / "config.json", document))
+
+
+# Spec-0080/T1: selected cards remain unique, but sessions can reuse them.
+def test_sessions_can_exceed_selected_personas(tmp_path):
+    document = definition()
+    document["rounds"].update(sessions_per_round=3, max_parallel_users=2)
+    loaded = load_fixture_config(write(tmp_path / "config.json", document))
+    assert loaded["rounds"]["sessions_per_round"] == 3
+    assert loaded["workload"]["persona_ids"] == ["sr-15-swyx"]
+
+
+def test_selected_persona_ids_still_must_be_unique(tmp_path):
+    document = definition()
+    document["workload"]["persona_ids"] *= 2
+    with pytest.raises(ConfigError, match="non-unique"):
+        load_fixture_config(write(tmp_path / "config.json", document))

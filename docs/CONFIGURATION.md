@@ -16,7 +16,7 @@ New experiments use JSON with `schema_version: 2` and the unified entry describe
 | Personas | JSON array following the repository persona schema | `examples/personas/n1.json` |
 | Credentials | Explicit environment variables or a mode-0600 env file | `examples/experiment.env.example` |
 
-The N1 example uses `examples/personas/n1.json`. N4 uses four real cards from the maintained `examples/personas/library.json`. Select IDs present in the library; the number of distinct selected personas must cover sessions_per_round.
+The N1 example uses `examples/personas/n1.json`. N4 uses four real cards from the maintained `examples/personas/library.json`. Select unique IDs present in the library. A persona card may be reused across multiple independent sessions in the same round.
 
 Paths in the experiment are relative to that JSON; task paths are relative to the task package. `check --offline` shows an unfrozen allocation preview without fetching Git. `prepare` freezes each task's package, instruction, setup, dependency lock and verified source archive, then creates `materials/task-catalog.json`, `materials/session-plan.json`, the persona roster, Harness archive and hash manifest. You do not need to handcraft these.
 
@@ -38,7 +38,7 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `evaluation.official_grading` | `false`; evolution stays ungraded; use the independent post-run `grade` command |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
-Choose one or more task packages and set sessions_per_round up to the number of selected personas; max_parallel_users must not exceed sessions_per_round. Different personas may use the same task in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
+Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
 
 `builtin` freezes this checkout's `backend/harness_template/`. It is not the historical `cade14d` Harness. To reproduce that baseline, supply its actual archive and checksum explicitly.
 
@@ -168,7 +168,7 @@ Set task-package `interaction: "direct"` for Harness-driven execution; the defau
 }
 ```
 
-The plan validates every round's session count and selected persona/task IDs. Personas must be unique within a round; tasks may repeat. If omitted, global slot k=(round_no-1)*sessions_per_round+slot selects persona_ids[k % P] and task_packages[k % T] in their configured order. This simple rotation does not guarantee all persona × task combinations; use an explicit plan for AABB, fixed groups or cross-task coverage. Ordinary `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds and continuation initialization require delivery readiness.
+The plan validates every round's session count and selected persona/task IDs. The selected persona_ids and library IDs remain unique. The ordered session list may repeat personas, tasks, or complete pairs; round/slot gives each its own session ID, client, writable workspace and recovery unit. Reused cards are not independent human samples. If omitted, global slot k=(round_no-1)*sessions_per_round+slot selects persona_ids[k % P] and task_packages[k % T] in their configured order. This simple rotation does not guarantee all persona × task combinations; use an explicit plan for AABB, fixed groups or cross-task coverage. Ordinary `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds and continuation initialization require delivery readiness.
 
 `experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 

@@ -37,7 +37,7 @@ persona 来自 `examples/personas/library.json` 的真实卡片。显式计划�
 
 每轮四个 session，`max_parallel_users: 2`。R1 等所有用户会话终结，再运行 Triage/Synthesizer/Owner，并等待准入交付票达到终态后封口。R2 只试用已封口 Harness，不再生成交付批次。任务结果、用户满意度、基础设施失败分别记录。
 
-创建其他实验时，选择库中存在的 persona ID 和唯一任务包 ID。`task_packages` 与旧 `kind` + `task_package` 互斥。省略 interaction_plan 时，按全局槽 k=(round_no-1)*sessions_per_round+slot，分别取第 k % P 个 persona 与第 k % T 个任务；这种简单轮转不保证覆盖全部 persona × task 组合，覆盖或固定分组请写显式计划。同轮 persona 不重复，task 可以重复。
+创建其他实验时，选择库中存在的 persona ID 和唯一任务包 ID。`task_packages` 与旧 `kind` + `task_package` 互斥。省略 interaction_plan 时，按全局槽 k=(round_no-1)*sessions_per_round+slot，分别取第 k % P 个 persona 与第 k % T 个任务；这种简单轮转不保证覆盖全部 persona × task 组合，覆盖或固定分组请写显式计划。所选 persona ID 集合仍唯一；执行列表允许重复画像或完整配对。sessions_per_round 表示槽位数量，而非不同画像数。每个槽位都有独立对话、client、工作区及恢复身份；复用画像不代表多个独立真人样本。
 
 ## 3. 检查并冻结全部任务
 

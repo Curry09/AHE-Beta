@@ -198,7 +198,7 @@ def test_input_branches_and_multi_seed_override_fail_offline(multiple_inputs, mu
         materials.check_materials(multiple_inputs)
 
 
-def test_duplicate_task_ids_and_duplicate_personas_fail(multiple_inputs, tmp_path):
+def test_duplicate_task_ids_fail_but_execution_personas_may_repeat(multiple_inputs, tmp_path):
     second_path = tmp_path / "second/task.json"
     second = json.loads(second_path.read_text())
     second["id"] = "simple-task"
@@ -211,8 +211,9 @@ def test_duplicate_task_ids_and_duplicate_personas_fail(multiple_inputs, tmp_pat
     p = config["workload"]["persona_ids"][0]
     config["workload"]["interaction_plan"] = [[[p, "simple-task"]] * 4] * 2
     write(multiple_inputs, config)
-    with pytest.raises(ConfigError, match="duplicate persona"):
-        materials.check_materials(multiple_inputs)
+    # Spec-0080/T1: identical pairs occupy distinct ordered slots.
+    report = materials.check_materials(multiple_inputs)
+    assert report["interaction_plan"] == [[[p, "simple-task"]] * 4] * 2
 
 
 def test_second_task_freeze_failure_is_atomic_and_names_task(
@@ -375,3 +376,34 @@ def test_plan_scalar_types_cannot_masquerade_as_compiled_bindings(
     manifest["plan_hash"] = record["sha256"]
     with pytest.raises(ConfigError, match="logical task/persona"):
         materials.verify_materials(manifest)
+
+
+# Spec-0080/T1: reuse does not relax length or selected-ID validation.
+@pytest.mark.parametrize(
+    "plan,message",
+    [
+        ([[["p", "task"]]], "sessions_per_round"),
+        ([[["p", "task"], ["unknown", "task"]]], "unselected persona"),
+        ([[["p", "task"], ["p", "unknown"]]], "unknown task"),
+    ],
+)
+def test_reused_plan_still_rejects_invalid_references(plan, message):
+    config = {
+        "workload": {"persona_ids": ["p"], "interaction_plan": plan},
+        "rounds": {"count": 1, "sessions_per_round": 2},
+    }
+    with pytest.raises(ConfigError, match=message):
+        workload.interaction_plan(config, [{"id": "task"}])
+
+
+def test_default_rotation_reuses_one_selected_card(prepared_inputs, tmp_path):
+    document = json.loads(prepared_inputs.read_text())
+    document["rounds"].update(count=2, sessions_per_round=3, max_parallel_users=2)
+    write(prepared_inputs, document)
+    report = materials.check_materials(prepared_inputs)
+    assert report["persona_ids"] == ["sr-15-swyx"]
+    assert report["interaction_plan"] == [[["sr-15-swyx", "simple-task"]] * 3] * 2
+    frozen = materials.prepare_materials(prepared_inputs, tmp_path / "runs")
+    plan = workload.read_session_plan(Path(frozen["run_dir"]), frozen)
+    assert len(plan["rounds"]) == 2
+    assert all([b["slot"] for b in picks] == [0, 1, 2] for picks in plan["rounds"])

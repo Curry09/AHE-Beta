@@ -775,7 +775,8 @@ def _check_parent_materials(*, config: dict[str, Any]) -> dict[str, Any]:
         "config_hash": config_hash(data=config),
         "task_packages": source.tasks,
         "persona_cards": source.personas,
-        "persona_ids": [pair["persona_id"] for pair in source.pairs],
+        # Spec-0080/T3: freeze each card once while preserving every execution pair.
+        "persona_ids": [card["id"] for card in source.personas],
         "interaction_plan": [pairs for _ in range(config["rounds"]["count"])],
         "preview": {"frozen": False},
         "continuation": source.summary(),

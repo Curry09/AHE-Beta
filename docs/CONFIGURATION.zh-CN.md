@@ -16,7 +16,7 @@
 | Persona | 符合仓内 persona schema 的 JSON 数组 | `examples/personas/n1.json` |
 | 凭证 | 显式环境变量，或权限 0600 的 env 文件 | `examples/experiment.env.example` |
 
-N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/personas/library.json` 选择四张真实卡片。ID 必须存在于所选库中，不同 persona 的数量必须至少覆盖 sessions_per_round。
+N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/personas/library.json` 选择四张真实卡片。所选 ID 必须唯一且存在于画像库中；同一画像可在一轮中用于多个独立会话。
 
 实验中的路径相对于实验 JSON；任务包中的路径相对于任务 JSON。`check --offline` 只给尚未冻结的分配预览，不拉取 Git。`prepare` 冻结每个任务的包、指令、setup、依赖锁及已验证源码 archive，再生成 `materials/task-catalog.json`、`materials/session-plan.json`、persona roster、Harness archive 和哈希清单，无需手工拼装。
 
@@ -38,7 +38,7 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 | `evaluation.official_grading` | `false`，演化期间不评分；独立事后评分用 `grade` 命令 |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
-可选一个或多个任务包；sessions_per_round 不超过所选不同 persona 的数量，max_parallel_users 不超过 sessions_per_round。同轮不同 persona 可使用同一任务，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
+可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
 
 `builtin` 冻结当前 checkout 的 `backend/harness_template/`，不是历史 `cade14d` Harness。复现旧基线必须显式提供那份归档和真实校验和。
 
@@ -168,7 +168,7 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 }
 ```
 
-计划校验每轮 session 数量及已选 persona/task ID。同轮 persona 不重复，task 可以重复。省略计划时，按全局槽 k=(round_no-1)*sessions_per_round+slot，从配置顺序取 persona_ids[k % P] 和 task_packages[k % T]。这种简单轮转不保证覆盖全部 persona × task 组合；AABB、固定分组和交叉任务覆盖请写显式计划。普通实验的 `rounds.count: 1` 可只试用用户，不等待 Vigil；多轮和继承初始化仍须验证交付进程就绪。
+计划校验每轮 session 数量及已选 persona/task ID。画像选择集合 persona_ids 和库中 ID 仍须唯一；有序会话列表允许重复画像、任务或完整配对。round/slot 为每次执行区分 session ID、client、可写工作区及恢复 unit，复用画像不能解释为独立真人样本。省略计划时，按全局槽 k=(round_no-1)*sessions_per_round+slot，从配置顺序取 persona_ids[k % P] 和 task_packages[k % T]。这种简单轮转不保证覆盖全部 persona × task 组合；AABB、固定分组和交叉任务覆盖请写显式计划。普通实验的 `rounds.count: 1` 可只试用用户，不等待 Vigil；多轮和继承初始化仍须验证交付进程就绪。
 
 `experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 

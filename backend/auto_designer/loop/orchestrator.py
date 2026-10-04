@@ -421,7 +421,7 @@ class Orchestrator:
         assert self._frozen_session_plan is not None
         plan = json.loads(json.dumps(list(self._frozen_session_plan(round_no))))
         keys = {"round_no", "slot", "persona_id", "task_id", "task_digest", "interaction"}
-        personas = set()
+        # Spec-0080/T2: slot distinguishes sessions even for identical persona/task pairs.
         for index, binding in enumerate(plan):
             if (
                 not isinstance(binding, dict)
@@ -435,11 +435,9 @@ class Orchestrator:
                     for key in ("persona_id", "task_id", "task_digest", "interaction")
                 )
                 or binding["interaction"] not in {"direct", "simulated_user"}
-                or binding["persona_id"] in personas
                 or self._task_kinds.get(binding["task_id"]) not in {"ordinary", "swebench"}
             ):
                 raise RecoveryConflictError("invalid frozen logical session binding")
-            personas.add(binding["persona_id"])
         return plan
 
     def _resolve_logical_session(self, binding: Mapping[str, Any]) -> SessionPair:
