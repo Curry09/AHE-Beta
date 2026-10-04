@@ -237,6 +237,7 @@ def run_continuation_bootstrap(
     )
     pipeline = FeedbackPipeline(
         recovery=ledger,
+        grounding_repo=str(repo),
         resolve_head=resolve_head,
         assert_descendant=assert_descendant,
         integrity_guard=integrity_guard,

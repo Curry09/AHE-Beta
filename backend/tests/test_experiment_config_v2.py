@@ -121,6 +121,33 @@ def test_legacy_schema_is_explicitly_identified(tmp_path):
         load_fixture_config(write(tmp_path / "config.json", {"schema_version": 1}))
 
 
+@pytest.mark.parametrize(
+    "limits",
+    [
+        {},
+        {"termination_grace_seconds": 60},
+        {"request_budget_seconds": 0},
+        {"request_budget_seconds": True},
+        {"request_budget_seconds": 86401},
+        {"request_budget_seconds": 3600, "termination_grace_seconds": 0},
+        {"request_budget_seconds": 3600, "termination_grace_seconds": 301},
+        {"request_budget_seconds": 3600, "unknown": True},
+    ],
+)
+def test_invalid_public_harness_limits_fail_before_provider(tmp_path, limits):
+    document = definition()
+    document["runtime"]["harness"] = limits
+    with pytest.raises(ConfigError):
+        load_fixture_config(write(tmp_path / "config.json", document))
+
+
+def test_public_request_budget_is_preserved_without_adding_defaults(tmp_path):
+    document = definition()
+    document["runtime"]["harness"] = {"request_budget_seconds": 3600}
+    config = load_fixture_config(write(tmp_path / "config.json", document))
+    assert config["runtime"]["harness"] == {"request_budget_seconds": 3600}
+
+
 def test_task_paths_and_provenance(tmp_path):
     task = load_task_package(write(tmp_path / "task.json", package()))
     assert task["source"]["path"] == str(tmp_path / "repo")

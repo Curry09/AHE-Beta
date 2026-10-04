@@ -29,6 +29,7 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 | `runtime.gitea` | 本地用 `localhost`，E2B 用 `gitea.com`；另填仓库名前缀 |
 | `runtime.local` | 可选镜像覆盖、`ci_enabled`（默认 `false`）；本地工程 CI 必须使用已核验的专属 runner |
 | `runtime.e2b` | `cpu_count`、`memory_mb`、`timeout_seconds`（300–86400）；可选兼容 template |
+| `runtime.harness` | 可选单次请求预算和基础设施收尾余量；两后端共用 |
 | `harness.source` | `builtin`、`archive` 加路径和 SHA-256，或配合父来源的 `continuation` |
 | `workload` | 任务包与 persona 输入及可选 interaction_plan，或继承时仅填 `{"source":"parent"}` |
 | `rounds` | 轮数、每轮 session 数、最大用户并发数；继承时轮数表示新增用户轮 |
@@ -41,6 +42,23 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
 
 `builtin` 冻结当前 checkout 的 `backend/harness_template/`，不是历史 `cade14d` Harness。复现旧基线必须显式提供那份归档和真实校验和。
+
+### Harness 请求截止
+
+要为每次 Harness 请求设置一小时预算，在 `runtime` 中加入以下片段：
+
+```json
+"harness": {
+  "request_budget_seconds": 3600,
+  "termination_grace_seconds": 60
+}
+```
+
+launcher 将预算传入消息及兼容产品环境变量。所选 Harness 仍须实现内部预算；预算加余量后还未收到回复，基础设施才强停请求（此例为 3660 秒）。请求收据区分 Harness 回复和基础设施强停。这与 E2B 沙箱寿命、交付角色超时分别配置；在任务正文中写时长不会自动设置截止时间。
+
+预算须为正数且最多 86400 秒；余量须为正数且最多 300 秒，省略时为 60。未配置 `runtime.harness` 时，launcher 保留既有 1800 秒 fallback，考虑可识别的旧产品环境期限，再增加 60 秒余量。公共入口不继承宿主机设置；旧冻结配置不增加字段、不改变身份。已准备 run 继续使用自己的冻结 controller。
+
+反馈角色读取试用提交的源码快照；分诊历史报告时读取该报告记录的提交。缺少提交会阻止源码访问，不静默改读当前工作树。新 direct 会话与模拟交互一样完整保存已收到的进度与回复步骤，证据查询时共用摘要和展开限制，persona 仍只评阅终态回复；旧会话没有这些记录时仍标为未知。
 
 ## 继承当前完整归档
 

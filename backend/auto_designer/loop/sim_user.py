@@ -542,6 +542,37 @@ def make_sim_run_session_fn(
     return run
 
 
+def _direct_execution_record(harness) -> tuple[dict, list[dict]]:
+    """Preserve received evidence like SimTrace; clipping belongs to query projections."""
+    events = list(getattr(harness, "visible_events", []) or [])
+    steps = list(getattr(harness, "last_steps", []) or [])
+    provenance = "reply_steps"
+    if not steps:
+        provenance = "stdout_progress"
+        for event in events:
+            raw = event.get("raw") if isinstance(event, dict) else None
+            if not isinstance(raw, dict):
+                continue
+            progress = raw if raw.get("type") == "progress" else raw.get("progress", {})
+            if isinstance(progress, dict) and progress.get("text"):
+                step = dict(progress)
+                step.pop("type", None)  # Frame type remains in events; steps use kind.
+                step.setdefault("kind", "progress")
+                steps.append(step)
+    return {
+        "contract_version": 1,
+        "source": "launcher_received",
+        "storage_policy": "received_full",
+        "reviewer_visibility": "terminal_reply_only",
+        "events": events,
+        "events_total": len(events),
+        "events_omitted": 0,
+        "steps_source": provenance,
+        "steps_total": len(steps),
+        "steps_omitted": 0,
+    }, steps
+
+
 def make_direct_run_session_fn(
     *,
     client_factory: Callable[[], PersonaClient],
@@ -601,6 +632,7 @@ def make_direct_run_session_fn(
             harness_error = str(exc)
             reply = f"[harness error] {harness_error}"
         finally:
+            execution_record, harness_steps = _direct_execution_record(harness)
             try:
                 connector.close()
             finally:
@@ -705,7 +737,7 @@ def make_direct_run_session_fn(
             transcript=Transcript(
                 turns=[
                     Turn(role="user", content=scenario.description),
-                    Turn(role="harness", content=reply),
+                    Turn(role="harness", content=reply, steps=harness_steps),
                     Turn(role="user", content=feedback),
                 ]
             ),
@@ -717,6 +749,7 @@ def make_direct_run_session_fn(
             session_id=session_id,
             user_outcome={
                 "interaction_mode": "direct",
+                "execution_record": execution_record,
                 "user_model": getattr(review_client, "model", None),
                 "user_turns": 1,
                 "harness_messages": 1,

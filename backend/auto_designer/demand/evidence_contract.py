@@ -492,6 +492,14 @@ def build_evidence_envelope(
     else:
         sid = str(session.session_id)
         l1 = build_l1_summary(session)
+    if harness_ref is None and session is not None:
+        harness_ref = (session.session_provenance or {}).get("harness_sha")
+        if not harness_ref:
+            harness_ref = (
+                session.workspace_evidence.get("observation", {})
+                .get("artifact", {})
+                .get("harness_sha")
+            )
     source = {"status": "read_only", "repo": "harness", "ref": harness_ref or "unavailable"}
     categories = {
         "report": {

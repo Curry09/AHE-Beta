@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import json
 import subprocess
 import threading
@@ -18,6 +19,7 @@ from types import MappingProxyType
 from typing import Any, Protocol
 
 from auto_designer.demand.divergent import Divergent
+from auto_designer.demand.source import bind_harness_source
 from auto_designer.demand.synthesizer import Synthesizer
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.harness.launcher import HarnessLauncher
@@ -139,6 +141,7 @@ class Orchestrator:
             integrity_guard=self._integrity_guard,
             fetch_issue=self._fetch_issue,
             wait_delivery=self._wait_delivery,
+            grounding_repo=self._harness_repo,
         )
 
     @property
@@ -268,6 +271,10 @@ class Orchestrator:
                 self._integrity_guard()
             return self._resolve_head(ref=self._initial_ref)
 
+        with bind_harness_source(self._harness_repo, sha):
+            return self._run_legacy_feedback()
+
+    def _run_legacy_feedback(self) -> str:
         # 生成段·第一拍（Spec-0029/T8）：triage 分片 ∥ divergent，同一线程池并行。
         # 二者都只依赖 a 段产物（triage 吃 report、divergent 吃会话证据）、互不依赖；产出全为不可领
         # proposal（PM 独立交给 Owner，Synthesizer 仅吸收非 PM 来源）→ 分片自由。
@@ -676,7 +683,7 @@ class Orchestrator:
         if not jobs:
             return
         with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
-            futures = {pool.submit(fn): name for name, fn in jobs}
+            futures = {pool.submit(contextvars.copy_context().run, fn): name for name, fn in jobs}
             for fut in as_completed(futures):
                 name = futures[fut]
                 try:

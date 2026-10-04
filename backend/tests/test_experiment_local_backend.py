@@ -735,6 +735,8 @@ def test_harness_launcher_uses_controller_python_while_task_shell_is_separate(
     # The model destination remains valid even when its hostname also appeared
     # in the host's NO_PROXY. Only proxy routing is replaced inside Docker.
     monkeypatch.setenv("LLM_BASE_URL", "https://model.example/v1")
+    monkeypatch.setenv("AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS", "3600")
+    monkeypatch.setenv("AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS", "60")
     selected = launcher.HarnessLauncher(str(tmp_path), tmp_path / "runs")
     monkeypatch.setattr(selected, "_resolve_sha", lambda **kwargs: "b" * 40)
     monkeypatch.setattr(selected, "_checkout", lambda **kwargs: product)
@@ -752,6 +754,11 @@ def test_harness_launcher_uses_controller_python_while_task_shell_is_separate(
     assert "/opt/controller/.venv/bin/python" in argv
     assert "python3" not in argv
     assert "SANDBOX_WORK_DIR=/workspace/task/repo" in argv
+    assert "HARNESS_TASK_BUDGET_SECONDS=3600" in argv
+    assert "HARNESS_CALL_TIMEOUT=3600" in argv
+    assert "HARNESS_TURN_TIMEOUT=3600" in argv
+    assert invocation["limits"].outer_seconds == 3660
+    assert invocation["limits"].request_seconds == 3600
     proxy_names = {"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"}
     proxies = {
         item.partition("=")[0]: item.partition("=")[2]

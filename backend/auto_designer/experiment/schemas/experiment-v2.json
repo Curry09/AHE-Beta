@@ -101,6 +101,25 @@
             "memory_mb",
             "timeout_seconds"
           ]
+        },
+        "harness": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "request_budget_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 86400
+            },
+            "termination_grace_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 300
+            }
+          },
+          "required": [
+            "request_budget_seconds"
+          ]
         }
       },
       "required": [

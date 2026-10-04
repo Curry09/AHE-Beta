@@ -21,7 +21,7 @@ llm_config:
   timeout: 300
   api_type: openai_chat_completion
 
-# 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于验证产品现状；
+# 本地 sandbox：只读 harness 仓（公共运行时逐调用绑定试用 SHA 的源码快照）用于验证产品现状；
 # 产品 PM 不修改文件或 Git 状态。
 sandbox_config:
   type: local

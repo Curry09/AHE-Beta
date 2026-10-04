@@ -138,6 +138,32 @@ def test_standard_anthropic_key_keeps_api_key_auth(prepared):
     assert "ANTHROPIC_AUTH_TOKEN" not in env
 
 
+@pytest.mark.parametrize("backend", ["local", "e2b"])
+def test_request_limits_use_frozen_runtime_and_ignore_host(prepared, monkeypatch, backend):
+    root, manifest, credentials, resources = prepared
+    manifest["config"]["runtime"]["backend"] = backend
+    if backend == "e2b":
+        resources["sandbox_id"] = "owned-sandbox"
+        resources["workspace"] = {"kind": "prebuilt", "params": {"source": "/workspace"}}
+    for key in (
+        "AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS",
+        "AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS",
+        "HARNESS_CALL_TIMEOUT",
+    ):
+        monkeypatch.setenv(key, "9000")
+    kwargs = dict(run_dir=root, manifest=manifest, credentials=credentials, resources=resources)
+    env = build_controller_environment(**kwargs)
+    assert "HARNESS_CALL_TIMEOUT" not in env
+    assert "AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS" not in env
+    manifest["config"]["runtime"]["harness"] = {
+        "request_budget_seconds": 3600,
+        "termination_grace_seconds": 60,
+    }
+    env = build_controller_environment(**kwargs)
+    assert env["AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS"] == "3600"
+    assert env["AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS"] == "60"
+
+
 def test_e2b_swe_context_and_explicit_workspace(prepared, monkeypatch):
     root, manifest, credentials, resources = prepared
     manifest["config"]["runtime"]["backend"] = "e2b"

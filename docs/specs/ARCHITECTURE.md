@@ -36,6 +36,7 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `role_contract.py` | Spec-0043: task-independent cognitive contracts for demand-side roles. |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂结构综合作机制层判别证据。 |
 | `session_timeline.py` | 结构综合按需取用：从落盘 Session 投影「使用事件时间线」。 |
+| `source.py` | Spec-0082/T1: demand reads a commit snapshot rather than a moving checkout. |
 | `submit_tools.py` | submit 工具的 binding。 |
 | `synthesizer.py` | Synthesizer 驱动器。 |
 | `triage.py` | Triage（报告规范化）驱动器。 |
@@ -139,6 +140,7 @@ _Evaluation harness integration and execution support._
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | Evaluation harness integration and execution support. |
+| `budget.py` | Spec-0082/T2: request budgets and infrastructure termination are separate limits. |
 | `connector.py` | Platform-side connector from simulated users to the harness human-facing interface. |
 | `interface.py` | harness 多轮对话契约 HarnessInterface + 测试后端 FakeHarness（spec-0001/T2）。 |
 | `launcher.py` | harness launcher（spec-0003/T1）：把某版 harness 程序接成 spec-0001 的 HarnessInterface。 |
@@ -273,6 +275,7 @@ graph LR
     nauto_designer_demand_role_contract["demand.role_contract"]
     nauto_designer_demand_runtime_agg["demand.runtime_agg"]
     nauto_designer_demand_session_timeline["demand.session_timeline"]
+    nauto_designer_demand_source["demand.source"]
     nauto_designer_demand_submit_tools["demand.submit_tools"]
     nauto_designer_demand_synthesizer["demand.synthesizer"]
     nauto_designer_demand_triage["demand.triage"]
@@ -320,6 +323,7 @@ graph LR
     nauto_designer_guards_repo_guard["guards.repo_guard"]
     nauto_designer_guards_workspace_jail["guards.workspace_jail"]
     nauto_designer_harness["auto_designer.harness"]
+    nauto_designer_harness_budget["harness.budget"]
     nauto_designer_harness_connector["harness.connector"]
     nauto_designer_harness_interface["harness.interface"]
     nauto_designer_harness_launcher["harness.launcher"]
@@ -392,6 +396,7 @@ graph LR
     nauto_designer_demand_agent_contract --> nauto_designer_demand_issue_schema
     nauto_designer_demand_agent_runtime --> nauto_designer_demand_observation_provider
     nauto_designer_demand_agent_runtime --> nauto_designer_demand_session_timeline
+    nauto_designer_demand_agent_runtime --> nauto_designer_demand_source
     nauto_designer_demand_agent_runtime --> nauto_designer_invocation
     nauto_designer_demand_agent_runtime --> nauto_designer_loop_live_tracer
     nauto_designer_demand_agent_runtime --> nauto_designer_observations_gaps
@@ -457,6 +462,7 @@ graph LR
     nauto_designer_demand_triage --> nauto_designer_demand_evidence_contract
     nauto_designer_demand_triage --> nauto_designer_demand_issue_schema
     nauto_designer_demand_triage --> nauto_designer_demand_role_contract
+    nauto_designer_demand_triage --> nauto_designer_demand_source
     nauto_designer_demand_triage --> nauto_designer_loop_recovery
     nauto_designer_demand_triage --> nauto_designer_observations_grants
     nauto_designer_demand_triage --> nauto_designer_tracker_base
@@ -629,10 +635,12 @@ graph LR
     nauto_designer_guards_workspace_jail --> nauto_designer_usage
     nauto_designer_harness_connector --> nauto_designer_harness_interface
     nauto_designer_harness_connector --> nauto_designer_usage
+    nauto_designer_harness_launcher --> nauto_designer_harness_budget
     nauto_designer_harness_launcher --> nauto_designer_harness_interface
     nauto_designer_harness_launcher --> nauto_designer_observations_publication
     nauto_designer_harness_launcher --> nauto_designer_user_sim_runtime
     nauto_designer_invocation --> nauto_designer_usage
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_demand_source
     nauto_designer_loop_feedback_pipeline --> nauto_designer_loop_recovery
     nauto_designer_loop_feedback_pipeline --> nauto_designer_loop_round_gate
     nauto_designer_loop_feedback_pipeline --> nauto_designer_models
@@ -642,6 +650,7 @@ graph LR
     nauto_designer_loop_metrics --> nauto_designer_tracker_base
     nauto_designer_loop_metrics --> nauto_designer_user_session_store
     nauto_designer_loop_orchestrator --> nauto_designer_demand_divergent
+    nauto_designer_loop_orchestrator --> nauto_designer_demand_source
     nauto_designer_loop_orchestrator --> nauto_designer_demand_synthesizer
     nauto_designer_loop_orchestrator --> nauto_designer_harness_interface
     nauto_designer_loop_orchestrator --> nauto_designer_harness_launcher

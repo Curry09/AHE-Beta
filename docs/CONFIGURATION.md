@@ -29,6 +29,7 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `runtime.gitea` | Provider `localhost` for local, `gitea.com` for E2B; repository prefix |
 | `runtime.local` | Optional image overrides and `ci_enabled` (default `false`); local engineering CI requires a verified dedicated runner |
 | `runtime.e2b` | Requested `cpu_count`, `memory_mb`, `timeout_seconds` (300–86400); optional compatible template |
+| `runtime.harness` | Optional per-request budget and infrastructure termination grace; applies to both backends |
 | `harness.source` | `builtin`, `archive` with a path and SHA-256, or `continuation` with the matching parent source |
 | `workload` | Task packages with persona inputs/optional interaction_plan, or exactly `{"source":"parent"}` for continuation |
 | `rounds` | `count`, `sessions_per_round`, `max_parallel_users`; continuation count means added user rounds |
@@ -41,6 +42,23 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
 
 `builtin` freezes this checkout's `backend/harness_template/`. It is not the historical `cade14d` Harness. To reproduce that baseline, supply its actual archive and checksum explicitly.
+
+### Harness request deadlines
+
+To give each Harness request a one-hour budget, add this fragment to `runtime`:
+
+```json
+"harness": {
+  "request_budget_seconds": 3600,
+  "termination_grace_seconds": 60
+}
+```
+
+The launcher sends the budget in the message and compatible product environment variables. The selected Harness must implement its internal budget; infrastructure terminates a request that has not replied after budget plus grace (3660 seconds here). Request receipts distinguish a Harness reply from infrastructure termination. These are request deadlines, separate from E2B sandbox lifetime and delivery-role timeouts. Writing a duration in task text does not configure a deadline.
+
+The budget must be positive and at most 86400 seconds. Grace must be positive and at most 300 seconds; omission defaults to 60. Without `runtime.harness`, the launcher retains its existing 1800-second fallback, accounts for recognized legacy product limits, and adds 60 seconds of termination grace. Host settings are not inherited by the public entry; old frozen configurations do not gain new fields or change identity. Prepared runs continue using their frozen controller.
+
+Feedback roles read a source snapshot at the tested commit, while triage of a historical report uses that report's recorded commit. A missing commit blocks source access rather than silently reading the current checkout. New direct sessions preserve the received progress and reply steps in full, following simulated-session storage; evidence queries use shared summary and expansion limits. Their persona reviewer still sees only the terminal reply. Older sessions without these records remain unknown.
 
 ## Continue from a current completed archive
 

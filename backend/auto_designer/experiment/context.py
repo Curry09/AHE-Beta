@@ -264,6 +264,15 @@ def build_controller_environment(
         }
     )
     # Spec-0079/T4: no host inheritance; bind frozen parent material explicitly.
+    harness_limits = config["runtime"].get("harness") or {}
+    if "request_budget_seconds" in harness_limits:
+        env["AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS"] = str(
+            harness_limits["request_budget_seconds"]
+        )
+    if "termination_grace_seconds" in harness_limits:
+        env["AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS"] = str(
+            harness_limits["termination_grace_seconds"]
+        )
     env["AUTO_DESIGNER_DELIVERY_REQUIRED"] = "1" if delivery_required(config) else "0"
     if "continuation" in config:
         env["AUTO_DESIGNER_CONTINUATION_INPUT"] = str(

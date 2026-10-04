@@ -13,6 +13,7 @@ from collections.abc import Callable, Mapping, Sequence
 from contextlib import nullcontext
 from typing import Any
 
+from auto_designer.demand.source import bind_harness_source
 from auto_designer.loop.recovery import RecoveryConflictError, RecoveryStore, operation_key
 from auto_designer.loop.round_gate import RoundDeliveryBlocked, classify_issue, wait_round_delivery
 from auto_designer.models import OpenIssue
@@ -62,6 +63,7 @@ class FeedbackPipeline:
         wait_delivery: Callable[..., None] | None = None,
         prerequisite: str = "users",
         operation_namespace: str | None = None,
+        grounding_repo: str | None = None,
     ) -> None:
         if prerequisite not in {"users", "feedback_imported"}:
             raise ValueError("unsupported feedback prerequisite")
@@ -81,6 +83,7 @@ class FeedbackPipeline:
         self._wait_delivery = wait_delivery
         self._prerequisite = prerequisite
         self._operation_namespace = operation_namespace
+        self._grounding_repo = grounding_repo
         self.bind_roles()
 
     def bind_roles(self) -> None:
@@ -111,7 +114,10 @@ class FeedbackPipeline:
                 raise RecoveryConflictError("completed feedback round has no sealed SHA")
             return sealed
         self.bind_roles()
-        with bind_usage_context(round_no=round_no):
+        with (
+            bind_harness_source(self._grounding_repo, user_sha),
+            bind_usage_context(round_no=round_no, harness_sha=user_sha),
+        ):
             self._run_recovery_demand(round_no=round_no)
             admitted = self._run_recovery_owner(round_no=round_no)
             self._run_recovery_delivery(round_no=round_no, admitted=admitted)
