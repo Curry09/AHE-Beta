@@ -8,14 +8,12 @@ Orchestrator 只认 run_session_fn(persona, scenario, harness)（返回值不管
 
 from __future__ import annotations
 
-import json
 import os
 import uuid
 from collections.abc import Callable
 from pathlib import Path
 
 from auto_designer.demand.issue_schema import NEEDS_TRIAGE, round_label
-from auto_designer.evaluation.swebench import SWEbenchEvaluator, derive_accept_validity
 from auto_designer.harness.connector import HarnessConnector
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.loop.recovery import operation_key
@@ -30,9 +28,12 @@ from auto_designer.models import (
     SimTurn,
     Transcript,
     Turn,
+    bound_session_provenance,
+    validate_session_provenance,
 )
 from auto_designer.tracker.base import IssueTracker
 from auto_designer.usage import bind_usage_context, current_usage_context
+from auto_designer.user.patches import preserve_prediction
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.dimensions import Persona as SimPersona
@@ -51,7 +52,6 @@ def _audit_events(
     *,
     workspace_evidence: dict,
     request_outcomes: list[dict],
-    objective_evaluation: dict | None,
 ) -> list[dict]:
     """Build the minimal ordered evidence timeline retained with a session."""
     events: list[dict] = []
@@ -90,18 +90,80 @@ def _audit_events(
             str(workspace_evidence["closed_at"]),
             {"container_id": workspace_evidence.get("container_id")},
         )
-    if objective_evaluation is not None:
-        append(
-            "objective_evaluation_terminal",
-            str(objective_evaluation.get("finished_at") or ""),
-            {
-                "status": objective_evaluation.get("status"),
-                "passed": objective_evaluation.get("passed"),
-                "exit_code": objective_evaluation.get("exit_code"),
-                "patch_sha256": objective_evaluation.get("patch_sha256"),
-            },
-        )
     return events
+
+
+def _freeze_prediction_base(workspace: Workspace) -> None:
+    """Freeze before any Harness tools, without extending legacy runtime protocols."""
+    freeze = getattr(workspace, "freeze_patch_base", None)
+    if not callable(freeze):
+        return
+    try:
+        freeze()
+    except Exception as exc:  # noqa: BLE001 - still retain user interaction and failure evidence
+        workspace.evidence["diff_base_error"] = type(exc).__name__
+
+
+def _collect_evaluation_artifacts(*, workspace, scenario, store, session_id, provenance, evidence):
+    """Spec-0083/T3: both runners preserve the same immutable output receipt."""
+    declarations = (scenario.workspace.params if scenario.workspace else {}).get(
+        "evaluation_artifacts", []
+    )
+    if declarations:
+        from auto_designer.evaluation.artifacts import collect_session_artifacts
+
+        evidence["evaluation_artifacts"] = collect_session_artifacts(
+            workspace=workspace,
+            sessions_root=store.root,
+            session_id=session_id,
+            provenance=provenance or {},
+            declarations=declarations,
+        )
+
+
+def _export_prediction(
+    *, workspace: Workspace, store: SessionStore, session_id: str, evidence: dict
+) -> tuple[str, str]:
+    """Spec-0075/T1: export and preserve full bytes before session save/cleanup."""
+    evidence.update(dict(getattr(workspace, "evidence", {}) or {}))
+    evidence.pop("prediction", None)
+    try:
+        if evidence.get("diff_base_error"):
+            raise RuntimeError("original patch base could not be captured")
+        patch, patch_sha = workspace.export_patch()
+    except Exception as exc:  # noqa: BLE001 - retain the session without a fake prediction
+        evidence["patch_export_error"] = str(exc)
+        evidence["prediction_error"] = {"status": "export_failed", "error_type": type(exc).__name__}
+        for key in (
+            "diff_sha256",
+            "diff_bytes",
+            "patch_sha256",
+            "patch_bytes",
+            "patch_exported_at",
+        ):
+            evidence.pop(key, None)
+        return "", ""
+    try:
+        receipt = preserve_prediction(
+            sessions_root=store.root, session_id=session_id, patch=patch, patch_sha256=patch_sha
+        )
+    except Exception as exc:  # noqa: BLE001 - write/digest failure must not claim persistence
+        evidence["prediction_error"] = {
+            "status": "preservation_failed",
+            "error_type": type(exc).__name__,
+        }
+    else:
+        evidence["prediction"] = receipt
+        evidence.pop("prediction_error", None)
+    evidence.pop("patch_export_error", None)
+    evidence.update(
+        {
+            "diff_sha256": patch_sha,
+            "diff_bytes": len(patch.encode("utf-8")),
+            "patch_exported_at": utc_now(),
+        }
+    )
+    return patch, patch_sha
 
 
 def result_to_turns(res: SessionResult) -> list[Turn]:
@@ -268,7 +330,6 @@ def make_sim_run_session_fn(
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
     round_provider: Callable[[], int | None] | None = None,
-    evaluator: SWEbenchEvaluator | None = None,
 ) -> Callable[..., Session]:
     """返回 Orchestrator 用的 run_session_fn。
 
@@ -285,16 +346,10 @@ def make_sim_run_session_fn(
     observation_root = Path(
         os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations"))
     )
-    from auto_designer.observations.publication import preflight_root
+    # Spec-0070/T3: preserve the old framework contract while freezing checked transport.
+    from auto_designer.observations.preflight import prepare_observations
 
-    preflight_root(observation_root)
-    preflight = getattr(tracker, "preflight_observations", None)
-    if preflight is not None:
-        contract = preflight()
-        binding = observation_root / ".framework-contract.json"
-        if binding.exists() and json.loads(binding.read_text()) != contract:
-            raise ValueError("observation root already belongs to a different repository/contract")
-        binding.write_text(json.dumps(contract))
+    prepare_observations(tracker=tracker, root=observation_root)
 
     def run(
         persona: Persona,
@@ -308,6 +363,7 @@ def make_sim_run_session_fn(
         # Direct/legacy callers retain a random per-session identity.
         bound_session_id = current_usage_context().session_id
         session_id = bound_session_id or uuid.uuid4().hex
+        provenance = bound_session_provenance()
         client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
 
         # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
@@ -322,23 +378,33 @@ def make_sim_run_session_fn(
             # 使这条生产接缝「建了工作区即备好依赖」，不静默缺依赖。orchestrator 已传 workspace_dir
             # 的主路径依赖由 orchestrator 就位，故仅在此回落分支 ensure，不重复调。
             ensure_deps(ws, scenario.workspace)
+        if ws is not None:
+            _freeze_prediction_base(ws)
         if ws is not None and hasattr(client, "bind_session"):
             client.bind_session(persona=sim_persona, workspace_dir=ws)
 
         def progress(partial: SessionResult) -> None:
             if on_turn is not None:
-                on_turn(persona.identity, sim_persona, partial, True, session_id=None)
+                on_turn(
+                    persona.identity,
+                    sim_persona,
+                    partial,
+                    True,
+                    session_id=session_id if provenance else None,
+                )
 
         connector = HarnessConnector(harness)
         instance_id = None
         if scenario.workspace is not None:
             instance_id = scenario.workspace.params.get("instance_id")
-        round_no = round_provider() if round_provider is not None else None
+        round_no = (
+            round_provider() if round_provider is not None else current_usage_context().round_no
+        )
         with bind_usage_context(
             session_id=session_id,
             instance_id=instance_id,
             role="user",
-            agent_id=f"user-{persona.identity}",
+            agent_id=f"user-{session_id}" if provenance else f"user-{persona.identity}",
             round_no=round_no,
             operation="persona",
         ):
@@ -369,56 +435,31 @@ def make_sim_run_session_fn(
         patch = ""
         patch_sha = ""
         workspace_evidence: dict = {}
-        if ws is not None:
-            try:
-                patch, patch_sha = ws.export_patch()
-                workspace_evidence["patch_exported_at"] = utc_now()
-            except Exception as exc:  # noqa: BLE001 - evidence must fail closed
-                workspace_evidence["patch_export_error"] = str(exc)
-            workspace_evidence.update(dict(getattr(ws, "evidence", {}) or {}))
-            if patch_sha:
-                workspace_evidence["diff_sha256"] = patch_sha
-                workspace_evidence["diff_bytes"] = len(patch.encode())
-            # The interaction boundary is no longer needed once its patch is exported.
-            # Close before the fresh official evaluation so stop evidence is durable.
-            ws.close()
-            workspace_evidence.update(dict(getattr(ws, "evidence", {}) or {}))
-
-        objective_evaluation = None
-        active_evaluator = evaluator if evaluator is not None else SWEbenchEvaluator.from_env()
-        if active_evaluator is not None and instance_id and patch_sha:
-            try:
-                objective_evaluation = active_evaluator.evaluate(
-                    instance_id=str(instance_id), patch=patch
-                )
-            except Exception as exc:  # noqa: BLE001 - persist failed verification as evidence
-                objective_evaluation = {
-                    "evaluator": "swebench.harness.run_evaluation",
-                    "instance_id": str(instance_id),
-                    "patch_sha256": patch_sha,
-                    "status": "crashed",
-                    "passed": False,
-                    "error": str(exc),
-                    "finished_at": utc_now(),
-                }
-        elif evaluator is None and os.environ.get(
-            "AUTO_DESIGNER_OBJECTIVE_EVALUATION", "1"
-        ).strip().lower() in {"0", "false", "no", "off", "skip"}:
-            # Preserve an explicit audit marker; skipped is not a pass.
-            objective_evaluation = {
-                "evaluator": "swebench.harness.run_evaluation",
-                "instance_id": str(instance_id) if instance_id else None,
-                "patch_sha256": patch_sha or None,
-                "status": "skipped",
-                "passed": None,
-                "reason": "disabled_by_experiment_config",
-                "finished_at": utc_now(),
+        if ws is None:
+            workspace_evidence["prediction_error"] = {
+                "status": "unavailable",
+                "reason": "no_workspace",
             }
-        accept_validity = derive_accept_validity(
-            end_reason=res.end_reason,
-            request_outcomes=request_outcomes,
-            evaluation=objective_evaluation,
-        )
+        if ws is not None:
+            _collect_evaluation_artifacts(
+                workspace=ws,
+                scenario=scenario,
+                store=store,
+                session_id=session_id,
+                provenance=provenance,
+                evidence=workspace_evidence,
+            )
+            patch, patch_sha = _export_prediction(
+                workspace=ws, store=store, session_id=session_id, evidence=workspace_evidence
+            )
+            # The interaction boundary is no longer needed once its patch is exported.
+            # Persist stop evidence before saving the completed interaction.
+            ws.close()
+            for key, value in dict(getattr(ws, "evidence", {}) or {}).items():
+                if key not in {"prediction", "diff_sha256", "diff_bytes"}:
+                    workspace_evidence[key] = value
+
+        # Spec-0083/T3: grading is private and happens only after collection.
         terminal_note = next(
             (
                 t.message.strip()
@@ -429,12 +470,8 @@ def make_sim_run_session_fn(
             "",
         )
 
-        round_no = round_provider() if round_provider is not None else None
-        issue_refs = _flush_issues(
-            tracker,
-            res,
-            round_no=round_no,
-            session_id=session_id if bound_session_id else None,
+        round_no = (
+            round_provider() if round_provider is not None else current_usage_context().round_no
         )
         feel = res.feeling or res.feeling_derived
         session = Session(
@@ -442,19 +479,21 @@ def make_sim_run_session_fn(
             scenario=scenario,
             transcript=Transcript(turns=result_to_turns(res)),
             feeling=FeelingScore(score=feel.score, reason=feel.reason),
-            issue_refs=issue_refs,
+            issue_refs=[],
+            session_provenance=provenance,
             sim_trace=result_to_sim_trace(res),
             session_id=session_id,
             user_outcome={"end_reason": res.end_reason, "terminal_note": terminal_note},
             request_outcomes=request_outcomes,
             workspace_evidence=workspace_evidence,
-            objective_evaluation=objective_evaluation,
-            accept_validity=accept_validity,
             audit_events=_audit_events(
                 workspace_evidence=workspace_evidence,
                 request_outcomes=request_outcomes,
-                objective_evaluation=objective_evaluation,
             ),
+        )
+        validate_session_provenance(session, provenance)
+        session.issue_refs = _flush_issues(
+            tracker, res, round_no=round_no, session_id=session_id if bound_session_id else None
         )
         # Spec-0055/T2: materialize the bounded, deterministic user feedback
         # handoff at session close.  Demand roles consume this projection rather
@@ -470,8 +509,42 @@ def make_sim_run_session_fn(
 
     # The orchestrator uses this read path to reconcile a crash after SessionStore
     # committed but before the recovery completion marker was published.
-    run.load_completed_session = store.reconcile
+    def load_completed_session(session_id):
+        return store.reconcile(session_id, expected_provenance=bound_session_provenance())
+
+    run.load_completed_session = load_completed_session
     return run
+
+
+def _direct_execution_record(harness) -> tuple[dict, list[dict]]:
+    """Preserve received evidence like SimTrace; clipping belongs to query projections."""
+    events = list(getattr(harness, "visible_events", []) or [])
+    steps = list(getattr(harness, "last_steps", []) or [])
+    provenance = "reply_steps"
+    if not steps:
+        provenance = "stdout_progress"
+        for event in events:
+            raw = event.get("raw") if isinstance(event, dict) else None
+            if not isinstance(raw, dict):
+                continue
+            progress = raw if raw.get("type") == "progress" else raw.get("progress", {})
+            if isinstance(progress, dict) and progress.get("text"):
+                step = dict(progress)
+                step.pop("type", None)  # Frame type remains in events; steps use kind.
+                step.setdefault("kind", "progress")
+                steps.append(step)
+    return {
+        "contract_version": 1,
+        "source": "launcher_received",
+        "storage_policy": "received_full",
+        "reviewer_visibility": "terminal_reply_only",
+        "events": events,
+        "events_total": len(events),
+        "events_omitted": 0,
+        "steps_source": provenance,
+        "steps_total": len(steps),
+        "steps_omitted": 0,
+    }, steps
 
 
 def make_direct_run_session_fn(
@@ -495,16 +568,10 @@ def make_direct_run_session_fn(
     observation_root = Path(
         os.environ.get("AUTO_DESIGNER_OBSERVATION_ROOT", str(store.root.parent / "observations"))
     )
-    from auto_designer.observations.publication import preflight_root
+    # Spec-0070/T3: preserve the old framework contract while freezing checked transport.
+    from auto_designer.observations.preflight import prepare_observations
 
-    preflight_root(observation_root)
-    preflight = getattr(tracker, "preflight_observations", None)
-    if preflight is not None:
-        contract = preflight()
-        binding = observation_root / ".framework-contract.json"
-        if binding.exists() and json.loads(binding.read_text()) != contract:
-            raise ValueError("observation root already belongs to a different repository/contract")
-        binding.write_text(json.dumps(contract))
+    prepare_observations(tracker=tracker, root=observation_root)
 
     def run(
         persona: Persona,
@@ -517,11 +584,14 @@ def make_direct_run_session_fn(
         task_key = str(params.get("task_key") or persona.identity or "direct-task")
         benchmark = str(params.get("benchmark") or "unknown")
         session_id = current_usage_context().session_id or uuid.uuid4().hex
+        provenance = bound_session_provenance()
         connector = HarnessConnector(harness)
         reply = ""
         harness_error: str | None = None
         workspace_evidence: dict = {}
         patch_text = ""
+        if workspace_dir is not None:
+            _freeze_prediction_base(workspace_dir)
         try:
             connector.reset()
             with bind_usage_context(
@@ -529,13 +599,14 @@ def make_direct_run_session_fn(
                 instance_id=params.get("task_id") or task_key,
                 role="direct",
                 agent_id=f"direct-{task_key}",
-                round_no=round_provider() if round_provider else None,
+                round_no=round_provider() if round_provider else current_usage_context().round_no,
             ):
                 reply = connector.send(scenario.description)
         except Exception as exc:  # noqa: BLE001 - preserve an auditable infrastructure failure
             harness_error = str(exc)
             reply = f"[harness error] {harness_error}"
         finally:
+            execution_record, harness_steps = _direct_execution_record(harness)
             try:
                 connector.close()
             finally:
@@ -545,20 +616,23 @@ def make_direct_run_session_fn(
                         root=observation_root, session_id=session_id
                     )
 
+        if workspace_dir is None:
+            workspace_evidence["prediction_error"] = {
+                "status": "unavailable",
+                "reason": "no_workspace",
+            }
         if workspace_dir is not None:
-            try:
-                patch, patch_sha = workspace_dir.export_patch()
-                patch_text = patch[:12_000]
+            patch, patch_sha = _export_prediction(
+                workspace=workspace_dir,
+                store=store,
+                session_id=session_id,
+                evidence=workspace_evidence,
+            )
+            patch_text = patch[:12_000]
+            if patch_sha:
                 workspace_evidence.update(
-                    {
-                        "patch_sha256": patch_sha,
-                        "patch_bytes": len(patch.encode()),
-                        "patch_exported_at": utc_now(),
-                    }
+                    {"patch_sha256": patch_sha, "patch_bytes": len(patch.encode())}
                 )
-            except Exception as exc:  # noqa: BLE001 - evidence is still retained
-                workspace_evidence["patch_export_error"] = str(exc)
-            workspace_evidence.update(dict(getattr(workspace_dir, "evidence", {}) or {}))
 
         # Direct mode still has a user-side terminal review. It is deliberately
         # one bounded persona call after the harness reply: no tool/heartbeat/
@@ -595,8 +669,8 @@ def make_direct_run_session_fn(
                 session_id=session_id,
                 instance_id=params.get("task_id") or task_key,
                 role="user",
-                agent_id=f"user-{persona.identity}",
-                round_no=round_provider() if round_provider else None,
+                agent_id=f"user-{session_id}" if provenance else f"user-{persona.identity}",
+                round_no=round_provider() if round_provider else current_usage_context().round_no,
                 operation="direct_review",
             ):
                 review = dict(review_client.respond(review_system, review_prompt) or {})
@@ -613,6 +687,29 @@ def make_direct_run_session_fn(
         if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 4:
             score = 3
         review_status = "infrastructure_failure" if review_error else "completed"
+        # Spec-0083/T3: freeze outputs after the terminal user review, before reclamation.
+        if workspace_dir is not None:
+            _collect_evaluation_artifacts(
+                workspace=as_runtime(workspace_dir),
+                scenario=scenario,
+                store=store,
+                session_id=session_id,
+                provenance=provenance,
+                evidence=workspace_evidence,
+            )
+            if params.get("evaluation_artifacts"):
+                # The earlier patch was only the terminal review's excerpt.
+                # Persist the actual final state after finalize, using the same exporter.
+                patch, patch_sha = _export_prediction(
+                    workspace=as_runtime(workspace_dir),
+                    store=store,
+                    session_id=session_id,
+                    evidence=workspace_evidence,
+                )
+                if patch_sha:
+                    workspace_evidence.update(
+                        patch_sha256=patch_sha, patch_bytes=len(patch.encode())
+                    )
 
         body = (
             f"[direct task {task_key} / {benchmark}]\n"
@@ -620,7 +717,9 @@ def make_direct_run_session_fn(
             f"Harness final reply:\n{reply}\n"
             f"\nUser terminal review ({verdict}):\n{review_issue}\n"
         )
-        round_no = round_provider() if round_provider is not None else None
+        round_no = (
+            round_provider() if round_provider is not None else current_usage_context().round_no
+        )
         labels = ["bug", NEEDS_TRIAGE, "direct"]
         if round_no is not None:
             labels.append(round_label(round_no))
@@ -629,34 +728,25 @@ def make_direct_run_session_fn(
             body=body,
             labels=labels,
         )
-        create_once = getattr(tracker, "create_issue_once", None)
-        if callable(create_once):
-            issue_refs = [
-                create_once(
-                    draft,
-                    operation_key=operation_key("direct-session-issue", session_id),
-                )
-            ]
-        else:
-            issue_refs = [tracker.create_issue(draft)]
-
         session = Session(
             persona=persona,
             scenario=scenario,
             transcript=Transcript(
                 turns=[
                     Turn(role="user", content=scenario.description),
-                    Turn(role="harness", content=reply),
+                    Turn(role="harness", content=reply, steps=harness_steps),
                     Turn(role="user", content=feedback),
                 ]
             ),
             feeling=FeelingScore(
                 score=score, reason=str(review.get("reason") or "terminal user review")
             ),
-            issue_refs=issue_refs,
+            issue_refs=[],
+            session_provenance=provenance,
             session_id=session_id,
             user_outcome={
                 "interaction_mode": "direct",
+                "execution_record": execution_record,
                 "user_model": getattr(review_client, "model", None),
                 "user_turns": 1,
                 "harness_messages": 1,
@@ -677,16 +767,31 @@ def make_direct_run_session_fn(
             audit_events=_audit_events(
                 workspace_evidence=workspace_evidence,
                 request_outcomes=list(getattr(harness, "request_outcomes", []) or []),
-                objective_evaluation=None,
             ),
         )
+        validate_session_provenance(session, provenance)
+        create_once = getattr(tracker, "create_issue_once", None)
+        if callable(create_once):
+            issue_refs = [
+                create_once(
+                    draft,
+                    operation_key=operation_key("direct-session-issue", session_id),
+                )
+            ]
+        else:
+            issue_refs = [tracker.create_issue(draft)]
+
+        session.issue_refs = issue_refs
         from auto_designer.demand.evidence_contract import build_evidence_envelope
 
         session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
         store.save(session)
         return session
 
-    run.load_completed_session = store.reconcile
+    def load_completed_session(session_id):
+        return store.reconcile(session_id, expected_provenance=bound_session_provenance())
+
+    run.load_completed_session = load_completed_session
     return run
 
 
@@ -698,7 +803,6 @@ def make_mixed_run_session_fn(
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
     round_provider: Callable[[], int | None] | None = None,
-    evaluator: SWEbenchEvaluator | None = None,
 ) -> Callable[..., Session]:
     """Dispatch a frozen task to simulated-user or direct interaction mode."""
 
@@ -709,7 +813,6 @@ def make_mixed_run_session_fn(
         sim_personas=sim_personas,
         on_turn=on_turn,
         round_provider=round_provider,
-        evaluator=evaluator,
     )
     direct = make_direct_run_session_fn(
         client_factory=client_factory,

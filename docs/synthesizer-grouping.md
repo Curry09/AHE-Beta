@@ -16,20 +16,18 @@ Synthesizer 既有的 `source_proposals` / `covers` 校验、发布和关闭逻�
 
 ## 启用
 
-正式入口 `backend/run.py` 和 `backend/scripts/run_swebench_closed_loop.py` 共用
-`auto_designer.demand.grouped_synthesizer`。启用环境变量为：
+当前公开实验入口为 `backend/scripts/experiment.py`，它使用 prepare 冻结的包内控制器；
+ordinary 和 SWE 控制器共用 `auto_designer.demand.grouped_synthesizer`。角色数量由 schema 2
+配置的 `roles.triager`、`roles.synthesizer` 和 `roles.developer` 指定。
 
-```sh
-SYNTHESIZER_GROUPING=1
-N_TRIAGERS=16
-N_SYNTHESIZERS=2
-N_DEVELOPERS=8
-```
+分组是已有功能：旧入口可用 `SYNTHESIZER_GROUPING=1`，旧审计配置可用
+`execution.synthesizer_grouping: true`。它对待综合提案分组，不要求多用户；N1 产生多条提案时也可使用。
 
-审计实验配置使用 `execution.synthesizer_grouping: true`，编制使用
-`roster.triager: 16`、`roster.synthesizer: 2`、`roster.developer: 8`；交付并发容量也应设为 8。
-启动器据此导出环境变量，沿用现有 `NO_PROXY=*` 直连策略。未开启时保留原有编排。
-历史实验 pack 保留其独立快照；后续冻结正式实验时应包含本模块和已确认的最新开发镜像。
+当前 schema 2 已迁入分组：在实验 JSON 设置 `policies.synthesizer_grouping: true`，再 prepare 新 run。该值冻结进入 manifest，通过两后端传给实际分组调度；宿主或凭证文件中的 `SYNTHESIZER_GROUPING` 不覆盖它。分组不要求多用户，N1 产生多条提案时也可使用。旧 v2 run 不会因本次修改自动启用；历史实验的执行开关与来源仍保留于原冻结 checkout。见[配置说明](CONFIGURATION.zh-CN.md)与[验收报告](validation/spec0072-capability-migration.md)。
+`SYNTHESIZER_GROUPING`，因此公开示例使用默认编排。这是统一入口的配置迁移缺口，
+不是分组功能已经废弃或只适用于历史实验。当前不能向配置添加旧 `execution` 或 `roster`
+字段绕过校验；历史冻结 checkout 可以复现原运行，但不能替代正式迁移。
+完整差异与修复顺序见[能力迁移审计](audits/unified-entry-capability-migration-20261003.md)。
 
 ## 可验证的边界
 

@@ -97,3 +97,43 @@ def test_setup_allows_a_pinned_legacy_python() -> None:
     commands = module._setup_commands({"repo": "owner/repo", "setup_python": "python3.10"})
 
     assert commands[0] == "python3.10 -m venv .venv"
+
+
+@pytest.mark.parametrize("missing", ["--manifest", "--output"])
+def test_builder_requires_explicit_pool_and_output(monkeypatch, missing):
+    module = _module()
+    argv = [
+        "builder",
+        "--manifest",
+        "pool.json",
+        "--output",
+        "build-context",
+        "--parquet",
+        "data.parquet",
+    ]
+    index = argv.index(missing)
+    del argv[index : index + 2]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit, match="2"):
+        module._args()
+
+
+def test_builder_accepts_explicit_material_locations(monkeypatch):
+    module = _module()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "builder",
+            "--manifest",
+            "pool.json",
+            "--output",
+            "build-context",
+            "--parquet",
+            "data.parquet",
+        ],
+    )
+    args = module._args()
+    assert args.manifest == Path("pool.json")
+    assert args.output == Path("build-context")
+    assert args.parquet == Path("data.parquet")

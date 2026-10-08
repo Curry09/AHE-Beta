@@ -94,7 +94,7 @@ tasks:
     parallel: false
     files:
       - backend/tests/demand/test_role_contract_flow.py
-      - backend/scripts/replay_roles_from_sessions.py
+      - tools/dev/replay/replay_roles_from_sessions.py
     scope: 新增 report→Triage→Synthesize/Divergent 投影→Owner 的跨角色行为测试；运行设计/loop/tracker 回归，并以既有16份会话回放到 Owner 后停止，不启动 OpenAgents。
     acceptance: 无 API 测试验证 Triage 产生的精确票号集合经 Divergent 参照、Synthesize 输入到达 Owner；原始题面不进入默认下游上下文；非法状态图不可落库；相关测试、ruff、diff-check 全部通过；真实回放冻结模型、裁决、产物校验和与未启动 OpenAgents，并明确其只验证需求方向而非实现就绪度。
 ---

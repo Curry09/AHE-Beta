@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Spec-0047/T4：experiment CLI 入口。
+# Spec-0071/T3: the only public experiment CLI.
 from __future__ import annotations
 
 import sys

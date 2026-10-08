@@ -141,16 +141,15 @@ def test_card_to_seeds_envelope_shape_and_no_heldout(tmp_path) -> None:
         assert f'"{banned}"' not in text
 
 
-def test_raw_card_library_feeds_run_load_seeds(tmp_path) -> None:
-    # run._load_seeds 走 SeedLibrary + card_to_seed：读原始种子卡库 → 注入 SeedScenario 列表。
-    import run  # backend/run.py（pyproject pythonpath 暴露 backend）
+def test_raw_card_library_preserves_adapter_boundary(tmp_path) -> None:
+    # Archived raw seed libraries still preserve the distill held-out boundary.
 
     path = tmp_path / "seeds.json"
     lib = SeedLibrary(path)
     lib.add(_git_card("seed-a"))
     lib.add(_text_card("seed-b"))
 
-    seeds = run._load_seeds(path)
+    seeds = [card_to_seed(record) for record in SeedLibrary(path).load()]
     assert len(seeds) == 2  # 等长 SeedScenario 列表
     assert seeds[0].workspace is not None and seeds[0].workspace.kind == "git"
     assert seeds[1].workspace is None

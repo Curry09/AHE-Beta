@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def _module():
-    path = Path(__file__).parents[2] / "scripts" / "audit_sim_action_integrity.py"
+    path = Path(__file__).resolve().parents[3] / "tools/dev/audit/audit_sim_action_integrity.py"
     spec = importlib.util.spec_from_file_location("audit_sim_action_integrity", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)

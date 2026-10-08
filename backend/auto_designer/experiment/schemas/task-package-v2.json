@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "kind": {
+      "enum": [
+        "ordinary",
+        "swebench",
+        "benchmark"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "instruction_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "git"
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "repo": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+            }
+          },
+          "required": [
+            "kind",
+            "url",
+            "revision",
+            "repo"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "local"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ]
+        }
+      ]
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "script": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requirements_lock": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "script",
+        "requirements_lock"
+      ]
+    },
+    "difficulty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "not_in_benchmark": {
+      "const": true
+    },
+    "interaction": {
+      "enum": [
+        "simulated_user",
+        "direct"
+      ]
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suite": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$"
+        },
+        "instance_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        }
+      },
+      "required": [
+        "suite",
+        "instance_id",
+        "revision"
+      ]
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "exports": {
+          "type": "array",
+              "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "source": {
+                "enum": [
+                  "workspace",
+                  "managed_service"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "handle": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "content_type": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]*/[A-Za-z0-9][A-Za-z0-9.+-]*$"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "max_bytes": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "id",
+              "source",
+              "content_type",
+              "required",
+              "max_bytes"
+            ],
+            "oneOf": [
+              {
+                "properties": {
+                  "source": {
+                    "const": "workspace"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "not": {
+                  "required": [
+                    "handle"
+                  ]
+                }
+              },
+              {
+                "properties": {
+                  "source": {
+                    "const": "managed_service"
+                  }
+                },
+                "required": [
+                  "handle"
+                ],
+                "not": {
+                  "required": [
+                    "path"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "version",
+        "exports"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "id",
+    "instruction_file",
+    "source",
+    "setup"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "benchmark"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "benchmark"
+        ],
+        "not": {
+          "required": [
+            "not_in_benchmark"
+          ]
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "benchmark"
+          ]
+        }
+      }
+    }
+  ]
+}

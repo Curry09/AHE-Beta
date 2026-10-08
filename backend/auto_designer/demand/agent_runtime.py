@@ -4,7 +4,7 @@
 - `run_with_timeout`：daemon 线程跑 call + 超时兜底；用 `contextvars.copy_context()` 把主线程
   context（含 bind_session_store 注入的 SessionStore）带进 worker 线程——新起线程默认空 context，
   否则 agent 在 worker 线程里调 get_session_timeline 会报「session store not bound」（线上实测过）。
-- `run_agent_def`：加载 agent 定义并跑一轮——设 SANDBOX_WORK_DIR（绝对路径，防 cwd 漂移）、
+- `run_agent_def`：加载 agent 定义并跑一轮——逐调用绑定 sandbox work_dir（绝对路径，防 cwd 漂移）、
   AgentConfig.from_yaml、StepTracer（看板过程流）、bind_session_store、超时；返回 agent.run 的
   返回值（submit stop-tool 的回显 JSON；非 str 时 dumps 兜底）。
 - `read_submit`：从 agent.run 返回值取 submit 载荷数组——有界逐层 json.loads（兼容 nexau 可能
@@ -174,10 +174,26 @@ def run_agent_def(
     Spec-0055：可选 evidence 元数据同步落盘，便于离线边界回放。
     """
 
-    os.environ["SANDBOX_WORK_DIR"] = str(Path(repo).resolve())
+    from auto_designer.demand.source import current_harness_source
+
+    source = current_harness_source()
+    if source is not None:
+        repo = source.snapshot()
+        message += (
+            f"\n\nHarness source is the immutable tested commit {source.sha}. "
+            f"Read its source at {repo}; do not infer the version from another checkout."
+        )
+        evidence = {**(evidence or {}), "harness_source": {"ref": source.sha, "repo": str(repo)}}
+    import nexau
     from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
 
+    message += f"\nRead-only NexAU source root: {Path(nexau.__file__).resolve().parents[1]}."
+
     cfg = AgentConfig.from_yaml(config_path=Path(agent_def_dir) / "agent.yaml")
+    sandbox_config = getattr(cfg, "sandbox_config", None)
+    if sandbox_config is not None and getattr(sandbox_config, "type", None) == "local":
+        # Bind per invocation instead of relying on a shared environment lookup.
+        sandbox_config.work_dir = str(Path(repo).resolve())
     reasoning_effort = os.environ.get("DEMAND_LLM_REASONING_EFFORT", "").strip()
     if reasoning_effort and getattr(cfg, "llm_config", None) is not None:
         cfg.llm_config.extra_params["reasoning_effort"] = reasoning_effort

@@ -27,7 +27,7 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/run.py
+  - backend/auto_designer/experiment/controllers/ordinary.py
   - backend/tests/test_sandbox_isolation.py
   scope: 把 需求 Agent 的 sandbox 工作目录（= harness 仓）下沉到独立父目录 data/harness_sandbox/harness_repo，使 trace 目录（data/sessions 体感+会话、data/harness_runs 运行副本）不再是它的 ../ 同级——agent 顺 ../sessions/*.json、../harness_runs/** 这类相对路径不再命中真数据，从目录布局上断掉「顺手翻轨迹」的现实路径。run.py 的 _seed_harness_repo 在此新布局下建仓、并调 install_pre_commit（T1）装边界钩子；launcher/store/runs_root 指向相应目录。与 WorkspaceJail（T3）互补：本任务改目录布局（被动隔离），T3 改工具行为（主动拒绝）。
   acceptance: HARNESS_REPO = data/harness_sandbox/harness_repo，与 data/sessions、data/harness_runs 无父子/兄弟可达关系；从 harness_repo 出发的 ../sessions / ../harness_runs 相对路径不指向真 trace；_seed_harness_repo 在新布局建仓并装 pre-commit 钩子。单测断言目录布局隔离（trace 不在 work_dir 的 ../ 同级）。

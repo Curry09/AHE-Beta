@@ -1,3 +1,34 @@
+# Spec-0069/T3: public recipes build from frozen material directories. Explicit
+# targets leave the historical build.sh/default final stage unchanged.
+FROM python:3.12.13-bookworm AS unified-base
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates util-linux && rm -rf /var/lib/apt/lists/*
+RUN curl -fLsS https://github.com/astral-sh/uv/releases/download/0.11.28/uv-x86_64-unknown-linux-gnu.tar.gz -o /tmp/uv.tar.gz \
+    && echo 'e490a6464492183c5d4534a5527fb4440f7f2bb2f228162ad7e4afe076dc0224  /tmp/uv.tar.gz' | sha256sum -c - \
+    && tar -xzf /tmp/uv.tar.gz -C /tmp && cp /tmp/uv-x86_64-unknown-linux-gnu/uv /usr/local/bin/uv && rm -rf /tmp/uv*
+COPY controller /opt/controller
+WORKDIR /opt/controller
+RUN uv sync --locked --python /usr/local/bin/python3 --extra experiments --extra dev
+ENV PATH="/opt/controller/.venv/bin:$PATH" PYTHONPATH=/opt/controller/backend
+
+FROM unified-base AS unified-vigil
+COPY openagents /opt/openagents-src
+WORKDIR /opt/openagents-src
+RUN uv sync --locked --python /usr/local/bin/python3 --extra nexau --extra dev
+RUN curl -fLsS https://downloads.claude.ai/claude-code-releases/2.1.284/linux-x64/claude -o /usr/local/bin/claude \
+    && echo '5cd90aabd83f8a15136c35aa37bb1d92b348993573316643dc3fe4e04afbf88f  /usr/local/bin/claude' | sha256sum -c - \
+    && chmod 0755 /usr/local/bin/claude && claude --version | grep -F '2.1.284'
+ENV PATH="/opt/openagents-src/.venv/bin:$PATH" DISABLE_UPDATES=1 OPENAGENTS_NO_SELF_UPDATE=1
+RUN useradd -m -u 1000 -s /bin/bash vigil && mkdir -p /work && chown vigil:vigil /work
+USER vigil
+WORKDIR /work
+RUN openagents observation-capabilities --json && python -c 'from nexau import Agent'
+
+FROM unified-base AS unified-seed
+COPY task-source.tar.gz setup.sh requirements.lock task-build.json task-bootstrap.py /opt/task-build/
+RUN python /opt/task-build/task-bootstrap.py && rm -rf /opt/task-build
+LABEL org.auto-designer.seed-runtime="1"
+WORKDIR /workspace
+
 # Spec-0033/T1：vigil 交付面容器镜像——python + git + claude CLI + OpenAgents + NexAU。
 # 默认 build context = 本地 OpenAgents checkout；命名 context `nexau` = 本地 NexAU checkout。
 # 两者的 pin 均由 checkout 决定，由 build.sh 统一校验和传入。

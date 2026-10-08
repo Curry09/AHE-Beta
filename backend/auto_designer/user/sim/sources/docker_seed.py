@@ -7,11 +7,13 @@ never copied to a host workspace.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import uuid
 
 from auto_designer.models import WorkspaceSpec
+from auto_designer.usage import current_usage_context
 from auto_designer.user.sim.runtime import DockerWorkspaceRuntime
 from auto_designer.user.sim.seed_source import register
 
@@ -85,6 +87,51 @@ class DockerSeedSource:
         workspace = f"/workspace/{instance_id}/repo"
         name = f"ad-session-{uuid.uuid4().hex[:16]}"
         network = str(spec.params.get("network") or "none")
+        # Spec-0069/T3: retain ownership after a controller is forcibly stopped.
+        ownership = []
+        for key, label in (
+            ("AUTO_DESIGNER_RUN_ID", "io.auto-designer.run_id"),
+            ("AUTO_DESIGNER_EXPERIMENT_ID", "io.openagents.experiment_id"),
+            ("AUTO_DESIGNER_CONFIG_HASH", "io.openagents.manifest_sha"),
+        ):
+            if os.environ.get(key):
+                ownership.extend(["--label", f"{label}={os.environ[key]}"])
+        # Spec-0073/T2: bind disposable containers to a logical session before setup.
+        context = current_usage_context()
+        if context.session_id:
+            for label, value in (
+                ("io.auto-designer.session_id", context.session_id),
+                ("io.auto-designer.task_id", spec.params.get("task_id") or instance_id),
+                ("io.auto-designer.task_digest", spec.params.get("task_digest")),
+                ("io.auto-designer.round_no", context.round_no),
+                ("io.auto-designer.attempt", getattr(context, "attempt", None)),
+            ):
+                if value is not None:
+                    ownership.extend(["--label", f"{label}={value}"])
+        harness_python = str(spec.params.get("harness_python") or "")
+        task_environment = []
+        if harness_python:
+            image_environment = (image_info.get("Config") or {}).get("Env") or []
+            image_path = next(
+                (item[5:] for item in image_environment if item.startswith("PATH=")),
+                "/opt/controller/.venv/bin:/usr/local/bin:/usr/bin:/bin",
+            )
+            task_environment = [
+                "-e",
+                f"PATH={workspace}/.venv/bin:{image_path}",
+                "-e",
+                f"VIRTUAL_ENV={workspace}/.venv",
+            ]
+        # Spec-0069/T3: only explicit proxy settings cross this workspace boundary.
+        proxy_environment = spec.params.get("env") or {}
+        allowed = {"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"}
+        if not isinstance(proxy_environment, dict) or any(
+            key not in allowed or not isinstance(value, str) or "\n" in value or "\r" in value
+            for key, value in proxy_environment.items()
+        ):
+            raise ValueError("docker-seed params.env only accepts explicit proxy variables")
+        for key, value in proxy_environment.items():
+            task_environment.extend(["-e", f"{key}={value}"])
         started = _docker(
             [
                 "run",
@@ -93,6 +140,8 @@ class DockerSeedSource:
                 name,
                 "--label",
                 f"auto-designer.session={name}",
+                *ownership,
+                *task_environment,
                 "--network",
                 network,
                 "--workdir",
@@ -135,10 +184,23 @@ class DockerSeedSource:
         except Exception as exc:
             runtime.close()
             raise RuntimeError(f"无法将 session 隔离到 instance {instance_id!r}") from exc
+        if harness_python:
+            runtime.evidence["harness_python"] = harness_python
+        if proxy_environment:
+            runtime.evidence["proxy_environment"] = dict(proxy_environment)
         runtime.evidence.update(
             {
                 "instance_id": instance_id,
                 "workspace_scope": "single_instance",
+                **(
+                    {
+                        "session_id": context.session_id,
+                        "task_id": spec.params.get("task_id") or instance_id,
+                        "task_digest": spec.params.get("task_digest"),
+                    }
+                    if context.session_id
+                    else {}
+                ),
             }
         )
         return runtime

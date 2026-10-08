@@ -43,7 +43,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/auto_designer/loop/roster.py
       - backend/tests/loop/test_roster.py
     scope: roster 增加 dev 策略配置读取：N_BUG_FIRST_DEVS（默认 1，非负整数，超过 developer 数则截断）；run.py 读 DEV_BUDGET_BUG（默认 38）/DEV_BUDGET_DESIGN（默认 60）并在构造 developers 列表时注入：前 N_BUG_FIRST_DEVS 个 pick_policy='bug_first'，其余 'design_first'。启动横幅打印策略分布与预算档。
@@ -219,7 +219,7 @@ T1 与 T2 并行（covers 行格式由本 spec 定义，两侧各自按约定实
 - **T1**：`backend/auto_designer/demand/synthesizer.py`、`backend/tests/loop/test_synthesizer.py`
 - **T2**：`backend/auto_designer/dev/agentic_developer.py`、`backend/auto_designer/tracker/fake.py`、
   `backend/tests/dev/test_agentic_developer.py`、`backend/tests/tracker/test_fake.py`
-- **T3**：`backend/run.py`、`backend/auto_designer/loop/roster.py`、`backend/tests/loop/test_roster.py`（新建）
+- **T3**：`backend/auto_designer/experiment/controllers/ordinary.py`、`backend/auto_designer/loop/roster.py`、`backend/tests/loop/test_roster.py`（新建）
 - **T4**：`backend/auto_designer/web/api.py`、`backend/tests/web/test_api.py`
 - **T5**：`frontend/src/components/SidePanel.tsx`、`frontend/src/components/detail/IssueDetail.tsx`、
   `frontend/src/types.ts`、`frontend/src/api.ts`

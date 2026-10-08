@@ -1,11 +1,13 @@
 # Spec-0047/T2：不可变 manifest 与 append-only journal。
-"""create is exclusive; later facts go to journal.jsonl, never rewrite manifest."""
+"""Spec-0071/T3: immutable input manifests and shared append-only runtime facts."""
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import threading
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -106,3 +108,53 @@ def _next_seq(*, path: Path) -> int:
     if not lines:
         return 1
     return int(json.loads(lines[-1])["seq"]) + 1
+
+
+# Spec-0069/T5: changing provider facts never modify the frozen manifest.
+@contextmanager
+def run_lock(*, run_dir: Path, name: str = "operation", blocking: bool = True):
+    """Serialize managers across processes, including a detached collector."""
+    directory = run_dir / "runtime"
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / f"{name}.lock").open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def read_runtime(*, run_dir: Path) -> dict[str, Any]:
+    """Initial state is a convenience, not a provider liveness claim."""
+    path = run_dir / "runtime.json"
+    if path.is_file():
+        return read_manifest(path=path)
+    return {
+        "experiment_state": "PREPARING",
+        "preparation_complete": False,
+        "resource_state": "ABSENT",
+        "collection_state": "NONE",
+        "observation": "NOT_OBSERVED",
+    }
+
+
+def update_runtime(*, run_dir: Path, action: str, changes: dict[str, Any]) -> dict[str, Any]:
+    """Atomically append observed facts while preserving independent state axes."""
+    with run_lock(run_dir=run_dir, name="state"):
+        previous = read_runtime(run_dir=run_dir)
+        current = {**previous, **changes, "updated_at": datetime.now(UTC).isoformat()}
+        destination = run_dir / "runtime.json"
+        temporary = run_dir / "runtime/.runtime.tmp"
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump(current, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(destination)
+        append_journal(
+            path=run_dir / "journal.jsonl",
+            action=action,
+            from_state=previous["experiment_state"],
+            to_state=current["experiment_state"],
+            resources=changes,
+        )
+        return current

@@ -199,6 +199,7 @@ a:focus-visible,
   flex: none;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-4);
   border-bottom: 1px solid var(--border);
@@ -219,6 +220,12 @@ a:focus-visible,
   color: var(--text);
   padding: 3px 8px;
   font: inherit;
+}
+
+/* Spec-0071/T5: make frozen records identifiable without changing live controls. */
+.snapshot-recorded-at {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
 }
 
 .board {

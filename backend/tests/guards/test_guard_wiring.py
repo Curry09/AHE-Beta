@@ -11,7 +11,7 @@ from auto_designer.guards.workspace_jail import WorkspaceJailMiddleware
 
 
 def test_seed_entrypoint_installs_guard_after_initial_commit(monkeypatch, tmp_path):
-    run = importlib.import_module("run")
+    run = importlib.import_module("auto_designer.experiment.controllers.runtime")
     backend = tmp_path / "backend"
     template = backend / "harness_template"
     template.mkdir(parents=True)

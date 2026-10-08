@@ -31,7 +31,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/tests/test_run_vigil.py
     scope: VIGIL_MODE env（container 缺省 / subprocess 显式 opt-in 且打醒目告警「无围堵，仅限盯屏联调」）。container 模式：start_vigil 改为 docker run -d --rm --name auto-designer-vigil --network vigil-net、只读挂载 staging 配置目录到 /config、env 注入 GITEA_TOKEN + claude 凭证三选一（ANTHROPIC_API_KEY（API 计费）/ ANTHROPIC_AUTH_TOKEN（网关 Bearer，配 ANTHROPIC_BASE_URL——须为 Anthropic 协议端点，网关域加进 egress 白名单）/ CLAUDE_CODE_OAUTH_TOKEN（订阅计费，宿主 claude setup-token 生成的长效 headless token））+ HTTPS_PROXY=egress-proxy + 并发 K + 内网仓地址；全缺时预检 fail-loud；日志经 docker logs -f 子进程落 data/vigil.log；stop_vigil = docker rm -f（--rm 兜底自清理）。write_openagents_config 改写到 staging 目录（不再写进 HARNESS_REPO——容器内自 clone，宿主仓与交付面脱钩），gitea.base_url 用内网地址（VIGIL_GITEA_INTERNAL_URL 缺省 http gitea 3000），host 侧 .env 的 localhost 地址仅编排面自用。预检从「PATH 有 openagents」按模式分叉：container 模式改查 docker 可用 + 镜像存在（缺镜像给 build.sh 提示）。subprocess 模式保留既有行为（含写配置进 HARNESS_REPO）。
     acceptance: 两模式的 start/stop/config 落点/预检各有单测（mock subprocess/docker，不触真容器）；container 模式下 HARNESS_REPO 内不再出现 .openagents/；token/key 只经 env 不落盘断言保留；生产机容器模式端到端跑通一轮（承接 spec-0032/T5 的冒烟验收）。

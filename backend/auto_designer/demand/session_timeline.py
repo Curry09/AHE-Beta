@@ -34,6 +34,7 @@ import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Any
 
 from auto_designer.models import PersonaCallTrace, Session, SimTrace, SimTurn
@@ -410,7 +411,9 @@ def format_session_timeline(session: Session) -> str:
         "feeling": session.feeling.to_dict(),
         "issues": issues,
         "timeline": (
-            _project_sim_trace(session.sim_trace) if session.sim_trace is not None else None
+            _project_sim_trace(session.sim_trace)
+            if session.sim_trace is not None
+            else _direct_timeline(session)
         ),
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
@@ -544,6 +547,8 @@ def _classify_stop(*, heard: str) -> str:
         return "wall_timeout"
     if low.startswith("[interrupted]") or "interrupt" in low[:40]:
         return "interrupt"
+    if low.startswith("[harness error]"):
+        return "harness_error"
     if not h:
         return "empty"
     return "completed"
@@ -598,16 +603,91 @@ def _candidate_beats(*, trace: SimTrace, turn: int) -> list[SimTurn]:
     return with_harness or matches
 
 
+@dataclass(frozen=True)
+class _DirectBeat:
+    """A recorded request/reply exchange, without a simulated user decision."""
+
+    message: str
+    harness_output: str
+    harness_steps: list[dict]
+    turn: int = 1
+    phase: str = "direct"
+    action: str = "send_message"
+
+
+def _session_beats(session: Session, turn: int) -> list[SimTurn | _DirectBeat]:
+    if session.sim_trace is not None:
+        return _candidate_beats(trace=session.sim_trace, turn=turn)
+    record = session.user_outcome.get("execution_record") or {}
+    if not isinstance(record, dict) or turn != 1 or record.get("contract_version") != 1:
+        return []
+    requests = [t for t in session.transcript.turns if t.role == "user"]
+    replies = [t for t in session.transcript.turns if t.role == "harness"]
+    if not requests or not replies:
+        return []
+    return [_DirectBeat(requests[0].content, replies[0].content, list(replies[0].steps))]
+
+
+def _direct_timeline(session: Session) -> dict | None:
+    beats = _session_beats(session, 1)
+    if not beats:
+        return None
+    beat = beats[0]
+    record = session.user_outcome["execution_record"]
+    return {
+        "interaction_mode": "direct",
+        "end_reason": session.user_outcome.get("status", "unavailable"),
+        "source": "recorded_direct_exchange",
+        "events": [
+            {
+                "t": 1,
+                "when": "direct",
+                "user_did": "send_message",
+                "user_said": beat.message[:_HEARD_MAX],
+                "heard": beat.harness_output[:_HEARD_MAX],
+                "n_harness_steps": len(beat.harness_steps),
+            }
+        ],
+        "requests": list(session.request_outcomes),
+        "stdout_observations": [
+            {
+                "type": event.get("type"),
+                "text": str(event.get("text") or "")[:_ACTIVITY_TEXT],
+                "observed_at": event.get("observed_at"),
+                "source": event.get("source"),
+            }
+            for event in list(record.get("events") or [])[:_ACTIVITY_MAX]
+            if isinstance(event, dict)
+        ],
+        "observations_total": record.get("events_total"),
+        "steps_source": record.get("steps_source"),
+        "reviewer_visibility": record.get("reviewer_visibility"),
+        "note": "Recorded launcher observations do not establish model internals or task correctness.",
+    }
+
+
+def _beat_stop(session: Session, beat: SimTurn | _DirectBeat) -> str:
+    if isinstance(beat, _DirectBeat) and session.request_outcomes:
+        terminal = session.request_outcomes[-1]
+        if terminal.get("termination_source") == "infrastructure":
+            return (
+                "infrastructure_timeout"
+                if terminal.get("status") == "timed_out"
+                else "harness_error"
+            )
+    return _classify_stop(heard=beat.harness_output or "")
+
+
 def format_harness_beat(
     *, session: Session, turn: int, occurrence: int, reason: str = ""
 ) -> dict[str, Any]:
     """Session × turn → 某一拍 harness 活动细节（供 tool 返回）。"""
-    if session.sim_trace is None:
+    if session.sim_trace is None and not session.user_outcome.get("execution_record"):
         return {"ok": False, "error": "session has no sim_trace"}
     denied = _check_role_access(level="L3", session_id=session.session_id, reason=reason)
     if denied is not None:
         return denied
-    candidates = _candidate_beats(trace=session.sim_trace, turn=turn)
+    candidates = _session_beats(session, turn)
     if not candidates:
         return {
             "ok": False,
@@ -640,7 +720,7 @@ def format_harness_beat(
         "phase": beat.phase,
         "user_did": (beat.action or "").strip(),
         "user_said": (beat.message or "").strip(),
-        "stop_kind": _classify_stop(heard=heard),
+        "stop_kind": _beat_stop(session, beat),
         "heard": heard,
         "n_steps_raw": len(beat.harness_steps or []),
         "n_steps_returned": len(steps),
@@ -653,7 +733,22 @@ def format_harness_beat(
             "infrastructure cap), not to the SWE task."
         ),
     }
-    goal = _goal_turn_view(beat)
+    if isinstance(beat, _DirectBeat):
+        result["interaction_mode"] = "direct"
+        record = session.user_outcome.get("execution_record", {})
+        result["record_provenance"] = {
+            key: record.get(key)
+            for key in (
+                "source",
+                "storage_policy",
+                "steps_source",
+                "steps_total",
+                "steps_omitted",
+                "reviewer_visibility",
+            )
+        }
+        result["request_outcomes"] = list(session.request_outcomes)
+    goal = _goal_turn_view(beat) if isinstance(beat, SimTurn) else None
     if goal is not None:
         # Keep the same goal context at the second level so synthesizers do not have
         # to join a beat back to its parent timeline to understand its purpose.
@@ -711,11 +806,11 @@ _STEP_EXPAND_MAX = 6_000
 
 def _pick_beat_or_error(
     *, session: Session, turn: int, occurrence: int
-) -> SimTurn | dict[str, Any]:
+) -> SimTurn | _DirectBeat | dict[str, Any]:
     """共用：解析 turn/occurrence → SimTurn，或 ok=False dict。"""
-    if session.sim_trace is None:
+    if session.sim_trace is None and not session.user_outcome.get("execution_record"):
         return {"ok": False, "error": "session has no sim_trace"}
-    candidates = _candidate_beats(trace=session.sim_trace, turn=turn)
+    candidates = _session_beats(session, turn)
     if not candidates:
         return {
             "ok": False,
@@ -766,7 +861,7 @@ def format_harness_step(
         "turn": picked.turn,
         "occurrence": occurrence,
         "when": _phase_when(picked.phase),
-        "stop_kind": _classify_stop(heard=(picked.harness_output or "")),
+        "stop_kind": _beat_stop(session, picked),
         "step_i": step_i,
         "kind": kind,
         "n_chars_raw": n_chars,
@@ -779,7 +874,7 @@ def format_harness_step(
             "artifact is too large to paste into a design proposal; cite kind/path only."
         ),
     }
-    goal = _goal_turn_view(picked)
+    goal = _goal_turn_view(picked) if isinstance(picked, SimTurn) else None
     if goal is not None:
         # A single harness step is still interpreted in the user's current goal
         # context; retain only the compact projection, not another raw trace dump.

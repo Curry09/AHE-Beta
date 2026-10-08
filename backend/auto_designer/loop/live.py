@@ -249,6 +249,15 @@ def archive_agent(
         history = _read_json(path=path, fallback=[])
         if not isinstance(history, list):
             history = []
+        if record.get("kind") == "user_session" and record.get("session_id"):
+            history = [
+                item
+                for item in history
+                if not (
+                    item.get("kind") == "user_session"
+                    and item.get("session_id") == record["session_id"]
+                )
+            ]
         history.append(record)
         _write_atomic(path=path, data=history)
 

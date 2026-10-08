@@ -78,8 +78,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/scripts/audit_sim_action_integrity.py
-      - backend/scripts/canary_spec0048_final_check.py
+      - tools/dev/audit/audit_sim_action_integrity.py
+      - tools/dev/audit/canary_spec0048_final_check.py
       - backend/tests/scripts/test_audit_sim_action_integrity.py
       - backend/scripts/e2e-spec-0048-final-check-convergence.sh
       - docs/0048-user-sim-final-check-convergence.md
@@ -306,6 +306,18 @@ fixture 的摘要输入，最低断言分别保住 41 和 27 个 invalid fallbac
 计数保持为零。离线 deterministic fake 是 CI 必跑；配置真实 USER_LLM_* 时可追加 GLM canary，产物明确标注
 模型和源码 pin。
 
+Spec-0071 整理后，当前维护的审计与 canary 位于 `tools.dev.audit`，从仓库根目录调用：
+
+```bash
+PYTHONPATH=backend .venv/bin/python -m tools.dev.audit.audit_sim_action_integrity \
+  /path/to/collected/sessions --output /path/to/separate-audit.json
+# 可选在线 canary：明确提供 USER 模型配置，会调用模型。
+PYTHONPATH=backend .venv/bin/python -m tools.dev.audit.canary_spec0048_final_check \
+  --secrets-file /path/to/chosen.env
+```
+
+历史 GLM canary 的原始模型、源码 pin 与验收记录保持原样；上述调用说明当前工具位置，不声称重新执行了历史验收。
+
 ### DAG 与文件分配
 
 ```mermaid
@@ -339,8 +351,8 @@ PYTHONPATH=backend .venv/bin/pytest backend/tests/user/sim/test_action_space.py 
 PYTHONPATH=backend .venv/bin/pytest backend/tests/user/sim/test_prompt.py backend/tests/user/sim/test_loop.py backend/tests/user/sim/test_heartbeat.py -v
 PYTHONPATH=backend .venv/bin/pytest backend/tests/scripts/test_audit_sim_action_integrity.py -v
 backend/scripts/e2e-spec-0048-final-check-convergence.sh
-.venv/bin/ruff check backend/auto_designer/user/sim backend/scripts backend/tests/user/sim backend/tests/scripts
-.venv/bin/ruff format --check backend/auto_designer/user/sim backend/scripts backend/tests/user/sim backend/tests/scripts
+.venv/bin/ruff check backend/auto_designer/user/sim backend/scripts tools/dev/audit backend/tests/user/sim backend/tests/scripts
+.venv/bin/ruff format --check backend/auto_designer/user/sim backend/scripts tools/dev/audit backend/tests/user/sim backend/tests/scripts
 ```
 
 ## Drawbacks

@@ -27,7 +27,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/scripts/prepare_openagents_from_summary.py
+      - tools/dev/delivery/prepare_openagents_from_summary.py
       - backend/tests/test_prepare_openagents_from_summary.py
     scope: 预检连续 issue 快照和 harness 目录；复制时排除 Git/字节码运行态，在全新 Gitea 仓建立 main 并按原编号恢复 issue 状态与标签，写 source/main SHA/交付选择 manifest。
     acceptance: 所有本地输入在建仓前验证；源目录与 summary 不修改；目标 issue 编号、状态、标签与交付选择一致；manifest 原子边界明确且不含凭证；测试与真实 fresh-target 记录通过。
@@ -41,7 +41,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/scripts/prepare_openagents_validation.py
+      - tools/dev/delivery/prepare_openagents_validation.py
       - backend/tests/test_prepare_openagents_validation.py
     scope: 先读取并验证 source main 与 issue/comment 快照，再创建 fresh target；复制 Git 时清除已跟踪字节码，只有显式 --deliver issue 保留 openagents 令牌，其余事实与评论保持。
     acceptance: source 与 target 必须不同；选择的 issue 必须存在；预检失败不创建 target；main/issue/comment/state 稳定复制且来源不变；manifest 保存选择与 SHA；测试及真实回放记录通过。
@@ -56,7 +56,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/scripts/run_openagents_validation.py
+      - tools/dev/delivery/run_openagents_validation.py
       - backend/tests/test_run_openagents_validation.py
     scope: 把共享 WIS env 转为 Anthropic-compatible base/auth/model，校验 config 与并发度，以独立容器名启动 vigil；Gitea/模型凭证只经 subprocess env，代理和 no_proxy 大小写完整注入。
     acceptance: 带空格/引号 env 可解析，/v1 只移除末尾版本段，缺字段与非法并发在 docker 前失败；命令不含密钥值；容器网络/只读挂载/代理参数完整；pytest 与 ruff 通过。

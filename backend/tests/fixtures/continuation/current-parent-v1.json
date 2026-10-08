@@ -1,0 +1,23 @@
+{
+  "fixture_version": 1,
+  "purpose": "Offline current-producer contract fixture; it is not a recorded model experiment.",
+  "parent_rounds": 5,
+  "append_rounds": [2, 1],
+  "persona_ids": ["sr-15-swyx", "sr-01-willison", "sr-02-ronacher"],
+  "tasks": [
+    {"id": "task-code", "interaction": "direct"},
+    {"id": "task-review", "interaction": "simulated_user"},
+    {"id": "task-unselected", "interaction": "direct"}
+  ],
+  "selected_parent_pairs": [
+    ["sr-01-willison", "task-review"],
+    ["sr-15-swyx", "task-code"]
+  ],
+  "harness_files": {
+    ".gitignore": {"text": "ignored.txt\ncustom-cache/\n", "mode": "100644"},
+    ".gitattributes": {"text": "*.txt text eol=lf\nignored.txt export-ignore\n", "mode": "100644"},
+    "ignored.txt": {"text": "tracked raw CRLF\r\n", "mode": "100644"},
+    "run.sh": {"text": "#!/bin/sh\nexit 0\n", "mode": "100755"}
+  },
+  "expected_lineage_rounds": [5, 7, 8]
+}

@@ -54,7 +54,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/tests/test_run_vigil.py
     scope: 缺镜像提示包含双 checkout 用法；容器同时注入大小写 HTTP(S)_PROXY/NO_PROXY；命令环境显式配置优先于仓内 .env；既有 keep-alive、复用、停止与凭证隔离不变。
     acceptance: docker run 参数完整且不泄露凭证；显式环境不被 .env 覆盖；镜像缺失提示可执行；test_run_vigil、ruff 与真实容器 smoke 通过。

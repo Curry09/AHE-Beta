@@ -220,3 +220,27 @@ def test_recovery_reuses_output_and_reconciles_created_proposal(tmp_path: Path) 
     assert divergent.agent_calls == 1
     assert outcome.count == 1
     assert len(tracker.list_open_issues()) == 1
+
+
+def test_imported_feedback_uses_its_actual_stage_dependency(tmp_path):
+    """Spec-0079/T3: bootstrap PM needs imported feedback, never fake users."""
+    tracker = FakeTracker()
+    recovery = RecoveryStore.initialize(
+        root=tmp_path / "bootstrap",
+        identity=RecoveryIdentity("exp", "child", "config", "controller", "bootstrap"),
+    )
+    recovery.freeze_round(round_no=1, user_sha="seed", plan=[])
+    key = operation_key("feedback-imported")
+    recovery.begin_unit(round_no=1, stage="feedback_imported", key=key, input_value={})
+    recovery.complete_unit(round_no=1, stage="feedback_imported", key=key)
+    recovery.complete_stage(round_no=1, stage="feedback_imported")
+    divergent = _divergent(tmp_path, tracker, _submit([]), recovery=recovery)
+    divergent.bind_feedback_dependency("feedback_imported")
+    with bind_usage_context(round_no=1, operation="continuation-bootstrap-divergent"):
+        result = divergent.propose_once()
+    assert result.proposal_numbers == []
+    state = recovery.round_state(round_no=1)
+    assert state["stages"]["divergent"]["dependencies"] == ["feedback_imported"]
+    assert "users" not in state["stages"]
+    divergent.bind_feedback_dependency("users")
+    assert divergent._feedback_dependency == "users"

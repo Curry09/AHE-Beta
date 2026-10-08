@@ -29,8 +29,14 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
+from auto_designer.harness.budget import RequestLimits, product_budget_environment, request_limits
 from auto_designer.harness.interface import HarnessInterface
-from auto_designer.user.sim.runtime import DockerWorkspaceRuntime, Workspace, as_runtime
+from auto_designer.user.sim.runtime import (
+    DockerWorkspaceRuntime,
+    LocalWorkspaceRuntime,
+    Workspace,
+    as_runtime,
+)
 
 _PARAMS_FILE = "params.yaml"
 
@@ -86,10 +92,13 @@ class _HarnessHandle:
         help_text: str,
         protocol: str = "legacy",
         workspace_runtime=None,
+        limits: RequestLimits | None = None,
     ) -> None:
         self._entry = entry
         self._cwd = cwd
         self._env = {**os.environ, **env}
+        self._limits = limits or request_limits(self._env, fallback=_SEND_ABS_CAP)
+        self._env.update(product_budget_environment(self._limits))
         self._protocol = protocol
         self._workspace_runtime = workspace_runtime
         self._proc: subprocess.Popen[str] | None = None
@@ -228,8 +237,12 @@ class _HarnessHandle:
 
     def _message_frame(self, message: str) -> dict:
         if self._protocol == "stdio-jsonl-v1":
-            return {"type": "message", "text": message}
-        return {"message": message}
+            frame = {"type": "message", "text": message}
+        else:
+            frame = {"message": message}
+        if self._limits.request_seconds is not None:
+            frame["budget_seconds"] = self._limits.request_seconds
+        return frame
 
     def _interrupt_frame(self) -> dict:
         if self._protocol == "stdio-jsonl-v1":
@@ -256,7 +269,7 @@ class _HarnessHandle:
         self._request_id = uuid.uuid4().hex
         self._request_started_at = datetime.now(UTC).isoformat()
 
-    def _finish_request(self, status: str) -> None:
+    def _finish_request(self, status: str, *, origin: str = "harness_reply") -> None:
         if not self._request_id:
             return
         self.last_request_status = status
@@ -264,8 +277,12 @@ class _HarnessHandle:
             {
                 "request_id": self._request_id,
                 "status": status,
+                "termination_source": origin,
                 "started_at": self._request_started_at,
                 "finished_at": datetime.now(UTC).isoformat(),
+                "request_budget_seconds": self._limits.request_seconds,
+                "infrastructure_limit_seconds": self._limits.outer_seconds,
+                "termination_grace_seconds": self._limits.grace_seconds,
             }
         )
         self._request_id = ""
@@ -362,12 +379,13 @@ class _HarnessHandle:
         while True:
             if self._awaiting_reply and self._t0 > 0:
                 waited_abs = time.monotonic() - self._t0
-                if waited_abs >= _SEND_ABS_CAP:
+                if waited_abs >= self._limits.outer_seconds:
                     self._kill_group(signal.SIGKILL)
                     self._awaiting_reply = False
-                    self._finish_request("timed_out")
+                    self._finish_request("timed_out", origin="infrastructure")
                     raise RuntimeError(
-                        f"harness 单轮回复超绝对上限 >{_SEND_ABS_CAP:.0f}s（疑似活锁，已杀进程组）"
+                        f"harness 单轮回复超基础设施上限 >{self._limits.outer_seconds:g}s"
+                        "（已包含收尾余量；已杀进程组，内部停滞原因尚未确认）"
                     )
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -381,7 +399,7 @@ class _HarnessHandle:
                     if self._awaiting_reply:
                         self._kill_group(signal.SIGKILL)
                         self._awaiting_reply = False
-                        self._finish_request("crashed")
+                        self._finish_request("crashed", origin="transport")
                         raise RuntimeError(
                             "harness 子进程已退出但未回完整行（崩溃/孤儿占管道）"
                         ) from None
@@ -389,20 +407,22 @@ class _HarnessHandle:
                 continue
             if item is _EOF:
                 self._awaiting_reply = False
-                self._finish_request("crashed")
+                self._finish_request("crashed", origin="transport")
                 raise RuntimeError("harness 子进程已退出（stdout EOF）")
             line = str(item)
             try:
                 payload = json.loads(line)
             except (json.JSONDecodeError, TypeError) as exc:
                 self._awaiting_reply = False
+                self._finish_request("crashed", origin="protocol")
                 raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
             if not isinstance(payload, dict):
                 self._awaiting_reply = False
+                self._finish_request("crashed", origin="protocol")
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
             if payload.get("type") == "error":
                 self._awaiting_reply = False
-                self._finish_request("crashed")
+                self._finish_request("crashed", origin="harness_error")
                 msg = payload.get("message") or payload.get("text") or payload
                 self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
@@ -443,20 +463,22 @@ class _HarnessHandle:
                 return None
             if item is _EOF:
                 self._awaiting_reply = False
-                self._finish_request("crashed")
+                self._finish_request("crashed", origin="transport")
                 raise RuntimeError("harness 子进程已退出（stdout EOF）")
             line = str(item)
             try:
                 payload = json.loads(line)
             except (json.JSONDecodeError, TypeError) as exc:
                 self._awaiting_reply = False
+                self._finish_request("crashed", origin="protocol")
                 raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
             if not isinstance(payload, dict):
                 self._awaiting_reply = False
+                self._finish_request("crashed", origin="protocol")
                 raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
             if payload.get("type") == "error":
                 self._awaiting_reply = False
-                self._finish_request("crashed")
+                self._finish_request("crashed", origin="harness_error")
                 msg = payload.get("message") or payload.get("text") or payload
                 self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
@@ -505,7 +527,7 @@ class _HarnessHandle:
         """阻塞版：write_message + 等到下一条 reply（Spec-0036）。"""
         self.write_message(message)
         while True:
-            kind, val = self.poll(_SEND_ABS_CAP)
+            kind, val = self.poll(self._limits.outer_seconds)
             if kind == "reply":
                 return val  # type: ignore[return-value]
 
@@ -588,9 +610,31 @@ class HarnessLauncher:
         runtime = as_runtime(workspace_dir) if workspace_dir is not None else None
         is_docker = isinstance(runtime, DockerWorkspaceRuntime)
         if argv[0] in ("python", "python3"):
-            argv[0] = "python3" if is_docker else sys.executable
+            # Spec-0069/T3: task shell Python and Harness/NexAU use separate environments.
+            argv[0] = (
+                str(runtime.evidence.get("harness_python") or "python3")
+                if is_docker
+                else sys.executable
+            )
         cwd = dest / params["cwd"] if params.get("cwd") else dest
         env = {str(k): str(v) for k, v in (params.get("env") or {}).items()}
+        if isinstance(runtime, LocalWorkspaceRuntime) and runtime.environment:
+            # Spec-0073/T3: tools inherit this session's HOME/cache/attempt identity,
+            # overriding Harness defaults without changing the controller environment.
+            env.update(runtime.environment)
+        if runtime is not None and not is_docker and runtime.evidence.get("task_virtual_env"):
+            # Spec-0069/T3: E2B's task shell inherits its relocated environment,
+            # while the entry uses the controller's absolute NexAU interpreter.
+            task_venv = str(runtime.evidence["task_virtual_env"])
+            env["VIRTUAL_ENV"] = task_venv
+            shell_path = (
+                runtime.environment.get("PATH", os.environ.get("PATH", ""))
+                if isinstance(runtime, LocalWorkspaceRuntime) and runtime.environment
+                else os.environ.get("PATH", "")
+            )
+            env["PATH"] = task_venv + "/bin" + os.pathsep + shell_path
+            if argv[0] == sys.executable and runtime.evidence.get("harness_python"):
+                argv[0] = str(runtime.evidence["harness_python"])
         protocol = str(params.get("protocol") or params.get("interface") or "legacy")
         if protocol not in ("legacy", "stdio-jsonl-v1"):
             raise ValueError(f"params.yaml 的 protocol/interface 不支持：{protocol!r}")
@@ -600,6 +644,8 @@ class HarnessLauncher:
             # Spec-0008/T1 v2：与用户 agent 共享同一工作区——把它注入 harness 的 SANDBOX_WORK_DIR，
             # harness entry 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；覆盖 params.yaml 同名键。
             env["SANDBOX_WORK_DIR"] = runtime.cwd
+        limits = request_limits({**os.environ, **env}, fallback=_SEND_ABS_CAP)
+        env.update(product_budget_environment(limits))
         host_cwd = cwd
         host_env = env
         from auto_designer.observations.publication import ObservationSource
@@ -639,7 +685,22 @@ class HarnessLauncher:
                 if key.startswith(("LLM_", "NEXAU_", "AUTO_DESIGNER_"))
                 or key in {"NO_PROXY", "no_proxy", "HTTP_PROXY", "HTTPS_PROXY"}
             }
-            argv = runtime.popen_argv(argv, cwd=container_cwd, env={**inherited, **env})
+            child_environment = {**inherited, **env}
+            proxy_environment = runtime.evidence.get("proxy_environment")
+            if proxy_environment:
+                # Spec-0069/T3: host NO_PROXY contains direct model gateways; it
+                # must not bypass the owned egress proxy inside an internal network.
+                for key in (
+                    "HTTP_PROXY",
+                    "HTTPS_PROXY",
+                    "NO_PROXY",
+                    "http_proxy",
+                    "https_proxy",
+                    "no_proxy",
+                ):
+                    child_environment.pop(key, None)
+                child_environment.update(proxy_environment)
+            argv = runtime.popen_argv(argv, cwd=container_cwd, env=child_environment)
             # Environment/workdir are encoded in docker exec argv.  The docker client
             # itself runs from the immutable host checkout and needs only host env.
             host_cwd = dest
@@ -651,6 +712,7 @@ class HarnessLauncher:
             help_text=self._read_help_text(dest),
             protocol=protocol,
             workspace_runtime=runtime if is_docker else None,
+            limits=limits,
         )
         handle.observation_source = source
         return handle

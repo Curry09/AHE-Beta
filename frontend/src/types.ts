@@ -13,6 +13,8 @@ export interface PersonaMeta {
   level: string;
   domain: string;
   goal: string;
+  session_provenance?: SessionProvenance | null;
+  session_id?: string | null;
 }
 
 export interface Turn {
@@ -29,6 +31,20 @@ export interface LogEntry {
   t?: string;
   kind: string;
   text: string;
+}
+
+// Frozen identity shared by session results, usage, live observations and evidence.
+export interface SessionProvenance {
+  contract_version: number;
+  run_id: string;
+  round_no: number;
+  slot: number;
+  persona_id: string;
+  task_id: string;
+  task_digest: string;
+  task_kind: string;
+  interaction: string;
+  harness_sha: string;
 }
 
 export interface Agent {
@@ -126,6 +142,7 @@ export interface HistoryItem {
   archived_at: string;
   // user_session
   session_id?: string | null;
+  session_provenance?: SessionProvenance | null;
   score?: number | null;
   end_reason?: string;
   // dev_run
@@ -305,6 +322,7 @@ export interface SimTrace {
 }
 
 export interface SessionDetail {
+  session_provenance?: SessionProvenance | null;
   session_id: string;
   created_at: string;
   persona: {

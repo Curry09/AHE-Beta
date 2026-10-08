@@ -46,7 +46,7 @@ tasks:
     parallel: false
     files:
       - backend/auto_designer/loop/orchestrator.py
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/tests/loop/test_orchestrator.py
     scope: run_round a 段拆两阶段：阶段一串行 prepare（materialize_workspace + ensure_deps / mkdtemp，规避 git clone 缓存并发竞争）；阶段二 ThreadPoolExecutor(max_workers=min(n, max_parallel_users)) 并行 launch + run_session_fn，as_completed 收割，单会话异常记日志跳过不废整轮。Orchestrator 构造新增 max_parallel_users 参数；run.py 读 MAX_PARALLEL_USERS 环境变量（默认 roster 用户数）传入，并把 client 侧接成 T2 工厂。a 段全部汇齐后才进 d/b 段（维持串行）。
     acceptance: FakeHarness+Scripted 下 max_workers=4 跑 8 局：全部落盘、d/b 段在 a 汇齐后才执行；单会话 launch 抛异常时其余会话正常完成、轮不中断；max_parallel_users=1 与旧串行行为等价（回归基线）；现有 orchestrator 测试全绿。
@@ -233,7 +233,7 @@ T5（checkout 并发安全，无依赖——生产实跑踩中审计漏项后补
 |---|---|
 | T1 | `backend/auto_designer/user/session_store.py`, `backend/auto_designer/loop/live.py`, `backend/tests/user/test_session_store.py`, `backend/tests/loop/test_live.py` |
 | T2 | `backend/auto_designer/loop/sim_user.py`, `backend/tests/loop/test_sim_user.py` |
-| T3 | `backend/auto_designer/loop/orchestrator.py`, `backend/run.py`, `backend/tests/loop/test_orchestrator.py` |
+| T3 | `backend/auto_designer/loop/orchestrator.py`, `backend/auto_designer/experiment/controllers/ordinary.py`, `backend/tests/loop/test_orchestrator.py` |
 | T4 | `backend/tests/loop/test_parallel_sessions.py`（新增，本组 e2e） |
 | T5 | `backend/auto_designer/harness/launcher.py`, `backend/tests/harness/test_launcher.py` |
 

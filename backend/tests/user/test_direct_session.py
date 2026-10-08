@@ -75,7 +75,10 @@ def test_direct_mode_sends_one_harness_message_then_one_terminal_review(tmp_path
     )
 
     assert harness.messages == ["run the frozen task"]
-    assert session.user_outcome == {
+    outcome = {
+        key: value for key, value in session.user_outcome.items() if key != "execution_record"
+    }
+    assert outcome == {
         "interaction_mode": "direct",
         "user_model": "fake-review-model",
         "user_turns": 1,
@@ -89,6 +92,10 @@ def test_direct_mode_sends_one_harness_message_then_one_terminal_review(tmp_path
         "status": "completed",
         "harness_reply": "completed",
     }
+    record = session.user_outcome["execution_record"]
+    assert record["source"] == "launcher_received"
+    assert record["reviewer_visibility"] == "terminal_reply_only"
+    assert record["events_total"] == 0  # This scripted Harness exposes no progress.
     assert [turn.role for turn in session.transcript.turns] == ["user", "harness", "user"]
     assert len(session.issue_refs) == 1
     assert store.load(session.session_id).session_id == session.session_id

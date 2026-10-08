@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG SEED_IMAGE=auto-designer-seed:swebench-medium-hard-16
+ARG SEED_IMAGE
 FROM ${SEED_IMAGE} AS seed
 FROM ubuntu:22.04 AS py310
 RUN apt-get update \

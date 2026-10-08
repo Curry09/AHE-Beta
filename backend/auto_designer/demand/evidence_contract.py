@@ -361,6 +361,9 @@ def _enforce_l1_budget(result: dict[str, Any]) -> dict[str, Any]:
 def build_l1_summary(session: Session) -> dict[str, Any]:
     """Build a deterministic, bounded L1 projection from a persisted session."""
 
+    from auto_designer.models import validate_session_provenance
+
+    validate_session_provenance(session)
     sid = str(session.session_id)
     trace = session.sim_trace
     goal = _goal_summary(trace, session_id=sid)
@@ -372,6 +375,15 @@ def build_l1_summary(session: Session) -> dict[str, Any]:
         if isinstance(item, Mapping) and item.get("provenance")
     ]
     result: dict[str, Any] = {
+        **(
+            {
+                "task_id": session.session_provenance["task_id"],
+                "task_digest": session.session_provenance["task_digest"],
+                "task_kind": session.session_provenance["task_kind"],
+            }
+            if session.session_provenance
+            else {}
+        ),
         "level": EvidenceLevel.COMPACT.value,
         "session_id": sid,
         "goal_summary": goal,
@@ -480,6 +492,14 @@ def build_evidence_envelope(
     else:
         sid = str(session.session_id)
         l1 = build_l1_summary(session)
+    if harness_ref is None and session is not None:
+        harness_ref = (session.session_provenance or {}).get("harness_sha")
+        if not harness_ref:
+            harness_ref = (
+                session.workspace_evidence.get("observation", {})
+                .get("artifact", {})
+                .get("harness_sha")
+            )
     source = {"status": "read_only", "repo": "harness", "ref": harness_ref or "unavailable"}
     categories = {
         "report": {

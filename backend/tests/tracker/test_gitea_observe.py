@@ -27,9 +27,15 @@ class _FakeSession:
         self.calls: list[tuple[str, str]] = []
 
     def request(
-        self, method: str, url: str, json: Any = None, timeout: float | None = None
+        self,
+        method: str,
+        url: str,
+        json: Any = None,
+        timeout: float | None = None,
+        allow_redirects: bool = False,
     ) -> _Resp:
         assert timeout is not None, "GiteaTracker 的请求必须带超时（防挂死闭环）"
+        assert allow_redirects is False
         self.calls.append((method, url))
         return self._handler(method, url, json)
 

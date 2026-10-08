@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
-run = importlib.import_module("run")
+run = importlib.import_module("auto_designer.experiment.controllers.runtime")
 
 _GITEA = {
     "GITEA_URL": "http://localhost:3000",
@@ -26,21 +26,6 @@ _GITEA = {
 
 def _load_yaml(path: Path):
     return YAML(typ="safe").load(path.read_text(encoding="utf-8"))
-
-
-def test_repository_env_only_supplies_missing_process_values(monkeypatch) -> None:
-    monkeypatch.setenv("DEMAND_LLM_MODEL", "explicit-model")
-    monkeypatch.delenv("USER_LLM_MODEL", raising=False)
-
-    run._apply_env_defaults(
-        {
-            "DEMAND_LLM_MODEL": "repository-model",
-            "USER_LLM_MODEL": "repository-user-model",
-        }
-    )
-
-    assert run.os.environ["DEMAND_LLM_MODEL"] == "explicit-model"
-    assert run.os.environ["USER_LLM_MODEL"] == "repository-user-model"
 
 
 # --------------------------------------------------------------------------------------------------
@@ -407,9 +392,45 @@ def test_container_mounts_only_delivery_role_runs(tmp_path: Path, monkeypatch) -
     assert f"{(run_root / 'delivery').resolve()}:/role_runs" in joined
     assert "ROLE_RUNS_DIR=/role_runs" in joined
     assert "--user root" in joined
+    assert f"VIGIL_EXEC_UID={os.getuid() or 1000}" in docker_run
+    assert f"VIGIL_EXEC_GID={os.getgid() or 1000}" in docker_run
     assert "io.auto-designer.run_id=run-a" in joined
     assert "sessions" not in joined
     assert "/demand" not in joined
+
+
+@pytest.mark.parametrize("uid,gid", [(1201, 1302), (0, 0)])
+def test_delivery_mount_execution_identity_matches_host_without_running_as_root(
+    tmp_path: Path, monkeypatch, uid: int, gid: int
+) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("ROLE_RUNS_DIR", str(tmp_path / "role_runs" / "run-a"))
+    monkeypatch.setattr(run.os, "getuid", lambda: uid)
+    monkeypatch.setattr(run.os, "getgid", lambda: gid)
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    docker_run = next(argv for argv in calls["runs"] if argv[:2] == ["docker", "run"])
+    assert f"VIGIL_EXEC_UID={uid or 1000}" in docker_run
+    assert f"VIGIL_EXEC_GID={gid or 1000}" in docker_run
+    assert "VIGIL_EXEC_UID=0" not in docker_run
+    assert "VIGIL_EXEC_GID=0" not in docker_run
+
+
+@pytest.mark.parametrize("seconds", ["37", "0"])
+def test_container_passes_explicit_claude_idle_timeout_and_permissions(
+    tmp_path: Path, monkeypatch, seconds: str
+) -> None:
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("OPENAGENTS_CLAUDE_IDLE_TIMEOUT", seconds)
+    monkeypatch.setenv("OPENAGENTS_PERMISSION_MODE", "acceptEdits")
+    run.start_vigil(
+        repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
+    )
+    docker_run = next(argv for argv in calls["runs"] if argv[:2] == ["docker", "run"])
+    assert f"OPENAGENTS_CLAUDE_IDLE_TIMEOUT={seconds}" in docker_run
+    assert "OPENAGENTS_PERMISSION_MODE=acceptEdits" in docker_run
+    assert "OPENAGENTS_PERMISSION_MODE=bypassPermissions" not in docker_run
 
 
 def test_container_rebuilds_when_run_id_changes(tmp_path: Path, monkeypatch) -> None:
@@ -582,3 +603,136 @@ def test_stop_vigil_kills_on_timeout(tmp_path: Path) -> None:
         run.VigilHandle(mode="subprocess", proc=_Stuck(), log_handle=_Log(), keep_alive=False)
     )
     assert events == ["terminate", "wait-timeout", "killed", "wait-after-kill", "log-closed"]
+
+
+# Spec-0070/T3: the checked runtime is the runtime used for actual delivery.
+def _hosted_profile(tmp_path, monkeypatch):
+    from auto_designer.observations.transport import (
+        freeze_transport_profile,
+        make_transport_profile,
+    )
+
+    root = tmp_path / "observations"
+    monkeypatch.setenv("AUTO_DESIGNER_OBSERVATION_ROOT", str(root))
+    hosted = {**_GITEA, "GITEA_URL": "https://gitea.com"}
+    profile = make_transport_profile(
+        repository="https://gitea.com/api/v1/repos/harness/harness",
+        encoding="zip",
+        download_policy="gitea-com-r2-v1",
+    )
+    freeze_transport_profile(root=root, profile=profile)
+    return hosted, profile
+
+
+def _reader_capabilities():
+    return {
+        "schema": "openagents-observation-reader-capabilities-v1",
+        "marker": "auto-designer:observation-evidence-v1",
+        "encodings": ["gzip", "zip"],
+        "zip_profile": "single-evidence-json-v1",
+        "download_policies": ["same-origin-v1", "gitea-com-r2-v1"],
+        "max_transfer_bytes": 4_000_000,
+        "max_expanded_bytes": 24_000_000,
+    }
+
+
+def test_hosted_container_uses_checked_image_public_url_and_no_updates(tmp_path, monkeypatch):
+    from auto_designer.observations import preflight
+
+    calls = _container_rig(monkeypatch, tmp_path)
+    hosted, _ = _hosted_profile(tmp_path, monkeypatch)
+    identity = "sha256:" + "c" * 64
+    monkeypatch.setattr(
+        preflight,
+        "probe_reader",
+        lambda **kw: {
+            "capabilities": _reader_capabilities(),
+            "runtime": {"mode": "container", "image_id": identity},
+        },
+    )
+    run.start_vigil(repo=tmp_path / "repo", parallel=1, gitea=hosted, log_path=tmp_path / "d/v.log")
+    argv = next(a for a in calls["runs"] if a[:2] == ["docker", "run"])
+    assert identity in argv and run._VIGIL_IMAGE not in argv
+    assert "OPENAGENTS_NO_SELF_UPDATE=1" in argv
+    assert "AUTO_DESIGNER_OBSERVATION_DOWNLOAD_POLICY=gitea-com-r2-v1" in argv
+    data = _load_yaml(tmp_path / "staging/.openagents/openagents.yml")
+    assert data["gitea"]["base_url"] == "https://gitea.com"
+    assert any("@gitea.com/" in a for a in argv)
+
+
+def test_hosted_subprocess_uses_exact_checked_executable(tmp_path, monkeypatch):
+    from auto_designer.observations import preflight
+
+    hosted, _ = _hosted_profile(tmp_path, monkeypatch)
+    monkeypatch.setenv("VIGIL_MODE", "subprocess")
+    monkeypatch.setattr(run, "ensure_openagents_cli", lambda: None)
+    monkeypatch.setattr(
+        preflight,
+        "probe_reader",
+        lambda **kw: {
+            "capabilities": _reader_capabilities(),
+            "runtime": {"mode": "subprocess", "executable": "/verified/bin/openagents"},
+        },
+    )
+    calls = {}
+
+    def spawn(argv, **kw):
+        calls.update(argv=argv, env=kw["env"])
+        return _FakeProc(calls)
+
+    monkeypatch.setattr(run.subprocess, "Popen", spawn)
+    run.start_vigil(repo=tmp_path / "repo", parallel=1, gitea=hosted, log_path=tmp_path / "d/v.log")
+    assert calls["argv"][0] == "/verified/bin/openagents"
+    assert calls["env"]["OPENAGENTS_NO_SELF_UPDATE"] == "1"
+
+
+def test_bad_hosted_reader_cannot_start_vigil_or_write_config(tmp_path, monkeypatch):
+    from auto_designer.observations import preflight
+
+    calls = _container_rig(monkeypatch, tmp_path)
+    hosted, _ = _hosted_profile(tmp_path, monkeypatch)
+    monkeypatch.setattr(preflight, "probe_reader", lambda **kw: {"capabilities": {}})
+    with pytest.raises(ValueError, match="capability"):
+        run.start_vigil(
+            repo=tmp_path / "repo", parallel=1, gitea=hosted, log_path=tmp_path / "d/v.log"
+        )
+    assert not any(a[:2] == ["docker", "run"] for a in calls["runs"])
+    assert not (tmp_path / "staging/.openagents/openagents.yml").exists()
+
+
+def test_hosted_reuse_probes_actual_container(tmp_path, monkeypatch):
+    from auto_designer.observations import preflight
+
+    _container_rig(monkeypatch, tmp_path)
+    hosted, _ = _hosted_profile(tmp_path, monkeypatch)
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "our-run")
+    monkeypatch.delenv("AUTO_DESIGNER_EXPERIMENT_ID", raising=False)
+    monkeypatch.setattr(run, "_container_state", lambda **kw: (True, "our-run", ""))
+    seen = []
+
+    def probe(**kw):
+        seen.append(kw)
+        return {
+            "capabilities": _reader_capabilities(),
+            "runtime": {"image_id": "sha256:" + "d" * 64},
+        }
+
+    monkeypatch.setattr(preflight, "probe_reader", probe)
+    run._prepare_vigil_evidence(gitea=hosted, mode="container")
+    assert seen[0]["container"] == run._VIGIL_CONTAINER
+
+
+def test_hosted_public_url_keeps_explicit_override(monkeypatch):
+    monkeypatch.setenv("VIGIL_GITEA_INTERNAL_URL", "https://explicit.example")
+    assert (
+        run._vigil_gitea_url(gitea={**_GITEA, "GITEA_URL": "https://gitea.com"})
+        == "https://explicit.example"
+    )
+
+
+def test_reused_container_prereqs_do_not_require_old_local_image_tag(tmp_path, monkeypatch):
+    calls = _container_rig(monkeypatch, tmp_path)
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "our-run")
+    monkeypatch.setattr(run, "_container_state", lambda **kw: (True, "our-run", ""))
+    run._ensure_vigil_container_prereqs()
+    assert not any(a[:3] == ["docker", "image", "inspect"] for a in calls["runs"])

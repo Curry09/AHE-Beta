@@ -12,10 +12,15 @@ function personaSubline(agent: Agent): string | undefined {
 // 已完成工作项的 meta 行：按 kind 给出各角色最要紧的一眼信息。
 function historyMeta(item: HistoryItem): ReactNode {
   if (item.kind === "user_session") {
-    // status 已含结束原因，meta 只留彩色体感分供扫视。
-    return item.score != null ? (
-      <span className={`score s${item.score}`}>体感 {item.score}</span>
-    ) : null;
+    const origin = item.session_provenance;
+    return (
+      <>
+        {origin && <span>{origin.task_id} · {origin.persona_id}</span>}
+        {origin && <span title={origin.harness_sha}>Harness {origin.harness_sha.slice(0, 8)}</span>}
+        {item.session_id && <span>会话 {item.session_id}</span>}
+        {item.score != null && <span className={`score s${item.score}`}>体感 {item.score}</span>}
+      </>
+    );
   }
   if (item.kind === "dev_run") {
     return (
@@ -76,7 +81,18 @@ export function AgentColumn(props: {
             running={a.running}
             selected={selection?.type === "agent" && selection.agentId === a.agent_id}
             onClick={() => onSelect({ type: "agent", agentId: a.agent_id })}
-            meta={a.round != null && a.round > 0 ? <span>第 {a.round} 轮</span> : undefined}
+            meta={
+              <>
+                {a.round != null && a.round > 0 && <span>第 {a.round} 轮</span>}
+                {a.meta?.session_provenance && (
+                  <>
+                    <span>{a.meta.session_provenance.task_id} · {a.meta.session_provenance.persona_id}</span>
+                    <span>会话 {a.meta.session_id ?? a.agent_id.replace(/^user-/, "")}</span>
+                    <span title={a.meta.session_provenance.harness_sha}>Harness {a.meta.session_provenance.harness_sha.slice(0, 8)}</span>
+                  </>
+                )}
+              </>
+            }
             subline={personaSubline(a)}
             titleAttr={a.meta?.goal ?? undefined}
           />

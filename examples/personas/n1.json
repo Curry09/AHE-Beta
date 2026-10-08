@@ -1,0 +1,96 @@
+[
+  {
+    "id": "sr-15-swyx",
+    "authenticity": "authentic",
+    "era": {
+      "value": "post_vibe",
+      "basis": "swyx / Latent Space essays 2024-2026"
+    },
+    "dimensions": {
+      "D1_evaluation_capability": {
+        "value": "competent",
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D2_acceptance_bar": {
+        "primary": "functional",
+        "flags": [
+          "scope"
+        ],
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D3_interaction_style": {
+        "delegation": {
+          "value": "spec-driven",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "supervision": {
+          "value": "reviews",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        },
+        "on_offtrack": {
+          "value": "correct",
+          "source": "grounded",
+          "basis": "stated",
+          "confidence": "medium"
+        }
+      },
+      "D4_trust_model": {
+        "value": "balanced",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D5_domain": {
+        "area": "dev-tooling",
+        "depth": "working",
+        "stack": [
+          "typescript",
+          "react"
+        ],
+        "weak": [],
+        "source": "grounded",
+        "basis": "stated+observed",
+        "confidence": "high"
+      },
+      "D6_autonomy_expectation": {
+        "value": "collaborative",
+        "source": "grounded",
+        "basis": "stated",
+        "confidence": "medium"
+      },
+      "D7_time_temperament": {
+        "value": "steady",
+        "source": "injected",
+        "confidence": "low"
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "url": "swyx.io / latent.space 2024-2026",
+          "type": "blog"
+        }
+      ],
+      "self_report": true,
+      "evidence_quotes": [
+        {
+          "quote": "I write the shape of the thing I want, then iterate on the spec.",
+          "source": "swyx.io"
+        },
+        {
+          "quote": "The unlock is treating the agent as a collaborator with a memory problem.",
+          "source": "latent.space"
+        }
+      ]
+    },
+    "behavioral_prediction": "Meta-thinker; iterates on spec; balanced middle."
+  }
+]

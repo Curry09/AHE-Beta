@@ -24,7 +24,7 @@ llm_config:
   timeout: 300
   api_type: openai_chat_completion
 
-# 本地 sandbox：只读 harness 仓（SANDBOX_WORK_DIR 指向 harness 仓）用于读现状 grounding；
+# 本地 sandbox：只读 harness 仓（公共运行时逐调用绑定试用 SHA 的源码快照）用于读现状 grounding；
 # triage 不改文件、不碰 git，仅 read_file / list_directory / search_file_content 取证 +
 # get_session_timeline 拉单局轨迹 + submit_triage 交 disposition（原生结构化 stop tool）。
 sandbox_config:

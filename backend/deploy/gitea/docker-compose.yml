@@ -66,7 +66,9 @@ services:
     container_name: auto-designer-egress-proxy
     restart: unless-stopped
     volumes:
-      - ./egress-proxy.conf:/etc/squid/squid.conf:ro
+      # Explicit opt-in: AUTO_DESIGNER_EGRESS_CONFIG=./egress-gitea-com.conf
+      - ${AUTO_DESIGNER_EGRESS_CONFIG:-./egress-proxy.conf}:/etc/squid/squid.conf:ro
+      - ./egress-proxy.conf:/etc/squid/egress-base.conf:ro
     networks:
       - ci
       - vigil_net

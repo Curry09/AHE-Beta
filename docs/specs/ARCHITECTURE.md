@@ -36,6 +36,7 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `role_contract.py` | Spec-0043: task-independent cognitive contracts for demand-side roles. |
 | `runtime_agg.py` | 运行时行为聚合：从已落盘 Session 事后扫出任务无关指标，喂结构综合作机制层判别证据。 |
 | `session_timeline.py` | 结构综合按需取用：从落盘 Session 投影「使用事件时间线」。 |
+| `source.py` | Spec-0082/T1: demand reads a commit snapshot rather than a moving checkout. |
 | `submit_tools.py` | submit 工具的 binding。 |
 | `synthesizer.py` | Synthesizer 驱动器。 |
 | `triage.py` | Triage（报告规范化）驱动器。 |
@@ -53,27 +54,93 @@ _蒸馏侧（spec-0006）：persona 卡库读写 + 契约约束校验。_
 
 ### auto_designer.evaluation
 
-_Objective evaluators kept separate from simulated-user judgment._
+_Spec-0083: session artifact collection and independent post-run grading._
 
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
-| `__init__.py` | Objective evaluators kept separate from simulated-user judgment. |
-| `swebench.py` | Official fresh-container SWE-bench objective evidence (spec-0051/T4). |
+| `__init__.py` | Spec-0083: session artifact collection and independent post-run grading. |
+| `acceptance.py` | Keep original acceptance distinct from technical evidence (Spec-0083/T1). |
+| `artifacts.py` | Spec-0083/T3: one bounded, binary artifact collector for both interactions. |
+| `contracts.py` | Read-only requests for independent session grading (Spec-0083/T1). |
+| `registry.py` | Explicit versioned built-ins; no runtime Python plugins (Spec-0083/T1). |
+| `results.py` | Normalized grading results, separate from official reports (Spec-0083/T1). |
+
+### auto_designer.evaluation.adapters
+
+_Fixed official and custom grading adapters (Spec-0083/T4)._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Fixed official and custom grading adapters (Spec-0083/T4). |
+| `container.py` | Bounded staging and isolated Docker execution (Spec-0083/T4). |
+| `custom.py` | Execute an operator-fixed custom verifier in isolation (Spec-0083/T4). |
+| `nl2repo.py` | Pinned TinyDB post-processing and official score parser (Spec-0083/T4). |
+| `profiles.py` | Verified Git subtree identities for the first official tasks (Spec-0083/T4). |
+| `swebench.py` | Spec-0083/T4: SWE adapter with a private official CLI executor. |
+| `terminal_bench.py` | Run exact pinned separate Terminal-Bench verifiers (Spec-0083/T4). |
+| `tua_bench.py` | Reconstruct the first pinned Excel verifier without altering it (Spec-0083/T4). |
 
 ### auto_designer.experiment
 
-_Per-experiment isolation: config, manifest, compose, CLI, capacity._
+_Frozen materials, controllers and local/E2B resource lifecycles._
 
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
-| `__init__.py` | Per-experiment isolation: config, manifest, compose, CLI, capacity. |
-| `capacity.py` | File-locked lease registry under EXPERIMENTS_ROOT. Expired leases reclaim only if pid is dead. |
-| `cli.py` | Operator-facing commands. Mutating commands print a secret-free plan first. |
-| `config.py` | ExperimentConfig is the operator input; secrets never belong here. |
-| `health.py` | Rolling success/error window. Trip pauses this experiment, not the shared endpoint. |
+| `__init__.py` | Frozen materials, controllers and local/E2B resource lifecycles. |
+| `batch.py` | Spec-0074/T2: foreground batches reuse single-run lifecycle and durable leases. |
+| `batch_config.py` | Spec-0074/T1: strict batch inputs and identities using the existing material compiler. |
+| `batch_store.py` | Spec-0074/T1: immutable batch intent, atomic receipts and owned child roots. |
+| `cli.py` | Operator-facing commands with credential-free lifecycle receipts. |
+| `collection.py` | Spec-0069/T5: portable, checksummed evidence collection independent of model keys. |
+| `config.py` | Spec-0071/T3: strict public v2 configuration and shared identity helpers. |
+| `context.py` | Spec-0069/T2: one credential-free context and model mapping for both runners. |
+| `dashboard.py` | Spec-0072/T4: read-only dashboard bound to a prepared run, without provider discovery. |
+| `engine.py` | Spec-0069/T2: supervise the existing controller, with owned PIDs and receipts. |
+| `grading.py` | Spec-0083/T5: grade immutable collected sessions without resuming an experiment. |
+| `grading_inputs.py` | Spec-0083/T5: freeze private grading plans before dispatch or allocation. |
 | `infrastructure.py` | Provision, stop, and destroy experiment infrastructure via Compose project. |
-| `manifest.py` | create is exclusive; later facts go to journal.jsonl, never rewrite manifest. |
-| `runtime.py` | create/plan/preflight/start/stop/resume/archive/destroy. Manifest stays frozen. |
+| `manifest.py` | Spec-0071/T3: immutable input manifests and shared append-only runtime facts. |
+| `materials.py` | Spec-0069/T1: compile operator inputs into a checksummed, credential-free run bundle. |
+| `runtime.py` | Manage prepared experiments without rewriting their frozen identities. |
+| `task_import.py` | Spec-0076/T1: offline conversion into the existing ordinary task package contract. |
+| `workload.py` | Spec-0073/T1: logical task catalog and session plan, independent of providers. |
+
+### auto_designer.experiment.backends
+
+_Spec-0069/T2: execution adapters implement the same experiment lifecycle._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Spec-0069/T2: execution adapters implement the same experiment lifecycle. |
+| `base.py` | Spec-0069/T2: provider resources are mutable facts, never frozen config fields. |
+| `e2b.py` | Spec-0069/T4: identity-owned E2B execution and user-owned Gitea.com evidence. |
+| `e2b_bootstrap.py` | Spec-0069/T4: portable frozen-input bootstrap, without developer home files. |
+| `e2b_template.py` | Spec-0069/T4: cache a verified build identity, then inspect actual sandbox resources. |
+| `local.py` | Spec-0069/T3: frozen local toolchains and an experiment-owned Docker stack. |
+| `local_ci.py` | Spec-0077/T2: private registration and real PR readiness for an owned runner. |
+
+### auto_designer.experiment.continuation
+
+_Current, frozen experiment archive continuation contracts._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Current, frozen experiment archive continuation contracts. |
+| `evidence.py` | Spec-0079/T2: parent evidence stays read-only and outside child session metrics. |
+| `export.py` | Spec-0079/T2: export the ledger-selected final Git tree and evidence boundary. |
+| `forge.py` | Spec-0079/T2: project only selected pending reports into the child's fresh forge. |
+| `source.py` | Read and validate current collect archives without executing their contents. |
+
+### auto_designer.experiment.controllers
+
+_Spec-0073/T4: one unified controller backed by shared experiment runtime._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Spec-0073/T4: one unified controller backed by shared experiment runtime. |
+| `feedback.py` | Spec-0079/T4: concrete phase role assembly and inherited feedback initialization. |
+| `runtime.py` | Spec-0073/T4: shared experiment runtime: repository, delivery process and round receipts. |
+| `unified.py` | Spec-0073/T4: unified frozen-task experiment controller. Start through the experiment CLI. |
 
 ### auto_designer.guards
 
@@ -93,6 +160,7 @@ _Evaluation harness integration and execution support._
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | Evaluation harness integration and execution support. |
+| `budget.py` | Spec-0082/T2: request budgets and infrastructure termination are separate limits. |
 | `connector.py` | Platform-side connector from simulated users to the harness human-facing interface. |
 | `interface.py` | harness 多轮对话契约 HarnessInterface + 测试后端 FakeHarness（spec-0001/T2）。 |
 | `launcher.py` | harness launcher（spec-0003/T1）：把某版 harness 程序接成 spec-0001 的 HarnessInterface。 |
@@ -105,6 +173,7 @@ _Conversation-loop coordination, tracing, and lifecycle management._
 |----|----|
 | `__init__.py` | Conversation-loop coordination, tracing, and lifecycle management. |
 | `checkpoint.py` | checkpoint 存取（spec-0004/T1）：把自包含 STATE_DIR 打包成可下载 artifact，反向还原。 |
+| `feedback_pipeline.py` | Spec-0079/T3: one recoverable feedback and delivery cycle. |
 | `live.py` | 多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/。 |
 | `live_tracer.py` | StepTracer：把 nexau agent 运行中的过程流成看板可见的结构化事件。 |
 | `metrics.py` | metrics（spec-0003/T6，曲线口径 spec-0025/T7）：统计体感与 issue backlog 随时间的曲线。 |
@@ -127,7 +196,9 @@ _Artifact-owned observations with platform-owned collection and authorization._
 | `delivery_gaps.py` | Ingest only authenticated delivery requests, never arbitrary comments or logs. |
 | `gaps.py` | Spec-0061: scoped maintainer diagnostic gaps with a durable outbox. |
 | `grants.py` | Persist evidence authority separately from model-authored issue text. |
+| `preflight.py` | Spec-0070/T3: freeze transport and verify the actual delivery reader before models run. |
 | `publication.py` | Collect bounded opaque artifact files and publish immutable session evidence. |
+| `transport.py` | Spec-0070/T2: freeze transport separately from the historical framework contract. |
 
 ### auto_designer.tracker
 
@@ -136,6 +207,7 @@ _Issue-tracker integration and proposal state management._
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | Issue-tracker integration and proposal state management. |
+| `attachment_transport.py` | Spec-0070/T1: explicit formats and the fixed Gitea.com signed-download boundary. |
 | `base.py` | IssueTracker 协议（spec-0001/T5）：issue 提交去向的抽象，用户侧不绑定具体后端。 |
 | `fake.py` | FakeTracker（spec-0001/T5）：IssueTracker 的内存实现，供单测与无 Gitea 环境端到端跑通。 |
 | `gitea.py` | GiteaTracker（spec-0002/T2）：spec-0001/T5 IssueTracker 接口的真后端。 |
@@ -147,6 +219,7 @@ _User simulation, personas, and interaction evidence collection._
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | User simulation, personas, and interaction evidence collection. |
+| `patches.py` | Immutable full session predictions for post-run grading (Spec-0075/T1). |
 | `session_store.py` | 本地 SessionStore（spec-0001/T6）：一局 Session 全量落盘 + 单一总索引。 |
 
 ### auto_designer.user.sim
@@ -191,7 +264,7 @@ _SeedSource 实现子包（spec-0009/T1）。_
 | `empty.py` | empty SeedSource（spec-0009/T2）。 |
 | `git.py` | git SeedSource（spec-0009/T4）。 |
 | `local_fixture.py` | local-fixture SeedSource（spec-0009/T1）。 |
-| `prebuilt.py` | Prebuilt SeedSource: copy a prepared workspace and relocate its venv. |
+| `prebuilt.py` | Spec-0073/T3: copy pure task source and rebuild each managed session's venv. |
 
 ### auto_designer.web
 
@@ -222,6 +295,7 @@ graph LR
     nauto_designer_demand_role_contract["demand.role_contract"]
     nauto_designer_demand_runtime_agg["demand.runtime_agg"]
     nauto_designer_demand_session_timeline["demand.session_timeline"]
+    nauto_designer_demand_source["demand.source"]
     nauto_designer_demand_submit_tools["demand.submit_tools"]
     nauto_designer_demand_synthesizer["demand.synthesizer"]
     nauto_designer_demand_triage["demand.triage"]
@@ -230,26 +304,66 @@ graph LR
     nauto_designer_distill_seed_adapter["distill.seed_adapter"]
     nauto_designer_distill_seed_library["distill.seed_library"]
     nauto_designer_evaluation["auto_designer.evaluation"]
-    nauto_designer_evaluation_swebench["evaluation.swebench"]
+    nauto_designer_evaluation_acceptance["evaluation.acceptance"]
+    nauto_designer_evaluation_adapters["evaluation.adapters"]
+    nauto_designer_evaluation_adapters_container["adapters.container"]
+    nauto_designer_evaluation_adapters_custom["adapters.custom"]
+    nauto_designer_evaluation_adapters_nl2repo["adapters.nl2repo"]
+    nauto_designer_evaluation_adapters_profiles["adapters.profiles"]
+    nauto_designer_evaluation_adapters_swebench["adapters.swebench"]
+    nauto_designer_evaluation_adapters_terminal_bench["adapters.terminal_bench"]
+    nauto_designer_evaluation_adapters_tua_bench["adapters.tua_bench"]
+    nauto_designer_evaluation_artifacts["evaluation.artifacts"]
+    nauto_designer_evaluation_contracts["evaluation.contracts"]
+    nauto_designer_evaluation_registry["evaluation.registry"]
+    nauto_designer_evaluation_results["evaluation.results"]
     nauto_designer_experiment["auto_designer.experiment"]
-    nauto_designer_experiment_capacity["experiment.capacity"]
+    nauto_designer_experiment_backends["experiment.backends"]
+    nauto_designer_experiment_backends_base["backends.base"]
+    nauto_designer_experiment_backends_e2b["backends.e2b"]
+    nauto_designer_experiment_backends_e2b_bootstrap["backends.e2b_bootstrap"]
+    nauto_designer_experiment_backends_e2b_template["backends.e2b_template"]
+    nauto_designer_experiment_backends_local["backends.local"]
+    nauto_designer_experiment_backends_local_ci["backends.local_ci"]
+    nauto_designer_experiment_batch["experiment.batch"]
+    nauto_designer_experiment_batch_config["experiment.batch_config"]
+    nauto_designer_experiment_batch_store["experiment.batch_store"]
     nauto_designer_experiment_cli["experiment.cli"]
+    nauto_designer_experiment_collection["experiment.collection"]
     nauto_designer_experiment_config["experiment.config"]
-    nauto_designer_experiment_health["experiment.health"]
+    nauto_designer_experiment_context["experiment.context"]
+    nauto_designer_experiment_continuation["experiment.continuation"]
+    nauto_designer_experiment_continuation_evidence["continuation.evidence"]
+    nauto_designer_experiment_continuation_export["continuation.export"]
+    nauto_designer_experiment_continuation_forge["continuation.forge"]
+    nauto_designer_experiment_continuation_source["continuation.source"]
+    nauto_designer_experiment_controllers["experiment.controllers"]
+    nauto_designer_experiment_controllers_feedback["controllers.feedback"]
+    nauto_designer_experiment_controllers_runtime["controllers.runtime"]
+    nauto_designer_experiment_controllers_unified["controllers.unified"]
+    nauto_designer_experiment_dashboard["experiment.dashboard"]
+    nauto_designer_experiment_engine["experiment.engine"]
+    nauto_designer_experiment_grading["experiment.grading"]
+    nauto_designer_experiment_grading_inputs["experiment.grading_inputs"]
     nauto_designer_experiment_infrastructure["experiment.infrastructure"]
     nauto_designer_experiment_manifest["experiment.manifest"]
+    nauto_designer_experiment_materials["experiment.materials"]
     nauto_designer_experiment_runtime["experiment.runtime"]
+    nauto_designer_experiment_task_import["experiment.task_import"]
+    nauto_designer_experiment_workload["experiment.workload"]
     nauto_designer_guards["auto_designer.guards"]
     nauto_designer_guards_harness_boundary["guards.harness_boundary"]
     nauto_designer_guards_repo_guard["guards.repo_guard"]
     nauto_designer_guards_workspace_jail["guards.workspace_jail"]
     nauto_designer_harness["auto_designer.harness"]
+    nauto_designer_harness_budget["harness.budget"]
     nauto_designer_harness_connector["harness.connector"]
     nauto_designer_harness_interface["harness.interface"]
     nauto_designer_harness_launcher["harness.launcher"]
     nauto_designer_invocation["auto_designer.invocation"]
     nauto_designer_loop["auto_designer.loop"]
     nauto_designer_loop_checkpoint["loop.checkpoint"]
+    nauto_designer_loop_feedback_pipeline["loop.feedback_pipeline"]
     nauto_designer_loop_live["loop.live"]
     nauto_designer_loop_live_tracer["loop.live_tracer"]
     nauto_designer_loop_metrics["loop.metrics"]
@@ -267,13 +381,17 @@ graph LR
     nauto_designer_observations_delivery_gaps["observations.delivery_gaps"]
     nauto_designer_observations_gaps["observations.gaps"]
     nauto_designer_observations_grants["observations.grants"]
+    nauto_designer_observations_preflight["observations.preflight"]
     nauto_designer_observations_publication["observations.publication"]
+    nauto_designer_observations_transport["observations.transport"]
     nauto_designer_tracker["auto_designer.tracker"]
+    nauto_designer_tracker_attachment_transport["tracker.attachment_transport"]
     nauto_designer_tracker_base["tracker.base"]
     nauto_designer_tracker_fake["tracker.fake"]
     nauto_designer_tracker_gitea["tracker.gitea"]
     nauto_designer_usage["auto_designer.usage"]
     nauto_designer_user["auto_designer.user"]
+    nauto_designer_user_patches["user.patches"]
     nauto_designer_user_session_store["user.session_store"]
     nauto_designer_user_sim["user.sim"]
     nauto_designer_user_sim_action_space["sim.action_space"]
@@ -311,6 +429,7 @@ graph LR
     nauto_designer_demand_agent_contract --> nauto_designer_demand_issue_schema
     nauto_designer_demand_agent_runtime --> nauto_designer_demand_observation_provider
     nauto_designer_demand_agent_runtime --> nauto_designer_demand_session_timeline
+    nauto_designer_demand_agent_runtime --> nauto_designer_demand_source
     nauto_designer_demand_agent_runtime --> nauto_designer_invocation
     nauto_designer_demand_agent_runtime --> nauto_designer_loop_live_tracer
     nauto_designer_demand_agent_runtime --> nauto_designer_observations_gaps
@@ -318,6 +437,7 @@ graph LR
     nauto_designer_demand_agent_runtime --> nauto_designer_user_session_store
     nauto_designer_demand_delivery_evidence --> nauto_designer_observations_grants
     nauto_designer_demand_delivery_evidence --> nauto_designer_observations_publication
+    nauto_designer_demand_delivery_evidence --> nauto_designer_observations_transport
     nauto_designer_demand_divergent --> nauto_designer_demand_agent_runtime
     nauto_designer_demand_divergent --> nauto_designer_demand_evidence_contract
     nauto_designer_demand_divergent --> nauto_designer_demand_issue_schema
@@ -375,6 +495,7 @@ graph LR
     nauto_designer_demand_triage --> nauto_designer_demand_evidence_contract
     nauto_designer_demand_triage --> nauto_designer_demand_issue_schema
     nauto_designer_demand_triage --> nauto_designer_demand_role_contract
+    nauto_designer_demand_triage --> nauto_designer_demand_source
     nauto_designer_demand_triage --> nauto_designer_loop_recovery
     nauto_designer_demand_triage --> nauto_designer_observations_grants
     nauto_designer_demand_triage --> nauto_designer_tracker_base
@@ -384,35 +505,226 @@ graph LR
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
-    nauto_designer_evaluation --> nauto_designer_evaluation_swebench
-    nauto_designer_experiment_capacity --> nauto_designer_experiment_config
+    nauto_designer_evaluation_acceptance --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_container --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_adapters_terminal_bench
+    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_adapters_terminal_bench
+    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_profiles --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_profiles --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_adapters_profiles
+    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_profiles
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_terminal_bench
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_artifacts --> nauto_designer_user_sim_runtime
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_custom
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_nl2repo
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_swebench
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_terminal_bench
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_tua_bench
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_results --> nauto_designer_evaluation_contracts
+    nauto_designer_experiment_backends --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_base --> nauto_designer_experiment_config
+    nauto_designer_experiment_backends_e2b --> nauto_designer_demand_delivery_evidence
+    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_bootstrap
+    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_template
+    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_workload
+    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_config
+    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_materials
+    nauto_designer_experiment_backends_e2b_template --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_local_ci
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_collection
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_config
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_context
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_engine
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_infrastructure
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_materials
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_workload
+    nauto_designer_experiment_backends_local --> nauto_designer_observations_transport
+    nauto_designer_experiment_backends_local_ci --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local_ci --> nauto_designer_experiment_infrastructure
+    nauto_designer_experiment_batch --> nauto_designer_experiment
+    nauto_designer_experiment_batch --> nauto_designer_experiment_batch_config
+    nauto_designer_experiment_batch --> nauto_designer_experiment_batch_store
+    nauto_designer_experiment_batch --> nauto_designer_experiment_config
+    nauto_designer_experiment_batch --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_batch --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_batch_config --> nauto_designer_experiment
+    nauto_designer_experiment_batch_config --> nauto_designer_experiment_config
+    nauto_designer_experiment_batch_config --> nauto_designer_experiment_materials
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_config
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_materials
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_workload
     nauto_designer_experiment_cli --> nauto_designer_experiment
+    nauto_designer_experiment_cli --> nauto_designer_experiment_batch
     nauto_designer_experiment_cli --> nauto_designer_experiment_config
-    nauto_designer_experiment_cli --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_cli --> nauto_designer_experiment_dashboard
+    nauto_designer_experiment_cli --> nauto_designer_experiment_grading
     nauto_designer_experiment_cli --> nauto_designer_experiment_runtime
-    nauto_designer_experiment_health --> nauto_designer_experiment_config
+    nauto_designer_experiment_cli --> nauto_designer_experiment_task_import
+    nauto_designer_experiment_collection --> nauto_designer_experiment_config
+    nauto_designer_experiment_collection --> nauto_designer_experiment_continuation_export
+    nauto_designer_experiment_collection --> nauto_designer_experiment_materials
+    nauto_designer_experiment_context --> nauto_designer_experiment_config
+    nauto_designer_experiment_context --> nauto_designer_experiment_workload
+    nauto_designer_experiment_context --> nauto_designer_models
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_demand_evidence_contract
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_models
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_observations_grants
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_observations_publication
+    nauto_designer_experiment_continuation_evidence --> nauto_designer_user_session_store
+    nauto_designer_experiment_continuation_export --> nauto_designer_demand_issue_schema
+    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_materials
+    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_workload
+    nauto_designer_experiment_continuation_export --> nauto_designer_loop_recovery
+    nauto_designer_experiment_continuation_forge --> nauto_designer_demand_issue_schema
+    nauto_designer_experiment_continuation_forge --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_forge --> nauto_designer_loop_recovery
+    nauto_designer_experiment_continuation_forge --> nauto_designer_models
+    nauto_designer_experiment_continuation_forge --> nauto_designer_tracker_base
+    nauto_designer_experiment_continuation_source --> nauto_designer_demand_issue_schema
+    nauto_designer_experiment_continuation_source --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_source --> nauto_designer_experiment_workload
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_divergent
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_grouped_synthesizer
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_owner
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_synthesizer
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_triage
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_config
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_context
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_continuation_evidence
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_continuation_forge
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_materials
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_loop_feedback_pipeline
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_loop_recovery
+    nauto_designer_experiment_controllers_feedback --> nauto_designer_observations_grants
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_demand_issue_schema
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_guards_harness_boundary
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_invocation
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_live
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_recovery
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_sim_user
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_observations_preflight
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_observations_transport
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_tracker_attachment_transport
+    nauto_designer_experiment_controllers_runtime --> nauto_designer_tracker_gitea
+    nauto_designer_experiment_controllers_unified --> nauto_designer_distill_library
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_collection
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_config
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_context
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_continuation_export
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers_feedback
+    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers_runtime
+    nauto_designer_experiment_controllers_unified --> nauto_designer_guards_repo_guard
+    nauto_designer_experiment_controllers_unified --> nauto_designer_harness_launcher
+    nauto_designer_experiment_controllers_unified --> nauto_designer_invocation
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_live
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_metrics
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_orchestrator
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_roster
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_round_gate
+    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_sim_user
+    nauto_designer_experiment_controllers_unified --> nauto_designer_models
+    nauto_designer_experiment_controllers_unified --> nauto_designer_tracker_gitea
+    nauto_designer_experiment_controllers_unified --> nauto_designer_usage
+    nauto_designer_experiment_controllers_unified --> nauto_designer_user_session_store
+    nauto_designer_experiment_controllers_unified --> nauto_designer_user_sim_persona_client
+    nauto_designer_experiment_controllers_unified --> nauto_designer_user_sim_persona_io
+    nauto_designer_experiment_dashboard --> nauto_designer_experiment_config
+    nauto_designer_experiment_dashboard --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_dashboard --> nauto_designer_experiment_materials
+    nauto_designer_experiment_dashboard --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_dashboard --> nauto_designer_tracker_gitea
+    nauto_designer_experiment_dashboard --> nauto_designer_usage
+    nauto_designer_experiment_dashboard --> nauto_designer_user_session_store
+    nauto_designer_experiment_dashboard --> nauto_designer_web_api
+    nauto_designer_experiment_engine --> nauto_designer_experiment_config
+    nauto_designer_experiment_engine --> nauto_designer_experiment_context
+    nauto_designer_experiment_engine --> nauto_designer_experiment_materials
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_acceptance
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_contracts
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_registry
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_results
+    nauto_designer_experiment_grading --> nauto_designer_experiment_config
+    nauto_designer_experiment_grading --> nauto_designer_experiment_grading_inputs
+    nauto_designer_experiment_grading --> nauto_designer_experiment_manifest
+    nauto_designer_experiment_grading --> nauto_designer_experiment_materials
+    nauto_designer_experiment_grading --> nauto_designer_experiment_runtime
+    nauto_designer_experiment_grading --> nauto_designer_experiment_workload
+    nauto_designer_experiment_grading --> nauto_designer_loop_recovery
+    nauto_designer_experiment_grading --> nauto_designer_models
+    nauto_designer_experiment_grading_inputs --> nauto_designer_evaluation_contracts
+    nauto_designer_experiment_grading_inputs --> nauto_designer_experiment_config
+    nauto_designer_experiment_infrastructure --> nauto_designer_experiment_backends_local_ci
     nauto_designer_experiment_infrastructure --> nauto_designer_experiment_config
     nauto_designer_experiment_manifest --> nauto_designer_experiment_config
+    nauto_designer_experiment_materials --> nauto_designer_distill_library
+    nauto_designer_experiment_materials --> nauto_designer_experiment_config
+    nauto_designer_experiment_materials --> nauto_designer_experiment_continuation_forge
+    nauto_designer_experiment_materials --> nauto_designer_experiment_continuation_source
+    nauto_designer_experiment_materials --> nauto_designer_experiment_workload
+    nauto_designer_experiment_materials --> nauto_designer_user_sim_persona_io
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_e2b
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_local
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_collection
     nauto_designer_experiment_runtime --> nauto_designer_experiment_config
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_infrastructure
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_engine
     nauto_designer_experiment_runtime --> nauto_designer_experiment_manifest
-    nauto_designer_experiment_runtime --> nauto_designer_loop_recovery
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_materials
+    nauto_designer_experiment_runtime --> nauto_designer_experiment_workload
+    nauto_designer_experiment_task_import --> nauto_designer_distill_seed_library
+    nauto_designer_experiment_task_import --> nauto_designer_experiment_config
+    nauto_designer_experiment_task_import --> nauto_designer_experiment_workload
+    nauto_designer_experiment_workload --> nauto_designer_experiment_config
+    nauto_designer_experiment_workload --> nauto_designer_experiment_context
+    nauto_designer_experiment_workload --> nauto_designer_experiment_materials
     nauto_designer_guards_workspace_jail --> nauto_designer_demand_observation_provider
     nauto_designer_guards_workspace_jail --> nauto_designer_usage
     nauto_designer_harness_connector --> nauto_designer_harness_interface
     nauto_designer_harness_connector --> nauto_designer_usage
+    nauto_designer_harness_launcher --> nauto_designer_harness_budget
     nauto_designer_harness_launcher --> nauto_designer_harness_interface
     nauto_designer_harness_launcher --> nauto_designer_observations_publication
     nauto_designer_harness_launcher --> nauto_designer_user_sim_runtime
     nauto_designer_invocation --> nauto_designer_usage
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_demand_source
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_loop_recovery
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_loop_round_gate
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_models
+    nauto_designer_loop_feedback_pipeline --> nauto_designer_usage
     nauto_designer_loop_live_tracer --> nauto_designer_usage
     nauto_designer_loop_metrics --> nauto_designer_demand_issue_schema
     nauto_designer_loop_metrics --> nauto_designer_tracker_base
     nauto_designer_loop_metrics --> nauto_designer_user_session_store
     nauto_designer_loop_orchestrator --> nauto_designer_demand_divergent
+    nauto_designer_loop_orchestrator --> nauto_designer_demand_source
     nauto_designer_loop_orchestrator --> nauto_designer_demand_synthesizer
     nauto_designer_loop_orchestrator --> nauto_designer_harness_interface
     nauto_designer_loop_orchestrator --> nauto_designer_harness_launcher
+    nauto_designer_loop_orchestrator --> nauto_designer_loop_feedback_pipeline
     nauto_designer_loop_orchestrator --> nauto_designer_loop_recovery
     nauto_designer_loop_orchestrator --> nauto_designer_loop_round_gate
     nauto_designer_loop_orchestrator --> nauto_designer_models
@@ -425,14 +737,15 @@ graph LR
     nauto_designer_loop_runner --> nauto_designer_loop_run_state
     nauto_designer_loop_sim_user --> nauto_designer_demand_evidence_contract
     nauto_designer_loop_sim_user --> nauto_designer_demand_issue_schema
-    nauto_designer_loop_sim_user --> nauto_designer_evaluation_swebench
+    nauto_designer_loop_sim_user --> nauto_designer_evaluation_artifacts
     nauto_designer_loop_sim_user --> nauto_designer_harness_connector
     nauto_designer_loop_sim_user --> nauto_designer_harness_interface
     nauto_designer_loop_sim_user --> nauto_designer_loop_recovery
     nauto_designer_loop_sim_user --> nauto_designer_models
-    nauto_designer_loop_sim_user --> nauto_designer_observations_publication
+    nauto_designer_loop_sim_user --> nauto_designer_observations_preflight
     nauto_designer_loop_sim_user --> nauto_designer_tracker_base
     nauto_designer_loop_sim_user --> nauto_designer_usage
+    nauto_designer_loop_sim_user --> nauto_designer_user_patches
     nauto_designer_loop_sim_user --> nauto_designer_user_session_store
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_deps
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_dimensions
@@ -441,6 +754,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_prompt
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_runtime
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_workspace
+    nauto_designer_models --> nauto_designer_usage
     nauto_designer_observations___main__ --> nauto_designer_observations_publication
     nauto_designer_observations_delivery_gaps --> nauto_designer_observations_gaps
     nauto_designer_observations_delivery_gaps --> nauto_designer_observations_grants
@@ -450,11 +764,15 @@ graph LR
     nauto_designer_observations_gaps --> nauto_designer_observations_grants
     nauto_designer_observations_gaps --> nauto_designer_usage
     nauto_designer_observations_grants --> nauto_designer_observations_publication
+    nauto_designer_observations_preflight --> nauto_designer_observations_publication
+    nauto_designer_observations_preflight --> nauto_designer_observations_transport
     nauto_designer_observations_publication --> nauto_designer_invocation
     nauto_designer_tracker_base --> nauto_designer_models
     nauto_designer_tracker_fake --> nauto_designer_models
     nauto_designer_tracker_fake --> nauto_designer_tracker_base
     nauto_designer_tracker_gitea --> nauto_designer_models
+    nauto_designer_tracker_gitea --> nauto_designer_observations_transport
+    nauto_designer_tracker_gitea --> nauto_designer_tracker_attachment_transport
     nauto_designer_tracker_gitea --> nauto_designer_tracker_base
     nauto_designer_user_session_store --> nauto_designer_demand_evidence_contract
     nauto_designer_user_session_store --> nauto_designer_models
@@ -518,6 +836,7 @@ graph LR
     nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_sources
     nauto_designer_user_sim_skills --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_models
+    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_usage
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_empty --> nauto_designer_models
@@ -528,6 +847,9 @@ graph LR
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_workspace
     nauto_designer_user_sim_sources_prebuilt --> nauto_designer_models
+    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_usage
+    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_deps
+    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_state --> nauto_designer_user_sim_dimensions
     nauto_designer_user_sim_tools --> nauto_designer_user_sim_dimensions

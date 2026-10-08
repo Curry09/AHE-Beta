@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -167,6 +169,95 @@ def test_multi_turn_send(tmp_path) -> None:
         assert h.send("b") == "2:b"
     finally:
         h.close()
+
+
+def test_managed_local_launcher_and_real_tools_inherit_independent_session_env(
+    tmp_path, monkeypatch
+):
+    from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+
+    # Exercise Git checkout, native Harness startup and its real Python tool;
+    # no launcher/Popen mocks or process-global task environment switching.
+    entry = """import json,os,pathlib,subprocess,sys
+for line in sys.stdin:
+    json.loads(line)
+    keys=['HOME','VIRTUAL_ENV','AUTO_DESIGNER_ATTEMPT_NONCE','UV_LINK_MODE','UV_CACHE_DIR','HARNESS_ONLY']
+    values={key:os.environ.get(key) for key in keys}
+    values['entry_interpreter']=sys.executable
+    tool="import json,os,pathlib,sys;pathlib.Path(os.environ['HOME'],'tool-written').write_text(os.environ['AUTO_DESIGNER_ATTEMPT_NONCE']);print(json.dumps({'home':os.environ['HOME'],'prefix':sys.prefix,'nonce':os.environ['AUTO_DESIGNER_ATTEMPT_NONCE'],'cache':os.environ['UV_CACHE_DIR'],'link_mode':os.environ['UV_LINK_MODE']}))"
+    values['tool']=json.loads(subprocess.check_output(['python','-c',tool],cwd=os.environ['SANDBOX_WORK_DIR'],text=True))
+    print(json.dumps({'reply':json.dumps(values)}),flush=True)
+"""
+    repo = _make_repo(tmp_path, entry, ["python", "fake_entry.py"])
+    defaults = {
+        "HOME": "/shared-harness-home",
+        "UV_CACHE_DIR": "/shared-harness-cache",
+        "AUTO_DESIGNER_ATTEMPT_NONCE": "wrong-harness-nonce",
+        "UV_LINK_MODE": "hardlink",
+        "HARNESS_ONLY": "kept",
+    }
+    Path(repo, "params.yaml").write_text(
+        "entry: [python, fake_entry.py]\nenv: " + json.dumps(defaults) + "\n"
+    )
+    _commit_all(repo, "configure default harness environment")
+    controller_home = tmp_path / "controller-home"
+    controller_home.mkdir()
+    monkeypatch.setenv("HOME", str(controller_home))
+    monkeypatch.setenv("AUTO_DESIGNER_ATTEMPT_NONCE", "controller-nonce")
+    before = dict(os.environ)
+    launcher = HarnessLauncher(harness_repo=repo, runs_root=tmp_path / "runs")
+    handles = []
+    try:
+        for user in ("a", "b"):
+            attempt = tmp_path / ("attempt-" + user)
+            workspace, home, cache = attempt / "repo", attempt / "home", attempt / "cache"
+            workspace.mkdir(parents=True)
+            home.mkdir()
+            cache.mkdir()
+            venv = workspace / ".venv"
+            subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(venv)], check=True)
+            runtime = LocalWorkspaceRuntime(
+                str(workspace),
+                environment={
+                    "HOME": str(home),
+                    "VIRTUAL_ENV": str(venv),
+                    "UV_CACHE_DIR": str(cache),
+                    "UV_LINK_MODE": "copy",
+                    "AUTO_DESIGNER_ATTEMPT_NONCE": "attempt-" + user,
+                    "PATH": "/usr/bin:/bin",
+                },
+                evidence={"task_virtual_env": str(venv), "harness_python": sys.executable},
+            )
+            handles.append((launcher.launch("main", runtime), runtime))
+        for handle, runtime in handles:
+            observed = json.loads(handle.send("check environment"))
+            assert observed["entry_interpreter"] == sys.executable
+            assert observed["HARNESS_ONLY"] == "kept"
+            for key in (
+                "HOME",
+                "VIRTUAL_ENV",
+                "AUTO_DESIGNER_ATTEMPT_NONCE",
+                "UV_LINK_MODE",
+                "UV_CACHE_DIR",
+            ):
+                assert observed[key] == runtime.environment[key]
+            assert observed["tool"] == {
+                "home": runtime.environment["HOME"],
+                "prefix": runtime.evidence["task_virtual_env"],
+                "nonce": runtime.environment["AUTO_DESIGNER_ATTEMPT_NONCE"],
+                "cache": runtime.environment["UV_CACHE_DIR"],
+                "link_mode": "copy",
+            }
+            assert (
+                Path(runtime.environment["HOME"], "tool-written").read_text()
+                == runtime.environment["AUTO_DESIGNER_ATTEMPT_NONCE"]
+            )
+        assert not (controller_home / "tool-written").exists()
+        assert dict(os.environ) == before
+    finally:
+        for handle, runtime in handles:
+            handle.close()
+            runtime.close()
 
 
 def test_usage_sideband_is_isolated_and_drained_once(tmp_path) -> None:

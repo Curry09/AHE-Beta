@@ -1,7 +1,7 @@
 # Spec 0048 实现与历史校正说明
 
 本变更修复的是用户模拟评估器的动作完整性，不改写任何冻结实验。历史数据应通过
-`backend/scripts/audit_sim_action_integrity.py` 生成独立 correction artifact，并同时记录源码 pin 与模型 pin。
+`tools.dev.audit.audit_sim_action_integrity` 生成独立 correction artifact，并同时记录源码 pin 与模型 pin。
 
 冻结证据基线：固定 16 题的 harness v0–v6 共 112 局，raw broad Accept 为 94，模型显式 broad Accept
 为 53，非法 fallback 为 41；各轮非法数为 `5, 5, 5, 7, 9, 6, 4`。hard64 共 64 局，raw broad Accept
@@ -14,7 +14,7 @@ harness fail。
 示例：
 
 ```bash
-python backend/scripts/audit_sim_action_integrity.py SESSION_DIR \
+PYTHONPATH=backend uv run --locked python -m tools.dev.audit.audit_sim_action_integrity SESSION_DIR \
   --output correction.json \
   --source-pin COMMIT_OR_IMAGE \
   --model-pin glm-5-2-fp8-wangyiding-mlcoding

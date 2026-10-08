@@ -99,9 +99,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/scripts/probe_persona_reframe.py
-      - backend/scripts/probe_swebench_persona.py
-      - backend/scripts/probe_d43_quality_fail.py
+      - tools/dev/probes/probe_persona_reframe.py
+      - tools/dev/probes/probe_swebench_persona.py
+      - tools/dev/probes/probe_d43_quality_fail.py
     scope: 脚本探针验证重构轴可观测：tempo A/B（耐心/等待菜单差异）、过程卷入差异、d43 质量失败路径差异；支持覆盖 tempo/d42/d43。不宣称相对旧系统体感 uplift；不把 probe 当 CI 门禁。
     acceptance: 三探针可独立跑通（脚本/脚本 harness/可选真 seed）；覆盖项文档化；不修改 sim 核心文件（归 T2/T4）。
 ---
@@ -214,19 +214,22 @@ tasks:
 
 ### 探针（非门禁）
 
-- `backend/scripts/probe_persona_reframe.py` — 脚本态正交
-- `backend/scripts/probe_swebench_persona.py` — 可选真 seed；可覆盖 `--tempo/--d42/--d43`
-- `backend/scripts/probe_d43_quality_fail.py` — 质量失败路径
+- `tools/dev/probes/probe_persona_reframe.py` — 脚本态正交
+- `tools/dev/probes/probe_swebench_persona.py` — 可选真 seed；可覆盖 `--tempo/--d42/--d43`
+- `tools/dev/probes/probe_d43_quality_fail.py` — 质量失败路径
 
 验收口径：轴可观测、正交成立；**不**写「优于旧系统」。
 
 e2e / 探针入口（非 CI 门禁）：
 
 ```text
-backend/scripts/probe_persona_reframe.py
-backend/scripts/probe_swebench_persona.py
-backend/scripts/probe_d43_quality_fail.py
+tools/dev/probes/probe_persona_reframe.py
+tools/dev/probes/probe_swebench_persona.py
+tools/dev/probes/probe_d43_quality_fail.py
 ```
+
+当前维护工具从仓库根目录用 `PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.<module>` 调用。
+各工具的显式输入、凭证与是否调用模型见 `tools/dev/README.md`；它们不注册另一套实验配置或多任务入口。
 
 实现注释约定：本组落地代码用「本编号 + 任务号」追溯（形如本文件 `number` 加 `/T2` 的注释前缀，见 tools/spec-driven-development 注释规范）。
 
@@ -291,4 +294,3 @@ T1 活快照
 - 若枚举旧名持续误导，可另开组做 rename（micromanage→high involvement 等）并迁移卡库——本组不做。
 - 过程卷入与可见事件（progress/status）的更细耦合（例如「无新进度」与 stuck 判定）可在等待环侧演进，仍不把具体 UX 键焊进卡。
 - 可选：卡库分文件（`persona_library_selfreport.json` / `persona_library_github.json`）+ 合并默认库，便于按源跑实验（已在运行侧落地，非本组 Task 文件归属）。
-

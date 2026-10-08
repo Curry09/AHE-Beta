@@ -1,9 +1,9 @@
 ---
-number: "0051"
+number: '0051'
 title: 会话容器隔离与客观验收证据
 issue: 0
 slug: session-container-objective-evidence
-summary: 每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；harness 长请求由 90s persona 心跳决定续等或打断；主观接受与新鲜 SWE-bench 客观执行结果分栏落盘，假接受不得计为通过。
+summary: 每个用户会话从可运行 seed image 启动独立容器；persona 与 harness 只在容器工作区执行；harness 长请求由 90s persona 心跳决定续等或打断；用户会话留存主观结论与完整产物；新鲜 SWE-bench 客观验收由独立事后评分执行，假接受不得计为通过。
 tasks:
   - id: T1
     title: 隔离与验收契约
@@ -72,20 +72,20 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/evaluation/swebench.py
+      - backend/auto_designer/evaluation/adapters/swebench.py
       - backend/auto_designer/evaluation/__init__.py
       - backend/auto_designer/models.py
       - backend/auto_designer/user/session_store.py
       - backend/auto_designer/user/sim/loop.py
-      - backend/tests/evaluation/test_swebench.py
+      - backend/tests/evaluation/test_swebench_runner.py
       - backend/tests/user/test_session_store.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/test_models.py
       - pyproject.toml
-    scope: 保留 persona end_reason，同时在新鲜官方实例容器执行 canonical evaluator 并落 stdout/stderr/exit/hash；派生 valid_accept/false_accept/unverified_accept。
-    acceptance: 超时后 accept 必为 false_accept；未配置 evaluator 必为 unverified_accept；只有 fresh evaluator passed 才是 valid_accept；索引默认不把假接受当通过。
+    scope: 会话保留 persona end_reason 与完整预测；官方执行器供独立事后评分复用，历史 Session 客观字段继续可读，新结果只写独立报告。
+    acceptance: 用户会话不启动评分器；事后报告根据原交互、请求终态及核验的执行合同派生接受关系；缺有效评分不得认定技术通过；不改写历史字段。
   - id: T5
-    title: 可运行镜像、一键入口与审计冒烟
+    title: 可运行镜像、包内控制器与审计冒烟
     status: done
     priority: P1
     tags: []
@@ -97,14 +97,11 @@ tasks:
       - backend/deploy/swebench-seed/Dockerfile
       - backend/deploy/swebench-seed/runtime.Dockerfile
       - backend/scripts/build_swebench_runtime_image.sh
-      - backend/scripts/run_auditable_experiment.py
-      - backend/scripts/run_swebench_closed_loop.py
-      - backend/scripts/run-glm52fp8-1m-hard16-r5-isolated-v2.sh
-      - backend/scripts/run-glm52fp8-1m-canary2-isolated.sh
+      - backend/auto_designer/experiment/controllers/swebench.py
       - backend/scripts/e2e-spec-0051-session-container.sh
       - CLAUDE.md
-    scope: 提供从现有 seed 资产构建可运行镜像的入口，并让一键实验 fail-closed 校验 image；用冒烟脚本证明无宿主工作区泄漏、结果证据可追溯。
-    acceptance: 一键入口启动前检查 runnable image 标签/协议；e2e 不访问真实 LLM，验证容器名、diff hash、请求结果和客观判定落盘。
+    scope: 保留从显式 seed 资产构建 runnable 镜像的辅助脚本与 SWE controller 检查；公开实验由 v2 统一入口启动，模型专用 shell 和旧 auditable wrapper 已退出。
+    acceptance: runnable 镜像协议与用户容器隔离检查继续有效；e2e 无真实 LLM，验证容器名、diff hash、请求结果和客观判定落盘。
 ---
 
 # 0051 · 会话容器隔离与客观验收证据
@@ -115,9 +112,11 @@ tasks:
 
 SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿主临时目录后执行。每一局从同一个**可运行** seed image 创建一个独立容器；harness、persona 的 `read_file`/`run_shell` 和依赖准备都只通过该容器访问 `/workspace/<instance_id>/repo`。同一轮可并行 16 个容器，镜像只存一份，容器各有自己的可写层。
 
-用户是否接受仍是产品体验结论，不能冒充题目通过。会话结束后只导出 git diff，并在一个新鲜的官方 SWE-bench instance image 中应用 diff、执行 canonical evaluator。落盘同时保存 `user_outcome`、`objective_evaluation` 与派生的 `accept_validity`；超时、崩溃、缺 evaluator 或客观失败均不得成为 `valid_accept`。
+用户是否接受仍是产品体验结论，不能冒充题目通过。会话结束后保存完整 git diff 与产物回执，收集并封口后由独立事后命令在新鲜官方 SWE-bench instance image 中应用 diff、执行 canonical evaluator。原 `user_outcome` 不改写，客观结果和接受关系只写评分报告；历史 `objective_evaluation` 与 `accept_validity` 字段仍可读取。超时、崩溃、缺有效验收或客观失败均不得成为 `valid_accept`。
 
 审计不是给 persona 看，而是给实验操作者、复核者及以后写报告的人看：他们应能从 session JSON 还原“哪个容器、哪次请求、何时超时、导出了什么 diff、客观命令返回什么”。本组只做最小证据链，不建设通用合规日志平台。
+
+在线 objective evaluation 入口及其环境变量已删除；SWE 官方执行器成为评分适配器的内部模块。当前公开调用为 `experiment.py grade RUN_ID --plan /path/grading-plan.json`，由已收集归档与原会话绑定评分，direct 与模拟交互共用产物合同；接受关系只写新评分报告，不回写历史 Session。用户 runner 不再接受 evaluator 注入，不能通过宿主环境开启会话即时验收。
 
 ## Motivation
 
@@ -166,7 +165,7 @@ wire v1 的 terminal reply 增加 `status`。launcher 将最近请求结果记�
 | `objective_evaluation` | evaluator、fresh image digest、命令、exit code、stdout/stderr、UTC、passed |
 | `accept_validity` | `valid_accept / false_accept / unverified_accept / not_applicable` |
 
-派生函数是 fail-closed 的纯函数：非 accept → `not_applicable`；accept 且任一请求超时/崩溃 → `false_accept`；无完整客观结果 → `unverified_accept`；`passed=false` → `false_accept`；只有 `fresh=true && passed=true` → `valid_accept`。index 保留体验评分，但通过率消费者只数 `valid_accept`。
+接受关系由独立评分报告的纯函数派生：先确认原交互有效且用户接受，再核验评分状态与适配器执行合同。有效请求失败或有效客观失败为 `false_accept`；缺有效二值验收为 `unverified_accept`；核验合同且 `passed=true` 才为 `valid_accept`。Session 的历史字段不由评分回写，不能以体验评分推断技术通过。
 
 accept 动作的 `message` 政名义为 `terminal_note`，不路由给 harness，也不投影为 transcript 的 user turn。
 

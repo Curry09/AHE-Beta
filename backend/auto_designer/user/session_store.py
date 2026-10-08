@@ -14,7 +14,7 @@ import re
 import threading
 from pathlib import Path
 
-from auto_designer.models import Session
+from auto_designer.models import Session, bound_session_provenance, validate_session_provenance
 
 _INDEX_NAME = "index.json"
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -50,6 +50,7 @@ class SessionStore:
 
     def _save_locked(self, *, session: Session) -> None:
         _validate_session_id(session.session_id)
+        validate_session_provenance(session, bound_session_provenance())
         # 先写全量文件（唯一权威），后追加索引：中途失败至多「有全量缺索引」，可重建。
         full_path = self._root / f"{session.session_id}.json"
         body = session.to_dict()
@@ -82,7 +83,9 @@ class SessionStore:
         data = json.loads(full_path.read_text(encoding="utf-8"))  # 不存在则 FileNotFoundError
         return Session.from_dict(data)
 
-    def reconcile(self, session_id: str) -> Session | None:
+    def reconcile(
+        self, session_id: str, *, expected_provenance: dict | None = None
+    ) -> Session | None:
         """Return a complete session and repair its derived index, or return None."""
         _validate_session_id(session_id)
         full_path = self._root / f"{session_id}.json"
@@ -95,6 +98,7 @@ class SessionStore:
                 session = self.load(session_id)
                 if session.session_id != session_id:
                     raise SessionConflictError(f"session identity mismatch: {session_id}")
+                validate_session_provenance(session, expected_provenance)
                 entries = self.index(include_invalid=True)
                 expected = _index_entry(session)
                 matching = [row for row in entries if row.get("session_id") == session_id]
@@ -232,11 +236,32 @@ def _atomic_json(path: Path, value: object) -> None:
 
 
 def _index_entry(session: Session) -> dict:
+    validate_session_provenance(session)
     evaluation_status = (
         session.sim_trace.evaluation_status if session.sim_trace is not None else "valid"
     )
     return {
         "session_id": session.session_id,
+        **(
+            {
+                "session_provenance": dict(session.session_provenance),
+                **{
+                    key: session.session_provenance[key]
+                    for key in (
+                        "persona_id",
+                        "task_id",
+                        "task_digest",
+                        "task_kind",
+                        "round_no",
+                        "slot",
+                        "interaction",
+                        "harness_sha",
+                    )
+                },
+            }
+            if session.session_provenance
+            else {}
+        ),
         "score": session.feeling.score,
         "reason": session.feeling.reason,
         "created_at": session.created_at.isoformat(),

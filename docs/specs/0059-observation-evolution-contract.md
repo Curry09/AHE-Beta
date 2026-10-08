@@ -52,7 +52,7 @@ tasks:
     parallel: false
     files:
       - backend/tests/demand/test_observation_provider.py
-      - backend/scripts/replay_observation_synthesis.py
+      - tools/dev/replay/replay_observation_synthesis.py
     scope: 验证普通工具读取和来源链，固定证据回放 PM、Synthesizer，审计实际读取及产物。
     acceptance: 离线测试通过；真实模型结果保留输入、输出、访问与耗时，区分机制可达与实际下钻。
 ---

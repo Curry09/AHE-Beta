@@ -13,6 +13,8 @@ from auto_designer.experiment.config import ConfigError, compose_project
 
 LABEL_EXPERIMENT = "io.openagents.experiment_id"
 LABEL_MANIFEST = "io.openagents.manifest_sha"
+# Spec-0069/T3: Canonical Ubuntu 24.04 LTS channel, actual Squid 6.13 build.
+DEFAULT_EGRESS_IMAGE = "ubuntu/squid:6.6-24.04_beta@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029"
 COMPOSE_TEMPLATE = (
     Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "docker-compose.yml"
 )
@@ -34,9 +36,22 @@ def render_stack(
     manifest_sha: str,
     vigil_image: str,
     images: dict[str, str] | None = None,
+    gitea_host_port: int = 0,
+    ci_enabled: bool = False,
 ) -> Path:
+    if type(gitea_host_port) is not int or not 0 <= gitea_host_port <= 65535:
+        raise InfrastructureError("Gitea host port must be 0 (allocate) or a valid TCP port")
     dest.mkdir(parents=True, exist_ok=True)
     compose_src = COMPOSE_TEMPLATE.read_text(encoding="utf-8")
+    if ci_enabled:
+        from auto_designer.experiment.backends.local_ci import compose_service
+
+        compose_src = compose_src.replace(
+            'GITEA__actions__ENABLED: "false"', 'GITEA__actions__ENABLED: "true"'
+        )
+        compose_src = compose_src.replace("\nnetworks:\n", compose_service() + "\nnetworks:\n")
+        compose_src += "\n  runner_data:\n    labels: *ownership\n"
+        compose_src += "\n  ci_docker_data:\n    labels: *ownership\n"
     if "container_name:" in compose_src:
         raise InfrastructureError("compose 模板禁止 container_name")
     (dest / "docker-compose.yml").write_text(compose_src, encoding="utf-8")
@@ -51,8 +66,14 @@ def render_stack(
                 f"EXPERIMENT_ID={experiment_id}",
                 f"MANIFEST_SHA={manifest_sha}",
                 f"GITEA_IMAGE={resolved_images.get('gitea', 'gitea/gitea:1.22')}",
+                f"GITEA_HOST_PORT={gitea_host_port}",
                 f"RUNNER_IMAGE={resolved_images.get('runner', 'gitea/act_runner:0.2.11')}",
-                f"EGRESS_IMAGE={resolved_images.get('egress', 'ubuntu/squid:6.13')}",
+                *(
+                    [f"CI_DAEMON_IMAGE={resolved_images.get('ci_daemon', 'docker:27.5.1-dind')}"]
+                    if ci_enabled
+                    else []
+                ),
+                f"EGRESS_IMAGE={resolved_images.get('egress', DEFAULT_EGRESS_IMAGE)}",
                 f"VIGIL_IMAGE={vigil_image}",
                 f"COMPOSE_PROJECT_NAME={compose_project(experiment_id=experiment_id, cfg_hash=manifest_sha)}",
             ]

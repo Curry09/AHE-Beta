@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-CONTEXT="${SWEBENCH_SEED_CONTEXT:-$ROOT/backend/data/swebench_seed/medium-hard-16}"
-IMAGE="${SWEBENCH_SEED_IMAGE:-auto-designer-seed:swebench-medium-hard-16}"
+CONTEXT="${SWEBENCH_SEED_CONTEXT:?Set the prepared seed workspace context}"
+IMAGE="${SWEBENCH_SEED_IMAGE:?Set the output storage seed image}"
 
 test -d "$CONTEXT/workspace" || {
   echo "seed workspace 不存在：$CONTEXT/workspace" >&2

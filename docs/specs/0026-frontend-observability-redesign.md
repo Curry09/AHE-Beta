@@ -15,7 +15,7 @@ tasks:
     parallel: true
     files:
       - backend/auto_designer/loop/live.py
-      - backend/run.py
+      - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/tests/loop/test_live.py
     scope: live.py 的 _ROLE_ORDER 加 triager（排在 user 之后、synthesizer 之前）；update_agent 增可选 meta(dict)——只读透传，前端展示用，不参与任何决策；run.py 用户 status 回调传 persona 摘要（identity/level/domain/goal）进 meta；read_agents 排序含 triager。纯观测数据补齐，不动闭环。
     acceptance: read_agents 里 triager 排在 user 与 synthesizer 之间；用户 agent 槽带 persona 摘要 meta；老调用不传 meta 时退化为 None 不崩；test_live 覆盖排序与 meta 透传。

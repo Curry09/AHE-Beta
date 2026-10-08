@@ -15,8 +15,17 @@ import time
 from typing import Any
 
 import requests
+from urllib3.exceptions import HTTPError as TransportHTTPError
 
 from auto_designer.models import ISSUE_STATES, IssueDraft, IssueRef, OpenIssue
+from auto_designer.observations.transport import make_transport_profile, validate_transport_profile
+from auto_designer.tracker.attachment_transport import (
+    MIME_TYPES,
+    allows_encoding,
+    anonymous_session,
+    download_policy,
+    validate_r2_location,
+)
 from auto_designer.tracker.base import (
     IdempotencyConflictError,
     issue_payload_digest,
@@ -82,6 +91,7 @@ class GiteaTracker:
         self._owner = owner
         self._repo = repo
         self._token = token
+        self._observation_transport: dict | None = None
         # Spec-0017/T6：requests.Session 非线程安全（cookiejar/内部状态并发变异，Gitea 会回
         # Set-Cookie），a 段并行后各会话线程收尾并发 create_issue → Session 改每线程一个
         # （thread-local，惰性新建、各带全 header）。_session_override 是测试注入口（见 setter）。
@@ -431,7 +441,9 @@ class GiteaTracker:
         """commit 原始 diff 文本；取不到降级为空串（不阻断 commit 详情主体）。"""
         endpoint = f"/repos/{self._owner}/{self._repo}/git/commits/{sha}.diff"
         try:
-            resp = self._session.request("GET", self._api + endpoint, timeout=_REQUEST_TIMEOUT)
+            resp = self._session.request(
+                "GET", self._api + endpoint, timeout=_REQUEST_TIMEOUT, allow_redirects=False
+            )
         except requests.RequestException:
             return ""
         if not 200 <= resp.status_code < 300:
@@ -571,22 +583,71 @@ class GiteaTracker:
         return str(self._request("GET", "/user", None)["login"])
 
     def preflight_observations(self) -> dict:
+        selected = self.select_observation_transport()
+        profile = self.observation_transport or make_transport_profile(
+            repository=selected["repository"]
+        )
+        settings = self._attachment_settings
+        if not allows_encoding(settings.get("allowed_types"), profile["encoding"]):
+            raise ValueError(
+                "frozen observation encoding no longer supported; use a new experiment identity"
+            )
+        if profile["download_policy"] != selected["download_policy"]:
+            raise ValueError("observation download policy changed; use a new experiment identity")
+        return {
+            "repository": selected["repository"],
+            "format": "artifact-observations-v1",
+            "max_transfer_bytes": 4_000_000,
+        }
+
+    @property
+    def observation_transport(self) -> dict | None:
+        return dict(self._observation_transport) if self._observation_transport else None
+
+    def bind_observation_transport(self, profile: dict, *, reader_verified: bool = False) -> None:
+        profile = validate_transport_profile(
+            profile, repository=f"{self._api}/repos/{self._owner}/{self._repo}"
+        )
+        if (
+            profile["download_policy"] == "gitea-com-r2-v1"
+            and download_policy(self._api.removesuffix("/api/v1")) != "gitea-com-r2-v1"
+        ):
+            raise ValueError("hosted attachment policy requires https://gitea.com")
+        if (
+            profile["encoding"] != "gzip" or profile["download_policy"] != "same-origin-v1"
+        ) and not reader_verified:
+            raise ValueError("new observation transport requires verified reader capability")
+        if self._observation_transport is not None and self._observation_transport != profile:
+            raise ValueError("observation transport is already bound")
+        self._observation_transport = profile
+
+    def select_observation_transport(self) -> dict:
         settings = self._request("GET", "/settings/attachment", None)
         repo = self._request("GET", f"/repos/{self._owner}/{self._repo}", None)
         if (
             not settings.get("enabled")
             or int(settings.get("max_size", 0)) < 4
-            or ".gz" not in settings.get("allowed_types", "")
             or not (
                 repo.get("permissions", {}).get("push") or repo.get("permissions", {}).get("admin")
             )
         ):
             raise ValueError("observation attachment transport preflight failed")
-        return {
-            "repository": f"{self._api}/repos/{self._owner}/{self._repo}",
-            "format": "artifact-observations-v1",
-            "max_transfer_bytes": 4_000_000,
-        }
+        encoding = next(
+            (
+                item
+                for item in ("gzip", "zip")
+                if allows_encoding(settings.get("allowed_types"), item)
+            ),
+            None,
+        )
+        if encoding is None:
+            raise ValueError("Gitea attachment rules allow neither gzip nor ZIP evidence")
+        self._attachment_settings = settings
+        return make_transport_profile(
+            repository=f"{self._api}/repos/{self._owner}/{self._repo}",
+            encoding=encoding,
+            download_policy=download_policy(self._api.removesuffix("/api/v1")),
+        )
 
     def list_issue_assets(self, *, number: int) -> list[dict]:
         import json
@@ -601,7 +662,13 @@ class GiteaTracker:
         endpoint = f"/repos/{self._owner}/{self._repo}/issues/{number}/assets"
         response = self._session.post(
             self._api + endpoint,
-            files={"attachment": (name, data, "application/gzip")},
+            files={
+                "attachment": (
+                    name,
+                    data,
+                    MIME_TYPES[(self.observation_transport or {}).get("encoding", "gzip")],
+                )
+            },
             headers={"Content-Type": None},
             timeout=_REQUEST_TIMEOUT,
             allow_redirects=False,
@@ -615,9 +682,9 @@ class GiteaTracker:
             raise ValueError("attachment is not a member of this issue")
         # Never follow browser_download_url supplied by the server or model across origins.
         url = self._api.removesuffix("/api/v1") + "/attachments/" + asset["uuid"]
-        return self._observation_bytes(url=url, limit=limit)
+        return self._observation_bytes(url=url, limit=limit, attachment=True)
 
-    def _observation_bytes(self, *, url: str, limit: int) -> bytes:
+    def _observation_bytes(self, *, url: str, limit: int, attachment: bool = False) -> bytes:
         deadline = time.monotonic() + 15
         with self._session.get(
             url,
@@ -626,19 +693,57 @@ class GiteaTracker:
             allow_redirects=False,
             headers={"Accept-Encoding": "identity"},
         ) as response:
-            if response.status_code != 200:
-                raise GiteaError(response.status_code, "attachment download")
-            chunks, size = [], 0
-            while True:
-                # read1 returns available data; read(n) can wait forever on a drip-fed body.
-                chunk = response.raw.read1(min(65536, limit + 1 - size), decode_content=False)
-                size += len(chunk)
-                if size > limit or time.monotonic() > deadline:
+            if (
+                attachment
+                and response.status_code in (302, 303, 307, 308)
+                and (self.observation_transport or {}).get("download_policy") == "gitea-com-r2-v1"
+            ):
+                location = validate_r2_location(response.headers.get("Location", ""))
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
                     raise ValueError("attachment download exceeds budget")
-                if not chunk:
-                    break
-                chunks.append(chunk)
-            return b"".join(chunks)
+                try:
+                    with anonymous_session(self._session, location) as session:
+                        with session.get(
+                            location,
+                            stream=True,
+                            timeout=(min(5, remaining), min(5, remaining)),
+                            allow_redirects=False,
+                            headers={"Accept-Encoding": "identity"},
+                        ) as external:
+                            return self._read_observation_response(
+                                external, limit=limit, deadline=deadline
+                            )
+                except (requests.RequestException, TransportHTTPError, OSError):
+                    raise ValueError("signed observation attachment download failed") from None
+            return self._read_observation_response(response, limit=limit, deadline=deadline)
+
+    def _read_observation_response(self, response, *, limit: int, deadline: float) -> bytes:
+        if response.status_code != 200:
+            raise GiteaError(response.status_code, "attachment download")
+        chunks, size = [], 0
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ValueError("attachment download exceeds budget")
+            # requests leaves the streaming socket at its initial read timeout.
+            # Tighten it to the remaining shared budget before each read1.
+            raw_socket = getattr(
+                getattr(getattr(getattr(response.raw, "_fp", None), "fp", None), "raw", None),
+                "_sock",
+                None,
+            )
+            if raw_socket is not None:
+                raw_socket.settimeout(min(5, remaining))
+            # read1 returns available data; read(n) can wait forever on a drip-fed body.
+            chunk = response.raw.read1(min(65536, limit + 1 - size), decode_content=False)
+            size += len(chunk)
+            if size > limit or time.monotonic() > deadline:
+                raise ValueError("attachment download exceeds budget")
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return b"".join(chunks)
 
     def _refresh_label_cache(self) -> None:
         data = self._request("GET", f"/repos/{self._owner}/{self._repo}/labels", None)
@@ -651,6 +756,7 @@ class GiteaTracker:
             self._api + endpoint,
             json={"name": name, "color": _DEFAULT_LABEL_COLOR},
             timeout=_REQUEST_TIMEOUT,
+            allow_redirects=False,
         )
         if resp.status_code in (409, 422):  # 竞态：他处已建 → 回退 GET 取既有 id
             self._refresh_label_cache()
@@ -669,7 +775,11 @@ class GiteaTracker:
         for attempt in range(attempts):
             try:
                 resp = self._session.request(
-                    method, self._api + endpoint, json=json_body, timeout=_REQUEST_TIMEOUT
+                    method,
+                    self._api + endpoint,
+                    json=json_body,
+                    timeout=_REQUEST_TIMEOUT,
+                    allow_redirects=False,
                 )
                 if (
                     method.upper() == "GET"

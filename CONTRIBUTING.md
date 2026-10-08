@@ -9,8 +9,8 @@ We welcome reproducible bug reports, documentation fixes, and focused implementa
 From the repository root:
 
 ```bash
-uv sync --locked --extra dev
-uv run --locked --extra dev pytest -q
+uv sync --locked --extra experiments --extra dev
+uv run --locked --extra experiments --extra dev pytest -q
 uv run --locked --extra dev ruff check .
 uv run --locked --extra dev ruff format --check .
 PYTHONPATH=tools/spec-driven-development/vendor uv run --locked python -m openagents.spec.cli validate

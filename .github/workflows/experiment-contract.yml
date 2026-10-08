@@ -1,0 +1,47 @@
+name: Unified experiment contract
+on:
+  pull_request:
+    paths:
+      - 'backend/auto_designer/experiment/**'
+      - 'backend/auto_designer/loop/**'
+      - 'backend/auto_designer/demand/**'
+      - 'backend/auto_designer/observations/**'
+      - 'backend/auto_designer/user/session_store.py'
+      - 'backend/scripts/experiment.py'
+      - 'backend/auto_designer/user/sim/sources/docker_seed.py'
+      - 'backend/deploy/**'
+      - 'backend/scripts/e2e-spec-0069-experiment-entry.sh'
+      - 'backend/tests/test_experiment_*.py'
+      - 'examples/**'
+      - 'tools/dev/**'
+      - 'evaluation/adapters/**'
+      - 'research/**'
+      - 'backend/scripts/check_experiment_repository.py'
+      - 'backend/scripts/e2e-spec-0071-experiment-cleanup.sh'
+      - 'backend/scripts/e2e-spec-0076-seed-task-import.sh'
+      - 'backend/scripts/e2e-spec-0077-local-engineering-ci.sh'
+      - 'backend/scripts/e2e-spec-0079-experiment-continuation.sh'
+      - 'backend/tests/fixtures/continuation/**'
+      - 'release/compatibility.json'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/experiment-contract.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.11.28'
+          python-version: '3.12.13'
+      - run: uv sync --locked --extra experiments --extra dev
+      - run: bash backend/scripts/e2e-spec-0071-experiment-cleanup.sh
+      - run: bash backend/scripts/e2e-spec-0076-seed-task-import.sh
+      - run: bash backend/scripts/e2e-spec-0077-local-engineering-ci.sh
+      - run: bash backend/scripts/e2e-spec-0079-experiment-continuation.sh

@@ -7,7 +7,7 @@ harness_runs）不再是 sandbox 的 `../` 同级——`../sessions`/`../harness
 
 from __future__ import annotations
 
-import run
+from auto_designer.experiment.controllers import runtime as run
 
 
 def test_harness_repo_parent_isolated_from_data() -> None:

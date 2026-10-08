@@ -104,8 +104,8 @@ tasks:
     parallel: false
     files:
       - backend/tests/demand/test_role_contract_flow.py
-      - backend/scripts/replay_roles_from_sessions.py
-      - backend/scripts/evaluate_role_traces.py
+      - tools/dev/replay/replay_roles_from_sessions.py
+      - tools/dev/audit/evaluate_role_traces.py
     scope: 建立角色正例、反例与越界样例，验证同一证据经过四种认知任务产生不同 artifact；真实回放冻结完整输入、角色产物、裁决和逐角色合规评分，不以 JSON 合法或状态迁移成功代替行为验收。
     acceptance: 测试证明 Triage 不串票、PM 保持产品视角且不受 novelty 限制、Synthesize 解释多提案关系、Owner 做投资组合裁决并拦截越界产物；trace evaluator 输出逐角色 contract violations 和证据位置；真实回放无 OpenAgents 且完整产物可独立审计；ruff、相关 pytest、spec validate/render/graph 通过。
 ---
@@ -208,7 +208,7 @@ Synthesize 产关系解释、Owner 产投资裁决。测试拒绝“字段存在
 | T6 | 跨角色行为评测与真实回放 | T2、T3、T4、T5 |
 
 文件由 frontmatter 的 Task `files` 独占。端到端入口为
-`backend/scripts/evaluate_role_traces.py` 配合 `replay_roles_from_sessions.py`：回放运行到 Owner 停止，
+`tools/dev/audit/evaluate_role_traces.py` 配合 `replay_roles_from_sessions.py`：回放运行到 Owner 停止，
 输出完整 artifact、来源关系、violation、裁决和逐角色评分，不启动 OpenAgents。
 
 ## Drawbacks

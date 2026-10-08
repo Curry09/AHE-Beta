@@ -191,10 +191,17 @@ class Triager:
         self._on_status = on_status
         self._on_event = on_event
         self._recovery = recovery
+        self._feedback_dependency = "users"
 
     def bind_recovery(self, recovery: RecoveryStore) -> None:
         """Attach the experiment ledger after role construction."""
         self._recovery = recovery
+
+    def bind_feedback_dependency(self, prerequisite: str) -> None:
+        """Spec-0079/T3: share the outer feedback stage prerequisite."""
+        if prerequisite not in {"users", "feedback_imported"}:
+            raise ValueError("unsupported feedback prerequisite")
+        self._feedback_dependency = prerequisite
 
     def triage_once(
         self, pending: list | None = None, shard: tuple[int, int] | None = None
@@ -395,7 +402,7 @@ class Triager:
             key=key,
             input_value={"report": issue.to_dict()},
             expected_postconditions={"completed": True},
-            dependencies=("users",),
+            dependencies=(self._feedback_dependency,),
         )
 
     def _fail_recovery_item(self, *, key: str, error: str) -> None:
@@ -689,6 +696,9 @@ class Triager:
             try:
                 envelope = self._store.load_user_feedback_envelope(sid)
                 envelope["source_report"] = report
+                if (envelope.get("harness_source") or {}).get("ref") in {None, "unavailable"}:
+                    session = self._session_for_issue(int(issue.number))
+                    envelope["harness_source"] = build_evidence_envelope(session).harness_source
                 return project_for_role(envelope, "triage")
             except FileNotFoundError:
                 pass
@@ -714,24 +724,55 @@ class Triager:
             "完成调查后调用 submit_triage 一次，dispositions 只能包含当前这一条 report。"
         )
         report_id = str(pending[0].number) if pending else ""
-        return run_agent_def(
-            self._agent_def,
-            msg,
-            store=self._store,
-            repo=self._repo,
-            role="triager",
-            tracker=self._tracker,
-            source_issue_ids={i.number for i in pending},
-            timeout=_TRIAGE_TIMEOUT,
-            on_event=self._on_event,
-            subject={"kind": "report", "id": report_id},
-            evidence={
-                "default_level": "L1",
-                "session_id": triage_evidence.get("session_id", "unavailable"),
-                "allowed_levels": ["L2", "L3", "L4"],
-                "evidence_refs": list(triage_evidence.get("evidence_refs") or [])[:24],
-            },
+        from contextlib import nullcontext
+
+        from auto_designer.demand.source import bind_harness_source, current_harness_source
+
+        source = current_harness_source()
+        report_sha = triage_evidence.get("harness_source", {}).get("ref")
+        source_scope = (
+            bind_harness_source(source.repo if source is not None else self._repo, report_sha)
+            if report_sha and report_sha != "unavailable"
+            else nullcontext()
         )
+        with (
+            source_scope,
+            bind_usage_context(harness_sha=report_sha)
+            if report_sha and report_sha != "unavailable"
+            else nullcontext(),
+        ):
+            for attempt in range(2):
+                message = msg
+                if attempt:
+                    message += (
+                        "\n上次调用未提交有效 disposition。这是最后一次有界收尾机会。"
+                        "不要猜测缺失事实或反复寻找越界目录。依据可用证据尽快调用 submit_triage；"
+                        "无法可靠判断时提交 needs_info，明确缺少什么。"
+                    )
+                    if self._on_event is not None:
+                        self._on_event("retry", f"report #{report_id}: retry missing submit (2/2)")
+                result = run_agent_def(
+                    self._agent_def,
+                    message,
+                    store=self._store,
+                    repo=self._repo,
+                    role="triager",
+                    tracker=self._tracker,
+                    source_issue_ids={i.number for i in pending},
+                    timeout=_TRIAGE_TIMEOUT,
+                    on_event=self._on_event,
+                    max_iterations=8 if attempt else None,
+                    subject={"kind": "report", "id": report_id},
+                    evidence={
+                        "default_level": "L1",
+                        "session_id": triage_evidence.get("session_id", "unavailable"),
+                        "allowed_levels": ["L2", "L3", "L4"],
+                        "evidence_refs": list(triage_evidence.get("evidence_refs") or [])[:24],
+                    },
+                )
+                if read_submit(result, "dispositions") is not None:
+                    return result
+        return result
 
     @staticmethod
     def _format_evidence(evidence: dict) -> str:
