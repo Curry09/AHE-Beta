@@ -285,4 +285,4 @@ SWE-bench 官方 harness 仍是客观执行的唯一来源：persona 交互结�
 
 ## Future possibilities
 
-同一语义契约可推广到 triage、designer 和 delivery agent，统一“结构化产出状态”和“业务结果状态”的分离。事件链稳定后，可增加 UI 对原始响应、规范化动作、修复记录和客观结果的逐层展开；若需要合规级防篡改，可在现有事件字段上追加签名链。任何新增动作都必须先声明 executor、channel、effect、message_policy 和字段契约，再接入 action space 与回归矩阵。
+同一语义契约可推广到 triage、synthesizer 和 delivery agent，统一“结构化产出状态”和“业务结果状态”的分离。事件链稳定后，可增加 UI 对原始响应、规范化动作、修复记录和客观结果的逐层展开；若需要合规级防篡改，可在现有事件字段上追加签名链。任何新增动作都必须先声明 executor、channel、effect、message_policy 和字段契约，再接入 action space 与回归矩阵。

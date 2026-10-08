@@ -47,8 +47,8 @@
 ### 运行时：需求面 nexau + 交付面 OpenAgents（spec-0032）
 需求面角色为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」，固定角色定义置于 `agent_defs/`：
 - **用户 agent**：扮演用户，多轮使用 harness，产出体感与 issue（report 平面）。
-- **triager / synthesize / divergent**：生成器，产不可领 proposal（spec-0029 三平面）。
-- **双轨（spec-0060）**：PM 独立到 Owner；Triage 经 Designer 到 Owner。Designer 的 proposal/ready 输入排除 PM，证据授权只来自筛选后的可见提案；两路线仅在 Owner 汇合。
+- **triager / synthesizer / divergent**：生成器，产不可领 proposal（spec-0029 三平面）。
+- **双轨（spec-0060）**：PM 独立到 Owner；Triage 经 Synthesizer 到 Owner。Synthesizer 的 proposal/ready 输入排除 PM，证据授权只来自筛选后的可见提案；两路线仅在 Owner 汇合。
 - **Owner / Delivery Router**：默认 admit 并打 `openagents` 令牌；用 `delivery_overlaps` 协调双轨共享工作，双方仍独立交接与验收，交付侧决定实现复用。仅保留历史精确去重兼容，不选择实现层、不压缩独立能力与验收目标。
 
 交付面 = OpenAgents vigil：以独立 CLI 接入（不 vendor 不 import），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。运行形态（spec-0033）：**容器围堵为缺省**——vigil 跑在专用容器（deploy/vigil 镜像，容器内自 clone harness 仓、零宿主挂载），网络只挂 internal vigil-net、外网经 egress 代理 allowlist（仅 Anthropic API），claude 凭证（ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN）与 Gitea token 只经容器 env；`VIGIL_MODE=subprocess` 为无围堵的宿主直跑，仅限盯屏联调。
@@ -79,11 +79,12 @@ backend/                 # 后端（编排框架）
     user/                # user_agent + sim/WorkspaceRuntime（本地 fixture / 每会话 Docker）+ session_store
     evaluation/          # 官方 SWE-bench fresh-container 客观验收与 accept validity 派生
     tracker/             # base.py(IssueTracker接口) + gitea.py(含 PR 观测读路径) + fake.py
-    dev/                 # 边界/围堵原语：harness_boundary + workspace_jail + repo_guard 等（agentic_developer 已随 spec-0032 退役）
+    demand/              # Triage / Synthesizer / PM / Owner 及共享需求处理
+    guards/              # workspace_jail + repo_guard + harness_boundary；不含内置开发角色
     loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
     web/                 # 只读观测看板 FastAPI（/api/overview /api/delivery /api/sessions ...）
   tests/                 # 测试（pytest testpaths=backend/tests）
-  agent_defs/            # 需求面角色 nexau 定义（数据）：user_agent/ triage_agent/ designer/ divergent_pm/ owner/
+  agent_defs/            # 需求面角色 nexau 定义（数据）：user_agent/ triage_agent/ synthesizer/ divergent_pm/ owner/
   harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml + .gitea/workflows/smoke.yml
   deploy/gitea/          # 基建：docker-compose.yml(Gitea+act_runner+egress-proxy+双网络) + bootstrap.sh
   deploy/vigil/          # 交付面围堵盒（spec-0033）：Dockerfile + entrypoint.sh(自 clone) + build.sh

@@ -103,7 +103,7 @@ tasks:
 （工厂注入，根治 `bind_session` 串台）；② 工作区供给（materialize + ensure_deps）**前移到并行段
 之前串行完成**（规避 git clone 缓存并发竞争）；③ 共享状态加锁（`SessionStore.save` 的
 index.json 读-改-写、`live.py` 观测投影的读-改-写）。N 个用户的 a 段 wall-clock 从 ~ΣTᵢ 降到
-~max(Tᵢ)，且**并发不改变任何信号语义**。d（designer）/ b（developer）段维持串行，是明确的
+~max(Tᵢ)，且**并发不改变任何信号语义**。d（synthesizer）/ b（developer）段维持串行，是明确的
 Non-goal（多 dev 直推同一 main 必然 push 冲突 + `SANDBOX_WORK_DIR` 全局 env 变异，串行是纯
 trunk 模型的固有约束）。
 
@@ -141,7 +141,7 @@ round K:
   │  user2: launch → run_session → 落盘      │
   │  user3: launch → run_session → 落盘      │
   └───────── as_completed 全部汇齐 ──────────┘
-  d 段（designer，串行）→ b 段（developer，串行）→ c 段（回灌 main HEAD SHA）
+  d 段（synthesizer，串行）→ b 段（developer，串行）→ c 段（回灌 main HEAD SHA）
 ```
 
 对信号消费者（设计师/metrics/看板）：**并发只改 wall-clock，不改信号语义**——体感分布、issue
@@ -217,7 +217,7 @@ with ThreadPoolExecutor(max_workers=min(len(prepared), self._max_parallel_users)
 | `GiteaTracker`（共享 `requests.Session`） | requests 官方不承诺 Session 线程安全，且 Gitea 会回 Set-Cookie（cookiejar 并发变异）——初判「留观察」被生产第二轮推翻 | **T6 thread-local Session**（每线程一个，setter 保测试注入口）；`_label_ids` 缓存靠既有 409/422 竞态回退，不加锁 |
 | `launcher._yaml`（模块级共享 ruamel YAML 实例） | ruamel YAML 实例非线程安全（解析器内部状态跨调用共享），并行 launch 并发 load 互相搅乱——生产第二轮发现 | **T5 追加：每次解析新建实例**（构造开销微不足道） |
 | `ApiPersonaClient.client`（共享 openai 客户端） | httpx 底座，官方文档承诺线程安全 | 无需改 |
-| `os.environ` | 用户段不碰（launcher 显式传 env dict 给 Popen）；dev/designer 段才设全局 env | d/b 串行，天然无冲突（Non-goal 的依据之一） |
+| `os.environ` | 用户段不碰（launcher 显式传 env dict 给 Popen）；dev/synthesizer 段才设全局 env | d/b 串行，天然无冲突（Non-goal 的依据之一） |
 | run.py `current["round"]` | a 段内只读（round 游标只在轮边界写） | 无需改 |
 
 ### Task DAG 与文件分配

@@ -10,13 +10,13 @@ max_iterations: 120
 
 middlewares:
   # 工作区 jail 将源码读取限制在 harness 仓；会话证据只能经投影工具渐进获取。
-  - import: auto_designer.dev.workspace_jail:WorkspaceJailMiddleware
+  - import: auto_designer.guards.workspace_jail:WorkspaceJailMiddleware
 
 llm_config:
-  # 分角色配置：创新者 agent 用 DESIGNER_LLM_*。
-  model: ${env.DESIGNER_LLM_MODEL}
-  base_url: ${env.DESIGNER_LLM_BASE_URL}
-  api_key: ${env.DESIGNER_LLM_API_KEY}
+  # 分角色配置：创新者 agent 用 DEMAND_LLM_*。
+  model: ${env.DEMAND_LLM_MODEL}
+  base_url: ${env.DEMAND_LLM_BASE_URL}
+  api_key: ${env.DEMAND_LLM_API_KEY}
   max_tokens: 32768
   timeout: 300
   api_type: openai_chat_completion
@@ -44,20 +44,20 @@ tools:
   # 编排侧读 SessionStore，jail 仍禁直接读 sessions/。
   - name: get_session_timeline
     yaml_path: ./tools/get_session_timeline.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_session_timeline
+    binding: auto_designer.demand.session_timeline:get_session_timeline
   # 下钻某一拍：harness 内层 tool 序列（截断）+ stop_kind；timeline 不够细时再用。
   - name: get_harness_beat
     yaml_path: ./tools/get_harness_beat.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_harness_beat
+    binding: auto_designer.demand.session_timeline:get_harness_beat
   # 再展开某一步正文（硬顶字符）；beat 里 truncated=true 且确需细看时才调。
   - name: get_harness_step
     yaml_path: ./tools/get_harness_step.tool.yaml
-    binding: auto_designer.designer.session_timeline:get_harness_step
+    binding: auto_designer.demand.session_timeline:get_harness_step
   # Spec-0028：收尾工具——agent 以工具参数原生吐结构化候选（input_schema = agent_contract
   # .rfc_input_schema() 的生成副本，受 drift-guard 守护）；nexau 在调用层强校验，漂移/缺字段被拒→重试。
   # stop tool 的返回值（proposals 的 JSON）成为 agent.run 的返回，driver json.loads 取用。
   - name: submit_divergent
     yaml_path: ./tools/submit_divergent.tool.yaml
-    binding: auto_designer.designer.submit_tools:submit_divergent
+    binding: auto_designer.demand.submit_tools:submit_divergent
 
 stop_tools: [submit_divergent]

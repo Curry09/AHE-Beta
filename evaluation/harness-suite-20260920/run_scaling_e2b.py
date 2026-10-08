@@ -21,8 +21,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "evaluation" / "harness-suite-20260920"
-CONFIG = SUITE / "configs" / "scaling-e2b-20260922.json"
-MIXED = SUITE / "configs" / "mixed-scaling-20260922.json"
+CONFIG = ROOT / "examples" / "experiments" / "synthesizer-scaling-e2b.json"
+MIXED = ROOT / "examples" / "experiments" / "synthesizer-mixed-scaling.json"
 ASSIGNMENTS = SUITE / "configs" / "mixed-scaling-20260922.tasks.json"
 ROLES = MIXED
 NS = (1, 4, 8, 16, 32)
@@ -81,10 +81,10 @@ def validate_roles() -> list[str]:
     config = load(ROLES)
     roles = config.get("roles") or {}
     errors = []
-    for name in ("harness", "user_simulator", "triager", "designer", "developer", "owner"):
+    for name in ("harness", "user_simulator", "triager", "synthesizer", "developer", "owner"):
         if name not in roles:
             errors.append(f"角色配置缺失：{name}")
-    for name in ("harness", "user_simulator", "triager", "designer", "developer", "pm"):
+    for name in ("harness", "user_simulator", "triager", "synthesizer", "developer", "pm"):
         role = roles.get(name) or {}
         for field in ("provider", "model", "protocol"):
             if not role.get(field):
@@ -126,7 +126,7 @@ def gate(rows: list[dict]) -> list[str]:
                 "user",
                 "task_parallel",
                 "triager",
-                "designer",
+                "synthesizer",
                 "developer",
                 "owner",
                 "pm",
@@ -213,16 +213,18 @@ def run_one(row: dict, command: list[str], resume: bool) -> dict:
         text=True,
         env={
             **os.environ,
+            "HSE_SCALING_CONFIG": str(CONFIG),
+            "HSE_MIXED_CONFIG": str(MIXED),
             "HSE_SCALING_N": str(n),
             "HSE_SCALING_EXPERIMENT_ID": row["experiment_id"],
             "HSE_SCALING_ACTION": "resume" if resume else "fresh",
             "N_USERS": str(profile["user"]),
             "N_TRIAGERS": str(profile["triager"]),
-            "N_DESIGNERS": str(profile["designer"]),
+            "N_SYNTHESIZERS": str(profile["synthesizer"]),
             "N_DIVERGENTS": str(profile["pm"]),
             "N_OWNERS": str(profile["owner"]),
             "N_DEVELOPERS": str(profile["developer"]),
-            "DESIGNER_GROUPING": "1",
+            "SYNTHESIZER_GROUPING": "1",
         },
     )
     stdout, _ = process.communicate()
@@ -238,7 +240,13 @@ def run_one(row: dict, command: list[str], resume: bool) -> dict:
 
 
 def main() -> int:
+    global CONFIG, MIXED, ROLES
+
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=Path, default=os.environ.get("HSE_SCALING_CONFIG", CONFIG))
+    parser.add_argument(
+        "--mixed-config", type=Path, default=os.environ.get("HSE_MIXED_CONFIG", MIXED)
+    )
     parser.add_argument("--n", default="all", help="comma-separated N values or all")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--check-launch", action="store_true")
@@ -248,6 +256,9 @@ def main() -> int:
         "--executor", help="trusted bundle command, supports {n} and {experiment_id}"
     )
     args = parser.parse_args()
+    CONFIG = Path(args.config).expanduser().resolve()
+    MIXED = Path(args.mixed_config).expanduser().resolve()
+    ROLES = MIXED
     if args.start and args.resume:
         parser.error("--start 与 --resume 不能同时使用")
     try:

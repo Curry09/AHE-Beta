@@ -80,7 +80,7 @@ tasks:
 
 正式 scaling 使用 E2B + Boyue。N=1、4、8、16、32 是五个互相隔离的实验单元：每个单元
 拥有自己的 controller、sandbox、Gitea repository、run ID 和 recovery identity，运行五轮。
-物理 sandbox 直接按开发阶段峰值资源创建；用户、triage、designer/PM 和 developer 是
+物理 sandbox 直接按开发阶段峰值资源创建；用户、triage、synthesizer/PM 和 developer 是
 逻辑阶段，不在阶段之间调整 sandbox 规格。
 
 任务 assignment 在执行前冻结。agent payload 与 grader payload 分离，receipt 绑定配置、
@@ -91,10 +91,10 @@ launch gate 在任何凭证、网络或付费资源调用前检查这些约束�
 
 `simulated_user` 沿用已有 persona、heartbeat、workspace/check 访问和多轮终止规则；不再
 注入固定追问。`direct` 只有一条初始 harness 输入，等待 terminal result，再由用户模型做
-一次有界的终端 review；它没有 heartbeat 或中途 follow-up，但仍进入同一 triage → designer/PM
+一次有界的终端 review；它没有 heartbeat 或中途 follow-up，但仍进入同一 triage → synthesizer/PM
 → developer → grader 管线。
 
-每轮按 interaction、triage、designer/PM、developer、grader 的阶段顺序执行，在下一轮之前
+每轮按 interaction、triage、synthesizer/PM、developer、grader 的阶段顺序执行，在下一轮之前
 写入原子 checkpoint。最后一轮是否 users-only 由配置决定。断连时 resume 只能连接 receipt
 记录的 sandbox/repository/identity，不创建替代资源，也不重放已完成 session 或 delivery。
 

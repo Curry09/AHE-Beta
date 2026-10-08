@@ -1,7 +1,7 @@
 import time
 import unittest
 
-from auto_designer.designer.agent_runtime import AgentTimeout, run_with_timeout
+from auto_designer.demand.agent_runtime import AgentTimeout, run_with_timeout
 from auto_designer.usage import bind_time_accounting, provider_wait_scope
 
 

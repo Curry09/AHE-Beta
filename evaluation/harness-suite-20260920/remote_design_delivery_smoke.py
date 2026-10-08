@@ -7,9 +7,9 @@ from pathlib import Path
 
 sys.path.insert(0, "/opt/auto-designer/backend")
 
-from auto_designer.designer.designer import Designer
-from auto_designer.designer.issue_schema import FROM_TRIAGE, OPENAGENTS, PROPOSAL
-from auto_designer.designer.owner import Owner
+from auto_designer.demand.issue_schema import FROM_TRIAGE, OPENAGENTS, PROPOSAL
+from auto_designer.demand.owner import Owner
+from auto_designer.demand.synthesizer import Synthesizer
 from auto_designer.models import IssueDraft
 from auto_designer.tracker.fake import FakeTracker
 from auto_designer.usage import bind_usage_context
@@ -33,15 +33,15 @@ def main() -> int:
         )
     )
 
-    designer = Designer(
+    synthesizer = Synthesizer(
         tracker,
         store,
         str(repo),
-        "/opt/auto-designer/backend/agent_defs/designer",
+        "/opt/auto-designer/backend/agent_defs/synthesizer",
         round_provider=lambda: 1,
     )
-    with bind_usage_context(run_id="daytona-design-delivery-smoke", role="designer", round_no=1):
-        design = designer.propose_once()
+    with bind_usage_context(run_id="daytona-design-delivery-smoke", role="synthesizer", round_no=1):
+        design = synthesizer.propose_once()
 
     # This is deliberately the historical zero-LLM Owner mode.  Do not replace
     # it with Owner's model review path for this smoke test.
@@ -65,7 +65,7 @@ def main() -> int:
         "note": "This is the developer-plane handoff preflight; no Claude/OpenAgents worker was started.",
     }
     payload = {
-        "designer_model": os.environ.get("DESIGNER_LLM_MODEL", ""),
+        "synthesizer_model": os.environ.get("DEMAND_LLM_MODEL", ""),
         "owner_mode": "mechanical_review_false",
         "owner_model_used": False,
         "source_issue": source.number,

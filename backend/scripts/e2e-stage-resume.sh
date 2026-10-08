@@ -11,9 +11,9 @@ PYTHONPATH=backend .venv/bin/python -m pytest -q \
   backend/tests/loop/test_round_gate.py \
   backend/tests/loop/test_sim_user.py \
   backend/tests/user/test_session_store.py \
-  backend/tests/designer/test_triage.py \
-  backend/tests/designer/test_divergent_gate.py \
-  backend/tests/loop/test_designer.py \
-  backend/tests/designer/test_grouped_designer.py \
-  backend/tests/designer/test_owner.py \
-  backend/tests/designer/test_delivery_evidence.py
+  backend/tests/demand/test_triage.py \
+  backend/tests/demand/test_divergent_gate.py \
+  backend/tests/loop/test_synthesizer.py \
+  backend/tests/demand/test_grouped_synthesizer.py \
+  backend/tests/demand/test_owner.py \
+  backend/tests/demand/test_delivery_evidence.py

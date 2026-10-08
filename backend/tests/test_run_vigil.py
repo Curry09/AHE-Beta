@@ -29,17 +29,17 @@ def _load_yaml(path: Path):
 
 
 def test_repository_env_only_supplies_missing_process_values(monkeypatch) -> None:
-    monkeypatch.setenv("DESIGNER_LLM_MODEL", "explicit-model")
+    monkeypatch.setenv("DEMAND_LLM_MODEL", "explicit-model")
     monkeypatch.delenv("USER_LLM_MODEL", raising=False)
 
     run._apply_env_defaults(
         {
-            "DESIGNER_LLM_MODEL": "repository-model",
+            "DEMAND_LLM_MODEL": "repository-model",
             "USER_LLM_MODEL": "repository-user-model",
         }
     )
 
-    assert run.os.environ["DESIGNER_LLM_MODEL"] == "explicit-model"
+    assert run.os.environ["DEMAND_LLM_MODEL"] == "explicit-model"
     assert run.os.environ["USER_LLM_MODEL"] == "repository-user-model"
 
 

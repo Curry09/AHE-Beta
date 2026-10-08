@@ -5,7 +5,7 @@
 | 角色 | 入口 | 说明 |
 | --- | --- | --- |
 | 模拟用户 | `USER_LLM_MODEL/API_KEY/BASE_URL` | 用户侧模型；环境变量完整名称由前缀与斜杠后的字段组合 |
-| 需求生成 | `DESIGNER_LLM_MODEL/API_KEY/BASE_URL` | 设计侧角色的模型配置 |
+| 需求生成 | `DEMAND_LLM_MODEL/API_KEY/BASE_URL` | Triage、Synthesizer、PM、Owner 共用模型配置；可用 `DEMAND_LLM_REASONING_EFFORT` 设置已有推理强度选项 |
 | 被试 Harness | `HARNESS_LLM_MODEL/API_KEY/BASE_URL` | launcher 转为 Harness 使用的 `LLM_*` |
 | Claude Code 交付 | `ANTHROPIC_*` 或 `CLAUDE_CODE_OAUTH_TOKEN` | 独立 CLI 凭证，按入口选择；并非 `DEV_LLM_*` |
 | OpenAgents NexAU 交付 | `OPENAGENTS_NEXAU_MODEL/BASE_URL/API_KEY` | 选用 `backend: nexau` 时，使用 Anthropic-compatible Messages 端点 |
@@ -13,6 +13,21 @@
 `backend/.env.example` 对应旧 `backend/run.py` 的本地模型配置。可审计 launcher 则从 `$EXPERIMENTS_ROOT/.profiles/<models.profile>.env` 加载 profile；示例见 `examples/models.env.example`，文件权限设为 0600。两种入口的配置不要混用。profile 的模型名来自冻结实验 JSON，不能靠修改 shell 环境绕过 source/model pin。
 
 `.env`、`.env.*`（示例除外）、`.e2b`、`.boyue`、`.profiles/` 和默认实验输出已被忽略；这只能阻止新文件误入版本控制，不能清理已提交的历史内容。
+
+## Synthesizer 配置
+
+共享需求角色代码位于 `backend/auto_designer/demand/`，结构综合角色定义位于 `backend/agent_defs/synthesizer/`。主入口、回放脚本、看板和恢复键统一使用 `synthesizer`，对应事件为 `synthesizer_run`。
+
+| 设置 | 当前名称 |
+| --- | --- |
+| 结构综合实例数 | `N_SYNTHESIZERS` |
+| 前置分组开关 | `SYNTHESIZER_GROUPING` |
+| 实验编制 / 模型 | `roster.synthesizer` / `models.synthesizer` |
+| 审计实验分组开关 | `execution.synthesizer_grouping` |
+
+开发配置使用以上名称。`examples/experiments/synthesizer-*.json` 提供配置样例，实际运行前填写本次实验的源码和资产 pin。冻结历史材料保持原样，开发者按需要手动准备输入；原有配置结构、身份和摘要校验保持不变。
+
+项目名 `auto-designer`、顶层包 `auto_designer`、项目变量 `AUTO_DESIGNER_*` 和既有 Gitea 仓库账号不随角色改名。分组行为见[分组综合](synthesizer-grouping.md)。
 
 ## 默认交付配置
 

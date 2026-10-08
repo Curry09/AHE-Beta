@@ -280,7 +280,7 @@ issue 与 rating 是会话末专属任务。如果它们出现在 base system，
 - 0022：定义用户与 harness 的内外窗口、等待菜单与开放 intent，强调 message 是内通道、interrupt 是外通道。
 - 0023：把主 loop 与心跳 loop 钉成 judge → intent → act 三跳，为本组的阶段 contract 下沉提供结构基础。
 - 0024：Session.sim_trace 与设计师取证投影，强调用户可见 transcript 与 god-view trace 分离。
-- 0027：triage/designer 通过 submit-tool 统一结构化输出，说明结构化 contract 可以按角色/阶段局部化，而不必全局注入。
+- 0027：triage/synthesizer 通过 submit-tool 统一结构化输出，说明结构化 contract 可以按角色/阶段局部化，而不必全局注入。
 - 0030：harness 产品化边界，要求平台概念不进入 harness；本组把同样边界原则用于用户模拟 prompt。
 
 ## Unresolved questions

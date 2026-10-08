@@ -107,7 +107,7 @@ tasks:
       - OpenAgents/scripts/live-experiment-runtime-certification.sh
       - OpenAgents/scripts/live_experiment_runtime_certification.py
       - OpenAgents/tests/test_experiment_runtime_certification.py
-    scope: OpenAgents 在其仓另立对应 Spec，提供真实 GLM 角色协议、真实 Git 修改和隔离 Gitea issue→PR→merge canary，产出 certification.json；Auto Designer 强制消费认证，并以两套并行实验完成最终验收。
+    scope: OpenAgents 在其仓另立对应 Spec，提供真实 GLM 角色协议、真实 Git 修改和隔离 Gitea issue→PR→merge canary，产出 certification.json；Auto Synthesizer 强制消费认证，并以两套并行实验完成最终验收。
     acceptance: 精确 OpenAgents SHA/镜像 digest/模型 profile 的角色协议 canary 连续 3 次通过，最小真实交付连续 2 次无人介入完成；两套实验同时运行时仓库、状态、日志和停止操作零串扰；未认证或认证漂移的镜像不得启动正式实验；e2e、pytest、Ruff 和脱敏证据通过。
 ---
 
@@ -153,19 +153,19 @@ worktree 和门禁代码在 mock backend 下成立，却不能证明指定 GLM �
 
 ## Guide-level explanation
 
-操作者为一条谱系创建配置，例如：
+操作者为一条新谱系创建配置，例如（源码与资产 pin 必须填入本次验证的实际值）：
 
 ```yaml
 schema_version: 1
 experiment_id: glm-evolution-e0
 mode: full-evolution
 source:
-  auto_designer_sha: 37d1e44bd12c41b1ac76b9f5a7b8104e0869fdd4
-  openagents_sha: 147d263ba2283405d200fed88144d6fea45be530
-  nexau_sha: 09e747b59e3684d5541d557087d6d93790c5a43f
+  auto_designer_sha: <verified-controller-sha>
+  openagents_sha: <verified-openagents-sha>
+  nexau_sha: <verified-nexau-sha>
   harness:
     kind: git
-    revision: e8affd35ab2bf13203c1fbad6346112a549001dc
+    revision: <verified-harness-sha>
 images:
   vigil: sha256:<immutable-digest>
   seed: sha256:<immutable-digest>
@@ -173,7 +173,7 @@ models:
   profile: glm-5.2-fp8-local
   user: glm-5-2-fp8-wangyiding-mlcoding
   harness: glm-5-2-fp8-wangyiding-mlcoding
-  designer: glm-5-2-fp8-wangyiding-mlcoding
+  synthesizer: glm-5-2-fp8-wangyiding-mlcoding
   delivery: glm-5-2-fp8-wangyiding-mlcoding
 capacity:
   endpoint: glm-local
@@ -214,7 +214,7 @@ Compose project、容器、网络、卷、端口策略、模型容量和认证�
 | 资源 | 并行实验策略 |
 |---|---|
 | 实验根、session、telemetry、checkpoint | 每实验独立目录 |
-| Auto Designer/OpenAgents/NexAU | 精确 SHA 的只读 worktree 或镜像 |
+| Auto Synthesizer/OpenAgents/NexAU | 精确 SHA 的只读 worktree 或镜像 |
 | Harness 仓与每题 workspace | 每实验、每题独立 |
 | Gitea 数据、用户、token、repo | 每实验独立实例与 volume |
 | Runner 数据与 job 容器 | 每实验独立 Runner 和网络 |

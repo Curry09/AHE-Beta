@@ -42,7 +42,7 @@ def main() -> None:
     from openagents.runtime import engine
     from openagents.utils import forge
 
-    from auto_designer.designer.owner import Owner
+    from auto_designer.demand.owner import Owner
     from auto_designer.harness.launcher import HarnessLauncher
     from auto_designer.observations.delivery_gaps import ingest_delivery_gaps
     from auto_designer.observations.gaps import GapService

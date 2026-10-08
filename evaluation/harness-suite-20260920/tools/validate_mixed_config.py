@@ -63,7 +63,7 @@ def _check(config_path: Path, check_launch: bool) -> int:
         if mode not in {"direct", "simulated_user"}:
             errors.append(f"{task['task_key']}: unsupported interaction {mode!r}")
 
-    persona_path = config_path.parent / "../../../backend/persona_library.json"
+    persona_path = Path(__file__).resolve().parents[3] / "backend/persona_library.json"
     persona_ids = {entry["id"] for entry in _read_json(persona_path)}
     missing_personas = sorted(
         {task["persona_id"] for task in tasks if task["persona_id"]} - persona_ids
@@ -98,7 +98,7 @@ def _check(config_path: Path, check_launch: bool) -> int:
         if not set(scaling.get(left, [])).issubset(set(scaling.get(right, []))):
             errors.append(f"scaling sets are not nested: {left} is not a subset of {right}")
 
-    manifest_path = config_path.parent / "../mechanism-seeds/manifest.json"
+    manifest_path = Path(__file__).resolve().parents[1] / "mechanism-seeds/manifest.json"
     manifest = _read_json(manifest_path)
     manifest_ids = {entry["id"] for section in ("historical", "new") for entry in manifest[section]}
     assigned_mechanisms = {task["task_key"] for task in mechanism}
@@ -153,7 +153,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--config",
-        default="evaluation/harness-suite-20260920/configs/mixed-scaling-20260922.json",
+        default="examples/experiments/synthesizer-mixed-scaling.json",
         help="path to the mixed scaling config",
     )
     parser.add_argument(

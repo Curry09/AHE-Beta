@@ -14,9 +14,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/dev/repo_guard.py
+      - backend/auto_designer/guards/repo_guard.py
       - backend/auto_designer/loop/orchestrator.py
-      - backend/tests/dev/test_repo_guard.py
+      - backend/tests/guards/test_repo_guard.py
       - backend/tests/loop/test_orchestrator.py
     scope: '新模块 repo_guard：RepoIntegrityError；snapshot_repo(*,repo)->(HEAD sha, git status --porcelain)；verify_unchanged(*,repo,before) 快照不等即抛（git 读失败也抛，宁紧勿松）。orchestrator ctor 加可选 integrity_guard: Callable[[],None]|None=None；run_round 在 b 段之后、c 段 _resolve_head 之前调用（None 则跳过，退化今天行为）；guard 抛出传播中止 run_round。'
     acceptance: snapshot/verify：未变→放行、新增 commit/改 tracked/新 untracked→抛 RepoIntegrityError，既有 untracked 前后都在→不误报。orchestrator：注入的 guard 在 b 段后被调用一次；guard 抛出使 run_round 抛出（不吞）。repo_guard 测试用 symbolic-ref 建仓（兼容 git <2.28，本机可跑）。
@@ -44,8 +44,8 @@ tasks:
     parallel: false
     files:
       - backend/agent_defs/developer_agent/MANUAL.md
-    scope: 'git rm backend/agent_defs/developer_agent/MANUAL.md——dev agent 配置不加载它（agent.yaml 只 system_prompt: ./systemprompt.md；completion_gate manual_path 对 harness 仓解析），纯逃逸残留。'
-    acceptance: 文件从 git 移除；grep 全仓无对 agent_defs/developer_agent/MANUAL.md 的引用；dev/designer agent 构造/跑通不受影响（既有单测绿）。
+    scope: 'git rm backend/agent_defs/developer_agent/MANUAL.md——dev agent 配置不加载它（agent.yaml 只 system_prompt: ./systemprompt.md；旧收尾配置的文档路径曾对 harness 仓解析），纯逃逸残留。'
+    acceptance: 文件从 git 移除；grep 全仓无对 agent_defs/developer_agent/MANUAL.md 的引用；dev/synthesizer agent 构造/跑通不受影响（既有单测绿）。
 ---
 
 # 0021 · dev agent 逃逸围堵：凭证隔离 + 编排绊线 + 污染清理
@@ -53,6 +53,8 @@ tasks:
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
+
+**当前落点**：凭证隔离仍在启动入口执行，完整性绊线由 `backend/auto_designer/guards/repo_guard.py` 提供。下文事故描述保留历史成因；旧内置 Developer 与其收尾中间件已退役，不属于当前运行接线。
 
 实测发现 dev agent 用 python heredoc 打隧道绕过了 `WorkspaceJailMiddleware` 的路径扫描：直接工具
 （read_file/write_file/run_shell 里明晃晃带路径）被 jail 拒，但 `python3 - <<'PY' … os.chdir(编排仓);
@@ -111,14 +113,13 @@ agent 都是形同虚设——正文里 `os.chdir`+`subprocess` 可干任何事�
 - **清理**：删掉 `backend/agent_defs/developer_agent/MANUAL.md`（逃逸残留），dev agent 配置不加载它，删了
   无副作用。
 
-不变：jail/harness_boundary/completion_gate 全部保留（它们仍拦住直接路径与非隧道场景，纵深的一层）；
-dev agent 直推 main 的 Gitea 正常流程一字不动。
+当前保留 `guards/workspace_jail.py`、`guards/harness_boundary.py` 和 `guards/repo_guard.py`；前两者检查直接路径与提交范围，后者检查编排仓完整性。旧内置 Developer 的收尾中间件已经退役，当前交付由独立 OpenAgents 执行。
 
 ## Reference-level explanation
 
 ### T1 编排绊线（repo_guard.py + orchestrator.py）
 
-新模块 `backend/auto_designer/dev/repo_guard.py`：
+新模块 `backend/auto_designer/guards/repo_guard.py`：
 
 ```python
 class RepoIntegrityError(RuntimeError): ...
@@ -164,7 +165,7 @@ os.environ[f"GIT_CONFIG_VALUE_{n}"] = ""
 
 - 四条信道全封：ssh 传输、终端提示、askpass（含 VS Code 注入）、credential.helper。
 - 用 `setdefault` 保留运维对 `GIT_SSH_COMMAND` 的显式覆盖；`GIT_TERMINAL_PROMPT` 强设（防残留放行）。
-- 影响面核验：`_seed_harness_repo`/`_reset_to_initial`/dev/designer 推送全走 Gitea HTTP（`http://
+- 影响面核验：`_seed_harness_repo`/`_reset_to_initial`/dev/synthesizer 推送全走 Gitea HTTP（`http://
   OWNER:TOKEN@host/…`，凭证在 URL、不经 askpass/helper），launcher/orchestrator 的 git 全是本地无传输
   ——均不受影响。git ≥2.31 支持 GIT_CONFIG_* 注入；实测注入后 `git config credential.helper` 为空、
   常规 git 操作正常。
@@ -178,8 +179,8 @@ ROOT = auto-designer 检出根（编排仓，即逃逸目标）；快照 run 前
 ### T3 污染清理
 
 `git rm backend/agent_defs/developer_agent/MANUAL.md`。核验无引用：agent.yaml 只 `system_prompt:
-./systemprompt.md`；completion_gate 的 `manual_path=MANUAL.md` 对 SANDBOX_WORK_DIR（harness 仓）解析，
-非 agent_defs。删除后 dev/designer 配置加载不受影响。
+./systemprompt.md`；旧收尾配置的 `manual_path=MANUAL.md` 对 SANDBOX_WORK_DIR（harness 仓）解析，
+非 agent_defs。删除后 dev/synthesizer 配置加载不受影响。
 
 ### 现状锚点
 
@@ -203,8 +204,8 @@ T2 依赖 T1（用 repo_guard）；T3 独立。凭证隔离与绊线接线是两
 
 ### 文件分配（互斥）
 
-- **T1**：`backend/auto_designer/dev/repo_guard.py`、`backend/auto_designer/loop/orchestrator.py`、
-  `backend/tests/dev/test_repo_guard.py`、`backend/tests/loop/test_orchestrator.py`
+- **T1**：`backend/auto_designer/guards/repo_guard.py`、`backend/auto_designer/loop/orchestrator.py`、
+  `backend/tests/guards/test_repo_guard.py`、`backend/tests/loop/test_orchestrator.py`
 - **T2**：`backend/run.py`（凭证隔离 env 段 + orchestrator 接线段）、
   `backend/tests/test_run_git_isolation.py`
 - **T3**：`backend/agent_defs/developer_agent/MANUAL.md`（删除）

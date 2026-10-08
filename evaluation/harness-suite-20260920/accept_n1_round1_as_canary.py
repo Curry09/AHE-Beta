@@ -41,7 +41,7 @@ def main() -> int:
         "round_started",
         "users",
         "triage",
-        "designer",
+        "synthesizer",
         "divergent",
         "owner",
         "delivery_wait",

@@ -50,12 +50,12 @@ from auto_designer.experiment.manifest import (  # noqa: E402
 )
 from auto_designer.loop.recovery import RecoveryError, RecoveryIdentity, RecoveryStore  # noqa: E402
 
-_REQUIRED_ROSTER = {"user", "triager", "designer", "divergent", "owner", "developer"}
+_REQUIRED_ROSTER = {"user", "triager", "synthesizer", "divergent", "owner", "developer"}
 _PROFILE_KEYS = {
     "USER_LLM_BASE_URL",
     "USER_LLM_API_KEY",
-    "DESIGNER_LLM_BASE_URL",
-    "DESIGNER_LLM_API_KEY",
+    "DEMAND_LLM_BASE_URL",
+    "DEMAND_LLM_API_KEY",
     "HARNESS_LLM_BASE_URL",
     "HARNESS_LLM_API_KEY",
     "ANTHROPIC_BASE_URL",
@@ -161,8 +161,8 @@ class FrozenExperiment:
         execution = self.raw.get("execution")
         if not isinstance(execution, dict) or execution.get("runner") != "swebench-closed-loop":
             raise AuditLaunchError("execution.runner 必须为 swebench-closed-loop")
-        if type(execution.get("designer_grouping", False)) is not bool:
-            raise AuditLaunchError("execution.designer_grouping 必须为 boolean")
+        if type(execution.get("synthesizer_grouping", False)) is not bool:
+            raise AuditLaunchError("execution.synthesizer_grouping 必须为 boolean")
         rounds = int(execution.get("total_rounds") or 0)
         if self.config.mode == "full-evolution":
             if rounds < 2 or not execution.get("final_round_users_only"):
@@ -182,7 +182,7 @@ class FrozenExperiment:
             raise AuditLaunchError("full-evolution 的 owner 必须为 1")
         if self.config.mode == "user-only" and any(
             normalized[role] != 0
-            for role in ("triager", "designer", "divergent", "owner", "developer")
+            for role in ("triager", "synthesizer", "divergent", "owner", "developer")
         ):
             raise AuditLaunchError("user-only canary 除 user 外的 roster 必须全为 0")
         capacity = self.config.capacity
@@ -216,7 +216,7 @@ class FrozenExperiment:
             rounds=rounds,
         )
 
-        for role in ("user", "harness", "triage", "designer", "divergent", "owner", "delivery"):
+        for role in ("user", "harness", "triage", "synthesizer", "divergent", "owner", "delivery"):
             if not str(self.config.models.get(role) or ""):
                 raise AuditLaunchError(f"models.{role} 缺失")
         for role in ("gitea", "runner", "egress", "vigil", "seed"):
@@ -630,15 +630,15 @@ def _execution_environment(
             "TOTAL_ROUNDS": str(execution["total_rounds"]),
             "N_USERS": str(roster["user"]),
             "N_TRIAGERS": str(roster["triager"]),
-            "N_DESIGNERS": str(roster["designer"]),
-            "DESIGNER_GROUPING": "1" if execution.get("designer_grouping", False) else "0",
+            "N_SYNTHESIZERS": str(roster["synthesizer"]),
+            "SYNTHESIZER_GROUPING": "1" if execution.get("synthesizer_grouping", False) else "0",
             "N_DIVERGENTS": str(roster["divergent"]),
             "N_OWNERS": str(roster["owner"]),
             "N_DEVELOPERS": str(roster["developer"]),
             "MAX_PARALLEL_USERS": str(spec.config.capacity["user_parallel"]),
             "USER_LLM_MODEL": str(models["user"]),
             "HARNESS_LLM_MODEL": str(models["harness"]),
-            "DESIGNER_LLM_MODEL": str(models["designer"]),
+            "DEMAND_LLM_MODEL": str(models["synthesizer"]),
             "ANTHROPIC_MODEL": str(models["delivery"]),
             "ANTHROPIC_SMALL_FAST_MODEL": str(models["delivery"]),
             "CLAUDE_CODE_SUBAGENT_MODEL": str(models["delivery"]),

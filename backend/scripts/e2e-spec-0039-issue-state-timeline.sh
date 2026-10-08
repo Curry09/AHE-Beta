@@ -7,7 +7,7 @@ cd "$repo_root"
 .venv/bin/pytest -q \
   backend/tests/tracker/test_gitea_timeline.py \
   backend/tests/web/test_api.py \
-  backend/tests/loop/test_designer.py
+  backend/tests/loop/test_synthesizer.py
 
 npm --prefix frontend test -- --run src/components/detail/issueTimelineModel.test.ts
 npm --prefix frontend run build

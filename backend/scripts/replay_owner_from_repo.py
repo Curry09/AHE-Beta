@@ -54,15 +54,15 @@ def main() -> int:
             key, value = raw.split("=", 1)
             wis[key.strip()] = value.strip().strip('"').strip("'")
     os.environ.update(
-        DESIGNER_LLM_MODEL=args.model,
-        DESIGNER_LLM_BASE_URL=wis["wis_base_url"],
-        DESIGNER_LLM_API_KEY=wis["wis_api_key"],
+        DEMAND_LLM_MODEL=args.model,
+        DEMAND_LLM_BASE_URL=wis["wis_base_url"],
+        DEMAND_LLM_API_KEY=wis["wis_api_key"],
         NO_PROXY="localhost,127.0.0.1",
         no_proxy="localhost,127.0.0.1",
     )
     run_mod._isolate_git_credentials()
 
-    from auto_designer.designer.issue_schema import (  # noqa: PLC0415
+    from auto_designer.demand.issue_schema import (  # noqa: PLC0415
         DECLINED,
         MERGED,
         OPENAGENTS,
@@ -70,7 +70,7 @@ def main() -> int:
         READY,
         plane,
     )
-    from auto_designer.designer.owner import Owner  # noqa: PLC0415
+    from auto_designer.demand.owner import Owner  # noqa: PLC0415
     from auto_designer.models import IssueDraft  # noqa: PLC0415
     from auto_designer.tracker.gitea import GiteaTracker  # noqa: PLC0415
     from auto_designer.user.session_store import SessionStore  # noqa: PLC0415

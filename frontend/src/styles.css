@@ -1,7 +1,7 @@
 /* ============================================================================
  * 设计 token 层（Spec-0026/T2）：浅色为基准（:root），深色经 prefers-color-scheme
  * 与 [data-theme] 覆盖。组件一律走 token，不写死 hex。四角色强调色对齐闭环
- * a → d1(triage) → d2(synthesize) → b：user 青 · triager 翠 · designer 紫 · developer 琥珀。
+ * a → d1(triage) → d2(synthesize) → b：user 青 · triager 翠 · synthesizer 紫 · developer 琥珀。
  * ========================================================================== */
 :root {
   /* —— 中性表面/文字（浅色基准）—— */
@@ -25,7 +25,7 @@
   /* —— 四角色强调色 —— */
   --role-user: #0e8fb0;
   --role-triager: #0f9068;
-  --role-designer: #6d51cf;
+  --role-synthesizer: #6d51cf;
   --role-divergent: #bd3d8b;
   --role-developer: #b0770c;
 
@@ -70,7 +70,7 @@
     --sky: #7dd3fc;
     --role-user: #56cfe8;
     --role-triager: #46d3a4;
-    --role-designer: #baa7fd;
+    --role-synthesizer: #baa7fd;
     --role-divergent: #f0abfc;
     --role-developer: #fbce5b;
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -96,7 +96,7 @@
   --sky: #2f74d0;
   --role-user: #0e8fb0;
   --role-triager: #0f9068;
-  --role-designer: #6d51cf;
+  --role-synthesizer: #6d51cf;
   --role-divergent: #bd3d8b;
   --role-developer: #b0770c;
   --shadow-1: 0 1px 2px rgba(24, 39, 65, 0.06);
@@ -120,7 +120,7 @@
   --sky: #7dd3fc;
   --role-user: #56cfe8;
   --role-triager: #46d3a4;
-  --role-designer: #baa7fd;
+  --role-synthesizer: #baa7fd;
   --role-developer: #fbce5b;
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -283,7 +283,7 @@ a:focus-visible,
 
 .role-dot.user { background: var(--role-user); }
 .role-dot.triager { background: var(--role-triager); }
-.role-dot.designer { background: var(--role-designer); }
+.role-dot.synthesizer { background: var(--role-synthesizer); }
 .role-dot.divergent { background: var(--role-divergent); }
 .role-dot.owner { background: var(--amber); }
 .role-dot.developer { background: var(--role-developer); }
@@ -483,7 +483,7 @@ a:focus-visible,
 /* 卡片左缘按角色着色（强调色成套）。 */
 .card.role-user { border-left-color: var(--role-user); }
 .card.role-triager { border-left-color: var(--role-triager); }
-.card.role-designer { border-left-color: var(--role-designer); }
+.card.role-synthesizer { border-left-color: var(--role-synthesizer); }
 .card.role-divergent { border-left-color: var(--role-divergent); }
 .card.role-owner { border-left-color: var(--amber); }
 .card.role-developer { border-left-color: var(--role-developer); }
@@ -998,7 +998,7 @@ a:focus-visible,
 
 .tower-floor.role-user { --floor-role-color: var(--role-user); }
 .tower-floor.role-triager { --floor-role-color: var(--role-triager); }
-.tower-floor.role-designer { --floor-role-color: var(--role-designer); }
+.tower-floor.role-synthesizer { --floor-role-color: var(--role-synthesizer); }
 .tower-floor.role-divergent { --floor-role-color: var(--role-divergent); }
 .tower-floor.role-owner { --floor-role-color: var(--amber); }
 .tower-floor.role-developer { --floor-role-color: var(--role-developer); }
@@ -1108,9 +1108,9 @@ a:focus-visible,
   --floor-role-color: var(--role-triager);
   --workspace-pattern: repeating-linear-gradient(180deg, color-mix(in srgb, var(--role-triager) 8%, transparent) 0 1px, transparent 1px 28px);
 }
-.floor-workspace.role-designer {
-  --floor-role-color: var(--role-designer);
-  --workspace-pattern: linear-gradient(45deg, color-mix(in srgb, var(--role-designer) 7%, transparent) 25%, transparent 25% 75%, color-mix(in srgb, var(--role-designer) 7%, transparent) 75%);
+.floor-workspace.role-synthesizer {
+  --floor-role-color: var(--role-synthesizer);
+  --workspace-pattern: linear-gradient(45deg, color-mix(in srgb, var(--role-synthesizer) 7%, transparent) 25%, transparent 25% 75%, color-mix(in srgb, var(--role-synthesizer) 7%, transparent) 75%);
 }
 .floor-workspace.role-divergent {
   --floor-role-color: var(--role-divergent);
@@ -2052,7 +2052,7 @@ a:focus-visible,
 
 .prose.preview:hover { color: var(--text); }
 
-/* ---- 过程流（dev/designer 的完整工作过程）：签名元素 ---- */
+/* ---- 过程流（dev/synthesizer 的完整工作过程）：签名元素 ---- */
 .stream {
   display: flex;
   flex-direction: column;
@@ -2080,7 +2080,7 @@ a:focus-visible,
 
 .ev.assistant {
   background: var(--surface-2);
-  border-left: 2px solid var(--role-designer);
+  border-left: 2px solid var(--role-synthesizer);
   border-radius: 0 var(--radius) var(--radius) 0;
   padding: 8px 11px;
   white-space: pre-wrap;

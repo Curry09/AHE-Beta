@@ -17,7 +17,7 @@ JSONL 的进程内追加由锁保护，解析时跳过意外损坏的行。所�
 | 角色/链路 | 状态 | 来源 |
 | --- | --- | --- |
 | user persona | reported（精确） | OpenAI-compatible `ChatCompletion.usage` |
-| triager/designer/divergent/owner | reported（上游提供时精确） | NexAU LLM tracer 完整响应中的 `usage` / `usageMetadata` |
+| triager/synthesizer/divergent/owner | reported（上游提供时精确） | NexAU LLM tracer 完整响应中的 `usage` / `usageMetadata` |
 | harness | reported（上游提供时精确） | harness NexAU tracer 经专用 stdout usage 旁路回传，宿主补 session/instance 归属 |
 | developer/vigil | unavailable | vigil 在独立容器内经 OpenAgents/Claude 调用；宿主目前只有文本日志，没有逐调用结构化 usage 或归属协议 |
 

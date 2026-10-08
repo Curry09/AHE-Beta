@@ -52,7 +52,7 @@ tasks:
     scope: 新增 /help slash：读取 HELP.md、返回帮助文本且不结束会话；/exit 和 /quit 仍结束会话；清理 entry.py / agents/main.md 平台词；模板自测覆盖 HELP 存在、/help 行为、scripts shebang、禁入平台词。
     acceptance: 在 backend/harness_template 根下运行 python3 -m unittest discover -s tests -p 'test_*.py' 通过；/help 返回 HELP.md 内容且会话继续；/exit|/quit 仍退出；默认自测不依赖真实 LLM 网络。
   - id: T4
-    title: 边界白名单改为产品区域而非历史文件名
+    title: 产品提交边界：拒绝密钥与运行态
     status: done
     priority: P1
     tags: []
@@ -61,33 +61,17 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/dev/harness_boundary.py
-      - backend/tests/dev/test_harness_boundary.py
-    scope: harness boundary 允许 HELP.md/RUNTIME.md/.env.example/requirements.txt/entry.py/params.yaml/agent.yaml/agents/tools/scripts/tests/.gitignore；拒绝 README.md/USER.md/MANUAL.md/INTERFACE.md、.env、pyproject.toml、package.json、src 和未知任务项目目录。
-    acceptance: HELP/RUNTIME/scripts/tests/tools/agents 可提交；README/USER/MANUAL/INTERFACE/.env/pyproject.toml/package.json/src/任务目录被拒；错误文案同步新边界。
-  - id: T5
-    title: 平台读取 HELP.md 与收尾闸门同步
-    status: done
-    priority: P1
-    tags: []
-    depends-on:
-      - T2
-    relates-to: []
-    parallel: false
-    files:
-      - backend/auto_designer/dev/completion_gate.py
-      - backend/tests/dev/test_completion_gate.py
-      - backend/agent_defs/developer_agent/systemprompt.md
-      - backend/agent_defs/developer_agent/agent.yaml
-    scope: launcher 暴露的用户说明只读 HELP.md（缺失为空）；completion gate 的用户可见文档默认盯 HELP.md；developer prompt 明确 HELP/RUNTIME 职责，并禁止在 harness 模板中恢复 README/USER/MANUAL/INTERFACE。
-    acceptance: launcher 测试覆盖 HELP.md 读取与缺失为空；completion gate 测试改为 entry.py 用户可见变化要求 HELP.md 同步；developer prompt 以 HELP.md 为用户帮助真源。
+      - backend/auto_designer/guards/harness_boundary.py
+      - backend/tests/guards/test_harness_boundary.py
+    scope: guards/harness_boundary 使用产品提交拒绝清单：拒绝 .env、.env.*（.env.example 例外）和顶层 .openagents；正常产品代码、文档与配置可提交。
+    acceptance: HELP/RUNTIME/docs/src 与 .env.example 可提交；.env、.env.local 和 .openagents 被拒；本地钩子与 seed smoke 规则一致。
   - id: T6
     title: connector 与 stdio-jsonl-v1 协议适配
     status: done
     priority: P1
     tags: []
     depends-on:
-      - T5
+      - T2
     relates-to: []
     parallel: false
     files:
@@ -110,6 +94,8 @@ tasks:
 <!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
 
 ## Summary
+
+旧内置 Developer 收尾中间件及其配置接线（原 T5）已退役；HELP.md 的平台读取行为仍由 T6 的 launcher 与接口测试覆盖。
 
 本组把 harness 从“auto-designer 闭环里的被测对象片段”收敛为“真人可运行产品”的种子：harness 模板内只保留 `HELP.md` 作为 `/help` 内容源、`RUNTIME.md` 作为维护者说明，配合 `.env.example` / `requirements.txt` / `scripts/` / `tests/` 支撑独立运行和自测；`README.md`、`USER.md`、`MANUAL.md` 不再作为模板文档，`INTERFACE.md` 归 auto-designer 平台侧。
 
@@ -189,21 +175,21 @@ message: /help
 
 ### Boundary
 
-提交边界允许固定产品区域：`HELP.md`、`RUNTIME.md`、`.env.example`、`requirements.txt`、`entry.py`、`params.yaml`、`agent.yaml`、`agents/`、`tools/`、`scripts/`、`tests/`、`.gitignore`。拒绝 `README.md`、`USER.md`、`MANUAL.md`、`INTERFACE.md`、`.env`、项目脚手架和未知任务目录。
+当前提交边界采用拒绝清单：正常产品代码、文档和配置可提交；拒绝 `.env`、`.env.*`（`.env.example` 例外）及顶层 `.openagents`。不再按固定产品文件名限制合法扩展。
 
 ### DAG / file allocation
 
 ```text
 T1 ─┬→ T2 ─┬→ T3
     │      ├→ T4
-    │      └→ T5 → T6
+    │      └→ T6
 ```
 
 - T1 写 spec。
 - T2 收敛模板文档/脚本/依赖。
 - T3 实现 `/help` 并加自测。
-- T4 调整边界白名单。
-- T5 平台读取 HELP.md 与 completion gate 同步。
+- T4 维护产品提交拒绝清单。
+- 原 T5 的旧收尾检查接线已退役；平台读取 HELP.md 由 T6 维护。
 - T6 connector 与 v1/legacy 协议适配。
 
 ### E2E 验证路径
@@ -211,7 +197,7 @@ T1 ─┬→ T2 ─┬→ T3
 ```bash
 ./tools/spec-driven-development/spec validate
 python backend/scripts/check-spec-number-conflicts.py
-uv run pytest backend/tests/user/sim/test_heartbeat.py backend/tests/harness/test_connector.py backend/tests/loop/test_sim_user.py backend/tests/harness/test_launcher.py backend/tests/dev/test_harness_boundary.py backend/tests/dev/test_completion_gate.py backend/tests/test_bootstrap_harness.py
+uv run pytest backend/tests/user/sim/test_heartbeat.py backend/tests/harness/test_connector.py backend/tests/loop/test_sim_user.py backend/tests/harness/test_launcher.py backend/tests/guards/test_harness_boundary.py backend/tests/test_bootstrap_harness.py
 (cd backend/harness_template && python3 -m unittest discover -s tests -p 'test_*.py')
 ```
 

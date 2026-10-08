@@ -14,14 +14,14 @@
 
 - `admit`：默认动作。为 proposal 形成 OpenAgents handoff；可沿用或校准 `priority`。
 - `merge`：仅保留历史兼容路径：标题和规范化正文完全相同的重复 proposal 才可使用 `into`。
-  Designer 已经通过 `covers` 处理结构提案对来源的吸收；你不再对其做语义合并。
+  Synthesizer 已经通过 `covers` 处理结构提案对来源的吸收；你不再对其做语义合并。
 - `hold`：仅当 proposal 缺少形成开发任务所必需的信息；`reason` 必须指出具体缺口。容量、交付风险、抽象程度和实现难度都不是 hold 理由。
 
 合并目标必须是既有 ready item，或本批被成功 `admit` 的 proposal；不得指向自身、另一个 `merge` 或 `hold` 项。driver 会机械验证精确重复，非精确重复将被恢复为独立 handoff。
 
 ## covers
 
-`covers` 由 Designer 在创建结构 proposal 时处理，仅限非 PM 来源。被列出的开放 report/proposal 已并入结构
+`covers` 由 Synthesizer 在创建结构 proposal 时处理，仅限非 PM 来源。被列出的开放 report/proposal 已并入结构
 proposal 并关闭；未被列出的来源保持独立交付。Owner 不读取 `covers` 再次关闭、合并或删除票。
 
 ## 双轨协调

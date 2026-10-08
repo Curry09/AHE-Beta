@@ -3,7 +3,7 @@ number: "0059"
 title: 观测文件入口与设计角色按需取证
 issue: 0
 slug: observation-evolution-contract
-summary: 让 Triage、独立 PM 与 Designer 通过普通文件工具按职责查阅制品自己的观测文件，保留原有需求产物与角色分工。
+summary: 让 Triage、独立 PM 与 Synthesizer 通过普通文件工具按职责查阅制品自己的观测文件，保留原有需求产物与角色分工。
 tasks:
   - id: T1
     title: 制品观测文件的只读入口和访问审计
@@ -14,9 +14,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/observation_provider.py
-      - backend/auto_designer/designer/agent_runtime.py
-      - backend/auto_designer/dev/workspace_jail.py
+      - backend/auto_designer/demand/observation_provider.py
+      - backend/auto_designer/demand/agent_runtime.py
+      - backend/auto_designer/guards/workspace_jail.py
     scope: 注册 session 关联 manifest；普通文件工具读取已声明文件；保留文本格式、行号、查询与权限审计。
     acceptance: 无需解释事件 schema 即可读取改名后的日志与说明；跨 session、未声明文件和符号链接不可读取；无日志可正常运行。
   - id: T2
@@ -29,17 +29,17 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/divergent.py
-      - backend/auto_designer/designer/designer.py
-      - backend/auto_designer/designer/proposal_view.py
-      - backend/auto_designer/designer/evidence_contract.py
-      - backend/auto_designer/designer/session_timeline.py
-      - backend/tests/loop/test_designer.py
-      - backend/agent_defs/designer
+      - backend/auto_designer/demand/divergent.py
+      - backend/auto_designer/demand/synthesizer.py
+      - backend/auto_designer/demand/proposal_view.py
+      - backend/auto_designer/demand/evidence_contract.py
+      - backend/auto_designer/demand/session_timeline.py
+      - backend/tests/loop/test_synthesizer.py
+      - backend/agent_defs/synthesizer
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/triage_agent/systemprompt.md
-    scope: PM 以体验索引独立观察；Designer 仅核实可见提案引用的 session；综合输出确定性继承来源引用，兼容旧证据工具。
-    acceptance: PM 不等待 Triage 批准；Designer 引用不因 3000 字展示上限或来源合并丢失；无新增审核门禁。
+    scope: PM 以体验索引独立观察；Synthesizer 仅核实可见提案引用的 session；综合输出确定性继承来源引用，兼容旧证据工具。
+    acceptance: PM 不等待 Triage 批准；Synthesizer 引用不因 3000 字展示上限或来源合并丢失；无新增审核门禁。
   - id: T3
     title: 边界回归与真实模型单链路回放
     status: done
@@ -51,9 +51,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/tests/designer/test_observation_provider.py
-      - backend/scripts/replay_observation_design.py
-    scope: 验证普通工具读取和来源链，固定证据回放 PM、Designer，审计实际读取及产物。
+      - backend/tests/demand/test_observation_provider.py
+      - backend/scripts/replay_observation_synthesis.py
+    scope: 验证普通工具读取和来源链，固定证据回放 PM、Synthesizer，审计实际读取及产物。
     acceptance: 离线测试通过；真实模型结果保留输入、输出、访问与耗时，区分机制可达与实际下钻。
 ---
 
@@ -63,7 +63,7 @@ tasks:
 
 ## Summary
 
-为设计侧提供制品观测文件的只读入口。PM 独立从用户体验发现产品机会；Designer 从
+为设计侧提供制品观测文件的只读入口。PM 独立从用户体验发现产品机会；Synthesizer 从
 已有提案综合结构关系；Triage 继续处理单条报告。角色按需要使用已有文件工具取证，
 各自的任务、输出 schema 和提交条件不变。
 
@@ -81,7 +81,7 @@ tasks:
 不要求每轮查看日志，不通过额外模型进行日志归类，不强制提交新的诊断表格。
 
 例如，用户报告“长时间没有回应”。日志可能显示一次模型输出错误和恢复，也可能显示
-正常长工具执行。PM 据此判断等待体验，Designer 据此判断两个提案是否涉及同一机制；
+正常长工具执行。PM 据此判断等待体验，Synthesizer 据此判断两个提案是否涉及同一机制；
 内部重试证据本身不等价于“产品必须向用户展示重试明细”。缺失日志时保留不确定性，
 仍可基于用户证据提出有效需求。
 
@@ -104,11 +104,11 @@ T1 提供无模型的 ObservationProvider，并由公共 agent runtime 按每次
 Provider 不声称能从任意日志内容自动识别全部秘密。失败或缺失不伪装成空成功。
 
 T2 按职责绑定范围：Triage 为当前 report 的 session；PM 为本次体验索引的 sessions；
-Designer 为可见 proposal/ready 明确引用的 sessions；Owner 无原始观测。Designer
+Synthesizer 为可见 proposal/ready 明确引用的 sessions；Owner 无原始观测。Synthesizer
 兼容 0055 的 L2/L3/L4 引用下钻，权限由工具执行。3000 字正文展示截断不丢证据句柄；
 综合产物确定性继承所选来源引用，以免原提案关闭后观测链断开。
 
-Designer 不再默认接收旧 runtime_agg：该聚合器解释既有 transcript 字段、回复文字及
+Synthesizer 不再默认接收旧 runtime_agg：该聚合器解释既有 transcript 字段、回复文字及
 固定源码常量，不能代表演进后制品的内部事实。受控回放已观察到模型将缺失字段产生的
 零计数用作归因佐证，因此本次移除此默认输入；旧统计代码可保留供历史诊断，角色按需
 查阅对应制品的真实观测。
@@ -123,10 +123,10 @@ frontmatter。本次范围是设计侧消费接线；现有历史运行未采集
 完整新实验的制品日志采集、容器收尾导出须由相应制品/启动契约接入后再声称覆盖。
 
 实际验证：150 项相关测试通过；真实 GLM-5.3 回放中，PM 进行了 8 次原生文件读取及
-2 次时间线读取，Designer 进行了 7 次原生文件读取。Designer 在 204.268 秒提交一条
+2 次时间线读取，Synthesizer 进行了 7 次原生文件读取。Synthesizer 在 204.268 秒提交一条
 结构提案；PM 在 360 秒回放时限后晚到提交，不计为成功。回放发现的零计数误读已用于
 移除上述旧聚合默认输入，未宣称修正后的模型生成质量已再次测得提升。
-完整本地记录：`backend/data/observation-replays/0059-pm-designer-20260908/AUDIT.md`。
+完整本地记录：`backend/data/observation-replays/0059-pm-synthesizer-20260908/AUDIT.md`。
 
 ## Drawbacks
 

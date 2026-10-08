@@ -118,7 +118,7 @@ def test_restart_and_ambiguous_remote_response_do_not_duplicate_closed_issue(tmp
     assert tracker._counter == 1
 
 
-@pytest.mark.parametrize("role", ["triage_agent", "divergent_pm", "designer", "owner"])
+@pytest.mark.parametrize("role", ["triage_agent", "divergent_pm", "synthesizer", "owner"])
 def test_nonterminal_tool_schemas_do_not_drift(role):
     root = Path(__file__).resolve().parents[2] / "agent_defs" / role
     tool = yaml.safe_load((root / "tools/submit_observation_gap.tool.yaml").read_text())

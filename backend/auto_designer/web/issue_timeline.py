@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from auto_designer.designer.issue_schema import (
+from auto_designer.demand.issue_schema import (
     DECLINED,
     FROM_DIVERGENT,
     FROM_SYNTHESIZE,

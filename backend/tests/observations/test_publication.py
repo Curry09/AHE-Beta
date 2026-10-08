@@ -8,7 +8,7 @@ import tarfile
 
 import pytest
 
-from auto_designer.designer.observation_provider import ObservationProvider
+from auto_designer.demand.observation_provider import ObservationProvider
 from auto_designer.observations.publication import (
     ObservationSource,
     archive_files,
@@ -125,7 +125,7 @@ def test_missing_bundle_is_receipted_not_replaced_with_old_logs(tmp_path):
 
 
 def test_publication_redacts_credentials_before_storage(tmp_path, monkeypatch):
-    monkeypatch.setenv("DESIGNER_LLM_API_KEY", "known-secret-for-test")
+    monkeypatch.setenv("DEMAND_LLM_API_KEY", "known-secret-for-test")
     publish(
         root=tmp_path,
         session_id="s",

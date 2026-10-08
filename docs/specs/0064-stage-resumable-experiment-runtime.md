@@ -3,7 +3,7 @@ number: "0064"
 title: 阶段级可恢复实验运行
 issue: 0
 slug: stage-resumable-experiment-runtime
-summary: 把真实闭环改造成带持久化阶段游标、工作项幂等键和外部状态对账的可重入状态机，使实验失败后从最近完成的用户、Triage、Designer、Owner 或交付节点继续。
+summary: 把真实闭环改造成带持久化阶段游标、工作项幂等键和外部状态对账的可重入状态机，使实验失败后从最近完成的用户、Triage、Synthesizer、Owner 或交付节点继续。
 tasks:
   - id: T1
     title: 持久化恢复状态与对账原语
@@ -74,14 +74,14 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/designer/triage.py
-      - backend/auto_designer/designer/divergent.py
-      - backend/tests/designer/test_triage.py
-      - backend/tests/designer/test_divergent_gate.py
+      - backend/auto_designer/demand/triage.py
+      - backend/auto_designer/demand/divergent.py
+      - backend/tests/demand/test_triage.py
+      - backend/tests/demand/test_divergent_gate.py
     scope: 冻结 report 快照和分片，按 report/worker 保存模型输出，使用 operation key 幂等应用规范化与 PM proposal 副作用。
     acceptance: 恢复不重新切片、不吸收快照后新增 report；已处理票和已创建 PM proposal 不重复；部分应用可补齐，输入漂移或矛盾远端状态明确 blocked。
   - id: T5
-    title: Designer 与 Owner 输出先存后应用
+    title: Synthesizer 与 Owner 输出先存后应用
     status: done
     priority: P0
     tags: []
@@ -92,15 +92,15 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/designer/designer.py
-      - backend/auto_designer/designer/grouped_designer.py
-      - backend/auto_designer/designer/owner.py
-      - backend/auto_designer/designer/delivery_evidence.py
-      - backend/tests/loop/test_designer.py
-      - backend/tests/designer/test_grouped_designer.py
-      - backend/tests/designer/test_owner.py
-      - backend/tests/designer/test_delivery_evidence.py
-    scope: 让 grouping、Designer batch 和 Owner 决策拥有确定身份与不可变回执，逐项对账 proposal、来源迁移、评论、证据发布和准入。
+      - backend/auto_designer/demand/synthesizer.py
+      - backend/auto_designer/demand/grouped_synthesizer.py
+      - backend/auto_designer/demand/owner.py
+      - backend/auto_designer/demand/delivery_evidence.py
+      - backend/tests/loop/test_synthesizer.py
+      - backend/tests/demand/test_grouped_synthesizer.py
+      - backend/tests/demand/test_owner.py
+      - backend/tests/demand/test_delivery_evidence.py
+    scope: 让 grouping、Synthesizer batch 和 Owner 决策拥有确定身份与不可变回执，逐项对账 proposal、来源迁移、评论、证据发布和准入。
     acceptance: 分类和角色输出完整落盘后不再调用模型；崩溃恢复不重复建票、合并来源、评论或准入；Owner 完成后 admitted 集固定，后续开放队列变化不扩大本轮交付。
   - id: T6
     title: Fresh/resume 入口与故障矩阵验收
@@ -142,7 +142,7 @@ tasks:
 ## Summary
 
 真实实验闭环改为持久化、可重入的阶段状态机。每轮在冻结用户计划与 harness SHA 后，按
-用户会话、Triage 与 Divergent、Designer、Owner、交付等待、轮次封口推进；每个并行
+用户会话、Triage 与 Divergent、Synthesizer、Owner、交付等待、轮次封口推进；每个并行
 工作项有稳定幂等键、输入摘要、输出回执和可验证后置条件。进程或基础设施失败后，统一的
 `resume` 入口先对账 SessionStore、Gitea 与 git，再从最小未完成工作项继续，不重复已经完成
 的用户交互或模型调用，也不重新初始化实验。
@@ -156,7 +156,7 @@ tasks:
 仓库已有 `RunState`、checkpoint tar 和 `HarborRunner`，但它们只在完整轮次结束后记录
 `round` 与 main 游标；当前真实入口直接调用一次覆盖整轮的 Orchestrator。实际审计实验的
 `resume` 只重新启动基础设施，需求面启动路径仍会重新创建本地 harness 仓、强制复位远端
-main、关闭遗留 issue，并清空 live 投影。因此，用户会话已经全部完成后若 Triage、Designer、
+main、关闭遗留 issue，并清空 live 投影。因此，用户会话已经全部完成后若 Triage、Synthesizer、
 Owner 或交付等待失败，恢复只能依赖人工阅读日志、修改入口或重跑昂贵的上游阶段。
 
 真实副作用分散在两个权威面：SessionStore 保存会话，Gitea 保存 issue、评论、标签、PR 与
@@ -184,7 +184,7 @@ harness main。现有角色调用 JSON 是 fail-open 审计制品，不能证明
 - 八个用户中六个完成时，只补跑两个未完成 session；已完成 session 不重新收费或重复开票。
 - 用户阶段完成而 Triage 尚未开始时，直接从冻结的 report 快照开始 Triage。
 - 一部分 report 已规范化时，只处理仍属于该 Triage 快照且未完成的工作项。
-- Designer 分组完成后失败时，复用已保存的分组和模型输出，从未应用的 batch 继续。
+- Synthesizer 分组完成后失败时，复用已保存的分组和模型输出，从未应用的 batch 继续。
 - Owner 完成后失败时，复用固定的 admitted issue 集合，只恢复 Vigil 和交付等待。
 - 所有准入票已成功终结时，对账远端 main 并封存 sealed SHA，然后进入下一轮。
 
@@ -200,7 +200,7 @@ harness main。现有角色调用 JSON 是 fail-open 审计制品，不能证明
 | users | 一个 persona × seed session | 唯一 session 文件、索引项及关联 issue 后置条件 |
 | triage | 一张冻结 report | 保存的结构化决策及该票目标状态/标签/正文 |
 | divergent | 一个 worker 调用及其每项 proposal | 输出回执及带来源幂等标识的 Gitea issue |
-| designer | 一次 grouping 与一个 batch | grouping 摘要、设计输出、来源状态和新 proposal 回执 |
+| synthesizer | 一次 grouping 与一个 batch | grouping 摘要、设计输出、来源状态和新 proposal 回执 |
 | owner | 一张 proposal 决策 | 决策回执、标签/评论后置条件及固定 admitted 集合 |
 | delivery | 一张 admitted issue | Gitea issue/PR 终态与合并提交 |
 | seal | 一轮 | 全部交付成功及唯一 sealed main SHA |
@@ -250,15 +250,15 @@ flowchart LR
     R[round_started] --> U[users]
     U --> T[triage]
     U --> P[divergent]
-    T --> D[designer]
+    T --> D[synthesizer]
     P --> O[owner]
     D --> O
     O --> W[delivery_wait]
     W --> S[round_sealed]
 ```
 
-Triage 与 Divergent 属于同一拍但分别记录，Designer 只在全部 Triage 单元完成后启动；Owner
-等待 Designer 与 Divergent 都完成。末轮在 users 完成后直接 seal，不生成或交付提案。
+Triage 与 Divergent 属于同一拍但分别记录，Synthesizer 只在全部 Triage 单元完成后启动；Owner
+等待 Synthesizer 与 Divergent 都完成。末轮在 users 完成后直接 seal，不生成或交付提案。
 
 每个工作项执行统一协议：
 
@@ -286,7 +286,7 @@ Triage 在 users 完成后只拍一次 report 快照，并持久化 worker 分�
 后来人工新增的 report。已离开 report 平面的票必须与保存回执对账；仍在 report 且无完整输出的票
 才重新调用 Triage。
 
-Divergent、Designer 创建 proposal 时写入 operation key 签名。Designer grouping 的目录和 group
+Divergent、Synthesizer 创建 proposal 时写入 operation key 签名。Synthesizer grouping 的目录和 group
 id 由轮次与输入摘要派生，替换随机 UUID 作为恢复身份；分类输出一旦保存便复用。模型输出先落盘，
 再创建结构 proposal、合并来源；部分合并通过每个来源的后置条件逐项补齐。
 
@@ -320,7 +320,7 @@ live 文件仍是投影。resume 保留 history，修正遗留 running 槽并展
 | T2 | Orchestrator 阶段状态机与交付恢复 | T1 |
 | T3 | 用户 session 工作项级恢复 | T1, T2 |
 | T4 | Triage/Divergent 第一拍恢复 | T1, T2 |
-| T5 | Designer/Owner 输出先存后应用 | T1, T2, T4 |
+| T5 | Synthesizer/Owner 输出先存后应用 | T1, T2, T4 |
 | T6 | Fresh/resume 真实入口和故障注入验收 | T1–T5 |
 
 ```mermaid
@@ -343,7 +343,7 @@ flowchart TD
 端到端脚本为 `backend/scripts/e2e-stage-resume.sh`。它在每个模型输出保存点和每个外部副作用
 前后注入一次强制退出，随后执行 resume；每个 case 与无故障基线比较 session id/index、issue
 数量与内容、评论/标签、admitted 集、PR 终态、轮次 manifest 和 sealed SHA。测试必须覆盖并行
-用户部分完成、Triage 部分完成、Designer 创建后来源未完全迁移、Owner 部分应用、delivery
+用户部分完成、Triage 部分完成、Synthesizer 创建后来源未完全迁移、Owner 部分应用、delivery
 inflight/failed/success，以及配置和远端状态漂移的拒绝路径。测试使用 FakeTracker/Gitea fixture
 验证故障矩阵，不调用 benchmark 作为开发门禁。
 
@@ -361,7 +361,7 @@ inflight/failed/success，以及配置和远端状态漂移的拒绝路径。测
 业务事实。每个阶段复制整套 Gitea volume 虽然直观，但成本高、恢复慢，并且无法解决副作用发生在
 快照与完成标记之间的重复执行问题；完整 volume 备份更适合作为轮次级灾备。
 
-只在用户、Triage、Designer 后写单一 phase 文件实现较快，但无法处理并行阶段部分完成，也无法区分
+只在用户、Triage、Synthesizer 后写单一 phase 文件实现较快，但无法处理并行阶段部分完成，也无法区分
 “副作用已发生、标记未写”和“从未执行”。本组因此保留阶段游标，同时记录工作项回执与后置条件。
 
 把每个角色变成消息队列消费者可以天然获得 ack/retry，但会引入常驻 broker、消息 schema 和新的

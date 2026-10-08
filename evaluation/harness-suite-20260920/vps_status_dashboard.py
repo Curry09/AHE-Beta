@@ -58,7 +58,7 @@ def public_status(value: dict) -> dict:
     sources = value.get("api_sources")
     result["api_sources"] = {
         role: sources[role]
-        for role in ("harness", "user", "designer", "developer")
+        for role in ("harness", "user", "synthesizer", "developer")
         if isinstance(sources, dict) and sources.get(role) in ("Boyue", "WIS", "OpenRouter", "未知")
     }
     # Historical snapshots may have labelled a failed process as finished.
@@ -167,7 +167,7 @@ const snapshots=new Map(), rowNodes=new Map();
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function componentSummary(x){return (x.components||[]).map(c=>esc(c.name)+': '+esc(c.state)+(c.total?' · '+esc(c.completed)+'/'+esc(c.total)+' 完成':'')+(c.failed?' · '+esc(c.failed)+' 失败':'')+(c.name==='openagents'?'（进程状态，不代表正在交付）':'')).join('<br>')||'—';}
 function proposalSummary(x){let p=x.proposals;if(!p)return '尚无提案监控数据';return `进入 ${esc(p.admitted)} 条 · 完成 ${esc(p.completed)}<br>处理中 ${esc(p.processing)} · 就绪 ${esc(p.ready)} · 待确认 ${esc(p.awaiting_confirmation)}<br>失败 ${esc(p.failed)} · 阻塞 ${esc(p.blocked)} · 未知 ${esc(p.unknown)}`;}
-function sourceSummary(x){let s=x.api_sources||{};let names=[...new Set(['harness','user','designer','developer'].map(k=>s[k]).filter(Boolean))];return names.length?names.map(esc).join(' / '):'未记录';}
+function sourceSummary(x){let s=x.api_sources||{};let names=[...new Set(['harness','user','synthesizer','developer'].map(k=>s[k]).filter(Boolean))];return names.length?names.map(esc).join(' / '):'未记录';}
 function proposalTable(x){let p=x.proposals;if(!p)return '<p>尚无提案监控数据</p>';let labels={completed:'已完成（账本确认）',processing:'处理中',ready:'就绪待处理',awaiting_confirmation:'开发完成，待总控确认',failed:'失败',blocked:'阻塞',unknown:'待核实'};return '<h3>本轮进入 OpenAgents 的提案</h3><p>'+proposalSummary(x)+'</p><small>处理中来自最近观测，不保证持续推进；心跳更新不等于完成。账本长期不变也不直接代表卡死。</small><table><thead><tr><th>提案</th><th>PR</th><th>状态</th><th>开发记录</th><th>最近具体动作 / 时间</th><th>最近观测</th></tr></thead><tbody>'+p.items.map(r=>`<tr><td>#${esc(r.issue)}</td><td>${r.pr?'#'+esc(r.pr):'—'}</td><td>${esc(labels[r.state]||r.state)}</td><td>${esc(r.runtime_status||'—')} / ${esc(r.observed_phase||'—')}</td><td>${esc(r.last_action||'—')}<br>${esc(r.last_action_at||'—')}</td><td>${esc(r.last_observed_at||'—')}</td></tr>`).join('')+'</tbody></table>';}
 function renderRows(rows){
 const tbody=document.getElementById('runs');

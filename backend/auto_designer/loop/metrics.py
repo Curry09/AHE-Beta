@@ -13,7 +13,7 @@ needs-triage（未处理）与 rejected / needs-info（已否）与 superseded�
 
 from __future__ import annotations
 
-from auto_designer.designer.issue_schema import (
+from auto_designer.demand.issue_schema import (
     PROPOSAL,
     READY,
     REPORT,

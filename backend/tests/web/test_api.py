@@ -167,7 +167,7 @@ def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
         {
             "session_id": "s2",
             "instance_id": "i2",
-            "role": "designer",
+            "role": "synthesizer",
             "round_no": 2,
             "input_tokens": 7,
             "output_tokens": 3,
@@ -181,7 +181,7 @@ def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
         {
             "session_id": "s2",
             "instance_id": "i2",
-            "role": "designer",
+            "role": "synthesizer",
             "round_no": 2,
             "input_tokens": None,
             "output_tokens": None,
@@ -196,11 +196,11 @@ def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
     assert summary["by_instance"]["i1"]["total_tokens"] == 6
     assert summary["by_interaction"]["turn-0"]["total_tokens"] == 6
     events = client.get("/api/usage/events?round_no=2&session_id=s2").json()["events"]
-    assert len(events) == 2 and all(event["role"] == "designer" for event in events)
+    assert len(events) == 2 and all(event["role"] == "synthesizer" for event in events)
     assert summary["by_instance"]["i1"]["unavailable_count"] == 0
-    designer = client.get("/api/usage/summary?role=designer").json()
-    assert designer["unavailable_count"] == 1
-    assert designer["by_role"]["designer"]["unavailable_count"] == 1
+    synthesizer = client.get("/api/usage/summary?role=synthesizer").json()
+    assert synthesizer["unavailable_count"] == 1
+    assert synthesizer["by_role"]["synthesizer"]["unavailable_count"] == 1
     assert client.get("/api/usage/sessions/s1").json()["event_count"] == 1
 
 
@@ -510,7 +510,7 @@ def test_issue_detail_timeline_connected_and_failure_isolated(tmp_path: Path) ->
                     "body": "1",
                     "label": "ready",
                     "operation": "add",
-                    "actor": "designer",
+                    "actor": "synthesizer",
                     "created_at": "2026-06-01T00:00:00Z",
                 }
             ]
@@ -603,7 +603,7 @@ def test_history_grouped_source(tmp_path: Path) -> None:
 
 def test_issues_plane_and_provenance_fields(tmp_path: Path) -> None:
     """Spec-0029/T9：每条 issue 附 plane（三平面投影，旧标签映射）与 provenance。"""
-    from auto_designer.designer import issue_schema as sc
+    from auto_designer.demand import issue_schema as sc
 
     tracker = FakeTracker()
     r = tracker.create_issue(IssueDraft(title="报告", body="x", labels=["bug", sc.REPORT])).number
@@ -688,3 +688,9 @@ def test_delivery_degrades_without_capability(tmp_path: Path) -> None:
 def test_delivery_no_tracker(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=None)
     assert client.get("/api/delivery").json()["connected"] is False
+
+
+def test_config_exposes_synthesizer_roster(monkeypatch, tmp_path):
+    monkeypatch.setenv("N_SYNTHESIZERS", "3")
+    data = _client(tmp_path, tracker=None).get("/api/config").json()
+    assert data["roster"]["synthesizer"] == 3

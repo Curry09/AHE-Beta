@@ -135,7 +135,7 @@ def test_recoverable_runner_archives_incomplete_stage_before_raising(tmp_path) -
             raise RuntimeError("injected")
 
         def recovery_phase(self, *, round_no):
-            return "designer"
+            return "synthesizer"
 
     save = _SaveSpy()
     runner = HarborRunner(
@@ -148,5 +148,5 @@ def test_recoverable_runner_archives_incomplete_stage_before_raising(tmp_path) -
     with pytest.raises(RuntimeError, match="injected"):
         runner.run(initial_release_ref="v1", n_rounds=2)
     state = read_run_state(tmp_path / "state")
-    assert (state.round, state.phase, state.recovery_revision) == (0, "designer", 4)
+    assert (state.round, state.phase, state.recovery_revision) == (0, "synthesizer", 4)
     assert save.calls[-1].name == "checkpoint-round-1-incomplete.tar.gz"

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { AgentRole, Commit, LogEntry, Selection, Turn } from "../../types";
 import { ProcessStream, Turns } from "../Stream";
 
-// dev/designer 的一段工作（live 槽位或归档快照），以及 live 用户 agent 的会话中间态：
+// dev/synthesizer 的一段工作（live 槽位或归档快照），以及 live 用户 agent 的会话中间态：
 // 元信息 + 完整对话/过程流 + 最终报告，issue/tag 可交叉跳转。
 export function AgentRunDetail(props: {
   role: AgentRole;

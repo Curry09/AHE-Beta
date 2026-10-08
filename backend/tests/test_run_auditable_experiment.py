@@ -92,7 +92,7 @@ def test_frozen_experiment_validates_round_roster_and_pins(tmp_path: Path) -> No
                     "user",
                     "harness",
                     "triage",
-                    "designer",
+                    "synthesizer",
                     "divergent",
                     "owner",
                     "delivery",
@@ -103,7 +103,7 @@ def test_frozen_experiment_validates_round_roster_and_pins(tmp_path: Path) -> No
         "roster": {
             "user": 2,
             "triager": 1,
-            "designer": 1,
+            "synthesizer": 1,
             "divergent": 1,
             "owner": 1,
             "developer": 1,
@@ -159,20 +159,20 @@ def test_frozen_experiment_validates_round_roster_and_pins(tmp_path: Path) -> No
     assert module._validate_recovery_identity(frozen, resume=True) == identity
 
     for enabled in (False, True):
-        frozen.raw["execution"]["designer_grouping"] = enabled
+        frozen.raw["execution"]["synthesizer_grouping"] = enabled
         environment = module._execution_environment(
             frozen,
             profile={},
             context_path=tmp_path / "context.json",
             identity=identity,
         )
-        assert environment["DESIGNER_GROUPING"] == ("1" if enabled else "0")
+        assert environment["SYNTHESIZER_GROUPING"] == ("1" if enabled else "0")
         assert environment["NO_PROXY"] == environment["no_proxy"] == "*"
         frozen.validate_contract()
-    frozen.raw["execution"]["designer_grouping"] = "false"
-    with pytest.raises(module.AuditLaunchError, match="designer_grouping"):
+    frozen.raw["execution"]["synthesizer_grouping"] = "false"
+    with pytest.raises(module.AuditLaunchError, match="synthesizer_grouping"):
         frozen.validate_contract()
-    frozen.raw["execution"]["designer_grouping"] = True
+    frozen.raw["execution"]["synthesizer_grouping"] = True
 
     document["experiment_id"] = "unit-user-only"
     document["mode"] = "user-only"
@@ -181,7 +181,7 @@ def test_frozen_experiment_validates_round_roster_and_pins(tmp_path: Path) -> No
     document["execution"]["plan"]["sha256"] = _sha(plan)
     document["capacity"]["delivery_parallel"] = 0
     document["roster"].update(
-        {"triager": 0, "designer": 0, "divergent": 0, "owner": 0, "developer": 0}
+        {"triager": 0, "synthesizer": 0, "divergent": 0, "owner": 0, "developer": 0}
     )
     config.write_text(json.dumps(document), encoding="utf-8")
 

@@ -22,8 +22,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "evaluation" / "harness-suite-20260920"
-CONFIG = SUITE / "configs" / "scaling-e2b-20260922.json"
-MIXED = SUITE / "configs" / "mixed-scaling-20260922.json"
+CONFIG = ROOT / "examples" / "experiments" / "synthesizer-scaling-e2b.json"
+MIXED = ROOT / "examples" / "experiments" / "synthesizer-mixed-scaling.json"
 ASSIGNMENTS = SUITE / "configs" / "mixed-scaling-20260922.tasks.json"
 ARTIFACTS = ROOT.parent / "auto-designer-experiment-artifacts"
 HARNESS_ARCHIVE = ARTIFACTS / "harness-v0-cade14d.tar.gz"
@@ -337,9 +337,9 @@ def remote_files(
         "HARNESS_LLM_MODEL": roles["harness"]["model"],
         "HARNESS_LLM_BASE_URL": creds["BOYUE_OPENAI"],
         "HARNESS_LLM_API_KEY": creds["BOYUE_API_KEY"],
-        "DESIGNER_LLM_MODEL": roles["designer"]["model"],
-        "DESIGNER_LLM_BASE_URL": creds["BOYUE_OPENAI"],
-        "DESIGNER_LLM_API_KEY": creds["BOYUE_API_KEY"],
+        "DEMAND_LLM_MODEL": roles["synthesizer"]["model"],
+        "DEMAND_LLM_BASE_URL": creds["BOYUE_OPENAI"],
+        "DEMAND_LLM_API_KEY": creds["BOYUE_API_KEY"],
         "DEVELOPER_LLM_MODEL": roles["developer"]["model"],
         "DEVELOPER_LLM_BASE_URL": creds["BOYUE_ANTHROPIC"],
         "DEVELOPER_LLM_API_KEY": creds["BOYUE_API_KEY"],
@@ -390,7 +390,7 @@ export AUTO_DESIGNER_EXPERIMENT_ID={experiment_id} AUTO_DESIGNER_RUN_ID={run_id}
 export AUTO_DESIGNER_HARNESS_ARCHIVE=/opt/hse-round/harness-v0-cade14d.tar.gz AUTO_DESIGNER_OBJECTIVE_EVALUATION=0 TOTAL_ROUNDS={int(config["rounds"])} SESSIONS_PER_ROUND={int(profile["user"])} N_USERS={int(profile["user"])}
 export AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT={latency_enabled} AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS={latency_guard}
 export ROUND_DELIVERY_TIMEOUT_SEC={round_wait}
-export N_TRIAGERS={int(profile["triager"])} N_DESIGNERS={int(profile["designer"])} N_DEVELOPERS={int(profile["developer"])} N_DIVERGENTS={int(profile["pm"])} N_OWNERS={int(profile["owner"])} MAX_PARALLEL_USERS={int(profile["task_parallel"])} OPENAGENTS_PERMISSION_MODE=bypassPermissions VIGIL_MODE=subprocess
+export N_TRIAGERS={int(profile["triager"])} N_SYNTHESIZERS={int(profile["synthesizer"])} N_DEVELOPERS={int(profile["developer"])} N_DIVERGENTS={int(profile["pm"])} N_OWNERS={int(profile["owner"])} MAX_PARALLEL_USERS={int(profile["task_parallel"])} OPENAGENTS_PERMISSION_MODE=bypassPermissions VIGIL_MODE=subprocess
 set +e
 /opt/hse-venv/bin/python -u /opt/hse-round/backend/scripts/run_mixed_closed_loop.py
 code=$?
@@ -696,7 +696,13 @@ def resume(n: int, run_id: str, creds: dict[str, str], *, allow_failed: bool = F
 
 
 def main() -> int:
+    global CONFIG, MIXED
+
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=Path, default=os.environ.get("HSE_SCALING_CONFIG", CONFIG))
+    parser.add_argument(
+        "--mixed-config", type=Path, default=os.environ.get("HSE_MIXED_CONFIG", MIXED)
+    )
     parser.add_argument("--n", type=int, choices=(1, 4, 8, 16, 32), required=True)
     parser.add_argument("--gitea-env", type=Path)
     parser.add_argument(
@@ -708,6 +714,8 @@ def main() -> int:
     parser.add_argument("--allow-failed-resume", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    CONFIG = Path(args.config).expanduser().resolve()
+    MIXED = Path(args.mixed_config).expanduser().resolve()
     try:
         config = read_json(CONFIG)
         if args.dry_run:

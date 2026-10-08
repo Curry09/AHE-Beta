@@ -28,10 +28,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/dev/harness_boundary.py
-      - backend/tests/dev/test_harness_boundary.py
+      - backend/auto_designer/guards/harness_boundary.py
+      - backend/tests/guards/test_harness_boundary.py
     scope: harness_boundary 不再用顶层白名单锁死产品形状。DENIED_TOP 只含 .openagents；另拒 .env / .env.*（.env.example 除外）。docs/specs、新目录、pyproject、README、.gitea 一律放行。钩子模板与 violations() 同源。容器围堵后过拟合信道（编排仓 / data/sessions）vigil 看不见，白名单已无必要。
-    acceptance: violations 对 docs/specs、pyproject.toml、新顶层目录返回空；对 .env、.env.local、.openagents/* 返回这些路径；.env.example 放行。装钩子的临时仓可 commit docs/specs，不可 commit .env。pytest backend/tests/dev/test_harness_boundary.py 绿。
+    acceptance: violations 对 docs/specs、pyproject.toml、新顶层目录返回空；对 .env、.env.local、.openagents/* 返回这些路径；.env.example 放行。装钩子的临时仓可 commit docs/specs，不可 commit .env。pytest backend/tests/guards/test_harness_boundary.py 绿。
   - id: T3
     title: smoke 拒绝清单与种子 docs/specs 落点
     status: done
@@ -118,7 +118,7 @@ OpenAgents 侧契约（本仓镜像描述，不 vendor 其源码）：rfc:agent 
 5. smoke 绿、review/merge 闸过，合进 main。需求面 c 步仍只读 `origin/main` SHA 作观测游标。
 6. 需求面这一轮已经结束也不拆 vigil 容器（缺省 keep-alive），交付面继续把票做完。
 
-开发者改提交边界时必须同时改两处：`backend/auto_designer/dev/harness_boundary.py`（钩子生成源）和 `backend/harness_template/.gitea/workflows/smoke.yml`（服务端内联脚本，harness 仓独立、无法 import 编排包）。只改一处会在「钩子绿、CI 红」或「钩子红、CI 绿」上分叉。
+开发者改提交边界时必须同时改两处：`backend/auto_designer/guards/harness_boundary.py`（钩子生成源）和 `backend/harness_template/.gitea/workflows/smoke.yml`（服务端内联脚本，harness 仓独立、无法 import 编排包）。只改一处会在「钩子绿、CI 红」或「钩子红、CI 绿」上分叉。
 
 接非官方 Anthropic 协议网关时：把网关域名加进 `backend/deploy/gitea/egress-proxy.conf` 的 `allowed_egress` 并重启 egress-proxy，同时设置 `ANTHROPIC_BASE_URL`（及网关所需的模型名覆盖）。漏加域名时，打开 RFC 只表现为容器内 LLM 调用被代理 403，日志在 `data/vigil.log`。
 
@@ -199,7 +199,7 @@ T1 / T2 / T4 无互依赖，可并行。T3 依赖 T2（先定拒绝清单再抄�
 | Task | 本仓 files | 备注 |
 |---|---|---|
 | T1 | `backend/run.py`、`backend/tests/test_run_vigil.py`、`backend/scripts/run_swebench_closed_loop.py` | stages 单一出处 |
-| T2 | `backend/auto_designer/dev/harness_boundary.py`、`backend/tests/dev/test_harness_boundary.py` | 钩子生成源 |
+| T2 | `backend/auto_designer/guards/harness_boundary.py`、`backend/tests/guards/test_harness_boundary.py` | 钩子生成源 |
 | T3 | `backend/harness_template/.gitea/workflows/smoke.yml`、`backend/harness_template/docs/specs/README.md` | 与 T2 字面同步 |
 | T4 | `backend/deploy/gitea/egress-proxy.conf` | 部署实例域可换 |
 | T5 | `OpenAgents/openagents/recipes/vigil.py`、`OpenAgents/openagents/agents/implementer.py` | 镜像；OA 仓另立 |
@@ -209,7 +209,7 @@ T1 / T2 / T4 无互依赖，可并行。T3 依赖 T2（先定拒绝清单再抄�
 无新增 `scripts/*.sh` e2e。验收：
 
 ```text
-pytest backend/tests/test_run_vigil.py backend/tests/dev/test_harness_boundary.py
+pytest backend/tests/test_run_vigil.py backend/tests/guards/test_harness_boundary.py
 ./tools/spec-driven-development/spec validate
 ./tools/spec-driven-development/spec render
 ./tools/spec-driven-development/spec graph --package-root backend/auto_designer

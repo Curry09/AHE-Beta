@@ -11,7 +11,7 @@ function modeLabel(mode: BuildingMode, round: RoundFilter): string {
 const WORKSPACE_KIND: Record<AgentRole, { label: string; hint: string }> = {
   user: { label: "USER LAB", hint: "体验舱 / 访谈台" },
   triager: { label: "TRIAGE DESK", hint: "队列 / 分诊台" },
-  designer: { label: "DESIGN STUDIO", hint: "白板 / 方案墙" },
+  synthesizer: { label: "SYNTHESIZER", hint: "白板 / 方案墙" },
   divergent: { label: "DIVERGENT ROOM", hint: "灵感板 / 候选池" },
   owner: { label: "OWNER GATE", hint: "准入台 / Ready 队列" },
   developer: { label: "DELIVERY BOUNDARY", hint: "openagents 交接令牌" },
