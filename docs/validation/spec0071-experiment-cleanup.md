@@ -65,3 +65,10 @@ PYTHONPATH=backend uv run --locked python -m tools.dev.probes.probe_persona_wait
 检查 `examples/experiments/` 只含两份当前定义、原 launcher 路径已消失，并查看 [研究索引](../../research/README.zh-CN.md)和[维护工具说明](../../tools/dev/README.md)。前端静态模式的 mixed16 记录应显示“历史快照 / 当时状态 RUNNING”，原采集时间不随构建刷新。
 
 实际新用户验证仍需可用 Docker/模型配置，或 E2B/Gitea.com 凭证与建仓名额。按 [N1 教程](../tutorials/n1-experiment.zh-CN.md)从 prepare 开始，以新 run 验证用户会话与产物收集；不要用重算旧 hash、重建旧身份的方式冒充 resume。恢复的在线验收须使用本次创建的 run，并记录 stop/resume 所处阶段。
+
+
+## 2026-10-08 合并前完整测试依赖修复
+
+统一入口 PR 的完整 pytest 初次只安装 dev，结果 8 failed、2250 passed、2 skipped；八项失败均为未安装 experiments 中的 e2b 或 pyarrow。Test job 的安装、pytest、目录检查和 offline demo 现在统一选择 locked experiments + dev；双语 CONTRIBUTING 的完整测试命令同步更新。没有把可选实验依赖强加到核心安装，也未跳过相应测试。
+
+仓外新建独立环境，仅以 uv sync --locked --extra experiments --extra dev 安装，与新 CI 相同；相关 E2B、SWE parquet 及 persona 探针回归 14 passed、58 deselected，6.00 秒，不调用真实模型或云资源。最终完整测试以新 CI 提交的结果为准。

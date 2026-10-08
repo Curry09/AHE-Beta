@@ -51,13 +51,13 @@ jobs:
         with:
           enable-cache: true
       - name: Install locked dependencies
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --extra experiments --extra dev
       - name: Backend and evaluation tests
-        run: uv run --locked --extra dev pytest -q
+        run: uv run --locked --extra experiments --extra dev pytest -q
       - name: Public experiment directory contract
-        run: uv run --locked python backend/scripts/check_experiment_repository.py
+        run: uv run --locked --extra experiments --extra dev python backend/scripts/check_experiment_repository.py
       - name: Offline demo
-        run: uv run --locked python backend/scripts/offline_demo.py
+        run: uv run --locked --extra experiments --extra dev python backend/scripts/offline_demo.py
 
   frontend:
     name: Frontend

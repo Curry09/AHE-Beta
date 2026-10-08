@@ -571,6 +571,8 @@ tasks:
       - backend/scripts/e2e-spec-0069-experiment-entry.sh
       - .github/workflows/experiment-contract.yml
       - .github/workflows/ci.yml
+      - CONTRIBUTING.md
+      - CONTRIBUTING.zh-CN.md
       - .gitignore
       - README.md
       - README.zh-CN.md
