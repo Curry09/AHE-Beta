@@ -249,6 +249,9 @@ def seed_child(manifest, monkeypatch):
 def test_current_three_generations_preserve_selected_inputs_and_reach_logical_r8(
     tmp_path, prepared_inputs, monkeypatch, backend
 ):
+    # Repeated unchanged seed trees must not reuse a parent commit within one Git second.
+    monkeypatch.setenv("GIT_AUTHOR_DATE", "2026-01-01T00:00:00Z")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-01-01T00:00:00Z")
     fixture = json.loads(FIXTURE.read_text())
     raw = json.loads(prepared_inputs.read_text())
     task_paths = []

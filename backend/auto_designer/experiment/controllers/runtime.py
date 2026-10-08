@@ -966,7 +966,15 @@ def _seed_inherited_tree(*, input_path: Path) -> None:
     ).strip()
     if actual_tree != harness["tree_id"]:
         raise SystemExit("Inherited Harness seed tree differs from parent tree")
-    _git(HARNESS_REPO, "commit", "-m", "seed: inherited Harness tree")
+    # Bind the new root commit to its parent even when tree and Git timestamps repeat.
+    _git(
+        HARNESS_REPO,
+        "commit",
+        "-m",
+        "seed: inherited Harness tree",
+        "-m",
+        f"Parent Harness commit: {harness['commit']}",
+    )
     # Exclusions are runtime metadata; the tracked parent .gitignore is untouched.
     (HARNESS_REPO / ".git/info/exclude").write_text(
         "__pycache__/\n*.pyc\n.openagents/\n", encoding="utf-8"

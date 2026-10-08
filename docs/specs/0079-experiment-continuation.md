@@ -240,7 +240,7 @@ workload compiler 中新增明确的 inherited-pairs 输入路径，与普通编
 
 collector 保留一项明确的证据投影记录：发生已有凭证脱敏时，记录原文件 hash、归档 hash、credential_redaction 原因，不记录凭证值。父 Session 可作为已声明的脱敏证据使用，不能宣称其归档字节就是原始执行字节；task/Harness/persona 等可运行材料必须精确匹配其原 hash，脱敏改变它们则不能继承。
 
-首版使用精确源码 tree，不携带父 Git历史。子产生新 seed commit；receipt明确 parent_commit 与 child_seed_commit 不同，child Git tree必须等于 parent_tree_id。外层 collector 使用 write_bytes，不能依赖外层 tar mode；按内层 export inventory 恢复 executable mode。建 index 必须包含父已 tracked 但被 .gitignore 忽略的文件，避免 clean filter/.gitattributes 改变 blob，逐 blob hash 与 write-tree 双重核验，不只运行 git add .。continuation seed 不重写父 .gitignore；runtime排除规则写入 .git/info/exclude，hook在 seed后安装。普通 builtin/archive seed保持既有语义。
+首版使用精确源码 tree，不携带父 Git历史。子产生新 seed commit，提交正文绑定父 Harness commit，确保即使连续几代 tree、提交身份与秒级时间相同，父子 commit 仍不同；receipt明确 parent_commit 与 child_seed_commit 不同，child Git tree必须等于 parent_tree_id。外层 collector 使用 write_bytes，不能依赖外层 tar mode；按内层 export inventory 恢复 executable mode。建 index 必须包含父已 tracked 但被 .gitignore 忽略的文件，避免 clean filter/.gitattributes 改变 blob，逐 blob hash 与 write-tree 双重核验，不只运行 git add .。continuation seed 不重写父 .gitignore；runtime排除规则写入 .git/info/exclude，hook在 seed后安装。普通 builtin/archive seed保持既有语义。
 
 ### 4. 父证据与新仓 report 投影
 
