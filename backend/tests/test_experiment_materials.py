@@ -42,6 +42,11 @@ def prepared_inputs(tmp_path, monkeypatch):
             "user.name=Test",
             "-c",
             "user.email=test@example.com",
+            # Keep fixture preparation synchronous for directory side-effect checks.
+            "-c",
+            "maintenance.auto=false",
+            "-c",
+            "gc.auto=0",
             "commit",
             "--quiet",
             "-m",
