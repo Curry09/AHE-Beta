@@ -132,8 +132,7 @@ def load_task_package(path: str | Path) -> dict[str, Any]:
     """Validate the task recipe. Gold patches/hidden tests have no schema fields."""
     package_path = Path(path).expanduser().resolve()
     data = read_json_document(path=package_path)
-    validate_schema(document=data, schema_name="task-package-v1.json")
-    _reject_plaintext_credentials(node=data, location="task")
+    validate_task_package_document(data)
     for field in ("instruction_file",):
         data[field] = resolve_input_path(value=data[field], base=package_path.parent)
     for field in ("script", "requirements_lock"):
@@ -157,6 +156,39 @@ def load_task_package(path: str | Path) -> dict[str, Any]:
         raise ConfigError("SWE-bench must not declare not_in_benchmark")
     data.setdefault("interaction", "simulated_user")
     return data
+
+
+def validate_task_package_document(data: Any) -> None:
+    """Validate operator or frozen packages without resolving or rewriting their identity."""
+    version = data.get("schema_version") if isinstance(data, dict) else None
+    if type(version) is not int or version not in {1, 2}:
+        raise ConfigError("Expected task package schema_version=1 or 2")
+    validate_schema(document=data, schema_name=f"task-package-v{version}.json")
+    _reject_plaintext_credentials(node=data, location="task")
+    if version == 1:
+        return
+    if data["kind"] == "ordinary" and data.get("not_in_benchmark") is not True:
+        raise ConfigError("ordinary task must explicitly declare not_in_benchmark=true")
+    if data["kind"] != "ordinary" and "not_in_benchmark" in data:
+        raise ConfigError("benchmark task must not declare not_in_benchmark")
+    seen_ids: set[str] = set()
+    seen_targets: set[tuple[str, str]] = set()
+    for declaration in data.get("artifacts", {}).get("exports", []):
+        identifier = declaration["id"]
+        target = declaration.get("path", declaration.get("handle"))
+        if identifier in seen_ids or (declaration["source"], target) in seen_targets:
+            raise ConfigError("Artifact IDs and source targets must be unique")
+        seen_ids.add(identifier)
+        seen_targets.add((declaration["source"], target))
+        if declaration["source"] == "workspace":
+            # Paths name one future regular output file, never a shell glob or host path.
+            if (
+                target.startswith(("/", "~"))
+                or any(part in {"", ".", ".."} for part in target.split("/"))
+                or any(char in target for char in "\\:*?[]")
+                or any(ord(char) < 32 or ord(char) == 127 for char in target)
+            ):
+                raise ConfigError("Artifact path must be a task-root relative regular file path")
 
 
 def read_json_document(*, path: Path) -> Any:

@@ -442,7 +442,8 @@ class Orchestrator:
                     for key in ("persona_id", "task_id", "task_digest", "interaction")
                 )
                 or binding["interaction"] not in {"direct", "simulated_user"}
-                or self._task_kinds.get(binding["task_id"]) not in {"ordinary", "swebench"}
+                or self._task_kinds.get(binding["task_id"])
+                not in {"ordinary", "swebench", "benchmark"}
             ):
                 raise RecoveryConflictError("invalid frozen logical session binding")
         return plan

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "materials": {
+    "official_dataset": {
+      "path": "materials/official-dev.parquet",
+      "sha256": "d758d54540aa4140d0274ed0cc93b8288aa6f323c3c603e2557e7666a47fc41b"
+    }
+  },
+  "graders": [
+    {
+      "adapter": "swebench",
+      "contract_version": 1,
+      "task_ids": [
+        "pvlib__pvlib-python-1478"
+      ],
+      "inputs": {
+        "dataset": "official_dataset"
+      },
+      "timeout_seconds": 1800,
+      "config": {}
+    }
+  ]
+}

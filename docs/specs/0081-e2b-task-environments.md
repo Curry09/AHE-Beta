@@ -254,13 +254,13 @@ Harness staging、执行 cwd、模型环境及 observation 目录由 runtime 明
 
 stop/destroy 管理所属 namespace、服务、peer 与子进程；无法证明清理成功时保留失败记录并停止后续会话。资源统计与 collect 包含环境状态及 task-artifacts；自动销毁实验 compute 前检查所有执行资源和收集状态，保留 Gitea 仓及冻结原始输入。旧已准备 run 用原 controller 和资源合同，不进行升级或历史格式导入。
 
-continuation export/source 保留环境材料、runtime 身份和新的 workspace 能力；旧环境外形不变。子 run 继承完整环境配方及 task/persona/interaction，不把管理私密数据映射成用户可见输入。离线任务 grading、批量调度仍使用现有入口和本地轮号。
+continuation export/source 保留环境材料、runtime 身份和新的 workspace 能力；旧环境外形不变。子 run 继承完整环境配方及 task/persona/interaction，不把管理私密数据映射成用户可见输入。离线任务 grading、批量调度仍使用现有入口和本地轮号。验收产物采用 0083 的 task-package-v2 `artifacts` 声明和共用采集函数，不另建一套评分 receipt；受管 companion 完成 finalize/封存后提供有归属的只读材料，公共会话回执与管理私有原记录分别保存。公开 grade 仅接收独立私有 plan，不把 grader、答案或评分注入任务环境。
 
 ### 7. N8 材料与配对审计
 
 八份 agent payload 的原始 hash、固定任务指令、公开 case/candidate、数据库、工作簿和所需管理服务材料分别核验；grader payload 不用作初始化。只提取显式选定的任务输入，不让 agent archive 原始内容整体在任务根中可读。提取和过滤保留来源 inventory/hash，不改原输入文件；发现答案或不可重建的基线则拒绝准备，不用 toy 任务替代。
 
-私有实验 pack 存在仓外，分别给出当前 task-package-v1、环境 inputs/locks/scripts、原始 Harness archive、画像库、两份 schema-2 experiment 和 batch JSON。公开仓库仅放明确可发布的小型环境示例及材料说明，不把历史大包散落进 examples，不包含机器绝对开发路径。
+私有实验 pack 存在仓外，分别给出当前 task-package-v2、环境 inputs/locks/scripts、原始 Harness archive、画像库、两份 schema-2 experiment 和 batch JSON。公开仓库仅放明确可发布的小型环境示例及材料说明，不把历史大包散落进 examples，不包含机器绝对开发路径。
 
 两组固定相同五轮、每轮八个 slot、max_parallel_users、role roster、grouping、delivery coordination/并发、model/API 配置、reasoning/timing 和任务预算。默认建议两组均使用 `glm-5.3`；这与历史 user/Harness 的 `glm-5.3-flash` 不同，正式分析以本次配对重跑为因果对照，历史五轮只作参考。初始 Harness、源码/指令/环境/画像与运行策略的哈希必须相同；仅六个 interaction 字段、派生 task/catalog/plan/session 身份及 run/resource 坐标可不同。审批后的启动仍使用 check→prepare→run，无专用 N8 launcher。
 

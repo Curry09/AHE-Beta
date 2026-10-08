@@ -31,9 +31,9 @@ tasks:
   parallel: false
   files:
   - backend/auto_designer/experiment/grading.py
-  - backend/auto_designer/evaluation/swebench.py
+  - backend/auto_designer/evaluation/adapters/swebench.py
   - backend/tests/test_experiment_grading.py
-  - backend/tests/evaluation/test_swebench.py
+  - backend/tests/evaluation/test_swebench_runner.py
   scope: 严格读终态归档，匹配计划/恢复/预测与官方dataset，复用evaluator并独立保留每次评分
   acceptance: 错配/篡改/未知report拒绝，完整失败状态，local/E2B归档同路径，无模型/provider调用或原run写入
 - id: T4
@@ -85,7 +85,7 @@ tasks:
 
 ## Summary
 
-为统一实验命令增加 `grade RUN_ID --dataset PATH --dataset-sha256 SHA`：在已停止且完整收集的实验中，校验冻结任务、轮次会话及完整补丁，独立调用官方 SWE-bench fresh-container evaluator。默认评分末轮的全部 SWE 会话；可显式选择一个已完成轮次。ordinary 会话单列为不适用，不补造评分。实验后的结果保存在独立 evaluation 目录，不改原 manifest、Session、checkpoint、Issue、seal 或原归档。
+统一实验命令现使用 `grade RUN_ID --plan PATH`（0083 将本组最初的 dataset 参数退役）：在已停止且完整收集的实验中，校验冻结任务、轮次会话及完整补丁，独立调用官方 SWE-bench fresh-container evaluator。默认评分末轮的全部 SWE 会话；可显式选择一个已完成轮次。未选择规则的会话由当前通用报告单列为 not_configured，不补造评分。实验后的结果保存在独立 evaluation 目录，不改原 manifest、Session、checkpoint、Issue、seal 或原归档。
 
 ## Motivation
 
@@ -95,14 +95,16 @@ tasks:
 
 ## Guide-level explanation
 
-先运行并收集实验，然后准备一份本地官方数据集（JSON/JSONL/parquet），明确 SHA-256。数据集不进入实验 JSON 或任务包；操作者安装锁定 evaluation extra 并在本机使用 Docker。E2B 实验也是取其完整归档后本机评分，不在云端运行嵌套 Docker。
+先运行并收集实验，然后准备一份私有 grading plan，声明本地官方数据集（JSON/JSONL/parquet）的路径和 SHA-256，并以 swebench adapter 选择原任务。数据集不进入实验 JSON 或任务包；操作者安装锁定 evaluation extra 并在本机使用 Docker。E2B 实验也是取其完整归档后本机评分，不在云端运行嵌套 Docker。
 
 ```bash
 uv sync --locked --extra experiments --extra dev --extra evaluation
-uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py grade RUN_ID --dataset /path/to/verified.parquet --dataset-sha256 EXPECTED_SHA256 --offline
-uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py grade RUN_ID --dataset /path/to/verified.parquet --dataset-sha256 EXPECTED_SHA256
-# 可选 --round 1；默认 config.rounds.count；--timeout-seconds 默认 1800。
+uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py grade RUN_ID --plan /path/to/grading-plan.json --offline
+uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py grade RUN_ID --plan /path/to/grading-plan.json
+# 可选 --round 1；默认 config.rounds.count；时限在每个 plan grader 的 timeout_seconds 中声明。
 ```
+
+私有 plan 的 materials.dataset 对应文件路径及 sha256，graders 条目声明 adapter=swebench、contract_version=1、原 task_ids、inputs.dataset 材料引用及 timeout_seconds。当前公开 CLI 不保留 dataset 参数兼容；其他 suite 使用各自 adapter 材料，不强制套用 SWE dataset。
 
 offline 仅验证已收集输入、绑定及数据集，不调用 Docker、模型、Gitea 或 E2B，也不写评分产物。正式评分逐会话运行 fresh evaluator；输出严格区分 completed/pass、completed/fail、missing prediction、unavailable、crashed、timed_out。缺预测不当作空补丁；已成功导出且 hash 相符的空补丁可以评分。旧冻结 controller 未保存完整补丁时明确不可评分，需要新 run，禁止从截断轨迹或当前远端代码猜测补丁。已 destroy 的完整实验仍可评分，不重新启动实验资源。
 
@@ -128,7 +130,7 @@ offline 仅验证已收集输入、绑定及数据集，不调用 Docker、模�
 
 ### 数据集与 evaluator
 
-读取本地 dataset 的固定字节并验证用户给定 SHA（读取前后变化拒绝）；JSON/JSONL/parquet 必须在选中 instance_id 上唯一匹配，且 repo/base_commit 与 frozen SWE package 的 Git repo/revision 相同。拷贝选中的原官方 row 到评分 attempt 内，隐蔽 test/gold 字段只在此目录及 evaluator fresh container 中使用。失败输入在调用 evaluator 前拒绝。现有 SWEbenchEvaluator 复用官方 CLI（锁定 swebench 4.1.0）；正式执行先确认依赖和 Docker 可用。官方 report 只有明确将目标 instance 列为 resolved 或 unresolved 且不在 error/incomplete/missing 集合时才成为 completed；未知/malformed report 为 crashed，不能解释为正常不通过。官方 4.1.0 有时会在 pytest 加载 conftest 或收集失败后仍汇总为 unresolved。若其原始 test_output 的正式测试区间含明确加载/收集失败诊断，分类为 crashed / official_test_start_failed，不计正常失败分数；这类错误可能来自环境或补丁，不重写官方测试与判分。fresh 是官方隔离运行合同，记录 evaluator 版本/命令、patch/dataset hashes 和官方原始报告，不自造官方成功。
+读取本地 dataset 的固定字节并验证用户给定 SHA（读取前后变化拒绝）；JSON/JSONL/parquet 必须在选中 instance_id 上唯一匹配，且 repo/base_commit 与 frozen SWE package 的 Git repo/revision 相同。拷贝选中的原官方 row 到评分 attempt 内，隐蔽 test/gold 字段只在此目录及 evaluator fresh container 中使用。失败输入在调用 evaluator 前拒绝。内部 _SWEbenchRunner 复用官方 CLI（锁定 swebench 4.1.0）；正式执行先确认依赖和 Docker 可用。官方 report 只有明确将目标 instance 列为 resolved 或 unresolved 且不在 error/incomplete/missing 集合时才成为 completed；未知/malformed report 为 crashed，不能解释为正常不通过。官方 4.1.0 有时会在 pytest 加载 conftest 或收集失败后仍汇总为 unresolved。若其原始 test_output 的正式测试区间含明确加载/收集失败诊断，分类为 crashed / official_test_start_failed，不计正常失败分数；这类错误可能来自环境或补丁，不重写官方测试与判分。fresh 是官方隔离运行合同，记录 evaluator 版本/命令、patch/dataset hashes 和官方原始报告，不自造官方成功。
 
 ### 独立结果与重复操作
 
@@ -148,7 +150,7 @@ T1 完整预测 → T2 归档绑定与官方评分 → T3 统一 CLI 与生产�
 
 ## Prior art
 
-现有 SWEbenchEvaluator 已封装官方单 prediction CLI；独立 evaluation/harness_bench 已有 held-out 运行，不替换它。现有 collect 的 terminal inventory、Orchestrator logical binding/round seal 与 Session immutable evidence 可以复用，不能只凭文件名或用户接受宣称有效。
+内部 _SWEbenchRunner 已封装官方单 prediction CLI；独立 evaluation/harness_bench 已有 held-out 运行，不替换它。现有 collect 的 terminal inventory、Orchestrator logical binding/round seal 与 Session immutable evidence 可以复用，不能只凭文件名或用户接受宣称有效。
 
 ## Unresolved questions
 

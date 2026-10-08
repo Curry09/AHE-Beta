@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "materials": {
+    "production_task": {
+      "path": "materials/production-planning.tar.gz",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "excel_task": {
+      "path": "materials/010-pivot-product-revenue.tar.gz",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "excel_expected": {
+      "path": "materials/8_BoomerangSales_gt1.xlsx",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "tinydb_commands": {
+      "path": "materials/tinydb-test_commands.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "tinydb_files": {
+      "path": "materials/tinydb-test_files.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "tinydb_count": {
+      "path": "materials/tinydb-test_case_count.txt",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "nl2repo_post_processor": {
+      "path": "materials/nl2repo-post_processor.py",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "graders": [
+    {
+      "adapter": "terminal-bench",
+      "contract_version": 1,
+      "task_ids": [
+        "production-planning"
+      ],
+      "inputs": {
+        "task_bundle": "production_task"
+      },
+      "timeout_seconds": 1800,
+      "config": {
+        "revision": "452bf305c6daa62fc59061d22133a7cbc7c1572e",
+        "build_official_environment": true,
+        "artifact_map": {
+          "erp_writeback": "/app/output/erp_writeback.sql",
+          "mes_writeback": "/app/output/mes_writeback.sql",
+          "wms_writeback": "/app/output/wms_writeback.sql"
+        }
+      }
+    },
+    {
+      "adapter": "tua-bench",
+      "contract_version": 1,
+      "task_ids": [
+        "010-pivot-product-revenue"
+      ],
+      "inputs": {
+        "task_bundle": "excel_task",
+        "expected": "excel_expected"
+      },
+      "timeout_seconds": 1800,
+      "config": {
+        "revision": "3497fd320abcafaf4797424192c891a593fd7964",
+        "build_official_environment": true,
+        "artifact_map": {
+          "workbook": "/app/BoomerangSales.xlsx"
+        }
+      }
+    },
+    {
+      "adapter": "nl2repo",
+      "contract_version": 1,
+      "task_ids": [
+        "tinydb"
+      ],
+      "inputs": {
+        "test_commands": "tinydb_commands",
+        "test_files": "tinydb_files",
+        "test_count": "tinydb_count",
+        "post_processor": "nl2repo_post_processor"
+      },
+      "timeout_seconds": 1800,
+      "config": {
+        "revision": "781a1da1ee41fb8edb0bed22f586d69111610edf",
+        "image": "ghcr.io/multimodal-art-projection/nl2repobench/tinydb@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ]
+}

@@ -123,14 +123,10 @@ def test_grade_routes_pinned_dataset_without_credentials(monkeypatch, capsys, tm
         "/does-not-exist.env",
         "grade",
         "same-run",
-        "--dataset",
-        "verified.json",
-        "--dataset-sha256",
-        "a" * 64,
+        "--plan",
+        "grading-plan.json",
         "--round",
         "2",
-        "--timeout-seconds",
-        "60",
     ]
     if offline:
         arguments.append("--offline")
@@ -138,10 +134,8 @@ def test_grade_routes_pinned_dataset_without_credentials(monkeypatch, capsys, tm
     assert seen == {
         "run_id": "same-run",
         "root": tmp_path,
-        "dataset": Path("verified.json"),
-        "dataset_sha256": "a" * 64,
+        "plan": Path("grading-plan.json"),
         "round_no": 2,
-        "timeout_seconds": 60,
         "offline": offline,
     }
     assert json.loads(capsys.readouterr().out)["ok"] is True
@@ -153,12 +147,7 @@ def test_grade_incomplete_evidence_returns_business_failure(monkeypatch, capsys)
     monkeypatch.setattr(
         grading, "grade_run", lambda **kwargs: {"ok": False, "entries": [{"status": "ungradable"}]}
     )
-    assert (
-        cli.dispatch(
-            ["--json", "grade", "same-run", "--dataset", "d.json", "--dataset-sha256", "a" * 64]
-        )
-        == 1
-    )
+    assert cli.dispatch(["--json", "grade", "same-run", "--plan", "plan.json"]) == 1
     assert json.loads(capsys.readouterr().out)["entries"][0]["status"] == "ungradable"
 
 
@@ -167,8 +156,8 @@ def test_grade_defaults_to_last_round(monkeypatch):
 
     seen = {}
     monkeypatch.setattr(grading, "grade_run", lambda **kwargs: seen.update(kwargs) or {"ok": True})
-    assert cli.dispatch(["grade", "run", "--dataset", "d.json", "--dataset-sha256", "a" * 64]) == 0
-    assert seen["round_no"] is None and seen["timeout_seconds"] == 1800
+    assert cli.dispatch(["grade", "run", "--plan", "plan.json"]) == 0
+    assert seen["round_no"] is None
 
 
 @pytest.mark.parametrize("command", ["create", "plan", "preflight", "start", "archive"])

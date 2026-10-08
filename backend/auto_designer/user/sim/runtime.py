@@ -15,6 +15,7 @@ import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import tarfile
 import tempfile
@@ -27,6 +28,47 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Protocol, runtime_checkable
 
 _MAX_OUTPUT = 20_000
+
+
+def read_bounded_file(root: str, path: str, max_bytes: int) -> bytes:
+    """Spec-0083/T3: open beneath the workspace without following any symlink."""
+    parts = PurePosixPath(path).parts
+    if (
+        not parts
+        or path != PurePosixPath(path).as_posix()
+        or any(part in {"..", ".", ""} for part in parts)
+        or PurePosixPath(path).is_absolute()
+        or "\\" in path
+    ):
+        raise ValueError("artifact path must be a canonical workspace-relative file")
+    directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in parts[:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        descriptor = os.open(
+            parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory
+        )
+        with os.fdopen(descriptor, "rb") as handle:
+            before = os.fstat(handle.fileno())
+            if not stat.S_ISREG(before.st_mode):
+                raise ValueError("artifact must be a regular file")
+            if before.st_size > max_bytes:
+                raise OverflowError("artifact exceeds declared byte limit")
+            data = handle.read(max_bytes + 1)
+            after = os.fstat(handle.fileno())
+            if len(data) > max_bytes:
+                raise OverflowError("artifact exceeds declared byte limit")
+            if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            ) or len(data) != after.st_size:
+                raise RuntimeError("artifact changed during collection")
+            return data
+    finally:
+        os.close(directory)
 
 
 def utc_now() -> str:
@@ -48,6 +90,9 @@ class WorkspaceRuntime(Protocol):
     def stage_directory(self, source: Path, destination: str) -> None: ...
     def popen_argv(self, argv: list[str], *, cwd: str, env: dict[str, str]) -> list[str]: ...
     def export_patch(self) -> tuple[str, str]: ...
+    # Spec-0083/T3: capture requires a bounded binary path and a stopped writer boundary.
+    def export_file(self, path: str, max_bytes: int) -> bytes: ...
+    def quiesce(self) -> None: ...
     def invalidate(self, reason: str) -> None: ...
     def close(self) -> None: ...
 
@@ -133,6 +178,17 @@ class LocalWorkspaceRuntime:
 
     def read_text(self, path: str) -> str:
         return Path(self.resolve(path)).read_text(encoding="utf-8")
+
+    def export_file(self, path: str, max_bytes: int) -> bytes:
+        # Spec-0083/T3: binary outputs never pass through clipped shell stdout.
+        if self._closed:
+            raise RuntimeError("workspace is closed")
+        return read_bounded_file(self.cwd, path, max_bytes)
+
+    def quiesce(self) -> None:
+        """Stop attempt-owned background writers before saving grading outputs."""
+        if not stop_owned_processes(self.environment.get("AUTO_DESIGNER_ATTEMPT_NONCE")):
+            raise RuntimeError("workspace descendants could not be stopped")
 
     def write_text(self, path: str, content: str) -> str:
         target = Path(self.resolve(path))
@@ -411,6 +467,70 @@ class DockerWorkspaceRuntime:
         if proc.returncode != 0:
             raise OSError(proc.stderr.strip() or f"cannot read {path!r}")
         return proc.stdout
+
+    def export_file(self, path: str, max_bytes: int) -> bytes:
+        """Spec-0083/T3: bounded binary read inside the actual workspace boundary."""
+        import inspect
+
+        self._ensure_live()
+        # This is controller code, not a command or script supplied by the task.
+        script = (
+            "import os,stat,sys\nfrom pathlib import PurePosixPath\n"
+            + inspect.getsource(read_bounded_file)
+            + "\ntry:\n sys.stdout.buffer.write(read_bounded_file(sys.argv[1],sys.argv[2],int(sys.argv[3])))\n"
+            + "except Exception as exc:\n print(type(exc).__name__,file=sys.stderr);sys.exit(1)\n"
+        )
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                self.container_id,
+                "python3",
+                "-c",
+                script,
+                self.cwd,
+                path,
+                str(max_bytes),
+            ],
+            capture_output=True,
+            timeout=30,
+        )
+        if result.returncode:
+            error = result.stderr.decode(errors="replace").strip()
+            if error == "FileNotFoundError":
+                raise FileNotFoundError(path)
+            if error == "OverflowError":
+                raise OverflowError("artifact exceeds declared byte limit")
+            raise RuntimeError("artifact read failed: " + error)
+        if len(result.stdout) > max_bytes:
+            raise OverflowError("artifact exceeds declared byte limit")
+        return result.stdout
+
+    def quiesce(self) -> None:
+        """Spec-0083/T3: a disposable task container must have no background writers."""
+        self._ensure_live()
+        # Current Docker tasks have no managed companions. Those future services
+        # require the environment broker, not this container-wide cleanup rule.
+        script = (
+            "import os,signal,time\nfrom pathlib import Path\n"
+            "def live():\n"
+            " out=[]\n"
+            " for p in Path('/proc').iterdir():\n"
+            "  if p.name.isdigit() and int(p.name) not in (1,os.getpid()):\n"
+            "   try:\n"
+            "    if p.joinpath('stat').read_text().rsplit(')',1)[1].split()[0]!='Z': out.append(int(p.name))\n"
+            "   except (FileNotFoundError,PermissionError): pass\n"
+            " return out\n"
+            "for sig in (signal.SIGTERM,signal.SIGKILL):\n"
+            " for pid in live():\n"
+            "  try: os.kill(pid,sig)\n"
+            "  except ProcessLookupError: pass\n"
+            " time.sleep(.1)\n"
+            "if live(): raise RuntimeError('task descendants still active')\n"
+        )
+        result = self._exec(["python3", "-c", script], timeout=10)
+        if result.returncode:
+            raise RuntimeError("workspace descendants could not be stopped")
 
     def write_text(self, path: str, content: str) -> str:
         target = self._path(path)

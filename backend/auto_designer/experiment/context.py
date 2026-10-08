@@ -252,7 +252,6 @@ def build_controller_environment(
             "N_OWNERS": "1" if config["roles"].get("owner_mode") == "llm" else "0",
             "VIGIL_KEEP_ALIVE": "0",
             "VIGIL_CI_STAGE": ci_stage,
-            "AUTO_DESIGNER_OBJECTIVE_EVALUATION": "0",
             "DISABLE_UPDATES": "1",
             "OPENAGENTS_NO_SELF_UPDATE": "1",
             "VIGIL_MODE": "container" if config["runtime"]["backend"] == "local" else "subprocess",
@@ -486,6 +485,15 @@ def frozen_scenario(task_id: str | None = None):
         specification.params.setdefault("task_id", package["id"])
         specification.params.setdefault("task_key", package["id"])
     specification.params["interaction"] = package.get("interaction", "simulated_user")
+    # Spec-0083/T3: public declarations only; private grading plans never enter this context.
+    from auto_designer.experiment.workload import task_artifact_declarations, task_provenance
+
+    origin = task_provenance(package)
+    specification.params["benchmark"] = origin["suite"]
+    specification.params["instance_id"] = origin["instance_id"]
+    declarations = task_artifact_declarations(package)
+    if declarations:
+        specification.params["evaluation_artifacts"] = declarations
     return SeedScenario(
         description=instruction.read_text(encoding="utf-8"), workspace=specification
     )

@@ -6,34 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.evaluation.swebench import SWEbenchEvaluator, derive_accept_validity
-
-
-def test_accept_validity_is_fail_closed() -> None:
-    passed = {"status": "completed", "fresh": True, "passed": True}
-    failed = {"status": "completed", "fresh": True, "passed": False}
-    assert (
-        derive_accept_validity(end_reason="accepted", request_outcomes=[], evaluation=passed)
-        == "valid_accept"
-    )
-    assert (
-        derive_accept_validity(
-            end_reason="accepted", request_outcomes=[{"status": "timed_out"}], evaluation=passed
-        )
-        == "false_accept"
-    )
-    assert (
-        derive_accept_validity(end_reason="accepted", request_outcomes=[], evaluation=failed)
-        == "false_accept"
-    )
-    assert (
-        derive_accept_validity(end_reason="accepted", request_outcomes=[], evaluation=None)
-        == "unverified_accept"
-    )
-    assert (
-        derive_accept_validity(end_reason="abandoned", request_outcomes=[], evaluation=passed)
-        == "not_applicable"
-    )
+from auto_designer.evaluation.adapters.swebench import _SWEbenchRunner
 
 
 def test_evaluator_invokes_official_harness_and_records_report(tmp_path, monkeypatch) -> None:
@@ -53,10 +26,10 @@ def test_evaluator_invokes_official_harness_and_records_report(tmp_path, monkeyp
         )
         return subprocess.CompletedProcess(args, 0, "official done\n", "")
 
-    monkeypatch.setattr("auto_designer.evaluation.swebench.subprocess.run", fake_run)
+    monkeypatch.setattr("auto_designer.evaluation.adapters.swebench.subprocess.run", fake_run)
     dataset = tmp_path / "verified.json"
     dataset.write_text(json.dumps([{"instance_id": "sympy__sympy-18199"}]), encoding="utf-8")
-    result = SWEbenchEvaluator(dataset, tmp_path / "results").evaluate(
+    result = _SWEbenchRunner(dataset, tmp_path / "results").evaluate(
         instance_id="sympy__sympy-18199", patch="diff --git a/x b/x\n"
     )
     assert result["fresh"] is True
@@ -106,10 +79,8 @@ def test_official_report_requires_unambiguous_target_classification(
         )
         return subprocess.CompletedProcess(args, 0, "done", "")
 
-    monkeypatch.setattr("auto_designer.evaluation.swebench.subprocess.run", fake_run)
-    result = SWEbenchEvaluator(dataset, tmp_path / "results").evaluate(
-        instance_id="target", patch=""
-    )
+    monkeypatch.setattr("auto_designer.evaluation.adapters.swebench.subprocess.run", fake_run)
+    result = _SWEbenchRunner(dataset, tmp_path / "results").evaluate(instance_id="target", patch="")
     assert (result["status"], result["passed"]) == expected
 
 
@@ -122,8 +93,8 @@ def test_official_timeout_is_separate_from_failed_task(tmp_path, monkeypatch):
             return subprocess.CompletedProcess(args, 1, "", "")
         raise subprocess.TimeoutExpired(args, 1, output="still working")
 
-    monkeypatch.setattr("auto_designer.evaluation.swebench.subprocess.run", fake_run)
-    result = SWEbenchEvaluator(dataset, tmp_path / "results", timeout=1).evaluate(
+    monkeypatch.setattr("auto_designer.evaluation.adapters.swebench.subprocess.run", fake_run)
+    result = _SWEbenchRunner(dataset, tmp_path / "results", timeout=1).evaluate(
         instance_id="target", patch=""
     )
     assert result["status"] == "timed_out" and result["passed"] is False
@@ -131,13 +102,14 @@ def test_official_timeout_is_separate_from_failed_task(tmp_path, monkeypatch):
 
 def test_optional_dependency_preflight_is_explicit(monkeypatch):
     monkeypatch.setattr(
-        "auto_designer.evaluation.swebench.importlib.util.find_spec", lambda name: None
+        "auto_designer.evaluation.adapters.swebench.importlib.util.find_spec",
+        lambda name: None,
     )
     monkeypatch.setattr(
-        "auto_designer.evaluation.swebench.subprocess.run",
+        "auto_designer.evaluation.adapters.swebench.subprocess.run",
         lambda *a, **k: pytest.fail("noDockerwhenmissingextra"),
     )
-    assert SWEbenchEvaluator.preflight() == "evaluation extra is not installed"
+    assert _SWEbenchRunner.preflight() == "evaluation extra is not installed"
 
 
 @pytest.mark.parametrize(
@@ -172,8 +144,8 @@ def test_pytest_startup_error_is_not_a_completed_failure(
         )
         return subprocess.CompletedProcess(args, 0, "official done", "")
 
-    monkeypatch.setattr("auto_designer.evaluation.swebench.subprocess.run", fake_run)
-    result = SWEbenchEvaluator(dataset, tmp_path / "results").evaluate(
+    monkeypatch.setattr("auto_designer.evaluation.adapters.swebench.subprocess.run", fake_run)
+    result = _SWEbenchRunner(dataset, tmp_path / "results").evaluate(
         instance_id="target", patch="nonempty"
     )
     assert result["status"] == expected

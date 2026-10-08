@@ -32,7 +32,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py run <ru
 
 连续执行多个完整实验时，使用[批量教程](docs/tutorials/batch-experiment.zh-CN.md)及 `examples/batches/` 的 local/E2B 列表。批次沿用成员各自的单实验生命周期，监督到终态收集才释放并发名额；Ctrl+C 退出监督，`batch stop` 才停止已启动成员。N1/N4 列表保留各自五轮/两轮的不同设置，演示执行方式，不构成公平的因果对照。
 
-终态完整收集后，用 `grade RUN_ID --dataset PATH --dataset-sha256 SHA` 在本机 Docker 上通过官方 evaluator 评分已保存的 SWE 会话补丁，E2B 归档也使用此路径。这不是新的 Harness 留出测试，结果不回流演化。详见[事后评分教程](docs/tutorials/post-run-grading.zh-CN.md)；只有 hash 的旧预测不能猜回补丁评分。
+终态完整收集后，用 `grade RUN_ID --plan PATH` 在本机 Docker 上评分已保存的会话产物。私有计划选择任务 ID、适配器与带哈希的材料，SWE 官方数据集也在其中声明，E2B 归档也使用此路径。这不是新的 Harness 留出测试，结果不回流演化。详见[事后评分教程](docs/tutorials/post-run-grading.zh-CN.md)；只有 hash 的旧预测不能猜回补丁评分。
 
 可信 Harness 代码在本地 Docker + localhost Gitea 上可用 `runtime.local.ci_enabled: true` 开启可选工程 CI。每个 run 独占自己的 runner、privileged Docker daemon 和 job 存储，必须先通过真实 PR smoke，OpenAgents 才启用 CI 门禁。CI 不调用模型、不运行 benchmark。默认配置继续关闭 CI，E2B CI 仍不支持。[本地 CI 教程](docs/tutorials/local-engineering-ci.zh-CN.md)说明配置、状态和 runner 清理；[验收报告](docs/validation/local-engineering-ci.md)单独记录实际验证。
 

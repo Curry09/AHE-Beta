@@ -1,4 +1,4 @@
-"""Spec-0075/T2: grade immutable collected sessions without resuming an experiment."""
+"""Spec-0083/T5: grade immutable collected sessions without resuming an experiment."""
 
 from __future__ import annotations
 
@@ -16,8 +16,17 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from auto_designer.evaluation.swebench import SWEbenchEvaluator
+from auto_designer.evaluation.acceptance import derive_acceptance_assessment
+from auto_designer.evaluation.contracts import (
+    ArtifactInput,
+    GradingRequest,
+    InputValidationError,
+    MaterialInput,
+)
+from auto_designer.evaluation.registry import get_adapter
+from auto_designer.evaluation.results import EXECUTION_CONTRACTS
 from auto_designer.experiment.config import ConfigError
+from auto_designer.experiment.grading_inputs import archived_artifacts, load_grading_plan
 from auto_designer.experiment.manifest import recovery_identity
 from auto_designer.experiment.materials import sha256_file, verify_materials
 from auto_designer.experiment.runtime import load_run_v2
@@ -223,6 +232,9 @@ def _archive(run_dir: Path, manifest: dict) -> tuple[dict, dict[str, bytes]]:
                         or name.startswith("checkpoints/recovery-receipts/")
                         or name.startswith(f"data/role_runs/{manifest['run_id']}/sessions/")
                         or name.startswith(f"data/role_runs/{manifest['run_id']}/predictions/")
+                        or name.startswith(
+                            f"data/role_runs/{manifest['run_id']}/evaluation-artifacts/"
+                        )
                     ):
                         retained[name] = payload
             handle.seek(0)
@@ -437,7 +449,8 @@ def _session_entry(
     entry = {
         **expected,
         "session_id": session_id,
-        "status": "not_applicable" if task["kind"] != "swebench" else "ready",
+        "status": "ready",
+        "_session": document,
         "passed": None,
         "user_outcome": session.user_outcome,
         "accept_validity": session.accept_validity,
@@ -446,8 +459,6 @@ def _session_entry(
         if session.sim_trace
         else session.user_outcome.get("status", "completed"),
     }
-    if task["kind"] != "swebench":
-        return entry, None
     if (
         entry["evaluation_status"] != "valid"
         or entry["interaction_status"] not in {"completed", "protocol_repaired"}
@@ -461,12 +472,17 @@ def _session_entry(
     evidence = session.workspace_evidence
     prediction = evidence.get("prediction")
     if prediction is None:
+        if task["kind"] != "swebench":
+            return entry, None
         return {**entry, "status": "ungradable", "reason": "missing_prediction"}, None
     if not evidence.get("diff_base_commit"):
+        if task["kind"] != "swebench":
+            return entry, None
         return {**entry, "status": "ungradable", "reason": "missing_prediction_base"}, None
-    if evidence["diff_base_commit"] != task["source_snapshot"].get("revision") or evidence[
-        "diff_base_commit"
-    ] != task["package"].get("source", {}).get("revision"):
+    if task["kind"] == "swebench" and (
+        evidence["diff_base_commit"] != task["source_snapshot"].get("revision")
+        or evidence["diff_base_commit"] != task["package"].get("source", {}).get("revision")
+    ):
         raise ConfigError("Prediction base differs from frozen task baseline")
     if (
         not isinstance(prediction, dict)
@@ -512,11 +528,14 @@ def _result(identity: dict, entries: list[dict], report_dir: Path | None, offlin
         **identity,
         "offline": offline,
         "ok": all(
-            entry["status"] in {"not_applicable", "ready" if offline else "completed"}
+            entry["status"] in {"not_configured", "ready" if offline else "completed"}
             for entry in entries
         ),
         "report_dir": str(report_dir) if report_dir else None,
-        "entries": entries,
+        "entries": [
+            {key: value for key, value in entry.items() if not key.startswith("_")}
+            for entry in entries
+        ],
         "summary": {
             "total": len(entries),
             "statuses": dict(counts),
@@ -532,23 +551,15 @@ def _result(identity: dict, entries: list[dict], report_dir: Path | None, offlin
 def grade_run(
     *,
     run_id: str,
+    plan: Path,
     root: Path | None = None,
-    dataset: Path,
-    dataset_sha256: str,
     round_no: int | None = None,
-    timeout_seconds: int = 1800,
     offline: bool = False,
 ) -> dict:
-    """Validate immutable inputs; optionally run official fresh Docker grading locally."""
+    """Spec-0083/T5: verify original archive once, dispatch a private frozen plan."""
     try:
         return _grade_run(
-            run_id=run_id,
-            root=root,
-            dataset=dataset,
-            dataset_sha256=dataset_sha256,
-            round_no=round_no,
-            timeout_seconds=timeout_seconds,
-            offline=offline,
+            run_id=run_id, plan_path=plan, root=root, round_no=round_no, offline=offline
         )
     except ConfigError:
         raise
@@ -556,18 +567,17 @@ def grade_run(
         raise ConfigError("Malformed or unsupported collected grading inputs") from exc
 
 
+def _source(task: dict) -> dict:
+    package = task["package"]
+    if task["kind"] == "benchmark":
+        return {**package.get("source", {}), **package["benchmark"]}
+    return {**package.get("source", {}), "suite": task["kind"], "instance_id": task["id"]}
+
+
 def _grade_run(
-    *,
-    run_id: str,
-    root: Path | None,
-    dataset: Path,
-    dataset_sha256: str,
-    round_no: int | None,
-    timeout_seconds: int,
-    offline: bool,
+    *, run_id: str, plan_path: Path, root: Path | None, round_no: int | None, offline: bool
 ) -> dict:
-    if type(timeout_seconds) is not int or timeout_seconds <= 0:
-        raise ConfigError("timeout_seconds must be a positive integer")
+    grading_plan = load_grading_plan(Path(plan_path))
     run_dir, manifest = load_run_v2(run_id=run_id, root=root)
     if (
         type(manifest.get("schema_version")) is not int
@@ -623,32 +633,123 @@ def _grade_run(
         or seal_unit.get("observed_postconditions", {}).get("completed") is not True
     ):
         raise ConfigError("Archived round seal unit does not bind its user/delivery SHA")
-    rows, _ = _dataset(Path(dataset), dataset_sha256)
-    entries, predictions, selected_rows = [], {}, {}
+    selections = grading_plan.selections(set(tasks))
+    entries, requests, adapters = [], {}, {}
     for binding in bindings:
         task = tasks[binding["task_id"]]
-        if task["kind"] == "swebench":
-            selected_rows[task["id"]] = _official_row(rows, task)
         entry, patch = _session_entry(
             binding=binding, task=task, round_state=round_state, files=files, manifest=manifest
         )
         entries.append(entry)
-        if patch is not None:
-            predictions[entry["session_id"]] = patch
+        selection = selections.get(task["id"])
+        if selection is None:
+            entry.update(status="not_configured", passed=None)
+            continue
+        entry.update(
+            adapter=selection["adapter"], adapter_contract_version=selection["contract_version"]
+        )
+        if entry["status"] != "ready":
+            continue
+        try:
+            adapter = get_adapter(selection["adapter"], selection["contract_version"])
+        except ValueError as exc:
+            entry.update(status="unsupported", reason=str(exc), passed=None)
+            continue
+        origin = _source(task)
+        if selection["adapter"] != "custom" and origin["suite"] != selection["adapter"]:
+            raise ConfigError("Grading adapter differs from frozen benchmark source")
+        session = entry["_session"]
+        declarations = task["package"].get("artifacts", {}).get("exports", [])
+        outputs = archived_artifacts(
+            receipt=session.get("workspace_evidence", {}).get("evaluation_artifacts"),
+            provenance=entry,
+            declarations=declarations,
+            files=files,
+        )
+        frozen_materials = {
+            name: grading_plan.materials[reference]
+            for name, reference in selection["inputs"].items()
+        }
+        config = dict(selection.get("config", {}))
+        if selection["adapter"] == "swebench":
+            if "dataset" not in frozen_materials:
+                raise ConfigError("SWE adapter requires inputs.dataset")
+            material = frozen_materials["dataset"]
+            rows, _ = _dataset(material["path"], material["sha256"])
+            config["official_dataset_row"] = _official_row(rows, task)
+        missing = [
+            item["id"] for item in declarations if item["required"] and item["id"] not in outputs
+        ]
+        if missing:
+            entry.update(
+                status="missing_artifact", reason="missing_required_outputs: " + ",".join(missing)
+            )
+            continue
+        request = GradingRequest(
+            adapter=selection["adapter"],
+            contract_version=selection["contract_version"],
+            task_id=task["id"],
+            task_digest=task["digest"],
+            session_id=entry["session_id"],
+            source=origin,
+            artifacts={
+                name: ArtifactInput(
+                    path=Path(item["path"]),
+                    sha256=item["sha256"],
+                    bytes=item["bytes"],
+                    source=item["source"],
+                    metadata=item,
+                    payload=item["payload"],
+                )
+                for name, item in outputs.items()
+            },
+            materials={
+                name: MaterialInput(path=value["path"], sha256=value["sha256"])
+                for name, value in frozen_materials.items()
+            },
+            config=config,
+            timeout_seconds=selection["timeout_seconds"],
+            plan_digest=grading_plan.digest,
+            instance_id=origin["instance_id"],
+            patch=patch or "",
+            session=session,
+        )
+        try:
+            adapter.validate_inputs(request)
+        except InputValidationError as exc:
+            entry.update(status=exc.status, reason=str(exc), passed=None)
+            continue
+        except ValueError as exc:
+            raise ConfigError(f"Invalid {selection['adapter']} grading inputs: {exc}") from exc
+        requests[entry["session_id"]] = (request, frozen_materials, outputs)
+        adapters[entry["session_id"]] = adapter
     identity = {
         **recovery_identity(manifest),
         "catalog_hash": manifest["catalog_hash"],
         "archive_sha256": receipt["archive_sha256"],
         "manifest_sha256": sha256_file(run_dir / "manifest.json"),
-        "dataset_sha256": dataset_sha256,
+        "plan_digest": grading_plan.digest,
         "round_no": selected,
         "user_sha": round_state["user_sha"],
         "sealed_sha": round_state["sealed_sha"],
+        "grading_implementation": {
+            path.relative_to(Path(__file__).parents[1]).as_posix(): sha256_file(path)
+            for path in sorted(
+                [Path(__file__), Path(__file__).with_name("grading_inputs.py")]
+                + list((Path(__file__).parents[1] / "evaluation").rglob("*.py"))
+            )
+        },
     }
+    for entry in entries:
+        entry["acceptance_assessment"] = derive_acceptance_assessment(
+            session=entry["_session"], result={"status": "not_evaluated", "passed": None}
+        )
     with _operation_read(run_dir):
         _assert_host_current(run_dir, host_snapshot, receipt)
     if offline:
-        return _result(identity, entries, None, True)
+        result = _result(identity, entries, None, True)
+        result["environment_status"] = "not_checked_offline"
+        return result
     evaluation_root = run_dir / "evaluation"
     if evaluation_root.is_symlink() or any(parent.is_symlink() for parent in run_dir.parents):
         raise ConfigError("Unsafe evaluation output directory")
@@ -665,76 +766,105 @@ def _grade_run(
                 / f"grade-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:12]}"
             )
             attempt.mkdir(mode=0o700)
+            (attempt / "plan.json").write_bytes(grading_plan.payload)
+            material_root = attempt / "materials"
+            material_root.mkdir(mode=0o700)
+            snapshots = {}
+            for name, record in grading_plan.materials.items():
+                # Original suffix matters for SWE JSON/JSONL/parquet and typed adapter inputs.
+                destination = material_root / (name + record["path"].suffix)
+                destination.write_bytes(record["payload"])
+                destination.chmod(0o400)
+                snapshots[name] = destination
+            _write(
+                attempt / "materials.json",
+                {
+                    name: {
+                        "path": str(snapshots[name].relative_to(attempt)),
+                        "sha256": record["sha256"],
+                    }
+                    for name, record in grading_plan.materials.items()
+                },
+            )
             _write(
                 attempt / "intent.json",
                 {
                     **identity,
-                    "timeout_seconds": timeout_seconds,
                     "sessions": [
                         {
                             key: entry[key]
-                            for key in (
-                                "session_id",
-                                "task_id",
-                                "persona_id",
-                                "harness_sha",
-                                "status",
-                            )
+                            for key in ("session_id", "task_id", "harness_sha", "status")
                         }
                         for entry in entries
                     ],
                 },
             )
-        available = SWEbenchEvaluator.preflight() if predictions else None
-        with _operation_read(run_dir):
-            _assert_host_current(run_dir, host_snapshot, receipt)
         for entry in entries:
             if entry["status"] != "ready":
-                continue
-            session_root = attempt / entry["session_id"]
-            session_root.mkdir()
-            patch = predictions[entry["session_id"]]
-            (session_root / "prediction.patch").write_bytes(patch.encode("utf-8"))
-            dataset_path = session_root / "instance.json"
-            _write(dataset_path, [selected_rows[entry["task_id"]]])
-            if available:
-                result = {
-                    "status": "unavailable",
-                    "passed": False,
-                    "reason": available,
-                    "fresh": False,
-                }
-            else:
-                try:
-                    result = SWEbenchEvaluator(
-                        dataset_path, session_root / "official", timeout=timeout_seconds
-                    ).evaluate(instance_id=entry["task_id"], patch=patch)
-                except Exception as exc:  # noqa: BLE001 - retain evaluator failures as evidence
-                    result = {
-                        "status": "crashed",
-                        "passed": False,
-                        "reason": type(exc).__name__,
-                        "fresh": False,
-                    }
-            if (
-                not isinstance(result, dict)
-                or result.get("status")
-                not in {"completed", "unavailable", "crashed", "timed_out", "not_evaluated"}
-                or (
-                    result.get("status") == "completed"
-                    and (result.get("fresh") is not True or type(result.get("passed")) is not bool)
+                entry["acceptance_assessment"] = derive_acceptance_assessment(
+                    session=entry["_session"], result={"status": entry["status"], "passed": None}
                 )
-            ):
+                continue
+            from dataclasses import replace
+
+            original, frozen_materials, outputs = requests[entry["session_id"]]
+            session_root = attempt / entry["session_id"]
+            session_root.mkdir(mode=0o700)
+            artifact_root = session_root / "inputs"
+            artifact_root.mkdir(mode=0o700)
+            artifacts = {}
+            for name, artifact in original.artifacts.items():
+                path = artifact_root / name
+                path.write_bytes(outputs[name]["payload"])
+                path.chmod(0o400)
+                artifacts[name] = replace(artifact, path=path)
+            selection = selections[entry["task_id"]]
+            request = replace(
+                original,
+                artifacts=artifacts,
+                materials={
+                    name: MaterialInput(
+                        path=snapshots[reference], sha256=frozen_materials[name]["sha256"]
+                    )
+                    for name, reference in selection["inputs"].items()
+                },
+            )
+            with _operation_read(run_dir):
+                _assert_host_current(run_dir, host_snapshot, receipt)
+            try:
+                scored = adapters[entry["session_id"]].evaluate(request, session_root)
+                result = scored.to_dict()
+                execution = result.get("execution") or {}
+                if result.get("status") == "completed" and (
+                    execution.get("contract") not in EXECUTION_CONTRACTS
+                    or execution.get("verified") is not True
+                    or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(execution.get("image_digest")))
+                ):
+                    result = {
+                        **result,
+                        "status": "ungradable",
+                        "passed": None,
+                        "reason": "execution_contract_not_verified",
+                    }
+            except Exception as exc:  # noqa: BLE001 - preserve failed scorer independently
                 result = {
+                    "adapter": request.adapter,
+                    "contract_version": request.contract_version,
                     "status": "crashed",
-                    "passed": False,
-                    "reason": "invalid_evaluator_result",
-                    "fresh": False,
+                    "passed": None,
+                    "reason": type(exc).__name__,
                 }
             _write(session_root / "result.json", result)
             with _operation_read(run_dir):
                 _assert_host_current(run_dir, host_snapshot, receipt)
-            entry.update(status=result["status"], passed=result.get("passed"), evaluation=result)
+            entry.update(
+                status=result["status"],
+                passed=result.get("passed"),
+                evaluation=result,
+                acceptance_assessment=derive_acceptance_assessment(
+                    session=entry["_session"], result=result
+                ),
+            )
         result = _result(identity, entries, attempt, False)
         with _operation_read(run_dir):
             _assert_host_current(run_dir, host_snapshot, receipt)

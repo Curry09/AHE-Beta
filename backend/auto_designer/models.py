@@ -657,7 +657,7 @@ def validate_session_provenance(
                 "harness_sha",
             )
         )
-        or provenance["task_kind"] not in {"ordinary", "swebench"}
+        or provenance["task_kind"] not in {"ordinary", "swebench", "benchmark"}
         or provenance["interaction"] not in {"direct", "simulated_user"}
     ):
         raise ValueError("invalid session provenance identities")

@@ -16,7 +16,7 @@ export PYTHONPATH=backend
   backend/tests/harness/test_launcher.py \
   backend/tests/loop/test_orchestrator.py \
   backend/tests/loop/test_sim_user.py \
-  backend/tests/evaluation/test_swebench.py \
+  backend/tests/evaluation/test_swebench_runner.py \
   backend/tests/user/test_session_store.py \
   backend/tests/test_models.py
 

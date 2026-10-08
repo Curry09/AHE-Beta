@@ -1,75 +1,148 @@
-# 对已收集的 SWE 任务补丁评分
+# 对已完成的用户会话评分
 
 [English](post-run-grading.md) | 简体中文
 
-`grade` 评估指定已封口轮次中，各 SWE 任务会话产生的完整补丁。它在实验收集后运行，本地和 E2B 实验共用 `backend/scripts/experiment.py` 入口。普通任务会话单列为不适用。
+`experiment.py grade` 评估已收集、已封口轮次中用户会话产生的结果。本地和 E2B 实验共用命令，由独立的私有评分计划选择规则并固定材料。direct 和模拟用户会话都可评分，但原始执行及产物回执必须满足适配器的合同。
 
-这里评的是用户在演化期间已经试过的任务。**它不是对 Harness 通用能力的新留出测试。** 后一个问题仍使用独立的[评估工具](../../evaluation/README.md)。评分不进入反馈、提案、交付决策或 CI 门禁，也不改用户体感与接受记录。
+这里验收演化过程中已经尝试的任务，不重新调用 Harness，也不是在新任务上测通用能力。后者使用独立的 [Harness 评测工具](../../evaluation/README.md)。评分不反馈到演化，不修改用户评阅，也不更新 Gitea issue。
 
-## 1. 准备已收集实验和评分主机
+## 1. 收集实验并准备评分主机
 
-按 [N1](n1-experiment.zh-CN.md)或[多用户教程](multi-user-experiment.zh-CN.md)完成实验，收集已停止控制器的产物。评分要求经过核验的终态 `COMPLETE` 收集，以及已封口的指定轮次。收集 COMPLETE 本身不证明用户会话成功或官方测试通过；评分前会核对会话身份、任务绑定与恢复记录。
+完成 [N1](n1-experiment.zh-CN.md) 或[多用户教程](multi-user-experiment.zh-CN.md)，收集已停止控制器的完整归档。指定轮次必须已封口，收集必须有经过核验的终态 `COMPLETE` 回执。归档完整不证明交互有效或任务成功，这些事实单独核验。
 
-在有 Docker 的主机上评分。E2B 实验也先下载完整归档，再在本机评分，不在 E2B 中运行嵌套 Docker，也不重启实验资源。已销毁的实验只要保留冻结材料和完整归档，仍可评分。`grade` 不需要模型、Gitea 或 E2B 凭证。
-
-在仓库根目录运行：
+E2B 实验先下载归档，再在有 Docker 的主机评分。不重启 E2B，不运行嵌套 Docker，不调用模型；无需模型、Gitea 或 E2B 凭证。已销毁计算资源的实验，只要仍保留冻结 run 目录和完整归档，就可评分。
 
 ```bash
 uv sync --locked --extra experiments --extra dev --extra evaluation
 RUNS_DIR=.experiments
 RUN_ID=REPLACE_WITH_COLLECTED_RUN_ID
-DATASET=/absolute/path/to/official-dataset.parquet
-DATASET_SHA256=REPLACE_WITH_VERIFIED_SHA256
+PLAN=/absolute/path/to/grading-plan.json
 ```
 
-批次成员应把 `RUNS_DIR` 设为子实验根目录，例如 `.experiments/.batches/<batch_id>/children/n1`，不能用外层批次根目录。保留原冻结控制器与输入；resume 不会升级它们。
+批次成员的 `RUNS_DIR` 应设为子实验根目录，例如 `.experiments/.batches/<batch_id>/children/n1`。保留原冻结控制器与输入；升级当前 checkout 不会升级既有 run，也不能补造回执。
 
-## 2. 独立提供官方数据集
+## 2. 准备私有评分计划
 
-提供本地 JSON、JSONL 或 parquet 格式的官方数据集，并明确其完整字节的 SHA-256。每个选中的 SWE instance 必须唯一匹配一条记录，包括仓库和 base commit。任务基线不同、目标 instance 重复、数据集变化或校验和错误，都会在评分前拒绝。
+从模板开始：
 
-用 `sha256sum "$DATASET"` 检查拿到的文件，并与可信来源核对。校验和固定的是文件字节，不能证明任意文件就是官方数据集。评分命令不会自动下载或搜索数据集。
+| 模板 | 用途 |
+| --- | --- |
+| [swebench.json](../../examples/grading/swebench.json) | 公开 pvlib SWE 示例 |
+| [mixed-benchmarks.json](../../examples/grading/mixed-benchmarks.json) | 分别配置生产计划、Excel 和 TinyDB 的规则 |
+| [custom.json](../../examples/grading/custom.json) | 操作者自定义文件验收器 |
 
-公开示例的 `pvlib__pvlib-python-1478` 属于 [SWE-bench dev split](https://huggingface.co/datasets/princeton-nlp/SWE-bench/tree/e48e2bd1e9fecd5bbd641e9414ac59da9f2e69f6/data)，不在 Verified 或 Lite 中。请使用包含该 instance 的官方 dev 文件；仅指定任意 Verified 文件不会匹配这个示例。此次验收的固定数据集版本为 `e48e2bd1e9fecd5bbd641e9414ac59da9f2e69f6`，`data/dev-00000-of-00001.parquet` 的 SHA-256 为 `d758d54540aa4140d0274ed0cc93b8288aa6f323c3c603e2557e7666a47fc41b`。
+这些是模板，不包含官方数据集或完整 benchmark 材料包。须替换材料路径、占位 hash、镜像 digest 和任务/产物 ID。任务 ID 必须已存在于冻结 run，计划不能添加任务或替换来源。同一任务至多选择一个 grader；未选择的任务记为 `not_configured`。
 
-将数据集放在不提交的实验材料之外。gold patch 和隐藏测试只能用于这次事后评估，不能放入任务指令、任务包、persona 输入、实验 JSON 或 issue 证据。选中的官方记录会复制到独立评分 attempt 目录，因此该目录包含隐藏评估材料，不应作为普通实验反馈公开。
+只评 SWE 时，计划例如：
 
-## 3. 不调用 Docker，先校验输入
+```json
+{
+  "schema_version": 1,
+  "materials": {
+    "dataset": {
+      "path": "/absolute/path/to/official-dev.parquet",
+      "sha256": "REPLACE_WITH_THE_FILE_SHA256"
+    }
+  },
+  "graders": [
+    {
+      "adapter": "swebench",
+      "contract_version": 1,
+      "task_ids": ["pvlib__pvlib-python-1478"],
+      "inputs": {"dataset": "dataset"},
+      "timeout_seconds": 1800,
+      "config": {}
+    }
+  ]
+}
+```
+
+`materials` 声明本机普通文件及 SHA-256，不接受目录；任务包应打成 tar。相对路径以 plan 所在目录为基准。`inputs` 将适配器输入名称映射到材料名称。`timeout_seconds` 是每个选中会话的时限，没有 CLI 全局覆盖选项。`config` 为适配器专用配置。run、task digest、session 和实际试用 Harness SHA 从已验证归档读取，不由操作者手抄。
+
+用 `sha256sum /path/to/material` 检查字节，并核对可信来源。hash 固定内容，但不能证明任意文件就是官方材料。命令不会发现或下载数据集。gold patch、隐藏测试、标准答案和私有计划不要放进公开任务输入或 issue 证据。评分 attempt 可能包含隐藏材料，不应作为用户反馈公开。
+
+公开 pvlib instance 属于 [SWE-bench dev split](https://huggingface.co/datasets/princeton-nlp/SWE-bench/tree/e48e2bd1e9fecd5bbd641e9414ac59da9f2e69f6/data)，不在 Verified 或 Lite。固定 dev parquet 的 SHA-256 为 `d758d54540aa4140d0274ed0cc93b8288aa6f323c3c603e2557e7666a47fc41b`。instance 必须唯一匹配冻结仓库和 base commit。
+
+旧 `grade --dataset ... --dataset-sha256 ...` 接口已退役。只评 SWE 也必须传 `--plan`，数据集改为计划中的材料。
+
+## 3. 先检查输入，不执行评分器
 
 ```bash
-uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" grade "$RUN_ID" --dataset "$DATASET" --dataset-sha256 "$DATASET_SHA256" --offline
+uv run --locked --extra experiments --extra evaluation \
+  python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" \
+  grade "$RUN_ID" --plan "$PLAN" --round 6 --offline
 ```
 
-离线评分核对冻结身份、已收集归档、会话补丁与数据集绑定。不调用 Docker、模型、Gitea 或 E2B，不写评分 attempt。离线校验通过不意味着补丁通过官方测试。
+省略 `--round` 时选择 `config.rounds.count`，即配置末轮，不会自动退到更早轮次。轮号必须为正数且已封口。
 
-新控制器保存完整预测，并记录路径、SHA-256 和字节数回执。旧冻结控制器可能只保存 diff hash 或截断的 review 预览；不能从日志或当前远端代码猜回补丁来评分，需要新跑一次实验获取完整预测。缺失预测与成功导出的空补丁不同。
+离线检查核对计划/材料、原归档/会话身份和适配器要求的证据。不创建容器，不调用模型/provider，不写评分 attempt。通过不代表 Docker 或官方环境一定可运行，也不代表测试通过。
 
-补丁相对会话初始 Git 基线导出，包含已提交、已暂存和非忽略的新文件。评分将 `diff_base_commit` 绑定到冻结 SWE 源码 revision；只有 hash 而没有这个基线绑定不足以评分。
+完整 SWE prediction 须保留原基线、路径、字节数和 hash 回执。其他产物使用原会话的 `workspace_evidence.evaluation_artifacts` 回执，绑定原试用 Harness SHA 与已收集字节。计划不能把后来补进去的文件变成原执行证据。缺失、截断、超限仍无法有效验收，也不能从旧日志或最新远端代码补造。
 
-固定版本官方 evaluator 将空预测放入 `empty_patch_ids`，不计为已完成测试，见 [SWE-bench 4.1.0 reporting](https://github.com/SWE-bench/SWE-bench/blob/v4.1.0/swebench/harness/reporting.py)。因此完整的空补丁回执可以通过预测完整性校验，但评分状态为 `not_evaluated`、原因为 `official_empty_prediction`，没有通过/失败结论，也没有新测试容器，不计为完整评分（`ok: false`）。
+新任务包通过 schema version 2 声明公开产物采集，指定工作区文件及大小上限，不含测试或答案。既有 version 1 任务身份不变。受管服务测量依赖独立任务环境能力；当前标准后端不支持，会在 prepare 拒绝，不能用工作区普通文件冒充。
 
-## 4. 运行官方新容器评分
+例如，新自定义文件任务可在实验开始前向 version 2 任务包添加以下声明。`output` ID 对应 `custom.json` 的 `artifact_map`；任务必须实际生成此文件。这里的大小上限是操作者显式选择，不是自动推导的 benchmark 默认值。
+
+```json
+{
+  "artifacts": {
+    "version": 1,
+    "exports": [
+      {
+        "id": "output",
+        "source": "workspace",
+        "path": "output.json",
+        "content_type": "application/json",
+        "required": true,
+        "max_bytes": 1048576
+      }
+    ]
+  }
+}
+```
+
+这只是任务包片段，完整任务仍需 instruction/source/setup 等字段。NL2Repo 的 `generated_repository` 同样须声明为采集前实际生成的归档；评分不会从当前远端仓库目录重新打包。
+
+当前容器执行器对单个材料/产物及 tar 展开总大小设 256 MiB 上限、tar 文件数 10000、验收日志 16 MiB。这是执行器资源边界，不是官方 benchmark 规则。任务包仍需显式设置 `max_bytes`；超限拒绝，不会截断后判成功。
+
+## 4. 执行所选评分器
 
 ```bash
-uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" grade "$RUN_ID" --dataset "$DATASET" --dataset-sha256 "$DATASET_SHA256"
-# 选择更早的已封口轮次，并覆盖每会话超时：
-uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" --json grade "$RUN_ID" --dataset "$DATASET" --dataset-sha256 "$DATASET_SHA256" --round 1 --timeout-seconds 1800
+uv run --locked --extra experiments --extra evaluation \
+  python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" \
+  --json grade "$RUN_ID" --plan "$PLAN" --round 6
 ```
 
-省略 `--round` 时选择 `config.rounds.count`，即配置的末轮，不会自动退到更早的可用轮次。`--round` 必须为正数且已封口。`--timeout-seconds` 对每个评分会话生效，默认 1800 秒。首版逐会话串行评分，不调度整个批次。
+当前在本机逐会话串行评分。Docker 镜像下载、构建、测试可能耗费较多磁盘与时间；任务产物中的代码不在宿主执行。
 
-锁定的 evaluation extra 提供官方 SWE-bench evaluator。Docker 必须可用且能获取所需镜像；镜像下载、构建和测试可能耗费较多磁盘与时间。每份适用的非空预测在官方新 instance 环境中运行，评分期间没有模型调用。
+| 适配器 | 执行及证据要求 |
+| --- | --- |
+| `swebench` | 锁定官方 4.1.0 CLI，在 fresh instance 环境验收完整 prediction 和匹配数据行。 |
+| `terminal-bench` | 固定官方任务包及 verifier mode；生产计划在干净数据库重放提交 SQL。KV 须有原运行独立 loadgen 的可信测量，不能重新跑负载代替。 |
+| `tua-bench` | 使用官方 verifier/reward 和固定标准答案；仅支持能完整重建的事后环境，不静默替代缺失原环境证据。 |
+| `nl2repo` | 使用官方后处理、命令、计数及 task image 中的原测试。报告原通过率，无二值规则时 `passed=null`；操作者阈值单列。 |
+| `custom` | 隔离容器执行固定脚本，写 `/logs/verifier/result.json`，如 `{"passed": true, "score": 1}`；明确标记 custom。 |
 
-## 5. 读取结果，保留原实验
+适配器名称不表示支持整个 suite 所有任务或版本。未知来源和未覆盖执行模式明确拒绝。[验证报告](../validation/extensible-session-grading.md)记录实测范围与待完成官方验收；fixture 测试不能称为官方 benchmark 成绩。
 
-每次正式调用在 `<runs-dir>/<run_id>/evaluation/<attempt_id>/` 创建新目录，保留之前的 attempt。目录包含评分 intent、补丁、所选数据集记录、evaluator 日志和报告，以及绑定原 run、归档、计划、会话和 Harness 身份的汇总。中断的 attempt 保持不完整，重跑会创建另一个 attempt。
+官方任务包 tar 根保留固定任务的 `task.toml`、`tests/`、`environment/`。Terminal/TUA 要求 `build_official_environment: true`，构建冻结环境并在验收前记录镜像身份。NL2Repo/custom 指定不可变镜像。外部答案和依赖也要固定；仅固定测试脚本不等于固定其中下载的 URL 内容。
 
-汇总区分官方已完成的通过/失败，以及缺预测、基础设施不可用、evaluator 崩溃和超时。未知或格式错误的官方报告不能解释为正常测试不通过。普通任务不作为 SWE instance 评分；无效会话也不会因归档完整或用户接受而变为有效。
+## 5. 阅读独立报告
 
-退出码 `0` 和汇总的 `ok: true` 表示评分操作完成且结果完整，也可能包含官方测试不通过的会话，不表示所有预测通过。应查看汇总中单列的 passed 数量及逐会话结论。缺失或不可评分的预测不计为完整评分。
+每次正式执行创建 `<runs-dir>/<run_id>/evaluation/<attempt_id>/`，保留冻结计划、材料身份、逐会话日志/原报告和归一化汇总。中断 attempt 保持不完整，重跑创建新 attempt；原归档、Session、manifest、checkpoint、seal 不改写。
 
-评分不改原 Session、manifest、checkpoint、seal 或收集归档，不更新 Gitea issue。将技术成绩与单独记录的用户体验对照，而不是用其中一个覆盖另一个。实验字段 `evaluation.official_grading` 继续保持 `false`，让演化循环不接触评分；这里的显式命令提供独立事后评分。
+| 状态 | 含义 |
+| --- | --- |
+| `completed` | 有效执行评分，得出成败或没有二值结论的连续分数 |
+| `not_configured`、`unsupported` | 未选择规则，或不支持来源/合同 |
+| `missing_artifact`、`ungradable` | 缺产物，或不满足证据/环境合同 |
+| `unavailable`、`crashed`、`timed_out` | 评分基础设施、执行或解析失败 |
+| `not_evaluated` | 官方跳过评分，例如 SWE 空预测 |
 
-[验收报告](../validation/post-run-grading.md)分别记录 evaluator 替身的离线测试与实际官方 Docker 评分。这些命令说明支持的流程，不表示示例实验已经通过官方测试。
+非 completed 的 `passed` 为 null，基础设施故障不计普通任务失败。完整 SWE 空补丁记为 `not_evaluated / official_empty_prediction`，不是缺补丁或已完成失败。原官方报告与分母和覆盖率诊断分开；不能删除跳过/错误项后冒充更高的官方成功率。
 
-官方汇总可能在测试加载/收集失败时仍标记 unresolved；若正式测试日志包含明确的 pytest 启动失败，评分会记录 `crashed / official_test_start_failed`，不计正常任务失败。当前 `pvlib-1478` 官方镜像已复现 NumPy 2 与旧项目不兼容的加载错误，详见验收报告；不要据此解读 Harness 能力。
+退出码 `0` 和 `ok: true` 表示完整评分，可能包含有效任务失败，不代表所有任务通过。性能应查看逐会话结论和 score。
+
+独立报告增加 `acceptance_assessment`，不改原接受记录。`valid_accept` 要求有效交互、原用户接受、核验执行合同且 `passed=true`；接受但客观失败为 `false_accept`；缺验收或仅连续分数为 `unverified_accept`；未接受为 `not_applicable`。direct 读取原已完成 review，不依据 Harness 自述成功。
+
+实验配置的 `evaluation.official_grading` 仍为 `false`，使隐藏评分器与演化隔离。这个事后命令和独立 Harness benchmark 框架保持各自流程。

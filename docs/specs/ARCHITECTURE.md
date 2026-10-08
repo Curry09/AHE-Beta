@@ -54,12 +54,31 @@ _蒸馏侧（spec-0006）：persona 卡库读写 + 契约约束校验。_
 
 ### auto_designer.evaluation
 
-_Objective evaluators kept separate from simulated-user judgment._
+_Spec-0083: session artifact collection and independent post-run grading._
 
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
-| `__init__.py` | Objective evaluators kept separate from simulated-user judgment. |
-| `swebench.py` | Official fresh-container SWE-bench objective evidence (spec-0051/T4). |
+| `__init__.py` | Spec-0083: session artifact collection and independent post-run grading. |
+| `acceptance.py` | Keep original acceptance distinct from technical evidence (Spec-0083/T1). |
+| `artifacts.py` | Spec-0083/T3: one bounded, binary artifact collector for both interactions. |
+| `contracts.py` | Read-only requests for independent session grading (Spec-0083/T1). |
+| `registry.py` | Explicit versioned built-ins; no runtime Python plugins (Spec-0083/T1). |
+| `results.py` | Normalized grading results, separate from official reports (Spec-0083/T1). |
+
+### auto_designer.evaluation.adapters
+
+_Fixed official and custom grading adapters (Spec-0083/T4)._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Fixed official and custom grading adapters (Spec-0083/T4). |
+| `container.py` | Bounded staging and isolated Docker execution (Spec-0083/T4). |
+| `custom.py` | Execute an operator-fixed custom verifier in isolation (Spec-0083/T4). |
+| `nl2repo.py` | Pinned TinyDB post-processing and official score parser (Spec-0083/T4). |
+| `profiles.py` | Verified Git subtree identities for the first official tasks (Spec-0083/T4). |
+| `swebench.py` | Spec-0083/T4: SWE adapter with a private official CLI executor. |
+| `terminal_bench.py` | Run exact pinned separate Terminal-Bench verifiers (Spec-0083/T4). |
+| `tua_bench.py` | Reconstruct the first pinned Excel verifier without altering it (Spec-0083/T4). |
 
 ### auto_designer.experiment
 
@@ -77,7 +96,8 @@ _Frozen materials, controllers and local/E2B resource lifecycles._
 | `context.py` | Spec-0069/T2: one credential-free context and model mapping for both runners. |
 | `dashboard.py` | Spec-0072/T4: read-only dashboard bound to a prepared run, without provider discovery. |
 | `engine.py` | Spec-0069/T2: supervise the existing controller, with owned PIDs and receipts. |
-| `grading.py` | Spec-0075/T2: grade immutable collected sessions without resuming an experiment. |
+| `grading.py` | Spec-0083/T5: grade immutable collected sessions without resuming an experiment. |
+| `grading_inputs.py` | Spec-0083/T5: freeze private grading plans before dispatch or allocation. |
 | `infrastructure.py` | Provision, stop, and destroy experiment infrastructure via Compose project. |
 | `manifest.py` | Spec-0071/T3: immutable input manifests and shared append-only runtime facts. |
 | `materials.py` | Spec-0069/T1: compile operator inputs into a checksummed, credential-free run bundle. |
@@ -284,7 +304,19 @@ graph LR
     nauto_designer_distill_seed_adapter["distill.seed_adapter"]
     nauto_designer_distill_seed_library["distill.seed_library"]
     nauto_designer_evaluation["auto_designer.evaluation"]
-    nauto_designer_evaluation_swebench["evaluation.swebench"]
+    nauto_designer_evaluation_acceptance["evaluation.acceptance"]
+    nauto_designer_evaluation_adapters["evaluation.adapters"]
+    nauto_designer_evaluation_adapters_container["adapters.container"]
+    nauto_designer_evaluation_adapters_custom["adapters.custom"]
+    nauto_designer_evaluation_adapters_nl2repo["adapters.nl2repo"]
+    nauto_designer_evaluation_adapters_profiles["adapters.profiles"]
+    nauto_designer_evaluation_adapters_swebench["adapters.swebench"]
+    nauto_designer_evaluation_adapters_terminal_bench["adapters.terminal_bench"]
+    nauto_designer_evaluation_adapters_tua_bench["adapters.tua_bench"]
+    nauto_designer_evaluation_artifacts["evaluation.artifacts"]
+    nauto_designer_evaluation_contracts["evaluation.contracts"]
+    nauto_designer_evaluation_registry["evaluation.registry"]
+    nauto_designer_evaluation_results["evaluation.results"]
     nauto_designer_experiment["auto_designer.experiment"]
     nauto_designer_experiment_backends["experiment.backends"]
     nauto_designer_experiment_backends_base["backends.base"]
@@ -312,6 +344,7 @@ graph LR
     nauto_designer_experiment_dashboard["experiment.dashboard"]
     nauto_designer_experiment_engine["experiment.engine"]
     nauto_designer_experiment_grading["experiment.grading"]
+    nauto_designer_experiment_grading_inputs["experiment.grading_inputs"]
     nauto_designer_experiment_infrastructure["experiment.infrastructure"]
     nauto_designer_experiment_manifest["experiment.manifest"]
     nauto_designer_experiment_materials["experiment.materials"]
@@ -472,7 +505,38 @@ graph LR
     nauto_designer_distill --> nauto_designer_distill_library
     nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
     nauto_designer_distill_seed_adapter --> nauto_designer_models
-    nauto_designer_evaluation --> nauto_designer_evaluation_swebench
+    nauto_designer_evaluation_acceptance --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_container --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_adapters_terminal_bench
+    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_adapters_terminal_bench
+    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_profiles --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_profiles --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_adapters_profiles
+    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_container
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_profiles
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_terminal_bench
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_results
+    nauto_designer_evaluation_artifacts --> nauto_designer_user_sim_runtime
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_custom
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_nl2repo
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_swebench
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_terminal_bench
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_tua_bench
+    nauto_designer_evaluation_registry --> nauto_designer_evaluation_contracts
+    nauto_designer_evaluation_results --> nauto_designer_evaluation_contracts
     nauto_designer_experiment_backends --> nauto_designer_experiment_backends_base
     nauto_designer_experiment_backends_base --> nauto_designer_experiment_config
     nauto_designer_experiment_backends_e2b --> nauto_designer_demand_delivery_evidence
@@ -600,14 +664,20 @@ graph LR
     nauto_designer_experiment_engine --> nauto_designer_experiment_config
     nauto_designer_experiment_engine --> nauto_designer_experiment_context
     nauto_designer_experiment_engine --> nauto_designer_experiment_materials
-    nauto_designer_experiment_grading --> nauto_designer_evaluation_swebench
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_acceptance
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_contracts
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_registry
+    nauto_designer_experiment_grading --> nauto_designer_evaluation_results
     nauto_designer_experiment_grading --> nauto_designer_experiment_config
+    nauto_designer_experiment_grading --> nauto_designer_experiment_grading_inputs
     nauto_designer_experiment_grading --> nauto_designer_experiment_manifest
     nauto_designer_experiment_grading --> nauto_designer_experiment_materials
     nauto_designer_experiment_grading --> nauto_designer_experiment_runtime
     nauto_designer_experiment_grading --> nauto_designer_experiment_workload
     nauto_designer_experiment_grading --> nauto_designer_loop_recovery
     nauto_designer_experiment_grading --> nauto_designer_models
+    nauto_designer_experiment_grading_inputs --> nauto_designer_evaluation_contracts
+    nauto_designer_experiment_grading_inputs --> nauto_designer_experiment_config
     nauto_designer_experiment_infrastructure --> nauto_designer_experiment_backends_local_ci
     nauto_designer_experiment_infrastructure --> nauto_designer_experiment_config
     nauto_designer_experiment_manifest --> nauto_designer_experiment_config
@@ -667,7 +737,7 @@ graph LR
     nauto_designer_loop_runner --> nauto_designer_loop_run_state
     nauto_designer_loop_sim_user --> nauto_designer_demand_evidence_contract
     nauto_designer_loop_sim_user --> nauto_designer_demand_issue_schema
-    nauto_designer_loop_sim_user --> nauto_designer_evaluation_swebench
+    nauto_designer_loop_sim_user --> nauto_designer_evaluation_artifacts
     nauto_designer_loop_sim_user --> nauto_designer_harness_connector
     nauto_designer_loop_sim_user --> nauto_designer_harness_interface
     nauto_designer_loop_sim_user --> nauto_designer_loop_recovery

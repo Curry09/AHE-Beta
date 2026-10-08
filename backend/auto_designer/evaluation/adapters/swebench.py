@@ -1,4 +1,4 @@
-"""Official fresh-container SWE-bench objective evidence (spec-0051/T4)."""
+"""Spec-0083/T4: SWE adapter with a private official CLI executor."""
 
 from __future__ import annotations
 
@@ -15,27 +15,103 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ..contracts import GradingRequest, InputValidationError
+from ..results import ExecutionEvidence, GradingResult
+from .container import TimeBudget, input_hashes, require_material, resolve_image, run_docker
+
+
+class SWEbenchAdapter:
+    name = "swebench"
+    contract_version = 1
+
+    def validate_inputs(self, request: GradingRequest) -> None:
+        require_material(request, "dataset")
+        if not request.instance_id:
+            raise InputValidationError("SWE instance_id is required")
+        if request.source.get("suite") not in {None, "swebench", "SWE-bench Verified", "swe-bench"}:
+            raise InputValidationError("SWE adapter conflicts with task source")
+        if request.config:
+            unknown = set(request.config) - {"official_dataset_row"}
+            if unknown:
+                raise ValueError(f"unknown SWE adapter configuration: {sorted(unknown)}")
+
+    def evaluate(self, request: GradingRequest, attempt_dir: Path) -> GradingResult:
+        self.validate_inputs(request)
+        attempt_dir.mkdir(parents=True, exist_ok=True)
+        budget = TimeBudget(request.timeout_seconds)
+        error = _SWEbenchRunner.preflight()
+        if error:
+            return GradingResult(
+                self.name, 1, "unavailable", reason=error, input_hashes=input_hashes(request)
+            )
+        tag = "grade-" + uuid.uuid4().hex
+        namespace = "auto-designer-frozen"
+        official = _SWEbenchRunner.image_for(request.instance_id)
+        frozen = f"{namespace}/sweb.eval.x86_64.{request.instance_id.lower().replace('__', '_1776_')}:{tag}"
+        try:
+            digest = resolve_image(official, timeout=budget.remaining(), budget=budget)
+            run_docker(["tag", digest, frozen])
+            dataset = request.materials["dataset"].path
+            if request.config.get("official_dataset_row"):
+                dataset = attempt_dir / "instance.json"
+                dataset.write_text(json.dumps([dict(request.config["official_dataset_row"])]))
+            evaluator = _SWEbenchRunner(
+                dataset,
+                attempt_dir,
+                timeout=budget.remaining(),
+                outer_timeout=budget.remaining(),
+                image_namespace=namespace,
+                instance_image_tag=tag,
+            )
+            raw = evaluator.evaluate(instance_id=request.instance_id, patch=request.patch)
+            still_frozen = (
+                resolve_image(frozen, timeout=budget.remaining(30), budget=budget) == digest
+            )
+            evidence = ExecutionEvidence(
+                "fresh_official_instance",
+                raw.get("fresh") is True and still_frozen and raw.get("image_digest") == digest,
+                digest,
+                {"official_image": official, "frozen_image": frozen, "evaluator_version": "4.1.0"},
+            )
+            if raw.get("status") == "completed" and not evidence.verified:
+                status, reason = "ungradable", "frozen official image identity changed"
+            else:
+                status, reason = str(raw["status"]), raw.get("reason")
+            report = attempt_dir / "adapter-result.json"
+            report.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n")
+            return GradingResult(
+                self.name,
+                1,
+                status,
+                passed=raw.get("passed"),
+                score=float(raw["passed"]) if status == "completed" else None,
+                score_definition="official SWE-bench resolved",
+                reason=reason,
+                execution=evidence,
+                raw_report=raw,
+                report_paths=(str(report),),
+                input_hashes=input_hashes(request),
+            )
+        except subprocess.TimeoutExpired:
+            return GradingResult(
+                self.name, 1, "timed_out", reason="official image preparation timed out"
+            )
+        except (RuntimeError, OSError) as exc:
+            return GradingResult(self.name, 1, "unavailable", reason=str(exc))
+        except (ValueError, KeyError, TypeError) as exc:
+            return GradingResult(self.name, 1, "crashed", reason=f"invalid official result: {exc}")
+        finally:
+            try:
+                run_docker(["image", "rm", frozen])
+            except (RuntimeError, OSError, subprocess.TimeoutExpired):
+                pass
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def derive_accept_validity(
-    *, end_reason: str, request_outcomes: list[dict[str, Any]], evaluation: dict[str, Any] | None
-) -> str:
-    """Fail-closed derivation; subjective acceptance never implies technical success."""
-    if end_reason != "accepted":
-        return "not_applicable"
-    if any(row.get("status") in {"timed_out", "crashed"} for row in request_outcomes):
-        return "false_accept"
-    if not evaluation or evaluation.get("status") != "completed":
-        return "unverified_accept"
-    if evaluation.get("fresh") is not True or evaluation.get("passed") is not True:
-        return "false_accept"
-    return "valid_accept"
-
-
-class SWEbenchEvaluator:
+class _SWEbenchRunner:
     """Invoke the official SWE-bench harness for exactly one prediction.
 
     The official runner creates a fresh instance container, applies model_patch,
@@ -51,29 +127,17 @@ class SWEbenchEvaluator:
         *,
         timeout: float = 1800.0,
         python_executable: str = sys.executable,
+        image_namespace: str | None = None,
+        instance_image_tag: str | None = None,
+        outer_timeout: float | None = None,
     ) -> None:
         self.dataset_path = Path(dataset_path).expanduser().resolve()
         self.results_root = Path(results_root).expanduser().resolve()
         self.timeout = timeout
         self.python_executable = python_executable
-
-    @classmethod
-    def from_env(cls) -> SWEbenchEvaluator | None:
-        # Flow-only experiments can explicitly disable the expensive official
-        # evaluator. Normal runs keep the default enabled and fail closed.
-        if os.environ.get("AUTO_DESIGNER_OBJECTIVE_EVALUATION", "1").strip().lower() in {
-            "0",
-            "false",
-            "no",
-            "off",
-            "skip",
-        }:
-            return None
-        dataset = os.environ.get("SWEBENCH_PARQUET", "").strip()
-        root = os.environ.get("SWEBENCH_EVAL_RESULTS_ROOT", "").strip()
-        if not dataset or not root:
-            return None
-        return cls(dataset, root)
+        self.image_namespace = image_namespace
+        self.instance_image_tag = instance_image_tag
+        self.outer_timeout = outer_timeout
 
     @staticmethod
     def preflight() -> str | None:
@@ -149,6 +213,11 @@ class SWEbenchEvaluator:
         )
         patch_sha = hashlib.sha256(patch.encode()).hexdigest()
         image = self.image_for(instance_id)
+        if self.image_namespace and self.instance_image_tag:
+            image = (
+                f"{self.image_namespace}/sweb.eval.x86_64."
+                f"{instance_id.lower().replace('__', '_1776_')}:{self.instance_image_tag}"
+            )
         evaluation_dataset = self._normalized_dataset(
             instance_id=instance_id,
             destination=run_root / "instance.json",
@@ -197,6 +266,15 @@ class SWEbenchEvaluator:
             str(run_root),
         ]
         evidence["command"] = command
+        # Spec-0083/T4: a unique local tag freezes the selected official image;
+        # the runner invokes the official CLI with this frozen identity.
+        if self.image_namespace and self.instance_image_tag:
+            command += [
+                "--namespace",
+                self.image_namespace,
+                "--instance_image_tag",
+                self.instance_image_tag,
+            ]
         try:
             evidence["evaluator_version"] = importlib.metadata.version("swebench")
         except importlib.metadata.PackageNotFoundError:
@@ -207,7 +285,9 @@ class SWEbenchEvaluator:
                 cwd=run_root,
                 capture_output=True,
                 text=True,
-                timeout=self.timeout + 300,
+                timeout=self.outer_timeout
+                if self.outer_timeout is not None
+                else self.timeout + 300,
                 env={
                     key: value
                     for key, value in os.environ.items()

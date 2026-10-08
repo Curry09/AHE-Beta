@@ -116,7 +116,7 @@ def test_complete_model_mapping_and_context_excludes_tokens(prepared, monkeypatc
     assert env["N_SYNTHESIZERS"] == "2"
     assert env["N_OWNERS"] == "0"
     assert env["TOTAL_ROUNDS"] == "2"
-    assert env["AUTO_DESIGNER_OBJECTIVE_EVALUATION"] == "0"
+    assert "AUTO_DESIGNER_OBJECTIVE_EVALUATION" not in env
     assert env["VIGIL_KEEP_ALIVE"] == "0"
     document = Path(env["AUTO_DESIGNER_EXPERIMENT_CONTEXT"]).read_text()
     assert "secret" not in document

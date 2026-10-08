@@ -7,7 +7,12 @@ import re
 from pathlib import Path
 from typing import Any
 
-from auto_designer.experiment.config import ConfigError, config_hash, read_json_document
+from auto_designer.experiment.config import (
+    ConfigError,
+    config_hash,
+    read_json_document,
+    validate_task_package_document,
+)
 
 CONTRACT_VERSION = 1
 _TASK_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -71,6 +76,32 @@ def task_digest(task: dict[str, Any]) -> str:
     )
 
 
+def task_artifact_declarations(package: dict[str, Any]) -> list[dict[str, Any]]:
+    """Read public capture declarations without adding defaults to schema 1 packages."""
+    if package.get("schema_version") != 2:
+        return []
+    validate_task_package_document(package)
+    return json.loads(json.dumps(package.get("artifacts", {}).get("exports", [])))
+
+
+def task_provenance(package: dict[str, Any]) -> dict[str, str]:
+    """Benchmark source is independent of its local task ID and scoring adapter."""
+    if package["kind"] == "benchmark":
+        validate_task_package_document(package)
+        return dict(package["benchmark"])
+    return {"suite": package["kind"], "instance_id": package["id"]}
+
+
+def validate_artifact_backend(package: dict[str, Any], backend: str) -> None:
+    """Current providers have no owned managed-service handle capability (Spec-0081)."""
+    for declaration in task_artifact_declarations(package):
+        if declaration["source"] == "managed_service":
+            raise ConfigError(
+                f"Task {package['id']} artifact {declaration['id']}: {backend} does not support "
+                "controller-owned managed_service capture; requires Spec-0081 capability"
+            )
+
+
 def compile_session_plan(
     config: dict[str, Any],
     catalog: dict[str, Any],
@@ -132,6 +163,14 @@ def catalog_tasks(catalog: dict[str, Any]) -> list[dict[str, Any]]:
     validate_task_ids(tasks)
     for task in tasks:
         try:
+            package = task["package"]
+            version = package.get("schema_version")
+            if "schema_version" in package and (type(version) is not int or version not in {1, 2}):
+                raise ConfigError("Unknown frozen task package schema_version")
+            if version == 2 or task["kind"] == "benchmark":
+                validate_task_package_document(package)
+            elif "artifacts" in package or "benchmark" in package:
+                raise ConfigError("Frozen schema 1 package cannot contain schema 2 fields")
             if (
                 task_digest(task) != task["digest"]
                 or task["package"]["id"] != task["id"]

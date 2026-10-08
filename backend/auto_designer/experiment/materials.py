@@ -31,8 +31,10 @@ from auto_designer.experiment.workload import (
     interaction_plan,
     read_session_plan,
     read_task_catalog,
+    task_artifact_declarations,
     task_digest,
     task_material_path,
+    validate_artifact_backend,
     validate_task_ids,
 )
 
@@ -81,6 +83,7 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
     tasks = [load_task_package(path) for path in config["workload"]["task_packages"]]
     validate_task_ids(tasks)
     for task in tasks:
+        validate_artifact_backend(task, config["runtime"]["backend"])
         for path in [task["instruction_file"], *task["setup"].values()]:
             _require_file(path=Path(path))
         if not Path(task["instruction_file"]).read_text(encoding="utf-8").strip():
@@ -89,6 +92,7 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
             directory = Path(task["source"]["path"])
             if not directory.is_dir():
                 raise ConfigError(f"Task {task['id']} source directory missing: {directory}")
+            _check_artifact_source_paths(task=task, root=directory)
             _snapshot_files(root=directory, paths=None)
     cards = read_json_document(path=Path(config["workload"]["persona_library"]))
     if not isinstance(cards, list) or not all(isinstance(card, dict) for card in cards):
@@ -401,6 +405,7 @@ def _freeze_task_contents(
             destination=source_dir,
         )
         source["path"] = str(source_dir.relative_to(stage))
+    _check_artifact_source_paths(task=task, root=source_dir)
     files = _snapshot_files(root=source_dir, paths=None)
     refs = {}
     hashes = {}
@@ -438,6 +443,25 @@ def _freeze_task_contents(
     }
     record["digest"] = task_digest(record)
     return record
+
+
+def _check_artifact_source_paths(*, task: dict[str, Any], root: Path) -> None:
+    """Reject unsafe existing targets; absent files may be produced by the task later."""
+    for declaration in task_artifact_declarations(task):
+        if declaration["source"] != "workspace":
+            continue
+        target = root
+        parts = declaration["path"].split("/")
+        for index, part in enumerate(parts):
+            target = target / part
+            if target.is_symlink():
+                raise ConfigError(f"Artifact path rejects symbolic links: {declaration['path']}")
+            if index < len(parts) - 1 and target.exists() and not target.is_dir():
+                raise ConfigError(f"Artifact parent must be a directory: {declaration['path']}")
+        if not target.resolve().is_relative_to(root.resolve()):
+            raise ConfigError(f"Artifact path escapes task root: {declaration['path']}")
+        if target.exists() and not target.is_file():
+            raise ConfigError(f"Artifact target must be a regular file: {declaration['path']}")
 
 
 def _controller_root() -> Path:
@@ -748,6 +772,8 @@ def _check_parent_materials(*, config: dict[str, Any]) -> dict[str, Any]:
     from auto_designer.experiment.continuation.source import load_continuation_source
 
     source = load_continuation_source(**config["continuation"])
+    for task in source.tasks:
+        validate_artifact_backend(task["package"], config["runtime"]["backend"])
     if len(source.pairs) != config["rounds"]["sessions_per_round"]:
         raise ConfigError("sessions_per_round must equal the selected parent boundary")
     from auto_designer.experiment.continuation.forge import pending_report

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from auto_designer.evaluation.adapters.swebench import _SWEbenchRunner
 from auto_designer.experiment import grading, materials, workload
 from auto_designer.experiment.collection import collect_archive
 from auto_designer.experiment.config import ConfigError
@@ -39,7 +40,11 @@ def prepared_inputs(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def archived_run(prepared_inputs, tmp_path):
+def archived_run(prepared_inputs, tmp_path, monkeypatch, request):
+    from auto_designer.evaluation.adapters import swebench as adapter
+
+    monkeypatch.setattr(adapter, "resolve_image", lambda *args, **kwargs: "sha256:" + "f" * 64)
+    monkeypatch.setattr(adapter, "run_docker", lambda *args, **kwargs: "")
     config = json.loads(prepared_inputs.read_text())
     config["rounds"]["count"] = 1
     config["workload"].pop("kind")
@@ -48,6 +53,10 @@ def archived_run(prepared_inputs, tmp_path):
     task = json.loads((tmp_path / "task.json").read_text())
     task.update(kind="swebench", interaction="direct")
     task.pop("not_in_benchmark")
+    overrides = getattr(request, "param", {})
+    task.update(overrides)
+    if task["kind"] == "ordinary":
+        task["not_in_benchmark"] = True
     revision = config["source"]["openagents"]["revision"]
     task["source"] = {
         "kind": "git",
@@ -68,7 +77,7 @@ def archived_run(prepared_inputs, tmp_path):
         "run_id": manifest["run_id"],
         **binding,
         "harness_sha": harness_sha,
-        "task_kind": "swebench",
+        "task_kind": task["kind"],
     }
     sessions = directory / "data/role_runs" / manifest["run_id"] / "sessions"
     patch = "diff --git a/task.py b/task.py\n" + "x" * 16000
@@ -104,6 +113,20 @@ def archived_run(prepared_inputs, tmp_path):
             "review_verdict": "accept",
         },
     )
+    if task.get("artifacts"):
+        from auto_designer.evaluation.artifacts import collect_session_artifacts
+        from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+
+        workspace = tmp_path / "trial-workspace"
+        workspace.mkdir()
+        (workspace / "output.bin").write_bytes(b"original submission")
+        session.workspace_evidence["evaluation_artifacts"] = collect_session_artifacts(
+            workspace=LocalWorkspaceRuntime(str(workspace)),
+            sessions_root=sessions,
+            session_id=session_id,
+            provenance=provenance,
+            declarations=task["artifacts"]["exports"],
+        )
     SessionStore(sessions).save(session)
     data = session.to_dict()
     unit_input = {"binding": binding, "user_sha": harness_sha}
@@ -224,12 +247,34 @@ def archived_run(prepared_inputs, tmp_path):
     }
 
 
+def grading_plan(run):
+    path = run["dataset"].parent / "grading-plan.json"
+    write(
+        path,
+        {
+            "schema_version": 1,
+            "materials": {
+                "dataset": {"path": str(run["dataset"]), "sha256": run["dataset_sha256"]}
+            },
+            "graders": [
+                {
+                    "adapter": "swebench",
+                    "contract_version": 1,
+                    "task_ids": [run["task"]["id"]],
+                    "inputs": {"dataset": "dataset"},
+                    "timeout_seconds": 1800,
+                }
+            ],
+        },
+    )
+    return path
+
+
 def invoke(run, **kwargs):
     return grading.grade_run(
         run_id=run["manifest"]["run_id"],
         root=run["directory"].parent,
-        dataset=run["dataset"],
-        dataset_sha256=run["dataset_sha256"],
+        plan=grading_plan(run),
         **kwargs,
     )
 
@@ -289,12 +334,12 @@ def test_offline_validates_complete_large_patch_without_side_effects(archived_ru
     run = archived_run
     before = unchanged(run["directory"])
     monkeypatch.setattr(
-        grading.SWEbenchEvaluator,
+        _SWEbenchRunner,
         "preflight",
         staticmethod(lambda: pytest.fail("offline preflight")),
     )
     monkeypatch.setattr(
-        grading.SWEbenchEvaluator, "evaluate", lambda *a, **k: pytest.fail("offline evaluation")
+        _SWEbenchRunner, "evaluate", lambda *a, **k: pytest.fail("offline evaluation")
     )
     result = invoke(run, offline=True)
     assert result["ok"] and result["report_dir"] is None
@@ -311,13 +356,18 @@ def test_independent_attempts_preserve_original_and_official_failure_is_complete
     run = archived_run
     before = unchanged(run["directory"])
     calls = []
-    monkeypatch.setattr(grading.SWEbenchEvaluator, "preflight", staticmethod(lambda: None))
+    monkeypatch.setattr(_SWEbenchRunner, "preflight", staticmethod(lambda: None))
 
     def evaluate(self, *, instance_id, patch):
         calls.append((instance_id, patch, json.loads(self.dataset_path.read_text())))
-        return {"status": "completed", "fresh": True, "passed": passed}
+        return {
+            "status": "completed",
+            "fresh": True,
+            "passed": passed,
+            "image_digest": "sha256:" + "f" * 64,
+        }
 
-    monkeypatch.setattr(grading.SWEbenchEvaluator, "evaluate", evaluate)
+    monkeypatch.setattr(_SWEbenchRunner, "evaluate", evaluate)
     first = invoke(run)
     second = invoke(run)
     assert first["ok"] and second["ok"]
@@ -331,9 +381,9 @@ def test_independent_attempts_preserve_original_and_official_failure_is_complete
 
 @pytest.mark.parametrize("status", ["crashed", "timed_out", "unavailable", "unknown"])
 def test_evaluator_errors_are_not_completed(archived_run, monkeypatch, status):
-    monkeypatch.setattr(grading.SWEbenchEvaluator, "preflight", staticmethod(lambda: None))
+    monkeypatch.setattr(_SWEbenchRunner, "preflight", staticmethod(lambda: None))
     monkeypatch.setattr(
-        grading.SWEbenchEvaluator,
+        _SWEbenchRunner,
         "evaluate",
         lambda *a, **kw: {"status": status, "passed": False, "fresh": True},
     )
@@ -343,11 +393,9 @@ def test_evaluator_errors_are_not_completed(archived_run, monkeypatch, status):
 
 
 def test_preflight_unavailable_has_complete_report_without_evaluator(archived_run, monkeypatch):
+    monkeypatch.setattr(_SWEbenchRunner, "preflight", staticmethod(lambda: "Docker unavailable"))
     monkeypatch.setattr(
-        grading.SWEbenchEvaluator, "preflight", staticmethod(lambda: "Docker unavailable")
-    )
-    monkeypatch.setattr(
-        grading.SWEbenchEvaluator, "evaluate", lambda *a, **k: pytest.fail("unavailable evaluation")
+        _SWEbenchRunner, "evaluate", lambda *a, **k: pytest.fail("unavailable evaluation")
     )
     result = invoke(archived_run)
     assert not result["ok"] and result["entries"][0]["status"] == "unavailable"
@@ -621,9 +669,9 @@ def test_jsonl_dataset_uses_same_strict_binding(archived_run):
 
 
 def test_official_empty_prediction_is_explicitly_not_fully_graded(archived_run, monkeypatch):
-    monkeypatch.setattr(grading.SWEbenchEvaluator, "preflight", staticmethod(lambda: None))
+    monkeypatch.setattr(_SWEbenchRunner, "preflight", staticmethod(lambda: None))
     monkeypatch.setattr(
-        grading.SWEbenchEvaluator,
+        _SWEbenchRunner,
         "evaluate",
         lambda *a, **k: {
             "status": "not_evaluated",
@@ -774,14 +822,16 @@ def test_resume_during_evaluation_leaves_partial_attempt_without_summary(
         resume()
         return {"status": "completed", "passed": True, "fresh": True}
 
-    monkeypatch.setattr(grading.SWEbenchEvaluator, "preflight", staticmethod(preflight))
-    monkeypatch.setattr(grading.SWEbenchEvaluator, "evaluate", evaluate)
+    monkeypatch.setattr(_SWEbenchRunner, "preflight", staticmethod(preflight))
+    monkeypatch.setattr(_SWEbenchRunner, "evaluate", evaluate)
     with pytest.raises(ConfigError, match="current terminal runtime"):
         invoke(run)
     attempts = list((run["directory"] / "evaluation").glob("grade-*"))
     assert len(attempts) == 1 and (attempts[0] / "intent.json").is_file()
     assert not (attempts[0] / "summary.json").exists()
-    assert bool(list(attempts[0].rglob("result.json"))) is (stage == "evaluate")
+    # Adapter preparation is now part of evaluate. Any scorer diagnostics remain
+    # a partial attempt; the generation guard forbids an authoritative summary.
+    assert list(attempts[0].rglob("result.json"))
 
 
 @pytest.mark.parametrize("mutation", ["remove", "evaluation_status", "interaction_status"])
@@ -832,3 +882,82 @@ def test_trace_default_omissions_normalize_like_real_dataclass_receipt(archived_
     write(path, session)
     recollect(run)
     assert invoke(run, offline=True)["ok"]
+
+
+@pytest.mark.parametrize(
+    "archived_run",
+    [
+        {
+            "schema_version": 2,
+            "kind": "ordinary",
+            "artifacts": {
+                "version": 1,
+                "exports": [
+                    {
+                        "id": "output",
+                        "source": "workspace",
+                        "path": "output.bin",
+                        "content_type": "application/octet-stream",
+                        "required": True,
+                        "max_bytes": 1024,
+                    }
+                ],
+            },
+        }
+    ],
+    indirect=True,
+)
+def test_custom_plan_uses_frozen_original_output_and_keeps_original_session(
+    archived_run, monkeypatch
+):
+    from auto_designer.evaluation.results import ExecutionEvidence, GradingResult
+
+    run = archived_run
+    plan = run["dataset"].parent / "custom-plan.json"
+    write(
+        plan,
+        {
+            "schema_version": 1,
+            "materials": {},
+            "graders": [
+                {
+                    "adapter": "custom",
+                    "contract_version": 1,
+                    "task_ids": [run["task"]["id"]],
+                    "inputs": {},
+                    "timeout_seconds": 30,
+                }
+            ],
+        },
+    )
+
+    class Adapter:
+        def validate_inputs(self, request):
+            assert request.artifacts["output"].payload == b"original submission"
+
+        def evaluate(self, request, directory):
+            assert request.artifacts["output"].path.read_bytes() == b"original submission"
+            return GradingResult(
+                "custom",
+                1,
+                "completed",
+                passed=True,
+                execution=ExecutionEvidence("isolated_custom_verifier", True, "sha256:" + "f" * 64),
+            )
+
+    monkeypatch.setattr(grading, "get_adapter", lambda *args: Adapter())
+    before = unchanged(run["directory"])
+    common = {"run_id": run["manifest"]["run_id"], "root": run["directory"].parent, "plan": plan}
+    offline = grading.grade_run(**common, offline=True)
+    assert offline["ok"] and not (run["directory"] / "evaluation").exists()
+    result = grading.grade_run(**common)
+    assert result["entries"][0]["acceptance_assessment"] == "valid_accept"
+    assert unchanged(run["directory"]) == before
+    # Archived bytes remain the authority even if the live collected copy changes.
+    live = next(
+        (
+            run["directory"] / "data/role_runs" / run["manifest"]["run_id"] / "evaluation-artifacts"
+        ).rglob("output")
+    )
+    live.write_bytes(b"later live change")
+    assert grading.grade_run(**common, offline=True)["ok"]

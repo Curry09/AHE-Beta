@@ -147,18 +147,41 @@ def _original_hashes(root):
 def test_sealed_production_sessions_grade_without_mutating_experiment(
     multiple_inputs, tmp_path, monkeypatch, backend
 ):
-    from auto_designer.experiment import grading
+    from auto_designer.evaluation.adapters import swebench as adapter
+    from auto_designer.evaluation.adapters.swebench import _SWEbenchRunner
+    from auto_designer.experiment import grading, workload
+
+    monkeypatch.setattr(adapter, "resolve_image", lambda *args, **kwargs: "sha256:" + "f" * 64)
+    monkeypatch.setattr(adapter, "run_docker", lambda *args, **kwargs: "")
 
     root, manifest, dataset = _completed_mixed_archive(
         multiple_inputs, tmp_path, monkeypatch, backend
     )
     original = _original_hashes(root)
-    common = {
-        "run_id": manifest["run_id"],
-        "root": root.parent,
-        "dataset": dataset,
-        "dataset_sha256": materials.sha256_file(dataset),
-    }
+    catalog = workload.read_task_catalog(root, manifest)
+    plan = tmp_path / "grading-plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "materials": {
+                    "dataset": {"path": str(dataset), "sha256": materials.sha256_file(dataset)}
+                },
+                "graders": [
+                    {
+                        "adapter": "swebench",
+                        "contract_version": 1,
+                        "task_ids": [
+                            task["id"] for task in catalog["tasks"] if task["kind"] == "swebench"
+                        ],
+                        "inputs": {"dataset": "dataset"},
+                        "timeout_seconds": 1800,
+                    }
+                ],
+            }
+        )
+    )
+    common = {"run_id": manifest["run_id"], "root": root.parent, "plan": plan}
     offline = grading.grade_run(**common, offline=True)
     assert offline["ok"] is True
     assert _original_hashes(root) == original
@@ -169,7 +192,9 @@ def test_sealed_production_sessions_grade_without_mutating_experiment(
 
     def official_boundary(command, **kwargs):
         if command[:3] == ["docker", "image", "inspect"]:
-            return subprocess.CompletedProcess(command, 0, '[{"Id":"sha256:fixture"}]', "")
+            return subprocess.CompletedProcess(
+                command, 0, json.dumps([{"Id": "sha256:" + "f" * 64}]), ""
+            )
         if "swebench.harness.run_evaluation" not in command:
             return original_run(command, **kwargs)
         commands.append(command)
@@ -186,7 +211,7 @@ def test_sealed_production_sessions_grade_without_mutating_experiment(
 
     # No actual official Docker run or dependency installation in this offline
     # fixture. The evaluator's prediction creation and report parsing stay real.
-    monkeypatch.setattr(grading.SWEbenchEvaluator, "preflight", staticmethod(lambda: None))
+    monkeypatch.setattr(_SWEbenchRunner, "preflight", staticmethod(lambda: None))
     monkeypatch.setattr(subprocess, "run", official_boundary)
     first = grading.grade_run(**common)
     assert first["ok"] is True and len(commands) == 2

@@ -125,14 +125,10 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--port", type=int, default=8000)
     dashboard.add_argument("--secrets-file", type=Path, default=argparse.SUPPRESS)
     # Spec-0075/T3: post-run grading never starts a controller or reads credentials.
-    grade = sub.add_parser(
-        "grade", help="Grade collected SWE predictions with the official harness"
-    )
+    grade = sub.add_parser("grade", help="Grade original collected sessions using a private --plan")
     grade.add_argument("run_id")
-    grade.add_argument("--dataset", type=Path, required=True)
-    grade.add_argument("--dataset-sha256", required=True)
+    grade.add_argument("--plan", type=Path, required=True, help="Private grading-plan-v1 JSON")
     grade.add_argument("--round", dest="round_no", type=int)
-    grade.add_argument("--timeout-seconds", type=int, default=1800)
     grade.add_argument("--offline", action="store_true")
     # Spec-0076/T2: source adapters emit the existing task recipe, without provisioning.
     task = sub.add_parser("task", help="Convert seed cards or text into ordinary task packages")
@@ -204,10 +200,8 @@ def dispatch(argv: list[str] | None = None) -> int:
             result = grade_run(
                 run_id=args.run_id,
                 root=args.runs_dir,
-                dataset=args.dataset,
-                dataset_sha256=args.dataset_sha256,
+                plan=args.plan,
                 round_no=args.round_no,
-                timeout_seconds=args.timeout_seconds,
                 offline=args.offline,
             )
             _emit(payload=result, as_json=args.json)

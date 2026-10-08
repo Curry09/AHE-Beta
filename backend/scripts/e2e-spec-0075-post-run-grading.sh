@@ -9,7 +9,7 @@ if [[ ! -x .venv/bin/python ]]; then
 fi
 .venv/bin/python -m pytest -q \
   backend/tests/user/test_prediction_artifacts.py \
-  backend/tests/evaluation/test_swebench.py \
+  backend/tests/evaluation/test_swebench_runner.py \
   backend/tests/test_experiment_grading.py \
   backend/tests/test_experiment_grading_e2e.py \
   backend/tests/test_experiment_cli_v2.py \

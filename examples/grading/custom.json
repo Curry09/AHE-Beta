@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "materials": {
+    "verifier_script": {
+      "path": "materials/verify_output.py",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "graders": [
+    {
+      "adapter": "custom",
+      "contract_version": 1,
+      "task_ids": [
+        "custom-file-task"
+      ],
+      "inputs": {
+        "script": "verifier_script"
+      },
+      "timeout_seconds": 120,
+      "config": {
+        "image": "python@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "argv": [
+          "python3",
+          "/grader/script.py"
+        ],
+        "artifact_map": {
+          "output": "/inputs/output.json"
+        }
+      }
+    }
+  ]
+}

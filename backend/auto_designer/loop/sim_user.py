@@ -14,7 +14,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from auto_designer.demand.issue_schema import NEEDS_TRIAGE, round_label
-from auto_designer.evaluation.swebench import SWEbenchEvaluator, derive_accept_validity
 from auto_designer.harness.connector import HarnessConnector
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.loop.recovery import operation_key
@@ -53,7 +52,6 @@ def _audit_events(
     *,
     workspace_evidence: dict,
     request_outcomes: list[dict],
-    objective_evaluation: dict | None,
 ) -> list[dict]:
     """Build the minimal ordered evidence timeline retained with a session."""
     events: list[dict] = []
@@ -92,17 +90,6 @@ def _audit_events(
             str(workspace_evidence["closed_at"]),
             {"container_id": workspace_evidence.get("container_id")},
         )
-    if objective_evaluation is not None:
-        append(
-            "objective_evaluation_terminal",
-            str(objective_evaluation.get("finished_at") or ""),
-            {
-                "status": objective_evaluation.get("status"),
-                "passed": objective_evaluation.get("passed"),
-                "exit_code": objective_evaluation.get("exit_code"),
-                "patch_sha256": objective_evaluation.get("patch_sha256"),
-            },
-        )
     return events
 
 
@@ -115,6 +102,23 @@ def _freeze_prediction_base(workspace: Workspace) -> None:
         freeze()
     except Exception as exc:  # noqa: BLE001 - still retain user interaction and failure evidence
         workspace.evidence["diff_base_error"] = type(exc).__name__
+
+
+def _collect_evaluation_artifacts(*, workspace, scenario, store, session_id, provenance, evidence):
+    """Spec-0083/T3: both runners preserve the same immutable output receipt."""
+    declarations = (scenario.workspace.params if scenario.workspace else {}).get(
+        "evaluation_artifacts", []
+    )
+    if declarations:
+        from auto_designer.evaluation.artifacts import collect_session_artifacts
+
+        evidence["evaluation_artifacts"] = collect_session_artifacts(
+            workspace=workspace,
+            sessions_root=store.root,
+            session_id=session_id,
+            provenance=provenance or {},
+            declarations=declarations,
+        )
 
 
 def _export_prediction(
@@ -326,7 +330,6 @@ def make_sim_run_session_fn(
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
     round_provider: Callable[[], int | None] | None = None,
-    evaluator: SWEbenchEvaluator | None = None,
 ) -> Callable[..., Session]:
     """返回 Orchestrator 用的 run_session_fn。
 
@@ -438,51 +441,25 @@ def make_sim_run_session_fn(
                 "reason": "no_workspace",
             }
         if ws is not None:
+            _collect_evaluation_artifacts(
+                workspace=ws,
+                scenario=scenario,
+                store=store,
+                session_id=session_id,
+                provenance=provenance,
+                evidence=workspace_evidence,
+            )
             patch, patch_sha = _export_prediction(
                 workspace=ws, store=store, session_id=session_id, evidence=workspace_evidence
             )
             # The interaction boundary is no longer needed once its patch is exported.
-            # Close before the fresh official evaluation so stop evidence is durable.
+            # Persist stop evidence before saving the completed interaction.
             ws.close()
             for key, value in dict(getattr(ws, "evidence", {}) or {}).items():
                 if key not in {"prediction", "diff_sha256", "diff_bytes"}:
                     workspace_evidence[key] = value
 
-        objective_evaluation = None
-        active_evaluator = evaluator if evaluator is not None else SWEbenchEvaluator.from_env()
-        if active_evaluator is not None and instance_id and patch_sha:
-            try:
-                objective_evaluation = active_evaluator.evaluate(
-                    instance_id=str(instance_id), patch=patch
-                )
-            except Exception as exc:  # noqa: BLE001 - persist failed verification as evidence
-                objective_evaluation = {
-                    "evaluator": "swebench.harness.run_evaluation",
-                    "instance_id": str(instance_id),
-                    "patch_sha256": patch_sha,
-                    "status": "crashed",
-                    "passed": False,
-                    "error": str(exc),
-                    "finished_at": utc_now(),
-                }
-        elif evaluator is None and os.environ.get(
-            "AUTO_DESIGNER_OBJECTIVE_EVALUATION", "1"
-        ).strip().lower() in {"0", "false", "no", "off", "skip"}:
-            # Preserve an explicit audit marker; skipped is not a pass.
-            objective_evaluation = {
-                "evaluator": "swebench.harness.run_evaluation",
-                "instance_id": str(instance_id) if instance_id else None,
-                "patch_sha256": patch_sha or None,
-                "status": "skipped",
-                "passed": None,
-                "reason": "disabled_by_experiment_config",
-                "finished_at": utc_now(),
-            }
-        accept_validity = derive_accept_validity(
-            end_reason=res.end_reason,
-            request_outcomes=request_outcomes,
-            evaluation=objective_evaluation,
-        )
+        # Spec-0083/T3: grading is private and happens only after collection.
         terminal_note = next(
             (
                 t.message.strip()
@@ -509,12 +486,9 @@ def make_sim_run_session_fn(
             user_outcome={"end_reason": res.end_reason, "terminal_note": terminal_note},
             request_outcomes=request_outcomes,
             workspace_evidence=workspace_evidence,
-            objective_evaluation=objective_evaluation,
-            accept_validity=accept_validity,
             audit_events=_audit_events(
                 workspace_evidence=workspace_evidence,
                 request_outcomes=request_outcomes,
-                objective_evaluation=objective_evaluation,
             ),
         )
         validate_session_provenance(session, provenance)
@@ -713,6 +687,29 @@ def make_direct_run_session_fn(
         if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 4:
             score = 3
         review_status = "infrastructure_failure" if review_error else "completed"
+        # Spec-0083/T3: freeze outputs after the terminal user review, before reclamation.
+        if workspace_dir is not None:
+            _collect_evaluation_artifacts(
+                workspace=as_runtime(workspace_dir),
+                scenario=scenario,
+                store=store,
+                session_id=session_id,
+                provenance=provenance,
+                evidence=workspace_evidence,
+            )
+            if params.get("evaluation_artifacts"):
+                # The earlier patch was only the terminal review's excerpt.
+                # Persist the actual final state after finalize, using the same exporter.
+                patch, patch_sha = _export_prediction(
+                    workspace=as_runtime(workspace_dir),
+                    store=store,
+                    session_id=session_id,
+                    evidence=workspace_evidence,
+                )
+                if patch_sha:
+                    workspace_evidence.update(
+                        patch_sha256=patch_sha, patch_bytes=len(patch.encode())
+                    )
 
         body = (
             f"[direct task {task_key} / {benchmark}]\n"
@@ -770,7 +767,6 @@ def make_direct_run_session_fn(
             audit_events=_audit_events(
                 workspace_evidence=workspace_evidence,
                 request_outcomes=list(getattr(harness, "request_outcomes", []) or []),
-                objective_evaluation=None,
             ),
         )
         validate_session_provenance(session, provenance)
@@ -807,7 +803,6 @@ def make_mixed_run_session_fn(
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
     round_provider: Callable[[], int | None] | None = None,
-    evaluator: SWEbenchEvaluator | None = None,
 ) -> Callable[..., Session]:
     """Dispatch a frozen task to simulated-user or direct interaction mode."""
 
@@ -818,7 +813,6 @@ def make_mixed_run_session_fn(
         sim_personas=sim_personas,
         on_turn=on_turn,
         round_provider=round_provider,
-        evaluator=evaluator,
     )
     direct = make_direct_run_session_fn(
         client_factory=client_factory,

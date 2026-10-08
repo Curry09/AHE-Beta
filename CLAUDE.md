@@ -9,7 +9,7 @@
 ### 项目文档
 用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；支持冻结任务列表、同任务多用户与 ordinary/SWE 混合计划；N1/N4 公开示例涵盖两后端。带当前 continuation export 的完整归档可通过同入口继承到新 run 追加轮次，双语教程见 docs/tutorials/experiment-continuation.md / .zh-CN.md。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
-完整实验列表通过同入口的 batch check/prepare/run/status/stop/resume/collect 管理，成员仍沿用单 run 身份与冻结配置。实验后官方 SWE 任务评分使用 grade RUN_ID --dataset PATH --dataset-sha256 SHA；两后端均完整 collect 后在本机 Docker 评分，--offline 只校验输入。新会话原子保存完整 patch 与 receipt；旧冻结 controller 的 hash-only 预测不补造。每次评分写独立 evaluation attempt，不改 Session、manifest、checkpoint、seal 或 archive；不读取 provider 凭证，不把 gold/test 数据或分数送回演化。evaluation.official_grading 继续 false；这些用户任务成绩与独立 held-out Harness 泛化评估分开。双语教程见 docs/tutorials/post-run-grading.md / .zh-CN.md。
+完整实验列表通过同入口的 batch check/prepare/run/status/stop/resume/collect 管理，成员仍沿用单 run 身份与冻结配置。实验后的会话客观验收统一使用 grade RUN_ID --plan PATH；SWE、Terminal、TUA、NL2Repo 与 custom 都按独立计划分发，旧 dataset 参数已退役。两后端均完整 collect 后在本机 Docker 评分，--offline 只校验输入。direct 与 simulated 共用产物采集，新会话原子保存完整 patch、产物与 receipt；旧冻结 controller 的 hash-only 预测及缺失产物不补造。KV 可信原测量仍依赖未完成的 Spec-0081。每次评分写独立 evaluation attempt，不改 Session、manifest、checkpoint、seal 或 archive；不读取 provider 凭证，不把 gold/test 数据或分数送回演化。evaluation.official_grading 继续 false；这些用户任务成绩与独立 held-out Harness 泛化评估分开。双语教程见 docs/tutorials/post-run-grading.md / .zh-CN.md。
 
 旧 seed 卡库与自有文本通过统一入口的 task import-seeds LIBRARY --output DIR [--seed ID ...] / task from-text --instruction PATH --id ID --output DIR --not-in-benchmark 转为 ordinary v1 包；两者支持 --interaction direct|simulated_user 和父级 --json。转换不联网、不读模型/provider 凭证、不执行 setup。JSON 结果提供绝对 task_packages 数组，应移除旧 workload.kind/task_package/interaction_plan 后接入 workload.task_packages；tasks.json 仅为输出目录相对路径索引，不是新的运行入口。无 repo 使用带初始 README 的 scratch，不携带答案。oracle、env.test_cmd、gates、provenance 不复制到包或 sidecar；旧 setup 不自动锁依赖，旧镜像、外部服务不自动复现。公开 examples/seed-inputs/ 仅放明确非 benchmark 的小型合成卡与用户指令；历史七卡留在研究归档。双语教程见 docs/tutorials/seed-task-import.md / .zh-CN.md，实验仍走 check/prepare/run。seed 转换与归档 continuation 是两个输入功能；转换和离线检查不证明真实双 provider 实验或任务通过，实际 local 会话验收见 docs/validation/seed-task-import.md。
 
@@ -32,7 +32,7 @@ local + localhost 的工程 CI 由 runtime.local.ci_enabled=true 可选开启，
 
 - **a｜用户侧**：user agent 按 persona 和种子场景使用 harness，产生一段使用过程（包含追问、绕路、卡顿、放弃等情况）。输出两类信号：① 体感评分（类似 cc 的 1-4 评分，作训练信号）；② issue（bug 或需求，来自使用中的具体问题点）。
 
-  SWE-bench 场景按 spec-0051 使用**每会话一个临时容器**：从同一 runnable seed image 启动，persona 的 `read_file`/`run_shell` 与 harness 均只操作容器内 repo，不把 repo `docker cp` 到宿主。harness 不设 240 秒整轮超时，慢请求由 90 秒 persona 心跳决定续等或打断；仅真实崩溃/基础设施绝对上限 fail-closed。会话仍保留主观体感与接受决定，但技术通过只认随后由官方 SWE-bench harness 在新鲜 instance 容器产生的客观结果；两者与最小审计事件分别落入 session JSON。
+  SWE-bench 场景按 spec-0051 使用**每会话一个临时容器**：从同一 runnable seed image 启动，persona 的 `read_file`/`run_shell` 与 harness 均只操作容器内 repo，不把 repo `docker cp` 到宿主。harness 不设 240 秒整轮超时，慢请求由 90 秒 persona 心跳决定续等或打断；仅真实崩溃/基础设施绝对上限 fail-closed。会话仍保留主观体感与接受决定，但技术通过只认随后由官方 SWE-bench harness 在新鲜 instance 容器产生的客观结果；会话及最小审计事件保留在 session JSON，客观结果与接受关系写入独立事后评分报告。
 
 - **b｜开发者侧（交付面，spec-0032 现行）**：由 OpenAgents vigil（独立 CLI 常驻进程）承担。spec-0063 默认 coordination=soft，失败回普通队列；VIGIL_COORDINATION=off 可关闭前置。需求面 Owner 准入的票带 `openagents` 交接令牌，vigil 发现后走「盖 ready → 有界轻量前置（共享机制/软排序，不自动落 blocked_by）→ worktree/分支 → RFC/architecture → draft PR → 实现 → conflict/配置启用的 CI/e2e/review 闸 → 合并进 main」。CI/评审是**工程质量闸**（harness 仓结构冒烟，绝不跑 benchmark），与已去掉的体感门禁维度不同；体感仍纯观测、benchmark 全程 held-out。坏改动在 PR 处被打回、不落 main。
 
@@ -88,7 +88,7 @@ backend/                 # 后端（编排框架）
     nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
     harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
     user/                # user_agent + sim/WorkspaceRuntime（本地 fixture / 每会话 Docker）+ session_store
-    evaluation/          # 官方 SWE-bench fresh-container 客观验收与 accept validity 派生
+    evaluation/          # 共用产物采集、独立评分合同、benchmark/custom adapters 与接受关系
     tracker/             # base.py(IssueTracker接口) + gitea.py(含 PR 观测读路径) + fake.py
     demand/              # Triage / Synthesizer / PM / Owner 及共享需求处理
     guards/              # workspace_jail + repo_guard + harness_boundary；不含内置开发角色

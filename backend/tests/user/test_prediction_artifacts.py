@@ -97,11 +97,6 @@ def _runner(mode: str, store: SessionStore, review: _ReviewClient):
     return run, persona
 
 
-@pytest.fixture(autouse=True)
-def _objective_disabled(monkeypatch) -> None:
-    monkeypatch.setenv("AUTO_DESIGNER_OBJECTIVE_EVALUATION", "0")
-
-
 @pytest.mark.parametrize("mode", ["direct", "simulated"])
 @pytest.mark.parametrize("long_patch", [False, True])
 def test_actual_runners_persist_complete_patch_before_save_and_close(

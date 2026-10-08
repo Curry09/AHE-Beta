@@ -264,6 +264,6 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --json 
 
 ## 实验后 SWE 评分
 
-评分输入独立于实验 JSON。`grade RUN_ID` 必填 `--dataset PATH`（本地 JSON/JSONL/parquet）和 `--dataset-sha256 SHA`；`--round` 选择正整数且已封口的轮次，默认 `config.rounds.count`。`--timeout-seconds` 默认每会话 `1800` 秒。`--offline` 只验证绑定，不调用 Docker、不写评分结果。自定义根目录或批次成员使用全局 `--runs-dir`，机器可读输出用 `--json`。此命令不读凭证文件。
+评分输入独立于实验 JSON。`grade RUN_ID` 必填 `--plan PATH`；私有计划选择任务 ID、适配器与带哈希的材料，SWE 本地官方 JSON/JSONL/parquet 数据集也在其中声明。`--round` 选择正整数且已封口的轮次，默认 `config.rounds.count`。每个 grader 在计划中填写必需的 `timeout_seconds`。`--offline` 只验证绑定，不调用 Docker、不写评分结果。自定义根目录或批次成员使用全局 `--runs-dir`，机器可读输出用 `--json`。此命令不读凭证文件。
 
 安装 `uv sync --locked --extra experiments --extra dev --extra evaluation`。local 与 E2B 均在操作者的 Docker 主机上，以经过验证的终态 COMPLETE 归档评分，并要求新控制器保存的完整预测回执。每次结果写入独立的 `evaluation/<attempt_id>/`，原实验产物不改。gold patch 与隐藏测试是外部评分输入，不能成为冻结演化材料。只有 hash 的旧会话无法还原。详见[事后评分教程](tutorials/post-run-grading.zh-CN.md)和[验收报告](validation/post-run-grading.md)。这些用户任务成绩与 Harness 留出泛化测试分开，不进入反馈或 CI 门禁。
