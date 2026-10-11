@@ -32,13 +32,7 @@ class HarnessEvent:
             raise ProtocolError("harness event must be an object")
         event_type = value.get("type")
         if not isinstance(event_type, str) or not event_type:
-            if "reply" in value:
-                event_type = "reply"
-                value = {**value, "text": value.get("reply")}
-            elif value.get("error") is not None:
-                event_type = "error"
-            else:
-                raise ProtocolError("harness event has no type")
+            raise ProtocolError("harness event has no type")
         seq = value.get("seq")
         if seq is not None and (isinstance(seq, bool) or not isinstance(seq, int)):
             raise ProtocolError("event seq must be an integer")

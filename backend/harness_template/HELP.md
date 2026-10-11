@@ -38,6 +38,12 @@ The assistant runs file and shell operations in `SANDBOX_WORK_DIR`. Treat that d
 - Progress and status lines are updates, not the final answer.
 - The final reply states what changed, what was checked, and any remaining blocker.
 - Interrupting stops the current request and preserves the session for a follow-up.
+- A `completed` reply means the completion tool successfully submitted an answer;
+  it does not certify that the task passed its tests.
+- An `incomplete` reply preserves partial work and explains why execution ended,
+  such as an iteration limit or a response without the completion tool. You can
+  send a follow-up in the same session.
+- Runtime failures are marked as errors, rather than normal completion.
 
 ## Examples
 

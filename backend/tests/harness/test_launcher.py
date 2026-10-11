@@ -20,9 +20,9 @@ for line in sys.stdin:
     line = line.strip()
     if not line:
         continue
-    msg = json.loads(line)["message"]
+    msg = json.loads(line)["text"]
     count += 1
-    sys.stdout.write(json.dumps({"reply": f"{count}:{msg}"}) + "\\n")
+    sys.stdout.write(json.dumps({"type": "reply", "text": f"{count}:{msg}"}) + "\\n")
     sys.stdout.flush()
 """
 _BAD_JSON_ENTRY = (
@@ -30,7 +30,7 @@ _BAD_JSON_ENTRY = (
 )
 _NO_REPLY_ENTRY = (
     "import json, sys\nfor _ in sys.stdin:\n"
-    '    sys.stdout.write(json.dumps({"x": 1}) + "\\n"); sys.stdout.flush()\n'
+    '    sys.stdout.write(json.dumps({"type": "custom", "x": 1}) + "\\n"); sys.stdout.flush()\n'
 )
 _EARLY_EXIT_ENTRY = "import sys\nsys.exit(0)\n"
 # 读一行后长睡不回：让读线程卡在 stdout.readline() 里（在途），用于收尾竞态回归。
@@ -39,17 +39,17 @@ _BLOCKING_ENTRY = "import sys, time\nsys.stdin.readline()\ntime.sleep(300)\n"
 _V2_ENTRY = (
     "import json, sys\nfor line in sys.stdin:\n"
     "    line = line.strip()\n    if not line:\n        continue\n"
-    '    msg = json.loads(line)["message"]\n'
-    '    sys.stdout.write(json.dumps({"reply": f"v2:{msg}"}) + "\\n"); sys.stdout.flush()\n'
+    '    msg = json.loads(line)["text"]\n'
+    '    sys.stdout.write(json.dumps({"type": "reply", "text": f"v2:{msg}"}) + "\\n"); sys.stdout.flush()\n'
 )
 # 回 SANDBOX_WORK_DIR 当前值的 entry：验证 launch(workspace_dir=) 把它注入子进程 env。
 _ENV_ECHO_ENTRY = (
     "import json, os, sys\nfor line in sys.stdin:\n"
     "    line = line.strip()\n    if not line:\n        continue\n"
-    '    sys.stdout.write(json.dumps({"reply": os.environ.get("SANDBOX_WORK_DIR", "(unset)")})'
+    '    sys.stdout.write(json.dumps({"type": "reply", "text": os.environ.get("SANDBOX_WORK_DIR", "(unset)")})'
     ' + "\\n"); sys.stdout.flush()\n'
 )
-_V1_ENTRY = """\
+_TYPED_ENTRY = """\
 import json, sys
 for line in sys.stdin:
     line = line.strip()
@@ -57,14 +57,14 @@ for line in sys.stdin:
         continue
     obj = json.loads(line)
     if obj.get("type") == "message":
-        sys.stdout.write(json.dumps({"type": "progress", "kind": "tool", "text": "v1-progress"}) + "\\n")
-        sys.stdout.write(json.dumps({"type": "reply", "text": "v1:" + obj["text"], "steps": [{"kind": "tool", "text": "v1"}]}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "progress", "kind": "tool", "text": "typed-progress"}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "reply", "text": "typed:" + obj["text"], "steps": [{"kind": "tool", "text": "typed"}]}) + "\\n")
         sys.stdout.flush()
     elif obj.get("type") == "interrupt":
-        sys.stdout.write(json.dumps({"type": "reply", "text": "[v1-interrupted]"}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "reply", "text": "[interrupted]"}) + "\\n")
         sys.stdout.flush()
 """
-_V1_ERROR_ENTRY = """\
+_TYPED_ERROR_ENTRY = """\
 import json, sys
 for line in sys.stdin:
     line = line.strip()
@@ -74,7 +74,7 @@ for line in sys.stdin:
     sys.stdout.write(json.dumps({"type": "error", "message": "boom", "recoverable": False}) + "\\n")
     sys.stdout.flush()
 """
-_V1_TIMEOUT_STATUS_ENTRY = """\
+_TYPED_TIMEOUT_STATUS_ENTRY = """\
 import json, sys
 for line in sys.stdin:
     obj = json.loads(line)
@@ -82,27 +82,27 @@ for line in sys.stdin:
         sys.stdout.write(json.dumps({"type": "reply", "text": "timed out", "status": "timed_out"}) + "\\n")
         sys.stdout.flush()
 """
-_V1_USAGE_ENTRY = """\
+_TYPED_USAGE_ENTRY = """\
 import json, sys
 for line in sys.stdin:
     obj = json.loads(line)
-    if obj.get("type") == "message" or "message" in obj:
+    if obj.get("type") == "message":
         sys.stdout.write(json.dumps({"type": "usage", "provider": "nexau", "model": "m", "input_tokens": 7, "output_tokens": 3, "total_tokens": 10, "usage_source": "reported", "agent_run_id": "h1"}) + "\\n")
-        sys.stdout.write(json.dumps({"reply": "done"}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "reply", "text": "done"}) + "\\n")
         sys.stdout.flush()
 """
-_V1_POST_REPLY_USAGE_ENTRY = """\
+_TYPED_POST_REPLY_USAGE_ENTRY = """\
 import json, sys, time
 for line in sys.stdin:
     obj = json.loads(line)
-    if obj.get("type") == "message" or "message" in obj:
+    if obj.get("type") == "message":
         sys.stdout.write(json.dumps({"type": "reply", "text": "done"}) + "\\n")
         sys.stdout.flush()
         time.sleep(0.05)
         sys.stdout.write(json.dumps({"type": "usage", "total_tokens": 12, "usage_source": "reported"}) + "\\n")
         sys.stdout.flush()
 """
-_V1_INTERRUPT_ENTRY = """\
+_TYPED_INTERRUPT_ENTRY = """\
 import json, sys, threading, time
 busy = {"on": False}
 
@@ -122,7 +122,7 @@ for line in sys.stdin:
         threading.Thread(target=work, daemon=True).start()
     elif obj.get("type") == "interrupt":
         busy["on"] = False
-        sys.stdout.write(json.dumps({"type": "reply", "text": "[v1-interrupted]"}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "reply", "text": "[interrupted]"}) + "\\n")
         sys.stdout.flush()
 """
 
@@ -186,7 +186,7 @@ for line in sys.stdin:
     values['entry_interpreter']=sys.executable
     tool="import json,os,pathlib,sys;pathlib.Path(os.environ['HOME'],'tool-written').write_text(os.environ['AUTO_DESIGNER_ATTEMPT_NONCE']);print(json.dumps({'home':os.environ['HOME'],'prefix':sys.prefix,'nonce':os.environ['AUTO_DESIGNER_ATTEMPT_NONCE'],'cache':os.environ['UV_CACHE_DIR'],'link_mode':os.environ['UV_LINK_MODE']}))"
     values['tool']=json.loads(subprocess.check_output(['python','-c',tool],cwd=os.environ['SANDBOX_WORK_DIR'],text=True))
-    print(json.dumps({'reply':json.dumps(values)}),flush=True)
+    print(json.dumps({'type':'reply','text':json.dumps(values)}),flush=True)
 """
     repo = _make_repo(tmp_path, entry, ["python", "fake_entry.py"])
     defaults = {
@@ -261,7 +261,7 @@ for line in sys.stdin:
 
 
 def test_usage_sideband_is_isolated_and_drained_once(tmp_path) -> None:
-    h = _launcher(tmp_path, _V1_USAGE_ENTRY).launch("main")
+    h = _launcher(tmp_path, _TYPED_USAGE_ENTRY).launch("main")
     try:
         assert h.send("a") == "done"
         assert h.last_progress == []
@@ -275,8 +275,8 @@ def test_usage_sideband_is_isolated_and_drained_once(tmp_path) -> None:
         h.close()
 
 
-def test_v1_reply_status_is_recorded_as_request_outcome(tmp_path) -> None:
-    launcher = _launcher(tmp_path, _V1_TIMEOUT_STATUS_ENTRY)
+def test_reply_status_is_recorded_as_request_outcome(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _TYPED_TIMEOUT_STATUS_ENTRY)
     repo = Path(launcher._harness_repo)
     (repo / "params.yaml").write_text(
         "entry:\n  - python\n  - fake_entry.py\nprotocol: stdio-jsonl-v1\n", encoding="utf-8"
@@ -294,7 +294,7 @@ def test_v1_reply_status_is_recorded_as_request_outcome(tmp_path) -> None:
 
 
 def test_usage_arriving_shortly_after_reply_is_captured(tmp_path) -> None:
-    h = _launcher(tmp_path, _V1_POST_REPLY_USAGE_ENTRY).launch("main")
+    h = _launcher(tmp_path, _TYPED_POST_REPLY_USAGE_ENTRY).launch("main")
     try:
         assert h.send("a") == "done"
         assert h.drain_usage_events() == [
@@ -502,21 +502,21 @@ def test_launch_without_workspace_dir_leaves_sandbox_work_dir_unset(tmp_path, mo
         h.close()
 
 
-def test_v1_protocol_sends_type_message_and_reads_type_reply_progress(tmp_path) -> None:
-    launcher = _launcher(tmp_path, _V1_ENTRY)
+def test_typed_protocol_sends_type_message_and_reads_type_reply_progress(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _TYPED_ENTRY)
     repo = Path(launcher._harness_repo)
     (repo / "params.yaml").write_text(
         "entry:\n  - python\n  - fake_entry.py\nprotocol: stdio-jsonl-v1\n", encoding="utf-8"
     )
-    _commit_all(repo, "enable v1 protocol")
+    _commit_all(repo, "declare typed protocol")
     h = launcher.launch("main")
     try:
-        assert h.send("hello") == "v1:hello"
-        assert h.last_progress == [{"kind": "tool", "text": "v1-progress"}]
-        assert h.last_steps == [{"kind": "tool", "text": "v1"}]
+        assert h.send("hello") == "typed:hello"
+        assert h.last_progress == [{"kind": "tool", "text": "typed-progress"}]
+        assert h.last_steps == [{"kind": "tool", "text": "typed"}]
         events = h.drain_visible_events()
         assert [e["type"] for e in events] == ["progress", "reply"]
-        assert [e["text"] for e in events] == ["v1-progress", "v1:hello"]
+        assert [e["text"] for e in events] == ["typed-progress", "typed:hello"]
         assert all(e["source"] == "harness_stdout" for e in events)
         assert h.drain_visible_events() == []
     finally:
@@ -529,9 +529,9 @@ for line in sys.stdin:
     line = line.strip()
     if not line:
         continue
-    sys.stdout.write(json.dumps({"reply": "done"}) + "\\n")
+    sys.stdout.write(json.dumps({"type": "reply", "text": "done"}) + "\\n")
     sys.stdout.flush()
-    sys.stdout.write(json.dumps({"status": {"note": "handling queued"}}) + "\\n")
+    sys.stdout.write(json.dumps({"type": "status", "text": "handling queued"}) + "\\n")
     sys.stdout.flush()
 """
 
@@ -553,13 +553,13 @@ for line in sys.stdin:
     line = line.strip()
     if not line:
         continue
-    sys.stdout.write(json.dumps({"reply": "first"}) + "\\n")
+    sys.stdout.write(json.dumps({"type": "reply", "text": "first"}) + "\\n")
     sys.stdout.flush()
     time.sleep(0.05)
-    sys.stdout.write(json.dumps({"status": {"note": "handling queued"}}) + "\\n")
+    sys.stdout.write(json.dumps({"type": "status", "text": "handling queued"}) + "\\n")
     sys.stdout.flush()
     time.sleep(0.05)
-    sys.stdout.write(json.dumps({"reply": "second-queued"}) + "\\n")
+    sys.stdout.write(json.dumps({"type": "reply", "text": "second-queued"}) + "\\n")
     sys.stdout.flush()
 """
 
@@ -592,28 +592,28 @@ def test_poll_timeout_when_idle(tmp_path) -> None:
         h.close()
 
 
-def test_v1_protocol_interrupt_uses_type_interrupt(tmp_path) -> None:
-    launcher = _launcher(tmp_path, _V1_INTERRUPT_ENTRY)
+def test_typed_protocol_interrupt_uses_type_interrupt(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _TYPED_INTERRUPT_ENTRY)
     repo = Path(launcher._harness_repo)
     (repo / "params.yaml").write_text(
         "entry:\n  - python\n  - fake_entry.py\nprotocol: stdio-jsonl-v1\n", encoding="utf-8"
     )
-    _commit_all(repo, "enable v1 protocol")
+    _commit_all(repo, "declare typed protocol")
     h = launcher.launch("main")
     try:
         h.begin("long")
-        assert h.control("interrupt") == "[v1-interrupted]"
+        assert h.control("interrupt") == "[interrupted]"
     finally:
         h.close()
 
 
-def test_v1_protocol_error_raises(tmp_path) -> None:
-    launcher = _launcher(tmp_path, _V1_ERROR_ENTRY)
+def test_typed_protocol_error_raises(tmp_path) -> None:
+    launcher = _launcher(tmp_path, _TYPED_ERROR_ENTRY)
     repo = Path(launcher._harness_repo)
     (repo / "params.yaml").write_text(
         "entry:\n  - python\n  - fake_entry.py\nprotocol: stdio-jsonl-v1\n", encoding="utf-8"
     )
-    _commit_all(repo, "enable v1 protocol")
+    _commit_all(repo, "declare typed protocol")
     h = launcher.launch("main")
     try:
         with pytest.raises(RuntimeError, match="boom"):
@@ -659,7 +659,7 @@ def test_launch_help_text_empty_when_help_absent(tmp_path) -> None:
         h.close()
 
 
-# 进度旁路：reply 前可多行 {"progress":...}；poll pending 期间 last_progress 可见。
+# 进度旁路：reply 前可多行 type=progress；poll pending 期间 last_progress 可见。
 _PROGRESS_ENTRY = """\
 import json, sys, time
 for line in sys.stdin:
@@ -667,15 +667,15 @@ for line in sys.stdin:
     if not line:
         continue
     obj = json.loads(line)
-    if "control" in obj:
-        sys.stdout.write(json.dumps({"reply": "[interrupted]"}) + "\\n")
+    if obj.get("type") == "interrupt":
+        sys.stdout.write(json.dumps({"type": "reply", "text": "[interrupted]"}) + "\\n")
         sys.stdout.flush()
         continue
     for text in ("read core.py", "run pytest"):
-        sys.stdout.write(json.dumps({"progress": {"kind": "tool", "text": text}}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "progress", "kind": "tool", "text": text}) + "\\n")
         sys.stdout.flush()
         time.sleep(0.15)
-    sys.stdout.write(json.dumps({"reply": "all done", "steps": [{"kind": "tool", "text": "x"}]}) + "\\n")
+    sys.stdout.write(json.dumps({"type": "reply", "text": "all done", "steps": [{"kind": "tool", "text": "x"}]}) + "\\n")
     sys.stdout.flush()
 """
 
@@ -708,7 +708,7 @@ def work():
     n = 0
     while busy["on"]:
         n += 1
-        sys.stdout.write(json.dumps({"progress": {"kind": "tool", "text": f"step-{n}"}}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "progress", "kind": "tool", "text": f"step-{n}"}) + "\\n")
         sys.stdout.flush()
         time.sleep(0.15)
 
@@ -717,20 +717,20 @@ for line in sys.stdin:
     if not line:
         continue
     obj = json.loads(line)
-    if obj.get("control") in ("status", "peek"):
+    if obj.get("type") in ("status", "peek"):
         sys.stdout.write(json.dumps({
-            "status": {"phase": "running", "elapsed": 0.4, "completed": False,
+            "type": "status", "status": {"phase": "running", "elapsed": 0.4, "completed": False,
                        "current_step": {"kind": "tool", "text": "pytest"}}
         }) + "\\n")
         sys.stdout.flush()
         continue
-    if obj.get("control") == "interrupt":
+    if obj.get("type") == "interrupt":
         busy["on"] = False
         time.sleep(0.05)
-        sys.stdout.write(json.dumps({"reply": "[interrupted]"}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "reply", "text": "[interrupted]"}) + "\\n")
         sys.stdout.flush()
         continue
-    if "message" in obj:
+    if obj.get("type") == "message":
         busy["on"] = True
         threading.Thread(target=work, daemon=True).start()
 """
@@ -771,7 +771,7 @@ seen = []
 
 def work():
     while busy["on"]:
-        sys.stdout.write(json.dumps({"progress": {"kind": "tool", "text": "working"}}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "progress", "kind": "tool", "text": "working"}) + "\\n")
         sys.stdout.flush()
         time.sleep(0.12)
 
@@ -780,14 +780,14 @@ for line in sys.stdin:
     if not line:
         continue
     obj = json.loads(line)
-    if obj.get("control") == "interrupt":
+    if obj.get("type") == "interrupt":
         busy["on"] = False
         time.sleep(0.05)
-        sys.stdout.write(json.dumps({"reply": "[interrupted] saw=" + ",".join(seen)}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "reply", "text": "[interrupted] saw=" + ",".join(seen)}) + "\\n")
         sys.stdout.flush()
         continue
-    if "message" in obj:
-        seen.append(obj["message"])
+    if obj.get("type") == "message":
+        seen.append(obj["text"])
         if not busy["on"]:
             busy["on"] = True
             threading.Thread(target=work, daemon=True).start()
@@ -833,5 +833,27 @@ def test_write_message_alias_begin_and_emit(tmp_path) -> None:
         kind, val = h.poll(2.0)
         assert kind == "reply"
         assert val == "2:b"
+    finally:
+        h.close()
+
+
+@pytest.mark.parametrize("receive", ["poll", "try_reply"])
+def test_untyped_reply_is_rejected(tmp_path, receive):
+    entry = 'import json,sys\nfor line in sys.stdin:\n    print(json.dumps({"reply":"done"}),flush=True)\n'
+    h = _launcher(tmp_path, entry).launch("main")
+    try:
+        h.write_message("hello")
+        if receive == "try_reply":
+            h._reader.join(timeout=0.05)
+            # Synchronize with the stdout reader without imposing a product timeout.
+            import time
+
+            deadline = time.monotonic() + 2
+            while h._line_q.empty() and time.monotonic() < deadline:
+                time.sleep(0.01)
+        with pytest.raises(RuntimeError, match="type"):
+            h.poll(2) if receive == "poll" else h.try_reply()
+        assert h.last_request_status == "crashed"
+        assert h.request_outcomes[-1]["termination_source"] == "protocol"
     finally:
         h.close()

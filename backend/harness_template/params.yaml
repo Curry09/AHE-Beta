@@ -3,8 +3,7 @@
 entry:
   - python3
   - entry.py
-# Preferred process protocol is stdio JSONL v1. The entry process also accepts
-# legacy {"message"}/{"control"} input for local compatibility.
+# The process exchanges one typed JSON object per line.
 protocol: stdio-jsonl-v1
 observations: artifact-observations-v1
 # cwd: .

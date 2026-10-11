@@ -1,4 +1,4 @@
-"""Persistent stdio-jsonl-v1 client for the frozen harness.
+"""Persistent typed JSON Lines client for the frozen harness.
 
 This module has no Harbor or tau2 imports so it can be used by both benchmark
 stacks and unit-tested without installing either framework.
@@ -152,14 +152,13 @@ class HarnessStdioSession:
                     raise HarnessProtocolError("harness stdout reader failed") from item
                 seen.append(item)
                 event_type = item.get("type")
-                # Usage frames legitimately carry ``"error": null``. Only a
-                # v1 error frame or a non-empty legacy error payload is fatal.
-                if event_type == "error" or (event_type is None and item.get("error") is not None):
+                # Usage frames may carry "error": null; only error events are fatal.
+                if not isinstance(event_type, str) or not event_type:
+                    raise HarnessProtocolError("harness event has no type")
+                if event_type == "error":
                     raise HarnessProtocolError(f"harness error event: {item}")
                 if event_type == "reply":
                     reply_text = item.get("text", "")
-                elif "reply" in item:  # legacy protocol compatibility
-                    reply_text = item.get("reply", "")
                 else:
                     continue
                 if not isinstance(reply_text, str):
@@ -215,6 +214,8 @@ def harness_environment(
 
     env = dict(parent if parent is not None else os.environ)
     env["SANDBOX_WORK_DIR"] = str(work_dir)
+    # Frozen sources may default to untyped output. Select the typed contract
+    # at this artifact boundary; the current Seed no longer reads this variable.
     env["HARNESS_STDIO_PROTOCOL"] = "stdio-jsonl-v1"
     env["PYTHONUNBUFFERED"] = "1"
     if model:

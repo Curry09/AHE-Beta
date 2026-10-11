@@ -99,7 +99,7 @@ class HarnessSmokeTest(unittest.TestCase):
     def test_status_wire_out_is_user_visible_event(self) -> None:
         entry = importlib.import_module("entry")
         event = entry._wire_out("status", text="[queued] waiting")
-        self.assertIn("status", event)
+        self.assertEqual(event["type"], "status")
         self.assertIn("[queued]", json.dumps(event, ensure_ascii=False))
 
     def test_llm_span_emits_machine_usage_without_response_content(self) -> None:
@@ -110,21 +110,16 @@ class HarnessSmokeTest(unittest.TestCase):
         collector.set_session_id("agent-1")
         span = Span(id="", name="OpenAI chat", type=SpanType.LLM)
         stdout = io.StringIO()
-        old_protocol = entry._OUTPUT_PROTOCOL
-        entry._OUTPUT_PROTOCOL = entry._V1
-        try:
-            with contextlib.redirect_stdout(stdout):
-                collector.end_span(
-                    span,
-                    outputs={
-                        "id": "req-1",
-                        "model": "m",
-                        "usage": {"prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14},
-                        "choices": [{"message": {"content": "secret answer"}}],
-                    },
-                )
-        finally:
-            entry._OUTPUT_PROTOCOL = old_protocol
+        with contextlib.redirect_stdout(stdout):
+            collector.end_span(
+                span,
+                outputs={
+                    "id": "req-1",
+                    "model": "m",
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14},
+                    "choices": [{"message": {"content": "secret answer"}}],
+                },
+            )
         event = json.loads(stdout.getvalue())
         self.assertEqual(event["type"], "usage")
         self.assertEqual(event["total_tokens"], 14)
@@ -137,21 +132,16 @@ class HarnessSmokeTest(unittest.TestCase):
 
         collector = entry._make_step_collector()
         stdout = io.StringIO()
-        old_protocol = entry._OUTPUT_PROTOCOL
-        entry._OUTPUT_PROTOCOL = entry._V1
-        try:
-            with contextlib.redirect_stdout(stdout):
-                collector.end_span(
-                    Span(id="one", name="first call", type=SpanType.LLM),
-                    outputs={"usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 2}},
-                )
-                collector.end_span(
-                    Span(id="two", name="retry", type=SpanType.LLM),
-                    outputs={},
-                    error=RuntimeError("provider failed"),
-                )
-        finally:
-            entry._OUTPUT_PROTOCOL = old_protocol
+        with contextlib.redirect_stdout(stdout):
+            collector.end_span(
+                Span(id="one", name="first call", type=SpanType.LLM),
+                outputs={"usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 2}},
+            )
+            collector.end_span(
+                Span(id="two", name="retry", type=SpanType.LLM),
+                outputs={},
+                error=RuntimeError("provider failed"),
+            )
 
         events = [json.loads(line) for line in stdout.getvalue().splitlines()]
         self.assertEqual([event["type"] for event in events], ["usage", "usage"])
@@ -166,8 +156,6 @@ class HarnessSmokeTest(unittest.TestCase):
 
         collector = entry._make_step_collector()
         stdout = io.StringIO()
-        old_protocol = entry._OUTPUT_PROTOCOL
-        entry._OUTPUT_PROTOCOL = entry._V1
 
         def emit(index: int) -> None:
             collector.end_span(
@@ -175,11 +163,8 @@ class HarnessSmokeTest(unittest.TestCase):
                 outputs={"usage": {"input_tokens": index, "output_tokens": 1}},
             )
 
-        try:
-            with contextlib.redirect_stdout(stdout), ThreadPoolExecutor(max_workers=5) as pool:
-                list(pool.map(emit, range(20)))
-        finally:
-            entry._OUTPUT_PROTOCOL = old_protocol
+        with contextlib.redirect_stdout(stdout), ThreadPoolExecutor(max_workers=5) as pool:
+            list(pool.map(emit, range(20)))
 
         events = [json.loads(line) for line in stdout.getvalue().splitlines()]
         self.assertEqual(len(events), 20)
@@ -206,6 +191,20 @@ class HarnessSmokeTest(unittest.TestCase):
         out = stdout.getvalue()
         self.assertIn("queued", out)
         self.assertIn("previous request", out)
+
+    def test_untyped_input_does_not_dispatch_messages_or_controls(self) -> None:
+        entry = importlib.import_module("entry")
+        messages = queue.Queue()
+        controls = queue.Queue()
+        old_stdin = sys.stdin
+        sys.stdin = io.StringIO('{"message":"old input"}\n{"control":"interrupt"}\n')
+        try:
+            entry._stdin_reader(messages, controls, threading.Event())
+        finally:
+            sys.stdin = old_stdin
+        self.assertIs(messages.get_nowait(), entry._EOF)
+        self.assertTrue(messages.empty())
+        self.assertTrue(controls.empty())
 
     def test_product_docs_present_and_split_by_audience(self) -> None:
         for rel in ("HELP.md", "META_SPEC.md", ".env.example", "requirements.txt"):

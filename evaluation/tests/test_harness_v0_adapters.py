@@ -106,3 +106,16 @@ def test_tau_marker_rejects_unknown_tool() -> None:
     )
     with pytest.raises(ValueError, match="unknown"):
         agent._parse_tool_call('<TAU3_TOOL_CALL>{"name":"missing","arguments":{}}</TAU3_TOOL_CALL>')
+
+
+@pytest.mark.parametrize("payload", [{"reply": "done"}, {"error": "failed"}])
+def test_stdio_session_rejects_untyped_events(tmp_path, payload):
+    fake = tmp_path / "fake.py"
+    fake.write_text(
+        "import json,sys\nfor raw in sys.stdin:\n    print("
+        + repr(json.dumps(payload))
+        + ",flush=True)\n"
+    )
+    with HarnessStdioSession([sys.executable, "-u", str(fake)], cwd=tmp_path) as session:
+        with pytest.raises(HarnessProtocolError, match="type"):
+            session.request("one", timeout=2)

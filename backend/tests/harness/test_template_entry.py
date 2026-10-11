@@ -1,6 +1,7 @@
 """harness 种子 entry.py 的 _reply 鲁棒性单测：空回复不得静默通过（不依赖真 nexau/网络）。
 
-entry.py 在 harness_template/（非包），用 importlib 按路径加载；_reply 仅依赖 agent.run，注入假 agent。
+entry.py 在 harness_template/（非包），用 importlib 按路径加载，以假 agent 验证重试和中断。
+实际 NexAU 终态证据与进程协议验证见 test_seed_terminal_status.py。
 """
 
 from __future__ import annotations
@@ -92,11 +93,11 @@ def test_system_prompt_loads_instructions_from_file(
     assert [part.text for part in parts] == [expected]
 
 
-def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
+def test_reply_without_execution_facts_is_not_completed(entry: ModuleType) -> None:
     agent = _Agent(["hello"])
     out_agent, text, status = entry._reply(agent, "hi", _no_rebuild)
-    assert text == "hello"
-    assert status == "completed"
+    assert text == "[incomplete: unavailable]\nhello"
+    assert status == "incomplete"
     assert out_agent is agent  # 未重建，沿用同实例
     assert agent.calls == 1
 
@@ -104,8 +105,8 @@ def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
 def test_reply_retries_on_blank_then_succeeds(entry: ModuleType) -> None:
     agent = _Agent(["", "   ", "real answer"])
     out_agent, text, status = entry._reply(agent, "hi", _no_rebuild)
-    assert text == "real answer"
-    assert status == "completed"
+    assert text == "[incomplete: unavailable]\nreal answer"
+    assert status == "incomplete"
     assert out_agent is agent  # 空回复同 agent 重试，不重建
     assert agent.calls == 3  # 空串/纯空白都触发重试
 
@@ -187,7 +188,7 @@ def test_reply_interrupt_gracefully_stops_and_keeps_agent(entry: ModuleType) -> 
     """打断：ctrl_q 收到 interrupt → force_stop 优雅停 → 回定型 [interrupted]，不重试、保留同 agent（会话不丢）。"""
     agent = _StoppableAgent()
     ctrl_q: queue.Queue = queue.Queue()
-    threading.Timer(0.2, lambda: ctrl_q.put({"control": "interrupt"})).start()
+    threading.Timer(0.2, lambda: ctrl_q.put({"type": "interrupt"})).start()
     out_agent, text, status = entry._reply(agent, "hi", _no_rebuild, ctrl_q)
     assert text == entry._INTERRUPT_REPLY
     assert out_agent is agent  # 优雅停止保留 history → 沿用同实例，未重建
@@ -213,7 +214,7 @@ def test_reply_interrupt_without_stop_capability_rebuilds_with_history(entry: Mo
     stale = _UnstoppableAgent()
     fresh = _Agent(["after rebuild interrupt"])
     ctrl_q: queue.Queue = queue.Queue()
-    ctrl_q.put({"control": "interrupt"})  # 起手即有打断
+    ctrl_q.put({"type": "interrupt"})  # 起手即有打断
 
     def rebuild(old):
         fresh.history = list(getattr(old, "history", []) or [])

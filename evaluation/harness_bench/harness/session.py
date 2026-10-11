@@ -202,7 +202,7 @@ class HarnessSession:
     def interrupt(self, timeout: float = 30.0) -> HarnessReply | None:
         self.start()
         assert self.process is not None and self.process.stdin is not None
-        frame = {"type": "control", "control": "interrupt"}
+        frame = {"type": "interrupt"}
         with self._write_lock:
             self._record("controller", frame)
             self.process.stdin.write(json.dumps(frame) + "\n")

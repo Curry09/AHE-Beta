@@ -8,7 +8,7 @@ The harness product itself exposes human-facing behavior. The connector adapts s
 
 The target transport is stdio JSON Lines: one JSON object per line.
 
-## stdio-jsonl-v1
+## Message format
 
 ### Input
 
@@ -22,22 +22,9 @@ The target transport is stdio JSON Lines: one JSON object per line.
 
 ```json
 {"type":"progress","kind":"tool","text":"Running tests"}
-{"type":"reply","text":"Done","steps":[]}
+{"type":"reply","text":"Done","status":"completed","termination_reason":"complete_task","steps":[]}
 {"type":"error","message":"LLM_API_KEY is missing","recoverable":false}
 ```
-
-## Legacy compatibility
-
-Old harness refs may still use:
-
-```json
-{"message":"Fix the failing test"}
-{"control":"interrupt"}
-{"progress":{"kind":"tool","text":"Running tests"}}
-{"reply":"Done","steps":[]}
-```
-
-The launcher supports both formats. New templates should declare `protocol: stdio-jsonl-v1` in `params.yaml`.
 
 ## Platform seam API (Spec-0036)
 
@@ -48,12 +35,14 @@ User messages share **one stdin write**:
 
 Soft wake on stdout:
 
-- `poll(timeout)` — records `progress` / `status` and keeps waiting; returns on `type=reply` (or legacy `reply` field), or `pending` on timeout. **Not** gated by a write-path flag.
+- `poll(timeout)` — records `progress` / `status` and keeps waiting; returns on `type=reply`, or `pending` on timeout. **Not** gated by a write-path flag.
 - Blocking `send(text)` = `write_message` + poll until reply.
 
 Outer channel (unchanged from Spec-0022):
 
 - `interrupt` / `shutdown` — not ordinary messages.
+
+A terminal reply includes `status` and `termination_reason`. Receiving a reply does not by itself establish successful execution or objective task correctness.
 
 ## Ownership
 

@@ -27,7 +27,7 @@ _HERE = Path(__file__).resolve().parent
 # 空回复 / 网关毛刺用 _RUN_RETRIES 退避重试（同实例，不换 session）。
 # agent.run 没有整轮墙钟上限；慢任务由外层 90s persona 心跳观测并决定续等/打断。
 _RUN_RETRIES = 4
-# 打断（control:interrupt）后等待 nexau 优雅停止（保留 session/history）的宽限秒数：
+# 打断（type:interrupt）后等待 nexau 优雅停止（保留 session/history）的宽限秒数：
 # executor.force_stop() 只置位中断信号，run 会在下一个检查点安全退出。超过宽限仍没退，
 # 说明这次没赶上优雅停止 → 换新 agent_id 重建避自锁，并显式回灌 history。
 _INTERRUPT_GRACE = 15.0
@@ -37,8 +37,6 @@ _INTERRUPT_REPLY = (
     "会话上下文已保留——你可以直接给出修改后的要求或下一条指示，我会接着当前进度继续。"
 )
 _HARNESS_USER_ID = "harness_user"
-_V1 = "stdio-jsonl-v1"
-_OUTPUT_PROTOCOL = os.environ.get("HARNESS_STDIO_PROTOCOL", "legacy")
 
 # 内部分发：message 首词匹配 slash（如 /help /exit /quit）；其余走 agent。
 _HELP_PATH = _HERE / "HELP.md"
@@ -105,19 +103,8 @@ _stdout_lock = threading.Lock()
 
 
 def _wire_out(event_type: str, **payload) -> dict:
-    """输出帧：目标 stdio-jsonl-v1 或 legacy wire。"""
-    if _OUTPUT_PROTOCOL == _V1:
-        return {"type": event_type, **payload}
-    if event_type == "progress":
-        return {"progress": {"kind": payload.get("kind"), "text": payload.get("text")}}
-    if event_type == "reply":
-        out = {"reply": payload.get("text", "")}
-        if payload.get("steps"):
-            out["steps"] = payload["steps"]
-        return out
-    if event_type == "error":
-        return {"error": payload}
-    return {event_type: payload}
+    """Encode a process event as one typed JSON object."""
+    return {"type": event_type, **payload}
 
 
 def _emit_progress(*, kind: str, text: str) -> None:
@@ -168,6 +155,9 @@ def _run_supervised(agent, message, ctrl_q):
     工作线程只是为了让主线程持续处理 interrupt，不再用 deadline 放弃正在运行的请求。
     ctrl_q 为 None 时等到 agent.run 自身返回。"""
     box: dict = {}
+    outcome = getattr(agent, "_harness_outcome", None)
+    if outcome is not None:
+        outcome.reset()
     attempt_id = uuid.uuid4().hex
     began = time.monotonic()
     observer.event("attempt_started", attempt_id=attempt_id)
@@ -190,7 +180,7 @@ def _run_supervised(agent, message, ctrl_q):
                 ctrl = ctrl_q.get_nowait()
             except queue.Empty:
                 ctrl = None
-            if isinstance(ctrl, dict) and ctrl.get("control") == "interrupt":
+            if isinstance(ctrl, dict) and ctrl.get("type") == "interrupt":
                 observer.event("interrupt_requested", attempt_id=attempt_id)
                 stopped = _force_stop(agent)
                 if stopped:
@@ -246,6 +236,58 @@ def _restore_history(agent, messages) -> None:
         pass
 
 
+class _ExecutionOutcome:
+    """Per-attempt facts from NexAU hooks; reply text is never completion evidence."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.stop_reason = None
+        self.completion_tool_succeeded = False
+
+    def terminal(self):
+        reason = self.stop_reason or "unavailable"
+        if reason == "stop_tool_triggered" and self.completion_tool_succeeded:
+            return "completed", "complete_task"
+        if reason == "error_occurred":
+            return "crashed", reason
+        if reason == "user_interrupted":
+            return "interrupted", reason
+        return "incomplete", reason
+
+
+def _make_terminal_observer(outcome):
+    """Observe typed execution facts without modifying the model/tool lifecycle."""
+    from nexau.archs.main_sub.execution.hooks import HookResult, Middleware
+
+    class TerminalObserver(Middleware):
+        def after_tool(self, hook_input):
+            if hook_input.tool_name == "complete_task":
+                output = hook_input.tool_output
+                # NexAU normalizes a string tool result into {"result": ...}.
+                if isinstance(output, dict) and "result" in output:
+                    output = output["result"]
+                if isinstance(output, str):
+                    try:
+                        output = json.loads(output)
+                    except (ValueError, TypeError):
+                        output = None
+                outcome.completion_tool_succeeded = (
+                    isinstance(output, dict)
+                    and output.get("success") is True
+                    and output.get("task_completed") is True
+                )
+            return HookResult.no_changes()
+
+        def after_agent(self, hook_input):
+            reason = hook_input.stop_reason
+            outcome.stop_reason = reason.name.lower() if reason is not None else None
+            return HookResult.no_changes()
+
+    return TerminalObserver()
+
+
 def _build_agent(collector, session_id, agent_id):
     """按本目录 agent.yaml 构造工具型 nexau Agent（只挂 bash + complete_task）。
 
@@ -253,15 +295,31 @@ def _build_agent(collector, session_id, agent_id):
     挂 collector 作 tracer：内层每步收进 collector.steps，经协议 steps 提供给调用方。
     """
     from nexau import Agent, AgentConfig
+    from nexau.archs.main_sub.execution.hooks import MiddlewareManager
 
     cfg = AgentConfig.from_yaml(config_path=_HERE / "agent.yaml")
     cfg.resolved_tracer = collector  # 内层过程流 → collector.steps（诊断用，不影响回复）
-    return Agent(
+    outcome = _ExecutionOutcome()
+    terminal_observer = _make_terminal_observer(outcome)
+    cfg.middlewares = [*(cfg.middlewares or []), terminal_observer]
+    agent = Agent(
         config=cfg,
         session_id=session_id,
         agent_id=agent_id,
         user_id=_HARNESS_USER_ID,
     )
+    # NexAU 0.4.1 bridges model calls to sync whenever this manager is nonempty.
+    # Our observer only needs execution/tool hooks. Keep model wrappers exactly
+    # as configured, preserving native async cancellation for the default Seed.
+    agent.executor.llm_caller.middleware_manager = MiddlewareManager(
+        [
+            middleware
+            for middleware in agent.executor.middleware_manager.middlewares
+            if middleware is not terminal_observer
+        ]
+    )
+    agent._harness_outcome = outcome
+    return agent
 
 
 def _unwrap_reply(text: str) -> str:
@@ -462,8 +520,18 @@ def _reply(agent, message: str, rebuild, ctrl_q=None):
         try:
             out = _run_supervised(agent, message, ctrl_q)  # 无整轮超时，但可由 persona 打断
             text = out if isinstance(out, str) else (out[0] if out else "")  # 工具型返回 result 串
-            if text and text.strip():  # 非空才算成功
-                return agent, text, "completed"
+            if text and text.strip():
+                outcome = getattr(agent, "_harness_outcome", None)
+                status, reason = (
+                    outcome.terminal() if outcome is not None else ("incomplete", "unavailable")
+                )
+                if status == "incomplete":
+                    text = f"[incomplete: {reason}]\n" + text
+                elif status == "crashed":
+                    text = "[harness error] " + text
+                elif status == "interrupted":
+                    text = _INTERRUPT_REPLY
+                return agent, text, status
             last = "empty reply"  # 空回复（网关 200+空内容不抛异常）视为失败，不得静默返回
         except _Interrupted as it:  # 用户打断：不重试，保留/重建后回定型回复
             if it.rebuild:
@@ -480,9 +548,9 @@ _EOF = object()  # stdin 读线程读到 EOF 时投递的哨兵
 
 
 def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue, busy: threading.Event) -> None:
-    """后台逐行读 stdin，按类型分发：{"message":..} → msg_q，{"control":..} → ctrl_q。
+    """后台逐行读 stdin，按 type 分发：message → msg_q，interrupt → ctrl_q。
 
-    独立线程读，才能在某轮 agent.run 阻塞进行中仍收到 {"control":"interrupt"} 并即时打断
+    独立线程读，才能在某轮 agent.run 阻塞进行中仍收到 {"type":"interrupt"} 并即时打断
     （主线程正忙于该轮、无法自己读 stdin）。busy 时收到新 message 会先输出 queued 状态，
     让用户知道输入没有被静默吞掉，而是等待当前处理结束后进入队列。非法行/无 message 的行静默跳过；EOF 投 _EOF 收尾。"""
     for line in sys.stdin:
@@ -500,7 +568,7 @@ def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue, busy: threading.Event
             msg_q.put(_EOF)
             return
         if typ == "interrupt":
-            ctrl_q.put({"control": "interrupt"})
+            ctrl_q.put({"type": "interrupt"})
         elif typ == "message" and isinstance(obj.get("text"), str):
             was_queued = busy.is_set()
             if was_queued:
@@ -509,16 +577,6 @@ def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue, busy: threading.Event
                     "this message has been queued and will be handled after the current response."
                 )
             msg_q.put({"text": obj["text"], "queued": was_queued})
-        elif "control" in obj:
-            ctrl_q.put(obj)
-        elif "message" in obj:
-            was_queued = busy.is_set()
-            if was_queued:
-                _emit_status(
-                    "[queued] I am still working on the previous request; "
-                    "this message has been queued and will be handled after the current response."
-                )
-            msg_q.put({"text": obj["message"], "queued": was_queued})
     msg_q.put(_EOF)
 
 
@@ -584,6 +642,17 @@ def main() -> None:
         reply = _unwrap_reply(raw)  # 拆信封：用户只看最终答案
         steps = list(collector.steps)  # 完整内层迭代 → 诊断元数据；用户答案只看 reply
         payload = _wire_out("reply", text=reply, steps=steps, status=terminal_status)
+        outcome = getattr(agent, "_harness_outcome", None)
+        if terminal_status == "interrupted":
+            payload["termination_reason"] = "user_interrupted"
+        elif terminal_status == "crashed":
+            payload["termination_reason"] = (
+                "error_occurred"
+                if outcome and outcome.stop_reason == "error_occurred"
+                else "retry_exhausted"
+            )
+        elif outcome is not None:
+            payload["termination_reason"] = outcome.terminal()[1]
         with _stdout_lock:  # 与 progress 旁路互斥，保证终态行完整
             sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
             sys.stdout.flush()

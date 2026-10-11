@@ -331,7 +331,6 @@ def _handle(tmp_path, body, *, budget="0.1", grace="0.5"):
             "AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS": grace,
         },
         "",
-        protocol="stdio-jsonl-v1",
     )
 
 

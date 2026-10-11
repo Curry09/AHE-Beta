@@ -75,10 +75,7 @@ def _sideband_preview(payload: dict) -> str:
 
 def _is_control_ack_sideband(payload: dict) -> bool:
     """是否算「对本 control 的应答旁路」（排除夹杂的纯 progress 工具活动条）。"""
-    if "status" in payload:
-        return True
-    # 除 progress 外还有其它键 → 未知旁路也认（协议放宽，不注册）
-    return any(k != "progress" for k in payload)
+    return payload.get("type") != "progress"
 
 
 class _HarnessHandle:
@@ -90,7 +87,6 @@ class _HarnessHandle:
         cwd: Path,
         env: dict[str, str],
         help_text: str,
-        protocol: str = "legacy",
         workspace_runtime=None,
         limits: RequestLimits | None = None,
     ) -> None:
@@ -99,7 +95,6 @@ class _HarnessHandle:
         self._env = {**os.environ, **env}
         self._limits = limits or request_limits(self._env, fallback=_SEND_ABS_CAP)
         self._env.update(product_budget_environment(self._limits))
-        self._protocol = protocol
         self._workspace_runtime = workspace_runtime
         self._proc: subprocess.Popen[str] | None = None
         self._closed = False
@@ -236,23 +231,16 @@ class _HarnessHandle:
         self._proc.stdin.flush()
 
     def _message_frame(self, message: str) -> dict:
-        if self._protocol == "stdio-jsonl-v1":
-            frame = {"type": "message", "text": message}
-        else:
-            frame = {"message": message}
+        frame = {"type": "message", "text": message}
         if self._limits.request_seconds is not None:
             frame["budget_seconds"] = self._limits.request_seconds
         return frame
 
     def _interrupt_frame(self) -> dict:
-        if self._protocol == "stdio-jsonl-v1":
-            return {"type": "interrupt"}
-        return {"control": "interrupt"}
+        return {"type": "interrupt"}
 
     def _shutdown_frame(self) -> dict:
-        if self._protocol == "stdio-jsonl-v1":
-            return {"type": "shutdown"}
-        return {"control": "shutdown"}
+        return {"type": "shutdown"}
 
     def write_message(self, message: str) -> None:
         """统一写入口（Spec-0036）：向 harness stdin 写入一条用户消息。
@@ -300,22 +288,14 @@ class _HarnessHandle:
 
     def _ingest_sideband(self, payload: dict) -> None:
         """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
-        if payload.get("type") == "usage" or "usage" in payload:
-            raw = (
-                payload.get("usage")
-                if "usage" in payload and payload.get("type") != "usage"
-                else payload
-            )
-            if isinstance(raw, dict):
-                self._usage_events.append(dict(raw))
+        if payload.get("type") == "usage":
+            self._usage_events.append(dict(payload))
             return
         self.last_sideband.append(payload)
-        event_type = str(payload.get("type") or ("status" if "status" in payload else "sideband"))
+        event_type = str(payload["type"])
         event_text = ""
         if isinstance(payload.get("text"), str):
             event_text = str(payload.get("text") or "")
-        elif isinstance(payload.get("progress"), dict):
-            event_text = str((payload.get("progress") or {}).get("text") or "")
         if not event_text:
             event_text = _sideband_preview(payload)
         self._record_visible_event(event_type, event_text, payload)
@@ -326,12 +306,7 @@ class _HarnessHandle:
                     {"kind": str(payload.get("kind") or "progress"), "text": text}
                 )
                 return
-        if "progress" in payload:
-            prog = payload.get("progress")
-            if isinstance(prog, dict) and prog:
-                self.last_progress.append(prog)
-                return
-        kind = "status" if "status" in payload else "sideband"
+        kind = "status" if payload["type"] == "status" else "sideband"
         self.last_progress.append({"kind": kind, "text": _sideband_preview(payload)})
 
     def _post_reply_drain(self) -> None:
@@ -357,10 +332,14 @@ class _HarnessHandle:
             except (json.JSONDecodeError, TypeError):
                 self._line_q.put(line)
                 return
-            if not isinstance(payload, dict):
+            if (
+                not isinstance(payload, dict)
+                or not isinstance(payload.get("type"), str)
+                or not payload["type"]
+            ):
                 self._line_q.put(line)
                 return
-            if payload.get("type") in {"reply", "error"} or "reply" in payload:
+            if payload.get("type") in {"reply", "error"}:
                 self._line_q.put(line)
                 return
             self._ingest_sideband(payload)
@@ -416,10 +395,14 @@ class _HarnessHandle:
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="protocol")
                 raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
-            if not isinstance(payload, dict):
+            if (
+                not isinstance(payload, dict)
+                or not isinstance(payload.get("type"), str)
+                or not payload["type"]
+            ):
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="protocol")
-                raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
+                raise RuntimeError(f"harness 协议违例：需要含 type 的对象 {line!r}")
             if payload.get("type") == "error":
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="harness_error")
@@ -433,15 +416,6 @@ class _HarnessHandle:
                 steps = payload.get("steps")
                 self.last_steps = steps if isinstance(steps, list) else []
                 text = str(payload.get("text", ""))
-                self._record_visible_event("reply", text, payload)
-                self._post_reply_drain()
-                return ("reply", text)
-            if "reply" in payload:
-                self._awaiting_reply = False
-                self._finish_request(str(payload.get("status") or "completed"))
-                steps = payload.get("steps")
-                self.last_steps = steps if isinstance(steps, list) else []
-                text = str(payload["reply"])
                 self._record_visible_event("reply", text, payload)
                 self._post_reply_drain()
                 return ("reply", text)
@@ -472,10 +446,14 @@ class _HarnessHandle:
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="protocol")
                 raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
-            if not isinstance(payload, dict):
+            if (
+                not isinstance(payload, dict)
+                or not isinstance(payload.get("type"), str)
+                or not payload["type"]
+            ):
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="protocol")
-                raise RuntimeError(f"harness 协议违例：非对象 {line!r}")
+                raise RuntimeError(f"harness 协议违例：需要含 type 的对象 {line!r}")
             if payload.get("type") == "error":
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="harness_error")
@@ -491,28 +469,19 @@ class _HarnessHandle:
                 self._record_visible_event("reply", text, payload)
                 self._post_reply_drain()
                 return text
-            if "reply" in payload:
-                self._awaiting_reply = False
-                self._finish_request(str(payload.get("status") or "completed"))
-                steps = payload.get("steps")
-                self.last_steps = steps if isinstance(steps, list) else []
-                text = str(payload["reply"])
-                self._record_visible_event("reply", text, payload)
-                self._post_reply_drain()
-                return text
             self._ingest_sideband(payload)
 
     def control(self, name: str) -> str:
         """外通道：向 harness 发控制（用户侧主路径是 interrupt ≈ Ctrl+C）。
 
         - interrupt（及同类终结型）：最终吐 reply，返回 reply 文本。
-        - 若 harness 仍对其它名吐旁路 ack：返回旁路预览（兼容旧 wire）。
+        - 若 harness 仍对其它名吐旁路 ack：返回旁路预览。
         不要求写路径旗标（Spec-0036）；进程须仍打开。
         """
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可发控制消息")
         before = len(self.last_sideband)
-        self._write(self._interrupt_frame() if name == "interrupt" else {"control": name})
+        self._write(self._interrupt_frame() if name == "interrupt" else {"type": name})
         self._t0 = time.monotonic()
         self._awaiting_reply = True
         while True:
@@ -538,7 +507,7 @@ class _HarnessHandle:
         self._start()  # 重启 entry = 开新一局（复位语义收在 launcher 一侧）
 
     def shutdown(self) -> None:
-        """按 human-facing interface 结束进程；v1 先发 shutdown，随后兜底回收进程组。"""
+        """按 human-facing interface 结束进程；先发 shutdown，随后兜底回收进程组。"""
         if not self._closed and self._proc is not None and self._proc.stdin is not None:
             try:
                 self._write(self._shutdown_frame())
@@ -556,7 +525,6 @@ class _HarnessHandle:
             return
         if (
             getattr(getattr(self, "observation_source", None), "expected", False)
-            and self._protocol == "stdio-jsonl-v1"
             and self._proc.poll() is None
         ):
             try:
@@ -635,11 +603,12 @@ class HarnessLauncher:
             env["PATH"] = task_venv + "/bin" + os.pathsep + shell_path
             if argv[0] == sys.executable and runtime.evidence.get("harness_python"):
                 argv[0] = str(runtime.evidence["harness_python"])
-        protocol = str(params.get("protocol") or params.get("interface") or "legacy")
-        if protocol not in ("legacy", "stdio-jsonl-v1"):
-            raise ValueError(f"params.yaml 的 protocol/interface 不支持：{protocol!r}")
-        if protocol == "stdio-jsonl-v1":
-            env.setdefault("HARNESS_STDIO_PROTOCOL", protocol)
+        protocol = params.get("protocol", "stdio-jsonl-v1")
+        if protocol != "stdio-jsonl-v1" or "interface" in params:
+            raise ValueError("params.yaml must use the typed JSON Lines protocol")
+        # A frozen checkout may still default to untyped output. Always select
+        # the one supported contract; the current Seed ignores this variable.
+        env["HARNESS_STDIO_PROTOCOL"] = "stdio-jsonl-v1"
         if runtime is not None:
             # Spec-0008/T1 v2：与用户 agent 共享同一工作区——把它注入 harness 的 SANDBOX_WORK_DIR，
             # harness entry 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；覆盖 params.yaml 同名键。
@@ -710,7 +679,6 @@ class HarnessLauncher:
             cwd=host_cwd,
             env=host_env,
             help_text=self._read_help_text(dest),
-            protocol=protocol,
             workspace_runtime=runtime if is_docker else None,
             limits=limits,
         )
