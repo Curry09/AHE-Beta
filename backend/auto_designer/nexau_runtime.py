@@ -66,7 +66,7 @@ def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
                 "name: role\n"
                 "max_context_tokens: 256000\n"
                 "system_prompt: ./prompt.md\n"
-                "system_prompt_type: string\n"
+                "system_prompt_type: file\n"
                 "llm_config:\n"
                 f"  model: {model}\n"
                 f"  base_url: {base_url}\n"

@@ -2,8 +2,8 @@ type: agent
 name: divergent_pm
 max_context_tokens: 256000
 system_prompt: ./systemprompt.md
-system_prompt_type: string
-# xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
+system_prompt_type: file
+# structured：使用模型原生结构化工具调用，工具参数由 NexAU 按 schema 校验。
 tool_call_mode: structured
 # 预算覆盖体验索引分析、渐进式会话取证以及 submit schema 校验失败后的重试。
 max_iterations: 120

@@ -2,8 +2,8 @@ type: agent
 name: triage_agent
 max_context_tokens: 256000
 system_prompt: ./systemprompt.md
-system_prompt_type: string
-# xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
+system_prompt_type: file
+# structured：使用模型原生结构化工具调用，工具参数由 NexAU 按 schema 校验。
 tool_call_mode: structured
 # 预算覆盖单条报告的渐进取证与 submit schema 校验失败后的重试；
 # schema 错误由执行器回传给下一轮修正，重试上限由 max_iterations 统一约束。

@@ -2,8 +2,8 @@ type: agent
 name: owner
 max_context_tokens: 256000
 system_prompt: ./systemprompt.md
-system_prompt_type: string
-# xml 模式：模型以 XML 输出工具调用，nexau 解析；不依赖模型原生 function calling，任何 chat 模型可用。
+system_prompt_type: file
+# structured：使用模型原生结构化工具调用，工具参数由 NexAU 按 schema 校验。
 tool_call_mode: structured
 # 准入评审只读取运行时提供的结构化评审批次，并以一次 submit 完成裁决。
 max_iterations: 80
