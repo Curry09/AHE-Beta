@@ -68,6 +68,30 @@ def test_meta_spec_documents_baseline_and_changeability() -> None:
     assert "Terminology is an evolution invariant" in text
 
 
+def test_system_prompt_loads_instructions_from_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Exercise NexAU's real prompt loader without a model call or template-root cwd."""
+    from nexau import AgentConfig
+    from nexau.archs.main_sub.prompt_builder import PromptBuilder
+
+    monkeypatch.setenv("LLM_MODEL", "offline-test")
+    monkeypatch.setenv("LLM_BASE_URL", "https://offline.invalid/v1")
+    monkeypatch.setenv("LLM_API_KEY", "offline-test")
+    monkeypatch.chdir(tmp_path)
+
+    config = AgentConfig.from_yaml(config_path=_TEMPLATE / "agent.yaml")
+    parts = PromptBuilder().build_system_prompt(
+        agent_config=config,
+        runtime_context={"working_directory": str(tmp_path)},
+        include_tool_instructions=False,
+    )
+
+    # The structured-tool runtime uses this base prompt as its system message.
+    expected = (_TEMPLATE / "agents" / "main.md").read_text(encoding="utf-8").rstrip("\n")
+    assert [part.text for part in parts] == [expected]
+
+
 def test_reply_returns_nonempty_text(entry: ModuleType) -> None:
     agent = _Agent(["hello"])
     out_agent, text, status = entry._reply(agent, "hi", _no_rebuild)
