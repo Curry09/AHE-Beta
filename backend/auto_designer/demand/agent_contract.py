@@ -88,7 +88,9 @@ def dispositions_input_schema() -> dict:
     }
     return {
         "type": "object",
-        "properties": {"dispositions": {"type": "array", "items": item}},
+        "properties": {
+            "dispositions": {"type": "array", "minItems": 1, "maxItems": 1, "items": item}
+        },
         "required": ["dispositions"],
         "additionalProperties": False,
     }

@@ -183,28 +183,47 @@ def test_source_config_is_bound_per_invocation_without_shared_env(tmp_path, monk
     assert os.environ["SANDBOX_WORK_DIR"] == "/unrelated-host-directory"
 
 
-def test_triage_backlog_uses_report_sha_and_restores_round_context(tmp_path, monkeypatch):
+@pytest.mark.parametrize("needs_finalizer", [False, True], ids=["submitted", "finalized"])
+def test_triage_backlog_uses_report_sha_and_restores_round_context(
+    tmp_path, monkeypatch, needs_finalizer
+):
     repo, seed, tested = _source_repo(tmp_path)
     role = triage.Triager(FakeTracker(), SessionStore(tmp_path / "sessions"), str(repo), str(repo))
     monkeypatch.setattr(
         role, "_evidence_for_issue", lambda issue: {"harness_source": {"ref": seed}}
     )
     observed = []
+    disposition = {
+        "issue": 25,
+        "disposition": "needs_info",
+        "reason": "The report does not identify the failing behavior.",
+        "artifact": {
+            "reported_problem": "Old report without reproduction details",
+            "user_impact": "unavailable",
+            "scope_boundary": "unavailable",
+            "evidence": ["report:#25"],
+            "uncertainties": ["Missing reproduction details"],
+            "implementation_target": "uncertain",
+        },
+    }
 
     def run(*args, **kwargs):
         source = current_harness_source()
         observed.append((source.sha, current_usage_context().harness_sha))
         assert "seed" in (source.snapshot() / "entry.py").read_text()
-        return json.dumps({"dispositions": []})
+        if needs_finalizer and len(observed) == 1:
+            return json.dumps({"dispositions": []})
+        return json.dumps({"dispositions": [disposition]})
 
     monkeypatch.setattr(triage, "run_agent_def", run)
     issue = SimpleNamespace(number=25, title="Old report", body="", labels=["report"])
     with bind_harness_source(repo, tested), bind_usage_context(harness_sha=tested):
         parent = current_harness_source()
-        role._run_agent(pending=[issue])
+        result = role._run_agent(pending=[issue])
         assert current_harness_source() is parent
         assert current_usage_context().harness_sha == tested
-    assert observed == [(seed, seed)]
+    assert observed == [(seed, seed)] * (2 if needs_finalizer else 1)
+    assert json.loads(result) == {"dispositions": [disposition]}
 
 
 @pytest.mark.parametrize("source", ["reply_steps", "stdout_progress", "nested_progress"])

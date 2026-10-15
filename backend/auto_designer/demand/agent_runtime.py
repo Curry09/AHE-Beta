@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import copy
 import hashlib
 import json
 import os
@@ -167,6 +168,8 @@ def run_agent_def(
     tracker=None,
     source_issue_ids: set[int] | None = None,
     restored_timing: dict[str, object] | None = None,
+    history: list[object] | None = None,
+    on_history: Callable[[list[object]], None] | None = None,
 ) -> str:
     """加载 agent_def_dir 的 nexau agent 定义、以 message 跑一轮，返回 agent.run 的返回值（str）。
 
@@ -213,6 +216,17 @@ def run_agent_def(
     subj = subject or {"kind": "round", "id": str(current_usage_context().round_no or "")}
     pin = _agent_def_pin(agent_def_dir=Path(agent_def_dir))
     model = os.environ.get("DEMAND_LLM_MODEL")
+    history_context = (
+        json.dumps(history, ensure_ascii=False, default=lambda item: item.model_dump(mode="json"))
+        if history
+        else ""
+    )
+    if history:
+        evidence = {
+            **(evidence or {}),
+            "history_in_context": "nexau_messages",
+            "history_messages": len(history),
+        }
     scoped_sessions = set(allowed_session_ids or ())
     if role in {"triager", "triage", "triage_agent"}:
         scoped_sessions = {str(current_usage_context().session_id or "unavailable")}
@@ -270,7 +284,11 @@ def run_agent_def(
                         pass
 
                 out = run_with_timeout(
-                    lambda: agent.run(message=message),
+                    lambda: (
+                        agent.run(message=message)
+                        if history is None
+                        else agent.run(message=message, history=history)
+                    ),
                     timeout,
                     wall_guard=wall_guard or None,
                     latency_isolated=latency_isolated,
@@ -288,6 +306,7 @@ def run_agent_def(
                     role=role,
                     subject=subj,
                     prompt=message,
+                    context=history_context,
                     structured=None,
                     status="timeout",
                     error=str(exc),
@@ -301,6 +320,10 @@ def run_agent_def(
             accounting.finish()
             run_metrics["time_accounting"] = accounting.snapshot()
             run_metrics["latency_ms"] = round((time.monotonic() - started) * 1000, 3)
+        # Capture only a returned invocation, never a still-running timed-out thread.
+        # Keep the framework's native messages, including paired tool calls/results.
+        if on_history is not None:
+            on_history(copy.deepcopy(list(agent.history)))
     text = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
     structured, status = _structured_status(text=text)
     record_invocation(
@@ -308,6 +331,7 @@ def run_agent_def(
         role=role,
         subject=subj,
         prompt=message,
+        context=history_context,
         structured=structured,
         status=status,
         replayable=replayable,

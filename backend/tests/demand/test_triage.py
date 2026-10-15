@@ -291,7 +291,19 @@ def test_reject_and_needs_info_decline_with_reason(tmp_path) -> None:
             {"issue": b, "disposition": "needs_info", "reason": "轨迹无有效信息"},
         ]
     )
-    out = _triager(tmp_path, tracker, canned).triage_once()
+
+    class PerReportTriager(_StubTriager):
+        def _run_agent(self, *, pending: list) -> str:
+            decisions = json.loads(self._canned)["dispositions"]
+            return _submit([d for d in decisions if d["issue"] == pending[0].number])
+
+    out = PerReportTriager(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent_def"),
+        canned=canned,
+    ).triage_once()
     assert out.rejected == [a] and out.needs_info == [b]
     for n in (a, b):
         snap = tracker.issue(n)
@@ -307,6 +319,42 @@ def test_no_submit_is_noop(tmp_path) -> None:
     out = _triager(tmp_path, tracker, "我跑完了但没提交").triage_once()
     assert out.handled == 0
     assert sc.REPORT in tracker.issue(n)["labels"]  # 未被动过
+
+
+def test_finalizer_is_bounded_and_report_histories_do_not_mix(tmp_path, monkeypatch) -> None:
+    tracker = FakeTracker()
+    ids = [_report(tracker, "first report"), _report(tracker, "second report")]
+    calls = []
+
+    def invoke(agent_def, message, **kwargs):
+        report = kwargs["subject"]["id"]
+        calls.append((report, kwargs["max_iterations"], kwargs["history"]))
+        if kwargs["history"] is None:
+            kwargs["on_history"]([{"role": "tool", "content": f"evidence for {report}"}])
+        else:
+            assert kwargs["history"] == [{"role": "tool", "content": f"evidence for {report}"}]
+        return "no submit"
+
+    monkeypatch.setattr("auto_designer.demand.triage.run_agent_def", invoke)
+    triager = Triager(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent_def"),
+    )
+    outcome = triager.triage_once()
+
+    assert len(calls) == 4
+    assert [limit for _, limit, _ in calls] == [None, 8, None, 8]
+    assert [report for report, _, _ in calls] == [
+        str(ids[0]),
+        str(ids[0]),
+        str(ids[1]),
+        str(ids[1]),
+    ]
+    assert calls[0][2] is calls[2][2] is None
+    assert outcome.handled == 0 and set(outcome.failed) == set(ids)
+    assert all(sc.REPORT in tracker.issue(number)["labels"] for number in ids)
 
 
 def test_core_update_failure_is_reported_and_report_remains(tmp_path: Path) -> None:
@@ -340,8 +388,10 @@ def test_out_of_batch_issue_skipped(tmp_path) -> None:
     """disposition 指向不在本批的票号 → 跳过（防越界改动）。"""
     tracker = FakeTracker()
     n = _report(tracker, "在批内")
-    out = _triager(tmp_path, tracker, _submit([_accept(999), _accept(n)])).triage_once()
-    assert out.accepted == [n]
+    out = _triager(tmp_path, tracker, _submit([_accept(999)])).triage_once()
+    assert out.accepted == []
+    assert out.failed == {n: "missing-report-disposition"}
+    assert sc.REPORT in tracker.issue(n)["labels"]
 
 
 def test_shard_pending_param_scopes_batch(tmp_path) -> None:
@@ -405,6 +455,38 @@ def test_recovery_replays_saved_triage_output_without_model_or_duplicate_comment
     assert outcome.accepted == [number]
     assert resumed.agent_calls == 0
     assert len(tracker.issue(number)["comments"]) == 1
+
+
+@pytest.mark.parametrize("with_recovery", [False, True])
+def test_conflicting_decisions_do_not_partially_migrate_report(tmp_path, with_recovery) -> None:
+    tracker = FakeTracker()
+    number = _report(tracker, "one report, two decisions")
+    frozen_issue = tracker.list_open_issues()[0]
+    before = json.dumps(tracker.issue(number), sort_keys=True)
+    recovery = _recovery(tmp_path) if with_recovery else None
+    conflicting = _accept(number)
+    conflicting.update(disposition="needs_info", reason="uncertain")
+    triager = _StubTriager(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned=_submit([_accept(number), conflicting]),
+        recovery=recovery,
+    )
+    with bind_usage_context(round_no=1, operation="triage-worker-0"):
+        if recovery is not None:
+            with pytest.raises(RecoveryConflictError, match="remain incomplete"):
+                triager.triage_once(pending=[frozen_issue])
+            unit = recovery.unit(round_no=1, stage="triage", key=triager._recovery_key(number))
+            assert unit["status"] == "failed"
+            assert unit["output_digest"] is None
+            assert unit["error"] == "invalid-report-disposition-count"
+        else:
+            outcome = triager.triage_once(pending=[frozen_issue])
+            assert outcome.failed == {number: "invalid-report-disposition-count"}
+            assert not outcome.accepted and not outcome.needs_info
+    assert json.dumps(tracker.issue(number), sort_keys=True) == before
 
 
 @pytest.mark.parametrize("external_edit", [False, True])

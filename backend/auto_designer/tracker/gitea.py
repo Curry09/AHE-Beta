@@ -49,6 +49,7 @@ def _parse_closing_refs(*, body: str) -> list[int]:
 # 每次 HTTP 请求的硬超时（秒）：无超时的请求一旦挂死会把整条闭环卡住（主线程 poll() 永等）。
 _REQUEST_TIMEOUT = 30
 _TIMELINE_PAGE_SIZE = 50
+_LABEL_PAGE_SIZE = 50
 
 
 class GiteaError(RuntimeError):
@@ -226,7 +227,7 @@ class GiteaTracker:
         missing = [n for n in labels if n not in self._label_ids]
         if missing:
             self.ensure_labels(missing)
-        label_ids = [self._label_ids[n] for n in labels]
+        label_ids = list(dict.fromkeys(self._label_ids[n] for n in labels))
         self._request(
             "PUT",
             f"/repos/{self._owner}/{self._repo}/issues/{number}/labels",
@@ -746,9 +747,26 @@ class GiteaTracker:
         return b"".join(chunks)
 
     def _refresh_label_cache(self) -> None:
-        data = self._request("GET", f"/repos/{self._owner}/{self._repo}/labels", None)
-        for item in data:
-            self._label_ids[item["name"]] = item["id"]
+        labels, seen_ids = {}, set()
+        page = 1
+        while True:
+            data = self._request(
+                "GET",
+                f"/repos/{self._owner}/{self._repo}/labels?page={page}&limit={_LABEL_PAGE_SIZE}",
+                None,
+            )
+            new_ids = {item["id"] for item in data} - seen_ids
+            if not new_ids:
+                break
+            for item in data:
+                # Hosted repositories can contain duplicate label names. Use
+                # the first visible ID consistently instead of recreating it.
+                labels.setdefault(item["name"], item["id"])
+            seen_ids.update(new_ids)
+            if len(data) < _LABEL_PAGE_SIZE:
+                break
+            page += 1
+        self._label_ids.update(labels)
 
     def _create_label(self, name: str) -> None:
         endpoint = f"/repos/{self._owner}/{self._repo}/labels"

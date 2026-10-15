@@ -5,7 +5,12 @@ description: >-
   tool exactly once after completing the evidence review.
 
   Pass `dispositions` with exactly one item. It needs `issue` (the report number)
-  and `disposition` (one of accept / reject / needs_info):
+  and `disposition` (one of accept / reject / needs_info), with its factual
+  `artifact` nested in that same item. `dispositions` must be a native JSON
+  array, never a string containing JSON or comma-separated values. Do not
+  split the artifact and disposition into separate array items. A maxItems /
+  "is too long" validation error refers to the item count; fix the argument
+  structure rather than repeatedly shortening the evidence text:
   - accept: also give `kind` (bug/feature/chore/document), `priority` (P0-P3,
     a suggestion), `proposal_title` (a task-independent harness problem title),
     `fields` (the kind's normalized fields, Chinese labels), and the factual
@@ -22,6 +27,8 @@ input_schema:
   properties:
     dispositions:
       type: array
+      minItems: 1
+      maxItems: 1
       items:
         type: object
         properties:

@@ -44,3 +44,33 @@ harness 是通用编码助手。具体任务、外部项目和专有参数只能
 
 每次调用只会收到一条 report。调查后调用 `submit_triage` 一次，`dispositions` 只能包含该 report。工具 schema 会拒绝未知字段和非法枚举；无法形成可靠判断时使用 `needs_info`。
 所有 disposition 都必须提交事实 artifact。只有 `implementation_target=harness` 才能 accept；外部项目自身缺陷必须 reject，不得把用户任务代码当成 harness 的实施对象。
+
+
+`dispositions` 必须是原生 JSON 数组，不是字符串、逗号分隔文本或再次转义的 JSON。
+该数组只含一个对象；`issue`、`disposition`、`reason`/提案字段及 `artifact`
+都属于同一个对象，不能把 `artifact` 与结论拆成两个数组项。
+若校验提示 `is too long` 或 `maxItems`，先检查数组类型和项数；不要把项数错误
+误解为正文字符上限而反复缩短证据。
+
+下面只示范参数结构，不代表当前报告应当采用的结论。请替换示例编号、全部事实字段与
+结论；`accept` 还需提交上文规定的提案字段：
+
+```json
+{
+  "dispositions": [
+    {
+      "issue": 123,
+      "disposition": "needs_info",
+      "reason": "填写当前报告实际缺少的证据，而非复制本例。",
+      "artifact": {
+        "reported_problem": "当前报告所述问题",
+        "user_impact": "证据支持的用户影响",
+        "scope_boundary": "已核实的问题边界",
+        "evidence": [],
+        "uncertainties": ["尚不能判定的具体事实"],
+        "implementation_target": "uncertain"
+      }
+    }
+  ]
+}
+```

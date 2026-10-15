@@ -317,15 +317,16 @@ class Owner:
                 "artifacts": outcome.artifacts,
             }
             if outcome.failed:
+                details = "; ".join(
+                    f"#{number}: {error}" for number, error in sorted(outcome.failed.items())
+                )
                 self._recovery.fail_unit(
                     round_no=self._round_no(),
                     stage="owner",
                     key=recovery_key,
-                    error=f"owner decisions incomplete: {sorted(outcome.failed)}",
+                    error=f"owner decisions incomplete: {details}",
                 )
-                raise RecoveryConflictError(
-                    f"owner decisions remain incomplete: {sorted(outcome.failed)}"
-                )
+                raise RecoveryConflictError(f"owner decisions remain incomplete: {details}")
             self._recovery.complete_unit(
                 round_no=self._round_no(),
                 stage="owner",
@@ -392,7 +393,10 @@ class Owner:
         from auto_designer.demand.delivery_evidence import publish_delivery_evidence
 
         publish_delivery_evidence(tracker=self._tracker, store=self._store, issue=issue)
-        self._tracker.set_labels(issue.number, _ready_labels(list(issue.labels), priority))
+        current = self._tracker.get_issue(number=issue.number)
+        labels = _ready_labels(list(current["labels"]), priority)
+        if set(labels) != set(current["labels"]):
+            self._tracker.set_labels(issue.number, labels)
         self._safe_comment(issue.number, note)
 
     def _merge(self, issue, *, into: int) -> None:

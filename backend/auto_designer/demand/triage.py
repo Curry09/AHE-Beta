@@ -265,6 +265,16 @@ class Triager:
                     error="triage model output did not contain dispositions",
                 )
                 continue
+            # One isolated report has one decision. Validate the whole output
+            # before saving it or applying any tracker mutation; conflicting
+            # decisions must never partially promote then close the same issue.
+            if len(dispositions) != 1:
+                outcome.failed[issue.number] = "invalid-report-disposition-count"
+                self._fail_recovery_item(
+                    key=recovery_key,
+                    error=outcome.failed[issue.number],
+                )
+                continue
             valid_dispositions: list[dict] = []
             for d in dispositions:
                 try:
@@ -741,14 +751,23 @@ class Triager:
             if report_sha and report_sha != "unavailable"
             else nullcontext(),
         ):
+            history: list[object] | None = None
+
+            def remember_history(messages: list[object]) -> None:
+                nonlocal history
+                history = messages
+
             for attempt in range(2):
                 message = msg
                 if attempt:
-                    message += (
+                    closing = (
                         "\n上次调用未提交有效 disposition。这是最后一次有界收尾机会。"
                         "不要猜测缺失事实或反复寻找越界目录。依据可用证据尽快调用 submit_triage；"
                         "无法可靠判断时提交 needs_info，明确缺少什么。"
                     )
+                    # The eight-iteration finalizer continues the evidence already read;
+                    # it must not spend that budget starting the investigation again.
+                    message = closing if history else msg + closing
                     if self._on_event is not None:
                         self._on_event("retry", f"report #{report_id}: retry missing submit (2/2)")
                 result = run_agent_def(
@@ -762,6 +781,8 @@ class Triager:
                     timeout=_TRIAGE_TIMEOUT,
                     on_event=self._on_event,
                     max_iterations=8 if attempt else None,
+                    history=history if attempt else None,
+                    on_history=remember_history,
                     subject={"kind": "report", "id": report_id},
                     evidence={
                         "default_level": "L1",
@@ -770,7 +791,8 @@ class Triager:
                         "evidence_refs": list(triage_evidence.get("evidence_refs") or [])[:24],
                     },
                 )
-                if read_submit(result, "dispositions") is not None:
+                submitted = read_submit(result, "dispositions")
+                if submitted is not None and len(submitted) == 1:
                     return result
         return result
 

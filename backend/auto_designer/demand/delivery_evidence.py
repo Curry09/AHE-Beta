@@ -111,5 +111,8 @@ def publish_delivery_evidence(*, tracker, store, issue) -> dict:
     current = tracker.get_issue(number=issue.number)
     body = re.sub(r"<!-- " + re.escape(MARKER) + r" .*? -->", "", current["body"]).rstrip()
     body += f"\n\n<!-- {MARKER} {json.dumps(handle, sort_keys=True)} -->"
-    tracker.update_issue(issue.number, title=current["title"], body=body, labels=current["labels"])
+    if body != current["body"]:
+        tracker.update_issue(
+            issue.number, title=current["title"], body=body, labels=current["labels"]
+        )
     return {"status": "published", **handle}

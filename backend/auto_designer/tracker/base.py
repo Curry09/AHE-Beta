@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from auto_designer.models import IssueDraft, IssueRef, OpenIssue
 
@@ -62,6 +62,10 @@ class IssueTracker(Protocol):
 
     def list_open_issues(self) -> list[OpenIssue]:
         """读路径：列出当前 open 的 issue（供开发者侧 spec-0003/T3 领取）。无则空列表。"""
+        ...
+
+    def get_issue(self, *, number: int) -> dict[str, Any]:
+        """Read current title, body, state and label names, including closed issues."""
         ...
 
     def add_comment(self, number: int, body: str) -> None:

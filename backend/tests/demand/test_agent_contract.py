@@ -4,8 +4,31 @@
 
 from __future__ import annotations
 
+import jsonschema
+import pytest
+
 from auto_designer.demand import agent_contract as ac
 from auto_designer.demand import issue_schema as sc
+
+
+@pytest.mark.parametrize("count", [0, 2])
+def test_dispositions_schema_rejects_non_single_decisions(count) -> None:
+    decision = {
+        "issue": 1,
+        "disposition": "needs_info",
+        "artifact": {
+            "reported_problem": "unclear",
+            "user_impact": "unknown",
+            "scope_boundary": "harness",
+            "evidence": [],
+            "uncertainties": ["missing evidence"],
+            "implementation_target": "uncertain",
+        },
+    }
+    schema = ac.dispositions_input_schema()
+    jsonschema.validate({"dispositions": [decision]}, schema)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({"dispositions": [decision] * count}, schema)
 
 
 def test_dispositions_schema_shape_and_enums() -> None:

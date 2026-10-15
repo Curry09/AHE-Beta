@@ -181,6 +181,7 @@ def test_run_agent_def_timeout_still_records(tmp_path, monkeypatch) -> None:
     agent_dir = tmp_path / "owner"
     agent_dir.mkdir()
     (agent_dir / "agent.yaml").write_text("unused", encoding="utf-8")
+    captured = []
 
     try:
         run_agent_def(
@@ -191,12 +192,14 @@ def test_run_agent_def_timeout_still_records(tmp_path, monkeypatch) -> None:
             role="owner",
             timeout=1,
             subject={"kind": "round", "id": "1"},
+            on_history=captured.append,
         )
         raise AssertionError("应抛 TimeoutError")
     except TimeoutError:
         pass
     data = json.loads(next((tmp_path / "demand").glob("*.json")).read_text(encoding="utf-8"))
     assert data["output"]["status"] == "timeout"
+    assert captured == []  # Never capture history from a still-running timed-out call.
 
 
 def test_run_agent_def_no_submit_status(tmp_path, monkeypatch) -> None:

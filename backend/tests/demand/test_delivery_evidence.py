@@ -67,6 +67,34 @@ def test_package_uses_grants_not_model_authored_references(tmp_path):
     assert len(tracker.assets[issue.number]) == 1
 
 
+def test_verified_existing_footer_does_not_rewrite_delivery_labels(tmp_path, monkeypatch):
+    store, tracker, issue = setup(tmp_path)
+    first = publish_delivery_evidence(tracker=tracker, store=store, issue=issue)
+    tracker.set_labels(issue.number, ["openagents", "ready", "openagents-dispatching"])
+    reads = []
+    download = tracker.download_issue_asset
+
+    def readback(**kwargs):
+        reads.append(kwargs["asset_id"])
+        return download(**kwargs)
+
+    def unexpected_update(*args, **kwargs):
+        pytest.fail("an already verified publication must not rewrite downstream labels")
+
+    monkeypatch.setattr(tracker, "download_issue_asset", readback)
+    monkeypatch.setattr(tracker, "update_issue", unexpected_update)
+    assert publish_delivery_evidence(tracker=tracker, store=store, issue=issue) == first
+    assert reads == [first["asset_id"]]
+    assert tracker.issue(issue.number)["labels"] == [
+        "openagents",
+        "ready",
+        "openagents-dispatching",
+    ]
+    monkeypatch.setattr(tracker, "download_issue_asset", lambda **kwargs: b"corrupt")
+    with pytest.raises(ValueError, match="integrity"):
+        publish_delivery_evidence(tracker=tracker, store=store, issue=issue)
+
+
 def test_owner_publishes_before_admission_without_gaining_raw_tools(tmp_path):
     store, tracker, issue = setup(tmp_path)
     original = tracker.set_labels

@@ -472,8 +472,10 @@ def test_no_submit_defaults_to_direct_handoff(tmp_path: Path) -> None:
 def test_recovery_replays_owner_decisions_after_partial_admission(tmp_path: Path) -> None:
     class CrashAfterLabelsTracker(FakeTracker):
         crashed = False
+        label_writes = 0
 
         def set_labels(self, number: int, labels: list[str]) -> None:
+            self.label_writes += 1
             super().set_labels(number, labels)
             if not self.crashed:
                 self.crashed = True
@@ -481,17 +483,30 @@ def test_recovery_replays_owner_decisions_after_partial_admission(tmp_path: Path
 
     tracker = CrashAfterLabelsTracker()
     proposal = _synth_proposal(tracker, "resume owner")
+    recovery = _owner_recovery(tmp_path, synthesizer_proposals=[proposal])
     owner = _owner(
         tmp_path,
         tracker,
         _submit([{"issue": proposal, "decision": "admit"}]),
-        recovery=_owner_recovery(tmp_path, synthesizer_proposals=[proposal]),
+        recovery=recovery,
     )
     with bind_usage_context(round_no=1, operation="owner-stage"):
-        with pytest.raises(RecoveryConflictError, match="remain incomplete"):
+        with pytest.raises(
+            RecoveryConflictError,
+            match=f"#{proposal}: RuntimeError: injected after admission labels",
+        ):
             owner.admit_once()
+    failed = recovery.unit(
+        round_no=1,
+        stage="owner",
+        key=operation_key("owner-stage", "decisions"),
+    )
+    assert f"#{proposal}: RuntimeError: injected after admission labels" in failed["error"]
+    tracker.set_labels(proposal, [sc.OPENAGENTS, sc.READY, "openagents-dispatching"])
     with bind_usage_context(round_no=1, operation="owner-stage"):
         outcome = owner.admit_once()
     assert outcome.admitted == [proposal]
     assert owner.agent_calls == 1
     assert len(tracker.issue(proposal)["comments"]) == 2
+    assert tracker.label_writes == 2
+    assert tracker.issue(proposal)["labels"] == [sc.OPENAGENTS, sc.READY, "openagents-dispatching"]

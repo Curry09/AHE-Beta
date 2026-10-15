@@ -67,8 +67,15 @@ class FakeGitea:
 
     def __call__(self, method: str, url: str, json: Any) -> _Resp:
         path = url.split("/api/v1", 1)[1]
-        if method == "GET" and path.endswith("/labels"):
-            return _Resp(200, [{"id": i, "name": n} for n, i in self.labels.items()])
+        if method == "GET" and path.split("?", 1)[0].endswith("/labels"):
+            from urllib.parse import parse_qs, urlparse
+
+            query = parse_qs(urlparse(url).query)
+            page = int(query.get("page", ["1"])[0])
+            limit = int(query.get("limit", ["10"])[0])
+            start = (page - 1) * limit
+            values = [{"id": i, "name": n} for n, i in self.labels.items()]
+            return _Resp(200, values[start : start + limit])
         if method == "POST" and path.endswith("/labels"):
             name = json["name"]
             if self._race or name in self.labels:
@@ -288,6 +295,40 @@ def test_ensure_labels_empty_noop() -> None:
     t = _tracker(FakeGitea())
     t.ensure_labels([])
     assert t._session.calls == []
+
+
+def test_existing_label_on_later_page_is_not_recreated() -> None:
+    backend = FakeGitea()
+    backend.labels = {f"label-{n}": n + 1 for n in range(117)}
+    tracker = _tracker(backend)
+    issue = tracker.create_issue(IssueDraft("later page", "body", ["label-116"]))
+    assert backend.issues[issue.number]["labels"] == [117]
+    assert not any(
+        method == "POST" and url.endswith("/labels") for method, url, _ in tracker._session.calls
+    )
+
+
+def test_duplicate_label_names_use_one_id_per_requested_name() -> None:
+    def handler(method, url, body):
+        if method == "GET":
+            return _Resp(200, [{"id": 7, "name": "ready"}, {"id": 9, "name": "ready"}])
+        assert method == "PUT" and body == {"labels": [7]}
+        return _Resp(200, {})
+
+    tracker = _tracker(handler)
+    tracker.set_labels(1, ["ready", "ready"])
+
+
+def test_label_server_repeating_full_page_does_not_loop() -> None:
+    rows = [{"id": n + 1, "name": f"label-{n}"} for n in range(50)]
+
+    def handler(method, url, body):
+        assert method == "GET"
+        return _Resp(200, rows)
+
+    tracker = _tracker(handler)
+    tracker.ensure_labels(["label-49"])
+    assert len(tracker._session.calls) == 2
 
 
 def test_add_comment_and_set_state() -> None:
