@@ -10,6 +10,9 @@ dependencies = [
     "nexau @ git+https://github.com/nex-agi/NexAU.git@5cd791b1382f1163621c9ff0b50c2cf01c4ba923",
     # NexAU at this commit still imports pre-1.0 AG-UI thinking events.
     "ag-ui-protocol==0.1.22",
+    # Pinned NexAU passes httpx.Timeout; Anthropic 1.x rejects that type
+    # because it uses httpx2. OpenAI 3.x still accepts the configuration.
+    "anthropic<1",
     # spec CLI（vendored 在 tools/spec-driven-development/vendor）所需
     "ruamel.yaml>=0.18",
     "jsonschema>=4",
