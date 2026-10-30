@@ -13,3 +13,9 @@
 | 实验轨迹与模型输出 | 可能包含用户输入、代码、服务信息和第三方任务 | 不作为默认演示数据；公开前单独审查与脱敏 |
 
 离线 quickstart 使用 `user/sim/demo.py` 中构造的合成人格与脚本响应，不读取人物资料库。正式公开前应完成待办；无法确认权限的材料应移出公开分发范围并同步修正加载入口。
+
+## Held-out evaluation artifacts
+
+`evaluation/harness/meta_artifact/` preserves the Meta-Harness artifact from https://github.com/stanford-iris-lab/meta-harness-tbench2-artifact at `57fefdb2ff84af3fd81b69d67814acbe69bd0743`. Its provenance file records upstream hashes and the package-relative import adjustment. Upstream attribution and terms remain applicable.
+
+`evaluation/harness/user_engine/` is a frozen copy of this project's simulated-user implementation for the held-out protocol; it is isolated from future evolution-side changes. The only terminal-review change defers experience scoring until after freezing. The runtime release bundles pinned CPython and NexAU materials with checksums. Claude Code is installed from its official versioned distribution, not redistributed as source.

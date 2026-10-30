@@ -45,6 +45,9 @@ RETIRED_PATHS = (
     "backend/scripts/run_swebench_closed_loop.py",
     "examples/models.env.example",
     "backend/.env.example",
+    "evaluation/harness_bench",
+    "evaluation/harbor_integration",
+    "evaluation/adapters",
     "evaluation/public-bench-pilot",
     "evaluation/harness-suite-20260920",
 )

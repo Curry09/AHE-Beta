@@ -1,0 +1,16 @@
+{
+  "tasks": 38,
+  "harnesses": 7,
+  "generated_trials": 266,
+  "custom_archives": 5,
+  "run_identity_reused": true,
+  "official_time_budgets": [
+    600,
+    1200,
+    1800,
+    3600,
+    7200
+  ],
+  "paid_api_calls": 0,
+  "e2b_sandboxes": 0
+}

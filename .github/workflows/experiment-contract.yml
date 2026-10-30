@@ -14,7 +14,7 @@ on:
       - 'backend/tests/test_experiment_*.py'
       - 'examples/**'
       - 'tools/dev/**'
-      - 'evaluation/adapters/**'
+      - 'evaluation/**'
       - 'research/**'
       - 'backend/scripts/check_experiment_repository.py'
       - 'backend/scripts/e2e-spec-0071-experiment-cleanup.sh'

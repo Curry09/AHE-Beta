@@ -57,8 +57,8 @@ uv run --locked python backend/scripts/offline_demo.py
 - [贡献指南](CONTRIBUTING.zh-CN.md)、[安全说明](SECURITY.zh-CN.md)、[第三方来源](THIRD_PARTY.md)、[变更记录](CHANGELOG.md)。
 
 ```bash
-uv sync --locked --extra experiments --extra dev
-uv run --locked --extra experiments --extra dev pytest -q
+uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
+uv run --locked --extra experiments --extra dev --extra harbor-evaluation pytest -q
 ```
 
 前端开发需要 Node.js 22，在 `frontend/` 执行 `npm ci`、`npm test`、`npm run build`。实时 API 面向本地受信环境，静态 Pages 是另一条发布路径。默认开发 API 不自动选择 v2 run；当前实验进度使用统一入口的 `status`/`logs`，详见[前端说明](frontend/README.md)。
@@ -83,3 +83,5 @@ research/archives/                      # 冻结的历史研究记录
 项目代码采用 [MIT 许可证](LICENSE)。第三方材料保留各自的许可条款，详见[第三方来源说明](THIRD_PARTY.md)。
 
 统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/N4/N8 已使用同一冻结 workload 契约；带 continuation export 的当前归档可继承到新 run 并追加轮次，见[追加教程](docs/tutorials/experiment-continuation.zh-CN.md)。见[多用户验收](docs/validation/spec0073-multi-task-users.md)。
+
+独立 Harbor 评测：[使用教程](evaluation/docs/harbor.zh-CN.md)。

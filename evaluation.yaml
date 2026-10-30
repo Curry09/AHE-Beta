@@ -1,0 +1,45 @@
+# 唯一需要手动编辑的评测配置；API密钥写入.env。
+version: 1
+name: harbor-evaluation
+
+paths:
+  harnesses: ../harnesses
+  cache: .cache
+  runs: runs
+
+# published38 / all / [题目ID, ...]
+tasks: published38
+# 可选：v0、u8、u8-direct、u16、u32、claude-code、meta-harness
+harnesses: [v0, u32]
+
+actor:
+  model: glm-5.3-flash
+  base_url: https://open.bigmodel.cn/api/paas/v4
+  api_key_env: ACTOR_API_KEY
+  # 选claude-code时填写兼容Anthropic协议的地址；密钥默认同上。
+  anthropic_base_url: null
+  reasoning_effort: max
+  max_output_tokens: 65536
+  stream: native
+  thinking: true
+
+user:
+  enabled: true
+  model: glm-5.3-flash
+  # 未填地址/密钥变量时沿用actor；persona固定为原实验设定。
+  reasoning_effort: max
+
+judge:
+  # 仅需要官方LLM裁判的题目使用；模型由题目决定。
+  base_url: null
+  api_key_env: JUDGE_API_KEY
+
+execution:
+  provider: e2b
+  concurrency: 4
+  repetitions: 1
+  time_adaptation: false
+
+experience:
+  # 解题结束并冻结提交后统一评分，不占用官方解题预算。
+  timeout_seconds: 600

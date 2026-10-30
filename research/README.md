@@ -23,8 +23,8 @@ available or that reproduction has been verified.
 
 Archived source is kept as recorded. Its relative paths refer to the original
 checkout, so do not execute it directly from this directory. Current tests and
-lint exclude frozen source. Maintained benchmark adapters live in
-`evaluation/adapters/`; developer tools live in `tools/dev/`.
+lint exclude frozen source. Current held-out Harbor evaluation lives in
+`evaluation/`; Harness adapters are in `evaluation/harness/`; developer tools live in `tools/dev/`.
 
 Private raw sessions and experiment result bundles belong outside the source
 repository. This cleanup does not manage or delete running cloud resources.

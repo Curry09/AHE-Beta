@@ -45,3 +45,22 @@ auto-designer-experiments/
 
 # Spec-0069/T6: frozen runs, credentials and private experiment artifacts.
 .experiments/
+
+# Independent Harbor evaluation outputs and operator materials
+.harbor-evaluation/
+evaluation/runs/
+evaluation/materials/
+evaluation/datasets/
+
+# Unified evaluation: generated runs, local caches, downloaded runtime binaries
+/runs/
+/.cache/
+/.venv-evaluation/
+/runtime/python312.tar.gz
+/runtime/*.whl
+.glm
+.ds
+.silicon
+.tensoris
+
+/evaluation/harness/user_engine/data/

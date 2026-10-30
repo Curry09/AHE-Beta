@@ -1,0 +1,55 @@
+[project]
+name = "auto-designer-evaluation"
+version = "1.0.0"
+description = "Single-configuration Harbor Index evaluation with frozen harnesses and simulated users"
+requires-python = ">=3.12"
+dependencies = [
+  "harbor[e2b]==0.24.0",
+  "e2b==2.55.0",
+  "litellm==1.104.2",
+  "openai==2.54.0",
+  "anthropic==0.125.0",
+  "httpx[socks]==0.28.1",
+  "python-dotenv==1.2.3",
+  "pyyaml>=6,<7",
+  "platformdirs>=4",
+  "ruamel.yaml>=0.18,<1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+harbor-eval = "evaluation.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build.targets.wheel.force-include]
+"__init__.py" = "evaluation/__init__.py"
+"__main__.py" = "evaluation/__main__.py"
+"cli.py" = "evaluation/cli.py"
+"config.py" = "evaluation/config.py"
+"configuration.py" = "evaluation/configuration.py"
+"credentials.py" = "evaluation/credentials.py"
+"experience.py" = "evaluation/experience.py"
+"preparation.py" = "evaluation/preparation.py"
+"runner.py" = "evaluation/runner.py"
+"usage.py" = "evaluation/usage.py"
+"manifest.py" = "evaluation/manifest.py"
+"state.py" = "evaluation/state.py"
+"results.py" = "evaluation/results.py"
+"report.py" = "evaluation/report.py"
+"published_tasks.json" = "evaluation/published_tasks.json"
+"harbor" = "evaluation/harbor"
+"harness" = "evaluation/harness"
+"environments" = "evaluation/environments"
+"benchmarks" = "evaluation/benchmarks"
+"../runtime" = "evaluation/_runtime"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/runs", "/dist", "**/__pycache__"]

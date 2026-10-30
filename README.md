@@ -57,8 +57,8 @@ Run from source; a PyPI entry point is not yet available. `uv.lock` pins NexAU f
 - [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), [Third-party sources](THIRD_PARTY.md) and [Changelog](CHANGELOG.md).
 
 ```bash
-uv sync --locked --extra experiments --extra dev
-uv run --locked --extra experiments --extra dev pytest -q
+uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
+uv run --locked --extra experiments --extra dev --extra harbor-evaluation pytest -q
 ```
 
 Frontend development requires Node.js 22: run `npm ci`, `npm test` and `npm run build` in `frontend/`. The live API is intended for a trusted local environment; static Pages publication is separate. The default development API does not automatically select a v2 run; use experiment `status`/`logs` for current progress. See the [frontend guide](frontend/README.md).
@@ -83,3 +83,5 @@ research/archives/                      # Frozen historical research records
 Project code is licensed under the [MIT License](LICENSE). Third-party material retains its own terms; see [THIRD_PARTY.md](THIRD_PARTY.md).
 
 The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/N4/N8 uses the same frozen workload contract; current archives with a continuation export can seed a new run with additional rounds. See the [continuation tutorial](docs/tutorials/experiment-continuation.md). See [multi-user validation](docs/validation/spec0073-multi-task-users.md).
+
+Independent Harbor evaluation: [guide](evaluation/docs/harbor.md).

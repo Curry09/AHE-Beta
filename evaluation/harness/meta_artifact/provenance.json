@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/stanford-iris-lab/meta-harness-tbench2-artifact",
+  "revision": "57fefdb2ff84af3fd81b69d67814acbe69bd0743",
+  "upstream_files": {
+    "anthropic_caching.py": "fbc08f6e93569ce8dc144d765be6c24f28be139e630983aea9f0b741a464d56c",
+    "agent.py": "2afb292271e06ba25afa26ae729e56294c8d3822c846614ab944c0ba9e37e271",
+    "README.md": "9d3cfad1978ef25c9569beb917ba15c66080f3ca0eb160d7b256236cd21444de",
+    "pyproject.toml": "9770b769eab9fc692d76a75815402c497f1e28913e37c673cacaab71ed8e9589",
+    "prompt-templates/terminus-kira.txt": "adf2d40a4503965b307d348447f95141aa77db665c6571f3ab9512151894e6f6"
+  },
+  "compatibility_changes": [
+    "Package-relative caching import. Runtime uses pinned Harbor 0.24.0 and LiteLLM 1.104.2 instead of upstream LiteLLM<1.82.7 requirement; compatibility tested separately.",
+    "Adapter maps removed private settings to Harbor options, restores the former episode-log helper and no-op recording marker, and sets upstream Harbor 0.1.44 default temperature 0.7.",
+    "Unchanged upstream prompt/tool schema/command polling/two-confirmation completion.",
+    "Adapter owns tmux process tree with existing Linux subreaper; all actor commands are stopped before artifact collection, including on cancellation."
+  ]
+}

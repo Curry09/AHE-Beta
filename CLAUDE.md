@@ -68,6 +68,8 @@ local + localhost 的工程 CI 由 runtime.local.ci_enabled=true 可选开启，
 
 > 无体感门禁角色；体验及逐轮验收可供后续轮次纠错，不自动淘汰或回退候选。独立 held-out 评估不进入演化。
 
+独立 held-out 评测使用 `evaluation.yaml` 和 `python -m evaluation`，支持 Harbor Index 任务、direct 与 simulated_user，以及冻结 Harness 或原生 Agent。环境集中在 evaluation/environments/，Harness 接入集中在 evaluation/harness/，Index 专用辅助集中在 evaluation/benchmarks/harbor_index/。安装与运行见 evaluation/README.zh-CN.md；后台会话产物评分 backend/auto_designer/evaluation/ 保持独立。
+
 ### 被进化对象：harness 作为可启动程序
 harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对话契约」：启动后接收用户消息、返回回复；内部为 1 个或 N 个 nexau、如何编排，由其自身入口脚本决定（支持多 agent harness）。
 - 用户侧仅通过 `HarnessInterface`(send/reset/close) 与之交互，不感知内部结构。
@@ -107,7 +109,7 @@ backend/                 # 后端（编排框架）
 frontend/                # 前端：React+Vite+TS 只读观测看板（消费 backend web API）
 docs/specs/              # 设计 specs（spec-driven-development 源，项目级）
 examples/                # 当前实验定义、任务包、persona 主库和唯一凭证模板
-evaluation/              # 独立 held-out 评估、共享适配器与测试
+evaluation/              # python -m evaluation：独立 Harbor 评测，harbor/harness/environments 共用，benchmarks 为任务来源
 research/                # 历史归档、冻结版本和路径/哈希 inventory
 tools/dev/               # 当前维护的探针、审计、回放与交付验证
 tools/spec-driven-development/ # vendored spec CLI

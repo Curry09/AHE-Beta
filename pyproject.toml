@@ -31,7 +31,12 @@ dependencies = [
 # Spec-0069/T6: both unified experiment backends and frozen SWE task materials.
 experiments = [
     "pyarrow==21.0.0",
-    "e2b==2.51.0",
+    "e2b==2.55.0",
+]
+harbor-evaluation = [
+    "harbor[e2b,daytona]==0.24.0",
+    "e2b==2.55.0",
+    "daytona==0.223.0",
 ]
 evaluation = [
     # 4.1 is the official runner compatible with the pinned Verified parquet
@@ -45,6 +50,7 @@ dev = [
     "pytest>=8.0.0",
     # drift-guard 测试解析 agent_defs 的 *.tool.yaml（对照 agent_contract 生成的 input_schema）
     "pyyaml>=6.0",
+    "pytest-timeout==2.4.0",
 ]
 
 # 本仓暂不作为可安装包；uv 只装依赖。
@@ -64,7 +70,7 @@ target-version = "py312"
 # 首方包根：后端在 backend/，使 import 排序把 auto_designer / bootstrap_harness / 同目录测试模块识别为 first-party
 src = ["backend", "backend/scripts", "backend/tests", "evaluation"]
 # vendored 的 spec CLI 是外来代码，不纳入本仓 lint
-extend-exclude = ["tools/spec-driven-development/vendor", "research/archives"]
+extend-exclude = ["tools/spec-driven-development/vendor", "research/archives", "evaluation/harness/meta_artifact", "evaluation/harness/user_engine"]
 
 [tool.ruff.lint]
 # E/F: pyflakes+pycodestyle，I: import 排序，UP: pyupgrade，B: bugbear，ASYNC: 异步阻塞防护

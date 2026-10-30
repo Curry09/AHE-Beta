@@ -106,8 +106,8 @@ def test_compatibility_and_experiment_extras_are_pinned():
         assert re.fullmatch(r"[a-f0-9]{40}", reader)
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     extras = project["project"]["optional-dependencies"]["experiments"]
-    assert "e2b==2.51.0" in extras
-    assert "pyarrow==21.0.0" in extras
+    for package in ("e2b", "pyarrow"):
+        assert f"{package}=={compatibility['experiment_runtime'][package]}" in extras
 
 
 @pytest.mark.parametrize(

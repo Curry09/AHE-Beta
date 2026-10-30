@@ -57,12 +57,15 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: '3.12.13'
       - name: Install locked dependencies
-        run: uv sync --locked --extra experiments --extra dev
+        run: uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
       - name: Verify installed SDK commit
-        run: uv run --locked --extra experiments --extra dev python backend/scripts/check_nexau_dependency.py --installed
+        run: uv run --locked --extra experiments --extra dev --extra harbor-evaluation python backend/scripts/check_nexau_dependency.py --installed
+      - name: Standalone evaluation tests with the frozen user engine
+        run: PYTHONPATH=. uv run --locked --extra experiments --extra dev --extra harbor-evaluation python -m pytest -v -c /dev/null -p no:cacheprovider --durations=20 --timeout=120 --timeout-method=thread evaluation/tests
       - name: Backend and evaluation tests
-        run: uv run --locked --extra experiments --extra dev pytest -q
+        run: uv run --locked --extra experiments --extra dev --extra harbor-evaluation pytest -v --durations=20 --timeout=120 --timeout-method=thread -o faulthandler_timeout=60
       - name: Public experiment directory contract
         run: uv run --locked --extra experiments --extra dev python backend/scripts/check_experiment_repository.py
       - name: Offline demo

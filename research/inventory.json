@@ -818,7 +818,7 @@
       "reason": "Current maintained input, helper or evaluation component",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "516d2d88448de532fb31c463db21859eb09785c2c278ee33e31d0da9f1847594",
-      "destination_sha256": "516d2d88448de532fb31c463db21859eb09785c2c278ee33e31d0da9f1847594"
+      "destination_sha256": "fbb93bcb05904acc7566d86d125a307dc6abda0441faabb00862d6b8922615b3"
     },
     {
       "original_path": "evaluation/harness-suite-20260920/EXPERIMENT-MATRIX.md",
@@ -1920,315 +1920,289 @@
     },
     {
       "original_path": "evaluation/harness_bench/README.md",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/README.md",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/README.md",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "a929db9a8f2d0045fc21ccd091dbdcf8653e57cb7e537d45832f0f90ef9979d9",
-      "destination_sha256": "a929db9a8f2d0045fc21ccd091dbdcf8653e57cb7e537d45832f0f90ef9979d9"
+      "destination_sha256": "54f4d5511f2dff55adbbd13ad10a70673ee86644b090245b222a15c786ac17df"
     },
     {
       "original_path": "evaluation/harness_bench/__init__.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/__init__.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "663597b33788aa6854d0d31c7060b14d15af48f863cad2cd9c5af2f415f16912",
-      "destination_sha256": "663597b33788aa6854d0d31c7060b14d15af48f863cad2cd9c5af2f415f16912"
+      "source_sha256": "663597b33788aa6854d0d31c7060b14d15af48f863cad2cd9c5af2f415f16912"
     },
     {
       "original_path": "evaluation/harness_bench/benchmarks/__init__.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/benchmarks/__init__.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "ad5a866c18a2f7e09a9b0a67480cc862be193326efa1bea7d4c2c4e64e3b7501",
-      "destination_sha256": "ad5a866c18a2f7e09a9b0a67480cc862be193326efa1bea7d4c2c4e64e3b7501"
+      "source_sha256": "ad5a866c18a2f7e09a9b0a67480cc862be193326efa1bea7d4c2c4e64e3b7501"
     },
     {
       "original_path": "evaluation/harness_bench/benchmarks/base.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/benchmarks/base.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "ac99f6471c23ba1ed732e2670bf79e5f2220128f5028bbfb8fac3f6e634c31cc",
-      "destination_sha256": "ac99f6471c23ba1ed732e2670bf79e5f2220128f5028bbfb8fac3f6e634c31cc"
+      "source_sha256": "ac99f6471c23ba1ed732e2670bf79e5f2220128f5028bbfb8fac3f6e634c31cc"
     },
     {
       "original_path": "evaluation/harness_bench/benchmarks/swebench.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/benchmarks/swebench.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "2ecf41428a10e02cf7eb90797e4b7e4a152d93f576b9645aa9225150e2023a19",
-      "destination_sha256": "2ecf41428a10e02cf7eb90797e4b7e4a152d93f576b9645aa9225150e2023a19"
+      "source_sha256": "2ecf41428a10e02cf7eb90797e4b7e4a152d93f576b9645aa9225150e2023a19"
     },
     {
       "original_path": "evaluation/harness_bench/benchmarks/tau3.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/benchmarks/tau3.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "abf1144642bc00daf2f79cfc00064ce4b84fab70c715666233c9a2aa3f479d29",
-      "destination_sha256": "abf1144642bc00daf2f79cfc00064ce4b84fab70c715666233c9a2aa3f479d29"
+      "source_sha256": "abf1144642bc00daf2f79cfc00064ce4b84fab70c715666233c9a2aa3f479d29"
     },
     {
       "original_path": "evaluation/harness_bench/benchmarks/terminal_bench.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/benchmarks/terminal_bench.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "3975b11bf23f254baed0c9bca84fa37f5e945bd99ae93001c84ea6585a72afaf",
-      "destination_sha256": "3975b11bf23f254baed0c9bca84fa37f5e945bd99ae93001c84ea6585a72afaf"
+      "source_sha256": "3975b11bf23f254baed0c9bca84fa37f5e945bd99ae93001c84ea6585a72afaf"
     },
     {
       "original_path": "evaluation/harness_bench/benchmarks/tua_bench.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/benchmarks/tua_bench.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "10d56d22a43f1facdc2a63d9a121af0f1f42290f5c04f0dbbe8a1cce11fdec4c",
-      "destination_sha256": "10d56d22a43f1facdc2a63d9a121af0f1f42290f5c04f0dbbe8a1cce11fdec4c"
+      "source_sha256": "10d56d22a43f1facdc2a63d9a121af0f1f42290f5c04f0dbbe8a1cce11fdec4c"
     },
     {
       "original_path": "evaluation/harness_bench/cli.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/cli.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/cli.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "c4bb55e2bd1baf9aafab18e4e65c2d35d860751744444b16ad41e2d98b39a0c8",
-      "destination_sha256": "c4bb55e2bd1baf9aafab18e4e65c2d35d860751744444b16ad41e2d98b39a0c8"
+      "destination_sha256": "60b77d141d2ad300e4fa78fc43bab070d1f3532560cf5350f0e243163e0c8790"
     },
     {
       "original_path": "evaluation/harness_bench/config.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/config.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/config.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "8b4fa416ff10b3fdcdb9c0f26bf22ac3928e934b941c3568b82ac721f185ce89",
-      "destination_sha256": "8b4fa416ff10b3fdcdb9c0f26bf22ac3928e934b941c3568b82ac721f185ce89"
+      "destination_sha256": "452ba8a313eeafd40f803ab29893cb3b804c1a39196456687c1845ef47b148cb"
     },
     {
       "original_path": "evaluation/harness_bench/harbor_historical_user_agent.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/harbor_historical_user_agent.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "836a18fd618435c82d537bbcdf78ef6a49efe794c01735791e109f577aa509d3",
-      "destination_sha256": "836a18fd618435c82d537bbcdf78ef6a49efe794c01735791e109f577aa509d3"
+      "source_sha256": "836a18fd618435c82d537bbcdf78ef6a49efe794c01735791e109f577aa509d3"
     },
     {
       "original_path": "evaluation/harness_bench/harbor_historical_user_driver.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/harbor_historical_user_driver.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "1c973ac58aee4f354224fdee1d6ea14b475d36f0b37339ab7b877d9783b9ce10",
-      "destination_sha256": "1c973ac58aee4f354224fdee1d6ea14b475d36f0b37339ab7b877d9783b9ce10"
+      "source_sha256": "1c973ac58aee4f354224fdee1d6ea14b475d36f0b37339ab7b877d9783b9ce10"
     },
     {
       "original_path": "evaluation/harness_bench/harbor_v0_agent.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/harbor_v0_agent.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "d22bf31d0e3ca36c215cf944ae4d038a6d6a9ddd33bde0f0da06669caa99a3ca",
-      "destination_sha256": "3100212b276750f43ef3dcda74dc3eb4bec4ab3582b81f2c1527af1d4669641e"
+      "source_sha256": "d22bf31d0e3ca36c215cf944ae4d038a6d6a9ddd33bde0f0da06669caa99a3ca"
     },
     {
       "original_path": "evaluation/harness_bench/harbor_v0_driver.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/harbor_v0_driver.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "f48b5e816d5eca5caef9816ab6f4d98e3203983a92e6f1a0deeb32e27aae07f7",
-      "destination_sha256": "f48b5e816d5eca5caef9816ab6f4d98e3203983a92e6f1a0deeb32e27aae07f7"
+      "source_sha256": "f48b5e816d5eca5caef9816ab6f4d98e3203983a92e6f1a0deeb32e27aae07f7"
     },
     {
       "original_path": "evaluation/harness_bench/harness/__init__.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/harness/__init__.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "681476c35328e915b41a6a1936a5dab47227b71546e76b87208903343187627b",
-      "destination_sha256": "681476c35328e915b41a6a1936a5dab47227b71546e76b87208903343187627b"
+      "source_sha256": "681476c35328e915b41a6a1936a5dab47227b71546e76b87208903343187627b"
     },
     {
       "original_path": "evaluation/harness_bench/harness/adapters.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/harness/adapters.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "3ff47ccbfde7cadec26b5aca3ae89d43c90f1e2716765b32c2aa9d232166a605",
-      "destination_sha256": "3ff47ccbfde7cadec26b5aca3ae89d43c90f1e2716765b32c2aa9d232166a605"
+      "source_sha256": "3ff47ccbfde7cadec26b5aca3ae89d43c90f1e2716765b32c2aa9d232166a605"
     },
     {
       "original_path": "evaluation/harness_bench/harness/protocol.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/harness/protocol.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "7c6ed0c9e4485be97ac8bd473ae2e120a2b46e8c0f70518887096be2404c54a4",
-      "destination_sha256": "7c6ed0c9e4485be97ac8bd473ae2e120a2b46e8c0f70518887096be2404c54a4"
+      "source_sha256": "7c6ed0c9e4485be97ac8bd473ae2e120a2b46e8c0f70518887096be2404c54a4"
     },
     {
       "original_path": "evaluation/harness_bench/harness/session.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/harness/session.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "438aa5dbb11336b1b0b8ededb95f91e75dbb90e78d0c40efa1bbd75edf0b2b0b",
-      "destination_sha256": "438aa5dbb11336b1b0b8ededb95f91e75dbb90e78d0c40efa1bbd75edf0b2b0b"
+      "source_sha256": "438aa5dbb11336b1b0b8ededb95f91e75dbb90e78d0c40efa1bbd75edf0b2b0b"
     },
     {
       "original_path": "evaluation/harness_bench/interactions/__init__.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/interactions/__init__.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "bbb4f66e8ede4a6960f40f089e45b3393b62d8423ae6fcf801868c2e66b7686d",
-      "destination_sha256": "bbb4f66e8ede4a6960f40f089e45b3393b62d8423ae6fcf801868c2e66b7686d"
+      "source_sha256": "bbb4f66e8ede4a6960f40f089e45b3393b62d8423ae6fcf801868c2e66b7686d"
     },
     {
       "original_path": "evaluation/harness_bench/interactions/base.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/interactions/base.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "1e0c29a35cdfe528272363403dccb1f4cfe1d04e5adf4e0849ada50105056d52",
-      "destination_sha256": "1e0c29a35cdfe528272363403dccb1f4cfe1d04e5adf4e0849ada50105056d52"
+      "source_sha256": "1e0c29a35cdfe528272363403dccb1f4cfe1d04e5adf4e0849ada50105056d52"
     },
     {
       "original_path": "evaluation/harness_bench/interactions/direct.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/interactions/direct.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "db847af9ad001d94cfe4aabff5550e28e26aaa35536b818fa3af62c1f376ff26",
-      "destination_sha256": "db847af9ad001d94cfe4aabff5550e28e26aaa35536b818fa3af62c1f376ff26"
+      "source_sha256": "db847af9ad001d94cfe4aabff5550e28e26aaa35536b818fa3af62c1f376ff26"
     },
     {
       "original_path": "evaluation/harness_bench/interactions/native_user.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/interactions/native_user.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "82f93d609056808c2d1b065464f85b796b207f98966b63d94ecc3d0d42d5e6cf",
-      "destination_sha256": "82f93d609056808c2d1b065464f85b796b207f98966b63d94ecc3d0d42d5e6cf"
+      "source_sha256": "82f93d609056808c2d1b065464f85b796b207f98966b63d94ecc3d0d42d5e6cf"
     },
     {
       "original_path": "evaluation/harness_bench/interactions/simulated_user.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/interactions/simulated_user.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "e5098f400b05baeb7fd5c6c7dfb0693c30034ffc19b82498a6149ae116e3923e",
-      "destination_sha256": "e5098f400b05baeb7fd5c6c7dfb0693c30034ffc19b82498a6149ae116e3923e"
+      "source_sha256": "e5098f400b05baeb7fd5c6c7dfb0693c30034ffc19b82498a6149ae116e3923e"
     },
     {
       "original_path": "evaluation/harness_bench/manifest.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/manifest.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/manifest.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "39d0accb11a32301273824544a5ea078b8f44c4f53b031a98b6eecc5f8ee6ad7",
-      "destination_sha256": "39d0accb11a32301273824544a5ea078b8f44c4f53b031a98b6eecc5f8ee6ad7"
+      "destination_sha256": "35c37eea316fa777737efd81a564b78ca53c3c9da32bfd401f44c7ec74751a48"
     },
     {
       "original_path": "evaluation/harness_bench/orchestrator.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/orchestrator.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/harbor/scheduler.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "637977f25beac348b349c3ae2d55416233165e2d958964170337d874dd9ecc40",
-      "destination_sha256": "637977f25beac348b349c3ae2d55416233165e2d958964170337d874dd9ecc40"
+      "destination_sha256": "4bc61c388e727137026a95f788c4a4bc9a32617c18823434509a10f6bbf520bf"
     },
     {
       "original_path": "evaluation/harness_bench/outcomes.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/outcomes.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/results.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "c628d1627dfd04e7829149780fcb67dae23aa0a25df49c05aab9e300728e176e",
-      "destination_sha256": "c628d1627dfd04e7829149780fcb67dae23aa0a25df49c05aab9e300728e176e"
+      "destination_sha256": "ead29f363b8838e46718bdd62df870151299f999e94419ae08c120e0ac6a6aab"
     },
     {
       "original_path": "evaluation/harness_bench/providers/__init__.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/providers/__init__.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "847deb0a4c0f8b08004de73e0f203552bc9971f97c872d9faaa807d3954f1788",
-      "destination_sha256": "847deb0a4c0f8b08004de73e0f203552bc9971f97c872d9faaa807d3954f1788"
+      "source_sha256": "847deb0a4c0f8b08004de73e0f203552bc9971f97c872d9faaa807d3954f1788"
     },
     {
       "original_path": "evaluation/harness_bench/providers/base.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/providers/base.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "f2c3874a9720062fe189e12ec7c97122307468d04827716f9e7e1ac10715e39e",
-      "destination_sha256": "f2c3874a9720062fe189e12ec7c97122307468d04827716f9e7e1ac10715e39e"
+      "source_sha256": "f2c3874a9720062fe189e12ec7c97122307468d04827716f9e7e1ac10715e39e"
     },
     {
       "original_path": "evaluation/harness_bench/providers/daytona.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/providers/daytona.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "ca15c836c247ca8035b26af7a03061017e0a219cf346eae057987418dd082184",
-      "destination_sha256": "ca15c836c247ca8035b26af7a03061017e0a219cf346eae057987418dd082184"
+      "source_sha256": "ca15c836c247ca8035b26af7a03061017e0a219cf346eae057987418dd082184"
     },
     {
       "original_path": "evaluation/harness_bench/providers/local.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/providers/local.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "f36b2569188e2196ef87a2335e48bcb8d844ef72ea5c16904f8e0335c55e2bff",
-      "destination_sha256": "f36b2569188e2196ef87a2335e48bcb8d844ef72ea5c16904f8e0335c55e2bff"
+      "source_sha256": "f36b2569188e2196ef87a2335e48bcb8d844ef72ea5c16904f8e0335c55e2bff"
     },
     {
       "original_path": "evaluation/harness_bench/remote_driver.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/remote_driver.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "86b82a197707432a4c5ac84a22260ce8f0fce51963aedba90ade199720870e17",
-      "destination_sha256": "86b82a197707432a4c5ac84a22260ce8f0fce51963aedba90ade199720870e17"
+      "source_sha256": "86b82a197707432a4c5ac84a22260ce8f0fce51963aedba90ade199720870e17"
     },
     {
       "original_path": "evaluation/harness_bench/report.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/report.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/report.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "646c5e713bf7f3e7a41bbff365a069dbcb2da21c3f7162625c6e50dad3a509f7",
-      "destination_sha256": "646c5e713bf7f3e7a41bbff365a069dbcb2da21c3f7162625c6e50dad3a509f7"
+      "destination_sha256": "d0693dbc70f30ae8be3e4975ca61ff104d1a15ff395f0bbf8ec617d3a4b15212"
     },
     {
       "original_path": "evaluation/harness_bench/sandbox.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/sandbox.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "644b62f56f7656d826bb2470d3830e2fd64ad571834366afeecad7ad653d2209",
-      "destination_sha256": "644b62f56f7656d826bb2470d3830e2fd64ad571834366afeecad7ad653d2209"
+      "source_sha256": "644b62f56f7656d826bb2470d3830e2fd64ad571834366afeecad7ad653d2209"
     },
     {
       "original_path": "evaluation/harness_bench/schema.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/schema.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/config.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "e73da5d7cb00885d2ad3a162ae60edb9ba4ac458e250387633d14d0778802022",
-      "destination_sha256": "e73da5d7cb00885d2ad3a162ae60edb9ba4ac458e250387633d14d0778802022"
+      "destination_sha256": "452ba8a313eeafd40f803ab29893cb3b804c1a39196456687c1845ef47b148cb"
     },
     {
       "original_path": "evaluation/harness_bench/state.py",
-      "disposition": "maintained",
-      "destination": "evaluation/harness_bench/state.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/state.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "fd905b9e292a282c81a753ec344d3769a1a11d54d1100d997f942445434a3609",
       "destination_sha256": "fd905b9e292a282c81a753ec344d3769a1a11d54d1100d997f942445434a3609"
@@ -2253,57 +2227,52 @@
     },
     {
       "original_path": "evaluation/public-bench-pilot/adapters/__init__.py",
-      "disposition": "moved",
-      "destination": "evaluation/adapters/__init__.py",
-      "reason": "Adapter still used by independent evaluation",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "93cdfb94a45487478355f2f251d32bc3709610daf99e957d7aad1bc836bc9ab2",
-      "destination_sha256": "93cdfb94a45487478355f2f251d32bc3709610daf99e957d7aad1bc836bc9ab2"
+      "source_sha256": "93cdfb94a45487478355f2f251d32bc3709610daf99e957d7aad1bc836bc9ab2"
     },
     {
       "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/__init__.py",
-      "disposition": "moved",
-      "destination": "evaluation/adapters/harness_v0/__init__.py",
-      "reason": "Adapter still used by independent evaluation",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "ff0db777331b7c1f0ab5e2a719db48b90e566331e5459c2db034ac99b021ccf3",
-      "destination_sha256": "ff0db777331b7c1f0ab5e2a719db48b90e566331e5459c2db034ac99b021ccf3"
+      "source_sha256": "ff0db777331b7c1f0ab5e2a719db48b90e566331e5459c2db034ac99b021ccf3"
     },
     {
       "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/harbor_driver.py",
-      "disposition": "moved",
-      "destination": "evaluation/adapters/harness_v0/harbor_driver.py",
-      "reason": "Adapter still used by independent evaluation",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "1c76031f5d1901c069014bacf779a200bbf901b5123d61b4d9ccd36d55e47655",
-      "destination_sha256": "1c76031f5d1901c069014bacf779a200bbf901b5123d61b4d9ccd36d55e47655"
+      "source_sha256": "1c76031f5d1901c069014bacf779a200bbf901b5123d61b4d9ccd36d55e47655"
     },
     {
       "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/llm_user_simulator.py",
-      "disposition": "moved",
-      "destination": "evaluation/adapters/harness_v0/llm_user_simulator.py",
-      "reason": "Adapter still used by independent evaluation",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "2bd2b7c511c96c14d3ed7d715892440d8e392aa831d7d46dfb8cfef0f9c8926a",
-      "destination_sha256": "2bd2b7c511c96c14d3ed7d715892440d8e392aa831d7d46dfb8cfef0f9c8926a"
+      "source_sha256": "2bd2b7c511c96c14d3ed7d715892440d8e392aa831d7d46dfb8cfef0f9c8926a"
     },
     {
       "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/stdio.py",
       "disposition": "moved",
-      "destination": "evaluation/adapters/harness_v0/stdio.py",
-      "reason": "Adapter still used by independent evaluation",
+      "destination": "evaluation/harness/stdio.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "11cafe3b07fd77860ddd88f92c4654c4603c1782930e0ec25c91926d968c7869",
       "destination_sha256": "11cafe3b07fd77860ddd88f92c4654c4603c1782930e0ec25c91926d968c7869"
     },
     {
       "original_path": "evaluation/public-bench-pilot/adapters/harness_v0/tau3.py",
-      "disposition": "moved",
-      "destination": "evaluation/adapters/harness_v0/tau3.py",
-      "reason": "Adapter still used by independent evaluation",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "c6b63ad320ca549cf0006142bde29228c985cfae3e15ed5f2ae44536508a0ea2",
-      "destination_sha256": "c6b63ad320ca549cf0006142bde29228c985cfae3e15ed5f2ae44536508a0ea2"
+      "source_sha256": "c6b63ad320ca549cf0006142bde29228c985cfae3e15ed5f2ae44536508a0ea2"
     },
     {
       "original_path": "evaluation/public-bench-pilot/daytona_common.py",
@@ -2524,11 +2493,11 @@
     {
       "original_path": "evaluation/public-bench-pilot/tests/test_harness_v0_adapters.py",
       "disposition": "moved",
-      "destination": "evaluation/tests/test_harness_v0_adapters.py",
-      "reason": "Keep behavior tests for the maintained adapters",
+      "destination": "evaluation/tests/test_stdio.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "d74fa131bdf326f199176d5db5ef6133a428e81a952457f095eacee8b2aa8c32",
-      "destination_sha256": "a3c07ef5241de82e5dbc183ad9c31b26b09691077411f977feb182a33defca1f"
+      "destination_sha256": "96416f6fc4cb57d83e6bc0558c3ae6fb4e7ffde98386ff668e3303fd77e965bf"
     },
     {
       "original_path": "evaluation/public-bench-pilot/tests/test_timeout_policy.py",
@@ -2568,84 +2537,79 @@
     },
     {
       "original_path": "evaluation/tests/harness_bench/__init__.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/__init__.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "397384ee08b8ee42695a21e54cc99008a5074b81f10077b0957210076e395065",
-      "destination_sha256": "397384ee08b8ee42695a21e54cc99008a5074b81f10077b0957210076e395065"
+      "source_sha256": "397384ee08b8ee42695a21e54cc99008a5074b81f10077b0957210076e395065"
     },
     {
       "original_path": "evaluation/tests/harness_bench/test_benchmarks.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/test_benchmarks.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "524ae753ff96d4bbf885ae4a6565f9d43f2a1c16b9cec7ae9cff0e82d1abde01",
-      "destination_sha256": "524ae753ff96d4bbf885ae4a6565f9d43f2a1c16b9cec7ae9cff0e82d1abde01"
+      "source_sha256": "524ae753ff96d4bbf885ae4a6565f9d43f2a1c16b9cec7ae9cff0e82d1abde01"
     },
     {
       "original_path": "evaluation/tests/harness_bench/test_config.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/test_config.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/tests/test_config.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "85c58363ba06b5b57ad0d45b67230745803bd7d62b54a1ac77dbf52addbbaeb4",
-      "destination_sha256": "85c58363ba06b5b57ad0d45b67230745803bd7d62b54a1ac77dbf52addbbaeb4"
+      "destination_sha256": "80a28edab7d90c0f8ab9d031ff5f3bcf1764dd710c5f976aaadffc6bac9ea8e7"
     },
     {
       "original_path": "evaluation/tests/harness_bench/test_harness_session.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/test_harness_session.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "b32d57fdf03aa9eedbd88f26b49cc2294bddfa0a1a39890cf411be3beaa2f8a5",
-      "destination_sha256": "b32d57fdf03aa9eedbd88f26b49cc2294bddfa0a1a39890cf411be3beaa2f8a5"
+      "source_sha256": "b32d57fdf03aa9eedbd88f26b49cc2294bddfa0a1a39890cf411be3beaa2f8a5"
     },
     {
       "original_path": "evaluation/tests/harness_bench/test_interactions.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/test_interactions.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "aacbbf5632329bb8b5d154b056dffc84ba0a97aec8433279cc1af94ec6847b53",
-      "destination_sha256": "aacbbf5632329bb8b5d154b056dffc84ba0a97aec8433279cc1af94ec6847b53"
+      "source_sha256": "aacbbf5632329bb8b5d154b056dffc84ba0a97aec8433279cc1af94ec6847b53"
     },
     {
       "original_path": "evaluation/tests/harness_bench/test_manifest.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/test_manifest.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/tests/test_manifest.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "174ccd241d804f7b9679addf0e245303173185a3234a9b5fcd53e23f47e55100",
-      "destination_sha256": "174ccd241d804f7b9679addf0e245303173185a3234a9b5fcd53e23f47e55100"
+      "destination_sha256": "21954d5d857780028fced3d303b52ba928859f47ed1db243c0a7d53210fe861f"
     },
     {
       "original_path": "evaluation/tests/harness_bench/test_orchestrator.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/test_orchestrator.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/tests/test_scheduler.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "417998d9f9a7f839ab4b08cb9aec3e6e869314268f079603c33a3e870b7bf7c7",
-      "destination_sha256": "417998d9f9a7f839ab4b08cb9aec3e6e869314268f079603c33a3e870b7bf7c7"
+      "destination_sha256": "9240b7cadef6e962312feb03ca1eb85f3f2796f20506699d2a4f115204474419"
     },
     {
       "original_path": "evaluation/tests/harness_bench/test_reporting.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/test_reporting.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "evaluation/tests/test_reporting.py",
+      "reason": "Maintained Harbor evaluation component consolidated into the current layout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "9b16c61805e79d9068bd4f27a3da1e7419ec786e581fe0153b7f5d9c8fb327ad",
-      "destination_sha256": "9b16c61805e79d9068bd4f27a3da1e7419ec786e581fe0153b7f5d9c8fb327ad"
+      "destination_sha256": "39ca661fc0b52b9576d87feff7584f73738a73536d29f4d19286342b5d6c328f"
     },
     {
       "original_path": "evaluation/tests/harness_bench/test_sandbox.py",
-      "disposition": "maintained",
-      "destination": "evaluation/tests/harness_bench/test_sandbox.py",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired independent benchmark/interaction framework; historical source remains available at source_commit",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "8c721a2f9ead54ead9c24637cc5d5e76847afc70bbba48d1483805cddd5d3912",
-      "destination_sha256": "8c721a2f9ead54ead9c24637cc5d5e76847afc70bbba48d1483805cddd5d3912"
+      "source_sha256": "8c721a2f9ead54ead9c24637cc5d5e76847afc70bbba48d1483805cddd5d3912"
     },
     {
       "original_path": "evaluation/tests/test_vps_proposals.py",

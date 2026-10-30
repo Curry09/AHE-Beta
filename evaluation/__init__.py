@@ -1,1 +1,3 @@
-"""Evaluation tooling kept separate from the product runtime."""
+"""Held-out Harness evaluation with standard Harbor task packages."""
+
+__version__ = "1.0.0"

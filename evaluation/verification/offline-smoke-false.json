@@ -1,0 +1,40 @@
+{
+  "provider": "local fixture; no external model calls",
+  "results": [
+    {
+      "harness": "v0",
+      "reply": "OFFLINE_FIXTURE_COMPLETED",
+      "captured_responses": 1,
+      "tool_events": 2,
+      "stream_mode": "false"
+    },
+    {
+      "harness": "u8",
+      "reply": "OFFLINE_FIXTURE_COMPLETED",
+      "captured_responses": 1,
+      "tool_events": 2,
+      "stream_mode": "false"
+    },
+    {
+      "harness": "u8-direct",
+      "reply": "OFFLINE_FIXTURE_COMPLETED\n\n--- closing statement (deterministic assembly, no mod",
+      "captured_responses": 1,
+      "tool_events": 2,
+      "stream_mode": "false"
+    },
+    {
+      "harness": "u16",
+      "reply": "[evidence: no recorded command activity; see evidence.commands]\nOFFLINE_FIXTURE_",
+      "captured_responses": 1,
+      "tool_events": 2,
+      "stream_mode": "false"
+    },
+    {
+      "harness": "u32",
+      "reply": "OFFLINE_FIXTURE_COMPLETED",
+      "captured_responses": 1,
+      "tool_events": 2,
+      "stream_mode": "false"
+    }
+  ]
+}
