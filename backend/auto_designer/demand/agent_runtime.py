@@ -240,6 +240,30 @@ def run_agent_def(
         "synthesizer",
     }:
         scoped_sessions = set()
+    # Spec-0084/T4: a separate trusted lane is present in every real role invocation.
+    # Owner receives only public facts for its proposal grants, not raw session tools.
+    from auto_designer.demand.evidence_contract import (
+        execution_for_sessions,
+        format_execution_facts,
+    )
+    from auto_designer.observations.grants import authorized_sessions
+
+    contract_sessions = scoped_sessions - {"unavailable"}
+    if role == "owner":
+        contract_sessions = set().union(
+            *(authorized_sessions(store=store, issue=number) for number in source_issue_ids or ())
+        )
+    facts = execution_for_sessions(store=store, session_ids=contract_sessions)
+    fixed_conditions = format_execution_facts(facts)
+    if fixed_conditions:
+        message += (
+            "\n\n## 可信执行条件与安全验收摘要（不属于模型编写的提案正文）\n" + fixed_conditions
+        )
+        evidence = {
+            **(evidence or {}),
+            "execution_contract_ids": [row["contract_id"] for row in facts["execution_contracts"]],
+            "assessment_receipt_ids": [row["receipt_id"] for row in facts["assessment_summaries"]],
+        }
     with (
         bind_gaps(
             GapService(

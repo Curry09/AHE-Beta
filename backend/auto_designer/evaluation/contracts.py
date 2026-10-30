@@ -97,6 +97,10 @@ class GradingAdapter(Protocol):
     name: str
     contract_version: int
 
+    def validate_plan(self, request: GradingRequest) -> dict[str, str]:
+        """Validate static inputs; return required artifact IDs and source types."""
+        ...
+
     def validate_inputs(self, request: GradingRequest) -> None: ...
 
     def evaluate(self, request: GradingRequest, attempt_dir: Path) -> Any: ...

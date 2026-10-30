@@ -62,52 +62,6 @@ def test_user_simulator_content_normalization() -> None:
     assert _content_text(None) == ""
 
 
-def test_tau_marker_regex_accepts_one_json_object() -> None:
-    pytest.importorskip("tau2")
-    from tau2.environment.tool import as_tool
-
-    from evaluation.adapters.harness_v0.tau3 import _CALL_PATTERN, HarnessV0TauAgent
-
-    match = _CALL_PATTERN.search(
-        '<TAU3_TOOL_CALL>{"name":"lookup","arguments":{"id":7}}</TAU3_TOOL_CALL>'
-    )
-    assert match is not None
-    assert json.loads(match.group(1))["arguments"] == {"id": 7}
-
-    def lookup(id: int) -> str:
-        """Look up one record.
-
-        Args:
-            id: Record identifier.
-        """
-        return str(id)
-
-    agent = HarnessV0TauAgent(
-        tools=[as_tool(lookup)],
-        domain_policy="Use lookup when needed.",
-        llm="openrouter/z-ai/glm-5.2",
-        api_key="not-used-by-this-unit-test",
-    )
-    call = agent._parse_tool_call(match.group(0))
-    assert call is not None
-    assert call.name == "lookup"
-    assert call.arguments == {"id": 7}
-
-
-def test_tau_marker_rejects_unknown_tool() -> None:
-    pytest.importorskip("tau2")
-    from evaluation.adapters.harness_v0.tau3 import HarnessV0TauAgent
-
-    agent = HarnessV0TauAgent(
-        tools=[],
-        domain_policy="",
-        llm="openrouter/z-ai/glm-5.2",
-        api_key="not-used-by-this-unit-test",
-    )
-    with pytest.raises(ValueError, match="unknown"):
-        agent._parse_tool_call('<TAU3_TOOL_CALL>{"name":"missing","arguments":{}}</TAU3_TOOL_CALL>')
-
-
 @pytest.mark.parametrize("payload", [{"reply": "done"}, {"error": "failed"}])
 def test_stdio_session_rejects_untyped_events(tmp_path, payload):
     fake = tmp_path / "fake.py"

@@ -240,3 +240,60 @@ def test_unknown_encoding_is_not_guessed(tmp_path):
     store, tracker, issue = setup(tmp_path)
     with pytest.raises(ValueError, match="encoding"):
         build_package(store=store, issue=issue.number, encoding="tar")
+
+
+def test_current_execution_contract_and_public_material_survive_missing_logs(tmp_path):
+    from test_evidence_contract import contract_session
+
+    from auto_designer.execution_contract import canonical_bytes
+
+    store = SessionStore(tmp_path / "sessions")
+    session = contract_session()
+    store.save(session)
+    grant(store=store, issue=7, sessions={session.session_id})
+    value = json.loads(gzip.decompress(build_package(store=store, issue=7)))
+    contract = value["execution_evidence"]["execution_contracts"][0]
+    assert contract == session.execution_contract
+    row = value["sessions"][0]
+    assert row["observation_status"] == "unavailable"
+    assert row["status"] == "available"
+    assert row["files"]["execution/task.json"].encode() == canonical_bytes(
+        session.scenario.to_dict()
+    )
+    assert "session.json" not in row["files"]
+    assert "private" not in row["files"]
+
+
+def test_public_material_must_match_frozen_contract_not_current_text(tmp_path):
+    from test_evidence_contract import contract_session
+
+    store = SessionStore(tmp_path / "sessions")
+    session = contract_session()
+    session.scenario.description = "mutated after declaration"
+    store.save(session)
+    grant(store=store, issue=7, sessions={session.session_id})
+    with pytest.raises(ValueError, match="immutable declaration"):
+        build_package(store=store, issue=7)
+
+
+def test_owner_merge_preserves_conditions_of_both_sources(tmp_path):
+    from test_evidence_contract import contract_session
+
+    store = SessionStore(tmp_path / "sessions")
+    tracker = AssetTracker()
+    refs = []
+    sessions = [
+        contract_session(sid="source-one"),
+        contract_session(sid="source-two", followup="possible"),
+    ]
+    for session in sessions:
+        store.save(session)
+        ref = tracker.create_issue(IssueDraft(title="same", body="same", labels=["proposal"]))
+        grant(store=store, issue=ref.number, sessions={session.session_id})
+        refs.append(ref)
+    owner = Owner(tracker, store, str(tmp_path), "unused", review=False)
+    owner._merge(tracker.list_open_issues()[0], into=refs[1].number)
+    package = json.loads(gzip.decompress(tracker.assets[refs[1].number][-1]["data"]))
+    contracts = package["execution_evidence"]["execution_contracts"]
+    assert {row["followup_input"] for row in contracts} == {"unavailable", "possible"}
+    assert {row["session_id"] for row in contracts} == {s.session_id for s in sessions}

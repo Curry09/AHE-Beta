@@ -66,6 +66,7 @@ def test_overview_empty(tmp_path: Path) -> None:
         "open_issue_count": 0,
         "session_count": 0,
         "feeling_trend": [],
+        "feedback_counts": {},
         "issue_curve": [],
         "funnel": {"report": 0, "proposal": 0, "ready": 0},  # Spec-0029/T9 三平面漏斗
     }

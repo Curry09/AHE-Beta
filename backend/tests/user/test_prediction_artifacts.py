@@ -386,6 +386,12 @@ class _ContainerExecutionBoundary(DockerWorkspaceRuntime):
     def _exec(self, argv: list[str], **kwargs) -> subprocess.CompletedProcess[str]:
         return subprocess.run(argv, cwd=self.cwd, capture_output=True, text=True)
 
+    def quiesce(self) -> None:
+        # This double exercises Git export commands on the host. ScriptedHarness
+        # writes synchronously and starts no processes. Never run the production
+        # container-wide /proc cleanup outside its disposable container boundary.
+        self._ensure_live()
+
     def close(self) -> None:
         self.evidence["closed_at"] = "offline-container-boundary"
         self._closed = True
@@ -413,6 +419,7 @@ def test_prediction_captures_commits_staged_and_new_files_against_original_base(
     )
     harness = _CommittingHarness(repo)
     session = run(persona, SeedScenario("task"), harness, workspace_dir=workspace)
+    assert session.workspace_evidence["actor_freeze"]["status"] == "frozen"
     assert _git(repo, "rev-parse", "HEAD").strip() != base
     assert session.workspace_evidence["diff_base_commit"] == base
     assert (repo / ".git" / "index").read_bytes() == harness.index_before_export
@@ -560,6 +567,7 @@ def test_prediction_excludes_generated_runtime_even_without_gitignore(
     )
     harness = _RuntimeArtifactHarness(repo)
     session = run(persona, SeedScenario("task"), harness, workspace_dir=workspace)
+    assert session.workspace_evidence["actor_freeze"]["status"] == "frozen"
     assert (repo / ".git" / "index").read_bytes() == harness.index_before_export
     untracked = _git(repo, "ls-files", "--others", "--exclude-standard").splitlines()
     assert ".venv/bin/python" in untracked

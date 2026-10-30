@@ -134,7 +134,7 @@
         },
         "exports": {
           "type": "array",
-              "items": {
+          "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
@@ -213,6 +213,46 @@
       "required": [
         "version",
         "exports"
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "budget_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 86400
+        },
+        "budget_source": {
+          "enum": [
+            "task_metadata",
+            "operator_quota"
+          ]
+        },
+        "quota_override_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "public_deliverables": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "public_acceptance": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "budget_seconds",
+        "budget_source"
       ]
     }
   },

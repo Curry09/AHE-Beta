@@ -88,9 +88,11 @@ class Orchestrator:
         frozen_session_plan: Callable[[int], Sequence[Mapping[str, Any]]] | None = None,
         resolve_session: Callable[[Mapping[str, Any]], SessionPair] | None = None,
         task_kinds: Mapping[str, str] | None = None,
+        round_assessment: Callable[..., None] | None = None,
         on_session_event: Callable[[str, Persona, SeedScenario, Session | None], None]
         | None = None,
     ) -> None:
+        self._round_assessment = round_assessment
         self._launcher = launcher
         self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
         # 固定列表 = 每轮同一套；callable = 每轮重新抽（如有放回随机 persona×task）。
@@ -142,6 +144,7 @@ class Orchestrator:
             fetch_issue=self._fetch_issue,
             wait_delivery=self._wait_delivery,
             grounding_repo=self._harness_repo,
+            prerequisite="objective_grading" if self._round_assessment is not None else "users",
         )
 
     @property
@@ -170,6 +173,7 @@ class Orchestrator:
         order = (
             "round_started",
             "users",
+            *(("objective_grading",) if self._round_assessment else ()),
             "triage",
             "divergent",
             "synthesizer",
@@ -418,10 +422,20 @@ class Orchestrator:
             bindings=plan_payload if self._frozen_session_plan is not None else None,
         )
 
+        if self._round_assessment is not None:
+            self._round_assessment(
+                round_no=round_no, user_sha=user_sha, bindings=plan_payload, recovery=recovery
+            )
         assert self._feedback_pipeline is not None
         if deliver:
             return self._feedback_pipeline.run(round_no=round_no, user_sha=user_sha)
-        return self._feedback_pipeline.seal(round_no=round_no, user_sha=user_sha)
+        return self._feedback_pipeline.seal(
+            round_no=round_no,
+            user_sha=user_sha,
+            dependencies=("objective_grading",)
+            if self._round_assessment is not None
+            else ("users",),
+        )
 
     def _logical_plan(self, *, round_no: int) -> list[dict[str, Any]]:
         """Spec-0073/T4: use the same immutable binding for round, key and input."""

@@ -92,7 +92,8 @@ def test_report_preserves_main_action_and_reaches_tracker(tmp_path, ability, rep
     assert all(NOTE not in message for message in harness.messages)
     assert len(loaded.issue_refs) == 1
     issue = tracker.list_open_issues()[0]
-    assert issue.body == NOTE
+    assert issue.body.startswith(NOTE)
+    assert "root cause is unconfirmed" in issue.body
     assert "needs-triage" in issue.labels
     assert loaded.issue_refs[0].number == issue.number
     assert loaded.sim_trace.goal_ledger["unresolved"] == []

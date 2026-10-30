@@ -302,6 +302,7 @@ def create_app(
             "open_issue_count": _open_issue_count(tracker=tracker),
             "session_count": len(store.index()),
             "feeling_trend": metrics.feeling_trend(),
+            "feedback_counts": metrics.feedback_counts(),
             "issue_curve": metrics.issue_curve(),
             "funnel": metrics.funnel(),  # Spec-0029/T9：三平面漏斗当前量（report/proposal/ready）
         }

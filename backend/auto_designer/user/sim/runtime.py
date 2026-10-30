@@ -21,10 +21,11 @@ import tarfile
 import tempfile
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 from typing import Any, Protocol, runtime_checkable
 
 _MAX_OUTPUT = 20_000
@@ -656,3 +657,108 @@ def as_runtime(workspace: Workspace, *, owns_tmp: bool = False) -> WorkspaceRunt
 
 def make_empty_runtime() -> LocalWorkspaceRuntime:
     return LocalWorkspaceRuntime(tempfile.mkdtemp(prefix="shared_ws_"), owns_tmp=True)
+
+
+class ReviewSnapshot:
+    """Spec-0084/T2: captured bytes, without access to the task process or filesystem.
+
+    This is a bounded subjective review view. Full prediction/artifact receipts
+    remain separate, so clipping this view never changes formal grading inputs.
+    """
+
+    def __init__(self, files: dict[str, bytes], *, patch: str = "", omissions: Sequence[str] = ()):
+        self._files = MappingProxyType({name: bytes(data) for name, data in files.items()})
+        self._patch = patch
+        self.cwd = "/review-snapshot"
+        self.runtime_id = "review-snapshot"
+        manifest = {name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())}
+        self.evidence = {
+            "kind": "read_only_review",
+            "files": manifest,
+            "patch_sha256": hashlib.sha256(patch.encode()).hexdigest(),
+            "omissions": list(omissions),
+        }
+
+    def resolve(self, path: str) -> str:
+        return _safe_relative(path)
+
+    def read_text(self, path: str) -> str:
+        name = self.resolve(path)
+        if name not in self._files:
+            raise FileNotFoundError(f"Not captured in this review snapshot: {name}")
+        text = self._files[name].decode("utf-8", errors="replace")
+        return text[:_MAX_OUTPUT] + ("\n[review text clipped]" if len(text) > _MAX_OUTPUT else "")
+
+    def list_files(self, path: str = ".") -> list[str]:
+        prefix = self.resolve(path)
+        return [
+            name
+            for name in sorted(self._files)
+            if prefix == "." or name == prefix or name.startswith(prefix + "/")
+        ]
+
+    def read_diff(self) -> str:
+        return self._patch[:_MAX_OUTPUT] + (
+            "\n[review patch clipped]" if len(self._patch) > _MAX_OUTPUT else ""
+        )
+
+    def write_text(self, path: str, content: str) -> str:
+        raise PermissionError("Review snapshots do not allow writes")
+
+    def run(self, cmd: str, timeout: float = 10.0) -> dict:
+        raise PermissionError("Review snapshots do not execute commands")
+
+    def close(self) -> None:
+        pass
+
+
+def capture_review_snapshot(
+    workspace, *, patch: str | None = None, files: dict[str, bytes] | None = None
+) -> ReviewSnapshot:
+    """Capture a reply boundary without exposing deferred reads of a live workspace.
+
+    The fixed listing is infrastructure work, never a model-selected command.
+    Safe bounded exports reject symlinks and changing files. Missing/large files
+    stay explicitly unavailable; this view is not the complete grading bundle.
+    """
+    if isinstance(workspace, ReviewSnapshot):
+        return workspace
+    captured = dict(files or {})
+    omissions: list[str] = []
+    if workspace is None:
+        return ReviewSnapshot(captured, patch=patch or "", omissions=["no_workspace"])
+    runtime = as_runtime(workspace)
+    if patch is None:
+        try:
+            patch, _ = runtime.export_patch()
+        except Exception as exc:  # noqa: BLE001 - subjective evidence may be unavailable
+            patch = ""
+            omissions.append(f"patch:{type(exc).__name__}")
+    try:
+        listing = runtime.run("git ls-files -z --cached --others --exclude-standard", timeout=10)
+        if listing.get("returncode") != 0:
+            raise RuntimeError("file listing unavailable")
+        names = sorted(set(str(listing.get("stdout") or "").split("\0")) - {""})
+        if len(str(listing.get("stdout") or "")) >= _MAX_OUTPUT:
+            omissions.append("review_file_listing_clipped")
+        total = sum(len(data) for data in captured.values())
+        for index, name in enumerate(names):
+            if name in captured:
+                continue
+            if index >= 256 or total >= 8 * 1024 * 1024:
+                omissions.append("review_snapshot_capacity")
+                break
+            if any(
+                part in {".git", ".venv", "node_modules", "__pycache__"}
+                for part in PurePosixPath(name).parts
+            ):
+                continue
+            try:
+                data = runtime.export_file(name, min(1024 * 1024, 8 * 1024 * 1024 - total))
+                captured[name] = data
+                total += len(data)
+            except Exception as exc:  # noqa: BLE001
+                omissions.append(f"{name}:{type(exc).__name__}")
+    except Exception as exc:  # noqa: BLE001
+        omissions.append(f"files:{type(exc).__name__}")
+    return ReviewSnapshot(captured, patch=patch or "", omissions=omissions)

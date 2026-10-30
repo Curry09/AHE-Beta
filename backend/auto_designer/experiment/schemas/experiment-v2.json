@@ -115,6 +115,11 @@
               "type": "number",
               "exclusiveMinimum": 0,
               "maximum": 300
+            },
+            "message_activity_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 86400
             }
           },
           "required": [
@@ -350,6 +355,28 @@
               "minLength": 1,
               "maxLength": 64,
               "pattern": "^\\S+$"
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "context_window_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "max_context_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "reserved_output_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "input_headroom_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
             }
           },
           "required": [
@@ -373,6 +400,28 @@
             "api_key_env": {
               "type": "string",
               "pattern": "^[A-Z][A-Z0-9_]*$"
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "context_window_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "max_context_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "reserved_output_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "input_headroom_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
             }
           },
           "required": [
@@ -402,6 +451,28 @@
               "minLength": 1,
               "maxLength": 64,
               "pattern": "^\\S+$"
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "context_window_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "max_context_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "reserved_output_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "input_headroom_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
             }
           },
           "required": [
@@ -453,15 +524,50 @@
       ]
     },
     "evaluation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "official_grading": {
-          "const": false
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "official_grading": {
+              "const": false
+            }
+          },
+          "required": [
+            "official_grading"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session_grading": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "plan_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "worker_key_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "runner": {
+                  "const": "external"
+                }
+              },
+              "required": [
+                "plan_sha256",
+                "worker_key_sha256",
+                "runner"
+              ]
+            }
+          },
+          "required": [
+            "session_grading"
+          ]
         }
-      },
-      "required": [
-        "official_grading"
       ]
     },
     "source": {

@@ -396,7 +396,9 @@ def test_protocol_failure_is_evaluator_invalid_not_accept() -> None:
         "attempts": 2,
     }
     assert not res.turns
-    assert res.feeling is not None and "exclude from harness metrics" in res.feeling.reason
+    assert res.feeling is None
+    assert res.experience["status"] == "unavailable"
+    assert "exclude from harness metrics" in res.experience["reason"]
 
 
 def test_free_action_classification_still_converges_after_open_intent() -> None:
@@ -537,12 +539,12 @@ def test_max_turns_cutoff() -> None:
     assert len(res.turns) == MAX_TURNS
 
 
-def test_two_track_feeling_falls_back_to_derived() -> None:
+def test_missing_self_rating_does_not_fall_back_to_derived() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _StubClient(["send_message", "accept"], verdict="satisfied", rating={"oops": 1})
     res = run_session(p, client, ScriptedHarness(), TASK)
-    assert isinstance(res.feeling, FeelingScore) and isinstance(res.feeling_derived, FeelingScore)
-    assert res.feeling == res.feeling_derived  # LLM 解析失败 -> 回落派生分
+    assert res.feeling is None and isinstance(res.feeling_derived, FeelingScore)
+    assert res.experience["status"] == "missing"
 
 
 def test_pure_subjective_turnlog_has_no_objective_fields() -> None:

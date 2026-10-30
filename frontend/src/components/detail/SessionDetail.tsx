@@ -110,7 +110,9 @@ export function SessionDetailView(props: {
   const session = loaded?.session_id === sessionId ? loaded : null;
 
   const turns = session?.transcript.turns ?? item.turns;
-  const score = session?.feeling.score ?? item.score;
+  // Spec-0084/T1: a loaded missing rating is authoritative, even if history has a stale score.
+  const score = session ? session.feeling?.score : item.score;
+  const experience = session?.feedback?.experience;
   const origin = session?.session_provenance ?? item.session_provenance;
 
   return (
@@ -196,10 +198,17 @@ export function SessionDetailView(props: {
           <div className="block">
             <div className="block-title">体感评价</div>
             <div className="prose">
-              <span className={`score s${session.feeling.score}`} style={{ marginRight: 8 }}>
-                {session.feeling.score} / 4
-              </span>
-              {session.feeling.reason}
+              {session.feeling ? (
+                <>
+                  <span className={`score s${session.feeling.score}`} style={{ marginRight: 8 }}>
+                    {session.feeling.score} / 4
+                  </span>
+                  {session.feeling.reason}
+                </>
+              ) : (
+                <span>体感缺测（{experience?.status ?? "missing"}）：{experience?.reason || "未记录有效自评"}</span>
+              )}
+              {experience?.source && <div className="dim">来源：{experience.source}</div>}
             </div>
           </div>
         )}

@@ -8,6 +8,9 @@ Orchestrator 只认 run_session_fn(persona, scenario, harness)（返回值不管
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
+import json
 import os
 import uuid
 from collections.abc import Callable
@@ -20,6 +23,7 @@ from auto_designer.loop.recovery import operation_key
 from auto_designer.models import (
     FeelingScore,
     IssueDraft,
+    IssueRef,
     Persona,
     PersonaCallTrace,
     SeedScenario,
@@ -37,10 +41,17 @@ from auto_designer.user.patches import preserve_prediction
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.deps import ensure_deps
 from auto_designer.user.sim.dimensions import Persona as SimPersona
+from auto_designer.user.sim.feeling import experience_feedback
 from auto_designer.user.sim.loop import SessionResult
 from auto_designer.user.sim.loop import run_session as sim_run_session
 from auto_designer.user.sim.persona_client import PersonaClient
-from auto_designer.user.sim.runtime import Workspace, as_runtime, utc_now
+from auto_designer.user.sim.runtime import (
+    ReviewSnapshot,
+    Workspace,
+    as_runtime,
+    capture_review_snapshot,
+    utc_now,
+)
 from auto_designer.user.sim.workspace import materialize as materialize_workspace
 
 # 观测回调：(identity, sim_persona, 进行中/最终的 SessionResult, running, *, session_id) -> None。
@@ -105,20 +116,183 @@ def _freeze_prediction_base(workspace: Workspace) -> None:
 
 
 def _collect_evaluation_artifacts(*, workspace, scenario, store, session_id, provenance, evidence):
-    """Spec-0083/T3: both runners preserve the same immutable output receipt."""
+    """Spec-0084/T2: finalize once even when no declared output files exist."""
     declarations = (scenario.workspace.params if scenario.workspace else {}).get(
         "evaluation_artifacts", []
     )
-    if declarations:
-        from auto_designer.evaluation.artifacts import collect_session_artifacts
+    from auto_designer.evaluation.artifacts import collect_session_artifacts
 
-        evidence["evaluation_artifacts"] = collect_session_artifacts(
+    class CaptureBoundary:
+        def __getattr__(self, name):
+            return getattr(workspace, name)
+
+        def quiesce(self):
+            evidence["actor_freeze"] = {"status": "pending"}
+            stop = getattr(workspace, "quiesce", None)
+            if callable(stop):
+                stop()
+
+        def finalize_task(self):
+            finalize = getattr(workspace, "finalize_task", None)
+            if callable(finalize):
+                finalize()
+            evidence["actor_freeze"] = {"status": "frozen", "at": utc_now()}
+
+    receipt = collect_session_artifacts(
+        workspace=CaptureBoundary(),
+        sessions_root=store.root,
+        session_id=session_id,
+        provenance=provenance or {},
+        declarations=declarations,
+    )
+    if evidence.get("actor_freeze", {}).get("status") != "frozen":
+        evidence["actor_freeze"] = {"status": "failed", "reason": "quiesce_or_finalize_failed"}
+        receipt["complete"] = False
+    evidence["evaluation_artifacts"] = receipt
+
+
+def _freeze_actor_outputs(
+    *, workspace, scenario, store, session_id, provenance, evidence
+) -> ReviewSnapshot:
+    """One actor output boundary for both modes; review never re-exports its own modifications."""
+    if workspace is None:
+        evidence["prediction_error"] = {"status": "unavailable", "reason": "no_workspace"}
+        return ReviewSnapshot({}, omissions=["no_workspace"])
+    workspace = as_runtime(workspace)
+    try:
+        _collect_evaluation_artifacts(
             workspace=workspace,
-            sessions_root=store.root,
+            scenario=scenario,
+            store=store,
             session_id=session_id,
-            provenance=provenance or {},
-            declarations=declarations,
+            provenance=provenance,
+            evidence=evidence,
         )
+        if evidence["actor_freeze"]["status"] != "frozen":
+            evidence["prediction_error"] = {
+                "status": "unavailable",
+                "reason": "actor_not_quiescent",
+            }
+            return ReviewSnapshot({}, omissions=["actor_not_quiescent"])
+        patch, _ = _export_prediction(
+            workspace=workspace, store=store, session_id=session_id, evidence=evidence
+        )
+        files = {}
+        for row in evidence["evaluation_artifacts"]["entries"]:
+            if row["status"] == "collected":
+                data = (store.root.parent / row["path"]).read_bytes()
+                if hashlib.sha256(data).hexdigest() != row["sha256"]:
+                    raise ValueError("frozen artifact digest changed")
+                files[f"artifacts/{row['id']}"] = data
+        snapshot = capture_review_snapshot(workspace, patch=patch, files=files)
+        evidence["review_snapshot"] = dict(snapshot.evidence)
+        return snapshot
+    finally:
+        workspace.close()
+        for key, value in dict(getattr(workspace, "evidence", {}) or {}).items():
+            if key not in {"prediction", "diff_sha256", "diff_bytes"}:
+                evidence[key] = value
+
+
+def _execution_contract(*, session_id, scenario, provenance, harness, direct):
+    from auto_designer.execution_contract import canonical_sha256, make_execution_contract
+
+    params = (scenario.workspace.params if scenario.workspace else {}) or {}
+    execution = params.get("execution") or {}
+    seconds = execution.get(
+        "task_budget_seconds",
+        execution.get("budget_seconds", getattr(harness, "request_budget_seconds", None)),
+    )
+    contract = make_execution_contract(
+        session_id=session_id,
+        task_id=str(
+            provenance.get("task_id") or params.get("task_id") or params.get("task_key") or "task"
+        ),
+        task_digest=str(provenance.get("task_digest") or canonical_sha256(scenario.to_dict())),
+        followup_input="unavailable" if direct else "possible",
+        task_budget_seconds=seconds,
+        budget_source=execution.get("budget_source")
+        or ("operator_quota" if seconds else "undeclared"),
+        public_refs=[
+            {
+                "kind": "task",
+                "path": f"{session_id}/execution/task.json",
+                "sha256": canonical_sha256(scenario.to_dict()),
+            }
+        ],
+    )
+    bind = getattr(harness, "bind_execution_contract", None)
+    if callable(bind):
+        bind(contract)
+    return contract
+
+
+def _report_plan(drafts: list[IssueDraft], session_id: str) -> list[dict]:
+    from auto_designer.execution_contract import canonical_sha256
+
+    return [
+        {
+            "operation_key": operation_key("session-issue", session_id, index),
+            "draft": draft.to_dict(),
+            "draft_sha256": canonical_sha256(draft.to_dict()),
+        }
+        for index, draft in enumerate(drafts)
+    ]
+
+
+def _publish_reports(session: Session, *, tracker, store) -> Session:
+    """Spec-0084/T2: immutable complete plan + per-report receipts, then one handoff enrichment."""
+    from auto_designer.demand.evidence_contract import build_evidence_envelope
+    from auto_designer.execution_contract import canonical_sha256
+    from auto_designer.user.session_store import _atomic_json
+
+    if session.report_plan is None:
+        return session
+    directory = store.root / "reports"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{session.session_id}.json"
+    with (directory / f"{session.session_id}.lock").open("a+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        digest = canonical_sha256(session.report_plan)
+        receipt = (
+            json.loads(path.read_text())
+            if path.exists()
+            else {"plan_sha256": digest, "refs": {}, "completed": False}
+        )
+        if receipt["plan_sha256"] != digest:
+            raise ValueError("report plan digest changed")
+        for item in session.report_plan:
+            if canonical_sha256(item["draft"]) != item["draft_sha256"]:
+                raise ValueError("report draft digest changed")
+            key = item["operation_key"]
+            if key not in receipt["refs"]:
+                create_once = getattr(tracker, "create_issue_once", None)
+                if not callable(create_once):
+                    raise RuntimeError("report publication requires create_issue_once")
+                ref = create_once(IssueDraft.from_dict(item["draft"]), operation_key=key)
+                receipt["refs"][key] = ref.to_dict()
+                _atomic_json(path, receipt)
+        refs = [
+            IssueRef.from_dict(receipt["refs"][item["operation_key"]])
+            for item in session.report_plan
+        ]
+        if not session.issue_refs and refs:
+            session.issue_refs = refs
+            session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
+            store.save(session)
+        elif [ref.to_dict() for ref in session.issue_refs] != [ref.to_dict() for ref in refs]:
+            raise ValueError("session issue handoff conflicts with publication receipts")
+        receipt["completed"] = True
+        _atomic_json(path, receipt)
+        return session
+
+
+def _save_and_publish(session: Session, *, tracker, store) -> Session:
+    from auto_designer.demand.evidence_contract import build_evidence_envelope
+
+    session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
+    store.save(session)
+    return _publish_reports(session, tracker=tracker, store=store)
 
 
 def _export_prediction(
@@ -287,41 +461,6 @@ def _issue_draft_from_body(body: str, *, round_no: int | None = None) -> IssueDr
     return IssueDraft(title=first[:80], body=text, labels=labels)
 
 
-def _issue_draft(res: SessionResult) -> IssueDraft:
-    """兼容旧单测：仅从终结收场的 issue_artifact 建 draft（无轮号）。"""
-    return _issue_draft_from_body(res.issue_artifact or "")
-
-
-def _flush_issues(
-    tracker: IssueTracker,
-    res: SessionResult,
-    *,
-    round_no: int | None = None,
-    session_id: str | None = None,
-) -> list:
-    """中途 report_issue notes + 终结 issue_artifact 一并建单（顺序：先中途、后收场）。
-
-    round_no 由编排层透传（Spec-0025/T6）：给每条 raw issue 盖 `round-N`，供增量 triage 与观测曲线。
-    """
-    refs = []
-    bodies = list(res.issue_notes)
-    if res.issue_artifact:
-        bodies.append(res.issue_artifact)
-    create_once = getattr(tracker, "create_issue_once", None)
-    for index, body in enumerate(bodies):
-        draft = _issue_draft_from_body(body, round_no=round_no)
-        if session_id and callable(create_once):
-            refs.append(
-                create_once(
-                    draft,
-                    operation_key=operation_key("session-issue", session_id, index),
-                )
-            )
-        else:
-            refs.append(tracker.create_issue(draft))
-    return refs
-
-
 def make_sim_run_session_fn(
     *,
     client_factory: Callable[[], PersonaClient],
@@ -364,6 +503,9 @@ def make_sim_run_session_fn(
         bound_session_id = current_usage_context().session_id
         session_id = bound_session_id or uuid.uuid4().hex
         provenance = bound_session_provenance()
+        recovered = store.reconcile(session_id, expected_provenance=provenance)
+        if recovered is not None:
+            return _publish_reports(recovered, tracker=tracker, store=store)
         client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
 
         # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
@@ -400,6 +542,31 @@ def make_sim_run_session_fn(
         round_no = (
             round_provider() if round_provider is not None else current_usage_context().round_no
         )
+        workspace_evidence: dict = {}
+        actor_closed = False
+
+        def freeze_before_review() -> None:
+            nonlocal actor_closed
+            if actor_closed:
+                return
+            actor_closed = True
+            connector.close()
+            source = getattr(harness, "observation_source", None)
+            if source is not None:
+                workspace_evidence["observation"] = source.collect(
+                    root=observation_root, session_id=session_id
+                )
+            snapshot = _freeze_actor_outputs(
+                workspace=ws,
+                scenario=scenario,
+                store=store,
+                session_id=session_id,
+                provenance=provenance,
+                evidence=workspace_evidence,
+            )
+            if hasattr(client, "bind_session"):
+                client.bind_session(persona=sim_persona, workspace_dir=snapshot)
+
         with bind_usage_context(
             session_id=session_id,
             instance_id=instance_id,
@@ -409,55 +576,26 @@ def make_sim_run_session_fn(
             operation="persona",
         ):
             try:
-                connector.reset()  # Include startup failure in the evidence cleanup boundary.
+                connector.reset()
+                execution_contract = _execution_contract(
+                    session_id=session_id,
+                    scenario=scenario,
+                    provenance=provenance,
+                    harness=harness,
+                    direct=False,
+                )
                 res = sim_run_session(
                     sim_persona,
                     client,
                     connector,
                     scenario.description,
-                    # 该版本 harness 的帮助文本：让 persona 的能力预期锚定"这工具文档说的"，
-                    # 而非空泛先验；缺省空串（后端无 help_text 属性时为空）。
                     help_text=connector.help_text,
                     on_progress=progress,
+                    before_terminal_review=freeze_before_review,
                 )
             finally:
-                # 关闭时才到达的 usage 仍须继承本 session/instance/turn 归属。
-                try:
-                    connector.close()  # 无论成败都释放 harness 子进程
-                finally:
-                    source = getattr(harness, "observation_source", None)
-                    if source is not None:
-                        receipt = source.collect(root=observation_root, session_id=session_id)
-                        if ws is not None:
-                            ws.evidence["observation"] = receipt
-
+                freeze_before_review()
         request_outcomes = [dict(row) for row in (getattr(harness, "request_outcomes", None) or [])]
-        patch = ""
-        patch_sha = ""
-        workspace_evidence: dict = {}
-        if ws is None:
-            workspace_evidence["prediction_error"] = {
-                "status": "unavailable",
-                "reason": "no_workspace",
-            }
-        if ws is not None:
-            _collect_evaluation_artifacts(
-                workspace=ws,
-                scenario=scenario,
-                store=store,
-                session_id=session_id,
-                provenance=provenance,
-                evidence=workspace_evidence,
-            )
-            patch, patch_sha = _export_prediction(
-                workspace=ws, store=store, session_id=session_id, evidence=workspace_evidence
-            )
-            # The interaction boundary is no longer needed once its patch is exported.
-            # Persist stop evidence before saving the completed interaction.
-            ws.close()
-            for key, value in dict(getattr(ws, "evidence", {}) or {}).items():
-                if key not in {"prediction", "diff_sha256", "diff_bytes"}:
-                    workspace_evidence[key] = value
 
         # Spec-0083/T3: grading is private and happens only after collection.
         terminal_note = next(
@@ -473,12 +611,48 @@ def make_sim_run_session_fn(
         round_no = (
             round_provider() if round_provider is not None else current_usage_context().round_no
         )
-        feel = res.feeling or res.feeling_derived
+        bodies = list(res.issue_notes) + ([res.issue_artifact] if res.issue_artifact else [])
+        drafts = [_issue_draft_from_body(body, round_no=round_no) for body in bodies]
+        opportunities = [
+            {"kind": "feature" if "feature" in draft.labels else "diagnostic", "body": draft.body}
+            for draft in drafts
+        ]
+        for draft, opportunity in zip(drafts, opportunities, strict=True):
+            if opportunity["kind"] == "diagnostic":
+                draft.body += (
+                    "\n\nAttribution: user-reported observation; root cause is unconfirmed."
+                )
+        feedback = {
+            "schema_version": 1,
+            "task_assessment": {
+                "status": "fulfilled"
+                if res.end_reason == "accepted"
+                else "unfulfilled"
+                if res.end_reason in {"abandoned", "issue_filed", "max_turns"}
+                else "unknown",
+                "source": "simulated_user_terminal_action",
+                "evidence_refs": ["sim_trace"],
+            },
+            "experience": res.experience
+            or experience_feedback(
+                res.feeling.to_dict() if res.feeling else None, source="simulated_user"
+            ),
+            "attribution": {"status": "uncertain" if bodies else "unknown", "claims": []},
+            "opportunities": opportunities,
+        }
         session = Session(
             persona=persona,
             scenario=scenario,
             transcript=Transcript(turns=result_to_turns(res)),
-            feeling=FeelingScore(score=feel.score, reason=feel.reason),
+            feeling=None,
+            feedback=feedback,
+            execution_contract=execution_contract,
+            execution_receipt={
+                "interaction_mode": "simulated_user",
+                "harness_messages": sum(t.role == "user" for t in result_to_turns(res)),
+                "user_assistance": "recorded_in_sim_trace",
+            },
+            report_plan=_report_plan(drafts, session_id),
             issue_refs=[],
             session_provenance=provenance,
             sim_trace=result_to_sim_trace(res),
@@ -492,16 +666,7 @@ def make_sim_run_session_fn(
             ),
         )
         validate_session_provenance(session, provenance)
-        session.issue_refs = _flush_issues(
-            tracker, res, round_no=round_no, session_id=session_id if bound_session_id else None
-        )
-        # Spec-0055/T2: materialize the bounded, deterministic user feedback
-        # handoff at session close.  Demand roles consume this projection rather
-        # than reparsing the complete persona trace.
-        from auto_designer.demand.evidence_contract import build_evidence_envelope
-
-        session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
-        store.save(session)  # 体感 + session 落本地（issue 权威源在 Gitea）
+        _save_and_publish(session, tracker=tracker, store=store)
         if on_turn is not None:
             # 收尾：标 running=False，带 session_id 供看板归档关联全量会话。
             on_turn(persona.identity, sim_persona, res, False, session_id=session.session_id)
@@ -510,7 +675,10 @@ def make_sim_run_session_fn(
     # The orchestrator uses this read path to reconcile a crash after SessionStore
     # committed but before the recovery completion marker was published.
     def load_completed_session(session_id):
-        return store.reconcile(session_id, expected_provenance=bound_session_provenance())
+        session = store.reconcile(session_id, expected_provenance=bound_session_provenance())
+        return (
+            _publish_reports(session, tracker=tracker, store=store) if session is not None else None
+        )
 
     run.load_completed_session = load_completed_session
     return run
@@ -580,154 +748,152 @@ def make_direct_run_session_fn(
         *,
         workspace_dir: Workspace | None = None,
     ) -> Session:
+        from auto_designer.user.sim.persona_client import drain_call_traces
+        from auto_designer.user.sim.prompt import build_direct_review_turn, build_system
+
         params = dict((scenario.workspace.params if scenario.workspace else {}) or {})
         task_key = str(params.get("task_key") or persona.identity or "direct-task")
-        benchmark = str(params.get("benchmark") or "unknown")
         session_id = current_usage_context().session_id or uuid.uuid4().hex
         provenance = bound_session_provenance()
+        recovered = store.reconcile(session_id, expected_provenance=provenance)
+        if recovered is not None:
+            return _publish_reports(recovered, tracker=tracker, store=store)
         connector = HarnessConnector(harness)
+        round_no = round_provider() if round_provider else current_usage_context().round_no
         reply = ""
-        harness_error: str | None = None
+        harness_error = None
         workspace_evidence: dict = {}
-        patch_text = ""
         if workspace_dir is not None:
-            _freeze_prediction_base(workspace_dir)
+            _freeze_prediction_base(as_runtime(workspace_dir))
+        execution_contract = _execution_contract(
+            session_id=session_id,
+            scenario=scenario,
+            provenance=provenance,
+            harness=harness,
+            direct=True,
+        )
         try:
             connector.reset()
+            bind = getattr(harness, "bind_execution_contract", None)
+            if callable(bind):
+                bind(execution_contract)
             with bind_usage_context(
                 session_id=session_id,
                 instance_id=params.get("task_id") or task_key,
                 role="direct",
                 agent_id=f"direct-{task_key}",
-                round_no=round_provider() if round_provider else current_usage_context().round_no,
+                round_no=round_no,
             ):
                 reply = connector.send(scenario.description)
-        except Exception as exc:  # noqa: BLE001 - preserve an auditable infrastructure failure
+        except Exception as exc:  # noqa: BLE001 - retain actor failures independently of review
             harness_error = str(exc)
             reply = f"[harness error] {harness_error}"
         finally:
             execution_record, harness_steps = _direct_execution_record(harness)
-            try:
-                connector.close()
-            finally:
-                source = getattr(harness, "observation_source", None)
-                if source is not None:
-                    workspace_evidence["observation"] = source.collect(
-                        root=observation_root, session_id=session_id
-                    )
-
-        if workspace_dir is None:
-            workspace_evidence["prediction_error"] = {
-                "status": "unavailable",
-                "reason": "no_workspace",
-            }
-        if workspace_dir is not None:
-            patch, patch_sha = _export_prediction(
-                workspace=workspace_dir,
-                store=store,
-                session_id=session_id,
-                evidence=workspace_evidence,
-            )
-            patch_text = patch[:12_000]
-            if patch_sha:
-                workspace_evidence.update(
-                    {"patch_sha256": patch_sha, "patch_bytes": len(patch.encode())}
+            connector.close()
+            source = getattr(harness, "observation_source", None)
+            if source is not None:
+                workspace_evidence["observation"] = source.collect(
+                    root=observation_root, session_id=session_id
                 )
-
-        # Direct mode still has a user-side terminal review. It is deliberately
-        # one bounded persona call after the harness reply: no tool/heartbeat/
-        # follow-up is sent back to the harness.
-        review_client = client_factory()
-        sim_persona = sim_personas.get(persona.identity)
-        review_error: str | None = None
-        review: dict = {}
-        review_system = (
-            "You are a strict software user reviewing a completed harness run. Return JSON only."
+        snapshot = _freeze_actor_outputs(
+            workspace=workspace_dir,
+            scenario=scenario,
+            store=store,
+            session_id=session_id,
+            provenance=provenance,
+            evidence=workspace_evidence,
         )
-        if sim_persona is not None:
-            from auto_designer.user.sim.prompt import build_system
-
-            review_system = build_system(sim_persona)
-            if workspace_dir is not None and hasattr(review_client, "bind_session"):
-                review_client.bind_session(
-                    persona=sim_persona,
-                    workspace_dir=as_runtime(workspace_dir),
-                )
-        review_prompt = (
-            "<direct_review>\n"
-            "The harness has finished. Review its final reply and the bounded patch excerpt below. "
-            "Do not send anything to the harness and do not invent tests or evidence. Return exactly "
-            '{"verdict":"accept|file_issue","feedback":"user-facing concise findings",'
-            '"issue":"self-contained issue text if needed","score":1,"reason":"..."}.\n'
-            f"<task>\n{scenario.description}\n</task>\n"
-            f"<harness_reply>\n{reply}\n</harness_reply>\n"
-            f"<patch_excerpt>\n{patch_text or '(no patch exported)'}\n</patch_excerpt>\n"
-            "</direct_review>"
+        review_error = None
+        review: dict = {}
+        review_client = None
+        sim_persona = sim_personas.get(persona.identity)
+        review_system = (
+            build_system(sim_persona)
+            if sim_persona
+            else "Review only the frozen outputs. Return JSON."
         )
         try:
+            review_client = client_factory()
+            if sim_persona is not None and hasattr(review_client, "bind_session"):
+                review_client.bind_session(persona=sim_persona, workspace_dir=snapshot)
             with bind_usage_context(
                 session_id=session_id,
                 instance_id=params.get("task_id") or task_key,
                 role="user",
                 agent_id=f"user-{session_id}" if provenance else f"user-{persona.identity}",
-                round_no=round_provider() if round_provider else current_usage_context().round_no,
+                round_no=round_no,
                 operation="direct_review",
             ):
-                review = dict(review_client.respond(review_system, review_prompt) or {})
-        except Exception as exc:  # noqa: BLE001 - preserve feedback even if review is unavailable
+                review = dict(
+                    review_client.respond(
+                        review_system,
+                        build_direct_review_turn(scenario.description, reply, snapshot.read_diff()),
+                    )
+                    or {}
+                )
+        except Exception as exc:  # noqa: BLE001
             review_error = str(exc)
-        feedback = str(
+        text = str(
             review.get("feedback") or review.get("message") or review.get("issue") or ""
         ).strip()
-        if not feedback:
-            feedback = "Harness final reply recorded without additional user findings."
-        review_issue = str(review.get("issue") or feedback).strip()
-        verdict = str(review.get("verdict") or "file_issue").strip()
-        score = review.get("score")
-        if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 4:
-            score = 3
-        review_status = "infrastructure_failure" if review_error else "completed"
-        # Spec-0083/T3: freeze outputs after the terminal user review, before reclamation.
-        if workspace_dir is not None:
-            _collect_evaluation_artifacts(
-                workspace=as_runtime(workspace_dir),
-                scenario=scenario,
-                store=store,
-                session_id=session_id,
-                provenance=provenance,
-                evidence=workspace_evidence,
-            )
-            if params.get("evaluation_artifacts"):
-                # The earlier patch was only the terminal review's excerpt.
-                # Persist the actual final state after finalize, using the same exporter.
-                patch, patch_sha = _export_prediction(
-                    workspace=as_runtime(workspace_dir),
-                    store=store,
-                    session_id=session_id,
-                    evidence=workspace_evidence,
+        assessment = review.get("task_assessment", "unknown")
+        if assessment not in ("fulfilled", "unfulfilled", "unknown"):
+            assessment = "unknown"
+        opportunities = []
+        for row in (
+            review.get("opportunities", []) if isinstance(review.get("opportunities"), list) else []
+        ):
+            if isinstance(row, dict) and isinstance(row.get("body"), str) and row["body"].strip():
+                opportunities.append(
+                    {
+                        "kind": "feature" if row.get("kind") == "feature" else "diagnostic",
+                        "title": str(row.get("title") or task_key),
+                        "body": row["body"].strip(),
+                    }
                 )
-                if patch_sha:
-                    workspace_evidence.update(
-                        patch_sha256=patch_sha, patch_bytes=len(patch.encode())
-                    )
-
-        body = (
-            f"[direct task {task_key} / {benchmark}]\n"
-            f"Task instruction:\n{scenario.description}\n\n"
-            f"Harness final reply:\n{reply}\n"
-            f"\nUser terminal review ({verdict}):\n{review_issue}\n"
-        )
-        round_no = (
-            round_provider() if round_provider is not None else current_usage_context().round_no
-        )
-        labels = ["bug", NEEDS_TRIAGE, "direct"]
-        if round_no is not None:
-            labels.append(round_label(round_no))
-        draft = IssueDraft(
-            title=f"direct task {task_key}"[:80],
-            body=body,
-            labels=labels,
-        )
+        # Explicit old-style reviewer complaints can be retained, but a generic fallback
+        # or a missing review never manufactures a ticket or a successful task judgment.
+        if (
+            "opportunities" not in review
+            and isinstance(review.get("issue"), str)
+            and review["issue"].strip()
+        ):
+            opportunities.append(
+                {"kind": "diagnostic", "title": task_key, "body": review["issue"].strip()}
+            )
+        attribution = review.get("attribution") or {}
+        claims = attribution.get("claims", []) if isinstance(attribution, dict) else []
+        if not isinstance(claims, list):
+            claims = []
+        feedback = {
+            "schema_version": 1,
+            "task_assessment": {
+                "status": assessment,
+                "source": "direct_terminal_review",
+                "evidence_refs": ["transcript", "workspace_evidence"],
+            },
+            "experience": experience_feedback(
+                review, source="direct_terminal_review", error=review_error
+            ),
+            # The subjective reviewer cannot establish the implementation root cause.
+            "attribution": {"status": "uncertain" if claims else "unknown", "claims": claims},
+            "opportunities": opportunities,
+        }
+        drafts = []
+        for opportunity in opportunities:
+            labels = [
+                "feature" if opportunity["kind"] == "feature" else "bug",
+                NEEDS_TRIAGE,
+                "direct",
+            ]
+            if round_no is not None:
+                labels.append(round_label(round_no))
+            body = opportunity["body"]
+            if opportunity["kind"] == "diagnostic":
+                body += "\n\nAttribution: an observed task gap; the root cause is unconfirmed."
+            drafts.append(IssueDraft(title=opportunity["title"][:80], body=body, labels=labels))
+        status = "infrastructure_failure" if harness_error else "completed"
         session = Session(
             persona=persona,
             scenario=scenario,
@@ -735,12 +901,19 @@ def make_direct_run_session_fn(
                 turns=[
                     Turn(role="user", content=scenario.description),
                     Turn(role="harness", content=reply, steps=harness_steps),
-                    Turn(role="user", content=feedback),
+                    Turn(role="user", content=text),
                 ]
             ),
-            feeling=FeelingScore(
-                score=score, reason=str(review.get("reason") or "terminal user review")
-            ),
+            feeling=None,
+            feedback=feedback,
+            execution_contract=execution_contract,
+            execution_receipt={
+                "interaction_mode": "direct",
+                "harness_messages": 1,
+                "followups": 0,
+                "user_assistance": "none",
+            },
+            report_plan=_report_plan(drafts, session_id),
             issue_refs=[],
             session_provenance=provenance,
             session_id=session_id,
@@ -750,14 +923,15 @@ def make_direct_run_session_fn(
                 "user_model": getattr(review_client, "model", None),
                 "user_turns": 1,
                 "harness_messages": 1,
-                "review_calls": 1,
+                "review_calls": 1 if review_client else 0,
                 "followups": 0,
                 "heartbeat": False,
-                "status": "infrastructure_failure" if harness_error else "completed",
-                "review_status": review_status,
-                "review_verdict": verdict,
-                "review_feedback": feedback,
+                "status": status,
+                "review_status": "infrastructure_failure" if review_error else "completed",
+                "review_verdict": str(review.get("verdict") or assessment),
+                "review_feedback": text,
                 "harness_reply": reply,
+                "review_trace": drain_call_traces(review_client) if review_client else [],
                 **({"error": harness_error} if harness_error else {}),
                 **({"review_error": review_error} if review_error else {}),
             },
@@ -770,26 +944,13 @@ def make_direct_run_session_fn(
             ),
         )
         validate_session_provenance(session, provenance)
-        create_once = getattr(tracker, "create_issue_once", None)
-        if callable(create_once):
-            issue_refs = [
-                create_once(
-                    draft,
-                    operation_key=operation_key("direct-session-issue", session_id),
-                )
-            ]
-        else:
-            issue_refs = [tracker.create_issue(draft)]
-
-        session.issue_refs = issue_refs
-        from auto_designer.demand.evidence_contract import build_evidence_envelope
-
-        session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
-        store.save(session)
-        return session
+        return _save_and_publish(session, tracker=tracker, store=store)
 
     def load_completed_session(session_id):
-        return store.reconcile(session_id, expected_provenance=bound_session_provenance())
+        session = store.reconcile(session_id, expected_provenance=bound_session_provenance())
+        return (
+            _publish_reports(session, tracker=tracker, store=store) if session is not None else None
+        )
 
     run.load_completed_session = load_completed_session
     return run

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -70,6 +71,29 @@ def main() -> int:
     image = args.image or vigil.get("image")
     if not network or not image:
         raise SystemExit("Provide --network and --image when absent from the selected run")
+    import yaml
+
+    from auto_designer.experiment.backends.base import require_execution_reader
+
+    settings_doc = yaml.safe_load((config / "openagents.yml").read_text())
+    if settings_doc.get("execution_evidence", {}).get("required") is not True:
+        raise SystemExit("Validation requires execution_evidence.required: true")
+    capability = subprocess.check_output(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            image,
+            "openagents",
+            "observation-capabilities",
+            "--json",
+        ],
+        text=True,
+        timeout=30,
+    )
+    require_execution_reader(json.loads(capability))
     # Do not reuse or overwrite the controller's own delivery container.
     if args.container == vigil.get("container"):
         raise SystemExit("Validation container must differ from the run's delivery container")

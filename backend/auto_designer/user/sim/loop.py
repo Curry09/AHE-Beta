@@ -32,7 +32,7 @@ from auto_designer.usage import set_usage_context
 from .action_space import ActionResolutionError, derive_action_space, resolve_action
 from .actions import CATALOG, Channel, Effect, Executor, Phase
 from .dimensions import Persona
-from .feeling import FeelingScore, derive_feeling, parse_feeling_llm
+from .feeling import FeelingScore, derive_feeling, experience_feedback, parse_feeling_llm
 from .goals import GoalLedger, audit_acceptance_basis, audit_goal_fields
 from .persona_client import (
     PersonaClient,
@@ -167,7 +167,9 @@ class SessionResult:
     # 中途 report_issue tool 记下的正文（不终止会话）；收尾与 issue_artifact 一并交 tracker。
     issue_notes: list[str] = field(default_factory=list)
     feeling: FeelingScore | None = None  # 训练信号: persona LLM 会话末自评 (1–4)
-    feeling_derived: FeelingScore | None = None  # 交叉校验/兜底: 框架从主观末态聚合的 1–4
+    feeling_derived: FeelingScore | None = None  # 独立诊断，不填补自评缺测
+    experience: dict = field(default_factory=dict)
+    terminal_issue_mode: str | None = None
     # 已收到但尚未进入 TurnLog 的 harness 回复(harness 回复要等下一轮 TurnLog 才随
     # harness_output 落日志, 这里先行暴露给观测层实时展示; 下一条 TurnLog 追加时清空)
     pending_harness_output: str | None = None
@@ -907,42 +909,42 @@ def _finalize_terminal(
     action_id: str,
     *,
     result: SessionResult,
-    persona: Persona,
-    client: PersonaClient,
-    system: str,
-    task: str,
-    history: list[str],
-    state: State,
 ) -> None:
-    """终止收尾：记 end_reason；对 file_issue/give_up/accept_with_reservations 以本人口吻并出一条 issue。"""
+    """Record the chosen terminal action; narrate only after actor output freezing."""
     spec = CATALOG[action_id]
     result.end_reason = spec.end_reason or "terminated"
-    issue_mode = {
+    result.terminal_issue_mode = {
         "file_issue": "filed",
         "give_up": "left",
         "accept_with_reservations": "accepted",
     }.get(action_id)
-    if issue_mode is not None:
+    # Spec-0084/T2: narration is deferred until the outer runner has frozen actor outputs.
+
+
+def _narrate_terminal(*, result, persona, client, system, task, history, state) -> None:
+    if result.terminal_issue_mode is not None:
         try:
             issue_resp = client.respond(
-                system, build_issue_turn(task, history, state, mode=issue_mode)
+                system, build_issue_turn(task, history, state, mode=result.terminal_issue_mode)
             )
-        except PersonaProtocolError as exc:
+        except Exception as exc:  # noqa: BLE001 - preserve actor evidence when review is unavailable
             # Terminal issue narration is non-gating. Preserve the chosen terminal
             # action, but retain a typed warning instead of losing the whole session.
-            result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+            stage = getattr(exc, "stage", "file_issue")
+            code = getattr(exc, "code", type(exc).__name__)
+            result.persona_tail.extend(_take_persona_calls(client, stage))
             _take_protocol_events(client, result)
             result.protocol_events.append(
                 {
-                    "stage": exc.stage,
-                    "code": exc.code,
-                    "attempts": exc.attempts,
+                    "stage": stage,
+                    "code": code,
+                    "attempts": getattr(exc, "attempts", 1),
                     "status": "warning",
                     "terminal_narration": True,
                 }
             )
             result.signals.append(
-                f"PERSONA_PROTOCOL_WARNING: stage={exc.stage} code={exc.code} terminal_narration"
+                f"PERSONA_PROTOCOL_WARNING: stage={stage} code={code} terminal_narration"
             )
             return
         result.persona_tail.extend(_take_persona_calls(client, "file_issue"))
@@ -1327,6 +1329,7 @@ def run_session(
     help_text: str = "",
     on_progress: Callable[[SessionResult], None] | None = None,
     deadline_seconds: float | None = None,
+    before_terminal_review: Callable[[], None] | None = None,
 ) -> SessionResult:
     # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
     # Spec-0023：主决定与心跳均为 judge → intent → act（three），无 mode 旋钮。
@@ -1567,12 +1570,6 @@ def run_session(
             _finalize_terminal(
                 action_id,
                 result=result,
-                persona=persona,
-                client=client,
-                system=system,
-                task=_current_goal_text(task, goal_ledger),
-                history=history,
-                state=state,
             )
             break
 
@@ -1607,12 +1604,6 @@ def run_session(
                 _finalize_terminal(
                     "give_up",
                     result=result,
-                    persona=persona,
-                    client=client,
-                    system=system,
-                    task=_current_goal_text(task, goal_ledger),
-                    history=history,
-                    state=state,
                 )
                 break
             if terminal_from_wait == "protocol_stalled":
@@ -1691,6 +1682,18 @@ def run_session(
                 break
         # 本轮若未产生下一条 harness 输出（例如模型空转），保持上一条可见输出供下一轮继续判断。
 
+    # Spec-0084/T2: main_final_check stayed before accept/continue; terminal review starts only now.
+    if before_terminal_review is not None:
+        before_terminal_review()
+    _narrate_terminal(
+        result=result,
+        persona=persona,
+        client=client,
+        system=system,
+        task=_current_goal_text(task, goal_ledger),
+        history=history,
+        state=state,
+    )
     # Flush any recovery events from a successful or normally terminated session.
     _take_protocol_events(client, result)
     # 评估器协议失败不是用户体验分，也不是 harness 失败；保留审计哨兵但跳过正常评分。
@@ -1710,14 +1713,14 @@ def run_session(
         if result.interaction_status in {"protocol_unrecoverable", "protocol_stalled"}:
             result.signals.append(f"PROTOCOL_UNRECOVERABLE: {err}")
         result.signals.append(f"EVALUATOR_INVALID: {err}")
-        result.feeling = FeelingScore(score=2, reason=reason)
+        result.experience = experience_feedback(None, source="simulated_user", error=reason)
         return result
 
     # 收尾: 汇总纯主观的行为信号
     _collect_signals(result, persona)
 
     # 会话末两路并出体感分 (训练信号), 均只吃主观信号, 不读客观真值:
-    # ② 框架派生: 从 end_reason / verdict / trust 确定性聚合, 可复现, 也作兜底
+    # ② 框架派生仅作独立诊断，不补测量缺失。
     result.feeling_derived = derive_feeling(result.end_reason, result.turns)
     # ① LLM 自评: persona 在角色内给"这次体验"打 1–4 + 理由 (spec-0001/T3 产出方式)
     set_usage_context(interaction_id=None, turn_no=None, operation="rate")
@@ -1727,23 +1730,27 @@ def run_session(
         )
         result.persona_tail.extend(_take_persona_calls(client, "rate"))
         _take_protocol_events(client, result)
-        result.feeling = parse_feeling_llm(rating) or result.feeling_derived
-    except PersonaProtocolError as exc:
-        # Rating is a non-gating training signal. A malformed rating must not erase
-        # an otherwise complete interaction; use the deterministic derived score.
-        result.persona_tail.extend(_take_persona_calls(client, exc.stage))
+        result.feeling = parse_feeling_llm(rating)
+        result.experience = experience_feedback(rating, source="simulated_user")
+    except Exception as exc:  # noqa: BLE001 - a failed reviewer cannot erase the actor's artifacts
+        # Rating is non-gating. Retain its failure without inventing a self-rating.
+        stage = getattr(exc, "stage", "rate")
+        code = getattr(exc, "code", type(exc).__name__)
+        result.persona_tail.extend(_take_persona_calls(client, stage))
         _take_protocol_events(client, result)
         result.protocol_events.append(
             {
-                "stage": exc.stage,
-                "code": exc.code,
-                "attempts": exc.attempts,
+                "stage": stage,
+                "code": code,
+                "attempts": getattr(exc, "attempts", 1),
                 "status": "warning",
                 "non_gating": True,
             }
         )
-        result.signals.append(f"PERSONA_PROTOCOL_WARNING: stage={exc.stage} code={exc.code} rating")
-        result.feeling = result.feeling_derived
+        result.signals.append(f"PERSONA_PROTOCOL_WARNING: stage={stage} code={code} rating")
+        result.experience = experience_feedback(None, source="simulated_user", error=str(exc))
+        if isinstance(exc, PersonaProtocolError) and not code.startswith("internal_error:"):
+            result.experience["status"] = "invalid"
     return result
 
 

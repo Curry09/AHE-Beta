@@ -9,6 +9,19 @@ from pathlib import Path
 from urllib.parse import quote, urlsplit
 
 
+def require_execution_config(checkout: Path) -> None:
+    """Keep the trusted requirement when preparing a new delivery validation."""
+    import yaml
+
+    path = checkout / ".openagents/openagents.yml"
+    document = yaml.safe_load(path.read_text()) if path.exists() else {"version": 1}
+    if not isinstance(document, dict):
+        raise SystemExit("OpenAgents validation configuration must be an object")
+    document["execution_evidence"] = {"required": True}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(document, sort_keys=False))
+
+
 def git_remote_url(gitea: dict[str, str], repo: str) -> str:
     base = gitea["GITEA_URL"].rstrip("/")
     parsed = urlsplit(base)

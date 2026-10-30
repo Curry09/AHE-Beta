@@ -135,6 +135,21 @@ params.yaml
 作为成功证据。该判定不延长预算、不自动追加解题轮次，也不改变现有的迭代、
 模型请求、工具和 token 上限。
 
+### Autonomous and interactive execution conditions
+
+收到明确目标后应自主推进；后续用户输入是可选的控制、授权和补充通道，不能假定用户一定发送继续。
+运行器在 message 中提供稳定 task_id/message_id、followup_input 和显式任务预算。
+入队时以 remaining_budget_seconds 锚定本机 monotonic 截止，同任务只允许取更早的期限；
+排队、控制、后续输入或重连均不能续租。wall timestamp 仅用于审计。
+期限到达后仅允许取消、保留部分结果和收尾，不再开始新解题调用；停止标为 incomplete 并给出原因。
+人工输入没有声明时保持 unknown，不推断预算。内置命令的 builtin_command 确认只属于该消息，
+不代表任务完成。最终任务回复关联 task_id/message_id，并包含合法 status/termination_reason。
+
+当前 max_iterations=100、max_tokens=32768；外层长预算不保证模型一定耗尽它。
+max_context_tokens 是输入阈值，可显式下调；总容量声明的静态检查不等于可靠动态 token 计量或压缩。
+可识别的确定性 context overflow 返回 incomplete，不追加相同完整 Agent.run 重试；
+SDK 自身可能已经进行多次 HTTP 尝试，诊断需区分这两层。原生异步取消路径保持可用。
+
 ## 4. Repository skeleton
 
 | 路径 | 当前职责 | 变更提示 |

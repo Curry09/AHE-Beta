@@ -147,9 +147,11 @@ class DockerSeedSource:
                 "--workdir",
                 workspace,
                 image,
-                "sh",
-                "-lc",
-                "trap 'exit 0' TERM INT; while :; do sleep 3600; done",
+                # Spec-0084/T2: quiesce kills every non-init task process. A
+                # shell loop would respawn its sleep child during that cleanup.
+                # Keep PID 1 alive without creating any child processes.
+                "sleep",
+                "infinity",
             ]
         )
         container_id = started.stdout.strip()

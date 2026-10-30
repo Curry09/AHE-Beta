@@ -7,17 +7,21 @@ license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
 dependencies = [
-    "nexau @ git+https://github.com/nex-agi/NexAU.git@5cd791b1382f1163621c9ff0b50c2cf01c4ba923",
+    "nexau @ git+https://github.com/hzhua/nexau.git@28511d9f0362191a6c378fd441b2be55309a9e32",
     # NexAU at this commit still imports pre-1.0 AG-UI thinking events.
     "ag-ui-protocol==0.1.22",
     # Pinned NexAU passes httpx.Timeout; Anthropic 1.x rejects that type
     # because it uses httpx2. OpenAI 3.x still accepts the configuration.
     "anthropic<1",
+    # NexAU imports SQLAlchemy's asyncio engine even without an async DB driver.
+    "greenlet>=3.0.0",
     # spec CLI（vendored 在 tools/spec-driven-development/vendor）所需
     "ruamel.yaml>=0.18",
     "jsonschema>=4",
     # GiteaTracker（spec-0002）所需的薄 REST 客户端
     "requests>=2.31",
+    # Signed external grading receipts (Spec-0084/T5).
+    "cryptography>=44",
     # 前端观测看板的只读 HTTP 层
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",

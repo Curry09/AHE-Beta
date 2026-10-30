@@ -106,10 +106,20 @@ def check_v2(
     offline: bool = False,
     secrets_file: Path | None = None,
     probe_models: bool = False,
+    grading_plan: Path | None = None,
+    grading_worker_public_key: Path | None = None,
 ) -> dict[str, Any]:
     from auto_designer.experiment.materials import check_materials
 
     report = check_materials(config_path)
+    from auto_designer.experiment.assessment_worker import registration
+
+    report["assessment_registration"] = registration(
+        config=report["config"],
+        tasks=report["task_packages"],
+        plan_path=grading_plan,
+        public_key_path=grading_worker_public_key,
+    )
     # Spec-0072/T1: subscription OAuth is a Claude Code protocol, not a generic SDK probe.
     if probe_models and delivery_auth_type(report["config"]["models"]["delivery"]) == "oauth":
         raise ConfigError(
@@ -236,11 +246,19 @@ def prepare_v2(
     root: Path | None = None,
     secrets_file: Path | None = None,
     progress: Callable[[dict[str, Any]], None] | None = None,
+    grading_plan: Path | None = None,
+    grading_worker_public_key: Path | None = None,
 ) -> dict[str, Any]:
     from auto_designer.experiment.manifest import run_lock, update_runtime
     from auto_designer.experiment.materials import prepare_materials
 
-    manifest = prepare_materials(config_path, runs_root_v2(root), secrets_file)
+    manifest = prepare_materials(
+        config_path,
+        runs_root_v2(root),
+        secrets_file,
+        grading_plan=grading_plan,
+        grading_worker_public_key=grading_worker_public_key,
+    )
     directory = Path(manifest["run_dir"])
     with run_lock(run_dir=directory):
         update_runtime(
@@ -316,6 +334,18 @@ def _status_v2_unlocked(
             ),
         )
         receipt = adapter.inspect()
+        if (
+            manifest.get("assessment_registration")
+            and receipt.get("controller", receipt).get("state") != "ABSENT"
+        ):
+            try:
+                receipt["assessment"] = adapter.assessment_exchange("state", {}).get(
+                    "assessment", {}
+                )
+            except Exception:
+                # The controller observation remains valid when only the
+                # independent grading management channel is unavailable.
+                receipt["assessment"] = {"assessment_state": "UNKNOWN"}
     except Exception:
         receipt = {
             "observation": "UNKNOWN",
@@ -338,6 +368,13 @@ def _status_v2_unlocked(
             for key in ("count", "sessions_per_round", "max_parallel_users")
         },
     }
+    if receipt.get("assessment"):
+        assessment = receipt["assessment"]
+        changes["assessment_state"] = assessment.get("assessment_state")
+        if assessment.get("assessment_state") == "PENDING":
+            changes["phase"] = "objective_grading"
+        elif previous.get("phase") == "objective_grading":
+            changes["phase"] = None
     changes.update(_gitea_facts(directory))
     resource = receipt.get("resource_state")
     if resource:

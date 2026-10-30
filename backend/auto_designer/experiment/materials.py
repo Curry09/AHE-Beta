@@ -84,6 +84,15 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
     validate_task_ids(tasks)
     for task in tasks:
         validate_artifact_backend(task, config["runtime"]["backend"])
+        from auto_designer.experiment.workload import validate_task_execution
+
+        validate_task_execution(
+            task,
+            source_root=Path(task["source"]["path"]) if task["source"]["kind"] == "local" else None,
+            fallback_seconds=config.get("runtime", {})
+            .get("harness", {})
+            .get("request_budget_seconds"),
+        )
         for path in [task["instruction_file"], *task["setup"].values()]:
             _require_file(path=Path(path))
         if not Path(task["instruction_file"]).read_text(encoding="utf-8").strip():
@@ -152,11 +161,24 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
 
 
 def prepare_materials(
-    config_path: str | Path, runs_dir: str | Path, secrets_file: str | Path | None = None
+    config_path: str | Path,
+    runs_dir: str | Path,
+    secrets_file: str | Path | None = None,
+    *,
+    grading_plan: Path | None = None,
+    grading_worker_public_key: Path | None = None,
 ) -> dict[str, Any]:
     """Atomically freeze a run. Credentials are referenced, never copied or archived."""
     report = check_materials(config_path)
     config = report["config"]
+    from auto_designer.experiment.assessment_worker import registration
+
+    assessment_registration = registration(
+        config=config,
+        tasks=report["task_packages"],
+        plan_path=grading_plan,
+        public_key_path=grading_worker_public_key,
+    )
     root = Path(runs_dir).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
@@ -200,7 +222,14 @@ def prepare_materials(
             tasks = inherited["tasks"]
         else:
             tasks = [
-                _freeze_task(stage=stage, task=task, materials=materials)
+                _freeze_task(
+                    stage=stage,
+                    task=task,
+                    materials=materials,
+                    fallback_seconds=config.get("runtime", {})
+                    .get("harness", {})
+                    .get("request_budget_seconds"),
+                )
                 for task in report["task_packages"]
             ]
         catalog = {"contract_version": CONTRACT_VERSION, "tasks": tasks}
@@ -309,6 +338,8 @@ def prepare_materials(
             },
             "secrets_file": str(secret_path) if secret_path else None,
         }
+        if assessment_registration is not None:
+            manifest["assessment_registration"] = assessment_registration
         if inherited:
             manifest["lineage"] = inherited["lineage"]
         _write_json(path=stage / "manifest.json", value=manifest)
@@ -376,15 +407,27 @@ def _verify_task_archive(*, path: Path, expected: dict[str, str], task_id: str) 
         raise ConfigError(f"Frozen task source inventory mismatch: {task_id}")
 
 
-def _freeze_task(*, stage: Path, task: dict[str, Any], materials: dict[str, Any]) -> dict[str, Any]:
+def _freeze_task(
+    *,
+    stage: Path,
+    task: dict[str, Any],
+    materials: dict[str, Any],
+    fallback_seconds: float | None = None,
+) -> dict[str, Any]:
     try:
-        return _freeze_task_contents(stage=stage, task=task, materials=materials)
+        return _freeze_task_contents(
+            stage=stage, task=task, materials=materials, fallback_seconds=fallback_seconds
+        )
     except (ConfigError, OSError) as exc:
         raise ConfigError(f"Task {task['id']} freeze failed: {exc}") from exc
 
 
 def _freeze_task_contents(
-    *, stage: Path, task: dict[str, Any], materials: dict[str, Any]
+    *,
+    stage: Path,
+    task: dict[str, Any],
+    materials: dict[str, Any],
+    fallback_seconds: float | None = None,
 ) -> dict[str, Any]:
     task = json.loads(json.dumps(task))
     task_id = task["id"]
@@ -405,6 +448,11 @@ def _freeze_task_contents(
             destination=source_dir,
         )
         source["path"] = str(source_dir.relative_to(stage))
+    from auto_designer.experiment.workload import validate_task_execution
+
+    execution_verification = validate_task_execution(
+        task, source_root=source_dir, fallback_seconds=fallback_seconds
+    )
     _check_artifact_source_paths(task=task, root=source_dir)
     files = _snapshot_files(root=source_dir, paths=None)
     refs = {}
@@ -441,6 +489,8 @@ def _freeze_task_contents(
         "content_hashes": hashes,
         "materials": refs,
     }
+    if task.get("execution"):
+        record["execution_verification"] = execution_verification
     record["digest"] = task_digest(record)
     return record
 
@@ -689,7 +739,12 @@ def _git_source_files(*, root: Path) -> dict[str, str]:
 def _source_pins(*, config: dict[str, Any], controller: Path) -> dict[str, Any]:
     compatibility = read_json_document(path=controller / "release/compatibility.json")
     reader = compatibility.get("observation_transport", {})
+    execution_reader = compatibility.get("execution_evidence", {})
     oa_revision = reader.get("reader_release_commit") or reader.get("reader_candidate_commit")
+    if execution_reader:
+        oa_revision = execution_reader.get("reader_release_commit") or execution_reader.get(
+            "reader_candidate_commit"
+        )
     explicit = config.get("source", {})
     locked_nexau = _locked_nexau_source(controller=controller)
     published_nexau = compatibility["nexau"]
@@ -706,13 +761,15 @@ def _source_pins(*, config: dict[str, Any], controller: Path) -> dict[str, Any]:
         )
     if "openagents" not in explicit and not oa_revision:
         raise ConfigError(
-            "No verified OpenAgents reader pin: set source.openagents revision or publish reader_candidate_commit"
+            "No verified OpenAgents execution-contract reader pin: set source.openagents "
+            "to the paired Spec-0093 revision or publish execution_evidence.reader_candidate_commit"
         )
     return {
         "openagents": explicit.get("openagents")
         or {"repository": compatibility["openagents"]["repository"], "revision": oa_revision},
         "nexau": locked_nexau,
         "reader_status": "candidate" if not reader.get("reader_release_commit") else "release",
+        "execution_evidence_schema_version": 1,
     }
 
 

@@ -277,3 +277,94 @@ def verify_task_workspaces(catalog: dict[str, Any], workspaces: dict[str, Any]) 
             or not isinstance(workspace.get("params"), dict)
         ):
             raise ConfigError(f"Prepared task workspace identity/content mismatch: {task['id']}")
+
+
+def validate_task_execution(
+    package: dict[str, Any], *, source_root: Path | None, fallback_seconds: float | None = None
+) -> dict[str, Any]:
+    """Spec-0084/T3: validate known metadata; prose never supplies the deadline."""
+    import math
+    import tomllib
+
+    execution = dict(package.get("execution") or {})
+    seconds = execution.get("budget_seconds")
+    source = execution.get("budget_source")
+    if execution and (
+        type(seconds) not in (int, float)
+        or not math.isfinite(seconds)
+        or seconds <= 0
+        or source not in {"task_metadata", "operator_quota"}
+    ):
+        raise ConfigError(
+            "Task execution requires a positive budget_seconds and declared budget_source"
+        )
+    metadata_seconds = None
+    if source_root is not None:
+        metadata = source_root / "task.toml"
+        if metadata.is_file():
+            if metadata.is_symlink() or not metadata.resolve().is_relative_to(
+                source_root.resolve()
+            ):
+                raise ConfigError("Task metadata escapes source root")
+            try:
+                document = tomllib.loads(metadata.read_text())
+                metadata_seconds = document.get("agent", {}).get("timeout_sec")
+            except (ValueError, OSError) as exc:
+                raise ConfigError("Invalid task.toml execution metadata") from exc
+            if metadata_seconds is not None and (
+                type(metadata_seconds) not in (int, float)
+                or not math.isfinite(metadata_seconds)
+                or metadata_seconds <= 0
+            ):
+                raise ConfigError("task.toml agent.timeout_sec must be positive finite seconds")
+    selected_seconds = seconds if seconds is not None else fallback_seconds
+    if (
+        selected_seconds is not None
+        and metadata_seconds is not None
+        and selected_seconds != metadata_seconds
+    ):
+        if source != "operator_quota" or not execution.get("quota_override_reason", "").strip():
+            raise ConfigError(
+                "Task budget conflicts with task.toml; declare operator_quota and quota_override_reason"
+            )
+    instruction = Path(package["instruction_file"])
+    if selected_seconds is not None and instruction.is_file():
+        text = instruction.read_text(encoding="utf-8")
+        # A deliberately narrow lint, never a parser that selects a deadline.
+        for match in re.finditer(
+            r"\btime\s+limit\s*:\s*(\d+(?:\.\d+)?)\s*(seconds?|minutes?|hours?)\b", text, re.I
+        ):
+            explicit = float(match[1]) * {"s": 1, "m": 60, "h": 3600}[match[2][0].lower()]
+            if explicit != selected_seconds and not (
+                source == "operator_quota" and execution.get("quota_override_reason", "").strip()
+            ):
+                raise ConfigError(
+                    "Explicit instruction time limit conflicts with execution budget; fix materials or declare a quota override"
+                )
+    return {
+        **execution,
+        "instruction_budget_verification": (
+            "task_metadata_verified"
+            if metadata_seconds is not None and selected_seconds == metadata_seconds
+            else "operator_quota_override"
+            if metadata_seconds is not None and selected_seconds is not None
+            else "instruction_budget_unverified"
+        ),
+        "metadata_budget_seconds": metadata_seconds,
+    }
+
+
+def execution_declaration(
+    package: dict[str, Any], *, fallback_seconds: float | None
+) -> dict[str, Any]:
+    """The frozen task budget takes precedence over an operator runtime fallback."""
+    declaration = dict(package.get("execution") or {})
+    return {
+        **declaration,
+        "task_budget_seconds": declaration.get("budget_seconds", fallback_seconds),
+        "budget_source": declaration.get(
+            "budget_source", "operator_quota" if fallback_seconds is not None else "undeclared"
+        ),
+        "followup_input": "unavailable" if package.get("interaction") == "direct" else "possible",
+        "instruction_budget_verification": "instruction_budget_unverified",
+    }

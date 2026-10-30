@@ -250,3 +250,35 @@ def test_selected_persona_ids_still_must_be_unique(tmp_path):
     document["workload"]["persona_ids"] *= 2
     with pytest.raises(ConfigError, match="non-unique"):
         load_fixture_config(write(tmp_path / "config.json", document))
+
+
+def test_declared_model_limit_conflict_is_pre_provider_error(tmp_path):
+    document = definition()
+    document["models"]["harness"]["limits"] = {"context_window_tokens": 262144}
+    with pytest.raises(ConfigError, match="exceeds declared context"):
+        load_fixture_config(write(tmp_path / "config.json", document))
+    document["models"]["harness"]["limits"]["max_context_tokens"] = 229376
+    loaded = load_fixture_config(write(tmp_path / "config.json", document))
+    assert loaded["models"]["harness"]["limits"]["max_context_tokens"] == 229376
+
+
+def test_external_session_grading_and_old_grading_shape_are_mutually_exclusive(tmp_path):
+    document = definition()
+    grading = {"plan_sha256": "a" * 64, "worker_key_sha256": "b" * 64, "runner": "external"}
+    document["evaluation"] = {"session_grading": grading}
+    assert load_fixture_config(write(tmp_path / "config.json", document))["evaluation"] == {
+        "session_grading": grading
+    }
+    document["evaluation"]["official_grading"] = False
+    with pytest.raises(ConfigError):
+        load_fixture_config(write(tmp_path / "config.json", document))
+
+
+def test_message_activity_budget_is_distinct_from_total_task_budget(tmp_path):
+    document = definition()
+    document["runtime"]["harness"] = {
+        "request_budget_seconds": 7200,
+        "message_activity_seconds": 1800,
+    }
+    loaded = load_fixture_config(write(tmp_path / "config.json", document))
+    assert loaded["runtime"]["harness"]["message_activity_seconds"] == 1800

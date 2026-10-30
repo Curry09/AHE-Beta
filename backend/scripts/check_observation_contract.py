@@ -16,6 +16,7 @@ import io
 import json
 import os
 import stat
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -26,7 +27,20 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from auto_designer.demand.delivery_evidence import publish_delivery_evidence
-from auto_designer.models import IssueDraft
+from auto_designer.execution_contract import (
+    build_execution_evidence,
+    canonical_bytes,
+    canonical_sha256,
+    make_execution_contract,
+)
+from auto_designer.models import (
+    IssueDraft,
+    Persona,
+    SeedScenario,
+    Session,
+    Transcript,
+    WorkspaceSpec,
+)
 from auto_designer.observations.grants import grant
 from auto_designer.observations.publication import publish
 from auto_designer.observations.transport import (
@@ -247,6 +261,200 @@ def check_contract(checkout: Path) -> dict:
     }
 
 
+def check_execution_publication(*, checkout: Path) -> dict:
+    """Current Session -> publisher -> required reader -> actual role contexts."""
+    reader = load_reader(checkout)
+    fixture_path = (
+        Path(__file__).resolve().parents[1] / "tests/fixtures/execution_evidence_contract.json"
+    )
+    counterpart = checkout / "tests/fixtures/execution_evidence_contract.json"
+    assert fixture_path.read_bytes() == counterpart.read_bytes(), "shared execution fixture drift"
+    fixture = json.loads(fixture_path.read_text())["package"]
+    wire = fixture["execution_evidence"]
+    assert (
+        build_execution_evidence(
+            issue=wire["issue"],
+            contracts=wire["execution_contracts"],
+            summaries=wire["assessment_summaries"],
+        )
+        == wire
+    ), "publisher canonical encoding differs from reader fixture"
+    accepted, rejected = [], []
+    with tempfile.TemporaryDirectory(prefix="execution-publication-") as name:
+        root = Path(name)
+        subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
+        store = SessionStore(root / "sessions")
+        tracker = MemoryAssets()
+        issue = tracker.create_issue(
+            IssueDraft(title="Two original conditions", body="public goal", labels=[])
+        )
+        contracts, summaries = [], []
+        for number, followup in enumerate(("unavailable", "possible"), 1):
+            sid = f"current-session-{number}"
+            provenance = {
+                "contract_version": 1,
+                "run_id": "synthetic-run",
+                "round_no": 1,
+                "slot": number - 1,
+                "persona_id": "synthetic",
+                "task_id": f"task-{number}",
+                "task_digest": "1" * 64,
+                "task_kind": "ordinary",
+                "interaction": "direct" if number == 1 else "simulated_user",
+                "harness_sha": "synthetic-user-sha",
+            }
+            scenario = SeedScenario(
+                description="修复公开示例的计算结果，交付 result.txt。",
+                workspace=WorkspaceSpec(
+                    params={
+                        key: provenance[key]
+                        for key in ("task_id", "task_digest", "task_kind", "interaction")
+                    }
+                ),
+            )
+            contract = make_execution_contract(
+                session_id=sid,
+                task_id=f"task-{number}",
+                task_digest="1" * 64,
+                followup_input=followup,
+                task_budget_seconds=7200 if number == 1 else None,
+                budget_source="task_metadata" if number == 1 else "unverified",
+                public_refs=[
+                    {
+                        "kind": "task",
+                        "path": f"{sid}/execution/task.json",
+                        "sha256": canonical_sha256(scenario.to_dict()),
+                    }
+                ],
+            )
+            session = Session(
+                persona=Persona("synthetic", "test", "test", "test", "test"),
+                scenario=scenario,
+                transcript=Transcript(),
+                session_id=sid,
+                execution_contract=contract,
+                session_provenance=provenance,
+            )
+            store.save(session)
+            contracts.append(contract)
+            summaries.append(
+                {
+                    "receipt_id": f"receipt-{number}",
+                    "session_id": sid,
+                    "contract_id": contract["contract_id"],
+                    "assessment_kind": "independent",
+                    "status": "completed" if number == 1 else "unavailable",
+                    "passed": False if number == 1 else None,
+                    "score": None,
+                    "metric_definition": None,
+                    "source_sha256": "2" * 64,
+                }
+            )
+        grant(store=store, issue=issue.number, sessions={c["session_id"] for c in contracts})
+        assessment = root / "assessment"
+        (assessment / "feedback").mkdir(parents=True)
+        (assessment / "feedback/round-1.json").write_bytes(
+            canonical_bytes(
+                {
+                    "round_no": 1,
+                    "user_sha": "synthetic-user-sha",
+                    "summaries": summaries,
+                    "sha256": canonical_sha256(summaries),
+                }
+            )
+        )
+        (assessment / "private-grader-output.json").write_text("PRIVATE_GRADER_CANARY")
+        store.bind_assessment_root(assessment)
+        expected = build_execution_evidence(
+            issue=issue.number, contracts=contracts, summaries=summaries
+        )
+        for encoding in ("gzip", "zip"):
+            tracker.observation_transport = make_transport_profile(
+                repository="http://synthetic/api/v1/repos/o/r", encoding=encoding
+            )
+            handle = publish_delivery_evidence(tracker=tracker, store=store, issue=issue)
+            assert publish_delivery_evidence(tracker=tracker, store=store, issue=issue) == handle
+            data = tracker.download_issue_asset(
+                number=issue.number, asset_id=handle["asset_id"], limit=4_000_000
+            )
+            value = reader.evidence.decode_package(
+                data=data, digest=handle["sha256"], issue=issue.number, encoding=encoding
+            )
+            assert value["execution_evidence"] == expected
+            assert "PRIVATE_GRADER_CANARY" not in json.dumps(value)
+            assert all(row["observation_status"] == "unavailable" for row in value["sessions"])
+            body = tracker.get_issue(number=issue.number)["body"]
+            with (
+                patch.object(reader.forge, "active_forge", return_value="gitea"),
+                patch.object(reader.forge, "get_issue", return_value=SimpleNamespace(body=body)),
+                patch.object(
+                    reader.forge, "download_observation_asset", return_value=data, create=True
+                ),
+            ):
+                scope = reader.evidence.prepare(
+                    work_dir=root,
+                    issue=issue.number,
+                    role="developer",
+                    execution_required=True,
+                )
+                reader.verify_scope(scope=scope, expected=value, digest=handle["sha256"])
+                assert scope["execution_evidence"] == expected
+                accepted.append(encoding)
+        published_fixture = root / "published-fixture.json"
+        published_fixture.write_text(json.dumps({"package": value}, ensure_ascii=False))
+        contexts = reader.check_execution_contract(fixture=published_fixture)
+        # Recompute the outer envelope hash: inner semantic integrity must still reject.
+        invalids = []
+        missing = json.loads(json.dumps(value))
+        del missing["execution_evidence"]
+        invalids.append(("required-block-missing", missing))
+        for label in ("contract-digest", "public-material-digest", "private-summary-field"):
+            changed = json.loads(json.dumps(value))
+            payload = changed["execution_evidence"]
+            if label == "contract-digest":
+                payload["execution_contracts"][0]["followup_input"] = "unknown"
+            elif label == "public-material-digest":
+                changed["sessions"][0]["files"]["execution/task.json"] = "changed public task"
+            else:
+                payload["assessment_summaries"][0]["private_logs"] = "PRIVATE_GRADER_CANARY"
+            invalids.append((label, changed))
+        for label, invalid in invalids:
+            packed = reader.encode(invalid, "zip")
+            handle = {
+                "asset_id": 1,
+                "sha256": hashlib.sha256(packed).hexdigest(),
+                "bytes": len(packed),
+                "encoding": "zip",
+            }
+            body = f"<!-- {reader.evidence.MARKER} {json.dumps(handle)} -->"
+            with (
+                patch.object(reader.forge, "active_forge", return_value="gitea"),
+                patch.object(reader.forge, "get_issue", return_value=SimpleNamespace(body=body)),
+                patch.object(
+                    reader.forge, "download_observation_asset", return_value=packed, create=True
+                ),
+            ):
+                try:
+                    reader.evidence.prepare(
+                        work_dir=root,
+                        issue=issue.number,
+                        role="developer",
+                        execution_required=True,
+                    )
+                except reader.evidence.execution_contracts.ExecutionContractUnavailable:
+                    rejected.append(label)
+                else:
+                    raise AssertionError("required reader accepted " + label)
+    return {
+        "status": "passed",
+        "shared_fixture_identical": True,
+        "published_encodings": accepted,
+        "private_material_absent": True,
+        "rejected": rejected,
+        "role_contexts": contexts,
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--openagents", type=Path, required=True)
@@ -260,6 +468,7 @@ def main(argv=None) -> int:
             side_effect=AssertionError("offline contract attempted network"),
         ):
             result = check_contract(args.openagents)
+            result["execution_evidence"] = check_execution_publication(checkout=args.openagents)
         print(json.dumps(result, sort_keys=True))
         return 0
     except Exception as exc:

@@ -12,6 +12,7 @@ and restore conversation history. See META_SPEC.md for project boundaries and de
 from __future__ import annotations
 
 import json
+import math
 import os
 import queue
 import sys
@@ -25,7 +26,7 @@ from observability import observer
 
 _HERE = Path(__file__).resolve().parent
 # 空回复 / 网关毛刺用 _RUN_RETRIES 退避重试（同实例，不换 session）。
-# agent.run 没有整轮墙钟上限；慢任务由外层 90s persona 心跳观测并决定续等/打断。
+# Spec-0084/T3: an explicit task deadline bounds all attempts; unknown means undeclared.
 _RUN_RETRIES = 4
 # 打断（type:interrupt）后等待 nexau 优雅停止（保留 session/history）的宽限秒数：
 # executor.force_stop() 只置位中断信号，run 会在下一个检查点安全退出。超过宽限仍没退，
@@ -146,52 +147,73 @@ def _emit_usage(**payload) -> None:
         pass
 
 
-def _run_supervised(agent, message, ctrl_q):
-    """跑一次 agent.run，同时守望用户打断（control 队列）。
+class _BudgetExhausted(Exception):
+    def __init__(self, *, reason, rebuild):
+        super().__init__(reason)
+        self.reason = reason
+        self.rebuild = rebuild
 
-    - 正常完成：返回结果。
-    - 收到 interrupt：force_stop 优雅停止（保留 session）→ raise _Interrupted(rebuild=False)；
-      若宽限内没停下 → _Interrupted(rebuild=True)，由 caller 重建避自锁并回灌 history。
-    工作线程只是为了让主线程持续处理 interrupt，不再用 deadline 放弃正在运行的请求。
-    ctrl_q 为 None 时等到 agent.run 自身返回。"""
+
+def _run_supervised(agent, message, ctrl_q, *, deadline=None, message_id=None):
+    """Supervise the native Agent call without wrapping its async model client."""
     box: dict = {}
     outcome = getattr(agent, "_harness_outcome", None)
     if outcome is not None:
         outcome.reset()
     attempt_id = uuid.uuid4().hex
     began = time.monotonic()
+
+    def expired_reason():
+        limit, reason = deadline() if deadline is not None else (None, None)
+        return reason if limit is not None and time.monotonic() >= limit else None
+
+    if reason := expired_reason():
+        raise _BudgetExhausted(reason=reason, rebuild=False)
     observer.event("attempt_started", attempt_id=attempt_id)
 
     def target():
         try:
             box["out"] = agent.run(message=message)
-        except Exception as exc:  # noqa: BLE001  透传给调用方判定/重试
+        except Exception as exc:  # noqa: BLE001
             box["err"] = exc
 
-    t = threading.Thread(target=target, daemon=True)
-    t.start()
-    while t.is_alive():
-        # 小步轮询只为及时响应打断；长任务由 persona 心跳决定是否续等。
-        t.join(0.5)
-        if not t.is_alive():
-            break
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    while thread.is_alive():
+        thread.join(0.1)
+        reason = expired_reason()
+        control = None
         if ctrl_q is not None:
             try:
-                ctrl = ctrl_q.get_nowait()
+                control = ctrl_q.get_nowait()
             except queue.Empty:
-                ctrl = None
-            if isinstance(ctrl, dict) and ctrl.get("type") == "interrupt":
-                observer.event("interrupt_requested", attempt_id=attempt_id)
-                stopped = _force_stop(agent)
-                if stopped:
-                    t.join(_INTERRUPT_GRACE)  # 等它在下一个检查点优雅退出
-                observer.event(
-                    "attempt_failed",
-                    attempt_id=attempt_id,
-                    error_type="_Interrupted",
-                    elapsed_seconds=time.monotonic() - began,
-                )
-                raise _Interrupted(rebuild=not stopped or t.is_alive())
+                pass
+        interrupted = (
+            isinstance(control, dict)
+            and control.get("type") == "interrupt"
+            and (message_id is None or control.get("message_id") in (None, "", message_id))
+        )
+        if interrupted and control.get("reason") in {
+            "task_budget_exhausted",
+            "message_activity_exhausted",
+        }:
+            reason = control["reason"]
+        if reason or interrupted:
+            observer.event(
+                "budget_exhausted" if reason else "interrupt_requested", attempt_id=attempt_id
+            )
+            stopped = _force_stop(agent)
+            if stopped:
+                thread.join(_INTERRUPT_GRACE)
+            observer.event(
+                "attempt_failed",
+                attempt_id=attempt_id,
+                error_type="_BudgetExhausted" if reason else "_Interrupted",
+                elapsed_seconds=time.monotonic() - began,
+            )
+            if reason:
+                raise _BudgetExhausted(reason=reason, rebuild=not stopped or thread.is_alive())
+            raise _Interrupted(rebuild=not stopped or thread.is_alive())
     if "err" in box:
         observer.event(
             "attempt_failed",
@@ -298,6 +320,11 @@ def _build_agent(collector, session_id, agent_id):
     from nexau.archs.main_sub.execution.hooks import MiddlewareManager
 
     cfg = AgentConfig.from_yaml(config_path=_HERE / "agent.yaml")
+    if raw_limit := os.environ.get("LLM_MAX_CONTEXT_TOKENS"):
+        input_limit = int(raw_limit)
+        if input_limit <= 0:
+            raise ValueError("LLM_MAX_CONTEXT_TOKENS must be positive")
+        cfg.max_context_tokens = input_limit
     cfg.resolved_tracer = collector  # 内层过程流 → collector.steps（诊断用，不影响回复）
     outcome = _ExecutionOutcome()
     terminal_observer = _make_terminal_observer(outcome)
@@ -509,16 +536,17 @@ def _make_step_collector():
     return _StepCollector()
 
 
-def _reply(agent, message: str, rebuild, ctrl_q=None):
+def _reply(agent, message: str, rebuild, ctrl_q=None, *, deadline=None, message_id=None):
     """返回 (live_agent, reply, terminal_status)。
 
     hard interrupt 可调用 `rebuild()` 换新 agent_id 并回灌 history（见 META_SPEC.md）。
     空回复 / 502 等同实例退避重试。优雅打断保持同实例；强打断才 rebuild。
     """
     last = None
+    agent._harness_termination_reason = None
     for attempt in range(_RUN_RETRIES):
         try:
-            out = _run_supervised(agent, message, ctrl_q)  # 无整轮超时，但可由 persona 打断
+            out = _run_supervised(agent, message, ctrl_q, deadline=deadline, message_id=message_id)
             text = out if isinstance(out, str) else (out[0] if out else "")  # 工具型返回 result 串
             if text and text.strip():
                 outcome = getattr(agent, "_harness_outcome", None)
@@ -528,55 +556,222 @@ def _reply(agent, message: str, rebuild, ctrl_q=None):
                 if status == "incomplete":
                     text = f"[incomplete: {reason}]\n" + text
                 elif status == "crashed":
+                    if _is_context_overflow(text):
+                        agent._harness_termination_reason = "context_overflow"
+                        return (
+                            agent,
+                            "[incomplete: context_overflow] The model rejected the context capacity.",
+                            "incomplete",
+                        )
                     text = "[harness error] " + text
                 elif status == "interrupted":
                     text = _INTERRUPT_REPLY
                 return agent, text, status
             last = "empty reply"  # 空回复（网关 200+空内容不抛异常）视为失败，不得静默返回
+        except _BudgetExhausted as exhausted:
+            if exhausted.rebuild:
+                agent = rebuild(agent)
+            agent._harness_termination_reason = exhausted.reason
+            return (
+                agent,
+                f"[incomplete: {exhausted.reason}] Task activity stopped at its declared limit.",
+                "incomplete",
+            )
         except _Interrupted as it:  # 用户打断：不重试，保留/重建后回定型回复
             if it.rebuild:
                 agent = rebuild(agent)
             return agent, _INTERRUPT_REPLY, "interrupted"
         except Exception as exc:  # 网关 502 等 → 同 agent 退避重试（线程已结束、锁已释放）
             last = exc
+            if _is_context_overflow(exc):
+                agent._harness_termination_reason = "context_overflow"
+                observer.event("context_overflow", outer_attempt=attempt + 1, retry_suppressed=True)
+                return (
+                    agent,
+                    "[incomplete: context_overflow] The model rejected the context capacity; partial work is retained.",
+                    "incomplete",
+                )
         if attempt < _RUN_RETRIES - 1:  # 末次不再睡
             time.sleep(1.5 * (attempt + 1))
     return agent, f"[harness error] {last}", "crashed"
 
 
-_EOF = object()  # stdin 读线程读到 EOF 时投递的哨兵
+def _is_context_overflow(error) -> bool:
+    """Classify deterministic capacity errors, not arbitrary task reply text."""
+    text = str(error).lower()
+    return any(
+        marker in text
+        for marker in (
+            "context_length_exceeded",
+            "maximum context length",
+            "context window exceeded",
+            "prompt is too long",
+            "exceeds the context window",
+            "max_model_len",
+            "input tokens + max_tokens",
+            "input tokens plus max_tokens",
+        )
+    )
 
 
-def _stdin_reader(msg_q: queue.Queue, ctrl_q: queue.Queue, busy: threading.Event) -> None:
-    """后台逐行读 stdin，按 type 分发：message → msg_q，interrupt → ctrl_q。
+class _TaskFrames:
+    """Spec-0084/T3: anchor remaining time at enqueue, never at dequeue."""
 
-    独立线程读，才能在某轮 agent.run 阻塞进行中仍收到 {"type":"interrupt"} 并即时打断
-    （主线程正忙于该轮、无法自己读 stdin）。busy 时收到新 message 会先输出 queued 状态，
-    让用户知道输入没有被静默吞掉，而是等待当前处理结束后进入队列。非法行/无 message 的行静默跳过；EOF 投 _EOF 收尾。"""
+    def __init__(self, *, clock=None):
+        self.clock = clock or time.monotonic
+        self.task_id = None
+        self.declaration = None
+        self.deadline = None
+        self.message_ids = set()
+        self.lock = threading.Lock()
+
+    def accept(self, frame):
+        now = self.clock()
+        value = dict(frame)
+        with self.lock:
+            declared = "contract_id" in value
+            if declared:
+                required = {
+                    "task_id",
+                    "message_id",
+                    "contract_id",
+                    "followup_input",
+                    "task_budget_seconds",
+                    "remaining_budget_seconds",
+                    "budget_source",
+                }
+                if not required <= value.keys():
+                    raise ValueError("Incomplete execution conditions")
+                if not isinstance(value["followup_input"], str) or value["followup_input"] not in {
+                    "unavailable",
+                    "possible",
+                    "unknown",
+                }:
+                    raise ValueError("Invalid followup_input")
+                for key in ("task_id", "message_id", "contract_id", "budget_source"):
+                    if not isinstance(value[key], str) or not value[key].strip():
+                        raise ValueError("Missing execution identity")
+                declaration = tuple(
+                    value[key]
+                    for key in (
+                        "contract_id",
+                        "followup_input",
+                        "task_budget_seconds",
+                        "budget_source",
+                    )
+                )
+                if self.declaration is not None and declaration != self.declaration:
+                    raise ValueError("Execution declaration changed within a task")
+            elif self.declaration is not None:
+                raise ValueError("An active declared task cannot lose execution fields")
+            for key in ("task_id", "message_id"):
+                if key in value and (not isinstance(value[key], str) or not value[key].strip()):
+                    raise ValueError("Invalid execution identity")
+            task_id = value.get("task_id") or self.task_id or uuid.uuid4().hex
+            message_id = value.get("message_id") or uuid.uuid4().hex
+            if self.task_id is not None and task_id != self.task_id:
+                raise ValueError("Unknown task identity")
+            if message_id in self.message_ids:
+                raise ValueError("Duplicate message identity")
+            remaining = value.get("remaining_budget_seconds", value.get("budget_seconds"))
+            budget = value.get("task_budget_seconds", value.get("budget_seconds"))
+            for key, number in (("remaining budget", remaining), ("task budget", budget)):
+                if number is not None and (
+                    type(number) not in (int, float) or not math.isfinite(number) or number < 0
+                ):
+                    raise ValueError(f"Invalid {key}")
+            if declared and (
+                (remaining is None) != (budget is None)
+                or (budget is not None and (budget <= 0 or remaining > budget))
+            ):
+                raise ValueError("Remaining budget does not match declared task budget")
+            activity = value.get("message_activity_seconds")
+            if activity is not None and (
+                type(activity) not in (int, float) or not math.isfinite(activity) or activity <= 0
+            ):
+                raise ValueError("Invalid message activity limit")
+            if _slash_command(value["text"]) is None and remaining is not None:
+                deadline = now + remaining
+                self.deadline = (
+                    min(self.deadline, deadline) if self.deadline is not None else deadline
+                )
+            value.update(
+                task_id=task_id,
+                message_id=message_id,
+                activity_deadline=now + activity if activity is not None else None,
+            )
+            if declared:
+                self.declaration = declaration
+            self.task_id = task_id
+            self.message_ids.add(message_id)
+        return value
+
+    def limit(self, frame):
+        with self.lock:
+            candidates = [
+                (limit, reason)
+                for limit, reason in (
+                    (self.deadline, "task_budget_exhausted"),
+                    (frame.get("activity_deadline"), "message_activity_exhausted"),
+                )
+                if limit is not None
+            ]
+            return min(candidates) if candidates else (None, None)
+
+
+def _bind_public_conditions(agent, frame):
+    if not frame.get("contract_id"):
+        return
+    # System suffix is runtime context; the original user task text is unchanged.
+    base = getattr(agent, "_harness_base_suffix", None)
+    if base is None:
+        base = agent.config.system_prompt_suffix or ""
+        agent._harness_base_suffix = base
+    agent.config.system_prompt_suffix = base + (
+        "\n\nExecution conditions (trusted runtime declaration):\n"
+        f"followup_input={frame['followup_input']}; task_budget_seconds={frame['task_budget_seconds']}; "
+        f"remaining_budget_seconds_at_enqueue={frame['remaining_budget_seconds']}; budget_source={frame['budget_source']}.\n"
+        "Follow-up input is optional and possible does not guarantee a reply. "
+        "Pursue the stated goal autonomously within these conditions. Controls and follow-ups do not extend its deadline."
+    )
+
+
+_EOF = object()
+
+
+def _stdin_reader(
+    msg_q: queue.Queue, ctrl_q: queue.Queue, busy: threading.Event, frames=None
+) -> None:
+    frames = frames or _TaskFrames()
     for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
         try:
             obj = json.loads(line)
-        except json.JSONDecodeError:
+        except (ValueError, TypeError):
             continue
         if not isinstance(obj, dict):
             continue
         typ = obj.get("type")
         if typ == "shutdown":
+            ctrl_q.put({"type": "interrupt"})
             msg_q.put(_EOF)
             return
         if typ == "interrupt":
-            ctrl_q.put({"type": "interrupt"})
+            if obj.get("task_id") is not None and obj["task_id"] != frames.task_id:
+                _emit_status("[ignored] Control belongs to an unknown task.")
+                continue
+            ctrl_q.put(obj)
         elif typ == "message" and isinstance(obj.get("text"), str):
-            was_queued = busy.is_set()
-            if was_queued:
+            try:
+                item = frames.accept(obj)
+            except ValueError as exc:
+                _emit_status(f"[rejected] {exc}")
+                continue
+            item["queued"] = busy.is_set()
+            if item["queued"]:
                 _emit_status(
-                    "[queued] I am still working on the previous request; "
-                    "this message has been queued and will be handled after the current response."
+                    "[queued] I am still working on the previous request; this message is queued."
                 )
-            msg_q.put({"text": obj["text"], "queued": was_queued})
+            msg_q.put(item)
     msg_q.put(_EOF)
 
 
@@ -604,7 +799,8 @@ def main() -> None:
     msg_q: queue.Queue = queue.Queue()
     ctrl_q: queue.Queue = queue.Queue()
     busy = threading.Event()
-    threading.Thread(target=_stdin_reader, args=(msg_q, ctrl_q, busy), daemon=True).start()
+    frames = _TaskFrames()
+    threading.Thread(target=_stdin_reader, args=(msg_q, ctrl_q, busy, frames), daemon=True).start()
     while True:
         item = msg_q.get()
         if item is _EOF:  # stdin 关闭：正常收尾退出
@@ -615,15 +811,34 @@ def main() -> None:
         else:
             message = str(item)
             was_queued = False
-        while not ctrl_q.empty():  # 丢弃上一轮遗留的过期 control，避免误打断本轮
-            ctrl_q.get_nowait()
+        # Drop previous-message controls, but keep an identified interrupt that
+        # arrived after enqueue and before this message began execution.
+        current_controls = []
+        while not ctrl_q.empty():
+            control = ctrl_q.get_nowait()
+            if control.get("message_id") == item.get("message_id"):
+                current_controls.append(control)
+        for control in current_controls:
+            ctrl_q.put(control)
         # slash 内部分发：/help 回 reply 后继续；/exit|/quit 回 reply 后结束进程。
         slash = _slash_command(message)
         if slash is not None:
             slash_reply, should_exit = slash
             with _stdout_lock:
                 sys.stdout.write(
-                    json.dumps(_wire_out("reply", text=slash_reply), ensure_ascii=False) + "\n"
+                    json.dumps(
+                        _wire_out(
+                            "reply",
+                            text=slash_reply,
+                            kind="builtin_command",
+                            status="acknowledged",
+                            termination_reason="builtin_command",
+                            task_id=item.get("task_id"),
+                            message_id=item.get("message_id"),
+                        ),
+                        ensure_ascii=False,
+                    )
+                    + "\n"
                 )
                 sys.stdout.flush()
             if should_exit:
@@ -635,15 +850,32 @@ def main() -> None:
         collector.reset()  # 只收本轮内层过程
         busy.set()
         try:
-            agent, raw, terminal_status = _reply(agent, message, rebuild, ctrl_q)
+            _bind_public_conditions(agent, item)
+            agent, raw, terminal_status = _reply(
+                agent,
+                message,
+                rebuild,
+                ctrl_q,
+                deadline=lambda frame=item: frames.limit(frame),
+                message_id=item.get("message_id"),
+            )
         finally:
             busy.clear()
         history_snapshot = _snapshot_history(agent) or history_snapshot
         reply = _unwrap_reply(raw)  # 拆信封：用户只看最终答案
         steps = list(collector.steps)  # 完整内层迭代 → 诊断元数据；用户答案只看 reply
-        payload = _wire_out("reply", text=reply, steps=steps, status=terminal_status)
+        payload = _wire_out(
+            "reply",
+            text=reply,
+            steps=steps,
+            status=terminal_status,
+            task_id=item.get("task_id"),
+            message_id=item.get("message_id"),
+        )
         outcome = getattr(agent, "_harness_outcome", None)
-        if terminal_status == "interrupted":
+        if getattr(agent, "_harness_termination_reason", None):
+            payload["termination_reason"] = agent._harness_termination_reason
+        elif terminal_status == "interrupted":
             payload["termination_reason"] = "user_interrupted"
         elif terminal_status == "crashed":
             payload["termination_reason"] = (
@@ -651,8 +883,10 @@ def main() -> None:
                 if outcome and outcome.stop_reason == "error_occurred"
                 else "retry_exhausted"
             )
-        elif outcome is not None:
-            payload["termination_reason"] = outcome.terminal()[1]
+        else:
+            payload["termination_reason"] = (
+                outcome.terminal()[1] if outcome is not None else "unavailable"
+            )
         with _stdout_lock:  # 与 progress 旁路互斥，保证终态行完整
             sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
             sys.stdout.flush()

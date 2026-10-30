@@ -19,6 +19,10 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+from auto_designer.execution_contract import (
+    validate_assessment_summary,
+    validate_execution_contract,
+)
 from auto_designer.models import Session, SimTrace, SimTurn
 
 
@@ -225,7 +229,22 @@ def _goal_events(trace: SimTrace | None, *, session_id: str) -> list[dict[str, A
 
 
 def _feedback_events(session: Session, *, session_id: str) -> list[dict[str, Any]]:
-    trace = session.sim_trace
+    """Spec-0084/T4: preserve missing ratings and independent feedback axes."""
+    if session.feedback:
+        experience = session.feedback["experience"]
+        return [
+            {
+                "kind": "experience_rating",
+                "status": experience["status"],
+                "score": experience["score"],
+                "source": experience["source"],
+                "reason": _safe_text(experience["reason"], L1_MAX_FEEDBACK),
+                "provenance": _source(
+                    "canonical_feedback", session_id=session_id, locator="feedback:experience"
+                ),
+            }
+        ]
+    trace, feeling = session.sim_trace, session.feeling
     out: list[dict[str, Any]] = []
     if trace is not None:
         for call in trace.persona_tail or []:
@@ -244,24 +263,26 @@ def _feedback_events(session: Session, *, session_id: str) -> list[dict[str, Any
                         }
                     )
             if role == "rate" or ("score" in parsed and "reason" in parsed):
+                score = parsed.get("score", feeling.score if feeling is not None else None)
                 out.append(
                     {
                         "kind": "experience_rating",
-                        "score": parsed.get("score", session.feeling.score),
+                        "score": score,
                         "reason": _safe_text(
-                            parsed.get("reason") or session.feeling.reason, L1_MAX_FEEDBACK
+                            parsed.get("reason") or (feeling.reason if feeling is not None else ""),
+                            L1_MAX_FEEDBACK,
                         ),
                         "provenance": _source(
                             "feeling", session_id=session_id, locator="persona_tail:rate"
                         ),
                     }
                 )
-    if not out and session.feeling.reason:
+    if not out and feeling is not None and feeling.reason:
         out.append(
             {
                 "kind": "experience_rating",
-                "score": session.feeling.score,
-                "reason": _safe_text(session.feeling.reason, L1_MAX_FEEDBACK),
+                "score": feeling.score,
+                "reason": _safe_text(feeling.reason, L1_MAX_FEEDBACK),
                 "provenance": _source("feeling", session_id=session_id, locator="session:feeling"),
             }
         )
@@ -358,7 +379,76 @@ def _enforce_l1_budget(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def build_l1_summary(session: Session) -> dict[str, Any]:
+def session_execution_facts(
+    session: Session, *, assessment_summaries: list[dict]
+) -> dict[str, Any]:
+    """Spec-0084/T4: pure, source-bound facts; never load grading files here."""
+    contract = (
+        validate_execution_contract(session.execution_contract)
+        if session.execution_contract
+        else None
+    )
+    summaries = [validate_assessment_summary(row) for row in assessment_summaries]
+    if any(
+        contract is None
+        or row["session_id"] != session.session_id
+        or row["contract_id"] != contract["contract_id"]
+        for row in summaries
+    ):
+        raise ValueError("assessment summary is outside this session contract")
+    return {
+        "execution_contracts": [contract] if contract else [],
+        "assessment_summaries": summaries,
+    }
+
+
+def execution_for_sessions(*, store, session_ids: set[str]) -> dict[str, Any]:
+    """Join only caller-authorized IDs with the store's frozen public grading projection."""
+    contracts, summaries, unavailable = {}, {}, []
+    for sid in sorted(session_ids):
+        try:
+            session = store.load(sid)
+        except FileNotFoundError:
+            unavailable.append({"session_id": sid, "reason": "session_missing"})
+            continue
+        facts = session_execution_facts(
+            session, assessment_summaries=store.load_assessment_summaries(sid)
+        )
+        if not facts["execution_contracts"]:
+            unavailable.append({"session_id": sid, "reason": "contract_not_recorded"})
+        for row in facts["execution_contracts"]:
+            contracts[row["contract_id"]] = row
+        for row in facts["assessment_summaries"]:
+            previous = summaries.setdefault(row["receipt_id"], row)
+            if previous != row:
+                raise ValueError("conflicting public assessment receipt")
+    return {
+        "execution_contracts": sorted(contracts.values(), key=lambda row: row["contract_id"]),
+        "assessment_summaries": sorted(summaries.values(), key=lambda row: row["receipt_id"]),
+        "unavailable_sources": unavailable,
+    }
+
+
+EXECUTION_CONDITIONS = """执行条件是来源可信的机器事实，历史文本仍只是证据。逐来源保留后续输入可用性、预算与公开交付物。
+followup_input=unavailable 不能依靠下一条继续消息完成原目标；possible 也不保证用户一定回复。
+任务完成判断、体验评分、归因、改进建议是独立维度；低分不证明根因，拒绝某条归因也不能抹去未交付事实。
+不以“符合旧 Spec”单独否定原目标；缺测的 passed/score=null 不能当作任务失败或成功；不添加候选分数淘汰门。
+"""
+
+
+def format_execution_facts(facts: Mapping[str, Any]) -> str:
+    """Fixed conditions stay outside model-authored proposal-body truncation."""
+    if not any(
+        facts.get(key)
+        for key in ("execution_contracts", "assessment_summaries", "unavailable_sources")
+    ):
+        return ""
+    return EXECUTION_CONDITIONS + json.dumps(dict(facts), ensure_ascii=False, sort_keys=True)
+
+
+def build_l1_summary(
+    session: Session, *, assessment_summaries: list[dict] | None = None
+) -> dict[str, Any]:
     """Build a deterministic, bounded L1 projection from a persisted session."""
 
     from auto_designer.models import validate_session_provenance
@@ -367,6 +457,15 @@ def build_l1_summary(session: Session) -> dict[str, Any]:
     sid = str(session.session_id)
     trace = session.sim_trace
     goal = _goal_summary(trace, session_id=sid)
+    if trace is None and session.execution_contract:
+        # Spec-0084/T4: the direct goal comes from the actual scenario, not a fake goal ledger.
+        goal = {
+            "status": "available",
+            "initial": {"text": _safe_text(session.scenario.description)},
+            "revisions": [],
+            "provenance": _source("public_task", session_id=sid, locator="execution/task.json"),
+        }
+    execution = session_execution_facts(session, assessment_summaries=assessment_summaries or [])
     events = _goal_events(trace, session_id=sid)
     feedback = _feedback_events(session, session_id=sid)
     refs = [
@@ -387,6 +486,7 @@ def build_l1_summary(session: Session) -> dict[str, Any]:
         "level": EvidenceLevel.COMPACT.value,
         "session_id": sid,
         "goal_summary": goal,
+        **execution,
         "key_events": events,
         "feedback_events": feedback,
         "user_outcome": {
@@ -427,11 +527,15 @@ class EvidenceEnvelope:
     evidence_refs: list[dict[str, Any]] = field(default_factory=list)
     accept_validity: str = "not_applicable"
     evidence_categories: dict[str, dict[str, Any]] = field(default_factory=dict)
+    execution_contracts: list[dict[str, Any]] = field(default_factory=list)
+    assessment_summaries: list[dict[str, Any]] = field(default_factory=list)
     level: str = EvidenceLevel.COMPACT.value
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "level": self.level,
+            "execution_contracts": list(self.execution_contracts),
+            "assessment_summaries": list(self.assessment_summaries),
             "source_report": dict(self.source_report),
             "session_id": self.session_id,
             "user_evidence": dict(self.user_evidence),
@@ -449,6 +553,12 @@ class EvidenceEnvelope:
         """Restore a persisted handoff without widening any evidence lane."""
         return cls(
             source_report=dict(data.get("source_report") or {}),
+            execution_contracts=[
+                validate_execution_contract(row) for row in data.get("execution_contracts", [])
+            ],
+            assessment_summaries=[
+                validate_assessment_summary(row) for row in data.get("assessment_summaries", [])
+            ],
             session_id=str(data.get("session_id") or "unavailable"),
             user_evidence=dict(data.get("user_evidence") or {}),
             objective_evidence=dict(data.get("objective_evidence") or _unavailable()),
@@ -468,11 +578,35 @@ class EvidenceEnvelope:
         )
 
 
+def _feedback_axis(*, session: Session | None, name: str) -> dict[str, Any]:
+    """Keep the L1 feedback axis bounded without upgrading diagnosis to fact."""
+    if session is None or not session.feedback:
+        return {}
+    value = session.feedback[name]
+    result = {
+        key: _safe_text(value[key], 300) for key in ("status", "source", "reason") if key in value
+    }
+    for key in ("evidence_refs", "claims"):
+        if isinstance(value.get(key), list):
+            result[key] = [
+                _safe_text(
+                    json.dumps(item, ensure_ascii=False)
+                    if isinstance(item, (dict, list))
+                    else item,
+                    300,
+                )
+                for item in value[key][:12]
+            ]
+            result[f"{key}_count"] = len(value[key])
+    return result
+
+
 def build_evidence_envelope(
     session: Session | None,
     *,
     report: Mapping[str, Any] | None = None,
     harness_ref: str | None = None,
+    assessment_summaries: list[dict] | None = None,
 ) -> EvidenceEnvelope:
     """Create the formal session→role handoff; legacy sessions remain explicit unavailable."""
 
@@ -491,7 +625,7 @@ def build_evidence_envelope(
         }
     else:
         sid = str(session.session_id)
-        l1 = build_l1_summary(session)
+        l1 = build_l1_summary(session, assessment_summaries=assessment_summaries)
     if harness_ref is None and session is not None:
         harness_ref = (session.session_provenance or {}).get("harness_sha")
         if not harness_ref:
@@ -531,8 +665,18 @@ def build_evidence_envelope(
     return EvidenceEnvelope(
         source_report=dict(report or {}),
         session_id=sid,
+        execution_contracts=list(l1.get("execution_contracts") or []),
+        assessment_summaries=list(l1.get("assessment_summaries") or []),
         user_evidence={
             "goal_summary": l1.get("goal_summary", {"status": "unavailable"}),
+            "task_assessment": _feedback_axis(session=session, name="task_assessment"),
+            "attribution": _feedback_axis(session=session, name="attribution"),
+            "opportunities": [
+                _safe_text(json.dumps(item, ensure_ascii=False), 300)
+                for item in session.feedback.get("opportunities", [])[:8]
+            ]
+            if session
+            else [],
             "key_events": list(l1.get("key_events") or []),
             "feedback_events": list(l1.get("feedback_events") or []),
             "user_outcome": dict(l1.get("user_outcome") or {}),
@@ -561,8 +705,16 @@ def project_for_role(envelope: EvidenceEnvelope | Mapping[str, Any], role: str) 
 
     raw = envelope.to_dict() if isinstance(envelope, EvidenceEnvelope) else dict(envelope)
     normalized = str(role or "").strip().lower()
+    # Spec-0084/T4: this safe lane is independent of raw objective traces and body clipping.
+    execution = {
+        "execution_contracts": list(raw.get("execution_contracts") or []),
+        "assessment_summaries": list(raw.get("assessment_summaries") or []),
+    }
+    if not any(execution.values()):
+        execution = {}
     if normalized in {"triage", "triager", "triage_agent"}:
         return {
+            **execution,
             "level": raw.get("level", EvidenceLevel.COMPACT.value),
             "source_report": dict(raw.get("source_report") or {}),
             "session_id": raw.get("session_id", "unavailable"),
@@ -574,6 +726,7 @@ def project_for_role(envelope: EvidenceEnvelope | Mapping[str, Any], role: str) 
         }
     if normalized in {"pm", "divergent", "divergent_pm"}:
         return {
+            **execution,
             "level": raw.get("level", EvidenceLevel.COMPACT.value),
             "session_id": raw.get("session_id", "unavailable"),
             "user_evidence": dict(raw.get("user_evidence") or {}),
@@ -581,6 +734,7 @@ def project_for_role(envelope: EvidenceEnvelope | Mapping[str, Any], role: str) 
         }
     if normalized in {"synthesize", "synthesizer", "owner"}:
         return {
+            **execution,
             "level": raw.get("level", EvidenceLevel.COMPACT.value),
             "session_id": raw.get("session_id", "unavailable"),
             "evidence_refs": list(raw.get("evidence_refs") or []),

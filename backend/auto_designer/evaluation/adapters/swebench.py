@@ -24,7 +24,7 @@ class SWEbenchAdapter:
     name = "swebench"
     contract_version = 1
 
-    def validate_inputs(self, request: GradingRequest) -> None:
+    def validate_plan(self, request: GradingRequest) -> dict[str, str]:
         require_material(request, "dataset")
         if not request.instance_id:
             raise InputValidationError("SWE instance_id is required")
@@ -34,6 +34,11 @@ class SWEbenchAdapter:
             unknown = set(request.config) - {"official_dataset_row"}
             if unknown:
                 raise ValueError(f"unknown SWE adapter configuration: {sorted(unknown)}")
+
+        return {}
+
+    def validate_inputs(self, request: GradingRequest) -> None:
+        self.validate_plan(request)
 
     def evaluate(self, request: GradingRequest, attempt_dir: Path) -> GradingResult:
         self.validate_inputs(request)

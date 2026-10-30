@@ -179,6 +179,7 @@ class OfflineProvider:
         self.calls = []
         self.behaviors = {}
         self.maximum = 0
+        self.launch_barrier = []
 
     def adapter(self, *, run_dir, manifest, credentials):
         self.roots[manifest["run_id"]] = run_dir
@@ -248,6 +249,15 @@ class Adapter:
             env=env,
         )
         self.provider.maximum = max(self.provider.maximum, self.provider.active())
+        # Keep the deliberately short workers alive until both real processes
+        # start. Frozen SDK extraction can take longer than the worker itself;
+        # overlap must not depend on a machine-specific startup speed.
+        if self.provider.launch_barrier and self.provider.active() == len(
+            self.provider.launch_barrier
+        ):
+            for root in self.provider.launch_barrier:
+                (root / "runtime/hold").unlink(missing_ok=True)
+            self.provider.launch_barrier = []
         if self.provider.behaviors.get(self.id) == "crash":
             self.provider.behaviors.pop(self.id)
             raise LostSupervisor()
@@ -343,6 +353,10 @@ def _run(fixture, store, **kwargs):
 def test_two_real_processes_seal_deliver_collect_and_respect_active_cap(setup_batch, limit):
     fixture = setup_batch
     store = fixture.prepare(limit)
+    if limit == 2:
+        fixture.provider.launch_barrier = list(_members(store).values())
+        for root in fixture.provider.launch_barrier:
+            (root / "runtime/hold").touch()
     result = _run(fixture, store)
     assert result["ok"] and result["experiment_success"], result
     assert fixture.provider.maximum == limit

@@ -17,8 +17,8 @@
     "integration_commit": "ee87df3acab036213cecbc35cdea01339a5dd988"
   },
   "nexau": {
-    "repository": "https://github.com/nex-agi/NexAU",
-    "commit": "5cd791b1382f1163621c9ff0b50c2cf01c4ba923"
+    "repository": "https://github.com/hzhua/nexau",
+    "commit": "28511d9f0362191a6c378fd441b2be55309a9e32"
   },
   "ag_ui_protocol": "0.1.22",
   "python": ">=3.12",
@@ -32,10 +32,10 @@
     "reader_spec": "0092",
     "reader_release_commit": null,
     "legacy_integration_scope": "configuration contract; existing gzip and same-origin behavior",
-    "candidate_validation": "Run check_observation_contract.py with the paired reviewed OpenAgents checkout; CI workflow_dispatch requires its full remote commit SHA.",
+    "candidate_validation": "PR CI selects the reviewed immutable execution_evidence reader candidate and runs both configuration and gzip/ZIP producer-reader contracts; workflow_dispatch can verify another full remote commit SHA.",
     "image_record": "backend/deploy/vigil/observation-runtime.json#hosted_candidate",
     "release_gate": "Merge and publish the reader first, fill reader_release_commit with its verified immutable commit, rebuild the reader image, and rerun the joint contract before enabling the hosted release.",
-    "reader_candidate_commit": "a752e8830a13f44d97a3043d1f3e8dd16bd8d8aa"
+    "reader_candidate_commit": "04e9519e69f5c2200e645f6814009f3ac1221932"
   },
   "release_commits": null,
   "container_digests": null,
@@ -50,5 +50,16 @@
     },
     "e2b": "2.51.0",
     "pyarrow": "21.0.0"
+  },
+  "execution_evidence": {
+    "status": "published-review-candidate-not-a-release",
+    "publisher_spec": "0084",
+    "reader_spec": "0093",
+    "schema_version": 1,
+    "required_dispatch": true,
+    "context_projection": "all-delivery-roles-v1",
+    "reader_candidate_commit": "04e9519e69f5c2200e645f6814009f3ac1221932",
+    "reader_release_commit": null,
+    "release_gate": "Review and merge the paired Spec-0093 reader, fill reader_release_commit with the merged immutable SHA, and rerun the publisher/reader contract and provider preflight. Preparation currently uses the published reader_candidate_commit; the Spec-0092 transport pin alone is insufficient."
   }
 }

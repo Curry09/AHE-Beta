@@ -134,11 +134,18 @@ def clause_capability(p: Persona, tool_names: list[str]) -> str:
             "read in the output; you cannot independently execute or verify anything."
         )
     listed = ", ".join(tool_names)
-    extra = (
-        " You can even write your own throwaway test scripts to probe it."
-        if "write_file" in tool_names
-        else " You can read and run things, but you do not author your own test suites."
-    )
+    # Spec-0084/T2: describe the actual stage capabilities, including terminal review.
+    if "write_file" in tool_names:
+        extra = (
+            " You can write your own test scripts or code changes when that fits your persona. "
+            "Identify these as your own contributions, not the assistant's independent work."
+        )
+    elif "run_shell" in tool_names:
+        extra = " You can read and run things, but you do not author your own test suites."
+    else:
+        extra = (
+            " You can inspect captured evidence only; you cannot execute commands or edit files."
+        )
     return f"You can verify on your OWN using these tools: {listed}.{extra}"
 
 

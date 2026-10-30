@@ -34,7 +34,11 @@ def inventory(root, content=b"historical source\n"):
 def test_current_repository_has_only_supported_public_materials():
     result = checker.check_repository(ROOT)
     assert result["ok"], result["errors"]
-    assert len(result["examples"]) == 4
+    assert set(result["examples"]) == {
+        f"examples/experiments/{name}-{backend}.json"
+        for name in ("synthesizer-n1", "synthesizer-n4", "evolution-feedback")
+        for backend in ("local", "e2b")
+    }
     assert len(result["batches"]) == 2
 
 

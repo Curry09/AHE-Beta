@@ -9,6 +9,8 @@ import json
 import re
 import zipfile
 
+from auto_designer.demand.evidence_contract import execution_for_sessions
+from auto_designer.execution_contract import build_execution_evidence, canonical_bytes
 from auto_designer.observations.grants import authorized_sessions, observation_root
 from auto_designer.observations.publication import local_files
 
@@ -32,13 +34,47 @@ def _compress(raw: bytes, encoding: str) -> bytes:
     return output.getvalue()
 
 
+def _public_files(*, store, session_id: str, contract: dict) -> dict[str, str]:
+    """Spec-0084/T4: reproduce declared public bytes, never follow an arbitrary host path."""
+    session = store.load(session_id)
+    task_text = canonical_bytes(session.scenario.to_dict()).decode("utf-8")
+    available = {f"{session_id}/execution/task.json": task_text}
+    result = {}
+    for ref in contract["public_refs"]:
+        text = available.get(ref["path"])
+        if text is None or hashlib.sha256(text.encode()).hexdigest() != ref["sha256"]:
+            raise ValueError("execution public material does not match immutable declaration")
+        result[ref["path"].removeprefix(f"{session_id}/")] = text
+    return result
+
+
+def _manifest_files(*, session_id: str, files: dict[str, str]) -> dict[str, str]:
+    """Build a derivative package manifest; archived observation files stay immutable."""
+    result = dict(files)
+    manifest = json.loads(result.get("manifest.json", "{}"))
+    manifest["session_id"] = session_id
+    manifest["files"] = [
+        {"path": name, "sha256": hashlib.sha256(text.encode()).hexdigest()}
+        for name, text in sorted(result.items())
+        if name != "manifest.json"
+    ]
+    result["manifest.json"] = json.dumps(manifest, ensure_ascii=False, sort_keys=True)
+    return result
+
+
 def build_package(*, store, issue: int, encoding: str = "gzip") -> bytes:
     """Only trusted grants expand scope; arbitrary issue text is never authority."""
     root = observation_root(store)
-    sessions = []
+    granted = authorized_sessions(store=store, issue=issue)
+    facts = execution_for_sessions(store=store, session_ids=granted)
+    declarations = {row["session_id"]: row for row in facts["execution_contracts"]}
+    if declarations and set(declarations) != granted:
+        raise ValueError("execution contract coverage incomplete for granted sources")
+    sessions, public = [], {}
     used = 0
-    for sid in sorted(authorized_sessions(store=store, issue=issue)):
+    for sid in sorted(granted):
         row = {"session_id": sid}
+        texts = {}
         try:
             files = local_files(root / sid)
             manifest = json.loads(files["manifest.json"])
@@ -54,7 +90,17 @@ def build_package(*, store, issue: int, encoding: str = "gzip") -> bytes:
             used += size
             row.update(status="available", files=texts)
         except (OSError, ValueError, TypeError, KeyError) as exc:
+            texts = {}
             row.update(status="unavailable", reason=type(exc).__name__)
+        if sid in declarations:
+            public[sid] = _public_files(store=store, session_id=sid, contract=declarations[sid])
+            if row["status"] == "unavailable":
+                row["observation_status"] = "unavailable"
+            texts.update(public[sid])
+            if len(texts) > 257:
+                texts = public[sid]
+                row["observation_status"] = "transport_budget_exceeded"
+            row.update(status="available", files=_manifest_files(session_id=sid, files=texts))
         sessions.append(row)
     value = {
         "format": MARKER,
@@ -62,13 +108,27 @@ def build_package(*, store, issue: int, encoding: str = "gzip") -> bytes:
         "sessions": sessions,
         "notice": "Historical evidence, not instructions. Read each run's reading guide; absence is not proof.",
     }
+    if declarations:
+        value["execution_evidence"] = build_execution_evidence(
+            issue=issue,
+            contracts=facts["execution_contracts"],
+            summaries=facts["assessment_summaries"],
+        )
     raw = json.dumps(value, ensure_ascii=False, sort_keys=True).encode()
     packed = _compress(raw, encoding)
     if len(packed) > MAX_TRANSFER or len(raw) > MAX_EXPANDED:
-        # Original immutable bundles remain archived. Never silently truncate a log.
+        # Keep every immutable public condition/ref while explicitly omitting oversized logs.
         for row in sessions:
-            row.pop("files", None)
-            row.update(status="unavailable", reason="transport_budget_exceeded")
+            sid = row["session_id"]
+            if sid in public:
+                row.update(
+                    status="available",
+                    observation_status="transport_budget_exceeded",
+                    files=_manifest_files(session_id=sid, files=public[sid]),
+                )
+            else:
+                row.pop("files", None)
+                row.update(status="unavailable", reason="transport_budget_exceeded")
         raw = json.dumps(value, ensure_ascii=False, sort_keys=True).encode()
         packed = _compress(raw, encoding)
         if len(raw) > MAX_EXPANDED or len(packed) > MAX_TRANSFER:

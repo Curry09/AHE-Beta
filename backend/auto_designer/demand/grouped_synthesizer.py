@@ -20,7 +20,7 @@ from auto_designer.demand.issue_schema import (
     filter_synthesizer_round,
     plane,
 )
-from auto_designer.demand.proposal_view import normalized_proposal_body
+from auto_designer.demand.proposal_view import normalized_proposal_body, proposal_view
 from auto_designer.demand.synthesizer import SynthesisOutcome, Synthesizer
 from auto_designer.loop.recovery import (
     RecoveryConflictError,
@@ -230,16 +230,22 @@ class GroupedSynthesizer:
                 round_no=round_no,
             )
             issues = sorted(issues, key=lambda item: item.number)
-            cards = [
-                {
+            cards = []
+            for item in issues:
+                view = proposal_view(item, store=self.synthesizers[0]._store)
+                card = {
                     "id": item.number,
                     "title": item.title,
                     "summary": normalized_proposal_body(item.body)
                     .split("## 证据引用", 1)[0]
                     .strip()[:1200],
                 }
-                for item in issues
-            ]
+                # Spec-0084/T4: grouping preserves applicability independently of clipped prose.
+                if view.execution_contracts:
+                    card["execution_contracts"] = list(view.execution_contracts)
+                    card["assessment_summaries"] = list(view.assessment_summaries)
+                cards.append(card)
+
         if self.recovery is not None:
             recovery_unit = self.recovery.begin_unit(
                 round_no=self._recovery_round_no(),

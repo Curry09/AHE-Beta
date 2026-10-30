@@ -9,7 +9,7 @@ Run all commands from the auto-designer repository root. One entry point starts 
 | `local` | Local Docker containers | A dedicated localhost Gitea started automatically | A running Docker daemon and model credentials |
 | `e2b` | One E2B sandbox per experiment | Your own Gitea.com account | Model credentials, `E2B_API_KEY`, `GITEA_TOKEN` |
 
-Choose N1 for one task and one user per round, or N4 for four users on two tasks with a concurrency limit of two. N4 runs two rounds: the first includes delivery, the second is user-only. Task-package lists and explicit persona/task plans use the same entry. Historical-result import for an extra round remains unsupported. The N1 example runs one simulated user per round for five rounds. R1–R4 include requirements and OpenAgents delivery; R5 only tries the final Harness. It evolves the Harness, using pvlib as a user task. It does not evolve the auto-designer or pvlib repository. Official SWE-bench grading is separate.
+Choose N1 for one task and one user per round, or N4 for four users on two tasks with a concurrency limit of two. N4 runs two rounds: the first includes delivery, the second is user-only. Task-package lists and explicit persona/task plans use the same entry. Historical-result import for an extra round remains unsupported. The N1 example runs one simulated user per round for five rounds. R1–R4 include requirements and OpenAgents delivery; R5 only tries the final Harness. It evolves the Harness, using pvlib as a user task. It does not evolve the auto-designer or pvlib repository. Objective grading is unconfigured by default; optional per-round and separate post-run paths are described below.
 
 ## 1. Install
 
@@ -43,6 +43,8 @@ For E2B also fill `E2B_API_KEY` and a Gitea.com token allowed to create and read
 
 ## 3. Check, prepare and run
 
+The paired execution-evidence reader is pinned to a published review candidate in `release/compatibility.json`. Preparation uses that immutable revision by default; see the [readiness note](tutorials/evolution-feedback.md#3-check-and-prepare). The two repositories still need joint review before release.
+
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$CONFIG" --offline
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$CONFIG" --secrets-file .env.experiment
@@ -74,6 +76,12 @@ uv run --locked --extra experiments python backend/scripts/experiment.py destroy
 Runs live under `.experiments/<run_id>/`. Experiment outcome, resource state and collection state are separate: `COMPLETED` requires every configured round to be sealed and the controller to finish; `COMPLETE` collection alone does not mean experiment success. The host monitor collects periodically while the host is online. Keep it online until terminal collection succeeds; cloud expiry can lose data not yet collected.
 
 The [complete N=1 tutorial](tutorials/n1-experiment.md) explains every input, expected outputs, interruption boundaries and evidence. The [multi-user tutorial](tutorials/multi-user-experiment.md) runs N4 with two tasks, a fixed cross-round plan and stop/resume. Actual validation results are recorded in the [N1 report](validation/spec-0069-new-user.md) and [multi-user report](validation/spec0073-multi-task-users.md).
+
+## Enable assessment before each round’s feedback
+
+The standard examples leave objective grading unconfigured. To use independent task results in later feedback, follow the [per-round assessment tutorial](tutorials/evolution-feedback.md). It generates a public task, private grading plan and worker key, then uses the same `check → prepare → run` entry with an external `assessment-worker`. Both local and E2B require a trusted Docker host for this worker. Start the run first, then the worker in another terminal. Without it, the controller waits in `objective_grading / PENDING` rather than reporting a pass or zero. The final user-only round is assessed too.
+
+Actor outputs are frozen before terminal read-only review. Experience ratings, task results, cause attribution and suggestions are separate; missing ratings remain null and a successful session may publish no Issues. An explicit 7200-second task budget overrides the runtime's 1800-second fallback. See [configuration](CONFIGURATION.md) for message limits and static context-capacity checks. This optional path does not change the post-run command below or the independent Harness benchmark framework.
 
 ## Grade saved session artifacts
 

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Agent, HistoryItem, SessionDetail, SessionProvenance } from "../../types";
 import { AgentColumn } from "../AgentColumn";
 import { SessionDetailView } from "./SessionDetail";
+import { Charts } from "../Charts";
 
 const result = vi.hoisted(() => ({ session: null as SessionDetail | null }));
 vi.mock("../../hooks/useFetch", () => ({ useFetch: () => result.session }));
@@ -65,5 +66,49 @@ describe("Spec-0073/T5 session attribution", () => {
     expect(html).not.toContain("Harness SHA");
     expect(html).not.toContain("task-content-b");
     expect(html).toContain("session-b");
+  });
+});
+
+describe("Spec-0084/T1 missing experience", () => {
+  it("does not replace a loaded unavailable rating with the archived score", () => {
+    result.session = {
+      session_id: "session-b", created_at: "", persona: { identity: "user", level: "", domain: "", goal: "", speaking_style: "" },
+      scenario: { description: "task" }, transcript: { turns: [] }, feeling: null, issue_refs: [],
+      feedback: {
+        schema_version: 1,
+        task_assessment: { status: "unknown", source: "reviewer", evidence_refs: [] },
+        experience: { status: "unavailable", score: null, source: "terminal_review", reason: "gateway unavailable" },
+        attribution: { status: "unknown", claims: [] }, opportunities: [],
+      },
+    };
+    const html = renderToStaticMarkup(<SessionDetailView item={{ ...item, score: 3 }} onBack={() => {}} onSelect={() => {}} />);
+    expect(html).toContain("体感缺测（unavailable）");
+    expect(html).toContain("gateway unavailable");
+    expect(html).toContain("来源：terminal_review");
+    expect(html).not.toContain("体感 3");
+    expect(html).not.toContain("3 / 4");
+  });
+
+  it("renders old null ratings without requiring the new feedback object", () => {
+    result.session = {
+      session_id: "session-b", created_at: "", persona: { identity: "user", level: "", domain: "", goal: "", speaking_style: "" },
+      scenario: { description: "task" }, transcript: { turns: [] }, feeling: null, issue_refs: [],
+    };
+    expect(detail()).toContain("未记录有效自评");
+  });
+
+  it("shows missing sample counts separately for each input condition", () => {
+    const html = renderToStaticMarkup(<Charts overview={{
+      open_issue_count: 0, session_count: 5, feeling_trend: [], issue_curve: [],
+      feedback_counts: {
+        unavailable: { rated: 1, missing: 0, invalid: 1, unavailable: 0 },
+        possible: { rated: 1, missing: 1, invalid: 0, unavailable: 1 },
+      },
+    }} />);
+    expect(html).toContain("无后续输入");
+    expect(html).toContain("可后续输入");
+    expect(html).toContain("有效 1 · 未提供 0 · 无效 1 · 不可用 0");
+    expect(html).toContain("有效 1 · 未提供 1 · 无效 0 · 不可用 1");
+    expect(html).not.toContain("NaN");
   });
 });

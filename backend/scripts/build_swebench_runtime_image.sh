@@ -5,7 +5,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 seed_image="${SWEBENCH_STORAGE_SEED_IMAGE:?Set the immutable storage seed image}"
 runtime_image="${SWEBENCH_RUNTIME_SEED_IMAGE:?Set the output runtime image}"
-nexau_source="${NEXAU_SOURCE:?Set the pinned NexAU checkout}"
+nexau_source="${NEXAU_SOURCE:?Set NEXAU_SOURCE to a checkout of the locked hzhua/nexau commit}"
 builder_python="${NEXAU_BUILD_PYTHON:-$repo_root/.venv/bin/python}"
 build_context="$(mktemp -d /tmp/auto-designer-runtime-image.XXXXXX)"
 cleanup() { rm -rf -- "$build_context"; }
@@ -14,9 +14,9 @@ trap cleanup EXIT
 docker image inspect "$seed_image" >/dev/null
 test -f "$nexau_source/pyproject.toml"
 test -x "$builder_python"
-"$builder_python" -m pip wheel --no-deps --wheel-dir "$build_context" "$nexau_source" >/dev/null
-wheel="$(find "$build_context" -maxdepth 1 -type f -name 'nexau-*.whl' -print -quit)"
-test -n "$wheel"
+uv build --python "$builder_python" "$nexau_source" --wheel --out-dir "$build_context" >/dev/null
+sdk_wheels=("$build_context"/nexau-*.whl)
+test -f "${sdk_wheels[0]}"
 cp "$repo_root/backend/deploy/swebench-seed/runtime.Dockerfile" "$build_context/runtime.Dockerfile"
 cp "$repo_root/backend/scripts/prepare_swebench_runtime_tree.py" "$build_context/prepare_swebench_runtime_tree.py"
 docker build \

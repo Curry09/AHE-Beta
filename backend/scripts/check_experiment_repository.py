@@ -30,6 +30,7 @@ PUBLIC_COMMANDS = {
     "dashboard",  # Spec-0072/T5: the same entry binds a selected run for observation.
     "batch",  # Spec-0074/T3: lists reuse the maintained single-run entry.
     "grade",  # Spec-0075/T3: independent grading consumes collected run artifacts.
+    "assessment-worker",  # Spec-0084/T5: trusted external per-round grading.
     "task",  # Spec-0076/T2: input conversion produces existing task packages.
 }
 BATCH_COMMANDS = {"check", "prepare", "run", "status", "stop", "resume", "collect"}

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
-import io
 import json
 import os
 import re
@@ -18,13 +17,11 @@ from typing import Any
 
 from auto_designer.evaluation.acceptance import derive_acceptance_assessment
 from auto_designer.evaluation.contracts import (
-    ArtifactInput,
-    GradingRequest,
     InputValidationError,
     MaterialInput,
 )
 from auto_designer.evaluation.registry import get_adapter
-from auto_designer.evaluation.results import EXECUTION_CONTRACTS
+from auto_designer.evaluation.service import build_request, evaluate_request
 from auto_designer.experiment.config import ConfigError
 from auto_designer.experiment.grading_inputs import archived_artifacts, load_grading_plan
 from auto_designer.experiment.manifest import recovery_identity
@@ -293,71 +290,6 @@ def _terminal(receipt: dict, files: dict[str, bytes]) -> None:
         raise ConfigError("Controller terminal nonce/identity/cleanup mismatch")
 
 
-def _dataset(path: Path, expected_sha: str) -> tuple[list[dict], bytes]:
-    if not isinstance(expected_sha, str) or not _SHA.fullmatch(expected_sha):
-        raise ConfigError("dataset_sha256 must be a lowercase SHA-256")
-    path = path.expanduser().absolute()
-    if path.is_symlink() or any(part.is_symlink() for part in path.parents):
-        raise ConfigError("Dataset path contains a symlink")
-    try:
-        payload = path.read_bytes()
-        if hashlib.sha256(payload).hexdigest() != expected_sha:
-            raise ConfigError("Dataset SHA-256 mismatch")
-        if path.suffix == ".json":
-            decoded = _json(payload, "dataset")
-            rows = decoded if isinstance(decoded, list) else [decoded]
-        elif path.suffix == ".jsonl":
-            rows = [
-                _json(line, "dataset JSONL row") for line in payload.splitlines() if line.strip()
-            ]
-        elif path.suffix == ".parquet":
-            try:
-                import pyarrow.parquet as parquet
-            except ImportError as exc:
-                raise ConfigError("Parquet dataset requires the evaluation extra") from exc
-            rows = parquet.read_table(io.BytesIO(payload)).to_pylist()
-        else:
-            raise ConfigError("Dataset must be JSON, JSONL or parquet")
-        if path.read_bytes() != payload:
-            raise ConfigError("Dataset changed while reading")
-    except OSError as exc:
-        raise ConfigError("Dataset file cannot be read") from exc
-    if not rows or not all(isinstance(row, dict) for row in rows):
-        raise ConfigError("Dataset must contain nonempty official row objects")
-    if any(not isinstance(row.get("instance_id"), str) or not row["instance_id"] for row in rows):
-        raise ConfigError("Dataset rows require instance_id")
-    return rows, payload
-
-
-def _official_row(rows: list[dict], task: dict) -> dict:
-    matches = [row for row in rows if row["instance_id"] == task["id"]]
-    if len(matches) != 1:
-        raise ConfigError(f"Dataset must uniquely match selected instance: {task['id']}")
-    row = matches[0]
-    source = task["package"].get("source", {})
-    if (
-        source.get("kind") != "git"
-        or not isinstance(source.get("repo"), str)
-        or row.get("repo") != source["repo"]
-        or not isinstance(row.get("base_commit"), str)
-        or not _COMMIT.fullmatch(row["base_commit"])
-        or row["base_commit"] != source.get("revision")
-        or row["base_commit"] != task["source_snapshot"].get("revision")
-    ):
-        raise ConfigError(f"Dataset repo/base_commit differs from frozen task: {task['id']}")
-    # These fields are consumed by the official runner, never the experiment.
-    for field in ("patch", "test_patch", "version", "FAIL_TO_PASS", "PASS_TO_PASS"):
-        if field not in row:
-            raise ConfigError(f"Official dataset row is missing required field: {field}")
-    if any(not isinstance(row[field], str) for field in ("patch", "test_patch", "version")):
-        raise ConfigError("Official dataset patch/test_patch/version fields must be strings")
-    for field in ("FAIL_TO_PASS", "PASS_TO_PASS"):
-        values = _json(row[field].encode(), field) if isinstance(row[field], str) else row[field]
-        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
-            raise ConfigError("Official dataset test lists are malformed")
-    return row
-
-
 def _session_entry(
     *, binding: dict, task: dict, round_state: dict, files: dict[str, bytes], manifest: dict
 ) -> tuple[dict, str | None]:
@@ -430,6 +362,8 @@ def _session_entry(
         "request_outcomes": [],
         "accept_validity": "not_applicable",
     }
+    if session.feedback:
+        defaults.update(feedback={}, execution_contract={}, execution_receipt={}, report_plan=None)
     for field, default in defaults.items():
         if saved.get(field, default) != document.get(field, default):
             raise ConfigError("Session differs from immutable recovery output")
@@ -460,9 +394,12 @@ def _session_entry(
         else session.user_outcome.get("status", "completed"),
     }
     if (
-        entry["evaluation_status"] != "valid"
+        (not session.feedback and entry["evaluation_status"] != "valid")
         or entry["interaction_status"] not in {"completed", "protocol_repaired"}
-        or session.user_outcome.get("review_status", "completed") != "completed"
+        or (
+            not session.feedback
+            and session.user_outcome.get("review_status", "completed") != "completed"
+        )
     ):
         return {
             **entry,
@@ -567,13 +504,6 @@ def grade_run(
         raise ConfigError("Malformed or unsupported collected grading inputs") from exc
 
 
-def _source(task: dict) -> dict:
-    package = task["package"]
-    if task["kind"] == "benchmark":
-        return {**package.get("source", {}), **package["benchmark"]}
-    return {**package.get("source", {}), "suite": task["kind"], "instance_id": task["id"]}
-
-
 def _grade_run(
     *, run_id: str, plan_path: Path, root: Path | None, round_no: int | None, offline: bool
 ) -> dict:
@@ -655,9 +585,6 @@ def _grade_run(
         except ValueError as exc:
             entry.update(status="unsupported", reason=str(exc), passed=None)
             continue
-        origin = _source(task)
-        if selection["adapter"] != "custom" and origin["suite"] != selection["adapter"]:
-            raise ConfigError("Grading adapter differs from frozen benchmark source")
         session = entry["_session"]
         declarations = task["package"].get("artifacts", {}).get("exports", [])
         outputs = archived_artifacts(
@@ -670,57 +597,18 @@ def _grade_run(
             name: grading_plan.materials[reference]
             for name, reference in selection["inputs"].items()
         }
-        config = dict(selection.get("config", {}))
-        if selection["adapter"] == "swebench":
-            if "dataset" not in frozen_materials:
-                raise ConfigError("SWE adapter requires inputs.dataset")
-            material = frozen_materials["dataset"]
-            rows, _ = _dataset(material["path"], material["sha256"])
-            config["official_dataset_row"] = _official_row(rows, task)
-        missing = [
-            item["id"] for item in declarations if item["required"] and item["id"] not in outputs
-        ]
-        if missing:
-            entry.update(
-                status="missing_artifact", reason="missing_required_outputs: " + ",".join(missing)
-            )
-            continue
-        request = GradingRequest(
-            adapter=selection["adapter"],
-            contract_version=selection["contract_version"],
-            task_id=task["id"],
-            task_digest=task["digest"],
-            session_id=entry["session_id"],
-            source=origin,
-            artifacts={
-                name: ArtifactInput(
-                    path=Path(item["path"]),
-                    sha256=item["sha256"],
-                    bytes=item["bytes"],
-                    source=item["source"],
-                    metadata=item,
-                    payload=item["payload"],
-                )
-                for name, item in outputs.items()
-            },
-            materials={
-                name: MaterialInput(path=value["path"], sha256=value["sha256"])
-                for name, value in frozen_materials.items()
-            },
-            config=config,
-            timeout_seconds=selection["timeout_seconds"],
-            plan_digest=grading_plan.digest,
-            instance_id=origin["instance_id"],
-            patch=patch or "",
-            session=session,
-        )
         try:
-            adapter.validate_inputs(request)
+            request = build_request(
+                task=task,
+                session=session,
+                outputs=outputs,
+                plan=grading_plan,
+                selection=selection,
+                patch=patch or "",
+            )
         except InputValidationError as exc:
             entry.update(status=exc.status, reason=str(exc), passed=None)
             continue
-        except ValueError as exc:
-            raise ConfigError(f"Invalid {selection['adapter']} grading inputs: {exc}") from exc
         requests[entry["session_id"]] = (request, frozen_materials, outputs)
         adapters[entry["session_id"]] = adapter
     identity = {
@@ -831,29 +719,7 @@ def _grade_run(
             )
             with _operation_read(run_dir):
                 _assert_host_current(run_dir, host_snapshot, receipt)
-            try:
-                scored = adapters[entry["session_id"]].evaluate(request, session_root)
-                result = scored.to_dict()
-                execution = result.get("execution") or {}
-                if result.get("status") == "completed" and (
-                    execution.get("contract") not in EXECUTION_CONTRACTS
-                    or execution.get("verified") is not True
-                    or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(execution.get("image_digest")))
-                ):
-                    result = {
-                        **result,
-                        "status": "ungradable",
-                        "passed": None,
-                        "reason": "execution_contract_not_verified",
-                    }
-            except Exception as exc:  # noqa: BLE001 - preserve failed scorer independently
-                result = {
-                    "adapter": request.adapter,
-                    "contract_version": request.contract_version,
-                    "status": "crashed",
-                    "passed": None,
-                    "reason": type(exc).__name__,
-                }
+            result = evaluate_request(request, session_root)
             _write(session_root / "result.json", result)
             with _operation_read(run_dir):
                 _assert_host_current(run_dir, host_snapshot, receipt)

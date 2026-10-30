@@ -222,3 +222,129 @@ def test_timeline_tools_enforce_role_visibility_and_audit_reason(tmp_path, monke
     audit = (tmp_path / "role-runs" / "evidence_access.jsonl").read_text(encoding="utf-8")
     assert "should not be visible" in audit
     assert "explain the user wait" in audit
+
+
+def contract_session(*, sid="session-current", followup="unavailable"):
+    """Current immutable public declaration with an ungraded/missing experience axis."""
+    from auto_designer.execution_contract import canonical_sha256, make_execution_contract
+
+    scenario = SeedScenario(description="Complete the original public goal without extra input.")
+    declaration = make_execution_contract(
+        session_id=sid,
+        task_id=f"task-{sid}",
+        task_digest="a" * 64,
+        followup_input=followup,
+        task_budget_seconds=7200,
+        budget_source="task_metadata",
+        public_refs=[
+            {
+                "kind": "task",
+                "path": f"{sid}/execution/task.json",
+                "sha256": canonical_sha256(scenario.to_dict()),
+            }
+        ],
+    )
+    return Session(
+        persona=Persona("i", "l", "d", "g", "s"),
+        scenario=scenario,
+        transcript=Transcript(),
+        session_id=sid,
+        execution_contract=declaration,
+        feedback={
+            "schema_version": 1,
+            "task_assessment": {"status": "unfulfilled", "source": "reviewer", "evidence_refs": []},
+            "experience": {
+                "status": "missing",
+                "score": None,
+                "source": "reviewer",
+                "reason": "no self-rating",
+            },
+            "attribution": {"status": "unknown", "claims": []},
+            "opportunities": [],
+        },
+    )
+
+
+def test_direct_goal_and_missing_rating_remain_distinct_from_execution_outcome():
+    session = contract_session()
+    l1 = build_l1_summary(session)
+    assert l1["goal_summary"]["initial"]["text"] == session.scenario.description
+    assert "baseline_id" not in l1["goal_summary"]
+    assert l1["feedback_events"][0]["score"] is None
+    assert l1["feedback_events"][0]["status"] == "missing"
+    envelope = build_evidence_envelope(session)
+    assert envelope.user_evidence["task_assessment"]["status"] == "unfulfilled"
+    for role in ("triage", "pm", "synthesizer", "owner"):
+        projection = project_for_role(envelope, role)
+        assert projection["execution_contracts"] == [session.execution_contract]
+        if role == "pm":
+            assert "objective_evidence" not in projection
+
+
+def test_oversized_feedback_does_not_clip_fixed_execution_conditions():
+    session = contract_session()
+    session.feedback["experience"]["reason"] = "very long rating reason " * 10000
+    l1 = build_l1_summary(session)
+    assert l1["execution_contracts"][0] == session.execution_contract
+    assert l1["execution_contracts"][0]["task_budget_seconds"] == 7200
+    assert len(l1["feedback_events"][0]["reason"]) <= 1200
+
+
+def test_missing_experience_remains_in_pm_discovery_index(tmp_path):
+    session = contract_session()
+    store = SessionStore(tmp_path / "sessions")
+    store.save(session)
+    pm = Divergent(FakeTracker(), store, str(tmp_path), str(tmp_path / "pm"))
+    trend = pm._feeling_trend()
+    assert trend[0][1] is None
+    assert "unavailable" in pm._format_trend(trend)
+    assert pm._goal_index(trend)[0]["execution_contracts"] == [session.execution_contract]
+
+
+def test_actual_role_runtime_receives_granted_contracts_even_for_owner(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import nexau
+
+    from auto_designer.demand.agent_runtime import run_agent_def
+    from auto_designer.observations.grants import grant
+
+    session = contract_session()
+    store = SessionStore(tmp_path / "sessions")
+    store.save(session)
+    grant(store=store, issue=7, sessions={session.session_id})
+    received = []
+
+    class Config:
+        @staticmethod
+        def from_yaml(**kwargs):
+            return SimpleNamespace(max_iterations=1, resolved_tracer=None)
+
+    class Agent:
+        def __init__(self, *, config):
+            pass
+
+        def run(self, *, message):
+            received.append(message)
+            return {"decisions": []}
+
+    monkeypatch.setattr(nexau, "AgentConfig", Config)
+    monkeypatch.setattr(nexau, "Agent", Agent)
+    agent_dir = tmp_path / "agent"
+    agent_dir.mkdir()
+    (agent_dir / "agent.yaml").write_text("test")
+    for role in ("owner", "synthesizer", "divergent", "triager"):
+        with bind_usage_context(session_id=session.session_id):
+            run_agent_def(
+                agent_dir,
+                "proposal text " * 1000,
+                store=store,
+                repo=tmp_path,
+                role=role,
+                timeout=5,
+                source_issue_ids={7},
+                allowed_session_ids={session.session_id},
+            )
+    assert len(received) == 4
+    assert all(session.execution_contract["contract_id"] in text for text in received)
+    assert all('"followup_input": "unavailable"' in text for text in received)

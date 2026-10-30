@@ -10,8 +10,8 @@ on:
   workflow_dispatch:
     inputs:
       observation_reader_commit:
-        description: 'Full OpenAgents commit SHA for the gzip/ZIP candidate contract'
-        required: true
+        description: 'Optional full OpenAgents commit SHA overriding the pinned execution-evidence reader'
+        required: false
         type: string
 
 permissions:
@@ -26,6 +26,13 @@ env:
   SPEC_PYTHONPATH: tools/spec-driven-development/vendor
 
 jobs:
+  nexau-pin:
+    name: NexAU immutable dependency contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 backend/scripts/check_nexau_dependency.py
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -52,6 +59,8 @@ jobs:
           enable-cache: true
       - name: Install locked dependencies
         run: uv sync --locked --extra experiments --extra dev
+      - name: Verify installed SDK commit
+        run: uv run --locked --extra experiments --extra dev python backend/scripts/check_nexau_dependency.py --installed
       - name: Backend and evaluation tests
         run: uv run --locked --extra experiments --extra dev pytest -q
       - name: Public experiment directory contract
@@ -79,8 +88,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Spec-0070/T5: the published baseline stays usable while the reader PR is reviewed.
-      # A candidate must use an explicit immutable remote commit, never a moving branch.
+      # Spec-0084/T6: validate the reader used by new experiments, including execution evidence.
+      # An override must use an immutable remote commit, never a moving branch.
       - name: Select the immutable reader
         id: reader
         env:
@@ -90,14 +99,15 @@ jobs:
           import json, os, re
           from pathlib import Path
           manifest = json.loads(Path('release/compatibility.json').read_text())
-          hosted = manifest['observation_transport']['reader_release_commit']
+          reader = manifest['execution_evidence']
           candidate = os.environ.get('CANDIDATE_READER', '')
-          ref = candidate or hosted or manifest['openagents']['integration_commit']
+          ref = candidate or reader.get('reader_release_commit') or reader.get('reader_candidate_commit')
+          if not isinstance(ref, str):
+              raise SystemExit('Execution-evidence reader pin is required')
           if not re.fullmatch('[a-f0-9]{40}', ref):
               raise SystemExit('Reader pin must be a full commit SHA')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'ref={ref}\n')
-              output.write(f'hosted={str(bool(candidate or hosted)).lower()}\n')
           PY
       - uses: actions/checkout@v4
         with:
@@ -110,13 +120,11 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked --extra dev
+      - name: Match the paired SDK source
+        run: uv run --locked --extra dev python backend/scripts/check_nexau_dependency.py --other-project .ci/OpenAgents --installed
       - run: uv run --locked --extra dev python backend/scripts/check_openagents_contract.py --openagents .ci/OpenAgents
-      - name: Real gzip and ZIP producer-reader contract
-        if: steps.reader.outputs.hosted == 'true'
+      - name: Real gzip, ZIP and execution-evidence producer-reader contracts
         run: uv run --locked --extra dev python backend/scripts/check_observation_contract.py --openagents .ci/OpenAgents
-      - name: Report baseline-only coverage
-        if: steps.reader.outputs.hosted != 'true'
-        run: echo 'Hosted evidence release pin is pending; configuration baseline only. Run workflow_dispatch with the reader candidate SHA to validate ZIP.'
 
   commitlint:
     name: Commit Lint
@@ -166,7 +174,7 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [lint, test, frontend, integration, commitlint, spec-validate, spec-conflicts]
+    needs: [nexau-pin, lint, test, frontend, integration, commitlint, spec-validate, spec-conflicts]
     runs-on: ubuntu-latest
     steps:
       - name: Check job results
@@ -177,6 +185,7 @@ jobs:
           echo "spec-validate:  ${{ needs.spec-validate.result }}"
           echo "spec-conflicts: ${{ needs.spec-conflicts.result }}"
           results=(
+            "${{ needs.nexau-pin.result }}"
             "${{ needs.frontend.result }}"
             "${{ needs.integration.result }}"
             "${{ needs.lint.result }}"

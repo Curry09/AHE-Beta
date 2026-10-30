@@ -23,7 +23,8 @@ RUN apt-get update \
 COPY --from=py310 /usr/bin/python3.10 /usr/bin/python3.10
 COPY --from=py310 /usr/lib/python3.10/ /usr/lib/python3.10/
 COPY nexau-*.whl /tmp/
-RUN python3 -m pip install --break-system-packages --no-cache-dir /tmp/nexau-*.whl \
+RUN python3 -m pip install --break-system-packages --no-cache-dir /tmp/nexau-*.whl "ag-ui-protocol==0.1.22" "anthropic<1" "greenlet>=3" \
+    && python3 -c 'from nexau import Agent, AgentConfig' \
     && rm /tmp/nexau-*.whl
 
 COPY --from=seed /workspace/ /workspace/

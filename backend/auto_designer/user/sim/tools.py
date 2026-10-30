@@ -46,6 +46,21 @@ def run_shell(sandbox: Sandbox, cmd: str, timeout: float = 10.0) -> dict:
     return sandbox.run(cmd, timeout=timeout)
 
 
+def list_files(sandbox: Sandbox, path: str = ".") -> dict:
+    """Spec-0084/T2: list only already captured review files."""
+    try:
+        return {"ok": True, "files": sandbox.list_files(path)}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
+def read_diff(sandbox: Sandbox) -> dict:
+    try:
+        return {"ok": True, "content": sandbox.read_diff()}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
 def report_issue(sandbox: Sandbox, body: str) -> dict:  # noqa: ARG001
     """占位：真实记笔记由 AgenticPersonaClient._dispatch 拦截；直接调则失败。"""
     return {"ok": False, "error": "report_issue requires agentic client dispatch"}
@@ -70,6 +85,10 @@ class ToolSpec:
 
 
 READ_FILE = ToolSpec("read_file", "Read a file in your workspace.", ("path",), read_file)
+LIST_FILES = ToolSpec(
+    "list_files", "List files captured in this read-only snapshot.", ("path",), list_files
+)
+READ_DIFF = ToolSpec("read_diff", "Read the captured patch; never runs a command.", (), read_diff)
 RUN_SHELL = ToolSpec(
     "run_shell", "Run a shell command in your workspace and see its output.", ("cmd",), run_shell
 )
@@ -102,3 +121,8 @@ _STACK: dict[D1Eval, list[ToolSpec]] = {
 def tool_stack(persona: Persona) -> list[ToolSpec]:
     """按 persona 的 D1 给出可用工具子集（web_search 不入栈：占位、永不真实启用）。"""
     return list(_STACK[persona.d1])
+
+
+def review_tool_stack(persona: Persona) -> list[ToolSpec]:
+    """Spec-0084/T2: reviewer capabilities are independent of authoring tools."""
+    return [] if persona.d1 is D1Eval.BLIND else [READ_FILE, LIST_FILES, READ_DIFF]

@@ -9,37 +9,41 @@
 ### 项目文档
 用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 N=1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；支持冻结任务列表、同任务多用户与 ordinary/SWE 混合计划；N1/N4 公开示例涵盖两后端。带当前 continuation export 的完整归档可通过同入口继承到新 run 追加轮次，双语教程见 docs/tutorials/experiment-continuation.md / .zh-CN.md。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
-完整实验列表通过同入口的 batch check/prepare/run/status/stop/resume/collect 管理，成员仍沿用单 run 身份与冻结配置。实验后的会话客观验收统一使用 grade RUN_ID --plan PATH；SWE、Terminal、TUA、NL2Repo 与 custom 都按独立计划分发，旧 dataset 参数已退役。两后端均完整 collect 后在本机 Docker 评分，--offline 只校验输入。direct 与 simulated 共用产物采集，新会话原子保存完整 patch、产物与 receipt；旧冻结 controller 的 hash-only 预测及缺失产物不补造。KV 可信原测量仍依赖未完成的 Spec-0081。每次评分写独立 evaluation attempt，不改 Session、manifest、checkpoint、seal 或 archive；不读取 provider 凭证，不把 gold/test 数据或分数送回演化。evaluation.official_grading 继续 false；这些用户任务成绩与独立 held-out Harness 泛化评估分开。双语教程见 docs/tutorials/post-run-grading.md / .zh-CN.md。
+完整实验列表通过同入口的 batch check/prepare/run/status/stop/resume/collect 管理，成员仍沿用单 run 身份与冻结配置。实验后的会话客观验收统一使用 grade RUN_ID --plan PATH；SWE、Terminal、TUA、NL2Repo 与 custom 都按独立计划分发，旧 dataset 参数已退役。两后端均完整 collect 后在本机 Docker 评分，--offline 只校验输入。direct 与 simulated 共用产物采集，新会话原子保存完整 patch、产物与 receipt；旧冻结 controller 的 hash-only 预测及缺失产物不补造。KV 可信原测量仍依赖未完成的 Spec-0081。事后评分写独立 evaluation attempt，不改 Session、manifest、checkpoint、seal 或 archive，也不把评分报告回填演化。evaluation.official_grading 继续 false；这些用户任务成绩与独立 held-out Harness 泛化评估分开。双语教程见 docs/tutorials/post-run-grading.md / .zh-CN.md。
+
+Spec-0084 增加显式可选的 evaluation.session_grading：每轮用户产物封存后、反馈处理前，由独立 assessment-worker 使用私有 plan 和 Docker 评分，末轮也执行。仅固定字段的签名安全摘要进入需求和交付；隐藏断言、标准答案与原始 verifier 日志始终留在外部评分端。此路径与事后 grade 共用评分实现，缺 worker 等待、基础设施故障不记 0、任务失败不淘汰或回滚候选。参与演化的任务及其反馈不能再当作 held-out 结果。配置和真实验收边界见 docs/tutorials/evolution-feedback.zh-CN.md 与 docs/validation/evolution-feedback-contracts.md。
+
+双模式反馈独立记录任务判断、体验评分、问题归因和改进机会；缺测保持空值，accept不代替任务通过，成功允许零Issue。交互中的模拟用户按persona访问实时工作区，competent/expert可自行写测试、运行命令及按协作风格改代码，main_final_check仍限四次工具调用并经过重新判断。只有终态评阅前才停止Actor及写进程、冻结产物，终态Reviewer只读快照；用户操作保留sim_trace，最终协作产物通过不自动等于Harness独立通过。报告计划与发布收据支持恢复且不重复Actor/Reviewer。执行合同从首次目标贯穿所有角色：Direct不依赖第二条用户输入；任务总期限不会被控制消息续租，已声明的7200秒预算不被内部1800秒兜底截断。模型容量按显式配置预检，未知容量不猜测；确定性上下文超限不重复相同外层调用。这些边界不预先实现上下文压缩或新的早停策略。
 
 旧 seed 卡库与自有文本通过统一入口的 task import-seeds LIBRARY --output DIR [--seed ID ...] / task from-text --instruction PATH --id ID --output DIR --not-in-benchmark 转为 ordinary v1 包；两者支持 --interaction direct|simulated_user 和父级 --json。转换不联网、不读模型/provider 凭证、不执行 setup。JSON 结果提供绝对 task_packages 数组，应移除旧 workload.kind/task_package/interaction_plan 后接入 workload.task_packages；tasks.json 仅为输出目录相对路径索引，不是新的运行入口。无 repo 使用带初始 README 的 scratch，不携带答案。oracle、env.test_cmd、gates、provenance 不复制到包或 sidecar；旧 setup 不自动锁依赖，旧镜像、外部服务不自动复现。公开 examples/seed-inputs/ 仅放明确非 benchmark 的小型合成卡与用户指令；历史七卡留在研究归档。双语教程见 docs/tutorials/seed-task-import.md / .zh-CN.md，实验仍走 check/prepare/run。seed 转换与归档 continuation 是两个输入功能；转换和离线检查不证明真实双 provider 实验或任务通过，实际 local 会话验收见 docs/validation/seed-task-import.md。
 
 local + localhost 的工程 CI 由 runtime.local.ci_enabled=true 可选开启，默认关闭，不改旧冻结 run；E2B CI 不支持。runner_image、ci_job_image 可选且只在开启时允许，必须带显式版本或摘要，不能用 :latest；默认镜像及实际 image ID 按 run 固定；内部 docker:27.5.1-dind daemon 配方也固定实际 image ID。冻结 Harness 需有 ubuntu-latest PR 工作流；后端核验专属 runner 身份并通过真实 PR checkout/Python smoke 后才发就绪收据，context 仅接受匹配的已核验收据以设置 OpenAgents ci:agent，失败不降级 skip。status/collect 保存 CI 就绪与当前 main/PR SHA 状态，不沿用旧 head 绿灯。每个 run 独占自己的 privileged Docker daemon、job 存储及工具缓存，runner 通过内部 DOCKER_HOST 连接，不挂宿主 Docker socket、不发布 daemon 宿主端口；job 的 host 网络属于私有 daemon 的网络命名空间。stop 处理所属 runner/job 并停止 daemon，保留恢复数据；resume 复用 daemon/存储/注册并重验；destroy 移除有所有权证据的执行资源与 CI job 存储，明确保留 Gitea 和 runner 私密注册卷；注册凭据不进入普通归档。此配置用于可信 Harness 工程代码，不提供恶意代码隔离；CI 不调模型、不跑 benchmark，与事后 SWE grade 和 Harness 留出评估分开。双语教程见 docs/tutorials/local-engineering-ci.md / .zh-CN.md；真实验收范围以 docs/validation/local-engineering-ci.md 为准，人工红绿对照不能称作模型自动修复。
 
 ### 当前归档追加
-当前归档 continuation 使用 harness.source=continuation、workload.source=parent 和 archive/sha256 三项来源声明创建新 run，不修改父配置后 resume。父末轮配对、材料、persona 和完整会话按冻结 hash 继承，count 只表示新增用户轮。先以独立 checkpoints/continuation-bootstrap 恢复域处理父反馈并交付，再运行本次 1..N 用户轮；两阶段共用 loop/feedback_pipeline，最后新增轮仍只用户。父会话不进入子 SessionStore 索引或新增指标，报告通过 source namespace/issue map 进入新仓，observations 保留原身份并重新授予访问。父 commit 与子 seed commit SHA 不同，但按 inventory 精确构造同一 tree；collector 不用工作树 HEAD 猜最终代码。当前 export/schema 和 source validator 是唯一契约，不增旧格式 adapter、转调脚本或第二套监督器。子 collect 可再次继承，逻辑轮号累计，grade/batch 仍用本地轮号；全链路真实覆盖见 docs/validation/experiment-continuation.md，不能以零准入或离线合同测试冒充真实代码交付。
+当前归档 continuation 使用 harness.source=continuation、workload.source=parent 和 archive/sha256 三项来源声明创建新 run，不修改父配置后 resume。父末轮配对、材料、persona 和完整会话按冻结 hash 继承，count 只表示新增用户轮。先以独立 checkpoints/continuation-bootstrap 恢复域处理父反馈并交付，再运行本次 1..N 用户轮；两阶段共用 loop/feedback_pipeline，最后新增轮运行用户及已配置的独立验收，不再生成需求或交付。父会话不进入子 SessionStore 索引或新增指标，报告通过 source namespace/issue map 进入新仓，observations 保留原身份并重新授予访问。父 commit 与子 seed commit SHA 不同，但按 inventory 精确构造同一 tree；collector 不用工作树 HEAD 猜最终代码。当前 export/schema 和 source validator 是唯一契约，不增旧格式 adapter、转调脚本或第二套监督器。子 collect 可再次继承，逻辑轮号累计，grade/batch 仍用本地轮号；全链路真实覆盖见 docs/validation/experiment-continuation.md，不能以零准入或离线合同测试冒充真实代码交付。
 
 ### 要解决的问题
 直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
 
 ### 核心思路：训练信号与测试分离
-- 训练信号用用户体感，在"模拟真实使用"的分布上优化。
+- 演化反馈来自使用过程中的任务判断、体验、归因和改进机会；显式开启逐轮验收时另附独立安全摘要，在"模拟真实使用"的分布上优化。
 - 测试用各类 benchmark，held-out，只在事后验证体感驱动的进化是否带来真实能力提升。
-- benchmark 不进入训练，因此其特征不会被带入 harness；同时开发者 agent 可以做较大改动，效果由 benchmark 事后判定。
+- 留出评估的任务与结果不进入演化；已作为使用任务并提供反馈的材料不能再宣称 held-out。开发者 agent 可以做较大改动，泛化效果由独立评估判定。
 
 ### 方法：模拟"用户使用 → 开发者迭代"的闭环
 
 - **蒸馏模块**：从真实使用数据（CC/codex/nexau 的真实日志、issue tracker、社区反馈）蒸馏出 persona 库和种子场景库。persona 来自真实数据，不依据 benchmark 构造，以此保证体感信号的真实性，并避免训练目标和测试目标互相污染。
 
-- **a｜用户侧**：user agent 按 persona 和种子场景使用 harness，产生一段使用过程（包含追问、绕路、卡顿、放弃等情况）。输出两类信号：① 体感评分（类似 cc 的 1-4 评分，作训练信号）；② issue（bug 或需求，来自使用中的具体问题点）。
+- **a｜用户侧**：按 persona 和任务的 direct/simulated_user 条件使用 harness，保存真实轨迹、执行合同与四轴反馈。体验使用共同的 1–4 量表，缺测保持空值；Issue 来自冻结报告计划，可以为零。独立验收与 Reviewer 判断分别记录，不用是否提 bug 代替任务完成。
 
-  SWE-bench 场景按 spec-0051 使用**每会话一个临时容器**：从同一 runnable seed image 启动，persona 的 `read_file`/`run_shell` 与 harness 均只操作容器内 repo，不把 repo `docker cp` 到宿主。harness 不设 240 秒整轮超时，慢请求由 90 秒 persona 心跳决定续等或打断；仅真实崩溃/基础设施绝对上限 fail-closed。会话仍保留主观体感与接受决定，但技术通过只认随后由官方 SWE-bench harness 在新鲜 instance 容器产生的客观结果；会话及最小审计事件保留在 session JSON，客观结果与接受关系写入独立事后评分报告。
+  SWE-bench 场景按 spec-0051 使用**每会话一个临时容器**：从同一 runnable seed image 启动，persona 的 `read_file`/`run_shell` 与 harness 均只操作容器内 repo，不把 repo `docker cp` 到宿主。harness 不设 240 秒整轮超时，慢请求由 90 秒 persona 心跳决定续等或打断；仅真实崩溃/基础设施绝对上限 fail-closed。会话仍保留主观体感与接受决定，但技术通过只认随后由官方 SWE-bench harness 在新鲜 instance 容器产生的客观结果；会话及最小审计事件保留在 session JSON，客观结果与接受关系写入独立评分报告；显式开启逐轮验收时，仅签名安全摘要进入后续反馈。
 
-- **b｜开发者侧（交付面，spec-0032 现行）**：由 OpenAgents vigil（独立 CLI 常驻进程）承担。spec-0063 默认 coordination=soft，失败回普通队列；VIGIL_COORDINATION=off 可关闭前置。需求面 Owner 准入的票带 `openagents` 交接令牌，vigil 发现后走「盖 ready → 有界轻量前置（共享机制/软排序，不自动落 blocked_by）→ worktree/分支 → RFC/architecture → draft PR → 实现 → conflict/配置启用的 CI/e2e/review 闸 → 合并进 main」。CI/评审是**工程质量闸**（harness 仓结构冒烟，绝不跑 benchmark），与已去掉的体感门禁维度不同；体感仍纯观测、benchmark 全程 held-out。坏改动在 PR 处被打回、不落 main。
+- **b｜开发者侧（交付面，spec-0032 现行）**：由 OpenAgents vigil（独立 CLI 常驻进程）承担。spec-0063 默认 coordination=soft，失败回普通队列；VIGIL_COORDINATION=off 可关闭前置。需求面 Owner 准入的票带 `openagents` 交接令牌，vigil 发现后走「盖 ready → 有界轻量前置（共享机制/软排序，不自动落 blocked_by）→ worktree/分支 → RFC/architecture → draft PR → 实现 → conflict/配置启用的 CI/e2e/review 闸 → 合并进 main」。CI/评审是**工程质量闸**（harness 仓结构冒烟，绝不跑 benchmark），与已去掉的体感门禁维度不同；体验和逐轮验收不作候选淘汰门；独立 held-out 评估不进入演化。坏改动在 PR 处被打回、不落 main。
 
-- **c｜闭环（spec-0050/0062）**：非末轮在 Owner 准入后**等待本轮准入票终态**（合进 main 或明确卡死）才开下一轮用户。末轮只跑用户交互，不再提案、不再交付。第 N+1 轮体感相对第 N 轮归因于第 N 轮已封口产物。一张票 `automation-failed`、历史 `needs-human` 或超时则实验停在该轮，闭票不覆盖失败。同一轮内用户与多票交付仍可并行。
+- **c｜闭环（spec-0050/0062/0084）**：非末轮在 Owner 准入后**等待本轮准入票终态**（合进 main 或明确卡死）才开下一轮用户。末轮仍运行用户及已配置的独立验收，不再提案、不再交付。第 N+1 轮体感相对第 N 轮归因于第 N 轮已封口产物。一张票 `automation-failed`、历史 `needs-human` 或超时则实验停在该轮，闭票不覆盖失败。同一轮内用户与多票交付仍可并行。
 
 ### 约束
-1. benchmark 全程 held-out：不参与训练，不参与发版门禁。
+1. held-out benchmark 不参与训练或发版门禁；已用于逐轮反馈的任务与留出评估明确分开。
 2. persona 来自真实数据，不依据 benchmark 或轨迹构造。
 3. 体感与 benchmark 只作观测；交付按配置启用工程质量闸，不以体感分数决定合并。
 
@@ -47,7 +51,7 @@ local + localhost 的工程 CI 由 runtime.local.ci_enabled=true 可选开启，
 记录 issue 数量随时间的曲线，用于判断新 issue 的产生和已有 issue 的解决是否平衡：issue 长期不下降说明 harness 在退化；issue 过早归零说明 persona 多样性不足、探索停止。
 
 ### 待定项
-1. 体感 1-4 的评分细则（评分维度与归一）。
+1. 已统一 1–4 体验量表在不同 persona 与任务分布上的校准研究。
 2. 真实数据盘点（确认蒸馏模块的输入）。
 3. 体感观测的样本量与回归分析口径（单点比较 vs 分布比较）。
 
@@ -62,7 +66,7 @@ local + localhost 的工程 CI 由 runtime.local.ci_enabled=true 可选开启，
 
 交付面 = OpenAgents vigil：以独立 CLI 接入（不 vendor 不 import），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。运行形态（spec-0033）：**容器围堵为缺省**——vigil 跑在专用容器（deploy/vigil 镜像，容器内自 clone harness 仓、零宿主挂载），网络只挂 internal vigil-net、外网经 egress 代理 allowlist（仅 Anthropic API），claude 凭证（ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN）与 Gitea token 只经容器 env；`VIGIL_MODE=subprocess` 只适用于盯屏宿主联调，或经统一入口验证身份的 E2B 整实验沙箱；后者使用沙箱内进程而非嵌套 Docker，不宣称每 session 容器隔离。
 
-> 无体感门禁角色——体感只作观测，benchmark 全程 held-out。
+> 无体感门禁角色；体验及逐轮验收可供后续轮次纠错，不自动淘汰或回退候选。独立 held-out 评估不进入演化。
 
 ### 被进化对象：harness 作为可启动程序
 harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对话契约」：启动后接收用户消息、返回回复；内部为 1 个或 N 个 nexau、如何编排，由其自身入口脚本决定（支持多 agent harness）。
@@ -75,7 +79,7 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 - **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
 
 ### 闭环
-`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮只用户。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；普通 `TOTAL_ROUNDS=1` 不启 vigil；continuation 初始化按统一 delivery_required 语义启用交付，即使只追加一个用户轮。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。新 workload contract 1 由监督器启动 `auto_designer.experiment.controllers.unified`；旧 schema-2 module/script run 从原 archive 配方执行；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
+`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 已配置的独立验收 → 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮运行用户及已配置的独立验收，不再需求或交付。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；普通 `TOTAL_ROUNDS=1` 不启 vigil；continuation 初始化按统一 delivery_required 语义启用交付，即使只追加一个用户轮。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。新 workload contract 1 由监督器启动 `auto_designer.experiment.controllers.unified`；旧 schema-2 module/script run 从原 archive 配方执行；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
 
 ### 目录结构
 前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 提供只读观测看板，项目级文档/工具与配置留根。

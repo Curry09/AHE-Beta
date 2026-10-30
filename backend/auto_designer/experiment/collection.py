@@ -159,6 +159,8 @@ def _ci_evidence(*, ci: Mapping[str, Any], branches: list, pulls: list, get: Any
 
 def _public_file(relative: Path) -> bool:
     # Spec-0083/T3: private scorer inputs/reports never re-enter an experiment archive.
+    if relative.parts[0] == "assessment" and relative.name == "bundle.json":
+        return False
     if relative.parts[0] == "evaluation":
         return False
     if relative.parts[0] == "infrastructure" or relative.as_posix() == "logs/collector.log":

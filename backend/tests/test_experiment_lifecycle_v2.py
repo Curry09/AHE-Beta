@@ -129,7 +129,7 @@ def test_prepare_is_observable_and_serialized_until_images_ready(run, monkeypatc
     from auto_designer.experiment.backends import local
 
     base, directory, manifest, _ = run
-    monkeypatch.setattr(materials, "prepare_materials", lambda *args: manifest)
+    monkeypatch.setattr(materials, "prepare_materials", lambda *args, **kwargs: manifest)
     entered, release = threading.Event(), threading.Event()
     errors = []
 
@@ -198,6 +198,25 @@ def test_status_exposes_only_public_gitea_fields(run):
         "repository_id": 42,
     }
     assert "must-not-appear" not in json.dumps(result)
+
+
+def test_assessment_disconnect_does_not_hide_live_controller_state(run, monkeypatch):
+    base, directory, manifest, adapter = run
+    manifest["assessment_registration"] = {"schema_version": 1}
+    (directory / "manifest.json").write_text(json.dumps(manifest))
+    adapter.receipt = {
+        "controller": {"state": "RUNNING", "running": True},
+        "resource_state": "RUNNING",
+    }
+
+    def disconnected(*args):
+        raise ConnectionError("worker management disconnected")
+
+    monkeypatch.setattr(adapter, "assessment_exchange", disconnected, raising=False)
+    result = runtime.status_v2(run_id=manifest["run_id"], root=base)
+    assert result["experiment_state"] == "RUNNING"
+    assert result["assessment_state"] == "UNKNOWN"
+    assert result["provider"]["controller"]["running"] is True
 
 
 def test_exit_zero_without_seals_is_failed(run):
@@ -524,7 +543,9 @@ def test_model_probe_uses_explicit_protocol_and_excludes_other_host_auth(
     config = definition()
     config["models"]["delivery"].update(auth_type=auth_type, api_key_env="CUSTOM_AUTH")
     config["models"]["user"]["reasoning_effort"] = "high"
-    monkeypatch.setattr(materials, "check_materials", lambda _: {"config": config, "ok": True})
+    monkeypatch.setattr(
+        materials, "check_materials", lambda _: {"config": config, "ok": True, "task_packages": []}
+    )
     monkeypatch.setattr(
         runtime,
         "credentials_v2",
@@ -567,7 +588,9 @@ def test_oauth_sdk_probe_is_rejected_before_provider_calls(tmp_path, monkeypatch
 
     config = definition()
     config["models"]["delivery"]["auth_type"] = "oauth"
-    monkeypatch.setattr(materials, "check_materials", lambda _: {"config": config, "ok": True})
+    monkeypatch.setattr(
+        materials, "check_materials", lambda _: {"config": config, "ok": True, "task_packages": []}
+    )
 
     def forbidden(**kwargs):
         raise AssertionError("unsupported OAuth SDK probe contacted provider")

@@ -1,487 +1,456 @@
-"""Spec-0082: real source snapshots, subprocess deadlines and direct evidence handoff."""
+"""Spec-0084/T2: preserve actor ownership, missing measurements and publication identity."""
 
-import contextvars
+import hashlib
 import json
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor
-from types import SimpleNamespace
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
-from auto_designer.demand import triage
-from auto_designer.demand.evidence_contract import build_evidence_envelope
-from auto_designer.demand.session_timeline import (
-    bind_session_store,
-    format_harness_beat,
-    format_harness_step,
-    format_session_timeline,
-    get_harness_step,
-)
-from auto_designer.demand.source import bind_harness_source, current_harness_source
-from auto_designer.harness.budget import request_limits
-from auto_designer.harness.launcher import _HarnessHandle
-from auto_designer.loop.feedback_pipeline import FeedbackPipeline
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
-from auto_designer.loop.sim_user import (
-    make_direct_run_session_fn,
-    result_to_sim_trace,
-    result_to_turns,
-)
-from auto_designer.models import FeelingScore, Persona, SeedScenario, Session, Transcript, Turn
+from auto_designer.loop.sim_user import make_direct_run_session_fn, make_sim_run_session_fn
+from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
 from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context, current_usage_context
+from auto_designer.usage import bind_usage_context
 from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.loop import SessionResult, TurnLog
+from auto_designer.user.sim.dimensions import D1Eval
+from auto_designer.user.sim.persona_client import (
+    AgenticPersonaClient,
+    ApiPersonaClient,
+    PersonaContextLimitError,
+    ScriptedPersonaClient,
+)
+from auto_designer.user.sim.run_live import expert
+from auto_designer.user.sim.runtime import LocalWorkspaceRuntime, ReviewSnapshot
+
+PERSONA = Persona("reviewer", "expert", "python", "finish", "plain")
 
 
-def _git(repo, *args):
-    return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
-
-
-def _source_repo(tmp_path):
-    repo = tmp_path / "source"
-    repo.mkdir()
-    _git(repo, "init", "-q", "-b", "main")
-    _git(repo, "config", "user.name", "Test")
-    _git(repo, "config", "user.email", "test@example.com")
-    (repo / "entry.py").write_text("version = 'seed'\n")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-qm", "seed")
-    seed = _git(repo, "rev-parse", "HEAD")
-    (repo / "entry.py").write_text("version = 'tested'\n")
-    _git(repo, "commit", "-qam", "tested")
-    tested = _git(repo, "rev-parse", "HEAD")
-    _git(repo, "checkout", "-q", seed)
-    return repo, seed, tested
-
-
-def test_feedback_roles_share_tested_snapshot_without_changing_checkout(tmp_path):
-    repo, seed, tested = _source_repo(tmp_path)
-    ledger = RecoveryStore.initialize(
-        root=tmp_path / "ledger", identity=RecoveryIdentity("exp", "run", "cfg", "src", "plan")
+def workspace(tmp_path):
+    path = tmp_path / "task"
+    path.mkdir()
+    (path / "value.txt").write_text("baseline\n")
+    subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+    subprocess.run(["git", "add", "value.txt"], cwd=path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "base",
+        ],
+        cwd=path,
+        check=True,
     )
-    ledger.freeze_round(round_no=1, user_sha=tested, plan=[])
-    observations = []
+    return LocalWorkspaceRuntime(str(path))
 
-    class Role:
-        def inspect(self):
-            source = current_harness_source()
-            path = source.snapshot()
-            observations.append((source.sha, (path / "entry.py").read_text(), path))
-            assert not (path / ".git").exists()
 
-        def triage_once(self, **kwargs):
-            self.inspect()
+class Harness:
+    observation_source = None
+    request_outcomes = []
 
-        propose_once = inspect
+    def __init__(self, ws=None):
+        self.workspace = ws
+        self.messages = []
+        self.closed = False
 
-        def admit_once(self):
-            self.inspect()
-            return SimpleNamespace(admitted=[])
+    def reset(self):
+        pass
 
-    role = Role()
-    pipeline = FeedbackPipeline(
-        recovery=ledger,
-        grounding_repo=str(repo),
-        resolve_head=lambda: tested,
-        assert_descendant=lambda **kwargs: None,
-        triagers=[role],
-        divergents=[role],
-        synthesizers=[role],
-        owner=role,
+    def bind_execution_contract(self, contract):
+        self.contract = contract
+
+    def send(self, message):
+        self.messages.append(message)
+        if self.workspace:
+            self.workspace.write_text("value.txt", "actor output\n")
+        return "Delivered the requested file."
+
+    def close(self):
+        self.closed = True
+
+
+class Review:
+    def __init__(self, result=None, error=None):
+        self.result = result or {
+            "task_assessment": "fulfilled",
+            "score": 4,
+            "reason": "works",
+            "opportunities": [],
+        }
+        self.error = error
+        self.calls = 0
+
+    def respond(self, system, user):
+        self.calls += 1
+        if self.error:
+            raise self.error
+        return self.result
+
+
+def direct(tmp_path, review, tracker=None, store=None):
+    return make_direct_run_session_fn(
+        client_factory=lambda: review,
+        tracker=tracker or FakeTracker(),
+        store=store or SessionStore(tmp_path / "sessions"),
+        sim_personas={"reviewer": expert()},
     )
-    pipeline.mark_stage(round_no=1, stage="users", input_value={"done": True})
-    assert pipeline.run(round_no=1, user_sha=tested) == tested
-    assert len(observations) == 4
-    assert all(sha == tested and "tested" in text for sha, text, _ in observations)
-    assert len({path for _, _, path in observations}) == 1
-    assert not observations[0][2].exists()
-    assert _git(repo, "rev-parse", "HEAD") == seed
 
 
-def test_missing_snapshot_cannot_fall_back_to_seed(tmp_path):
-    repo, _, _ = _source_repo(tmp_path)
-    with bind_harness_source(repo, "a" * 40), pytest.raises(subprocess.CalledProcessError):
-        current_harness_source().snapshot()
-
-
-def test_source_binding_propagates_to_parallel_role_and_is_restored(tmp_path):
-    repo, seed, tested = _source_repo(tmp_path)
-    with bind_harness_source(repo, seed):
-        parent = current_harness_source()
-        with bind_harness_source(repo, tested), ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [
-                pool.submit(
-                    contextvars.copy_context().run, lambda: current_harness_source().snapshot()
-                )
-                for _ in range(2)
-            ]
-            assert len({future.result() for future in futures}) == 1
-        assert current_harness_source() is parent
-    assert current_harness_source() is None
-
-
-@pytest.mark.parametrize("budget", ["0", "-1", "nan", "inf", "invalid"])
-def test_invalid_request_budget_is_rejected(budget):
-    with pytest.raises(ValueError):
-        request_limits({"AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS": budget}, fallback=1800)
-
-
-def test_legacy_internal_limit_has_termination_margin():
-    limits = request_limits({"HARNESS_CALL_TIMEOUT": "1800"}, fallback=1800)
-    assert limits.request_seconds is None
-    assert limits.outer_seconds == 1860
-
-
-def test_invalid_legacy_knobs_preserve_launcher_fallback():
-    limits = request_limits({"HARNESS_CALL_TIMEOUT": "unknown"}, fallback=1800)
-    assert limits.outer_seconds == 1860
-
-
-def test_source_config_is_bound_per_invocation_without_shared_env(tmp_path, monkeypatch):
-    import nexau
-
-    from auto_designer.demand.agent_runtime import run_agent_def
-
-    repo, seed, tested = _source_repo(tmp_path)
-    monkeypatch.setenv("SANDBOX_WORK_DIR", "/unrelated-host-directory")
-    monkeypatch.setenv("DEMAND_LLM_MODEL", "unused-model")
-    monkeypatch.setenv("DEMAND_LLM_BASE_URL", "https://model.example/v1")
-    monkeypatch.setenv("DEMAND_LLM_API_KEY", "test-secret")
-    observed = []
-
-    class Agent:
-        def __init__(self, *, config):
-            self.config = config
-
-        def run(self, *, message):
-            from pathlib import Path
-
-            path = Path(self.config.sandbox_config.work_dir)
-            observed.append((path / "entry.py").read_text())
-            assert tested in message
-            return {"dispositions": []}
-
-    monkeypatch.setattr(nexau, "Agent", Agent)
-    from pathlib import Path
-
-    agent_def = Path(__file__).resolve().parents[1] / "agent_defs/triage_agent"
-    with bind_harness_source(repo, tested):
-        run_agent_def(
-            agent_def,
-            "inspect source",
-            store=SessionStore(tmp_path / "sessions"),
-            repo=repo,
-            role="triager",
-            timeout=5,
-        )
-    assert observed == ["version = 'tested'\n"]
-    assert _git(repo, "rev-parse", "HEAD") == seed
-    import os
-
-    assert os.environ["SANDBOX_WORK_DIR"] == "/unrelated-host-directory"
-
-
-@pytest.mark.parametrize("needs_finalizer", [False, True], ids=["submitted", "finalized"])
-def test_triage_backlog_uses_report_sha_and_restores_round_context(
-    tmp_path, monkeypatch, needs_finalizer
-):
-    repo, seed, tested = _source_repo(tmp_path)
-    role = triage.Triager(FakeTracker(), SessionStore(tmp_path / "sessions"), str(repo), str(repo))
-    monkeypatch.setattr(
-        role, "_evidence_for_issue", lambda issue: {"harness_source": {"ref": seed}}
-    )
-    observed = []
-    disposition = {
-        "issue": 25,
-        "disposition": "needs_info",
-        "reason": "The report does not identify the failing behavior.",
-        "artifact": {
-            "reported_problem": "Old report without reproduction details",
-            "user_impact": "unavailable",
-            "scope_boundary": "unavailable",
-            "evidence": ["report:#25"],
-            "uncertainties": ["Missing reproduction details"],
-            "implementation_target": "uncertain",
-        },
+def test_actor_outputs_are_frozen_before_readonly_review(tmp_path):
+    ws = workspace(tmp_path)
+    harness = Harness(ws)
+    declaration = {
+        "id": "result",
+        "source": "workspace",
+        "path": "value.txt",
+        "content_type": "text/plain",
+        "required": True,
+        "max_bytes": 1024,
     }
 
-    def run(*args, **kwargs):
-        source = current_harness_source()
-        observed.append((source.sha, current_usage_context().harness_sha))
-        assert "seed" in (source.snapshot() / "entry.py").read_text()
-        if needs_finalizer and len(observed) == 1:
-            return json.dumps({"dispositions": []})
-        return json.dumps({"dispositions": [disposition]})
+    class ProbingReview(Review):
+        def bind_session(self, *, persona, workspace_dir):
+            self.snapshot = workspace_dir
 
-    monkeypatch.setattr(triage, "run_agent_def", run)
-    issue = SimpleNamespace(number=25, title="Old report", body="", labels=["report"])
-    with bind_harness_source(repo, tested), bind_usage_context(harness_sha=tested):
-        parent = current_harness_source()
-        result = role._run_agent(pending=[issue])
-        assert current_harness_source() is parent
-        assert current_usage_context().harness_sha == tested
-    assert observed == [(seed, seed)] * (2 if needs_finalizer else 1)
-    assert json.loads(result) == {"dispositions": [disposition]}
+        def respond(self, system, user):
+            assert harness.closed and ws._closed
+            assert isinstance(self.snapshot, ReviewSnapshot)
+            assert self.snapshot.read_text("value.txt") == "actor output\n"
+            assert self.snapshot.read_text("artifacts/result") == "actor output\n"
+            with pytest.raises(PermissionError):
+                self.snapshot.write_text("value.txt", "reviewer changed it")
+            with pytest.raises(PermissionError):
+                self.snapshot.run("echo changed > value.txt")
+            return super().respond(system, user)
+
+    review = ProbingReview()
+    store = SessionStore(tmp_path / "sessions")
+    session = direct(tmp_path, review, store=store)(
+        PERSONA,
+        SeedScenario(
+            "produce value",
+            WorkspaceSpec("prebuilt", params={"evaluation_artifacts": [declaration]}),
+        ),
+        harness,
+        workspace_dir=ws,
+    )
+    row = session.workspace_evidence["evaluation_artifacts"]["entries"][0]
+    content = (store.root.parent / row["path"]).read_bytes()
+    assert content == b"actor output\n"
+    assert row["sha256"] == hashlib.sha256(content).hexdigest()
+    assert session.report_plan == [] and session.issue_refs == []
+    assert harness.messages == ["produce value"]
+    assert harness.contract == session.execution_contract
+    assert session.execution_contract["followup_input"] == "unavailable"
 
 
-@pytest.mark.parametrize("source", ["reply_steps", "stdout_progress", "nested_progress"])
-@pytest.mark.parametrize("text_size", [5000, 9000])
-def test_direct_and_simulated_storage_and_query_limits_match(tmp_path, source, text_size):
-    steps = [
-        {"kind": "tool_result", "text": str(i) + ":" + "x" * text_size, "metadata": {"index": i}}
-        for i in range(300)
-    ]
-    events = [
+@pytest.mark.parametrize("score", [None, True, "3", 2.9, 2.0, 0, 5])
+def test_direct_invalid_score_never_backfills_a_rating(tmp_path, score):
+    review = Review({"task_assessment": "fulfilled", "score": score, "opportunities": []})
+    session = direct(tmp_path, review)(PERSONA, SeedScenario("task"), Harness())
+    assert session.feeling is None
+    assert session.feedback["experience"]["status"] == ("missing" if score is None else "invalid")
+    assert session.feedback["task_assessment"]["status"] == "fulfilled"
+    assert session.issue_refs == []
+
+
+def test_missing_and_unavailable_review_are_distinct_and_do_not_create_bugs(tmp_path):
+    missing = direct(
+        tmp_path / "missing", Review({"task_assessment": "unknown", "opportunities": []})
+    )(
+        PERSONA,
+        SeedScenario("task"),
+        Harness(),
+    )
+    unavailable = direct(tmp_path / "unavailable", Review(error=RuntimeError("gateway offline")))(
+        PERSONA,
+        SeedScenario("task"),
+        Harness(),
+    )
+    assert missing.feedback["experience"]["status"] == "missing"
+    assert unavailable.feedback["experience"]["status"] == "unavailable"
+    assert missing.feeling is unavailable.feeling is None
+    assert missing.issue_refs == unavailable.issue_refs == []
+
+
+def test_partial_report_publication_recovers_without_actor_or_reviewer(tmp_path):
+    class FailAfterCreate(FakeTracker):
+        failed = False
+
+        def create_issue_once(self, draft, *, operation_key):
+            ref = super().create_issue_once(draft, operation_key=operation_key)
+            if ref.number == 2 and not self.failed:
+                self.failed = True
+                raise RuntimeError("connection lost after remote creation")
+            return ref
+
+    review = Review(
         {
-            "type": "progress",
-            "text": step["text"],
-            "raw": {"type": "progress", **step},
-            "source": "harness_stdout",
+            "task_assessment": "unfulfilled",
+            "score": 2,
+            "reason": "not delivered",
+            "opportunities": [
+                {"kind": "diagnostic", "title": "failure", "body": "Goal was not delivered."},
+                {"kind": "feature", "title": "suggestion", "body": "Please make progress clearer."},
+            ],
         }
-        for step in steps
-    ]
-    if source == "nested_progress":
-        for event, step in zip(events, steps, strict=True):
-            event["raw"] = {"progress": step}
-    expected_steps = steps
-    handle = SimpleNamespace(
-        visible_events=events,
-        last_steps=steps if source == "reply_steps" else [],
-        reset=lambda: None,
-        send=lambda message: "completed",
-        close=lambda: None,
     )
-    review = SimpleNamespace(respond=lambda *args: {"score": 3, "reason": "done"})
+    tracker = FailAfterCreate()
     store = SessionStore(tmp_path / "sessions")
-    persona = Persona("p", "senior", "python", "task", "brief")
-    scenario = SeedScenario("do task")
-    direct = make_direct_run_session_fn(
-        client_factory=lambda: review, tracker=FakeTracker(), store=store, sim_personas={}
-    )(persona, scenario, handle)
-    direct = store.load(direct.session_id)
-    record = direct.user_outcome["execution_record"]
-    assert record["events"] == events  # Includes raw frames and complete text.
-    assert record["events_total"] == len(events) == 300
-    assert record["steps_total"] == len(expected_steps) == 300
-    assert record["events_omitted"] == record["steps_omitted"] == 0
-    assert direct.transcript.turns[1].steps == expected_steps
+    run = direct(tmp_path, review, tracker=tracker, store=store)
+    harness = Harness()
+    with bind_usage_context(session_id="stable-session"):
+        with pytest.raises(RuntimeError, match="connection lost"):
+            run(PERSONA, SeedScenario("task"), harness)
+        pending = store.load("stable-session")
+        assert len(pending.report_plan) == 2 and pending.issue_refs == []
+        original_plan = pending.report_plan
+        result = run.load_completed_session("stable-session")
+        rerun = run(PERSONA, SeedScenario("task"), harness)
+    assert result.report_plan == original_plan == rerun.report_plan
+    assert len(result.issue_refs) == len(tracker.list_open_issues()) == 2
+    assert review.calls == 1 and harness.messages == ["task"]
+    receipt = json.loads((store.root / "reports/stable-session.json").read_text())
+    assert receipt["completed"] is True and len(receipt["refs"]) == 2
+    assert "root cause is unconfirmed" in tracker.list_open_issues()[0].body
+    assert "feature" in tracker.list_open_issues()[1].labels
 
-    turn = TurnLog(
-        turn=1,
-        phase="active",
-        action_space=[],
-        perceive="",
-        verdict="unsure",
-        action="send_message",
-        message="do task",
-        executor="user",
-        channel="emit",
-        patience=3,
-        trust="ok",
-        harness_output="completed",
-        harness_steps=expected_steps,
-        harness_events=events,
+
+def test_final_check_uses_live_workspace_and_does_not_end_actor(tmp_path):
+    ws = workspace(tmp_path)
+    calls = []
+
+    def llm(messages):
+        calls.append(messages[-1]["content"])
+        if len(calls) == 1:
+            return json.dumps({"tool": "read_file", "args": {"path": "value.txt"}})
+        if len(calls) == 2:
+            ws.write_text("value.txt", "later actor change")
+            return json.dumps({"tool": "read_file", "args": {"path": "value.txt"}})
+        return json.dumps({"perceive": "read the current workspace", "check_status": "completed"})
+
+    client = AgenticPersonaClient(llm)
+    client.bind_session(expert(), ws)
+    result = client.respond("system", "<main_final_check>Inspect the file.</main_final_check>")
+    assert result["check_status"] == "completed"
+    assert "baseline" in calls[1]
+    assert "later actor change" in calls[2]
+    assert not ws._closed  # The user can still choose continue after checking.
+
+
+def test_expert_final_check_writes_and_executes_own_test(tmp_path):
+    ws = workspace(tmp_path)
+    script = iter(
+        [
+            {
+                "tool": "write_file",
+                "args": {
+                    "path": "user_check.py",
+                    "content": "from pathlib import Path\nassert Path('value.txt').read_text() == 'baseline\\n'\nprint('user check passed')\n",
+                },
+            },
+            {"tool": "run_shell", "args": {"cmd": f"{sys.executable} user_check.py"}},
+            {"perceive": "my own check passed", "check_status": "completed"},
+        ]
     )
-    result = SessionResult(persona_id="p", end_reason="completed", turns=[turn])
-    simulated = Session(
-        persona,
-        scenario,
-        Transcript(result_to_turns(result)),
-        FeelingScore(3, "done"),
-        sim_trace=result_to_sim_trace(result),
+    calls = []
+
+    def llm(messages):
+        calls.append(messages[-1]["content"])
+        return json.dumps(next(script))
+
+    client = AgenticPersonaClient(llm)
+    client.bind_session(expert(), ws)
+    result = client.respond("system", "<main_final_check>Check the result.</main_final_check>")
+    assert result["check_status"] == "completed"
+    assert "user check passed" in calls[2]
+    assert ws.read_text("user_check.py").startswith("from pathlib import Path")
+    assert not ws._closed
+
+
+@pytest.mark.parametrize("stage", ["main_judge", "waiting_judge", "main_final_check"])
+@pytest.mark.parametrize(
+    "ability,allowed", [(D1Eval.SHALLOW, False), (D1Eval.COMPETENT, True), (D1Eval.EXPERT, True)]
+)
+def test_interactive_tool_dispatch_respects_persona_write_capability(
+    tmp_path, stage, ability, allowed
+):
+    ws = workspace(tmp_path)
+    conclusion = (
+        {"perceive": "checked", "check_status": "completed"}
+        if stage == "main_final_check"
+        else {"perceive": "checked", "judgment": "on_track"}
+        if stage == "waiting_judge"
+        else {"perceive": "checked", "verdict": "satisfied"}
     )
-    store.save(simulated)
-    simulated = store.load(simulated.session_id)
-    assert simulated.transcript.turns[0].steps == direct.transcript.turns[1].steps
-    assert simulated.sim_trace.turns[0].harness_events == record["events"]
 
-    # Both query paths keep the same 80-item peek and 6000-character expansion.
-    for session in (direct, simulated):
-        beat = format_harness_beat(session=session, turn=1, occurrence=0)
-        assert beat["n_steps_raw"] == 300
-        assert beat["n_steps_returned"] == 80
-        assert any(step["kind"] == "omitted" for step in beat["steps"])
-        # An original middle index survives; direct previously removed these steps.
-        step = format_harness_step(session=session, turn=1, occurrence=0, step_i=150)
-        assert step["n_chars_raw"] == len(expected_steps[150]["text"])
-        if text_size == 5000:
-            assert step["text"] == expected_steps[150]["text"]
-            assert not step["truncated"]
-        else:
-            assert step["truncated"]
-            assert step["text"].startswith(expected_steps[150]["text"][:6000])
-    timeline = json.loads(format_session_timeline(direct))["timeline"]
-    assert len(timeline["stdout_observations"]) == 8
-    assert all(len(event["text"]) <= 160 for event in timeline["stdout_observations"])
-    assert all("raw" not in event for event in timeline["stdout_observations"])
-
-
-def test_direct_malformed_progress_is_retained_without_inventing_steps(tmp_path):
-    events = [{"type": "progress", "text": "observed", "raw": ["malformed"]}]
-    handle = SimpleNamespace(
-        visible_events=events,
-        last_steps=[],
-        reset=lambda: None,
-        send=lambda message: "completed",
-        close=lambda: None,
+    calls = []
+    path = f"user-{ability.value}.txt"
+    script = iter(
+        [{"tool": "write_file", "args": {"path": path, "content": "user edit"}}, conclusion]
     )
+
+    def llm(messages):
+        calls.append(messages[-1]["content"])
+        return json.dumps(next(script))
+
+    client = AgenticPersonaClient(llm)
+    client.bind_session(replace(expert(), d1=ability), ws)
+    client.respond("system", f"<{stage}>Check this result.</{stage}>")
+    assert ("unknown or unavailable tool" not in calls[1]) is allowed
+    assert Path(ws.resolve(path)).is_file() is allowed
+
+
+def test_simulated_user_edits_are_frozen_with_their_tool_trace(tmp_path):
+    ws = workspace(tmp_path)
+    harness = Harness(ws)
+    check = (
+        "from pathlib import Path\n"
+        "assert Path('value.txt').read_text() == 'user corrected output\\n'\n"
+        "print('user test passed')\n"
+    )
+    script = iter(
+        [
+            {"perceive": "starting", "verdict": "unsure", "task_load": "normal"},
+            {"intent": "start", "needs_final_check": False, "check_goal": ""},
+            {"action": "send_message", "message": "write the file", "gap": False},
+            {"tool": "write_file", "args": {"path": "user_notes.txt", "content": "my inspection"}},
+            {"perceive": "I want to correct and test it", "verdict": "unsure"},
+            {"intent": "check my correction", "needs_final_check": True, "check_goal": "test it"},
+            {
+                "tool": "write_file",
+                "args": {"path": "value.txt", "content": "user corrected output\n"},
+            },
+            {"tool": "write_file", "args": {"path": "user_check.py", "content": check}},
+            {"tool": "run_shell", "args": {"cmd": f"{sys.executable} user_check.py"}},
+            {"perceive": "my correction passed my test", "check_status": "completed"},
+            {"perceive": "the result includes my correction", "verdict": "satisfied"},
+            {"intent": "accept the combined result", "needs_final_check": False, "check_goal": ""},
+            {"action": "accept", "message": "I corrected it and checked it", "gap": False},
+            {"score": 3, "reason": "I had to correct it myself"},
+        ]
+    )
+    observed = []
+
+    def llm(messages):
+        obj = next(script)
+        if "tool" in obj:
+            assert not harness.closed and not ws._closed
+        if "score" in obj:
+            assert harness.closed and ws._closed
+        observed.append(messages[-1]["content"])
+        return json.dumps(obj)
+
+    client = AgenticPersonaClient(llm)
     store = SessionStore(tmp_path / "sessions")
-    session = make_direct_run_session_fn(
-        client_factory=lambda: SimpleNamespace(respond=lambda *args: {"score": 3}),
+    run = make_sim_run_session_fn(
+        client_factory=lambda: client,
         tracker=FakeTracker(),
         store=store,
-        sim_personas={},
-    )(Persona("p", "s", "d", "g", "b"), SeedScenario("task"), handle)
-    loaded = store.load(session.session_id)
-    assert loaded.user_outcome["execution_record"]["events"] == events
-    assert loaded.transcript.turns[1].steps == []
-
-
-def _handle(tmp_path, body, *, budget="0.1", grace="0.5"):
-    script = tmp_path / "entry.py"
-    script.write_text(body)
-    return _HarnessHandle(
-        [sys.executable, str(script)],
-        tmp_path,
-        {
-            "AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS": budget,
-            "AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS": grace,
-        },
-        "",
+        sim_personas={PERSONA.identity: expert()},
     )
-
-
-def test_real_subprocess_can_deliver_timeout_reply_during_grace(tmp_path):
-    handle = _handle(
-        tmp_path,
-        """import json,sys,time,os
-obj=json.loads(sys.stdin.readline())
-time.sleep(float(obj['budget_seconds']) + .05)
-print(json.dumps({'type':'reply','text':json.dumps({'budget':obj['budget_seconds'],'env':os.environ['HARNESS_TASK_BUDGET_SECONDS']}),'status':'timed_out'}),flush=True)
-""",
+    session = run(PERSONA, SeedScenario("write the file"), harness, workspace_dir=ws)
+    assert "user test passed" in "\n".join(observed)
+    assert session.workspace_evidence["actor_freeze"]["status"] == "frozen"
+    prediction = store.root.parent / session.workspace_evidence["prediction"]["path"]
+    assert "+user corrected output" in prediction.read_text()
+    assert "+print('user test passed')" in prediction.read_text()
+    restored = store.load(session.session_id).to_dict()
+    traces = [call for turn in restored["sim_trace"]["turns"] for call in turn["persona_trace"]]
+    own_tools = [
+        step for call in traces for step in call.get("steps", []) if step["kind"] == "tool"
+    ]
+    assert any(
+        step["text"].startswith("write_file ") and '"path": "value.txt"' in step["text"]
+        for step in own_tools
     )
-    try:
-        reply = json.loads(handle.send("task"))
-        assert reply == {"budget": 0.1, "env": "0.1"}
-        assert handle.request_outcomes[-1]["termination_source"] == "harness_reply"
-        assert handle.request_outcomes[-1]["infrastructure_limit_seconds"] == 0.6
-    finally:
-        handle.close()
+    assert any(step["text"].startswith("run_shell ") for step in own_tools)
+    assert restored["execution_receipt"]["user_assistance"] == "recorded_in_sim_trace"
 
 
-@pytest.mark.parametrize(
-    ("output", "origin"),
-    [
-        ("", "transport"),
-        ("bad json", "protocol"),
-        ('{"type":"error","text":"failed"}', "harness_error"),
-    ],
-)
-def test_request_failure_does_not_claim_product_reply(tmp_path, output, origin):
-    handle = _handle(
-        tmp_path,
-        f"import sys\nsys.stdin.readline()\nprint({output!r},flush=True)\n"
-        if output
-        else "import sys\nsys.stdin.readline()\n",
-    )
-    try:
-        with pytest.raises(RuntimeError):
-            handle.send("task")
-        assert handle.request_outcomes[-1]["status"] == "crashed"
-        assert handle.request_outcomes[-1]["termination_source"] == origin
-    finally:
-        handle.close()
-
-
-def test_direct_timeout_retains_received_steps_and_supports_evidence_tools(tmp_path):
-    handle = _handle(
-        tmp_path,
-        """import json,sys,time
-sys.stdin.readline()
-print(json.dumps({'type':'progress','kind':'tool','text':'read task input'}),flush=True)
-time.sleep(300)
-""",
-        budget="0.1",
-        grace="0.4",
-    )
-    tracker = FakeTracker()
-    store = SessionStore(tmp_path / "sessions")
-    review = SimpleNamespace(
-        respond=lambda *args: {
-            "verdict": "file_issue",
-            "score": 1,
-            "reason": "timeout",
-            "issue": "No terminal reply",
-        }
-    )
-    runner = make_direct_run_session_fn(
-        client_factory=lambda: review, tracker=tracker, store=store, sim_personas={}
-    )
-    session = runner(
-        Persona("p", "senior", "python", "task", "brief"), SeedScenario("do task"), handle
-    )
-    loaded = store.load(session.session_id)
-    assert loaded.sim_trace is None
-    assert loaded.user_outcome["harness_messages"] == 1
-    assert loaded.user_outcome["followups"] == 0
-    assert loaded.transcript.turns[1].steps == [{"kind": "tool", "text": "read task input"}]
-    timeline = json.loads(format_session_timeline(loaded))["timeline"]
-    assert timeline["interaction_mode"] == "direct"
-    assert timeline["requests"][0]["termination_source"] == "infrastructure"
-    beat = format_harness_beat(session=loaded, turn=1, occurrence=0)
-    assert beat["stop_kind"] == "infrastructure_timeout"
-    assert beat["steps"][0]["text"] == "read task input"
-    step = format_harness_step(session=loaded, turn=1, occurrence=0, step_i=0)
-    assert step["text"] == "read task input"
-    assert step["stop_kind"] == "infrastructure_timeout"
-    assert not format_harness_beat(session=loaded, turn=2, occurrence=0)["ok"]
-    with bind_usage_context(role="owner"):
-        assert not format_harness_beat(session=loaded, turn=1, occurrence=0)["ok"]
-    with (
-        bind_session_store(store),
-        bind_usage_context(role="triager", session_id="another-session"),
-    ):
-        assert not get_harness_step(session_id=loaded.session_id, turn=1, occurrence=0, step_i=0)[
-            "ok"
-        ]
-
-
-def test_source_sha_is_recovered_from_trusted_launch_receipt():
-    session = Session(
-        Persona("p", "s", "d", "g", "b"),
-        SeedScenario("task"),
-        Transcript([Turn("harness", "done")]),
-        FeelingScore(1, "ok"),
-    )
-    session.workspace_evidence = {
-        "observation": {"status": "not_supported", "artifact": {"harness_sha": "a" * 40}}
-    }
-    assert build_evidence_envelope(session).harness_source["ref"] == "a" * 40
-
-
-@pytest.mark.parametrize("succeeds", [True, False])
-def test_missing_submit_has_one_bounded_completion_retry(tmp_path, monkeypatch, succeeds):
-    tracker = FakeTracker()
-    store = SessionStore(tmp_path / "sessions")
-    role = triage.Triager(tracker, store, str(tmp_path), str(tmp_path))
+def test_terminal_stage_cannot_dispatch_authoring_or_shell_tools(tmp_path):
+    ws = workspace(tmp_path)
     calls = []
-    submitted = json.dumps({"dispositions": [{"issue": 25, "disposition": "needs_info"}]})
+    script = iter(
+        [
+            {"tool": "write_file", "args": {"path": "value.txt", "content": "reviewer output"}},
+            {"tool": "run_shell", "args": {"cmd": "echo reviewer > value.txt"}},
+            {"tool": "read_file", "args": {"path": "value.txt"}},
+            {"task_assessment": "unknown", "opportunities": [], "score": None},
+        ]
+    )
 
-    def run(*args, **kwargs):
-        calls.append((args[1], kwargs))
-        return (
-            submitted
-            if succeeds and len(calls) == 2
-            else "[Error: Maximum iteration limit reached.]"
-        )
+    def llm(messages):
+        calls.append(messages[-1]["content"])
+        return json.dumps(next(script))
 
-    monkeypatch.setattr(triage, "run_agent_def", run)
-    issue = SimpleNamespace(number=25, title="Timeout", body="No reply", labels=["report"])
-    with bind_usage_context(session_id="missing"):
-        result = role._run_agent(pending=[issue])
-    assert len(calls) == 2
-    assert calls[1][1]["max_iterations"] == 8
-    assert "needs_info" in calls[1][0]
-    assert (triage.read_submit(result, "dispositions") is not None) is succeeds
+    client = AgenticPersonaClient(llm)
+    client.bind_session(expert(), ReviewSnapshot({"value.txt": b"actor output"}))
+    review = client.respond("system", "<direct_review>Review this output.</direct_review>")
+    assert review["task_assessment"] == "unknown"
+    assert "unknown or unavailable tool" in calls[1]
+    assert "unknown or unavailable tool" in calls[2]
+    assert "actor output" in calls[3]
+    assert ws.read_text("value.txt") == "baseline\n"
+
+
+def test_finalizer_runs_once_before_prediction_and_review(tmp_path):
+    original = workspace(tmp_path)
+
+    class FinalizingWorkspace(LocalWorkspaceRuntime):
+        finalized = 0
+
+        def finalize_task(self):
+            self.finalized += 1
+            self.write_text("final.txt", "trusted finalization")
+
+    ws = FinalizingWorkspace(original.cwd)
+    session = direct(tmp_path, Review())(
+        PERSONA, SeedScenario("task"), Harness(ws), workspace_dir=ws
+    )
+    assert ws.finalized == 1
+    prediction = session.workspace_evidence["prediction"]
+    data = (tmp_path / prediction["path"]).read_text()
+    assert "trusted finalization" in data
+
+
+def test_declared_persona_input_threshold_is_checked_before_dispatch(monkeypatch):
+    monkeypatch.setenv("USER_LLM_MAX_CONTEXT_TOKENS", "10")
+    client = ApiPersonaClient.__new__(ApiPersonaClient)
+    with pytest.raises(PersonaContextLimitError) as error:
+        client._create([{"role": "user", "content": "x" * 1000}], 32768)
+    assert error.value.limit == 10 and error.value.attempts == 0
+
+
+def test_simulated_terminal_review_failure_keeps_frozen_actor_artifacts(tmp_path):
+    ws = workspace(tmp_path)
+    harness = Harness(ws)
+
+    class Client(ScriptedPersonaClient):
+        def _respond_body(self, system, user):
+            if "<rate_experience>" in user:
+                assert harness.closed and ws._closed
+                raise RuntimeError("review service offline")
+            return super()._respond_body(system, user)
+
+    sim_persona = expert()
+    run = make_sim_run_session_fn(
+        client_factory=Client,
+        tracker=FakeTracker(),
+        store=SessionStore(tmp_path / "sessions"),
+        sim_personas={PERSONA.identity: sim_persona},
+    )
+    session = run(PERSONA, SeedScenario("write the file"), harness, workspace_dir=ws)
+    assert session.feeling is None
+    assert session.feedback["experience"]["status"] == "unavailable"
+    assert (
+        session.workspace_evidence["prediction"]["sha256"]
+        == session.workspace_evidence["diff_sha256"]
+    )
+    assert session.workspace_evidence["actor_freeze"]["status"] == "frozen"

@@ -9,7 +9,7 @@
 | 输入 | 格式 | 示例 |
 | --- | --- | --- |
 | 实验定义 | v2 JSON：后端、Harness、任务、轮次、角色、模型 | `examples/experiments/synthesizer-n1-local.json` |
-| 任务包 | v1 JSON：任务文本、代码来源、安装脚本、依赖锁 | `examples/tasks/pvlib-1478/task.json` |
+| 任务包 | v1/v2 JSON：任务文本、代码来源、安装脚本、依赖锁；v2 可声明执行条件和产物 | `examples/tasks/pvlib-1478/task.json` |
 | 任务文本 | UTF-8，不含标准答案或隐藏测试 | `examples/tasks/pvlib-1478/instruction.md` |
 | 安装配方 | 受信任 shell 脚本，创建独立任务环境 | `examples/tasks/pvlib-1478/setup.sh` |
 | 任务依赖 | 完整固定版本及 SHA-256 的 requirements | `examples/tasks/pvlib-1478/requirements.lock` |
@@ -29,36 +29,52 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 | `runtime.gitea` | 本地用 `localhost`，E2B 用 `gitea.com`；另填仓库名前缀 |
 | `runtime.local` | 可选镜像覆盖、`ci_enabled`（默认 `false`）；本地工程 CI 必须使用已核验的专属 runner |
 | `runtime.e2b` | `cpu_count`、`memory_mb`、`timeout_seconds`（300–86400）；可选兼容 template |
-| `runtime.harness` | 可选单次请求预算和基础设施收尾余量；两后端共用 |
+| `runtime.harness` | 任务预算 fallback、可选消息活动上限和收尾余量；两后端共用 |
 | `harness.source` | `builtin`、`archive` 加路径和 SHA-256，或配合父来源的 `continuation` |
 | `workload` | 任务包与 persona 输入及可选 interaction_plan，或继承时仅填 `{"source":"parent"}` |
 | `rounds` | 轮数、每轮 session 数、最大用户并发数；继承时轮数表示新增用户轮 |
 | `continuation` | 可选的当前父 `archive` 路径和预期 `sha256`；须同时声明两个父输入来源 |
 | `roles` | Triage/Synthesizer/divergent/developer 数量；`owner_mode: mechanical` / `llm` |
 | `models` | User、Harness、共享需求面、Claude Code 交付模型 |
-| `evaluation.official_grading` | `false`，演化期间不评分；独立事后评分用 `grade` 命令 |
+| `evaluation.official_grading` | 未开启逐轮验收时设为 `false` |
+| `evaluation.session_grading` | 可选的外部逐轮验收：冻结计划、公钥摘要及 `runner: external` |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
-可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮始终只试用。
+可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮运行用户及已配置的独立验收，不再需求或交付。
 
 `builtin` 冻结当前 checkout 的 `backend/harness_template/`，不是历史 `cade14d` Harness。复现旧基线必须显式提供那份归档和真实校验和。
 
-### Harness 请求截止
+### 任务截止与消息活动上限
 
-要为每次 Harness 请求设置一小时预算，在 `runtime` 中加入以下片段：
+在 v2 任务包中声明整个任务的预算：
+
+```json
+"execution": {
+  "budget_seconds": 7200,
+  "budget_source": "task_metadata",
+  "public_deliverables": ["任务要求的源码改动"],
+  "public_acceptance": ["公开任务描述中要求的行为"]
+}
+```
+
+这只是字段片段，不是完整任务包。若采用操作者配额，改用 `budget_source: "operator_quota"`，并用 `quota_override_reason` 说明原因；覆盖任务已声明的时限时必须填写原因，不能把配额描述成官方时限。公开验收描述不能含隐藏测试或答案。
+
+合同从首次任务目标发出开始计时，排队消息、后续交互及控制命令都不续租。`direct` 记录 `followup_input: unavailable`，模拟用户记录 `possible`；反馈与交付继续保留这一条件，不能假定总有人发送“继续”。
+
+可在实验 `runtime` 下配置 fallback：
 
 ```json
 "harness": {
-  "request_budget_seconds": 3600,
+  "request_budget_seconds": 1800,
   "termination_grace_seconds": 60
 }
 ```
 
-launcher 将预算传入消息及兼容产品环境变量。所选 Harness 仍须实现内部预算；预算加余量后还未收到回复，基础设施才强停请求（此例为 3660 秒）。请求收据区分 Harness 回复和基础设施强停。这与 E2B 沙箱寿命、交付角色超时分别配置；在任务正文中写时长不会自动设置截止时间。
+`request_budget_seconds` 沿用已有字段名，只在任务没有显式执行预算时提供 fallback。任务声明的 7200 秒优先于此处的 1800 秒。可选 `message_activity_seconds` 单独限制每条消息；不需要更短消息边界时不填，且它不能延长任务期限。
 
-预算须为正数且最多 86400 秒；余量须为正数且最多 300 秒，省略时为 60。未配置 `runtime.harness` 时，launcher 保留既有 1800 秒 fallback，考虑可识别的旧产品环境期限，再增加 60 秒余量。公共入口不继承宿主机设置；旧冻结配置不增加字段、不改变身份。已准备 run 继续使用自己的冻结 controller。
+预算为正数且最多 86400 秒；收尾余量为正数且最多 300 秒，默认 60 秒，只用于取消、进程清理与收据采集，不增加解题时间。沙箱寿命、交付超时和任务截止分别配置；仅在正文写时长不会自动配置截止。当前 seed 保持 `max_iterations: 100`、`max_tokens: 32768`，较长预算不保证模型一定运行满时长；耗尽、中断、缺少有效完成状态的回复都不能算成功完成。
 
-反馈角色读取试用提交的源码快照；分诊历史报告时读取该报告记录的提交。缺少提交会阻止源码访问，不静默改读当前工作树。新 direct 会话与模拟交互一样完整保存已收到的进度与回复步骤，证据查询时共用摘要和展开限制，persona 仍只评阅终态回复；旧会话没有这些记录时仍标为未知。
+公共入口不继承任意宿主机 Harness 设置，已准备 run 使用自己的冻结 controller 和 seed。反馈角色读取实际试用提交，缺失提交时不静默改读另一个工作树。direct 与模拟交互都会保存进度及回复，终态 Reviewer 只读冻结任务证据，不能执行任意 shell 或改写评分产物。模拟用户的 `main_final_check` 仍在决定继续或接受之前执行。
 
 ## 继承当前完整归档
 
@@ -98,6 +114,43 @@ launcher 将预算传入消息及兼容产品环境变量。所选 Harness 仍�
 使用标准 Anthropic API key 时，将交付 JSON 的 `auth_type` 设为 `api-key`，`api_key_env` 填存放该密钥的变量名，并提供该变量。交付端不能填只支持 Chat Completions 的地址。同一供应商密钥可以重复填入所需 env 变量；文件不启用 dotenv 变量插值。
 
 显式 `--secrets-file` 覆盖同名进程变量，不隐式读取 `backend/.env`、个人 Claude 配置或试跑目录。程序可以记录受保护凭证文件的路径，内容不进入材料快照或归档。迁移凭证时管理命令可用新的 `--secrets-file`。status、collect、destroy 不要求模型密钥，但云操作仍需基础设施凭证。
+
+### 静态上下文容量声明
+
+`models.user`、`models.harness`、`models.demand` 各自支持 `limits`。供应商明确声明总上下文为 262144 tokens 时，以下配置可通过静态检查：
+
+```json
+"limits": {
+  "context_window_tokens": 262144,
+  "max_context_tokens": 220000,
+  "reserved_output_tokens": 32768,
+  "input_headroom_tokens": 8192
+}
+```
+
+预检要求：输入阈值 + 输出预留 + 输入余量 <= 声明容量。默认输入阈值仍为 256000，默认输出预算仍为 32768；因此只填容量 262144 会被拒绝，需要显式调整输入阈值。`reserved_output_tokens` 至少覆盖 32768，不会改变实际 `max_tokens`。余量可为零，其他限制必须为正整数。
+
+这只是静态校验，不证明供应商 tokenizer 的实际计数，也不会动态压缩。未声明容量时标为 `unverified`，不通过模型名猜容量。确定性的上下文超限会独立分类，不再当作瞬时错误原样重试。
+
+## 每轮客观验收
+
+准备时默认使用 `release/compatibility.json` 中固定的执行证据 reader 候选提交 `57eac90a5702022c1ed2452b5b2b9918c235df39`，也可通过 `source.openagents` 指定其他兼容的不可变提交。该候选已推送供审阅；配套改动审阅合并后再填写 `reader_release_commit`。只有旧 transport 能力的版本不足以满足要求。
+
+默认 `evaluation: {"official_grading": false}` 记录 `not_configured`，不表示通过，也不记零分。开启时使用 `evaluation.session_grading`：
+
+| 字段 | 含义 |
+| --- | --- |
+| `runner` | 固定为 `external` |
+| `plan_sha256` | 私有 grading-plan 文件原始字节的 SHA-256 |
+| `worker_key_sha256` | Ed25519 公钥原始 32 字节的 SHA-256，不是 PEM 文件的摘要 |
+
+[反馈与验收教程](tutorials/evolution-feedback.zh-CN.md)可生成带真实摘要的完整示例。`check` 和 `prepare` 都必须传 `--grading-plan`、`--grading-worker-public-key`；计划覆盖全部选定任务，固定适配器、材料、镜像和超时。注册也绑定评分实现版本，修改后需要重新 prepare。
+
+执行 `run` 后，在可信 Docker 主机启动 `assessment-worker RUN_ID --plan PATH --signing-key PATH --follow`。worker 使用同一份准备结果、checkout 和 provider 访问凭证，local 与 E2B 都如此；任务沙箱没有 Docker socket 和私有 grader。worker 未就绪时 controller 显示 `objective_grading / PENDING / worker_not_ready`，启动 worker 即可继续。恢复保留已接收的结果，不重跑 Actor 或 Reviewer。
+
+每一轮（含末轮只试用）都先封存 Actor 产物，再独立验收，在需求处理前使用认证后的安全摘要。`completed / passed=false` 才是评分有效执行后的任务失败；不可评分、不可用、崩溃及超时保留 `passed=null`，未配置也单列。独立体验评分只能是整数 1–4 或缺测状态；任务成功和缺分都不自动补分、不强制发 Issue。归因与改进建议各自记录。
+
+私有计划、隐藏测试、答案和密钥留在可信主机上操作者提供的原路径；worker 执行副本及详细 verifier 输出保存在该 run 的 `evaluation/online` 区域。两者均不进入实验收集包或需求角色证据。在线路径只支持可从冻结工作区产物重建的验收；依赖受管服务可信测量或原始存活环境的 profile 会被拒绝。逐轮验收为后续纠错提供证据，不自动淘汰或回退已交付 Harness；本地工程 CI 和独立 Harness 留出评测保持独立。
 
 ## 任务包
 
@@ -190,7 +243,7 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 `experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 
-本次已迁入上述设置、交互和看板；可选本地工程 CI 见下方说明，当前归档追加已接入，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。官方 SWE 任务评分已提供独立事后命令，演化循环内评分仍按设计关闭。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+本次已迁入上述设置、交互和看板；可选本地工程 CI 见下方说明，当前归档追加已接入，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。独立事后评分仍然可用；可选逐轮验收使用上面的外部 worker 合同。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
 
 ## 本地工程 CI
 
@@ -262,8 +315,8 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --json 
 
 并发上限不是账户全局上限，也不是已分配资源数上限；停止/完成的沙箱及其他批次可能仍占配额。批次管理不自动销毁计算或删除仓库，顺序执行也可能耗尽仓库名额。按[批次教程](tutorials/batch-experiment.zh-CN.md)逐项收集并显式清理。
 
-## 实验后 SWE 评分
+## 实验后会话评分
 
 评分输入独立于实验 JSON。`grade RUN_ID` 必填 `--plan PATH`；私有计划选择任务 ID、适配器与带哈希的材料，SWE 本地官方 JSON/JSONL/parquet 数据集也在其中声明。`--round` 选择正整数且已封口的轮次，默认 `config.rounds.count`。每个 grader 在计划中填写必需的 `timeout_seconds`。`--offline` 只验证绑定，不调用 Docker、不写评分结果。自定义根目录或批次成员使用全局 `--runs-dir`，机器可读输出用 `--json`。此命令不读凭证文件。
 
-安装 `uv sync --locked --extra experiments --extra dev --extra evaluation`。local 与 E2B 均在操作者的 Docker 主机上，以经过验证的终态 COMPLETE 归档评分，并要求新控制器保存的完整预测回执。每次结果写入独立的 `evaluation/<attempt_id>/`，原实验产物不改。gold patch 与隐藏测试是外部评分输入，不能成为冻结演化材料。只有 hash 的旧会话无法还原。详见[事后评分教程](tutorials/post-run-grading.zh-CN.md)和[验收报告](validation/post-run-grading.md)。这些用户任务成绩与 Harness 留出泛化测试分开，不进入反馈或 CI 门禁。
+安装 `uv sync --locked --extra experiments --extra dev --extra evaluation`。local 与 E2B 均在操作者的 Docker 主机上，以经过验证的终态 COMPLETE 归档评分，并要求新控制器保存的完整预测回执。每次结果写入独立的 `evaluation/<attempt_id>/`，原实验产物不改。gold patch 与隐藏测试是外部评分输入，不能成为冻结演化材料。只有 hash 的旧会话无法还原。详见[事后评分教程](tutorials/post-run-grading.zh-CN.md)和[验收报告](validation/post-run-grading.md)。事后命令结果与 Harness 留出泛化测试分开，不会追溯进入原演化反馈或 CI 门禁；可选逐轮验收需单独配置。

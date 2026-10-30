@@ -67,7 +67,7 @@ function Panel(props: {
 }
 
 export function Charts({ overview }: { overview: OverviewResponse | null }) {
-  const feeling = (overview?.feeling_trend ?? []).map(([, s]) => s);
+  const feeling = (overview?.feeling_trend ?? []).map(([, s]) => s).filter((s) => Number.isInteger(s) && s >= 1 && s <= 4);
   const backlog = (overview?.issue_curve ?? []).map(([, , b]) => b);
   const feelNow = feeling.length ? `${feeling[feeling.length - 1]}/4` : "—";
   const backlogMax = backlog.length ? Math.max(...backlog, 1) : 1;
@@ -90,6 +90,12 @@ export function Charts({ overview }: { overview: OverviewResponse | null }) {
         max={backlogMax}
         color="var(--role-developer)"
       />
+      {Object.entries(overview?.feedback_counts ?? {}).map(([condition, count]) => (
+        <div className="chart" key={condition}>
+          <div className="chart-head">体感样本 · {{ unavailable: "无后续输入", possible: "可后续输入", unknown: "输入条件未知" }[condition] ?? condition}</div>
+          <div className="dim">有效 {count.rated} · 未提供 {count.missing} · 无效 {count.invalid} · 不可用 {count.unavailable}</div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -347,6 +347,8 @@ def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
         "# 由 ordinary controller 每次 run 生成（Spec-0032/T5），勿手工编辑——改 ordinary controller 的定稿常量。\n"
         "version: 1\n"
         "forge: gitea\n"
+        "execution_evidence:\n"
+        "  required: true\n"
         f"coordination: {coordination}\n"
         "gitea:\n"
         f"  base_url: {gitea['GITEA_URL']}\n"

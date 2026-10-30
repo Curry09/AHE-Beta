@@ -455,7 +455,7 @@ def test_owner_receives_normalized_body_for_every_proposal_source(tmp_path: Path
         )
     ).number
     issue = tracker.list_open_issues()[0]
-    rendered = Owner._format_index([issue])
+    rendered = Owner._format_index([issue], store=None)
     assert "agents/main.md 在精确指令下仍无界探索" in rendered
     assert "只改通用 harness 行为" in rendered
     assert f"#{p}" in rendered

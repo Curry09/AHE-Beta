@@ -9,7 +9,7 @@ New experiments use JSON with `schema_version: 2` and the unified entry describe
 | Input | Format | Example |
 | --- | --- | --- |
 | Experiment | v2 JSON: backend, Harness, workload, rounds, roles, models | `examples/experiments/synthesizer-n1-local.json` |
-| Task | v1 JSON: instruction, source, setup script, dependency lock | `examples/tasks/pvlib-1478/task.json` |
+| Task | v1/v2 JSON: instruction, source, setup, dependencies; v2 adds execution/artifact declarations | `examples/tasks/pvlib-1478/task.json` |
 | Instruction | UTF-8 task text, without a solution or hidden tests | `examples/tasks/pvlib-1478/instruction.md` |
 | Setup | Trusted shell script; creates the isolated task environment | `examples/tasks/pvlib-1478/setup.sh` |
 | Task dependencies | Fully pinned requirements with SHA-256 hashes | `examples/tasks/pvlib-1478/requirements.lock` |
@@ -29,36 +29,52 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `runtime.gitea` | Provider `localhost` for local, `gitea.com` for E2B; repository prefix |
 | `runtime.local` | Optional image overrides and `ci_enabled` (default `false`); local engineering CI requires a verified dedicated runner |
 | `runtime.e2b` | Requested `cpu_count`, `memory_mb`, `timeout_seconds` (300–86400); optional compatible template |
-| `runtime.harness` | Optional per-request budget and infrastructure termination grace; applies to both backends |
+| `runtime.harness` | Fallback task budget, optional message activity limit and termination grace; both backends |
 | `harness.source` | `builtin`, `archive` with a path and SHA-256, or `continuation` with the matching parent source |
 | `workload` | Task packages with persona inputs/optional interaction_plan, or exactly `{"source":"parent"}` for continuation |
 | `rounds` | `count`, `sessions_per_round`, `max_parallel_users`; continuation count means added user rounds |
 | `continuation` | Optional current parent `archive` path and expected `sha256`; requires both parent input selectors |
 | `roles` | Triage/Synthesizer/divergent/developer counts; `owner_mode: mechanical` / `llm` |
 | `models` | User, Harness, shared demand and Claude Code delivery settings |
-| `evaluation.official_grading` | `false`; evolution stays ungraded; use the independent post-run `grade` command |
+| `evaluation.official_grading` | `false` for a run without per-round grading |
+| `evaluation.session_grading` | Optional external per-round assessment; frozen plan/key digests and `runner: external` |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
-Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round is always user-only.
+Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round runs users and any configured independent assessment, with no requirements or delivery stage.
 
 `builtin` freezes this checkout's `backend/harness_template/`. It is not the historical `cade14d` Harness. To reproduce that baseline, supply its actual archive and checksum explicitly.
 
-### Harness request deadlines
+### Task deadlines and message activity
 
-To give each Harness request a one-hour budget, add this fragment to `runtime`:
+Declare the task's total budget in its v2 task package:
+
+```json
+"execution": {
+  "budget_seconds": 7200,
+  "budget_source": "task_metadata",
+  "public_deliverables": ["The requested source changes"],
+  "public_acceptance": ["The behavior described in the public instruction"]
+}
+```
+
+This is a fragment, not a complete package. An operator quota uses `budget_source: "operator_quota"`; document its reason with `quota_override_reason`. A reason is required when overriding a task-declared deadline. Do not present a quota as the official task budget. Public acceptance text must not contain hidden tests or answers.
+
+The clock starts when the first task goal is dispatched. Queued messages, follow-ups and controls do not renew it. `direct` records `followup_input: unavailable`; `simulated_user` records `possible`. Feedback and delivery retain this condition rather than assuming somebody can send “continue”.
+
+An optional experiment-level fallback goes under `runtime`:
 
 ```json
 "harness": {
-  "request_budget_seconds": 3600,
+  "request_budget_seconds": 1800,
   "termination_grace_seconds": 60
 }
 ```
 
-The launcher sends the budget in the message and compatible product environment variables. The selected Harness must implement its internal budget; infrastructure terminates a request that has not replied after budget plus grace (3660 seconds here). Request receipts distinguish a Harness reply from infrastructure termination. These are request deadlines, separate from E2B sandbox lifetime and delivery-role timeouts. Writing a duration in task text does not configure a deadline.
+Despite its existing name, `request_budget_seconds` provides the fallback when the task has no explicit execution budget. A 7200-second task declaration takes precedence over this 1800-second fallback. `message_activity_seconds` is a separate optional per-message limit; leave it absent to avoid a shorter message boundary. It cannot extend the task deadline.
 
-The budget must be positive and at most 86400 seconds. Grace must be positive and at most 300 seconds; omission defaults to 60. Without `runtime.harness`, the launcher retains its existing 1800-second fallback, accounts for recognized legacy product limits, and adds 60 seconds of termination grace. Host settings are not inherited by the public entry; old frozen configurations do not gain new fields or change identity. Prepared runs continue using their frozen controller.
+Budgets must be positive and at most 86400 seconds. Grace must be positive and at most 300 seconds, defaulting to 60. Grace permits cancellation, cleanup and receipt collection, not additional solving time. Sandbox lifetime and delivery timeouts are separate. Duration in task prose alone does not configure a deadline. The current seed retains `max_iterations: 100` and `max_tokens: 32768`; a longer budget does not guarantee use of all available time. Exhaustion, interruption and replies without a valid completion status are not successful completion.
 
-Feedback roles read a source snapshot at the tested commit, while triage of a historical report uses that report's recorded commit. A missing commit blocks source access rather than silently reading the current checkout. New direct sessions preserve the received progress and reply steps in full, following simulated-session storage; evidence queries use shared summary and expansion limits. Their persona reviewer still sees only the terminal reply. Older sessions without these records remain unknown.
+The public entry does not inherit arbitrary host Harness settings. Prepared runs keep their frozen controller and seed. Feedback roles read the tested source commit; a missing commit blocks source access rather than silently reading another checkout. Direct and interactive sessions retain progress/replies. Terminal reviewers see frozen read-only task evidence and cannot run arbitrary shell commands or change scored artifacts. Interactive `main_final_check` still precedes the decision to continue or accept.
 
 ## Continue from a current completed archive
 
@@ -98,6 +114,43 @@ Each model setting contains a model name, `base_url_env` and `api_key_env`. Thes
 For standard Anthropic API keys set delivery's `auth_type` to `api-key` and `api_key_env` to the variable containing that key. Do not put a Chat Completions-only endpoint in the delivery setting. A shared provider key can be repeated in the required env variables; dotenv interpolation is not enabled.
 
 The explicit `--secrets-file` overrides identically named process variables. No implicit `backend/.env`, user Claude settings or personal trial directory is read. The protected file path may be recorded for later management; secret contents are excluded from material snapshots and archives. To move credentials, pass another `--secrets-file` to the management command. Status, collection and destruction do not require model keys, but cloud operations still need provider credentials.
+
+### Static context-capacity declarations
+
+`models.user`, `models.harness` and `models.demand` each accept `limits`. For a provider declaring a 262144-token total context window, this example fits:
+
+```json
+"limits": {
+  "context_window_tokens": 262144,
+  "max_context_tokens": 220000,
+  "reserved_output_tokens": 32768,
+  "input_headroom_tokens": 8192
+}
+```
+
+Preflight requires input threshold + reserved output + headroom <= declared capacity. Default input remains 256000 and output remains 32768; declaring only a 262144-token capacity is therefore rejected. Set the input threshold explicitly. `reserved_output_tokens` must cover 32768 and does not change actual `max_tokens`. Headroom may be zero; other limits must be positive integers.
+
+This is static validation, not proof of the provider's token counting or dynamic compression. Without declared capacity the report says `unverified`; names do not imply capacity. Deterministic context-limit failures are classified separately rather than retried unchanged as transient errors.
+
+## Per-round objective assessment
+
+Preparation uses the immutable execution-evidence reader candidate recorded in `release/compatibility.json` (`57eac90a5702022c1ed2452b5b2b9918c235df39`). You can override `source.openagents` with another compatible immutable revision. The candidate is published for review; `reader_release_commit` remains unset until the paired change is reviewed and merged. An old transport-only revision is insufficient.
+
+By default `evaluation: {"official_grading": false}` records `not_configured`, not a pass or zero. To opt in, use `evaluation.session_grading`:
+
+| Field | Meaning |
+| --- | --- |
+| `runner` | Must be `external` |
+| `plan_sha256` | SHA-256 of the exact private grading-plan file bytes |
+| `worker_key_sha256` | SHA-256 of the Ed25519 public key's raw 32 bytes, not its PEM file |
+
+The [assessment tutorial](tutorials/evolution-feedback.md) generates a complete example with real digests. Both `check` and `prepare` require `--grading-plan` and `--grading-worker-public-key`. The plan covers every selected task and pins adapters, materials, images and timeouts. Registration binds the grading implementation too; changing it requires a new prepared run.
+
+After `run`, start `assessment-worker RUN_ID --plan PATH --signing-key PATH --follow` on a trusted Docker host with the same prepared run state, checkout and provider access. Local and E2B both require this worker. Task sandboxes receive no Docker socket or private grader. Without a ready worker the controller reports `objective_grading / PENDING / worker_not_ready`; starting it lets the run proceed. Recovery retains accepted results without rerunning the Actor or reviewer.
+
+Each round, including the final user-only round, seals Actor outputs before assessment and consumes authenticated safe summaries before requirements processing. Only `completed / passed=false` is a valid task failure; ungradable/unavailable/crashed/timed-out assessments retain `passed=null`. Experience is separately a strict integer 1–4 or a missing state. Task success and missing ratings neither invent a score nor require an Issue. Attribution and improvement suggestions remain separate axes.
+
+Private plans, tests, answers and keys stay at operator-provided paths on the trusted host; worker execution copies and detailed verifier outputs stay under the run's `evaluation/online` area. Neither enters experiment collection or demand-role evidence. The online path accepts reproducible workspace artifacts; profiles requiring managed-service measurements or the original live environment are rejected. Assessment informs later correction without automatically rejecting or rolling back a delivered Harness. Local engineering CI and independent held-out Harness evaluation remain separate.
 
 ## Task package
 
@@ -190,7 +243,7 @@ The plan validates every round's session count and selected persona/task IDs. Th
 
 `experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-These settings, interactions and dashboard binding are migrated. Optional local engineering CI is described below; current archive continuation is described in the [append-round tutorial](tutorials/experiment-continuation.md). Seed libraries and text instructions now convert to ordinary packages as described below. Official SWE task grading is available as a separate post-run command; in-loop grading remains disabled by design. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+These settings, interactions and dashboard binding are migrated. Optional local engineering CI is described below; current archive continuation is described in the [append-round tutorial](tutorials/experiment-continuation.md). Seed libraries and text instructions now convert to ordinary packages as described below. Independent post-run grading remains available. Optional per-round grading uses the external-worker contract above. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
 
 ## Local engineering CI
 
@@ -225,7 +278,7 @@ Cards without repositories and text instructions use a local scratch source dire
 
 ## Multiple task packages
 
-Use `workload.task_packages` for new multi-task definitions. It is mutually exclusive with `kind` and `task_package`; do not add a global kind to this branch. Each package uses task-package-v1 and has a globally unique, safe ID, including ordinary `order-service` and SWE IDs such as `pvlib__pvlib-python-1478`. The existing single-package form is converted once during new preparation. Already frozen runs keep their original config, hash and archived controller. Unknown workload contract versions are refused.
+Use `workload.task_packages` for new multi-task definitions. It is mutually exclusive with `kind` and `task_package`; do not add a global kind to this branch. Each package uses a supported v1/v2 task schema and has a globally unique, safe ID, including ordinary `order-service` and SWE IDs such as `pvlib__pvlib-python-1478`. The existing single-package form is converted once during new preparation. Already frozen runs keep their original config, hash and archived controller. Unknown workload contract versions are refused.
 
 `runtime.local.seed_image` remains a single-task override and is rejected when more than one task package is selected. Automatic per-task image building handles mixed tasks. Local sessions use independent containers; E2B copies each task's pure baseline source and recreates its venv at the final session directory. Download/wheel caches may be shared, writable repos and installed environments are not. E2B's single Unix user does not provide malicious cross-directory isolation equivalent to Docker.
 
@@ -262,7 +315,7 @@ A batch lives under `<runs-dir>/.batches/<batch_id>/`; each member's normal run 
 
 The parallel limit is not an account-wide limit or allocated-resource cap. Stopped/completed sandboxes and other batches may still consume quota. Batch management does not automatically destroy compute or delete repositories; even sequential runs may exhaust repository limits. Use the [batch tutorial](tutorials/batch-experiment.md) to collect and explicitly clean up each member.
 
-## Post-run SWE grading
+## Post-run session grading
 
 Grading inputs are separate from experiment JSON. `grade RUN_ID` requires `--plan PATH`; the private plan selects task IDs, adapters and hashed materials. SWE declares its local official JSON/JSONL/parquet dataset in that plan. `--round` selects a positive sealed round and defaults to `config.rounds.count`. Each grader declares its required `timeout_seconds` in the plan. `--offline` validates bindings without Docker or result writes. Use global `--runs-dir` for a custom root or batch child root, and `--json` for machine-readable output. The command does not read a secrets file.
 

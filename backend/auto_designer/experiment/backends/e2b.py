@@ -15,7 +15,7 @@ from typing import Any
 
 import requests
 
-from auto_designer.experiment.backends.base import BackendError
+from auto_designer.experiment.backends.base import BackendError, require_execution_reader
 from auto_designer.experiment.backends.e2b_bootstrap import (
     EXECUTION_USER,
     bootstrap_command,
@@ -330,6 +330,7 @@ class E2BBackend:
             "download_policies", []
         ):
             raise BackendError("Frozen OpenAgents reader lacks Gitea.com ZIP/redirect support")
+        require_execution_reader(capability)
         probe = self._probe(sandbox, resources)
         facts = sandbox_facts(
             sandbox.get_info(), manifest=self.manifest, template=resources["template"]
@@ -676,6 +677,43 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
         _write(self.run_dir / "runtime/e2b-collection.json", receipt)
         return receipt
 
+    def assessment_exchange(self, action: str, payload: dict) -> dict:
+        # Spec-0084/T5: reuse verified sandbox ownership and the frozen controller.
+        sandbox = self._sandbox()
+        resources = _read(self.resource_file)
+        program = "import json,pathlib,sys;sys.path.insert(0,sys.argv[1]+'/source/controller/backend');from auto_designer.loop.round_assessment import exchange;print(json.dumps(exchange(pathlib.Path(sys.argv[1]),sys.argv[2],json.loads(sys.argv[3]))))"
+        return json.loads(
+            self._command(
+                sandbox,
+                self._python(resources, program, self.root, action, json.dumps(payload)),
+                user=resources["bootstrap"].get("execution_user", "root"),
+            )
+        )
+
+    def assessment_download(self, request_digest: str) -> bytes:
+        from auto_designer.loop.round_assessment import MAX_BUNDLE_BYTES, _digest
+
+        sandbox = self._sandbox()
+        resources = _read(self.resource_file)
+        program = "import pathlib,sys;sys.path.insert(0,sys.argv[1]+'/source/controller/backend');from auto_designer.loop.round_assessment import bundle_path;print(bundle_path(pathlib.Path(sys.argv[1]),sys.argv[2]).stat().st_size)"
+        length = int(
+            self._command(
+                sandbox, self._python(resources, program, self.root, _digest(request_digest))
+            )
+        )
+        if length > MAX_BUNDLE_BYTES:
+            raise BackendError("Assessment bundle too large")
+        data = bytes(
+            sandbox.files.read(
+                self.root + "/assessment/requests/" + request_digest + "/bundle.json",
+                format="bytes",
+                user="root",
+            )
+        )
+        if len(data) != length:
+            raise BackendError("Assessment bundle changed during download")
+        return data
+
     def destroy(self) -> dict:
         resources = _read(self.resource_file)
         if resources.get("resource_state") == "DESTROYED":
@@ -738,7 +776,7 @@ excluded={'secrets','.venv','.git','.openagents','__pycache__','source','cloud-s
 private_runtime={('runtime','home'),('runtime','python'),('runtime','uv-cache'),('runtime','task-cache')}
 def paths():
     result=[]
-    for area in ['data','logs','checkpoints','telemetry','runtime']:
+    for area in ['data','logs','checkpoints','telemetry','runtime','assessment']:
         base=root/area
         if not base.is_dir() or base.is_symlink(): continue
         area_paths=[]

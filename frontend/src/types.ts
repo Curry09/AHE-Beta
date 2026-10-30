@@ -334,7 +334,24 @@ export interface SessionDetail {
   };
   scenario: { description: string };
   transcript: { turns: Turn[] };
-  feeling: { score: number; reason: string };
+  // Spec-0084/T1: only an actual valid rating has a score; derived scores stay diagnostic.
+  feeling: { score: number; reason: string } | null;
+  feedback?: {
+    schema_version: 1;
+    task_assessment: {
+      status: "fulfilled" | "unfulfilled" | "unknown";
+      source: string;
+      evidence_refs: string[];
+    };
+    experience: {
+      status: "rated" | "missing" | "invalid" | "unavailable";
+      score: number | null;
+      source: string;
+      reason: string;
+    };
+    attribution: { status: "confirmed" | "uncertain" | "unknown"; claims: unknown[] };
+    opportunities: unknown[];
+  };
   issue_refs: { number: number; url: string; state: string }[];
   sim_trace?: SimTrace | null;
 }
@@ -358,6 +375,7 @@ export interface OverviewResponse {
   open_issue_count: number;
   session_count: number;
   feeling_trend: [string, number][];
+  feedback_counts?: Record<string, { rated: number; missing: number; invalid: number; unavailable: number }>;
   issue_curve: [string, number, number][];
   // Spec-0029/T9：三平面漏斗当前量（老后端缺省 → 不渲染漏斗条）。
   funnel?: { report: number; proposal: number; ready: number };

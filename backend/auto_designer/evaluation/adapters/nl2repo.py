@@ -64,7 +64,7 @@ class NL2RepoAdapter:
     name = "nl2repo"
     contract_version = 1
 
-    def validate_inputs(self, request: GradingRequest) -> None:
+    def validate_plan(self, request: GradingRequest) -> dict[str, str]:
         task = request.source.get("instance_id") or request.instance_id or request.task_id
         if (
             task != "tinydb"
@@ -80,13 +80,6 @@ class NL2RepoAdapter:
         image = immutable_image(request)
         if "@" in image and image != OFFICIAL_IMAGE:
             raise InputValidationError("NL2Repo image must identify the official TinyDB repository")
-        if "generated_repository" not in request.artifacts:
-            raise InputValidationError(
-                "generated_repository tar is missing", status="missing_artifact"
-            )
-        files = archive_files(artifact_bytes(request.artifacts["generated_repository"]))
-        if not files:
-            raise InputValidationError("generated repository is empty")
         unknown = set(request.config) - {"revision", "image", "operator_pass_threshold"}
         if unknown:
             raise ValueError(f"unknown NL2Repo configuration: {sorted(unknown)}")
@@ -97,6 +90,18 @@ class NL2RepoAdapter:
             or not 0 <= threshold <= 1
         ):
             raise ValueError("operator_pass_threshold must be between 0 and 1")
+
+        return {"generated_repository": "workspace"}
+
+    def validate_inputs(self, request: GradingRequest) -> None:
+        self.validate_plan(request)
+        if "generated_repository" not in request.artifacts:
+            raise InputValidationError(
+                "generated_repository tar is missing", status="missing_artifact"
+            )
+        files = archive_files(artifact_bytes(request.artifacts["generated_repository"]))
+        if not files:
+            raise InputValidationError("generated repository is empty")
 
     def evaluate(self, request: GradingRequest, attempt_dir: Path) -> GradingResult:
         self.validate_inputs(request)

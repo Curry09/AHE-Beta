@@ -64,6 +64,28 @@ def test_create_records_rejected_flag_and_fallback_as_separate_calls(monkeypatch
     assert events[1]["usage"] is None
 
 
+@pytest.mark.parametrize(
+    "model",
+    [
+        "glm-5.3",
+        "z-ai/glm-5.3",
+        "glm53_512k_o64k_pd128_mlc",
+        "glm53-flash-lmdeploy-dp8ep8-512k-96gpu-mtp3-pool-1014",
+        "glm-5.2",
+    ],
+)
+def test_glm_deployment_aliases_keep_server_thinking_defaults(monkeypatch, model):
+    monkeypatch.delenv("USER_LLM_REASONING_EFFORT", raising=False)
+    response = _response()
+    client = _client(response)
+    client.model = model
+    assert client._create([], 32768) is response
+    request = client.client.chat.completions.calls[0]
+    assert request["model"] == model
+    assert request["max_tokens"] == 32768
+    assert "extra_body" not in request and "reasoning_effort" not in request
+
+
 def test_create_records_every_failed_retry_before_raising(monkeypatch) -> None:
     events: list[dict[str, object]] = []
     monkeypatch.setattr(module, "record_usage", lambda **event: events.append(event))

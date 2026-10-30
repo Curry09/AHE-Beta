@@ -198,8 +198,8 @@ class Triager:
         self._recovery = recovery
 
     def bind_feedback_dependency(self, prerequisite: str) -> None:
-        """Spec-0079/T3: share the outer feedback stage prerequisite."""
-        if prerequisite not in {"users", "feedback_imported"}:
+        """Share the outer feedback prerequisite, including independent assessment."""
+        if prerequisite not in {"users", "feedback_imported", "objective_grading"}:
             raise ValueError("unsupported feedback prerequisite")
         self._feedback_dependency = prerequisite
 
@@ -709,6 +709,15 @@ class Triager:
                 if (envelope.get("harness_source") or {}).get("ref") in {None, "unavailable"}:
                     session = self._session_for_issue(int(issue.number))
                     envelope["harness_source"] = build_evidence_envelope(session).harness_source
+                # Spec-0084/T4: join immutable conditions and sealed public assessment facts.
+                from auto_designer.demand.evidence_contract import session_execution_facts
+
+                session = self._store.load(sid)
+                envelope.update(
+                    session_execution_facts(
+                        session, assessment_summaries=self._store.load_assessment_summaries(sid)
+                    )
+                )
                 return project_for_role(envelope, "triage")
             except FileNotFoundError:
                 pass

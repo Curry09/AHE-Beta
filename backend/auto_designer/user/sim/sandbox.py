@@ -33,6 +33,12 @@ class Sandbox:
     def write_text(self, path: str, content: str) -> str:
         return self._runtime.write_text(path, content)
 
+    def list_files(self, path: str = ".") -> list[str]:
+        return self._runtime.list_files(path)
+
+    def read_diff(self) -> str:
+        return self._runtime.read_diff()
+
     def _env(self) -> dict[str, str] | None:
         """返回私有工具执行环境。
 

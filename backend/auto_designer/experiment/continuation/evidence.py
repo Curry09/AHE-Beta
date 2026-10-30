@@ -13,7 +13,11 @@ from auto_designer.models import Session
 from auto_designer.observations.grants import grant
 from auto_designer.observations.grants import observation_root as resolved_observation_root
 from auto_designer.observations.publication import local_files
-from auto_designer.user.session_store import SessionConflictError, _index_entry
+from auto_designer.user.session_store import (
+    SessionConflictError,
+    _index_entry,
+    read_assessment_summaries,
+)
 
 
 class ContinuationEvidenceView:
@@ -27,11 +31,9 @@ class ContinuationEvidenceView:
         self._selected = {item["session_id"]: item for item in export["boundary"]["sessions"]}
         self._issue_map = issue_map
         collection = parent_root / "collection.json"
-        self._projections = (
-            json.loads(collection.read_text()).get("public_projections", {})
-            if collection.is_file()
-            else {}
-        )
+        receipt = json.loads(collection.read_text()) if collection.is_file() else {}
+        self._projections = receipt.get("public_projections", {})
+        self._archive_files = receipt.get("files", {})
         for sid in self._selected:
             if (child_store.root / f"{sid}.json").exists():
                 raise SessionConflictError("Parent and child session identities collide")
@@ -105,6 +107,24 @@ class ContinuationEvidenceView:
             if include_invalid or row["evaluation_status"] == "valid":
                 rows.append(row)
         return rows
+
+    def load_assessment_summaries(self, session_id: str) -> list[dict]:
+        """Spec-0084/T5: retain parent measurements without mixing them into child metrics."""
+        if session_id not in self._selected:
+            return self._child.load_assessment_summaries(session_id)
+        session = self.load(session_id)
+        round_no = session.session_provenance.get("round_no")
+        if type(round_no) is not int:
+            return []
+        relative = f"assessment/feedback/round-{round_no}.json"
+        digest = self._archive_files.get(relative)
+        if digest is None:
+            if (self._parent_root / relative).exists():
+                raise ConfigError("Continuation assessment is not in the verified archive")
+            return []
+        return read_assessment_summaries(
+            self._parent_root / "assessment", session, archive_sha256=digest
+        )
 
 
 def _verified_bundle(root: Path) -> dict[str, bytes]:

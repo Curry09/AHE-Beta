@@ -5,7 +5,7 @@
 | 范围 | 来源与许可处理 | 当前状态 |
 | --- | --- | --- |
 | `tools/spec-driven-development/vendor/openagents/` 与 spec skill | 来自 Curry09/OpenAgents；两仓现采用 MIT。随 vendored 代码保留 OpenAgents LICENSE | 已补许可副本；精确上游源提交仍需追溯，不能把本次联合基线冒充 vendoring pin |
-| NexAU | `pyproject.toml` 固定官方 Git 提交，安装时获取，未把依赖源码复制入本仓 | 依赖的 LICENSE/NOTICE 随其上游分发 |
+| NexAU dependency | [hzhua/nexau](https://github.com/hzhua/nexau)，Apache-2.0；固定提交 `28511d9f0362191a6c378fd441b2be55309a9e32` | uv.lock 固定 Git 来源；本仓不复制 SDK 源码，SDK 的许可证和版权声明随其上游分发保留 |
 | Python / frontend npm dependencies | 来源、版本与哈希在锁文件；各包许可证分别适用 | 发行资产需附依赖许可汇总，npm 安全告警另行处置 |
 | `backend/persona_library*.json` 与 `tools/persona-distill/` 中来源资料 | 包含公开 GitHub/自述资料的链接及派生人格描述 | 逐条检查引用、授权与分发范围待完成；不暗示真实人物参与或背书 |
 | `backend/seeds*.json`、`evaluation/` 与 benchmark 配置 | 自有生成逻辑与外部任务/数据分开；遵循任务仓和数据集原条款 | 在公开源码/研究数据前逐类确认；模型/评测分数不是许可依据 |

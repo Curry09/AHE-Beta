@@ -77,7 +77,12 @@ def test_new_assessment_does_not_rewrite_original_legacy_session_evaluation():
             "image_digest": "sha256:" + "a" * 64,
         },
     }
-    assert derive_acceptance_assessment(session=original.to_dict(), result=result) == "valid_accept"
+    # Historical "accept" only meant no reportable harness bug. A technical pass
+    # cannot turn that into a task-fulfilment judgment that was never collected.
+    assert (
+        derive_acceptance_assessment(session=original.to_dict(), result=result)
+        == "unverified_accept"
+    )
     assert json.dumps(original.to_dict(), sort_keys=True) == original_bytes
     assert "evaluation_artifacts" not in original.workspace_evidence
     restored = Session.from_dict(json.loads(original_bytes))

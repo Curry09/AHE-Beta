@@ -55,7 +55,8 @@ def test_capability_clause_varies_by_d1() -> None:
 
     expert_tools = [t.name for t in tool_stack(_persona(D1Eval.EXPERT))]
     expert = clause_capability(_persona(D1Eval.EXPERT), expert_tools)
-    assert "write your own throwaway test scripts" in expert
+    assert "write your own test scripts or code changes" in expert
+    assert "your own contributions" in expert
 
 
 def test_inner_system_renders_tools_by_d1() -> None:

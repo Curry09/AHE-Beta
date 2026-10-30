@@ -145,8 +145,12 @@ class ApiPersonaClient:
     def _create(self, messages: list[dict], max_tokens: int):
         """带退避重试 (429 / 瞬时网关错误)。每轮先试 enable_thinking=False, 失败再裸试。"""
         estimated_tokens = _estimate_context_tokens(messages)
-        if estimated_tokens > PERSONA_MAX_CONTEXT_TOKENS:
-            raise PersonaContextLimitError(estimated_tokens, PERSONA_MAX_CONTEXT_TOKENS)
+        # Spec-0084/T2: consume the checked operator threshold, without dynamic compression.
+        limit = int(os.getenv("USER_LLM_MAX_CONTEXT_TOKENS", str(PERSONA_MAX_CONTEXT_TOKENS)))
+        if limit <= 0:
+            raise ValueError("USER_LLM_MAX_CONTEXT_TOKENS must be positive")
+        if estimated_tokens > limit:
+            raise PersonaContextLimitError(estimated_tokens, limit)
         delay = 2.0
         last: Exception | None = None
         for _ in range(5):
@@ -161,12 +165,11 @@ class ApiPersonaClient:
                 reasoning_effort = os.getenv("USER_LLM_REASONING_EFFORT", "").strip()
                 if reasoning_effort:
                     request["reasoning_effort"] = reasoning_effort
-                # Boyue's GLM-5.x endpoint is an always-thinking model and
-                # rejects ``enable_thinking=false`` with HTTP 400.  Do not
-                # spend a retry on a parameter that is known to be invalid;
-                # other OpenAI-compatible gateways keep the historical flag.
-                if not reasoning_effort and not self.model.lower().startswith(
-                    ("glm-5.2", "glm-5.3")
+                # GLM deployments also use glm53_* / glm53-flash-* names and
+                # provider-qualified IDs. Preserve their server thinking default.
+                model_family = self.model.rsplit("/", 1)[-1].lower().replace("-", "")
+                if not reasoning_effort and not model_family.startswith(
+                    ("glm5.2", "glm5.3", "glm52", "glm53")
                 ):
                     request["extra_body"] = {"enable_thinking": False}
                 with provider_wait_scope():
@@ -566,6 +569,7 @@ def _extract(user: str, tag: str) -> str:
 # Spec-0048/T2: JSON 语法解析与阶段语义校验是两层边界。任意 dict 都不能再被当作
 # 当前 OUTPUT CONTRACT 的成功结果，尤其是 main_act 中的 {tool,args}。
 _STAGE_TAGS = (
+    ("direct_review", "<direct_review>"),
     ("main_final_check", "<main_final_check>"),
     ("main_rejudge", "<main_rejudge>"),
     ("main_reintent", "<main_reintent>"),
@@ -611,7 +615,7 @@ def _action_space_from_user(user: str) -> set[str]:
 
 
 def _stage_allows_tools(stage: str) -> bool:
-    return stage in {"main_judge", "waiting_judge", "main_final_check", "legacy"}
+    return stage in {"main_judge", "waiting_judge", "main_final_check", "direct_review", "legacy"}
 
 
 def _validate_stage_output(
@@ -725,6 +729,14 @@ def _validate_stage_output(
         if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 4:
             return "invalid_score"
         return None if str(obj.get("reason") or "").strip() else "missing_reason"
+    if stage == "direct_review":
+        if obj.get("task_assessment") not in {"fulfilled", "unfulfilled", "unknown"}:
+            return "invalid_task_assessment"
+        if not isinstance(obj.get("opportunities"), list):
+            return "invalid_opportunities"
+        # Each measurement axis is validated independently by the session runner.
+        # An invalid/missing score must not erase a valid task observation.
+        return None
 
     # 未带阶段标签的旧探针/离线调用保持兼容，但仍保留原解析/空消息检查。
     if obj.get("_parse_failed"):
@@ -735,6 +747,7 @@ def _validate_stage_output(
 
 
 _CONTRACT_SCHEMAS = {
+    "direct_review": '{"task_assessment":"fulfilled|unfulfilled|unknown","feedback":"...","score":null,"reason":"...","attribution":{"status":"unknown","claims":[]},"opportunities":[]}',
     "main_judge": '{"perceive":"...","verdict":"satisfied|failed_blame_harness|failed_blame_self|unsure|stuck"}',
     "main_rejudge": '{"perceive":"...","verdict":"satisfied|failed_blame_harness|failed_blame_self|unsure|stuck"}',
     "waiting_judge": '{"perceive":"...","judgment":"on_track|off_track|unclear","goal_reading":[],"goal_update":[]}',
@@ -1130,7 +1143,7 @@ class AgenticPersonaClient:
         from .prompt import build_inner_system
         from .skills import select_skills
         from .state import State
-        from .tools import tool_stack
+        from .tools import review_tool_stack, tool_stack
 
         stage = _stage_from_user(user)
         # intent / re-judge / re-intent / act / issue / rating 均为无工具 contract。即使 persona
@@ -1140,14 +1153,14 @@ class AgenticPersonaClient:
             return self._call_without_tools(system, user, stage)
 
         tools = tool_stack(self._persona)
-        if stage == "main_final_check":
-            # 最终核实只观察，不接管开发，也不在收口途中开单。
-            tools = [tool for tool in tools if tool.name in {"read_file", "run_shell"}]
-        elif stage in {"main_judge", "waiting_judge"}:
-            # 常规核实可顺手记录真实问题，但不能写工作区或接管实现。
-            tools = [
-                tool for tool in tools if tool.name in {"read_file", "run_shell", "report_issue"}
-            ]
+        # Spec-0084/T2: an interacting user retains their persona's capabilities.
+        # Only post-session review runs against a captured, non-executable view.
+        readonly_review = stage == "direct_review"
+        if readonly_review:
+            tools = review_tool_stack(self._persona)
+        elif stage == "main_final_check":
+            # Keep this one bounded evidence episode separate from report publication.
+            tools = [tool for tool in tools if tool.name != "report_issue"]
         if not tools:  # blind / final-check 无可用工具：由 loop 记录 unavailable 后强制 re-judge
             if stage == "main_final_check":
                 obj = {
@@ -1170,7 +1183,13 @@ class AgenticPersonaClient:
             self._persona, tools, skills, State(trust=self._persona.trust)
         )
         tools_by_name = {t.name: t for t in tools}
-        sandbox = self._sandbox_factory(workspace=self._workspace_dir)
+        if readonly_review:
+            from .runtime import capture_review_snapshot
+            from .sandbox import Sandbox
+
+            sandbox = Sandbox(workspace=capture_review_snapshot(self._workspace_dir))
+        else:
+            sandbox = self._sandbox_factory(workspace=self._workspace_dir)
         steps: list[dict] = []
         messages = [
             {"role": "system", "content": inner_system},
@@ -1181,7 +1200,7 @@ class AgenticPersonaClient:
         tool_calls = 0
         tool_budget = (
             min(self.max_inner_steps, _FINAL_CHECK_TOOL_BUDGET)
-            if stage == "main_final_check"
+            if stage in {"main_final_check", "direct_review"}
             else self.max_inner_steps
         )
         try:

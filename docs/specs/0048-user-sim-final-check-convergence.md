@@ -52,7 +52,7 @@ tasks:
       - backend/tests/user/sim/test_loop.py
       - backend/tests/user/sim/test_heartbeat.py
       - backend/tests/user/test_session_store.py
-    scope: intent 增加 needs_final_check/check_goal；ACTIVE 主决策周期最多进入一次有界非 authoring final-check，随后无条件执行无工具 re-judge→re-intent→act；持久化 evaluation_status/error 并使 invalid 不派生正常终态体感。
+    scope: intent 增加 needs_final_check/check_goal；ACTIVE 主决策周期最多进入一次按persona能力的有界final-check，随后无条件执行无工具re-judge→re-intent→act；持久化evaluation_status/error，评分缺测不补派生分。
     acceptance: 完成、失败、无工具、预算耗尽四条 final-check 路径均只进入一次且最终经过 re-judge；re-intent 不能回跳；opening/waiting 不误开放；invalid 与 end_reason 正交并兼容读取旧 session；loop/prompt/heartbeat 集成测试通过。
   - id: T4
     title: Action 边界 fail-closed
@@ -147,10 +147,11 @@ intent → {intent, needs_final_check, check_goal}
      act（无工具，只能产合法外部 action）
 ```
 
-`final_check` 是一次 episode，不等于只允许一个原子工具调用。persona 可以在一个小预算内读文件、看 diff、
-运行验证命令并消费工具结果，但只能进入该 episode 一次。它不暴露 `write_file` 和 `report_issue`，定位是
-核实而非替 harness 实现。检查结果整理为短的 private evidence，并连同成功、失败或不可用状态交给
-re-judge；框架不根据工具成功与否自行推断 verdict。
+`final_check` 是一次episode，不等于只允许一个原子工具调用。persona可以在小预算内读文件、运行测试，
+competent/expert还可用write_file写测试或按其协作风格修改代码；是否操作仍取决于persona，不强制接管任务。
+这是交互用户在实时工作区的能力，不是会话结束后的只读评阅。它不暴露report_issue；用户自己的编辑和
+命令保存在persona_trace，不能据最终产物通过就宣称Harness独立完成。检查结果整理为private evidence，
+连同成功、失败或不可用状态交给re-judge；框架不根据工具成功与否自行推断verdict。
 
 例如，assistant 超时但声称已完成时，intent 可以返回：
 
@@ -209,7 +210,10 @@ spec-0048 首轮 hard64 真实 GLM canary 在人工停止时留下 47 个 termin
 执行 4 个工具、2 次执行 3 个工具后被非法输出占步；8 次都已经走过合法 rejudge/reintent，最终动作均为
 `send_message`，没有直接 Accept 污染。因此 final-check 维持 4 次工具上限，并新增独立无工具结论调用。
 
-审计还发现普通 judge 的 375 个工具中有 27 条具有修改倾向的命令，失败调用中占 21 条，包括安装依赖、
+2026-10-16按用户确认的模拟目标修订：运行中的用户保留按persona读/跑/写的能力，只有终态评阅保持只读。
+以下为先前收敛实验的历史观察，不能将用户自行跑测试或合法编辑一概判成评估污染；应保留真实贡献轨迹。
+
+当时审计还发现普通 judge 的 375 个工具中有 27 条具有修改倾向的命令，失败调用中占 21 条，包括安装依赖、
 stash、删除缓存和临时写脚本。故 opening judge 机械禁用 private tools；普通 judge 不再暴露 `write_file`，
 prompt 同时禁止安装、reset/stash 和接管实现；final-check 仍严格只暴露 `read_file/run_shell`。
 

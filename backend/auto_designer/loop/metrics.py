@@ -34,7 +34,21 @@ class Metrics:
     def feeling_trend(self) -> list[tuple[str, int]]:
         """体感随时间：[(created_at, score)]，按时间升序。空数据源返回空序列。"""
         rows = sorted(self._store.index(), key=lambda e: e["created_at"])
-        return [(e["created_at"], e["score"]) for e in rows]
+        return [(e["created_at"], e["score"]) for e in rows if type(e.get("score")) is int]
+
+    def feedback_counts(self) -> dict[str, dict[str, int]]:
+        """Spec-0084/T1: retain denominator and missing observations by input condition."""
+        groups: dict[str, dict[str, int]] = {}
+        for row in self._store.index(include_invalid=True):
+            group = groups.setdefault(
+                row.get("followup_input", "unknown"),
+                {"rated": 0, "missing": 0, "invalid": 0, "unavailable": 0},
+            )
+            status = row.get(
+                "experience_status", "rated" if type(row.get("score")) is int else "missing"
+            )
+            group[status] = group.get(status, 0) + 1
+        return groups
 
     def issue_curve(self) -> list[tuple[str, int, int]]:
         """可执行 backlog ~ 时间：[(timestamp, delta, backlog)]，backlog 为该时刻累计未关闭的

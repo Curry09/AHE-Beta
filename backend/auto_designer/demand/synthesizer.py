@@ -395,8 +395,8 @@ class Synthesizer:
             "结构提案不规定数据结构、协议或实施步骤。`covers` 是你对来源提案的吸收决定；"
             "结构提案创建成功后，driver 会合并关闭其中仍开放的 report/proposal 来源。未放入"
             "covers 的来源继续独立交付。\n\n"
-            f"## ready 工作队列（{len(ready)} 条）\n{self._format_backlog(ready)}\n\n"
-            f"## 开放 ProposalView（{len(proposals)} 条）\n{self._format_backlog(proposals)}\n\n"
+            f"## ready 工作队列（{len(ready)} 条）\n{self._format_backlog(ready, store=self._store)}\n\n"
+            f"## 开放 ProposalView（{len(proposals)} 条）\n{self._format_backlog(proposals, store=self._store)}\n\n"
             f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
             "调查完成后调用 `submit_rfcs` 一次：`proposals` 为本轮 0..n 条结构 proposal（无则空数组）；"
             "每条含 title、source_proposals、relationship、common_tension、structural_direction、"
@@ -439,7 +439,7 @@ class Synthesizer:
 
         reason = 用户末态那句「为什么」。session_id 供 get_session_timeline 按体感点取用。
         """
-        rows = sorted(self._store.index(), key=lambda e: e["created_at"])
+        rows = sorted(self._store.index(include_invalid=True), key=lambda e: e["created_at"])
         return [
             (
                 e["created_at"],
@@ -451,8 +451,8 @@ class Synthesizer:
         ]
 
     @staticmethod
-    def _format_backlog(backlog: list) -> str:
-        return format_proposal_list(backlog)
+    def _format_backlog(backlog: list, *, store) -> str:
+        return format_proposal_list(backlog, store=store)
 
     @staticmethod
     def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:
@@ -462,7 +462,9 @@ class Synthesizer:
         for ts, score, reason, sid in trend:
             why = f" — {reason}" if reason else ""
             sid_bit = f" [session={sid}]" if sid else ""
-            lines.append(f"- {ts}{sid_bit}: {score}{why}")
+            lines.append(
+                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (未评分)'}{why}"
+            )
         return "\n".join(lines)
 
     @staticmethod

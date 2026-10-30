@@ -102,6 +102,8 @@ def build_parser() -> argparse.ArgumentParser:
         item = sub.add_parser(name)
         item.add_argument("--config", type=Path, required=True)
         item.add_argument("--secrets-file", type=Path, default=argparse.SUPPRESS)
+        item.add_argument("--grading-plan", type=Path)
+        item.add_argument("--grading-worker-public-key", type=Path)
         if name == "check":
             item.add_argument("--offline", action="store_true")
             item.add_argument("--probe-models", action="store_true")
@@ -119,6 +121,14 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "destroy":
             item.add_argument("--confirm", required=True)
             item.add_argument("--discard-uncollected", action="store_true")
+    worker = sub.add_parser(
+        "assessment-worker", help="Grade sealed sessions on a trusted Docker host"
+    )
+    worker.add_argument("run_id")
+    worker.add_argument("--plan", type=Path, required=True)
+    worker.add_argument("--signing-key", type=Path, required=True)
+    worker.add_argument("--follow", action="store_true")
+    worker.add_argument("--secrets-file", type=Path, default=argparse.SUPPRESS)
     dashboard = sub.add_parser("dashboard", help="View one local run or collected E2B snapshot")
     dashboard.add_argument("run_id")
     dashboard.add_argument("--host", default="127.0.0.1")
@@ -194,6 +204,19 @@ def dispatch(argv: list[str] | None = None) -> int:
             if result.get("batch_state") == "INTERRUPTED":
                 return 130
             return 1 if result.get("ok") is False else 0
+        elif args.cmd == "assessment-worker":
+            from auto_designer.experiment.assessment_worker import run_worker
+
+            result = run_worker(
+                run_id=args.run_id,
+                root=args.runs_dir,
+                plan_path=args.plan,
+                signing_key=args.signing_key,
+                secrets_file=args.secrets_file,
+                follow=args.follow,
+            )
+            _emit(payload=result, as_json=args.json)
+            return 0
         elif args.cmd == "grade":
             from auto_designer.experiment.grading import grade_run
 
@@ -212,6 +235,8 @@ def dispatch(argv: list[str] | None = None) -> int:
                 offline=args.offline,
                 secrets_file=args.secrets_file,
                 probe_models=args.probe_models,
+                grading_plan=args.grading_plan,
+                grading_worker_public_key=args.grading_worker_public_key,
             )
             # Resolved material configuration is public, provider credentials never are.
         elif args.cmd == "prepare":
@@ -220,6 +245,8 @@ def dispatch(argv: list[str] | None = None) -> int:
                 root=args.runs_dir,
                 secrets_file=args.secrets_file,
                 progress=_prepare_progress,
+                grading_plan=args.grading_plan,
+                grading_worker_public_key=args.grading_worker_public_key,
             )
         else:
             if args.cmd == "run":

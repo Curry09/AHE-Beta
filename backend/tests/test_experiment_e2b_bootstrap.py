@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import io
 import json
 import os
@@ -75,6 +76,13 @@ def test_bootstrap_installs_run_local_python_and_transfers_only_owned_tree(
         "materials": records,
         "source_snapshot": {"files": {}},
         "task_package": {"source": {"kind": "local"}},
+        "source_pins": {
+            "nexau": {
+                "revision": json.loads(
+                    importlib.metadata.distribution("nexau").read_text("direct_url.json")
+                )["vcs_info"]["commit_id"]
+            }
+        },
     }
     if multitask:
         tasks = []

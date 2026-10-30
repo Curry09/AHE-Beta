@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import time
+import uuid
 from pathlib import Path
 
 import pytest
@@ -97,7 +100,8 @@ def test_docker_seed_starts_runnable_session_without_copying_repo_to_host(
 
     assert result.container_id == "container-1"
     assert result.cwd == "/workspace/instance-1/repo"
-    assert any(call[0] == "run" for call in calls)
+    started = next(call for call in calls if call[0] == "run")
+    assert started[-3:] == ["seed:test", "sleep", "infinity"]
     assert not any("cp" in call for call in calls)
     isolate_call = next(call for call in calls if call[:3] == ["exec", "container-1", "python3"])
     assert isolate_call[-1] == "instance-1"
@@ -243,3 +247,125 @@ def test_docker_session_carries_bound_task_round_and_stable_session(monkeypatch)
     assert runtime.evidence["session_id"] == "stable-session"
     assert runtime.evidence["task_digest"] == "a" * 64
     runtime.close()
+
+
+def test_real_docker_seed_quiesce_kills_descendants_and_keeps_frozen_export(tmp_path):
+    """Spec-0084/T2: no actor writer survives, while controller export remains usable."""
+    if os.environ.get("RUN_SPEC_0084_DOCKER") != "1":
+        pytest.skip("set RUN_SPEC_0084_DOCKER=1 for real Docker lifecycle verification")
+    from auto_designer.user.sim.sources.docker_seed import DockerSeedSource
+
+    image = f"auto-designer-quiesce-test:{uuid.uuid4().hex}"
+    # Use an installed image; the opt-in regression never pulls an unpinned remote tag.
+    base = subprocess.run(
+        ["docker", "image", "inspect", "python:3.13-slim-bookworm", "--format", "{{.Id}}"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout.strip()
+    runtime = None
+    fixture = None
+    try:
+        fixture = subprocess.run(
+            ["docker", "create", base, "sleep", "infinity"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        ).stdout.strip()
+        root = tmp_path / "root"
+        (root / "workspace/task/repo").mkdir(parents=True)
+        (root / "build-state.json").write_text('{"instances":{"task":{}}}')
+        subprocess.run(
+            ["docker", "cp", str(root) + "/.", fixture + ":/"],
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        subprocess.run(
+            [
+                "docker",
+                "commit",
+                "--change",
+                "LABEL org.auto-designer.seed-runtime=1",
+                fixture,
+                image,
+            ],
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        runtime = DockerSeedSource().provision(
+            WorkspaceSpec(kind="docker-seed", params={"image": image, "instance_id": "task"})
+        )
+        # Two forks create children and grandchildren. Ignore TERM deliberately so
+        # the production KILL pass must stop them; orphan descendants still count.
+        writer = (
+            "import os,signal,time\nfrom pathlib import Path\n"
+            "signal.signal(signal.SIGTERM,signal.SIG_IGN)\n"
+            "root=Path('/workspace/task/repo')\n"
+            "for generation in range(3):\n"
+            " root.joinpath(f'pid-{generation}').write_text(str(os.getpid()))\n"
+            " if generation==2: break\n"
+            " if os.fork():\n"
+            "  while True: time.sleep(1)\n"
+            "while True:\n"
+            " root.joinpath('answer.tmp').write_text(str(time.monotonic_ns()))\n"
+            " root.joinpath('answer.tmp').replace(root/'answer.json')\n"
+            " time.sleep(.01)\n"
+        )
+        subprocess.run(
+            ["docker", "exec", "-d", runtime.container_id, "python3", "-c", writer],
+            check=True,
+            capture_output=True,
+            timeout=10,
+        )
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                pids = [int(runtime.read_text(f"pid-{i}")) for i in range(3)]
+                if runtime.export_file("answer.json", 100):
+                    break
+            except (OSError, ValueError):
+                pass
+            assert time.monotonic() < deadline, "task writer did not start"
+            time.sleep(0.05)
+
+        runtime.quiesce()
+        assert len(set(pids)) == 3
+        assert (
+            runtime._exec(
+                [
+                    "python3",
+                    "-c",
+                    "from pathlib import Path\nimport sys\n"
+                    "for pid in sys.argv[1:]:\n"
+                    " p=Path('/proc')/pid/'stat'\n"
+                    " assert not p.exists() or p.read_text().rsplit(')',1)[1].split()[0]=='Z'\n",
+                    *map(str, pids),
+                ]
+            ).returncode
+            == 0
+        )
+        assert (
+            subprocess.run(
+                ["docker", "inspect", runtime.container_id, "--format", "{{.State.Running}}"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            ).stdout.strip()
+            == "true"
+        )
+        frozen = runtime.export_file("answer.json", 100)
+        time.sleep(0.1)
+        assert runtime.export_file("answer.json", 100) == frozen
+        (tmp_path / "answer.json").write_bytes(frozen)
+        assert (tmp_path / "answer.json").read_bytes() == frozen
+    finally:
+        if runtime is not None:
+            runtime.close()
+        if fixture is not None:
+            subprocess.run(["docker", "rm", "-f", fixture], capture_output=True, timeout=30)
+        subprocess.run(["docker", "image", "rm", "-f", image], capture_output=True, timeout=30)

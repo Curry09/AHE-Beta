@@ -8,6 +8,7 @@ import pytest
 
 from auto_designer.demand.delivery_evidence import build_package
 from auto_designer.demand.observation_provider import ObservationProvider
+from auto_designer.execution_contract import canonical_sha256, make_execution_contract
 from auto_designer.experiment.config import ConfigError
 from auto_designer.experiment.continuation.evidence import (
     ContinuationEvidenceView,
@@ -101,6 +102,95 @@ def test_parent_tampering_is_detected_on_load(evidence):
     path.write_text(path.read_text() + " ")
     with pytest.raises(ConfigError, match="content changed"):
         view.load("parent-sid")
+
+
+@pytest.fixture
+def assessed_parent(evidence):
+    parent, exported, child, issue_map = evidence
+    path = parent / "sessions/parent-sid.json"
+    session = json.loads(path.read_text())
+    contract = make_execution_contract(
+        session_id="parent-sid",
+        task_id="task",
+        task_digest="a" * 64,
+        followup_input="unavailable",
+        task_budget_seconds=600,
+        budget_source="task_metadata",
+    )
+    session.update(
+        execution_contract=contract,
+        session_provenance={"round_no": 1, "harness_sha": "b" * 40},
+    )
+    path.write_text(json.dumps(session))
+    exported["boundary"]["sessions"][0]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    summary = dict(
+        receipt_id="parent-assessment",
+        session_id="parent-sid",
+        contract_id=contract["contract_id"],
+        status="completed",
+        passed=False,
+        score=None,
+        metric_definition=None,
+        assessment_kind="custom",
+        source_sha256="c" * 64,
+    )
+    relative = "assessment/feedback/round-1.json"
+    projection = parent / relative
+    projection.parent.mkdir(parents=True)
+    projection.write_text(
+        json.dumps(
+            dict(
+                round_no=1,
+                user_sha="b" * 40,
+                summaries=[summary],
+                sha256=canonical_sha256([summary]),
+            )
+        )
+    )
+    (parent / "collection.json").write_text(
+        json.dumps({"files": {relative: hashlib.sha256(projection.read_bytes()).hexdigest()}})
+    )
+    return evidence, summary, projection
+
+
+def test_continuation_preserves_parent_assessment_without_child_writes(assessed_parent):
+    (parent, exported, child, issue_map), summary, _ = assessed_parent
+    before = {p.relative_to(parent): p.read_bytes() for p in parent.rglob("*") if p.is_file()}
+    view = ContinuationEvidenceView(
+        child_store=child, parent_root=parent, export=exported, issue_map=issue_map
+    )
+    assert view.load_assessment_summaries("parent-sid") == [summary]
+    assert not child.root.exists()
+    assert before == {
+        p.relative_to(parent): p.read_bytes() for p in parent.rglob("*") if p.is_file()
+    }
+
+
+@pytest.mark.parametrize("mutation", ["changed", "missing", "unlisted"])
+def test_parent_assessment_requires_archived_bytes(assessed_parent, mutation):
+    (parent, exported, child, issue_map), _, projection = assessed_parent
+    if mutation == "changed":
+        frozen = json.loads(projection.read_text())
+        frozen["summaries"][0]["passed"] = True
+        frozen["sha256"] = canonical_sha256(frozen["summaries"])
+        projection.write_text(json.dumps(frozen))
+    elif mutation == "missing":
+        projection.unlink()
+    else:
+        (parent / "collection.json").write_text('{"files":{}}')
+    view = ContinuationEvidenceView(
+        child_store=child, parent_root=parent, export=exported, issue_map=issue_map
+    )
+    with pytest.raises((SessionConflictError, ConfigError), match="assessment"):
+        view.load_assessment_summaries("parent-sid")
+
+
+def test_parent_without_measurement_stays_unmeasured(evidence):
+    parent, exported, child, issue_map = evidence
+    view = ContinuationEvidenceView(
+        child_store=child, parent_root=parent, export=exported, issue_map=issue_map
+    )
+    assert view.load_assessment_summaries("parent-sid") == []
 
 
 @pytest.mark.parametrize("redacted", [False, True])

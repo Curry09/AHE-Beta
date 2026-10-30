@@ -31,7 +31,9 @@ def artifact_targets(metadata: dict[str, Any]) -> dict[str, str | None]:
     }
 
 
-def validate_mapping(request: GradingRequest, targets: dict[str, str | None]) -> None:
+def validate_mapping_plan(
+    request: GradingRequest, targets: dict[str, str | None]
+) -> dict[str, str]:
     mapping = request.config.get("artifact_map")
     if not isinstance(mapping, dict) and not hasattr(mapping, "items"):
         raise InputValidationError("artifact_map must map collected IDs to official destinations")
@@ -39,7 +41,15 @@ def validate_mapping(request: GradingRequest, targets: dict[str, str | None]) ->
         raise InputValidationError(
             "artifact destinations must exactly match the pinned official task"
         )
-    for name, destination in mapping.items():
+    return {
+        name: "managed_service" if targets[destination] else "workspace"
+        for name, destination in mapping.items()
+    }
+
+
+def validate_mapping(request: GradingRequest, targets: dict[str, str | None]) -> None:
+    validate_mapping_plan(request, targets)
+    for name, destination in request.config["artifact_map"].items():
         if name not in request.artifacts:
             raise InputValidationError(
                 f"missing required artifact: {name}", status="missing_artifact"
@@ -122,7 +132,7 @@ class TerminalBenchAdapter:
     name = "terminal-bench"
     contract_version = 1
 
-    def validate_inputs(self, request: GradingRequest) -> None:
+    def validate_plan(self, request: GradingRequest) -> dict[str, str]:
         _, _, metadata = validate_task_bundle(request)
         if metadata.get("verifier", {}).get("environment_mode") != "separate":
             raise InputValidationError(
@@ -135,6 +145,11 @@ class TerminalBenchAdapter:
         unknown = set(request.config) - {"revision", "build_official_environment", "artifact_map"}
         if unknown:
             raise ValueError(f"unknown Terminal adapter configuration: {sorted(unknown)}")
+        return validate_mapping_plan(request, artifact_targets(metadata))
+
+    def validate_inputs(self, request: GradingRequest) -> None:
+        self.validate_plan(request)
+        _, _, metadata = validate_task_bundle(request)
         validate_mapping(request, artifact_targets(metadata))
 
     def evaluate(self, request: GradingRequest, attempt_dir: Path) -> GradingResult:

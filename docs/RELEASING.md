@@ -4,9 +4,9 @@
 
 ## 基线与冻结
 
-`release/compatibility.json` 的 `baseline_commit` 保留整理前的审计来源，`openagents.integration_commit` 则记录当前跨仓 CI 使用的完整 SHA，**两者都不是整理完成后的正式发行版本**。整理 PR 合并并通过检查后，从双方目标分支取最终提交，生成发布资产中的完整 manifest，填写两仓 SHA/tag、NexAU、seed Harness tree、容器 digest、配置 profile、平台及验证结果。避免在提交内部记录自身 commit hash。
+`release/compatibility.json` 的 `baseline_commit` 保留整理前的审计来源，`openagents.integration_commit` 则记录已合入 main 的跨仓基线完整 SHA；当前跨仓 CI 优先采用 `execution_evidence.reader_release_commit`，未发布时采用 `reader_candidate_commit`，**两者都不是整理完成后的正式发行版本**。整理 PR 合并并通过检查后，从双方目标分支取最终提交，生成发布资产中的完整 manifest，填写两仓 SHA/tag、NexAU、seed Harness tree、容器 digest、配置 profile、平台及验证结果。避免在提交内部记录自身 commit hash。
 
-两仓最终均从 main 发布。OpenAgents 的功能和开源整理已分别通过 [PR #185](https://github.com/Curry09/OpenAgents/pull/185) 与 [PR #186](https://github.com/Curry09/OpenAgents/pull/186) 合入 main；当前跨仓受测提交为 `ee87df3acab036213cecbc35cdea01339a5dd988`。这仍是提交 pin，尚未发布正式 tag。项目/前端/桌面组件版本可以不同，Release notes 解释各自范围。NexAU 的 extra 含固定 Git 来源，当前优先源码/GitHub wheel 发布；PyPI 发行前需另行验证 direct-reference 依赖政策与分发方案。
+两仓最终均从 main 发布。OpenAgents 的功能和开源整理已分别通过 [PR #185](https://github.com/Curry09/OpenAgents/pull/185) 与 [PR #186](https://github.com/Curry09/OpenAgents/pull/186) 合入 main；已合入 main 的配置基线为 `ee87df3acab036213cecbc35cdea01339a5dd988`；当前 PR CI 的配套执行证据 reader 为 `release/compatibility.json` 中的不可变候选提交。这仍是提交 pin，尚未发布正式 tag。项目/前端/桌面组件版本可以不同，Release notes 解释各自范围。NexAU 从 hzhua/nexau 的固定 Git 提交获取；pyproject.toml、uv.lock 与 release/compatibility.json 必须一致。OpenAgents wheel 的 nexau extra 也直接携带固定 Git 依赖，安装时需能读取上游仓库；当前发布方式为源码/GitHub wheel，PyPI 发行前另行确认 direct-reference 依赖政策。
 
 ## 已纳入本轮代码的检查
 
@@ -51,10 +51,12 @@ GitHub CI 的跨仓 checkout 要求对方仓库可读；首次公开前若仍是
 
 OpenAgents 0092 必须先于新发布端上线：旧 reader 不理解 ZIP，不能靠 publisher 上传成功判断交付成功。当前实现是配套工作树候选，`observation_transport.reader_release_commit` 保持 `null`，没有捏造尚未发布的提交。`observation-runtime.json` 中历史 runtime pin 仍属于 gzip 基线，`hosted_candidate` 只记录本次实际构建的评审镜像。
 
-1. 审阅并合并 OpenAgents reader，取得真实完整 SHA；用它构建新镜像并通过镜像内能力检查。
-2. 在 auto-designer 的 CI 手动触发 `workflow_dispatch`，输入该 SHA 运行真实 producer/reader 的 gzip/ZIP 离线契约。未填写新 release pin 时，普通 PR CI 仍只运行旧配置契约，会明确提示未覆盖 ZIP；不能把这项旧基线绿灯当成新功能验收。
+1. 审阅并合并 OpenAgents reader，取得真实完整 SHA，并更新候选 pin；用它构建新镜像并通过镜像内能力检查。
+2. 普通 PR CI 按清单选择配套 execution evidence reader 的 release pin 或候选 pin，同时运行配置及真实 producer/reader 的 gzip/ZIP 离线契约；也可手动触发 `workflow_dispatch`，输入完整 SHA 验证另一提交。离线契约通过不代表镜像或模型 canary 已通过。
 3. 对新容器/代理及 E2B 分别执行显式真人探针，确认真实 `prepare` 返回授权 session，历史文件和摘要一致且权限为 `0400`。记录环境、版本与结果，脱敏后保存；不调用模型。
-4. 把已验证 SHA 填入 `observation_transport.reader_release_commit`，同步 Quickstart 与镜像发行记录。此后普通 PR CI 自动跑新编码契约。运行时使用实际镜像 digest，而不是仅更新宿主 checkout。
+4. 把已验证 SHA 填入 `observation_transport.reader_release_commit`，同步 Quickstart 与镜像发行记录。普通 PR CI 继续自动运行新编码契约。运行时使用实际镜像 digest，而不是仅更新宿主 checkout。
 5. 保留旧 gzip/direct 兼容组合。旧实验恢复继续原冻结 profile；新实验才使用新托管路径。
 
 附件链路验收与完整闭环 canary 分开记录；前者不代替 R1 交付、R2 复测和停止/恢复的模型实验。
+
+手动构建经典 Vigil 或 SWE 运行时镜像时，另备 SDK checkout：`git clone https://github.com/hzhua/nexau.git /path/to/nexau` 后执行 `git -C /path/to/nexau checkout --detach 28511d9f0362191a6c378fd441b2be55309a9e32`。Vigil 的 `backend/deploy/vigil/build.sh` 显式接收 OpenAgents 与 SDK 两个源码路径；SWE 镜像构建设置 `NEXAU_SOURCE=/path/to/nexau`。统一实验入口的 local/E2B 引导直接按冻结 uv.lock 安装 Git 依赖，无需内置或额外打包 SDK 源码。

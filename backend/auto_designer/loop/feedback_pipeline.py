@@ -65,7 +65,7 @@ class FeedbackPipeline:
         operation_namespace: str | None = None,
         grounding_repo: str | None = None,
     ) -> None:
-        if prerequisite not in {"users", "feedback_imported"}:
+        if prerequisite not in {"users", "feedback_imported", "objective_grading"}:
             raise ValueError("unsupported feedback prerequisite")
         if prerequisite == "feedback_imported" and not operation_namespace:
             raise ValueError("imported feedback requires an operation namespace")

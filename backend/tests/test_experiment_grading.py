@@ -945,13 +945,16 @@ def test_custom_plan_uses_frozen_original_output_and_keeps_original_session(
                 execution=ExecutionEvidence("isolated_custom_verifier", True, "sha256:" + "f" * 64),
             )
 
+    from auto_designer.evaluation import service
+
     monkeypatch.setattr(grading, "get_adapter", lambda *args: Adapter())
+    monkeypatch.setattr(service, "get_adapter", lambda *args: Adapter())
     before = unchanged(run["directory"])
     common = {"run_id": run["manifest"]["run_id"], "root": run["directory"].parent, "plan": plan}
     offline = grading.grade_run(**common, offline=True)
     assert offline["ok"] and not (run["directory"] / "evaluation").exists()
     result = grading.grade_run(**common)
-    assert result["entries"][0]["acceptance_assessment"] == "valid_accept"
+    assert result["entries"][0]["acceptance_assessment"] == "unverified_accept"
     assert unchanged(run["directory"]) == before
     # Archived bytes remain the authority even if the live collected copy changes.
     live = next(

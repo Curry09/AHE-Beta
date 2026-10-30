@@ -13,6 +13,28 @@ from auto_designer.experiment.backends.base import BackendError
 from auto_designer.experiment.infrastructure import LABEL_EXPERIMENT, LABEL_MANIFEST
 
 
+def test_transport_reader_alone_cannot_start_new_execution_contract_run():
+    from auto_designer.experiment.backends.base import require_execution_reader
+
+    with pytest.raises(BackendError, match="execution-evidence"):
+        require_execution_reader(
+            {
+                "encodings": ["gzip", "zip"],
+                "download_policies": ["same-origin-v1", "gitea-com-r2-v1"],
+            }
+        )
+    with pytest.raises(BackendError, match="execution-evidence"):
+        require_execution_reader(
+            {
+                "execution_evidence": {
+                    "schema_versions": [1],
+                    "required_dispatch": False,
+                    "context_projection": "all-delivery-roles-v1",
+                }
+            }
+        )
+
+
 @pytest.fixture
 def backend(tmp_path, monkeypatch):
     run_id = "20260930T123000Z-1234abcd"
@@ -120,7 +142,15 @@ def backend(tmp_path, monkeypatch):
         if argv[:2] == ["docker", "run"]:
             if "observation-capabilities" in argv:
                 return json.dumps(
-                    {"encodings": ["gzip", "zip"], "download_policies": ["same-origin-v1"]}
+                    {
+                        "encodings": ["gzip", "zip"],
+                        "download_policies": ["same-origin-v1"],
+                        "execution_evidence": {
+                            "schema_versions": [1],
+                            "required_dispatch": True,
+                            "context_projection": "all-delivery-roles-v1",
+                        },
+                    }
                 )
             if argv[-3:] == ["git", "rev-parse", "HEAD"]:
                 return "b" * 40
@@ -683,7 +713,17 @@ def test_prepare_builds_only_frozen_sources_and_never_passes_credentials(tmp_pat
                 ]
             )
         if "observation-capabilities" in argv:
-            return json.dumps({"encodings": ["gzip"], "download_policies": ["same-origin-v1"]})
+            return json.dumps(
+                {
+                    "encodings": ["gzip"],
+                    "download_policies": ["same-origin-v1"],
+                    "execution_evidence": {
+                        "schema_versions": [1],
+                        "required_dispatch": True,
+                        "context_projection": "all-delivery-roles-v1",
+                    },
+                }
+            )
         if argv[:2] == ["docker", "run"] and "-c" in argv:
             return json.dumps({"verified": True, "nexau_commit": "n" * 40})
         return ""
@@ -1284,7 +1324,17 @@ def test_prepare_multitask_seeds_use_distinct_sources_and_one_shared_toolchain(
             else:
                 builds.append((target,))
         if "observation-capabilities" in argv:
-            return json.dumps({"encodings": ["gzip"], "download_policies": ["same-origin-v1"]})
+            return json.dumps(
+                {
+                    "encodings": ["gzip"],
+                    "download_policies": ["same-origin-v1"],
+                    "execution_evidence": {
+                        "schema_versions": [1],
+                        "required_dispatch": True,
+                        "context_projection": "all-delivery-roles-v1",
+                    },
+                }
+            )
         if argv[:2] == ["docker", "run"] and "-c" in argv:
             return json.dumps(
                 {"verified": True, "nexau_commit": manifest["source_pins"]["nexau"]["revision"]}
@@ -1426,7 +1476,17 @@ def test_multitask_preflight_checks_every_selected_image_before_readiness(
 
     def command(argv, **_kwargs):
         if "observation-capabilities" in argv:
-            return json.dumps({"encodings": ["gzip"], "download_policies": ["same-origin-v1"]})
+            return json.dumps(
+                {
+                    "encodings": ["gzip"],
+                    "download_policies": ["same-origin-v1"],
+                    "execution_evidence": {
+                        "schema_versions": [1],
+                        "required_dispatch": True,
+                        "context_projection": "all-delivery-roles-v1",
+                    },
+                }
+            )
         task_id = argv[argv.index("-w") + 1].split("/")[2]
         probed.append(task_id)
         assert argv[argv.index("-w") + 2] == bindings[task_id]["params"]["image"]

@@ -26,7 +26,7 @@ class CustomAdapter:
     name = "custom"
     contract_version = 1
 
-    def validate_inputs(self, request: GradingRequest) -> None:
+    def validate_plan(self, request: GradingRequest) -> dict[str, str]:
         require_material(request, "script")
         immutable_image(request)
         unknown = set(request.config) - {"image", "argv", "artifact_map"}
@@ -46,13 +46,18 @@ class CustomAdapter:
             raise ValueError("custom artifact_map must be an object")
         if len(set(mapping.values())) != len(mapping):
             raise ValueError("duplicate custom artifact destinations")
-        for key, path in mapping.items():
+        for path in mapping.values():
             if (
                 not isinstance(path, str)
                 or not path.startswith("/inputs/")
                 or ".." in PurePosixPath(path).parts
             ):
                 raise ValueError("custom inputs must be placed below /inputs/")
+        return {name: "workspace" for name in mapping}
+
+    def validate_inputs(self, request: GradingRequest) -> None:
+        required = self.validate_plan(request)
+        for key in required:
             if key not in request.artifacts:
                 raise InputValidationError(
                     f"missing custom input: {key}", status="missing_artifact"

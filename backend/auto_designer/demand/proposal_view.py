@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from auto_designer.demand.evidence_contract import execution_for_sessions, format_execution_facts
 from auto_designer.demand.issue_schema import (
     FROM_DIVERGENT,
     FROM_SYNTHESIZE,
@@ -24,6 +25,7 @@ from auto_designer.demand.issue_schema import (
     provenance_of,
     round_of,
 )
+from auto_designer.observations.grants import authorized_sessions
 
 _LEGACY_EVIDENCE_HEADING = "## 原始用户报告（案例证据，非实现对象）"
 _BODY_LIMIT = 3000
@@ -50,6 +52,9 @@ class ProposalView:
     provenance: str | None
     covers: tuple[int, ...]
     body: str
+    execution_contracts: tuple[dict, ...] = ()
+    assessment_summaries: tuple[dict, ...] = ()
+    unavailable_sources: tuple[dict, ...] = ()
 
 
 def normalized_proposal_body(body: str) -> str:
@@ -57,13 +62,23 @@ def normalized_proposal_body(body: str) -> str:
     return (body or "").split(_LEGACY_EVIDENCE_HEADING, 1)[0].strip()[:_BODY_LIMIT]
 
 
-def proposal_view(issue) -> ProposalView:
+def proposal_view(issue, *, store=None) -> ProposalView:
     labels = tuple(
         label
         for label in (str(value) for value in issue.labels)
         if label in _CANONICAL_LABELS or round_of([label]) is not None
     )
+    execution = (
+        execution_for_sessions(
+            store=store, session_ids=authorized_sessions(store=store, issue=int(issue.number))
+        )
+        if store is not None
+        else {}
+    )
     return ProposalView(
+        execution_contracts=tuple(execution.get("execution_contracts") or []),
+        assessment_summaries=tuple(execution.get("assessment_summaries") or []),
+        unavailable_sources=tuple(execution.get("unavailable_sources") or []),
         number=int(issue.number),
         title=str(issue.title).strip(),
         labels=labels,
@@ -74,8 +89,8 @@ def proposal_view(issue) -> ProposalView:
     )
 
 
-def format_proposal_view(issue) -> str:
-    view = proposal_view(issue)
+def format_proposal_view(issue, *, store=None) -> str:
+    view = proposal_view(issue, store=store)
     metadata = [f"labels={','.join(view.labels) or '-'}"]
     if view.priority:
         metadata.append(f"priority={view.priority}")
@@ -87,13 +102,22 @@ def format_proposal_view(issue) -> str:
     sessions = evidence_session_ids([issue])
     if sessions:
         metadata.append(f"evidence_sessions={','.join(sorted(sessions))}")
-    return f"- #{view.number} [{'; '.join(metadata)}] {view.title}\n  {body}"
+    execution = format_execution_facts(
+        {
+            "execution_contracts": list(view.execution_contracts),
+            "assessment_summaries": list(view.assessment_summaries),
+            "unavailable_sources": list(view.unavailable_sources),
+        }
+    )
+    return f"- #{view.number} [{'; '.join(metadata)}] {view.title}\n  {body}" + (
+        f"\n  可信执行条件（独立于正文裁剪）：{execution}" if execution else ""
+    )
 
 
-def format_proposal_list(issues: list) -> str:
+def format_proposal_list(issues: list, *, store=None) -> str:
     if not issues:
         return "（空）"
-    return "\n".join(format_proposal_view(issue) for issue in issues)
+    return "\n".join(format_proposal_view(issue, store=store) for issue in issues)
 
 
 def format_proposal_reference(issue) -> str:

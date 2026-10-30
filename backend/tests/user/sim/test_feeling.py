@@ -31,6 +31,8 @@ def test_parse_feeling_llm() -> None:
     assert parse_feeling_llm({"score": "abc"}) is None  # 非整数
     assert parse_feeling_llm({"score": 5}) is None  # 越界
     assert parse_feeling_llm({"score": 2}).reason == ""  # reason 缺省空串
+    for value in (True, False, "2", 2.9, 2.0, None):
+        assert parse_feeling_llm({"score": value}) is None
 
 
 def test_derive_feeling_mapping() -> None:

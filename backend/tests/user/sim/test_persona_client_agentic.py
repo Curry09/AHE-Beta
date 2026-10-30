@@ -275,7 +275,7 @@ def test_final_check_tool_budget_is_capped_at_four() -> None:
 
     out = c.respond("SYS", "<main_final_check><check_goal>x</check_goal></main_final_check>")
     assert out == {"perceive": "four checks completed", "check_status": "completed"}
-    assert len(sb.runs) == 4
+    assert len(sb.runs) == 4  # Interactive checks execute commands, retaining the bounded episode.
     assert len(llm.calls) == 5
 
 

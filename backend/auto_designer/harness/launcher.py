@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import os
 import queue
 import shutil
@@ -29,7 +30,12 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-from auto_designer.harness.budget import RequestLimits, product_budget_environment, request_limits
+from auto_designer.harness.budget import (
+    RequestLimits,
+    TaskBudget,
+    product_budget_environment,
+    request_limits,
+)
 from auto_designer.harness.interface import HarnessInterface
 from auto_designer.user.sim.runtime import (
     DockerWorkspaceRuntime,
@@ -40,13 +46,10 @@ from auto_designer.user.sim.runtime import (
 
 _PARAMS_FILE = "params.yaml"
 
-# 单轮回复的兜底机制。harness 自身不设整轮墙钟上限：「慢」是合法的长任务，
-# 由外层 90s persona 心跳决定续等/打断，不按旧 240s deadline 盲杀。
-# 真正要防的是「进程已死但孤儿子进程占着管道写端 → readline 永不 EOF」这种死锁：靠轮询 proc.poll()
-# 精确识别（进程没了却没回完整行 → 立即上抛），而非靠计时。
+# Spec-0084/T3: negotiated task deadlines are authoritative. The old bounded
+# process fallback applies only when no task execution conditions were bound.
+# Process death is detected separately, even when an orphan holds stdout open.
 _POLL_INTERVAL = 5.0
-# 绝对上限：仅作最后基础设施兜底，防「进程还活着但真活锁」。
-# 正常慢任务应先经多次 persona 心跳做出明确决策，不依赖此上限收敛。
 _SEND_ABS_CAP = 1800.0
 # 读线程 EOF / 进程退出时投进行队列的哨兵（与真实 stdout 行区分）。
 _EOF = object()
@@ -124,11 +127,30 @@ class _HarnessHandle:
         self._awaiting_reply = False
         self._request_id = ""
         self._request_started_at = ""
+        self._execution_contract: dict | None = None
+        self._task_id = uuid.uuid4().hex
+        self._task_budget = TaskBudget(self._limits.request_seconds)
+        self._task_deadline_utc: str | None = None
+        self._pending_requests: dict[str, dict] = {}
+        self._deadline_interrupt_sent: float | None = None
+        raw_activity = self._env.get("AUTO_DESIGNER_HARNESS_MESSAGE_ACTIVITY_SECONDS")
+        self._message_activity_seconds = float(raw_activity) if raw_activity else None
+        if self._message_activity_seconds is not None and (
+            not math.isfinite(self._message_activity_seconds) or self._message_activity_seconds <= 0
+        ):
+            raise ValueError(
+                "AUTO_DESIGNER_HARNESS_MESSAGE_ACTIVITY_SECONDS must be positive finite seconds"
+            )
         self.request_outcomes: list[dict[str, Any]] = []
         # 最近一笔已结束请求的结构化终态。调用方必须能区分正常 reply 与
         # "带 timeout/crash 文本的终局 reply"，不能再靠解析人类可见文本猜测。
         self.last_request_status = ""
         self._start()
+
+    @property
+    def request_budget_seconds(self) -> float | None:
+        """The configured fallback, or the bound task budget after contract binding."""
+        return self._task_budget.seconds
 
     @property
     def in_flight(self) -> bool:
@@ -230,14 +252,53 @@ class _HarnessHandle:
         self._proc.stdin.write(json.dumps(obj, ensure_ascii=False) + "\n")
         self._proc.stdin.flush()
 
-    def _message_frame(self, message: str) -> dict:
-        frame = {"type": "message", "text": message}
-        if self._limits.request_seconds is not None:
-            frame["budget_seconds"] = self._limits.request_seconds
+    def bind_execution_contract(self, contract: dict) -> None:
+        """Spec-0084/T3: bind once before the first goal; never renew on follow-ups."""
+        from auto_designer.execution_contract import validate_execution_contract
+
+        declaration = validate_execution_contract(contract)
+        if self._execution_contract == declaration:
+            return
+        if (
+            self._execution_contract is not None
+            or self._task_budget.started_at is not None
+            or self._pending_requests
+        ):
+            raise ValueError("Execution contract cannot change after task binding or dispatch")
+        self._execution_contract = declaration
+        self._task_id = declaration["task_id"]
+        seconds = declaration["task_budget_seconds"]
+        self._task_budget = TaskBudget(seconds)
+        self._limits = RequestLimits(
+            seconds,
+            seconds + self._limits.grace_seconds if seconds is not None else float("inf"),
+            self._limits.grace_seconds,
+        )
+
+    def _message_frame(self, message: str, message_id: str) -> dict:
+        frame = {
+            "type": "message",
+            "text": message,
+            "task_id": self._task_id,
+            "message_id": message_id,
+        }
+        if self._execution_contract is not None:
+            frame.update(
+                contract_id=self._execution_contract["contract_id"],
+                followup_input=self._execution_contract["followup_input"],
+                task_budget_seconds=self._task_budget.seconds,
+                remaining_budget_seconds=self._task_budget.remaining(),
+                task_deadline_utc=self._task_deadline_utc,
+                budget_source=self._execution_contract["budget_source"],
+            )
+        elif self._limits.request_seconds is not None:
+            frame["budget_seconds"] = self._task_budget.remaining()
+        if self._message_activity_seconds is not None:
+            frame["message_activity_seconds"] = self._message_activity_seconds
         return frame
 
     def _interrupt_frame(self) -> dict:
-        return {"type": "interrupt"}
+        return {"type": "interrupt", "task_id": self._task_id, "message_id": self._request_id}
 
     def _shutdown_frame(self) -> dict:
         return {"type": "shutdown"}
@@ -251,32 +312,151 @@ class _HarnessHandle:
             raise RuntimeError("harness 句柄已关闭，不可再 send")
         assert self._proc.stdin is not None and self._proc.stdout is not None
         self.last_request_status = ""
-        self._write(self._message_frame(message))
-        self._t0 = time.monotonic()
-        self._awaiting_reply = True
-        self._request_id = uuid.uuid4().hex
-        self._request_started_at = datetime.now(UTC).isoformat()
+        command = message.strip().split(maxsplit=1)[0].lower() if message.strip() else ""
+        builtin = command in {"/help", "/exit", "/quit"}
+        if not builtin:
+            self._task_budget.start()
+            if self._task_budget.expired():
+                raise RuntimeError("Task budget is exhausted; new solving messages are not allowed")
+            if self._task_budget.seconds is not None and self._task_deadline_utc is None:
+                from datetime import timedelta
 
-    def _finish_request(self, status: str, *, origin: str = "harness_reply") -> None:
+                self._task_deadline_utc = (
+                    datetime.now(UTC) + timedelta(seconds=self._task_budget.remaining())
+                ).isoformat()
+        message_id = uuid.uuid4().hex
+        now = time.monotonic()
+        self._pending_requests[message_id] = {
+            "started_at": datetime.now(UTC).isoformat(),
+            "started_monotonic": now,
+            "builtin": builtin,
+            "activity_deadline": now + self._message_activity_seconds
+            if self._message_activity_seconds is not None and not builtin
+            else None,
+        }
         if not self._request_id:
+            self._request_id = message_id
+            self._request_started_at = self._pending_requests[message_id]["started_at"]
+            self._t0 = now
+        self._awaiting_reply = True
+        self._write(self._message_frame(message, message_id))
+
+    def _finish_request(
+        self,
+        status: str,
+        *,
+        origin: str = "harness_reply",
+        reason: str = "",
+        message_id: str | None = None,
+    ) -> None:
+        identifier = message_id or self._request_id
+        if not identifier:
             return
+        record = self._pending_requests.pop(identifier, {})
         self.last_request_status = status
         self.request_outcomes.append(
             {
-                "request_id": self._request_id,
+                "request_id": identifier,
+                "message_id": identifier,
+                "task_id": self._task_id,
+                "contract_id": self._execution_contract["contract_id"]
+                if self._execution_contract
+                else None,
                 "status": status,
                 "termination_source": origin,
-                "started_at": self._request_started_at,
+                "termination_reason": reason,
+                "started_at": record.get("started_at", self._request_started_at),
                 "finished_at": datetime.now(UTC).isoformat(),
-                "request_budget_seconds": self._limits.request_seconds,
-                "infrastructure_limit_seconds": self._limits.outer_seconds,
+                "request_budget_seconds": self._task_budget.seconds,
+                "task_deadline_utc": self._task_deadline_utc,
+                "remaining_budget_seconds": self._task_budget.remaining(),
+                "infrastructure_limit_seconds": self._limits.outer_seconds
+                if self._limits.outer_seconds != float("inf")
+                else None,
                 "termination_grace_seconds": self._limits.grace_seconds,
             }
         )
-        self._request_id = ""
-        self._request_started_at = ""
+        self._request_id = next(iter(self._pending_requests), "")
+        following = self._pending_requests.get(self._request_id, {})
+        self._request_started_at = following.get("started_at", "")
+        self._t0 = following.get("started_monotonic", self._t0)
+        self._awaiting_reply = bool(self._pending_requests)
         if status in {"timed_out", "crashed"} and self._workspace_runtime is not None:
             self._workspace_runtime.invalidate(f"harness request {status}")
+
+    def _accept_reply(self, payload: dict) -> bool:
+        """Consume only replies belonging to a dispatched message in this task."""
+        identifier = payload.get("message_id")
+        if (
+            self._execution_contract is not None
+            or identifier is not None
+            or payload.get("task_id") is not None
+        ):
+            if (
+                not isinstance(identifier, str)
+                or payload.get("task_id") != self._task_id
+                or identifier not in self._pending_requests
+            ):
+                self._ingest_sideband({**payload, "type": "unmatched_reply"})
+                return False
+        else:
+            identifier = self._request_id
+        record = self._pending_requests.get(identifier, {})
+        status = payload.get("status")
+        reason = payload.get("termination_reason")
+        if payload.get("kind") == "builtin_command" and record.get("builtin"):
+            status, reason = "builtin_command", "builtin_command"
+        elif (
+            not isinstance(status, str)
+            or status not in {"completed", "incomplete", "interrupted", "crashed", "timed_out"}
+            or not isinstance(reason, str)
+            or not reason.strip()
+        ):
+            status, reason = "incomplete", "protocol_invalid_terminal"
+        self._finish_request(status, reason=reason, message_id=identifier)
+        # Unbound manual clients have no negotiated identity contract. Their unknown
+        # replies are readable, but never inferred to be successful task completion.
+        if self._execution_contract is None and payload.get("message_id") is None:
+            self._pending_requests.clear()
+            self._request_id = ""
+            self._awaiting_reply = False
+        steps = payload.get("steps")
+        self.last_steps = steps if isinstance(steps, list) else []
+        self._record_visible_event("reply", str(payload.get("text", "")), payload)
+        return True
+
+    def _check_deadlines(self) -> None:
+        if not self._awaiting_reply:
+            return
+        now = time.monotonic()
+        task_deadline = self._task_budget.deadline
+        activity = self._pending_requests.get(self._request_id, {}).get("activity_deadline")
+        deadlines = [value for value in (task_deadline, activity) if value is not None]
+        if deadlines:
+            active_deadline = min(deadlines)
+            if now >= active_deadline and self._deadline_interrupt_sent != active_deadline:
+                self._write(
+                    {
+                        **self._interrupt_frame(),
+                        "reason": "task_budget_exhausted"
+                        if task_deadline == active_deadline
+                        else "message_activity_exhausted",
+                    }
+                )
+                self._deadline_interrupt_sent = active_deadline
+            expired = now >= active_deadline + self._limits.grace_seconds
+        else:
+            expired = self._t0 > 0 and now - self._t0 >= self._limits.outer_seconds
+        if expired:
+            self._kill_group(signal.SIGKILL)
+            self._finish_request(
+                "timed_out", origin="infrastructure", reason="termination_grace_exhausted"
+            )
+            self._pending_requests.clear()
+            self._awaiting_reply = False
+            raise RuntimeError(
+                "harness task exceeded its infrastructure deadline (termination grace exhausted)"
+            )
 
     def begin(self, message: str) -> None:
         """Deprecated alias of write_message（Spec-0036）。"""
@@ -349,23 +529,14 @@ class _HarnessHandle:
 
         不要求写路径旗标。返回 ("reply", text) 或 ("pending", waited_sec)。
         progress/status 等旁路照记并继续等。进程已死却无完整行则上抛；
-        自上次 write 起的极宽松绝对上限仅在仍 awaiting_reply 时防活锁。
+        显式任务期限先取消，独立收尾余量后才强停；新消息不续租。
         """
         if self._closed or self._proc is None:
             raise RuntimeError("harness 句柄已关闭，不可 poll")
         t_poll0 = time.monotonic()
         deadline = t_poll0 + max(0.0, timeout)
         while True:
-            if self._awaiting_reply and self._t0 > 0:
-                waited_abs = time.monotonic() - self._t0
-                if waited_abs >= self._limits.outer_seconds:
-                    self._kill_group(signal.SIGKILL)
-                    self._awaiting_reply = False
-                    self._finish_request("timed_out", origin="infrastructure")
-                    raise RuntimeError(
-                        f"harness 单轮回复超基础设施上限 >{self._limits.outer_seconds:g}s"
-                        "（已包含收尾余量；已杀进程组，内部停滞原因尚未确认）"
-                    )
+            self._check_deadlines()
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 base = self._t0 if self._awaiting_reply and self._t0 > 0 else t_poll0
@@ -410,13 +581,9 @@ class _HarnessHandle:
                 self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
             if payload.get("type") == "reply":
-                self._awaiting_reply = False
-                status = str(payload.get("status") or "completed")
-                self._finish_request(status)
-                steps = payload.get("steps")
-                self.last_steps = steps if isinstance(steps, list) else []
+                if not self._accept_reply(payload):
+                    continue
                 text = str(payload.get("text", ""))
-                self._record_visible_event("reply", text, payload)
                 self._post_reply_drain()
                 return ("reply", text)
             self._ingest_sideband(payload)
@@ -461,12 +628,9 @@ class _HarnessHandle:
                 self._record_visible_event("error", str(msg), payload)
                 raise RuntimeError(f"harness error: {msg}")
             if payload.get("type") == "reply":
-                self._awaiting_reply = False
-                self._finish_request(str(payload.get("status") or "completed"))
-                steps = payload.get("steps")
-                self.last_steps = steps if isinstance(steps, list) else []
+                if not self._accept_reply(payload):
+                    continue
                 text = str(payload.get("text", ""))
-                self._record_visible_event("reply", text, payload)
                 self._post_reply_drain()
                 return text
             self._ingest_sideband(payload)
@@ -482,8 +646,7 @@ class _HarnessHandle:
             raise RuntimeError("harness 句柄已关闭，不可发控制消息")
         before = len(self.last_sideband)
         self._write(self._interrupt_frame() if name == "interrupt" else {"type": name})
-        self._t0 = time.monotonic()
-        self._awaiting_reply = True
+        # Control acknowledges existing work; it never renews a task deadline.
         while True:
             kind, val = self.poll(_POLL_INTERVAL)
             if kind == "reply":
@@ -496,7 +659,7 @@ class _HarnessHandle:
         """阻塞版：write_message + 等到下一条 reply（Spec-0036）。"""
         self.write_message(message)
         while True:
-            kind, val = self.poll(self._limits.outer_seconds)
+            kind, val = self.poll(min(self._limits.outer_seconds, 60.0))
             if kind == "reply":
                 return val  # type: ignore[return-value]
 
@@ -504,6 +667,8 @@ class _HarnessHandle:
         if self._closed:
             raise RuntimeError("harness 句柄已关闭，不可 reset")
         self._terminate()
+        self._pending_requests.clear()
+        self._request_id = ""
         self._start()  # 重启 entry = 开新一局（复位语义收在 launcher 一侧）
 
     def shutdown(self) -> None:
@@ -613,6 +778,8 @@ class HarnessLauncher:
             # Spec-0008/T1 v2：与用户 agent 共享同一工作区——把它注入 harness 的 SANDBOX_WORK_DIR，
             # harness entry 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；覆盖 params.yaml 同名键。
             env["SANDBOX_WORK_DIR"] = runtime.cwd
+        if os.environ.get("HARNESS_LLM_MAX_CONTEXT_TOKENS"):
+            env["LLM_MAX_CONTEXT_TOKENS"] = os.environ["HARNESS_LLM_MAX_CONTEXT_TOKENS"]
         limits = request_limits({**os.environ, **env}, fallback=_SEND_ABS_CAP)
         env.update(product_budget_environment(limits))
         host_cwd = cwd

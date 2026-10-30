@@ -449,10 +449,11 @@ def test_client_factory_gives_each_session_its_own_instance(tmp_path) -> None:
         list(pool.map(one, ["/ws/a", "/ws/b"]))
 
     assert len(made) == 2 and made[0] is not made[1]  # 每局独立实例
-    # 每个实例恰 bind 一次、且两局的 workspace 各归各（无后 bind 覆盖先 bind）
+    # Each client first sees its own interaction workspace, then its own immutable terminal view.
     all_bound = [c.bound for c in made]
-    assert all(len(b) == 1 for b in all_bound)
+    assert all(len(b) == 2 for b in all_bound)
     assert {b[0][1].cwd for b in all_bound} == {"/ws/a", "/ws/b"}
+    assert all(b[1][1].runtime_id == "review-snapshot" for b in all_bound)
 
 
 def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:

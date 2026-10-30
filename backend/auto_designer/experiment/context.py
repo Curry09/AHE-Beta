@@ -272,6 +272,10 @@ def build_controller_environment(
         env["AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS"] = str(
             harness_limits["termination_grace_seconds"]
         )
+    if "message_activity_seconds" in harness_limits:
+        env["AUTO_DESIGNER_HARNESS_MESSAGE_ACTIVITY_SECONDS"] = str(
+            harness_limits["message_activity_seconds"]
+        )
     env["AUTO_DESIGNER_DELIVERY_REQUIRED"] = "1" if delivery_required(config) else "0"
     if "continuation" in config:
         env["AUTO_DESIGNER_CONTINUATION_INPUT"] = str(
@@ -360,6 +364,8 @@ def build_controller_environment(
                     prefix + "API_KEY": key,
                 }
             )
+            if "max_context_tokens" in (model.get("limits") or {}):
+                env[prefix + "MAX_CONTEXT_TOKENS"] = str(model["limits"]["max_context_tokens"])
             if model.get("reasoning_effort"):
                 env[prefix + "REASONING_EFFORT"] = model["reasoning_effort"]
     if "workload_contract_version" not in manifest and config["workload"]["kind"] == "swebench":
@@ -486,8 +492,20 @@ def frozen_scenario(task_id: str | None = None):
         specification.params.setdefault("task_key", package["id"])
     specification.params["interaction"] = package.get("interaction", "simulated_user")
     # Spec-0083/T3: public declarations only; private grading plans never enter this context.
-    from auto_designer.experiment.workload import task_artifact_declarations, task_provenance
+    from auto_designer.experiment.workload import (
+        execution_declaration,
+        task_artifact_declarations,
+        task_provenance,
+    )
 
+    fallback = os.environ.get("AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS")
+    specification.params["execution"] = execution_declaration(
+        package, fallback_seconds=float(fallback) if fallback else None
+    )
+    if "task_digest" not in specification.params:
+        from auto_designer.execution_contract import canonical_sha256
+
+        specification.params["task_digest"] = canonical_sha256(package)
     origin = task_provenance(package)
     specification.params["benchmark"] = origin["suite"]
     specification.params["instance_id"] = origin["instance_id"]

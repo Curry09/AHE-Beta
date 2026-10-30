@@ -42,7 +42,7 @@ def _complete_prerequisite(pipeline, prerequisite):
     pipeline.mark_stage(round_no=1, stage=prerequisite, input_value={"complete": True})
 
 
-@pytest.mark.parametrize("prerequisite", ["users", "feedback_imported"])
+@pytest.mark.parametrize("prerequisite", ["users", "feedback_imported", "objective_grading"])
 def test_feedback_requires_real_prerequisite_and_preserves_seal_contract(tmp_path, prerequisite):
     store = _store(tmp_path)
     events = []
@@ -215,7 +215,7 @@ def test_reused_roles_resume_ordinary_ledger_after_bootstrap(tmp_path):
     assert visited == [("bootstrap", "feedback_imported"), ("ordinary", "users")]
 
 
-@pytest.mark.parametrize("prerequisite", ["users", "feedback_imported"])
+@pytest.mark.parametrize("prerequisite", ["users", "feedback_imported", "objective_grading"])
 @pytest.mark.parametrize("failure_reporting", ["exception", "outcome"])
 def test_real_triager_saved_output_retries_failed_side_effect(
     tmp_path, prerequisite, failure_reporting
@@ -288,3 +288,25 @@ def test_real_triager_saved_output_retries_failed_side_effect(
     assert pipeline.run(round_no=1, user_sha="seed") == "delivered"
     assert calls == {"model": 1, "apply": 2}
     assert tracker.issue(number)["state"] == "closed"
+
+
+def test_objective_feedback_binds_real_roles_at_pipeline_construction(tmp_path):
+    from auto_designer.demand.divergent import Divergent
+    from auto_designer.demand.triage import Triager
+    from auto_designer.tracker.fake import FakeTracker
+    from auto_designer.user.session_store import SessionStore
+
+    store = _store(tmp_path)
+    args = (FakeTracker(), SessionStore(tmp_path / "sessions"), str(tmp_path), str(tmp_path))
+    triager, divergent = Triager(*args), Divergent(*args)
+    pipeline = _pipeline(
+        store, [], triagers=[triager], divergents=[divergent], prerequisite="objective_grading"
+    )
+    assert triager._recovery is divergent._recovery is store
+    assert triager._feedback_dependency == divergent._feedback_dependency == "objective_grading"
+    # The exact constructor used by a controller must not run roles before grading.
+    with pytest.raises(RecoveryConflictError, match="dependencies"):
+        pipeline.run(round_no=1, user_sha="seed")
+    for role in (triager, divergent):
+        with pytest.raises(ValueError, match="unsupported"):
+            role.bind_feedback_dependency("untrusted_external_stage")

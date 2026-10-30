@@ -62,7 +62,7 @@ def test_acceptance_checks_adapter_contract_not_universal_fresh(contract):
             "review_status": "completed",
         }
     }
-    assert derive_acceptance_assessment(session=session, result=result) == "valid_accept"
+    assert derive_acceptance_assessment(session=session, result=result) == "unverified_accept"
 
 
 def test_continuous_score_without_binary_rule_is_unverified_acceptance():
@@ -112,5 +112,22 @@ def test_known_request_failure_remains_false_accept_for_valid_direct_review():
         derive_acceptance_assessment(
             session=session, result=GradingResult("custom", 1, "unavailable")
         )
-        == "false_accept"
+        == "unverified_accept"
     )
+
+
+@pytest.mark.parametrize("passed,expected", [(True, "valid_accept"), (False, "false_accept")])
+def test_canonical_acceptance_uses_task_assessment_even_if_rating_missing(passed, expected):
+    session = {
+        "feedback": {"task_assessment": {"status": "fulfilled"}},
+        "user_outcome": {"interaction_mode": "direct", "review_status": "completed"},
+        "sim_trace": {"evaluation_status": "invalid"},
+    }
+    result = GradingResult(
+        "custom",
+        1,
+        "completed",
+        passed=passed,
+        execution=ExecutionEvidence("isolated_custom_verifier", True, "sha256:" + "a" * 64),
+    )
+    assert derive_acceptance_assessment(session=session, result=result) == expected

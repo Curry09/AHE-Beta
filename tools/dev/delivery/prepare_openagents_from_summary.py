@@ -11,7 +11,7 @@ from pathlib import Path
 
 import requests
 from tools.dev import add_inputs, run_inputs
-from tools.dev.delivery import git_remote_url, run_git
+from tools.dev.delivery import git_remote_url, require_execution_config, run_git
 
 
 def validate_summary(source: object, harness_repo: Path) -> list[dict]:
@@ -80,6 +80,7 @@ def main() -> int:
             checkout,
             ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
         )
+        require_execution_config(checkout)
         commands = (
             ["git", "init", "-b", "main"],
             ["git", "add", "-A"],

@@ -407,3 +407,74 @@ def test_default_rotation_reuses_one_selected_card(prepared_inputs, tmp_path):
     plan = workload.read_session_plan(Path(frozen["run_dir"]), frozen)
     assert len(plan["rounds"]) == 2
     assert all([b["slot"] for b in picks] == [0, 1, 2] for picks in plan["rounds"])
+
+
+def test_task_metadata_budget_and_operator_quota_are_distinct(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "task.toml").write_text("[agent]\ntimeout_sec = 7200\n")
+    task = package()
+    task.update(
+        schema_version=2,
+        instruction_file=str(tmp_path / "instruction.md"),
+        execution={"budget_seconds": 7200, "budget_source": "task_metadata"},
+    )
+    report = workload.validate_task_execution(task, source_root=source)
+    assert report["metadata_budget_seconds"] == 7200
+    task["execution"]["budget_seconds"] = 1800
+    with pytest.raises(ConfigError, match="conflicts with task.toml"):
+        workload.validate_task_execution(task, source_root=source)
+    task["execution"].update(
+        budget_source="operator_quota", quota_override_reason="short controlled experiment"
+    )
+    assert workload.validate_task_execution(task, source_root=source)["budget_seconds"] == 1800
+
+
+def test_task_budget_wins_over_runtime_fallback_without_parsing_prose():
+    task = package()
+    task.update(
+        schema_version=2,
+        interaction="direct",
+        execution={"budget_seconds": 7200, "budget_source": "task_metadata"},
+    )
+    declaration = workload.execution_declaration(task, fallback_seconds=1800)
+    assert declaration["task_budget_seconds"] == 7200
+    assert declaration["followup_input"] == "unavailable"
+    del task["execution"]
+    assert (
+        workload.execution_declaration(task, fallback_seconds=1800)["budget_source"]
+        == "operator_quota"
+    )
+    assert (
+        workload.execution_declaration(task, fallback_seconds=None)["task_budget_seconds"] is None
+    )
+
+
+def test_explicit_instruction_time_conflict_is_lint_not_budget_source(tmp_path):
+    instruction = tmp_path / "instruction.md"
+    instruction.write_text("Fix the code. Time limit: 2 hours")
+    task = package()
+    task.update(
+        schema_version=2,
+        instruction_file=str(instruction),
+        execution={"budget_seconds": 1800, "budget_source": "task_metadata"},
+    )
+    with pytest.raises(ConfigError, match="instruction time limit"):
+        workload.validate_task_execution(task, source_root=None)
+    task.pop("execution")
+    report = workload.validate_task_execution(task, source_root=None)
+    assert report["instruction_budget_verification"] == "instruction_budget_unverified"
+    assert "budget_seconds" not in report
+
+
+def test_runtime_fallback_cannot_silently_override_known_task_budget(tmp_path):
+    (tmp_path / "task.toml").write_text("[agent]\ntimeout_sec = 7200\n")
+    task = package()
+    with pytest.raises(ConfigError, match="conflicts with task.toml"):
+        workload.validate_task_execution(task, source_root=tmp_path, fallback_seconds=1800)
+    assert (
+        workload.validate_task_execution(task, source_root=tmp_path, fallback_seconds=7200)[
+            "instruction_budget_verification"
+        ]
+        == "task_metadata_verified"
+    )

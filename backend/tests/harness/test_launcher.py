@@ -79,7 +79,7 @@ import json, sys
 for line in sys.stdin:
     obj = json.loads(line)
     if obj.get("type") == "message":
-        sys.stdout.write(json.dumps({"type": "reply", "text": "timed out", "status": "timed_out"}) + "\\n")
+        sys.stdout.write(json.dumps({"type": "reply", "text": "timed out", "status": "timed_out", "termination_reason": "task_budget_exhausted"}) + "\\n")
         sys.stdout.flush()
 """
 _TYPED_USAGE_ENTRY = """\

@@ -245,7 +245,9 @@ def test_container_start_shapes_docker_run(tmp_path: Path, monkeypatch) -> None:
     assert "/config:ro" in joined and "/entrypoint.sh:ro" in joined  # 两处只读挂载
     assert "/role_runs" not in joined  # 未设 ROLE_RUNS_DIR 时不挂 delivery
     assert "sessions" not in joined and "/demand" not in joined
-    assert "nexau" not in joined.lower()  # NexAU 烘入镜像，不扩大宿主挂载面
+    # Inspect container destinations, not incidental words in the host checkout name.
+    mounts = [docker_run[i + 1] for i, value in enumerate(docker_run) if value == "-v"]
+    assert {value.rsplit(":", 2)[-2] for value in mounts} == {"/config", "/entrypoint.sh"}
     assert "GITEA_TOKEN=secret-token" in joined  # 凭证只经容器 env
     assert "GITEA_USER=harness" in joined
     assert "ANTHROPIC_API_KEY=sk-test" in joined

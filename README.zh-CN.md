@@ -44,7 +44,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py run <ru
 uv run --locked python backend/scripts/offline_demo.py
 ```
 
-当前采用源码运行，尚无 PyPI 入口；`uv.lock` 固定 NexAU 和兼容依赖。
+当前采用源码运行，尚无 PyPI 入口；`uv.lock` 将 NexAU 固定到 [hzhua/nexau](https://github.com/hzhua/nexau) 的完整提交 `28511d9f0362191a6c378fd441b2be55309a9e32`，并锁定兼容依赖。`uv sync --locked` 自动获取该 Git 版本，本仓不内置 SDK 源码副本。
 
 ## 文档和开发
 

@@ -43,7 +43,7 @@ def test_gateway_fails_without_explicit_credentials(tmp_path, monkeypatch):
 def configure(tmp_path, monkeypatch, *, container="validation-one"):
     config = tmp_path / "config"
     config.mkdir()
-    (config / "openagents.yml").write_text("forge: gitea\n")
+    (config / "openagents.yml").write_text("forge: gitea\nexecution_evidence:\n  required: true\n")
     run = tmp_path / "run"
     run.mkdir()
     (run / "manifest.json").write_text(
@@ -104,6 +104,19 @@ def configure(tmp_path, monkeypatch, *, container="validation-one"):
     )
     calls = []
     monkeypatch.setattr(
+        module.subprocess,
+        "check_output",
+        lambda *a, **kw: json.dumps(
+            {
+                "execution_evidence": {
+                    "schema_versions": [1],
+                    "required_dispatch": True,
+                    "context_projection": "all-delivery-roles-v1",
+                }
+            }
+        ),
+    )
+    monkeypatch.setattr(
         module.subprocess, "run", lambda command, **kwargs: calls.append((command, kwargs))
     )
     return config, calls
@@ -130,6 +143,14 @@ def test_main_isolates_run_provider_and_passes_credentials_only_by_environment(
 def test_main_refuses_controller_container(tmp_path, monkeypatch):
     _, calls = configure(tmp_path, monkeypatch, container="controller-delivery")
     with pytest.raises(SystemExit, match="must differ"):
+        module.main()
+    assert calls == []
+
+
+def test_validation_refuses_downgraded_required_dispatch(tmp_path, monkeypatch):
+    config, calls = configure(tmp_path, monkeypatch)
+    (config / "openagents.yml").write_text("forge: gitea\n")
+    with pytest.raises(SystemExit, match="required: true"):
         module.main()
     assert calls == []
 

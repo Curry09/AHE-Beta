@@ -167,6 +167,9 @@ run(['git','-C',str(controller),'-c','user.name=Experiment','-c','user.email=exp
 env=dict(install_env);env['UV_PYTHON']=python
 run([str(uv),'sync','--locked','--extra','experiments','--extra','dev','--python',python],cwd=controller,env=env)
 run([str(uv),'sync','--locked','--extra','nexau','--extra','dev','--python',python],cwd=oa,env=env)
+sdk_probe="import importlib.metadata,json,sys;source=json.loads(importlib.metadata.distribution('nexau').read_text('direct_url.json'));pin=source.get('vcs_info',{}).get('commit_id');assert pin==sys.argv[1], 'NexAU installed Git commit differs';print(pin)"
+for project in (controller,oa):
+    run([str(project/'.venv/bin/python'),'-c',sdk_probe,manifest['source_pins']['nexau']['revision']],env=env)
 claude=binroot/'claude';download('https://downloads.claude.ai/claude-code-releases/2.1.284/linux-x64/claude','CLAUDE_SHA',claude);claude.chmod(0o755)
 TASK_SETUP
 # Keep task venv selection across explicit bash login shells without activating it for controller/vigil.

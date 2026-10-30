@@ -2,6 +2,8 @@
 # Keep this file focused on runtime configuration; product behavior belongs in agents/main.md.
 type: agent
 name: harness
+# Spec-0084/T3: explicit LLM_MAX_CONTEXT_TOKENS may lower this input threshold.
+# This is not the provider total context capacity or a dynamic compression guarantee.
 max_context_tokens: 256000
 system_prompt: ./agents/main.md
 system_prompt_type: file
@@ -13,7 +15,7 @@ llm_config:
   model: ${env.LLM_MODEL}
   base_url: ${env.LLM_BASE_URL}
   api_key: ${env.LLM_API_KEY}
-  # Nex-N2-Pro 是推理模型：reasoning_content 先吃 token，4096 会被推理吃光致 content=null。
+  # Keep the output allowance explicit; reasoning and final content share it.
   max_tokens: 32768
   timeout: 300
   api_type: openai_chat_completion

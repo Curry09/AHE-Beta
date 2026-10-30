@@ -458,8 +458,8 @@ class Owner:
             "PM 独立到 Owner；Synthesizer 只吸收非 PM 来源。你负责识别双轨交付重叠：用可选 "
             "delivery_overlaps 列出本批或 ready 中关联票号，并在 handoff_summary 解释共享工作与独立验收边界。"
             "重叠不代表重复，双方仍分别 admit；此字段不是 merge、依赖或自动合并实现的指令。\n\n"
-            f"## 待评审提案（{len(proposals)} 条）\n{self._format_index(proposals)}\n\n"
-            f"## 已在 ready 的工作项（{len(ready)} 条，判重参照）\n{self._format_index(ready)}\n\n"
+            f"## 待评审提案（{len(proposals)} 条）\n{self._format_index(proposals, store=self._store)}\n\n"
+            f"## 已在 ready 的工作项（{len(ready)} 条，判重参照）\n{self._format_index(ready, store=self._store)}\n\n"
             f"## 体感曲线\n{self._format_trend(trend)}\n\n"
             "## 目标证据摘要（仅审计元数据，不是客观验收）\n"
             f"{goal_summary}\n\n"
@@ -494,7 +494,7 @@ class Owner:
         return json.dumps(rows, ensure_ascii=False, indent=2)
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
-        rows = sorted(self._store.index(), key=lambda e: e["created_at"])
+        rows = sorted(self._store.index(include_invalid=True), key=lambda e: e["created_at"])
         return [
             (
                 e["created_at"],
@@ -506,9 +506,9 @@ class Owner:
         ]
 
     @staticmethod
-    def _format_index(issues: list) -> str:
+    def _format_index(issues: list, *, store) -> str:
         """准入索引使用所有下游角色共享的 canonical ProposalView。"""
-        return format_proposal_list(issues)
+        return format_proposal_list(issues, store=store)
 
     @staticmethod
     def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:
@@ -518,7 +518,9 @@ class Owner:
         for ts, score, reason, sid in trend:
             why = f" — {reason}" if reason else ""
             sid_bit = f" [session={sid}]" if sid else ""
-            lines.append(f"- {ts}{sid_bit}: {score}{why}")
+            lines.append(
+                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (未评分)'}{why}"
+            )
         return "\n".join(lines)
 
     def _safe_comment(self, number: int, body: str) -> None:

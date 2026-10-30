@@ -44,7 +44,7 @@ For an offline scripted demo without models or infrastructure:
 uv run --locked python backend/scripts/offline_demo.py
 ```
 
-Run from source; a PyPI entry point is not yet available. `uv.lock` pins NexAU and compatible dependencies.
+Run from source; a PyPI entry point is not yet available. `uv.lock` pins NexAU from [hzhua/nexau](https://github.com/hzhua/nexau) at commit `28511d9f0362191a6c378fd441b2be55309a9e32`, together with compatible dependencies. `uv sync --locked` fetches that exact Git revision; no SDK source copy is bundled in this repository.
 
 ## Documentation and development
 

@@ -408,7 +408,9 @@ def format_session_timeline(session: Session) -> str:
     payload: dict[str, Any] = {
         "session_id": session.session_id,
         "started_at": session.created_at.isoformat(),
-        "feeling": session.feeling.to_dict(),
+        "feeling": session.feeling.to_dict() if session.feeling is not None else None,
+        "feedback": dict(session.feedback),
+        "execution_contract": dict(session.execution_contract),
         "issues": issues,
         "timeline": (
             _project_sim_trace(session.sim_trace)

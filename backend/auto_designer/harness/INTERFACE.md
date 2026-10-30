@@ -13,7 +13,7 @@ The target transport is stdio JSON Lines: one JSON object per line.
 ### Input
 
 ```json
-{"type":"message","text":"Fix the failing test"}
+{"type":"message","text":"Fix the failing test","task_id":"task-1","message_id":"m-1","contract_id":"<declaration sha256>","followup_input":"unavailable","task_budget_seconds":7200,"remaining_budget_seconds":7200,"budget_source":"task_metadata","task_deadline_utc":"<audit timestamp>"}
 {"type":"interrupt"}
 {"type":"shutdown"}
 ```
@@ -22,7 +22,7 @@ The target transport is stdio JSON Lines: one JSON object per line.
 
 ```json
 {"type":"progress","kind":"tool","text":"Running tests"}
-{"type":"reply","text":"Done","status":"completed","termination_reason":"complete_task","steps":[]}
+{"type":"reply","text":"Done","status":"completed","termination_reason":"complete_task","task_id":"task-1","message_id":"m-1","steps":[]}
 {"type":"error","message":"LLM_API_KEY is missing","recoverable":false}
 ```
 
@@ -49,3 +49,19 @@ A terminal reply includes `status` and `termination_reason`. Receiving a reply d
 - Harness: product behavior and `/help` content.
 - Connector: simulated-user action adaptation; exposes unified `write_message` + optional poll/drain.
 - Launcher: checkout, process lifecycle, stdio encoding/decoding.
+
+## Execution conditions (Spec-0084/T3)
+
+Before the first goal, call `bind_execution_contract(declaration)` on the launched handle.
+The runner starts one wall-clock task budget at first goal dispatch. Task metadata wins over the
+runtime operator fallback; controls, queues, follow-ups and process reset never renew it.
+The Seed anchors remaining time at enqueue with its monotonic clock, and subsequent frames
+can only tighten the deadline. Optional message activity limits cannot exceed task remaining time.
+A separate termination grace permits cancellation and evidence retention, never additional solving.
+
+A bound task accepts only matching task/message identities. Unknown or duplicate replies are
+recorded as unmatched sideband events and cannot end the current request. Missing/invalid terminal
+status or reason is incomplete with `protocol_invalid_terminal`; a nonempty text is not success.
+Manual sessions without negotiated execution conditions remain unknown. `/help`, `/exit` and
+`/quit` return `kind=builtin_command`, `status=acknowledged`, `termination_reason=builtin_command`;
+they acknowledge their own message and do not complete or renew an active task.

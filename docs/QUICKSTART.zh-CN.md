@@ -9,7 +9,7 @@
 | `local` | 本机 Docker 容器 | 程序自动启动独立的 localhost Gitea | 可用的 Docker 服务、模型凭证 |
 | `e2b` | 每个实验一个 E2B 沙箱 | 用户自己的 Gitea.com 账户 | 模型凭证、`E2B_API_KEY`、`GITEA_TOKEN` |
 
-可选 N1：每轮一位用户试用一个任务；或 N4：每轮四位用户试用两个任务，并发上限为二。N4 共两轮，首轮包含交付，末轮只试用。任务包列表和显式 persona/任务计划使用同一入口。历史结果导入后追加一轮仍不支持。N1 示例是每轮一位模拟用户、共五轮：R1–R4 包含需求处理与 OpenAgents 交付，R5 仅试用最终 Harness。被进化的对象是 Harness；pvlib 是用户的试用任务，auto-designer 是实验控制器。官方 SWE-bench 评分是独立的事后步骤。
+可选 N1：每轮一位用户试用一个任务；或 N4：每轮四位用户试用两个任务，并发上限为二。N4 共两轮，首轮包含交付，末轮只试用。任务包列表和显式 persona/任务计划使用同一入口。历史结果导入后追加一轮仍不支持。N1 示例是每轮一位模拟用户、共五轮：R1–R4 包含需求处理与 OpenAgents 交付，R5 仅试用最终 Harness。被进化的对象是 Harness；pvlib 是用户的试用任务，auto-designer 是实验控制器。客观评分默认未配置；可选逐轮验收和独立事后评分见下文。
 
 ## 1. 安装
 
@@ -43,6 +43,8 @@ E2B 路径还要填写 `E2B_API_KEY` 和 Gitea.com token，授权创建、读写
 
 ## 3. 检查、准备、启动
 
+配套执行证据 reader 已在 `release/compatibility.json` 固定为远端审阅候选，`prepare` 默认使用该不可变提交，见[准备说明](tutorials/evolution-feedback.zh-CN.md#3-检查并准备)。正式发布前仍需完成两仓联合审阅。
+
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$CONFIG" --offline
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$CONFIG" --secrets-file .env.experiment
@@ -74,6 +76,12 @@ stop 保留实验身份、仓库与 recovery checkpoint。本地会停止 Gitea/
 默认目录为 `.experiments/<run_id>/`。实验结果、资源状态、收集状态分别记录：配置的轮次全部封口和 controller 完成才是 `COMPLETED`；收集的 `COMPLETE` 不代表实验成功。主机在线时后台 monitor 周期收集。终态收集完成前应保持主机在线，云沙箱到期可能丢失尚未收集的数据。
 
 [完整 N=1 教程](tutorials/n1-experiment.zh-CN.md)说明所有输入、预期结果、中断边界和证据；[多用户教程](tutorials/multi-user-experiment.zh-CN.md)提供两个任务、固定跨轮计划和停止/恢复的 N4 流程；实际验证结果见[N1 报告](validation/spec-0069-new-user.md)和[多用户报告](validation/spec0073-multi-task-users.md)。
+
+## 在每轮反馈前启用客观验收
+
+普通示例默认不配置客观评分。若希望后续反馈使用独立任务结果，按[逐轮验收教程](tutorials/evolution-feedback.zh-CN.md)生成公开任务、私有计划和 worker 密钥，再走同一个 `check → prepare → run` 入口。local 与 E2B 都需要可信 Docker 主机上的独立 `assessment-worker`。先启动 run，再在另一终端启动 worker；缺少 worker 时 controller 等待于 `objective_grading / PENDING`，不会假报通过或零分，末轮只试用也会验收。
+
+Actor 产物先冻结，再进行只读终态复核。体验评分、任务结果、原因归属、改进建议分开保存，缺测保持 null，成功会话可以不发 Issue。显式声明的 7200 秒任务预算优先于运行时 1800 秒 fallback；消息限制和静态模型容量校验见[配置说明](CONFIGURATION.zh-CN.md)。此可选流程不改变下面的事后评分命令，也不替代独立 Harness benchmark 框架。
 
 ## 对已保存的会话产物评分
 

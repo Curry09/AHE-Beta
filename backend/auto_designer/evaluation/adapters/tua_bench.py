@@ -17,7 +17,7 @@ from .container import (
     write_files,
 )
 from .profiles import validate_task_bundle
-from .terminal_bench import failed, official_reward, validate_mapping
+from .terminal_bench import failed, official_reward, validate_mapping, validate_mapping_plan
 
 # Material identity is filled from the official remote file during implementation;
 # its bytes must be fixed, even though the test's original URL uses resolve/main.
@@ -28,7 +28,7 @@ class TUABenchAdapter:
     name = "tua-bench"
     contract_version = 1
 
-    def validate_inputs(self, request: GradingRequest) -> None:
+    def validate_plan(self, request: GradingRequest) -> dict[str, str]:
         validate_task_bundle(request)
         if request.config.get("build_official_environment") is not True:
             raise InputValidationError(
@@ -42,6 +42,10 @@ class TUABenchAdapter:
             raise InputValidationError(
                 "expected workbook is not the pinned official answer material"
             )
+        return validate_mapping_plan(request, {"/app/BoomerangSales.xlsx": None})
+
+    def validate_inputs(self, request: GradingRequest) -> None:
+        self.validate_plan(request)
         validate_mapping(request, {"/app/BoomerangSales.xlsx": None})
 
     def evaluate(self, request: GradingRequest, attempt_dir: Path) -> GradingResult:

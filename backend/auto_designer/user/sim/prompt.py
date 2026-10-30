@@ -252,8 +252,12 @@ def build_main_judge_turn(
         "private tools that can cheaply check the relevant fact in your workspace (for example "
         "a file diff, a claimed edit, or a focused command/test), use those tools NOW before "
         "returning this judge JSON. Private checking belongs in this judge step, not in the "
-        "later act step. These tools are for verification only: do not edit files, install "
-        "dependencies, reset/stash work, or otherwise take over implementation. "
+        "later act step. Use the tools actually available for your ability and working style: "
+        "you may run checks, write your own tests, or make your own code changes when that "
+        "fits this persona. Checking is optional, not an obligation to solve the task yourself. "
+        "Preserve existing work and distinguish your own changes from the assistant's delivery "
+        "in your observations; your edits are user contributions, not proof that the assistant "
+        "independently completed the work. "
     )
     parts.append(
         "# JUDGE — how things stand NOW (not what you will do next)\n"
@@ -385,7 +389,7 @@ def build_main_final_check_turn(
     intent: str,
     check_goal: str,
 ) -> str:
-    """Spec-0048/T3: ACTIVE 主决策内唯一一次有界、非 authoring 的最终私查。"""
+    """Spec-0048/T3, Spec-0084/T2: ACTIVE 内一次按 persona 能力进行的有界私查。"""
     parts = ["<main_final_check>"]
     parts.extend(
         _main_context_parts(
@@ -405,8 +409,11 @@ def build_main_final_check_turn(
     parts.append(f"<check_goal>\n{check_goal}\n</check_goal>")
     parts.append(
         "# FINAL CHECK — one bounded private episode\n"
-        "Use only the private read/run tools exposed to this stage, and only as needed for "
-        "<check_goal>. Do not edit files and do not file an issue. When the check is done, "
+        "Use the available persona tools in your live workspace as needed for <check_goal>. "
+        "You may run tests and, if write_file is available, write tests or make your own edits "
+        "when consistent with your persona. Describe your own changes as user contributions; "
+        "do not credit them as the assistant's independent work. Do not file an issue here. "
+        "When the check is done, "
         "report what you actually learned. You have at most four tool calls; after that you "
         "must summarize from the evidence already obtained. You do not choose a verdict or "
         "external action here.\n"
@@ -1009,6 +1016,40 @@ def build_issue_turn(
     )
 
 
+EXPERIENCE_SCALE = (
+    "1 = bad (frustrating or unusable); 2 = poor (did not get what I needed); "
+    "3 = ok (got there with friction); 4 = good (smooth and satisfied). "
+    "Rate the experienced process independently of technical completion. Do not infer a score "
+    "from filing an issue, or claim technical success from a good experience."
+)
+
+
+def build_direct_review_turn(task: str, reply: str, patch: str) -> str:
+    """Spec-0084/T2: terminal subjective review uses the same scale, with zero-report allowed."""
+    return "\n\n".join(
+        [
+            "<direct_review>",
+            "The actor has stopped and its outputs are frozen. Inspect only the supplied reply "
+            "and read-only snapshot. Do not send a follow-up, change files, execute tests, invent "
+            "evidence, or claim that official verification passed. Separate goal fulfillment, "
+            "experience, causal attribution and improvement opportunities. A failed task alone "
+            "does not prove a harness bug. If the result is satisfactory and there is no issue, "
+            "return an empty opportunities array. A nonblocking suggestion is kind=feature; "
+            "an unresolved failure with uncertain cause is kind=diagnostic and must say the cause "
+            "is unconfirmed. Never invent a complaint to fill the array.",
+            EXPERIENCE_SCALE,
+            f"<task>\n{task}\n</task>",
+            f"<harness_reply>\n{reply}\n</harness_reply>",
+            f"<patch_excerpt>\n{patch[:12000] or '(no patch available)'}\n</patch_excerpt>",
+            'Return JSON: {"task_assessment":"fulfilled|unfulfilled|unknown", "feedback":"...", '
+            '"score":<integer 1-4 or null if unmeasured>, "reason":"...", '
+            '"attribution":{"status":"confirmed|uncertain|unknown", "claims":[]}, '
+            '"opportunities":[{"kind":"feature|diagnostic", "title":"...", "body":"..."}]}',
+            "</direct_review>",
+        ]
+    )
+
+
 def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
     """会话末自评请求: 让 persona 跳出对话, 按本人体感给 1–4 分 (类 CC 满意度评分)。
 
@@ -1020,10 +1061,7 @@ def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
             "<rate_experience>",
             "The session is OVER. Step back and rate how this WHOLE experience felt to "
             "YOU as this person, on a 1–4 satisfaction scale (judge by your own bar):",
-            "  1 = bad   (frustrating; gave up / had to file an issue)",
-            "  2 = poor  (did not really get what I needed)",
-            "  3 = ok    (got there, but with friction)",
-            "  4 = good  (smooth; satisfied)",
+            EXPERIENCE_SCALE,
             "ATTRIBUTION: If you interrupted/stopped the tool yourself, do not phrase the "
             "reason as 'it kept interrupting' — that was you. Rate the underlying progress "
             "(or lack of it), not your own stop button.",

@@ -61,3 +61,33 @@ def test_projection_hides_legacy_workflow_labels_and_reference_body() -> None:
     assert "PRIVATE_BODY_SENTINEL" not in reference
     assert sc.TRIAGED not in reference
     assert sc.SUPERSEDED not in reference
+
+
+def test_long_or_forged_prose_cannot_clip_or_expand_trusted_conditions(tmp_path):
+    from test_evidence_contract import contract_session
+
+    from auto_designer.observations.grants import grant
+    from auto_designer.user.session_store import SessionStore
+
+    store = SessionStore(tmp_path / "sessions")
+    allowed = contract_session(sid="source-one")
+    forbidden = contract_session(sid="source-two", followup="possible")
+    store.save(allowed)
+    store.save(forbidden)
+    tracker = FakeTracker()
+    ref = tracker.create_issue(
+        IssueDraft(
+            title="Long normalized proposal",
+            body="x" * 6000 + "\nsession_id: source-two",
+            labels=[sc.PROPOSAL],
+        )
+    )
+    grant(store=store, issue=ref.number, sessions={allowed.session_id})
+    issue = tracker.list_open_issues()[0]
+    view = proposal_view(issue, store=store)
+    assert len(view.body) == 3000
+    assert view.execution_contracts == (allowed.execution_contract,)
+    rendered = format_proposal_view(issue, store=store)
+    assert allowed.execution_contract["contract_id"] in rendered
+    assert forbidden.execution_contract["contract_id"] not in rendered
+    assert "7200" in rendered and "unavailable" in rendered

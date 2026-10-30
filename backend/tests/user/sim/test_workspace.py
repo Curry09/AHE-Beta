@@ -99,9 +99,11 @@ class _RecordingClient:
 
     def __init__(self) -> None:
         self.bound: tuple | None = None
+        self.bindings = []
 
     def bind_session(self, persona, workspace_dir):
         self.bound = (persona, workspace_dir)
+        self.bindings.append(self.bound)
 
     def respond(self, system: str, user: str) -> dict:
         if "<rate_experience>" in user:
@@ -144,17 +146,20 @@ def test_bridge_binds_when_workspace_present(tmp_path) -> None:
     fn(mp, scenario, ScriptedHarness())
 
     assert client.bound is not None
-    persona, ws = client.bound
+    persona, ws = client.bindings[0]
     assert persona is sp
     assert ws.cwd.endswith("billing-split")
+    assert client.bound[1].runtime_id == "review-snapshot"
 
 
-def test_bridge_no_bind_without_workspace(tmp_path) -> None:
+def test_bridge_without_workspace_binds_only_an_empty_terminal_snapshot(tmp_path) -> None:
     sp, client = expert(), _RecordingClient()
     mp = _model_persona(sp)
     fn = _make_fn(client, tmp_path, sp, mp)
     fn(mp, SeedScenario(description="task"), ScriptedHarness())
-    assert client.bound is None
+    assert len(client.bindings) == 1
+    assert client.bound[1].runtime_id == "review-snapshot"
+    assert client.bound[1].evidence["omissions"] == ["no_workspace"]
 
 
 def test_bridge_no_error_when_client_lacks_bind(tmp_path) -> None:
@@ -201,4 +206,5 @@ def test_bridge_uses_passed_workspace_dir_and_skips_materialize(tmp_path, monkey
     fn(mp, scenario, ScriptedHarness(), workspace_dir="/shared/ws")
 
     assert client.bound[0] is sp
-    assert client.bound[1].cwd == "/shared/ws"  # 复用传入目录，未走 materialize
+    assert client.bindings[0][1].cwd == "/shared/ws"
+    assert client.bound[1].runtime_id == "review-snapshot"

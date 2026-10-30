@@ -25,6 +25,7 @@ on:
       - 'release/compatibility.json'
       - 'pyproject.toml'
       - 'uv.lock'
+      - 'backend/scripts/check_nexau_dependency.py'
       - '.github/workflows/experiment-contract.yml'
   push:
     branches: [main]
@@ -40,6 +41,7 @@ jobs:
         with:
           version: '0.11.28'
           python-version: '3.12.13'
+      - run: uv run --no-project --python 3.12.13 python backend/scripts/check_nexau_dependency.py
       - run: uv sync --locked --extra experiments --extra dev
       - run: bash backend/scripts/e2e-spec-0071-experiment-cleanup.sh
       - run: bash backend/scripts/e2e-spec-0076-seed-task-import.sh

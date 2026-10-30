@@ -16,7 +16,11 @@ def derive_acceptance_assessment(
     outcome = session.get("user_outcome") or session
     trace = session.get("sim_trace") or {}
     direct = outcome.get("interaction_mode") == "direct" or "review_verdict" in outcome
-    if direct:
+    feedback = session.get("feedback") or {}
+    if feedback:
+        # Spec-0084/T1: no complaint/bug verdict is not an acceptance judgment.
+        accepted = (feedback.get("task_assessment") or {}).get("status") == "fulfilled"
+    elif direct:
         accepted = (
             outcome.get("review_verdict") == "accept"
             and outcome.get("review_status") == "completed"
@@ -25,11 +29,13 @@ def derive_acceptance_assessment(
         accepted = outcome.get("end_reason", trace.get("end_reason")) == "accepted"
     if not accepted:
         return "not_applicable"
+    if not feedback and direct:
+        return "unverified_accept"
     if (
         session.get("status") in {"crashed", "timed_out", "invalid"}
-        or trace.get("evaluation_status", "valid") != "valid"
+        or (not feedback and trace.get("evaluation_status", "valid") != "valid")
         or trace.get("interaction_status", "completed") not in {"completed", "protocol_repaired"}
-        or outcome.get("evaluation_status", "valid") != "valid"
+        or (not feedback and outcome.get("evaluation_status", "valid") != "valid")
     ):
         return "unverified_accept"
     if any(

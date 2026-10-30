@@ -184,6 +184,7 @@ def test_freeze_generates_plan_archives_and_records_dirty_tree(prepared_inputs, 
     assert "backend/deploy/vigil/Dockerfile" in files
     assert "backend/deploy/vigil/entrypoint.sh" in files
     assert "backend/scripts/prepare_swebench_runtime_tree.py" in files
+    assert not any(name.startswith("third_party/nexau/") for name in files)
     assert not any(name.startswith(("research/", "tools/", "examples/")) for name in files)
     assert "backend/run.py" not in files
     assert "backend/scripts/run_swebench_closed_loop.py" not in files
@@ -340,10 +341,10 @@ def test_swe_dataset_preserves_actual_runner_columns(tmp_path):
 @pytest.mark.parametrize(
     "override",
     [
-        {"repository": "https://github.com/nex-agi/NexAU.git", "revision": "a" * 40},
+        {"repository": "https://github.com/hzhua/nexau.git", "revision": "a" * 40},
         {
             "repository": "https://example.com/fork.git",
-            "revision": "5cd791b1382f1163621c9ff0b50c2cf01c4ba923",
+            "revision": "28511d9f0362191a6c378fd441b2be55309a9e32",
         },
     ],
 )
@@ -358,8 +359,8 @@ def test_nexau_override_cannot_disagree_with_installed_runtime(prepared_inputs, 
 def test_matching_nexau_override_records_real_installed_pin(prepared_inputs, tmp_path):
     document = json.loads(prepared_inputs.read_text())
     document["source"]["nexau"] = {
-        "repository": "https://github.com/nex-agi/NexAU.git",
-        "revision": "5cd791b1382f1163621c9ff0b50c2cf01c4ba923",
+        "repository": "https://github.com/hzhua/nexau.git",
+        "revision": "28511d9f0362191a6c378fd441b2be55309a9e32",
     }
     write(prepared_inputs, document)
     manifest = materials.prepare_materials(prepared_inputs, tmp_path / "runs")

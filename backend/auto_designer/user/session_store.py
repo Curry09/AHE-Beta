@@ -35,6 +35,7 @@ class SessionStore:
     def __init__(self, root: str | Path) -> None:
         self._root = Path(root)
         self._lock = threading.RLock()
+        self._assessment_root: Path | None = None
 
     @property
     def root(self) -> Path:
@@ -187,6 +188,16 @@ class SessionStore:
 
         return build_evidence_envelope(session).to_dict()
 
+    def bind_assessment_root(self, root: Path) -> None:
+        """Spec-0084/T5: controller supplies its trusted measurement projection root."""
+        self._assessment_root = Path(root)
+
+    def load_assessment_summaries(self, session_id: str) -> list[dict]:
+        """Read only frozen safe feedback, never live worker state or private reports."""
+        if self._assessment_root is None:
+            return []
+        return read_assessment_summaries(self._assessment_root, self.load(session_id))
+
     def index(self, *, include_invalid: bool = False) -> list[dict]:
         index_path = self._root / _INDEX_NAME
         if not index_path.exists():
@@ -196,6 +207,44 @@ class SessionStore:
             return rows
         # 旧索引没有该字段，按 valid 兼容；正式体感/通过率消费者不接收 evaluator-invalid。
         return [row for row in rows if row.get("evaluation_status", "valid") == "valid"]
+
+
+def read_assessment_summaries(
+    root: Path, session: Session, *, archive_sha256: str | None = None
+) -> list[dict]:
+    """Read a frozen projection, optionally bound to a verified parent archive inventory."""
+    import hashlib
+
+    from auto_designer.execution_contract import canonical_sha256, validate_assessment_summary
+
+    round_no = session.session_provenance.get("round_no")
+    if type(round_no) is not int:
+        return []
+    path = root / "feedback" / f"round-{round_no}.json"
+    if any(item.is_symlink() for item in (path, *path.parents)):
+        raise SessionConflictError("Unsafe frozen assessment projection")
+    if not path.exists():
+        if archive_sha256 is not None:
+            raise SessionConflictError("Archived assessment projection is missing")
+        return []
+    raw = path.read_bytes()
+    if archive_sha256 is not None and hashlib.sha256(raw).hexdigest() != archive_sha256:
+        raise SessionConflictError("Archived assessment projection content changed")
+    frozen = json.loads(raw)
+    if (
+        frozen.get("sha256") != canonical_sha256(frozen.get("summaries"))
+        or frozen.get("round_no") != round_no
+        or frozen.get("user_sha") != session.session_provenance.get("harness_sha")
+    ):
+        raise SessionConflictError("Frozen assessment projection identity mismatch")
+    result = []
+    for item in frozen["summaries"]:
+        if item.get("session_id") == session.session_id:
+            row = validate_assessment_summary(item)
+            if row["contract_id"] != session.execution_contract.get("contract_id"):
+                raise SessionConflictError("Assessment is bound to another execution contract")
+            result.append(row)
+    return result
 
 
 def _validate_session_id(session_id: str) -> None:
@@ -262,8 +311,15 @@ def _index_entry(session: Session) -> dict:
             if session.session_provenance
             else {}
         ),
-        "score": session.feeling.score,
-        "reason": session.feeling.reason,
+        "score": session.feeling.score if session.feeling is not None else None,
+        "reason": session.feeling.reason if session.feeling is not None else "",
+        # Spec-0084/T1: missingness is a measurement, not a synthetic low score.
+        "experience_status": (session.feedback.get("experience") or {}).get(
+            "status", "rated" if session.feeling is not None else "missing"
+        ),
+        "experience_source": (session.feedback.get("experience") or {}).get("source", "legacy"),
+        "task_assessment": (session.feedback.get("task_assessment") or {}).get("status", "unknown"),
+        "followup_input": session.execution_contract.get("followup_input", "unknown"),
         "created_at": session.created_at.isoformat(),
         "n_issues": len(session.issue_refs),
         "issue_numbers": [ref.number for ref in session.issue_refs],

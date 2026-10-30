@@ -57,6 +57,10 @@ def test_copy_git_authenticates_by_environment_and_retains_cleanup(tmp_path, mon
             checkout = Path(command[command.index("-C") + 1])
             assert not (checkout / "generated.pyc").exists()
             assert "__pycache__/" in (checkout / ".gitignore").read_text()
+            import yaml
+
+            configuration = yaml.safe_load((checkout / ".openagents/openagents.yml").read_text())
+            assert configuration["execution_evidence"] == {"required": True}
             stdout = "final-main-sha\n"
         else:
             stdout = b""

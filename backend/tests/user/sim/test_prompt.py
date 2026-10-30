@@ -242,7 +242,9 @@ def test_final_check_rejudge_reintent_contracts_are_one_way() -> None:
     )
 
     assert "<main_final_check>" in check and "inspect the changed API" in check
-    assert '"check_status"' in check and "Do not edit" in check
+    assert '"check_status"' in check and "live workspace" in check
+    assert "You may run tests" in check and "if write_file is available" in check
+    assert "user contributions" in check
     assert "<main_rejudge>" in rejudge and "tests pass" in rejudge
     assert "cannot use another private tool" in rejudge
     assert "<main_reintent>" in reintent

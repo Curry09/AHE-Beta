@@ -161,7 +161,9 @@ class FeelingScore:
     reason: str
 
     def __post_init__(self) -> None:
-        assert 1 <= self.score <= 4, f"体感分越界：{self.score}（须在 1..4）"
+        assert type(self.score) is int and 1 <= self.score <= 4, (
+            f"体感分越界：{self.score}（须在 1..4）"
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {"score": self.score, "reason": self.reason}
@@ -169,6 +171,57 @@ class FeelingScore:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> FeelingScore:
         return cls(score=data["score"], reason=data["reason"])
+
+
+def validate_feedback(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate independent observation axes without fabricating missing ratings (Spec-0084/T1)."""
+    import json
+
+    from auto_designer.execution_contract import canonical_bytes
+
+    expected = {"schema_version", "task_assessment", "experience", "attribution", "opportunities"}
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != expected
+        or type(value["schema_version"]) is not int
+        or value["schema_version"] != 1
+    ):
+        raise ValueError("feedback must use the complete schema 1")
+    task, experience, attribution = (
+        value[key] for key in ("task_assessment", "experience", "attribution")
+    )
+    if not isinstance(task, dict) or task.get("status") not in {
+        "fulfilled",
+        "unfulfilled",
+        "unknown",
+    }:
+        raise ValueError("invalid task assessment")
+    if not isinstance(task.get("source"), str) or not isinstance(task.get("evidence_refs"), list):
+        raise ValueError("task assessment requires a source and evidence references")
+    if not isinstance(experience, dict) or experience.get("status") not in {
+        "rated",
+        "missing",
+        "invalid",
+        "unavailable",
+    }:
+        raise ValueError("invalid experience status")
+    score = experience.get("score")
+    if experience["status"] == "rated":
+        if type(score) is not int or not 1 <= score <= 4:
+            raise ValueError("rated experience requires an integer from 1 to 4")
+    elif score is not None:
+        raise ValueError("missing experience cannot carry a rating")
+    if any(not isinstance(experience.get(key), str) for key in ("source", "reason")):
+        raise ValueError("experience requires source and reason")
+    if (
+        not isinstance(attribution, dict)
+        or attribution.get("status") not in {"confirmed", "uncertain", "unknown"}
+        or not isinstance(attribution.get("claims"), list)
+    ):
+        raise ValueError("invalid attribution")
+    if not isinstance(value["opportunities"], list):
+        raise ValueError("opportunities must be an array")
+    return json.loads(canonical_bytes(dict(value)))
 
 
 @dataclass
@@ -503,7 +556,7 @@ class Session:
     persona: Persona
     scenario: SeedScenario
     transcript: Transcript
-    feeling: FeelingScore
+    feeling: FeelingScore | None = None
     issue_refs: list[IssueRef] = field(default_factory=list)
     session_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     created_at: datetime = field(default_factory=datetime.now)
@@ -520,6 +573,28 @@ class Session:
     # Spec-0073/T4: one frozen source of session, task and persona ownership.
     session_provenance: dict[str, Any] = field(default_factory=dict)
 
+    # Spec-0084/T1: optional only for read-only historical records.
+    feedback: dict[str, Any] = field(default_factory=dict)
+    execution_contract: dict[str, Any] = field(default_factory=dict)
+    execution_receipt: dict[str, Any] = field(default_factory=dict)
+    report_plan: list[dict[str, Any]] | None = None
+
+    def __post_init__(self) -> None:
+        if self.feedback:
+            self.feedback = validate_feedback(self.feedback)
+            experience = self.feedback["experience"]
+            self.feeling = (
+                FeelingScore(experience["score"], experience["reason"])
+                if experience["status"] == "rated"
+                else None
+            )
+        if self.execution_contract:
+            from auto_designer.execution_contract import validate_execution_contract
+
+            self.execution_contract = validate_execution_contract(self.execution_contract)
+            if self.execution_contract["session_id"] != self.session_id:
+                raise ValueError("execution contract session identity mismatch")
+
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
             "session_id": self.session_id,
@@ -527,9 +602,14 @@ class Session:
             "persona": self.persona.to_dict(),
             "scenario": self.scenario.to_dict(),
             "transcript": self.transcript.to_dict(),
-            "feeling": self.feeling.to_dict(),
+            "feeling": self.feeling.to_dict() if self.feeling is not None else None,
             "issue_refs": [r.to_dict() for r in self.issue_refs],
         }
+        for name in ("feedback", "execution_contract", "execution_receipt"):
+            if getattr(self, name):
+                d[name] = dict(getattr(self, name))
+        if self.report_plan is not None:
+            d["report_plan"] = list(self.report_plan)
         if self.sim_trace is not None:
             d["sim_trace"] = self.sim_trace.to_dict()
         if self.user_outcome:
@@ -556,7 +636,7 @@ class Session:
             persona=Persona.from_dict(data["persona"]),
             scenario=SeedScenario.from_dict(data["scenario"]),
             transcript=Transcript.from_dict(data["transcript"]),
-            feeling=FeelingScore.from_dict(data["feeling"]),
+            feeling=FeelingScore.from_dict(data["feeling"]) if data.get("feeling") else None,
             issue_refs=[IssueRef.from_dict(r) for r in data.get("issue_refs", [])],
             session_id=data["session_id"],
             created_at=datetime.fromisoformat(data["created_at"]),
@@ -573,6 +653,10 @@ class Session:
             audit_events=[dict(row) for row in data.get("audit_events", [])],
             user_feedback_envelope=dict(data.get("user_feedback_envelope") or {}),
             session_provenance=dict(data.get("session_provenance") or {}),
+            feedback=dict(data.get("feedback") or {}),
+            execution_contract=dict(data.get("execution_contract") or {}),
+            execution_receipt=dict(data.get("execution_receipt") or {}),
+            report_plan=data.get("report_plan"),
         )
 
 

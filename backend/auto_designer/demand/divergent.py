@@ -77,8 +77,8 @@ class Divergent:
         self._recovery = recovery
 
     def bind_feedback_dependency(self, prerequisite: str) -> None:
-        """Spec-0079/T3: share the outer feedback stage prerequisite."""
-        if prerequisite not in {"users", "feedback_imported"}:
+        """Share the outer feedback prerequisite, including independent assessment."""
+        if prerequisite not in {"users", "feedback_imported", "objective_grading"}:
             raise ValueError("unsupported feedback prerequisite")
         self._feedback_dependency = prerequisite
 
@@ -264,6 +264,14 @@ class Divergent:
                 envelope = self._store.load_user_feedback_envelope(session_id)
             except FileNotFoundError:
                 envelope = build_evidence_envelope(session).to_dict()
+            # Spec-0084/T4: the frozen grading summary is joined separately from raw objective logs.
+            from auto_designer.demand.evidence_contract import session_execution_facts
+
+            envelope.update(
+                session_execution_facts(
+                    session, assessment_summaries=self._store.load_assessment_summaries(session_id)
+                )
+            )
             rows.append(project_for_role(envelope, "pm"))
         return rows
 
@@ -276,7 +284,7 @@ class Divergent:
         return json.dumps(rows, ensure_ascii=False, indent=2)
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
-        rows = sorted(self._store.index(), key=lambda e: e["created_at"])
+        rows = sorted(self._store.index(include_invalid=True), key=lambda e: e["created_at"])
         return [
             (
                 e["created_at"],
@@ -299,7 +307,9 @@ class Divergent:
         for ts, score, reason, sid in trend:
             why = f" — {reason}" if reason else ""
             sid_bit = f" [session={sid}]" if sid else ""
-            lines.append(f"- {ts}{sid_bit}: {score}{why}")
+            lines.append(
+                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (未评分)'}{why}"
+            )
         return "\n".join(lines)
 
     def _emit(self, *, running: bool, status: str, **kw: object) -> None:

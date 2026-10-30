@@ -91,6 +91,7 @@ def test_direct_mode_sends_one_harness_message_then_one_terminal_review(tmp_path
         "review_feedback": "The terminal result needs triage.",
         "status": "completed",
         "harness_reply": "completed",
+        "review_trace": [],
     }
     record = session.user_outcome["execution_record"]
     assert record["source"] == "launcher_received"

@@ -52,3 +52,33 @@ def request_limits(environment: Mapping[str, str], *, fallback: float) -> Reques
             continue
     inner = request if request is not None else max([fallback, *[v for v in legacy if v]])
     return RequestLimits(request, inner + grace, grace)
+
+
+class TaskBudget:
+    """Spec-0084/T3: one task clock; message/control activity never renews it."""
+
+    def __init__(self, seconds: float | None, *, clock=None) -> None:
+        import time
+
+        if seconds is not None and (
+            type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds <= 0
+        ):
+            raise ValueError("Task budget must be positive finite seconds or null")
+        self.seconds = seconds
+        self.clock = clock or time.monotonic
+        self.started_at: float | None = None
+        self.deadline: float | None = None
+
+    def start(self) -> None:
+        if self.started_at is None:
+            self.started_at = self.clock()
+            if self.seconds is not None:
+                self.deadline = self.started_at + self.seconds
+
+    def remaining(self) -> float | None:
+        if self.deadline is None:
+            return self.seconds
+        return max(0.0, self.deadline - self.clock())
+
+    def expired(self) -> bool:
+        return self.deadline is not None and self.clock() >= self.deadline

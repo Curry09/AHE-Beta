@@ -13,6 +13,24 @@ from auto_designer.models import bound_session_provenance
 from auto_designer.usage import current_usage_context
 
 
+class _AssessmentReadyLauncher:
+    """Gate actual Actors, while allowing sealed-session recovery without a worker."""
+
+    def __init__(self, launcher, assessment):
+        self._launcher = launcher
+        self._assessment = assessment
+
+    def __getattr__(self, name):
+        return getattr(self._launcher, name)
+
+    def launch(self, *args, **kwargs):
+        # Recovery resolves authoritative Sessions before reaching launch. Each
+        # real launch still checks the current generation's signed readiness;
+        # no mutable "already ready" flag is shared by concurrent user slots.
+        self._assessment.await_worker()
+        return self._launcher.launch(*args, **kwargs)
+
+
 def _resolve_frozen_session(binding, sim_personas):
     from auto_designer.experiment.context import frozen_scenario
     from auto_designer.models import Persona
@@ -69,7 +87,9 @@ def _observe_session(status, persona, scenario, result, *, data_dir, persona_met
             extra={
                 "kind": "user_session",
                 **meta,
-                "score": result.feeling.score if result is not None else None,
+                "score": result.feeling.score
+                if result is not None and result.feeling is not None
+                else None,
             },
         )
 
@@ -158,7 +178,17 @@ def main() -> int:
     else:
         print("②.5 resume：保留 Gitea、session、harness 与 live 历史 ...")
     store = SessionStore(role_runs / "sessions")
-    launcher = HarnessLauncher(harness_repo=str(repo), runs_root=runtime.DATA / "harness_runs")
+    from auto_designer.loop.round_assessment import RoundAssessment, read_json
+
+    experiment_root = Path(os.environ["AUTO_DESIGNER_FROZEN_MANIFEST"]).parent
+    store.bind_assessment_root(experiment_root / "assessment")
+    round_assessment = RoundAssessment(
+        experiment_root, read_json(experiment_root / "manifest.json"), store
+    )
+    launcher = _AssessmentReadyLauncher(
+        HarnessLauncher(harness_repo=str(repo), runs_root=runtime.DATA / "harness_runs"),
+        round_assessment,
+    )
     print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 生成/准入角色 ...")
     api = ApiPersonaClient()
 
@@ -281,6 +311,7 @@ def main() -> int:
         verify_unchanged(repo=str(runtime.ROOT), before=_repo_baseline)
 
     orch = Orchestrator(
+        round_assessment=round_assessment,
         launcher=launcher,
         harness_repo=str(repo),
         fixed_set=[],

@@ -6,7 +6,7 @@ feeling.py
 - ① LLM 自评 (parse_feeling_llm): persona 在角色内给"这次体验"打 1–4 + 理由,
      对齐 spec-0001/T3"会话结束后经 LLM 产出 FeelingScore"的产出方式 (类 CC 评分)。
 - ② 框架派生 (derive_feeling): 从主观末态 (end_reason / verdict / trust) 确定性聚合,
-     可复现, 也作 LLM 解析失败时的兜底。
+     可复现，仅作独立诊断，不填补缺失自评。
 
 铁律:
 - 体感是 *主观* 信号, 只从 persona 的末态 (end_reason / verdict / patience / trust)
@@ -49,7 +49,9 @@ class FeelingScore:
     reason: str
 
     def __post_init__(self) -> None:
-        assert 1 <= self.score <= 4, f"体感分越界: {self.score} (须在 1..4)"
+        assert type(self.score) is int and 1 <= self.score <= 4, (
+            f"体感分须为 1..4 的整数: {self.score!r}"
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {"score": self.score, "reason": self.reason}
@@ -63,20 +65,35 @@ def parse_feeling_llm(ret: dict) -> FeelingScore | None:
     """从 persona LLM 的会话末自评 dict 解析 1–4 体感分 (spec-0001/T3 的产出方式)。
 
     期望 ret 形如 {"score": <1..4>, "reason": "<...>"}。无效 (缺字段 / 非整数 / 越界)
-    返回 None, 交由调用方回落到 derive_feeling 的派生分。越界经 FeelingScore.__post_init__
+    返回 None，缺测不能回填派生分。越界经 FeelingScore.__post_init__
     断言失败 -> 捕获为 None, 既守住"越界即非法"又不崩 loop。
     """
     if not isinstance(ret, dict) or "score" not in ret:
         return None
-    try:
-        score = int(ret["score"])
-    except (TypeError, ValueError):
+    score = ret["score"]
+    if type(score) is not int:
         return None
     reason = str(ret.get("reason", "")).strip()
     try:
         return FeelingScore(score=score, reason=reason)
     except AssertionError:
         return None
+
+
+def experience_feedback(ret: dict | None, *, source: str, error: str | None = None) -> dict:
+    """Spec-0084/T2: one strict scale for both interaction modes, including missingness."""
+    if error is not None:
+        return {"status": "unavailable", "score": None, "source": source, "reason": error}
+    value = ret if isinstance(ret, dict) else {}
+    feeling = parse_feeling_llm(value)
+    return {
+        "status": "rated" if feeling else ("missing" if value.get("score") is None else "invalid"),
+        "score": feeling.score if feeling else None,
+        "source": source,
+        "reason": feeling.reason
+        if feeling
+        else str(value.get("reason") or "No valid integer rating supplied"),
+    }
 
 
 def derive_feeling(end_reason: str, turns: list) -> FeelingScore:

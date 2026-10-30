@@ -48,7 +48,7 @@ class RecordingWorkspace(LocalWorkspaceRuntime):
             target.write_bytes(BINARY_OUTPUT)
 
     def export_file(self, path, max_bytes):
-        self.events.append("export")
+        self.events.append("export:" + path)
         return super().export_file(path, max_bytes)
 
     def close(self):
@@ -177,13 +177,13 @@ def start_session(mode, session_setup, *, failure=None, byte_limit=4096):
     }
     with bind_usage_context(**context):
         session = runner(persona, scenario, RecordingHarness(events), workspace_dir=workspace)
-    # direct's workspace belongs to the caller/orchestrator; simulated closes it itself.
+    # Both runners seal and close before terminal review; caller cleanup is idempotent.
     workspace.close()
     return session, runner, store, events, context
 
 
 @pytest.mark.parametrize("mode", ["direct", "simulated_user"])
-def test_binary_output_collected_after_review_and_finalize_before_cleanup(session_setup, mode):
+def test_binary_output_frozen_before_terminal_review_and_cleanup(session_setup, mode):
     session, _, store, events, _ = start_session(mode, session_setup)
     receipt = session.workspace_evidence["evaluation_artifacts"]
     assert receipt["complete"] is True
@@ -204,11 +204,16 @@ def test_binary_output_collected_after_review_and_finalize_before_cleanup(sessio
     assert entry["bytes"] == len(BINARY_OUTPUT)
     assert entry["sha256"] == hashlib.sha256(BINARY_OUTPUT).hexdigest()
     assert events.index("harness_close") < events.index("quiesce")
-    assert max(i for i, event in enumerate(events) if event == "user_review") < events.index(
-        "quiesce"
+    # The final narration/rating is read-only and runs after the live workspace
+    # is gone. Interactive main checks may occur earlier, before accept/continue.
+    assert events.index("workspace_close") < max(
+        i for i, event in enumerate(events) if event == "user_review"
     )
-    assert events.index("quiesce") < events.index("finalize") < events.index("export")
-    assert events.index("export") < events.index("workspace_close")
+    artifact_export = events.index("export:output/result.xlsx")
+    assert events.index("quiesce") < events.index("finalize") < artifact_export
+    assert artifact_export < events.index("workspace_close")
+    assert events.count("quiesce") == events.count("finalize") == 1
+    assert session.workspace_evidence["actor_freeze"]["status"] == "frozen"
     assert not session_setup[0].exists()
     assert store.load(session.session_id).workspace_evidence["evaluation_artifacts"] == receipt
 

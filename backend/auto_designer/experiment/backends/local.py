@@ -24,7 +24,7 @@ from urllib.parse import urlsplit
 import requests
 
 from auto_designer.experiment.backends import local_ci
-from auto_designer.experiment.backends.base import BackendError
+from auto_designer.experiment.backends.base import BackendError, require_execution_reader
 from auto_designer.experiment.config import config_hash, delivery_required
 from auto_designer.experiment.context import build_controller_environment, material_path
 from auto_designer.experiment.engine import (
@@ -478,6 +478,7 @@ def prepare_images(
         "download_policies", []
     ):
         raise BackendError("Installed OpenAgents lacks local evidence-reader capabilities")
+    require_execution_reader(capabilities)
     result = {
         "recipe": "unified-local-tasks-v1" if modern else RECIPE_VERSION,
         "recipe_hash": base_hash,
@@ -1110,6 +1111,7 @@ class LocalBackend:
             "encodings", []
         ) or "same-origin-v1" not in capabilities.get("download_policies", []):
             raise BackendError("Local reader capability check failed")
+        require_execution_reader(capabilities)
         # Prove every task's source and interpreter, not merely a receipt's ID.
         task_checks = {}
         if self.manifest.get("workload_contract_version") is not None:
@@ -1488,7 +1490,7 @@ print('ready')
 
     def _snapshot_files(self) -> dict[str, str]:
         values = {}
-        for directory in ("checkpoints", "data", "logs", "telemetry", "runtime"):
+        for directory in ("checkpoints", "data", "logs", "telemetry", "runtime", "assessment"):
             for path in (self.root / directory).rglob("*"):
                 relative = path.relative_to(self.root)
                 if (
@@ -1523,6 +1525,20 @@ print('ready')
                     ):
                         values[str(relative)] = sha256_file(path)
         return values
+
+    def assessment_exchange(self, action: str, payload: dict) -> dict:
+        from auto_designer.loop.round_assessment import exchange
+
+        if _read(self.root / "manifest.json").get("config_hash") != self.digest:
+            raise BackendError("Assessment run ownership differs")
+        return exchange(self.root, action, payload)
+
+    def assessment_download(self, request_digest: str) -> bytes:
+        from auto_designer.loop.round_assessment import bundle_path
+
+        if _read(self.root / "manifest.json").get("config_hash") != self.digest:
+            raise BackendError("Assessment run ownership differs")
+        return bundle_path(self.root, request_digest).read_bytes()
 
     def destroy(self) -> dict[str, Any]:
         if inspect_controller(self.root).get("running"):

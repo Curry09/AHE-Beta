@@ -54,6 +54,9 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
         )
     validate_schema(document=data, schema_name="experiment-v2.json")
     _reject_plaintext_credentials(node=data, location="config")
+    from auto_designer.experiment.model_limits import validate_model_limits
+
+    validate_model_limits(data)
     runtime = data["runtime"]
     backend = runtime["backend"]
     if backend == "local":
@@ -155,6 +158,11 @@ def load_task_package(path: str | Path) -> dict[str, Any]:
     if data["kind"] == "swebench" and "not_in_benchmark" in data:
         raise ConfigError("SWE-bench must not declare not_in_benchmark")
     data.setdefault("interaction", "simulated_user")
+    from auto_designer.experiment.workload import validate_task_execution
+
+    validate_task_execution(
+        data, source_root=Path(source["path"]) if source["kind"] == "local" else None
+    )
     return data
 
 
@@ -220,7 +228,19 @@ def resolve_input_path(*, value: str, base: Path) -> str:
 def _reject_plaintext_credentials(*, node: Any, location: str) -> None:
     if isinstance(node, dict):
         for key, value in node.items():
-            if _SECRET_KEY_RE.search(key) and not key.endswith("_env"):
+            model_limit = (
+                location
+                in {f"config.models.{role}.limits" for role in ("user", "harness", "demand")}
+                and key
+                in {
+                    "context_window_tokens",
+                    "max_context_tokens",
+                    "reserved_output_tokens",
+                    "input_headroom_tokens",
+                }
+                and type(value) is int
+            )
+            if _SECRET_KEY_RE.search(key) and not key.endswith("_env") and not model_limit:
                 raise ConfigError(f"Plaintext credential field forbidden: {location}.{key}")
             _reject_plaintext_credentials(node=value, location=f"{location}.{key}")
     elif isinstance(node, list):

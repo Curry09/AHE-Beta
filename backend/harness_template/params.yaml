@@ -4,6 +4,7 @@ entry:
   - python3
   - entry.py
 # The process exchanges one typed JSON object per line.
+# Execution conditions and task/message identity are preserved in protocol frames.
 protocol: stdio-jsonl-v1
 observations: artifact-observations-v1
 # cwd: .

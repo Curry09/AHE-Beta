@@ -63,7 +63,7 @@ RUN pip install --no-cache-dir --no-build-isolation /opt/openagents-src \
 # 测试，也要能审查当前 pin 的真实 API；因此不能只安装一个不可见的 wheel，保留
 # checkout 于 /opt/nexau-src。运行容器为非 root，该目录不可写。
 COPY --from=nexau . /opt/nexau-src
-RUN pip install --no-cache-dir --no-build-isolation /opt/nexau-src "ag-ui-protocol==0.1.22" \
+RUN pip install --no-cache-dir --no-build-isolation /opt/nexau-src "ag-ui-protocol==0.1.22" "anthropic<1" "greenlet>=3" \
     && python -c "from nexau import Agent, AgentConfig, Span, SpanType" \
     && chmod -R a-w /opt/nexau-src
 

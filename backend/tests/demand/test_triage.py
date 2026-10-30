@@ -820,8 +820,9 @@ def test_recovery_reuses_saved_output_after_previous_tracker_outage(tmp_path, mo
     assert len(tracker.issue(number)["comments"]) == 1
 
 
-def test_imported_feedback_uses_its_actual_stage_dependency(tmp_path):
-    """Spec-0079/T3: role-level recovery must agree with bootstrap's stage DAG."""
+@pytest.mark.parametrize("prerequisite", ["feedback_imported", "objective_grading"])
+def test_feedback_uses_its_actual_stage_dependency(tmp_path, prerequisite):
+    """Role recovery agrees with imported or independently graded feedback."""
     tracker = FakeTracker()
     number = _report(tracker, "historical report")
     triager = _triager(
@@ -835,16 +836,16 @@ def test_imported_feedback_uses_its_actual_stage_dependency(tmp_path):
     )
     recovery.freeze_round(round_no=1, user_sha="seed", plan=[])
     key = operation_key("feedback-imported")
-    recovery.begin_unit(round_no=1, stage="feedback_imported", key=key, input_value={})
-    recovery.complete_unit(round_no=1, stage="feedback_imported", key=key)
-    recovery.complete_stage(round_no=1, stage="feedback_imported")
+    recovery.begin_unit(round_no=1, stage=prerequisite, key=key, input_value={})
+    recovery.complete_unit(round_no=1, stage=prerequisite, key=key)
+    recovery.complete_stage(round_no=1, stage=prerequisite)
     triager.bind_recovery(recovery)
-    triager.bind_feedback_dependency("feedback_imported")
+    triager.bind_feedback_dependency(prerequisite)
     with bind_usage_context(round_no=1, operation="continuation-bootstrap-triage"):
         result = triager.triage_once()
     assert result.rejected == [number]
     state = recovery.round_state(round_no=1)
-    assert state["stages"]["triage"]["dependencies"] == ["feedback_imported"]
+    assert state["stages"]["triage"]["dependencies"] == [prerequisite]
     assert "users" not in state["stages"]
     triager.bind_feedback_dependency("users")
     assert triager._feedback_dependency == "users"
