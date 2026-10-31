@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 from pathlib import Path
@@ -39,11 +40,15 @@ class TaskEnvironmentMixin:
         session_id,
         environment_dir,
         benchmark="Harbor",
+        benchmark_options=None,
         role=None,
         **kwargs,
     ):
         self.role = role
         self.benchmark = benchmark
+        # Opaque task-source options belong to each environment instance, not
+        # the generic worker's process environment. Only its profile reads them.
+        self.benchmark_options = copy.deepcopy(benchmark_options or {})
         profile = get_profile(benchmark)
         self.support = profile.EnvironmentSupport(self) if profile else None
         super().__init__(

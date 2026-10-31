@@ -6,6 +6,12 @@ import json
 import math
 from pathlib import Path
 
+from .judge import canonical_model
+
+
+def _judge_run_ids(runs):
+    return {(canonical_model(run.get("model")), run.get("repeat")) for run in runs}
+
 
 def _ensemble_ok(report: dict) -> bool:
     runs = report.get("runs", [])
@@ -16,8 +22,7 @@ def _ensemble_ok(report: dict) -> bool:
     ):
         return False
     return (
-        {(run.get("model"), run.get("repeat")) for run in runs}
-        == {("claude-opus-5", n) for n in (1, 2, 3)}
+        _judge_run_ids(runs) == {("claude-opus-5", n) for n in (1, 2, 3)}
         and all(run.get("provider") == "anthropic" and "error" not in run for run in runs)
         and all(
             isinstance(run.get("reward"), (int, float)) and math.isfinite(run["reward"])
@@ -122,8 +127,7 @@ def grade_issues(task: str, rewards: dict | None, logs: Path) -> list[str]:
             clean_fraction = sum(not r["is_hack"] for r in votes) / len(votes) if votes else -1
             if not (
                 len(runs) == gate.get("n_total") == 3
-                and {(r.get("model"), r.get("repeat")) for r in runs}
-                == {("claude-opus-5", n) for n in (1, 2, 3)}
+                and _judge_run_ids(runs) == {("claude-opus-5", n) for n in (1, 2, 3)}
                 and len(votes) == gate.get("n_verdicts") >= gate.get("quorum", 4) == 2
                 and gate.get("ran") is True
                 and gate.get("clean_fraction") == clean_fraction

@@ -18,6 +18,7 @@ from harbor.models.task.config import EnvironmentConfig
 
 from evaluation.environments.files import list_requests, read_bytes, write_bytes
 
+from ..judge import OFFICIAL_MODEL, runtime_model, transport_options
 from .mcp_timeouts import transport_timeouts
 
 
@@ -28,8 +29,9 @@ def sidecar_config(spec):
 
 
 class AreSidecar:
-    def __init__(self, parent):
+    def __init__(self, parent, judge=None):
         self.parent = parent
+        self.judge = transport_options(judge)
         self.child = None
         self.pump = None
         self.failure = None
@@ -90,7 +92,11 @@ class AreSidecar:
             ["python", "are_mcp_server_soft_judge.py"],
         ):
             raise ValueError("Unsupported official ARE sidecar command")
+        wire_model = self.judge["model"]
+        normalize_usage = self.judge["normalize_usage"]
         if self.parent.capabilities.docker_compose:
+            if wire_model != OFFICIAL_MODEL or normalize_usage:
+                raise ValueError("Gateway judge options require a managed ARE sidecar")
             child = ServiceEnvironment(self.parent, "are-sidecar")
             self.child = child
             self.managed = False
@@ -121,9 +127,13 @@ class AreSidecar:
                 "EVENT_LOG_PATH": "/logs/are_event_log.json",
                 "ANTHROPIC_API_KEY": key or "",
                 "ANTHROPIC_BASE_URL": os.environ.get("JUDGE_ANTHROPIC_BASE_URL", ""),
-                "ARE_JUDGE_MODEL": "claude-opus-5",
+                "ARE_JUDGE_MODEL": runtime_model(wire_model),
                 "PYTHONUNBUFFERED": "1",
             }
+            if normalize_usage and command[-1] == "are_mcp_server_soft_judge.py":
+                env["ANTHROPIC_BASE_URL"] = await self._start_judge_proxy(
+                    child, env["ANTHROPIC_BASE_URL"], context
+                )
             result = await child.exec(
                 "nohup " + shlex.join(command) + " </dev/null >/logs/server.log 2>&1 & echo $!",
                 env=env,
@@ -155,6 +165,49 @@ class AreSidecar:
             Path(__file__).with_name("mcp_shell_client.py"), "/opt/harbor-mcp/client.py"
         )
         self.pump = asyncio.create_task(self._pump())
+
+    async def _start_judge_proxy(self, child, upstream, context):
+        from evaluation.harbor.contracts import resolve_contract
+
+        if not upstream:
+            raise ValueError("ARE judge usage normalization requires an explicit upstream")
+        # The task's outer execution deadline still bounds every call. The
+        # bridge must not add the old draft's independent 300-second cap.
+        budget = resolve_contract(context.parent)["agent_timeout_seconds"]
+        await child.upload_file(
+            Path(__file__).with_name("anthropic_gateway_proxy.py"),
+            "/opt/gaia2-task/anthropic_gateway_proxy.py",
+        )
+        launched = await child.exec(
+            "nohup python /opt/gaia2-task/anthropic_gateway_proxy.py "
+            "</dev/null >/logs/judge-proxy.log 2>&1 & echo $!",
+            env={"ARE_JUDGE_UPSTREAM": upstream, "ARE_JUDGE_TIMEOUT_SECONDS": str(budget)},
+            user="root",
+            timeout_sec=30,
+        )
+        if launched.return_code or not launched.stdout.strip().isdigit():
+            raise RuntimeError("ARE judge compatibility proxy launch failed")
+        # Dynamic loopback port avoids collisions. Probe the exact PID's health
+        # before starting ARE, rather than trusting a successful background shell.
+        probe = (
+            "import json,urllib.request;"
+            "p=json.load(open('/logs/judge-proxy.json'));"
+            f"assert p['pid']=={int(launched.stdout.strip())};"
+            "base='http://127.0.0.1:'+str(p['port']);"
+            "r=urllib.request.urlopen(base+'/health',timeout=2);"
+            "assert r.read()==b'are-judge-gateway-ready';print(base)"
+        )
+        try:
+            async with asyncio.timeout(30):
+                while True:
+                    result = await child.exec(
+                        "python -c " + shlex.quote(probe), user="root", timeout_sec=5
+                    )
+                    if not result.return_code:
+                        return result.stdout.strip()
+                    await asyncio.sleep(1)
+        except TimeoutError as error:
+            raise RuntimeError("ARE judge compatibility proxy never became healthy") from error
 
     async def call(self, request):
         tool = request["tool"]

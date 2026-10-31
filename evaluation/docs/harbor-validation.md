@@ -276,3 +276,12 @@ and subsequent verification must be recorded separately with their provenance.
   E2B outage. Missing diagnostics from prior attempts cannot be reconstructed;
   running attempts retain their frozen implementation. Time budgets, official
   tests, judge configuration and score validity rules are unchanged.
+
+
+## 2026-10-31: standard Harbor source on E2B
+
+The public `evaluation.yaml` entry completed `validate`, `prepare`, `plan`, `run`, official verification and cleanup for Terminal-Bench 2 `fix-code-vulnerability`, outside the pinned Harbor Index selection. Upstream was frozen at `2fd12b88aafdd04a52c298e3940bcb189f9766d6`; only its official image tag was resolved to an immutable digest. Instructions, verifier scripts, 900-second agent/verifier budgets, 1 CPU and 2048 MiB declaration were retained.
+
+The current seed (`v0`) used GLM-5.3-Flash, max reasoning effort, 65,536 output allowance, direct interaction and concurrency 1. One actor launch completed in 106.99 seconds. The original verifier reported 367 repository tests and 6 additional tests passed, raw reward `1`, `valid_grade: true`, with no agent exception or invalid attempt. Ten captured API calls reported 77,005 total tokens. CPU and memory allocations matched; E2B did not enforce the storage declaration, as recorded. No per-task runtime hook or manual edit during solving was used.
+
+Run ID: `hbench-6157a0d27082e431`. The credential-free receipt is `evaluation/verification/standard-harbor-e2b-smoke.json`; full logs and traces are retained separately from the source repository. This confirms this standard task path, rather than a score claim for the full Terminal-Bench dataset.

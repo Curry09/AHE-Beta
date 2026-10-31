@@ -28,7 +28,7 @@ def _run_lock(root):
 def main(argv=None):
     os.umask(0o077)
     parser = argparse.ArgumentParser(
-        prog="harbor-eval", description="Single-configuration Harbor Index evaluation"
+        prog="harbor-eval", description="Single-configuration Harbor task evaluation"
     )
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("validate", "prepare", "plan", "run"):

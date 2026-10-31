@@ -86,11 +86,6 @@ def job_config(manifest: dict, trial: dict, jobs_dir: Path, job_name: str) -> di
         "ANTHROPIC_API_KEY": "${JUDGE_ANTHROPIC_API_KEY}",
         "ANTHROPIC_BASE_URL": "${JUDGE_ANTHROPIC_BASE_URL}",
     }
-    if (
-        case["task_id"].startswith(("algotune-", "gso-"))
-        and manifest.get("metadata", {}).get("anti_cheat_review") == "deferred_by_user"
-    ):
-        verifier_credentials = {"ANTHROPIC_API_KEY": "", "ANTHROPIC_BASE_URL": ""}
     result = {
         "job_name": job_name,
         "jobs_dir": str(jobs_dir),
@@ -98,13 +93,21 @@ def job_config(manifest: dict, trial: dict, jobs_dir: Path, job_name: str) -> di
         "n_concurrent_trials": 1,
         "timeout_multiplier": 1.0,
         "retry": {"max_retries": 0},
-        "environment": environment_config(manifest["provider"], case["benchmark"]),
+        "environment": environment_config(
+            manifest["provider"],
+            case["benchmark"],
+            profile.environment_options(settings) if profile else None,
+        ),
         "agents": [agent],
         "verifier": {
             "disable": False,
             "env": {
                 **verifier_credentials,
-                **(profile.verifier_env(case["task_id"]) if profile else {}),
+                **(
+                    profile.verifier_env(case["task_id"], settings, manifest.get("metadata", {}))
+                    if profile
+                    else {}
+                ),
             },
         },
         "tasks": [{"path": str(task_root)}],

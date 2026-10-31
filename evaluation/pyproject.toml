@@ -1,7 +1,7 @@
 [project]
 name = "auto-designer-evaluation"
 version = "1.0.0"
-description = "Single-configuration Harbor Index evaluation with frozen harnesses and simulated users"
+description = "Single-configuration Harbor evaluation with task-source profiles and frozen harnesses"
 requires-python = ">=3.12"
 dependencies = [
   "harbor[e2b]==0.24.0",
@@ -44,7 +44,6 @@ bypass-selection = true
 "state.py" = "evaluation/state.py"
 "results.py" = "evaluation/results.py"
 "report.py" = "evaluation/report.py"
-"published_tasks.json" = "evaluation/published_tasks.json"
 "harbor" = "evaluation/harbor"
 "harness" = "evaluation/harness"
 "environments" = "evaluation/environments"

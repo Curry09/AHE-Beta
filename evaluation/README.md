@@ -1,4 +1,4 @@
-# Unified Harbor Index evaluation
+# Unified Harbor evaluation
 
 [简体中文](README.zh-CN.md) · [Guide](docs/harbor.md)
 
@@ -20,7 +20,7 @@ python -m evaluation prepare
 python -m evaluation run
 ```
 
-Preparation downloads and verifies the pinned official task definitions, and creates one archive per custom harness source version. It does not start solving sandboxes or call a paid model. Default `published38` selects the published 38 tasks; an explicit task list or `all` is also supported. `all` may include tasks that exceed E2B limits; infrastructure failures remain separate from task failures.
+Preparation acquires tasks through the selected source and creates one archive per custom harness source version. It does not start solving sandboxes or call a paid model. The default `task_source: harbor_index` downloads the pinned official definitions; `published38` selects the published 38 tasks, with an explicit task list or `all` also supported. `task_source: harbor` instead accepts local task-package paths without Index rules; see the guide. Tasks may exceed E2B limits; infrastructure failures remain separate from task failures.
 
 ## Execution and recovery
 
@@ -52,4 +52,4 @@ pip install -e './evaluation[test]'
 python -m pytest evaluation/tests
 ```
 
-Validation is offline; this consolidation has not launched a new paid end-to-end evaluation. The framework is independent of evolution experiments under `backend/scripts/experiment.py`. Validation records are in `evaluation/verification/`.
+Offline regression tests and a real E2B run of the standard Terminal-Bench task `fix-code-vulnerability` passed. That run used `task_source: harbor`, the current seed and GLM-5.3-Flash; its original 367 repository tests and 6 task tests passed with reward 1.0. The framework is independent of evolution experiments under `backend/scripts/experiment.py`. Validation records are in `evaluation/verification/`.

@@ -52,11 +52,82 @@ def test_standard_package_has_no_index_specific_judge_or_thread_settings(tmp_pat
     ordinary = job_config(manifest, trial, tmp_path / "jobs", "job")
     assert "OMP_NUM_THREADS" not in ordinary["verifier"]["env"]
     assert not set(PIN["judge"]) & set(ordinary["verifier"]["env"])
+    assert "benchmark_options" not in ordinary["environment"]["kwargs"]
     case["benchmark"] = trial["benchmark"] = "Harbor Index"
     manifest["resolved_cases"] = {"Harbor Index/" + case["task_id"]: resolve_contract(tmp_path)}
     index = job_config(manifest, trial, tmp_path / "jobs", "job")
     assert index["verifier"]["env"]["OMP_NUM_THREADS"] == "1"
     assert index["environment"]["kwargs"]["benchmark"] == "Harbor Index"
+
+
+def test_another_profile_can_supply_options_without_index_judge_rules(tmp_path, monkeypatch):
+    from evaluation import benchmarks
+
+    received = []
+    profile = SimpleNamespace(
+        environment_options=lambda runtime: {"custom_setting": runtime["judge"]["model"]},
+        verifier_env=lambda task_id, runtime, metadata: {"OTHER_JUDGE": runtime["judge"]["model"]},
+        EnvironmentSupport=lambda env: received.append(env.benchmark_options),
+    )
+    # Register a different task-source implementation through the existing
+    # lookup; the generic job and environment code must not validate it as Index.
+    monkeypatch.setitem(benchmarks._SOURCES, "other", ("Other", "fixture_other_profile"))
+    original = benchmarks.import_module
+    monkeypatch.setattr(
+        benchmarks,
+        "import_module",
+        lambda name: profile if name == "fixture_other_profile" else original(name),
+    )
+    raw = payload(task(tmp_path))
+    plan = HarborEvaluationPlan.from_mapping(raw, tmp_path / "plan.json")
+    case = asdict(plan.cases[0])
+    case["benchmark"] = "Other"
+    manifest = {
+        "cases": [case],
+        "harnesses": [asdict(plan.harnesses[0])],
+        "resolved_cases": {"Other/" + case["task_id"]: resolve_contract(tmp_path)},
+        "harness_model": plan.harness_model,
+        "provider": asdict(plan.provider),
+        "metadata": {
+            "evaluation_runtime": {"judge": {"model": "other-official-model"}, "actor": {}}
+        },
+    }
+    trial = {"benchmark": "Other", "task_id": case["task_id"], "harness": "seed"}
+    job = job_config(manifest, trial, tmp_path / "jobs", "job")
+    assert job["verifier"]["env"]["OTHER_JUDGE"] == "other-official-model"
+    assert job["environment"]["kwargs"]["benchmark_options"] == {
+        "custom_setting": "other-official-model"
+    }
+    from harbor.models.task.config import EnvironmentConfig
+
+    from evaluation.environments.base import TaskEnvironmentMixin
+
+    class Backend:
+        def __init__(self, **kwargs):
+            pass
+
+    class Environment(TaskEnvironmentMixin, Backend):
+        pass
+
+    options = job["environment"]["kwargs"]["benchmark_options"]
+    Environment(
+        task_env_config=EnvironmentConfig(),
+        session_id="fixture",
+        environment_dir=tmp_path,
+        **job["environment"]["kwargs"],
+    )
+    assert received == [options]
+    received[0]["custom_setting"] = "changed-instance"
+    assert options["custom_setting"] == "other-official-model"
+
+
+def test_provider_cannot_override_frozen_profile_options():
+    from evaluation.environments.registry import environment_config
+
+    with pytest.raises(ValueError, match="frozen task source"):
+        environment_config(
+            {"type": "e2b", "kwargs": {"benchmark_options": {"override": True}}}, "Harbor"
+        )
 
 
 def test_generic_grading_accepts_verifiers_without_index_stdout_format(tmp_path):

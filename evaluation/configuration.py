@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 
 import yaml
 
+from .benchmarks import DEFAULT_SOURCE, configuration_profile
+
 HARNESS_NAMES = ("v0", "u8", "u8-direct", "u16", "u32", "claude-code", "meta-harness")
 
 
@@ -75,6 +77,7 @@ class Configuration:
                     "name",
                     "paths",
                     "tasks",
+                    "task_source",
                     "harnesses",
                     "actor",
                     "user",
@@ -110,13 +113,11 @@ class Configuration:
             raise ConfigurationError(
                 "harnesses must be unique names from " + ", ".join(HARNESS_NAMES)
             )
-        tasks = x.setdefault("tasks", "published38")
-        if not isinstance(tasks, list) and tasks not in ["published38", "all"]:
-            raise ConfigurationError("tasks must be published38, all, or a list of task names")
-        if isinstance(tasks, list) and (
-            not tasks or any(not isinstance(t, str) for t in tasks) or len(set(tasks)) != len(tasks)
-        ):
-            raise ConfigurationError("task names must be a nonempty unique list")
+        x.setdefault("task_source", DEFAULT_SOURCE)
+        try:
+            profile = configuration_profile(x["task_source"])
+        except ValueError as error:
+            raise ConfigurationError(str(error)) from error
         actor = fields(
             x.setdefault("actor", {}),
             {
@@ -193,11 +194,17 @@ class Configuration:
         if user["reasoning_effort"] not in {"none", "low", "medium", "high", "max"}:
             raise ConfigurationError("Invalid user.reasoning_effort")
         positive(user["max_output_tokens"], "user.max_output_tokens")
-        judge = fields(x.setdefault("judge", {}), {"base_url", "api_key_env"}, "judge")
+        judge = x.setdefault("judge", {})
+        if not isinstance(judge, dict):
+            raise ConfigurationError("judge must be a mapping")
         judge["base_url"] = endpoint(judge.get("base_url"), "judge.base_url", True)
         judge["api_key_env"] = env_name(
             judge.get("api_key_env", "JUDGE_API_KEY"), "judge.api_key_env"
         )
+        try:
+            profile.validate_configuration(x)
+        except ValueError as error:
+            raise ConfigurationError(str(error)) from error
         execution = fields(
             x.setdefault("execution", {}),
             {"provider", "concurrency", "repetitions", "time_adaptation"},
@@ -224,19 +231,10 @@ class Configuration:
         return p.resolve() if p.is_absolute() else (self.source.parent / p).resolve()
 
     def task_names(self):
-        from .benchmarks.harbor_index.source import PIN
-
-        names = self.data["tasks"]
-        if names == "all":
-            names = list(PIN["tasks"])
-        elif names == "published38":
-            import json
-
-            names = json.loads(Path(__file__).with_name("published_tasks.json").read_text())
-        unknown = set(names) - set(PIN["tasks"])
-        if unknown:
-            raise ConfigurationError("Unknown task names: " + ", ".join(sorted(unknown)))
-        return list(names)
+        try:
+            return configuration_profile(self.data["task_source"]).task_names(self.data["tasks"])
+        except ValueError as error:
+            raise ConfigurationError(str(error)) from error
 
     def validate_sources(self):
         folder = {"claude-code": "Claude-Code", "meta-harness": "Meta-Harness"}

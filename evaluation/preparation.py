@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from .benchmarks.harbor_index.source import PIN, prepare_tasks, resolve_dataset
+from .benchmarks import configuration_profile
 from .harbor.contracts import runtime_identity, runtime_source_files
 from .harbor.tasks import resolve_case, verify_case
 from .manifest import _assert_secret_free, digest_json
@@ -110,20 +110,10 @@ def runtime_descriptor():
 
 def prepare(config, download=True):
     config.validate_sources()
-    names = config.task_names()
     cache = config.path("cache")
     runtime = runtime_descriptor()
-    ds, cases = resolve_dataset(
-        dict(
-            source="harbor_index",
-            revision=PIN["revision"],
-            task_names=names,
-            cache_dir=str(cache / "tasks"),
-        ),
-        config.source,
-    )
-    if download:
-        prepare_tasks(Path(ds["cache_dir"]), names)
+    profile = configuration_profile(config.data["task_source"])
+    ds, cases = profile.prepare_cases(config, download=download)
     for c in cases:
         verify_case(asdict(c))
     resolved = {f"{c.benchmark}/{c.task_id}": resolve_case(asdict(c)) for c in cases}

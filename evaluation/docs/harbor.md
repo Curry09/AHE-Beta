@@ -28,6 +28,36 @@ The official task metadata defines the shared solver/user wall-clock limit. Each
 
 `stream: native` preserves harness behavior. Custom harnesses also accept explicit streaming/non-streaming; pinned Meta consumes complete responses and CC owns its CLI streaming. Model settings are explicit: providers must support the configured effort and output allowance. Claude Code requires `actor.anthropic_base_url`; judge credentials are separate.
 
+### Judge gateway compatibility
+
+These options belong to `task_source: harbor_index`. `judge.model` defaults to `claude-opus-5`. A gateway requiring a provider namespace may use `anthropic/claude-opus-5`; these are the only accepted names for the pinned official judge. This does not change the model or its three scoring runs. Operators must verify the gateway actually serves that model; a matching name does not establish its identity.
+
+`judge.normalize_usage` defaults to `false`. Enable it only with an explicit `judge.base_url` when a gateway returns `usage.server_tool_use: null` that the official ARE image's old LiteLLM cannot parse. It starts a loopback bridge inside the isolated ARE environment for non-streaming runtime judge calls, changing only that optional null field to `{}`. Requests, verdict content and token counts are preserved; final grading still uses the task's original verifier. The bridge uses a dynamic port, checks readiness, and takes its upstream read timeout from the official agent budget. The outer task deadline remains unchanged.
+
+Both settings belong in the existing `judge` section of `evaluation.yaml`. The entire judge configuration is frozen in `metadata.evaluation_runtime.judge` and checked when comparing runs; different endpoints, aliases or compatibility settings are not silently paired. Resuming a run uses its frozen configuration.
+
+The Index profile interprets these settings and passes them to ARE through per-environment `benchmark_options`. The generic worker neither imports a concrete benchmark nor sets benchmark-specific process environment variables. Standard Harbor packages receive no Index options; other task sources implement extensions within their own profile.
+
+### Other Harbor task packages
+
+`task_source` selects a source profile; it defaults to `harbor_index`. Catalog selection, judge rules and acquisition belong to that profile. To use already prepared standard Harbor task packages with the same YAML entry, set:
+
+```yaml
+task_source: harbor
+tasks:
+  - ./my-tasks/task-a
+  - ./my-tasks/task-b
+judge:
+  base_url: null
+  api_key_env: JUDGE_API_KEY
+```
+
+Keep the other actor, user, harness and execution settings. Paths resolve relative to the configuration file, and task directory names must be unique. Preparation freezes content hashes; execution rejects changed materials. This source never downloads or rewrites tasks and applies no Index catalog, judge model list or grading evidence rules. Remove Index-only `judge.model` and `judge.normalize_usage` when switching sources; unsupported options fail rather than being silently ignored. Existing E2B image, task-format and execution limits still apply.
+
+The E2B path currently requires a prebuilt image pinned by digest. If upstream declares only a tag, resolve it to the same image's immutable digest during material preparation and retain that difference; keep instructions, tests, budgets and resource declarations unchanged. The real `fix-code-vulnerability` smoke run used this procedure and the public entry point: 367 original repository tests and 6 task tests passed, reward 1.0. See `verification/standard-harbor-e2b-smoke.json`.
+
+New sources implement configuration validation, selection and preparation in a registered profile, with environment/grading extensions where needed. The generic parser, preparation and worker do not add benchmark-name branches.
+
 The simulated user sees completed replies and public git diffs, can give feedback or accept, and cannot execute commands or edit code. The first request matches the official public instruction. Its model/endpoint/key reference can be configured separately. After freezing, a uniform reviewer scores experience from the original persona and saved public dialogue, without task grades, hidden tests or internal actor reasoning. Missing evidence stays missing.
 
 ```bash

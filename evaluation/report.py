@@ -161,6 +161,7 @@ def comparison_signature(manifest: Mapping[str, Any]) -> dict[str, Any]:
         "framework_commit": manifest.get("framework_commit"),
         "cases": manifest.get("cases"),
         "harness_model": manifest.get("harness_model"),
+        "judge": manifest.get("metadata", {}).get("evaluation_runtime", {}).get("judge"),
         "interactions": manifest.get("interactions"),
         "provider": manifest.get("provider"),
         "measurement": manifest.get("measurement"),

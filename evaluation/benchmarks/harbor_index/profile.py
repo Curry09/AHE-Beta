@@ -1,9 +1,11 @@
 """Explicit integration points for the pinned Index task set."""
 
+import json
 import shlex
 from pathlib import Path
 
 from .grading import grade_issues as grade_issues
+from .judge import transport_options
 from .source import PIN, prepare_tasks
 from .source import resolve_dataset as resolve_dataset
 from .source import verify_case as verify_case
@@ -13,10 +15,66 @@ def prepare_dataset(dataset):
     prepare_tasks(Path(dataset["cache_dir"]), dataset["task_names"])
 
 
-def verifier_env(task_id):
+def task_names(selection):
+    if selection == "all":
+        return list(PIN["tasks"])
+    if selection == "published38":
+        selection = json.loads(Path(__file__).with_name("published_tasks.json").read_text())
+    if (
+        not isinstance(selection, list)
+        or not selection
+        or any(not isinstance(name, str) for name in selection)
+        or len(set(selection)) != len(selection)
+    ):
+        raise ValueError("tasks must be published38, all, or a nonempty unique list of task names")
+    unknown = set(selection) - set(PIN["tasks"])
+    if unknown:
+        raise ValueError("Unknown task names: " + ", ".join(sorted(unknown)))
+    return list(selection)
+
+
+def validate_configuration(data):
+    data.setdefault("tasks", "published38")
+    task_names(data["tasks"])
+    judge = data["judge"]
+    extra = set(judge) - {"base_url", "api_key_env", "model", "normalize_usage"}
+    if extra:
+        raise ValueError(f"Unknown judge fields: {sorted(extra)}")
+    judge.update(transport_options(judge))
+    if judge["normalize_usage"] and not judge["base_url"]:
+        raise ValueError("judge.normalize_usage requires an explicit judge.base_url")
+
+
+def prepare_cases(config, download=True):
+    dataset, cases = resolve_dataset(
+        {
+            "source": "harbor_index",
+            "revision": PIN["revision"],
+            "task_names": task_names(config.data["tasks"]),
+            "cache_dir": str(config.path("cache") / "tasks"),
+        },
+        config.source,
+    )
+    if download:
+        prepare_dataset(dataset)
+    return dataset, cases
+
+
+def environment_options(runtime=None):
+    return {"judge": transport_options((runtime or {}).get("judge"))}
+
+
+def verifier_env(task_id, runtime=None, metadata=None):
     env = dict(PIN["judge"])
+    judge = transport_options((runtime or {}).get("judge"))
+    env["JUDGE_MODELS"] = json.dumps([judge["model"]])
     if task_id == "usaco-assign-cows-to-barns":
         env.update(OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")
+    if (
+        task_id.startswith(("algotune-", "gso-"))
+        and (metadata or {}).get("anti_cheat_review") == "deferred_by_user"
+    ):
+        env.update(ANTHROPIC_API_KEY="", ANTHROPIC_BASE_URL="")
     return env
 
 
@@ -54,7 +112,7 @@ class EnvironmentSupport:
         ):
             from .support.are_sidecar import AreSidecar
 
-            self.are = AreSidecar(env)
+            self.are = AreSidecar(env, judge=getattr(env, "benchmark_options", {}).get("judge"))
             await self.are.start()
 
     @property
