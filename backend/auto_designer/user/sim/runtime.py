@@ -31,8 +31,14 @@ from typing import Any, Protocol, runtime_checkable
 _MAX_OUTPUT = 20_000
 
 
+class InvalidWorkspaceArtifact(ValueError):
+    """The Actor's final filesystem cannot supply the declared task artifact."""
+
+
 def read_bounded_file(root: str, path: str, max_bytes: int) -> bytes:
     """Spec-0083/T3: open beneath the workspace without following any symlink."""
+    import errno
+
     parts = PurePosixPath(path).parts
     if (
         not parts
@@ -68,6 +74,10 @@ def read_bounded_file(root: str, path: str, max_bytes: int) -> bytes:
             ) or len(data) != after.st_size:
                 raise RuntimeError("artifact changed during collection")
             return data
+    except OSError as error:
+        if error.errno in {errno.ELOOP, errno.ENOTDIR, errno.EISDIR}:
+            raise ValueError("artifact must be a real regular file") from error
+        raise
     finally:
         os.close(directory)
 
@@ -150,6 +160,39 @@ def _prediction_patch_argv(base_commit: str | None) -> list[str]:
     return ["sh", "-c", script]
 
 
+def list_review_files(*, root: str, max_output: int) -> dict:
+    """Spec-0081/T3: fixed, bounded source preview without requiring Git or task Python."""
+    import os
+    from pathlib import Path
+
+    source = Path(root)
+    if source.is_symlink() or any(parent.is_symlink() for parent in source.parents):
+        raise ValueError("Linked review workspace")
+    pending = [source]
+    names = []
+    visited = 0
+    clipped = False
+    while pending and not clipped:
+        with os.scandir(pending.pop()) as entries:
+            for item in entries:
+                visited += 1
+                if visited > 1024 or len(names) >= 257:
+                    clipped = True
+                    break
+                if item.name in {".git", ".venv", "node_modules", "__pycache__"}:
+                    continue
+                if item.is_dir(follow_symlinks=False):
+                    pending.append(Path(item.path))
+                elif item.is_file(follow_symlinks=False):
+                    names.append(Path(item.path).relative_to(root).as_posix())
+    listing = "\0".join(sorted(names))
+    return {
+        "returncode": 0,
+        "stdout": listing[:max_output],
+        "clipped": clipped or len(listing) >= max_output,
+    }
+
+
 @dataclass
 class LocalWorkspaceRuntime:
     """Compatibility runtime for fixtures and developer-only local scenarios."""
@@ -168,6 +211,13 @@ class LocalWorkspaceRuntime:
     def __post_init__(self) -> None:
         self.cwd = str(Path(self.root).resolve())
         self.evidence.update({"kind": "local", "runtime_id": self.runtime_id, "cwd": self.cwd})
+
+    def __fspath__(self) -> str:
+        """Local source runtimes retain ordinary Path/subprocess directory interoperability."""
+        return self.cwd
+
+    def __str__(self) -> str:
+        return self.cwd
 
     def resolve(self, path: str) -> str:
         rel = _safe_relative(path)
@@ -272,17 +322,36 @@ class LocalWorkspaceRuntime:
         return subprocess.run(argv, cwd=self.cwd, capture_output=True, text=True)
 
     def freeze_patch_base(self) -> None:
+        if self.evidence.get("patch_capability") == "not_applicable":
+            self.evidence["patch_status"] = "not_applicable"
+            return
         _capture_patch_base(self, self._git_export)
 
     def export_patch(self) -> tuple[str, str]:
+        if self.evidence.get("patch_capability") == "not_applicable":
+            self.evidence["patch_status"] = "not_applicable"
+            return "", ""
         if self._patch_base_failed:
             raise RuntimeError("original patch base could not be captured")
         proc = self._git_export(_prediction_patch_argv(self._patch_base_commit))
         # Spec-0075/T1: a failed export is not a successful empty prediction.
         if proc.returncode != 0:
+            if self._patch_base_commit is not None and proc.returncode == 128:
+                raise InvalidWorkspaceArtifact(
+                    "Actor workspace no longer supplies a valid Git artifact"
+                )
             raise RuntimeError(proc.stderr.strip() or "git diff failed")
         patch = proc.stdout
         return patch, hashlib.sha256(patch.encode()).hexdigest()
+
+    def review_file_listing(self) -> dict:
+        if self.evidence.get("patch_capability") != "not_applicable":
+            result = self._git_export(
+                ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"]
+            )
+            return {"returncode": result.returncode, "stdout": result.stdout[:_MAX_OUTPUT]}
+        # The preview remains separate from the complete formal artifact capture.
+        return list_review_files(root=self.cwd, max_output=_MAX_OUTPUT)
 
     def invalidate(self, reason: str) -> None:
         self.evidence.update({"invalidated_at": utc_now(), "invalid_reason": reason})
@@ -303,11 +372,17 @@ class LocalWorkspaceRuntime:
                 raise RuntimeError("Uncontained workspace attempt retained for inspection")
             self.evidence.setdefault("closed_at", utc_now())
             self.save_receipt()
+            if self.evidence.get("collection_pending") is True:
+                self.evidence["retained_for_collection"] = True
+                self._closed = True
+                return
             shutil.rmtree(self.attempt_root)
             self._closed = True
             return
         self.evidence.setdefault("closed_at", utc_now())
-        if self.owns_tmp:
+        if self.evidence.get("collection_pending") is True:
+            self.evidence["retained_for_collection"] = True
+        elif self.owns_tmp:
             shutil.rmtree(self.cwd, ignore_errors=True)
         self._closed = True
 
@@ -502,6 +577,8 @@ class DockerWorkspaceRuntime:
                 raise FileNotFoundError(path)
             if error == "OverflowError":
                 raise OverflowError("artifact exceeds declared byte limit")
+            if error == "ValueError":
+                raise ValueError("artifact must be a real regular file")
             raise RuntimeError("artifact read failed: " + error)
         if len(result.stdout) > max_bytes:
             raise OverflowError("artifact exceeds declared byte limit")
@@ -611,6 +688,10 @@ class DockerWorkspaceRuntime:
             raise RuntimeError("original patch base could not be captured")
         proc = self._exec(_prediction_patch_argv(self._patch_base_commit))
         if proc.returncode != 0:
+            if self._patch_base_commit is not None and proc.returncode == 128:
+                raise InvalidWorkspaceArtifact(
+                    "Actor workspace no longer supplies a valid Git artifact"
+                )
             raise RuntimeError(proc.stderr.strip() or "git diff failed")
         patch = proc.stdout
         digest = hashlib.sha256(patch.encode()).hexdigest()
@@ -627,7 +708,10 @@ class DockerWorkspaceRuntime:
     def close(self) -> None:
         if self._closed:
             return
-        if self.evidence.get("observation", {}).get("retain_source"):
+        if (
+            self.evidence.get("observation", {}).get("retain_source")
+            or self.evidence.get("collection_pending") is True
+        ):
             # Keep the only copy after a failed export, but never keep the task running.
             stopped = subprocess.run(
                 ["docker", "stop", "--time", "2", self.container_id],
@@ -656,7 +740,11 @@ def as_runtime(workspace: Workspace, *, owns_tmp: bool = False) -> WorkspaceRunt
 
 
 def make_empty_runtime() -> LocalWorkspaceRuntime:
-    return LocalWorkspaceRuntime(tempfile.mkdtemp(prefix="shared_ws_"), owns_tmp=True)
+    return LocalWorkspaceRuntime(
+        tempfile.mkdtemp(prefix="shared_ws_"),
+        owns_tmp=True,
+        evidence={"patch_capability": "not_applicable"},
+    )
 
 
 class ReviewSnapshot:
@@ -735,11 +823,18 @@ def capture_review_snapshot(
             patch = ""
             omissions.append(f"patch:{type(exc).__name__}")
     try:
-        listing = runtime.run("git ls-files -z --cached --others --exclude-standard", timeout=10)
+        # Spec-0081/T3: frozen container tasks expose only a fixed read-only listing.
+        # Non-Git tasks also provide a bounded source preview beside declared artifacts.
+        read_listing = getattr(runtime, "review_file_listing", None)
+        listing = (
+            read_listing()
+            if callable(read_listing)
+            else runtime.run("git ls-files -z --cached --others --exclude-standard", timeout=10)
+        )
         if listing.get("returncode") != 0:
             raise RuntimeError("file listing unavailable")
         names = sorted(set(str(listing.get("stdout") or "").split("\0")) - {""})
-        if len(str(listing.get("stdout") or "")) >= _MAX_OUTPUT:
+        if listing.get("clipped") or len(str(listing.get("stdout") or "")) >= _MAX_OUTPUT:
             omissions.append("review_file_listing_clipped")
         total = sum(len(data) for data in captured.values())
         for index, name in enumerate(names):

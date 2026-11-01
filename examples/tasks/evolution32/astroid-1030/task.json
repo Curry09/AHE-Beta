@@ -1,0 +1,73 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "astroid-1030",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "swebench",
+    "instance_id": "astroid-1030",
+    "revision": "957e85d200830b1218cc2bddc8f746c0a078daf7d08e4574f9fe8afd44757470"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aa2074e9f14638dd33b6b23c79f039fe2f0d2337a28781ee8a2f3354cd0ff9d4",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "9a96566c6e62fa9941647d72fddd00c7720791ffc2ff84184116894b560d18bc",
+          "format": "file",
+          "files": {
+            "input": "9a96566c6e62fa9941647d72fddd00c7720791ffc2ff84184116894b560d18bc"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/astroid-1030-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "-c",
+        "import importlib,pathlib,subprocess; m=importlib.import_module('astroid'); w=pathlib.Path('/workspace').resolve(); p=pathlib.Path(m.__file__).resolve(); assert p.is_relative_to(w),(str(p),str(w)); assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()=='dae2b99aa3f7af057a63843384fae933b659d668'; import pytest; print(p)"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "/usr/bin/env",
+        "PIP_NO_INDEX=1",
+        "PIP_FIND_LINKS=/opt/task-tools/astroid-1030-build-wheels",
+        "python3",
+        "/opt/task-inputs/recipes/initialize.py",
+        "--bundle",
+        "/opt/task-inputs/initial.bundle",
+        "--revision",
+        "dae2b99aa3f7af057a63843384fae933b659d668",
+        "--workspace",
+        "/workspace",
+        "--editable"
+      ],
+      "timeout_seconds": 240
+    }
+  }
+}

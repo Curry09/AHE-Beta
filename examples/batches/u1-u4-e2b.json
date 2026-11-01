@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "name": "u1-u4-e2b",
+  "max_parallel_runs": 1,
+  "entries": [
+    {
+      "id": "u1",
+      "config": "../experiments/u1-e2b.json"
+    },
+    {
+      "id": "u4",
+      "config": "../experiments/u4-e2b.json"
+    }
+  ]
+}

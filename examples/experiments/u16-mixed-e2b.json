@@ -1,0 +1,505 @@
+{
+  "schema_version": 2,
+  "runtime": {
+    "backend": "e2b",
+    "gitea": {
+      "provider": "gitea.com",
+      "repository_prefix": "u16-mixed"
+    },
+    "e2b": {
+      "cpu_count": 4,
+      "memory_mb": 8192,
+      "timeout_seconds": 86400
+    }
+  },
+  "harness": {
+    "source": "builtin"
+  },
+  "workload": {
+    "task_packages": [
+      "../tasks/evolution32/O03/task.json",
+      "../tasks/evolution32/O09/task.json",
+      "../tasks/evolution32/O14/task.json",
+      "../tasks/evolution32/M03/task.json",
+      "../tasks/evolution32/O01/task.json",
+      "../tasks/evolution32/kv-live-surgery/task.json",
+      "../tasks/evolution32/tinydb/task.json",
+      "../tasks/evolution32/M01/task.json",
+      "../tasks/evolution32/O05/task.json",
+      "../tasks/evolution32/O06/task.json",
+      "../tasks/evolution32/vf2-speedup-networkx/task.json",
+      "../tasks/evolution32/pretrain-shard-corruption/task.json",
+      "../tasks/evolution32/091-add-receipts-bookkeeping/task.json",
+      "../tasks/evolution32/flask-restful/task.json",
+      "../tasks/evolution32/M05/task.json",
+      "../tasks/evolution32/M09/task.json"
+    ],
+    "persona_library": "../personas/library.json",
+    "persona_ids": [
+      "sr-15-swyx",
+      "sr-20-kellan",
+      "sr-27-kenton-varda",
+      "sr-19-xe-iaso",
+      "sr-02-ronacher",
+      "gh-ml-03-5df6e44f943b",
+      "sr-30-kent-beck",
+      "sr-01-willison"
+    ],
+    "interaction_plan": [
+      [
+        [
+          "sr-15-swyx",
+          "pvlib__pvlib-python-1478"
+        ],
+        [
+          "sr-15-swyx",
+          "production-planning"
+        ],
+        [
+          "sr-20-kellan",
+          "010-pivot-product-revenue"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "superset-goal-discovery"
+        ],
+        [
+          "sr-15-swyx",
+          "pylint-dev__astroid-2240"
+        ],
+        [
+          "sr-19-xe-iaso",
+          "kv-live-surgery"
+        ],
+        [
+          "sr-15-swyx",
+          "tinydb"
+        ],
+        [
+          "sr-02-ronacher",
+          "sqlfluff-subagent-review"
+        ],
+        [
+          "sr-02-ronacher",
+          "marshmallow-code__marshmallow-1229"
+        ],
+        [
+          "sr-15-swyx",
+          "sqlfluff__sqlfluff-2336"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "vf2-speedup-networkx"
+        ],
+        [
+          "gh-ml-03-5df6e44f943b",
+          "pretrain-shard-corruption"
+        ],
+        [
+          "sr-30-kent-beck",
+          "091-add-receipts-bookkeeping"
+        ],
+        [
+          "sr-15-swyx",
+          "flask-restful"
+        ],
+        [
+          "sr-01-willison",
+          "permission-schema-migration"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "plan-blocked-dependency"
+        ]
+      ],
+      [
+        [
+          "sr-15-swyx",
+          "production-planning"
+        ],
+        [
+          "sr-20-kellan",
+          "010-pivot-product-revenue"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "superset-goal-discovery"
+        ],
+        [
+          "sr-15-swyx",
+          "pylint-dev__astroid-2240"
+        ],
+        [
+          "sr-19-xe-iaso",
+          "kv-live-surgery"
+        ],
+        [
+          "sr-15-swyx",
+          "tinydb"
+        ],
+        [
+          "sr-02-ronacher",
+          "sqlfluff-subagent-review"
+        ],
+        [
+          "sr-02-ronacher",
+          "marshmallow-code__marshmallow-1229"
+        ],
+        [
+          "sr-15-swyx",
+          "sqlfluff__sqlfluff-2336"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "vf2-speedup-networkx"
+        ],
+        [
+          "gh-ml-03-5df6e44f943b",
+          "pretrain-shard-corruption"
+        ],
+        [
+          "sr-30-kent-beck",
+          "091-add-receipts-bookkeeping"
+        ],
+        [
+          "sr-15-swyx",
+          "flask-restful"
+        ],
+        [
+          "sr-01-willison",
+          "permission-schema-migration"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "plan-blocked-dependency"
+        ],
+        [
+          "sr-15-swyx",
+          "pvlib__pvlib-python-1478"
+        ]
+      ],
+      [
+        [
+          "sr-20-kellan",
+          "010-pivot-product-revenue"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "superset-goal-discovery"
+        ],
+        [
+          "sr-15-swyx",
+          "pylint-dev__astroid-2240"
+        ],
+        [
+          "sr-19-xe-iaso",
+          "kv-live-surgery"
+        ],
+        [
+          "sr-15-swyx",
+          "tinydb"
+        ],
+        [
+          "sr-02-ronacher",
+          "sqlfluff-subagent-review"
+        ],
+        [
+          "sr-02-ronacher",
+          "marshmallow-code__marshmallow-1229"
+        ],
+        [
+          "sr-15-swyx",
+          "sqlfluff__sqlfluff-2336"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "vf2-speedup-networkx"
+        ],
+        [
+          "gh-ml-03-5df6e44f943b",
+          "pretrain-shard-corruption"
+        ],
+        [
+          "sr-30-kent-beck",
+          "091-add-receipts-bookkeeping"
+        ],
+        [
+          "sr-15-swyx",
+          "flask-restful"
+        ],
+        [
+          "sr-01-willison",
+          "permission-schema-migration"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "plan-blocked-dependency"
+        ],
+        [
+          "sr-15-swyx",
+          "pvlib__pvlib-python-1478"
+        ],
+        [
+          "sr-15-swyx",
+          "production-planning"
+        ]
+      ],
+      [
+        [
+          "sr-27-kenton-varda",
+          "superset-goal-discovery"
+        ],
+        [
+          "sr-15-swyx",
+          "pylint-dev__astroid-2240"
+        ],
+        [
+          "sr-19-xe-iaso",
+          "kv-live-surgery"
+        ],
+        [
+          "sr-15-swyx",
+          "tinydb"
+        ],
+        [
+          "sr-02-ronacher",
+          "sqlfluff-subagent-review"
+        ],
+        [
+          "sr-02-ronacher",
+          "marshmallow-code__marshmallow-1229"
+        ],
+        [
+          "sr-15-swyx",
+          "sqlfluff__sqlfluff-2336"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "vf2-speedup-networkx"
+        ],
+        [
+          "gh-ml-03-5df6e44f943b",
+          "pretrain-shard-corruption"
+        ],
+        [
+          "sr-30-kent-beck",
+          "091-add-receipts-bookkeeping"
+        ],
+        [
+          "sr-15-swyx",
+          "flask-restful"
+        ],
+        [
+          "sr-01-willison",
+          "permission-schema-migration"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "plan-blocked-dependency"
+        ],
+        [
+          "sr-15-swyx",
+          "pvlib__pvlib-python-1478"
+        ],
+        [
+          "sr-15-swyx",
+          "production-planning"
+        ],
+        [
+          "sr-20-kellan",
+          "010-pivot-product-revenue"
+        ]
+      ],
+      [
+        [
+          "sr-15-swyx",
+          "pylint-dev__astroid-2240"
+        ],
+        [
+          "sr-19-xe-iaso",
+          "kv-live-surgery"
+        ],
+        [
+          "sr-15-swyx",
+          "tinydb"
+        ],
+        [
+          "sr-02-ronacher",
+          "sqlfluff-subagent-review"
+        ],
+        [
+          "sr-02-ronacher",
+          "marshmallow-code__marshmallow-1229"
+        ],
+        [
+          "sr-15-swyx",
+          "sqlfluff__sqlfluff-2336"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "vf2-speedup-networkx"
+        ],
+        [
+          "gh-ml-03-5df6e44f943b",
+          "pretrain-shard-corruption"
+        ],
+        [
+          "sr-30-kent-beck",
+          "091-add-receipts-bookkeeping"
+        ],
+        [
+          "sr-15-swyx",
+          "flask-restful"
+        ],
+        [
+          "sr-01-willison",
+          "permission-schema-migration"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "plan-blocked-dependency"
+        ],
+        [
+          "sr-15-swyx",
+          "pvlib__pvlib-python-1478"
+        ],
+        [
+          "sr-15-swyx",
+          "production-planning"
+        ],
+        [
+          "sr-20-kellan",
+          "010-pivot-product-revenue"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "superset-goal-discovery"
+        ]
+      ],
+      [
+        [
+          "sr-19-xe-iaso",
+          "kv-live-surgery"
+        ],
+        [
+          "sr-15-swyx",
+          "tinydb"
+        ],
+        [
+          "sr-02-ronacher",
+          "sqlfluff-subagent-review"
+        ],
+        [
+          "sr-02-ronacher",
+          "marshmallow-code__marshmallow-1229"
+        ],
+        [
+          "sr-15-swyx",
+          "sqlfluff__sqlfluff-2336"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "vf2-speedup-networkx"
+        ],
+        [
+          "gh-ml-03-5df6e44f943b",
+          "pretrain-shard-corruption"
+        ],
+        [
+          "sr-30-kent-beck",
+          "091-add-receipts-bookkeeping"
+        ],
+        [
+          "sr-15-swyx",
+          "flask-restful"
+        ],
+        [
+          "sr-01-willison",
+          "permission-schema-migration"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "plan-blocked-dependency"
+        ],
+        [
+          "sr-15-swyx",
+          "pvlib__pvlib-python-1478"
+        ],
+        [
+          "sr-15-swyx",
+          "production-planning"
+        ],
+        [
+          "sr-20-kellan",
+          "010-pivot-product-revenue"
+        ],
+        [
+          "sr-27-kenton-varda",
+          "superset-goal-discovery"
+        ],
+        [
+          "sr-15-swyx",
+          "pylint-dev__astroid-2240"
+        ]
+      ]
+    ]
+  },
+  "rounds": {
+    "count": 6,
+    "sessions_per_round": 16,
+    "max_parallel_users": 4
+  },
+  "roles": {
+    "triager": 8,
+    "synthesizer": 1,
+    "divergent": 1,
+    "owner_mode": "mechanical",
+    "developer": 4
+  },
+  "models": {
+    "user": {
+      "model": "glm-5.3-flash",
+      "base_url_env": "USER_LLM_BASE_URL",
+      "api_key_env": "USER_LLM_API_KEY"
+    },
+    "harness": {
+      "model": "glm-5.3-flash",
+      "base_url_env": "HARNESS_LLM_BASE_URL",
+      "api_key_env": "HARNESS_LLM_API_KEY"
+    },
+    "demand": {
+      "model": "glm-5.3",
+      "base_url_env": "DEMAND_LLM_BASE_URL",
+      "api_key_env": "DEMAND_LLM_API_KEY"
+    },
+    "delivery": {
+      "backend": "claude-code",
+      "model": "glm-5.3",
+      "base_url_env": "ANTHROPIC_BASE_URL",
+      "api_key_env": "ANTHROPIC_AUTH_TOKEN",
+      "auth_type": "bearer"
+    }
+  },
+  "evaluation": {
+    "official_grading": false
+  },
+  "policies": {
+    "synthesizer_grouping": false,
+    "timing": {
+      "latency_isolated": false,
+      "wall_guard_seconds": 0
+    },
+    "delivery": {
+      "timeout_seconds": 86400,
+      "poll_seconds": 15,
+      "coordination": "soft",
+      "permission_mode": "bypassPermissions",
+      "idle_timeout_seconds": 300
+    },
+    "alarms": {
+      "proposal_depth": 20,
+      "ready_depth": 20
+    }
+  },
+  "name": "u16-mixed-e2b"
+}

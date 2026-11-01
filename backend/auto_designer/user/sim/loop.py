@@ -25,7 +25,7 @@ import json
 import re
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from auto_designer.usage import set_usage_context
 
@@ -1330,6 +1330,7 @@ def run_session(
     on_progress: Callable[[SessionResult], None] | None = None,
     deadline_seconds: float | None = None,
     before_terminal_review: Callable[[], None] | None = None,
+    on_actor_complete: Callable[[dict], None] | None = None,
 ) -> SessionResult:
     # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
     # Spec-0023：主决定与心跳均为 judge → intent → act（three），无 mode 旋钮。
@@ -1682,21 +1683,6 @@ def run_session(
                 break
         # 本轮若未产生下一条 harness 输出（例如模型空转），保持上一条可见输出供下一轮继续判断。
 
-    # Spec-0084/T2: main_final_check stayed before accept/continue; terminal review starts only now.
-    if before_terminal_review is not None:
-        before_terminal_review()
-    _narrate_terminal(
-        result=result,
-        persona=persona,
-        client=client,
-        system=system,
-        task=_current_goal_text(task, goal_ledger),
-        history=history,
-        state=state,
-    )
-    # Flush any recovery events from a successful or normally terminated session.
-    _take_protocol_events(client, result)
-    # 评估器协议失败不是用户体验分，也不是 harness 失败；保留审计哨兵但跳过正常评分。
     result.goal_ledger = goal_ledger.snapshot()
     final_goal_audit = goal_ledger.audit()
     if result.terminal_audit:
@@ -1707,6 +1693,66 @@ def run_session(
                 result.terminal_audit.get("warnings", [])
             )
     result.goal_audit = final_goal_audit
+    checkpoint = {
+        "version": 1,
+        "result": asdict(result),
+        "history": list(history),
+        "state": {**asdict(state), "trust": state.trust.value},
+        "task": _current_goal_text(task, goal_ledger),
+    }
+    if on_actor_complete is not None:
+        on_actor_complete(checkpoint)
+    if before_terminal_review is not None:
+        before_terminal_review()
+    return _finish_terminal_review(
+        persona=persona,
+        client=client,
+        result=result,
+        history=history,
+        state=state,
+        task=checkpoint["task"],
+    )
+
+
+def resume_terminal_review(
+    *, persona: Persona, client: PersonaClient, checkpoint: dict
+) -> SessionResult:
+    """Resume only terminal review from a frozen completed interaction, never send to Harness."""
+    from .dimensions import TrustStance
+
+    if checkpoint.get("version") != 1:
+        raise ValueError("Unsupported terminal review checkpoint")
+    values = dict(checkpoint["result"])
+    values["turns"] = [TurnLog(**row) for row in values["turns"]]
+    for key in ("feeling", "feeling_derived"):
+        if values.get(key) is not None:
+            values[key] = FeelingScore.from_dict(values[key])
+    result = SessionResult(**values)
+    if result.persona_id != persona.persona_id:
+        raise ValueError("Terminal review checkpoint belongs to another persona")
+    state = State(**{**checkpoint["state"], "trust": TrustStance(checkpoint["state"]["trust"])})
+    return _finish_terminal_review(
+        persona=persona,
+        client=client,
+        result=result,
+        history=list(checkpoint["history"]),
+        state=state,
+        task=checkpoint["task"],
+    )
+
+
+def _finish_terminal_review(*, persona, client, result, history, state, task) -> SessionResult:
+    system = build_system(persona)
+    _narrate_terminal(
+        result=result,
+        persona=persona,
+        client=client,
+        system=system,
+        task=task,
+        history=history,
+        state=state,
+    )
+    _take_protocol_events(client, result)
     if result.evaluation_status == "invalid":
         err = result.evaluation_error or {}
         reason = f"Evaluator invalid; exclude from harness metrics: {err.get('code', 'unknown')}"
@@ -1725,9 +1771,7 @@ def run_session(
     # ① LLM 自评: persona 在角色内给"这次体验"打 1–4 + 理由 (spec-0001/T3 产出方式)
     set_usage_context(interaction_id=None, turn_no=None, operation="rate")
     try:
-        rating = client.respond(
-            system, build_rating_turn(_current_goal_text(task, goal_ledger), history, state)
-        )
+        rating = client.respond(system, build_rating_turn(task, history, state))
         result.persona_tail.extend(_take_persona_calls(client, "rate"))
         _take_protocol_events(client, result)
         result.feeling = parse_feeling_llm(rating)

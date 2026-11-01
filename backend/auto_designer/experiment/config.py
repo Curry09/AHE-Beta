@@ -111,6 +111,8 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
             ]
         if len(workload["task_packages"]) > 1 and runtime.get("local", {}).get("seed_image"):
             raise ConfigError("runtime.local.seed_image is only supported for a single task")
+        if "interaction_overrides" in workload:
+            load_task_packages(data)  # Reject unknown IDs without changing any task file.
     rounds = data["rounds"]
     sessions = rounds["sessions_per_round"]
     # Spec-0080/T1: persona selection is unique; execution slots may reuse it.
@@ -136,6 +138,15 @@ def load_task_package(path: str | Path) -> dict[str, Any]:
     package_path = Path(path).expanduser().resolve()
     data = read_json_document(path=package_path)
     validate_task_package_document(data)
+    if data["schema_version"] == 3:
+        from auto_designer.experiment.task_environments.contract import resolve_container_paths
+
+        data = resolve_container_paths(data, package_path.parent)
+        data.setdefault("interaction", "simulated_user")
+        from auto_designer.experiment.workload import validate_task_execution
+
+        validate_task_execution(data, source_root=None)
+        return data
     for field in ("instruction_file",):
         data[field] = resolve_input_path(value=data[field], base=package_path.parent)
     for field in ("script", "requirements_lock"):
@@ -166,11 +177,34 @@ def load_task_package(path: str | Path) -> dict[str, Any]:
     return data
 
 
+def load_task_packages(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Spec-0081/T1: apply explicit per-task interaction choices before content freezing.
+
+    The shared source/material package stays unchanged. The chosen interaction
+    becomes part of the resulting frozen task digest and session bindings.
+    """
+    tasks = [load_task_package(path) for path in config["workload"]["task_packages"]]
+    overrides = config["workload"].get("interaction_overrides", {})
+    if not isinstance(overrides, dict) or any(
+        mode not in ("direct", "simulated_user") for mode in overrides.values()
+    ):
+        raise ConfigError("interaction_overrides requires explicit direct or simulated_user modes")
+    unknown = set(overrides) - {task["id"] for task in tasks}
+    if unknown:
+        raise ConfigError(
+            "interaction_overrides references unknown task IDs: " + ", ".join(sorted(unknown))
+        )
+    for task in tasks:
+        if task["id"] in overrides:
+            task["interaction"] = overrides[task["id"]]
+    return tasks
+
+
 def validate_task_package_document(data: Any) -> None:
     """Validate operator or frozen packages without resolving or rewriting their identity."""
     version = data.get("schema_version") if isinstance(data, dict) else None
-    if type(version) is not int or version not in {1, 2}:
-        raise ConfigError("Expected task package schema_version=1 or 2")
+    if type(version) is not int or version not in {1, 2, 3}:
+        raise ConfigError("Expected task package schema_version=1, 2 or 3")
     validate_schema(document=data, schema_name=f"task-package-v{version}.json")
     _reject_plaintext_credentials(node=data, location="task")
     if version == 1:
@@ -179,6 +213,32 @@ def validate_task_package_document(data: Any) -> None:
         raise ConfigError("ordinary task must explicitly declare not_in_benchmark=true")
     if data["kind"] != "ordinary" and "not_in_benchmark" in data:
         raise ConfigError("benchmark task must not declare not_in_benchmark")
+    if version == 3:
+        from auto_designer.experiment.task_environments.contract import (
+            EnvironmentContractError,
+            validate_container_environment,
+        )
+
+        try:
+            validate_container_environment(data)
+        except EnvironmentContractError as exc:
+            raise ConfigError(str(exc)) from exc
+        source = data.get("source")
+        if source:
+            from urllib.parse import urlsplit
+
+            url = urlsplit(source["url"])
+            if (
+                url.scheme != "https"
+                or not url.hostname
+                or url.username
+                or url.password
+                or url.query
+                or url.fragment
+            ):
+                raise ConfigError("task Git URL must be credential-free HTTPS")
+        if data["kind"] == "swebench" and data["environment"].get("patch", "git") != "git":
+            raise ConfigError("SWE-bench container tasks require a real Git patch capability")
     seen_ids: set[str] = set()
     seen_targets: set[tuple[str, str]] = set()
     for declaration in data.get("artifacts", {}).get("exports", []):
@@ -240,7 +300,25 @@ def _reject_plaintext_credentials(*, node: Any, location: str) -> None:
                 }
                 and type(value) is int
             )
-            if _SECRET_KEY_RE.search(key) and not key.endswith("_env") and not model_limit:
+            # Spec-0081/T1: inventory filenames such as tokenizer.py are not
+            # credential fields; their values have already passed SHA validation.
+            inventory_digest = (
+                location.startswith("task.environment.inputs[")
+                and location.endswith(".material.files")
+                and isinstance(value, str)
+                and re.fullmatch(r"[a-f0-9]{64}", value) is not None
+            )
+            interaction_choice = location == "config.workload.interaction_overrides" and value in (
+                "direct",
+                "simulated_user",
+            )
+            if (
+                _SECRET_KEY_RE.search(key)
+                and not key.endswith("_env")
+                and not model_limit
+                and not inventory_digest
+                and not interaction_choice
+            ):
                 raise ConfigError(f"Plaintext credential field forbidden: {location}.{key}")
             _reject_plaintext_credentials(node=value, location=f"{location}.{key}")
     elif isinstance(node, list):

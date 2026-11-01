@@ -1,0 +1,70 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "tinydb",
+  "instruction_file": "instruction.md",
+  "interaction": "direct",
+  "benchmark": {
+    "suite": "nl2repo",
+    "instance_id": "tinydb",
+    "revision": "2c1469c547a4bf0b140d90ead93046edea3ecdaafe925908e6d05718c7d1ecc8"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:9617023e89ca5cfe016ab2e6cd26306a69f69cdf559314562cbcb1dc998dee60",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "91bf01c567daebb0720dfca9ae2814aec450408e6c2b0ab37f8e1236bfb2f246",
+          "format": "file",
+          "files": {
+            "input": "91bf01c567daebb0720dfca9ae2814aec450408e6c2b0ab37f8e1236bfb2f246"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/tinydb-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/verify.py",
+        "--git-revision",
+        "a4749f8f5c8f1d305b93eca9ccc6f1af70a33db1"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/initialize.py",
+        "--bundle",
+        "/opt/task-inputs/initial.bundle",
+        "--revision",
+        "a4749f8f5c8f1d305b93eca9ccc6f1af70a33db1",
+        "--workspace",
+        "/workspace"
+      ],
+      "timeout_seconds": 240
+    }
+  }
+}

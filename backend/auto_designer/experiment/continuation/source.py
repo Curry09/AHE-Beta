@@ -273,6 +273,18 @@ def _validate_materials(files, collection, manifest, exported):
                 _digest(_material(files, collection, manifest, task["materials"][name])) == digest,
                 "Task content differs",
             )
+        if package.get("schema_version") == 3:
+            from auto_designer.experiment.task_environments.contract import environment_materials
+
+            for entry in environment_materials(package):
+                payload = _material(
+                    files, collection, manifest, task["materials"]["input:" + entry["id"]]
+                )
+                _require(
+                    _digest(payload) == entry["material"]["sha256"],
+                    "Container task material differs",
+                )
+            continue
         payload = _material(files, collection, manifest, task["materials"]["source_archive"])
         source = _read_tar(io.BytesIO(payload), mode="r:gz")
         _require(

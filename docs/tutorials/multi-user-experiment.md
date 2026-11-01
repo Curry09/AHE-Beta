@@ -2,9 +2,9 @@
 
 English | [简体中文](multi-user-experiment.zh-CN.md)
 
-This tutorial uses the maintained N4 local/E2B examples: four distinct personas per round, two tasks, two rounds and at most two active user sessions. Every session uses the same round's Harness SHA in its own writable task workspace. The experiment evolves one shared Harness, rather than either task repository.
+This tutorial uses the maintained U4 local/E2B examples: four distinct personas per round, two tasks, two rounds and at most two active user sessions. Every session uses the same round's Harness SHA in its own writable task workspace. The experiment evolves one shared Harness, rather than either task repository.
 
-The [Spec0073 validation report](../validation/spec0073-multi-task-users.md) distinguishes offline integration from actual provider/model runs. The earlier N1 runs remain historical baselines; they do not prove this N4 release ran in Docker or E2B.
+The [Spec0073 validation report](../validation/spec0073-multi-task-users.md) distinguishes offline integration from actual provider/model runs. The earlier U1 runs remain historical baselines; they do not prove this U4 release ran in Docker or E2B.
 
 ## 1. Install and choose a backend
 
@@ -16,8 +16,8 @@ cd auto-designer
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
-CONFIG=examples/experiments/synthesizer-n4-local.json
-# CONFIG=examples/experiments/synthesizer-n4-e2b.json
+CONFIG=examples/experiments/u4-local.json
+# CONFIG=examples/experiments/u4-e2b.json
 ```
 
 Fill `.env.experiment` using [the credential guide](../CONFIGURATION.md): User, Harness and demand use OpenAI-compatible Chat Completions, delivery uses Anthropic-compatible Claude Code. E2B additionally uses `E2B_API_KEY` and `GITEA_TOKEN`; local creates its own localhost Gitea credentials. Do not put keys into JSON. If changing model names, edit the four `models.*.model` fields before prepare. A copied JSON must retain correct relative material paths.

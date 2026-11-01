@@ -14,7 +14,7 @@ from typing import Any
 import jsonschema
 
 from auto_designer.evaluation.contracts import MAX_INPUT_BYTES
-from auto_designer.experiment.config import ConfigError
+from auto_designer.experiment.config import ConfigError, config_hash
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,13 @@ def load_grading_plan(path: Path) -> GradingPlan:
 
 
 def archived_artifacts(
-    *, receipt: dict | None, provenance: dict, declarations: list[dict], files: dict[str, bytes]
+    *,
+    receipt: dict | None,
+    provenance: dict,
+    declarations: list[dict],
+    files: dict[str, bytes],
+    task_package: dict | None = None,
+    expected_config_hash: str | None = None,
 ) -> dict[str, dict]:
     """Verify original receipt ownership, declarations and exact retained bytes."""
     if receipt is None:
@@ -137,9 +143,14 @@ def archived_artifacts(
             raise ConfigError("Artifact receipt differs from frozen declaration")
         if item.get("status") != "collected":
             continue
-        # Current backends have no independent managed-service ownership boundary.
-        if declaration["source"] != "workspace":
-            raise ConfigError("Managed measurement cannot be verified on this runtime version")
+        if declaration["source"] == "managed_service":
+            _verify_managed_artifact(
+                item=item,
+                declaration=declaration,
+                provenance=provenance,
+                package=task_package,
+                expected_config_hash=expected_config_hash,
+            )
         relative = f"evaluation-artifacts/{provenance['session_id']}/{receipt['attempt_id']}/{name}"
         if (
             not re.fullmatch(r"[0-9a-f]{32}", str(receipt.get("attempt_id", "")))
@@ -158,8 +169,81 @@ def archived_artifacts(
         ):
             raise ConfigError("Collected artifact bytes/digest mismatch")
         result[name] = {**item, "payload": payload}
-    if receipt.get("complete") is not all(
-        not row.get("required") or row.get("status") == "collected" for row in entries
+    if receipt.get("complete") is not (
+        receipt.get("collection_error") is None
+        and all(not row.get("required") or row.get("status") == "collected" for row in entries)
     ):
         raise ConfigError("Artifact completeness receipt is inconsistent")
     return result
+
+
+def _verify_managed_artifact(
+    *,
+    item: dict,
+    declaration: dict,
+    provenance: dict,
+    package: dict | None,
+    expected_config_hash: str | None,
+) -> None:
+    """Spec-0081/T3: replay only controller-bound, task-visible service outputs.
+
+    Isolation is a factual property of placement, not a permission inferred from
+    an artifact name. Official graders remain responsible for requiring it.
+    """
+    from auto_designer.experiment.task_environments.contract import (
+        container_environment,
+        environment_identity,
+    )
+
+    if package is None or package.get("schema_version") != 3 or not expected_config_hash:
+        raise ConfigError("Managed artifact requires its frozen environment and run binding")
+    metadata = item.get("metadata")
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("identity"), dict):
+        raise ConfigError("Managed artifact has no controller ownership metadata")
+    identity = metadata["identity"]
+    recipe_hash = environment_identity(package)
+    expected = {
+        key: provenance[key]
+        for key in (
+            "run_id",
+            "round_no",
+            "slot",
+            "task_id",
+            "task_digest",
+            "session_id",
+        )
+    }
+    expected.update(config_hash=expected_config_hash, recipe_hash=recipe_hash)
+    if (
+        set(identity) != {*expected, "attempt"}
+        or any(identity.get(key) != value for key, value in expected.items())
+        or type(identity.get("attempt")) is not int
+        or identity["attempt"] < 1
+        or metadata.get("environment_key") != config_hash(data=identity)
+        or metadata.get("recipe_hash") != recipe_hash
+        or metadata.get("owner_session_id") != provenance["session_id"]
+    ):
+        raise ConfigError("Managed artifact environment ownership mismatch")
+    service = None
+    for candidate in container_environment(package)["services"]:
+        if any(
+            output["handle"] == declaration["handle"] and output["visibility"] == "task"
+            for output in candidate["exports"]
+        ):
+            service = candidate
+            break
+    if (
+        service is None
+        or metadata.get("service") != service["id"]
+        or metadata.get("handle") != declaration["handle"]
+        or metadata.get("placement") != service["placement"]
+        or metadata.get("visibility") != "task"
+        or metadata.get("controller_owned") is not True
+        or metadata.get("agent_stopped") is not True
+        or metadata.get("isolated") is not (service["placement"] == "companion")
+        or not isinstance(metadata.get("service_id"), str)
+        or not metadata["service_id"]
+        or not isinstance(metadata.get("sealed_at"), str)
+        or not metadata["sealed_at"]
+    ):
+        raise ConfigError("Managed artifact differs from its frozen public service export")

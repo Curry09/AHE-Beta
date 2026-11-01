@@ -36,7 +36,7 @@ seed 示例默认使用 `simulated_user`；文本示例选择 `direct`。两个�
 
 每次命令的 JSON 结果都提供绝对 `task_packages` 数组。生成的 `tasks.json` 是以输出目录为基准的相对路径索引，保留来源摘要与顺序；它不是新的实验定义，不能把索引路径填入 `workload.task_packages`。请使用结果中的实际任务包路径，移动任务包后相应更新引用。
 
-下面合并两次结果的数组，分别复制一个既有 N1 local/E2B 模板。代码移除旧单包字段和旧任务计划，更新为新数组；因为配置副本移到了其他目录，也将模板中的 persona 路径转为绝对路径。模型、persona、角色数量和五轮设置仍来自 N1 模板；每轮一个用户会话，轮转两项任务。如需其他分配，编写新的显式计划。
+下面合并两次结果的数组，分别复制一个既有 U1 local/E2B 模板。代码移除旧单包字段和旧任务计划，更新为新数组；因为配置副本移到了其他目录，也将模板中的 persona 路径转为绝对路径。模型、persona、角色数量和五轮设置仍来自 U1 模板；每轮一个用户会话，轮转两项任务。如需其他分配，编写新的显式计划。
 
 ```bash
 uv run --locked --extra experiments python - "$WORK_DIR" <<'PYCODE'
@@ -51,7 +51,7 @@ for result_name in ("seeds-result.json", "text-result.json"):
     task_packages.extend(result["task_packages"])
 
 for backend in ("local", "e2b"):
-    template = Path(f"examples/experiments/synthesizer-n1-{backend}.json").resolve()
+    template = Path(f"examples/experiments/u1-{backend}.json").resolve()
     config = json.loads(template.read_text(encoding="utf-8"))
     workload = config["workload"]
     workload["persona_library"] = str(
@@ -87,4 +87,4 @@ RUN_ID=REPLACE_WITH_PRINTED_RUN_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py run "$RUN_ID" --secrets-file .env.experiment
 ```
 
-local 要求 Docker/Compose，并启动 localhost Gitea；E2B 要求 API key 和 Gitea.com 账户。等待 prepare 完成后使用打印的 run ID。按 [N1 教程](n1-experiment.zh-CN.md)查看进度、停止/恢复同一 run、收集和清理。转换增加的是现有生命周期的输入方式，不导入历史结果追加轮次。可选本地工程 CI 使用专属 runner 和私有 Docker daemon，见 [CI 教程](local-engineering-ci.zh-CN.md)；历史 continuation 仍需单独设计。
+local 要求 Docker/Compose，并启动 localhost Gitea；E2B 要求 API key 和 Gitea.com 账户。等待 prepare 完成后使用打印的 run ID。按 [U1 教程](u1-experiment.zh-CN.md)查看进度、停止/恢复同一 run、收集和清理。转换增加的是现有生命周期的输入方式，不导入历史结果追加轮次。可选本地工程 CI 使用专属 runner 和私有 Docker daemon，见 [CI 教程](local-engineering-ci.zh-CN.md)；历史 continuation 仍需单独设计。

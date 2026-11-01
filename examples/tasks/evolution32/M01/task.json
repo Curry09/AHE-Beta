@@ -1,0 +1,126 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "sqlfluff-subagent-review",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "mechanism",
+    "instance_id": "sqlfluff-subagent-review",
+    "revision": "ab9f0ab00b5b65af40792313ee3b12d90378af1a409fcc76294f59de6f8a6f4c"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "f2166a5cea33451a83536252e8f2c05145e705596a0793b79a05439848c7d153",
+          "format": "file",
+          "files": {
+            "input": "f2166a5cea33451a83536252e8f2c05145e705596a0793b79a05439848c7d153"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m01-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      },
+      {
+        "id": "public-overlay",
+        "material": {
+          "sha256": "8a425d598889a3b4eca7381aaed1e0edf2e49fba2450c290a2de995a52b8fecc",
+          "format": "tar.gz",
+          "files": {
+            "public/SOURCES.md": "ce8c029fb775d778e5e9618c4cc138f70c881db92e975f69615f5f29c013ba2c",
+            "public/TASK.md": "548ce1624a51b3a461eeb35304193f76ae8422f8123c77967212339b6d3bd3d5",
+            "public/candidate.diff": "2557ef519542f753de30762fad951b1561c481fcd11874722efacd6c2b895fd5",
+            "public/review-samples/correlated_update.sql": "862ff00ecc9512a437894ada9939ca490b6c12079503599b293de81840101789",
+            "public/review-samples/nested_cte.sql": "57f2df49df3de4e06cdf3e3e4e1976509446003c7b9d15b52d7a647a27847448",
+            "public/review-samples/templated_cte.sql": "7fa60070b3b5f159213534a3d5ae4706ecfd3a65dadebd60236e04b4bcd22afd"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m01-public-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/public-overlay",
+        "placement": "task"
+      },
+      {
+        "id": "initial-git-recipes",
+        "target": "/opt/task-inputs/initial-git",
+        "material": {
+          "format": "tar.gz",
+          "sha256": "9b2f3b30ae2247f565b89048f8e535b465f64cceb89be78c9dc4c2c17fa450e4",
+          "files": {
+            "freeze_initial_git.py": "a6633dd13a92308eb13279da9356e1fc1dd5e21b194876ec11a4a238886b4f67"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-initial-git-recipes-v1.tar.gz"
+        }
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/initial-git/freeze_initial_git.py",
+        "--workspace",
+        "/workspace",
+        "--parent",
+        "30b4cd0e7f074dafca13ea77012c3d00c48ef40f",
+        "--allow-json",
+        "{\"public/SOURCES.md\":{\"bytes\":466,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"ce8c029fb775d778e5e9618c4cc138f70c881db92e975f69615f5f29c013ba2c\"},\"public/TASK.md\":{\"bytes\":1660,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"548ce1624a51b3a461eeb35304193f76ae8422f8123c77967212339b6d3bd3d5\"},\"public/candidate.diff\":{\"bytes\":45076,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"2557ef519542f753de30762fad951b1561c481fcd11874722efacd6c2b895fd5\"},\"public/review-samples/correlated_update.sql\":{\"bytes\":81,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"862ff00ecc9512a437894ada9939ca490b6c12079503599b293de81840101789\"},\"public/review-samples/nested_cte.sql\":{\"bytes\":80,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"57f2df49df3de4e06cdf3e3e4e1976509446003c7b9d15b52d7a647a27847448\"},\"public/review-samples/templated_cte.sql\":{\"bytes\":156,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"7fa60070b3b5f159213534a3d5ae4706ecfd3a65dadebd60236e04b4bcd22afd\"}}",
+        "--expected-prepared",
+        "9ae5c9531c1ea77af47ef40c9648d6ae5c5f9697",
+        "--verify-only"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/initial-git/freeze_initial_git.py",
+        "--workspace",
+        "/workspace",
+        "--parent",
+        "30b4cd0e7f074dafca13ea77012c3d00c48ef40f",
+        "--allow-json",
+        "{\"public/SOURCES.md\":{\"bytes\":466,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"ce8c029fb775d778e5e9618c4cc138f70c881db92e975f69615f5f29c013ba2c\"},\"public/TASK.md\":{\"bytes\":1660,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"548ce1624a51b3a461eeb35304193f76ae8422f8123c77967212339b6d3bd3d5\"},\"public/candidate.diff\":{\"bytes\":45076,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"2557ef519542f753de30762fad951b1561c481fcd11874722efacd6c2b895fd5\"},\"public/review-samples/correlated_update.sql\":{\"bytes\":81,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"862ff00ecc9512a437894ada9939ca490b6c12079503599b293de81840101789\"},\"public/review-samples/nested_cte.sql\":{\"bytes\":80,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"57f2df49df3de4e06cdf3e3e4e1976509446003c7b9d15b52d7a647a27847448\"},\"public/review-samples/templated_cte.sql\":{\"bytes\":156,\"git_mode\":\"100644\",\"mode\":420,\"sha256\":\"7fa60070b3b5f159213534a3d5ae4706ecfd3a65dadebd60236e04b4bcd22afd\"}}",
+        "--expected-prepared",
+        "9ae5c9531c1ea77af47ef40c9648d6ae5c5f9697",
+        "--initialize-argv-json",
+        "[\"python3\", \"/opt/task-inputs/recipes/initialize.py\", \"--bundle\", \"/opt/task-inputs/initial.bundle\", \"--revision\", \"30b4cd0e7f074dafca13ea77012c3d00c48ef40f\", \"--workspace\", \"/workspace\", \"--shallow-root\", \"1000cf1beae75186cadf3a586c87e86e9f30ecb2\", \"--overlay\", \"/opt/task-inputs/public-overlay\", \"--editable\"]",
+        "--readiness-argv-json",
+        "[\"python3\", \"-c\", \"import importlib,pathlib,subprocess; m=importlib.import_module('sqlfluff'); w=pathlib.Path('/workspace').resolve(); p=pathlib.Path(m.__file__).resolve(); assert p.is_relative_to(w),(str(p),str(w)); assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()=='30b4cd0e7f074dafca13ea77012c3d00c48ef40f'; import pytest; print(p)\"]"
+      ],
+      "timeout_seconds": 360
+    }
+  },
+  "artifacts": {
+    "version": 1,
+    "exports": [
+      {
+        "id": "review",
+        "source": "workspace",
+        "path": "reports/review.md",
+        "content_type": "text/markdown",
+        "required": true,
+        "max_bytes": 2097152
+      }
+    ]
+  }
+}

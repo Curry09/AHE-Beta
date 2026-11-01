@@ -1,0 +1,70 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "marshmallow-2123",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "swebench",
+    "instance_id": "marshmallow-2123",
+    "revision": "3b6ce40591806d42a5eb1f821ff301ae8a31b1a8eefc7c7855a16d6454a11a54"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:cc4be898552542f6e430283993f5e493999d2c3059aded5ff41d353030d13d18",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "be52b2ad55cfacf815f3019adda4be9bb4675fe04934742de3dae4b07d8f0486",
+          "format": "file",
+          "files": {
+            "input": "be52b2ad55cfacf815f3019adda4be9bb4675fe04934742de3dae4b07d8f0486"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/marshmallow-2123-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "-c",
+        "import importlib,pathlib,subprocess; m=importlib.import_module('marshmallow'); w=pathlib.Path('/workspace').resolve(); p=pathlib.Path(m.__file__).resolve(); assert p.is_relative_to(w),(str(p),str(w)); assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()=='81d992831a77decffeea3390dfc097ed989b4322'; import pytest; print(p)"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/initialize.py",
+        "--bundle",
+        "/opt/task-inputs/initial.bundle",
+        "--revision",
+        "81d992831a77decffeea3390dfc097ed989b4322",
+        "--workspace",
+        "/workspace",
+        "--editable"
+      ],
+      "timeout_seconds": 240
+    }
+  }
+}

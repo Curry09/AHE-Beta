@@ -1,0 +1,70 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "cookiecutter",
+  "instruction_file": "instruction.md",
+  "interaction": "direct",
+  "benchmark": {
+    "suite": "nl2repo",
+    "instance_id": "cookiecutter",
+    "revision": "8b3ab1b73f8ab1aaec22cf606fba2fb6533511fb3c901ef52bc63cd0b84fb6c7"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:d45a6b83c47a17b1b0b12a17493a22ce68513b7079d1ad51f3d2e26e5e796f9e",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "1187d5a6952440bc7d2f7cddc05d8854620f284d39c5d1a50a88d5f7e010f5fa",
+          "format": "file",
+          "files": {
+            "input": "1187d5a6952440bc7d2f7cddc05d8854620f284d39c5d1a50a88d5f7e010f5fa"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/cookiecutter-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/verify.py",
+        "--git-revision",
+        "cadd51e4ba464ef61538a7f9afb2ae644942ff55"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/initialize.py",
+        "--bundle",
+        "/opt/task-inputs/initial.bundle",
+        "--revision",
+        "cadd51e4ba464ef61538a7f9afb2ae644942ff55",
+        "--workspace",
+        "/workspace"
+      ],
+      "timeout_seconds": 240
+    }
+  }
+}

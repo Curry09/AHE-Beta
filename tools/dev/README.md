@@ -1,11 +1,12 @@
-# Maintenance tools / 开发维护工具
+# Maintenance tools
 
 These tools inspect or replay existing evidence; they are not experiment launchers.
 Use `backend/scripts/experiment.py` for new local/E2B experiments. Run the commands
 below from the repository root with `PYTHONPATH=backend .venv/bin/python -m ...`.
 Every listed module supports `--help` without model/provider calls.
 
-这些工具用于探针、证据回放、审计和交付验证，不注册新的实验配置格式。
+The probes, evidence replays, audits, and delivery checks do not introduce new
+experiment configuration formats.
 `offline` in a filename means a local fake tracker, **not** a model-free run.
 The online tools consume only `--secrets-file` or injected environment. Gitea tools
 also require `--run-dir` to select a prepared v2 run; only its `manifest.json`,
@@ -18,14 +19,15 @@ credentials when a mapped field is missing. Harness-to-`LLM_*` mapping is scoped
 spawning its child process and does not change another role's profile.
 No tool selects a developer's private model or shared Docker network.
 
-凭证显式指定；远端操作会创建或修改仓库/Issue，执行前查看对应工具的参数。
-回放不会重新执行原始用户对话，产物也不能当作新一轮用户评估。
+Supply credentials explicitly. Remote operations may create or modify repositories
+and issues; review each tool's arguments before running it. Replays do not rerun
+the original user dialogue, and their outputs are not a new round of user evaluation.
 
 ## Probes
 
 For each row, its safe help command is `PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.<module> --help`.
 
-| Module | Purpose / 目的 | Inputs | Model / remote writes | Output |
+| Module | Purpose | Inputs | Model / remote writes | Output |
 | --- | --- | --- | --- | --- |
 | `probe_d43_quality_fail` | Compare quality-failure strategies against scripted Harness | `--d43`, USER profile | USER model; no remote writes | stdout |
 | `probe_ontrack_new_harness` | Compare expert/blind waiting with a new manual contract | USER profile, optional `--manual` | USER model; no remote writes | stdout |
@@ -59,11 +61,40 @@ PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.probe_persona_wait_matri
   --secrets-file /path/to/chosen.env --personas sr-01-willison --scenarios ON-TRACK
 ```
 
+## Export original evolution task materials
+
+`export-evolution-task-materials.py` verifies explicitly selected original agent
+payloads against `tasks[].agent_payload_sha256`, retains the compressed bytes,
+and writes a portable `materials.lock.json` with file hashes, sizes, modes and
+source provenance. The input manifest must contain `task_key`, `task_id` and the
+original SHA-256 for every task; payloads are `<task_key>.tar.gz` in the selected
+directory. Links and special archive members are rejected. Output must be new;
+missing or changed originals leave no completed export. These checks establish
+byte identity and safe archive contents, not whether a scenario is complete or
+solvable. An intentionally incomplete original can be exported unchanged; record
+the operator decision and scenario scope in its task-library manifest. This does
+not relax archive safety or hash verification and does not authorize adding
+candidate source, tests, or solved-state files. Publication is a separate step.
+
+```bash
+.venv/bin/python tools/dev/export-evolution-task-materials.py \
+  --manifest /path/to/original/tasks.json \
+  --payloads /path/to/original/agent-payloads \
+  --images /path/to/original/image-reference.json \
+  --output /path/to/new-material-export
+```
+
+The optional image map records only original image names/local IDs as provenance;
+it does not turn them into usable registry digests. The tool is offline and starts
+no models, providers or experiment roles, and never publishes assets. A verified
+source archive still needs an explicit environment recipe and agent-visible input
+selection before use; a completed workspace is not an original payload substitute.
+
 ## Replay
 
 For each row, its safe help command is `PYTHONPATH=backend .venv/bin/python -m tools.dev.replay.<module> --help`.
 
-| Module | Purpose / 目的 | Inputs | Model / remote writes | Output |
+| Module | Purpose | Inputs | Model / remote writes | Output |
 | --- | --- | --- | --- | --- |
 | `replay_observation_lifecycle` | Verify private evidence grants, version isolation and delivery reads | `--run-dir`, `--openagents-source`, optional images/credential file | no models; creates private Gitea test repo, Docker containers | retained temporary evidence, stdout; remote test repo retained |
 | `replay_observation_synthesis` | Replay PM/Synthesizer against fixed evidence | `--sessions`, `--observations`, `--proposals`, `--repo`, `--output`, DEMAND profile | DEMAND model; fake tracker | output directory with traces and summary |
@@ -83,7 +114,7 @@ from that run, with explicit `--delivery-network`/`--internal-url` overrides ava
 
 For each row, its safe help command is `PYTHONPATH=backend .venv/bin/python -m tools.dev.audit.<module> --help`.
 
-| Module | Purpose / 目的 | Inputs | Model / remote writes | Output |
+| Module | Purpose | Inputs | Model / remote writes | Output |
 | --- | --- | --- | --- | --- |
 | `audit_sim_action_integrity` | Compare terminal actions with explicit persona trace actions | session files/directories; optional output/source/model pins | no models or remote writes; inputs stay unchanged | JSON on stdout/explicit output |
 | `evaluate_role_traces` | Check trace violations and optional input-size deltas | trace JSONL, optional baseline | no models or remote writes | JSON on stdout; nonzero for violations |
@@ -100,7 +131,7 @@ PYTHONPATH=backend .venv/bin/python -m tools.dev.audit.audit_sim_action_integrit
 
 For each row, its safe help command is `PYTHONPATH=backend .venv/bin/python -m tools.dev.delivery.<module> --help`.
 
-| Module | Purpose / 目的 | Inputs | Model / remote writes | Output |
+| Module | Purpose | Inputs | Model / remote writes | Output |
 | --- | --- | --- | --- | --- |
 | `prepare_openagents_from_summary` | Materialize a frozen local summary into a fresh delivery repo | prepared run, summary, Harness repo, target repo, manifest output | no models; creates repo/commits/issues | explicit manifest |
 | `prepare_openagents_validation` | Copy a backlog to a fresh repo with selected deliverable issues | prepared run, source/target repo, deliver issue numbers, manifest | no models; creates repo/commits/issues | explicit manifest |

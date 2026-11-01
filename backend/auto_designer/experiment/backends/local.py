@@ -310,6 +310,11 @@ def prepare_images(
     uv = shutil.which("uv")
     if not uv or _command([uv, "--version"]).split()[:2] != ["uv", UV_VERSION]:
         raise BackendError(f"Install uv {UV_VERSION} before preparing the local runtime")
+    container_tasks = any(
+        task["package"].get("schema_version") == 3
+        for task in _image_tasks(root=root, manifest=manifest)
+    )
+    install_env = {**os.environ, "UV_LINK_MODE": "copy"} if container_tasks else None
     _command(
         [
             uv,
@@ -323,6 +328,7 @@ def prepare_images(
             "dev",
         ],
         cwd=source,
+        env=install_env,
         log_path=build_log,
     )
     python = source / ".venv/bin/python"
@@ -377,6 +383,16 @@ def prepare_images(
     }
     task_images = {}
     for task in tasks:
+        # Spec-0081/T4: task images are independently locked; no invented Python seed build.
+        if task["package"].get("schema_version") == 3:
+            from auto_designer.experiment.task_environments.contract import environment_identity
+
+            task_images[task["id"]] = {
+                "task_digest": task["digest"],
+                "recipe_hash": environment_identity(task["package"]),
+                "kind": "container",
+            }
+            continue
         task_hash = hashlib.sha256(
             json.dumps({"base_recipe": base_hash, "task": task["digest"]}, sort_keys=True).encode()
         ).hexdigest()
@@ -489,8 +505,33 @@ def prepare_images(
         "installed_toolchain": installed,
         "prepared_at": _now(),
     }
+    if container_tasks:
+        result["python_root"] = _command([str(python), "-c", "import sys; print(sys.base_prefix)"])
+        result["python_alias_root"] = (
+            str(Path(os.path.abspath(python.parent / os.readlink(python))).parent.parent)
+            if python.is_symlink()
+            else result["python_root"]
+        )
     if modern:
         result["task_images"] = task_images
+    if container_tasks:
+        from auto_designer.experiment.backends.e2b_bootstrap import (
+            probe_container_workspace,
+            task_workspace_record,
+        )
+
+        tools = {
+            "controller_python": str(python),
+            "python_root": result["python_root"],
+            "python_alias_root": result["python_alias_root"],
+        }
+        result["container_preflight"] = {
+            task["id"]: probe_container_workspace(
+                task_workspace_record(task, manifest, str(root), tools)
+            )
+            for task in tasks
+            if task["package"].get("schema_version") == 3
+        }
     _write(root / "runtime/local-images.json", result)
     return result
 
@@ -800,6 +841,25 @@ class LocalBackend:
         workspaces = {}
         for task in tasks:
             receipt = receipts[task["id"]]
+            if task["package"].get("schema_version") == 3:
+                from auto_designer.experiment.backends.e2b_bootstrap import task_workspace_record
+
+                workspaces[task["id"]] = task_workspace_record(
+                    task,
+                    self.manifest,
+                    str(self.root),
+                    {
+                        "controller_python": self.images["controller_python"],
+                        "python_root": self.images["python_root"],
+                        "python_alias_root": self.images["python_alias_root"],
+                    },
+                )
+                if (
+                    receipt.get("recipe_hash") != workspaces[task["id"]]["recipe_hash"]
+                    or receipt.get("task_digest") != task["digest"]
+                ):
+                    raise BackendError(f"Task {task['id']} container recipe changed")
+                continue
             expected_recipe = hashlib.sha256(
                 json.dumps(
                     {"base_recipe": self.images["recipe_hash"], "task": task["digest"]},
@@ -1128,6 +1188,13 @@ class LocalBackend:
             if actual_map != expected_map:
                 raise BackendError("Recorded task image bindings changed since preparation")
             for task in catalog_tasks(catalog):
+                if task["package"].get("schema_version") == 3:
+                    from auto_designer.experiment.backends.e2b_bootstrap import (
+                        probe_container_workspace,
+                    )
+
+                    task_checks[task["id"]] = probe_container_workspace(actual_map[task["id"]])
+                    continue
                 workspace = actual_map[task["id"]]["params"]
                 program = """import hashlib,json,subprocess,sys
 from pathlib import Path
@@ -1424,8 +1491,35 @@ print('ready')
             "observation": "KNOWN",
             "controller": controller,
             "vigil_running": bool((running_vigil or {}).get("State", {}).get("Running")),
+            **(
+                {"task_environments": self._task_environments("inspect")}
+                if (self.root / "runtime/task-environments").exists()
+                else {}
+            ),
             "observed_at": _now(),
         }
+
+    def _task_environments(self, action: str) -> dict[str, Any]:
+        # Spec-0081/T4: these operations do not create a Workspace or Actor.
+        registry = self.root / "runtime/task-environments"
+        if not registry.exists():
+            return {"version": 1, "attempts": []}
+        from auto_designer.experiment.task_environments import docker
+
+        if action in {"stop", "destroy"}:
+            from auto_designer.experiment.backends.e2b_bootstrap import cleanup_container_probes
+
+            cleanup_container_probes(
+                registry_root=registry, run_id=self.run_id, config_hash=self.digest
+            )
+        operations = {
+            "inspect": docker.inspect_registered,
+            "stop": docker.stop_registered,
+            "destroy": docker.destroy_registered,
+        }
+        return operations[action](
+            registry_root=registry, run_id=self.run_id, config_hash=self.digest
+        )
 
     def _remove_execution_containers(self) -> list[str]:
         removed = []
@@ -1459,6 +1553,7 @@ print('ready')
                 raise BackendError(
                     "Unable to collect terminal Gitea evidence; infrastructure retained"
                 )
+        self._task_environments("stop")
         removed = self._remove_execution_containers()
         if self.dest.is_dir():
             self._owned("container")
@@ -1548,6 +1643,7 @@ print('ready')
         volumes = self._owned("volume")
         if local_ci.enabled(self.manifest) and self.resources.get("ci"):
             local_ci.stop(self)
+        self._task_environments("destroy")
         self._remove_execution_containers()
         if self.dest.is_dir():
             # No --volumes: these contain the local Gitea experiment repository.

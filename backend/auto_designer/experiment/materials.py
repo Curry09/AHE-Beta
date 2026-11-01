@@ -21,7 +21,7 @@ from auto_designer.experiment.config import (
     ConfigError,
     config_hash,
     load_config_v2,
-    load_task_package,
+    load_task_packages,
     local_ci_enabled,
     read_json_document,
 )
@@ -80,11 +80,37 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
     config = load_config_v2(config_path)
     if "continuation" in config:
         return _check_parent_materials(config=config)
-    tasks = [load_task_package(path) for path in config["workload"]["task_packages"]]
+    tasks = load_task_packages(config)
     validate_task_ids(tasks)
+    container_checks = {}
     for task in tasks:
         validate_artifact_backend(task, config["runtime"]["backend"])
         from auto_designer.experiment.workload import validate_task_execution
+
+        # Spec-0081/T2: container recipes do not invent a source tree or Python setup.
+        if task.get("schema_version") == 3:
+            from auto_designer.experiment.task_environments.materials import (
+                MaterialError,
+            )
+            from auto_designer.experiment.task_environments.materials import (
+                check_materials as check_container_materials,
+            )
+
+            _require_file(path=Path(task["instruction_file"]))
+            if not Path(task["instruction_file"]).read_text(encoding="utf-8").strip():
+                raise ConfigError(f"Task {task['id']} instruction must not be empty")
+            try:
+                container_checks[task["id"]] = check_container_materials(package=task)
+            except MaterialError as exc:
+                raise ConfigError(f"Task {task['id']}: {exc}") from exc
+            validate_task_execution(
+                task,
+                source_root=None,
+                fallback_seconds=config.get("runtime", {})
+                .get("harness", {})
+                .get("request_budget_seconds"),
+            )
+            continue
 
         validate_task_execution(
             task,
@@ -147,7 +173,7 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
                     if _is_ci_workflow(Path(name))
                 }
             )
-    return {
+    report = {
         "ok": True,
         "config": config,
         "config_hash": config_hash(data=config),
@@ -158,6 +184,9 @@ def check_materials(config_path: str | Path) -> dict[str, Any]:
         "interaction_plan": interaction_plan(config, tasks),
         "network_required_for_prepare": True,
     }
+    if container_checks:
+        report["container_materials"] = container_checks
+    return report
 
 
 def prepare_materials(
@@ -372,6 +401,13 @@ def verify_materials(manifest: dict[str, Any]) -> None:
         read_session_plan(run_dir, manifest)
         catalog = read_task_catalog(run_dir, manifest)
         for task in catalog["tasks"]:
+            if task["package"].get("schema_version") == 3:
+                from auto_designer.experiment.task_environments.materials import (
+                    execution_environment,
+                )
+
+                execution_environment(package=task["package"], run_root=run_dir)
+                continue
             _verify_task_archive(
                 path=task_material_path(run_dir, manifest, task, "source_archive"),
                 expected=task["source_snapshot"]["files"],
@@ -429,6 +465,10 @@ def _freeze_task_contents(
     materials: dict[str, Any],
     fallback_seconds: float | None = None,
 ) -> dict[str, Any]:
+    if task.get("schema_version") == 3:
+        return _freeze_container_task(
+            stage=stage, task=task, materials=materials, fallback_seconds=fallback_seconds
+        )
     task = json.loads(json.dumps(task))
     task_id = task["id"]
     directory = stage / "materials/tasks" / task_id
@@ -491,6 +531,57 @@ def _freeze_task_contents(
     }
     if task.get("execution"):
         record["execution_verification"] = execution_verification
+    record["digest"] = task_digest(record)
+    return record
+
+
+def _freeze_container_task(
+    *, stage: Path, task: dict[str, Any], materials: dict[str, Any], fallback_seconds: float | None
+) -> dict[str, Any]:
+    """Spec-0081/T2: immutable container inputs retain the shared catalog identity."""
+    from auto_designer.experiment.task_environments.materials import (
+        MaterialError,
+        freeze_environment,
+    )
+    from auto_designer.experiment.workload import validate_task_execution
+
+    directory = stage / "materials/tasks" / task["id"]
+    directory.mkdir(parents=True)
+    try:
+        frozen, files = freeze_environment(
+            package=task,
+            directory=directory,
+            stage=stage,
+            cache=stage.parent / ".cache/task-inputs",
+        )
+    except MaterialError as exc:
+        raise ConfigError(str(exc)) from exc
+    instruction = directory / "instruction.md"
+    shutil.copyfile(task["instruction_file"], instruction)
+    frozen["instruction_file"] = instruction.relative_to(stage).as_posix()
+    files["instruction"] = instruction
+    refs, hashes = {}, {}
+    for name, path in files.items():
+        key = f"task:{task['id']}:{name}"
+        _register(materials=materials, key=key, path=path, stage=stage)
+        refs[name], hashes[name] = key, materials[key]["sha256"]
+    package_path = directory / "package.json"
+    _write_json(path=package_path, value=frozen)
+    refs["package"] = f"task:{task['id']}:package"
+    _register(materials=materials, key=refs["package"], path=package_path, stage=stage)
+    record = {
+        "id": task["id"],
+        "kind": task["kind"],
+        "interaction": task["interaction"],
+        "package": frozen,
+        "source_snapshot": {"revision": task.get("source", {}).get("revision"), "files": {}},
+        "content_hashes": hashes,
+        "materials": refs,
+    }
+    if task.get("execution"):
+        record["execution_verification"] = validate_task_execution(
+            task, source_root=None, fallback_seconds=fallback_seconds
+        )
     record["digest"] = task_digest(record)
     return record
 
@@ -906,6 +997,8 @@ def _freeze_parent_materials(
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(source.read(record["path"]))
             _register(materials=materials, key=key, path=target, stage=stage)
+        if task["package"].get("schema_version") == 3:
+            continue
         # Runtime source recipe reads the same frozen archive; restore its logical directory.
         archive_path = stage / materials[task["materials"]["source_archive"]]["path"]
         destination = stage / "source/tasks" / task["id"]

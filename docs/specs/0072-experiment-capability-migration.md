@@ -103,14 +103,14 @@ tasks:
   - docs/CONFIGURATION.zh-CN.md
   - docs/QUICKSTART.md
   - docs/QUICKSTART.zh-CN.md
-  - docs/tutorials/n1-experiment.md
-  - docs/tutorials/n1-experiment.zh-CN.md
+  - docs/tutorials/u1-experiment.md
+  - docs/tutorials/u1-experiment.zh-CN.md
   - docs/synthesizer-grouping.md
   - README.md
   - README.zh-CN.md
   - frontend/README.md
-  - examples/experiments/synthesizer-n1-local.json
-  - examples/experiments/synthesizer-n1-e2b.json
+  - examples/experiments/u1-local.json
+  - examples/experiments/u1-e2b.json
   - examples/experiment.env.example
   scope: 公开文档、真实消费者矩阵和在线证据边界
   acceptance: schema→freeze→两后端→真实消费者回归通过，文档列明已迁/待迁范围，记录实际在线覆盖而非假称完整云交付

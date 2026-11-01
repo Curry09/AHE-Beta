@@ -25,6 +25,24 @@ from auto_designer.user.sim.persona_client import ScriptedPersonaClient
 from auto_designer.user.sim.run_live import expert
 
 
+class _NonGitWorkspace:
+    def __init__(self, cwd):
+        self.cwd = cwd
+        self.evidence = {"patch_capability": "not_applicable"}
+
+    def freeze_patch_base(self):
+        pass
+
+    def export_patch(self):
+        return "", ""
+
+    def review_file_listing(self):
+        return {"returncode": 0, "stdout": ""}
+
+    def close(self):
+        pass
+
+
 def _turn(
     turn: int,
     action: str,
@@ -443,7 +461,12 @@ def test_client_factory_gives_each_session_its_own_instance(tmp_path) -> None:
 
     def one(ws: str) -> None:
         barrier.wait()
-        fn(mp, SeedScenario(description="task"), ScriptedHarness(), workspace_dir=ws)
+        fn(
+            mp,
+            SeedScenario(description="task"),
+            ScriptedHarness(),
+            workspace_dir=_NonGitWorkspace(ws),
+        )
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(one, ["/ws/a", "/ws/b"]))
@@ -463,7 +486,9 @@ def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:
     events: list = []
     monkeypatch.setattr(
         "auto_designer.loop.sim_user.materialize_workspace",
-        lambda spec: events.append(("materialize", spec.fixture)) or f"/ws/{spec.fixture}",
+        lambda spec: (
+            events.append(("materialize", spec.fixture)) or _NonGitWorkspace(f"/ws/{spec.fixture}")
+        ),
     )
     monkeypatch.setattr(
         "auto_designer.loop.sim_user.ensure_deps",
@@ -500,7 +525,7 @@ def test_main_path_does_not_ensure_deps_in_sim_user(tmp_path, monkeypatch) -> No
     )
 
     # 传入 workspace_dir（orchestrator 已 materialize+ensure）→ sim_user 不再碰这两者，不抛即通过。
-    fn(mp, scenario, ScriptedHarness(), workspace_dir="/given/ws")
+    fn(mp, scenario, ScriptedHarness(), workspace_dir=_NonGitWorkspace("/given/ws"))
 
 
 # ---- Spec-0025/T2：raw issue 结构化——暂定 type + needs-triage + round 标签 ----

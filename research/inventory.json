@@ -2649,21 +2649,21 @@
     },
     {
       "original_path": "examples/experiments/synthesizer-n1-e2b.json",
-      "disposition": "maintained",
-      "destination": "examples/experiments/synthesizer-n1-e2b.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "examples/experiments/u1-e2b.json",
+      "reason": "Public user-count example renamed from N1 to U1",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "e121fa6da18030f9eff184e10a3a10f9c9ef491ea3c69b9671ce74eec34080d9",
-      "destination_sha256": "e121fa6da18030f9eff184e10a3a10f9c9ef491ea3c69b9671ce74eec34080d9"
+      "destination_sha256": "8d7bee9e4277af56a8ecf954888cf5227d991554cfaefbbb7f191b1784228c0d"
     },
     {
       "original_path": "examples/experiments/synthesizer-n1-local.json",
-      "disposition": "maintained",
-      "destination": "examples/experiments/synthesizer-n1-local.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "examples/experiments/u1-local.json",
+      "reason": "Public user-count example renamed from N1 to U1",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "d0fc2d867f83618c4a6e4c4ce038243880ae8fbb61befea05aa1384eb0e565e0",
-      "destination_sha256": "d0fc2d867f83618c4a6e4c4ce038243880ae8fbb61befea05aa1384eb0e565e0"
+      "destination_sha256": "af39db47a56273dcd279f401f92cb80c41c7533053785ea30188a5dc48e58103"
     },
     {
       "original_path": "examples/experiments/synthesizer-ordinary-five-rounds.json",
@@ -2703,9 +2703,9 @@
     },
     {
       "original_path": "examples/personas/n1.json",
-      "disposition": "maintained",
-      "destination": "examples/personas/n1.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "examples/personas/u1.json",
+      "reason": "Public persona library renamed from N1 to U1",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "f7869a09b2c5a6b69d79a46715e84012ec53e87810a261bb272c6f7b4c711bf7",
       "destination_sha256": "f7869a09b2c5a6b69d79a46715e84012ec53e87810a261bb272c6f7b4c711bf7"

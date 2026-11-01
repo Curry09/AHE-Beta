@@ -36,7 +36,7 @@ def manifest():
             "runtime": {
                 "backend": "e2b",
                 "e2b": {"cpu_count": 4, "memory_mb": 8192, "timeout_seconds": 3600},
-                "gitea": {"repository_prefix": "n1"},
+                "gitea": {"repository_prefix": "u1"},
             }
         },
     }
@@ -337,6 +337,8 @@ def test_tampered_download_preserves_previous_snapshot(backend, monkeypatch):
 
 
 def test_uploaded_frozen_manifest_is_not_relocated(backend, monkeypatch):
+    import httpx
+
     from auto_designer.experiment.backends.e2b_bootstrap import upload_frozen_inputs
 
     backend.manifest["materials"] = {"example": {"path": "materials/example.txt"}}
@@ -349,12 +351,26 @@ def test_uploaded_frozen_manifest_is_not_relocated(backend, monkeypatch):
         "auto_designer.experiment.materials.verify_materials", lambda manifest: None
     )
     sandbox = Mock()
+    sandbox.connection_config.proxy = None
+    sandbox.upload_url.side_effect = lambda path, user: "https://upload.example" + path
+    uploaded = {}
+
+    def post(url, *, files, **_kwargs):
+        path = url.removeprefix("https://upload.example")
+        uploaded[path] = files["file"][1].read()
+        return httpx.Response(200, json=[{"path": path}], request=httpx.Request("POST", url))
+
+    client = Mock()
+    client.__enter__ = Mock(return_value=client)
+    client.__exit__ = Mock(return_value=False)
+    client.post.side_effect = post
+    monkeypatch.setattr(httpx, "Client", Mock(return_value=client))
     upload_frozen_inputs(
         sandbox, run_dir=backend.run_dir, manifest=backend.manifest, root=backend.root
     )
-    args = sandbox.files.write.call_args_list[0]
-    assert args.args[1] == original.encode()
-    assert "/host/original" in args.args[1].decode()
+    actual = uploaded[backend.root + "/manifest.json"]
+    assert actual == original.encode()
+    assert "/host/original" in actual.decode()
 
 
 def test_resume_rejects_changed_gitea_account_before_creating_repository(backend, monkeypatch):

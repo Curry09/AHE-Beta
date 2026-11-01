@@ -11,6 +11,57 @@ from typing import Any
 from auto_designer.experiment.backends.base import BackendError
 
 BOOTSTRAP_VERSION = "uv-0.11.28-python-3.12.13-claude-2.1.284-v2"
+# Spec-0081/T4: public, independently checksummed Docker toolchain for container tasks.
+DOCKER_VERSION = "27.5.1"
+DOCKER_URL = "https://download.docker.com/linux/static/stable/x86_64/docker-27.5.1.tgz"
+DOCKER_SHA256 = "4f798b3ee1e0140eab5bf30b0edc4e84f4cdb53255a429dc3bbae9524845d640"
+
+
+def _container_tasks(run_dir: Path, manifest: dict) -> bool:
+    if manifest.get("workload_contract_version") != 1:
+        return False
+    from auto_designer.experiment.workload import read_task_catalog
+
+    return any(
+        task["package"].get("schema_version") == 3
+        for task in read_task_catalog(run_dir, manifest)["tasks"]
+    )
+
+
+def _build_template(Template: Any, *, container_tasks: bool) -> Any:
+    template = (
+        Template()
+        .from_base_image()
+        .run_cmd(
+            "apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates python3"
+            + (" iptables pigz" if container_tasks else "")
+            + " && rm -rf /var/lib/apt/lists/*",
+            user="root",
+        )
+    )
+    if not container_tasks:
+        return template
+    return (
+        template.run_cmd(
+            "curl --fail --location --retry 3 "
+            + DOCKER_URL
+            + " -o /tmp/docker.tgz && "
+            + "echo '"
+            + DOCKER_SHA256
+            + "  /tmp/docker.tgz' | sha256sum -c - && "
+            + "tar -xzf /tmp/docker.tgz -C /usr/local/bin --strip-components=1 && rm /tmp/docker.tgz && "
+            + 'test "$(docker --version)" = \'Docker version '
+            + DOCKER_VERSION
+            + ", build 9f9e405' && "
+            + "groupadd -f docker",
+            user="root",
+        )
+        .set_user("root")
+        .set_start_cmd(
+            "exec dockerd --host=unix:///var/run/docker.sock --group=docker --storage-driver=overlay2",
+            "docker info >/dev/null 2>&1",
+        )
+    )
 
 
 def resolve_template(
@@ -43,12 +94,15 @@ def resolve_template(
             "expected_cpu": settings["cpu_count"],
             "expected_memory_mb": settings["memory_mb"],
         }
+    container_tasks = _container_tasks(run_dir, manifest)
     recipe = {
         "bootstrap": BOOTSTRAP_VERSION,
         "cpu_count": settings["cpu_count"],
         "memory_mb": settings["memory_mb"],
         "base": "e2b-base",
     }
+    if container_tasks:
+        recipe["docker"] = {"version": DOCKER_VERSION, "url": DOCKER_URL, "sha256": DOCKER_SHA256}
     digest = hashlib.sha256(json.dumps(recipe, sort_keys=True).encode()).hexdigest()
     cache = run_dir.parent / ".cache/e2b" / f"{digest}.json"
     if cache.is_file():
@@ -63,12 +117,7 @@ def resolve_template(
     # Builds are shared immutable runtime inputs. Individual destroy operations
     # intentionally retain them; a failed build never claims a successful cache.
     build = Template.build(
-        Template()
-        .from_base_image()
-        .run_cmd(
-            "apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates python3 && rm -rf /var/lib/apt/lists/*",
-            user="root",
-        ),
+        _build_template(Template, container_tasks=container_tasks),
         name=alias,
         tags=[digest[:20]],
         cpu_count=settings["cpu_count"],

@@ -23,21 +23,24 @@ def test_empty_provisions_empty_isolated_dir() -> None:
 
     a = seed_source.provision(WorkspaceSpec(kind="empty"))
     b = seed_source.provision(WorkspaceSpec(kind="empty"))
-    assert a != b
-    assert Path(a).is_dir()
-    assert not any(Path(a).iterdir())  # 无 doc 时为纯空目录
+    assert a.cwd != b.cwd
+    assert a.evidence["patch_capability"] == "not_applicable"
+    a.freeze_patch_base()
+    assert a.export_patch() == ("", "")
+    assert Path(a.cwd).is_dir()
+    assert not any(Path(a.cwd).iterdir())  # 无 doc 时为纯空目录
 
 
 def test_empty_writes_doc_and_doc_name_override() -> None:
     from auto_designer.user.sim import seed_source
 
     ws = seed_source.provision(WorkspaceSpec(kind="empty", params={"doc": "build X"}))
-    assert (Path(ws) / "SPEC.md").read_text() == "build X"
+    assert (Path(ws.cwd) / "SPEC.md").read_text() == "build X"
 
     ws2 = seed_source.provision(
         WorkspaceSpec(kind="empty", params={"doc": "y", "doc_name": "REQUIREMENTS.md"})
     )
-    assert (Path(ws2) / "REQUIREMENTS.md").read_text() == "y"
+    assert (Path(ws2.cwd) / "REQUIREMENTS.md").read_text() == "y"
 
 
 def test_empty_spec_roundtrip() -> None:

@@ -1,0 +1,97 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "080-convert-novel-epub",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "tua-bench",
+    "instance_id": "080-convert-novel-epub",
+    "revision": "5628e14bc7b0d2f883d4b2dca1089eb598793ae80d5ecceea6eaa428cf2cd317"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a4cfa8a2ae5fd875d32fa58fef0e359c1a3f06b05cc8e9085bb9ef60448bb2fc",
+    "workdir": "/app",
+    "patch": "not_applicable",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "24f1ccc696b3ddaf90693920c56fb3d22eb05f189716047b7e6d94a3c8b5109f",
+          "format": "tar.gz",
+          "files": {
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-readiness-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      },
+      {
+        "id": "collection-recipes",
+        "material": {
+          "sha256": "ff43c5c6eb2bd0ab8cf200c60e1b03387c836a56a2045c889ae8b5a097134cd6",
+          "format": "tar.gz",
+          "files": {
+            "collect_directory.py": "85154f316e093105ce087d510cbef121fcfbd8b3a13db8e1565af57988e1b2d7",
+            "collect_epub.py": "a54b1e238a0212a1292e16559392fd497721bb4f09f2946c0b9fd292e2a139d6"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-collection-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/collection"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "-c",
+        "from pathlib import Path\nimport shutil\np=Path('/home/user/Documents/Novels/Pass Through');assert p.is_dir(),str(p);assert list(p.rglob('*.txt')),'novel chapters missing'\nassert shutil.which('chromium') and shutil.which('Xvfb')\n"
+      ],
+      "timeout_seconds": 120
+    },
+    "services": [
+      {
+        "id": "desktop-session",
+        "placement": "task",
+        "argv": [
+          "/usr/local/bin/task-entrypoint.sh",
+          "sleep",
+          "infinity"
+        ],
+        "cwd": "/app",
+        "readiness": {
+          "argv": [
+            "/bin/sh",
+            "-ec",
+            "xdpyinfo -display :99 >/dev/null && test -S /tmp/tua-dbus-session"
+          ],
+          "timeout_seconds": 180
+        }
+      }
+    ],
+    "finalize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/collection/collect_epub.py",
+        "--source",
+        "/home/agent/Documents/Novels/Pass Through"
+      ],
+      "timeout_seconds": 120
+    }
+  },
+  "artifacts": {
+    "version": 1,
+    "exports": [
+      {
+        "id": "epub",
+        "source": "workspace",
+        "path": ".collected/novel.epub",
+        "content_type": "application/epub+zip",
+        "required": true,
+        "max_bytes": 134217728
+      }
+    ]
+  }
+}

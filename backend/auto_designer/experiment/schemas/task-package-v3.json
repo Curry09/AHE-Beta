@@ -1,0 +1,675 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "kind": {
+      "enum": [
+        "ordinary",
+        "swebench",
+        "benchmark"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "instruction_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "git"
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        }
+      },
+      "required": [
+        "kind",
+        "url",
+        "revision",
+        "repo"
+      ]
+    },
+    "difficulty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "not_in_benchmark": {
+      "const": true
+    },
+    "interaction": {
+      "enum": [
+        "simulated_user",
+        "direct"
+      ]
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suite": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$"
+        },
+        "instance_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        }
+      },
+      "required": [
+        "suite",
+        "instance_id",
+        "revision"
+      ]
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "exports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "source": {
+                "enum": [
+                  "workspace",
+                  "managed_service"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "handle": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "content_type": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]*/[A-Za-z0-9][A-Za-z0-9.+-]*$"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "max_bytes": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "id",
+              "source",
+              "content_type",
+              "required",
+              "max_bytes"
+            ],
+            "oneOf": [
+              {
+                "properties": {
+                  "source": {
+                    "const": "workspace"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "not": {
+                  "required": [
+                    "handle"
+                  ]
+                }
+              },
+              {
+                "properties": {
+                  "source": {
+                    "const": "managed_service"
+                  }
+                },
+                "required": [
+                  "handle"
+                ],
+                "not": {
+                  "required": [
+                    "path"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "version",
+        "exports"
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "budget_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 86400
+        },
+        "budget_source": {
+          "enum": [
+            "task_metadata",
+            "operator_quota"
+          ]
+        },
+        "quota_override_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "public_deliverables": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "public_acceptance": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "budget_seconds",
+        "budget_source"
+      ]
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "id",
+    "instruction_file",
+    "environment"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "benchmark"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "benchmark"
+        ],
+        "not": {
+          "required": [
+            "not_in_benchmark"
+          ]
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "benchmark"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "swebench"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "source"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "argv",
+        "timeout_seconds"
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpus": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "memory_mb": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": []
+    },
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "format": {
+          "enum": [
+            "tar",
+            "tar.gz",
+            "file"
+          ]
+        },
+        "files": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "required": [
+        "sha256",
+        "format"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "path"
+          ],
+          "not": {
+            "required": [
+              "url"
+            ]
+          }
+        },
+        {
+          "required": [
+            "url"
+          ],
+          "not": {
+            "required": [
+              "path"
+            ]
+          }
+        }
+      ]
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "material": {
+          "$ref": "#/$defs/material"
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "placement": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        }
+      },
+      "required": [
+        "id",
+        "material",
+        "target"
+      ]
+    },
+    "serviceExport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "handle": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visibility": {
+          "enum": [
+            "task",
+            "management"
+          ]
+        }
+      },
+      "required": [
+        "handle",
+        "path"
+      ]
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "placement": {
+          "enum": [
+            "task",
+            "companion"
+          ]
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[a-f0-9]{64}$"
+        },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "depends_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+          }
+        },
+        "readiness": {
+          "$ref": "#/$defs/command"
+        },
+        "finalize": {
+          "$ref": "#/$defs/command"
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        },
+        "exports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/serviceExport"
+          }
+        },
+        "mode": {
+          "enum": [
+            "daemon",
+            "oneshot"
+          ]
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "handoff_ports": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          }
+        }
+      },
+      "required": [
+        "id",
+        "placement",
+        "argv"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "placement": {
+                "const": "companion"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "image"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "image"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "oneshot"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "timeout_seconds"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "readiness"
+                  ]
+                },
+                {
+                  "required": [
+                    "finalize"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "readiness"
+            ],
+            "not": {
+              "required": [
+                "timeout_seconds"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "handoff_ports"
+            ]
+          },
+          "then": {
+            "properties": {
+              "placement": {
+                "const": "task"
+              },
+              "mode": {
+                "const": "daemon"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "container"
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[a-f0-9]{64}$"
+        },
+        "workdir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "patch": {
+          "enum": [
+            "git",
+            "not_applicable"
+          ]
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "ptrace"
+            ]
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/input"
+          }
+        },
+        "initialize": {
+          "$ref": "#/$defs/command"
+        },
+        "readiness": {
+          "$ref": "#/$defs/command"
+        },
+        "finalize": {
+          "$ref": "#/$defs/command"
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/service"
+          }
+        },
+        "variables": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "image",
+        "workdir",
+        "readiness"
+      ]
+    }
+  }
+}

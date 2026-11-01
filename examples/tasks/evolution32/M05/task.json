@@ -1,0 +1,69 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "permission-schema-migration",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "mechanism",
+    "instance_id": "permission-schema-migration",
+    "revision": "fd3e05a4a85d4a036d85cb316a7a4d3379fab2e542b8198f1c07c4a8cb896e45"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:48306e72f236b0979a3979b1b37af8373156affe2bf9a4ba7559c76faeba7410",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "d0244aa8327aee2827a90aa2aa148e290eeeea3b2affdd44bea038f04404a1c9",
+          "format": "file",
+          "files": {
+            "input": "d0244aa8327aee2827a90aa2aa148e290eeeea3b2affdd44bea038f04404a1c9"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m05-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "-c",
+        "import sys,sqlite3; assert sys.version_info[:2]==(3,12),sys.version; assert sqlite3.sqlite_version_info>=(3,35); import pathlib,subprocess; assert pathlib.Path('/workspace/public/TASK.md').is_file(); assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()=='858319bc9a9c974ab5a43dd1f8a8f9c8abea202b'"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/initialize.py",
+        "--bundle",
+        "/opt/task-inputs/initial.bundle",
+        "--revision",
+        "858319bc9a9c974ab5a43dd1f8a8f9c8abea202b",
+        "--workspace",
+        "/workspace"
+      ],
+      "timeout_seconds": 240
+    }
+  }
+}

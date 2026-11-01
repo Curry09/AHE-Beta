@@ -58,7 +58,9 @@ def test_repeated_pair_has_independent_clients_workspaces_feedback_and_recovery(
         directory = tmp_path / f"{ctx.session_id}-{ctx.attempt}"
         directory.mkdir()
         (directory / "owner").write_text(ctx.session_id)
-        return LocalWorkspaceRuntime(directory, owns_tmp=True)
+        return LocalWorkspaceRuntime(
+            directory, owns_tmp=True, evidence={"patch_capability": "not_applicable"}
+        )
 
     monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", provision)
 

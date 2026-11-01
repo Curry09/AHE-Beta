@@ -30,15 +30,12 @@ def _commands(path: str) -> list[str]:
 
 @pytest.mark.parametrize("backend", ["local", "e2b"])
 def test_public_batch_references_complete_offline_members_and_keeps_their_rounds(backend):
-    batch = load_batch_config(ROOT / f"examples/batches/n1-n4-{backend}.json")
+    batch = load_batch_config(ROOT / f"examples/batches/u1-u4-{backend}.json")
     assert batch["backend"] == backend
     assert batch["max_parallel_runs"] == 1
-    assert [entry["id"] for entry in batch["entries"]] == ["n1", "n4"]
+    assert [entry["id"] for entry in batch["entries"]] == ["u1", "u4"]
     for entry, users, rounds in zip(batch["entries"], [1, 4], [5, 2], strict=True):
-        assert (
-            Path(entry["config_path"])
-            == ROOT / f"examples/experiments/synthesizer-n{users}-{backend}.json"
-        )
+        assert Path(entry["config_path"]) == ROOT / f"examples/experiments/u{users}-{backend}.json"
         assert entry["config"]["runtime"]["backend"] == backend
         assert entry["config"]["rounds"] == {
             "count": rounds,
@@ -53,7 +50,7 @@ def test_public_batch_references_complete_offline_members_and_keeps_their_rounds
 def test_two_batch_examples_keep_member_semantics_identical_across_backends():
     members = []
     for backend in ("local", "e2b"):
-        batch = load_batch_config(ROOT / f"examples/batches/n1-n4-{backend}.json")
+        batch = load_batch_config(ROOT / f"examples/batches/u1-u4-{backend}.json")
         normalized = []
         for entry in batch["entries"]:
             config = deepcopy(entry["config"])

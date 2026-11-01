@@ -8,6 +8,7 @@ Orchestrator 只认 run_session_fn(persona, scenario, harness)（返回值不管
 
 from __future__ import annotations
 
+import base64
 import fcntl
 import hashlib
 import json
@@ -46,6 +47,7 @@ from auto_designer.user.sim.loop import SessionResult
 from auto_designer.user.sim.loop import run_session as sim_run_session
 from auto_designer.user.sim.persona_client import PersonaClient
 from auto_designer.user.sim.runtime import (
+    InvalidWorkspaceArtifact,
     ReviewSnapshot,
     Workspace,
     as_runtime,
@@ -57,6 +59,161 @@ from auto_designer.user.sim.workspace import materialize as materialize_workspac
 # 观测回调：(identity, sim_persona, 进行中/最终的 SessionResult, running, *, session_id) -> None。
 # session_id 仅收尾（running=False）时携带（session 已落 store），供看板归档关联全量会话。
 SimTurnHook = Callable[..., None]
+
+
+class EnvironmentInfrastructureError(RuntimeError):
+    """A completed Actor awaits infrastructure capture; no feedback may be published."""
+
+
+def _observation_binding(harness) -> dict | None:
+    source = getattr(harness, "observation_source", None)
+    if source is None:
+        return None
+    return {
+        "directory": source.directory,
+        "container_id": source.container_id,
+        "version": dict(source.version),
+        "expected": source.expected,
+        "run_id": source.run_id,
+    }
+
+
+def _actor_checkpoint_payload(
+    *, mode, persona, scenario, execution_contract, workspace, actor, observation
+):
+    binding = getattr(workspace, "collection_binding", None)
+    return {
+        "mode": mode,
+        "persona": persona.to_dict(),
+        "scenario": scenario.to_dict(),
+        "execution_contract": execution_contract,
+        "actor": actor,
+        "collection_binding": binding() if callable(binding) else None,
+        "workspace_present": workspace is not None,
+        "workspace_evidence": dict(getattr(workspace, "evidence", {}) or {}),
+        "observation": observation,
+    }
+
+
+def _capture_completed_actor(*, packet, store, session_id, provenance, observation_root, workspace):
+    """Reuse the original attempt or committed frozen bytes, never instantiate an Actor."""
+    payload = packet["payload"]
+    scenario = SeedScenario.from_dict(payload["scenario"])
+    if provenance and (
+        payload["mode"] != provenance["interaction"]
+        or payload["persona"]["identity"] != provenance["persona_id"]
+        or scenario.workspace is None
+        or any(
+            scenario.workspace.params.get(key) != provenance[key]
+            for key in ("task_id", "task_digest", "task_kind", "interaction")
+        )
+    ):
+        raise EnvironmentInfrastructureError("Actor checkpoint logical task binding differs")
+    evidence = dict(payload["workspace_evidence"])
+    binding = payload.get("collection_binding")
+    captured = store.load_actor_capture(session_id, expected_provenance=provenance)
+    if captured is not None:
+        value = captured["payload"]
+        snapshot = ReviewSnapshot(
+            {name: base64.b64decode(body, validate=True) for name, body in value["files"].items()},
+            patch=value["patch"],
+            omissions=value["omissions"],
+        )
+        evidence.update(value["evidence"])
+    else:
+        if workspace is None and payload["workspace_present"]:
+            if binding is None:
+                raise EnvironmentInfrastructureError(
+                    "Completed Actor has no recoverable task environment"
+                )
+            from auto_designer.user.sim.seed_source import resume_collection
+
+            workspace = resume_collection(
+                binding=binding,
+                expected_provenance={**provenance, "session_id": session_id},
+                spec=scenario.workspace,
+            )
+            workspace.evidence.update(evidence)
+        if workspace is not None:
+            workspace.evidence["collection_pending"] = True
+
+        def save_capture(snapshot):
+            store.stage_actor_capture(
+                session_id,
+                provenance=provenance,
+                payload={
+                    "files": {
+                        name: base64.b64encode(body).decode("ascii")
+                        for name, body in snapshot._files.items()
+                    },
+                    "patch": snapshot._patch,
+                    "omissions": snapshot.evidence["omissions"],
+                    "evidence": dict(evidence),
+                },
+            )
+
+        try:
+            snapshot = _freeze_actor_outputs(
+                workspace=workspace,
+                scenario=scenario,
+                store=store,
+                session_id=session_id,
+                provenance=provenance,
+                evidence=evidence,
+                capture_complete=save_capture,
+            )
+        except Exception as error:
+            store.record_actor_capture_failure(
+                session_id, provenance=provenance, evidence=evidence, error=type(error).__name__
+            )
+            raise
+    descriptor = payload.get("observation")
+    if descriptor is not None:
+        from auto_designer.observations.publication import ObservationSource, verify_published
+
+        source = ObservationSource(
+            **{key: descriptor[key] for key in ("directory", "container_id", "version", "expected")}
+        )
+        source.run_id = descriptor["run_id"]
+        previous = (
+            verify_published(
+                root=observation_root,
+                session_id=session_id,
+                run_id=source.run_id,
+                version=source.version,
+            )
+            if source.expected
+            else None
+        )
+        evidence["observation"] = previous or source.collect(
+            root=observation_root, session_id=session_id
+        )
+        if evidence["observation"].get("status") == "unavailable":
+            raise EnvironmentInfrastructureError(
+                "Completed Actor observation transport is unavailable"
+            )
+        if source.expected:
+            verified = verify_published(
+                root=observation_root,
+                session_id=session_id,
+                run_id=source.run_id,
+                version=source.version,
+            )
+            if verified is None:
+                raise EnvironmentInfrastructureError("Published Actor observation is missing")
+            evidence["observation"] = verified
+    if binding is not None:
+        from auto_designer.user.sim.seed_source import release_collection
+
+        release_collection(
+            binding=binding,
+            expected_provenance={**provenance, "session_id": session_id},
+            spec=scenario.workspace,
+        )
+        evidence.update(
+            environment_phase="closed", collection_pending=False, retained_for_observations=False
+        )
+    return snapshot, evidence
 
 
 def _audit_events(
@@ -152,12 +309,14 @@ def _collect_evaluation_artifacts(*, workspace, scenario, store, session_id, pro
 
 
 def _freeze_actor_outputs(
-    *, workspace, scenario, store, session_id, provenance, evidence
+    *, workspace, scenario, store, session_id, provenance, evidence, capture_complete
 ) -> ReviewSnapshot:
     """One actor output boundary for both modes; review never re-exports its own modifications."""
     if workspace is None:
         evidence["prediction_error"] = {"status": "unavailable", "reason": "no_workspace"}
-        return ReviewSnapshot({}, omissions=["no_workspace"])
+        snapshot = ReviewSnapshot({}, omissions=["no_workspace"])
+        capture_complete(snapshot)
+        return snapshot
     workspace = as_runtime(workspace)
     try:
         _collect_evaluation_artifacts(
@@ -173,10 +332,18 @@ def _freeze_actor_outputs(
                 "status": "unavailable",
                 "reason": "actor_not_quiescent",
             }
-            return ReviewSnapshot({}, omissions=["actor_not_quiescent"])
+            raise EnvironmentInfrastructureError("Actor quiesce or service finalization failed")
+        if any(
+            row["status"] == "collection_failed"
+            for row in evidence["evaluation_artifacts"]["entries"]
+        ):
+            raise EnvironmentInfrastructureError("Completed Actor artifact transport failed")
         patch, _ = _export_prediction(
             workspace=workspace, store=store, session_id=session_id, evidence=evidence
         )
+        invalid_git = evidence.get("prediction_error", {}).get("status") == "invalid_task_artifact"
+        if evidence.get("prediction_error") and not invalid_git:
+            raise EnvironmentInfrastructureError("Completed Actor patch preservation failed")
         files = {}
         for row in evidence["evaluation_artifacts"]["entries"]:
             if row["status"] == "collected":
@@ -184,8 +351,17 @@ def _freeze_actor_outputs(
                 if hashlib.sha256(data).hexdigest() != row["sha256"]:
                     raise ValueError("frozen artifact digest changed")
                 files[f"artifacts/{row['id']}"] = data
-        snapshot = capture_review_snapshot(workspace, patch=patch, files=files)
+        snapshot = (
+            ReviewSnapshot(files, omissions=["invalid_git_artifact"])
+            if invalid_git
+            else capture_review_snapshot(workspace, patch=patch, files=files)
+        )
+        if any(str(reason).startswith("files:") for reason in snapshot.evidence["omissions"]):
+            raise EnvironmentInfrastructureError("Completed Actor review listing transport failed")
         evidence["review_snapshot"] = dict(snapshot.evidence)
+        capture_complete(snapshot)
+        if not callable(getattr(workspace, "collection_binding", None)):
+            workspace.evidence["collection_pending"] = False
         return snapshot
     finally:
         workspace.close()
@@ -301,10 +477,30 @@ def _export_prediction(
     """Spec-0075/T1: export and preserve full bytes before session save/cleanup."""
     evidence.update(dict(getattr(workspace, "evidence", {}) or {}))
     evidence.pop("prediction", None)
+    if evidence.get("patch_capability") == "not_applicable":
+        # Spec-0081/T3: a file/service task has no synthetic empty Git prediction.
+        evidence["prediction_status"] = "not_applicable"
+        evidence.pop("prediction_error", None)
+        evidence.pop("patch_export_error", None)
+        return "", ""
     try:
         if evidence.get("diff_base_error"):
             raise RuntimeError("original patch base could not be captured")
         patch, patch_sha = workspace.export_patch()
+    except InvalidWorkspaceArtifact:
+        evidence["prediction_error"] = {
+            "status": "invalid_task_artifact",
+            "reason": "invalid_git_artifact",
+        }
+        for key in (
+            "diff_sha256",
+            "diff_bytes",
+            "patch_sha256",
+            "patch_bytes",
+            "patch_exported_at",
+        ):
+            evidence.pop(key, None)
+        return "", ""
     except Exception as exc:  # noqa: BLE001 - retain the session without a fake prediction
         evidence["patch_export_error"] = str(exc)
         evidence["prediction_error"] = {"status": "export_failed", "error_type": type(exc).__name__}
@@ -490,113 +686,13 @@ def make_sim_run_session_fn(
 
     prepare_observations(tracker=tracker, root=observation_root)
 
-    def run(
-        persona: Persona,
-        scenario: SeedScenario,
-        harness: HarnessInterface,
-        *,
-        workspace_dir: Workspace | None = None,
-    ) -> Session:
+    def save_result(packet, res, workspace_evidence):
+        payload = packet["payload"]
+        persona = Persona.from_dict(payload["persona"])
+        scenario = SeedScenario.from_dict(payload["scenario"])
         sim_persona = sim_personas[persona.identity]
-        # Spec-0064/T3: the staged orchestrator binds a stable operation id.
-        # Direct/legacy callers retain a random per-session identity.
-        bound_session_id = current_usage_context().session_id
-        session_id = bound_session_id or uuid.uuid4().hex
-        provenance = bound_session_provenance()
-        recovered = store.reconcile(session_id, expected_provenance=provenance)
-        if recovered is not None:
-            return _publish_reports(recovered, tracker=tracker, store=store)
-        client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
-
-        # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
-        # harness（SANDBOX_WORK_DIR）并把同一目录 workspace_dir 传到这里——两侧 cwd 同指一处，harness
-        # 改、用户 agent 同目录核实。这里复用传入目录绑定内层 client，不再自行 materialize。
-        # 兼容直连调用（不经 orchestrator）：未传 workspace_dir 但 scenario 带 workspace 时，回落自行
-        # materialize（等价 v1）。守卫式 bind_session：仅 AgenticPersonaClient 暴露，Scripted/Api 跳过。
-        ws = as_runtime(workspace_dir) if workspace_dir is not None else None
-        if ws is None and scenario.workspace is not None:
-            ws = as_runtime(materialize_workspace(scenario.workspace), owns_tmp=True)
-            # Spec-0009/T3：回落路径 materialize 后对称调 ensure_deps（与 orchestrator 主路径同构），
-            # 使这条生产接缝「建了工作区即备好依赖」，不静默缺依赖。orchestrator 已传 workspace_dir
-            # 的主路径依赖由 orchestrator 就位，故仅在此回落分支 ensure，不重复调。
-            ensure_deps(ws, scenario.workspace)
-        if ws is not None:
-            _freeze_prediction_base(ws)
-        if ws is not None and hasattr(client, "bind_session"):
-            client.bind_session(persona=sim_persona, workspace_dir=ws)
-
-        def progress(partial: SessionResult) -> None:
-            if on_turn is not None:
-                on_turn(
-                    persona.identity,
-                    sim_persona,
-                    partial,
-                    True,
-                    session_id=session_id if provenance else None,
-                )
-
-        connector = HarnessConnector(harness)
-        instance_id = None
-        if scenario.workspace is not None:
-            instance_id = scenario.workspace.params.get("instance_id")
-        round_no = (
-            round_provider() if round_provider is not None else current_usage_context().round_no
-        )
-        workspace_evidence: dict = {}
-        actor_closed = False
-
-        def freeze_before_review() -> None:
-            nonlocal actor_closed
-            if actor_closed:
-                return
-            actor_closed = True
-            connector.close()
-            source = getattr(harness, "observation_source", None)
-            if source is not None:
-                workspace_evidence["observation"] = source.collect(
-                    root=observation_root, session_id=session_id
-                )
-            snapshot = _freeze_actor_outputs(
-                workspace=ws,
-                scenario=scenario,
-                store=store,
-                session_id=session_id,
-                provenance=provenance,
-                evidence=workspace_evidence,
-            )
-            if hasattr(client, "bind_session"):
-                client.bind_session(persona=sim_persona, workspace_dir=snapshot)
-
-        with bind_usage_context(
-            session_id=session_id,
-            instance_id=instance_id,
-            role="user",
-            agent_id=f"user-{session_id}" if provenance else f"user-{persona.identity}",
-            round_no=round_no,
-            operation="persona",
-        ):
-            try:
-                connector.reset()
-                execution_contract = _execution_contract(
-                    session_id=session_id,
-                    scenario=scenario,
-                    provenance=provenance,
-                    harness=harness,
-                    direct=False,
-                )
-                res = sim_run_session(
-                    sim_persona,
-                    client,
-                    connector,
-                    scenario.description,
-                    help_text=connector.help_text,
-                    on_progress=progress,
-                    before_terminal_review=freeze_before_review,
-                )
-            finally:
-                freeze_before_review()
-        request_outcomes = [dict(row) for row in (getattr(harness, "request_outcomes", None) or [])]
-
+        session_id, provenance = packet["session_id"], packet["provenance"]
+        request_outcomes = payload["actor"]["request_outcomes"]
         # Spec-0083/T3: grading is private and happens only after collection.
         terminal_note = next(
             (
@@ -646,7 +742,7 @@ def make_sim_run_session_fn(
             transcript=Transcript(turns=result_to_turns(res)),
             feeling=None,
             feedback=feedback,
-            execution_contract=execution_contract,
+            execution_contract=payload["execution_contract"],
             execution_receipt={
                 "interaction_mode": "simulated_user",
                 "harness_messages": sum(t.role == "user" for t in result_to_turns(res)),
@@ -672,13 +768,176 @@ def make_sim_run_session_fn(
             on_turn(persona.identity, sim_persona, res, False, session_id=session.session_id)
         return session
 
+    def complete_actor(packet):
+        from auto_designer.user.sim.loop import resume_terminal_review
+
+        payload = packet["payload"]
+        persona = Persona.from_dict(payload["persona"])
+        sim_persona = sim_personas[persona.identity]
+        snapshot, workspace_evidence = _capture_completed_actor(
+            packet=packet,
+            store=store,
+            session_id=packet["session_id"],
+            provenance=packet["provenance"],
+            observation_root=observation_root,
+            workspace=None,
+        )
+        client = client_factory()
+        if hasattr(client, "bind_session"):
+            client.bind_session(persona=sim_persona, workspace_dir=snapshot)
+        with bind_usage_context(
+            session_id=packet["session_id"], role="user", operation="terminal_review"
+        ):
+            res = resume_terminal_review(
+                persona=sim_persona, client=client, checkpoint=payload["actor"]["terminal"]
+            )
+        return save_result(packet, res, workspace_evidence)
+
+    def run(
+        persona: Persona,
+        scenario: SeedScenario,
+        harness: HarnessInterface,
+        *,
+        workspace_dir: Workspace | None = None,
+    ) -> Session:
+        sim_persona = sim_personas[persona.identity]
+        # Spec-0064/T3: the staged orchestrator binds a stable operation id.
+        # Direct/legacy callers retain a random per-session identity.
+        bound_session_id = current_usage_context().session_id
+        session_id = bound_session_id or uuid.uuid4().hex
+        provenance = bound_session_provenance()
+        recovered = store.reconcile(session_id, expected_provenance=provenance)
+        if recovered is not None:
+            return _publish_reports(recovered, tracker=tracker, store=store)
+        pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
+        if pending is not None:
+            return complete_actor(pending)
+        client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
+
+        # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
+        # harness（SANDBOX_WORK_DIR）并把同一目录 workspace_dir 传到这里——两侧 cwd 同指一处，harness
+        # 改、用户 agent 同目录核实。这里复用传入目录绑定内层 client，不再自行 materialize。
+        # 兼容直连调用（不经 orchestrator）：未传 workspace_dir 但 scenario 带 workspace 时，回落自行
+        # materialize（等价 v1）。守卫式 bind_session：仅 AgenticPersonaClient 暴露，Scripted/Api 跳过。
+        ws = as_runtime(workspace_dir) if workspace_dir is not None else None
+        if ws is None and scenario.workspace is not None:
+            ws = as_runtime(materialize_workspace(scenario.workspace), owns_tmp=True)
+            # Spec-0009/T3：回落路径 materialize 后对称调 ensure_deps（与 orchestrator 主路径同构），
+            # 使这条生产接缝「建了工作区即备好依赖」，不静默缺依赖。orchestrator 已传 workspace_dir
+            # 的主路径依赖由 orchestrator 就位，故仅在此回落分支 ensure，不重复调。
+            ensure_deps(ws, scenario.workspace)
+        if ws is not None:
+            _freeze_prediction_base(ws)
+        if ws is not None and hasattr(client, "bind_session"):
+            client.bind_session(persona=sim_persona, workspace_dir=ws)
+
+        def progress(partial: SessionResult) -> None:
+            if on_turn is not None:
+                on_turn(
+                    persona.identity,
+                    sim_persona,
+                    partial,
+                    True,
+                    session_id=session_id if provenance else None,
+                )
+
+        connector = HarnessConnector(harness)
+        instance_id = None
+        if scenario.workspace is not None:
+            instance_id = scenario.workspace.params.get("instance_id")
+        round_no = (
+            round_provider() if round_provider is not None else current_usage_context().round_no
+        )
+        workspace_evidence: dict = {}
+        actor_closed = False
+        packet = None
+
+        def stage_actor(terminal):
+            nonlocal packet
+            packet = store.stage_actor(
+                session_id,
+                provenance=provenance,
+                payload=_actor_checkpoint_payload(
+                    mode="simulated_user",
+                    persona=persona,
+                    scenario=scenario,
+                    execution_contract=execution_contract,
+                    workspace=ws,
+                    actor={
+                        "terminal": terminal,
+                        "request_outcomes": [
+                            dict(row) for row in (getattr(harness, "request_outcomes", None) or [])
+                        ],
+                    },
+                    observation=_observation_binding(harness),
+                ),
+            )
+
+        def freeze_before_review() -> None:
+            nonlocal actor_closed, workspace_evidence
+            if actor_closed:
+                return
+            actor_closed = True
+            connector.close()
+            if packet is None:
+                if ws is not None:
+                    ws.close()
+                return
+            snapshot, workspace_evidence = _capture_completed_actor(
+                packet=packet,
+                store=store,
+                session_id=session_id,
+                provenance=provenance,
+                observation_root=observation_root,
+                workspace=ws,
+            )
+            if hasattr(client, "bind_session"):
+                client.bind_session(persona=sim_persona, workspace_dir=snapshot)
+
+        with bind_usage_context(
+            session_id=session_id,
+            instance_id=instance_id,
+            role="user",
+            agent_id=f"user-{session_id}" if provenance else f"user-{persona.identity}",
+            round_no=round_no,
+            operation="persona",
+        ):
+            try:
+                connector.reset()
+                execution_contract = _execution_contract(
+                    session_id=session_id,
+                    scenario=scenario,
+                    provenance=provenance,
+                    harness=harness,
+                    direct=False,
+                )
+                res = sim_run_session(
+                    sim_persona,
+                    client,
+                    connector,
+                    scenario.description,
+                    help_text=connector.help_text,
+                    on_progress=progress,
+                    before_terminal_review=freeze_before_review,
+                    on_actor_complete=stage_actor,
+                )
+            finally:
+                freeze_before_review()
+        return save_result(packet, res, workspace_evidence)
+
     # The orchestrator uses this read path to reconcile a crash after SessionStore
     # committed but before the recovery completion marker was published.
     def load_completed_session(session_id):
-        session = store.reconcile(session_id, expected_provenance=bound_session_provenance())
-        return (
-            _publish_reports(session, tracker=tracker, store=store) if session is not None else None
-        )
+        provenance = bound_session_provenance()
+        session = store.reconcile(session_id, expected_provenance=provenance)
+        if session is not None:
+            return _publish_reports(session, tracker=tracker, store=store)
+        pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
+        if pending is None:
+            return None
+        if pending["payload"]["mode"] != "simulated_user":
+            raise EnvironmentInfrastructureError("Actor checkpoint interaction mode differs")
+        return complete_actor(pending)
 
     run.load_completed_session = load_completed_session
     return run
@@ -741,68 +1000,31 @@ def make_direct_run_session_fn(
 
     prepare_observations(tracker=tracker, root=observation_root)
 
-    def run(
-        persona: Persona,
-        scenario: SeedScenario,
-        harness: HarnessInterface,
-        *,
-        workspace_dir: Workspace | None = None,
-    ) -> Session:
+    def complete_actor(packet, workspace):
         from auto_designer.user.sim.persona_client import drain_call_traces
         from auto_designer.user.sim.prompt import build_direct_review_turn, build_system
 
+        payload = packet["payload"]
+        actor = payload["actor"]
+        persona = Persona.from_dict(payload["persona"])
+        scenario = SeedScenario.from_dict(payload["scenario"])
         params = dict((scenario.workspace.params if scenario.workspace else {}) or {})
         task_key = str(params.get("task_key") or persona.identity or "direct-task")
-        session_id = current_usage_context().session_id or uuid.uuid4().hex
-        provenance = bound_session_provenance()
-        recovered = store.reconcile(session_id, expected_provenance=provenance)
-        if recovered is not None:
-            return _publish_reports(recovered, tracker=tracker, store=store)
-        connector = HarnessConnector(harness)
-        round_no = round_provider() if round_provider else current_usage_context().round_no
-        reply = ""
-        harness_error = None
-        workspace_evidence: dict = {}
-        if workspace_dir is not None:
-            _freeze_prediction_base(as_runtime(workspace_dir))
-        execution_contract = _execution_contract(
-            session_id=session_id,
-            scenario=scenario,
-            provenance=provenance,
-            harness=harness,
-            direct=True,
+        session_id = packet["session_id"]
+        provenance = packet["provenance"]
+        round_no = provenance.get("round_no") or (
+            round_provider() if round_provider else current_usage_context().round_no
         )
-        try:
-            connector.reset()
-            bind = getattr(harness, "bind_execution_contract", None)
-            if callable(bind):
-                bind(execution_contract)
-            with bind_usage_context(
-                session_id=session_id,
-                instance_id=params.get("task_id") or task_key,
-                role="direct",
-                agent_id=f"direct-{task_key}",
-                round_no=round_no,
-            ):
-                reply = connector.send(scenario.description)
-        except Exception as exc:  # noqa: BLE001 - retain actor failures independently of review
-            harness_error = str(exc)
-            reply = f"[harness error] {harness_error}"
-        finally:
-            execution_record, harness_steps = _direct_execution_record(harness)
-            connector.close()
-            source = getattr(harness, "observation_source", None)
-            if source is not None:
-                workspace_evidence["observation"] = source.collect(
-                    root=observation_root, session_id=session_id
-                )
-        snapshot = _freeze_actor_outputs(
-            workspace=workspace_dir,
-            scenario=scenario,
+        reply, harness_error = actor["reply"], actor["harness_error"]
+        execution_record, harness_steps = actor["execution_record"], actor["harness_steps"]
+        execution_contract = payload["execution_contract"]
+        snapshot, workspace_evidence = _capture_completed_actor(
+            packet=packet,
             store=store,
             session_id=session_id,
             provenance=provenance,
-            evidence=workspace_evidence,
+            observation_root=observation_root,
+            workspace=workspace,
         )
         review_error = None
         review: dict = {}
@@ -935,22 +1157,98 @@ def make_direct_run_session_fn(
                 **({"error": harness_error} if harness_error else {}),
                 **({"review_error": review_error} if review_error else {}),
             },
-            request_outcomes=list(getattr(harness, "request_outcomes", []) or []),
+            request_outcomes=list(actor["request_outcomes"]),
             workspace_evidence=workspace_evidence,
             accept_validity="not_applicable",
             audit_events=_audit_events(
                 workspace_evidence=workspace_evidence,
-                request_outcomes=list(getattr(harness, "request_outcomes", []) or []),
+                request_outcomes=list(actor["request_outcomes"]),
             ),
         )
         validate_session_provenance(session, provenance)
         return _save_and_publish(session, tracker=tracker, store=store)
 
-    def load_completed_session(session_id):
-        session = store.reconcile(session_id, expected_provenance=bound_session_provenance())
-        return (
-            _publish_reports(session, tracker=tracker, store=store) if session is not None else None
+    def run(
+        persona: Persona,
+        scenario: SeedScenario,
+        harness: HarnessInterface,
+        *,
+        workspace_dir: Workspace | None = None,
+    ) -> Session:
+        params = dict((scenario.workspace.params if scenario.workspace else {}) or {})
+        task_key = str(params.get("task_key") or persona.identity or "direct-task")
+        session_id = current_usage_context().session_id or uuid.uuid4().hex
+        provenance = bound_session_provenance()
+        recovered = store.reconcile(session_id, expected_provenance=provenance)
+        if recovered is not None:
+            return _publish_reports(recovered, tracker=tracker, store=store)
+        pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
+        if pending is not None:
+            return complete_actor(pending, None)
+        connector = HarnessConnector(harness)
+        round_no = round_provider() if round_provider else current_usage_context().round_no
+        reply = ""
+        harness_error = None
+        if workspace_dir is not None:
+            _freeze_prediction_base(as_runtime(workspace_dir))
+        execution_contract = _execution_contract(
+            session_id=session_id,
+            scenario=scenario,
+            provenance=provenance,
+            harness=harness,
+            direct=True,
         )
+        try:
+            connector.reset()
+            bind = getattr(harness, "bind_execution_contract", None)
+            if callable(bind):
+                bind(execution_contract)
+            with bind_usage_context(
+                session_id=session_id,
+                instance_id=params.get("task_id") or task_key,
+                role="direct",
+                agent_id=f"direct-{task_key}",
+                round_no=round_no,
+            ):
+                reply = connector.send(scenario.description)
+        except Exception as exc:  # noqa: BLE001 - retain actor failures independently of review
+            harness_error = str(exc)
+            reply = f"[harness error] {harness_error}"
+        finally:
+            execution_record, harness_steps = _direct_execution_record(harness)
+            packet = store.stage_actor(
+                session_id,
+                provenance=provenance,
+                payload=_actor_checkpoint_payload(
+                    mode="direct",
+                    persona=persona,
+                    scenario=scenario,
+                    execution_contract=execution_contract,
+                    workspace=workspace_dir,
+                    actor={
+                        "reply": reply,
+                        "harness_error": harness_error,
+                        "execution_record": execution_record,
+                        "harness_steps": harness_steps,
+                        "request_outcomes": list(getattr(harness, "request_outcomes", []) or []),
+                    },
+                    observation=_observation_binding(harness),
+                ),
+            )
+            connector.close()
+        return complete_actor(packet, workspace_dir)
+
+    def load_completed_session(session_id):
+        provenance = bound_session_provenance()
+        session = store.reconcile(session_id, expected_provenance=provenance)
+        if session is not None:
+            return _publish_reports(session, tracker=tracker, store=store)
+        pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
+        if pending is None:
+            return None
+        if pending["payload"]["mode"] != "direct":
+            raise EnvironmentInfrastructureError("Actor checkpoint interaction mode differs")
+        return complete_actor(pending, None)
 
     run.load_completed_session = load_completed_session
     return run
@@ -997,5 +1295,14 @@ def make_mixed_run_session_fn(
             raise ValueError(f"unsupported interaction mode: {mode}")
         return simulated(persona, scenario, harness, workspace_dir=workspace_dir)
 
-    run.load_completed_session = simulated.load_completed_session
+    def load_completed_session(session_id):
+        packet = store.load_actor_checkpoint(
+            session_id, expected_provenance=bound_session_provenance()
+        )
+        chosen = (
+            direct if packet is not None and packet["payload"]["mode"] == "direct" else simulated
+        )
+        return chosen.load_completed_session(session_id)
+
+    run.load_completed_session = load_completed_session
     return run

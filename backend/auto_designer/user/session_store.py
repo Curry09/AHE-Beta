@@ -12,6 +12,7 @@ import json
 import os
 import re
 import threading
+import uuid
 from pathlib import Path
 
 from auto_designer.models import Session, bound_session_provenance, validate_session_provenance
@@ -108,6 +109,115 @@ class SessionStore:
                     entries.append(expected)
                     _atomic_json(self._root / _INDEX_NAME, entries)
                 return session
+
+    def stage_actor(self, session_id: str, *, provenance: dict, payload: dict) -> dict:
+        """Keep completed Actor output separate from complete, publishable Sessions."""
+        return self._stage_actor_part(
+            session_id=session_id, part="actor", provenance=provenance, payload=payload
+        )
+
+    def stage_actor_capture(self, session_id: str, *, provenance: dict, payload: dict) -> dict:
+        """Commit immutable frozen bytes before cleanup or any terminal reviewer call."""
+        if self.load_actor_checkpoint(session_id, expected_provenance=provenance) is None:
+            raise SessionConflictError("Actor capture has no completed Actor checkpoint")
+        return self._stage_actor_part(
+            session_id=session_id, part="capture", provenance=provenance, payload=payload
+        )
+
+    def load_actor_checkpoint(
+        self, session_id: str, *, expected_provenance: dict | None = None
+    ) -> dict | None:
+        return self._load_actor_part(
+            session_id=session_id, part="actor", expected_provenance=expected_provenance
+        )
+
+    def load_actor_capture(
+        self, session_id: str, *, expected_provenance: dict | None = None
+    ) -> dict | None:
+        return self._load_actor_part(
+            session_id=session_id, part="capture", expected_provenance=expected_provenance
+        )
+
+    def record_actor_capture_failure(
+        self, session_id: str, *, provenance: dict, evidence: dict, error: str
+    ) -> None:
+        """Diagnostic attempts are not complete Sessions and never enter the feedback index."""
+        if self.load_actor_checkpoint(session_id, expected_provenance=provenance) is None:
+            raise SessionConflictError("Capture failure has no completed Actor")
+        directory = self._root / "actor-checkpoints" / f"{session_id}.failures"
+        if any(path.is_symlink() for path in (directory, *directory.parents)):
+            raise SessionConflictError("Linked Actor capture diagnostics")
+        directory.mkdir(mode=0o700, exist_ok=True)
+        path = directory / f"{uuid.uuid4().hex}.json"
+        _atomic_json(
+            path,
+            {
+                "session_id": session_id,
+                "provenance": provenance,
+                "error": error,
+                "evidence": {
+                    key: evidence[key]
+                    for key in (
+                        "actor_freeze",
+                        "evaluation_artifacts",
+                        "prediction_error",
+                        "review_snapshot",
+                    )
+                    if key in evidence
+                },
+            },
+        )
+        path.chmod(0o600)
+
+    def _stage_actor_part(self, *, session_id: str, part: str, provenance: dict, payload: dict):
+        from auto_designer.execution_contract import canonical_sha256
+
+        _validate_session_id(session_id)
+        packet = {
+            "version": 1,
+            "session_id": session_id,
+            "provenance": dict(provenance),
+            "payload": payload,
+            "sha256": canonical_sha256(payload),
+        }
+        with self._lock:
+            directory = self._root / "actor-checkpoints"
+            if any(path.is_symlink() for path in (directory, *directory.parents)):
+                raise SessionConflictError("Linked Actor checkpoint directory")
+            directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+            path = directory / f"{session_id}.{part}.json"
+            with (directory / ".lock").open("a+b") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                if path.exists():
+                    existing = self._load_actor_part(
+                        session_id=session_id, part=part, expected_provenance=provenance
+                    )
+                    if existing != packet:
+                        raise SessionConflictError("Completed Actor checkpoint content changed")
+                    return existing
+                _atomic_json(path, packet)
+                path.chmod(0o600)
+        return packet
+
+    def _load_actor_part(self, *, session_id: str, part: str, expected_provenance):
+        from auto_designer.execution_contract import canonical_sha256
+
+        _validate_session_id(session_id)
+        path = self._root / "actor-checkpoints" / f"{session_id}.{part}.json"
+        if any(item.is_symlink() for item in (path, *path.parents)):
+            raise SessionConflictError("Linked Actor checkpoint")
+        if not path.exists():
+            return None
+        packet = json.loads(path.read_text())
+        if (
+            packet.get("version") != 1
+            or packet.get("session_id") != session_id
+            or packet.get("sha256") != canonical_sha256(packet.get("payload"))
+            or expected_provenance is not None
+            and packet.get("provenance") != expected_provenance
+        ):
+            raise SessionConflictError("Actor checkpoint identity or digest mismatch")
+        return packet
 
     def find_session_id_by_issue(self, issue_number: int) -> str | None:
         """Resolve an issue to its session, repairing a stale/missing index.

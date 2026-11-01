@@ -65,6 +65,28 @@ def provision(spec: WorkspaceSpec, dest_root: str | None = None) -> Workspace:
     return get_source(spec.kind).provision(spec, dest_root)
 
 
+def resume_collection(
+    *, binding: dict, expected_provenance: dict, spec: WorkspaceSpec
+) -> Workspace:
+    """Dispatch recovery through the same frozen source registry, without provisioning an Actor."""
+    resume = getattr(get_source(binding.get("kind")), "resume_collection", None)
+    if not callable(resume):
+        raise ValueError("This workspace source has no completed-Actor collection recovery")
+    if binding["kind"] != spec.kind:
+        raise ValueError("Collection recovery source differs from its frozen workspace")
+    return resume(binding=binding, expected_provenance=expected_provenance, spec=spec)
+
+
+def release_collection(*, binding: dict, expected_provenance: dict, spec: WorkspaceSpec) -> None:
+    """Release only a source's already-frozen original resources."""
+    release = getattr(get_source(binding.get("kind")), "release_collection", None)
+    if not callable(release):
+        raise ValueError("This workspace source has no frozen collection release capability")
+    if binding["kind"] != spec.kind:
+        raise ValueError("Collection release source differs from its frozen workspace")
+    release(binding=binding, expected_provenance=expected_provenance, spec=spec)
+
+
 def _discover() -> None:
     """import 期遍历 sources/ 子包逐一 import，触发各 source 的 @register 自注册。"""
     from auto_designer.user.sim import sources as _sources_pkg

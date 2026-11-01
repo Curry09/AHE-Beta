@@ -2,23 +2,25 @@
 
 English | [简体中文](CONFIGURATION.zh-CN.md)
 
-New experiments use JSON with `schema_version: 2` and the unified entry described in [Quickstart](QUICKSTART.md). Copy either [local](../examples/experiments/synthesizer-n1-local.json) or [E2B](../examples/experiments/synthesizer-n1-e2b.json) example. Unknown fields are rejected; old evaluation schemas and v1 lifecycle commands are rejected before provider operations.
+New experiments use JSON with `schema_version: 2` and the unified entry described in [Quickstart](QUICKSTART.md). Copy either [local](../examples/experiments/u1-local.json) or [E2B](../examples/experiments/u1-e2b.json) example. Unknown fields are rejected; old evaluation schemas and v1 lifecycle commands are rejected before provider operations.
 
 ## Files you supply
 
 | Input | Format | Example |
 | --- | --- | --- |
-| Experiment | v2 JSON: backend, Harness, workload, rounds, roles, models | `examples/experiments/synthesizer-n1-local.json` |
-| Task | v1/v2 JSON: instruction, source, setup, dependencies; v2 adds execution/artifact declarations | `examples/tasks/pvlib-1478/task.json` |
+| Experiment | v2 JSON: backend, Harness, workload, rounds, roles, models | `examples/experiments/u1-local.json` |
+| Task | v1/v2 source/setup recipes, or v3 container environments with fixed inputs/services and artifact declarations | `examples/tasks/pvlib-1478/task.json`; `examples/tasks/evolution32/*/task.json` |
 | Instruction | UTF-8 task text, without a solution or hidden tests | `examples/tasks/pvlib-1478/instruction.md` |
 | Setup | Trusted shell script; creates the isolated task environment | `examples/tasks/pvlib-1478/setup.sh` |
 | Task dependencies | Fully pinned requirements with SHA-256 hashes | `examples/tasks/pvlib-1478/requirements.lock` |
-| Personas | JSON array following the repository persona schema | `examples/personas/n1.json` |
+| Personas | JSON array following the repository persona schema | `examples/personas/u1.json` |
 | Credentials | Explicit environment variables or a mode-0600 env file | `examples/experiment.env.example` |
 
-The N1 example uses `examples/personas/n1.json`. N4 uses four real cards from the maintained `examples/personas/library.json`. Select unique IDs present in the library. A persona card may be reused across multiple independent sessions in the same round.
+The U1 example uses `examples/personas/u1.json`. U4 uses four real cards from the maintained `examples/personas/library.json`. Select unique IDs present in the library. A persona card may be reused across multiple independent sessions in the same round.
 
 Paths in the experiment are relative to that JSON; task paths are relative to the task package. `check --offline` shows an unfrozen allocation preview without fetching Git. `prepare` freezes each task's package, instruction, setup, dependency lock and verified source archive, then creates `materials/task-catalog.json`, `materials/session-plan.json`, the persona roster, Harness archive and hash manifest. You do not need to handcraft these.
+
+Container task packages freeze their declared input hashes, image digests, environment recipe and artifact contract instead of requiring a synthetic Python setup/venv. Remote inputs not already cached remain pending during offline checks; preparation must verify their actual bytes before publishing a prepared run.
 
 ## Experiment fields
 
@@ -40,13 +42,19 @@ Paths in the experiment are relative to that JSON; task paths are relative to th
 | `evaluation.session_grading` | Optional external per-round assessment; frozen plan/key digests and `runner: external` |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
-Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The N=1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round runs users and any configured independent assessment, with no requirements or delivery stage.
+Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The U1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round runs users and any configured independent assessment, with no requirements or delivery stage.
 
 `builtin` freezes this checkout's `backend/harness_template/`. It is not the historical `cade14d` Harness. To reproduce that baseline, supply its actual archive and checksum explicitly.
 
+### Six-round study configurations
+
+The [E2B tutorial](tutorials/evolution32.md) provides U8 mixed/direct, U16 mixed and U32 mixed configurations using the first eight, first sixteen or all thirty-two tasks in [evolution32](../examples/tasks/evolution32/README.md). All use experiment schema 2, the current builtin seed, six rounds, 4 CPU/8192 MiB and explicit user/Developer concurrency four. Their Triager counts are 4/4/8/16; Synthesizer and Divergent are one each, Owner is mechanical and grouping is false. R6 only runs users and any configured assessment; these examples leave official grading unconfigured.
+
+Original task/persona bindings remain fixed while each round rotates the execution list by one slot within its selected subset. `persona_ids` contains unique IDs, but the six round arrays in `interaction_plan` reuse them across separate slots. Original direct tasks use `sr-15-swyx` for terminal feedback, not simulated interaction. U8 direct overrides only the six original simulated tasks by their actual task IDs in `workload.interaction_overrides`; it does not edit shared task files or change persona assignments. Unknown override IDs are rejected. Models are public replaceable IDs: User/Harness `glm-5.3-flash`, demand/delivery `glm-5.3`; credentials remain env references.
+
 ### Task deadlines and message activity
 
-Declare the task's total budget in its v2 task package:
+Declare the task's total budget in its v2/v3 task package:
 
 ```json
 "execution": {
@@ -132,6 +140,8 @@ Preflight requires input threshold + reserved output + headroom <= declared capa
 
 This is static validation, not proof of the provider's token counting or dynamic compression. Without declared capacity the report says `unverified`; names do not imply capacity. Deterministic context-limit failures are classified separately rather than retried unchanged as transient errors.
 
+The current User client, builtin Harness seed and demand definitions actually request 32768 output tokens; the four study examples do not add a 128k override or another model budget. Inspect each evolved Harness version for its actual parameters. Claude Code delivery has a separate client/provider output policy. User and builtin Harness apply configured input-threshold overrides; demand roles currently keep their YAML input threshold of 256000, so a demand `limits` declaration is a static capacity check rather than a runtime YAML override.
+
 ## Per-round objective assessment
 
 Preparation uses the immutable execution-evidence reader candidate recorded in `release/compatibility.json` (`57eac90a5702022c1ed2452b5b2b9918c235df39`). You can override `source.openagents` with another compatible immutable revision. The candidate is published for review; `reader_release_commit` remains unset until the paired change is reviewed and merged. An old transport-only revision is insufficient.
@@ -153,6 +163,10 @@ Each round, including the final user-only round, seals Actor outputs before asse
 Private plans, tests, answers and keys stay at operator-provided paths on the trusted host; worker execution copies and detailed verifier outputs stay under the run's `evaluation/online` area. Neither enters experiment collection or demand-role evidence. The online path accepts reproducible workspace artifacts; profiles requiring managed-service measurements or the original live environment are rejected. Assessment informs later correction without automatically rejecting or rolling back a delivered Harness. Local engineering CI and independent held-out Harness evaluation remain separate.
 
 ## Task package
+
+Task-package versions are independent of the experiment's schema 2. The evolution32 collection uses schema 3 with `environment.kind: container`. Its fixed image digest and workdir, SHA-256-bound inputs, initialization/readiness/finalization commands, finite task/companion services and declared capabilities form the environment recipe. See the [task catalog](../examples/tasks/evolution32/README.md) for complete definitions rather than copying an old launcher.
+
+Services are fixture processes, not model Agents. Inputs may belong to the task container or an explicitly declared companion; management-only service outputs are not exposed as Actor inputs. Files and public service handles use the common `artifacts` contract. Non-Git tasks declare patch capture not applicable; SWE tasks retain real repository/revision metadata. Environment or capture failures are infrastructure failures, not fabricated negative user feedback. The environment driver does not perform official scoring.
 
 The public example contains:
 
@@ -181,11 +195,15 @@ Setup runs in the task checkout with `TASK_ROOT`, `TASK_PYTHON`, `REQUIREMENTS_L
 
 Local execution starts per-experiment Gitea and an egress proxy, then owned Vigil and user-session containers. Gitea's host port is dynamically allocated on loopback; status reports its actual URL. Model domains/ports come from the explicit endpoints. Engineering CI is optional and disabled by default; disabled runs create no runner.
 
-E2B runs the controller and delivery processes inside one sandbox without nested Docker. Task directories are isolated within that sandbox; this differs from local per-session container isolation. Actual CPU, memory, template/build identity and expiry are checked and recorded. The default example requests 4 CPUs and 8192 MiB. Model usage and cloud runtime determine cost and duration.
+E2B runs the controller and delivery processes inside one sandbox. Existing v1/v2 source recipes retain their directory/workspace behavior; v3 container tasks use the sandbox's verified Docker daemon to create separate task containers and owned service networks for each attempt. They do not run the Actor on the controller's filesystem. Actual CPU, memory, Docker/image capabilities, template/build identity and expiry are checked and recorded. The default examples request 4 CPUs and 8192 MiB. Model usage and cloud runtime determine cost and duration.
+
+Preparation verifies frozen material hashes before uploading files as binary streams. Transfer I/O waits scale with file size; they do not impose a strict whole-transfer deadline or modify task/model budgets. File-scoped upload signatures are excluded from progress, transport logs and reported errors.
 
 Local evidence uses the negotiated gzip/direct transport; Gitea.com uses ZIP and constrained R2 downloads. Preflight checks the actual pinned OpenAgents reader, disables self-update, and verifies publishing and reading before the user experiment. Original self-hosted gzip handles remain supported.
 
 Frozen `manifest.json` describes inputs. Mutable `runtime.json` and provider/controller receipts describe observations. The three state axes are independent: experiment `COMPLETED` can coexist with resources `DESTROYED` and collection `COMPLETE`. An unreachable provider is an unknown observation, not proof of completion. Resume requires the original identity, repository, resources and recovery data. Normal completion releases dedicated compute only after complete collection; stopping E2B processes alone does not release its sandbox.
+
+The single-run background monitor runs on the management machine and collects periodically; the cloud supervisor runs the controller independently. Neither currently renews the E2B creation lease. The example's `timeout_seconds: 86400` is not unlimited lifetime, and a six-round job may exceed it. Status retains actual `expires_at`; a provider-paused instance needs explicit recovery, and an expired/deleted one is LOST. CLI `resume` does not silently replace or provider-resume such an instance. Keep collection available and retain verified archives.
 
 Use global `--runs-dir /absolute/path/runs` before the command to select another run root. Always use the same root for subsequent management. Editing the original JSON or source checkout after preparation does not change an existing run. For a changed experiment, prepare a new run.
 
@@ -199,7 +217,7 @@ Optional `policies` control execution. `prepare` fills defaults and freezes them
 
 | Field | Default and behavior |
 | --- | --- |
-| `policies.synthesizer_grouping` | `false`; `true` enables existing grouped scheduling, including N1 |
+| `policies.synthesizer_grouping` | `false`; `true` enables existing grouped scheduling, including U1 |
 | `models.user.reasoning_effort`, `models.demand.reasoning_effort` | Optional, e.g. `high`; passed to the user client/shared demand roles. The provider must support the chosen value |
 | `policies.timing.latency_isolated` | `false`; excludes instrumented provider waits from demand role execution budgets |
 | `policies.timing.wall_guard_seconds` | Additional grace seconds; `0` retains the existing 600-second default. With isolation, the wall cap is role budget plus grace; positive values override the grace |
@@ -243,7 +261,7 @@ The plan validates every round's session count and selected persona/task IDs. Th
 
 `experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-These settings, interactions and dashboard binding are migrated. Optional local engineering CI is described below; current archive continuation is described in the [append-round tutorial](tutorials/experiment-continuation.md). Seed libraries and text instructions now convert to ordinary packages as described below. Independent post-run grading remains available. Optional per-round grading uses the external-worker contract above. Multi-task/N4/N8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+These settings, interactions and dashboard binding are migrated. Optional local engineering CI is described below; current archive continuation is described in the [append-round tutorial](tutorials/experiment-continuation.md). Seed libraries and text instructions now convert to ordinary packages as described below. Independent post-run grading remains available. Optional per-round grading uses the external-worker contract above. Multi-task/U4/U8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
 
 ## Local engineering CI
 
@@ -272,7 +290,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --json 
 uv run --locked --extra experiments python backend/scripts/experiment.py --json task from-text --instruction examples/seed-inputs/instruction.md --id weekly-notes --output /absolute/path/to/new-text-task --not-in-benchmark
 ```
 
-The result's `task_packages` is an absolute path array: assign it to `workload.task_packages` after removing `kind`, `task_package` and any obsolete `interaction_plan`. The generated `tasks.json` only indexes relative paths from the output directory; it is not a runnable experiment or a replacement for that array. When copying an experiment JSON, also resolve its relative persona/Harness paths from the original JSON directory. The [complete import tutorial](tutorials/seed-task-import.md) provides exact Python commands for both maintained N1 backend templates and offline checks.
+The result's `task_packages` is an absolute path array: assign it to `workload.task_packages` after removing `kind`, `task_package` and any obsolete `interaction_plan`. The generated `tasks.json` only indexes relative paths from the output directory; it is not a runnable experiment or a replacement for that array. When copying an experiment JSON, also resolve its relative persona/Harness paths from the original JSON directory. The [complete import tutorial](tutorials/seed-task-import.md) provides exact Python commands for both maintained U1 backend templates and offline checks.
 
 Cards without repositories and text instructions use a local scratch source directory with an initial README, containing no solution. Repository cards accept an owner/repo identifier resolved to GitHub HTTPS or a credential-free HTTPS URL, with an immutable 40-character lowercase SHA. The importer preserves prompt/source/setup mappings but does not copy oracle, env.test_cmd, gates or provenance into materials or sidecars. Old setup dependencies are not automatically locked, and old images/external services are not restored. Review the generated setup and requirements before preparation. Importing or offline checking is not proof of task success or a reproducible historical environment. Experiments still run through check/prepare/run.
 
@@ -282,20 +300,20 @@ Use `workload.task_packages` for new multi-task definitions. It is mutually excl
 
 `runtime.local.seed_image` remains a single-task override and is rejected when more than one task package is selected. Automatic per-task image building handles mixed tasks. Local sessions use independent containers; E2B copies each task's pure baseline source and recreates its venv at the final session directory. Download/wheel caches may be shared, writable repos and installed environments are not. E2B's single Unix user does not provide malicious cross-directory isolation equivalent to Docker.
 
-See [the complete N4 tutorial](tutorials/multi-user-experiment.md) for a two-task explicit plan, cost expectations and evidence paths.
+See [the complete U4 tutorial](tutorials/multi-user-experiment.md) for a two-task explicit plan, cost expectations and evidence paths.
 
 ## Batch configuration
 
-A batch list is separate from the member's v2 experiment JSON. The public [local](../examples/batches/n1-n4-local.json) and [E2B](../examples/batches/n1-n4-e2b.json) examples reference complete existing N1/N4 configurations. The N1 configuration has five rounds; N4 has two, so this is a scheduling example rather than a fair causal comparison.
+A batch list is separate from the member's v2 experiment JSON. The public [local](../examples/batches/u1-u4-local.json) and [E2B](../examples/batches/u1-u4-e2b.json) examples reference complete existing U1/U4 configurations. The U1 configuration has five rounds; U4 has two, so this is a scheduling example rather than a fair causal comparison.
 
 ```json
 {
   "schema_version": 1,
-  "name": "synthesizer-n1-n4-local",
+  "name": "u1-u4-local",
   "max_parallel_runs": 1,
   "entries": [
-    {"id": "n1", "config": "../experiments/synthesizer-n1-local.json"},
-    {"id": "n4", "config": "../experiments/synthesizer-n4-local.json"}
+    {"id": "u1", "config": "../experiments/u1-local.json"},
+    {"id": "u4", "config": "../experiments/u4-local.json"}
   ]
 }
 ```

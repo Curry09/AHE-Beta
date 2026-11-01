@@ -168,7 +168,8 @@ def _public_file(relative: Path) -> bool:
     if (
         relative.parts[0] == "runtime"
         and len(relative.parts) > 1
-        and relative.parts[1] in {"image-build", "vigil-config", "collection.json"}
+        and relative.parts[1]
+        in {"image-build", "vigil-config", "collection.json", "task-environments"}
     ):
         return False
     return not any(part in _EXCLUDED for part in relative.parts) and not any(
@@ -182,6 +183,190 @@ def _public_file(relative: Path) -> bool:
         and part != "requirements.lock"
         for i, part in enumerate(relative.parts)
     )
+
+
+def management_evidence(
+    *, run_dir: Path, source: Path, manifest: dict[str, Any], terminal: bool
+) -> dict[str, Any]:
+    """Spec-0081/T4: archive private service records separately from role-visible evidence."""
+    import gzip
+    import io
+    import os
+
+    registry = source / "runtime/task-environments"
+    if not registry.exists():
+        return {"applicable": False, "complete": True}
+    if registry.is_symlink() or not registry.is_dir():
+        raise ConfigError("Invalid private task environment registry")
+    contents: dict[str, bytes] = {}
+    attempts = []
+    complete = terminal
+    for path in sorted(registry.glob("*.json")):
+        if path.is_symlink() or not re.fullmatch(r"[a-f0-9]{64}\.json", path.name):
+            raise ConfigError("Invalid private task environment record")
+        body = path.read_bytes()
+        record = json.loads(body)
+        identity = record["identity"]
+        if any(identity.get(key) != manifest[key] for key in ("run_id", "config_hash")):
+            raise ConfigError("Private task evidence belongs to another run")
+        key = path.stem
+        identity_hash = hashlib.sha256(
+            json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        if record.get("key") != key or identity_hash != key:
+            raise ConfigError("Private task evidence filename differs from its identity")
+        contents["task-environments/" + path.name] = body
+        frozen = bool(record.get("frozen_at")) and record["phase"] in {
+            "frozen",
+            "stopped",
+            "closed",
+        }
+        outputs = record.get("management_outputs", {})
+        required = {
+            output["handle"]
+            for service in record["environment"]["services"]
+            for output in service["exports"]
+            if output["visibility"] == "management"
+        }
+        captured = set()
+        missing_collected = False
+        for handle, row in outputs.items():
+            if row.get("status") != "collected":
+                continue
+            if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]*", handle):
+                raise ConfigError("Invalid private task output handle")
+            raw = registry / key / (handle + ".data")
+            if raw.is_symlink() or not raw.is_file():
+                missing_collected = True
+                continue
+            data = raw.read_bytes()
+            if hashlib.sha256(data).hexdigest() != row.get("sha256") or len(data) != row.get(
+                "bytes"
+            ):
+                raise ConfigError("Private task output checksum differs")
+            contents["task-environments/" + key + "/" + handle + ".data"] = data
+            captured.add(handle)
+        sealed = frozen and required <= captured and not missing_collected
+        complete = complete and sealed
+        attempts.append(
+            {
+                "environment_key": key,
+                "identity": identity,
+                "phase": record["phase"],
+                "frozen": frozen,
+                "management_exports_required": len(required),
+                "management_exports_collected": len(required & captured),
+                "complete": sealed,
+                "before_actor": not record.get("ready_at")
+                and not record.get("finalization_error")
+                and not outputs,
+            }
+        )
+    # A failed initializer cannot produce user feedback. A later sealed attempt
+    # for exactly the same binding is explicit recovery evidence; finalization
+    # failures after readiness still require retained measurements or discard.
+    binding_fields = (
+        "run_id",
+        "config_hash",
+        "task_id",
+        "task_digest",
+        "recipe_hash",
+        "session_id",
+        "round_no",
+        "slot",
+    )
+    for attempt in attempts:
+        if attempt["complete"] or not attempt["before_actor"]:
+            continue
+        successors = [
+            other
+            for other in attempts
+            if other["complete"]
+            and all(
+                other["identity"].get(field) == attempt["identity"].get(field)
+                for field in binding_fields
+            )
+            and other["identity"]["attempt"] > attempt["identity"]["attempt"]
+        ]
+        if successors:
+            successor = min(successors, key=lambda row: row["identity"]["attempt"])
+            attempt.update(
+                complete=True,
+                outcome="superseded_before_actor",
+                superseded_by=successor["environment_key"],
+            )
+    complete = terminal and all(attempt["complete"] for attempt in attempts)
+    if not attempts:
+        return {"applicable": False, "complete": True}
+    public = {"version": 1, "attempts": attempts, "complete": complete}
+    public_path = run_dir / "runtime/task-environments-public.json"
+    public_path.parent.mkdir(exist_ok=True)
+    public_path.write_text(json.dumps(public, ensure_ascii=False, indent=2) + "\n")
+    inventory = {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()}
+    private_manifest = {
+        "version": 1,
+        "run_id": manifest["run_id"],
+        "config_hash": manifest["config_hash"],
+        "complete": complete,
+        "files": inventory,
+    }
+    contents["management-evidence.json"] = (
+        json.dumps(private_manifest, sort_keys=True, indent=2) + "\n"
+    ).encode()
+    archive_root = run_dir / "archive"
+    archive_root.mkdir(exist_ok=True)
+    descriptor, name = tempfile.mkstemp(prefix=".management-", suffix=".tar.gz", dir=archive_root)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            with gzip.GzipFile(fileobj=stream, mode="wb", filename="", mtime=0) as zipped:
+                with tarfile.open(fileobj=zipped, mode="w") as archive:
+                    for relative, body in sorted(contents.items()):
+                        row = tarfile.TarInfo(relative)
+                        row.size, row.mode = len(body), 0o600
+                        archive.addfile(row, io.BytesIO(body))
+        digest = sha256_file(temporary)
+        destination = archive_root / ("management-evidence-" + digest + ".tar.gz")
+        if destination.exists():
+            if destination.is_symlink() or sha256_file(destination) != digest:
+                raise ConfigError("Retained management evidence archive differs")
+            temporary.unlink()
+        else:
+            temporary.replace(destination)
+        destination.chmod(0o600)
+        return {
+            "applicable": True,
+            "complete": complete,
+            "path": destination.relative_to(run_dir).as_posix(),
+            "sha256": digest,
+            "files": inventory,
+            "public_path": "runtime/task-environments-public.json",
+        }
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def verify_management_evidence(*, run_dir: Path, receipt: dict[str, Any]) -> None:
+    """Refuse destruction after losing a previously collected private sidecar."""
+    evidence = receipt.get("management_evidence", {})
+    if evidence.get("applicable") is not True:
+        return
+    relative = Path(evidence.get("path", ""))
+    path = run_dir / relative
+    if (
+        evidence.get("complete") is not True
+        or relative.is_absolute()
+        or ".." in relative.parts
+        or len(relative.parts) != 2
+        or relative.parts[0] != "archive"
+        or path.is_symlink()
+        or not path.is_file()
+        or sha256_file(path) != evidence.get("sha256")
+    ):
+        raise ConfigError(
+            "Collect and retain verified private task evidence before destroying compute"
+        )
 
 
 def collect_archive(
@@ -207,7 +392,10 @@ def collect_archive(
         if len(v) >= 8 and any(t in k for t in ("KEY", "TOKEN", "PASSWORD"))
     ]
     expected = snapshot.get("files", {})
-    consistent = bool(snapshot.get("consistent"))
+    private = management_evidence(
+        run_dir=run_dir, source=source, manifest=manifest, terminal=bool(snapshot.get("terminal"))
+    )
+    consistent = bool(snapshot.get("consistent")) and private["complete"]
     with tempfile.TemporaryDirectory(prefix="collection-stage-", dir=run_dir / "runtime") as tmp:
         stage = Path(tmp)
         files: dict[str, str] = {}
@@ -257,6 +445,8 @@ def collect_archive(
         evidence = run_dir / "runtime/gitea-evidence.json"
         if evidence.is_file() and not evidence.is_relative_to(source):
             copy(evidence, Path("runtime/gitea-evidence.json"))
+        if private.get("applicable"):
+            copy(run_dir / private["public_path"], Path(private["public_path"]))
         if not snapshot.get("gitea_evidence", {}).get("complete", True):
             consistent = False
         state = "COMPLETE" if snapshot.get("terminal") and consistent else "PARTIAL"
@@ -275,6 +465,8 @@ def collect_archive(
                 stage=stage, manifest=manifest, controller=snapshot.get("controller")
             ),
         }
+        if private.get("applicable"):
+            receipt["management_evidence"] = private
         (stage / "collection.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
         temporary = archive_root / ".artifacts.tar.gz.tmp"
         with tarfile.open(temporary, "w:gz") as archive:

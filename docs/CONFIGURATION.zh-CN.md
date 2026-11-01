@@ -2,23 +2,25 @@
 
 [English](CONFIGURATION.md) | 简体中文
 
-新实验采用 `schema_version: 2` 的 JSON，通过[快速开始](QUICKSTART.zh-CN.md)里的统一入口运行。复制[本地示例](../examples/experiments/synthesizer-n1-local.json)或 [E2B 示例](../examples/experiments/synthesizer-n1-e2b.json)。未知字段会报错，历史 evaluation schema 与 v1 生命周期命令在 provider 操作前拒绝执行。
+新实验采用 `schema_version: 2` 的 JSON，通过[快速开始](QUICKSTART.zh-CN.md)里的统一入口运行。复制[本地示例](../examples/experiments/u1-local.json)或 [E2B 示例](../examples/experiments/u1-e2b.json)。未知字段会报错，历史 evaluation schema 与 v1 生命周期命令在 provider 操作前拒绝执行。
 
 ## 用户需要提供的文件
 
 | 输入 | 格式 | 示例 |
 | --- | --- | --- |
-| 实验定义 | v2 JSON：后端、Harness、任务、轮次、角色、模型 | `examples/experiments/synthesizer-n1-local.json` |
-| 任务包 | v1/v2 JSON：任务文本、代码来源、安装脚本、依赖锁；v2 可声明执行条件和产物 | `examples/tasks/pvlib-1478/task.json` |
+| 实验定义 | v2 JSON：后端、Harness、任务、轮次、角色、模型 | `examples/experiments/u1-local.json` |
+| 任务包 | v1/v2 源码/setup 配方，或带固定输入、服务及产物声明的 v3 容器环境 | `examples/tasks/pvlib-1478/task.json`；`examples/tasks/evolution32/*/task.json` |
 | 任务文本 | UTF-8，不含标准答案或隐藏测试 | `examples/tasks/pvlib-1478/instruction.md` |
 | 安装配方 | 受信任 shell 脚本，创建独立任务环境 | `examples/tasks/pvlib-1478/setup.sh` |
 | 任务依赖 | 完整固定版本及 SHA-256 的 requirements | `examples/tasks/pvlib-1478/requirements.lock` |
-| Persona | 符合仓内 persona schema 的 JSON 数组 | `examples/personas/n1.json` |
+| Persona | 符合仓内 persona schema 的 JSON 数组 | `examples/personas/u1.json` |
 | 凭证 | 显式环境变量，或权限 0600 的 env 文件 | `examples/experiment.env.example` |
 
-N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/personas/library.json` 选择四张真实卡片。所选 ID 必须唯一且存在于画像库中；同一画像可在一轮中用于多个独立会话。
+U1 示例使用 `examples/personas/u1.json`；U4 从通用主库 `examples/personas/library.json` 选择四张真实卡片。所选 ID 必须唯一且存在于画像库中；同一画像可在一轮中用于多个独立会话。
 
 实验中的路径相对于实验 JSON；任务包中的路径相对于任务 JSON。`check --offline` 只给尚未冻结的分配预览，不拉取 Git。`prepare` 冻结每个任务的包、指令、setup、依赖锁及已验证源码 archive，再生成 `materials/task-catalog.json`、`materials/session-plan.json`、persona roster、Harness archive 和哈希清单，无需手工拼装。
+
+容器任务包冻结声明的输入哈希、镜像 digest、环境配方和产物合同，不要求伪造 Python setup/venv。未缓存的远端输入在离线检查中保持待下载；prepare 必须验证实际字节后才能发布已准备的 run。
 
 ## 实验字段
 
@@ -40,13 +42,19 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 | `evaluation.session_grading` | 可选的外部逐轮验收：冻结计划、公钥摘要及 `runner: external` |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
-可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。N=1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮运行用户及已配置的独立验收，不再需求或交付。
+可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。U1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮运行用户及已配置的独立验收，不再需求或交付。
 
 `builtin` 冻结当前 checkout 的 `backend/harness_template/`，不是历史 `cade14d` Harness。复现旧基线必须显式提供那份归档和真实校验和。
 
+### 六轮研究任务配置
+
+[E2B 教程](tutorials/evolution32.zh-CN.md)提供 U8 mixed/direct、U16 mixed、U32 mixed 四份配置，分别选择 [evolution32](../examples/tasks/evolution32/README.zh-CN.md) 的前八项、前十六项或全部三十二项。实验仍是 schema 2，均从当前 builtin seed 开始，共六轮，4 CPU/8192 MiB，用户和 Developer 并发显式为四。Triager 数为 4/4/8/16，Synthesizer 和 Divergent 各一，Owner 为 mechanical，grouping 为 false。R6 仅运行用户及已配置的验收；本组示例不配置官方评分。
+
+任务与 persona 的原配对固定，每轮只在所选子集内将执行顺序旋转一个槽位。`persona_ids` 是唯一 ID 集合，显式 `interaction_plan` 中的六轮数组则允许同一画像用于独立槽位。原 direct 任务用 `sr-15-swyx` 做终态反馈，不会因此变成模拟交互。U8 direct 仅通过 `workload.interaction_overrides` 按真实 task ID 覆盖原先六个模拟任务，不编辑共享任务文件，也不改画像；未知覆盖 ID 会报错。公开可替换模型 ID 为 User/Harness 的 `glm-5.3-flash`、需求/交付的 `glm-5.3`，凭证仍由 env 引用提供。
+
 ### 任务截止与消息活动上限
 
-在 v2 任务包中声明整个任务的预算：
+在 v2/v3 任务包中声明整个任务的预算：
 
 ```json
 "execution": {
@@ -132,6 +140,8 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 
 这只是静态校验，不证明供应商 tokenizer 的实际计数，也不会动态压缩。未声明容量时标为 `unverified`，不通过模型名猜容量。确定性的上下文超限会独立分类，不再当作瞬时错误原样重试。
 
+当前 User 客户端、builtin Harness seed 和需求角色定义实际请求的输出上限均为 32768；四组研究示例不新增 128k 覆盖或另一套模型预算。演化后的 Harness 参数应查看当轮版本，Claude Code 交付另由其客户端/提供商控制输出策略。User 和 builtin Harness 会应用输入阈值覆盖；需求角色目前仍使用 YAML 中的 256000 阈值，因此 demand 的 `limits` 是静态容量检查，不是运行时 YAML 覆盖。
+
 ## 每轮客观验收
 
 准备时默认使用 `release/compatibility.json` 中固定的执行证据 reader 候选提交 `57eac90a5702022c1ed2452b5b2b9918c235df39`，也可通过 `source.openagents` 指定其他兼容的不可变提交。该候选已推送供审阅；配套改动审阅合并后再填写 `reader_release_commit`。只有旧 transport 能力的版本不足以满足要求。
@@ -153,6 +163,10 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 私有计划、隐藏测试、答案和密钥留在可信主机上操作者提供的原路径；worker 执行副本及详细 verifier 输出保存在该 run 的 `evaluation/online` 区域。两者均不进入实验收集包或需求角色证据。在线路径只支持可从冻结工作区产物重建的验收；依赖受管服务可信测量或原始存活环境的 profile 会被拒绝。逐轮验收为后续纠错提供证据，不自动淘汰或回退已交付 Harness；本地工程 CI 和独立 Harness 留出评测保持独立。
 
 ## 任务包
+
+任务包版本与实验 schema 2 独立。evolution32 使用 schema 3、`environment.kind: container`：固定镜像 digest、workdir、带 SHA-256 的输入、初始化/就绪/收尾命令、有限的 task/companion 服务与所需能力共同构成环境配方。完整定义见[任务清单](../examples/tasks/evolution32/README.zh-CN.md)，不复制旧 launcher 来启动。
+
+服务是任务设施进程，不是模型 Agent。输入可以进入任务容器或明确声明的 companion；管理侧服务输出不作为 Actor 输入暴露。文件和公开服务 handle 复用共同的 `artifacts` 合同。非 Git 任务明确声明 patch 不适用；SWE 任务保留真实 repo/revision 元数据。环境或采集故障按基础设施失败处理，不伪造成用户负反馈；环境驱动不执行官方评分。
 
 公开示例为：
 
@@ -181,11 +195,15 @@ N1 示例使用 `examples/personas/n1.json`；N4 从通用主库 `examples/perso
 
 本地路径启动每实验独立的 Gitea 和 egress proxy，然后启动所属 Vigil、用户 session 容器。Gitea 宿主端口动态分配并绑定 loopback，status 提供实际地址。模型域名、端口从显式 endpoint 生成。工程 CI 可选且默认关闭；关闭时不创建 runner。
 
-E2B 在一个沙箱内运行 controller 与交付进程，不依赖嵌套 Docker；任务目录在沙箱内隔离，与本地每 session 容器的隔离不同。程序核对实际 CPU、内存、template/build 身份和到期时间并记录。示例请求 4 CPU、8192 MiB；耗时和费用由模型及云资源运行决定。
+E2B 在一个沙箱内运行 controller 与交付进程。已有 v1/v2 源码配方保留原目录/工作区行为；v3 容器任务使用沙箱内已核验的 Docker daemon，按 attempt 创建独立任务容器与所属服务网络，Actor 不在控制器文件系统中解题。程序核对实际 CPU、内存、Docker/镜像能力、template/build 身份和到期时间并记录。示例请求 4 CPU、8192 MiB；耗时和费用由模型及云资源运行决定。
+
+准备阶段先核验全部冻结材料哈希，再以二进制文件流上传。传输 I/O 等待随文件大小增加；它不是整个上传的严格总时限，不改变任务或模型预算。单文件上传签名不会写入进度、传输日志或对外错误信息。
 
 本地证据使用协商后的 gzip/direct；Gitea.com 使用 ZIP 和受约束的 R2 下载。预检检查实际固定版本的 OpenAgents reader，禁用自更新，并在正式用户实验前验证发布和读取。原自建 Gitea 的 gzip handle 仍受支持。
 
 冻结 `manifest.json` 描述输入；可变 `runtime.json`、资源/controller receipt 描述实际观察。三个状态独立：实验 `COMPLETED` 可以与资源 `DESTROYED`、收集 `COMPLETE` 同时存在。Provider 不可达只表示观察未知，不代表完成。resume 要求原身份、仓库、资源及 recovery 数据；正常完成后，只有完整收集才释放专有计算资源。E2B stop 进程本身不释放沙箱。
+
+单 run 的后台 monitor 在管理主机上定期采集，云内 supervisor 独立运行 controller；目前两者都不续租 E2B 创建租期。示例的 `timeout_seconds: 86400` 不是无限存活，六轮可能超过一天。status 保留实际 `expires_at`；provider 的 paused 实例需要显式恢复，已到期/删除则为 LOST，CLI `resume` 不会静默替换或 provider-resume。应保持采集可用并保留已验证归档。
 
 用全局 `--runs-dir /absolute/path/runs` 放在子命令前可改运行根目录，后续管理始终使用同一根目录。prepare 后编辑原 JSON 或源码 checkout 不影响既有 run；改变实验定义应重新 prepare。
 
@@ -199,7 +217,7 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 | 字段 | 默认值与行为 |
 | --- | --- |
-| `policies.synthesizer_grouping` | `false`；`true` 启用已有分组调度，N1 也可使用 |
+| `policies.synthesizer_grouping` | `false`；`true` 启用已有分组调度，U1 也可使用 |
 | `models.user.reasoning_effort`、`models.demand.reasoning_effort` | 可选，例如 `high`；分别交给用户客户端及共享需求角色，供应商须支持该值 |
 | `policies.timing.latency_isolated` | `false`；启用后需求角色计时排除已标记的 provider 等待 |
 | `policies.timing.wall_guard_seconds` | 额外宽限秒数；`0` 使用已有默认 600 秒。开启隔离时，总墙钟上限 = 角色预算 + 宽限；正整数覆盖宽限 |
@@ -243,7 +261,7 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 `experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 
-本次已迁入上述设置、交互和看板；可选本地工程 CI 见下方说明，当前归档追加已接入，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。独立事后评分仍然可用；可选逐轮验收使用上面的外部 worker 合同。多任务/N4/N8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+本次已迁入上述设置、交互和看板；可选本地工程 CI 见下方说明，当前归档追加已接入，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。独立事后评分仍然可用；可选逐轮验收使用上面的外部 worker 合同。多任务/U4/U8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
 
 ## 本地工程 CI
 
@@ -272,7 +290,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --json 
 uv run --locked --extra experiments python backend/scripts/experiment.py --json task from-text --instruction examples/seed-inputs/instruction.md --id weekly-notes --output /absolute/path/to/new-text-task --not-in-benchmark
 ```
 
-结果的 `task_packages` 是绝对路径数组：移除 `workload.kind`、`task_package` 及不再适用的 `interaction_plan` 后，赋给 `workload.task_packages`。生成的 `tasks.json` 只是以输出目录为基准的相对路径索引，不是可运行实验，也不能替代该数组。复制实验 JSON 时，persona/Harness 等相对路径也须按原 JSON 目录解析。[完整导入教程](tutorials/seed-task-import.zh-CN.md) 提供将数组写入两个当前 N1 后端模板的精确 Python 命令及离线检查。
+结果的 `task_packages` 是绝对路径数组：移除 `workload.kind`、`task_package` 及不再适用的 `interaction_plan` 后，赋给 `workload.task_packages`。生成的 `tasks.json` 只是以输出目录为基准的相对路径索引，不是可运行实验，也不能替代该数组。复制实验 JSON 时，persona/Harness 等相对路径也须按原 JSON 目录解析。[完整导入教程](tutorials/seed-task-import.zh-CN.md) 提供将数组写入两个当前 U1 后端模板的精确 Python 命令及离线检查。
 
 无仓库卡和文本指令使用本地 scratch 源目录，其中初始 README 不包含答案。有仓库卡支持转为 GitHub HTTPS 的 owner/repo 标识或无凭证 HTTPS 地址，并要求固定的 40 位小写 SHA。导入只映射 prompt/source/setup，不把 oracle、env.test_cmd、gates、provenance 复制到材料或 sidecar；不会自动锁定旧 setup 依赖，也不恢复旧镜像/外部服务。prepare 前审阅生成的 setup 和 requirements。导入或离线检查成功不证明任务通过或历史环境可复现；实验仍使用 check/prepare/run。
 
@@ -282,20 +300,20 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --json 
 
 `runtime.local.seed_image` 保留单任务覆盖含义，选择多个包时填写会报错；自动逐任务构建支持混合任务。本地 session 使用独立容器；E2B 复制各任务纯源码基线，在最终 session 目录重建 venv。下载/wheel 缓存可共享，可写 repo 和已安装环境不共享。E2B 同一 Unix 用户不提供等同 Docker 的恶意跨目录访问防护。
 
-两个任务的显式计划、成本及证据路径见[完整 N4 教程](tutorials/multi-user-experiment.zh-CN.md)。
+两个任务的显式计划、成本及证据路径见[完整 U4 教程](tutorials/multi-user-experiment.zh-CN.md)。
 
 ## 批次配置
 
-批次列表独立于成员的 v2 实验 JSON。公开的 [local](../examples/batches/n1-n4-local.json)和 [E2B](../examples/batches/n1-n4-e2b.json)示例引用现有完整 N1/N4 配置。N1 为五轮、N4 为两轮，因此它们是调度示例，不构成公平的因果对照。
+批次列表独立于成员的 v2 实验 JSON。公开的 [local](../examples/batches/u1-u4-local.json)和 [E2B](../examples/batches/u1-u4-e2b.json)示例引用现有完整 U1/U4 配置。U1 为五轮、U4 为两轮，因此它们是调度示例，不构成公平的因果对照。
 
 ```json
 {
   "schema_version": 1,
-  "name": "synthesizer-n1-n4-local",
+  "name": "u1-u4-local",
   "max_parallel_runs": 1,
   "entries": [
-    {"id": "n1", "config": "../experiments/synthesizer-n1-local.json"},
-    {"id": "n4", "config": "../experiments/synthesizer-n4-local.json"}
+    {"id": "u1", "config": "../experiments/u1-local.json"},
+    {"id": "u4", "config": "../experiments/u4-local.json"}
   ]
 }
 ```

@@ -849,6 +849,10 @@ def destroy_v2(
             )
         if controller.get("running"):
             raise ConfigError("Stop the controller before destroying compute")
+        if not discard_uncollected:
+            from auto_designer.experiment.collection import verify_management_evidence
+
+            verify_management_evidence(run_dir=directory, receipt=current.get("collection", {}))
         receipt = adapter.destroy()
         return {
             "run_id": run_id,

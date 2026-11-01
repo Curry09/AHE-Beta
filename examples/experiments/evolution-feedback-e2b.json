@@ -23,7 +23,7 @@
   "workload": {
     "kind": "ordinary",
     "task_package": "../tasks/order-service/task.json",
-    "persona_library": "../personas/n1.json",
+    "persona_library": "../personas/u1.json",
     "persona_ids": [
       "sr-15-swyx"
     ]

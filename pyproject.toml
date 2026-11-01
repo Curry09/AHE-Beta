@@ -69,8 +69,8 @@ line-length = 100
 target-version = "py312"
 # 首方包根：后端在 backend/，使 import 排序把 auto_designer / bootstrap_harness / 同目录测试模块识别为 first-party
 src = ["backend", "backend/scripts", "backend/tests", "evaluation"]
-# vendored 的 spec CLI 是外来代码，不纳入本仓 lint
-extend-exclude = ["tools/spec-driven-development/vendor", "research/archives", "evaluation/harness/meta_artifact", "evaluation/harness/user_engine"]
+# 外来代码、原始任务指令及 M04 固定配方保持发布字节，由材料哈希校验，不自动格式化。
+extend-exclude = ["tools/spec-driven-development/vendor", "research/archives", "evaluation/harness/meta_artifact", "evaluation/harness/user_engine", "examples/tasks/evolution32/*/instruction.md", "examples/tasks/evolution32/M04/recipes"]
 
 [tool.ruff.lint]
 # E/F: pyflakes+pycodestyle，I: import 排序，UP: pyupgrade，B: bugbear，ASYNC: 异步阻塞防护

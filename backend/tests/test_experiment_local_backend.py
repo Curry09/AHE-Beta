@@ -43,7 +43,7 @@ def backend(tmp_path, monkeypatch):
         "rounds": {"count": 2},
         "runtime": {
             "backend": "local",
-            "gitea": {"provider": "localhost", "repository_prefix": "n1"},
+            "gitea": {"provider": "localhost", "repository_prefix": "u1"},
         },
         "models": {
             role: {"base_url_env": "MODEL_URL", "api_key_env": "MODEL_KEY", "model": "test"}

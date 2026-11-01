@@ -1,0 +1,2 @@
+# Preserve published task instruction bytes, including upstream trailing spaces.
+examples/tasks/evolution32/*/instruction.md whitespace=-blank-at-eol,-blank-at-eof

@@ -54,17 +54,27 @@ def describe_entry(config_path: str | Path) -> dict[str, Any]:
     report = materials.check_materials(config_path)
     tasks = []
     for original in report["task_packages"]:
-        task = copy.deepcopy(original)
         hashes = {
-            "instruction": materials.sha256_file(task.pop("instruction_file")),
-            **{name: materials.sha256_file(path) for name, path in task.pop("setup").items()},
+            "instruction": materials.sha256_file(original["instruction_file"]),
+            **{
+                name: materials.sha256_file(path)
+                for name, path in original.get("setup", {}).items()
+            },
         }
+        if original.get("schema_version") == 3:
+            hashes.update(
+                {
+                    "input:" + row["id"]: row["material"]["sha256"]
+                    for row in original["environment"]["inputs"]
+                }
+            )
         source_files = None
-        if task["source"]["kind"] == "local":
+        if original.get("source", {}).get("kind") == "local":
             # Match the compiler's exclusion/symlink rules rather than invent another snapshot.
             source_files = materials._snapshot_files(
-                root=Path(task["source"].pop("path")), paths=None
+                root=Path(original["source"]["path"]), paths=None
             )
+        task = package_input_identity(package=original)
         tasks.append({"package": task, "content_hashes": hashes, "source_files": source_files})
     controller = materials._controller_root()
     harness = report["config"]["harness"]
@@ -90,6 +100,21 @@ def describe_entry(config_path: str | Path) -> dict[str, Any]:
         "input_identity": identity,
         "input_hash": config_hash(data=identity),
     }
+
+
+def package_input_identity(*, package: dict[str, Any]) -> dict[str, Any]:
+    """Spec-0081/T4: compare recipes by content across original and frozen locators."""
+    task = copy.deepcopy(package)
+    task.pop("instruction_file")
+    if task.get("schema_version") == 3:
+        from auto_designer.experiment.task_environments.contract import environment_identity
+
+        task["environment"] = {"identity": environment_identity(package)}
+    else:
+        task.pop("setup")
+        if task["source"]["kind"] == "local":
+            task["source"].pop("path")
+    return task
 
 
 def verify_entry_inputs(entry: dict[str, Any]) -> None:

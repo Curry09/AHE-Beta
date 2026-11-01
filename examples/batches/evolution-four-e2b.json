@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "name": "evolution-four-e2b",
+  "max_parallel_runs": 1,
+  "entries": [
+    {
+      "id": "u8-mixed",
+      "config": "../experiments/u8-mixed-e2b.json"
+    },
+    {
+      "id": "u8-direct",
+      "config": "../experiments/u8-direct-e2b.json"
+    },
+    {
+      "id": "u16-mixed",
+      "config": "../experiments/u16-mixed-e2b.json"
+    },
+    {
+      "id": "u32-mixed",
+      "config": "../experiments/u32-mixed-e2b.json"
+    }
+  ]
+}

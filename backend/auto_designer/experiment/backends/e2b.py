@@ -293,7 +293,9 @@ class E2BBackend:
         actual = bootstrap.get("task_workspaces")
         verify_task_workspaces(catalog, actual)
         expected = {
-            task["id"]: task_workspace_record(task, self.manifest, self.root, bootstrap)
+            task["id"]: task_workspace_record(
+                task, self.manifest, self.root, bootstrap, material_root=self.run_dir
+            )
             for task in catalog_tasks(catalog)
         }
         if actual != expected:
@@ -356,6 +358,21 @@ class E2BBackend:
                 }
                 for task_id, record in prepared.items()
             }
+        container_records = {
+            task_id: record
+            for task_id, record in (resources.get("task_workspaces") or {}).items()
+            if record["kind"] == "container"
+        }
+        if container_records:
+            program = "import json,sys;sys.path.insert(0,sys.argv[1]+'/source/controller/backend');from auto_designer.experiment.backends.e2b_bootstrap import probe_container_workspace;print(json.dumps({key:probe_container_workspace(value) for key,value in json.loads(sys.argv[2]).items()}))"
+            receipt["container_preflight"] = json.loads(
+                self._command(
+                    sandbox,
+                    self._python(resources, program, self.root, json.dumps(container_records)),
+                    user=bootstrap["execution_user"],
+                    timeout=1800,
+                )
+            )
         _write(self.run_dir / "runtime/preflight.json", receipt)
         return receipt
 
@@ -518,9 +535,19 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
             "from auto_designer.experiment.runtime import progress_v2;"
             "root=pathlib.Path(sys.argv[1]);result="
             + call
-            + ";result['progress']=progress_v2(root);print(json.dumps(result))"
+            + ";result['progress']=progress_v2(root);"
+            + "registry=root/'runtime/task-environments';"
+            + "manifest=json.loads((root/'manifest.json').read_text());"
+            + "probe_module=__import__('auto_designer.experiment.backends.e2b_bootstrap',fromlist=['']) if registry.exists() and sys.argv[2]=='stop_controller' and not result.get('running') else None;"
+            + "probe_module.cleanup_container_probes(registry_root=registry,run_id=manifest['run_id'],config_hash=manifest['config_hash']) if probe_module else None;"
+            + "module=__import__('auto_designer.experiment.task_environments.docker',fromlist=['']) if registry.exists() else None;"
+            + "operation=getattr(module,'stop_registered' if sys.argv[2]=='stop_controller' and not result.get('running') else 'inspect_registered') if module else None;"
+            + "result.update(task_environments=operation(registry_root=registry,run_id=manifest['run_id'],config_hash=manifest['config_hash'])) if operation else None;"
+            + "print(json.dumps(result))"
         )
-        return json.loads(self._command(sandbox, self._python(resources, program, self.root)))
+        return json.loads(
+            self._command(sandbox, self._python(resources, program, self.root, action))
+        )
 
     def _inspect(self) -> dict:
         resources = _read(self.resource_file)
@@ -757,6 +784,12 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
             raise BackendError(
                 "Owned controller remains alive; refusing premature compute destruction"
             )
+        if any(
+            record["kind"] == "container"
+            for record in (resources.get("task_workspaces") or {}).values()
+        ):
+            program = "import json,pathlib,sys;sys.path.insert(0,sys.argv[1]+'/source/controller/backend');from auto_designer.experiment.task_environments.docker import destroy_registered;root=pathlib.Path(sys.argv[1]);manifest=json.loads((root/'manifest.json').read_text());print(json.dumps(destroy_registered(registry_root=root/'runtime/task-environments',run_id=manifest['run_id'],config_hash=manifest['config_hash'])))"
+            self._command(sandbox, self._python(resources, program, self.root))
         sandbox.kill()
         resources["destroyed_at"] = timestamp()
         resources["resource_state"] = "DESTROYED"
@@ -791,7 +824,8 @@ def paths():
         result.extend(sorted(area_paths))
     return result
 files={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths()}
-with tarfile.open(output,'w:gz',dereference=True) as tar:
+descriptor=os.open(output,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600);os.fchmod(descriptor,0o600)
+with os.fdopen(descriptor,'wb') as stream,tarfile.open(fileobj=stream,mode='w:gz',dereference=True) as tar:
     for name in files: tar.add(root/name,arcname=name,recursive=False)
 consistent=all((root/name).is_file() and hashlib.sha256((root/name).read_bytes()).hexdigest()==digest for name,digest in files.items())
 print(json.dumps({'files':files,'consistent':consistent,'archive_sha256':hashlib.sha256(output.read_bytes()).hexdigest()}))

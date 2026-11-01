@@ -1,0 +1,72 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "superset-ci-loop",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "mechanism",
+    "instance_id": "superset-ci-loop",
+    "revision": "c0f36dfc1d10cc7929622141e03c468e0da810e199e1e0946f41e918d32d07e8"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:c30e0d3b6a4773d52e3748759b64ae0ab41777b5b34793e7268bb707eb229ce2",
+    "workdir": "/workspace",
+    "patch": "not_applicable",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "24f1ccc696b3ddaf90693920c56fb3d22eb05f189716047b7e6d94a3c8b5109f",
+          "format": "tar.gz",
+          "files": {
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-readiness-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      },
+      {
+        "id": "original-public",
+        "material": {
+          "sha256": "7b633b019a52c81b97a6962f01085db7a3bf96310583308a96ec623ec808286d",
+          "format": "tar.gz",
+          "files": {
+            "public/TASK.md": "85c383e2021119a1b8b9eb75fd1c2c32df491978da04d5f71f9a471dd02a4079",
+            "public/ci.py": "727490bd8666a6267c155e71501301efe758332c610b1a6193047de46316bde7"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m02-public-v1.tar.gz"
+        },
+        "target": "/workspace",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/verify.py",
+        "--path",
+        "/workspace/public/TASK.md",
+        "--path",
+        "/workspace/public/ci.py"
+      ],
+      "timeout_seconds": 120
+    }
+  },
+  "artifacts": {
+    "version": 1,
+    "exports": [
+      {
+        "id": "ci-handover",
+        "source": "workspace",
+        "path": "reports/ci-handover.md",
+        "content_type": "text/markdown",
+        "required": false,
+        "max_bytes": 2097152
+      }
+    ]
+  }
+}

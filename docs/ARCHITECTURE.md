@@ -41,7 +41,7 @@ NexAU 是 agent 运行时依赖。OpenAgents 可选择 Claude Code、Codex 或 N
 
 | 目录 | 当前职责 |
 | --- | --- |
-| `examples/experiments/` | N1 与两轮 N4 的 local/E2B 可校验定义 |
+| `examples/experiments/` | U1/U4 的 local/E2B 与 U8/U16/U32 的 E2B 可校验定义 |
 | `examples/tasks/`、`examples/personas/` | 任务与 persona 材料；主库为 `examples/personas/library.json` |
 | `backend/scripts/` | 公开入口、演示、静态导出、CI 与构建检查 |
 | `tools/dev/` | 维护中的诊断与回放，见[工具说明](../tools/dev/README.md) |

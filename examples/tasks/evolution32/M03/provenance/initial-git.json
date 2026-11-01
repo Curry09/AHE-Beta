@@ -1,0 +1,53 @@
+{
+  "kind": "publication-prepared initial-input Git child",
+  "parent": "00cb83ff299e386ade5a771bedb924f185ba3d9f",
+  "prepared": "5dc487b9ec58168220721831c0ae5667b4202a6f",
+  "tree": "cafea2929fa5be34cb970cea1c73a3b990b2c9b0",
+  "original_input_files": {
+    "public/TASK.md": {
+      "sha256": "8a89958333094e58e559330aa13d9c68a30508ace168979cb148d59a9c2bd084",
+      "bytes": 2481,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/case/SOURCES.md": {
+      "sha256": "12dd664ceca5fc1e0302768f7254f6674bc298e5ad702e5c4391b1a8a20e32d8",
+      "bytes": 464,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/case/platform.json": {
+      "sha256": "c1d08f65786c5ff87133ff8acf77c9c66889e22f878dee1af6b977619515f13f",
+      "bytes": 610,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/case/requests.csv": {
+      "sha256": "a41ac6649f43f87d552b425adff71c59004d37c804e3d0b68fd9118f27876ed6",
+      "bytes": 2715,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/case/stakeholders.md": {
+      "sha256": "c76e18daf209fffd8bcd304f5d245de19a2296fd3319d2c8938d9a7dcc184b50",
+      "bytes": 667,
+      "mode": 420,
+      "git_mode": "100644"
+    }
+  },
+  "input_bytes_type_mode_unchanged": true,
+  "verification": {
+    "fresh_environments": 2,
+    "same_prepared_commit": true,
+    "production_pre_actor_patch_bytes": 0,
+    "source_and_binary_negative_controls": "only intentional single-file mutation exported; after restoration patch empty"
+  },
+  "recipe_asset": {
+    "name": "task-initial-git-recipes-v1.tar.gz",
+    "sha256": "9b2f3b30ae2247f565b89048f8e535b465f64cceb89be78c9dc4c2c17fa450e4",
+    "files": {
+      "freeze_initial_git.py": "a6633dd13a92308eb13279da9356e1fc1dd5e21b194876ec11a4a238886b4f67"
+    }
+  },
+  "source_identity": "The parent is a real original prepared task commit. The child adds only the listed original, previously untracked inputs; it is not an upstream GitHub commit or an Actor solution."
+}

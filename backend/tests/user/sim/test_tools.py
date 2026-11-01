@@ -83,7 +83,7 @@ def test_run_shell_timeout_and_nonzero() -> None:
 def test_sandbox_runs_real_fixture() -> None:
     ws = materialize(WorkspaceSpec(fixture="billing-split"))
     sb = Sandbox(workspace=ws)
-    assert sb.cwd == ws  # 外部工作区当 cwd
+    assert sb.cwd == ws.cwd  # 外部工作区当 cwd
     run = run_shell(sb, f"{sys.executable} billing/core.py")
     assert run["ok"] and run["returncode"] == 0, run
     # 外部 workspace 不被 cleanup 删除

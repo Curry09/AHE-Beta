@@ -1,0 +1,70 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "flask-restful",
+  "instruction_file": "instruction.md",
+  "interaction": "direct",
+  "benchmark": {
+    "suite": "nl2repo",
+    "instance_id": "flask-restful",
+    "revision": "5a998cafeff084b620845a4b4f1c709e6dd03eb996d0c09e54d8d552bde40eb3"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a93047a86e5ad139ebe1bd67fa2f125b731591df09c00394cd5733a5d3facd7e",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "5f7f52f6020e09da06796f5179d4b4a540b9f521ee0945b13e80d85a5e31af4b",
+          "format": "file",
+          "files": {
+            "input": "5f7f52f6020e09da06796f5179d4b4a540b9f521ee0945b13e80d85a5e31af4b"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/flask-restful-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/verify.py",
+        "--git-revision",
+        "6965408d0fb2ca6bf63f2e60d846b582908b25b1"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/initialize.py",
+        "--bundle",
+        "/opt/task-inputs/initial.bundle",
+        "--revision",
+        "6965408d0fb2ca6bf63f2e60d846b582908b25b1",
+        "--workspace",
+        "/workspace"
+      ],
+      "timeout_seconds": 240
+    }
+  }
+}

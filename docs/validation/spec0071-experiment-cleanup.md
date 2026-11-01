@@ -57,14 +57,14 @@ Spec validator 仍输出跨组文件重叠和旧文档裸引用提示；它们�
 ```bash
 uv sync --locked --extra experiments --extra dev
 bash backend/scripts/e2e-spec-0071-experiment-cleanup.sh
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-local.json --offline
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-e2b.json --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u1-local.json --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u1-e2b.json --offline
 PYTHONPATH=backend uv run --locked python -m tools.dev.probes.probe_persona_wait_matrix --check-inputs
 ```
 
 检查 `examples/experiments/` 只含两份当前定义、原 launcher 路径已消失，并查看 [研究索引](../../research/README.zh-CN.md)和[维护工具说明](../../tools/dev/README.md)。前端静态模式的 mixed16 记录应显示“历史快照 / 当时状态 RUNNING”，原采集时间不随构建刷新。
 
-实际新用户验证仍需可用 Docker/模型配置，或 E2B/Gitea.com 凭证与建仓名额。按 [N1 教程](../tutorials/n1-experiment.zh-CN.md)从 prepare 开始，以新 run 验证用户会话与产物收集；不要用重算旧 hash、重建旧身份的方式冒充 resume。恢复的在线验收须使用本次创建的 run，并记录 stop/resume 所处阶段。
+实际新用户验证仍需可用 Docker/模型配置，或 E2B/Gitea.com 凭证与建仓名额。按 [N1 教程](../tutorials/u1-experiment.zh-CN.md)从 prepare 开始，以新 run 验证用户会话与产物收集；不要用重算旧 hash、重建旧身份的方式冒充 resume。恢复的在线验收须使用本次创建的 run，并记录 stop/resume 所处阶段。
 
 
 ## 2026-10-08 合并前完整测试依赖修复

@@ -76,8 +76,16 @@ def write_controller_context(
         catalog = read_task_catalog(root, manifest)
         workspaces = resources.get("task_workspaces") or {}
         verify_task_workspaces(catalog, workspaces)
-        if any(item["kind"] != expected_workspace for item in workspaces.values()):
-            raise ConfigError(f"{backend} requires prepared {expected_workspace} task workspaces")
+        expected_kinds = {
+            task["id"]: "container"
+            if task["package"].get("schema_version") == 3
+            else expected_workspace
+            for task in catalog["tasks"]
+        }
+        if any(item["kind"] != expected_kinds[task_id] for task_id, item in workspaces.items()):
+            raise ConfigError(
+                f"{backend} task workspace kind differs from the frozen task contract"
+            )
     elif workspace.get("kind") != expected_workspace:
         raise ConfigError(f"{backend} requires a prepared {expected_workspace} workspace")
     token = credentials.get("GITEA_TOKEN", "")

@@ -1,0 +1,136 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "dbt-direction-negotiation",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "mechanism",
+    "instance_id": "dbt-direction-negotiation",
+    "revision": "e0268040cf8a6dff2b1605ade6e402d25f9ac82601e048ae791941f0a035ce4e"
+  },
+  "source": {
+    "kind": "git",
+    "url": "https://github.com/fivetran/dbt_salesforce.git",
+    "revision": "2e99cce10766c16c08aaf5c1fef8e6d17b857171",
+    "repo": "fivetran/dbt_salesforce"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:dd714c8ff7d7431836e5c133c52691dff3fc996134fbfdc18a0782b38a2d27ee",
+    "workdir": "/app/repo",
+    "patch": "git",
+    "resources": {
+      "cpus": 2,
+      "memory_mb": 4096
+    },
+    "inputs": [
+      {
+        "id": "initial",
+        "target": "/opt/task-inputs/initial.bundle",
+        "material": {
+          "sha256": "1cf9f684b33cc5f677f13b8f47654ab4a88fc9768ca69b2729ff5290fef234db",
+          "format": "file",
+          "files": {
+            "input": "1cf9f684b33cc5f677f13b8f47654ab4a88fc9768ca69b2729ff5290fef234db"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m04-initial-v1.bundle"
+        }
+      },
+      {
+        "id": "public",
+        "target": "/opt/task-inputs/public",
+        "material": {
+          "sha256": "e0268040cf8a6dff2b1605ade6e402d25f9ac82601e048ae791941f0a035ce4e",
+          "format": "tar.gz",
+          "files": {
+            "M04/public/TASK.md": "083c2d3078512c9f43c68bad1a73d9397e08a43885a9569979761584dc69eef6",
+            "M04/public/case/SOURCES.md": "b63dd03f7b1e4dcb6e438adf25995864f709ba2ba2f21aec1597847ee206bb57",
+            "M04/public/case/repository-inventory.json": "131eac0beccea3c30eb2ab5583ada6651bc303e324ce0717d6fa82d6fdf288d0",
+            "M04/public/case/team-constraints.md": "0f89dc77e0ebb1c860a0358fe2b04140c8eab60784d5678c7a3058f8a4e7099c"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m04-public-v1.tar.gz"
+        }
+      },
+      {
+        "id": "reference",
+        "target": "/opt/task-inputs/reference",
+        "material": {
+          "sha256": "d25818766910571367b7024ba82b5773c1140b14bf210eb18b06bdd3b08b3d82",
+          "format": "tar.gz",
+          "files": {
+            "M04/reference/docs/source/configuration/default_configuration.rst": "bb0b99a43d8db5e5105747a158f1792d4d356ece2bb7f9082a6000c28481c179",
+            "M04/reference/docs/source/configuration/ignoring_configuration.rst": "7455e150cbf59eb5c6bf4ec1555ff2eaaf5507ae762432683a5a67873b109e98",
+            "M04/reference/docs/source/configuration/index.rst": "b05cc46cb6ce692bfbd427fb2527ef2f954df476172fa972d5c5f5e08bdb0a78",
+            "M04/reference/docs/source/configuration/layout.rst": "fd04fc41ff2906743cc9c06431884bc1390fd5cf1ea88e6aa4216f39589af076",
+            "M04/reference/docs/source/configuration/rule_configuration.rst": "c08c817d07d2032e2b8bb689e52c97d7a745aa5ffbb4d023ee555d787d51afcf",
+            "M04/reference/docs/source/configuration/setting_configuration.rst": "82666b999ff179edf76f5b4412f993c35cade79e04d1373db44dc4422f7f8204",
+            "M04/reference/docs/source/configuration/templating/dbt.rst": "e30ce86ba28a893ff128189935c3ae9ddda8742f41ebbab31e56c3a3a21ca2e7",
+            "M04/reference/docs/source/configuration/templating/index.rst": "1760b03a09aee879baa57ee178515f168a70d552538dda704d7d4dbac424a388",
+            "M04/reference/docs/source/configuration/templating/jinja.rst": "38e83baaecd91f27ea85da25576407039b82b8c44f9086e75eef0848ef3725d4",
+            "M04/reference/docs/source/configuration/templating/placeholder.rst": "6a8d19851a9e1e8864d36c67f5e1882481726b5b1ae921a22bc6eaef7b454bcb",
+            "M04/reference/docs/source/configuration/templating/python.rst": "6b79b071e1215c95c41d9476989f595380207735c8a48ec12ce7556020adf291"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m04-reference-v1.tar.gz"
+        }
+      },
+      {
+        "id": "recipes",
+        "target": "/opt/task-inputs/recipes",
+        "material": {
+          "sha256": "99f0d66c59f33969de9a4767634c5da3851743bfca1fab541d57269cd224d1f6",
+          "format": "tar.gz",
+          "files": {
+            "collect_pilot.py": "3e2fc04e7753dd5743e727e392c6d1bcfb2d7593e141aeaca308c2eca30a12dd",
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "prepare.py": "c5d4b1bd936d7fec01f33f1828fd1ac4b24a66b4c3b9aa5f998ee7cc6741d2ec",
+            "readiness.py": "a26344fe947ea2bcb65166a68eeebae78415d4ec15e8d4ccc7e4910d75f748bd"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m04-recipes-v1.tar.gz"
+        }
+      }
+    ],
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/prepare.py"
+      ],
+      "timeout_seconds": 120
+    },
+    "readiness": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/readiness.py"
+      ],
+      "timeout_seconds": 60
+    },
+    "finalize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/collect_pilot.py"
+      ],
+      "timeout_seconds": 60
+    }
+  },
+  "artifacts": {
+    "version": 1,
+    "exports": [
+      {
+        "id": "adr",
+        "source": "workspace",
+        "path": "reports/adr.md",
+        "required": true,
+        "content_type": "text/markdown",
+        "max_bytes": 2097152
+      },
+      {
+        "id": "pilot",
+        "source": "workspace",
+        "path": "reports/.collected-pilot.tar.gz",
+        "required": true,
+        "content_type": "application/gzip",
+        "max_bytes": 34603008
+      }
+    ]
+  }
+}

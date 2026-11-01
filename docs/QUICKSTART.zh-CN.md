@@ -9,7 +9,9 @@
 | `local` | 本机 Docker 容器 | 程序自动启动独立的 localhost Gitea | 可用的 Docker 服务、模型凭证 |
 | `e2b` | 每个实验一个 E2B 沙箱 | 用户自己的 Gitea.com 账户 | 模型凭证、`E2B_API_KEY`、`GITEA_TOKEN` |
 
-可选 N1：每轮一位用户试用一个任务；或 N4：每轮四位用户试用两个任务，并发上限为二。N4 共两轮，首轮包含交付，末轮只试用。任务包列表和显式 persona/任务计划使用同一入口。历史结果导入后追加一轮仍不支持。N1 示例是每轮一位模拟用户、共五轮：R1–R4 包含需求处理与 OpenAgents 交付，R5 仅试用最终 Harness。被进化的对象是 Harness；pvlib 是用户的试用任务，auto-designer 是实验控制器。客观评分默认未配置；可选逐轮验收和独立事后评分见下文。
+可选 U1：每轮一位用户试用一个任务；或 U4：每轮四位用户试用两个任务，并发上限为二。U4 共两轮，首轮包含交付，末轮只试用。任务包列表和显式 persona/任务计划使用同一入口。当前格式的完整归档可[追加轮次](tutorials/experiment-continuation.zh-CN.md)；旧布局产物不自动转换。U1 示例是每轮一位模拟用户、共五轮：R1–R4 包含需求处理与 OpenAgents 交付，R5 仅试用最终 Harness。被进化的对象是 Harness；pvlib 是用户的试用任务，auto-designer 是实验控制器。客观评分默认未配置；可选逐轮验收和独立事后评分见下文。
+
+完整原任务环境见[六轮 E2B 教程](tutorials/evolution32.zh-CN.md)：U8 mixed/direct 分别为 6/2、0/8 个模拟/direct 会话，U16 为 12/4，U32 为 25/7。这些配置选择真实任务包、输入、服务和原 persona 配对，而不是只增加会话数量。四组均从当前 builtin seed 开始，用户和 Developer 并发分别为四，默认关闭逐轮官方评分；R1–R5 包含交付，R6 只试用。材料获取方式和来源见[任务清单](../examples/tasks/evolution32/README.zh-CN.md)。
 
 ## 1. 安装
 
@@ -27,21 +29,34 @@ uv sync --locked --extra experiments
 
 ```bash
 # 本地 Docker + localhost Gitea：
-CONFIG=examples/experiments/synthesizer-n1-local.json
+CONFIG=examples/experiments/u1-local.json
 # 或者 E2B + 用户自己的 Gitea.com：
-# CONFIG=examples/experiments/synthesizer-n1-e2b.json
+# CONFIG=examples/experiments/u1-e2b.json
 # 四位用户、两个任务：选择对应后端。
-# CONFIG=examples/experiments/synthesizer-n4-local.json
-# CONFIG=examples/experiments/synthesizer-n4-e2b.json
+# CONFIG=examples/experiments/u4-local.json
+# CONFIG=examples/experiments/u4-e2b.json
+# 六轮 E2B 研究任务配置：
+# CONFIG=examples/experiments/u8-mixed-e2b.json
+# CONFIG=examples/experiments/u8-direct-e2b.json
+# CONFIG=examples/experiments/u16-mixed-e2b.json
+# CONFIG=examples/experiments/u32-mixed-e2b.json
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
 ```
 
-编辑 `.env.experiment`，填写 User、Harness、需求面的 OpenAI-compatible base URL/key，以及交付角色的 Anthropic-compatible base URL/token。示例模型为 `claude-opus-5-5`；供应商模型名不同时，复制 JSON 后修改四个 `models.*.model`。Triage、Synthesizer、PM 共用需求模型，Owner 准入是机械规则。
+编辑 `.env.experiment`，填写 User、Harness、需求面的 OpenAI-compatible base URL/key，以及交付角色的 Anthropic-compatible base URL/token。U1/U4 使用 `claude-opus-5-5`；四组六轮配置的 User/Harness 使用 `glm-5.3-flash`，需求/交付使用 `glm-5.3`。供应商模型名不同时，在 prepare 前修改四个 `models.*.model`。Triage、Synthesizer、PM 共用需求模型，Owner 准入是机械规则。只有 OpenAI 协议的地址不能直接用于 Claude Code 交付，交付需要对应的 Anthropic-compatible base URL。
 
 E2B 路径还要填写 `E2B_API_KEY` 和 Gitea.com token，授权创建、读写本人的私有仓库、Issue、评论、附件。可选的 `GITEA_USER` 用于校验 token 实际对应的账号。本地 Gitea 账户和 token 自动生成；新建账户的网页登录信息保存在对应 run 的 `secrets/local-gitea-login.env`（权限 0600）。具体格式见[配置说明](CONFIGURATION.zh-CN.md)。
 
 ## 3. 检查、准备、启动
+
+填好凭证后，也可以用一条命令连续完成 prepare 和启动；输出的 run ID 用于后续 status/logs/collect：
+
+```bash
+uv run --locked --extra experiments python backend/scripts/experiment.py run --config "$CONFIG" --secrets-file .env.experiment
+```
+
+下面分开执行的方式适合先核对冻结输入和准备结果；两种方式选择一种即可。
 
 配套执行证据 reader 已在 `release/compatibility.json` 固定为远端审阅候选，`prepare` 默认使用该不可变提交，见[准备说明](tutorials/evolution-feedback.zh-CN.md#3-检查并准备)。正式发布前仍需完成两仓联合审阅。
 
@@ -51,7 +66,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py check -
 uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config "$CONFIG" --secrets-file .env.experiment
 ```
 
-离线检查验证 JSON 和本地材料，不调用模型、不创建云资源。第二条 check 检查凭证配置和 Docker/provider 访问，除非显式加 `--probe-models`，否则不发送模型请求。prepare 生成唯一 run ID，冻结输入，下载固定版本源码，并构建所需本地镜像；不调用模型，也不启动实验资源。冻结后 `[prepare]` 会先输出 run ID，本地构建还会输出日志路径；可在另一终端执行 `tail -f /printed/path/logs/prepare.log` 查看首次镜像构建进度。首次需要下载源码、依赖、Claude 和 Docker 镜像，冷构建可能明显慢于后续使用缓存的准备。等 prepare 成功结束再启动实验，提前出现 ID 不代表已准备好。复制 run ID：
+离线检查验证 JSON 和本地材料，不调用模型、不创建云资源；未进入已验证缓存的远端输入仍列为待下载，离线通过不证明材料实体或 provider 已就绪。第二条 check 检查凭证配置和 Docker/provider 访问，除非显式加 `--probe-models`，否则不发送模型请求。prepare 生成唯一 run ID，冻结输入，下载固定版本源码，并构建所需本地镜像；不调用模型，也不启动实验资源。冻结后 `[prepare]` 会先输出 run ID，本地构建还会输出日志路径；可在另一终端执行 `tail -f /printed/path/logs/prepare.log` 查看首次镜像构建进度。首次需要下载源码、依赖、Claude 和 Docker 镜像，冷构建可能明显慢于后续使用缓存的准备。等 prepare 成功结束再启动实验，提前出现 ID 不代表已准备好。复制 run ID：
 
 ```bash
 RUN_ID=REPLACE_WITH_PRINTED_RUN_ID
@@ -73,9 +88,11 @@ uv run --locked --extra experiments python backend/scripts/experiment.py destroy
 
 stop 保留实验身份、仓库与 recovery checkpoint。本地会停止 Gitea/egress、清理执行容器并保留 Gitea 数据；resume 恢复原 loopback 端口和仓库。原端口被占用时，应排除冲突后重试 resume，不修改冻结地址。E2B 停进程后沙箱仍被分配，仍可能计费。resume 使用同一份冻结输入和仍存活的资源；到期或被删除的沙箱会标为 `LOST`，不会悄悄新建后声称续跑。destroy 保留已收集产物、Gitea 仓库和共享构建缓存；没有完整收集时默认拒绝删除。
 
-默认目录为 `.experiments/<run_id>/`。实验结果、资源状态、收集状态分别记录：配置的轮次全部封口和 controller 完成才是 `COMPLETED`；收集的 `COMPLETE` 不代表实验成功。主机在线时后台 monitor 周期收集。终态收集完成前应保持主机在线，云沙箱到期可能丢失尚未收集的数据。
+默认目录为 `.experiments/<run_id>/`。实验结果、资源状态、收集状态分别记录：配置的轮次全部封口和 controller 完成才是 `COMPLETED`；收集的 `COMPLETE` 不代表实验成功。主机在线时后台 monitor 周期收集，确认实验 `COMPLETED` 且收集 `COMPLETE` 后会自动释放计算资源，保留归档和 Gitea 仓库。停止或失败的实验不走这条自动清理路径。终态收集完成前应保持主机在线，云沙箱到期可能丢失尚未收集的数据。
 
-[完整 N=1 教程](tutorials/n1-experiment.zh-CN.md)说明所有输入、预期结果、中断边界和证据；[多用户教程](tutorials/multi-user-experiment.zh-CN.md)提供两个任务、固定跨轮计划和停止/恢复的 N4 流程；实际验证结果见[N1 报告](validation/spec-0069-new-user.md)和[多用户报告](validation/spec0073-multi-task-users.md)。
+E2B 创建租期由 `runtime.e2b.timeout_seconds` 指定，示例为 86400 秒；当前后台 collector 不会续租。云内 supervisor 在本机 CLI 退出后仍可运行，但完整六轮可能超过一天，应关注实际 `expires_at` 并定期收集。CLI `resume` 要求原沙箱仍在运行，不自动恢复 provider 的 paused 实例，详见[六轮教程](tutorials/evolution32.zh-CN.md#收集停止和恢复)。
+
+[完整 U1 教程](tutorials/u1-experiment.zh-CN.md)说明所有输入、预期结果、中断边界和证据；[多用户教程](tutorials/multi-user-experiment.zh-CN.md)提供两个任务、固定跨轮计划和停止/恢复的 U4 流程；实际验证结果见[U1 报告](validation/spec-0069-new-user.md)和[多用户报告](validation/spec0073-multi-task-users.md)。
 
 ## 在每轮反馈前启用客观验收
 
@@ -100,15 +117,17 @@ uv run --locked --extra experiments --extra evaluation python backend/scripts/ex
 填好同一份 `.env.experiment` 后，选择批次列表，替代单个实验配置：
 
 ```bash
-BATCH_CONFIG=examples/batches/n1-n4-local.json
-# BATCH_CONFIG=examples/batches/n1-n4-e2b.json
+BATCH_CONFIG=examples/batches/u1-u4-local.json
+# BATCH_CONFIG=examples/batches/u1-u4-e2b.json
+# 四组六轮 E2B 配置，每次运行一组：
+# BATCH_CONFIG=examples/batches/evolution-four-e2b.json
 uv run --locked --extra experiments python backend/scripts/experiment.py batch check --config "$BATCH_CONFIG" --offline
 uv run --locked --extra experiments python backend/scripts/experiment.py batch prepare --config "$BATCH_CONFIG" --secrets-file .env.experiment
 BATCH_ID=REPLACE_WITH_PRINTED_BATCH_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py batch run "$BATCH_ID" --secrets-file .env.experiment
 ```
 
-示例每次只运行一个活动实验。`batch run` 在前台监督到终态收集；Ctrl+C 退出监督，已启动成员继续运行。停止成员用 `batch stop`，接回原成员用 `batch resume`。N1 为五轮、N4 为两轮，因此这些列表演示调度，不构成公平的因果对照。状态、子实验专属 `--runs-dir`、收集、成本和显式清理见[完整批次教程](tutorials/batch-experiment.zh-CN.md)。批次管理不自动销毁计算资源或删除仓库；E2B stop 后沙箱仍保留。
+示例每次只运行一个活动实验。`batch run` 在前台监督到终态收集；Ctrl+C 退出监督，已启动成员继续运行。停止成员用 `batch stop`，接回原成员用 `batch resume`。U1 为五轮、U4 为两轮，因此这些列表演示调度，不构成公平的因果对照。状态、子实验专属 `--runs-dir`、收集、成本和显式清理见[完整批次教程](tutorials/batch-experiment.zh-CN.md)。批次管理不自动销毁计算资源或删除仓库；E2B stop 后沙箱仍保留。
 
 
 ## 离线演示和开发

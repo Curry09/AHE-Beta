@@ -8,7 +8,7 @@
 
 ## 1. 收集实验并准备评分主机
 
-完成 [N1](n1-experiment.zh-CN.md) 或[多用户教程](multi-user-experiment.zh-CN.md)，收集已停止控制器的完整归档。指定轮次必须已封口，收集必须有经过核验的终态 `COMPLETE` 回执。归档完整不证明交互有效或任务成功，这些事实单独核验。
+完成 [U1](u1-experiment.zh-CN.md) 或[多用户教程](multi-user-experiment.zh-CN.md)，收集已停止控制器的完整归档。指定轮次必须已封口，收集必须有经过核验的终态 `COMPLETE` 回执。归档完整不证明交互有效或任务成功，这些事实单独核验。
 
 E2B 实验先下载归档，再在有 Docker 的主机评分。不重启 E2B，不运行嵌套 Docker，不调用模型；无需模型、Gitea 或 E2B 凭证。已销毁计算资源的实验，只要仍保留冻结 run 目录和完整归档，就可评分。
 
@@ -19,7 +19,7 @@ RUN_ID=REPLACE_WITH_COLLECTED_RUN_ID
 PLAN=/absolute/path/to/grading-plan.json
 ```
 
-批次成员的 `RUNS_DIR` 应设为子实验根目录，例如 `.experiments/.batches/<batch_id>/children/n1`。保留原冻结控制器与输入；升级当前 checkout 不会升级既有 run，也不能补造回执。
+批次成员的 `RUNS_DIR` 应设为子实验根目录，例如 `.experiments/.batches/<batch_id>/children/u1`。保留原冻结控制器与输入；升级当前 checkout 不会升级既有 run，也不能补造回执。
 
 ## 2. 准备私有评分计划
 

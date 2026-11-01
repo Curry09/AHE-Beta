@@ -146,6 +146,17 @@ _Spec-0073/T4: one unified controller backed by shared experiment runtime._
 | `runtime.py` | Spec-0073/T4: shared experiment runtime: repository, delivery process and round receipts. |
 | `unified.py` | Spec-0073/T4: unified frozen-task experiment controller. Start through the experiment CLI. |
 
+### auto_designer.experiment.task_environments
+
+_Spec-0081: frozen task material and Docker execution capabilities._
+
+| 组件 | 职责（文件级 docstring 首行） |
+|----|----|
+| `__init__.py` | Spec-0081: frozen task material and Docker execution capabilities. |
+| `contract.py` | Spec-0081/T1: container task declarations independent of execution providers. |
+| `docker.py` | Spec-0081/T3: owned Docker task containers and finite companion services. |
+| `materials.py` | Spec-0081/T2: verified task inputs; no provider or experiment orchestration. |
+
 ### auto_designer.guards
 
 _Spec-0068/T1: repository integrity, commit boundaries and tool path checks._
@@ -265,6 +276,7 @@ _SeedSource 实现子包（spec-0009/T1）。_
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | SeedSource 实现子包（spec-0009/T1）。 |
+| `container.py` | Spec-0081/T3: bind a frozen container recipe to a concrete session attempt. |
 | `docker_seed.py` | Runnable Docker seed source (spec-0051/T2). |
 | `empty.py` | empty SeedSource（spec-0009/T2）。 |
 | `git.py` | git SeedSource（spec-0009/T4）。 |
@@ -358,6 +370,10 @@ graph LR
     nauto_designer_experiment_materials["experiment.materials"]
     nauto_designer_experiment_model_limits["experiment.model_limits"]
     nauto_designer_experiment_runtime["experiment.runtime"]
+    nauto_designer_experiment_task_environments["experiment.task_environments"]
+    nauto_designer_experiment_task_environments_contract["task_environments.contract"]
+    nauto_designer_experiment_task_environments_docker["task_environments.docker"]
+    nauto_designer_experiment_task_environments_materials["task_environments.materials"]
     nauto_designer_experiment_task_import["experiment.task_import"]
     nauto_designer_experiment_workload["experiment.workload"]
     nauto_designer_guards["auto_designer.guards"]
@@ -425,6 +441,7 @@ graph LR
     nauto_designer_user_sim_seed_source["sim.seed_source"]
     nauto_designer_user_sim_skills["sim.skills"]
     nauto_designer_user_sim_sources["sim.sources"]
+    nauto_designer_user_sim_sources_container["sources.container"]
     nauto_designer_user_sim_sources_docker_seed["sources.docker_seed"]
     nauto_designer_user_sim_sources_empty["sources.empty"]
     nauto_designer_user_sim_sources_git["sources.git"]
@@ -575,11 +592,17 @@ graph LR
     nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_template
     nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_workload
     nauto_designer_experiment_backends_e2b --> nauto_designer_loop_round_assessment
+    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_backends_base
     nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_config
     nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_materials
+    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_task_environments_contract
+    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_task_environments_docker
+    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_task_environments_materials
     nauto_designer_experiment_backends_e2b_template --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_e2b_template --> nauto_designer_experiment_workload
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_base
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_e2b_bootstrap
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_local_ci
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_collection
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_config
@@ -587,6 +610,9 @@ graph LR
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_engine
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_infrastructure
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_materials
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_task_environments
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_task_environments_contract
+    nauto_designer_experiment_backends_local --> nauto_designer_experiment_task_environments_docker
     nauto_designer_experiment_backends_local --> nauto_designer_experiment_workload
     nauto_designer_experiment_backends_local --> nauto_designer_loop_round_assessment
     nauto_designer_experiment_backends_local --> nauto_designer_observations_transport
@@ -601,7 +627,9 @@ graph LR
     nauto_designer_experiment_batch_config --> nauto_designer_experiment
     nauto_designer_experiment_batch_config --> nauto_designer_experiment_config
     nauto_designer_experiment_batch_config --> nauto_designer_experiment_materials
+    nauto_designer_experiment_batch_config --> nauto_designer_experiment_task_environments_contract
     nauto_designer_experiment_batch_store --> nauto_designer_experiment
+    nauto_designer_experiment_batch_store --> nauto_designer_experiment_batch_config
     nauto_designer_experiment_batch_store --> nauto_designer_experiment_config
     nauto_designer_experiment_batch_store --> nauto_designer_experiment_manifest
     nauto_designer_experiment_batch_store --> nauto_designer_experiment_materials
@@ -619,6 +647,7 @@ graph LR
     nauto_designer_experiment_collection --> nauto_designer_experiment_continuation_export
     nauto_designer_experiment_collection --> nauto_designer_experiment_materials
     nauto_designer_experiment_config --> nauto_designer_experiment_model_limits
+    nauto_designer_experiment_config --> nauto_designer_experiment_task_environments_contract
     nauto_designer_experiment_config --> nauto_designer_experiment_workload
     nauto_designer_experiment_context --> nauto_designer_execution_contract
     nauto_designer_experiment_context --> nauto_designer_experiment_config
@@ -642,6 +671,7 @@ graph LR
     nauto_designer_experiment_continuation_forge --> nauto_designer_tracker_base
     nauto_designer_experiment_continuation_source --> nauto_designer_demand_issue_schema
     nauto_designer_experiment_continuation_source --> nauto_designer_experiment_config
+    nauto_designer_experiment_continuation_source --> nauto_designer_experiment_task_environments_contract
     nauto_designer_experiment_continuation_source --> nauto_designer_experiment_workload
     nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_divergent
     nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_grouped_synthesizer
@@ -715,6 +745,7 @@ graph LR
     nauto_designer_experiment_grading --> nauto_designer_models
     nauto_designer_experiment_grading_inputs --> nauto_designer_evaluation_contracts
     nauto_designer_experiment_grading_inputs --> nauto_designer_experiment_config
+    nauto_designer_experiment_grading_inputs --> nauto_designer_experiment_task_environments_contract
     nauto_designer_experiment_infrastructure --> nauto_designer_experiment_backends_local_ci
     nauto_designer_experiment_infrastructure --> nauto_designer_experiment_config
     nauto_designer_experiment_manifest --> nauto_designer_experiment_config
@@ -723,6 +754,7 @@ graph LR
     nauto_designer_experiment_materials --> nauto_designer_experiment_config
     nauto_designer_experiment_materials --> nauto_designer_experiment_continuation_forge
     nauto_designer_experiment_materials --> nauto_designer_experiment_continuation_source
+    nauto_designer_experiment_materials --> nauto_designer_experiment_task_environments_materials
     nauto_designer_experiment_materials --> nauto_designer_experiment_workload
     nauto_designer_experiment_materials --> nauto_designer_user_sim_persona_io
     nauto_designer_experiment_model_limits --> nauto_designer_experiment_config
@@ -735,12 +767,18 @@ graph LR
     nauto_designer_experiment_runtime --> nauto_designer_experiment_manifest
     nauto_designer_experiment_runtime --> nauto_designer_experiment_materials
     nauto_designer_experiment_runtime --> nauto_designer_experiment_workload
+    nauto_designer_experiment_task_environments_docker --> nauto_designer_experiment_task_environments_contract
+    nauto_designer_experiment_task_environments_docker --> nauto_designer_experiment_task_environments_materials
+    nauto_designer_experiment_task_environments_docker --> nauto_designer_observations_publication
+    nauto_designer_experiment_task_environments_docker --> nauto_designer_user_sim_runtime
+    nauto_designer_experiment_task_environments_materials --> nauto_designer_experiment_task_environments_contract
     nauto_designer_experiment_task_import --> nauto_designer_distill_seed_library
     nauto_designer_experiment_task_import --> nauto_designer_experiment_config
     nauto_designer_experiment_task_import --> nauto_designer_experiment_workload
     nauto_designer_experiment_workload --> nauto_designer_experiment_config
     nauto_designer_experiment_workload --> nauto_designer_experiment_context
     nauto_designer_experiment_workload --> nauto_designer_experiment_materials
+    nauto_designer_experiment_workload --> nauto_designer_experiment_task_environments_contract
     nauto_designer_guards_workspace_jail --> nauto_designer_demand_observation_provider
     nauto_designer_guards_workspace_jail --> nauto_designer_usage
     nauto_designer_harness_connector --> nauto_designer_harness_interface
@@ -789,6 +827,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_loop_recovery
     nauto_designer_loop_sim_user --> nauto_designer_models
     nauto_designer_loop_sim_user --> nauto_designer_observations_preflight
+    nauto_designer_loop_sim_user --> nauto_designer_observations_publication
     nauto_designer_loop_sim_user --> nauto_designer_tracker_base
     nauto_designer_loop_sim_user --> nauto_designer_usage
     nauto_designer_loop_sim_user --> nauto_designer_user_patches
@@ -800,6 +839,7 @@ graph LR
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_persona_client
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_prompt
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_runtime
+    nauto_designer_loop_sim_user --> nauto_designer_user_sim_seed_source
     nauto_designer_loop_sim_user --> nauto_designer_user_sim_workspace
     nauto_designer_models --> nauto_designer_execution_contract
     nauto_designer_models --> nauto_designer_usage
@@ -885,15 +925,22 @@ graph LR
     nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_sources
     nauto_designer_user_sim_skills --> nauto_designer_user_sim_dimensions
+    nauto_designer_user_sim_sources_container --> nauto_designer_experiment_task_environments_contract
+    nauto_designer_user_sim_sources_container --> nauto_designer_experiment_task_environments_docker
+    nauto_designer_user_sim_sources_container --> nauto_designer_models
+    nauto_designer_user_sim_sources_container --> nauto_designer_usage
+    nauto_designer_user_sim_sources_container --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_models
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_usage
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_empty --> nauto_designer_models
+    nauto_designer_user_sim_sources_empty --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_empty --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_git --> nauto_designer_models
     nauto_designer_user_sim_sources_git --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_models
+    nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_runtime
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_seed_source
     nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_workspace
     nauto_designer_user_sim_sources_prebuilt --> nauto_designer_models

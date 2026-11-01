@@ -78,7 +78,7 @@ def task_digest(task: dict[str, Any]) -> str:
 
 def task_artifact_declarations(package: dict[str, Any]) -> list[dict[str, Any]]:
     """Read public capture declarations without adding defaults to schema 1 packages."""
-    if package.get("schema_version") != 2:
+    if package.get("schema_version") not in {2, 3}:
         return []
     validate_task_package_document(package)
     return json.loads(json.dumps(package.get("artifacts", {}).get("exports", [])))
@@ -93,7 +93,12 @@ def task_provenance(package: dict[str, Any]) -> dict[str, str]:
 
 
 def validate_artifact_backend(package: dict[str, Any], backend: str) -> None:
-    """Current providers have no owned managed-service handle capability (Spec-0081)."""
+    """Service exports require the explicit container contract, never old workspaces."""
+    if package.get("schema_version") == 3:
+        validate_task_package_document(package)
+        if backend not in {"local", "e2b"}:
+            raise ConfigError(f"Task {package['id']}: unsupported container backend {backend}")
+        return
     for declaration in task_artifact_declarations(package):
         if declaration["source"] == "managed_service":
             raise ConfigError(
@@ -165,9 +170,11 @@ def catalog_tasks(catalog: dict[str, Any]) -> list[dict[str, Any]]:
         try:
             package = task["package"]
             version = package.get("schema_version")
-            if "schema_version" in package and (type(version) is not int or version not in {1, 2}):
+            if "schema_version" in package and (
+                type(version) is not int or version not in {1, 2, 3}
+            ):
                 raise ConfigError("Unknown frozen task package schema_version")
-            if version == 2 or task["kind"] == "benchmark":
+            if version in {2, 3} or task["kind"] == "benchmark":
                 validate_task_package_document(package)
             elif "artifacts" in package or "benchmark" in package:
                 raise ConfigError("Frozen schema 1 package cannot contain schema 2 fields")
@@ -217,7 +224,8 @@ def read_task_catalog(run_dir: Path, manifest: dict[str, Any]) -> dict[str, Any]
                 path = task_material_path(run_dir, manifest, task, name)
                 if sha256_file(path) != expected:
                     raise ConfigError(f"Frozen task content hash mismatch: {task['id']}/{name}")
-            task_material_path(run_dir, manifest, task, "source_archive")
+            if task["package"].get("schema_version") != 3 or "source_archive" in task["materials"]:
+                task_material_path(run_dir, manifest, task, "source_archive")
         except (KeyError, TypeError) as exc:
             raise ConfigError(f"Incomplete task materials: {task['id']}") from exc
     return catalog
@@ -266,6 +274,49 @@ def verify_task_workspaces(catalog: dict[str, Any], workspaces: dict[str, Any]) 
         raise ConfigError("Prepared task workspaces do not match the frozen catalog")
     for task in tasks:
         workspace = workspaces[task["id"]]
+        if task["package"].get("schema_version") == 3:
+            from auto_designer.experiment.task_environments.contract import (
+                EnvironmentContractError,
+                environment_identity,
+            )
+
+            try:
+                actual_recipe = environment_identity(
+                    {**task["package"], "environment": workspace["params"]["environment"]}
+                )
+            except (EnvironmentContractError, KeyError, TypeError) as exc:
+                raise ConfigError(
+                    f"Prepared container workspace identity/content mismatch: {task['id']}"
+                ) from exc
+
+            if (
+                not isinstance(workspace, dict)
+                or workspace.get("kind") != "container"
+                or workspace.get("status") != "prepared"
+                or workspace.get("task_digest") != task["digest"]
+                or workspace.get("recipe_hash") != environment_identity(task["package"])
+                or actual_recipe != workspace.get("recipe_hash")
+                or not isinstance(workspace.get("params"), dict)
+                or workspace["params"].get("task_id") != task["id"]
+                or workspace["params"].get("task_digest") != task["digest"]
+                or workspace["params"].get("environment", {}).get("image")
+                != task["package"]["environment"]["image"]
+            ):
+                raise ConfigError(
+                    f"Prepared container workspace identity/content mismatch: {task['id']}"
+                )
+            source = task["package"].get("source")
+            expected_revision = source["revision"] if source else None
+            params = workspace["params"]
+            if (
+                params.get("source") != source
+                or params.get("expected_git_revision") != expected_revision
+                or workspace.get("source_revision") != expected_revision
+            ):
+                raise ConfigError(
+                    f"Prepared container Git source differs from frozen task: {task['id']}"
+                )
+            continue
         if (
             not isinstance(workspace, dict)
             or workspace.get("task_digest") != task["digest"]

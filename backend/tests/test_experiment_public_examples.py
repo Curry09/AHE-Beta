@@ -29,7 +29,31 @@ def test_public_example_has_complete_offline_materials(path):
         # The preparation script generates an enabled artifact task plus actual key/plan hashes.
         assert config["workload"]["task_packages"][0].endswith("/order-service/task.json")
         return
-    n_users = 1 if "-n1-" in path.name else 4
+    study_examples = {
+        "u8-mixed-e2b.json": (8, 5),
+        "u8-direct-e2b.json": (8, 5),
+        "u16-mixed-e2b.json": (16, 8),
+        "u32-mixed-e2b.json": (32, 15),
+    }
+    if path.name in study_examples:
+        n_sessions, n_personas = study_examples[path.name]
+        config = load_config_v2(path)
+        tasks = [load_task_package(value) for value in config["workload"]["task_packages"]]
+        assert len(tasks) == len({task["id"] for task in tasks}) == n_sessions
+        assert all(task["schema_version"] == 3 for task in tasks)
+        assert len(report["persona_ids"]) == n_personas
+        assert report["preview"] == {"frozen": False}
+        assert config["rounds"] == {
+            "count": 6,
+            "sessions_per_round": n_sessions,
+            "max_parallel_users": 4,
+        }
+        assert len(report["interaction_plan"]) == 6
+        assert all(len(pairs) == n_sessions for pairs in report["interaction_plan"])
+        # Exact source bindings, interaction contrasts and capture boundaries have
+        # their own study contract in test_evolution32_examples.py.
+        return
+    n_users = 1 if path.name.startswith("u1-") else 4
     assert len(report["persona_ids"]) == n_users
     assert report["preview"] == {"frozen": False}
     config = load_config_v2(path)
@@ -52,14 +76,14 @@ def test_public_example_has_complete_offline_materials(path):
         } == expected_pairs
     else:
         assert report["persona_ids"] == ["sr-15-swyx"]
-        # The old public N1 input remains accepted unchanged at the loader boundary.
+        # The U1 example still exercises the original v1 workload fields.
         assert json.loads(path.read_text())["workload"]["task_package"]
 
 
 @pytest.mark.parametrize("n_users", [1, 4])
 def test_two_backends_keep_identical_experiment_semantics(n_users):
     configs = [
-        load_config_v2(ROOT / f"examples/experiments/synthesizer-n{n_users}-{backend}.json")
+        load_config_v2(ROOT / f"examples/experiments/u{n_users}-{backend}.json")
         for backend in ("local", "e2b")
     ]
     normalized = []
@@ -114,7 +138,7 @@ def test_compatibility_and_experiment_extras_are_pinned():
     "english,chinese",
     [
         ("docs/QUICKSTART.md", "docs/QUICKSTART.zh-CN.md"),
-        ("docs/tutorials/n1-experiment.md", "docs/tutorials/n1-experiment.zh-CN.md"),
+        ("docs/tutorials/u1-experiment.md", "docs/tutorials/u1-experiment.zh-CN.md"),
         ("README.md", "README.zh-CN.md"),
         (
             "docs/tutorials/multi-user-experiment.md",

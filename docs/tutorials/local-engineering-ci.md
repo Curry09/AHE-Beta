@@ -20,7 +20,7 @@ WORK_DIR="$(mktemp -d)"
 CONFIG="$WORK_DIR/experiment-local-ci.json"
 ```
 
-Fill `.env.experiment` with the model credentials described in [configuration](../CONFIGURATION.md). If you already have a filled protected file, keep using it. The next command copies the maintained local N1 template and enables CI. Because the copy lives in a temporary directory, it resolves the original task and persona paths to absolute paths. The builtin Harness needs no path rewrite. Review models, rounds and workload in the resulting configuration before preparation; this template runs five rounds and uses models during the experiment.
+Fill `.env.experiment` with the model credentials described in [configuration](../CONFIGURATION.md). If you already have a filled protected file, keep using it. The next command copies the maintained local U1 template and enables CI. Because the copy lives in a temporary directory, it resolves the original task and persona paths to absolute paths. The builtin Harness needs no path rewrite. Review models, rounds and workload in the resulting configuration before preparation; this template runs five rounds and uses models during the experiment.
 
 ```bash
 uv run --locked --extra experiments python - "$CONFIG" <<'PYCODE'
@@ -28,9 +28,9 @@ import json
 import sys
 from pathlib import Path
 
-template = Path("examples/experiments/synthesizer-n1-local.json").resolve()
+template = Path("examples/experiments/u1-local.json").resolve()
 config = json.loads(template.read_text(encoding="utf-8"))
-config["name"] = "synthesizer-n1-local-ci"
+config["name"] = "u1-local-ci"
 config["runtime"].setdefault("local", {})["ci_enabled"] = True
 workload = config["workload"]
 for field in ("task_package", "persona_library"):

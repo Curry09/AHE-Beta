@@ -16,6 +16,7 @@ from auto_designer.tracker.fake import FakeTracker
 from auto_designer.user.session_store import SessionStore
 from auto_designer.user.sim.harness_adapter import ScriptedHarness
 from auto_designer.user.sim.run_live import expert
+from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
 from auto_designer.user.sim.workspace import materialize
 
 
@@ -203,8 +204,13 @@ def test_bridge_uses_passed_workspace_dir_and_skips_materialize(tmp_path, monkey
     )
     fn = _make_fn(client, tmp_path, sp, mp)
     scenario = SeedScenario(description="task", workspace=WorkspaceSpec(fixture="billing-split"))
-    fn(mp, scenario, ScriptedHarness(), workspace_dir="/shared/ws")
+    shared = tmp_path / "shared/ws"
+    shared.mkdir(parents=True)
+    workspace = LocalWorkspaceRuntime(
+        str(shared), owns_tmp=True, evidence={"patch_capability": "not_applicable"}
+    )
+    fn(mp, scenario, ScriptedHarness(), workspace_dir=workspace)
 
     assert client.bound[0] is sp
-    assert client.bindings[0][1].cwd == "/shared/ws"
+    assert client.bindings[0][1].cwd == str(shared)
     assert client.bound[1].runtime_id == "review-snapshot"

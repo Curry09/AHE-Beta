@@ -10,7 +10,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.loop.sim_user import make_direct_run_session_fn, make_sim_run_session_fn
+from auto_designer.loop.sim_user import (
+    EnvironmentInfrastructureError,
+    make_direct_run_session_fn,
+    make_sim_run_session_fn,
+)
 from auto_designer.models import Persona, SeedScenario
 from auto_designer.tracker.fake import FakeTracker
 from auto_designer.usage import bind_usage_context
@@ -146,18 +150,21 @@ def test_real_git_export_failure_is_not_an_empty_prediction(tmp_path: Path, mode
     repo.mkdir()
     store = SessionStore(tmp_path / "data" / "sessions")
     run, persona = _runner(mode, store, _ReviewClient())
-    with bind_usage_context(session_id=f"failed-{mode}"):
-        session = run(
-            persona,
-            SeedScenario("task"),
-            ScriptedHarness(),
-            workspace_dir=LocalWorkspaceRuntime(str(repo)),
-        )
-    evidence = store.load(session.session_id).workspace_evidence
-    assert "prediction" not in evidence
-    assert evidence["prediction_error"]["status"] == "export_failed"
-    assert "patch_export_error" in evidence
-    assert "diff_sha256" not in evidence
+    sid = f"failed-{mode}"
+    with bind_usage_context(session_id=sid):
+        with pytest.raises(EnvironmentInfrastructureError, match="patch preservation"):
+            run(
+                persona,
+                SeedScenario("task"),
+                ScriptedHarness(),
+                workspace_dir=LocalWorkspaceRuntime(str(repo)),
+            )
+    assert store.load_actor_checkpoint(sid) is not None
+    assert store.reconcile(sid) is None and store.index() == []
+    failure = json.loads(
+        next((store.root / "actor-checkpoints" / f"{sid}.failures").glob("*.json")).read_text()
+    )
+    assert failure["evidence"]["prediction_error"]["status"] == "export_failed"
     assert not (store.root.parent / "predictions").exists()
 
 
@@ -178,17 +185,17 @@ def test_preservation_conflict_saves_failure_without_overwriting_prediction(
     before = path.stat().st_mtime_ns
     run, persona = _runner(mode, store, _ReviewClient())
     with bind_usage_context(session_id=sid):
-        session = run(
-            persona,
-            SeedScenario("task"),
-            ScriptedHarness(),
-            workspace_dir=LocalWorkspaceRuntime(str(repo)),
-        )
-    assert "prediction" not in session.workspace_evidence
-    assert session.workspace_evidence["prediction_error"]["status"] == "preservation_failed"
+        with pytest.raises(EnvironmentInfrastructureError, match="patch preservation"):
+            run(
+                persona,
+                SeedScenario("task"),
+                ScriptedHarness(),
+                workspace_dir=LocalWorkspaceRuntime(str(repo)),
+            )
+    assert store.reconcile(sid) is None
+    assert store.load_actor_checkpoint(sid) is not None
     assert path.read_bytes() == b"previous"
     assert path.stat().st_mtime_ns == before
-    assert store.load(sid).workspace_evidence == session.workspace_evidence
 
 
 @pytest.mark.parametrize("sid", ["", ".", "..", "../escape", "/escape", "a/b", "a\\b", "a\x00b"])
@@ -293,20 +300,25 @@ def test_write_failure_does_not_fabricate_receipt_and_retains_session(
         raise OSError("private-host-path: disk full")
 
     monkeypatch.setattr("auto_designer.loop.sim_user.preserve_prediction", fail)
-    session = run(
-        persona,
-        SeedScenario("task"),
-        ScriptedHarness(),
-        workspace_dir=LocalWorkspaceRuntime(str(repo)),
+    sid = f"write-failure-{mode}"
+    with bind_usage_context(session_id=sid):
+        with pytest.raises(EnvironmentInfrastructureError, match="patch preservation"):
+            run(
+                persona,
+                SeedScenario("task"),
+                ScriptedHarness(),
+                workspace_dir=LocalWorkspaceRuntime(str(repo)),
+            )
+    assert store.reconcile(sid) is None and store.index() == []
+    assert store.load_actor_checkpoint(sid) is not None
+    failure = json.loads(
+        next((store.root / "actor-checkpoints" / f"{sid}.failures").glob("*.json")).read_text()
     )
-    evidence = store.load(session.session_id).workspace_evidence
-    assert "prediction" not in evidence
-    assert evidence["prediction_error"] == {
+    assert failure["evidence"]["prediction_error"] == {
         "status": "preservation_failed",
         "error_type": "OSError",
     }
-    assert "private-host-path" not in json.dumps(evidence["prediction_error"])
-    assert evidence["diff_sha256"] == hashlib.sha256(b"").hexdigest()
+    assert "private-host-path" not in json.dumps(failure["evidence"]["prediction_error"])
 
 
 @pytest.mark.parametrize("mode", ["direct", "simulated"])
@@ -588,3 +600,28 @@ def test_prediction_excludes_generated_runtime_even_without_gitignore(
     assert (fresh / "tracked.txt").read_text() == "real source change\n"
     assert not (fresh / ".venv").exists()
     assert not (fresh / "__pycache__").exists()
+
+
+@pytest.mark.parametrize("mode", ["direct", "simulated"])
+def test_actor_breaking_git_is_task_artifact_failure_and_does_not_block_feedback(tmp_path, mode):
+    import shutil
+
+    repo = _repository(tmp_path)
+    store = SessionStore(tmp_path / "data/sessions")
+    run, persona = _runner(mode, store, _ReviewClient())
+
+    class BrokenGitHarness(ScriptedHarness):
+        def send(self, message):
+            shutil.rmtree(repo / ".git", ignore_errors=True)
+            return super().send(message)
+
+    session = run(
+        persona,
+        SeedScenario("task"),
+        BrokenGitHarness(),
+        workspace_dir=LocalWorkspaceRuntime(str(repo)),
+    )
+    assert session.workspace_evidence["prediction_error"]["status"] == "invalid_task_artifact"
+    assert "prediction" not in session.workspace_evidence
+    assert session.workspace_evidence["review_snapshot"]["omissions"] == ["invalid_git_artifact"]
+    assert store.load(session.session_id).session_id == session.session_id

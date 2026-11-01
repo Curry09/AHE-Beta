@@ -1,0 +1,55 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "010-pivot-product-revenue",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "tua-bench",
+    "instance_id": "010-pivot-product-revenue",
+    "revision": "9b4a26f0152b1f46da28e3df34bae1b9124aa6472fa5f5ebd8a840cc347b584a"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:2bd80ebe6aabced68e7c9c2508d81574b86645fbc34a7411adc15c0f1aff90be",
+    "workdir": "/app",
+    "patch": "not_applicable",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "24f1ccc696b3ddaf90693920c56fb3d22eb05f189716047b7e6d94a3c8b5109f",
+          "format": "tar.gz",
+          "files": {
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-readiness-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "-c",
+        "from pathlib import Path\nimport hashlib,openpyxl,shutil\np=Path('/app/BoomerangSales.xlsx');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9962eddeb2e47c89d67374922dce5065a65e233bd806eb024506b4c6647bd6b2'\nw=openpyxl.load_workbook(p,read_only=True);assert 'Retail Price' in w.sheetnames\nassert shutil.which('libreoffice')\n"
+      ],
+      "timeout_seconds": 120
+    }
+  },
+  "artifacts": {
+    "version": 1,
+    "exports": [
+      {
+        "id": "workbook",
+        "source": "workspace",
+        "path": "BoomerangSales.xlsx",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "required": true,
+        "max_bytes": 67108864
+      }
+    ]
+  }
+}

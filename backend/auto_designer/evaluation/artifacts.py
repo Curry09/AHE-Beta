@@ -44,15 +44,31 @@ def collect_session_artifacts(
         try:
             if collection_error:
                 raise RuntimeError(collection_error)
-            if declaration["source"] != "workspace":
-                raise NotImplementedError(
-                    "Managed service evidence requires the environment broker"
-                )
             if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", declaration["id"]):
                 raise ValueError("Invalid artifact id")
             if not re.fullmatch(r"[A-Za-z0-9_.-]+", session_id):
                 raise ValueError("Invalid session id")
-            payload = workspace.export_file(declaration["path"], declaration["max_bytes"])
+            if declaration["source"] == "workspace":
+                try:
+                    payload = workspace.export_file(declaration["path"], declaration["max_bytes"])
+                except ValueError:
+                    row.update(status="invalid", reason="invalid_task_artifact")
+                    receipt["entries"].append(row)
+                    continue
+            elif declaration["source"] == "managed_service":
+                # Spec-0081/T3: ownership and public visibility belong to the runtime.
+                export = getattr(workspace, "export_service_file", None)
+                if not callable(export):
+                    raise NotImplementedError(
+                        "This runtime has no managed-service export capability"
+                    )
+                payload = export(declaration["handle"], declaration["max_bytes"])
+                attest = getattr(workspace, "service_export_provenance", None)
+                if not callable(attest):
+                    raise NotImplementedError("Managed output has no ownership provenance")
+                row["metadata"] = attest(declaration["handle"])
+            else:
+                raise ValueError("Unknown artifact source")
             if not isinstance(payload, bytes) or len(payload) > declaration["max_bytes"]:
                 raise OverflowError("Artifact exceeds its byte limit")
             relative = f"evaluation-artifacts/{session_id}/{attempt_id}/{declaration['id']}"
@@ -76,7 +92,10 @@ def collect_session_artifacts(
         except Exception as exc:  # noqa: BLE001 - one failed output must not skip cleanup
             row.update(status="collection_failed", reason=type(exc).__name__)
         receipt["entries"].append(row)
-    receipt["complete"] = all(
+    # Spec-0081/T3: empty exports never conceal a failed freeze/finalize.
+    receipt["complete"] = collection_error is None and all(
         not row["required"] or row["status"] == "collected" for row in receipt["entries"]
     )
+    if collection_error:
+        receipt["collection_error"] = collection_error
     return receipt

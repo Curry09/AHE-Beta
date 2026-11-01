@@ -79,7 +79,7 @@ tasks:
       - backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml
       - backend/auto_designer/experiment/controllers/ordinary.py
       - backend/auto_designer/experiment/controllers/swebench.py
-      - examples/experiments/synthesizer-n1-e2b.json
+      - examples/experiments/u1-e2b.json
     scope: 当前 Agent 定义、包内 controller 与 v2 示例统一使用 synthesizer 及共享需求模型参数；旧 env 模板、auditable wrapper 和 scaling 示例已归档，不再映射为活入口。
     acceptance: 现行定义可加载，两个 v2 示例离线校验通过；角色和环境字段为新名称，归档配置不进入当前运行输入。
   - id: T3

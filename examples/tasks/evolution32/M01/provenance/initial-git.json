@@ -1,0 +1,59 @@
+{
+  "kind": "publication-prepared initial-input Git child",
+  "parent": "30b4cd0e7f074dafca13ea77012c3d00c48ef40f",
+  "prepared": "9ae5c9531c1ea77af47ef40c9648d6ae5c5f9697",
+  "tree": "069fe741531fb0ce03d0106cea5ef23a64529012",
+  "original_input_files": {
+    "public/SOURCES.md": {
+      "sha256": "ce8c029fb775d778e5e9618c4cc138f70c881db92e975f69615f5f29c013ba2c",
+      "bytes": 466,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/TASK.md": {
+      "sha256": "548ce1624a51b3a461eeb35304193f76ae8422f8123c77967212339b6d3bd3d5",
+      "bytes": 1660,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/candidate.diff": {
+      "sha256": "2557ef519542f753de30762fad951b1561c481fcd11874722efacd6c2b895fd5",
+      "bytes": 45076,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/review-samples/correlated_update.sql": {
+      "sha256": "862ff00ecc9512a437894ada9939ca490b6c12079503599b293de81840101789",
+      "bytes": 81,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/review-samples/nested_cte.sql": {
+      "sha256": "57f2df49df3de4e06cdf3e3e4e1976509446003c7b9d15b52d7a647a27847448",
+      "bytes": 80,
+      "mode": 420,
+      "git_mode": "100644"
+    },
+    "public/review-samples/templated_cte.sql": {
+      "sha256": "7fa60070b3b5f159213534a3d5ae4706ecfd3a65dadebd60236e04b4bcd22afd",
+      "bytes": 156,
+      "mode": 420,
+      "git_mode": "100644"
+    }
+  },
+  "input_bytes_type_mode_unchanged": true,
+  "verification": {
+    "fresh_environments": 2,
+    "same_prepared_commit": true,
+    "production_pre_actor_patch_bytes": 0,
+    "source_and_binary_negative_controls": "only intentional single-file mutation exported; after restoration patch empty"
+  },
+  "recipe_asset": {
+    "name": "task-initial-git-recipes-v1.tar.gz",
+    "sha256": "9b2f3b30ae2247f565b89048f8e535b465f64cceb89be78c9dc4c2c17fa450e4",
+    "files": {
+      "freeze_initial_git.py": "a6633dd13a92308eb13279da9356e1fc1dd5e21b194876ec11a4a238886b4f67"
+    }
+  },
+  "source_identity": "The parent is a real original prepared task commit. The child adds only the listed original, previously untracked inputs; it is not an upstream GitHub commit or an Actor solution."
+}

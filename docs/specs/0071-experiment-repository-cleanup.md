@@ -583,13 +583,13 @@ tasks:
       - docs/CONFIGURATION.zh-CN.md
       - docs/ARCHITECTURE.md
       - docs/EXPORTING.md
-      - docs/tutorials/n1-experiment.md
-      - docs/tutorials/n1-experiment.zh-CN.md
+      - docs/tutorials/u1-experiment.md
+      - docs/tutorials/u1-experiment.zh-CN.md
       - docs/validation/spec0071-experiment-cleanup.md
       - frontend/README.md
       - examples/experiment.env.example
-      - examples/experiments/synthesizer-n1-local.json
-      - examples/experiments/synthesizer-n1-e2b.json
+      - examples/experiments/u1-local.json
+      - examples/experiments/u1-e2b.json
       - backend/scripts/e2e-synthesizer-naming.sh
       - docs/specs/0001-user-agent-harness-usage.md
       - docs/specs/0002-gitea-tracker-and-infra.md
@@ -706,13 +706,13 @@ tasks:
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py check \
-  --config examples/experiments/synthesizer-n1-local.json --offline
+  --config examples/experiments/u1-local.json --offline
 uv run --locked --extra experiments python backend/scripts/experiment.py prepare \
-  --config examples/experiments/synthesizer-n1-local.json --secrets-file .env.experiment
+  --config examples/experiments/u1-local.json --secrets-file .env.experiment
 uv run --locked --extra experiments python backend/scripts/experiment.py run <run_id>
 ```
 
-E2B 使用同一组命令，将配置换为 `synthesizer-n1-e2b.json`。管理命令只有 status/logs/stop/resume/collect/destroy；模型与云端凭证从 `examples/experiment.env.example` 的显式引用提供。用户无需寻找个人 HOME 下的文件、选择带模型名的 shell 或手动运行控制器。
+E2B 使用同一组命令，将配置换为 `u1-e2b.json`。管理命令只有 status/logs/stop/resume/collect/destroy；模型与云端凭证从 `examples/experiment.env.example` 的显式引用提供。用户无需寻找个人 HOME 下的文件、选择带模型名的 shell 或手动运行控制器。
 
 N1 示例的任务、persona、轮次、角色、模型映射和末轮只试用语义保持。教程明确当前公开任务包是单任务；N4/N8 多场景和历史结果追加轮不属于这版统一入口的支持范围。
 

@@ -20,7 +20,7 @@ WORK_DIR="$(mktemp -d)"
 CONFIG="$WORK_DIR/experiment-local-ci.json"
 ```
 
-按[配置说明](../CONFIGURATION.zh-CN.md)填写 `.env.experiment` 中的模型凭证。已有填写完成的受保护文件时继续使用它。下列命令复制现行 local N1 模板并启用 CI。副本位于临时目录，所以把原任务、persona 路径转为绝对路径；builtin Harness 无需改写路径。准备前检查生成配置中的模型、轮次和任务；此模板运行五轮，实验过程会使用模型。
+按[配置说明](../CONFIGURATION.zh-CN.md)填写 `.env.experiment` 中的模型凭证。已有填写完成的受保护文件时继续使用它。下列命令复制现行 local U1 模板并启用 CI。副本位于临时目录，所以把原任务、persona 路径转为绝对路径；builtin Harness 无需改写路径。准备前检查生成配置中的模型、轮次和任务；此模板运行五轮，实验过程会使用模型。
 
 ```bash
 uv run --locked --extra experiments python - "$CONFIG" <<'PYCODE'
@@ -28,9 +28,9 @@ import json
 import sys
 from pathlib import Path
 
-template = Path("examples/experiments/synthesizer-n1-local.json").resolve()
+template = Path("examples/experiments/u1-local.json").resolve()
 config = json.loads(template.read_text(encoding="utf-8"))
-config["name"] = "synthesizer-n1-local-ci"
+config["name"] = "u1-local-ci"
 config["runtime"].setdefault("local", {})["ci_enabled"] = True
 workload = config["workload"]
 for field in ("task_package", "persona_library"):

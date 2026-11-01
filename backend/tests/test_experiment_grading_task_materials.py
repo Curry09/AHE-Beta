@@ -165,12 +165,21 @@ def test_minimal_frozen_schema1_catalog_keeps_old_identity(kind, explicit_versio
     assert workload.task_digest(task) == before["digest"]
 
 
-@pytest.mark.parametrize("version", [None, True, False, 1.0, 0, 3, "1"])
+@pytest.mark.parametrize("version", [None, True, False, 1.0, 0, 4, "1"])
 def test_explicit_invalid_frozen_version_cannot_bypass_schema2_checks(version):
     task = frozen_legacy_task()
     task["package"]["schema_version"] = version
     task["digest"] = workload.task_digest(task)
     with pytest.raises(ConfigError, match="schema_version"):
+        workload.catalog_tasks({"contract_version": 1, "tasks": [task]})
+
+
+def test_container_version_cannot_relabel_an_incomplete_frozen_task():
+    """Spec-0081/T1: recognizing v3 still requires its complete container contract."""
+    task = frozen_legacy_task()
+    task["package"]["schema_version"] = 3
+    task["digest"] = workload.task_digest(task)
+    with pytest.raises(ConfigError, match="required property"):
         workload.catalog_tasks({"contract_version": 1, "tasks": [task]})
 
 

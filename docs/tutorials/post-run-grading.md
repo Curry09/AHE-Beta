@@ -8,7 +8,7 @@ This evaluates tasks already attempted during evolution. It does not rerun the H
 
 ## 1. Collect the experiment and prepare the grading host
 
-Complete the [N1](n1-experiment.md) or [multi-user](multi-user-experiment.md) workflow and collect the stopped controller's complete archive. The selected round must be sealed, and the collection must have a verified terminal `COMPLETE` receipt. Archive completeness does not prove valid interactions or successful task execution; grading checks those separately.
+Complete the [U1](u1-experiment.md) or [multi-user](multi-user-experiment.md) workflow and collect the stopped controller's complete archive. The selected round must be sealed, and the collection must have a verified terminal `COMPLETE` receipt. Archive completeness does not prove valid interactions or successful task execution; grading checks those separately.
 
 For E2B experiments, download the archive and grade on a Docker host. Grading does not restart E2B, use nested Docker or make model calls. No model, Gitea or E2B credentials are needed. A destroyed experiment remains gradable if its frozen run directory and complete archive are retained.
 
@@ -19,7 +19,7 @@ RUN_ID=REPLACE_WITH_COLLECTED_RUN_ID
 PLAN=/absolute/path/to/grading-plan.json
 ```
 
-A batch member uses its child root, for example `.experiments/.batches/<batch_id>/children/n1`, as `RUNS_DIR`. Keep the original frozen controller and inputs. Upgrading this checkout does not upgrade an existing run or invent missing receipts.
+A batch member uses its child root, for example `.experiments/.batches/<batch_id>/children/u1`, as `RUNS_DIR`. Keep the original frozen controller and inputs. Upgrading this checkout does not upgrade an existing run or invent missing receipts.
 
 ## 2. Prepare a private grading plan
 

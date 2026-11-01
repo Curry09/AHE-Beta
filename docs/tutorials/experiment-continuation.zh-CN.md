@@ -8,7 +8,7 @@
 
 ## 1. 安装并选择父实验
 
-在仓库根目录使用 Python 3.12+ 和 uv。父实验需要由能产生当前 continuation export 的 controller 准备，并已达到 `COMPLETED`。[N1 教程](n1-experiment.zh-CN.md)说明怎样在本地 Docker 或 E2B 创建父实验。
+在仓库根目录使用 Python 3.12+ 和 uv。父实验需要由能产生当前 continuation export 的 controller 准备，并已达到 `COMPLETED`。[U1 教程](u1-experiment.zh-CN.md)说明怎样在本地 Docker 或 E2B 创建父实验。
 
 ```bash
 uv sync --locked --extra experiments
@@ -35,7 +35,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --json 
 
 ## 3. 生成完整的 local 和 E2B 子配置
 
-下面复制两份当前 N1 定义，将 Harness/workload 输入替换为父来源，保留模板完整的模型、角色、runtime 和策略。脚本从父末轮读取 session 数，不假设父实验是 N1；归档路径写为绝对路径，移动子 JSON 不改变含义。
+下面复制两份当前 U1 定义，将 Harness/workload 输入替换为父来源，保留模板完整的模型、角色、runtime 和策略。脚本从父末轮读取 session 数，不假设父实验是 U1；归档路径写为绝对路径，移动子 JSON 不改变含义。
 
 ```bash
 uv run --locked --extra experiments python - "$WORK_DIR" "$ADD_ROUNDS" <<'PYCODE'
@@ -65,7 +65,7 @@ with tarfile.open(parent_archive, "r:gz") as archive:
     export = json.load(archive.extractfile("runtime/continuation-export.json"))
 sessions = len(export["boundary"]["sessions"])
 for backend in ("local", "e2b"):
-    template = Path(f"examples/experiments/synthesizer-n1-{backend}.json")
+    template = Path(f"examples/experiments/u1-{backend}.json")
     config = json.loads(template.read_text(encoding="utf-8"))
     config["name"] = f"continuation-{backend}"
     config["harness"] = {"source": "continuation"}

@@ -325,7 +325,7 @@ def test_batch_verbs_preserve_explicit_root_and_credentials(command, monkeypatch
         seen.update(kwargs)
         progress = kwargs.get("progress")
         if progress:
-            progress({"batch_id": "selected-batch", "phase": "PREPARING", "entry_id": "n1"})
+            progress({"batch_id": "selected-batch", "phase": "PREPARING", "entry_id": "u1"})
         return {"batch_id": "selected-batch", "ok": True, "batch_state": "READY"}
 
     target = "run" if command == "resume" else command
@@ -403,7 +403,7 @@ def test_batch_progress_shows_user_completion_without_polluting_json(capsys):
             "batch_state": "RUNNING",
             "counts": {"active": 1, "pending": 1, "completed": 0},
             "entries": {
-                "n4": {
+                "u4": {
                     "last_status": {
                         "progress": {
                             "current_round": 2,
@@ -418,7 +418,7 @@ def test_batch_progress_shows_user_completion_without_polluting_json(capsys):
     )
     output = capsys.readouterr()
     assert output.out == ""
-    assert "n4 R2: 3/4 sessions completed, 1 running" in output.err
+    assert "u4 R2: 3/4 sessions completed, 1 running" in output.err
 
 
 @pytest.mark.parametrize(

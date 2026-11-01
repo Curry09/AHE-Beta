@@ -143,8 +143,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - examples/experiments/synthesizer-n4-local.json
-      - examples/experiments/synthesizer-n4-e2b.json
+      - examples/experiments/u4-local.json
+      - examples/experiments/u4-e2b.json
       - examples/tasks/order-service/task.json
       - examples/tasks/order-service/instruction.md
       - examples/tasks/order-service/setup.sh
@@ -158,8 +158,8 @@ tasks:
       - docs/QUICKSTART.zh-CN.md
       - docs/CONFIGURATION.md
       - docs/CONFIGURATION.zh-CN.md
-      - docs/tutorials/n1-experiment.md
-      - docs/tutorials/n1-experiment.zh-CN.md
+      - docs/tutorials/u1-experiment.md
+      - docs/tutorials/u1-experiment.zh-CN.md
       - docs/tutorials/multi-user-experiment.md
       - docs/tutorials/multi-user-experiment.zh-CN.md
       - docs/ARCHITECTURE.md
@@ -208,7 +208,7 @@ tasks:
 "workload": {
   "kind": "swebench",
   "task_package": "../tasks/pvlib-1478/task.json",
-  "persona_library": "../personas/n1.json",
+  "persona_library": "../personas/u1.json",
   "persona_ids": ["sr-15-swyx"]
 }
 ```
@@ -256,8 +256,8 @@ N4 表示一轮四局，不表示四条独立进化流水线。一次交付仍�
 命令不变，新示例使用方式：
 
 ```bash
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n4-local.json --offline
-uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config examples/experiments/synthesizer-n4-local.json --secrets-file /path/to/experiment.env
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u4-local.json --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config examples/experiments/u4-local.json --secrets-file /path/to/experiment.env
 uv run --locked --extra experiments python backend/scripts/experiment.py run RUN_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py status RUN_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py collect RUN_ID

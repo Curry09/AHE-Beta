@@ -274,6 +274,41 @@ def publish(
     }
 
 
+def verify_published(*, root: Path, session_id: str, run_id: str, version: dict) -> dict | None:
+    """Reuse an immutable run only after verifying its identity and every retained file."""
+    for identifier in (session_id, run_id):
+        if safe_relative(identifier) != identifier or "/" in identifier:
+            raise ValueError("Invalid published observation identity")
+    directory = Path(root) / session_id / "runs" / run_id
+    if any(path.is_symlink() for path in (directory, *directory.parents)):
+        raise ValueError("Linked published observation directory")
+    if not directory.exists():
+        return None
+    files = local_files(directory)
+    manifest = json.loads(files["manifest.json"])
+    if (
+        manifest.get("session_id") != session_id
+        or manifest.get("run_id") != run_id
+        or manifest.get("artifact") != version
+        or manifest.get("status") not in {"complete", "partial"}
+        or manifest.get("redaction") != "platform-filtered"
+    ):
+        raise ValueError("Published observation provenance mismatch")
+    seen = set()
+    for item in manifest["files"]:
+        name = safe_relative(item["path"])
+        if name in seen or name == "manifest.json":
+            raise ValueError("Duplicate published observation file")
+        seen.add(name)
+        body = files[name]
+        if item.get("bytes") != len(body) or item.get("sha256") != hashlib.sha256(body).hexdigest():
+            raise ValueError("Published observation content changed")
+    if manifest.get("reading") not in seen:
+        raise ValueError("Published observation reading guide missing")
+    # Run files are authoritative; repair a derived index if the controller stopped before it.
+    return publish(root=root, session_id=session_id, run_id=run_id, version=version, files=files)
+
+
 class ObservationSource:
     """Bind trusted launch provenance and collect without knowing the runtime schema."""
 

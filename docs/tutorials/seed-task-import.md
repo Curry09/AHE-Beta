@@ -36,7 +36,7 @@ Only the permitted prompt/source/setup mapping is exported. `oracle`, `env.test_
 
 Each command's JSON result supplies an absolute `task_packages` array. The generated `tasks.json` is a relative-path index rooted at the output directory, with source summaries and ordering. It is not a new experiment definition: do not put the index path in `workload.task_packages`. Use the result's actual package paths; if moving the packages, update their references.
 
-The following code combines the two result arrays and copies one existing N1 template for each backend. It removes the old single-package fields and any old task-specific plan, then installs the new array. It also resolves the template's persona path because the copied JSON is in a different directory. Models, personas, role counts and five-round settings still come from the N1 templates. One user session per round alternates the two tasks; use an explicit new plan if you need another assignment.
+The following code combines the two result arrays and copies one existing U1 template for each backend. It removes the old single-package fields and any old task-specific plan, then installs the new array. It also resolves the template's persona path because the copied JSON is in a different directory. Models, personas, role counts and five-round settings still come from the U1 templates. One user session per round alternates the two tasks; use an explicit new plan if you need another assignment.
 
 ```bash
 uv run --locked --extra experiments python - "$WORK_DIR" <<'PYCODE'
@@ -51,7 +51,7 @@ for result_name in ("seeds-result.json", "text-result.json"):
     task_packages.extend(result["task_packages"])
 
 for backend in ("local", "e2b"):
-    template = Path(f"examples/experiments/synthesizer-n1-{backend}.json").resolve()
+    template = Path(f"examples/experiments/u1-{backend}.json").resolve()
     config = json.loads(template.read_text(encoding="utf-8"))
     workload = config["workload"]
     workload["persona_library"] = str(
@@ -87,4 +87,4 @@ RUN_ID=REPLACE_WITH_PRINTED_RUN_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py run "$RUN_ID" --secrets-file .env.experiment
 ```
 
-Local requires Docker/Compose and provisions localhost Gitea; E2B requires its API key and a Gitea.com account. Wait for preparation to finish and use its printed run ID. Follow [the N1 tutorial](n1-experiment.md) for progress, stopping/resuming the same run, collection and cleanup. Task conversion adds an input path to the existing lifecycle; it does not import historical results to append rounds. Optional local engineering CI uses a dedicated runner and private Docker daemon as described in the [CI tutorial](local-engineering-ci.md); historical continuation still requires separate design.
+Local requires Docker/Compose and provisions localhost Gitea; E2B requires its API key and a Gitea.com account. Wait for preparation to finish and use its printed run ID. Follow [the U1 tutorial](u1-experiment.md) for progress, stopping/resuming the same run, collection and cleanup. Task conversion adds an input path to the existing lifecycle; it does not import historical results to append rounds. Optional local engineering CI uses a dedicated runner and private Docker daemon as described in the [CI tutorial](local-engineering-ci.md); historical continuation still requires separate design.

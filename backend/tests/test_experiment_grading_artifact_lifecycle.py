@@ -13,7 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.loop.sim_user import make_direct_run_session_fn, make_sim_run_session_fn
+from auto_designer.loop.sim_user import (
+    EnvironmentInfrastructureError,
+    make_direct_run_session_fn,
+    make_sim_run_session_fn,
+)
 from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
 from auto_designer.tracker.fake import FakeTracker
 from auto_designer.usage import bind_usage_context
@@ -223,7 +227,6 @@ def test_binary_output_frozen_before_terminal_review_and_cleanup(session_setup, 
     ("failure", "byte_limit", "status"),
     [
         ("missing", 4096, "missing"),
-        ("finalize", 4096, "collection_failed"),
         (None, 4, "over_limit"),
     ],
 )
@@ -332,3 +335,19 @@ def test_session_ignores_retired_inline_grading_configuration(
     assert session.accept_validity == "not_applicable"
     assert not results.exists()
     assert not any(row["event"] == "objective_evaluation_terminal" for row in session.audit_events)
+
+
+@pytest.mark.parametrize("mode", ["direct", "simulated_user"])
+def test_finalization_failure_blocks_feedback_but_retains_completed_actor(session_setup, mode):
+    with pytest.raises(EnvironmentInfrastructureError, match="finalization"):
+        start_session(mode, session_setup, failure="finalize")
+    root, store = session_setup
+    sid = f"stable-{mode}-session"
+    assert store.reconcile(sid) is None and store.index() == []
+    assert store.load_actor_checkpoint(sid) is not None
+    assert root.exists()
+    failures = list((store.root / "actor-checkpoints" / f"{sid}.failures").glob("*.json"))
+    assert len(failures) == 1
+    evidence = json.loads(failures[0].read_text())["evidence"]
+    assert evidence["actor_freeze"]["status"] == "failed"
+    assert evidence["evaluation_artifacts"]["complete"] is False

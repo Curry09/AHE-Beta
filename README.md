@@ -9,28 +9,44 @@ auto-designer simulates users interacting with a harness, turns their usage trac
 
 This repository is the **experiment controller**; OpenAgents is the **delivery CLI**; `backend/harness_template/` contains the **initial source code of the product being evolved**. Harnesses produced by experiments should be released as separate, versioned artifacts.
 
+| Goal | Configuration and entry point | Start here |
+| --- | --- | --- |
+| Evolve a Harness | `examples/experiments/*.json` → `backend/scripts/experiment.py` | [Evolution Quickstart](docs/QUICKSTART.md) |
+| Evaluate an existing Harness | `evaluation.yaml` → `python -m evaluation`; `user.enabled` selects simulated user participation | [Evaluation guide](evaluation/docs/harbor.md) |
+
+These paths use `.env.experiment` and `.env`, respectively. The [six-round study examples](docs/tutorials/evolution32.md) use the original task set through versioned container task packages: U8 mixed/direct select the first eight tasks, U16 the first sixteen and U32 all thirty-two. See the [task materials](examples/tasks/evolution32/README.md) for provenance and availability. Material/tool checks and complete model-driven experiments are separate validation claims.
+
 The **Synthesizer** combines related proposals into structural improvements; it does not implement code. Triage, Synthesizer, and PM share the `auto_designer.demand` package and `DEMAND_LLM_*` model configuration. Active file-access, repository-integrity, and Harness commit-boundary checks live in `auto_designer.guards`.
 
 Current code and development configuration use `synthesizer`, `N_SYNTHESIZERS`, and `SYNTHESIZER_GROUPING` directly. See [configuration](docs/CONFIGURATION.md) and [grouped synthesis](docs/synthesizer-grouping.md) (Chinese).
 
 ## Run an experiment
 
-Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use `backend/scripts/experiment.py` and the same v2 experiment format. Use the N1 examples for one user on one task, or the N4 examples for four users on ordinary and SWE tasks. Each round may repeat a task with distinct personas; sessions have independent writable workspaces. Use a complete current archive to [append new rounds](docs/tutorials/experiment-continuation.md) in a new run, with delivery of its final feedback before new users start. The checked-in N=1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
+Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use `backend/scripts/experiment.py` and the same v2 experiment format. Use the U1 examples for one user on one task, or the U4 examples for four users on ordinary and SWE tasks. Each round may repeat a task with distinct personas; sessions have independent writable workspaces. Use a complete current archive to [append new rounds](docs/tutorials/experiment-continuation.md) in a new run, with delivery of its final feedback before new users start. The checked-in U1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
+
+For the full task environments, choose one of these E2B configurations. All run six rounds from the current builtin seed, with user and Developer concurrency four; R1–R5 include delivery and R6 is trial-only. U8 mixed/direct keep the same conditions and persona bindings, changing only the six original simulated-user tasks to direct mode.
+
+| Configuration | Sessions per round | Simulated / direct |
+| --- | --- | --- |
+| `examples/experiments/u8-mixed-e2b.json` | 8 | 6 / 2 |
+| `examples/experiments/u8-direct-e2b.json` | 8 | 0 / 8 |
+| `examples/experiments/u16-mixed-e2b.json` | 16 | 12 / 4 |
+| `examples/experiments/u32-mixed-e2b.json` | 32 | 25 / 7 |
+
+The [complete tutorial](docs/tutorials/evolution32.md) covers model protocols, credentials, materials, startup and collection. The selected personas are reused across slots; session count is not a count of independent human profiles. These examples leave per-round official grading disabled.
 
 ```bash
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
-# Fill credentials; choose synthesizer-n1-local.json for local Docker.
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-e2b.json --offline
-uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config examples/experiments/synthesizer-n1-e2b.json --secrets-file .env.experiment
-# Copy the generated run ID:
-uv run --locked --extra experiments python backend/scripts/experiment.py run <run_id>
+# Fill credentials; choose u1-local.json for local Docker.
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u1-e2b.json --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py run --config examples/experiments/u1-e2b.json --secrets-file .env.experiment
 ```
 
-Start with [Quickstart](docs/QUICKSTART.md), then follow the [complete N=1 tutorial](docs/tutorials/n1-experiment.md). They explain the required materials, model protocols, provider credentials, progress, stop/resume, collection and cleanup. For a complete two-round, four-user example, follow the [multi-user tutorial](docs/tutorials/multi-user-experiment.md). Preparation fetches pinned OpenAgents automatically; no sibling checkout is required. The [N1 validation report](docs/validation/spec-0069-new-user.md) and [multi-user validation report](docs/validation/spec0073-multi-task-users.md) record actual checks separately from the documented workflow.
+Start with [Quickstart](docs/QUICKSTART.md), then follow the [complete U1 tutorial](docs/tutorials/u1-experiment.md). They explain the required materials, model protocols, provider credentials, progress, stop/resume, collection and cleanup. For a complete two-round, four-user example, follow the [multi-user tutorial](docs/tutorials/multi-user-experiment.md). Preparation fetches pinned OpenAgents automatically; no sibling checkout is required. The [U1 validation report](docs/validation/spec-0069-new-user.md) and [multi-user validation report](docs/validation/spec0073-multi-task-users.md) record actual checks separately from the documented workflow.
 
-To queue several complete experiments, use the [batch tutorial](docs/tutorials/batch-experiment.md) and the local/E2B lists in `examples/batches/`. Batch supervision retains each member's single-run lifecycle and limits active runs until terminal collection; Ctrl+C detaches supervision, while `batch stop` stops started members. The N1/N4 lists preserve their different five-round/two-round settings and demonstrate execution rather than a fair causal comparison.
+To queue several complete experiments, use the [batch tutorial](docs/tutorials/batch-experiment.md) and the lists in `examples/batches/`; `evolution-four-e2b.json` runs the four six-round groups sequentially. Batch supervision retains each member's single-run lifecycle and limits active runs until terminal collection; Ctrl+C detaches supervision, while `batch stop` stops started members. The U1/U4 lists preserve their different five-round/two-round settings and demonstrate execution rather than a fair causal comparison.
 
 After complete terminal collection, use `grade RUN_ID --plan PATH` to grade saved session artifacts on a local Docker host. The private plan selects task IDs, adapters and hashed materials, including the official dataset for SWE. This also applies to E2B archives and does not score new held-out Harness tasks or feed results into evolution. See the [post-run grading tutorial](docs/tutorials/post-run-grading.md); older hash-only predictions cannot be reconstructed for grading.
 
@@ -82,6 +98,6 @@ research/archives/                      # Frozen historical research records
 
 Project code is licensed under the [MIT License](LICENSE). Third-party material retains its own terms; see [THIRD_PARTY.md](THIRD_PARTY.md).
 
-The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/N4/N8 uses the same frozen workload contract; current archives with a continuation export can seed a new run with additional rounds. See the [continuation tutorial](docs/tutorials/experiment-continuation.md). See [multi-user validation](docs/validation/spec0073-multi-task-users.md).
+The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/U4/U8 uses the same frozen workload contract; current archives with a continuation export can seed a new run with additional rounds. See the [continuation tutorial](docs/tutorials/experiment-continuation.md). See [multi-user validation](docs/validation/spec0073-multi-task-users.md).
 
 Independent Harbor evaluation: [guide](evaluation/docs/harbor.md).

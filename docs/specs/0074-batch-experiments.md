@@ -65,8 +65,8 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - examples/batches/n1-n4-local.json
-  - examples/batches/n1-n4-e2b.json
+  - examples/batches/u1-u4-local.json
+  - examples/batches/u1-u4-e2b.json
   - README.md
   - README.zh-CN.md
   - docs/QUICKSTART.md
@@ -114,16 +114,16 @@ tasks:
 
 ## Guide-level explanation
 
-用户准备 `examples/batches/n1-n4-local.json` 或对应 E2B 示例，首版公开格式如下：
+用户准备 `examples/batches/u1-u4-local.json` 或对应 E2B 示例，首版公开格式如下：
 
 ```json
 {
   "schema_version": 1,
-  "name": "n1-n4-comparison",
+  "name": "u1-u4-comparison",
   "max_parallel_runs": 1,
   "entries": [
-    {"id": "n1", "config": "../experiments/synthesizer-n1-local.json"},
-    {"id": "n4", "config": "../experiments/synthesizer-n4-local.json"}
+    {"id": "u1", "config": "../experiments/u1-local.json"},
+    {"id": "u4", "config": "../experiments/u4-local.json"}
   ]
 }
 ```
@@ -131,8 +131,8 @@ tasks:
 路径相对批次文件解析；`id` 是安全且唯一的路径段。`schema_version`、`max_parallel_runs` 只接受正整数，不接受 bool。列表不能为空，拒绝未知字段。首版同批必须选择同一 backend；不同 backend 用不同 batch，避免一个 max_parallel 值掩盖不同 provider 配额。每个 entry 是完整现有配置，不允许局部覆盖、共享可写目录或任意 executor 命令。凭证只用现有 `--secrets-file`/显式注入环境，不写进批次 manifest、receipt 或日志。
 
 ```bash
-uv run --locked --extra experiments python backend/scripts/experiment.py batch check --config examples/batches/n1-n4-local.json --offline
-uv run --locked --extra experiments python backend/scripts/experiment.py batch prepare --config examples/batches/n1-n4-local.json --secrets-file .env.experiment
+uv run --locked --extra experiments python backend/scripts/experiment.py batch check --config examples/batches/u1-u4-local.json --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py batch prepare --config examples/batches/u1-u4-local.json --secrets-file .env.experiment
 BATCH_ID=REPLACE_WITH_PRINTED_BATCH_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py batch run "$BATCH_ID"
 uv run --locked --extra experiments python backend/scripts/experiment.py batch status "$BATCH_ID"
@@ -180,7 +180,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py batch c
 | T1 批次输入、冻结身份与 receipt | 无 | `backend/auto_designer/experiment/batch_config.py`; `backend/auto_designer/experiment/schemas/batch-v1.json`; `backend/auto_designer/experiment/batch_store.py`; `backend/tests/test_experiment_batch_config.py`; `backend/tests/test_experiment_batch_store.py` | 严格公开字段、独立 entry root、无凭证 manifest、atomic revision/locking、篡改和越界拒绝、prepare intent恢复；不加载provider或运行模型。 |
 | T2 生命周期 scheduler | T1 | `backend/auto_designer/experiment/batch.py`; `backend/tests/test_experiment_batch.py` | 只调用现有runtime API；真 active lease上限，启动返回不释放；中断前后不重复建仓/run；UNKNOWN/LOST/collection失败/stop-resume和quota分类。若接口审计证明必须扩展runtime，正式spec需将`runtime.py`及其相应test一并归此Task，不能平行抢写。 |
 | T3 统一 CLI 接线与仓库契约 | T1 | `backend/auto_designer/experiment/cli.py`; `backend/tests/test_experiment_cli_v2.py`; `backend/scripts/check_experiment_repository.py`; `backend/tests/test_experiment_repository.py` | batch子命令解析、--runs-dir/--secrets-file对齐、已有单run命令不变、JSON输出退出码、未collect/unknown不能宣称完成。 |
-| T4 公开示例与双语文档 | T1 | `examples/batches/n1-n4-local.json`; `examples/batches/n1-n4-e2b.json`; `README.md`; `README.zh-CN.md`; `docs/QUICKSTART.md`; `docs/QUICKSTART.zh-CN.md`; `docs/CONFIGURATION.md`; `docs/CONFIGURATION.zh-CN.md`; `docs/tutorials/batch-experiment.md`; `docs/tutorials/batch-experiment.zh-CN.md`; `backend/tests/test_experiment_batch_examples.py` | 两backend同计划、真配置路径/credential refs、中英文命令一致；明确并发/费用/仓限/retain资源与 Ctrl+C/stop差异，无私人路径。 |
+| T4 公开示例与双语文档 | T1 | `examples/batches/u1-u4-local.json`; `examples/batches/u1-u4-e2b.json`; `README.md`; `README.zh-CN.md`; `docs/QUICKSTART.md`; `docs/QUICKSTART.zh-CN.md`; `docs/CONFIGURATION.md`; `docs/CONFIGURATION.zh-CN.md`; `docs/tutorials/batch-experiment.md`; `docs/tutorials/batch-experiment.zh-CN.md`; `backend/tests/test_experiment_batch_examples.py` | 两backend同计划、真配置路径/credential refs、中英文命令一致；明确并发/费用/仓限/retain资源与 Ctrl+C/stop差异，无私人路径。 |
 | T5 故障恢复闭环与验证报告 | T2、T3、T4 | `backend/tests/test_experiment_batch_e2e.py`; `backend/scripts/e2e-spec-0074-batch-experiments.sh`; `docs/validation/batch-experiments.md` | 真实batch store/scheduler接实际single-run runtime，provider/model边界替身；非空交付至少一项，两run完整terminalcollect；crash/restart、UNKNOWN占槽、quota、重复操作；真实local/E2B可用时再记录实际provider证据，不能将mock当live。 |
 
 共五个 Task，DAG：T1→T2→T5，另有 T1→T3→T5、T1→T4→T5。T2 公共 Python 接口已固定，T3 可独立完成 CLI 接线；T5 必须同时等待调度、CLI 与文档完成。本组已通过 spec 工具建立正式组和所有权表，e2e 固定为 `backend/scripts/e2e-spec-0074-batch-experiments.sh`。

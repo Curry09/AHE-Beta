@@ -178,6 +178,8 @@ def grade_bundle(*, payload: bytes, request: dict, plan: GradingPlan, attempt_di
         provenance=entry,
         declarations=task["package"].get("artifacts", {}).get("exports", []),
         files=bundle["files"],
+        task_package=task["package"],
+        expected_config_hash=bundle["manifest"].get("config_hash"),
     )
     try:
         grading = build_request(

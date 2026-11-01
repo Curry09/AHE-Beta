@@ -4,7 +4,7 @@ English | [简体中文](batch-experiment.zh-CN.md)
 
 A batch freezes a list of existing experiment configurations and supervises their complete runs. Each member has its own frozen inputs, Harness repository, resources, checkpoints and results. The same `backend/scripts/experiment.py` entry manages both the batch and individual members; the batch does not introduce another controller.
 
-The public examples list N1 and N4 on the same backend. **They demonstrate batch execution, not a fair causal comparison:** N1 runs five rounds on one task, while N4 runs two rounds on two tasks. Those settings remain unchanged. See the [N1](n1-experiment.md) and [N4](multi-user-experiment.md) tutorials for their full workflows. For a controlled comparison, prepare separate complete configurations with the factors you intend to compare.
+The public examples list U1 and U4 on the same backend. **They demonstrate batch execution, not a fair causal comparison:** U1 runs five rounds on one task, while U4 runs two rounds on two tasks. Those settings remain unchanged. See the [U1](u1-experiment.md) and [U4](multi-user-experiment.md) tutorials for their full workflows. For a controlled comparison, prepare separate complete configurations with the factors you intend to compare.
 
 ## 1. Install and select the list
 
@@ -15,8 +15,8 @@ uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
 RUNS_DIR=.experiments
-BATCH_CONFIG=examples/batches/n1-n4-local.json
-# BATCH_CONFIG=examples/batches/n1-n4-e2b.json
+BATCH_CONFIG=examples/batches/u1-u4-local.json
+# BATCH_CONFIG=examples/batches/u1-u4-e2b.json
 ```
 
 Fill `.env.experiment` before online checks. To change models, rounds or personas, copy and edit each experiment JSON before preparation; keep its relative material paths valid. Then point each batch entry at that complete configuration. Keep credentials in the protected env file, never in either JSON.
@@ -50,7 +50,7 @@ Ctrl+C detaches batch supervision and stops new queued dispatch. **It does not s
 uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" batch status "$BATCH_ID" --secrets-file .env.experiment
 ```
 
-`max_parallel_runs` limits active or uncertain run leases in this batch. It is neither an account-wide limit nor a maximum number of allocated sandboxes or model calls. Each child retains its configured `max_parallel_users`; N4 uses two concurrent user sessions. Stopped or completed resources may still be allocated, and independent experiments or batches are outside this limit.
+`max_parallel_runs` limits active or uncertain run leases in this batch. It is neither an account-wide limit nor a maximum number of allocated sandboxes or model calls. Each child retains its configured `max_parallel_users`; U4 uses two concurrent user sessions. Stopped or completed resources may still be allocated, and independent experiments or batches are outside this limit.
 
 ## 4. Stop, resume and collect the same members
 
@@ -68,10 +68,10 @@ Collection reports complete, partial or failed collection per member. A successf
 
 The batch is stored in `$RUNS_DIR/.batches/$BATCH_ID/`. Its `intent.json` and `manifest.json` preserve the selected members; `runtime.json` and `journal.jsonl` record scheduling observations. Each child lives under `children/<entry_id>/<run_id>/` and retains its normal single-run artifacts. Copy the child's run ID from `entries[entry_id].run_id` and its root from `child_roots[entry_id]` in batch status, then use the commands below.
 
-For the `n1` entry, replace the printed run ID below; use `children/n4` for the other member:
+For the `u1` entry, replace the printed run ID below; use `children/u4` for the other member:
 
 ```bash
-CHILD_RUNS_DIR="$RUNS_DIR/.batches/$BATCH_ID/children/n1"
+CHILD_RUNS_DIR="$RUNS_DIR/.batches/$BATCH_ID/children/u1"
 RUN_ID=REPLACE_WITH_PRINTED_CHILD_RUN_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$CHILD_RUNS_DIR" status "$RUN_ID" --secrets-file .env.experiment
 uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$CHILD_RUNS_DIR" logs "$RUN_ID" --follow --secrets-file .env.experiment
@@ -82,6 +82,6 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --runs-
 
 Always pass the child's `--runs-dir`; its ID is not located at the outer runs root. E2B dashboards show a collected snapshot, so collect first. Destroy only after complete collection. Batch management does not automatically destroy compute or delete repositories. Stopping an E2B process retains its allocated sandbox; inspect resource state and use the explicit cleanup commands. Compute destruction preserves the Gitea repository. Remove old repositories yourself only after preserving any needed records.
 
-These examples normally need two separate Harness repositories. Serial execution can still exhaust repository quota because repositories remain after earlier members finish. The N1/N4 list schedules thirteen user sessions in total, plus their Harness requests and requirements/delivery work; concurrency limits do not reduce total calls or cost. Cloud allocation, dependency builds and model generation add their own costs. Neither a capacity-unknown check nor this tutorial claims that a provider account has enough quota.
+These examples normally need two separate Harness repositories. Serial execution can still exhaust repository quota because repositories remain after earlier members finish. The U1/U4 list schedules thirteen user sessions in total, plus their Harness requests and requirements/delivery work; concurrency limits do not reduce total calls or cost. Cloud allocation, dependency builds and model generation add their own costs. Neither a capacity-unknown check nor this tutorial claims that a provider account has enough quota.
 
-The [single-run multi-user validation report](../validation/spec0073-multi-task-users.md) applies to independent N4 runs. It is not evidence of a live local/E2B batch. Batch tests using scripted provider/model boundaries must be recorded separately from live execution.
+The [single-run multi-user validation report](../validation/spec0073-multi-task-users.md) applies to independent U4 runs. It is not evidence of a live local/E2B batch. Batch tests using scripted provider/model boundaries must be recorded separately from live execution.

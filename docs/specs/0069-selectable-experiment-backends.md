@@ -122,20 +122,20 @@ tasks:
       - uv.lock
       - release/compatibility.json
       - examples/experiment.env.example
-      - examples/experiments/synthesizer-n1-e2b.json
-      - examples/experiments/synthesizer-n1-local.json
+      - examples/experiments/u1-e2b.json
+      - examples/experiments/u1-local.json
       - examples/tasks/pvlib-1478/task.json
       - examples/tasks/pvlib-1478/instruction.md
       - examples/tasks/pvlib-1478/setup.sh
       - examples/tasks/pvlib-1478/requirements.lock
-      - examples/personas/n1.json
+      - examples/personas/u1.json
       - THIRD_PARTY.md
       - docs/QUICKSTART.md
       - docs/QUICKSTART.zh-CN.md
       - docs/CONFIGURATION.md
       - docs/CONFIGURATION.zh-CN.md
-      - docs/tutorials/n1-experiment.md
-      - docs/tutorials/n1-experiment.zh-CN.md
+      - docs/tutorials/u1-experiment.md
+      - docs/tutorials/u1-experiment.zh-CN.md
       - docs/validation/spec-0069-new-user.md
       - backend/scripts/e2e-spec-0069-experiment-entry.sh
       - backend/tests/test_experiment_public_examples.py
@@ -189,8 +189,8 @@ tasks:
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 # 填写模型凭证；E2B 路径另填 E2B_API_KEY / GITEA_TOKEN。
-uv run python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-e2b.json --offline
-uv run python backend/scripts/experiment.py prepare --config examples/experiments/synthesizer-n1-e2b.json --secrets-file .env.experiment
+uv run python backend/scripts/experiment.py check --config examples/experiments/u1-e2b.json --offline
+uv run python backend/scripts/experiment.py prepare --config examples/experiments/u1-e2b.json --secrets-file .env.experiment
 # prepare 输出 run_id、冻结目录、资源计划及下一条可复制命令。
 uv run python backend/scripts/experiment.py run <run_id> --secrets-file .env.experiment
 uv run python backend/scripts/experiment.py status <run_id>
@@ -201,13 +201,13 @@ uv run python backend/scripts/experiment.py collect <run_id>
 uv run python backend/scripts/experiment.py destroy <run_id> --confirm <run_id>
 ```
 
-本地只替换 config 为 `synthesizer-n1-local.json`，不改命令。不需要新用户选择历史 launcher。`run --config ... --secrets-file ...` 为 prepare → run 的便利组合，调用同一实现；不增加独立配置通路。`prepare` 不调用模型、不启动实验资源；下载依赖和任务材料、构建本地镜像会明确输出进度。E2B 模板准备如果需要创建云资源，归于 run 的可见 provisioning 阶段。
+本地只替换 config 为 `u1-local.json`，不改命令。不需要新用户选择历史 launcher。`run --config ... --secrets-file ...` 为 prepare → run 的便利组合，调用同一实现；不增加独立配置通路。`prepare` 不调用模型、不启动实验资源；下载依赖和任务材料、构建本地镜像会明确输出进度。E2B 模板准备如果需要创建云资源，归于 run 的可见 provisioning 阶段。
 
 ### 用户要准备的材料
 
 | 材料 | 格式与要求 | N=1 示例默认来源 |
 | --- | --- | --- |
-| 实验定义 | JSON，`schema_version: 2`，相对路径以配置文件目录为基准 | 两份 examples/experiments/synthesizer-n1-*.json |
+| 实验定义 | JSON，`schema_version: 2`，相对路径以配置文件目录为基准 | 两份 examples/experiments/u1-*.json |
 | 模型设置 | JSON 中填模型名及 base URL/key 的环境变量名，凭证写独立 env 文件 | examples/experiment.env.example 列全字段和用途 |
 | 初始 Harness | `builtin`，或自备 archive + SHA-256；有可启动入口 | 仓内 backend/harness_template，冻结当前代码版本 |
 | 试用任务 | task package JSON + instruction.md；代码来源、固定 revision、setup recipe | 仓内 pvlib__pvlib-python-1478 定义，公开代码固定 revision |
@@ -236,17 +236,17 @@ QuickStart 先给两路径选择表、依赖和凭证表、最短启动命令，
 ```json
 {
   "schema_version": 2,
-  "name": "synthesizer-n1",
+  "name": "u1",
   "runtime": {
     "backend": "e2b",
     "e2b": {"cpu_count": 2, "memory_mb": 2048, "timeout_seconds": 86400},
-    "gitea": {"provider": "gitea.com", "repository_prefix": "synthesizer-n1"}
+    "gitea": {"provider": "gitea.com", "repository_prefix": "u1"}
   },
   "harness": {"source": "builtin"},
   "workload": {
     "kind": "swebench",
     "task_package": "../tasks/pvlib-1478/task.json",
-    "persona_library": "../personas/n1.json",
+    "persona_library": "../personas/u1.json",
     "persona_ids": ["sr-15-swyx"]
   },
   "rounds": {"count": 5, "sessions_per_round": 1, "max_parallel_users": 1},

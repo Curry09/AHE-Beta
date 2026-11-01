@@ -1,0 +1,83 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "memory-project-constraints",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "mechanism",
+    "instance_id": "memory-project-constraints",
+    "revision": "1d29de324d1bf24db474297e8e193651189990debc1ea39cfc4369ac2a6ed85e"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:b106e5c93b2e08bfeb73aa096971b075119670c257da3ebe2a19242b883ce92e",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "0168bb406d783f6987b4e07fd3a34c182603ca7285c84cff02c576dff855fdd9",
+          "format": "file",
+          "files": {
+            "input": "0168bb406d783f6987b4e07fd3a34c182603ca7285c84cff02c576dff855fdd9"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m07-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/verify.py",
+        "--git-revision",
+        "47ad03d7a1590da30f9ecec9d0a726242f454fc9"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/initialize.py",
+        "--bundle",
+        "/opt/task-inputs/initial.bundle",
+        "--revision",
+        "47ad03d7a1590da30f9ecec9d0a726242f454fc9",
+        "--workspace",
+        "/workspace"
+      ],
+      "timeout_seconds": 240
+    }
+  },
+  "artifacts": {
+    "version": 1,
+    "exports": [
+      {
+        "id": "migration-note",
+        "source": "workspace",
+        "path": "MIGRATION.md",
+        "content_type": "text/markdown",
+        "required": false,
+        "max_bytes": 2097152
+      }
+    ]
+  }
+}

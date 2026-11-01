@@ -2,9 +2,9 @@
 
 [English](multi-user-experiment.md) | 简体中文
 
-本教程使用受维护的 N4 local/E2B 示例：每轮四位不同 persona、两个任务、共两轮，最多同时运行两个用户会话。每个会话在独立可写工作区试用本轮同一 Harness SHA。实验进化的是一份共享 Harness，而不是两个任务仓库。
+本教程使用受维护的 U4 local/E2B 示例：每轮四位不同 persona、两个任务、共两轮，最多同时运行两个用户会话。每个会话在独立可写工作区试用本轮同一 Harness SHA。实验进化的是一份共享 Harness，而不是两个任务仓库。
 
-[Spec0073 验证报告](../validation/spec0073-multi-task-users.md)区分离线集成与真实 provider/模型运行。之前 N1 运行仍是历史基线，不能据此宣称本次 N4 已在 Docker 或 E2B 实跑。
+[Spec0073 验证报告](../validation/spec0073-multi-task-users.md)区分离线集成与真实 provider/模型运行。之前 U1 运行仍是历史基线，不能据此宣称本次 U4 已在 Docker 或 E2B 实跑。
 
 ## 1. 安装并选择后端
 
@@ -16,8 +16,8 @@ cd auto-designer
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
-CONFIG=examples/experiments/synthesizer-n4-local.json
-# CONFIG=examples/experiments/synthesizer-n4-e2b.json
+CONFIG=examples/experiments/u4-local.json
+# CONFIG=examples/experiments/u4-e2b.json
 ```
 
 按[凭证说明](../CONFIGURATION.zh-CN.md)填写 `.env.experiment`：User、Harness、需求角色使用 OpenAI 兼容 Chat Completions，交付角色使用 Anthropic 兼容 Claude Code。E2B 还需要 `E2B_API_KEY`、`GITEA_TOKEN`；本地自动创建 localhost Gitea 凭证。密钥不放 JSON。更换模型时，在 prepare 前修改四个 `models.*.model`；复制 JSON 后必须保持材料相对路径正确。

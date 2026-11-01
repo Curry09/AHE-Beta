@@ -4,7 +4,7 @@
 
 批次冻结一份现有实验配置列表，监督各成员跑完自己的完整闭环。每个成员有独立的冻结输入、Harness 仓库、资源、checkpoint 和结果。批次与单实验共用 `backend/scripts/experiment.py`，不增加另一套 controller。
 
-公开示例在同一后端列出 N1 和 N4。**它们演示批量执行，不构成公平的因果对照：**N1 是一个任务、五轮；N4 是两个任务、两轮，批次不改这些设置。完整流程见 [N1](n1-experiment.zh-CN.md)和 [N4](multi-user-experiment.zh-CN.md)教程。需要受控对照时，先分别准备完整配置，并明确需要比较的因素。
+公开示例在同一后端列出 U1 和 U4。**它们演示批量执行，不构成公平的因果对照：**U1 是一个任务、五轮；U4 是两个任务、两轮，批次不改这些设置。完整流程见 [U1](u1-experiment.zh-CN.md)和 [U4](multi-user-experiment.zh-CN.md)教程。需要受控对照时，先分别准备完整配置，并明确需要比较的因素。
 
 ## 1. 安装，选择列表
 
@@ -15,8 +15,8 @@ uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
 RUNS_DIR=.experiments
-BATCH_CONFIG=examples/batches/n1-n4-local.json
-# BATCH_CONFIG=examples/batches/n1-n4-e2b.json
+BATCH_CONFIG=examples/batches/u1-u4-local.json
+# BATCH_CONFIG=examples/batches/u1-u4-e2b.json
 ```
 
 在线检查前填好 `.env.experiment`。修改模型、轮次或 persona 时，先复制和修改各实验 JSON，保持相对材料路径有效，再让批次引用这些完整配置。凭证只放受保护的 env 文件，不写入两种 JSON。
@@ -50,7 +50,7 @@ Ctrl+C 退出批次监督、停止后续排队启动，**不会停止已经启�
 uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" batch status "$BATCH_ID" --secrets-file .env.experiment
 ```
 
-`max_parallel_runs` 限制本批次的活动或不确定运行租约，不是整个账户的上限，也不是已分配沙箱数或模型调用数上限。各子实验保留自己的 `max_parallel_users`，N4 为两个并发用户会话。停止或完成后的资源可能仍被分配，独立实验及其他批次不受本批上限管理。
+`max_parallel_runs` 限制本批次的活动或不确定运行租约，不是整个账户的上限，也不是已分配沙箱数或模型调用数上限。各子实验保留自己的 `max_parallel_users`，U4 为两个并发用户会话。停止或完成后的资源可能仍被分配，独立实验及其他批次不受本批上限管理。
 
 ## 4. 停止、续跑、收集原成员
 
@@ -68,10 +68,10 @@ collect 逐项报告完整、部分或失败。整个批次成功要求所有实
 
 批次目录为 `$RUNS_DIR/.batches/$BATCH_ID/`。`intent.json`、`manifest.json` 固定所选成员，`runtime.json`、`journal.jsonl` 记录调度观测。每个子实验位于 `children/<entry_id>/<run_id>/`，沿用单实验的正常产物结构。从 batch status 的 `entries[entry_id].run_id` 复制子实验 ID，从 `child_roots[entry_id]` 复制目录，再按下面的命令管理。
 
-以下以 `n1` 成员为例，替换打印出的 run ID；另一成员使用 `children/n4`：
+以下以 `u1` 成员为例，替换打印出的 run ID；另一成员使用 `children/u4`：
 
 ```bash
-CHILD_RUNS_DIR="$RUNS_DIR/.batches/$BATCH_ID/children/n1"
+CHILD_RUNS_DIR="$RUNS_DIR/.batches/$BATCH_ID/children/u1"
 RUN_ID=REPLACE_WITH_PRINTED_CHILD_RUN_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$CHILD_RUNS_DIR" status "$RUN_ID" --secrets-file .env.experiment
 uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$CHILD_RUNS_DIR" logs "$RUN_ID" --follow --secrets-file .env.experiment
@@ -82,6 +82,6 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --runs-
 
 管理成员必须指定其 `--runs-dir`，不能拿子 run ID 到外层根目录找。E2B 看板显示已收集快照，先 collect 再查看；完整收集后再 destroy。批次管理不自动销毁计算资源或删除仓库。E2B 停进程后沙箱仍被分配，应核对资源状态并用显式清理命令。销毁计算不会删除 Gitea 仓库；需要删旧仓时，先自行保存需要的记录。
 
-这两个示例通常需要两个独立 Harness 仓库。顺序执行也可能耗尽仓库配额，因为先前成员结束后仓库仍保留。N1/N4 列表共安排十三个用户会话，另有 Harness 请求及需求/交付工作；降低并发不减少总调用或费用。云资源分配、依赖构建和模型生成各有成本。容量未知的检查结果和本教程都不证明账户配额足够。
+这两个示例通常需要两个独立 Harness 仓库。顺序执行也可能耗尽仓库配额，因为先前成员结束后仓库仍保留。U1/U4 列表共安排十三个用户会话，另有 Harness 请求及需求/交付工作；降低并发不减少总调用或费用。云资源分配、依赖构建和模型生成各有成本。容量未知的检查结果和本教程都不证明账户配额足够。
 
-[单实验多用户验收报告](../validation/spec0073-multi-task-users.md)对应独立 N4 运行，不证明 local/E2B 批次已经真实跑通。使用脚本化 provider/model 边界的批次测试应与真实执行分开记录。
+[单实验多用户验收报告](../validation/spec0073-multi-task-users.md)对应独立 U4 运行，不证明 local/E2B 批次已经真实跑通。使用脚本化 provider/model 边界的批次测试应与真实执行分开记录。

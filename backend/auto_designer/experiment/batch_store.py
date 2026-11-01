@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from auto_designer.experiment import materials, runtime
+from auto_designer.experiment.batch_config import package_input_identity
 from auto_designer.experiment.config import ConfigError, config_hash, read_json_document
 from auto_designer.experiment.manifest import read_runtime
 from auto_designer.experiment.workload import read_task_catalog
@@ -301,16 +302,20 @@ class BatchStore:
         if len(actual_tasks) != len(expected["tasks"]):
             raise ConfigError("Child task set differs from batch intent")
         for task, item in zip(actual_tasks, expected["tasks"], strict=True):
-            package = copy.deepcopy(task["package"])
-            package.pop("instruction_file")
-            package.pop("setup")
-            if package["source"]["kind"] == "local":
-                package["source"].pop("path")
+            package = package_input_identity(package=task["package"])
+            content_hashes = task["content_hashes"]
+            if package.get("schema_version") == 3:
+                # Origins record download coordinates; task identity fixes the actual bytes.
+                # verify_materials above independently checks the retained origins file.
+                content_hashes = {
+                    key: value for key, value in content_hashes.items() if key != "input_origins"
+                }
+            if package.get("source", {}).get("kind") == "local":
                 if task["source_snapshot"]["files"] != item["source_files"]:
                     raise ConfigError("Child task source differs from batch intent")
             if (
                 config_hash(data=package) != config_hash(data=item["package"])
-                or task["content_hashes"] != item["content_hashes"]
+                or content_hashes != item["content_hashes"]
             ):
                 raise ConfigError("Child task materials differ from batch intent")
         harness = expected["harness"]

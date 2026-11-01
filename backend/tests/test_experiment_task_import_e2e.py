@@ -107,7 +107,7 @@ def test_imported_text_checks_with_both_existing_public_templates(tmp_path, back
         output=tmp_path / "text-tasks",
         not_in_benchmark=True,
     )
-    config = json.loads((ROOT / f"examples/experiments/synthesizer-n1-{backend}.json").read_text())
+    config = json.loads((ROOT / f"examples/experiments/u1-{backend}.json").read_text())
     config["workload"].pop("kind", None)
     config["workload"].pop("task_package", None)
     config["workload"].pop("interaction_plan", None)

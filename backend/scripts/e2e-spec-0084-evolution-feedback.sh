@@ -139,7 +139,7 @@ if args.prepare_example:
     (private / 'worker.pub').write_bytes(key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
     definition = json.loads((repo / f'examples/experiments/evolution-feedback-{args.backend}.json').read_text())
     definition['workload'] = {'kind': 'ordinary', 'task_package': 'public/task/task.json',
-        'persona_library': str(repo / 'examples/personas/n1.json'), 'persona_ids': ['sr-15-swyx']}
+        'persona_library': str(repo / 'examples/personas/u1.json'), 'persona_ids': ['sr-15-swyx']}
     definition['evaluation'] = {'session_grading': {'plan_sha256': digest((private / 'grading-plan.json').read_bytes()),
         'worker_key_sha256': digest(public_raw), 'runner': 'external'}}
     write_json(root / 'experiment.json', definition)

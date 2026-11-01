@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 from auto_designer.models import WorkspaceSpec
+from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
 from auto_designer.user.sim.seed_source import register
 
 
@@ -20,14 +21,19 @@ from auto_designer.user.sim.seed_source import register
 class EmptySource:
     kind = "empty"
 
-    def provision(self, spec: WorkspaceSpec, dest_root: str | None = None) -> str:
+    def provision(self, spec: WorkspaceSpec, dest_root: str | None = None) -> LocalWorkspaceRuntime:
         if dest_root is None:
             dest = Path(tempfile.mkdtemp(prefix="sim_ws_empty_"))
         else:
             dest = Path(dest_root) / "empty"
             dest.mkdir(parents=True, exist_ok=True)
+        runtime = LocalWorkspaceRuntime(
+            str(dest.resolve()),
+            owns_tmp=dest_root is None,
+            evidence={"patch_capability": "not_applicable"},
+        )
         doc = spec.params.get("doc")
         if doc:
             name = spec.params.get("doc_name", "SPEC.md")
-            (dest / name).write_text(doc)
-        return str(dest.resolve())
+            runtime.write_text(name, doc)
+        return runtime

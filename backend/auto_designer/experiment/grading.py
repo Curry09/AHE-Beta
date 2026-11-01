@@ -592,6 +592,8 @@ def _grade_run(
             provenance=entry,
             declarations=declarations,
             files=files,
+            task_package=task["package"],
+            expected_config_hash=manifest.get("config_hash"),
         )
         frozen_materials = {
             name: grading_plan.materials[reference]

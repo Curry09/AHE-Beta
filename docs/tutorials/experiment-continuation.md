@@ -8,7 +8,7 @@ This uses the existing check/prepare/run/status/stop/resume/collect/destroy comm
 
 ## 1. Install and choose the parent
 
-Run from the repository root with Python 3.12+ and uv. Start with a parent prepared using a controller that produces the current continuation export, and wait for it to reach `COMPLETED`. The [N1 tutorial](n1-experiment.md) covers creating that parent on local Docker or E2B.
+Run from the repository root with Python 3.12+ and uv. Start with a parent prepared using a controller that produces the current continuation export, and wait for it to reach `COMPLETED`. The [U1 tutorial](u1-experiment.md) covers creating that parent on local Docker or E2B.
 
 ```bash
 uv sync --locked --extra experiments
@@ -35,7 +35,7 @@ The archive contains a versioned `runtime/continuation-export.json` bound to the
 
 ## 3. Generate complete local and E2B child definitions
 
-This command copies each maintained N1 definition and replaces its Harness/workload inputs with the validated parent source. It preserves the template's complete model, role, runtime and policy settings. It reads the parent's last-round session count rather than assuming N1, and writes absolute archive paths so moving the child JSON does not change their meaning.
+This command copies each maintained U1 definition and replaces its Harness/workload inputs with the validated parent source. It preserves the template's complete model, role, runtime and policy settings. It reads the parent's last-round session count rather than assuming U1, and writes absolute archive paths so moving the child JSON does not change their meaning.
 
 ```bash
 uv run --locked --extra experiments python - "$WORK_DIR" "$ADD_ROUNDS" <<'PYCODE'
@@ -65,7 +65,7 @@ with tarfile.open(parent_archive, "r:gz") as archive:
     export = json.load(archive.extractfile("runtime/continuation-export.json"))
 sessions = len(export["boundary"]["sessions"])
 for backend in ("local", "e2b"):
-    template = Path(f"examples/experiments/synthesizer-n1-{backend}.json")
+    template = Path(f"examples/experiments/u1-{backend}.json")
     config = json.loads(template.read_text(encoding="utf-8"))
     config["name"] = f"continuation-{backend}"
     config["harness"] = {"source": "continuation"}

@@ -53,11 +53,11 @@
 
 ```bash
 bash backend/scripts/e2e-spec-0072-capability-migration.sh
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-local.json --offline
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-e2b.json --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u1-local.json --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u1-e2b.json --offline
 ```
 
-实际环境可用后按 [N1 教程](../tutorials/n1-experiment.zh-CN.md) prepare 新 run。观察入口：
+实际环境可用后按 [N1 教程](../tutorials/u1-experiment.zh-CN.md) prepare 新 run。观察入口：
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment

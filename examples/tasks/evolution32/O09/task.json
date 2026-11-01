@@ -1,0 +1,103 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "production-planning",
+  "instruction_file": "instruction.md",
+  "interaction": "direct",
+  "benchmark": {
+    "suite": "terminal-bench",
+    "instance_id": "production-planning",
+    "revision": "941ea5556797d055b93e98bd898d9d15fe01e9191821bd51202c3614c15c21c4"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:54b85575736165727e754c88b7c64be0556ee73d782ee04ad8caf8a199fcf9c7",
+    "workdir": "/app",
+    "patch": "not_applicable",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "24f1ccc696b3ddaf90693920c56fb3d22eb05f189716047b7e6d94a3c8b5109f",
+          "format": "tar.gz",
+          "files": {
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-readiness-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "-c",
+        "import sqlite3,yaml\nfrom pathlib import Path\nfor n in ['dbgw.py','README_DBGW.md','config/connections.yaml','erp.db','mes.db','wms.db']:assert (Path('/app/data')/n).is_file(),n\nfor n in ['erp','mes','wms']:\n c=sqlite3.connect('file:/app/data/'+n+'.db?mode=ro',uri=True);assert c.execute('PRAGMA quick_check').fetchone()[0]=='ok';assert c.execute(\"SELECT count(*) FROM sqlite_master WHERE type='table'\").fetchone()[0]>0\n"
+      ],
+      "timeout_seconds": 120
+    }
+  },
+  "artifacts": {
+    "version": 1,
+    "exports": [
+      {
+        "id": "erp-writeback",
+        "source": "workspace",
+        "path": "output/erp_writeback.sql",
+        "content_type": "application/sql",
+        "required": true,
+        "max_bytes": 4194304
+      },
+      {
+        "id": "mes-writeback",
+        "source": "workspace",
+        "path": "output/mes_writeback.sql",
+        "content_type": "application/sql",
+        "required": true,
+        "max_bytes": 4194304
+      },
+      {
+        "id": "wms-writeback",
+        "source": "workspace",
+        "path": "output/wms_writeback.sql",
+        "content_type": "application/sql",
+        "required": true,
+        "max_bytes": 4194304
+      },
+      {
+        "id": "audit",
+        "source": "workspace",
+        "path": "output/audit.log",
+        "content_type": "text/plain",
+        "required": true,
+        "max_bytes": 8388608
+      },
+      {
+        "id": "erp-database",
+        "source": "workspace",
+        "path": "data/erp.db",
+        "content_type": "application/vnd.sqlite3",
+        "required": true,
+        "max_bytes": 33554432
+      },
+      {
+        "id": "mes-database",
+        "source": "workspace",
+        "path": "data/mes.db",
+        "content_type": "application/vnd.sqlite3",
+        "required": true,
+        "max_bytes": 33554432
+      },
+      {
+        "id": "wms-database",
+        "source": "workspace",
+        "path": "data/wms.db",
+        "content_type": "application/vnd.sqlite3",
+        "required": true,
+        "max_bytes": 33554432
+      }
+    ]
+  }
+}

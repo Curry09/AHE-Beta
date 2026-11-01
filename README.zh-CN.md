@@ -13,24 +13,40 @@ auto-designer 模拟用户使用 Harness，把使用轨迹转为需求，再交�
 
 本仓是**实验控制器**；OpenAgents 是**交付 CLI**；`backend/harness_template/` 是**被进化产品的初始源码**。实验迭代得到的 Harness 应作为带版本的独立产物发布。
 
+| 要做什么 | 配置与入口 | 从哪里开始 |
+| --- | --- | --- |
+| 迭代 Harness | `examples/experiments/*.json` → `backend/scripts/experiment.py` | [迭代快速开始](docs/QUICKSTART.zh-CN.md) |
+| 评测已有 Harness | `evaluation.yaml` → `python -m evaluation`；`user.enabled` 选择是否带模拟用户 | [评测教程](evaluation/docs/harbor.zh-CN.md) |
+
+两条路径分别使用 `.env.experiment` 与 `.env`。[六轮研究任务示例](docs/tutorials/evolution32.zh-CN.md)通过版本化容器任务包接入原任务集：U8 mixed/direct 取前八项，U16 取前十六项，U32 使用全部三十二项。来源和获取方式见[任务材料清单](examples/tasks/evolution32/README.zh-CN.md)。材料或工具检查通过，与正式模型驱动的完整实验完成分别记录。
+
 ## 运行实验
 
-选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用 `backend/scripts/experiment.py` 和相同的 v2 实验格式。N1 示例是一位用户试用一个任务；N4 示例是四位用户试用普通任务和 SWE 任务。同轮可由不同 persona 重复试用同一任务，每个会话有独立可写工作区。完整当前归档可在新 run 中[追加轮次](docs/tutorials/experiment-continuation.zh-CN.md)，先交付父末轮反馈再开始新用户。仓内 N=1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
+选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用 `backend/scripts/experiment.py` 和相同的 v2 实验格式。U1 示例是一位用户试用一个任务；U4 示例是四位用户试用普通任务和 SWE 任务。同轮可由不同 persona 重复试用同一任务，每个会话有独立可写工作区。完整当前归档可在新 run 中[追加轮次](docs/tutorials/experiment-continuation.zh-CN.md)，先交付父末轮反馈再开始新用户。仓内 U1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
+
+完整任务环境可选择下面四份 E2B 配置，均从当前 builtin seed 跑六轮，用户与 Developer 并发分别为四；R1–R5 包含交付，R6 只试用。U8 mixed/direct 保持条件和 persona 配对一致，仅将原先六个模拟交互任务改成 direct。
+
+| 配置 | 每轮会话 | 模拟交互 / direct |
+| --- | --- | --- |
+| `examples/experiments/u8-mixed-e2b.json` | 8 | 6 / 2 |
+| `examples/experiments/u8-direct-e2b.json` | 8 | 0 / 8 |
+| `examples/experiments/u16-mixed-e2b.json` | 16 | 12 / 4 |
+| `examples/experiments/u32-mixed-e2b.json` | 32 | 25 / 7 |
+
+[完整教程](docs/tutorials/evolution32.zh-CN.md)说明模型协议、凭证、材料、启动和归档。画像可跨槽位复用，会话数量不等于独立真人画像数。这四组默认不启用逐轮官方评分。
 
 ```bash
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
-# 填写凭证；本地 Docker 改用 synthesizer-n1-local.json。
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/synthesizer-n1-e2b.json --offline
-uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config examples/experiments/synthesizer-n1-e2b.json --secrets-file .env.experiment
-# 复制生成的 run ID：
-uv run --locked --extra experiments python backend/scripts/experiment.py run <run_id>
+# 填写凭证；本地 Docker 改用 u1-local.json。
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u1-e2b.json --offline
+uv run --locked --extra experiments python backend/scripts/experiment.py run --config examples/experiments/u1-e2b.json --secrets-file .env.experiment
 ```
 
-先看[快速开始](docs/QUICKSTART.zh-CN.md)，再按[完整 N=1 教程](docs/tutorials/n1-experiment.zh-CN.md)操作，了解材料、模型协议、provider 凭证、进度、停止/恢复、收集与清理。两轮四用户的完整示例见[多用户教程](docs/tutorials/multi-user-experiment.zh-CN.md)。prepare 自动获取固定版本 OpenAgents，不需要提前放置 sibling checkout。[N1 验证报告](docs/validation/spec-0069-new-user.md)和[多用户验证报告](docs/validation/spec0073-multi-task-users.md)独立记录实际检查结果。
+先看[快速开始](docs/QUICKSTART.zh-CN.md)，再按[完整 U1 教程](docs/tutorials/u1-experiment.zh-CN.md)操作，了解材料、模型协议、provider 凭证、进度、停止/恢复、收集与清理。两轮四用户的完整示例见[多用户教程](docs/tutorials/multi-user-experiment.zh-CN.md)。prepare 自动获取固定版本 OpenAgents，不需要提前放置 sibling checkout。[U1 验证报告](docs/validation/spec-0069-new-user.md)和[多用户验证报告](docs/validation/spec0073-multi-task-users.md)独立记录实际检查结果。
 
-连续执行多个完整实验时，使用[批量教程](docs/tutorials/batch-experiment.zh-CN.md)及 `examples/batches/` 的 local/E2B 列表。批次沿用成员各自的单实验生命周期，监督到终态收集才释放并发名额；Ctrl+C 退出监督，`batch stop` 才停止已启动成员。N1/N4 列表保留各自五轮/两轮的不同设置，演示执行方式，不构成公平的因果对照。
+连续执行多个完整实验时，使用[批量教程](docs/tutorials/batch-experiment.zh-CN.md)及 `examples/batches/` 的列表；`evolution-four-e2b.json` 顺序运行四组六轮实验。批次沿用成员各自的单实验生命周期，监督到终态收集才释放并发名额；Ctrl+C 退出监督，`batch stop` 才停止已启动成员。U1/U4 列表保留各自五轮/两轮的不同设置，演示执行方式，不构成公平的因果对照。
 
 终态完整收集后，用 `grade RUN_ID --plan PATH` 在本机 Docker 上评分已保存的会话产物。私有计划选择任务 ID、适配器与带哈希的材料，SWE 官方数据集也在其中声明，E2B 归档也使用此路径。这不是新的 Harness 留出测试，结果不回流演化。详见[事后评分教程](docs/tutorials/post-run-grading.zh-CN.md)；只有 hash 的旧预测不能猜回补丁评分。
 
@@ -82,6 +98,6 @@ research/archives/                      # 冻结的历史研究记录
 
 项目代码采用 [MIT 许可证](LICENSE)。第三方材料保留各自的许可条款，详见[第三方来源说明](THIRD_PARTY.md)。
 
-统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/N4/N8 已使用同一冻结 workload 契约；带 continuation export 的当前归档可继承到新 run 并追加轮次，见[追加教程](docs/tutorials/experiment-continuation.zh-CN.md)。见[多用户验收](docs/validation/spec0073-multi-task-users.md)。
+统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/U4/U8 已使用同一冻结 workload 契约；带 continuation export 的当前归档可继承到新 run 并追加轮次，见[追加教程](docs/tutorials/experiment-continuation.zh-CN.md)。见[多用户验收](docs/validation/spec0073-multi-task-users.md)。
 
 独立 Harbor 评测：[使用教程](evaluation/docs/harbor.zh-CN.md)。

@@ -1,0 +1,3589 @@
+{
+  "schema_version": 1,
+  "id": "evolution32",
+  "task_order": [
+    "O03",
+    "O09",
+    "O14",
+    "M03",
+    "O01",
+    "kv-live-surgery",
+    "tinydb",
+    "M01",
+    "O05",
+    "O06",
+    "vf2-speedup-networkx",
+    "pretrain-shard-corruption",
+    "091-add-receipts-bookkeeping",
+    "flask-restful",
+    "M05",
+    "M09",
+    "O02",
+    "O04",
+    "astroid-1030",
+    "sqlfluff-3608",
+    "marshmallow-2123",
+    "payments-pipeline-fix",
+    "wal-recovery-ordering",
+    "vba-userform-port",
+    "react-lead-form",
+    "080-convert-novel-epub",
+    "cookiecutter",
+    "tqdm",
+    "M02",
+    "M04",
+    "M07",
+    "M10"
+  ],
+  "material_policy": "Original immutable payload bytes and explicit source derivations; image/input publication is finalized separately with verified digests.",
+  "publication": {
+    "status": "materials_published_definitions_validated",
+    "release": {
+      "repository": "Curry09/auto-designer",
+      "tag": "evolution32-task-materials-v1",
+      "url": "https://github.com/Curry09/auto-designer/releases/tag/evolution32-task-materials-v1",
+      "status": "published",
+      "asset_manifest_url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/materials.lock.json",
+      "asset_manifest_sha256": "ff4e8388b531b400d1570c09f37ea168acf4e5c8655dc5f8aa34d21f8e632447",
+      "checksum_url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/SHA256SUMS",
+      "checksum_sha256": "08793156cabd924185939965e52a57f7dc05a15a00333cb758a14ec7b47db620",
+      "input_asset_count": 37,
+      "release_id": 430367618,
+      "published_at": "2026-11-01T05:04:31Z",
+      "distributed_file_count": 40,
+      "input_bytes": 251473655,
+      "repository_visibility_at_validation": "private",
+      "download_verification": {
+        "status": "passed",
+        "method": "authenticated GitHub release asset API",
+        "file_count": 40,
+        "runtime_asset_count": 37,
+        "receipt_sha256": "1ef9be0587c89804fcf83c7f881305764418048e7460499d79d5a16aaa42fab4"
+      },
+      "anonymous_download_verification": "deferred_until_repository_is_public"
+    },
+    "images": {
+      "M04": {
+        "title": "M04 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m04-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:dd714c8ff7d7431836e5c133c52691dff3fc996134fbfdc18a0782b38a2d27ee",
+        "config_image_id": "sha256:10395f71dd71ee3577c24dbb12723a7acaf3c2678893cf988acc481f9eed6aaf",
+        "visibility": "public",
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "cache_absent_before_pull": true,
+          "registry_credentials_used": false,
+          "pull_seconds": 5.894,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "anonymous_e2b_pull": "629de25a64aeb586b7d54d3c5d9df60a03d2b53ceb963f97c6c8e0f8bf2d22a1",
+          "metadata_and_filesystem_equivalence": "59115c160215b8d11b4a8a8bd3fc509cf8aa096cabc6cd9cad16130f70a7fb76"
+        },
+        "metadata_recipe": {
+          "recipe": "M04/environment/Dockerfile",
+          "recipe_sha256": "b0dcf76de03908f17059315741da8c3c7a9de15157adb06dc2cd13faa18c8588",
+          "parent_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:78ef1a05bf3c05b714a2600217c53a75efeb8261ab1c5dfa2e7bd2e9302e24dd",
+          "parent_retention": "retained untagged in the same public GHCR package",
+          "change_scope": "configuration labels only; task tool filesystem unchanged",
+          "original_build_receipt_preserved": true
+        }
+      },
+      "M09": {
+        "title": "M09 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m09-v2",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:845fdaa1966416b7a6c4e7eda1b619006f7a28c46dfb6441f4425e093c6fadcf",
+        "config_image_id": "sha256:43e0c1c29fa2e9c777b9b5418fa812abc7afbf9040fd611b37632ac65f9a92d7",
+        "visibility": "public",
+        "platform": "linux/amd64",
+        "anonymous_manifest_verified": true,
+        "compressed_layer_bytes": 344244996,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "pull_seconds": 0.664,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "preparation": {
+          "kind": "original_base_plus_original_task_python",
+          "base_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:af5dfe8cde78a328e8b317edf4114a85b79dcde654474a166c63b807454eb9ad",
+          "interpreter_source_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
+          "recipe": "M09/environment/Dockerfile",
+          "recipe_sha256": "d711e2cfda88d008aad6bdc90bc2ba6a2b147dd94f031ce79df211fd3dc34806",
+          "reason": "Restore the original task Python3.12 selection; M05 public commission requires Python3.11 or newer.",
+          "change_scope": "original interpreter prefix and PATH selection; original task input bytes unchanged"
+        },
+        "verified_tools": {
+          "python": "3.12.14",
+          "prefix": "/opt/python",
+          "sqlite": "3.53.1",
+          "dependency_versions": {
+            "pip": "26.2.1"
+          }
+        },
+        "previous_versions": [
+          {
+            "title": "M09 task environment",
+            "status": "published_and_verified",
+            "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m09-v1",
+            "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:af5dfe8cde78a328e8b317edf4114a85b79dcde654474a166c63b807454eb9ad",
+            "config_image_id": "sha256:dce58703e0b37db746dd6bd6cb3d66790215fbdcfc7de986c03acb32560b0af4",
+            "visibility": "public",
+            "anonymous_manifest_verified": true,
+            "anonymous_e2b_verification": {
+              "status": "passed",
+              "registry_credentials_used": false,
+              "image_absent_before_pull": true,
+              "layer_cache_scope": "shared layers may be reused within a clean verification group",
+              "pull_seconds": 0.705,
+              "tool_probe": "passed",
+              "full_actor_trial": "not_performed",
+              "temporary_sandbox_deleted": true
+            },
+            "receipt_sha256": {
+              "publication": "405f6819cb907f480b6618106effd03256e68f8b094cf9dd1755c94e9791d052",
+              "anonymous_e2b_pull_and_tools": "f7875c05fc0e143581ce2a4f208e74d75d094e0de58ac49d8fdc0ddd57743992",
+              "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+              "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+            },
+            "source_image_id": "sha256:dce58703e0b37db746dd6bd6cb3d66790215fbdcfc7de986c03acb32560b0af4",
+            "platform": "linux/amd64",
+            "compressed_layer_bytes": 307765076,
+            "preparation": {
+              "kind": "original_base_metadata_only",
+              "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+            }
+          }
+        ],
+        "receipt_sha256": {
+          "publication": "1bb8bc14ba4551c5217be4119c53dfeaaa0914e6f85a1fc611ca0c44533eaec1",
+          "anonymous_e2b_pull_and_tools": "e644132cfda29d722cbdbe6748e9b5a2c6a64080d75a8d9db809ee1c5e684685",
+          "M09-publication-approval": "84134c60695fc8c4e1aa01fac49acef4e09b2b9253812d385aed5b7b3550f546"
+        }
+      },
+      "M10": {
+        "title": "M10 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m10-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a5d0075fb128b3b368711c57e959cdd5ebaa96f4f5aea4589912ca8376b3cb16",
+        "config_image_id": "sha256:f1443f7833de92febc60bef4b535095739748933033da425a089f7767ce32da7",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 0.619,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "299b0a4300ed68ea28a2f3f9466c1ba063b8fddccde6d98bea01015afda3e8aa",
+          "anonymous_e2b_pull_and_tools": "6338cf61e424ec35bff3754d68d72387b4b9a4435ff9e1dd39f1ac6eef40a4ab",
+          "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+          "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+        },
+        "source_image_id": "sha256:f1443f7833de92febc60bef4b535095739748933033da425a089f7767ce32da7",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 307765076,
+        "preparation": {
+          "kind": "original_base_metadata_only",
+          "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+        }
+      },
+      "091-add-receipts-bookkeeping": {
+        "title": "091-add-receipts-bookkeeping task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:091-add-receipts-bookkeeping-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:651de19e573e9af3df9f276c793f3133dbf93438d668bc3007954fbca20797a4",
+        "config_image_id": "sha256:bcec9cfc9fb22cfb13f68eb1d9cd4556393bf663555676d70e2115009ad619e0",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 10.892,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "24f12636c4d25a195f571bd59df32e42923317184f1dd5e58b48904e8a125d40",
+          "anonymous_e2b_pull_and_tools": "d301f209562865eaf180d850e25939433727970990d6e46cf9fe157bf7cc45e9",
+          "8034d9c88b69.audit": "6e5ce1e8013d21135a51129aa08a7743697d697fcf04a759823aca20ffb3f777"
+        },
+        "source_image_id": "sha256:8034d9c88b6999a2ca07b6d288c98bbd2df234983ac0e3e95d0b742e855abb54",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 216377889,
+        "configuration_normalizations": [
+          "empty Entrypoint array normalized to unset; both have no entrypoint"
+        ]
+      },
+      "O03": {
+        "title": "O03 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o03-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:1841e6685c5ec7845dff02aed304dac10482143f4de33f5c7fd0474b062d8821",
+        "config_image_id": "sha256:75ece095b2f3403ed624244da5d86e091dea91b1fa0272190d2667273baed9e1",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 23.473,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "55815dc074ebacaa4f9e5c407eed2f2167e0cb8111de1c752091d11f49a2a474",
+          "anonymous_e2b_pull_and_tools": "cd2661012d73cda8cac0a070523c5b050fa12a6390b8ea2a53a18c0fc450ab04",
+          "SWE-metadata-candidates.independent-audit": "79e21971c2b012be8521f8c6a16f1dadda68bf174ffe70d6fe11a1dd9c057ea0",
+          "receipt": "94b6a0d03ca30f35b7e6e4b23bee7f57fe48095fbdef81ac37fb56a4233e3512"
+        },
+        "source_image_id": "sha256:75ece095b2f3403ed624244da5d86e091dea91b1fa0272190d2667273baed9e1",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 396288087,
+        "preparation": {
+          "kind": "original_pristine_dependency_metadata_only",
+          "original_image_id": "sha256:a4416cf9ec15258c5da7ae7907767f77cb1a01799b6c37ec9c7a269acefcce03",
+          "observed_original_tool_packages": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pandas": "1.5.3",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "python-dateutil": "2.9.0.post0",
+            "pytz": "2026.5",
+            "scipy": "1.10.1",
+            "setuptools": "69.5.1",
+            "six": "1.17.0",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "certifi": "2026.10.19",
+            "charset_normalizer": "3.5.2",
+            "h5py": "3.16.0",
+            "idna": "3.20",
+            "requests": "2.34.2",
+            "urllib3": "2.8.0",
+            "wheel": "0.46.3"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "pytz": {
+              "historical_log": "2026.4",
+              "actual": "2026.5",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            },
+            "certifi": {
+              "historical_log": "2026.7.22",
+              "actual": "2026.10.19",
+              "matches": false
+            },
+            "charset_normalizer": {
+              "historical_log": "3.5.1",
+              "actual": "3.5.2",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "3f397ed44075b01f4ba535750356859195a51b2d",
+            "receipt_sha256": "94b6a0d03ca30f35b7e6e4b23bee7f57fe48095fbdef81ac37fb56a4233e3512",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "certifi": "2026.10.19",
+            "charset-normalizer": "3.5.2",
+            "exceptiongroup": "1.3.1",
+            "h5py": "3.16.0",
+            "idna": "3.20",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pandas": "1.5.3",
+            "pip": "23.0.1",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "python-dateutil": "2.9.0.post0",
+            "pytz": "2026.5",
+            "requests": "2.34.2",
+            "scipy": "1.10.1",
+            "setuptools": "69.5.1",
+            "six": "1.17.0",
+            "tomli": "2.5.0",
+            "typing_extensions": "4.16.0",
+            "urllib3": "2.8.0",
+            "wheel": "0.46.3"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "vba-userform-port": {
+        "title": "vba-userform-port task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:vba-userform-port-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:61db6cfa15f71bf513952c8ae5135a90a72a97ccb0733ae467bd31b1a89c2e5a",
+        "config_image_id": "sha256:d5e607e2ddf3ba6fda6cfa480709c40f904d3b2231850a3ad0ea00092ce03052",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 9.884,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "122d6c5642f8d8f7053dd6c9f28aaa65b960d046863330313aa743795bdc3b9c",
+          "anonymous_e2b_pull_and_tools": "c62a77bb98d0e8198c0d47df749f07016db4ff61185bf15d5c838438b978dacd",
+          "04842c9697fa.audit": "40ca5465bcfbfc9a77c5b84c306b69b516b1ab95fad2fe4226cfff9c96d711e9"
+        },
+        "source_image_id": "sha256:04842c9697fa6ab37d10890fe396ae941e7eea643705a585d0185f7bbcf9a3c0",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 119496743
+      },
+      "payments-pipeline-fix": {
+        "title": "payments-pipeline-fix task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:payments-pipeline-fix-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:31bca97cc4d5cd9b6f304b935987064d4f84597149193e53cd4beb59e0f70674",
+        "config_image_id": "sha256:dee1ebd240a672dfed44b8c6f32d3bf037ef103eb186838c41517cbbd7f18443",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 3.333,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "a75c419380dc1acc6750167bc6c17bf0ee6813015edac0dcd7ccdfcbdc1e0205",
+          "anonymous_e2b_pull_and_tools": "430fcdaabd1c03041f28b4936d3ef79e249c7ce37e0f803e8ecd1ad59c49edcc",
+          "7f1df458b151.audit": "aee758961c2742a1e09d41ba3fd40b7b8f10fcbb99a41d5469792ba6f25950b5"
+        },
+        "source_image_id": "sha256:7f1df458b1516a29832ccadc893fd46073fc72d4cb5b71d899f8927862ef6e8c",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 98001905
+      },
+      "M07": {
+        "title": "M07 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m07-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:b106e5c93b2e08bfeb73aa096971b075119670c257da3ebe2a19242b883ce92e",
+        "config_image_id": "sha256:d508a88bc01a5be4936e24431c8bfd5e0be7a308d811a4cdcdfda09937547814",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 0.655,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "5bcbeedc0a8db868e114e5110608eaac79aa4632f726a99c666cf1be4a18b84b",
+          "anonymous_e2b_pull_and_tools": "1bea109c6012913fe75997c97e6f42bf137b9bcd4617c3d425f5a060198b9ff4",
+          "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+          "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+        },
+        "source_image_id": "sha256:d508a88bc01a5be4936e24431c8bfd5e0be7a308d811a4cdcdfda09937547814",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 307765076,
+        "preparation": {
+          "kind": "original_base_metadata_only",
+          "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+        }
+      },
+      "cookiecutter": {
+        "title": "cookiecutter task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:cookiecutter-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:d45a6b83c47a17b1b0b12a17493a22ce68513b7079d1ad51f3d2e26e5e796f9e",
+        "config_image_id": "sha256:1d9665ec62cabcee51c6f16dc9b3eea09fd6b854d82aad48883c402fb20e1fa8",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 0.68,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "6943d98c3c3972b0b60dd7cae2d5a1925775b3304bf0e57e7057377d4015e78f",
+          "anonymous_e2b_pull_and_tools": "13f7b90be89265e319dce5353e7934d7e986e9c785ae528b5f5d35cda7226fe0",
+          "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+          "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+        },
+        "source_image_id": "sha256:1d9665ec62cabcee51c6f16dc9b3eea09fd6b854d82aad48883c402fb20e1fa8",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 307765076,
+        "preparation": {
+          "kind": "original_base_metadata_only",
+          "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+        }
+      },
+      "tqdm": {
+        "title": "tqdm task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:tqdm-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:77e309a5a4663e3dbcc560e0225e29575fe3a94f3d68b1d2ca2993f3b308348a",
+        "config_image_id": "sha256:d638ae5b8c3b18dd422726f7c39c96499346c7018644e134bed7cbdc9decf756",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 0.688,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "a49f2e7634b5e13c8cd5764bdb0a0bb7963d1cb765aefbe823eb623d6e613135",
+          "anonymous_e2b_pull_and_tools": "3515dd592d85392234851365d62e42e7c3f46bd005905fb77c271a9f1164710b",
+          "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+          "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+        },
+        "source_image_id": "sha256:d638ae5b8c3b18dd422726f7c39c96499346c7018644e134bed7cbdc9decf756",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 307765076,
+        "preparation": {
+          "kind": "original_base_metadata_only",
+          "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+        }
+      },
+      "flask-restful": {
+        "title": "flask-restful task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:flask-restful-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a93047a86e5ad139ebe1bd67fa2f125b731591df09c00394cd5733a5d3facd7e",
+        "config_image_id": "sha256:9e1832e62190db7b854388ad93de01a9326ebb6d48a1358727194fe8bbf0ef91",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 0.659,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "48f01d466c43d2fbca850553ef7700a34a0ab5b67acc0e05d7f3fd6d84d420f8",
+          "anonymous_e2b_pull_and_tools": "11ad138803cf0c966323d05d03e495473ee99eaed226019d3b18bde0c49ecf4e",
+          "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+          "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+        },
+        "source_image_id": "sha256:9e1832e62190db7b854388ad93de01a9326ebb6d48a1358727194fe8bbf0ef91",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 307765076,
+        "preparation": {
+          "kind": "original_base_metadata_only",
+          "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+        }
+      },
+      "tinydb": {
+        "title": "tinydb task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:tinydb-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:9617023e89ca5cfe016ab2e6cd26306a69f69cdf559314562cbcb1dc998dee60",
+        "config_image_id": "sha256:f843d1cea2ae0c1e4dc33b6c528261a995155af7036dd6389a71cb68f2d57fd7",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 21.185,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "1d24a777b85b099fded4eeaac3f6f597fa763c93cf1fbbcf7be13c8120a2f697",
+          "anonymous_e2b_pull_and_tools": "fe27959d0099db2cef9ce47e399e1bc5837a969fae40d47268b454865edbc6c4",
+          "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+          "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+        },
+        "source_image_id": "sha256:f843d1cea2ae0c1e4dc33b6c528261a995155af7036dd6389a71cb68f2d57fd7",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 307765076,
+        "preparation": {
+          "kind": "original_base_metadata_only",
+          "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+        }
+      },
+      "react-lead-form": {
+        "title": "react-lead-form task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:react-lead-form-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:4cd341d8c3889c35c5d7442f8dd291c99524c429f910c3eb918f9e445a565424",
+        "config_image_id": "sha256:79681ee7a6f0ee94d05be43d1f387bb98e7131a0441f62f0deae2589b5a6c3d5",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 5.355,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "4a940fab03487831c9bc1a280db63e8fab62578f8c0746a8e8f85281c56022d0",
+          "anonymous_e2b_pull_and_tools": "7d673ae84dd5abf2cf9b56d0bbef1afdb710ae7f1d8dba48c9afae5ff2c10ec1",
+          "00520b2ea107.audit": "36c60d806d78c36c43cf0e22c09e5f9e20b30080d58654916c1595d95cece987"
+        },
+        "source_image_id": "sha256:00520b2ea1070a2d9cc0b29c3c71a9d91bbb7d32243323252882c4af3f02900d",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 123485029
+      },
+      "M05": {
+        "title": "M05 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m05-v2",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:48306e72f236b0979a3979b1b37af8373156affe2bf9a4ba7559c76faeba7410",
+        "config_image_id": "sha256:b5b6773a4f551337667aadd4b149c6b9bcc95dc856ab53bda7407d188fb85243",
+        "visibility": "public",
+        "platform": "linux/amd64",
+        "anonymous_manifest_verified": true,
+        "compressed_layer_bytes": 344244996,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "pull_seconds": 24.363,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "preparation": {
+          "kind": "original_base_plus_original_task_python",
+          "base_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:e90095ce181e47a728407bbe4ecb39ebdeb54abb5aa598fc6efc7704d2570fd9",
+          "interpreter_source_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
+          "recipe": "M05/environment/Dockerfile",
+          "recipe_sha256": "be3531ece0ca0fdbdeea5d534ace516e10344a94563ab703f74d71f6df1f2ff1",
+          "reason": "Restore the original task Python3.12 selection; M05 public commission requires Python3.11 or newer.",
+          "change_scope": "original interpreter prefix and PATH selection; original task input bytes unchanged"
+        },
+        "verified_tools": {
+          "python": "3.12.14",
+          "prefix": "/opt/python",
+          "sqlite": "3.53.1",
+          "dependency_versions": {
+            "pip": "26.2.1"
+          }
+        },
+        "previous_versions": [
+          {
+            "title": "M05 task environment",
+            "status": "published_and_verified",
+            "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m05-v1",
+            "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:e90095ce181e47a728407bbe4ecb39ebdeb54abb5aa598fc6efc7704d2570fd9",
+            "config_image_id": "sha256:52c91b13a49501463a804d655f2fbb4f9a73faff0378f255c45528c044682d6f",
+            "visibility": "public",
+            "anonymous_manifest_verified": true,
+            "anonymous_e2b_verification": {
+              "status": "passed",
+              "registry_credentials_used": false,
+              "image_absent_before_pull": true,
+              "layer_cache_scope": "shared layers may be reused within a clean verification group",
+              "pull_seconds": 0.632,
+              "tool_probe": "passed",
+              "full_actor_trial": "not_performed",
+              "temporary_sandbox_deleted": true
+            },
+            "receipt_sha256": {
+              "publication": "072367a7ef93a17e5f32aadfda3c398af692325c20d8dbec8a509feda690c266",
+              "anonymous_e2b_pull_and_tools": "1993312ee8e92fc3223af70c25b1b34dfd5b9a064f380548509ee022c44fdec7",
+              "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+              "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+            },
+            "source_image_id": "sha256:52c91b13a49501463a804d655f2fbb4f9a73faff0378f255c45528c044682d6f",
+            "platform": "linux/amd64",
+            "compressed_layer_bytes": 307765076,
+            "preparation": {
+              "kind": "original_base_metadata_only",
+              "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+            }
+          }
+        ],
+        "receipt_sha256": {
+          "publication": "fa5f6ce51f2b702945291b598ef615883c9c938076d8c3c7b28158fab947a05b",
+          "anonymous_e2b_pull_and_tools": "8fdea5be0eb4601473b61fda442dbcd1779182498f4f55351ae66d970bf286aa",
+          "M05-publication-approval": "06ffc47c5e2f6ef55fcec92ab4e20bcb107b54f9a2464400514d6a838e1b4539"
+        }
+      },
+      "wal-recovery-ordering": {
+        "title": "wal-recovery-ordering task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:wal-recovery-ordering-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:ca1ce80bb2aab25147921df74e55f74a50fb2bae2ac69f15985043f4cbbd91da",
+        "config_image_id": "sha256:276b381f57b3642cf86c62d3e2190673059484a119f3b404e8687e712e520d57",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 3.233,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "cf27aaff7450cb8d569723ba979aa90dcef02b1f8232b5a9a27c5de472e5efd2",
+          "anonymous_e2b_pull_and_tools": "227b883939f2f7760e27742f63a1ff02786a403cf99b30ca6d5eeef1dfd2cfda",
+          "a784f6d1194c.audit": "04dfe43565e04dbfa07f6148960cd6b10b56ceba5944a3e72eda1c66ce32cc08"
+        },
+        "source_image_id": "sha256:a784f6d1194c6c2797fec1b683fc95e2f247e0fd64f75ca5ed77491d9fba486a",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 45183927
+      },
+      "O09": {
+        "title": "O09 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o09-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:54b85575736165727e754c88b7c64be0556ee73d782ee04ad8caf8a199fcf9c7",
+        "config_image_id": "sha256:3a5de1701647a640c7aa84dffe3dfe8a305eda6935c72d639025da159e069c4d",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 4.23,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "299592845826abd04b20bc707d53e2ffae105314606270ce8c27d2a3c19365c1",
+          "anonymous_e2b_pull_and_tools": "b2cfca7d20a882a5b6877c42e64c93d3082b0c420307684779e51dedf02b3d55",
+          "643c384945df.audit": "ff6ec78bc178f1675e5e66f4b4a4594aa6c3d63b250c8f8cf19962a75141e862"
+        },
+        "source_image_id": "sha256:643c384945df3808adb060e98959942fb0e943a9e61c1ad7707005c4e87992e6",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 49624666
+      },
+      "kv-live-surgery": {
+        "title": "kv-live-surgery task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:kv-live-surgery-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a4b54d32e44254d45ce21556e5f687fb4c566dd0c6d6a44cdf9e3f8f1e08a51b",
+        "config_image_id": "sha256:a5ffc3ac1a9136187c2cbe812d32dbd460e1801f260d94ea9b275ff926fc6aa8",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 14.701,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "2126c9a41b083d9f89a9f595b7fb5caa343cd70118130adb16483adb5ed499fc",
+          "anonymous_e2b_pull_and_tools": "9888b4295acb35d98c0d10ad986de96cc795625d3c37ff9e06647fc88d7cc1ba",
+          "a5ffc3ac1a91.audit": "c9aa37a265a53d582c2f529e152ebf43be8289127f063f3e61da6777451a5b65",
+          "kv-clean-final-rootfs-comparison": "0c090349b5c6fa9fe5c69e2f069171901f9857589e0fccfa78f55b717c47fa4e"
+        },
+        "source_image_id": "sha256:a5ffc3ac1a9136187c2cbe812d32dbd460e1801f260d94ea9b275ff926fc6aa8",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 236549243,
+        "preparation": {
+          "kind": "flattened_final_filesystem",
+          "reason": "exclude hidden build inputs retained in historical layers",
+          "final_filesystem_equivalence": "verified contents, metadata, links and task input hashes",
+          "scope": "new clean layer closure; original layers deliberately not published"
+        }
+      },
+      "M02": {
+        "title": "M02 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m02-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:c30e0d3b6a4773d52e3748759b64ae0ab41777b5b34793e7268bb707eb229ce2",
+        "config_image_id": "sha256:04a577cb0c28ee070598b9ba889cd29e03fed15278072c10107431e88c6791a0",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 0.622,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "0ecdd96730e6bc6d91dbb1f4d124c5404f64693a127e1b94c5c4cdb0b1d51ede",
+          "anonymous_e2b_pull_and_tools": "f2502cc8851d5d2bbfbd440495c9c89319839748360b450f9c39769331571629",
+          "generic-metadata-candidate-independent-audit": "4398193d092f2e5557933a11909be3dccb1afaa14e85c1f3fc6b4774d3c8de20",
+          "715f468f5323.audit": "0f94deb817563bd84e6bcfbd2f5ba05ad43a550c6f82e30e91eed3dbcb6a51e9"
+        },
+        "source_image_id": "sha256:04a577cb0c28ee070598b9ba889cd29e03fed15278072c10107431e88c6791a0",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 307765076,
+        "preparation": {
+          "kind": "original_base_metadata_only",
+          "original_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258"
+        }
+      },
+      "O01": {
+        "title": "O01 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o01-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:9593cad462e5957a70ffc71714db590604633b56330909a6a0331f340fb83a17",
+        "config_image_id": "sha256:0810ccf20977fa0daaa6e173dc6f454c69ff3e8285a932392f4d2f4a1a1714b3",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 3.031,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "dd05808c116fbdde1552d53dd9bf9ed2ff8bc4f43f5667059ab9fb64291c6b16",
+          "anonymous_e2b_pull_and_tools": "a9a5ae7e70c738e979235c3cff713dfa38c597a3de30d32b9a46663362283546",
+          "SWE-metadata-candidates.independent-audit": "79e21971c2b012be8521f8c6a16f1dadda68bf174ffe70d6fe11a1dd9c057ea0",
+          "receipt": "a3a8ce30ce1c244cdbbaa5edc76fd61588544227d22d2323f97015ef21bc46b3"
+        },
+        "source_image_id": "sha256:0810ccf20977fa0daaa6e173dc6f454c69ff3e8285a932392f4d2f4a1a1714b3",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 333252824,
+        "preparation": {
+          "kind": "original_pristine_dependency_metadata_only",
+          "original_image_id": "sha256:ee85ede3eece248cec8331f062fb9da32927b1895cda90c6800fca1e548668ec",
+          "observed_original_tool_packages": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "368a66fdb4863ba6fa4542a4a72351a3499943dd",
+            "receipt_sha256": "a3a8ce30ce1c244cdbbaa5edc76fd61588544227d22d2323f97015ef21bc46b3",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pip": "23.0.1",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing_extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "sqlfluff-3608": {
+        "title": "sqlfluff-3608 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:sqlfluff-3608-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:c7f7127ea6e3ebb6e4657305041b7e8f9449511d3b1f1b1aa9eca47bdad4db52",
+        "config_image_id": "sha256:d0b641d4f2aafa4d45a9684a4527eeb53866b62b95d2cd0df735a09712228ed4",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 3.932,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "74f300a5ec1d78ef0dd3ce51c9106fcfe61d39d88e10a8d982e0b7aee932e830",
+          "anonymous_e2b_pull_and_tools": "ec6370fd9649a37c15109673fbf1f4857e576c5f009471ab71474df134f01545",
+          "SWE-metadata-candidates.independent-audit": "79e21971c2b012be8521f8c6a16f1dadda68bf174ffe70d6fe11a1dd9c057ea0",
+          "receipt": "c964904e8c32b224f27929f7fa4eba9dd7f749d6f2ccfb159299a9b1228c142c"
+        },
+        "source_image_id": "sha256:d0b641d4f2aafa4d45a9684a4527eeb53866b62b95d2cd0df735a09712228ed4",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 340002325,
+        "preparation": {
+          "kind": "original_pristine_dependency_metadata_only",
+          "original_image_id": "sha256:317128d4d5df85f08854d0b33e755cbb98d405fd62ab515c2173a3aba3943ffd",
+          "observed_original_tool_packages": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "Jinja2": "3.1.6",
+            "MarkupSafe": "3.0.4",
+            "appdirs": "1.4.4",
+            "chardet": "7.7.0",
+            "click": "8.5.0",
+            "colorama": "0.4.6",
+            "diff-cover": "10.6.0",
+            "pathspec": "1.1.1",
+            "pygments": "2.21.0",
+            "pyyaml": "6.0.3",
+            "regex": "2026.9.29",
+            "tblib": "3.2.2",
+            "toml": "0.10.2",
+            "tqdm": "4.70.1",
+            "wheel": "0.46.3",
+            "typing_extensions": "4.16.0"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            },
+            "MarkupSafe": {
+              "historical_log": "3.0.3",
+              "actual": "3.0.4",
+              "matches": false
+            },
+            "chardet": {
+              "historical_log": "7.6.0",
+              "actual": "7.7.0",
+              "matches": false
+            },
+            "regex": {
+              "historical_log": "2026.9.10",
+              "actual": "2026.9.29",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "f6390a6cfd07763ceb6eac0b2635bfe13dca0c6b",
+            "receipt_sha256": "c964904e8c32b224f27929f7fa4eba9dd7f749d6f2ccfb159299a9b1228c142c",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "Jinja2": "3.1.6",
+            "MarkupSafe": "3.0.4",
+            "PyYAML": "6.0.3",
+            "Pygments": "2.21.0",
+            "appdirs": "1.4.4",
+            "chardet": "7.7.0",
+            "click": "8.5.0",
+            "colorama": "0.4.6",
+            "diff_cover": "10.6.0",
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pathspec": "1.1.1",
+            "pip": "23.0.1",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "regex": "2026.9.29",
+            "setuptools": "69.5.1",
+            "tblib": "3.2.2",
+            "toml": "0.10.2",
+            "tomli": "2.5.0",
+            "tqdm": "4.70.1",
+            "typing_extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "O05": {
+        "title": "O05 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o05-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:8623cd618151fa0d826506064b5aede155a2d62100988b3d42203a8eadf44148",
+        "config_image_id": "sha256:ce01572fa132abf9927b7274a7b359d515e61b7f0c46297c723711de86a9d0be",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 2.51,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "b93eceba2502e5b407ff0939531dc46bd4e853f38442aaf05c0560bf487ec741",
+          "anonymous_e2b_pull_and_tools": "40cd8c2b1d317a0dc847c285aeb5a5c5b34c8de0a39cadd71a87bccaccf8140c",
+          "SWE-metadata-candidates.independent-audit": "79e21971c2b012be8521f8c6a16f1dadda68bf174ffe70d6fe11a1dd9c057ea0",
+          "receipt": "20f2394594bcc70e591d238e058eac532d5063f3940892628f842fb1c52df129"
+        },
+        "source_image_id": "sha256:ce01572fa132abf9927b7274a7b359d515e61b7f0c46297c723711de86a9d0be",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 333959652,
+        "preparation": {
+          "kind": "original_pristine_dependency_metadata_only",
+          "original_image_id": "sha256:2e96a9cb1ed859110230654ff96779181678a034dac183ce9a01b63733aba649",
+          "observed_original_tool_packages": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "456bacbbead4fa30a1a82892c9446ac9efb8055b",
+            "receipt_sha256": "20f2394594bcc70e591d238e058eac532d5063f3940892628f842fb1c52df129",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pip": "23.0.1",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "python-dateutil": "2.9.0.post0",
+            "pytz": "2024.1",
+            "setuptools": "69.5.1",
+            "simplejson": "3.19.2",
+            "six": "1.17.0",
+            "tomli": "2.5.0",
+            "typing_extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "O02": {
+        "title": "O02 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o02-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:62b302e6d556e6f6ca89ac946858c2c8cb969359dab7e28505fdaa7231a919df",
+        "config_image_id": "sha256:a151d2654f805160570438549378776004cbc8737b47d89de2fbd68e8212282a",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 2.439,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "9434e3f69ddde6e8a83a06aa68f05b2971bcb113d9a8a5fd1329594defc137d8",
+          "anonymous_e2b_pull_and_tools": "42d803d0ced42743fbc72a8ad54e10e78d0337c9e8bee579b9f8a9ef18db75ca",
+          "SWE-metadata-candidates.independent-audit": "79e21971c2b012be8521f8c6a16f1dadda68bf174ffe70d6fe11a1dd9c057ea0",
+          "receipt": "c790dda6cf30902c98ccec3032478cc57a6718d91b556e23f259a892f6b9e8aa"
+        },
+        "source_image_id": "sha256:a151d2654f805160570438549378776004cbc8737b47d89de2fbd68e8212282a",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 333139476,
+        "preparation": {
+          "kind": "original_pristine_dependency_metadata_only",
+          "original_image_id": "sha256:2204dc1ed204ce277f1f1c2cd69d5867d787dfdd70471881c22adda4cccbe446",
+          "observed_original_tool_packages": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "2591fb216e5f3f840ca9612552d11349041c9036",
+            "receipt_sha256": "c790dda6cf30902c98ccec3032478cc57a6718d91b556e23f259a892f6b9e8aa",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pip": "23.0.1",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing_extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "O04": {
+        "title": "O04 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o04-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:cf108af424ae37474dd7ede9a16c9999e3608a733418b4e0c38da8deb3a6e140",
+        "config_image_id": "sha256:8b15e1fbfc4ddfe72f5a3e730e1e0b7618213ac8d073f610ba2774bf26aabe77",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 8.311,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "6ddd96a58db73d4f05b0c6a94cb51cca46e7afaca8bbf248bab7e7c3fdbab0f2",
+          "anonymous_e2b_pull_and_tools": "eeb12b1d15a75e73ed8c1ca41cc47af622437d4c3bf4e1656000a724ad47e651",
+          "SWE-metadata-candidates.independent-audit": "79e21971c2b012be8521f8c6a16f1dadda68bf174ffe70d6fe11a1dd9c057ea0",
+          "receipt": "fccb15df9719970bf86ab7245838115d4e11d61dce914ab0c05a7d7aa056e160"
+        },
+        "source_image_id": "sha256:8b15e1fbfc4ddfe72f5a3e730e1e0b7618213ac8d073f610ba2774bf26aabe77",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 446436603,
+        "preparation": {
+          "kind": "original_pristine_dependency_metadata_only",
+          "original_image_id": "sha256:6ebf11e6d85db466c437ec754fc20231611827419e56e8a6d8368a06733d0935",
+          "observed_original_tool_packages": {
+            "contourpy": "1.3.2",
+            "cycler": "0.12.1",
+            "exceptiongroup": "1.3.1",
+            "fonttools": "4.65.0",
+            "iniconfig": "2.3.1",
+            "kiwisolver": "1.5.1",
+            "matplotlib": "3.8.4",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pillow": "12.3.0",
+            "pluggy": "1.7.0",
+            "pyparsing": "3.3.3",
+            "pytest": "7.4.4",
+            "python-dateutil": "2.9.0.post0",
+            "setuptools": "69.5.1",
+            "six": "1.17.0",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "vtk": "9.2.6",
+            "certifi": "2026.10.19",
+            "charset_normalizer": "3.5.2",
+            "idna": "3.20",
+            "imageio": "2.38.0",
+            "platformdirs": "4.12.4",
+            "pooch": "1.9.0",
+            "requests": "2.34.2",
+            "scooby": "0.12.0",
+            "urllib3": "2.8.0",
+            "wheel": "0.46.3"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            },
+            "certifi": {
+              "historical_log": "2026.7.22",
+              "actual": "2026.10.19",
+              "matches": false
+            },
+            "charset_normalizer": {
+              "historical_log": "3.5.1",
+              "actual": "3.5.2",
+              "matches": false
+            },
+            "imageio": {
+              "historical_log": "2.37.4",
+              "actual": "2.38.0",
+              "matches": false
+            },
+            "platformdirs": {
+              "historical_log": "4.12.0",
+              "actual": "4.12.4",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "4b98f33b8470e207290eea9a9dcee3c5f62e64ab",
+            "receipt_sha256": "fccb15df9719970bf86ab7245838115d4e11d61dce914ab0c05a7d7aa056e160",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "ImageIO": "2.38.0",
+            "certifi": "2026.10.19",
+            "charset-normalizer": "3.5.2",
+            "contourpy": "1.3.2",
+            "cycler": "0.12.1",
+            "exceptiongroup": "1.3.1",
+            "fonttools": "4.65.0",
+            "idna": "3.20",
+            "iniconfig": "2.3.1",
+            "kiwisolver": "1.5.1",
+            "matplotlib": "3.8.4",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pillow": "12.3.0",
+            "pip": "23.0.1",
+            "platformdirs": "4.12.4",
+            "pluggy": "1.7.0",
+            "pooch": "1.9.0",
+            "pyparsing": "3.3.3",
+            "pytest": "7.4.4",
+            "python-dateutil": "2.9.0.post0",
+            "requests": "2.34.2",
+            "scooby": "0.12.0",
+            "setuptools": "69.5.1",
+            "six": "1.17.0",
+            "tomli": "2.5.0",
+            "typing_extensions": "4.16.0",
+            "urllib3": "2.8.0",
+            "vtk": "9.2.6",
+            "wheel": "0.46.3"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "O06": {
+        "title": "O06 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o06-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:997494f549f3870b1bef1045b0a6042ca2b8f2d1b6ce1423ac94b0b6f1c8c500",
+        "config_image_id": "sha256:2544959977023305461fc3179cb3942803d348a7fb000fbb5e817b073f5a060b",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 3.093,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "84e464a32417b35c2687680797fcdf382de5efe4f09205d0353e9ad4ef5204ee",
+          "anonymous_e2b_pull_and_tools": "dc2f8ecd0d2df1f3100891acdf516df5c4e18064c9a1064274da73dcf97dfa62",
+          "SWE-metadata-candidates.independent-audit": "79e21971c2b012be8521f8c6a16f1dadda68bf174ffe70d6fe11a1dd9c057ea0",
+          "receipt": "fc4de64b56fa56a89eeeb63e8eed5729be068558903fd87ca51b854c2d51ae5e"
+        },
+        "source_image_id": "sha256:2544959977023305461fc3179cb3942803d348a7fb000fbb5e817b073f5a060b",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 340002631,
+        "preparation": {
+          "kind": "original_pristine_dependency_metadata_only",
+          "original_image_id": "sha256:9eefeaf98a02347d26fbbf9646abb565c80c62269e3e3769468e31b01b3305a2",
+          "observed_original_tool_packages": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "Jinja2": "3.1.6",
+            "MarkupSafe": "3.0.4",
+            "appdirs": "1.4.4",
+            "chardet": "7.7.0",
+            "click": "8.5.0",
+            "colorama": "0.4.6",
+            "diff-cover": "10.6.0",
+            "pathspec": "1.1.1",
+            "pygments": "2.21.0",
+            "pyyaml": "6.0.3",
+            "regex": "2026.9.29",
+            "tblib": "3.2.2",
+            "toml": "0.10.2",
+            "tqdm": "4.70.1",
+            "wheel": "0.46.3",
+            "typing_extensions": "4.16.0"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            },
+            "MarkupSafe": {
+              "historical_log": "3.0.3",
+              "actual": "3.0.4",
+              "matches": false
+            },
+            "chardet": {
+              "historical_log": "7.6.0",
+              "actual": "7.7.0",
+              "matches": false
+            },
+            "regex": {
+              "historical_log": "2026.9.10",
+              "actual": "2026.9.29",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "856d71e891f24e275fd667c5d441e6c070922bf2",
+            "receipt_sha256": "fc4de64b56fa56a89eeeb63e8eed5729be068558903fd87ca51b854c2d51ae5e",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "Jinja2": "3.1.6",
+            "MarkupSafe": "3.0.4",
+            "PyYAML": "6.0.3",
+            "Pygments": "2.21.0",
+            "appdirs": "1.4.4",
+            "chardet": "7.7.0",
+            "click": "8.5.0",
+            "colorama": "0.4.6",
+            "diff_cover": "10.6.0",
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pathspec": "1.1.1",
+            "pip": "23.0.1",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "regex": "2026.9.29",
+            "setuptools": "69.5.1",
+            "tblib": "3.2.2",
+            "toml": "0.10.2",
+            "tomli": "2.5.0",
+            "tqdm": "4.70.1",
+            "typing_extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "marshmallow-2123": {
+        "title": "marshmallow-2123 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:marshmallow-2123-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:cc4be898552542f6e430283993f5e493999d2c3059aded5ff41d353030d13d18",
+        "config_image_id": "sha256:e7eead97a7996debdc91ba76dd1d923d046d46922fcfea7f9bebaefe13deda61",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 2.655,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "7b733acb58c8c80e19f455c78f972b19962223db4974f311e5c5c96d8f33e4d1",
+          "anonymous_e2b_pull_and_tools": "f460f9ec305b368c0f53dd5b4f99c02625b2cdbdeaa54affdf3a479b46e4d088",
+          "SWE-metadata-candidates.independent-audit": "79e21971c2b012be8521f8c6a16f1dadda68bf174ffe70d6fe11a1dd9c057ea0",
+          "receipt": "98d78d3848403de139f70871ccd46473f380530b2a13fbd0118211e981831e3a"
+        },
+        "source_image_id": "sha256:e7eead97a7996debdc91ba76dd1d923d046d46922fcfea7f9bebaefe13deda61",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 333992556,
+        "preparation": {
+          "kind": "original_pristine_dependency_metadata_only",
+          "original_image_id": "sha256:0377ee0da09c64de66c97cad7acd338d03c73e9b70704c4fe48b82af27ba57bc",
+          "observed_original_tool_packages": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "81d992831a77decffeea3390dfc097ed989b4322",
+            "receipt_sha256": "98d78d3848403de139f70871ccd46473f380530b2a13fbd0118211e981831e3a",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pip": "23.0.1",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "python-dateutil": "2.9.0.post0",
+            "pytz": "2024.1",
+            "setuptools": "69.5.1",
+            "simplejson": "3.19.2",
+            "six": "1.17.0",
+            "tomli": "2.5.0",
+            "typing_extensions": "4.16.0",
+            "wheel": "0.46.3"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "M01": {
+        "title": "M01 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m01-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
+        "config_image_id": "sha256:3ccfd33ee58eabe31b8de28f578b7178e63a4b4d892e9fdfb93eca0a44a1801f",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 27.041,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "2b98395dd5174981aaab0fef0cf867a906d56f629cb2b568943621e39dfccbdd",
+          "anonymous_e2b_pull_and_tools": "dce4bbaee31ee90441c7147258c8b969b17e139ec26e9b7d8e7ab25644599560",
+          "3ccfd33ee58e.audit": "d502e01a71c1c2613860f1f4c53b2843f9c503cc699052335e1625e4f7895111",
+          "receipt": "1919a23c50da25bcbd119870ca08151d08a153a2888f7308040de5df72731adc"
+        },
+        "source_image_id": "sha256:3ccfd33ee58eabe31b8de28f578b7178e63a4b4d892e9fdfb93eca0a44a1801f",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 368765960,
+        "preparation": {
+          "kind": "derived_self_contained_tools",
+          "original_base_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258",
+          "recipe_sha256": "4bbe63fe8a4afd36f0032a7ca60ef30da71ac6a014a63a9cce37703cbc0eb7ac",
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "30b4cd0e7f074dafca13ea77012c3d00c48ef40f",
+            "receipt_sha256": "1919a23c50da25bcbd119870ca08151d08a153a2888f7308040de5df72731adc",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.12.14",
+          "prefix": "/opt/task-tools/m01-venv",
+          "dependency_versions": {
+            "Jinja2": "3.1.6",
+            "MarkupSafe": "3.0.3",
+            "PyYAML": "6.0.3",
+            "Pygments": "2.21.0",
+            "appdirs": "1.4.4",
+            "autocommand": "2.2.2",
+            "backports.tarfile": "1.2.0",
+            "chardet": "7.6.0",
+            "click": "8.5.0",
+            "colorama": "0.4.6",
+            "diff_cover": "10.5.1",
+            "importlib_metadata": "8.7.1",
+            "iniconfig": "2.3.0",
+            "jaraco.context": "6.1.0",
+            "jaraco.functools": "4.4.0",
+            "jaraco.text": "4.0.0",
+            "more-itertools": "10.8.0",
+            "packaging": "26.0",
+            "pathspec": "1.1.1",
+            "pip": "26.2.1",
+            "platformdirs": "4.4.0",
+            "pluggy": "1.6.0",
+            "pytest": "9.1.1",
+            "regex": "2026.9.3",
+            "setuptools": "80.10.2",
+            "tblib": "3.2.2",
+            "toml": "0.10.2",
+            "tomli": "2.4.0",
+            "tqdm": "4.70.0",
+            "typing_extensions": "4.16.0",
+            "wheel": "0.48.0",
+            "zipp": "3.23.0"
+          },
+          "pytest_version": "pytest 9.1.1"
+        }
+      },
+      "O14": {
+        "title": "O14 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o14-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:2bd80ebe6aabced68e7c9c2508d81574b86645fbc34a7411adc15c0f1aff90be",
+        "config_image_id": "sha256:d7aded463da16042e2e33304b01a9ebab21eddf60fb05a98a5a3615cd82df44c",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 37.252,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "fcb6d192ab577dea1d40e320f5774e162af8183329704d11949b84fbcbd6a307",
+          "anonymous_e2b_pull_and_tools": "64a9d4123d1fb1bf3a3cc09ef87576f03af2ff4316b4440877669e1bb4def4ba",
+          "efe0dca4f06e.audit": "4470bcd9452bdabd345ef4c21e1c5094b9fd61ba859fd2c87df3eaef5d84df09"
+        },
+        "source_image_id": "sha256:efe0dca4f06e8043e6aa763d043d87f872a637545792c9869f7d009bb8a08a54",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 585126289
+      },
+      "astroid-1030": {
+        "title": "astroid-1030 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:astroid-1030-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aa2074e9f14638dd33b6b23c79f039fe2f0d2337a28781ee8a2f3354cd0ff9d4",
+        "config_image_id": "sha256:e21041495c6b51e6cc818ad04a6e1159e1c85a2d0fab8ca07fc4d0305ff0932c",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 3.967,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "4da9f5bb2e70c859054734469cac89fa8bc2f08bab44aa6736ceb695d9405ed3",
+          "anonymous_e2b_pull_and_tools": "686963a4eead7d2a133b473add7ce086eb6de8f3e500844ef218f7c49e46a2ae",
+          "e21041495c6b.audit": "02991a1a52cd18ce1232a44453cba71d735740e536032eec43ede4dd0c988249",
+          "receipt": "f0159ae97db055a72ead58594dc57f34f10fd8dee215a776da891985fb7a5c8a",
+          "actual-initialization-argv-check": "7139f9c9c35810742a035e9ce512e0fd95554a3323ce5cf5e6d2b2ba815b3e80"
+        },
+        "source_image_id": "sha256:e21041495c6b51e6cc818ad04a6e1159e1c85a2d0fab8ca07fc4d0305ff0932c",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 333984582,
+        "preparation": {
+          "kind": "original_runtime_plus_fixed_build_only_wheelhouse",
+          "original_image_id": "sha256:47c032a9c99fdcb3a3c36233e9f83a9eca52b49e362d3bc0b36ba590aaf7908b",
+          "recipe_sha256": "00e96a48784169db98fae3a978c920ac70722719903f2c557268adc66a545640",
+          "provenance_boundary": "original7 layers and runtimeEnv unchanged; no non-pyc global package bytes changed;1pip pyc regenerated by verification; backend assets remain build-only",
+          "observed_original_tool_packages": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing-extensions": "4.16.0",
+            "lazy_object_proxy": "1.12.0",
+            "wrapt": "1.12.1",
+            "wheel": "0.46.3"
+          },
+          "historical_initial_log_version_deltas": {
+            "iniconfig": {
+              "historical_log": "2.3.0",
+              "actual": "2.3.1",
+              "matches": false
+            },
+            "pluggy": {
+              "historical_log": "1.6.0",
+              "actual": "1.7.0",
+              "matches": false
+            },
+            "tomli": {
+              "historical_log": "2.4.1",
+              "actual": "2.5.0",
+              "matches": false
+            }
+          },
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "dae2b99aa3f7af057a63843384fae933b659d668",
+            "receipt_sha256": "f0159ae97db055a72ead58594dc57f34f10fd8dee215a776da891985fb7a5c8a",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          },
+          "initialization": {
+            "prepend_initialization_argv": [
+              "/usr/bin/env",
+              "PIP_NO_INDEX=1",
+              "PIP_FIND_LINKS=/opt/task-tools/astroid-1030-build-wheels"
+            ],
+            "remaining_argv": "existing material initialize recipe with --editable and declared frozen source inputs",
+            "applies_to": "that initialization command and its child pip/build subprocesses only",
+            "global_agent_env_unchanged": true,
+            "runtime_packaging_version": "24.2",
+            "source_code_modifications": false,
+            "task_key_branches_in_controller_or_loader": false
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/usr/local",
+          "dependency_versions": {
+            "exceptiongroup": "1.3.1",
+            "iniconfig": "2.3.1",
+            "lazy-object-proxy": "1.12.0",
+            "numpy": "1.24.4",
+            "packaging": "24.2",
+            "pip": "23.0.1",
+            "pluggy": "1.7.0",
+            "pytest": "7.4.4",
+            "setuptools": "69.5.1",
+            "tomli": "2.5.0",
+            "typing_extensions": "4.16.0",
+            "wheel": "0.46.3",
+            "wrapt": "1.12.1"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "M03": {
+        "title": "M03 task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m03-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:4bdc30f79123276996ebb5ca9cd966e559c5ceac9b616cb4ff7b9fa10bcabbd5",
+        "config_image_id": "sha256:67ccf57a5bb8127b94da9e433d2c1a48c633317fd760b3b60244c3966f1e791c",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 18.231,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "50be7e98da21bf4655b8792800d638fbc4e6c93272cc9ec4831f7f098270134c",
+          "anonymous_e2b_pull_and_tools": "a29853bce43f23c126112717c3811b7dd41d5154c9b952881837914d461609b7",
+          "67ccf57a5bb8.audit": "5fc4f1ec1ea99920054f23c94c04056da9bac6cf7f395402d6eb9df0d8667bd6",
+          "receipt": "cfccd1a112b15c92ad5c6fb57aa1e305e1c9e99e115f0f62ae01b271f69fa7d9"
+        },
+        "source_image_id": "sha256:67ccf57a5bb8127b94da9e433d2c1a48c633317fd760b3b60244c3966f1e791c",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 512663407,
+        "preparation": {
+          "kind": "derived_self_contained_tools",
+          "original_base_image_id": "sha256:715f468f5323c1d22f08d79c34729e10ed9edb1c5df791bdc9d6bb3ceeef5258",
+          "recipe_sha256": "15c34f66d080e0dcab98710548ac1235f32dd048ed5b545ab805cba96fcf080c",
+          "provenance_boundary": "original dependency non-pyc source/native bytes retained;467pyc naturally rebuilt;23 stale project binding files excluded; not a byte-identical full final dependency filesystem",
+          "source_initialization_check": {
+            "status": "passed",
+            "source_revision": "00cb83ff299e386ade5a771bedb924f185ba3d9f",
+            "receipt_sha256": "cfccd1a112b15c92ad5c6fb57aa1e305e1c9e99e115f0f62ae01b271f69fa7d9",
+            "scope": "offline initialization and python/pytest source-path check only, not task-solving"
+          }
+        },
+        "verified_tools": {
+          "python": "3.10.21",
+          "prefix": "/opt/task-tools/m03-venv",
+          "dependency_versions": {
+            "Babel": "2.15.0",
+            "Bottleneck": "1.3.8",
+            "Brotli": "1.1.0",
+            "Deprecated": "1.2.14",
+            "Flask": "2.3.3",
+            "Flask-AppBuilder": "4.5.0",
+            "Flask-Babel": "2.0.0",
+            "Flask-Caching": "2.3.0",
+            "Flask-Compress": "1.15",
+            "Flask-JWT-Extended": "4.6.0",
+            "Flask-Limiter": "3.7.0",
+            "Flask-Login": "0.6.3",
+            "Flask-Migrate": "3.1.0",
+            "Flask-SQLAlchemy": "2.5.1",
+            "Flask-Session": "0.8.0",
+            "Flask-WTF": "1.2.1",
+            "Jinja2": "3.1.4",
+            "Mako": "1.3.5",
+            "Markdown": "3.6",
+            "MarkupSafe": "2.1.5",
+            "PyJWT": "2.8.0",
+            "PyNaCl": "1.5.0",
+            "PyYAML": "6.0.1",
+            "Pygments": "2.18.0",
+            "SQLAlchemy": "1.4.52",
+            "SQLAlchemy-Utils": "0.38.3",
+            "WTForms": "3.1.2",
+            "WTForms-JSON": "0.3.5",
+            "Werkzeug": "3.0.6",
+            "XlsxWriter": "3.0.9",
+            "alembic": "1.13.1",
+            "amqp": "5.2.0",
+            "apispec": "6.3.0",
+            "apsw": "3.46.0.0",
+            "async-timeout": "5.0.1",
+            "attrs": "23.2.0",
+            "backoff": "2.2.1",
+            "bcrypt": "4.1.3",
+            "billiard": "4.2.0",
+            "blinker": "1.8.2",
+            "cachelib": "0.9.0",
+            "cachetools": "5.3.3",
+            "cattrs": "23.2.3",
+            "celery": "5.4.0",
+            "certifi": "2024.2.2",
+            "cffi": "1.16.0",
+            "charset-normalizer": "3.3.2",
+            "click": "8.1.7",
+            "click-didyoumean": "0.3.1",
+            "click-option-group": "0.5.6",
+            "click-plugins": "1.1.1",
+            "click-repl": "0.3.0",
+            "colorama": "0.4.6",
+            "coverage": "7.16.0",
+            "cron-descriptor": "1.4.3",
+            "croniter": "2.0.5",
+            "cryptography": "42.0.7",
+            "deprecation": "2.1.0",
+            "dnspython": "2.6.1",
+            "email_validator": "2.1.1",
+            "exceptiongroup": "1.2.2",
+            "flask-talisman": "1.1.0",
+            "freezegun": "1.5.1",
+            "func_timeout": "4.3.5",
+            "geographiclib": "2.0",
+            "geopy": "2.4.1",
+            "google-auth": "2.29.0",
+            "greenlet": "3.0.3",
+            "gunicorn": "22.0.0",
+            "hashids": "1.3.1",
+            "holidays": "0.25",
+            "humanize": "4.9.0",
+            "idna": "3.7",
+            "importlib_metadata": "7.1.0",
+            "importlib_resources": "6.4.0",
+            "iniconfig": "2.3.0",
+            "isodate": "0.6.1",
+            "itsdangerous": "2.2.0",
+            "jsonpath-ng": "1.6.1",
+            "jsonschema": "4.17.3",
+            "kombu": "5.3.7",
+            "korean-lunar-calendar": "0.3.1",
+            "limits": "3.12.0",
+            "llvmlite": "0.42.0",
+            "markdown-it-py": "3.0.0",
+            "marshmallow": "3.21.2",
+            "marshmallow-sqlalchemy": "0.28.2",
+            "mdurl": "0.1.2",
+            "msgpack": "1.0.8",
+            "msgspec": "0.18.6",
+            "nh3": "0.2.17",
+            "numba": "0.59.1",
+            "numexpr": "2.10.0",
+            "numpy": "1.23.5",
+            "ordered-set": "4.1.0",
+            "packaging": "23.2",
+            "pandas": "2.0.3",
+            "parameterized": "0.9.0",
+            "paramiko": "3.4.0",
+            "parsedatetime": "2.6",
+            "pgsanity": "0.2.9",
+            "pip": "23.0.1",
+            "platformdirs": "3.8.1",
+            "pluggy": "1.6.0",
+            "ply": "3.11",
+            "polyline": "2.0.2",
+            "prison": "0.2.1",
+            "prompt_toolkit": "3.0.44",
+            "pyOpenSSL": "24.1.0",
+            "pyarrow": "14.0.2",
+            "pyasn1": "0.6.0",
+            "pyasn1_modules": "0.4.0",
+            "pycparser": "2.22",
+            "pyparsing": "3.1.2",
+            "pyrsistent": "0.20.0",
+            "pytest": "7.4.4",
+            "pytest-cov": "5.0.0",
+            "pytest-mock": "3.10.0",
+            "python-dateutil": "2.9.0.post0",
+            "python-dotenv": "1.0.1",
+            "python-geohash": "0.8.5",
+            "pytz": "2024.1",
+            "redis": "4.6.0",
+            "requests": "2.32.2",
+            "requests-cache": "1.2.0",
+            "rich": "13.7.1",
+            "rsa": "4.9",
+            "selenium": "3.141.0",
+            "setuptools": "65.5.0",
+            "shillelagh": "1.2.18",
+            "shortid": "0.1.2",
+            "simplejson": "3.19.2",
+            "six": "1.16.0",
+            "slack_sdk": "3.27.2",
+            "sqlglot": "25.24.0",
+            "sqloxide": "0.1.43",
+            "sqlparse": "0.5.0",
+            "sshtunnel": "0.4.0",
+            "tabulate": "0.8.10",
+            "tomli": "2.4.1",
+            "typing_extensions": "4.12.0",
+            "tzdata": "2024.1",
+            "url-normalize": "1.4.3",
+            "urllib3": "1.26.18",
+            "vine": "5.1.0",
+            "wcwidth": "0.2.13",
+            "wheel": "0.45.0",
+            "wrapt": "1.16.0",
+            "zipp": "3.19.0",
+            "zstandard": "0.22.0"
+          },
+          "pytest_version": "pytest 7.4.4"
+        }
+      },
+      "pretrain-shard-corruption": {
+        "title": "pretrain-shard-corruption task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:pretrain-shard-corruption-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:5d7c23e80aadd65c831f1b4df7a8e55ccd196d8d581f5af42b92dd9832fbb233",
+        "config_image_id": "sha256:b88427e87b19831010ac5810ff3251ac052559ac2b1d5bb5addd21e426f17ba7",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 24.588,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "b91b7889c79abe4db50d39e62f904120219f16180315ee4aa2e81f6acbbbe006",
+          "anonymous_e2b_pull_and_tools": "a31df234b47ba670c6c2e1bff7c59d1eefcd5dc29fbab8ed92a438c4b3f1dabb",
+          "b88427e87b19.audit": "54e694ebedfe2ddb8cbd236d2eb36f5411496e91f4c72762d0745a953af34e93",
+          "pretrain-clean-final-rootfs-comparison": "b7bc96653beb89d788c145ad23c2c3351336c76594bfff836a7ae15dcd35256c"
+        },
+        "source_image_id": "sha256:b88427e87b19831010ac5810ff3251ac052559ac2b1d5bb5addd21e426f17ba7",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 357376035,
+        "preparation": {
+          "kind": "flattened_final_filesystem",
+          "reason": "exclude hidden build inputs retained in historical layers",
+          "final_filesystem_equivalence": "verified contents, metadata, links and task input hashes",
+          "scope": "new clean layer closure; original layers deliberately not published"
+        }
+      },
+      "vf2-speedup-networkx": {
+        "title": "vf2-speedup-networkx task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:vf2-speedup-networkx-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:0d4381357bd9451189f8ff33a30624a8c7023c438668c3d0f46b9d3915f09fdf",
+        "config_image_id": "sha256:4534e1cf6a657575872af16f8d5f342214091e3d44dc07c3c46fc913bd99b881",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 42.573,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "fbf1ca48d6a83583657962eb85feeebed482699ab55692097d713739191b5779",
+          "anonymous_e2b_pull_and_tools": "4ee9985aa0246fc82c7cc98f08c54d873f3e1567b74f354135b80d73fd5ac381",
+          "4d966aab1b56.audit": "52c28e1e6f35aaf84a8e7b03c0f5600cef86e99c016c00aa03488dcded71b315"
+        },
+        "source_image_id": "sha256:4d966aab1b5654f1c05bbd0942f9fe8576a95dec935a85a4306a7ce5d846d416",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 531984710
+      },
+      "080-convert-novel-epub": {
+        "title": "080-convert-novel-epub task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:080-convert-novel-epub-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a4cfa8a2ae5fd875d32fa58fef0e359c1a3f06b05cc8e9085bb9ef60448bb2fc",
+        "config_image_id": "sha256:83dc71e9f5a6be8a8f9f1554afb6454f435e090d7d8de9294184c69b2cac8097",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 43.078,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "23c1faa35fb54d41620ce24089d3cfba2185bac590bf75b86746cec942e42425",
+          "anonymous_e2b_pull_and_tools": "a8aa6853d3fe88032312c36e5c238d0afe9b0684c76cb1914e3b1296dea557c0",
+          "b377c196af7c.audit": "468d4744cffe2bbc0768999f27564635fc34a7823539a98591103a07bf7bbc98",
+          "published-receipt": "350bfb748e65b3a47c100d5d06c4909aa62da12365a59c1e3c12679542fb0308",
+          "source-publish-controller": "058a130adcb71a9cd0ce9c305393c44096498ce3c46de5b1c377166a874004c3",
+          "runtime-compatibility-proof": "9427e267bb5cde628aaf21754b617f92d01523d073fbd8a2f8782e97e563eca4",
+          "final-proof": "f8e3278dcf1cc8a96d715f8fdb2d85b39052d5fe5d0a3e27653f89646cbddc94"
+        },
+        "source_image_id": "sha256:b377c196af7ce35474a0ae18c7b158df44790104315d680cc1735d6d31cf6ff0",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 882095193,
+        "configuration_normalizations": [
+          "AttachStderr: legacy attachment default false; omission does not attach stderr",
+          "AttachStdin: legacy attachment default false; omission does not attach stdin",
+          "AttachStdout: legacy attachment default false; omission does not attach stdout",
+          "Cmd: no image command override; original null and candidate absence both leave no Cmd",
+          "Domainname: no preset container domain name in either image",
+          "Hostname: no preset hostname; Docker allocates runtime hostname",
+          "OnBuild: no inherited build triggers in either image",
+          "OpenStdin: stdin is not held open by the image default",
+          "StdinOnce: no one-shot stdin behavior requested",
+          "Tty: no pseudo-terminal requested by the image default",
+          "Volumes: neither image declares any image-level volume"
+        ]
+      }
+    },
+    "image_naming": {
+      "tag_pattern": "<lowercase-task-key>-v<version>",
+      "examples": [
+        "m04-v1",
+        "m05-v2",
+        "o03-v1",
+        "kv-live-surgery-v1"
+      ],
+      "scope": "main task images for all 32 task keys",
+      "tag_role": "human-readable version alias; tags do not establish an immutable runtime identity",
+      "runtime_identity": "Only use the actual registry manifest digest after publication and verification.",
+      "provenance": "Dependency versions, build recipes, and source revisions belong in build and source manifests, not image names.",
+      "package": "ghcr.io/mmjzmy/auto-designer-tasks"
+    },
+    "companion_images": {
+      "payments-pipeline-fix-kafka": {
+        "title": "payments-pipeline-fix-kafka task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:payments-pipeline-fix-kafka-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:2a06248e4e626c3a99c0d9bcdf1461a0e30aeef5bd599330e85009e20b70b8ed",
+        "config_image_id": "sha256:9fed58ce43fea90f65aaa5552c341477f84181cb933c026054cf77b0a0179580",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 2.678,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "0d8439f9471e1ba5a2c188c6e6c499f8eb3a89ac1f6422b92493d2839f755d84",
+          "anonymous_e2b_pull_and_tools": "17f11d5d455df484e123b30ac4627733986e7bfb0e42bf3b0a37f89ace3ca3a5",
+          "a5ebb9f673af.audit": "faf1eb7f347b204a15336246f568ab61e55f50a8e12abfd8447074ba12b5d1eb"
+        },
+        "source_image_id": "sha256:a5ebb9f673af0a9cf23547dbf40831e0349bb3683af327366fc4ddf609394dd1",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 55070685
+      },
+      "payments-pipeline-fix-customer": {
+        "title": "payments-pipeline-fix-customer task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:payments-pipeline-fix-customer-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a2a31dd00f6553ed83338a27a7c87ef09c3b404ffa75986444ab029d7e9a82ae",
+        "config_image_id": "sha256:eb3b01e09078c62ceebc48261be6f2360a27479396610421eb3d55dc54174ec8",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 1.041,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "be076b765e1742c279209a0d66505d8a611afa2ba07618c96b03a7e7a77b8a93",
+          "anonymous_e2b_pull_and_tools": "12f5f19902f3ab0c29fde50ad9735b54d1737ecfc8be50f03075b73b77f51b7d",
+          "851075d424c5.audit": "a47e7e64a7c4724ab4c4c18eea383486b266d75f2cf740f9312763a57d8fecd5"
+        },
+        "source_image_id": "sha256:851075d424c5802ea6670302c654f5253aded012b4e8fb7a7ce8e1e56fc32a9d",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 54658383
+      },
+      "payments-pipeline-fix-seeder": {
+        "title": "payments-pipeline-fix-seeder task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:payments-pipeline-fix-seeder-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:77af49d73ea723d1383b07f092817bea97a74add8438e6569f60ef3a9ea1be28",
+        "config_image_id": "sha256:83cf561668626908f23a26a7eb0d884b76ff276f3632e0df106388b7d94e3d4a",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 1.791,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "300a6486953c79be7a00bc2b1ffd6f2d5b3f45e138b1b2e916f54d28983b685f",
+          "anonymous_e2b_pull_and_tools": "dae59c19caf3ff33b39da3172340823348418574edf65759ac132948fafde310",
+          "3ce9618235f4.audit": "761dc5444f22c26d553a0c773f1becd4486ffa358e3463629476cfa7d8e5ae30"
+        },
+        "source_image_id": "sha256:3ce9618235f47b956b8cf588bebc57f2d355b10631a6da5c9c09e1743b8fbf33",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 54988628
+      },
+      "kv-live-surgery-loadgen": {
+        "title": "kv-live-surgery-loadgen task environment",
+        "status": "published_and_verified",
+        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:kv-live-surgery-loadgen-v1",
+        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:bba512daa9fd82205ad38d508817da2f84ad287a7d99d2bd5adffb3993ba3818",
+        "config_image_id": "sha256:52118cb50bd4f9c98504dc5fac52643eef614554f3e35a7a010243540b0d227c",
+        "visibility": "public",
+        "anonymous_manifest_verified": true,
+        "anonymous_e2b_verification": {
+          "status": "passed",
+          "registry_credentials_used": false,
+          "image_absent_before_pull": true,
+          "layer_cache_scope": "shared layers may be reused within a clean verification group",
+          "pull_seconds": 2.229,
+          "tool_probe": "passed",
+          "full_actor_trial": "not_performed",
+          "temporary_sandbox_deleted": true
+        },
+        "receipt_sha256": {
+          "publication": "77aafcc631d6ade33644617d084dadb530131913a59d651b6671c831854bb596",
+          "anonymous_e2b_pull_and_tools": "e06bb3d8b038d3cbf11e2185d745db93a47628eca3f2cb60298a1795d1b6d152",
+          "ac04f7d9774b.audit": "e71085f7015c8de1b0ff6162cbfbf3fd6f95d12b6ac0836d56984a2fb277bb55"
+        },
+        "source_image_id": "sha256:ac04f7d9774b85c7c762e62a4072b7849a4b9ba709585ab31836b5039fac0adc",
+        "platform": "linux/amd64",
+        "compressed_layer_bytes": 30139128,
+        "configuration_normalizations": [
+          "empty Entrypoint array normalized to unset; both have no entrypoint"
+        ]
+      }
+    },
+    "material_release_status": "published_authenticated_verified",
+    "published_main_image_count": 32,
+    "verified_main_image_count": 32,
+    "previous_registry_validation": {
+      "status": "passed",
+      "checked_image_count": 36,
+      "registry_credentials_used": false,
+      "completed_at": "2026-10-31T19:54:20.009669+00:00",
+      "receipt_sha256": "e7c41347b95a0485e7d2cbdbd0e4840ce23fe3075b28c3267ce7b0d083b29570"
+    },
+    "registry_validation": {
+      "status": "passed",
+      "checked_image_count": 36,
+      "registry_credentials_used": false,
+      "completed_at": "2026-11-01T04:03:25.239176+00:00",
+      "receipt_sha256": "0ffbf3042a369df6258fdb84d367aeb62bc9786db1871543b99e7ab78e1655f9"
+    },
+    "task_definition_count": 32,
+    "environment_readiness": {
+      "status": "passed",
+      "task_count": 32,
+      "environment": "local Docker; production DockerTaskEnvironmentManager",
+      "scope": "initialization, readiness, pre-Actor patch, quiesce, finalization, artifact collection and owned-resource cleanup",
+      "actor_or_model_calls": false,
+      "task_solving": "not_performed",
+      "receipt_sha256": "bc6f2ba8c0a67903d7b0cebbedb8a15bb6c3066513195e623e30e3d124bd4dd8"
+    },
+    "e2b_input_upload_validation": {
+      "status": "passed",
+      "input": "m03-initial-v1.bundle",
+      "bytes": 102107257,
+      "sha256": "6133e2d634e424756bbec8b4dac4537ea0dc2a1e27cf5d0f2796ce61ea8126b7",
+      "seconds": 94.416431,
+      "scope": "production frozen-input upload and remote SHA; no bootstrap or model execution",
+      "temporary_sandbox_deleted": true,
+      "receipt_sha256": "9a47aa6e1619fd8c509ae2ec693832cb2245f0334842a680756361aba16060ca"
+    },
+    "example_preparation_validation": {
+      "status": "passed",
+      "groups": 4,
+      "planned_sessions": 384,
+      "material_source": "verified authenticated Release downloads in isolated hash cache",
+      "models_called": false,
+      "cloud_or_gitea_resources_created": false,
+      "receipt_sha256": "8a2f418e4e10c084451480280f362a222e1a0b0cec10a93b9d5ec03e6fa24ec7"
+    }
+  },
+  "tasks": [
+    {
+      "key": "O03",
+      "id": "pvlib__pvlib-python-1478",
+      "benchmark": "SWE-bench",
+      "instruction_file": "O03/instruction.md",
+      "instruction_sha256": "5875487f412b0fe900fae2a24a64e757113131dee64ad8dcb77d7c600e064209",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-15-swyx",
+      "original_payload_sha256": "8a388d442b797f3549f3fb5034ab98af3a55921e3aa22a194664b150694e9b67",
+      "original_tar_sha256": "1153bef1f760b4558408b5b32d79cb61acd4220f8ca1ee01f58db14f084a7d6e",
+      "original_instruction_sha256": "0bedb9856721d7187925d3c56c897f9337e679251f06eabd35a673b3f1ad74ac",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "3f397ed44075b01f4ba535750356859195a51b2d",
+        "bundle_sha256": "ec2798a274cff54f965f5a944bba9b466f8ee082a6bbf64486df2d8be00892a6",
+        "bundle_bytes": 33255676,
+        "restore_shallow_roots": [
+          "3f397ed44075b01f4ba535750356859195a51b2d"
+        ],
+        "origin": "original prepared source archive Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_source_archive_sha256": "3f4b50d007943c5a2cd90a93f11821a9a5ca7f8b64ab2ba27db89a8f358539ed"
+      },
+      "task_definition_sha256": "0a162d635d487dbe8fa21c5adb185bff956edfc1b0cd16c0bfc06ce7e0cb6091",
+      "package_file": "O03/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "b973759d551b63d97e41aecf81ffbbedc557ab6b5414d6f5bd55317acc0cb514",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "d0f4f8d8c6df8018586483e3907eebe2ed335f230f503816ee32409fee785b40"
+      }
+    },
+    {
+      "key": "O09",
+      "id": "production-planning",
+      "benchmark": "Terminal-Bench",
+      "instruction_file": "O09/instruction.md",
+      "instruction_sha256": "b4e85ed8bc8e9f5ea093ae6b144ea8b66c085a585d32bfef6917eef61022e702",
+      "default_interaction": "direct",
+      "persona_id": null,
+      "original_payload_sha256": "941ea5556797d055b93e98bd898d9d15fe01e9191821bd51202c3614c15c21c4",
+      "original_tar_sha256": "8938213291862779f99f683fe023564f5e2a6f04455d33e921e182f25c9fd8c6",
+      "original_instruction_sha256": "1418451612d0b0ab078027b31a53e3a7866f9afafbdc454679e5fc0879706124",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "5bbb0ea4ce02db4d2e165b0488665135f76b2dfb632ca388b6c0534b2991b51b",
+      "package_file": "O09/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "30d58c0a975b4b4c82fbde44f7548694f32fb4ec14670ee4c56e41d7830b17cd",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "744b36b6f5b38c90d57f83f7d718fabbb69c96ac2285bd26318c47c8d4ecec91"
+      }
+    },
+    {
+      "key": "O14",
+      "id": "010-pivot-product-revenue",
+      "benchmark": "TUA-Bench",
+      "instruction_file": "O14/instruction.md",
+      "instruction_sha256": "73d9abb7a21eb2d8b1f5f70b0301d0c37c8538efcda13f9d6c3de22c039dbd73",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-20-kellan",
+      "original_payload_sha256": "9b4a26f0152b1f46da28e3df34bae1b9124aa6472fa5f5ebd8a840cc347b584a",
+      "original_tar_sha256": "69723ae782bf6fb2b413518cd777035bf55d28a6cb2ac766c8bfbda9efa5d5bf",
+      "original_instruction_sha256": "6d348eed309149da76605a2fd75cb481d7fb1de3008f1a3ed768187913474bd2",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "54d400281be069bd5ca9fcd45a0809237cdc192839684ca5d46b748c92c387ab",
+      "package_file": "O14/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "b4d474e0b2071cdb7a657983d1871c2b95de86d7991bf054152fd2a981c9bdd3",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "5593206d76a3d072b11426eda564269b8fa658eb9b9ef7ca45fccf4003062264"
+      }
+    },
+    {
+      "key": "M03",
+      "id": "superset-goal-discovery",
+      "benchmark": "mechanism",
+      "instruction_file": "M03/instruction.md",
+      "instruction_sha256": "767beff29d8cfc3d8211c7b80fb72963e3ab173a5829262f4c777f12d71d990e",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-27-kenton-varda",
+      "original_payload_sha256": "dcbd5ad092a10c97802a69ce8153dcea9a1aa31a8b6ffa029172018700b65e0c",
+      "original_tar_sha256": "3497d1ee29825269fddd899f0435b52138cdf2ababb38ac4dc5c9e6a12c09a5f",
+      "original_instruction_sha256": "3888aa29c1219110f6f8b29f04e7bbdbbdf8f44fc32a7c186cfb869978cdc49e",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "00cb83ff299e386ade5a771bedb924f185ba3d9f",
+        "bundle_sha256": "6133e2d634e424756bbec8b4dac4537ea0dc2a1e27cf5d0f2796ce61ea8126b7",
+        "bundle_bytes": 102107257,
+        "restore_shallow_roots": [],
+        "origin": "original prepared source archive Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_source_archive_sha256": "b649f670507600ecefa4efa29642613efe9698b5e51182bd1998f5b7d9e54cf2"
+      },
+      "prepared_initial_git": {
+        "parent_revision": "00cb83ff299e386ade5a771bedb924f185ba3d9f",
+        "revision": "5dc487b9ec58168220721831c0ae5667b4202a6f",
+        "tree": "cafea2929fa5be34cb970cea1c73a3b990b2c9b0",
+        "kind": "publication-prepared initial-input Git child",
+        "source_identity": "The child contains only verified original initial files missing from the parent index; it is not an upstream GitHub revision or an Actor-produced solution.",
+        "original_added_files": {
+          "public/TASK.md": {
+            "sha256": "8a89958333094e58e559330aa13d9c68a30508ace168979cb148d59a9c2bd084",
+            "bytes": 2481,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/case/SOURCES.md": {
+            "sha256": "12dd664ceca5fc1e0302768f7254f6674bc298e5ad702e5c4391b1a8a20e32d8",
+            "bytes": 464,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/case/platform.json": {
+            "sha256": "c1d08f65786c5ff87133ff8acf77c9c66889e22f878dee1af6b977619515f13f",
+            "bytes": 610,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/case/requests.csv": {
+            "sha256": "a41ac6649f43f87d552b425adff71c59004d37c804e3d0b68fd9118f27876ed6",
+            "bytes": 2715,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/case/stakeholders.md": {
+            "sha256": "c76e18daf209fffd8bcd304f5d245de19a2296fd3319d2c8938d9a7dcc184b50",
+            "bytes": 667,
+            "mode": 420,
+            "git_mode": "100644"
+          }
+        },
+        "provenance_file": "M03/provenance/initial-git.json",
+        "recipe": {
+          "asset": "task-initial-git-recipes-v1.tar.gz",
+          "sha256": "9b2f3b30ae2247f565b89048f8e535b465f64cceb89be78c9dc4c2c17fa450e4",
+          "files": {
+            "freeze_initial_git.py": "a6633dd13a92308eb13279da9356e1fc1dd5e21b194876ec11a4a238886b4f67"
+          }
+        },
+        "verification": {
+          "fresh_environments": 2,
+          "prepared_commit_reproducible": true,
+          "non_git_workspace_bytes_types_and_modes_unchanged": true,
+          "production_pre_actor_patch_bytes": 0,
+          "source_and_binary_attribution_controls": "only the intentional single-file change exported; empty again after restoring original bytes",
+          "actor_task_execution_performed": false
+        }
+      },
+      "task_definition_sha256": "f7312dacbe738f7dc7bedaf6f4fc056bdf5c69122cd6a0b3af30f970f7a6bab1",
+      "package_file": "M03/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "2936414db3a16bdafd21614286a385f2ed74454e0ff184ddedd447d26d321401",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "81f5198d0f30f5c58e7c34a228ff1bc85b10d716afe0b1c25fbda16d2b152b00"
+      }
+    },
+    {
+      "key": "O01",
+      "id": "pylint-dev__astroid-2240",
+      "benchmark": "SWE-bench",
+      "instruction_file": "O01/instruction.md",
+      "instruction_sha256": "0cffdf2f1ab0181d09b37739417d143ecc1308758f6ffb005ff366039749ebf1",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-15-swyx",
+      "original_payload_sha256": "9b66044fdb1272febb092a7336c4d1a2bad9bb5617b52049855e2bb558bf99c8",
+      "original_tar_sha256": "0c89630d73f7b70cff9c4ccda870c5181a69df6529f63026c583b3bef9967c9a",
+      "original_instruction_sha256": "795862853a47b7dde25e3e2eb859c9ffe577cfc1acfb147ee37501405516be4c",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "368a66fdb4863ba6fa4542a4a72351a3499943dd",
+        "bundle_sha256": "232193194ee81240bd5a72f914c38354e59f9d2905ad445f549a7d6596df7849",
+        "bundle_bytes": 342157,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_ignored_inputs": [
+          "astroid.egg-info/PKG-INFO",
+          "astroid.egg-info/SOURCES.txt",
+          "astroid.egg-info/dependency_links.txt",
+          "astroid.egg-info/requires.txt",
+          "astroid.egg-info/top_level.txt"
+        ]
+      },
+      "task_definition_sha256": "45cb912721660dea76916dc34e2b5e52c2dbd67fb0a756b71fdd6e7bfbd73d10",
+      "package_file": "O01/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "06a57b989e60b7f04ef668b904317d6dfad5e7c9ce777111510a9b8677c1207a",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "2b73cc579a77e083cc6b055bc259ba657852ad1470a18e683cd3a286c9e56680"
+      }
+    },
+    {
+      "key": "kv-live-surgery",
+      "id": "kv-live-surgery",
+      "benchmark": "Terminal-Bench",
+      "instruction_file": "kv-live-surgery/instruction.md",
+      "instruction_sha256": "78c31d0b82a368b1d464375990c2a8f059f0744ee4ad27ef7eab2548d87bd0ba",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-19-xe-iaso",
+      "original_payload_sha256": "9d2ee2e7d45d38b494373a329c00d819a2ca86eb3c6c55b2f47139fe0825ab13",
+      "original_tar_sha256": "fb9c0bd4d2764792bf735e215c33d4484463d6fa3f3b9adb1625c7c26d798e6a",
+      "original_instruction_sha256": "808aaf91b765febd4c86258b38aa28482bcb7388e6dd60536841d77221c69291",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "fcd69068f0aa9e1e590b05f645c4efd6572097699c32a6d5195c56b12c97badd",
+      "package_file": "kv-live-surgery/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "ceaff181ec7156b6663e956bf6880a4eebecb376227c9eb308a76da2c43e5605",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "d5f5a2575c5417f1e508f159c4fd545bc080f22165e482a66f69bccc7087cccb"
+      }
+    },
+    {
+      "key": "tinydb",
+      "id": "tinydb",
+      "benchmark": "NL2Repo",
+      "instruction_file": "tinydb/instruction.md",
+      "instruction_sha256": "8095b0f32f60bb20a7c60814f1d6699139e01309479bee598e11c2f40b757f5d",
+      "default_interaction": "direct",
+      "persona_id": null,
+      "original_payload_sha256": "2c1469c547a4bf0b140d90ead93046edea3ecdaafe925908e6d05718c7d1ecc8",
+      "original_tar_sha256": "6687e3070271cf970cae0d5d9a55a830e627e4a293cb14191e85e1f1ade4371f",
+      "original_instruction_sha256": "77df3249f296f9e1f525393db2db15cc67ffeddbdc7936f10382508ace1643a4",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "a4749f8f5c8f1d305b93eca9ccc6f1af70a33db1",
+        "bundle_sha256": "91bf01c567daebb0720dfca9ae2814aec450408e6c2b0ab37f8e1236bfb2f246",
+        "bundle_bytes": 11984,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "6c8756689eee8df8f36716e8eb757e4691d6cb77563cc2dcadb7dcdd1653a087",
+      "package_file": "tinydb/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "7b98ac57fed0d4a46ba9ea7d050f9387ce531edca8cf52b63071a2c7f8acb5cc",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "c4c40bde2ca7839cc883b1fd38e87d79ac4f1d27e00e282541a7a49d7f34370a"
+      }
+    },
+    {
+      "key": "M01",
+      "id": "sqlfluff-subagent-review",
+      "benchmark": "mechanism",
+      "instruction_file": "M01/instruction.md",
+      "instruction_sha256": "403e13db427e76c8c28cc2ec25a0d703cd486c8bc8ff80df1f6ed5c20b1b5729",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-02-ronacher",
+      "original_payload_sha256": "ab9f0ab00b5b65af40792313ee3b12d90378af1a409fcc76294f59de6f8a6f4c",
+      "original_tar_sha256": "12af15950e0bed53199bb4cf364caf03cc279dcabb9c40e714bb8b1737163a0c",
+      "original_instruction_sha256": "fb731d6d787e318b46332f4050ca1f0a77905c6e50aa9b335fb344dfa7c63ea8",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "30b4cd0e7f074dafca13ea77012c3d00c48ef40f",
+        "bundle_sha256": "f2166a5cea33451a83536252e8f2c05145e705596a0793b79a05439848c7d153",
+        "bundle_bytes": 7468320,
+        "restore_shallow_roots": [
+          "1000cf1beae75186cadf3a586c87e86e9f30ecb2"
+        ],
+        "origin": "original prepared source archive Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_source_archive_sha256": "b649f670507600ecefa4efa29642613efe9698b5e51182bd1998f5b7d9e54cf2"
+      },
+      "prepared_initial_git": {
+        "parent_revision": "30b4cd0e7f074dafca13ea77012c3d00c48ef40f",
+        "revision": "9ae5c9531c1ea77af47ef40c9648d6ae5c5f9697",
+        "tree": "069fe741531fb0ce03d0106cea5ef23a64529012",
+        "kind": "publication-prepared initial-input Git child",
+        "source_identity": "The child contains only verified original initial files missing from the parent index; it is not an upstream GitHub revision or an Actor-produced solution.",
+        "original_added_files": {
+          "public/SOURCES.md": {
+            "sha256": "ce8c029fb775d778e5e9618c4cc138f70c881db92e975f69615f5f29c013ba2c",
+            "bytes": 466,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/TASK.md": {
+            "sha256": "548ce1624a51b3a461eeb35304193f76ae8422f8123c77967212339b6d3bd3d5",
+            "bytes": 1660,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/candidate.diff": {
+            "sha256": "2557ef519542f753de30762fad951b1561c481fcd11874722efacd6c2b895fd5",
+            "bytes": 45076,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/review-samples/correlated_update.sql": {
+            "sha256": "862ff00ecc9512a437894ada9939ca490b6c12079503599b293de81840101789",
+            "bytes": 81,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/review-samples/nested_cte.sql": {
+            "sha256": "57f2df49df3de4e06cdf3e3e4e1976509446003c7b9d15b52d7a647a27847448",
+            "bytes": 80,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "public/review-samples/templated_cte.sql": {
+            "sha256": "7fa60070b3b5f159213534a3d5ae4706ecfd3a65dadebd60236e04b4bcd22afd",
+            "bytes": 156,
+            "mode": 420,
+            "git_mode": "100644"
+          }
+        },
+        "provenance_file": "M01/provenance/initial-git.json",
+        "recipe": {
+          "asset": "task-initial-git-recipes-v1.tar.gz",
+          "sha256": "9b2f3b30ae2247f565b89048f8e535b465f64cceb89be78c9dc4c2c17fa450e4",
+          "files": {
+            "freeze_initial_git.py": "a6633dd13a92308eb13279da9356e1fc1dd5e21b194876ec11a4a238886b4f67"
+          }
+        },
+        "verification": {
+          "fresh_environments": 2,
+          "prepared_commit_reproducible": true,
+          "non_git_workspace_bytes_types_and_modes_unchanged": true,
+          "production_pre_actor_patch_bytes": 0,
+          "source_and_binary_attribution_controls": "only the intentional single-file change exported; empty again after restoring original bytes",
+          "actor_task_execution_performed": false
+        }
+      },
+      "task_definition_sha256": "8c44647d441e4dc6444c9ed95df8c4530c1524fefdd4c923f351b731e77c1a4b",
+      "package_file": "M01/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "9fb57fc5732b344289a3fb00f0fe6ab00fa8bb3b03afc36dee41198ff1750b58",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "047e4ab40187e2a5036fb939a79b5d59472cb137b2dbc9d11ec63ca35a2cf99e"
+      }
+    },
+    {
+      "key": "O05",
+      "id": "marshmallow-code__marshmallow-1229",
+      "benchmark": "SWE-bench",
+      "instruction_file": "O05/instruction.md",
+      "instruction_sha256": "c11ab5e72952b051f11e1da53e65b07dcde4025fa2b0f25f87da1ddc7d9d74ce",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-02-ronacher",
+      "original_payload_sha256": "b3fbd4b7bf2c84312e001417d01f5b349165b09931eea4a35d13197eb88d31e2",
+      "original_tar_sha256": "568cd7a6aec1e3790fb5af6f8666dc76865e68f455d073d542dbc956a2d807be",
+      "original_instruction_sha256": "55f51e2f993f9240f42936f014fe9c5a296c8bcccbfc81ec3bf3b8a5e7c91e69",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "456bacbbead4fa30a1a82892c9446ac9efb8055b",
+        "bundle_sha256": "2700b74cfc906d542383842b0d3cf9e04dc5b1f4c1d5d3a71bd3037c4b14376d",
+        "bundle_bytes": 180918,
+        "restore_shallow_roots": [
+          "456bacbbead4fa30a1a82892c9446ac9efb8055b"
+        ],
+        "origin": "original prepared source archive Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_source_archive_sha256": "2d86227de217371015df70ea4719c431aa873072c8040ec0dd723f9b43959682"
+      },
+      "task_definition_sha256": "2db16a2eebac39f0fb7232e53d3618b8d9edf90b0c22589c9c32555c0c718e9e",
+      "package_file": "O05/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "2c7b389ddb06b789c6ee34c601669d5b0869f7297d9f9bf5e814cd011dbb8ebc",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "486f9a3500bd333ea35cb05f7577e0f36fda41148f0d6b581a38d49785d6f217"
+      }
+    },
+    {
+      "key": "O06",
+      "id": "sqlfluff__sqlfluff-2336",
+      "benchmark": "SWE-bench",
+      "instruction_file": "O06/instruction.md",
+      "instruction_sha256": "3bc52bddd67d6d90f0bfd9c977b8403936efbce045081bc3ed491c7bbfa879e5",
+      "default_interaction": "direct",
+      "persona_id": null,
+      "original_payload_sha256": "350398dd198ed091d874af0c1c696d4ee8019aefaaa872c0e0721c7eabbcbcdb",
+      "original_tar_sha256": "6e7c4a7dc1dc6139543b8b74c0d78167598fe4562c4a8ceb03ebff201253089f",
+      "original_instruction_sha256": "52819027eec57469c79515b3999186a8008202c15501951750b0e357974328a5",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "856d71e891f24e275fd667c5d441e6c070922bf2",
+        "bundle_sha256": "b792a6dcbe9a2c9f12af9b4aa822b9a59bf7b83b0c87c3701bd862b74c87707b",
+        "bundle_bytes": 1500309,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_ignored_inputs": [
+          "src/sqlfluff.egg-info/PKG-INFO",
+          "src/sqlfluff.egg-info/SOURCES.txt",
+          "src/sqlfluff.egg-info/dependency_links.txt",
+          "src/sqlfluff.egg-info/entry_points.txt",
+          "src/sqlfluff.egg-info/requires.txt",
+          "src/sqlfluff.egg-info/top_level.txt"
+        ]
+      },
+      "task_definition_sha256": "f75a22daa8723c8c18a0077c1bdea8335296ea1553b4ead25f43ce326a116694",
+      "package_file": "O06/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "d4a002c7f3623ce81b3fd8137ecf231f6214fa1cbfa33c1e2b18c8d3a2a560fa",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "413aea507ea9e54274a6f551c754218171782bc40d313fb72c9ba8a43040efcb"
+      }
+    },
+    {
+      "key": "vf2-speedup-networkx",
+      "id": "vf2-speedup-networkx",
+      "benchmark": "Terminal-Bench",
+      "instruction_file": "vf2-speedup-networkx/instruction.md",
+      "instruction_sha256": "18c06496a69be455bf3fc738e3cbfcdc4fd023fea7064a1279182248b1b9a6ae",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-27-kenton-varda",
+      "original_payload_sha256": "9b6cef53b70a33e800d5a700fd1e98a320a1620c993a43d06e8f267c3f071dc1",
+      "original_tar_sha256": "98771f5113a5670e531a11b8c618879e82b0dc86a13e24e2337710cf8d244fb7",
+      "original_instruction_sha256": "e5ea9c8393ac826e18ff241397b77fe3a59c2560e646cae34484db0a6eaf4a99",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "94cb0386cbbc95815fe232aebfa63e70b393ed88ee5c4edb4d43e9c71988849c",
+      "package_file": "vf2-speedup-networkx/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "e01154a8514cf3ad915d5c2c65dbb135c0ee77977e1044d5f17b4e2f2baa9a88",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "e26f4b3d16b7f47ee7d1ee7075305ba01e091fb62fdcbbf50ba3fc782b7095d7"
+      }
+    },
+    {
+      "key": "pretrain-shard-corruption",
+      "id": "pretrain-shard-corruption",
+      "benchmark": "Terminal-Bench",
+      "instruction_file": "pretrain-shard-corruption/instruction.md",
+      "instruction_sha256": "a9c0f8112fcad8afbaf5106062f390c528c61d536618e71e57fbad2651524fd5",
+      "default_interaction": "simulated_user",
+      "persona_id": "gh-ml-03-5df6e44f943b",
+      "original_payload_sha256": "f350047fdacff6d649531e2d0b66109b69550209dead4e48d80369ce14ffc61b",
+      "original_tar_sha256": "09cfd8fa652971e5d950a83d0714b136101fa44787f70bbdcd4a4b88fce0060a",
+      "original_instruction_sha256": "168db7a29a67efa17767080c857829071ca85148dc5ef87b5cd635f8e380481a",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "prepared_initial_git": {
+        "parent_revision": "aa74441139ac4b350aa11478e36c8328039eaee9",
+        "revision": "10044fbc4603c75ff6c43584783389f8c0c633b2",
+        "tree": "f26663525536e231dab0416685b622e0c488b50c",
+        "kind": "publication-prepared initial-input Git child",
+        "source_identity": "The child contains only verified original initial files missing from the parent index; it is not an upstream GitHub revision or an Actor-produced solution.",
+        "original_added_files": {
+          "data/train/chunk-0-0.bin": {
+            "sha256": "a5f15527ccc8b7209e3c33e05984ef93f7094be6a8b759ef475b9d4d746dabbd",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-1.bin": {
+            "sha256": "49617d71fab9ab8bd1d6983399d2e70c41467a3f1a13ef5974ced71dcdf0a174",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-2.bin": {
+            "sha256": "bb73aa3e321273b9d9fdd123305a847c5dc044b9eaba4eb1033e8b080ae8d6c2",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-3.bin": {
+            "sha256": "584044589594bbfc3fe91e56e52fcac910aa92c7f086b0ad4cdc0c1f068c686c",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-4.bin": {
+            "sha256": "ba2c9b97dce5b95165167cab1cf5a14d75dd604785beda3220c42d7110a7e0f2",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-5.bin": {
+            "sha256": "06f4ca4679d9927dc51ef5f81f5b555ddaa6084395b3deebb61dd2088818c911",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-6.bin": {
+            "sha256": "9cc930431f9b1c38237937f877708f1c8e0fad622463cc5bc0a1705b77bb64f9",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-7.bin": {
+            "sha256": "0f3a90062c30c2c75f1147ae19bff4272b971f63959ea88ca5c73d4939de3790",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-8.bin": {
+            "sha256": "1a76bcff08210af5fc74caa368b9d0f4917b1af2713b89814293d96539b8ff18",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-9.bin": {
+            "sha256": "59a219b1c9a793272eded663dc05f5ab60be44ee264b3f425947b655c59cf53f",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-10.bin": {
+            "sha256": "d3fc1d6bc64d3d0095a8652a901699b396b32506d7c47d928fa25cab03aa2427",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-11.bin": {
+            "sha256": "3fe148217726432396c71e6be9c5394d3734690bddaee81f7adec6274c2ff73e",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-12.bin": {
+            "sha256": "8fdbb6a896aea2299080f93de68396f7626887364f081fbcaf1bffb6b1cf3348",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-13.bin": {
+            "sha256": "6584439e9d2f11eb6899edac167c9436c855fe3eb5d909547e5a1dcf05d76d65",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-14.bin": {
+            "sha256": "58076850f66d301b9cefa5ba12b8e56b3b547f3b2fd4082bb8fbbd0cba7a9f7e",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-15.bin": {
+            "sha256": "347e4ce8addde9f137399337c91973454932209cff45e9ca0856c7cc878feece",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-16.bin": {
+            "sha256": "fc754a0c309bfe60747114ab51ccf4c2003186e410e4eedba30f8269e8d66d7f",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-17.bin": {
+            "sha256": "24c458529e580e1b95154d8c2a874dd8646d5c043d6158d64c3f5bbd636ce76b",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-18.bin": {
+            "sha256": "bdb9ce2e453ab97655ab817a511945fa1efe32445cafab33a945d73fef0b4776",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/chunk-0-19.bin": {
+            "sha256": "c0d673c38c1d47439897648dae99e19695d004accf4dbc14e61dd257a1cbd52c",
+            "bytes": 167840,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/train/index.json": {
+            "sha256": "009d315169bd6c5d2f66d451ba725944afa89fede475e33836e20a7e639ef764",
+            "bytes": 2044,
+            "mode": 420,
+            "git_mode": "100644"
+          },
+          "data/val/val.bin": {
+            "sha256": "a00d393663bcef0dc8b061e9b8ab8b386cf32bf41860d191ed3542000365c6b4",
+            "bytes": 206400,
+            "mode": 420,
+            "git_mode": "100644"
+          }
+        },
+        "provenance_file": "pretrain-shard-corruption/provenance/initial-git.json",
+        "recipe": {
+          "asset": "task-initial-git-recipes-v1.tar.gz",
+          "sha256": "9b2f3b30ae2247f565b89048f8e535b465f64cceb89be78c9dc4c2c17fa450e4",
+          "files": {
+            "freeze_initial_git.py": "a6633dd13a92308eb13279da9356e1fc1dd5e21b194876ec11a4a238886b4f67"
+          }
+        },
+        "verification": {
+          "fresh_environments": 2,
+          "prepared_commit_reproducible": true,
+          "non_git_workspace_bytes_types_and_modes_unchanged": true,
+          "production_pre_actor_patch_bytes": 0,
+          "source_and_binary_attribution_controls": "only the intentional single-file change exported; empty again after restoring original bytes",
+          "actor_task_execution_performed": false
+        }
+      },
+      "task_definition_sha256": "f2204f64868cba9953bd63c0403d3ef07ca117667beb3969ba5dcc74df11673d",
+      "package_file": "pretrain-shard-corruption/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "2cbda187c9d3b00f7e6e0f269d6959d3ae95f57fd92024fbc861c1258735d687",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "e789ff29a5e9726c320ac0578a39c756b16bf9033d052970333a81bed49a0c67"
+      }
+    },
+    {
+      "key": "091-add-receipts-bookkeeping",
+      "id": "091-add-receipts-bookkeeping",
+      "benchmark": "TUA-Bench",
+      "instruction_file": "091-add-receipts-bookkeeping/instruction.md",
+      "instruction_sha256": "4db7bcc83ec6592481fa98c216dae3ed1b44aad24dcd98572a0eec25bf9a2719",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-30-kent-beck",
+      "original_payload_sha256": "5bcfa860f5f1d0bb33194b6536ac8443e17b9106fb4c89bf778565bb88b43a15",
+      "original_tar_sha256": "682c04b2e195cdcee827a6e322104696fef0d46b52f7b6fcc1e1631cf4a88e50",
+      "original_instruction_sha256": "ea296e95055091cb9678fcdb19ca61f8cb6a721342e68b6b842f40f831249d75",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "346bcf80d4718dc7f7a570e820b6f149cc5683639c96bbac722fba8bf348d128",
+      "package_file": "091-add-receipts-bookkeeping/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "04a1c5cc15016cf66c91d7810814a672c994687efe080f99fd15968e21168f87",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "780865789d5325e1c6fd62b69c1f90f353664a7e09dfcb93e2582c8142a26867"
+      }
+    },
+    {
+      "key": "flask-restful",
+      "id": "flask-restful",
+      "benchmark": "NL2Repo",
+      "instruction_file": "flask-restful/instruction.md",
+      "instruction_sha256": "03e2b47e8db936c8fb522eec0c53a045e5cf172909bb9fd2641a8ec86b073396",
+      "default_interaction": "direct",
+      "persona_id": null,
+      "original_payload_sha256": "5a998cafeff084b620845a4b4f1c709e6dd03eb996d0c09e54d8d552bde40eb3",
+      "original_tar_sha256": "ba7f03a56af5c3e2fe31c8cae7bb88bc787e416f1890ab4bd93f22ad0f8f362c",
+      "original_instruction_sha256": "0feba264feccfffca17fe8e1c5aac3deed7612a19e530145fa1506655d3b2306",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "6965408d0fb2ca6bf63f2e60d846b582908b25b1",
+        "bundle_sha256": "5f7f52f6020e09da06796f5179d4b4a540b9f521ee0945b13e80d85a5e31af4b",
+        "bundle_bytes": 16276,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "46904ed4cea6a2385ba75306e2323e3cc4cf79200caa3fd9dee404035f610f88",
+      "package_file": "flask-restful/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "edbd862f008a4c56923d87f3c2a172cd4baa28d95d4793729155b19cb93084f2",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "3c6788b682b10bb674c901ac9c51f5685324c395c118fbd3fd0e899e55139cd3"
+      }
+    },
+    {
+      "key": "M05",
+      "id": "permission-schema-migration",
+      "benchmark": "mechanism",
+      "instruction_file": "M05/instruction.md",
+      "instruction_sha256": "9e6672ebc3b67adf5396c53be59d0120e92a209c53890ceadbd898417231bf4f",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-01-willison",
+      "original_payload_sha256": "fd3e05a4a85d4a036d85cb316a7a4d3379fab2e542b8198f1c07c4a8cb896e45",
+      "original_tar_sha256": "3f0a3fbef35d6d6143362aa9ae8118ff9f6b7a482a04f9632a85bec7f8aea5cb",
+      "original_instruction_sha256": "41aa7329563020f99b167345c13e33fce0948e03f8d11c73431fb342bfd86370",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "858319bc9a9c974ab5a43dd1f8a8f9c8abea202b",
+        "bundle_sha256": "d0244aa8327aee2827a90aa2aa148e290eeeea3b2affdd44bea038f04404a1c9",
+        "bundle_bytes": 3270,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "4c738b8a4acd750196c6bfe0c1476ecc45394ec32ce8938e1f04d1e94f3c7319",
+      "package_file": "M05/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "caecf2ba4738559d5765df73fccbf7b1063f738af943677460ce99ab74cdfde6",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "9b37b6d7414de68072cf1b8b1ebcd65341c4eb9ff9fb4fdf546b7bec6bc41843"
+      }
+    },
+    {
+      "key": "M09",
+      "id": "plan-blocked-dependency",
+      "benchmark": "mechanism",
+      "instruction_file": "M09/instruction.md",
+      "instruction_sha256": "9d02ba93904dec7feee764f8f73599a29ad6eed4a60859e98239b16c13d20347",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-27-kenton-varda",
+      "original_payload_sha256": "b87220a5b0871db01027d406c7a2c87278d7adea7e764234b789d3d94996597a",
+      "original_tar_sha256": "43f99f199840fcd1f963860b285383f30b865c989096a90fd1cd218c40a23dbf",
+      "original_instruction_sha256": "4e03b5e6d8981d1951c482d7b38fc36b44d493fe7ddd580daffc41538d540abd",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "4f87ed73d6d916d72e6d11ef0caee27a062b9a9a",
+        "bundle_sha256": "82d1d395de5ff675578bb21a892b99fe2679dccb73b5d903f2e6166460828f52",
+        "bundle_bytes": 2937,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "029c8c30f5cd056d8d149034f00f74425bb69da338c9e8d0ac186b049b353a8a",
+      "package_file": "M09/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "285182b78d7736001837fadab4f1ba001425cbd1f6131f625cced47e64692e12",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "fd0c053494723cc3bfcfa5fb4b7b7bb0bce9c1d7524efb5ed74da3eec16748ea"
+      }
+    },
+    {
+      "key": "O02",
+      "id": "pydicom__pydicom-1334",
+      "benchmark": "SWE-bench",
+      "instruction_file": "O02/instruction.md",
+      "instruction_sha256": "30fbbf0db62ec433792994158c2a8a5e47fe1fccf402daf5e84504df24e3c864",
+      "default_interaction": "simulated_user",
+      "persona_id": "gh-sci-03-3a200275ad87",
+      "original_payload_sha256": "611189b93b1958070ef281dbfafbfa11eb4529ad967cee27740720b6f8ded476",
+      "original_tar_sha256": "d2b2def4975fb3c5f9f954c6d154c65416ee5cc3efddd61df140ebcadd9e369f",
+      "original_instruction_sha256": "6f6b8014e5c606cefc37a1a5fe463b8f294367fb48ee55e6476fcd4f9a6dcb10",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "2591fb216e5f3f840ca9612552d11349041c9036",
+        "bundle_sha256": "b84219bee45274c3c0e8cca689e58eb9d0f1cbfc5edd2f155ab0250904c2a480",
+        "bundle_bytes": 2220485,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_ignored_inputs": [
+          "pydicom.egg-info/PKG-INFO",
+          "pydicom.egg-info/SOURCES.txt",
+          "pydicom.egg-info/dependency_links.txt",
+          "pydicom.egg-info/entry_points.txt",
+          "pydicom.egg-info/not-zip-safe",
+          "pydicom.egg-info/top_level.txt"
+        ]
+      },
+      "task_definition_sha256": "8b78bf06b7203e3b0a066c2e3caf7e39d6d4214b937d1651190b57f5e42b85df",
+      "package_file": "O02/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "a56851132029d2937ee9f2a11551bd63b3a669c268a271be27425ba4b34d5d63",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "06b787aa56cc1f7e0afe194cd9700585bfc9b56edfed8371a785761608a484a4"
+      }
+    },
+    {
+      "key": "O04",
+      "id": "pyvista__pyvista-3750",
+      "benchmark": "SWE-bench",
+      "instruction_file": "O04/instruction.md",
+      "instruction_sha256": "e6eb767947a8e6e46ec1408c606798c215c67ac9031993e703e2417f7d4b2b9a",
+      "default_interaction": "simulated_user",
+      "persona_id": "gh-viz-03-4fd081054e66",
+      "original_payload_sha256": "90bc3534b404f02f3080348b3623f80e287cc2814838767ca5dc42f0506fb57d",
+      "original_tar_sha256": "47de4b31f1c514c06b692020792141cf4d076588f7a7d70602a7231d408a25cc",
+      "original_instruction_sha256": "04b9512b59e3de1afbbd73f29bf9304948418a2ba436d4c0c7fcc8ef697c919e",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "4b98f33b8470e207290eea9a9dcee3c5f62e64ab",
+        "bundle_sha256": "ca577141cfb9ac9ce6a3ae1dc173e9b06870ad3f993dce62c832132a8522ecf9",
+        "bundle_bytes": 92195349,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_ignored_inputs": [
+          "pyvista.egg-info/PKG-INFO",
+          "pyvista.egg-info/SOURCES.txt",
+          "pyvista.egg-info/dependency_links.txt",
+          "pyvista.egg-info/requires.txt",
+          "pyvista.egg-info/top_level.txt"
+        ]
+      },
+      "task_definition_sha256": "d9a7b6bfe329a67064c26d821b5736407c5250447991270c643054b83c6727c1",
+      "package_file": "O04/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "fd8894671212d962435f168136732249bbbfea183f1c66c50503fef112fe4b3d",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "ae6400797c89d4cef779b739d8c6ef74fe66633d54de02fe26a2aa67525d1f0b"
+      }
+    },
+    {
+      "key": "astroid-1030",
+      "id": "astroid-1030",
+      "benchmark": "SWE-bench",
+      "instruction_file": "astroid-1030/instruction.md",
+      "instruction_sha256": "89e66006b95d6b46b2174560a7139b753fe3f842341b09c721421097e36c1b2a",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-08-nat-bennett",
+      "original_payload_sha256": "957e85d200830b1218cc2bddc8f746c0a078daf7d08e4574f9fe8afd44757470",
+      "original_tar_sha256": "40107f0d6ac8782d94624d33d12bf74a3d051f750107d61a9855eafa88602870",
+      "original_instruction_sha256": "f92b787ff8bf0aad2743558f53c970e7073bf909406860484532395bcec46aca",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "dae2b99aa3f7af057a63843384fae933b659d668",
+        "bundle_sha256": "9a96566c6e62fa9941647d72fddd00c7720791ffc2ff84184116894b560d18bc",
+        "bundle_bytes": 275038,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "cb76bb789907072ca1f84aa409fe579b8935961ba56c1001632f29357bfe7f3a",
+      "package_file": "astroid-1030/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "135c485eb65d005f2aad17d08fc0a69dc9ca3f0327c0d2216c631a83c04cef66",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "0dde6fb2e3e80010e28e0bfa92c610bd5c59a5ef2b183699301423825fb886c6"
+      }
+    },
+    {
+      "key": "sqlfluff-3608",
+      "id": "sqlfluff-3608",
+      "benchmark": "SWE-bench",
+      "instruction_file": "sqlfluff-3608/instruction.md",
+      "instruction_sha256": "a1a96ccd4ba6d9353cc94b79f720f35163087e09ad2cc3e96830af9c4449165c",
+      "default_interaction": "simulated_user",
+      "persona_id": "gh-de-03-82e3b11d3c73",
+      "original_payload_sha256": "75e54818beddb1ee65ec1e82f2ea1a7bdbe537675838bfefdb541ecb49b1e563",
+      "original_tar_sha256": "a9595551b1fbf87c7b3c4b8b35d03063cd4b9c1e40a8c6451d499a5e54d6bd29",
+      "original_instruction_sha256": "36561079dc0b46e8e10cd80c10cec14e9b177d917d6e67dd34a9444506c3fb15",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "f6390a6cfd07763ceb6eac0b2635bfe13dca0c6b",
+        "bundle_sha256": "beb92651b63cf711f1515f95026f8a550c14ed6323a120967fe005444bd3c6f7",
+        "bundle_bytes": 7421686,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_ignored_inputs": [
+          "src/sqlfluff.egg-info/PKG-INFO",
+          "src/sqlfluff.egg-info/SOURCES.txt",
+          "src/sqlfluff.egg-info/dependency_links.txt",
+          "src/sqlfluff.egg-info/entry_points.txt",
+          "src/sqlfluff.egg-info/requires.txt",
+          "src/sqlfluff.egg-info/top_level.txt"
+        ]
+      },
+      "task_definition_sha256": "37923b3de7c75bb6634c4987b62c1a86c46868dd619fd123c58369bb4b114c5c",
+      "package_file": "sqlfluff-3608/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "58f624d17e6187bc35481dde7464bdf558badd4d3dca3cc9453a217a5c900bff",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "1946cd54defff0ef6d9dfa8ee1a32d903d77e79a2955e29e3e36f6e46f8c4ad5"
+      }
+    },
+    {
+      "key": "marshmallow-2123",
+      "id": "marshmallow-2123",
+      "benchmark": "SWE-bench",
+      "instruction_file": "marshmallow-2123/instruction.md",
+      "instruction_sha256": "82865e670939b09c8b43f8a8ea5583cf6cda74302c04029cc27fab4610e560fc",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-02-ronacher",
+      "original_payload_sha256": "3b6ce40591806d42a5eb1f821ff301ae8a31b1a8eefc7c7855a16d6454a11a54",
+      "original_tar_sha256": "f3dfdd577cce7f27733775b306dcc8718900943204529a91e5d144ed5ff779ee",
+      "original_instruction_sha256": "198787017eecc47b2bd7d158ca3dde5b9bff785073c9d8948743cd4bf5199802",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "81d992831a77decffeea3390dfc097ed989b4322",
+        "bundle_sha256": "be52b2ad55cfacf815f3019adda4be9bb4675fe04934742de3dae4b07d8f0486",
+        "bundle_bytes": 141421,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck",
+        "original_ignored_inputs": [
+          "src/marshmallow.egg-info/PKG-INFO",
+          "src/marshmallow.egg-info/SOURCES.txt",
+          "src/marshmallow.egg-info/dependency_links.txt",
+          "src/marshmallow.egg-info/not-zip-safe",
+          "src/marshmallow.egg-info/requires.txt",
+          "src/marshmallow.egg-info/top_level.txt"
+        ]
+      },
+      "task_definition_sha256": "fa52abd45a8d89e95cf22c156c62acbd8a66968e01fb55d45d00bab017b11f09",
+      "package_file": "marshmallow-2123/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "6505ced81167e4460aa69c8323e24418f94833dbb5e431121953f069ded21298",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "aa1d55bd49031c38e377d7590aff8227cf0a3abb76767607fb464ea7f2811730"
+      }
+    },
+    {
+      "key": "payments-pipeline-fix",
+      "id": "payments-pipeline-fix",
+      "benchmark": "Terminal-Bench",
+      "instruction_file": "payments-pipeline-fix/instruction.md",
+      "instruction_sha256": "fc0846b2965ef36ed9373a715c8d508f78215d33ade8726ca51c2c19ecd034c3",
+      "default_interaction": "direct",
+      "persona_id": null,
+      "original_payload_sha256": "33ebbb4a7bb4cc0301d279c3005f8b221e2774a4ead7b6a5ef5d89b79488d98f",
+      "original_tar_sha256": "1152c3d3415d26ed6ac0ae3a3d57abf4ff2648feaf3c92d743b92d58b063eba0",
+      "original_instruction_sha256": "84dc2f6a5a94013c90706ca393aef6c026881b7ae8331258d4c8bb7226f3099f",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "228a25dd9d98a2800898d67f022fedd1ca8e4689d258f6eb24a2934974b3bbcd",
+      "package_file": "payments-pipeline-fix/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "ea80549ccdb9c4fe2dfa86bcea690a536d96830c74763083c7761f61292fc77a",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "e6c072cd2b366e200fca646f267c357e8cfa66655e6a5f115709e470adebb85e"
+      }
+    },
+    {
+      "key": "wal-recovery-ordering",
+      "id": "wal-recovery-ordering",
+      "benchmark": "Terminal-Bench",
+      "instruction_file": "wal-recovery-ordering/instruction.md",
+      "instruction_sha256": "f8e44418b9cb1329b1ac226d88a03c8c9654c496e1a32950ce31d768139a4ad3",
+      "default_interaction": "simulated_user",
+      "persona_id": "gh-de-03-82e3b11d3c73",
+      "original_payload_sha256": "356b29bfe5b43383dd114f9a11ef0448c0ca0de1d39b34fe390c77e27d2b42dc",
+      "original_tar_sha256": "ed72a0065addf11bf531c07674756e0c713ec1677a3a4206890752087f4f5e53",
+      "original_instruction_sha256": "9630da6851926f7aada9229e4e39a2759f9efe88973b2bdeab57b59d7a05d8f6",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "96a6467f094561383da9a80f57e23706fced056f6ca57c47f4937c8a1a7d63f6",
+      "package_file": "wal-recovery-ordering/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "554a8af3d7089a4bbb3e21d492ef42d4dd6d62a4f830f991c90948d20ca09bda",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "65ec355d4c2db8efd2ec0d8b918472e0a6a1c0ada2193e01078382c5293c49a1"
+      }
+    },
+    {
+      "key": "vba-userform-port",
+      "id": "vba-userform-port",
+      "benchmark": "Terminal-Bench",
+      "instruction_file": "vba-userform-port/instruction.md",
+      "instruction_sha256": "33d576e87bef222748bbf86da9ad1eb9ceb7913b104deb517d15176e28bce01d",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-19-xe-iaso",
+      "original_payload_sha256": "39a9d68339fda8b132cdef867e7667cc98a6860cf6381a9d9accec786ce9684e",
+      "original_tar_sha256": "4f4b0486525706c9fea22d249364a5f7bff9b4782cbfd1eedce0a57ee75459ce",
+      "original_instruction_sha256": "c9bee6dd42ab974c99f1d02a3bd069c14686c5ddaf7cbfd503f4c6e337f92c25",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "23ab5cb0ac3c5db241dc73bf134e31b93c2b4fcf416dcb2ebad9d866f8c0cd4a",
+      "package_file": "vba-userform-port/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "9a4d849ca135c98425e3fcbd723ec5b79c8d28a15f57082ddc1f001537d02331",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "17dee415caf91984d61f2ed2605d833af4f39fbfdf030cfccbdd5cb29e6ba63b"
+      }
+    },
+    {
+      "key": "react-lead-form",
+      "id": "react-lead-form",
+      "benchmark": "Terminal-Bench",
+      "instruction_file": "react-lead-form/instruction.md",
+      "instruction_sha256": "e1cc9571c8c9e69a2c12ace760ecad6ff2330bbc246b8ad025edd03a7eea9f9d",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-16-theo-t3",
+      "original_payload_sha256": "fd508ca2cf35d65121a0469368fcf5afbde0026b9dbba469a308b10391cf2362",
+      "original_tar_sha256": "e8588431e5cc121aa170a60c559ed544a342a436980970b0abbf30b9a952c44f",
+      "original_instruction_sha256": "6e16c343f85a840bd2ef3369a0f1bde2dc1c6da7e56fa2f0bb4743bd8fba12d0",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "123ce2bf02f7f41fe894271dfec19768ecd719f8dceea39fd2d87a74565349cb",
+      "package_file": "react-lead-form/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "46bbb3137608ef31a03e67d916e72a5d104df01dd52b57e092303132cae10a55",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "22084e41153f753dc680e609d0895c109d46bb4fd664b1c9fdaf2bd28ba7eb49"
+      }
+    },
+    {
+      "key": "080-convert-novel-epub",
+      "id": "080-convert-novel-epub",
+      "benchmark": "TUA-Bench",
+      "instruction_file": "080-convert-novel-epub/instruction.md",
+      "instruction_sha256": "263aba1fca9c271e69e44d3929c9d1b205f3e9f74a815029ef328b225d95f979",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-20-kellan",
+      "original_payload_sha256": "5628e14bc7b0d2f883d4b2dca1089eb598793ae80d5ecceea6eaa428cf2cd317",
+      "original_tar_sha256": "3a554e817ca4cc6561a86f740ac1c3dee026a3ab3b111a68a797ef484b145298",
+      "original_instruction_sha256": "2b1db343ef603a6ffa64ef95ade2a6c86ffe851ba7b883c10470a801b1bfae19",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "task_definition_sha256": "f598b489cd30cbf966da3fc590f878c6a308c85ba64edaa9b0ea6ad6d05a73cd",
+      "package_file": "080-convert-novel-epub/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "85f525e07e1477512e37e70098a54aeb2c46f95016070fed841f426f0cec7031",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "5439ce0382edf4924a0b69829f1035f226663f30afdedfdebd2925481561eeb5"
+      }
+    },
+    {
+      "key": "cookiecutter",
+      "id": "cookiecutter",
+      "benchmark": "NL2Repo",
+      "instruction_file": "cookiecutter/instruction.md",
+      "instruction_sha256": "253973405e16e1ff2daa2e5b0517d8ff715ee59a5a41c73d6fbcfda3e6815ccb",
+      "default_interaction": "direct",
+      "persona_id": null,
+      "original_payload_sha256": "8b3ab1b73f8ab1aaec22cf606fba2fb6533511fb3c901ef52bc63cd0b84fb6c7",
+      "original_tar_sha256": "1d278a1a41fb6d9ab451f5b992367511297905ce714ba442245c352097d74cb2",
+      "original_instruction_sha256": "7fd1f737aef01ac6482fb6e8ee2354598b18ae5ab8493429b77ecbd17c444278",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "cadd51e4ba464ef61538a7f9afb2ae644942ff55",
+        "bundle_sha256": "1187d5a6952440bc7d2f7cddc05d8854620f284d39c5d1a50a88d5f7e010f5fa",
+        "bundle_bytes": 23826,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "c76be10cba7114bd1a620552d3fe61f00148672ca684cae4a5a24d070a867a9b",
+      "package_file": "cookiecutter/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "e4f7d4248e3aa4ec975f81f9b46630264035d3358442cd858bca1226fc694473",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "ada44dbd27823d0f39b6eceffe2fecf4061a93f71067cfa1dc49aff59b42ae30"
+      }
+    },
+    {
+      "key": "tqdm",
+      "id": "tqdm",
+      "benchmark": "NL2Repo",
+      "instruction_file": "tqdm/instruction.md",
+      "instruction_sha256": "816aaf8f67bcf2deef5cee75b1248fc4917350ddeda737386fa194d3f0e3d73e",
+      "default_interaction": "direct",
+      "persona_id": null,
+      "original_payload_sha256": "fe06f2a5065c935a2f159436e917032009ea8ea26f4acd4f0a9d78b9afa603c2",
+      "original_tar_sha256": "34466d50e9e585d74ec790a7e57a2c389ed5b30874485169146f9d103509529c",
+      "original_instruction_sha256": "1199ab663bdcdd17ac1f52f2684a8edbae888632f681f17e5a3c22a1927446e0",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "fd85a2f3574b76bbfc68afad0b01e4d35db20660",
+        "bundle_sha256": "6977ffd4d351a37c963cf536f40b97084dbfa0fd261d081435dc107a0c439530",
+        "bundle_bytes": 25589,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "9e0dee7b10f89245b0a4ac95fca86b119571a82ab8187fe3307f5b0109b10774",
+      "package_file": "tqdm/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "5d6d97c0f73a0414323b265d11343299137336632ce0d53d836c3f4467b6a2e4",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "834eb4881588769f36c318004b231e36aa33830cea8cd41d6face392be5911f7"
+      }
+    },
+    {
+      "key": "M02",
+      "id": "superset-ci-loop",
+      "benchmark": "mechanism",
+      "instruction_file": "M02/instruction.md",
+      "instruction_sha256": "7921b35a5c84d66557f1739d003ab2d0266136de8708733ec5abc5cc0bd0939e",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-26-ghuntley",
+      "original_payload_sha256": "c0f36dfc1d10cc7929622141e03c468e0da810e199e1e0946f41e918d32d07e8",
+      "original_tar_sha256": "f2ddec4944f1330fccd40fcaf457e99ea32c06f586bd17e43edb457e50d4f4fc",
+      "original_instruction_sha256": "55f20fcddf648ca42c8399160253321e84ef28d2d577568048bac3e704cb0783",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "availability": {
+        "status": "verified_original_intentionally_incomplete",
+        "verified_original_members": [
+          "M02/public/TASK.md",
+          "M02/public/ci.py"
+        ],
+        "scenario_role": "intentionally incomplete robustness case",
+        "operator_decision": {
+          "confirmed": true,
+          "action": "retain the verified original two-file input unchanged",
+          "basis": "The operator confirmed that the original initial workspace did not contain the candidate source, regression tests, or API placeholders described by its commission."
+        },
+        "scope": "The original commission and instruction are preserved. This is not a complete, self-contained Superset code-repair material set and is not claimed to be fully solvable from the supplied input.",
+        "reconstruction": "not permitted: do not add a replacement Superset candidate, regression tests, API placeholders, solved workspace, or a supplied solution",
+        "preparation_boundary": "Verify the declared original files and runtime; absence of the candidate described by the commission is intentionally retained, not an archive-loss or source-recovery blocker.",
+        "publication_boundary": "Original two-file input published in the fixed material Release; intentionally incomplete scenario retained."
+      },
+      "task_definition_sha256": "c67b7829d7e95d47fe968402b2b44373bc6d7c321aa93657a77ea37c4e3a523e",
+      "package_file": "M02/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "68175e001c791f36e4c92da8a6f2a4bc5a34d40578d93badabc528faf17f6664",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "32c906a677277806f70f6a7d7669edcf2cd7d8c6bfa6ecfcc50f6aa98c81b05d"
+      }
+    },
+    {
+      "key": "M04",
+      "id": "dbt-direction-negotiation",
+      "benchmark": "mechanism",
+      "instruction_file": "M04/instruction.md",
+      "instruction_sha256": "f66103d20452ba6b3ec5fdd5efb9930e2cafc880f9958eefcdbb8560e23484ac",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-08-nat-bennett",
+      "original_payload_sha256": "e0268040cf8a6dff2b1605ade6e402d25f9ac82601e048ae791941f0a035ce4e",
+      "original_tar_sha256": "cdbd5bb7a5367c0a881d19a783e2bee9adc44802a39c3e685a8ba991bc7b4190",
+      "original_instruction_sha256": "30ba2e957d861ea66f530cbe34dcf745c2ad61d410d4fb5be8e25bfcc3fc885c",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "availability": {
+        "status": "verified_for_declared_validation_scopes",
+        "source": {
+          "repository": "https://github.com/fivetran/dbt_salesforce",
+          "revision": "2e99cce10766c16c08aaf5c1fef8e6d17b857171",
+          "regular_files": 117,
+          "sql_files": 69,
+          "origin": "Exact source revision named by the original public commission",
+          "verification": [
+            "fresh offline Git bundle restoration",
+            "exact revision checkout",
+            "full strict Git fsck",
+            "every restored file matches the pinned Git blob"
+          ]
+        },
+        "tool_environment": {
+          "status": "newly_reconstructed_not_recovered_historical_environment",
+          "sqlfluff_version": "3.4.0",
+          "sqlfluff_source_revision": "338ff784a3ead58a2c6e4e0f2e94e60ecb058ed6"
+        },
+        "runtime_readiness": "passed_for_listed_scopes",
+        "validation": {
+          "local_actor_trial": {
+            "status": "completed",
+            "session_scope": "two-stage API-switch continuation",
+            "artifact_collection": "complete",
+            "required_artifacts_collected": 2,
+            "collected_patch_bytes": 67338
+          },
+          "independent_pilot_replay": {
+            "status": "passed",
+            "clean_environment": true,
+            "network": "none",
+            "pilots": 2,
+            "expected_exit_codes_verified": {
+              "normal": 0,
+              "violation": 1,
+              "no_changes": 0,
+              "tool_failure": 2
+            }
+          },
+          "e2b": {
+            "anonymous_uncached_image_pull": "passed",
+            "tools": "passed",
+            "full_actor_trial": "not_performed"
+          },
+          "known_limitations": [
+            "An additional whole-repository report claimed TMP=0 but missed eight undefined-target templating violations; it is not evidence of zero templating errors."
+          ]
+        }
+      },
+      "git_baseline": {
+        "revision": "2e99cce10766c16c08aaf5c1fef8e6d17b857171",
+        "bundle_sha256": "1cf9f684b33cc5f677f13b8f47654ab4a88fc9768ca69b2729ff5290fef234db",
+        "bundle_bytes": 4197446,
+        "restore_shallow_roots": [],
+        "origin": "Pinned upstream source restored from the original commission, with complete history",
+        "verification": "fresh offline restoration, exact checkout, full strict fsck, every file compared to its Git blob"
+      },
+      "task_definition_sha256": "e824206cb1bc8d6f14db3066c3cce563117a169bf6abac19130183bd717bfd0f",
+      "package_file": "M04/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "6f9fca03f00621e09219e750493f729727c9f7b9e34b2b17b8ad5cc8f7fbb1f5",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "807c685526d30f6a6f4f650d7b40a1dab9419e2429ea56e66ed4e7902cba364e"
+      }
+    },
+    {
+      "key": "M07",
+      "id": "memory-project-constraints",
+      "benchmark": "mechanism",
+      "instruction_file": "M07/instruction.md",
+      "instruction_sha256": "5e4490a000b4f32fa383075f8ba40413978df87f61df200de43e264b1b638dd4",
+      "default_interaction": "simulated_user",
+      "persona_id": "gh-db-01-db528f7b6a83",
+      "original_payload_sha256": "1d29de324d1bf24db474297e8e193651189990debc1ea39cfc4369ac2a6ed85e",
+      "original_tar_sha256": "c74778d5a25791eba67117c1649e9fda8a3ceba74091e0e21241bb1b89c65222",
+      "original_instruction_sha256": "9f880e704b3f1c603f7e805ce8fbb02d2af0bd373b9a5f15cd1d95b607bf2d6a",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "47ad03d7a1590da30f9ecec9d0a726242f454fc9",
+        "bundle_sha256": "0168bb406d783f6987b4e07fd3a34c182603ca7285c84cff02c576dff855fdd9",
+        "bundle_bytes": 2454,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "c50e1c1c9052a51c1d19325616377473e7dd1ec5a98d93d7a948291e94d2cb64",
+      "package_file": "M07/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "3640f68c5fe0cd959603d12eab5504d1bd6226060f69ac9539c589e5daa8bd0d",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "ff839f4e85b18d617deed1960164bf1d0fc676123120cbf3c880e020f4bdaf04"
+      }
+    },
+    {
+      "key": "M10",
+      "id": "review-verifier-catches-regression",
+      "benchmark": "mechanism",
+      "instruction_file": "M10/instruction.md",
+      "instruction_sha256": "84e85c2b5a7b4d1918d572cb0ff4619cca91663babc046a573d70e0fe7338397",
+      "default_interaction": "simulated_user",
+      "persona_id": "sr-30-kent-beck",
+      "original_payload_sha256": "abd4fb133dc14f76a9793a45cfb1a00ce3e0c68179ce8c60657caccc29eb1840",
+      "original_tar_sha256": "f569e27490f057b29de872df701848f6b8b0d98847dc0a56a135b966c6b7c43e",
+      "original_instruction_sha256": "8c8d8a5dbfb34e8c0d4862c857401b953536b5e4e2f1ef9689bcb4dfafdbabba",
+      "instruction_transform": "preserve original text; append terminal newline only when missing",
+      "git_baseline": {
+        "revision": "450b87b9521856230ef26a0f7e7b4f92487e7bb8",
+        "bundle_sha256": "965f99d866ae494ba619c84bc206a8169391e27148356ee762a39f1986fbfdd7",
+        "bundle_bytes": 2419,
+        "restore_shallow_roots": [],
+        "origin": "original research environment Git baseline",
+        "verification": "offline local restoration, exact checkout, full strict fsck"
+      },
+      "task_definition_sha256": "2026e1a0d9a2d3d17c6aac2b4af7d77c7e95e701dcced613cdd8a67d42919298",
+      "package_file": "M10/task.json",
+      "package_schema_version": 3,
+      "environment_validation": {
+        "status": "passed",
+        "recipe_hash": "e660eecfac483e988b2431f811501035b8d88b852c26cf7edd875a9c1fda0069",
+        "initial_patch_bytes": 0,
+        "readiness": true,
+        "quiesce_finalize": true,
+        "owned_resources_removed": true,
+        "receipt_sha256": "974db37a270e204665952b085101ea0546881dc3d55399c6718ee3b055843787"
+      }
+    }
+  ]
+}

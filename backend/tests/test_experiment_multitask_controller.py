@@ -140,7 +140,9 @@ def test_same_task_many_users_have_independent_workspaces_and_bounded_fanout(
         shutil.copytree(baseline, destination)
         # Verify Python imports from the local editable checkout, not another slot.
         (destination / "editable.py").write_text(f"OWNER = {ctx.persona_id!r}\n")
-        return LocalWorkspaceRuntime(destination, owns_tmp=True)
+        return LocalWorkspaceRuntime(
+            destination, owns_tmp=True, evidence={"patch_capability": "not_applicable"}
+        )
 
     monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", materialize)
 
@@ -273,7 +275,9 @@ def test_partial_failure_recovery_keeps_keys_inputs_and_completed_sessions_when_
             raise RuntimeError("setup interrupted")
         destination = tmp_path / f"{ctx.session_id}-{ctx.attempt}"
         destination.mkdir()
-        return LocalWorkspaceRuntime(destination, owns_tmp=True)
+        return LocalWorkspaceRuntime(
+            destination, owns_tmp=True, evidence={"patch_capability": "not_applicable"}
+        )
 
     monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", materialize)
 
@@ -611,7 +615,9 @@ def test_real_unified_main_uses_frozen_catalog_and_terminal_user_only_plan(
         launches.append((ctx.session_id, ctx.task_id, ctx.task_digest, ctx.attempt, spec.kind))
         directory = tmp_path / ctx.session_id
         directory.mkdir()
-        return LocalWorkspaceRuntime(directory, owns_tmp=True)
+        return LocalWorkspaceRuntime(
+            directory, owns_tmp=True, evidence={"patch_capability": "not_applicable"}
+        )
 
     monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", materialize)
 

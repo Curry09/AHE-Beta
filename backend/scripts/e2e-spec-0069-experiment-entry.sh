@@ -29,7 +29,7 @@ if ! "$live"; then
 fi
 [[ "$backend" == local || "$backend" == e2b ]] || { echo '--backend local|e2b required' >&2; exit 2; }
 [[ -n "$secrets_file" ]] || { echo '--secrets-file FILE required' >&2; exit 2; }
-config="examples/experiments/synthesizer-n1-$backend.json"
+config="examples/experiments/u1-$backend.json"
 entry=(uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$runs_dir")
 "${entry[@]}" check --config "$config" --offline
 receipt=$("${entry[@]}" --json prepare --config "$config" --secrets-file "$secrets_file")

@@ -1,0 +1,69 @@
+{
+  "schema_version": 3,
+  "kind": "benchmark",
+  "id": "plan-blocked-dependency",
+  "instruction_file": "instruction.md",
+  "interaction": "simulated_user",
+  "benchmark": {
+    "suite": "mechanism",
+    "instance_id": "plan-blocked-dependency",
+    "revision": "b87220a5b0871db01027d406c7a2c87278d7adea7e764234b789d3d94996597a"
+  },
+  "environment": {
+    "kind": "container",
+    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:845fdaa1966416b7a6c4e7eda1b619006f7a28c46dfb6441f4425e093c6fadcf",
+    "workdir": "/workspace",
+    "patch": "git",
+    "resources": {},
+    "inputs": [
+      {
+        "id": "initial",
+        "material": {
+          "sha256": "82d1d395de5ff675578bb21a892b99fe2679dccb73b5d903f2e6166460828f52",
+          "format": "file",
+          "files": {
+            "input": "82d1d395de5ff675578bb21a892b99fe2679dccb73b5d903f2e6166460828f52"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m09-initial-v1.bundle"
+        },
+        "target": "/opt/task-inputs/initial.bundle",
+        "placement": "task"
+      },
+      {
+        "id": "recipes",
+        "material": {
+          "sha256": "62ed15069d89a819935307eb8afc6c4c429835a285017dd6cfab9f42d88c0de4",
+          "format": "tar.gz",
+          "files": {
+            "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
+            "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
+          },
+          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+        },
+        "target": "/opt/task-inputs/recipes",
+        "placement": "task"
+      }
+    ],
+    "readiness": {
+      "argv": [
+        "python3",
+        "-c",
+        "import sys,sqlite3; assert sys.version_info[:2]==(3,12),sys.version; assert sqlite3.sqlite_version_info>=(3,35); import importlib.util; assert importlib.util.find_spec('weasyprint') is None; import pathlib,subprocess; assert pathlib.Path('/workspace/public/TASK.md').is_file(); assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()=='4f87ed73d6d916d72e6d11ef0caee27a062b9a9a'"
+      ],
+      "timeout_seconds": 120
+    },
+    "initialize": {
+      "argv": [
+        "python3",
+        "/opt/task-inputs/recipes/initialize.py",
+        "--bundle",
+        "/opt/task-inputs/initial.bundle",
+        "--revision",
+        "4f87ed73d6d916d72e6d11ef0caee27a062b9a9a",
+        "--workspace",
+        "/workspace"
+      ],
+      "timeout_seconds": 240
+    }
+  }
+}

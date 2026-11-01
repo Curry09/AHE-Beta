@@ -36,10 +36,17 @@ def test_current_repository_has_only_supported_public_materials():
     assert result["ok"], result["errors"]
     assert set(result["examples"]) == {
         f"examples/experiments/{name}-{backend}.json"
-        for name in ("synthesizer-n1", "synthesizer-n4", "evolution-feedback")
+        for name in ("u1", "u4", "evolution-feedback")
         for backend in ("local", "e2b")
+    } | {
+        f"examples/experiments/{name}-e2b.json"
+        for name in ("u8-mixed", "u8-direct", "u16-mixed", "u32-mixed")
     }
-    assert len(result["batches"]) == 2
+    assert set(result["batches"]) == {
+        "examples/batches/u1-u4-local.json",
+        "examples/batches/u1-u4-e2b.json",
+        "examples/batches/evolution-four-e2b.json",
+    }
 
 
 def test_unpublished_task_subcommand_is_rejected(monkeypatch):
@@ -150,7 +157,7 @@ def test_new_batch_json_cannot_bypass_public_contract_validation(tmp_path):
             {
                 "schema_version": 1,
                 "name": "extra",
-                "entries": [{"id": "n1", "config": "missing.json"}],
+                "entries": [{"id": "u1", "config": "missing.json"}],
                 "executor": "old-launcher",
             }
         )
