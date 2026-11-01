@@ -53,7 +53,6 @@ tasks:
   - docs/QUICKSTART.zh-CN.md
   - README.md
   - README.zh-CN.md
-  - docs/audits/unified-entry-capability-migration-20261003.md
   - CLAUDE.md
   scope: 说明显式本地dataset和哈希、安装evaluationextra、两后端评分、旧预测边界及不回流演化
   acceptance: 英中命令一致，held-out泛化与用户任务评分区分，历史缺口如实更新
@@ -72,7 +71,6 @@ tasks:
   - backend/tests/test_experiment_cli_v2.py
   - backend/tests/test_experiment_grading_e2e.py
   - backend/scripts/e2e-spec-0075-post-run-grading.sh
-  - docs/validation/post-run-grading.md
   - backend/scripts/check_experiment_repository.py
   scope: 接线grade选轮/离线验证/JSON，真实冻结/会话/收集到评分接线及完整回归
   acceptance: 

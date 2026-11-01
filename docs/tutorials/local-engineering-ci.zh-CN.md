@@ -94,4 +94,4 @@ uv run --locked --extra experiments python backend/scripts/experiment.py destroy
 
 destroy 只处理已核验属于此 run 的 job 和资源，移除其私有 daemon 和 CI job 存储。Gitea 仓库/数据卷及 runner 私密注册卷会保留，资源收据列明名称和原因。runner 私有卷包含注册凭据，应与私密运行数据一起保存。其他实验的 daemon、runner、job 和已有 Gitea 服务不属于此次清理。job 清理失败不能报告为 `DESTROYED`。
 
-这些命令描述实现契约。实际离线和真实运行覆盖由 [CI 验收报告](../validation/local-engineering-ci.md)记录；文档步骤本身不是完整真实 CI 实验的证据。人工构造的红绿探针只能证明工程状态行为，不能证明模型自动修复或 benchmark 改善。
+开发检查见[验证说明](../VERIFICATION.zh-CN.md)。CI 探针用于确认工作流能够执行、状态能够回传；模型是否完成修复及 Harness 的任务能力，应分别查看交付结果和独立评测。

@@ -2,9 +2,9 @@
 
 English | [简体中文](evolution32.zh-CN.md)
 
-This tutorial uses four configurations in `examples/experiments/`. Each uses `backend/scripts/experiment.py`, starts from the current builtin seed and selects a subset of the original 32-task set. There is no need to copy materials, environments or personas from an old experiment directory. Run every command from the repository root.
+This tutorial covers the six-round U8 mixed, U8 direct, U16 mixed and U32 mixed experiments. Each starts through `backend/scripts/experiment.py` from the current seed Harness and selects a subset of the 32-task collection. Task definitions, environment recipes and personas are included in the repository; preparation acquires larger materials. Run every command from the repository root.
 
-See the [task catalog](../../examples/tasks/evolution32/README.md) for task content, provenance and published materials. These are new experiment examples, not byte-for-byte reproductions of a historical run. Material checks and tool probes do not establish that a complete six-round experiment has run.
+The [task catalog](../../examples/tasks/evolution32/README.md) records task content, provenance, pinned versions and material locations. Preparation freezes these inputs together with the configuration, controller and seed Harness to create an independent run.
 
 | Configuration | Sessions per round | simulated_user / direct | Distinct personas | Triager / Synthesizer / Divergent | User / Developer concurrency |
 | --- | --- | --- | --- | --- | --- |
@@ -15,7 +15,7 @@ See the [task catalog](../../examples/tasks/evolution32/README.md) for task cont
 
 Each configuration starts from the builtin seed frozen during preparation and runs six rounds. R1–R5 include trials, feedback and delivery; R6 only tries the final Harness. Six rounds therefore contain five between-round delivery batches. Owner is mechanical, `synthesizer_grouping` is false and per-round official grading is disabled. Disabling official grading does not disable persona feedback or terminal review; user acceptance is not an official benchmark pass.
 
-Each experiment uses one 4 CPU / 8192 MiB E2B sandbox, with separate Docker task environments for each session/attempt. Public examples explicitly use user concurrency 4; some historical runs started with different concurrency. This is not a guarantee that all selected tasks can reach peak resource use simultaneously. Slots have separate sessions and environments but may reuse a persona, so U32 does not mean 32 independent human profiles.
+Each experiment uses one 4 CPU / 8192 MiB E2B sandbox, separate Docker task environments per session attempt, and user concurrency four. Choose concurrency with task memory and service requirements in mind. Sessions and environments are separate, but personas may be reused: U32 means 32 sessions per round, with the distinct persona count shown above.
 
 The U8 pair has identical tasks, initial inputs, persona bindings, six-round order, seed, models, roles, resources and concurrency. The direct configuration uses `interaction_overrides` to change only the original six simulated-user tasks to direct. The other two tasks remain direct. Names, repository prefixes and derived identities distinguish the two runs.
 
@@ -23,7 +23,7 @@ The U8 pair has identical tasks, initial inputs, persona bindings, six-round ord
 
 Use Linux or WSL2, Git, Python 3.12 and uv on the management machine. The E2B runtime template provides Docker remotely; Docker Desktop is not required on this machine for this route. Task definitions and the original persona library are in the repository. Larger inputs and recipes use fixed Release materials, and images use public registry digests. Preparation verifies checksums and does not need anyone's historical E2B template.
 
-The main repository is currently private. Anonymous downloads of the material Release still require verification after it becomes public; current authenticated release checks do not establish anonymous access.
+Task materials come from the versioned Release recorded in the manifest. Confirm that the management host can access those download URLs. Preparation verifies material hashes; offline checks list uncached remote materials as pending.
 
 ```bash
 git clone https://github.com/Curry09/auto-designer.git
@@ -89,7 +89,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 
 The cloud supervisor/controller runs independently after launch. A separate background collector on the management machine periodically collects status and artifacts. Exiting log-following does not stop the experiment. Shutting down the management machine prevents local collection; cloud execution remains subject to the provider lifecycle.
 
-There is currently no automatic lease-renewal loop. `runtime.e2b.timeout_seconds: 86400` is the sandbox lease set at creation, not unlimited lifetime or a model budget. `stop` stops the controller while leaving the sandbox running. CLI `resume` restores checkpoints on the same running sandbox; it is not provider auto-pause/auto-resume. A paused sandbox needs explicit provider recovery. An expired or deleted instance is LOST and cannot be replaced while claiming an uninterrupted run. Long six-round experiments can exceed a day: inspect actual `expires_at`, keep collection available and retain complete archives. This tutorial does not prescribe an automatic renewal command that the runtime does not implement.
+E2B sandbox leases are not automatically renewed. `runtime.e2b.timeout_seconds: 86400` sets the creation lease and is independent of model output budgets. `stop` stops the controller and retains the sandbox; CLI `resume` requires the original sandbox to be running. Restore paused instances through the provider first; expired or deleted instances are marked `LOST`. Six-round experiments may exceed a day, so monitor actual `expires_at`, keep management-host collection available and retain complete archives.
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py collect "$RUN_ID"

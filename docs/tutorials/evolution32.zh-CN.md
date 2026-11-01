@@ -2,11 +2,11 @@
 
 [English](evolution32.md) | 简体中文
 
-本教程使用 `examples/experiments/` 中四份配置。它们通过同一个 `backend/scripts/experiment.py` 入口，从当前 builtin seed 运行原32任务集的指定子集；材料、环境和画像不需要从旧实验目录手动复制。所有命令在仓库根目录执行。
+本教程介绍 U8 mixed、U8 direct、U16 mixed 和 U32 mixed 四组六轮实验。它们通过 `backend/scripts/experiment.py` 启动，从当前初始 Harness 开始，使用 32 项任务集中的指定子集。任务定义、环境配方和用户画像随仓库提供，大型材料由准备阶段获取。所有命令在仓库根目录执行。
 
-任务内容、来源和发布材料见[任务清单](../../examples/tasks/evolution32/README.zh-CN.md)。这里的配置是新实验示例，不宣称逐字节重现某次历史运行，也不把材料检查或工具探针当成正式六轮已完成。
+任务内容、来源、固定版本与材料获取方式见[任务清单](../../examples/tasks/evolution32/README.zh-CN.md)。准备阶段将这些材料与当前配置、控制器和初始 Harness 一并固定，生成一次独立实验。
 
-| 配置 | 每轮会话 | simulated_user / direct | 不重复的 persona | Triager / Synthesizer / Divergent | 用户 / Developer 并发 |
+| 配置 | 每轮会话 | simulated_user / direct | 独立画像数 | Triager / Synthesizer / Divergent | 用户 / Developer 并发 |
 | --- | --- | --- | --- | --- | --- |
 | u8-mixed-e2b.json | 8 | 6 / 2 | 5 | 4 / 1 / 1 | 4 / 4 |
 | u8-direct-e2b.json | 8 | 0 / 8 | 5 | 4 / 1 / 1 | 4 / 4 |
@@ -15,7 +15,7 @@
 
 每份配置均从准备时的当前 builtin seed 开始，共六轮。R1–R5 运行试用、反馈和交付，R6 仅试用最终 Harness。六轮对应五次轮间交付批次，不是六次交付。Owner 为 mechanical，synthesizer_grouping 为 false，逐轮官方评分关闭。后者不关闭 persona 的会话反馈或终态评阅；体感接受不等于官方基准通过。
 
-一个实验使用一个 4 CPU / 8192 MiB 的 E2B 沙箱，各 session/attempt 使用独立 Docker 任务环境。公开示例的用户并发统一为 4，它不同于部分历史运行的初始并发，也不是所有任务同时达到资源峰值的总容量保证。每个槽位有独立会话和环境；相同 persona 可以复用，因此 U32 不应描述成 32 个独立真人画像。
+每个实验使用一个 4 CPU / 8192 MiB 的 E2B 沙箱，各会话尝试使用独立 Docker 任务环境，用户并发为 4。实际并发应结合任务的内存与服务需求选择。会话和环境相互独立，但画像可以复用，因此 U32 表示每轮 32 个会话，使用的独立画像数见上表。
 
 U8 两组保持任务、初态、persona 配对、六轮轮序、seed、模型、角色、资源和并发一致。direct 配置仅以 interaction_overrides 将原先六个 simulated_user 任务改为 direct，另两个原 direct 任务保持不变；名称、仓库前缀和派生身份随实验区分。
 
@@ -23,7 +23,7 @@ U8 两组保持任务、初态、persona 配对、六轮轮序、seed、模型�
 
 工作机使用 Linux 或 WSL2、Git、Python 3.12 与 uv。E2B 路径由远端模板提供 Docker，不要求工作机启动本地 Docker Desktop。任务定义和原 persona 库随仓库提供，大输入和配方附件从固定版本 Release 获取，镜像使用公开 registry digest；准备过程核对校验和，不需要个人历史 E2B 模板。
 
-主仓目前仍为私有仓库；材料 Release 的匿名下载需要等仓库公开后补验。当前使用登录身份完成的 Release 校验不能等同于匿名可下载。
+任务材料来自清单中固定版本的 Release，运行前请确认管理主机能够访问相应下载地址。准备阶段验证材料哈希；离线检查会将尚未缓存的远端材料标为待下载。
 
 ```bash
 git clone https://github.com/Curry09/auto-designer.git
@@ -89,7 +89,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 
 run 启动后，云内 supervisor/controller 独立运行；工作机还会启动后台 collector，周期收集状态和产物。退出 logs 不会停止实验。工作机关机后本机 collector 不能继续收集，云端 controller 的存活仍受实际 provider 生命周期约束。
 
-当前代码没有自动续租循环。`runtime.e2b.timeout_seconds: 86400` 是创建沙箱时设置的 provider 租期，不是无限存活承诺，也不是模型输出预算。stop 停止 controller 并保留运行中的沙箱；CLI resume 连接同一仍在运行的沙箱并恢复检查点，不是 provider auto-pause/auto-resume。paused 沙箱需要显式 provider 恢复；已过期/删除实例报告 LOST，不能用一台新实例冒充无损续跑。长六轮运行可能超过一天，请关注实际 expires_at、保留工作机采集和完整归档；此处不提供不存在的自动续租指令。
+当前不会自动延长 E2B 沙箱租期。`runtime.e2b.timeout_seconds: 86400` 设置创建时的租期，与模型输出预算无关。`stop` 停止控制器并保留沙箱，CLI `resume` 要求原沙箱仍在运行；暂停实例需要先通过 provider 恢复，过期或已删除实例标记为 `LOST`。六轮实验可能超过一天，请关注实际 `expires_at`，保持管理主机的收集进程可用，并保留完整归档。
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py collect "$RUN_ID"

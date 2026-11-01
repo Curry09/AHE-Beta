@@ -2,11 +2,9 @@
 
 English | [简体中文](u1-experiment.zh-CN.md)
 
-This walkthrough uses the checked-in pvlib task and `sr-15-swyx` persona. Local and E2B examples have the same task, persona, seed, roles, models and five-round semantics. Select infrastructure once; the remaining commands are identical. Actual verification results are recorded separately in [the validation report](../validation/spec-0069-new-user.md).
+This walkthrough uses the checked-in pvlib task and `sr-15-swyx` persona. Local and E2B examples have the same task, persona, seed, roles, models and five-round semantics. Select infrastructure once; the remaining commands are identical. Run the checks in the [verification guide](../VERIFICATION.md) against this checkout.
 
-This cleanup has offline verification but no new live local/E2B run. The earlier U1 live record remains a baseline; see the [cleanup verification report](../validation/spec0071-experiment-cleanup.md) for current coverage.
-
-This tutorial uses one task and one user per round (`rounds.sessions_per_round: 1`). For four users and two tasks, use the [multi-user tutorial](multi-user-experiment.md). Importing a historical run to append another round remains unsupported. Existing-run `resume` continues the same frozen identity; it is not historical-result import.
+This tutorial runs one simulated-user session per round (`rounds.sessions_per_round: 1`). See the [multi-user tutorial](multi-user-experiment.md) for four users and two tasks. `resume` continues the same run. To add rounds after a complete experiment, create a child run from an archive containing a continuation export as described in the [continuation tutorial](experiment-continuation.md).
 
 ## 1. Start from the repository
 
@@ -51,7 +49,11 @@ uv run --locked --extra experiments python backend/scripts/experiment.py check -
 uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config "$CONFIG" --secrets-file .env.experiment
 ```
 
-The offline check validates materials; the second check verifies credential configuration and Docker/provider access without requesting models. Add `--probe-models` explicitly if you want model requests. Expect a valid material report, then a generated run ID, frozen run directory and next command. An unknown field, nonexistent persona or missing local file fails during checking. Preparation downloads pinned Git code, freezes all material hashes and builds local runtime images. Allow time for first-time source, dependency, Claude and Docker image downloads. Cold preparation can take substantially longer than a cached run; network speed determines download time, so an early wait does not by itself mean a stuck controller. Preparation creates no model request or running experiment resources. After freezing the inputs, `[prepare]` prints the run ID and frozen directory before environment preparation finishes. For local builds it also prints `logs/prepare.log`; use `tail -f /printed/path/logs/prepare.log` in another terminal to follow downloads and build commands. During this stage the recorded state is `PREPARING`. Wait for successful completion before `run`; an early run ID alone is not a ready experiment. E2B preparation reports its frozen material directory without a local image-build log.
+`check --offline` validates configuration, local materials and session plans. Online `check` also verifies credentials and Docker/provider access. Only explicit `--probe-models` sends model requests. Unknown fields, nonexistent personas and missing local files fail at this stage.
+
+`prepare` downloads pinned sources, records material hashes and builds local runtime images. First-time preparation downloads sources, dependencies, Claude Code and Docker images, so it generally takes longer than a cached preparation. It makes no model requests or running experiment processes.
+
+Preparation prints the run ID and frozen directory early, while the state may still be `PREPARING`. Local builds also provide `logs/prepare.log`; follow it with `tail -f /printed/path/logs/prepare.log` in another terminal. E2B preparation reports a material directory without a local image-build log. Wait for preparation to finish successfully before starting the experiment with that ID.
 
 ```bash
 RUN_ID=REPLACE_WITH_PRINTED_RUN_ID
@@ -96,7 +98,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 uv run --locked --extra experiments python backend/scripts/experiment.py logs "$RUN_ID" --follow
 ```
 
-Expect a confirmed stop and preserved checkpoint. Local stop shuts down Gitea/egress and removes execution containers while retaining the repository data volume; its browser URL is unavailable while Gitea is stopped. Local resume restores the same host port and repository. Resume retains the same run ID, Gitea repository, frozen inputs and resource identity, reconciling in-flight delivery. An interrupted unsealed user session may need to run again; resume does not invent a completed result. Duplicate resume must not create a second controller or deliver the same already-reconciled ticket twice. The completed cloud validation had no user issues or delivery tickets, so it verifies lifecycle and collection rather than actual delivery deduplication.
+Expect a confirmed stop and preserved checkpoint. Local stop shuts down Gitea/egress and removes execution containers while retaining the repository data volume; its browser URL is unavailable while Gitea is stopped. Local resume restores the same host port and repository. Resume retains the same run ID, Gitea repository, frozen inputs and resource identity, reconciling in-flight delivery. An interrupted user session without a completion seal may need to run again. Duplicate resume must not create a second controller or deliver the same already-reconciled ticket twice.
 
 E2B stopping processes retains an allocated sandbox. If its expiry passes or the sandbox is deleted, status becomes `LOST`; this is not recoverable by quietly provisioning another sandbox under the same identity. Keep the host online: its detached monitor periodically collects remote state, but is not permanent cloud storage.
 
@@ -143,9 +145,9 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 
 Retry resume after the original port is free. Do not edit `manifest.json`, `resources.json` or frozen evidence profiles to choose another port for this run.
 
-There is no fixed duration guarantee: model latency, retries, task interactions and delivery steps vary. Use recorded timestamps and provider billing for actual runtime/cost. This tutorial describes the full workflow; the validation report states which paths and rounds have actually been exercised.
+There is no fixed duration guarantee: model latency, retries, task interactions and delivery steps vary. Use recorded timestamps and provider billing for actual runtime/cost. Inspect each run’s records for its actual progress and results.
 
-The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest and pytest-mock for user-side checks. The unmodified task baseline was tested in a fresh environment: all 155 ModelChain tests passed, including 35 cases using the `mocker` fixture. This is task-environment validation, not official SWE-bench grading.
+The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest and pytest-mock for user-side checks. Task-environment checks are separate from official SWE-bench grading; see the [post-run grading tutorial](post-run-grading.md).
 
 Historical experiments and their source revisions are indexed in [research](../../research/README.md). For standalone diagnostics or evidence replay, see [developer tools](../../tools/dev/README.md); their outputs are not another round of this experiment.
 

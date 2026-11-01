@@ -250,10 +250,6 @@ tasks:
     files:
       - backend/scripts/e2e-spec-0081-e2b-task-environments.sh
       - backend/tests/test_experiment_environment_contract.py
-      - docs/validation/e2b-task-environments.md
-      - docs/validation/open-source-readiness.json
-      - docs/validation/open-source-readiness.md
-      - docs/validation/open-source-readiness.zh-CN.md
       - .github/workflows/experiment-contract.yml
     scope: 验证现有路径回归、32 项 readiness、源码/文件/服务真实环境、并发与恢复及公开入口两轮交付链路，记录发布验收证据。
     acceptance: 三类真实任务、至少两同路径端口会话、KV finalize/产物/清理通过；两轮链路含实际需求交付和末轮只试用；所有测试层次与四组正式六轮分别记录，无替身或探针冒充完成。

@@ -139,7 +139,6 @@ tasks:
   files:
   - docs/tutorials/post-run-grading.md
   - docs/tutorials/post-run-grading.zh-CN.md
-  - docs/validation/extensible-session-grading.md
   - docs/specs/0051-session-container-objective-evidence.md
   - docs/specs/0075-post-run-swe-grading.md
   - docs/specs/0081-e2b-task-environments.md
@@ -174,7 +173,7 @@ tasks:
 
 保留 SWE 官方 evaluator，但退役公开 grade 的旧 `--dataset`／`--dataset-sha256` 参数，所有任务只使用必填 `--plan`，不提供别名、自动转换或并行兼容路径。不改用户主观结论、原 Session、反馈、交付门禁或历史归档。每次评分生成独立报告，区分真实通过、真实不通过、未配置、不支持、材料缺失和验收环境故障。独立 Harness benchmark 评测仍负责将指定 Harness 在新任务上重新运行，不由本组替换。
 
-本组已获审阅批准并实施第一版：公共合同、任务包 v2、共用普通文件采集、首批 adapter 与统一 plan 命令已经接入。T3 的受管环境支路、T4 的完整官方核验和 T6 的完整验收仍 pending。已完成部分真实 Docker 控制，逐项结果及未完成项记录在 docs/validation/extensible-session-grading.md；离线回归不代表真实评分成功。不在本组重跑 N8 或修改旧实验结果。
+本组已获审阅批准并实施第一版：公共合同、任务包 v2、共用普通文件采集、首批 adapter 与统一 plan 命令已经接入。T3 的受管环境支路、T4 的完整官方核验和 T6 的完整验收仍 pending。已完成部分真实 Docker 控制；历史逐项记录可从 Git 历史查看，当前可复现检查见 docs/VERIFICATION.zh-CN.md。离线回归不代表真实评分成功。不在本组重跑 N8 或修改旧实验结果。
 
 ## Motivation
 

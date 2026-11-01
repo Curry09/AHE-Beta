@@ -2,7 +2,7 @@
 
 [English](evolution-feedback.md) | 简体中文
 
-本教程通过统一入口启动一个带逐轮独立验收的小实验。任务要求 Harness 计算总额并生成 `answer.json`，私有 custom verifier 检查冻结文件。这是流程示例，不是官方 benchmark 成绩，也不证明多轮演化已经提高 Harness 能力。
+本教程启动一个带逐轮独立验收的小实验：Harness 计算总额并生成 `answer.json`，私有 custom verifier 检查冻结后的文件。示例用于演示公开任务、私有验收规则与反馈处理之间的完整流程。
 
 ## 循环中的变化
 
@@ -15,11 +15,11 @@
 | `attribution` | 原因已确认、不确定或未知；任务失败不自动证明是 Harness 缺陷 |
 | `opportunities` | 零到多个建议；成功会话不必发 Issue |
 
-`direct` 的Actor只收到一次任务，不能期待用户追加消息。`simulated_user`在交互中仍是使用产品的人：main/waiting judge和接受/继续前的`main_final_check`按persona能力访问实时工作区。competent/expert可以写测试、运行命令，并按自己的协作方式编辑代码；核实是可选的，不强制用户接管。final-check每个决策周期最多一次、最多四次工具调用，之后仍须重新判断和选择动作。
+`direct` 模式下，解题 Agent（Actor）只收到一次任务，不会有用户追加消息。`simulated_user` 模式下，模拟用户可以按画像能力访问实时工作区，在等待或决定接受／继续之前进行检查。`competent` 和 `expert` 画像可写测试、运行命令，并按协作方式修改代码；这些检查是可选行为。`main_final_check` 每个决策周期最多执行一次，包含最多四次工具调用，之后由模拟用户重新判断下一步动作。
 
-只有会话真正终止后，才停止Actor和写进程、冻结完整评分产物，再进行只读终态复核。终态Reviewer能读快照文件和diff，不能写文件、执行shell或追加任务消息。用户自己的操作保存在`sim_trace`；冻结工作区可能包含用户贡献，其验收通过表示这一最终任务产物通过，不自动等于Harness独立求解。现有轨迹不提供完整逐行贡献归因；缺失体验评分也不由derived诊断分补齐。
+会话终止后，系统停止 Actor 及相关写入进程，冻结任务产物，再由终态 Reviewer 进行只读复核。Reviewer 能读取快照文件和 diff，不能写文件、执行 shell 或追加任务消息。用户的操作保存在 `sim_trace` 中；若最终工作区包含用户贡献，验收通过代表该协作产物通过，不自动等于 Harness 独立完成。现有记录不提供完整的逐行贡献归因，缺失体验评分也不会用诊断分数补齐。
 
-系统先保存完整报告计划，再发布 Issue，逐票保存发布收据。恢复时续发冻结计划，不重跑 Actor/Reviewer、不重复发票；空计划是正常结果。每轮的客观验收都在需求处理前执行，末轮只试用也包括在内。安全摘要支持后续纠错，不会因一次验收失败自动淘汰或回退已交付候选。
+系统先保存完整报告计划，再逐条发布 Issue 并保存收据。恢复时继续发布原计划中未完成的 Issue，不重跑 Actor 或 Reviewer；没有 Issue 的空计划也是正常结果。每轮的客观验收都在需求处理前执行，末轮只试用也包括在内。安全摘要支持后续纠错，不会因一次验收失败自动淘汰或回退已交付候选。
 
 ## 1. 安装并固定评分镜像
 
@@ -65,7 +65,7 @@ bash backend/scripts/e2e-spec-0084-evolution-feedback.sh \
 
 ## 3. 检查并准备
 
-当前实现仍是审阅候选。配套 OpenAgents reader 已推送为 `57eac90a5702022c1ed2452b5b2b9918c235df39`，并固定在 `release/compatibility.json`，准备时默认选择该提交。显式覆盖 `source.openagents` 也必须提供相同能力；只有旧 transport 能力的版本会被拒绝。正式发布前需审阅合并配套改动、填写 `reader_release_commit` 并重跑联合检查。开发 canary 的实测记录与发布批准分别记录。
+准备阶段根据[兼容清单](../../release/compatibility.json)固定 OpenAgents 的执行证据 reader 版本，优先使用 `execution_evidence.reader_release_commit`，未设置时使用 `reader_candidate_commit`。显式 `source.openagents` 也必须指向支持同一执行证据合同的不可变提交。预检会核验实际读取能力；配套版本更新见[发布指南](../RELEASING.md)。
 
 ```bash
 CONFIG="$CASE_DIR/experiment.json"
@@ -112,7 +112,7 @@ uv run --locked --extra experiments --extra evaluation python backend/scripts/ex
   --signing-key "$CASE_DIR/private/worker.key" --secrets-file "$SECRETS" --follow
 ```
 
-这是前台进程，local 和 E2B **都需要**该 worker 的 Docker。E2B 不接收 Docker socket 或私有 verifier；worker 使用同一准备目录和 provider 凭证交换封存请求、签名结果。如果自定义了全局 `--runs-dir`，每个子命令前（包括 worker）都要填写同一值。换用另一台 worker 主机时，必须具备相同准备状态、兼容 checkout 和凭证；这个命令不是远程 worker 注册服务。
+这是前台进程，local 和 E2B **都需要**该 worker 的 Docker。E2B 不接收评分主机的 Docker socket 或私有 verifier；worker 使用同一准备目录和 provider 凭证交换封存请求、签名结果。如果自定义了全局 `--runs-dir`，每个子命令前（包括 worker）都要填写同一值。换用另一台 worker 主机时，必须具备相同准备状态、兼容 checkout 和凭证；这个命令不是远程 worker 注册服务。
 
 worker 就绪前出现 `objective_grading / PENDING / worker_not_ready` 属于预期，启动 worker 即可继续。实验期间保持它运行，`--follow` 持续轮询，controller 为 `EXITED` 或 `STOPPED` 且没有待办时会自动退出，途中也可 Ctrl+C 停止；不带该参数只处理当前待办后退出。中断后用相同计划、私钥重启，已接受收据会复用；过期 generation 和冲突重复结果会被拒绝，恢复不会产生新的用户试用。
 
@@ -136,4 +136,4 @@ uv run --locked --extra experiments python backend/scripts/experiment.py collect
 
 实验保留执行合同、完整 Actor 产物和报告收据。controller 侧 `assessment/` 保存请求、已接受签名收据和安全轮次反馈；worker 本地 run 的 `evaluation/online/` 保存私有执行细节，排除于收集包及 Issue/需求证据。安全摘要只有结果、身份和摘要字段，不带 verifier 断言、隐藏测试或 stdout。Reviewer 的观察与独立验收可以不一致，二者不会互相覆盖。
 
-在线合同支持从保存的工作区产物重建验收；依赖仍存活的原任务环境或受管服务可信测量的 profile 会被拒绝，不猜环境后继续评分。[事后评分](post-run-grading.zh-CN.md)在收集后复用同一评分服务，仍是独立操作；`evaluation/` 下的 Harness 留出 benchmark 也保持独立。实际验证范围见[验收记录](../validation/evolution-feedback-contracts.md)。
+在线合同支持从保存的工作区产物重建验收；依赖仍存活的原任务环境或受管服务可信测量的 profile 会被拒绝，不猜环境后继续评分。[事后评分](post-run-grading.zh-CN.md)在收集后复用同一评分服务，仍是独立操作；`evaluation/` 下的 Harness 留出 benchmark 也保持独立。当前 checkout 的检查命令见[验证方法](../VERIFICATION.zh-CN.md)。

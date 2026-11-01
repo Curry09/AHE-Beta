@@ -21,7 +21,7 @@ Publication and validation status are recorded in `manifest.json`. The [versione
 
 All 32 task images use `ghcr.io/mmjzmy/auto-designer-tasks:<lowercase-task-key>-v<version>`, such as `m04-v1`, `o03-v1`, and `kv-live-surgery-v1`. Executable task definitions pin the image digest; source revisions, dependency versions, and build recipes remain in the manifest.
 
-All 32 task images and four companion service images are public. Each passed anonymous download, image identity checks, and tool startup in clean E2B environments. All 32 final task recipes also passed real local Docker initialization, readiness, finalization, and collection checks without an Actor. The [manifest](manifest.json) records material identities and validation receipts; the [validation record](../../../docs/validation/e2b-task-environments.md) separates these checks from the M04 model trial and full multi-round experiments.
+All 32 task images and four companion service images are public. Each passed anonymous download, image identity checks, and tool startup in clean E2B environments. All 32 final task recipes also passed real local Docker initialization, readiness, finalization, and collection checks without an Actor. The [manifest](manifest.json) records material identities and validation receipts; the [verification guide](../../../docs/VERIFICATION.md) lists checks users can rerun on this checkout.
 
 ## Material boundaries
 

@@ -2,7 +2,7 @@
 
 English | [简体中文](experiment-continuation.zh-CN.md)
 
-Use a complete current experiment archive to create a new run. The child first processes the parent's last user feedback and waits for admitted work to finish, then starts its own users. It inherits the final Harness tree and the last round's task/persona/interaction pairs. Models, roles, runtime and policies come from the child configuration.
+This tutorial creates a child experiment from a completed experiment archive and adds user rounds. The child inherits the final Harness and the parent’s final task/persona/interaction pairs. It processes the final feedback and waits for admitted work to be delivered before starting new trials. The child configuration selects models, roles, backend and runtime policies.
 
 This uses the existing check/prepare/run/status/stop/resume/collect/destroy commands. `resume` continues the same run; continuation creates a new identity and repository. Only current schema-2 / workload-contract-1 archives containing the new continuation export are accepted. Previously frozen controllers and archives without that export are not upgraded.
 
@@ -127,9 +127,9 @@ Wait for the child to reach `COMPLETED`, then collect its own final export.
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py --json --runs-dir "$RUNS_DIR" collect "$CHILD_RUN_ID" --secrets-file .env.continuation > "$WORK_DIR/child-collection.json"
-uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" destroy "$CHILD_RUN_ID" --confirm --secrets-file .env.continuation
+uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" destroy "$CHILD_RUN_ID" --confirm "$CHILD_RUN_ID" --secrets-file .env.continuation
 ```
 
 For another addition, use the child's complete receipt as `parent-collection.json`, set `ADD_ROUNDS=1`, and repeat steps 3–4 to create another new run. A child ending at logical R7 becomes the next parent; the next local R1 displays logical R8. The next source selects that direct parent's own final users and feedback. Ancestor identity/hash summaries are retained without recursively embedding complete parent archives.
 
-Destroy addresses the named child's resources and retains its evidence; clean up parent resources with their own run ID and profile. `grade --round` and batch operations continue to use each run's local round numbers and current predictions. See [configuration](../CONFIGURATION.md), [Spec-0079](../specs/0079-experiment-continuation.md), and the separate [validation record](../validation/experiment-continuation.md) for the implemented contract and actual execution coverage. The commands here describe the workflow; they do not themselves establish real delivery on both backends.
+`destroy` releases the named child’s resources and preserves collected evidence. Manage parent resources separately with the parent run ID and credentials. `grade --round` and batch operations use each run’s local round numbers. See [configuration](../CONFIGURATION.md) for the full input contract and [Verification](../VERIFICATION.md) for development checks.

@@ -50,7 +50,6 @@ tasks:
       - README.zh-CN.md
       - examples/seed-inputs/library.json
       - examples/seed-inputs/instruction.md
-      - docs/audits/unified-entry-capability-migration-20261003.md
       - CLAUDE.md
     scope: 解释转换和数组路径接入，提供当前小示例，更新历史能力迁入状态
     acceptance: 英中命令一致；不宣称隐藏sidecar或旧环境已复现；当前示例可转换和检查
@@ -68,7 +67,6 @@ tasks:
     files:
       - backend/tests/test_experiment_task_import_e2e.py
       - backend/scripts/e2e-spec-0076-seed-task-import.sh
-      - docs/validation/seed-task-import.md
       - .github/workflows/experiment-contract.yml
     scope: 验证真实材料冻结与无副作用转换，真实Docker准备及模型local运行和工作区导出
     acceptance: 实际产物进入既有哈希合同；全仓回归；真实local模型实验完成收集清理，云端与演化边界明确

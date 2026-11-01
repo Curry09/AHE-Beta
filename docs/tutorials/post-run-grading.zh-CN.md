@@ -70,7 +70,7 @@ PLAN=/absolute/path/to/grading-plan.json
 ```bash
 uv run --locked --extra experiments --extra evaluation \
   python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" \
-  grade "$RUN_ID" --plan "$PLAN" --round 6 --offline
+  grade "$RUN_ID" --plan "$PLAN" --offline
 ```
 
 省略 `--round` 时选择 `config.rounds.count`，即配置末轮，不会自动退到更早轮次。轮号必须为正数且已封口。
@@ -79,7 +79,7 @@ uv run --locked --extra experiments --extra evaluation \
 
 完整 SWE prediction 须保留原基线、路径、字节数和 hash 回执。其他产物使用原会话的 `workspace_evidence.evaluation_artifacts` 回执，绑定原试用 Harness SHA 与已收集字节。计划不能把后来补进去的文件变成原执行证据。缺失、截断、超限仍无法有效验收，也不能从旧日志或最新远端代码补造。
 
-新任务包通过 schema version 2 声明公开产物采集，指定工作区文件及大小上限，不含测试或答案。既有 version 1 任务身份不变。受管服务测量依赖独立任务环境能力；当前标准后端不支持，会在 prepare 拒绝，不能用工作区普通文件冒充。
+v2 任务包可声明公开的工作区文件产物及大小上限，v3 容器任务还可通过环境驱动采集声明的服务产物。声明中不包含隐藏测试或答案。受管服务测量需要相应运行时能力和原运行的可信回执；评分时按适配器要求核对，缺少能力或证据时保留不可评分状态，不能用普通文件替代。任务环境格式见[配置说明](../CONFIGURATION.zh-CN.md#任务包)。
 
 例如，新自定义文件任务可在实验开始前向 version 2 任务包添加以下声明。`output` ID 对应 `custom.json` 的 `artifact_map`；任务必须实际生成此文件。这里的大小上限是操作者显式选择，不是自动推导的 benchmark 默认值。
 
@@ -110,7 +110,7 @@ uv run --locked --extra experiments --extra evaluation \
 ```bash
 uv run --locked --extra experiments --extra evaluation \
   python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" \
-  --json grade "$RUN_ID" --plan "$PLAN" --round 6
+  --json grade "$RUN_ID" --plan "$PLAN"
 ```
 
 当前在本机逐会话串行评分。Docker 镜像下载、构建、测试可能耗费较多磁盘与时间；任务产物中的代码不在宿主执行。
@@ -123,7 +123,7 @@ uv run --locked --extra experiments --extra evaluation \
 | `nl2repo` | 使用官方后处理、命令、计数及 task image 中的原测试。报告原通过率，无二值规则时 `passed=null`；操作者阈值单列。 |
 | `custom` | 隔离容器执行固定脚本，写 `/logs/verifier/result.json`，如 `{"passed": true, "score": 1}`；明确标记 custom。 |
 
-适配器名称不表示支持整个 suite 所有任务或版本。未知来源和未覆盖执行模式明确拒绝。[验证报告](../validation/extensible-session-grading.md)记录实测范围与待完成官方验收；fixture 测试不能称为官方 benchmark 成绩。
+适配器名称不表示支持整个 suite 所有任务或版本。未知来源和未覆盖执行模式明确拒绝。当前检查命令见[验证方法](../VERIFICATION.zh-CN.md)；fixture 测试不能称为官方 benchmark 成绩。
 
 官方任务包 tar 根保留固定任务的 `task.toml`、`tests/`、`environment/`。Terminal/TUA 要求 `build_official_environment: true`，构建冻结环境并在验收前记录镜像身份。NL2Repo/custom 指定不可变镜像。外部答案和依赖也要固定；仅固定测试脚本不等于固定其中下载的 URL 内容。
 
@@ -139,7 +139,7 @@ uv run --locked --extra experiments --extra evaluation \
 | `unavailable`、`crashed`、`timed_out` | 评分基础设施、执行或解析失败 |
 | `not_evaluated` | 官方跳过评分，例如 SWE 空预测 |
 
-非 completed 的 `passed` 为 null，基础设施故障不计普通任务失败。完整 SWE 空补丁记为 `not_evaluated / official_empty_prediction`，不是缺补丁或已完成失败。原官方报告与分母和覆盖率诊断分开；不能删除跳过/错误项后冒充更高的官方成功率。
+非 completed 的 `passed` 为 null，基础设施故障不计普通任务失败。完整 SWE 空补丁记为 `not_evaluated / official_empty_prediction`，不是缺补丁或已完成失败。原官方报告与分母和覆盖率诊断分开；报告应保留官方分母以及跳过、错误等状态。
 
 退出码 `0` 和 `ok: true` 表示完整评分，可能包含有效任务失败，不代表所有任务通过。性能应查看逐会话结论和 score。
 

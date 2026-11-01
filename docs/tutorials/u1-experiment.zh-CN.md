@@ -2,11 +2,9 @@
 
 [English](u1-experiment.md) | 简体中文
 
-本教程使用仓内 pvlib 任务和 `sr-15-swyx` persona。本地与 E2B 示例的任务、persona、seed、角色、模型和五轮语义完全一致，只选一次基础设施，后续操作相同。真实验证结果单独记录在[验证报告](../validation/spec-0069-new-user.md)。
+本教程使用仓内 pvlib 任务和 `sr-15-swyx` persona。本地与 E2B 示例的任务、persona、seed、角色、模型和五轮语义完全一致，只选一次基础设施，后续操作相同。当前 checkout 的可复现检查见[验证方法](../VERIFICATION.zh-CN.md)。
 
-本次清理完成了离线验证，尚未重新执行 local/E2B 实跑；之前的 U1 实跑记录仍是基线。当前覆盖范围见[清理验收报告](../validation/spec0071-experiment-cleanup.md)。
-
-本教程使用一个任务、每轮一位用户（`rounds.sessions_per_round: 1`）；四位用户、两个任务请看[多用户教程](multi-user-experiment.zh-CN.md)。历史实验导入后追加一轮仍不支持。resume 继续同一冻结身份的实验，不是历史产物导入。
+本教程每轮运行一个模拟用户会话（`rounds.sessions_per_round: 1`）。四位用户、两项任务的示例见[多用户教程](multi-user-experiment.zh-CN.md)。`resume` 恢复同一个 run；若要在完整实验之后增加轮次，可用带 continuation export 的归档创建子实验，见[追加教程](experiment-continuation.zh-CN.md)。
 
 ## 1. 从仓库开始
 
@@ -51,7 +49,11 @@ uv run --locked --extra experiments python backend/scripts/experiment.py check -
 uv run --locked --extra experiments python backend/scripts/experiment.py prepare --config "$CONFIG" --secrets-file .env.experiment
 ```
 
-离线 check 验证材料，第二条 check 验证凭证配置和 Docker/provider 访问，不发送模型请求。需要测试模型时显式加 `--probe-models`。先看到材料合法报告，再看到生成的 run ID、冻结目录与下一条命令。未知字段、不存在的 persona 或缺少本地文件在 check 时失败。prepare 下载固定 Git 源码、冻结材料 hash，并构建本地运行镜像。第一次源码、依赖、Claude、Docker 镜像下载和构建需要时间；冷准备可能明显慢于缓存运行，下载耗时取决于网络，初期等待本身不代表 controller 卡住。此阶段不发模型请求、不启动实验资源。输入冻结后，`[prepare]` 会提前输出 run ID 和冻结目录；本地构建还会给出 `logs/prepare.log` 路径，可在另一终端执行 `tail -f /printed/path/logs/prepare.log` 查看下载与构建命令。此时记录的状态为 `PREPARING`，必须等 prepare 成功结束再 run，提前出现 ID 不代表已准备好。E2B prepare 输出冻结材料目录，不产生本地镜像构建日志。
+`check --offline` 验证配置、本地材料和会话计划；在线 `check` 还验证凭证及 Docker／provider 访问。只有显式加入 `--probe-models` 才发送模型请求。未知字段、不存在的画像或缺失本地文件会在此阶段报错。
+
+`prepare` 下载固定版本的源码、保存材料哈希，并构建本地运行镜像。首次准备涉及源码、依赖、Claude Code 和 Docker 镜像的下载，通常比缓存后的运行更慢。此阶段不调用模型，也不启动实验进程。
+
+准备过程中会提前打印 run ID 和冻结目录，此时状态仍可能是 `PREPARING`。本地构建还会提供 `logs/prepare.log` 路径，可在另一终端用 `tail -f /printed/path/logs/prepare.log` 查看进度。E2B 准备只输出材料目录，不产生本地镜像构建日志。等待 prepare 成功结束，再用该 ID 启动实验。
 
 ```bash
 RUN_ID=REPLACE_WITH_PRINTED_RUN_ID
@@ -81,7 +83,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py logs "$
 | R4 | 试用 R3 封口版本 | 同一流程 | R4 封口 |
 | R5 | 试用 R4 封口版本 | 不新增需求、不交付 | 最终用户轮封口 |
 
-合法轮次可以没有准入票，sealed SHA 因而不变；不能看到轮次增加就推断代码有改进。已准入票被阻塞或 automation 失败时闭环停止，下一轮不能悄悄使用未封口版本。
+合法轮次可以没有准入票，sealed SHA 因而不变；不能看到轮次增加就推断代码有改进。已准入票被阻塞或 automation 失败时闭环停止，下一轮只会在本轮交付完成并封存版本后开始。
 
 应联合查看 session、需求/Owner 轨迹、交付记录和 recovery 封口。模型声称完成不能单独证明文件修改或 PR 合并。controller 记录每轮实际使用和最终封口的 Harness SHA。
 
@@ -96,7 +98,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 uv run --locked --extra experiments python backend/scripts/experiment.py logs "$RUN_ID" --follow
 ```
 
-确认停止并保留 checkpoint。本地 stop 停止 Gitea/egress、清理执行容器，但保留仓库数据卷；Gitea 停止时浏览器地址不可用。本地 resume 恢复相同的宿主端口和仓库。resume 使用相同 run ID、Gitea 仓库、冻结输入和资源身份，核对在途交付。未封口的用户 session 可能需要重跑，恢复不能凭空制造已完成结果。重复 resume 不应产生第二个 controller，也不应重复交付已核对完的票。本次已完成的云端验证没有用户 Issue 或交付票，因此验证的是生命周期与收集，不代表实际交付去重已经实测。
+确认停止并保留 checkpoint。本地 stop 停止 Gitea/egress、清理执行容器，但保留仓库数据卷；Gitea 停止时浏览器地址不可用。本地 resume 恢复相同的宿主端口和仓库。resume 使用相同 run ID、Gitea 仓库、冻结输入和资源身份，核对在途交付。未完成封存的用户会话可能需要重新运行。重复 resume 不应产生第二个 controller，也不应重复交付已核对完的票。
 
 E2B stop 进程后沙箱仍被分配。到期或被删除时为 `LOST`，不能重新创建后继续沿用原身份声称恢复。保持主机在线：本地 detached monitor 周期收集远程数据，不是永久云存储。
 
@@ -143,9 +145,9 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 
 原端口释放后重试 resume，不通过编辑 manifest.json、resources.json 或冻结证据 profile 为同一 run 换端口。
 
-没有固定完成时间保证，模型延迟、重试、用户交互、交付步骤均会变化。实际耗时与费用看时间记录和 provider 账单。本教程描述完整操作流程，验证报告逐项说明已实际执行的路径与轮次。
+没有固定完成时间保证，模型延迟、重试、用户交互、交付步骤均会变化。实际耗时与费用看时间记录和 provider 账单。每次运行的实际进度与结果应以该 run 的记录为准。
 
-pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest 和 pytest-mock，供用户侧检查。未修改任务基线在全新环境中验证：155 个 ModelChain 测试全部通过，其中 35 个使用 `mocker` fixture。这是任务环境验证，不是官方 SWE-bench 评分。
+pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest 和 pytest-mock，供用户侧检查。任务环境检查与官方 SWE-bench 评分分别进行，评分流程见[事后评分教程](post-run-grading.zh-CN.md)。
 
 历史实验及对应源码版本见[研究索引](../../research/README.zh-CN.md)。独立诊断或证据回放见[开发维护工具](../../tools/dev/README.md)，这些工具的输出不算本实验的新一轮试用。
 

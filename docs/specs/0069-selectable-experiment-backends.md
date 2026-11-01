@@ -136,7 +136,6 @@ tasks:
       - docs/CONFIGURATION.zh-CN.md
       - docs/tutorials/u1-experiment.md
       - docs/tutorials/u1-experiment.zh-CN.md
-      - docs/validation/spec-0069-new-user.md
       - backend/scripts/e2e-spec-0069-experiment-entry.sh
       - backend/tests/test_experiment_public_examples.py
       - .github/workflows/experiment-contract.yml

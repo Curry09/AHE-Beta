@@ -54,7 +54,6 @@ tasks:
       - docs/CONFIGURATION.zh-CN.md
       - README.md
       - README.zh-CN.md
-      - docs/audits/unified-entry-capability-migration-20261003.md
       - CLAUDE.md
     scope: 说明启用、可信代码及本地范围，更新能力审计
     acceptance: 中英命令一致，明确工程CI与事后评分不同，验收事实不夸大
@@ -75,7 +74,6 @@ tasks:
       - backend/auto_designer/user/sim/runtime.py
       - backend/tests/user/sim/test_process_cleanup.py
       - backend/scripts/e2e-spec-0077-local-engineering-ci.sh
-      - docs/validation/local-engineering-ci.md
       - .github/workflows/experiment-contract.yml
     scope: 当前提交状态与CI收据采集，离线回归和真实Docker PR红绿及生命周期验收
     acceptance: 新head不会沿用旧绿灯；注册秘密不进入归档；真实PR红绿、恢复与清理有记录

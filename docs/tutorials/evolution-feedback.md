@@ -2,7 +2,7 @@
 
 English | [简体中文](evolution-feedback.zh-CN.md)
 
-This tutorial starts a small current-version experiment with independent assessment of every user round. The task asks the Harness to calculate a total and write `answer.json`. A private custom verifier checks the frozen file. This is a workflow example, not an official benchmark score or evidence that a multi-round evolution improved the Harness.
+This tutorial starts a small experiment with independent assessment after each user round. The Harness calculates a total and writes `answer.json`, which a private custom verifier checks after freezing. The example demonstrates the complete flow from public task inputs through private assessment to feedback processing.
 
 ## What changes in the loop
 
@@ -61,11 +61,11 @@ The repository's `examples/experiments/evolution-feedback-local.json` and `evolu
 
 Edit the four model selections in `experiment.json` to match your provider. Copy `examples/experiment.env.example` to `"$CASE_DIR/secrets.env"`, set mode 0600 and fill the role credentials. E2B also needs `E2B_API_KEY` and a Gitea.com token. See [configuration](../CONFIGURATION.md) for the protocols and explicit context limits. Keep private files outside `public/task/` and the task source.
 
-The generated task uses a 600-second operator quota for a short canary. A real task may instead declare `execution.budget_seconds: 7200` with `budget_source: task_metadata`. That total starts at first task dispatch and is not renewed by messages. It overrides the runtime fallback of 1800 seconds. Optional `runtime.harness.message_activity_seconds` can add a shorter per-message bound; it is absent by default. Termination grace is for cleanup only. Seed defaults remain 100 iterations and 32768 output tokens, so available time is not a guarantee of completing or running for that long.
+The generated task uses a 600-second operator quota for this small example. A real task may instead declare `execution.budget_seconds: 7200` with `budget_source: task_metadata`. That total starts at first task dispatch and is not renewed by messages. It overrides the runtime fallback of 1800 seconds. Optional `runtime.harness.message_activity_seconds` can add a shorter per-message bound; it is absent by default. Termination grace is for cleanup only. Seed defaults remain 100 iterations and 32768 output tokens, so available time is not a guarantee of completing or running for that long.
 
 ## 3. Check and prepare
 
-The current implementation is a review candidate. The paired OpenAgents reader is published at `57eac90a5702022c1ed2452b5b2b9918c235df39` and pinned in `release/compatibility.json`; preparation selects it by default. An explicit `source.openagents` override must provide the same capabilities, and an older transport-only revision is rejected. For release, review and merge the paired change, fill `reader_release_commit` and rerun the joint checks. Development-canary evidence is recorded separately from release approval.
+Preparation pins the OpenAgents execution-evidence reader through the [compatibility manifest](../../release/compatibility.json), preferring `execution_evidence.reader_release_commit` and otherwise using `reader_candidate_commit`. An explicit `source.openagents` must also identify an immutable revision supporting the same execution-evidence contract. Preflight checks the actual reader capabilities. See the [release guide](../RELEASING.md) for paired version updates.
 
 ```bash
 CONFIG="$CASE_DIR/experiment.json"
@@ -136,4 +136,4 @@ Use the normal [stop/resume/cleanup commands](../QUICKSTART.md#4-stop-resume-and
 
 The run retains contracts, full Actor artifacts and report receipts. Controller-side `assessment/` stores requests, accepted signed receipts and safe round feedback. The worker keeps private execution details under its local run's `evaluation/online/`; these files are excluded from collection and from Issue/demand evidence. Safe summaries contain outcome, identity and digest fields, not verifier assertions, hidden tests or stdout. The reviewer observation and independent result can disagree without one overwriting the other.
 
-The online contract supports assessments reproducible from retained workspace artifacts. It rejects profiles requiring a still-live original task environment or trusted managed-service measurements. Keep unsupported results explicit rather than guessing a new environment. [Post-run grading](post-run-grading.md) uses the same assessment service after collection and remains independent; held-out Harness benchmark runs under `evaluation/` also remain separate. See the [validation record](../validation/evolution-feedback-contracts.md) for what has actually been exercised.
+The online contract supports assessments reproducible from retained workspace artifacts. It rejects profiles requiring a still-live original task environment or trusted managed-service measurements. Keep unsupported results explicit rather than guessing a new environment. [Post-run grading](post-run-grading.md) uses the same assessment service after collection and remains independent; held-out Harness benchmark runs under `evaluation/` also remain separate. See the [verification guide](../VERIFICATION.md) for checks you can run on this checkout.

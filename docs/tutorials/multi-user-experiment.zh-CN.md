@@ -2,9 +2,9 @@
 
 [English](multi-user-experiment.md) | 简体中文
 
-本教程使用受维护的 U4 local/E2B 示例：每轮四位不同 persona、两个任务、共两轮，最多同时运行两个用户会话。每个会话在独立可写工作区试用本轮同一 Harness SHA。实验进化的是一份共享 Harness，而不是两个任务仓库。
+本教程使用受维护的 U4 local/E2B 示例：每轮四位不同 persona、两个任务、共两轮，最多同时运行两个用户会话。每个会话在独立可写工作区试用本轮同一 Harness SHA。所有会话围绕同一份 Harness 进行迭代。
 
-[Spec0073 验证报告](../validation/spec0073-multi-task-users.md)区分离线集成与真实 provider/模型运行。之前 U1 运行仍是历史基线，不能据此宣称本次 U4 已在 Docker 或 E2B 实跑。
+当前 checkout 的检查命令见[验证方法](../VERIFICATION.zh-CN.md)。真实 provider/模型结果应查看本次 U4 运行产物。
 
 ## 1. 安装并选择后端
 
@@ -26,7 +26,7 @@ CONFIG=examples/experiments/u4-local.json
 
 `workload.task_packages` 列出 `examples/tasks/pvlib-1478/task.json` 和 `examples/tasks/order-service/task.json`。每个包有自己的 kind、ID、指令、固定源码、setup 和带 hash 的依赖锁。pvlib 使用固定 Git 源码；order-service 是 MIT 的小示例项目，含可见测试和已有的商品数量计费问题。普通任务声明 `not_in_benchmark: true`。两者默认使用逐步交互的 `simulated_user`；如要直接发一次任务给 Harness、完成后再由 persona 评阅，可在 prepare 前把对应任务包设为 `interaction: "direct"`。
 
-persona 来自 `examples/personas/library.json` 的真实卡片。显式计划让同轮两个 persona 试同一任务，下一轮交换任务：
+模拟用户画像来自 `examples/personas/library.json`，根据公开资料构建。显式计划让同轮两个 persona 试同一任务，下一轮交换任务：
 
 | Persona | R1 | R2 |
 | --- | --- | --- |
@@ -72,9 +72,9 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 uv run --locked --extra experiments python backend/scripts/experiment.py status "$RUN_ID"
 ```
 
-stop 保留冻结身份和 checkpoint。完整且归属匹配的 SessionStore 结果会核对后跳过，不重新运行用户或创建重复 Issue；中断且未完成的 session 使用干净 attempt。resume 校验原资源和逻辑任务/persona 绑定，不修改已终结结果、不增加轮次、不导入历史 archive，也不升级冻结代码。到期或已删除的 E2B 沙箱是 LOST，不会自动换一台冒充原 run。
+stop 保留冻结身份和 checkpoint。完整且归属匹配的 SessionStore 结果会核对后跳过，不重新运行用户或创建重复 Issue；中断且未完成的 session 使用干净 attempt。resume 校验原资源和逻辑任务/persona 绑定，不修改已终结结果、不增加轮次、不导入历史 archive，也不升级冻结代码。到期或已删除的 E2B 沙箱是 LOST，需要保留原资源才能恢复。
 
-本地 session 使用独立容器。E2B 复制任务纯源码，在各 session 的最终目录重新 setup，建立独立 repo/venv/editable 元数据。下载和 wheel 可缓存，可写的已安装环境不共享。E2B 保留一个 Unix 用户，不提供等同 Docker 的恶意跨目录访问防护。
+本教程的两个任务包使用源码配方：本地会话运行在独立容器中，E2B 在各会话目录复制源码并重新创建虚拟环境。下载和 wheel 缓存可共享，可写的源码和环境保持独立。其他实验若使用 v3 容器任务，则会通过沙箱内 Docker 创建任务容器，见[任务环境说明](../CONFIGURATION.zh-CN.md#后端边界和生命周期)。
 
 ## 6. 收集、观察和清理
 
@@ -96,4 +96,4 @@ uv run --locked --extra experiments python backend/scripts/experiment.py destroy
 
 示例运行八个用户 session 及对应 Harness 请求，另有一轮需求和交付；角色/模型调用量取决于实际 Issue。并发上限限制活跃 session，不限制总调用量或费用，两个任务的依赖构建成本也不同。COMPLETED 需要配置的两轮全部封口和 controller 完成，收集成功不等于实验成功。
 
-用 `bash backend/scripts/e2e-spec-0073-multi-task-users.sh` 执行离线集成验收。它运行真正的材料编译、会话 runner、SessionStore、RecoveryStore 和需求 driver，在 provider/模型边界使用脚本替身；不能据此验证真实 Docker/E2B/Gitea 或模型表现。实际检查、环境阻碍及未验证的实跑覆盖见前述报告。
+用 `bash backend/scripts/e2e-spec-0073-multi-task-users.sh` 执行离线集成验收。它运行真正的材料编译、会话 runner、SessionStore、RecoveryStore 和需求 driver，在 provider/模型边界使用脚本替身；不能据此验证真实 Docker/E2B/Gitea 或模型表现。本次运行的后端与模型结果应从其实际运行记录核对，开发检查命令见[验证说明](../VERIFICATION.zh-CN.md)。

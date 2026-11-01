@@ -4,7 +4,7 @@ English | [简体中文](multi-user-experiment.zh-CN.md)
 
 This tutorial uses the maintained U4 local/E2B examples: four distinct personas per round, two tasks, two rounds and at most two active user sessions. Every session uses the same round's Harness SHA in its own writable task workspace. The experiment evolves one shared Harness, rather than either task repository.
 
-The [Spec0073 validation report](../validation/spec0073-multi-task-users.md) distinguishes offline integration from actual provider/model runs. The earlier U1 runs remain historical baselines; they do not prove this U4 release ran in Docker or E2B.
+Run the checks in the [verification guide](../VERIFICATION.md) against this checkout. For live provider/model results, inspect the artifacts of the U4 run you start.
 
 ## 1. Install and choose a backend
 
@@ -26,7 +26,7 @@ Fill `.env.experiment` using [the credential guide](../CONFIGURATION.md): User, 
 
 `workload.task_packages` lists `examples/tasks/pvlib-1478/task.json` and `examples/tasks/order-service/task.json`. Each package has its own kind, ID, instruction, fixed source, setup and hashed lock. pvlib is fixed Git source; order-service is a small MIT demonstration project with visible tests and an existing quantities bug. The ordinary package declares `not_in_benchmark: true`. Both default to stepwise `simulated_user`; change a task package to `interaction: "direct"` before prepare for one Harness task request followed by a persona review.
 
-The personas are real cards from `examples/personas/library.json`. The explicit plan intentionally lets two personas try the same task in a round, then swaps tasks:
+Simulated personas are derived from public material in `examples/personas/library.json`. The explicit plan intentionally lets two personas try the same task in a round, then swaps tasks:
 
 | Persona | R1 | R2 |
 | --- | --- | --- |
@@ -74,7 +74,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py status 
 
 Stop retains the frozen identity and checkpoint. Complete, correctly bound SessionStore results reconcile without replaying their user session or creating duplicate issues; interrupted uncompleted sessions start a clean attempt. Resume validates the original resources and logical task/persona binding. It does not mutate already finalized results, add a round, import historical archives or upgrade frozen code. An E2B sandbox that has expired or been deleted is LOST and cannot be silently replaced.
 
-Local sessions have separate containers. E2B copies pure task source and reruns setup in each final session directory to create independent repo/venv/editable metadata. Downloads and wheels may be cached; writable installed environments are not shared. E2B retains one Unix user and does not provide Docker-equivalent protection from malicious cross-directory access.
+The two task packages in this tutorial use source recipes. Local sessions have separate containers; E2B copies sources and creates a new virtual environment in each session directory. Downloads and wheels may be cached while writable sources and environments remain separate. Experiments using v3 container tasks instead create task containers through the sandbox’s Docker daemon; see [backend boundaries](../CONFIGURATION.md#backend-boundaries-and-lifecycle).
 
 ## 6. Collect, view and clean up
 
@@ -96,4 +96,4 @@ Collect at the terminal state before destruction. Destruction releases this run'
 
 This example runs eight user sessions plus their Harness requests, and one requirements/delivery round; role/model calls depend on the produced issues. Concurrency limits active sessions, not the total calls or cost. Two tasks can have different dependency-build costs. Completion requires both configured rounds to be sealed and controller completion; successful collection alone is not experiment success.
 
-Run the offline integration check with `bash backend/scripts/e2e-spec-0073-multi-task-users.sh`. It uses real compilation, session runners, SessionStore, RecoveryStore and demand drivers, with scripted provider/model boundaries. It does not validate real Docker/E2B/Gitea or model behavior. See the linked report for actual checks, known environment blockers and any unverified live coverage.
+Run the offline integration check with `bash backend/scripts/e2e-spec-0073-multi-task-users.sh`. It uses real compilation, session runners, SessionStore, RecoveryStore and demand drivers, with scripted provider/model boundaries. It does not validate real Docker/E2B/Gitea or model behavior. Inspect the run’s records for actual backend and model results; current development checks are listed in [Verification](../VERIFICATION.md).

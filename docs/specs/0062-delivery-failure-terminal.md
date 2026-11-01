@@ -15,7 +15,6 @@ tasks:
       - backend/auto_designer/loop/round_gate.py
       - backend/tests/loop/test_round_gate.py
       - backend/tests/loop/test_orchestrator.py
-      - docs/audits/0062-two-user-closure-and-framework-fixes.md
     scope: 代码修改完毕。automation-failed 与 needs-human 均优先于 closed，异常保留准确失败原因和票号。
     acceptance: 两类失败均即时停轮，闭票失败不算成功，不开下一轮；正常交付和超时路径不变。
 ---
@@ -27,7 +26,7 @@ tasks:
 代码修改完毕。修复框架本轮交付闸仅识别旧 needs-human 标签的问题。
 2026-09-09 全量测试 856 passed；针对性终态闸与编排回归 38 passed。
 测试入口：`.venv/bin/python -m pytest backend/tests/loop/test_round_gate.py backend/tests/loop/test_orchestrator.py -q`。
-原实验结果与验证边界见 `docs/audits/0062-two-user-closure-and-framework-fixes.md`。
+原实验结果可从 Git 历史查看；当前可复现检查见 `docs/VERIFICATION.zh-CN.md`。
 
 ## Motivation
 

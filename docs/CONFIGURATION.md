@@ -2,7 +2,7 @@
 
 English | [简体中文](CONFIGURATION.zh-CN.md)
 
-New experiments use JSON with `schema_version: 2` and the unified entry described in [Quickstart](QUICKSTART.md). Copy either [local](../examples/experiments/u1-local.json) or [E2B](../examples/experiments/u1-e2b.json) example. Unknown fields are rejected; old evaluation schemas and v1 lifecycle commands are rejected before provider operations.
+Experiment definitions use JSON with `schema_version: 2` and run through `backend/scripts/experiment.py`. Start from the [local](../examples/experiments/u1-local.json) or [E2B](../examples/experiments/u1-e2b.json) example and follow [Quickstart](QUICKSTART.md). Unknown fields are rejected. Independent Harness evaluation uses a separate `evaluation.yaml` configuration.
 
 ## Files you supply
 
@@ -16,11 +16,11 @@ New experiments use JSON with `schema_version: 2` and the unified entry describe
 | Personas | JSON array following the repository persona schema | `examples/personas/u1.json` |
 | Credentials | Explicit environment variables or a mode-0600 env file | `examples/experiment.env.example` |
 
-The U1 example uses `examples/personas/u1.json`. U4 uses four real cards from the maintained `examples/personas/library.json`. Select unique IDs present in the library. A persona card may be reused across multiple independent sessions in the same round.
+The U1 example uses `examples/personas/u1.json`. U4 selects four simulated profiles derived from public developer material in `examples/personas/library.json`. Select unique IDs present in the library. A persona card may be reused across multiple independent sessions in the same round.
 
 Paths in the experiment are relative to that JSON; task paths are relative to the task package. `check --offline` shows an unfrozen allocation preview without fetching Git. `prepare` freezes each task's package, instruction, setup, dependency lock and verified source archive, then creates `materials/task-catalog.json`, `materials/session-plan.json`, the persona roster, Harness archive and hash manifest. You do not need to handcraft these.
 
-Container task packages freeze their declared input hashes, image digests, environment recipe and artifact contract instead of requiring a synthetic Python setup/venv. Remote inputs not already cached remain pending during offline checks; preparation must verify their actual bytes before publishing a prepared run.
+Container task packages freeze their declared input hashes, image digests, environment recipe and artifact contract without requiring an additional Python setup script or virtual environment. Remote inputs not already cached remain pending during offline checks; preparation must verify their actual bytes before publishing a prepared run.
 
 ## Experiment fields
 
@@ -38,13 +38,13 @@ Container task packages freeze their declared input hashes, image digests, envir
 | `continuation` | Optional current parent `archive` path and expected `sha256`; requires both parent input selectors |
 | `roles` | Triage/Synthesizer/divergent/developer counts; `owner_mode: mechanical` / `llm` |
 | `models` | User, Harness, shared demand and Claude Code delivery settings |
-| `evaluation.official_grading` | `false` for a run without per-round grading |
+| `evaluation.official_grading` | Must be `false`; configure per-round assessment through `session_grading` |
 | `evaluation.session_grading` | Optional external per-round assessment; frozen plan/key digests and `runner: external` |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
 Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The U1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round runs users and any configured independent assessment, with no requirements or delivery stage.
 
-`builtin` freezes this checkout's `backend/harness_template/`. It is not the historical `cade14d` Harness. To reproduce that baseline, supply its actual archive and checksum explicitly.
+`builtin` freezes `backend/harness_template/` from the current checkout. To use a specific Harness version, select `archive` and provide its path and SHA-256.
 
 ### Six-round study configurations
 
@@ -104,7 +104,7 @@ All three selectors are required together. `continuation` accepts only `archive`
 
 Every added round inherits the parent's final task/persona/interaction pairs, including `direct` sessions. `sessions_per_round` equals that boundary's size; `max_parallel_users` may be smaller. Workload overrides are forbidden. Pending reports require Triage and Synthesizer counts of at least one. Models, runtime, roles, policies and credentials are explicit child choices; optional CI uses the child's normal local-only contract.
 
-The child first runs an independent feedback initialization and waits for delivery, even when count is one. `count` then counts new users; the final new round remains users-only. Parent logical R5 plus count two gives child local R1/R2 at logical R6/R7; another one-round child starts logical R8. Stop/resume targets the new run. Parent evidence and ratings stay outside new-user metrics; grade and batch use local round numbers. The [separate validation record](validation/experiment-continuation.md) distinguishes contract checks from actual backend execution.
+The child first runs an independent feedback initialization and waits for delivery, even when count is one. `count` then counts new users; the final new round remains users-only. Parent logical R5 plus count two gives child local R1/R2 at logical R6/R7; another one-round child starts logical R8. Stop/resume targets the new run. Parent evidence and ratings stay outside new-user metrics; grade and batch use local round numbers. See the [verification guide](VERIFICATION.md) for current checks.
 
 ## Models and credentials
 
@@ -144,7 +144,7 @@ The current User client, builtin Harness seed and demand definitions actually re
 
 ## Per-round objective assessment
 
-Preparation uses the immutable execution-evidence reader candidate recorded in `release/compatibility.json` (`57eac90a5702022c1ed2452b5b2b9918c235df39`). You can override `source.openagents` with another compatible immutable revision. The candidate is published for review; `reader_release_commit` remains unset until the paired change is reviewed and merged. An old transport-only revision is insufficient.
+Preparation selects a pinned OpenAgents revision from `execution_evidence` in the [compatibility manifest](../release/compatibility.json): `reader_release_commit` takes priority, followed by `reader_candidate_commit`. An explicit `source.openagents` may select another immutable revision; preflight verifies its execution-evidence capabilities. See the [release guide](RELEASING.md) for paired version updates and validation.
 
 By default `evaluation: {"official_grading": false}` records `not_configured`, not a pass or zero. To opt in, use `evaluation.session_grading`:
 
@@ -156,7 +156,7 @@ By default `evaluation: {"official_grading": false}` records `not_configured`, n
 
 The [assessment tutorial](tutorials/evolution-feedback.md) generates a complete example with real digests. Both `check` and `prepare` require `--grading-plan` and `--grading-worker-public-key`. The plan covers every selected task and pins adapters, materials, images and timeouts. Registration binds the grading implementation too; changing it requires a new prepared run.
 
-After `run`, start `assessment-worker RUN_ID --plan PATH --signing-key PATH --follow` on a trusted Docker host with the same prepared run state, checkout and provider access. Local and E2B both require this worker. Task sandboxes receive no Docker socket or private grader. Without a ready worker the controller reports `objective_grading / PENDING / worker_not_ready`; starting it lets the run proceed. Recovery retains accepted results without rerunning the Actor or reviewer.
+After `run`, start `assessment-worker RUN_ID --plan PATH --signing-key PATH --follow` on a trusted Docker host with the same prepared run state, checkout and provider access. Local and E2B both require this worker. Task sandboxes receive neither the grading host’s Docker socket nor the private grader. Without a ready worker the controller reports `objective_grading / PENDING / worker_not_ready`; starting it lets the run proceed. Recovery retains accepted results without rerunning the Actor or reviewer.
 
 Each round, including the final user-only round, seals Actor outputs before assessment and consumes authenticated safe summaries before requirements processing. Only `completed / passed=false` is a valid task failure; ungradable/unavailable/crashed/timed-out assessments retain `passed=null`. Experience is separately a strict integer 1–4 or a missing state. Task success and missing ratings neither invent a score nor require an Issue. Attribution and improvement suggestions remain separate axes.
 
@@ -166,7 +166,7 @@ Private plans, tests, answers and keys stay at operator-provided paths on the tr
 
 Task-package versions are independent of the experiment's schema 2. The evolution32 collection uses schema 3 with `environment.kind: container`. Its fixed image digest and workdir, SHA-256-bound inputs, initialization/readiness/finalization commands, finite task/companion services and declared capabilities form the environment recipe. See the [task catalog](../examples/tasks/evolution32/README.md) for complete definitions rather than copying an old launcher.
 
-Services are fixture processes, not model Agents. Inputs may belong to the task container or an explicitly declared companion; management-only service outputs are not exposed as Actor inputs. Files and public service handles use the common `artifacts` contract. Non-Git tasks declare patch capture not applicable; SWE tasks retain real repository/revision metadata. Environment or capture failures are infrastructure failures, not fabricated negative user feedback. The environment driver does not perform official scoring.
+Services are fixture processes, not model Agents. Inputs may belong to the task container or an explicitly declared companion; management-only service outputs are not exposed as Actor inputs. Files and public service handles use the common `artifacts` contract. Non-Git tasks declare patch capture not applicable; SWE tasks retain real repository/revision metadata. Environment and capture failures are recorded separately as infrastructure failures. The environment driver does not perform official scoring.
 
 The public example contains:
 
@@ -207,11 +207,11 @@ The single-run background monitor runs on the management machine and collects pe
 
 Use global `--runs-dir /absolute/path/runs` before the command to select another run root. Always use the same root for subsequent management. Editing the original JSON or source checkout after preparation does not change an existing run. For a changed experiment, prepare a new run.
 
-Use `examples/experiment.env.example` as the experiment credential template. Historical profiles and launchers are indexed in [research](../research/README.md) and require their original checkout; they do not supply current v2 configuration. Developer diagnostics have separate, explicit inputs documented in [tools/dev](../tools/dev/README.md). Existing prepared v2 runs retain their frozen source and input hashes when managed after this cleanup; `resume` does not upgrade their controller.
+Use `examples/experiment.env.example` as the experiment credential template. Historical profiles and launchers are indexed in [research](../research/README.md) and require their original checkout; they do not supply current v2 configuration. Developer diagnostics have separate, explicit inputs documented in [tools/dev](../tools/dev/README.md). Prepared runs retain their frozen source and input hashes; `resume` does not upgrade their controller.
 
 The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest for user-side checks.
 
-## Runtime policies and migrated capabilities
+## Runtime policies
 
 Optional `policies` control execution. `prepare` fills defaults and freezes them into the manifest. Put these settings in JSON; neither an env credential file nor identically named host variables override them.
 
@@ -259,9 +259,9 @@ Set task-package `interaction: "direct"` for Harness-driven execution; the defau
 
 The plan validates every round's session count and selected persona/task IDs. The selected persona_ids and library IDs remain unique. The ordered session list may repeat personas, tasks, or complete pairs; round/slot gives each its own session ID, client, writable workspace and recovery unit. Reused cards are not independent human samples. If omitted, global slot k=(round_no-1)*sessions_per_round+slot selects persona_ids[k % P] and task_packages[k % T] in their configured order. This simple rotation does not guarantee all persona × task combinations; use an explicit plan for AABB, fixed groups or cross-task coverage. Ordinary `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds and continuation initialization require delivery readiness.
 
-`experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp, rather than claiming live cloud activity. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
+`experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-These settings, interactions and dashboard binding are migrated. Optional local engineering CI is described below; current archive continuation is described in the [append-round tutorial](tutorials/experiment-continuation.md). Seed libraries and text instructions now convert to ordinary packages as described below. Independent post-run grading remains available. Optional per-round grading uses the external-worker contract above. Multi-task/U4/U8 plans now use the frozen workload contract described above. Older v2 runs retain frozen sources; resume does not upgrade them. The [validation report](validation/spec0072-capability-migration.md) separates offline regressions from actual cloud coverage.
+Runtime policies, interaction plans and dashboard settings are frozen with each experiment. Prepare a new run after changing them; recovery retains the original configuration. Task import, archive continuation and grading are described below and in their respective tutorials.
 
 ## Local engineering CI
 
@@ -279,7 +279,7 @@ Each run also uses a private Docker daemon and job storage, with the internal `d
 
 `status RUN_ID` reports CI separately. Collection preserves readiness and current main/PR commit statuses; a green status from an older head is not evidence for a newer commit. `stop` pauses the owned runner, handles its owned jobs and stops the private daemon while preserving its storage and registration for recovery. `resume` verifies the same daemon, images, storage and registration, then rechecks readiness without registering a replacement. `destroy` removes owned execution resources and CI job storage, retaining the named Gitea and private runner registration volumes; receipts list retained volumes. Runner registration credentials stay in the private volume, outside ordinary collected artifacts.
 
-CI performs engineering checks on trusted Harness code without model calls or benchmark execution. Official SWE task `grade` and held-out Harness evaluation remain separate post-run workflows. See the [local CI tutorial](tutorials/local-engineering-ci.md) and [validation report](validation/local-engineering-ci.md) for commands and the recorded verification scope.
+CI performs engineering checks on trusted Harness code without model calls or benchmark execution. Official SWE task `grade` and held-out Harness evaluation remain separate post-run workflows. See the [local CI tutorial](tutorials/local-engineering-ci.md) and [verification guide](VERIFICATION.md) for setup and current checks.
 
 ## Seed libraries and text instructions
 
@@ -296,9 +296,9 @@ Cards without repositories and text instructions use a local scratch source dire
 
 ## Multiple task packages
 
-Use `workload.task_packages` for new multi-task definitions. It is mutually exclusive with `kind` and `task_package`; do not add a global kind to this branch. Each package uses a supported v1/v2 task schema and has a globally unique, safe ID, including ordinary `order-service` and SWE IDs such as `pvlib__pvlib-python-1478`. The existing single-package form is converted once during new preparation. Already frozen runs keep their original config, hash and archived controller. Unknown workload contract versions are refused.
+Use `workload.task_packages` for new multi-task definitions. It is mutually exclusive with `kind` and `task_package`; do not add a global kind to this branch. Each package uses a supported v1/v2 source-task or v3 container-task schema and has a globally unique, safe ID, including ordinary `order-service` and SWE IDs such as `pvlib__pvlib-python-1478`. The existing single-package form is converted once during new preparation. Already frozen runs keep their original config, hash and archived controller. Unknown workload contract versions are refused.
 
-`runtime.local.seed_image` remains a single-task override and is rejected when more than one task package is selected. Automatic per-task image building handles mixed tasks. Local sessions use independent containers; E2B copies each task's pure baseline source and recreates its venv at the final session directory. Download/wheel caches may be shared, writable repos and installed environments are not. E2B's single Unix user does not provide malicious cross-directory isolation equivalent to Docker.
+`runtime.local.seed_image` is a single-task override; multi-task configurations use per-task environment preparation. Source tasks use separate session containers locally, or copied baseline sources and newly created per-session virtual environments on E2B. V3 container tasks use the Docker environment driver on either backend to create separate task containers and services. Download caches may be shared; writable sources and installed environments remain separate. E2B source-directory mode shares a Unix user and has different access boundaries from container mode.
 
 See [the complete U4 tutorial](tutorials/multi-user-experiment.md) for a two-task explicit plan, cost expectations and evidence paths.
 
@@ -337,4 +337,4 @@ The parallel limit is not an account-wide limit or allocated-resource cap. Stopp
 
 Grading inputs are separate from experiment JSON. `grade RUN_ID` requires `--plan PATH`; the private plan selects task IDs, adapters and hashed materials. SWE declares its local official JSON/JSONL/parquet dataset in that plan. `--round` selects a positive sealed round and defaults to `config.rounds.count`. Each grader declares its required `timeout_seconds` in the plan. `--offline` validates bindings without Docker or result writes. Use global `--runs-dir` for a custom root or batch child root, and `--json` for machine-readable output. The command does not read a secrets file.
 
-Install `uv sync --locked --extra experiments --extra dev --extra evaluation`. Both local and E2B runs are scored on the operator’s Docker host from a verified terminal COMPLETE archive, using complete prediction receipts from new controllers. Results go into independent `evaluation/<attempt_id>/` directories; original experiment artifacts remain unchanged. Gold patches and hidden tests are external grading inputs, never frozen evolution materials. Old hash-only sessions are not reconstructible. See the [post-run grading tutorial](tutorials/post-run-grading.md) and [validation report](validation/post-run-grading.md). These user-task scores are separate from held-out Harness generalization tests and do not become feedback or CI gates.
+Install `uv sync --locked --extra experiments --extra dev --extra evaluation`. Both local and E2B runs are scored on the operator’s Docker host from a verified terminal COMPLETE archive, using complete prediction receipts from new controllers. Results go into independent `evaluation/<attempt_id>/` directories; original experiment artifacts remain unchanged. Gold patches and hidden tests are external grading inputs, never frozen evolution materials. Old hash-only sessions are not reconstructible. See the [post-run grading tutorial](tutorials/post-run-grading.md) and [verification guide](VERIFICATION.md). These user-task scores are separate from held-out Harness generalization tests and do not become feedback or CI gates.

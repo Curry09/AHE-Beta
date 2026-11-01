@@ -69,7 +69,6 @@ tasks:
       - docs/CONFIGURATION.zh-CN.md
       - docs/tutorials/multi-user-experiment.md
       - docs/tutorials/multi-user-experiment.zh-CN.md
-      - docs/validation/reusable-persona-sessions.md
       - backend/scripts/e2e-spec-0080-reusable-persona-sessions.sh
     scope: 更新画像选择与执行列表语义，并记录恢复/观测/归因验收及 direct 评阅范围。
     acceptance: 中英文不再要求同轮画像唯一；live/report/L1 保留独立 session，脚本核验重复画像并发/恢复/继承，不能把复用画像当独立真人样本。

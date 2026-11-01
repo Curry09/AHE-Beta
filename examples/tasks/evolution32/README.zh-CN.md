@@ -21,7 +21,7 @@
 
 32 项任务镜像统一使用 `ghcr.io/mmjzmy/auto-designer-tasks:<任务 key 小写>-v<version>`，例如 `m04-v1`、`o03-v1`、`kv-live-surgery-v1`。实际任务定义锁定镜像 digest；源码、依赖版本与构建配方记录在清单中。
 
-32 项任务镜像和 4 项配套服务镜像均已公开，逐项通过干净 E2B 环境中的匿名下载、镜像身份校验和工具启动。32 项最终任务配方还通过了真实本地 Docker 初始化、就绪、收尾及收集检查，检查时未启动 Actor。[清单](manifest.json)记录材料身份与验证凭据；[验收记录](../../../docs/validation/e2b-task-environments.md)分别记录这些检查、M04 模型试用和完整多轮实验。
+32 项任务镜像和 4 项配套服务镜像均已公开，逐项通过干净 E2B 环境中的匿名下载、镜像身份校验和工具启动。32 项最终任务配方还通过了真实本地 Docker 初始化、就绪、收尾及收集检查，检查时未启动 Actor。[清单](manifest.json)记录材料身份与验证凭据；[验证方法](../../../docs/VERIFICATION.zh-CN.md)提供当前 checkout 可复现的检查命令。
 
 ## 材料边界
 

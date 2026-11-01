@@ -74,7 +74,6 @@ tasks:
   - backend/tests/test_experiment_engine.py
   - docs/CONFIGURATION.md
   - docs/CONFIGURATION.zh-CN.md
-  - docs/validation/feedback-runtime-integrity.md
   scope: 缺提交正常返回补一次八迭代调用，文档与独立验证。
   acceptance: 最多两次；无提交仍失败；本地实进程与独立 E2B 验证；旧实验不改写。
 ---

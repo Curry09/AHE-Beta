@@ -71,7 +71,6 @@ tasks:
       - backend/harness_template/META_SPEC.md
       - backend/deploy/vigil/observability-overlay.Dockerfile
       - backend/deploy/vigil/observation-runtime.json
-      - docs/audits/0061-observation-goal-boundaries.json
       - OpenAgents/openagents/runtime/engine.py
       - OpenAgents/openagents/runtime/context.py
       - OpenAgents/openagents/recipes/stages.py
@@ -131,7 +130,6 @@ tasks:
       - backend/tests/observations/fixtures/alternate_v1.py
       - backend/tests/observations/fixtures/alternate_v2.py
       - tools/dev/replay/replay_observation_lifecycle.py
-      - docs/audits/0061-observation-lifecycle-validation.md
     scope: 先合成双轮测试，再真实交付一项观测补强并在新版本会话复查；用非 NexAU 起点验证平台不解析内部事件。
     acceptance: v1 缺口到 proposal、Owner、交付、v2 实际观测形成闭环；旧包保留；泄漏、乱序、缺包、预算与恶意输入有负例；不使用 benchmark 作开发信号。
 ---
@@ -151,14 +149,14 @@ tracer 生成观测文件与说明，换其他 harness 起点时替换制品侧�
 验证改动”。本组观测补强专指后者；前者属于 0035 的用户侧状态反馈和普通产品需求。
 不要求每个改动新增日志，不规定统一内部事件字典，不新增常驻日志评审角色。
 
-实施和验证状态见任务表及 `docs/audits/0061-observation-lifecycle-validation.md`。
+实施状态见任务表；当前可复现检查见 `docs/VERIFICATION.zh-CN.md`。
 工程闭环验证与真实模型是否主动、有效使用观测是两种证据，不能相互冒充。
 
 本次目标边界澄清已同步角色提示、诊断工具字段说明、提案标题和开发上下文；现有观测、
 角色交接与模板入口回归 70 项通过，OpenAgents 观测回归 15 项通过。它们验证接线、
 兼容性和既有行为，不证明真实模型已经稳定区分两类需求；此前受控闭环也不替代此项验证。
-新版交付镜像在无网络、无宿主挂载容器中核实安装源码摘要及八类角色上下文，记录见
-`docs/audits/0061-observation-goal-boundaries.json`，版本见部署 pin；未替换运行中实验。
+新版交付镜像在无网络、无宿主挂载容器中核实安装源码摘要及八类角色上下文；
+历史验证记录可从 Git 历史查看，版本见部署 pin；未替换运行中实验。
 
 ## Motivation
 

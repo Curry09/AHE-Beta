@@ -1,103 +1,132 @@
 # auto-designer
 
-English | [简体中文](README.zh-CN.md)
+**Evolve coding-agent harnesses through simulated use and structured feedback.**
 
-A research framework for evolving coding-agent harnesses through simulated user feedback.
-Python 3.12+ · Linux / WSL2 · MIT. Choose local Docker or E2B in the Quickstart.
+[English](README.md) · [简体中文](README.zh-CN.md) · [Quickstart](docs/QUICKSTART.md) · [Evaluation](evaluation/docs/harbor.md) · [Contributing](CONTRIBUTING.md)
 
-auto-designer simulates users interacting with a harness, turns their usage traces into requirements, and delegates implementation to the separate [OpenAgents](https://github.com/Curry09/OpenAgents) project. After each delivery round is finalized, users try the updated harness. The final round evaluates the harness without another delivery. User impressions, technical acceptance results, and held-out benchmarks are recorded separately.
+Python 3.12+ · Linux / WSL2 · [MIT](LICENSE)
 
-This repository is the **experiment controller**; OpenAgents is the **delivery CLI**; `backend/harness_template/` contains the **initial source code of the product being evolved**. Harnesses produced by experiments should be released as separate, versioned artifacts.
+auto-designer evolves coding-agent harnesses by simulating how users try a product, give feedback, and developers improve it. Simulated users work on tasks with the Harness and report problems. Requirements agents turn that feedback into proposals, and [OpenAgents](https://github.com/Curry09/OpenAgents) implements the code changes. The updated Harness enters the next round of use, continuing the feedback and improvement cycle.
 
-| Goal | Configuration and entry point | Start here |
-| --- | --- | --- |
-| Evolve a Harness | `examples/experiments/*.json` → `backend/scripts/experiment.py` | [Evolution Quickstart](docs/QUICKSTART.md) |
-| Evaluate an existing Harness | `evaluation.yaml` → `python -m evaluation`; `user.enabled` selects simulated user participation | [Evaluation guide](evaluation/docs/harbor.md) |
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/harness-evolution-en-dark.svg">
+    <img src="assets/harness-evolution-en-light.svg" alt="An animated sequence highlights round 1, round 2 and the final round in turn. Moving signals highlight each node on arrival. Feedback and OpenAgents delivery update the Harness between rounds; the final trial is followed by independent held-out Harbor evaluation." width="100%">
+  </picture>
+</p>
 
-These paths use `.env.experiment` and `.env`, respectively. The [six-round study examples](docs/tutorials/evolution32.md) use the original task set through versioned container task packages: U8 mixed/direct select the first eight tasks, U16 the first sixteen and U32 all thirty-two. See the [task materials](examples/tasks/evolution32/README.md) for provenance and availability. Material/tool checks and complete model-driven experiments are separate validation claims.
+This repository orchestrates experiments, while OpenAgents implements code changes. Each experiment starts with the seed Harness in `backend/harness_template/`, evolves its source code, and saves the Harness version and execution records for each round.
 
-The **Synthesizer** combines related proposals into structural improvements; it does not implement code. Triage, Synthesizer, and PM share the `auto_designer.demand` package and `DEMAND_LLM_*` model configuration. Active file-access, repository-integrity, and Harness commit-boundary checks live in `auto_designer.guards`.
+## Offline demo
 
-Current code and development configuration use `synthesizer`, `N_SYNTHESIZERS`, and `SYNTHESIZER_GROUPING` directly. See [configuration](docs/CONFIGURATION.md) and [grouped synthesis](docs/synthesizer-grouping.md) (Chinese).
+The offline demo uses scripted simulated users and a scripted Harness to demonstrate an interaction and its feedback. It requires no model API or experiment infrastructure. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) before running:
 
-## Run an experiment
+```bash
+git clone https://github.com/Curry09/auto-designer.git
+cd auto-designer
+uv run --locked python backend/scripts/offline_demo.py
+```
 
-Choose local Docker + automatically provisioned localhost Gitea, or E2B + your own Gitea.com account. Both use `backend/scripts/experiment.py` and the same v2 experiment format. Use the U1 examples for one user on one task, or the U4 examples for four users on ordinary and SWE tasks. Each round may repeat a task with distinct personas; sessions have independent writable workspaces. Use a complete current archive to [append new rounds](docs/tutorials/experiment-continuation.md) in a new run, with delivery of its final feedback before new users start. The checked-in U1 examples run five rounds on a fixed pvlib task: R1–R4 include delivery, and R5 only tries the final Harness.
+The script finishes with:
 
-For the full task environments, choose one of these E2B configurations. All run six rounds from the current builtin seed, with user and Developer concurrency four; R1–R5 include delivery and R6 is trial-only. U8 mixed/direct keep the same conditions and persona bindings, changing only the six original simulated-user tasks to direct mode.
+```text
+Offline demo complete: scripted sessions only; no model, forge or delivery invoked.
+```
 
-| Configuration | Sessions per round | Simulated / direct |
-| --- | --- | --- |
-| `examples/experiments/u8-mixed-e2b.json` | 8 | 6 / 2 |
-| `examples/experiments/u8-direct-e2b.json` | 8 | 0 / 8 |
-| `examples/experiments/u16-mixed-e2b.json` | 16 | 12 / 4 |
-| `examples/experiments/u32-mixed-e2b.json` | 32 | 25 / 7 |
+To run a complete evolution experiment with models, follow the steps below.
 
-The [complete tutorial](docs/tutorials/evolution32.md) covers model protocols, credentials, materials, startup and collection. The selected personas are reused across slots; session count is not a count of independent human profiles. These examples leave per-round official grading disabled.
+## Run a Harness evolution experiment
+
+Experiments are managed through `backend/scripts/experiment.py`, with a choice of local or cloud execution:
+
+| Backend | Runtime | Repository hosting | Requirements |
+| --- | --- | --- | --- |
+| `local` | Local Docker | Local Gitea started automatically | Docker Engine with Compose |
+| `e2b` | E2B sandbox | Your Gitea.com account | `E2B_API_KEY` and a Gitea.com token |
+
+Both backends require model endpoints. Simulated users, the Harness and requirements agents use OpenAI-compatible APIs; OpenAgents delivery uses an Anthropic-compatible API. Select models in the experiment JSON and enter their endpoint URLs and keys in `.env.experiment`. See the [Quickstart](docs/QUICKSTART.md) for the configuration fields.
+
+Start with the U1 example: one simulated user tries the same task each round for five rounds. The first four include feedback processing and code delivery; the final round tries the updated Harness. Run these commands from the repository root:
 
 ```bash
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
-# Fill credentials; choose u1-local.json for local Docker.
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u1-e2b.json --offline
-uv run --locked --extra experiments python backend/scripts/experiment.py run --config examples/experiments/u1-e2b.json --secrets-file .env.experiment
+
+CONFIG=examples/experiments/u1-local.json
+# For E2B, use:
+# CONFIG=examples/experiments/u1-e2b.json
+
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$CONFIG" --offline
+# Fill .env.experiment and confirm the configured model names, then start:
+uv run --locked --extra experiments python backend/scripts/experiment.py run --config "$CONFIG" --secrets-file .env.experiment
 ```
 
-Start with [Quickstart](docs/QUICKSTART.md), then follow the [complete U1 tutorial](docs/tutorials/u1-experiment.md). They explain the required materials, model protocols, provider credentials, progress, stop/resume, collection and cleanup. For a complete two-round, four-user example, follow the [multi-user tutorial](docs/tutorials/multi-user-experiment.md). Preparation fetches pinned OpenAgents automatically; no sibling checkout is required. The [U1 validation report](docs/validation/spec-0069-new-user.md) and [multi-user validation report](docs/validation/spec0073-multi-task-users.md) record actual checks separately from the documented workflow.
+`check --offline` checks the configuration and local material declarations. `run --config` then prepares materials, provisions resources and starts the experiment. Use the printed run ID to check progress (`status`), read logs (`logs`) or collect artifacts (`collect`). The [U1 walkthrough](docs/tutorials/u1-experiment.md) covers the complete workflow, expected outputs, and stop/resume operations.
 
-To queue several complete experiments, use the [batch tutorial](docs/tutorials/batch-experiment.md) and the lists in `examples/batches/`; `evolution-four-e2b.json` runs the four six-round groups sequentially. Batch supervision retains each member's single-run lifecycle and limits active runs until terminal collection; Ctrl+C detaches supervision, while `batch stop` stops started members. The U1/U4 lists preserve their different five-round/two-round settings and demonstrate execution rather than a fair causal comparison.
+### Multi-user experiments
 
-After complete terminal collection, use `grade RUN_ID --plan PATH` to grade saved session artifacts on a local Docker host. The private plan selects task IDs, adapters and hashed materials, including the official dataset for SWE. This also applies to E2B archives and does not score new held-out Harness tasks or feed results into evolution. See the [post-run grading tutorial](docs/tutorials/post-run-grading.md); older hash-only predictions cannot be reconstructed for grading.
+The U4 examples provide a smaller multi-user experiment with four user sessions across two tasks over two rounds. Choose [`u4-local.json`](examples/experiments/u4-local.json) or [`u4-e2b.json`](examples/experiments/u4-e2b.json) and follow the [multi-user tutorial](docs/tutorials/multi-user-experiment.md).
 
-For trusted Harness code on local Docker + localhost Gitea, enable optional engineering CI with `runtime.local.ci_enabled: true`. Each run has its own runner, privileged Docker daemon and job storage; it must pass a real PR smoke before OpenAgents enables its CI gate. CI calls no models and runs no benchmarks. Default configurations keep CI disabled, and E2B CI remains unsupported. The [local CI tutorial](docs/tutorials/local-engineering-ci.md) covers configuration, status and runner cleanup; [validation](docs/validation/local-engineering-ci.md) records actual verification separately.
+For larger six-round experiments, use these E2B configurations:
 
-For your own non-benchmark seed library or text instruction, use `task import-seeds` or `task from-text` to create ordinary task packages without models, providers or setup execution. Copy the returned absolute `task_packages` array into an experiment JSON, then use check/prepare/run. The [seed/text import tutorial](docs/tutorials/seed-task-import.md) includes a synthetic card, an editable user task and complete offline checks for local/E2B configurations; importing does not reproduce old images/services or prove task success.
+| Configuration | Sessions per round | Simulated-user interaction / direct |
+| --- | ---: | ---: |
+| [`u8-mixed-e2b.json`](examples/experiments/u8-mixed-e2b.json) | 8 | 6 / 2 |
+| [`u8-direct-e2b.json`](examples/experiments/u8-direct-e2b.json) | 8 | 0 / 8 |
+| [`u16-mixed-e2b.json`](examples/experiments/u16-mixed-e2b.json) | 16 | 12 / 4 |
+| [`u32-mixed-e2b.json`](examples/experiments/u32-mixed-e2b.json) | 32 | 25 / 7 |
 
-For an offline scripted demo without models or infrastructure:
+Each configuration fixes its task packages, persona pairings and round schedule. Simulated-user sessions allow follow-up interaction; direct sessions let the Harness work autonomously after receiving the task. R1–R5 include trials, feedback processing and delivery; R6 tries the final Harness. Per-round official grading is disabled by default. See the [six-round tutorial](docs/tutorials/evolution32.md) and [task catalog](examples/tasks/evolution32/README.md) for materials and startup instructions, or the [batch tutorial](docs/tutorials/batch-experiment.md) to schedule several experiments.
+
+## Evaluate an existing Harness
+
+After evolution, use the independent Harbor evaluation workflow to assess the Harness on benchmark tasks. Configure it in [`evaluation.yaml`](evaluation.yaml) and launch it with `python -m evaluation`. It supports Harbor Index tasks and standard Harbor task packages on E2B.
+
+Choose a released Harness (`v0`, `u8`, `u8-direct`, `u16` or `u32`), or an integrated agent (Claude Code or Meta-Harness). Set `user.enabled: false` for direct solving. With `true`, a simulated user participates in follow-up interaction and can ask questions or assess the response.
+
+Download the pinned runtime and Harness archives described in the [evaluation guide](evaluation/docs/harbor.md), then create a separate evaluation environment:
 
 ```bash
-uv run --locked python backend/scripts/offline_demo.py
+uv venv --python 3.12.13 --managed-python --seed .venv-evaluation
+source .venv-evaluation/bin/activate
+pip install --require-hashes -r evaluation/requirements.lock
+pip install --no-deps -e ./evaluation
+cp .env.example .env
 ```
 
-Run from source; a PyPI entry point is not yet available. `uv.lock` pins NexAU from [hzhua/nexau](https://github.com/hzhua/nexau) at commit `28511d9f0362191a6c378fd441b2be55309a9e32`, together with compatible dependencies. `uv sync --locked` fetches that exact Git revision; no SDK source copy is bundled in this repository.
+Configure model names and endpoint URLs in `evaluation.yaml`, and enter API keys and E2B credentials in `.env`. The default configuration selects 38 tasks and two Harnesses. Start with one task and one Harness to verify your setup before expanding the run. For example, change these fields and keep the remaining settings:
 
-## Documentation and development
+```yaml
+tasks: [swebenchpro-fix-file-suffix-chooser]
+harnesses: [v0]
+user:
+  enabled: false
+```
 
-- [Configuration](docs/CONFIGURATION.md): v2 JSON, task packages, personas and credentials.
-- [Architecture](docs/ARCHITECTURE.md): requirements, delivery and artifact boundaries (Chinese).
-- [Public snapshots](docs/EXPORTING.md): publish coarse progress while keeping raw conversations local (Chinese).
-- [Developer tools](tools/dev/README.md): probes, evidence replay and delivery validation.
-- [Research archive](research/README.md): historical configurations, source versions and migration inventory.
-- [Joint release checklist](docs/RELEASING.md): version freezing and publication (Chinese).
-- [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), [Third-party sources](THIRD_PARTY.md) and [Changelog](CHANGELOG.md).
+Once configured, validate, prepare and run:
 
 ```bash
-uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
-uv run --locked --extra experiments --extra dev --extra harbor-evaluation pytest -q
+python -m evaluation validate
+python -m evaluation prepare
+python -m evaluation run
 ```
 
-Frontend development requires Node.js 22: run `npm ci`, `npm test` and `npm run build` in `frontend/`. The live API is intended for a trusted local environment; static Pages publication is separate. The default development API does not automatically select a v2 run; use experiment `status`/`logs` for current progress. See the [frontend guide](frontend/README.md).
+`validate` checks the configuration, `prepare` prepares task and Harness materials, and `run` starts solving and grading. The run directory retains task scores, execution traces and usage records, along with interaction records when simulated users are enabled. Some tasks require an official judge model and its credentials. Task failures, infrastructure failures and judge failures are recorded separately.
 
-Repository layout:
+This workflow evaluates the evolved Harness; its scores do not feed back into evolution. See the [evaluation guide](evaluation/docs/harbor.md) for resuming runs, viewing reports and regrading submissions.
 
-```text
-examples/experiments/                    # Runnable v2 local/E2B definitions
-examples/tasks/, examples/personas/      # Task packages and persona inputs
-backend/auto_designer/experiment/        # Lifecycle and internal controllers
-backend/scripts/                        # Public entry, demo, export, CI/build checks
-tools/dev/                              # Maintained diagnostics and replay tools
-evaluation/                             # Independent held-out grading and adapters
-research/archives/                      # Frozen historical research records
-.experiments/                           # Ignored run outputs
-```
+## Documentation
 
-`docs/specs/` stores design contracts and task mappings. Historical research is indexed in `research/inventory.json`; reproduce it using its recorded source revision in a separate checkout, rather than running archived launchers from the current tree. User impressions and closed-loop completion do not imply official benchmark success; held-out grading remains a separate workflow.
+| Topic | Guide |
+| --- | --- |
+| First local or E2B experiment | [Quickstart](docs/QUICKSTART.md) |
+| Experiment configuration, task packages and credentials | [Configuration](docs/CONFIGURATION.md) |
+| Six-round U8/U16/U32 experiments | [Six-round tutorial](docs/tutorials/evolution32.md) |
+| Harbor evaluation setup and execution | [Evaluation guide](evaluation/docs/harbor.md) |
+| Development checks and verification commands | [Verification](docs/VERIFICATION.md) |
+| System architecture and design documents | [Architecture](docs/ARCHITECTURE.md) · [Specs](docs/specs/README.md) |
 
-## License
+Further workflows cover [importing your own tasks](docs/tutorials/seed-task-import.md), [appending experiment rounds](docs/tutorials/experiment-continuation.md), [grading saved session artifacts](docs/tutorials/post-run-grading.md) and [enabling per-round assessment](docs/tutorials/evolution-feedback.md). Historical experiment materials are indexed under [research](research/README.md).
 
-Project code is licensed under the [MIT License](LICENSE). Third-party material retains its own terms; see [THIRD_PARTY.md](THIRD_PARTY.md).
-
-The unified entry supports runtime policies, direct interaction, explicit round plans and `dashboard RUN_ID`. See [configuration](docs/CONFIGURATION.md) and [migration validation](docs/validation/spec0072-capability-migration.md). Multi-task/U4/U8 uses the same frozen workload contract; current archives with a continuation export can seed a new run with additional rounds. See the [continuation tutorial](docs/tutorials/experiment-continuation.md). See [multi-user validation](docs/validation/spec0073-multi-task-users.md).
-
-Independent Harbor evaluation: [guide](evaluation/docs/harbor.md).
+To participate in development, see [Contributing](CONTRIBUTING.md). Report security issues as described in [Security](SECURITY.md). Project code is [MIT licensed](LICENSE); third-party licenses and sources are documented in [THIRD_PARTY.md](THIRD_PARTY.md).

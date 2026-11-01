@@ -2,7 +2,7 @@
 
 [English](CONFIGURATION.md) | 简体中文
 
-新实验采用 `schema_version: 2` 的 JSON，通过[快速开始](QUICKSTART.zh-CN.md)里的统一入口运行。复制[本地示例](../examples/experiments/u1-local.json)或 [E2B 示例](../examples/experiments/u1-e2b.json)。未知字段会报错，历史 evaluation schema 与 v1 生命周期命令在 provider 操作前拒绝执行。
+实验定义采用 `schema_version: 2` 的 JSON，通过 `backend/scripts/experiment.py` 运行。可从[本地示例](../examples/experiments/u1-local.json)或 [E2B 示例](../examples/experiments/u1-e2b.json)开始修改，完整操作见[快速开始](QUICKSTART.zh-CN.md)。配置中的未知字段会报错；独立 Harness 评测使用另一份 `evaluation.yaml` 配置。
 
 ## 用户需要提供的文件
 
@@ -16,11 +16,11 @@
 | Persona | 符合仓内 persona schema 的 JSON 数组 | `examples/personas/u1.json` |
 | 凭证 | 显式环境变量，或权限 0600 的 env 文件 | `examples/experiment.env.example` |
 
-U1 示例使用 `examples/personas/u1.json`；U4 从通用主库 `examples/personas/library.json` 选择四张真实卡片。所选 ID 必须唯一且存在于画像库中；同一画像可在一轮中用于多个独立会话。
+U1 示例使用 `examples/personas/u1.json`；U4 从 `examples/personas/library.json` 选择四个基于公开资料构建的模拟画像。所选 ID 必须唯一且存在于画像库中；同一画像可在一轮中用于多个独立会话。
 
 实验中的路径相对于实验 JSON；任务包中的路径相对于任务 JSON。`check --offline` 只给尚未冻结的分配预览，不拉取 Git。`prepare` 冻结每个任务的包、指令、setup、依赖锁及已验证源码 archive，再生成 `materials/task-catalog.json`、`materials/session-plan.json`、persona roster、Harness archive 和哈希清单，无需手工拼装。
 
-容器任务包冻结声明的输入哈希、镜像 digest、环境配方和产物合同，不要求伪造 Python setup/venv。未缓存的远端输入在离线检查中保持待下载；prepare 必须验证实际字节后才能发布已准备的 run。
+容器任务包冻结声明的输入哈希、镜像 digest、环境配方和产物合同，无需额外提供 Python 安装配方或虚拟环境。未缓存的远端输入在离线检查中保持待下载；prepare 必须验证实际字节后才能发布已准备的 run。
 
 ## 实验字段
 
@@ -38,13 +38,13 @@ U1 示例使用 `examples/personas/u1.json`；U4 从通用主库 `examples/perso
 | `continuation` | 可选的当前父 `archive` 路径和预期 `sha256`；须同时声明两个父输入来源 |
 | `roles` | Triage/Synthesizer/divergent/developer 数量；`owner_mode: mechanical` / `llm` |
 | `models` | User、Harness、共享需求面、Claude Code 交付模型 |
-| `evaluation.official_grading` | 未开启逐轮验收时设为 `false` |
+| `evaluation.official_grading` | 固定为 `false`；逐轮验收另用 `session_grading` 配置 |
 | `evaluation.session_grading` | 可选的外部逐轮验收：冻结计划、公钥摘要及 `runner: external` |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
 可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。U1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮运行用户及已配置的独立验收，不再需求或交付。
 
-`builtin` 冻结当前 checkout 的 `backend/harness_template/`，不是历史 `cade14d` Harness。复现旧基线必须显式提供那份归档和真实校验和。
+`builtin` 固定当前 checkout 中 `backend/harness_template/` 的内容。需要使用指定版本的 Harness 时，选择 `archive` 并提供归档路径及 SHA-256。
 
 ### 六轮研究任务配置
 
@@ -104,7 +104,7 @@ U1 示例使用 `examples/personas/u1.json`；U4 从通用主库 `examples/perso
 
 每个新增轮继承父末轮 task/persona/interaction 配对，包括 `direct` 会话。`sessions_per_round` 等于该边界人数，`max_parallel_users` 可降低；workload 不能混入覆盖项。有 pending report 时 Triage 和 Synthesizer 各至少一个。模型、runtime、角色、策略和凭证由子配置显式决定；可选 CI 沿用子实验的本地契约。
 
-子实验先在独立恢复域处理父反馈并等待交付，即使 count 为一也执行初始化。随后 `count` 只计新增用户轮，最后一个新增轮仍只试用。父逻辑 R5 加两轮，对应子本地 R1/R2 和逻辑 R6/R7；再追加一轮从逻辑 R8 开始。stop/resume 操作新 run，父证据与评分不混入新增用户指标；grade 和 batch 使用本地轮号。独立[验收记录](validation/experiment-continuation.md)区分合同检查与真实后端执行。
+子实验先在独立恢复域处理父反馈并等待交付，即使 count 为一也执行初始化。随后 `count` 只计新增用户轮，最后一个新增轮仍只试用。父逻辑 R5 加两轮，对应子本地 R1/R2 和逻辑 R6/R7；再追加一轮从逻辑 R8 开始。stop/resume 操作新 run，父证据与评分不混入新增用户指标；grade 和 batch 使用本地轮号。当前检查命令见[验证方法](VERIFICATION.zh-CN.md)。
 
 ## 模型和凭证
 
@@ -144,7 +144,7 @@ U1 示例使用 `examples/personas/u1.json`；U4 从通用主库 `examples/perso
 
 ## 每轮客观验收
 
-准备时默认使用 `release/compatibility.json` 中固定的执行证据 reader 候选提交 `57eac90a5702022c1ed2452b5b2b9918c235df39`，也可通过 `source.openagents` 指定其他兼容的不可变提交。该候选已推送供审阅；配套改动审阅合并后再填写 `reader_release_commit`。只有旧 transport 能力的版本不足以满足要求。
+准备阶段从[兼容清单](../release/compatibility.json)的 `execution_evidence` 选择固定版本的 OpenAgents，优先使用 `reader_release_commit`，未设置时使用 `reader_candidate_commit`。也可通过 `source.openagents` 指定其他不可变提交；预检会验证其执行证据读取能力。版本更新和联合验证见[发布指南](RELEASING.md)。
 
 默认 `evaluation: {"official_grading": false}` 记录 `not_configured`，不表示通过，也不记零分。开启时使用 `evaluation.session_grading`：
 
@@ -156,7 +156,7 @@ U1 示例使用 `examples/personas/u1.json`；U4 从通用主库 `examples/perso
 
 [反馈与验收教程](tutorials/evolution-feedback.zh-CN.md)可生成带真实摘要的完整示例。`check` 和 `prepare` 都必须传 `--grading-plan`、`--grading-worker-public-key`；计划覆盖全部选定任务，固定适配器、材料、镜像和超时。注册也绑定评分实现版本，修改后需要重新 prepare。
 
-执行 `run` 后，在可信 Docker 主机启动 `assessment-worker RUN_ID --plan PATH --signing-key PATH --follow`。worker 使用同一份准备结果、checkout 和 provider 访问凭证，local 与 E2B 都如此；任务沙箱没有 Docker socket 和私有 grader。worker 未就绪时 controller 显示 `objective_grading / PENDING / worker_not_ready`，启动 worker 即可继续。恢复保留已接收的结果，不重跑 Actor 或 Reviewer。
+执行 `run` 后，在可信 Docker 主机启动 `assessment-worker RUN_ID --plan PATH --signing-key PATH --follow`。worker 使用同一份准备结果、checkout 和 provider 访问凭证，local 与 E2B 都如此；任务沙箱不会接收评分主机的 Docker socket 或私有 grader。worker 未就绪时 controller 显示 `objective_grading / PENDING / worker_not_ready`，启动 worker 即可继续。恢复保留已接收的结果，不重跑 Actor 或 Reviewer。
 
 每一轮（含末轮只试用）都先封存 Actor 产物，再独立验收，在需求处理前使用认证后的安全摘要。`completed / passed=false` 才是评分有效执行后的任务失败；不可评分、不可用、崩溃及超时保留 `passed=null`，未配置也单列。独立体验评分只能是整数 1–4 或缺测状态；任务成功和缺分都不自动补分、不强制发 Issue。归因与改进建议各自记录。
 
@@ -166,7 +166,7 @@ U1 示例使用 `examples/personas/u1.json`；U4 从通用主库 `examples/perso
 
 任务包版本与实验 schema 2 独立。evolution32 使用 schema 3、`environment.kind: container`：固定镜像 digest、workdir、带 SHA-256 的输入、初始化/就绪/收尾命令、有限的 task/companion 服务与所需能力共同构成环境配方。完整定义见[任务清单](../examples/tasks/evolution32/README.zh-CN.md)，不复制旧 launcher 来启动。
 
-服务是任务设施进程，不是模型 Agent。输入可以进入任务容器或明确声明的 companion；管理侧服务输出不作为 Actor 输入暴露。文件和公开服务 handle 复用共同的 `artifacts` 合同。非 Git 任务明确声明 patch 不适用；SWE 任务保留真实 repo/revision 元数据。环境或采集故障按基础设施失败处理，不伪造成用户负反馈；环境驱动不执行官方评分。
+服务是任务设施进程，不是模型 Agent。输入可以进入任务容器或明确声明的 companion；管理侧服务输出不作为 Actor 输入暴露。文件和公开服务 handle 复用共同的 `artifacts` 合同。非 Git 任务明确声明 patch 不适用；SWE 任务保留真实 repo/revision 元数据。环境或采集故障单独记为基础设施失败；环境驱动不执行官方评分。
 
 公开示例为：
 
@@ -207,11 +207,11 @@ E2B 在一个沙箱内运行 controller 与交付进程。已有 v1/v2 源码配
 
 用全局 `--runs-dir /absolute/path/runs` 放在子命令前可改运行根目录，后续管理始终使用同一根目录。prepare 后编辑原 JSON 或源码 checkout 不影响既有 run；改变实验定义应重新 prepare。
 
-实验凭证统一使用 `examples/experiment.env.example` 模板。历史 profile 和 launcher 从[研究索引](../research/README.zh-CN.md)查找，需使用原 checkout，不作为当前 v2 配置来源。[开发维护工具](../tools/dev/README.md)各自要求显式输入。已准备的 v2 实验在本次清理后继续保留冻结源码和输入哈希；resume 不升级其中的 controller。
+实验凭证统一使用 `examples/experiment.env.example` 模板。历史 profile 和 launcher 从[研究索引](../research/README.zh-CN.md)查找，需使用原 checkout，不作为当前 v2 配置来源。[开发维护工具](../tools/dev/README.md)各自要求显式输入。已准备的实验始终使用冻结源码和输入哈希；`resume` 不升级其控制器。
 
 pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest，供用户侧检查。
 
-## 运行策略与能力迁移
+## 运行策略
 
 可选 `policies` 控制运行行为，`prepare` 会补齐默认值并冻结进 manifest。这些设置不放在 env 文件，也不继承宿主机的同名变量。
 
@@ -259,9 +259,9 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 计划校验每轮 session 数量及已选 persona/task ID。画像选择集合 persona_ids 和库中 ID 仍须唯一；有序会话列表允许重复画像、任务或完整配对。round/slot 为每次执行区分 session ID、client、可写工作区及恢复 unit，复用画像不能解释为独立真人样本。省略计划时，按全局槽 k=(round_no-1)*sessions_per_round+slot，从配置顺序取 persona_ids[k % P] 和 task_packages[k % T]。这种简单轮转不保证覆盖全部 persona × task 组合；AABB、固定分组和交叉任务覆盖请写显式计划。普通实验的 `rounds.count: 1` 可只试用用户，不等待 Vigil；多轮和继承初始化仍须验证交付进程就绪。
 
-`experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示已收集快照时间，不冒充云端实时活动。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
+`experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示快照的采集时间。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
 
-本次已迁入上述设置、交互和看板；可选本地工程 CI 见下方说明，当前归档追加已接入，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。旧 seed 库及纯文本任务已通过 ordinary 任务包转换接入，见下方导入说明。独立事后评分仍然可用；可选逐轮验收使用上面的外部 worker 合同。多任务/U4/U8 已使用上述冻结 workload 契约。旧 v2 run 继续使用原冻结源码，resume 不升级实验。[验收报告](validation/spec0072-capability-migration.md)区分离线回归和真实云端覆盖。
+运行策略、交互计划和看板设置均随实验固定。修改后应准备新 run；恢复仍使用原配置。任务导入、归档追加及独立评分的配置见下文和对应教程。
 
 ## 本地工程 CI
 
@@ -279,7 +279,7 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 `status RUN_ID` 单独报告 CI。收集保存就绪收据和 main/PR 当前提交状态；旧 head 的绿灯不能证明新提交通过。`stop` 暂停所属 runner、处理所属 job 并停止私有 daemon，保留其存储和注册以供恢复。`resume` 核验原 daemon、镜像、存储及注册身份，再重新检查就绪，不注册替代 runner。`destroy` 移除所属执行资源和 CI job 存储，保留列明名称的 Gitea 和 runner 私密注册卷；收据列出保留卷。runner 注册凭据保存在私有卷内，不进入普通收集产物。
 
-CI 只对可信 Harness 代码做工程检查，不调用模型、不运行 benchmark。官方 SWE 任务 `grade` 和 Harness 留出评估继续作为独立事后流程。命令及实际核验范围见[本地 CI 教程](tutorials/local-engineering-ci.zh-CN.md)和[验收报告](validation/local-engineering-ci.md)。
+CI 只对可信 Harness 代码做工程检查，不调用模型、不运行 benchmark。官方 SWE 任务 `grade` 和 Harness 留出评估继续作为独立事后流程。配置与当前检查命令见[本地 CI 教程](tutorials/local-engineering-ci.zh-CN.md)和[验证方法](VERIFICATION.zh-CN.md)。
 
 ## seed 卡库与文本指令
 
@@ -296,9 +296,9 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --json 
 
 ## 多任务包
 
-新多任务定义用 `workload.task_packages`；它与 `kind`、`task_package` 互斥，这个分支不填全局 kind。各包沿用 task-package-v1，并拥有全局唯一的安全 ID，如普通任务 `order-service` 和 SWE 的 `pvlib__pvlib-python-1478`。原单包形式在新 prepare 的输入边界转换一次；已冻结 run 保留原 config、hash 及 archive 内的 controller，未知 workload 契约版本拒绝。
+新多任务定义用 `workload.task_packages`；它与 `kind`、`task_package` 互斥，这个分支不填全局 kind。各包使用受支持的 v1/v2 源码任务或 v3 容器任务格式，并拥有全局唯一的安全 ID，如普通任务 `order-service` 和 SWE 的 `pvlib__pvlib-python-1478`。原单包形式在新 prepare 的输入边界转换一次；已冻结 run 保留原 config、hash 及 archive 内的 controller，未知 workload 契约版本拒绝。
 
-`runtime.local.seed_image` 保留单任务覆盖含义，选择多个包时填写会报错；自动逐任务构建支持混合任务。本地 session 使用独立容器；E2B 复制各任务纯源码基线，在最终 session 目录重建 venv。下载/wheel 缓存可共享，可写 repo 和已安装环境不共享。E2B 同一 Unix 用户不提供等同 Docker 的恶意跨目录访问防护。
+`runtime.local.seed_image` 只适用于单任务配置，选择多个任务包时应使用逐任务环境准备。源码任务在本地使用独立会话容器，在 E2B 中复制基线源码并为各会话重新创建虚拟环境；v3 容器任务通过两后端的 Docker 环境驱动创建独立任务容器与服务。下载缓存可以共享，可写源码和已安装环境按会话隔离。E2B 源码目录模式仍共享 Unix 用户，其访问边界与容器模式不同。
 
 两个任务的显式计划、成本及证据路径见[完整 U4 教程](tutorials/multi-user-experiment.zh-CN.md)。
 
@@ -337,4 +337,4 @@ uv run --locked --extra experiments python backend/scripts/experiment.py --json 
 
 评分输入独立于实验 JSON。`grade RUN_ID` 必填 `--plan PATH`；私有计划选择任务 ID、适配器与带哈希的材料，SWE 本地官方 JSON/JSONL/parquet 数据集也在其中声明。`--round` 选择正整数且已封口的轮次，默认 `config.rounds.count`。每个 grader 在计划中填写必需的 `timeout_seconds`。`--offline` 只验证绑定，不调用 Docker、不写评分结果。自定义根目录或批次成员使用全局 `--runs-dir`，机器可读输出用 `--json`。此命令不读凭证文件。
 
-安装 `uv sync --locked --extra experiments --extra dev --extra evaluation`。local 与 E2B 均在操作者的 Docker 主机上，以经过验证的终态 COMPLETE 归档评分，并要求新控制器保存的完整预测回执。每次结果写入独立的 `evaluation/<attempt_id>/`，原实验产物不改。gold patch 与隐藏测试是外部评分输入，不能成为冻结演化材料。只有 hash 的旧会话无法还原。详见[事后评分教程](tutorials/post-run-grading.zh-CN.md)和[验收报告](validation/post-run-grading.md)。事后命令结果与 Harness 留出泛化测试分开，不会追溯进入原演化反馈或 CI 门禁；可选逐轮验收需单独配置。
+安装 `uv sync --locked --extra experiments --extra dev --extra evaluation`。local 与 E2B 均在操作者的 Docker 主机上，以经过验证的终态 COMPLETE 归档评分，并要求新控制器保存的完整预测回执。每次结果写入独立的 `evaluation/<attempt_id>/`，原实验产物不改。gold patch 与隐藏测试是外部评分输入，不能成为冻结演化材料。只有 hash 的旧会话无法还原。详见[事后评分教程](tutorials/post-run-grading.zh-CN.md)和[验证方法](VERIFICATION.zh-CN.md)。事后命令结果与 Harness 留出泛化测试分开，不会追溯进入原演化反馈或 CI 门禁；可选逐轮验收需单独配置。

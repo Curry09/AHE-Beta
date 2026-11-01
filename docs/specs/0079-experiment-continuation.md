@@ -102,7 +102,6 @@ tasks:
       - docs/tutorials/experiment-continuation.zh-CN.md
       - docs/CONFIGURATION.md
       - docs/CONFIGURATION.zh-CN.md
-      - docs/audits/unified-entry-capability-migration-20261003.md
       - README.md
       - README.zh-CN.md
       - CLAUDE.md
@@ -122,7 +121,6 @@ tasks:
       - backend/scripts/e2e-spec-0079-experiment-continuation.sh
       - backend/tests/test_experiment_continuation_contract.py
       - backend/tests/fixtures/continuation/current-parent-v1.json
-      - docs/validation/experiment-continuation.md
       - .github/workflows/experiment-contract.yml
     scope: 崩溃边界/重复继承/普通路径回归；真实local和E2B非空交付与归档清理实证
     acceptance: 两后端证实父反馈→真实交付→新增试用；当前源不变/新身份/正确累计轮号；无准入不冒充交付

@@ -126,7 +126,6 @@ tasks:
       - backend/tests/loop/test_live.py
       - backend/tests/test_run_swebench_closed_loop.py
       - backend/tests/test_stage_resume_e2e.py
-      - docs/audits/0064-stage-resume-validation.md
     scope: 统一包内 ordinary/SWE controller 和当前 v2 生命周期的 fresh/resume 语义，保留 live/history 与阶段级恢复故障矩阵；旧 auditable/v1 入口及其测试已退出。
     acceptance: fresh 才能复位，resume 复用稳定 run id 和冻结 manifest；当前阶段恢复、controller 与 v2 生命周期故障矩阵通过；历史记录不重写。
 ---

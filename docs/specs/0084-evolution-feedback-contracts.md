@@ -214,7 +214,6 @@ tasks:
       - examples/experiments/evolution-feedback-e2b.json
       - docs/tutorials/evolution-feedback.md
       - docs/tutorials/evolution-feedback.zh-CN.md
-      - docs/validation/evolution-feedback-contracts.md
       - docs/ARCHITECTURE.md
       - docs/specs/0048-user-sim-final-check-convergence.md
       - docs/CONFIGURATION.md

@@ -2,7 +2,7 @@
 
 [English](experiment-continuation.md) | 简体中文
 
-使用完整的当前实验归档创建新 run。子实验先处理父实验末轮用户反馈，等待准入工作交付完成，再开始自己的用户试用。它继承最终 Harness tree 和末轮 task/persona/interaction 配对；模型、角色、后端及策略由子配置决定。
+本教程从已完成实验的完整归档创建子实验，并追加用户轮次。子实验继承最终 Harness 及父末轮的任务、画像和交互模式配对；先处理父末轮反馈、完成准入需求的交付，再开始新增试用。模型、角色、后端和运行策略由子配置指定。
 
 继续使用 check/prepare/run/status/stop/resume/collect/destroy。`resume` 恢复同一个 run；追加创建新身份和新仓库。只支持带新 continuation export 的当前 schema 2 / workload contract 1 归档。此前冻结的 controller 和缺少该 export 的归档不会被追溯升级。
 
@@ -127,9 +127,9 @@ status 单独展示初始化，普通轮显示 `local_round` 与 `lineage_round`
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py --json --runs-dir "$RUNS_DIR" collect "$CHILD_RUN_ID" --secrets-file .env.continuation > "$WORK_DIR/child-collection.json"
-uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" destroy "$CHILD_RUN_ID" --confirm --secrets-file .env.continuation
+uv run --locked --extra experiments python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" destroy "$CHILD_RUN_ID" --confirm "$CHILD_RUN_ID" --secrets-file .env.continuation
 ```
 
 再次追加时，把子完整收据用作 `parent-collection.json`，设置 `ADD_ROUNDS=1`，重复第 3–4 步创建另一个新 run。逻辑 R7 结束的子实验成为下一父来源，下一本地 R1 显示逻辑 R8。下一来源只选直接父的末轮用户与反馈；祖先保留身份/hash 摘要，不递归嵌套整个父归档。
 
-destroy 处理指定子 run 的资源并保留证据；父资源用自己的 run ID 和 profile 单独清理。`grade --round` 和 batch 继续使用各 run 的本地轮号与本次预测。[配置说明](../CONFIGURATION.zh-CN.md)、[Spec-0079](../specs/0079-experiment-continuation.md)及独立[验收记录](../validation/experiment-continuation.md)分别记录实现契约与实际覆盖。本教程描述操作流程，命令本身不代表真实双后端交付已经验收。
+`destroy` 释放指定子实验的资源并保留已收集证据。父实验资源通过父 run ID 和凭证单独管理。`grade --round` 和批次操作使用各 run 自己的本地轮号。完整配置见[配置说明](../CONFIGURATION.zh-CN.md)，开发检查见[验证说明](../VERIFICATION.zh-CN.md)。

@@ -1,54 +1,70 @@
-# 当前架构
+# 系统架构
+
+auto-designer 负责模拟使用、反馈处理、轮次管理和实验记录；OpenAgents 负责根据已准入的需求修改 Harness。被迭代的 Harness、用于试用的任务代码与实验控制器分别管理。
+
+## 迭代流程
 
 ```mermaid
 flowchart LR
-    U[User 模拟用户] --> H[本轮 Harness]
-    U --> R[轨迹与用户 report]
-    R --> T[Triage / Synthesizer]
-    R --> P[PM]
+    U[模拟用户或 direct 任务] --> H[本轮 Harness]
+    H --> R[执行轨迹与反馈]
+    R --> T[Triage → Synthesizer]
+    R --> P[Divergent PM]
     T --> O[Owner 准入]
     P --> O
-    O --> I[Gitea issue + openagents 标签]
-    I --> A[OpenAgents vigil]
-    A --> PR[Spec / 实现 / 验收与评审 / PR]
-    PR --> M[Harness main SHA]
-    M --> N[下一轮用户试用]
+    O --> I[Gitea 需求 Issue]
+    I --> A[OpenAgents 交付]
+    A --> PR[实现、测试与评审]
+    PR --> M[合并 Harness 更新]
+    M --> N[下一轮试用]
 ```
 
-auto-designer 控制实验身份、用户会话、需求提案、Owner 准入、轮次屏障和恢复。PM 与 Triage/Synthesizer 是独立需求路径，在 Owner 汇合。用户 report、proposal 与已准入需求不是同一状态。
+Triage 对用户报告进行核查，Synthesizer 综合相关提案；Divergent PM 从使用证据中提出独立的改进方向。两条需求路径在 Owner 汇合，经准入后交给 OpenAgents。报告、提案和已准入需求分别保存，便于追溯一项修改的来源。
 
-`auto_designer.demand` 包含四个需求角色及共享证据/运行逻辑；`agent_defs/synthesizer/` 只定义结构综合角色。`auto_designer.guards` 保留需求工具路径检查、编排仓完整性检查和 Harness 提交钩子。旧内置开发角色的两个未接线提交中间件已删除，不将它们描述为 OpenAgents 的等价保障。
+需求角色及共享逻辑位于 `backend/auto_designer/demand/`，角色定义位于 `backend/agent_defs/`。OpenAgents 作为独立 CLI 运行，通过 Gitea Issue、标签、PR 和 Harness 提交版本与控制器交互。NexAU 提供用户和需求角色的模型运行能力；实验示例使用 Claude Code 作为 OpenAgents 的交付后端。
 
-角色、恢复阶段、API 和静态导出统一使用 `synthesizer`。恢复流程通过 schema、身份与摘要检查保证记录一致。
+每个非末轮在用户试用结束后处理反馈，并等待本轮准入需求交付完成，再固定该轮的 Harness 提交。交付失败、超时或需要人工处理时，实验停留在当前轮。末轮只试用最终版本及执行已配置的客观验收，不再启动需求和交付阶段。
 
-OpenAgents 独立运行，负责交付；两仓运行时通过 Gitea 的 issue/标签/PR 与 Harness main SHA 连接，而非相互导入 Python 包。离线契约检查临时导入配置解析器，只用于开发验证。
+## 实验身份与恢复
 
-NexAU 是 agent 运行时依赖。OpenAgents 可选择 Claude Code、Codex 或 NexAU 后端；seed Harness 自带入口及工具契约，后续产生的子 Agent 等能力取决于被试 Harness 的具体版本。
+实验统一通过 `backend/scripts/experiment.py` 管理。`check` 检查配置，`prepare` 固定控制器、Harness、任务材料、依赖和会话计划，`run` 启动实验。准备后的输入由 `manifest.json` 及哈希清单记录；后续修改原配置不会改变已准备的实验。
 
-非末轮等待本轮准入需求达到交付终态再进入下一轮；失败、超时或 needs-human 不能被误算为已完成。末轮试用最终版本并运行已配置的独立验收，不再触发需求交付。
+每个会话关联 run、轮次、执行槽位、用户画像、任务摘要、交互模式和实际使用的 Harness 提交。即使复用同一画像或任务，各会话仍有独立的标识、工作区和恢复记录。恢复时只复用身份与内容均匹配的完整结果。
 
-体感、用户 acceptance 与客观技术验证分开记录，不能相互替代。独立 held-out 评测不回灌演化；显式开启 `evaluation.session_grading` 时，独立 worker 对已用于演化的任务评分，仅向需求和交付传递签名安全摘要，这些任务不再属于 held-out。逐轮验收不自动淘汰或回滚候选；工程 CI/e2e 是否启用由交付配置决定。原始轨迹用于审计，公开静态看板仅保留经过导出的粗粒度数据。
+`resume` 继续同一个实验，使用原冻结输入和仍然可用的资源。需要增加轮次时，通过当前完整归档创建新的子实验，先处理父实验末轮反馈，再运行新增用户轮；详见[追加轮次教程](tutorials/experiment-continuation.zh-CN.md)。
 
-## 实验入口与目录边界
+## 运行环境
 
-新实验只使用 `backend/scripts/experiment.py`，v2 配置通过 check → prepare → run 进入完整闭环，后续用 status/logs/stop/resume/collect/destroy 管理。两种受支持部署为 local Docker + 自动启动的 localhost Gitea、E2B 单沙箱 + 用户自己的 Gitea.com。E2B 不依赖嵌套 Docker，隔离语义不同于本地每会话容器。
+| 后端 | 控制器与交付 | 用户任务环境 | 仓库托管 |
+| --- | --- | --- | --- |
+| `local` | 本地专属运行容器 | 每个会话使用独立任务容器 | 自动启动的本地 Gitea |
+| `e2b` | 同一 E2B 沙箱内的进程 | 源码任务使用独立目录与虚拟环境；v3 容器任务使用沙箱内 Docker | 用户自己的 Gitea.com |
 
-新 run 冻结 workload contract 1 的 TaskCatalog/SessionPlan，监督器启动同一 `auto_designer.experiment.controllers.unified`。普通/SWE 与 direct/simulated 差异留在任务包、工作区准备和会话工厂；多个任务围绕同一 Harness 迭代，同轮可由多个不同 persona 试用同一任务。已准备 v2 实验继续使用原冻结源码、旧 module/script 配方及 hash，不升级 controller。当前带 continuation export 的完整归档支持在新 run 追加轮次；旧格式实验产物不支持导入。
+任务环境由任务包声明。v1/v2 包提供源码与安装配方；v3 包可声明容器镜像、输入、服务、初始化与收尾命令及产物。容器型任务按每次尝试创建独立容器和服务网络；代码位于 `backend/auto_designer/experiment/task_environments/`。源码目录模式共享沙箱的 Unix 用户，其访问隔离能力与容器模式不同。
 
-逻辑会话绑定为 run/round/slot/persona/task digest/interaction；session ID 只由 Orchestrator/RecoveryStore 生成。资源坐标不参与用户恢复输入，完整结果必须匹配冻结归属才可复用。Local task baseline 为不可变镜像，各 session 独立容器；E2B 任务基线为纯源码，各 session 最终目录重建独立 venv，下载缓存可共享。E2B 单 Unix 用户不宣称 Docker 等价恶意隔离。
+管理主机负责启动、查看状态和收集产物。E2B 控制器可以在本地 CLI 退出后继续运行，但后台收集依赖管理主机在线，且当前不会自动延长沙箱租期。生命周期和资源清理见[快速开始](QUICKSTART.zh-CN.md)。
 
-观察与证据沿同一 session/task/persona/round/Harness SHA 关联，live 用户槽不再以 persona 唯一。status 从恢复账本给逐轮已完成/运行中/待运行/失败数量，无账本时明确 unknown；E2B 看板展示最近 collect 的快照与时间。
+## 反馈、验收与独立评测
 
-| 目录 | 当前职责 |
+实验分别保存任务判断、体验评分、原因归属和改进建议。模拟用户的接受决定、客观测试结果和留出基准成绩各有独立来源。
+
+可选的 `evaluation.session_grading` 在每轮任务产物冻结后，由可信 Docker 主机上的独立 worker 执行验收。需求角色和交付角色仅接收经过签名验证的结果摘要，私有测试与详细评分日志保留在 worker 侧。这类任务已经参与迭代，其成绩不能作为留出结果；验收失败也不会自动回滚已交付的 Harness。
+
+`evaluation/` 提供独立 Harbor 评测，通过 `evaluation.yaml` 和 `python -m evaluation` 运行新任务。任务成绩不会回流到迭代过程。具体设置见[评测指南](../evaluation/docs/harbor.zh-CN.md)。
+
+## 主要目录
+
+| 目录 | 职责 |
 | --- | --- |
-| `examples/experiments/` | U1/U4 的 local/E2B 与 U8/U16/U32 的 E2B 可校验定义 |
-| `examples/tasks/`、`examples/personas/` | 任务与 persona 材料；主库为 `examples/personas/library.json` |
-| `backend/scripts/` | 公开入口、演示、静态导出、CI 与构建检查 |
-| `tools/dev/` | 维护中的诊断与回放，见[工具说明](../tools/dev/README.md) |
-| `evaluation/` | 独立 held-out 评分与维护中的适配器 |
-| `research/archives/` | 历史配置、研究代码和记录，见[研究索引](../research/README.zh-CN.md) |
-| `.experiments/` | 忽略的私有运行输出 |
+| `examples/experiments/`、`examples/batches/` | 单实验与批次配置 |
+| `examples/tasks/`、`examples/personas/` | 任务包与用户画像 |
+| `backend/auto_designer/experiment/` | 准备、调度、运行后端、收集与恢复 |
+| `backend/auto_designer/demand/` | 反馈处理、提案综合与需求准入 |
+| `backend/harness_template/` | 初始 Harness 源码 |
+| `backend/scripts/` | 公开命令入口及检查脚本 |
+| `evaluation/` | 独立 Harness 评测 |
+| `tools/dev/` | [诊断、回放与开发工具](../tools/dev/README.md) |
+| `.experiments/` | 默认的私有实验输出目录 |
+| `research/` | [历史研究材料与源码版本索引](../research/README.zh-CN.md) |
 
-历史归档不注册为第三种运行后端，源码内的原相对路径对应原 checkout。复现需使用索引记录的冻结源码版本；诊断回放输出不等于新一轮用户评估。静态看板显示历史快照、记录时间和当时状态，实时 API 模式保持实时观测。
-
-代码映射见 `docs/specs/ARCHITECTURE.md`（生成文件），详细契约见 `docs/specs/OVERVIEW.md`。
+[Spec 总览](specs/OVERVIEW.md)记录设计任务，[代码映射](specs/ARCHITECTURE.md)记录对应模块；两者均由 Spec CLI 生成。

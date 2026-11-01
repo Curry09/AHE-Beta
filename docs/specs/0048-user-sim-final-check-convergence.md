@@ -82,7 +82,6 @@ tasks:
       - tools/dev/audit/canary_spec0048_final_check.py
       - backend/tests/scripts/test_audit_sim_action_integrity.py
       - backend/scripts/e2e-spec-0048-final-check-convergence.sh
-      - docs/0048-user-sim-final-check-convergence.md
     scope: 生成不覆盖冻结实验的 correction artifact，区分 raw/explicit/invalid；建立 deterministic e2e，并在配置 USER_LLM_* 时运行真实 GLM canary。
     acceptance: 审计 fixture 稳定复现旧 112 局 41 次及 hard64 27 次 invalid fallback；e2e 覆盖 final-check→re-judge→合法 act 和连续非法 act→evaluator-invalid/零 Accept；输出含源码与模型 pin 且无密钥。
 ---

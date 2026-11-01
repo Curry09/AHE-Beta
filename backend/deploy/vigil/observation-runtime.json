@@ -10,7 +10,7 @@
   "base_local_tag": "auto-designer-vigil:spec61-base-e092fd2ba48a",
   "validation_date": "2026-09-08",
   "validation": "installed module digest matches committed source; all eight delivery roles receive the revised contract in a network-disabled container without host bind mounts; controlled forge, not a new lifecycle integration run",
-  "result_file": "docs/audits/0061-observation-goal-boundaries.json",
+  "validation_commit": "ac5093cd2369e478f7a41dfa8c6199198599ae6d",
   "deployment": "Prepared for new experiments. Existing running experiments and the latest tag were not replaced.",
   "observation_transport": {
     "encodings": [

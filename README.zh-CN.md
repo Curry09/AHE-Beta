@@ -1,103 +1,132 @@
 # auto-designer
 
-[English](README.md) | 简体中文
+**通过模拟使用和结构化反馈，迭代改进编码 Agent 的 Harness。**
 
-通过模拟用户反馈，迭代改进编码 Agent Harness 的研究框架。
-Python 3.12+ · Linux / WSL2 · MIT。通过快速开始选择本地 Docker 或 E2B。
+[English](README.md) · [简体中文](README.zh-CN.md) · [快速开始](docs/QUICKSTART.zh-CN.md) · [评测指南](evaluation/docs/harbor.zh-CN.md) · [贡献指南](CONTRIBUTING.zh-CN.md)
 
-auto-designer 模拟用户使用 Harness，把使用轨迹转为需求，再交给独立的 [OpenAgents](https://github.com/Curry09/OpenAgents) 实现。每轮交付封口后，用户试用新的 Harness；末轮只试用，不再交付。体感、技术验收和 留出基准测试 分开记录。
+Python 3.12+ · Linux / WSL2 · [MIT](LICENSE)
 
-**Synthesizer（结构综合）**综合相关提案，形成结构性改进方向，不负责代码实现。Triage、Synthesizer、PM 共用 `auto_designer.demand` 包和 `DEMAND_LLM_*` 模型配置。仍有效的文件访问、编排仓完整性与 Harness 提交边界检查位于 `auto_designer.guards`。
+auto-designer 通过模拟“用户使用、反馈、开发者改进”的过程，推动编码 Agent Harness 持续迭代。模拟用户在任务中使用 Harness 并反馈问题，需求角色据此形成改进提案，再由 [OpenAgents](https://github.com/Curry09/OpenAgents) 完成代码修改。更新后的 Harness 进入下一轮试用，形成持续的反馈与改进循环。
 
-当前代码和开发配置直接使用 `synthesizer`、`N_SYNTHESIZERS`、`SYNTHESIZER_GROUPING`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[分组综合](docs/synthesizer-grouping.md)。
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/harness-evolution-zh-CN-dark.svg">
+    <img src="assets/harness-evolution-zh-CN-light.svg" alt="动画依次高亮第 1 轮、第 2 轮与末轮，光点到达时同步高亮对应节点。用户反馈与 OpenAgents 交付推动轮间更新；末轮只试用，之后独立运行 Harbor 留出评测。" width="100%">
+  </picture>
+</p>
 
-本仓是**实验控制器**；OpenAgents 是**交付 CLI**；`backend/harness_template/` 是**被进化产品的初始源码**。实验迭代得到的 Harness 应作为带版本的独立产物发布。
+本仓负责实验编排，OpenAgents 负责代码交付。实验从 `backend/harness_template/` 提供的初始 Harness 开始，逐轮修改其源码，并保存每轮的 Harness 版本和运行记录。
 
-| 要做什么 | 配置与入口 | 从哪里开始 |
-| --- | --- | --- |
-| 迭代 Harness | `examples/experiments/*.json` → `backend/scripts/experiment.py` | [迭代快速开始](docs/QUICKSTART.zh-CN.md) |
-| 评测已有 Harness | `evaluation.yaml` → `python -m evaluation`；`user.enabled` 选择是否带模拟用户 | [评测教程](evaluation/docs/harbor.zh-CN.md) |
+## 离线演示
 
-两条路径分别使用 `.env.experiment` 与 `.env`。[六轮研究任务示例](docs/tutorials/evolution32.zh-CN.md)通过版本化容器任务包接入原任务集：U8 mixed/direct 取前八项，U16 取前十六项，U32 使用全部三十二项。来源和获取方式见[任务材料清单](examples/tasks/evolution32/README.zh-CN.md)。材料或工具检查通过，与正式模型驱动的完整实验完成分别记录。
+离线演示使用预设的模拟用户和 Harness，展示一次交互及其反馈，无需配置模型接口或启动实验环境。运行前请安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)。
 
-## 运行实验
+```bash
+git clone https://github.com/Curry09/auto-designer.git
+cd auto-designer
+uv run --locked python backend/scripts/offline_demo.py
+```
 
-选择本地 Docker + 自动启动的 localhost Gitea，或 E2B + 本人的 Gitea.com 账户。两者使用 `backend/scripts/experiment.py` 和相同的 v2 实验格式。U1 示例是一位用户试用一个任务；U4 示例是四位用户试用普通任务和 SWE 任务。同轮可由不同 persona 重复试用同一任务，每个会话有独立可写工作区。完整当前归档可在新 run 中[追加轮次](docs/tutorials/experiment-continuation.zh-CN.md)，先交付父末轮反馈再开始新用户。仓内 U1 示例在固定 pvlib 任务上跑五轮：R1–R4 包含交付，R5 只试用最终 Harness。
+脚本结束时会输出：
 
-完整任务环境可选择下面四份 E2B 配置，均从当前 builtin seed 跑六轮，用户与 Developer 并发分别为四；R1–R5 包含交付，R6 只试用。U8 mixed/direct 保持条件和 persona 配对一致，仅将原先六个模拟交互任务改成 direct。
+```text
+Offline demo complete: scripted sessions only; no model, forge or delivery invoked.
+```
 
-| 配置 | 每轮会话 | 模拟交互 / direct |
-| --- | --- | --- |
-| `examples/experiments/u8-mixed-e2b.json` | 8 | 6 / 2 |
-| `examples/experiments/u8-direct-e2b.json` | 8 | 0 / 8 |
-| `examples/experiments/u16-mixed-e2b.json` | 16 | 12 / 4 |
-| `examples/experiments/u32-mixed-e2b.json` | 32 | 25 / 7 |
+完整的模型驱动迭代实验按以下步骤启动。
 
-[完整教程](docs/tutorials/evolution32.zh-CN.md)说明模型协议、凭证、材料、启动和归档。画像可跨槽位复用，会话数量不等于独立真人画像数。这四组默认不启用逐轮官方评分。
+## 运行 Harness 迭代实验
+
+实验通过 `backend/scripts/experiment.py` 统一管理，可选择本地或云端运行：
+
+| 后端 | 运行环境 | 代码仓托管 | 所需准备 |
+| --- | --- | --- | --- |
+| `local` | 本地 Docker | 自动启动的本地 Gitea | Docker Engine 与 Compose |
+| `e2b` | E2B 沙箱 | 自己的 Gitea.com 账户 | `E2B_API_KEY` 与 Gitea.com Token |
+
+两种后端都需要模型接口。模拟用户、Harness 和需求角色使用兼容 OpenAI 的接口，OpenAgents 交付使用兼容 Anthropic 的接口。在实验 JSON 中选择模型，并在 `.env.experiment` 中填写对应的接口地址和密钥。具体字段见[快速开始](docs/QUICKSTART.zh-CN.md)。
+
+首次运行可选择 U1 示例：每轮一位模拟用户试用同一项任务，共五轮；前四轮包含反馈处理和代码交付，末轮只试用更新后的 Harness。以下命令均在仓库根目录执行：
 
 ```bash
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
-# 填写凭证；本地 Docker 改用 u1-local.json。
-uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u1-e2b.json --offline
-uv run --locked --extra experiments python backend/scripts/experiment.py run --config examples/experiments/u1-e2b.json --secrets-file .env.experiment
+
+CONFIG=examples/experiments/u1-local.json
+# 使用 E2B 时改为：
+# CONFIG=examples/experiments/u1-e2b.json
+
+uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$CONFIG" --offline
+# 填写 .env.experiment，并确认配置中的模型名称后启动：
+uv run --locked --extra experiments python backend/scripts/experiment.py run --config "$CONFIG" --secrets-file .env.experiment
 ```
 
-先看[快速开始](docs/QUICKSTART.zh-CN.md)，再按[完整 U1 教程](docs/tutorials/u1-experiment.zh-CN.md)操作，了解材料、模型协议、provider 凭证、进度、停止/恢复、收集与清理。两轮四用户的完整示例见[多用户教程](docs/tutorials/multi-user-experiment.zh-CN.md)。prepare 自动获取固定版本 OpenAgents，不需要提前放置 sibling checkout。[U1 验证报告](docs/validation/spec-0069-new-user.md)和[多用户验证报告](docs/validation/spec0073-multi-task-users.md)独立记录实际检查结果。
+`check --offline` 检查配置和本地材料声明。`run --config` 随后准备运行材料、创建所需资源并启动实验。启动后，使用输出的 run ID 查询状态（`status`）、查看日志（`logs`）或收集产物（`collect`）。完整步骤、预期产物和停止／恢复方法见 [U1 教程](docs/tutorials/u1-experiment.zh-CN.md)。
 
-连续执行多个完整实验时，使用[批量教程](docs/tutorials/batch-experiment.zh-CN.md)及 `examples/batches/` 的列表；`evolution-four-e2b.json` 顺序运行四组六轮实验。批次沿用成员各自的单实验生命周期，监督到终态收集才释放并发名额；Ctrl+C 退出监督，`batch stop` 才停止已启动成员。U1/U4 列表保留各自五轮/两轮的不同设置，演示执行方式，不构成公平的因果对照。
+### 多用户实验
 
-终态完整收集后，用 `grade RUN_ID --plan PATH` 在本机 Docker 上评分已保存的会话产物。私有计划选择任务 ID、适配器与带哈希的材料，SWE 官方数据集也在其中声明，E2B 归档也使用此路径。这不是新的 Harness 留出测试，结果不回流演化。详见[事后评分教程](docs/tutorials/post-run-grading.zh-CN.md)；只有 hash 的旧预测不能猜回补丁评分。
+U4 示例在两项任务上安排四个用户会话，共运行两轮，提供较小规模的多用户实验。可选择 [`u4-local.json`](examples/experiments/u4-local.json) 或 [`u4-e2b.json`](examples/experiments/u4-e2b.json)，按[多用户教程](docs/tutorials/multi-user-experiment.zh-CN.md)启动。
 
-可信 Harness 代码在本地 Docker + localhost Gitea 上可用 `runtime.local.ci_enabled: true` 开启可选工程 CI。每个 run 独占自己的 runner、privileged Docker daemon 和 job 存储，必须先通过真实 PR smoke，OpenAgents 才启用 CI 门禁。CI 不调用模型、不运行 benchmark。默认配置继续关闭 CI，E2B CI 仍不支持。[本地 CI 教程](docs/tutorials/local-engineering-ci.zh-CN.md)说明配置、状态和 runner 清理；[验收报告](docs/validation/local-engineering-ci.md)单独记录实际验证。
+更大规模的六轮实验使用以下 E2B 配置：
 
-自己的非 benchmark seed 卡库或文本指令可用 `task import-seeds` / `task from-text` 转为 ordinary 任务包，转换不请求模型/provider，不执行 setup。将返回的绝对 `task_packages` 数组写入实验 JSON 后，继续使用 check/prepare/run。[seed/文本导入教程](docs/tutorials/seed-task-import.zh-CN.md) 提供合成卡、可编辑的用户任务和 local/E2B 配置的完整离线检查；导入不复现旧镜像/服务，也不证明任务通过。
+| 配置 | 每轮会话数 | 模拟用户交互 / direct |
+| --- | ---: | ---: |
+| [`u8-mixed-e2b.json`](examples/experiments/u8-mixed-e2b.json) | 8 | 6 / 2 |
+| [`u8-direct-e2b.json`](examples/experiments/u8-direct-e2b.json) | 8 | 0 / 8 |
+| [`u16-mixed-e2b.json`](examples/experiments/u16-mixed-e2b.json) | 16 | 12 / 4 |
+| [`u32-mixed-e2b.json`](examples/experiments/u32-mixed-e2b.json) | 32 | 25 / 7 |
 
-无需模型或基础设施的脚本演示：
+任务包、用户画像配对和各轮安排均由配置固定。模拟用户交互模式允许多轮沟通，direct 模式由 Harness 接收任务后自主执行。R1–R5 包含试用、反馈处理和交付，R6 只试用最终 Harness；默认不启用逐轮官方评分。材料准备和启动方法见[六轮实验教程](docs/tutorials/evolution32.zh-CN.md)及[任务材料清单](examples/tasks/evolution32/README.zh-CN.md)，多组实验的统一调度见[批量实验教程](docs/tutorials/batch-experiment.zh-CN.md)。
+
+## 评测已有 Harness
+
+迭代完成后，可以通过独立的 Harbor 评测流程测试 Harness 的任务能力。评测统一使用 [`evaluation.yaml`](evaluation.yaml) 配置，通过 `python -m evaluation` 启动，支持在 E2B 上运行 Harbor Index 题目和标准 Harbor 任务包。
+
+可选择已发布的 Harness（`v0`、`u8`、`u8-direct`、`u16`、`u32`），也可选择已接入的 Claude Code 或 Meta-Harness。`user.enabled: false` 表示 direct 解题；设为 `true` 时，模拟用户会参与后续交互，对回复进行追问或验收。
+
+先按[评测指南](evaluation/docs/harbor.zh-CN.md)下载固定版本的运行时和 Harness 压缩包，再创建独立的评测环境：
 
 ```bash
-uv run --locked python backend/scripts/offline_demo.py
+uv venv --python 3.12.13 --managed-python --seed .venv-evaluation
+source .venv-evaluation/bin/activate
+pip install --require-hashes -r evaluation/requirements.lock
+pip install --no-deps -e ./evaluation
+cp .env.example .env
 ```
 
-当前采用源码运行，尚无 PyPI 入口；`uv.lock` 将 NexAU 固定到 [hzhua/nexau](https://github.com/hzhua/nexau) 的完整提交 `28511d9f0362191a6c378fd441b2be55309a9e32`，并锁定兼容依赖。`uv sync --locked` 自动获取该 Git 版本，本仓不内置 SDK 源码副本。
+在 `evaluation.yaml` 中配置模型和接口地址，在 `.env` 中填写 API 密钥与 E2B 凭证。默认配置选择 38 题和两个 Harness；首次运行建议先选择一题、一个 Harness，确认流程后再扩大范围。例如，修改以下字段，保留其余设置：
 
-## 文档和开发
+```yaml
+tasks: [swebenchpro-fix-file-suffix-chooser]
+harnesses: [v0]
+user:
+  enabled: false
+```
 
-- [配置说明](docs/CONFIGURATION.zh-CN.md)：v2 JSON、任务包、persona、凭证。
-- [当前架构](docs/ARCHITECTURE.md)：需求面、交付面和产物边界。
-- [公开快照](docs/EXPORTING.md)：发布粗粒度进度，原始会话留本地。
-- [开发维护工具](tools/dev/README.md)：探针、证据回放和交付验证。
-- [历史研究索引](research/README.zh-CN.md)：旧配置、源码版本和迁移清单。
-- [联合发布清单](docs/RELEASING.md)：版本冻结与发布步骤。
-- [贡献指南](CONTRIBUTING.zh-CN.md)、[安全说明](SECURITY.zh-CN.md)、[第三方来源](THIRD_PARTY.md)、[变更记录](CHANGELOG.md)。
+完成配置后，依次检查、准备并运行：
 
 ```bash
-uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
-uv run --locked --extra experiments --extra dev --extra harbor-evaluation pytest -q
+python -m evaluation validate
+python -m evaluation prepare
+python -m evaluation run
 ```
 
-前端开发需要 Node.js 22，在 `frontend/` 执行 `npm ci`、`npm test`、`npm run build`。实时 API 面向本地受信环境，静态 Pages 是另一条发布路径。默认开发 API 不自动选择 v2 run；当前实验进度使用统一入口的 `status`/`logs`，详见[前端说明](frontend/README.md)。
+`validate` 检查配置，`prepare` 准备任务和 Harness 材料，`run` 启动解题并执行评分。运行目录会保存任务成绩、执行轨迹和用量记录；启用模拟用户时，也会保存交互记录。部分题目需要官方指定的裁判模型，应配置相应凭证。任务失败、基础设施故障和裁判故障分别记录。
 
-目录分工：
+这套流程用于评测迭代后的 Harness，成绩不回流到迭代过程。恢复运行、查看报告及重新评分的方法见[评测指南](evaluation/docs/harbor.zh-CN.md)。
 
-```text
-examples/experiments/                    # 可运行的 v2 local/E2B 实验定义
-examples/tasks/、examples/personas/      # 任务包和 persona 输入
-backend/auto_designer/experiment/        # 生命周期与包内控制器
-backend/scripts/                        # 公开入口、演示、导出、CI/构建检查
-tools/dev/                              # 当前维护的诊断与回放工具
-evaluation/                             # 独立留出评分与适配器
-research/archives/                      # 冻结的历史研究记录
-.experiments/                           # 忽略的运行输出
-```
+## 文档导航
 
-`docs/specs/` 保存设计契约和任务映射，`research/inventory.json` 记录历史资料的版本与迁移位置。复现历史实验时使用对应源码版本的独立 checkout，不在当前目录执行归档 launcher。用户体感、闭环完成不等于官方 benchmark 通过，留出评分仍独立执行。
+| 主题 | 指南 |
+| --- | --- |
+| 首次运行本地或 E2B 实验 | [快速开始](docs/QUICKSTART.zh-CN.md) |
+| 实验配置、任务包与凭证 | [配置说明](docs/CONFIGURATION.zh-CN.md) |
+| 六轮 U8/U16/U32 实验 | [六轮实验教程](docs/tutorials/evolution32.zh-CN.md) |
+| Harbor 评测安装与运行 | [评测指南](evaluation/docs/harbor.zh-CN.md) |
+| 开发检查与验证命令 | [验证说明](docs/VERIFICATION.zh-CN.md) |
+| 系统架构与设计文档 | [当前架构](docs/ARCHITECTURE.md) · [设计文档](docs/specs/README.md) |
 
-## 许可证
+扩展用法包括[导入自定义任务](docs/tutorials/seed-task-import.zh-CN.md)、[追加实验轮次](docs/tutorials/experiment-continuation.zh-CN.md)、[对已有会话产物评分](docs/tutorials/post-run-grading.zh-CN.md)和[启用逐轮客观验收](docs/tutorials/evolution-feedback.zh-CN.md)。历史实验材料见[研究索引](research/README.zh-CN.md)。
 
-项目代码采用 [MIT 许可证](LICENSE)。第三方材料保留各自的许可条款，详见[第三方来源说明](THIRD_PARTY.md)。
-
-统一入口已支持运行策略、direct 交互、指定逐轮计划与 `dashboard RUN_ID`。详见[配置说明](docs/CONFIGURATION.zh-CN.md)和[迁移验收](docs/validation/spec0072-capability-migration.md)；多任务/U4/U8 已使用同一冻结 workload 契约；带 continuation export 的当前归档可继承到新 run 并追加轮次，见[追加教程](docs/tutorials/experiment-continuation.zh-CN.md)。见[多用户验收](docs/validation/spec0073-multi-task-users.md)。
-
-独立 Harbor 评测：[使用教程](evaluation/docs/harbor.zh-CN.md)。
+参与开发请参阅[贡献指南](CONTRIBUTING.zh-CN.md)，安全问题的报告方式见[安全说明](SECURITY.zh-CN.md)。项目代码采用 [MIT 许可证](LICENSE)，第三方材料的许可与来源见[第三方说明](THIRD_PARTY.zh-CN.md)。

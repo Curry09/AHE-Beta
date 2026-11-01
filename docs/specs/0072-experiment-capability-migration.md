@@ -97,8 +97,6 @@ tasks:
   - backend/scripts/check_experiment_repository.py
   - backend/tests/test_experiment_capability_migration.py
   - backend/tests/test_experiment_repository.py
-  - docs/validation/spec0072-capability-migration.md
-  - docs/audits/unified-entry-capability-migration-20261003.md
   - docs/CONFIGURATION.md
   - docs/CONFIGURATION.zh-CN.md
   - docs/QUICKSTART.md

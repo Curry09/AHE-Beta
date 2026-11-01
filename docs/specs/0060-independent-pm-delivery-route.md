@@ -39,7 +39,6 @@ tasks:
       - backend/tests/demand/test_role_contract_flow.py
       - backend/tests/demand/test_owner.py
       - backend/tests/demand/test_observation_provider.py
-      - docs/audits/0060-spec0059-observation-audit.md
     scope: 验证双轨无损交接和更名换格式的跨轮读取；审计真实两会话取证，区分读取兼容与自动发布缺口。
     acceptance: 相关测试通过；按角色记录取证成效与语义局限；不把单版本两会话误报成多轮闭环。
 ---
@@ -86,7 +85,7 @@ Owner 的 schema 新增可选整数数组 `delivery_overlaps`，driver 过滤自
 保留 automation 身份。原有精确重复兼容路径不变；非精确重复仍不能 merge。
 
 T1 修改职责 prompt、schema、driver 与架构说明；T2 验证越权保护、真实固定产物回放和
-跨版本观测读取。详见 [观测审计](../audits/0060-spec0059-observation-audit.md)。
+跨版本观测读取。当前可复现检查见[验证方法](../VERIFICATION.zh-CN.md)。
 
 ## Drawbacks
 

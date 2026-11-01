@@ -87,4 +87,4 @@ RUN_ID=REPLACE_WITH_PRINTED_RUN_ID
 uv run --locked --extra experiments python backend/scripts/experiment.py run "$RUN_ID" --secrets-file .env.experiment
 ```
 
-local 要求 Docker/Compose，并启动 localhost Gitea；E2B 要求 API key 和 Gitea.com 账户。等待 prepare 完成后使用打印的 run ID。按 [U1 教程](u1-experiment.zh-CN.md)查看进度、停止/恢复同一 run、收集和清理。转换增加的是现有生命周期的输入方式，不导入历史结果追加轮次。可选本地工程 CI 使用专属 runner 和私有 Docker daemon，见 [CI 教程](local-engineering-ci.zh-CN.md)；历史 continuation 仍需单独设计。
+local 需要 Docker/Compose，并自动启动本地 Gitea；E2B 需要 API 密钥和自己的 Gitea.com 账户。等待 prepare 成功后，用打印的 run ID 继续运行。[U1 教程](u1-experiment.zh-CN.md)介绍状态查询、停止／恢复、收集与清理。任务转换用于为新实验提供输入；从已完成实验增加轮次请使用[归档追加流程](experiment-continuation.zh-CN.md)。可选本地工程 CI 见 [CI 教程](local-engineering-ci.zh-CN.md)。

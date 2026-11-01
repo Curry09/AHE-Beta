@@ -585,7 +585,6 @@ tasks:
       - docs/EXPORTING.md
       - docs/tutorials/u1-experiment.md
       - docs/tutorials/u1-experiment.zh-CN.md
-      - docs/validation/spec0071-experiment-cleanup.md
       - frontend/README.md
       - examples/experiment.env.example
       - examples/experiments/u1-local.json
@@ -664,12 +663,9 @@ tasks:
       - docs/specs/OVERVIEW.md
       - docs/specs/0071-experiment-repository-cleanup.md
       - backend/auto_designer/distill/seed_library.py
-      - docs/0048-user-sim-final-check-convergence.md
       - docs/synthesizer-grouping.md
-      - docs/audits/0061-observation-lifecycle-validation.md
       - backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh
       - backend/deploy/gitea/bootstrap.sh
-      - docs/audits/unified-entry-capability-migration-20261003.md
     scope: 完成逐文件 inventory、当前文档和 spec 活代码映射，新增目录契约检查接入 CI，完成回归与重构后验证报告
     acceptance: 所有公开配置被遍历校验；残留维护依赖和清单遗漏可检测；Ruff/pytest/前端/spec 检查通过，实跑覆盖与未覆盖如实记录
 ---
@@ -682,7 +678,7 @@ tasks:
 
 将当前开源工作树整理为「一个公开实验入口、两种运行后端、明确的开发工具、独立的评分与历史研究资料」。公开实验只使用 `backend/scripts/experiment.py` 与 `schema_version=2`，支持 local + localhost Gitea、E2B + Gitea.com。删除旧启动别名、个人实验快捷脚本与隐式配置来源，将仍被使用的 ordinary/SWE 控制器迁入包内，整理历史配置、研究脚本和公开展示数据，并通过目录契约检查阻止重新混入。
 
-本次是仓库清理，不扩展多任务或从历史产物追加新轮的能力。现有 v2 N1 实验行为与冻结运行的恢复能力必须保持；旧 N4/N8 研究流程退出公共入口，但通过归档资料和明确的冻结代码版本保留复现路径。已在 `feat/unified-experiment-entry` 分支完成实现与离线验收，保持未提交供开发者查看；实际覆盖和未执行的在线检查见[清理验收报告](../validation/spec0071-experiment-cleanup.md)。
+本次是仓库清理，不扩展多任务或从历史产物追加新轮的能力。现有 v2 N1 实验行为与冻结运行的恢复能力必须保持；旧 N4/N8 研究流程退出公共入口，但通过归档资料和明确的冻结代码版本保留复现路径。已在 `feat/unified-experiment-entry` 分支完成实现与离线验收，保持未提交供开发者查看；当前可复现检查见[验证方法](../VERIFICATION.zh-CN.md)。
 
 ## Motivation
 

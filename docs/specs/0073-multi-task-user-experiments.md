@@ -168,7 +168,6 @@ tasks:
       - backend/tests/test_experiment_public_examples.py
       - backend/tests/test_experiment_repository.py
       - backend/tests/test_experiment_multitask_e2e.py
-      - docs/validation/spec0073-multi-task-users.md
       - CLAUDE.md
       - research/inventory.json
     scope: 保留 N1 示例、增加两种后端完整 N4 混合任务配置与受维护普通任务，双语解释材料、计划、成本和隔离边界，提供统一入口离线集成及真实后端验证报告。

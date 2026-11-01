@@ -70,7 +70,7 @@ The old `grade --dataset ... --dataset-sha256 ...` interface has been removed. E
 ```bash
 uv run --locked --extra experiments --extra evaluation \
   python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" \
-  grade "$RUN_ID" --plan "$PLAN" --round 6 --offline
+  grade "$RUN_ID" --plan "$PLAN" --offline
 ```
 
 Omit `--round` to select `config.rounds.count`, the configured final round. Grading never silently falls back to an earlier round. The selected round must be positive and sealed.
@@ -79,7 +79,7 @@ Offline checks validate plan/material integrity, original archive and session bi
 
 Full SWE predictions need original baseline, path, byte-length and hash receipts. Other outputs require the session's `workspace_evidence.evaluation_artifacts` receipts, binding the original user trial's Harness SHA and collected bytes. A plan cannot turn a file copied in later into original execution evidence. Missing, truncated or oversized outputs remain ungradable; old logs or the latest remote code cannot fill the gap.
 
-New task packages declare public output collection using schema version 2. Declarations identify required workspace files and size limits, without tests or expected answers. Existing version 1 task identities remain unchanged. Managed-service measurement collection depends on separate task-environment work and is unsupported by standard backends; preparation rejects it rather than treating it as an ordinary workspace file.
+V2 task packages can declare public workspace artifacts and size limits; v3 container tasks can also collect declared service artifacts through the environment driver. Declarations contain no hidden tests or expected answers. Managed-service measurements require runtime support and trusted receipts from the original execution. Grading checks the adapter’s requirements and retains an ungradable result when capabilities or evidence are missing; ordinary files cannot replace that evidence. See [task packages](../CONFIGURATION.md#task-package) for environment formats.
 
 For example, a new custom file task can add the following to its version 2 task package before the experiment starts. The `output` ID then matches `custom.json`'s `artifact_map`; the task must actually produce this file. The size limit is an explicit operator choice, not an automatic benchmark default.
 
@@ -110,7 +110,7 @@ The current container runner limits each material/artifact and unpacked tar to 2
 ```bash
 uv run --locked --extra experiments --extra evaluation \
   python backend/scripts/experiment.py --runs-dir "$RUNS_DIR" \
-  --json grade "$RUN_ID" --plan "$PLAN" --round 6
+  --json grade "$RUN_ID" --plan "$PLAN"
 ```
 
 Sessions are graded serially on the local host. Docker downloads, builds and tests may take substantial disk space and time. Task-produced code is not executed on the host.
@@ -123,7 +123,7 @@ Sessions are graded serially on the local host. Docker downloads, builds and tes
 | `nl2repo` | Pinned official post-processing, commands, counts and original tests from the task image. Reports official pass rate; without a declared binary policy, `passed` is null. Operator thresholds are identified separately. |
 | `custom` | Fixed script in an isolated container. It writes `/logs/verifier/result.json`, for example `{"passed": true, "score": 1}`; results remain explicitly custom. |
 
-An adapter name does not mean every task or version of its suite is supported. Unknown sources or unsupported execution modes are rejected. See the [validation report](../validation/extensible-session-grading.md) for tested scope and remaining official validation; fixture tests are not official benchmark results.
+An adapter name does not mean every task or version of its suite is supported. Unknown sources or unsupported execution modes are rejected. See the [verification guide](../VERIFICATION.md) for current checks; fixture tests are not official benchmark results.
 
 An official bundle preserves the pinned task root (`task.toml`, `tests/`, `environment/`) in one tar archive. Terminal/TUA require `build_official_environment: true` to build the frozen environment and record its actual image identity before verification. NL2Repo/custom specify immutable images. External expected answers and dependency materials must also be fixed; pinning a script alone does not freeze its downloaded URLs.
 
