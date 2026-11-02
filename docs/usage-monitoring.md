@@ -4,7 +4,7 @@
 
 ## 数据位置与归属
 
-控制器通过 `AUTO_DESIGNER_USAGE_PATH` 指定本次运行的 `usage.jsonl`。统一实验入口将其放在运行数据目录的 `role_runs/<run_id>/` 下；未显式指定路径的独立进程默认写入 `backend/data/usage.jsonl`。E2B 中的记录需要通过 `collect` 收集到管理主机。
+控制器通过 `AHE_BETA_USAGE_PATH` 指定本次运行的 `usage.jsonl`。统一实验入口将其放在运行数据目录的 `role_runs/<run_id>/` 下；未显式指定路径的独立进程默认写入 `backend/data/usage.jsonl`。E2B 中的记录需要通过 `collect` 收集到管理主机。
 
 `UsageContext` 使用 `contextvars` 关联 run、轮次、会话、用户画像、任务、槽位、Harness 提交、角色和请求。NexAU worker 线程通过 `copy_context()` 继承这些信息，避免并发会话混用归属。
 
@@ -15,7 +15,7 @@
 | 链路 | 用量来源 | 可用性 |
 | --- | --- | --- |
 | 模拟用户 | OpenAI 兼容响应的 `usage` | 取决于提供商是否返回 |
-| Triage、Synthesizer、Divergent、模型 Owner | NexAU tracer 响应中的 `usage` 或 `usageMetadata` | 取决于运行时与提供商是否提供 |
+| Triage、Architect、Divergent、模型 Owner | NexAU tracer 响应中的 `usage` 或 `usageMetadata` | 取决于运行时与提供商是否提供 |
 | 被试 Harness | Harness tracer 通过专用 stdout 通道回传，控制器补充会话归属 | 取决于具体 Harness 版本的接入情况 |
 | OpenAgents 交付 | 独立进程或容器中的交付调用 | 当前控制器没有统一的逐请求 usage 接入 |
 
@@ -35,6 +35,6 @@
 
 ## 记录边界
 
-监测只覆盖已接入的调用，无法精确补算缺失的历史请求。`AUTO_DESIGNER_RUN_ID` 由编排环境指定，独立运行且未指定时会生成唯一值。
+监测只覆盖已接入的调用，无法精确补算缺失的历史请求。`AHE_BETA_RUN_ID` 由编排环境指定，独立运行且未指定时会生成唯一值。
 
 JSONL 追加使用进程内锁，读取时跳过损坏的行。统计写入失败不阻断实验主流程。该锁保护单进程内的多线程写入，不提供多进程共享文件的写入协调。

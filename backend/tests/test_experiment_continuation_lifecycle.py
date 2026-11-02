@@ -7,17 +7,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment import engine
-from auto_designer.experiment.config import ConfigError, config_hash
-from auto_designer.experiment.continuation.export import export_git_tree
-from auto_designer.experiment.controllers import feedback, runtime
-from auto_designer.experiment.materials import sha256_file
-from auto_designer.loop.feedback_pipeline import FeedbackPipeline
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
-from auto_designer.models import IssueDraft
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import current_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.experiment import engine
+from ahe_beta.experiment.config import ConfigError, config_hash
+from ahe_beta.experiment.continuation.export import export_git_tree
+from ahe_beta.experiment.controllers import feedback, runtime
+from ahe_beta.experiment.materials import sha256_file
+from ahe_beta.loop.feedback_pipeline import FeedbackPipeline
+from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore
+from ahe_beta.models import IssueDraft
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import current_usage_context
+from ahe_beta.user.session_store import SessionStore
 from test_experiment_config_v2 import write
 
 
@@ -112,8 +112,8 @@ def inherited_run(tmp_path, monkeypatch):
     write(root / "manifest.json", manifest)
     repo = root / "data/harness_sandbox/harness_repo"
     monkeypatch.setattr(runtime, "HARNESS_REPO", repo)
-    monkeypatch.setenv("AUTO_DESIGNER_HARNESS_ARCHIVE", str(archive))
-    monkeypatch.setenv("AUTO_DESIGNER_CONTINUATION_INPUT", str(input_path))
+    monkeypatch.setenv("AHE_BETA_HARNESS_ARCHIVE", str(archive))
+    monkeypatch.setenv("AHE_BETA_CONTINUATION_INPUT", str(input_path))
     return SimpleNamespace(
         root=root,
         repo=repo,
@@ -171,8 +171,8 @@ def test_ordinary_seed_retains_existing_ignore_and_hook_behavior(tmp_path, monke
     (root / "harness_template/.gitignore").write_text("custom\n")
     monkeypatch.setattr(runtime, "ROOT", root)
     monkeypatch.setattr(runtime, "HARNESS_REPO", tmp_path / "ordinary-repo")
-    monkeypatch.delenv("AUTO_DESIGNER_HARNESS_ARCHIVE", raising=False)
-    monkeypatch.delenv("AUTO_DESIGNER_CONTINUATION_INPUT", raising=False)
+    monkeypatch.delenv("AHE_BETA_HARNESS_ARCHIVE", raising=False)
+    monkeypatch.delenv("AHE_BETA_CONTINUATION_INPUT", raising=False)
     repo = runtime._seed_harness_repo()
     assert (repo / ".gitignore").read_text() == "__pycache__/\n*.pyc\n.openagents/\n"
     assert (repo / ".git/hooks/pre-commit").exists()
@@ -203,7 +203,7 @@ def _empty_roles(monkeypatch):
     monkeypatch.setattr(
         feedback,
         "assemble_feedback_roles",
-        lambda **kwargs: {"triagers": [], "synthesizers": [], "divergents": [], "owner": None},
+        lambda **kwargs: {"triagers": [], "architects": [], "divergents": [], "owner": None},
     )
 
 
@@ -247,7 +247,7 @@ def test_bootstrap_nonempty_admission_uses_isolated_external_identity(inherited_
     monkeypatch.setattr(
         feedback,
         "assemble_feedback_roles",
-        lambda **kwargs: {"triagers": [], "synthesizers": [], "divergents": [], "owner": Owner()},
+        lambda **kwargs: {"triagers": [], "architects": [], "divergents": [], "owner": Owner()},
     )
     receipt = _bootstrap(run, tracker)
     assert receipt["no_admissions"] is False
@@ -379,8 +379,8 @@ def test_completed_bootstrap_rejects_changed_mapping_on_resume(
 
 
 def _add_report_with_native_evidence(run):
-    from auto_designer.loop.recovery import digest_value
-    from auto_designer.models import (
+    from ahe_beta.loop.recovery import digest_value
+    from ahe_beta.models import (
         FeelingScore,
         IssueRef,
         Persona,
@@ -468,9 +468,9 @@ def _add_report_with_native_evidence(run):
 def test_resume_after_triage_reuses_frozen_projection_and_native_install(
     inherited_run, monkeypatch
 ):
-    from auto_designer.demand.triage import Triager
-    from auto_designer.experiment.continuation import evidence, forge
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+    from ahe_beta.demand.triage import Triager
+    from ahe_beta.experiment.continuation import evidence, forge
+    from ahe_beta.loop.round_gate import RoundDeliveryBlocked
 
     run = inherited_run
     _add_report_with_native_evidence(run)
@@ -538,7 +538,7 @@ def test_resume_after_triage_reuses_frozen_projection_and_native_install(
                 )
             ],
             "divergents": [Divergent()],
-            "synthesizers": [],
+            "architects": [],
             "owner": None,
         }
 
@@ -556,8 +556,8 @@ def test_resume_after_triage_reuses_frozen_projection_and_native_install(
 def test_resume_real_triager_reuses_saved_model_output_after_failed_side_effect(
     inherited_run, monkeypatch
 ):
-    from auto_designer.demand.triage import Triager
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+    from ahe_beta.demand.triage import Triager
+    from ahe_beta.loop.round_gate import RoundDeliveryBlocked
 
     run = inherited_run
     _add_report_with_native_evidence(run)
@@ -596,7 +596,7 @@ def test_resume_real_triager_reuses_saved_model_output_after_failed_side_effect(
                     str(kwargs["definitions_root"]),
                 )
             ],
-            "synthesizers": [],
+            "architects": [],
             "divergents": [],
             "owner": None,
         }

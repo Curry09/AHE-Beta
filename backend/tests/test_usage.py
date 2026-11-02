@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor
 
-from auto_designer import usage as module
-from auto_designer.usage import UsageStore, bind_usage_context, current_usage_context, usage_fields
+from ahe_beta import usage as module
+from ahe_beta.usage import UsageStore, bind_usage_context, current_usage_context, usage_fields
 
 
 def test_usage_normalization_preserves_optional_fields() -> None:
@@ -66,7 +66,7 @@ def test_summary_is_derived_from_filtered_raw_events(tmp_path) -> None:
     )
     store.append(
         {
-            "role": "synthesizer",
+            "role": "architect",
             "session_id": "b",
             "input_tokens": 7,
             "output_tokens": 1,
@@ -78,7 +78,7 @@ def test_summary_is_derived_from_filtered_raw_events(tmp_path) -> None:
     )
     store.append(
         {
-            "role": "synthesizer",
+            "role": "architect",
             "session_id": "b",
             "input_tokens": None,
             "output_tokens": None,
@@ -91,8 +91,8 @@ def test_summary_is_derived_from_filtered_raw_events(tmp_path) -> None:
     assert store.summary()["total_tokens"] == 13
     assert store.summary(session_id="a")["total_tokens"] == 5
     assert store.summary()["unavailable_count"] == 1
-    assert store.summary()["by_role"]["synthesizer"]["event_count"] == 2
-    assert store.summary()["by_role"]["synthesizer"]["unavailable_count"] == 1
+    assert store.summary()["by_role"]["architect"]["event_count"] == 2
+    assert store.summary()["by_role"]["architect"]["unavailable_count"] == 1
     assert store.summary(role="missing")["event_count"] == 0
 
 

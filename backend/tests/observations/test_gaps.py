@@ -4,17 +4,17 @@ from pathlib import Path
 import pytest
 import yaml
 
-from auto_designer.observations.delivery_gaps import MARKER, ingest_delivery_gaps
-from auto_designer.observations.gaps import (
+from ahe_beta.observations.delivery_gaps import MARKER, ingest_delivery_gaps
+from ahe_beta.observations.gaps import (
     GapService,
     bind_gaps,
     gap_schema,
     submit_observation_gap,
 )
-from auto_designer.observations.grants import authorized_sessions, grant
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.observations.grants import authorized_sessions, grant
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
 
 
 def request(**changes):
@@ -89,7 +89,7 @@ def test_pm_origin_preserved_and_conflicts_rejected(tmp_path):
 @pytest.mark.parametrize("role", ["owner", "delivery-developer"])
 def test_pm_lineage_cannot_leak_back_through_followup_gaps(tmp_path, role):
     svc = service(tmp_path, role=role)
-    from auto_designer.models import IssueDraft
+    from ahe_beta.models import IssueDraft
 
     source = svc.tracker.create_issue(
         IssueDraft(title="PM", body="opportunity", labels=["from-divergent"])
@@ -118,7 +118,7 @@ def test_restart_and_ambiguous_remote_response_do_not_duplicate_closed_issue(tmp
     assert tracker._counter == 1
 
 
-@pytest.mark.parametrize("role", ["triage_agent", "divergent_pm", "synthesizer", "owner"])
+@pytest.mark.parametrize("role", ["triage_agent", "divergent_pm", "architect", "owner"])
 def test_nonterminal_tool_schemas_do_not_drift(role):
     root = Path(__file__).resolve().parents[2] / "agent_defs" / role
     tool = yaml.safe_load((root / "tools/submit_observation_gap.tool.yaml").read_text())
@@ -130,7 +130,7 @@ def test_nonterminal_tool_schemas_do_not_drift(role):
 def test_delivery_ingestion_requires_authenticated_author_and_issue_scope(tmp_path):
     svc = service(tmp_path)
     tracker = svc.tracker
-    from auto_designer.models import IssueDraft
+    from ahe_beta.models import IssueDraft
 
     ref = tracker.create_issue(IssueDraft(title="original", body="context", labels=["openagents"]))
     grant(store=svc.store, issue=ref.number, sessions={"s1"})

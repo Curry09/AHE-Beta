@@ -8,7 +8,7 @@ import importlib
 
 import pytest
 
-run = importlib.import_module("auto_designer.experiment.controllers.runtime")
+run = importlib.import_module("ahe_beta.experiment.controllers.runtime")
 
 
 @pytest.fixture

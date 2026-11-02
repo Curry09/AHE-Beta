@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 import sys
 
-from auto_designer.models import WorkspaceSpec
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.models import WorkspaceSpec
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Domain,
     D5Autonomy,
@@ -20,15 +20,15 @@ from auto_designer.user.sim.dimensions import (
     Persona,
     finalize_persona,
 )
-from auto_designer.user.sim.sandbox import Sandbox
-from auto_designer.user.sim.tools import (
+from ahe_beta.user.sim.sandbox import Sandbox
+from ahe_beta.user.sim.tools import (
     read_file,
     run_shell,
     tool_stack,
     web_search,
     write_file,
 )
-from auto_designer.user.sim.workspace import materialize
+from ahe_beta.user.sim.workspace import materialize
 
 
 def _persona(d1: D1Eval) -> Persona:

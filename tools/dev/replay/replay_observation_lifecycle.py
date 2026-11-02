@@ -51,14 +51,14 @@ def main() -> None:
     from openagents.runtime import engine
     from openagents.utils import forge
 
-    from auto_designer.demand.owner import Owner
-    from auto_designer.harness.launcher import HarnessLauncher
-    from auto_designer.observations.delivery_gaps import ingest_delivery_gaps
-    from auto_designer.observations.gaps import GapService
-    from auto_designer.observations.grants import grant
-    from auto_designer.tracker.gitea import GiteaTracker
-    from auto_designer.user.session_store import SessionStore
-    from auto_designer.user.sim.runtime import DockerWorkspaceRuntime
+    from ahe_beta.demand.owner import Owner
+    from ahe_beta.harness.launcher import HarnessLauncher
+    from ahe_beta.observations.delivery_gaps import ingest_delivery_gaps
+    from ahe_beta.observations.gaps import GapService
+    from ahe_beta.observations.grants import grant
+    from ahe_beta.tracker.gitea import GiteaTracker
+    from ahe_beta.user.session_store import SessionStore
+    from ahe_beta.user.sim.runtime import DockerWorkspaceRuntime
 
     token = gitea["TOKEN"]
     os.environ["GITEA_TOKEN"] = token
@@ -84,7 +84,7 @@ def main() -> None:
     repo = root / "harness"
     repo.mkdir()
     store = SessionStore(root / "sessions")
-    os.environ["AUTO_DESIGNER_OBSERVATION_ROOT"] = str(root / "observations")
+    os.environ["AHE_BETA_OBSERVATION_ROOT"] = str(root / "observations")
     fixtures = (Path(__file__).resolve().parents[3] / "backend") / "tests/observations/fixtures"
 
     def run(argv, cwd=None):
@@ -244,7 +244,7 @@ def main() -> None:
     assert (old / "transitions.log").read_bytes() == old_bytes
     from openagents.observations.evidence import prepare
 
-    from auto_designer.models import IssueDraft
+    from ahe_beta.models import IssueDraft
 
     verified = tracker.create_issue(
         IssueDraft(

@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import runtime
-from auto_designer.experiment.collection import collect_archive
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.manifest import read_runtime, update_runtime
-from auto_designer.experiment.materials import sha256_file
+from ahe_beta.experiment import runtime
+from ahe_beta.experiment.collection import collect_archive
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.manifest import read_runtime, update_runtime
+from ahe_beta.experiment.materials import sha256_file
 
 
 class Adapter:
@@ -99,7 +99,7 @@ def run(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime, "backend_v2", lambda **kwargs: adapter)
     monkeypatch.setenv("TEST_URL", "https://example.test")
     monkeypatch.setenv("TEST_KEY", "model-secret")
-    from auto_designer.experiment import materials
+    from ahe_beta.experiment import materials
 
     monkeypatch.setattr(materials, "verify_materials", lambda value: None)
     return tmp_path, directory, manifest, adapter
@@ -125,8 +125,8 @@ def test_incomplete_preparation_cannot_contact_or_provision_provider(run, monkey
 def test_prepare_is_observable_and_serialized_until_images_ready(run, monkeypatch):
     import threading
 
-    from auto_designer.experiment import materials
-    from auto_designer.experiment.backends import local
+    from ahe_beta.experiment import materials
+    from ahe_beta.experiment.backends import local
 
     base, directory, manifest, _ = run
     monkeypatch.setattr(materials, "prepare_materials", lambda *args, **kwargs: manifest)
@@ -470,7 +470,7 @@ def test_explicit_secrets_override_process_variables(run, monkeypatch):
 
 
 def test_status_reports_provisioning_without_overwriting_owner_operation(run):
-    from auto_designer.experiment.manifest import run_lock
+    from ahe_beta.experiment.manifest import run_lock
 
     base, directory, manifest, _ = run
     update_runtime(
@@ -498,7 +498,7 @@ def test_destroy_retains_actual_provider_lost_receipt(run, monkeypatch):
 def test_forge_terminal_cache_must_match_controller_attempt(run, monkeypatch):
     import requests
 
-    from auto_designer.experiment.collection import export_gitea_snapshot
+    from ahe_beta.experiment.collection import export_gitea_snapshot
 
     _, directory, _, _ = run
     destination = directory / "runtime/gitea-evidence.json"
@@ -537,7 +537,7 @@ def test_model_probe_uses_explicit_protocol_and_excludes_other_host_auth(
     import anthropic
     import openai
 
-    from auto_designer.experiment import materials
+    from ahe_beta.experiment import materials
     from test_experiment_config_v2 import definition
 
     config = definition()
@@ -583,7 +583,7 @@ def test_model_probe_uses_explicit_protocol_and_excludes_other_host_auth(
 
 
 def test_oauth_sdk_probe_is_rejected_before_provider_calls(tmp_path, monkeypatch):
-    from auto_designer.experiment import materials
+    from ahe_beta.experiment import materials
     from test_experiment_config_v2 import definition
 
     config = definition()
@@ -737,8 +737,8 @@ def test_provider_unknown_retains_previous_ledger_facts_as_last_observed(run, mo
 def test_new_task_preparation_unknown_until_matching_receipt_and_stale_task_rejected(
     tmp_path, monkeypatch
 ):
-    from auto_designer.experiment import materials, workload
-    from auto_designer.experiment.config import config_hash
+    from ahe_beta.experiment import materials, workload
+    from ahe_beta.experiment.config import config_hash
     from test_experiment_workload import multiple_inputs, prepared_inputs
 
     config = multiple_inputs.__wrapped__(

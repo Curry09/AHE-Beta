@@ -80,7 +80,7 @@ class SimulatedUserHarnessAgent(FrozenHarnessAgent):
                 "USER_LLM_READ_TIMEOUT_SEC": str(self.request_timeout_sec),
                 "USER_LLM_REASONING_EFFORT": os.environ.get("USER_LLM_REASONING_EFFORT", "max"),
                 "USER_LLM_MAX_OUTPUT_TOKENS": os.environ.get("USER_LLM_MAX_OUTPUT_TOKENS", "65536"),
-                "AUTO_DESIGNER_USAGE_PATH": str(self.logs_dir / "user-llm-usage.jsonl"),
+                "AHE_BETA_USAGE_PATH": str(self.logs_dir / "user-llm-usage.jsonl"),
                 "FULL_TRACE_DIR": str(self.logs_dir / "full-call-traces/simulated-user"),
                 "PYTHONUNBUFFERED": "1",
             }

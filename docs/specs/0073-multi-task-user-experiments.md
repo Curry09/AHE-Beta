@@ -14,11 +14,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/schemas/experiment-v2.json
-      - backend/auto_designer/experiment/workload.py
-      - backend/auto_designer/experiment/materials.py
-      - backend/auto_designer/experiment/context.py
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/schemas/experiment-v2.json
+      - backend/ahe_beta/experiment/workload.py
+      - backend/ahe_beta/experiment/materials.py
+      - backend/ahe_beta/experiment/context.py
       - backend/tests/test_experiment_config_v2.py
       - backend/tests/test_experiment_materials.py
       - backend/tests/test_experiment_workload.py
@@ -34,9 +34,9 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/experiment/backends/local.py
+      - backend/ahe_beta/experiment/backends/local.py
       - backend/scripts/prepare_swebench_runtime_tree.py
-      - backend/auto_designer/user/sim/sources/docker_seed.py
+      - backend/ahe_beta/user/sim/sources/docker_seed.py
       - backend/tests/test_experiment_local_backend.py
       - backend/tests/user/sim/test_docker_seed_source.py
     scope: 按任务内容与配方建立 seed image/工作区映射，独立容器绑定会话与任务身份，扩展逐任务 preflight 和 ownership 清理。
@@ -51,16 +51,16 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/experiment/backends/e2b.py
-      - backend/auto_designer/experiment/backends/e2b_bootstrap.py
-      - backend/auto_designer/user/sim/sources/prebuilt.py
-      - backend/auto_designer/user/sim/runtime.py
-      - backend/auto_designer/user/sim/deps.py
+      - backend/ahe_beta/experiment/backends/e2b.py
+      - backend/ahe_beta/experiment/backends/e2b_bootstrap.py
+      - backend/ahe_beta/user/sim/sources/prebuilt.py
+      - backend/ahe_beta/user/sim/runtime.py
+      - backend/ahe_beta/user/sim/deps.py
       - backend/tests/test_experiment_e2b_backend.py
       - backend/tests/test_experiment_e2b_bootstrap.py
       - backend/tests/user/sim/test_prebuilt_source.py
       - backend/tests/user/sim/test_multitask_workspace.py
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/harness/launcher.py
       - backend/tests/harness/test_launcher.py
     scope: 建立任务准备映射，复制纯源码并在 run 所属 session/attempt 目录重建独立 venv，复用内容寻址依赖缓存，保护旧 prebuilt 调用免于共享链接写入。
     acceptance: 实际并发两任务依赖/同任务 editable import 指向各自目录，baseline/已发布缓存 artifact 不被改写且缓存新增原子发布；setup 子进程超时先终止再清理整个 attempt，无全局环境竞争；管理/执行身份、LOST 行为及旧冻结资源契约保留。
@@ -76,18 +76,18 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/__init__.py
-      - backend/auto_designer/experiment/controllers/unified.py
-      - backend/auto_designer/experiment/controllers/runtime.py
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/experiment/controllers/swebench.py
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/loop/live.py
-      - backend/auto_designer/models.py
-      - backend/auto_designer/user/session_store.py
-      - backend/auto_designer/usage.py
-      - backend/auto_designer/demand/evidence_contract.py
+      - backend/ahe_beta/experiment/controllers/__init__.py
+      - backend/ahe_beta/experiment/controllers/unified.py
+      - backend/ahe_beta/experiment/controllers/runtime.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/loop/live.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/user/session_store.py
+      - backend/ahe_beta/usage.py
+      - backend/ahe_beta/demand/evidence_contract.py
       - backend/scripts/check_openagents_contract.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_recovery.py
@@ -103,7 +103,7 @@ tasks:
       - backend/tests/test_run_git_isolation.py
       - backend/tests/test_sandbox_isolation.py
       - backend/tests/guards/test_guard_wiring.py
-      - tools/dev/replay/replay_synthesizer_owner_from_repo.py
+      - tools/dev/replay/replay_architect_owner_from_repo.py
       - tools/dev/replay/replay_roles_from_sessions.py
       - tools/dev/replay/replay_owner_from_repo.py
     scope: 新运行只装配一套控制器与角色，删除当前 ordinary/SWE 双份实现；冻结 round/key/input 使用逻辑绑定，setup 前建立会话身份，两交互模式复用原闭环并保留 L1 任务来源。
@@ -118,10 +118,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/engine.py
-      - backend/auto_designer/experiment/runtime.py
-      - backend/auto_designer/experiment/dashboard.py
-      - backend/auto_designer/web/api.py
+      - backend/ahe_beta/experiment/engine.py
+      - backend/ahe_beta/experiment/runtime.py
+      - backend/ahe_beta/experiment/dashboard.py
+      - backend/ahe_beta/web/api.py
       - backend/tests/test_experiment_engine.py
       - backend/tests/test_experiment_lifecycle_v2.py
       - backend/tests/test_experiment_dashboard.py

@@ -84,8 +84,8 @@ def replay_records(
 
 
 def _default_runner(agent_def, prompt, *, store_repo, role, subject) -> str:
-    from auto_designer.demand.agent_runtime import run_agent_def
-    from auto_designer.user.session_store import SessionStore
+    from ahe_beta.demand.agent_runtime import run_agent_def
+    from ahe_beta.user.session_store import SessionStore
 
     return run_agent_def(
         agent_def,

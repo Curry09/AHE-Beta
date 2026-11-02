@@ -15,9 +15,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "user_engine"))
 
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.sim import loop as sim_loop
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.sim import loop as sim_loop
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Domain,
     D3Accept,
@@ -28,7 +28,7 @@ from auto_designer.user.sim.dimensions import (
     Persona,
     finalize_persona,
 )
-from auto_designer.user.sim.loop import run_session
+from ahe_beta.user.sim.loop import run_session
 
 _original_space = sim_loop.derive_action_space
 
@@ -37,8 +37,8 @@ def _reply_only_space(*args, **kwargs):
     return [a for a in _original_space(*args, **kwargs) if a not in {"interrupt", "keep_waiting"}]
 
 
-from auto_designer.user.sim import persona_client as _persona_module
-from auto_designer.user.sim.persona_client import ApiPersonaClient
+from ahe_beta.user.sim import persona_client as _persona_module
+from ahe_beta.user.sim.persona_client import ApiPersonaClient
 
 _persona_module.PERSONA_MAX_OUTPUT_TOKENS = int(
     os.environ.get("USER_LLM_MAX_OUTPUT_TOKENS", "65536")

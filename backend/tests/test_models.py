@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from auto_designer.models import (
+from ahe_beta.models import (
     FeelingScore,
     IssueDraft,
     IssueRef,

@@ -8,21 +8,21 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.loop.sim_user import (
+from ahe_beta.loop.sim_user import (
     _infer_kind,
     _issue_draft_from_body,
     make_sim_run_session_fn,
     result_to_sim_trace,
     result_to_turns,
 )
-from auto_designer.models import Persona, SeedScenario, Session, WorkspaceSpec
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.loop import SessionResult, TurnLog
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.run_live import expert
+from ahe_beta.models import Persona, SeedScenario, Session, WorkspaceSpec
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.loop import SessionResult, TurnLog
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+from ahe_beta.user.sim.run_live import expert
 
 
 class _NonGitWorkspace:
@@ -290,7 +290,7 @@ def test_sim_adapter_wraps_harness_in_connector(tmp_path, monkeypatch) -> None:
         def close(self) -> None:
             self._harness.close()
 
-    monkeypatch.setattr("auto_designer.loop.sim_user.HarnessConnector", _SpyConnector)
+    monkeypatch.setattr("ahe_beta.loop.sim_user.HarnessConnector", _SpyConnector)
     fn = make_sim_run_session_fn(
         client_factory=ScriptedPersonaClient,
         tracker=FakeTracker(),
@@ -485,13 +485,13 @@ def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:
     """
     events: list = []
     monkeypatch.setattr(
-        "auto_designer.loop.sim_user.materialize_workspace",
+        "ahe_beta.loop.sim_user.materialize_workspace",
         lambda spec: (
             events.append(("materialize", spec.fixture)) or _NonGitWorkspace(f"/ws/{spec.fixture}")
         ),
     )
     monkeypatch.setattr(
-        "auto_designer.loop.sim_user.ensure_deps",
+        "ahe_beta.loop.sim_user.ensure_deps",
         lambda ws, spec: events.append(("ensure_deps", ws)),
     )
     fn, mp = _fn(tmp_path)
@@ -511,11 +511,11 @@ def test_main_path_does_not_ensure_deps_in_sim_user(tmp_path, monkeypatch) -> No
     """传入 workspace_dir 的 orchestrator 主路径：依赖已由 orchestrator 就位，sim_user 不重复
     materialize/ensure_deps（反向断言）。"""
     monkeypatch.setattr(
-        "auto_designer.loop.sim_user.materialize_workspace",
+        "ahe_beta.loop.sim_user.materialize_workspace",
         lambda spec: (_ for _ in ()).throw(AssertionError("主路径不应 materialize")),
     )
     monkeypatch.setattr(
-        "auto_designer.loop.sim_user.ensure_deps",
+        "ahe_beta.loop.sim_user.ensure_deps",
         lambda ws, spec: (_ for _ in ()).throw(AssertionError("主路径不应 ensure_deps")),
     )
     fn, mp = _fn(tmp_path)

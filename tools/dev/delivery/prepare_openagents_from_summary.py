@@ -106,8 +106,8 @@ def main() -> int:
             text=True,
         ).stdout.strip()
 
-    from auto_designer.models import IssueDraft  # noqa: PLC0415
-    from auto_designer.tracker.gitea import GiteaTracker  # noqa: PLC0415
+    from ahe_beta.models import IssueDraft  # noqa: PLC0415
+    from ahe_beta.tracker.gitea import GiteaTracker  # noqa: PLC0415
 
     tracker = GiteaTracker(
         base_url=base,

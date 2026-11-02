@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from auto_designer.user.sim.persona_client import (
+from ahe_beta.user.sim.persona_client import (
     PERSONA_MAX_CONTEXT_TOKENS,
     PERSONA_MAX_OUTPUT_TOKENS,
 )
@@ -19,7 +19,7 @@ def test_all_nexau_agents_use_256k_local_context() -> None:
     definitions = [
         BACKEND / "harness_template" / "agent.yaml",
         BACKEND / "agent_defs" / "triage_agent" / "agent.yaml",
-        BACKEND / "agent_defs" / "synthesizer" / "agent.yaml",
+        BACKEND / "agent_defs" / "architect" / "agent.yaml",
         BACKEND / "agent_defs" / "divergent_pm" / "agent.yaml",
         BACKEND / "agent_defs" / "owner" / "agent.yaml",
     ]
@@ -30,6 +30,6 @@ def test_all_nexau_agents_use_256k_local_context() -> None:
 
 
 def test_transient_nexau_role_uses_same_limits() -> None:
-    source = (BACKEND / "auto_designer" / "nexau_runtime.py").read_text(encoding="utf-8")
+    source = (BACKEND / "ahe_beta" / "nexau_runtime.py").read_text(encoding="utf-8")
     assert '"max_context_tokens: 256000\\n"' in source
     assert '"  max_tokens: 32768\\n"' in source

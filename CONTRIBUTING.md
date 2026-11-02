@@ -31,7 +31,7 @@ After editing specs, validate them and regenerate the indexes:
 ```bash
 tools/spec-driven-development/spec validate
 tools/spec-driven-development/spec render
-tools/spec-driven-development/spec graph --package-root backend/auto_designer
+tools/spec-driven-development/spec graph --package-root backend/ahe_beta
 ```
 
 Commit the generated changes to `docs/specs/OVERVIEW.md` and `docs/specs/ARCHITECTURE.md` with the source specs. Generate these files through the CLI rather than editing them manually.

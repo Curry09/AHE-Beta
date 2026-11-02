@@ -27,13 +27,13 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/runtime.py
-      - backend/auto_designer/user/sim/workspace.py
-      - backend/auto_designer/user/sim/seed_source.py
-      - backend/auto_designer/user/sim/sources/docker_seed.py
-      - backend/auto_designer/user/sim/deps.py
-      - backend/auto_designer/user/sim/sandbox.py
-      - backend/auto_designer/user/sim/tools.py
+      - backend/ahe_beta/user/sim/runtime.py
+      - backend/ahe_beta/user/sim/workspace.py
+      - backend/ahe_beta/user/sim/seed_source.py
+      - backend/ahe_beta/user/sim/sources/docker_seed.py
+      - backend/ahe_beta/user/sim/deps.py
+      - backend/ahe_beta/user/sim/sandbox.py
+      - backend/ahe_beta/user/sim/tools.py
       - backend/tests/user/sim/test_docker_seed_source.py
       - backend/tests/user/sim/test_workspace_runtime.py
       - backend/scripts/prepare_swebench_runtime_tree.py
@@ -49,13 +49,13 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/harness/launcher.py
       - backend/harness_template/entry.py
       - backend/harness_template/RUNTIME.md
       - backend/harness_template/tests/test_smoke.py
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/harness/test_launcher.py
       - backend/tests/harness/test_template_entry.py
       - backend/tests/loop/test_orchestrator.py
@@ -72,11 +72,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/evaluation/adapters/swebench.py
-      - backend/auto_designer/evaluation/__init__.py
-      - backend/auto_designer/models.py
-      - backend/auto_designer/user/session_store.py
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/evaluation/adapters/swebench.py
+      - backend/ahe_beta/evaluation/__init__.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/user/session_store.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/evaluation/test_swebench_runner.py
       - backend/tests/user/test_session_store.py
       - backend/tests/user/sim/test_loop.py
@@ -97,7 +97,7 @@ tasks:
       - backend/deploy/swebench-seed/Dockerfile
       - backend/deploy/swebench-seed/runtime.Dockerfile
       - backend/scripts/build_swebench_runtime_image.sh
-      - backend/auto_designer/experiment/controllers/swebench.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
       - backend/scripts/e2e-spec-0051-session-container.sh
       - CLAUDE.md
     scope: 保留从显式 seed 资产构建 runnable 镜像的辅助脚本与 SWE controller 检查；公开实验由 v2 统一入口启动，模型专用 shell 和旧 auditable wrapper 已退出。
@@ -131,7 +131,7 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 一局的生命周期固定为：
 
 1. `docker-seed` 校验 image 带有 runnable 协议标签，为该 session 创建唯一命名容器并启动；随后在该容器可写层移除其它 seed instance 与全池 build-state，使 `/workspace` 只剩目标 instance；工作目录是容器内 `/workspace/<instance_id>/repo`。
-2. persona 工具经 `WorkspaceRuntime` 读写/执行；harness checkout 作为只读输入复制进容器的 `/opt/auto-designer/harness/<sha>`，随后由 `docker exec -i` 启动。不得把 repo 导出成宿主工作目录。
+2. persona 工具经 `WorkspaceRuntime` 读写/执行；harness checkout 作为只读输入复制进容器的 `/opt/ahe-beta/harness/<sha>`，随后由 `docker exec -i` 启动。不得把 repo 导出成宿主工作目录。
 3. harness 正常 reply 带机器状态 `completed | interrupted | crashed`。慢请求不再有 240 秒整轮 deadline；每 90 秒由 persona 选择 `keep_waiting | send_message | interrupt | give_up`。`timed_out` 仅保留给宿主绝对上限等基础设施故障，与 `crashed` 一样 fail-closed。
 4. 正常结束时从会话容器导出 `git diff --binary` 文本及 SHA-256；随后删除会话容器。
 5. evaluator 从对应的官方 SWE-bench instance image 启动**新容器**，应用 diff 并运行 canonical eval 命令。交互容器里的依赖、未跟踪进程和测试缓存不带入验收。
@@ -147,7 +147,7 @@ SWE-bench 用户会话不再把 seed image 中的仓库 `docker cp` 到 WSL/宿�
 
 `WorkspaceRuntime` 是消费侧唯一接缝：`cwd`、`read_text`、`write_text`、`run`、`export_patch`、`close`。本地 fixture 由 `LocalWorkspaceRuntime` 包装以保持开发/单测兼容；`docker-seed` 返回 `DockerWorkspaceRuntime`，不再返回 `str`。任何需要 cwd 的调用点必须消费该协议，不得用 `Path(runtime)` 或宿主 `open()` 绕过。
 
-容器创建须使用：唯一 session 名、`--label auto-designer.session=<id>`、非特权、无宿主 bind mount、工作目录为 repo。共享 runnable image 可以打包任务池以复用镜像层，但 provision 返回前必须在该容器的 overlay 可写层对白名单外的 `/workspace/*` 建立删除态，并删除含全池清单的 `/build-state.json`；不能只依赖 cwd，因为 harness shell 可使用绝对路径。网络默认 `none`；正式 GLM 实验由 runner 显式配置 bridge 以访问 `172.22.64.1` 网关，后续可收紧为 egress allowlist。镜像标签 `org.auto-designer.seed-runtime=1` 是可运行契约；存储型旧镜像没有标签，启动即失败并提示重建，不能静默回退到 `docker cp`。
+容器创建须使用：唯一 session 名、`--label ahe-beta.session=<id>`、非特权、无宿主 bind mount、工作目录为 repo。共享 runnable image 可以打包任务池以复用镜像层，但 provision 返回前必须在该容器的 overlay 可写层对白名单外的 `/workspace/*` 建立删除态，并删除含全池清单的 `/build-state.json`；不能只依赖 cwd，因为 harness shell 可使用绝对路径。网络默认 `none`；正式 GLM 实验由 runner 显式配置 bridge 以访问 `172.22.64.1` 网关，后续可收紧为 egress allowlist。镜像标签 `org.auto-designer.seed-runtime=1` 是可运行契约；存储型旧镜像没有标签，启动即失败并提示重建，不能静默回退到 `docker cp`。
 
 ### 终止语义
 
@@ -215,7 +215,7 @@ SWE-bench 官方 harness 以 instance 为单位构建/启动 Docker image，在�
 
 无阻塞问题。操作者已确定：使用做好的 image 起 Docker；persona 保留直接查看工作区的能力；主观接受与客观执行结果都保留；审计先做最小可复核证据；移除 harness 240 秒整轮超时，长请求由 90 秒 persona 心跳决定是否继续。
 
-正式 16×5 重跑使用新的 `isolated-v2` experiment id 与 runnable seed digest。旧的 `auto-designer-seed:swebench-medium-hard-16` 是 storage-only，按本 spec 必须被启动检查拒绝，而不是兼容运行；旧 experiment 目录保持原样。
+正式 16×5 重跑使用新的 `isolated-v2` experiment id 与 runnable seed digest。旧的 `ahe-beta-seed:swebench-medium-hard-16` 是 storage-only，按本 spec 必须被启动检查拒绝，而不是兼容运行；旧 experiment 目录保持原样。
 
 ## Future possibilities
 

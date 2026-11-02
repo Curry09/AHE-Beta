@@ -6,7 +6,7 @@ Use one [`evaluation.yaml`](../evaluation.yaml), from the repository root. Crede
 
 ## Install
 
-On Linux/WSL with Python 3.12, download `harbor-evaluation-runtime-v1.0.0.zip` from the [framework release](https://github.com/Curry09/auto-designer/releases/tag/harbor-evaluation-framework-v1.0.0) and extract it into the repository root, creating `runtime/`. Download `harnesses.zip` from the [harness release](https://github.com/Curry09/auto-designer/releases/tag/harbor-evaluation-results-20261030), extracting it next to this repository, or update `paths.harnesses`.
+On Linux/WSL with Python 3.12, download `harbor-evaluation-runtime-v1.0.0.zip` from the [framework release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) and extract it into the repository root, creating `runtime/`. Download `harnesses.zip` from the [harness release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-results-20261030), extracting it next to this repository, or update `paths.harnesses`.
 
 ```bash
 python3.12 -m venv .venv-evaluation

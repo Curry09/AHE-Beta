@@ -51,18 +51,18 @@ def main() -> int:
     role_environment("DEMAND", model=args.model)
     args.model = os.environ["DEMAND_LLM_MODEL"]
     os.environ.update(
-        AUTO_DESIGNER_USAGE_PATH=str(output / "usage.jsonl"),
+        AHE_BETA_USAGE_PATH=str(output / "usage.jsonl"),
     )
 
-    from auto_designer.demand.divergent import Divergent
-    from auto_designer.demand.issue_schema import REPORT, plane
-    from auto_designer.demand.owner import Owner
-    from auto_designer.demand.synthesizer import Synthesizer
-    from auto_designer.demand.triage import Triager
-    from auto_designer.models import IssueDraft
-    from auto_designer.tracker.fake import FakeTracker
-    from auto_designer.usage import bind_usage_context, default_usage_store
-    from auto_designer.user.session_store import SessionStore
+    from ahe_beta.demand.architect import Architect
+    from ahe_beta.demand.divergent import Divergent
+    from ahe_beta.demand.issue_schema import REPORT, plane
+    from ahe_beta.demand.owner import Owner
+    from ahe_beta.demand.triage import Triager
+    from ahe_beta.models import IssueDraft
+    from ahe_beta.tracker.fake import FakeTracker
+    from ahe_beta.usage import bind_usage_context, default_usage_store
+    from ahe_beta.user.session_store import SessionStore
 
     tracker = FakeTracker()
     index_path = sessions / "index.json"
@@ -125,10 +125,10 @@ def main() -> int:
         on_event=event("pm"),
         round_provider=lambda: 1,
     )
-    synth = Synthesizer(
+    architect = Architect(
         *common,
-        str(ROOT / "agent_defs/synthesizer"),
-        on_event=event("synthesizer"),
+        str(ROOT / "agent_defs/architect"),
+        on_event=event("architect"),
         round_provider=lambda: 1,
     )
     owner = Owner(*common, str(ROOT / "agent_defs/owner"), on_event=event("owner"))
@@ -142,7 +142,7 @@ def main() -> int:
         a = pool.submit(invoke, "triager", triager.triage_once)
         b = pool.submit(invoke, "pm", pm.propose_once)
         triage_out, pm_out = a.result(), b.result()
-    synth_out = invoke("synthesizer", synth.propose_once)
+    architect_out = invoke("architect", architect.propose_once)
     owner_out = invoke("owner", owner.admit_once)
     issues = []
     for number in range(1, tracker._counter + 1):  # frozen diagnostic snapshot
@@ -156,7 +156,7 @@ def main() -> int:
         "prompt_sha256": _hashes(),
         "triage": triage_out.__dict__,
         "pm": pm_out.__dict__,
-        "synthesizer": synth_out.__dict__,
+        "architect": architect_out.__dict__,
         "owner": owner_out.__dict__,
         "usage": default_usage_store().summary(run_id=run_id),
         "issues": issues,
@@ -175,7 +175,7 @@ def main() -> int:
                     "source_sessions",
                     "triage",
                     "pm",
-                    "synthesizer",
+                    "architect",
                     "owner",
                     "usage",
                     "openagents_started",

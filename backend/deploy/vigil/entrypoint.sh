@@ -11,7 +11,7 @@ set -euo pipefail
 export DISABLE_UPDATES=1 OPENAGENTS_NO_SELF_UPDATE=1
 
 # Spec-0070/T4: preserve the reader verified before dispatch throughout this run.
-if [[ "${AUTO_DESIGNER_OBSERVATION_DOWNLOAD_POLICY:-same-origin-v1}" == "gitea-com-r2-v1" ]]; then
+if [[ "${AHE_BETA_OBSERVATION_DOWNLOAD_POLICY:-same-origin-v1}" == "gitea-com-r2-v1" ]]; then
   export OPENAGENTS_NO_SELF_UPDATE=1
 fi
 
@@ -71,7 +71,7 @@ cp /config/openagents.yml "$WORK/.openagents/openagents.yml"
 
 # 交付面 agent 的 git 身份（deliver/merge 的 commit 归属；容器内全局，不依赖宿主配置）。
 git config --global user.name "openagents"
-git config --global user.email "openagents@auto-designer.local"
+git config --global user.email "openagents@ahe-beta.local"
 git config --global --add safe.directory "$WORK"
 git config --global credential.helper \
   '!f() { if [ "$1" = get ]; then printf "%s\n" "username=${GITEA_USER}" "password=${GITEA_TOKEN}"; fi; }; f'

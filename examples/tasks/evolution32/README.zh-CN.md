@@ -17,7 +17,7 @@
 - `recipes/collect_directory.py` 及任务专用收集器：在 Actor 退出后保存实际文件和产物。
 - `recipes/freeze_initial_git.py`：在执行前，将声明的初始文件记录进准备版 Git 基线。
 
-发布和验证状态以 `manifest.json` 为准。[固定版本材料 Release](https://github.com/Curry09/auto-designer/releases/tag/evolution32-task-materials-v1) 包含 37 项输入资产，以及 `materials.lock.json`、`SHA256SUMS` 和 README。准备阶段只下载所选任务需要的资产，逐项检查哈希及文件清单。主仓当前仍为私有，带身份下载单独验证；匿名材料下载待主仓公开后再验证，通用材料下载器不加入 GitHub 身份认证逻辑。
+发布和验证状态以 `manifest.json` 为准。[固定版本材料 Release](https://github.com/Curry09/AHE-Beta/releases/tag/evolution32-task-materials-v1) 包含 37 项输入资产，以及 `materials.lock.json`、`SHA256SUMS` 和 README。准备阶段只下载所选任务需要的资产，逐项检查哈希及文件清单。主仓当前仍为私有，带身份下载单独验证；匿名材料下载待主仓公开后再验证，通用材料下载器不加入 GitHub 身份认证逻辑。
 
 32 项任务镜像统一使用 `ghcr.io/mmjzmy/auto-designer-tasks:<任务 key 小写>-v<version>`，例如 `m04-v1`、`o03-v1`、`kv-live-surgery-v1`。实际任务定义锁定镜像 digest；源码、依赖版本与构建配方记录在清单中。
 

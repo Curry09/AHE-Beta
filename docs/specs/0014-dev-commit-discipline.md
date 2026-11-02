@@ -19,7 +19,7 @@ tasks: []
 
 ## Guide-level explanation
 
-当前不配置这组旧中间件。仍有效的需求 Agent 文件访问检查、编排仓完整性检查和 Harness 提交钩子位于 `backend/auto_designer/guards/`，它们不等同于旧 Developer 的提交纪律。
+当前不配置这组旧中间件。仍有效的需求 Agent 文件访问检查、编排仓完整性检查和 Harness 提交钩子位于 `backend/ahe_beta/guards/`，它们不等同于旧 Developer 的提交纪律。
 
 ## Reference-level explanation
 

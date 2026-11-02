@@ -11,14 +11,14 @@ pytest.importorskip("nexau")  # CI 无 nexau 时跳过本模块（对齐 test_li
 
 from nexau.archs.main_sub.execution.hooks import ToolCallParams  # noqa: E402
 
-from auto_designer.guards.workspace_jail import (  # noqa: E402
+from ahe_beta.guards.workspace_jail import (  # noqa: E402
     WorkspaceJailMiddleware,
     _escapes,
     _nexau_repo_root,
     _nexau_runtime_read_roots,
     _shell_offender,
 )
-from auto_designer.usage import bind_usage_context  # noqa: E402
+from ahe_beta.usage import bind_usage_context  # noqa: E402
 
 
 class _FakeSandbox:

@@ -7,18 +7,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.evaluation.results import ExecutionEvidence, GradingResult
-from auto_designer.evaluation.service import implementation_digest
-from auto_designer.execution_contract import (
+from ahe_beta.evaluation.results import ExecutionEvidence, GradingResult
+from ahe_beta.evaluation.service import implementation_digest
+from ahe_beta.execution_contract import (
     canonical_bytes,
     canonical_sha256,
     make_execution_contract,
 )
-from auto_designer.experiment.assessment_worker import grade_bundle
-from auto_designer.experiment.grading_inputs import load_grading_plan
-from auto_designer.loop.recovery import digest_value
-from auto_designer.loop.round_assessment import _bundle, read_json, write_json
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.experiment.assessment_worker import grade_bundle
+from ahe_beta.experiment.grading_inputs import load_grading_plan
+from ahe_beta.loop.recovery import digest_value
+from ahe_beta.loop.round_assessment import _bundle, read_json, write_json
+from ahe_beta.user.session_store import SessionStore
 from test_experiment_grading import archived_run, grading_plan, prepared_inputs  # noqa: F401
 
 
@@ -78,7 +78,7 @@ def sealed(archived_run):  # noqa: F811
 
 @pytest.mark.parametrize("passed", [True, False])
 def test_sealed_session_uses_common_verified_result_service(sealed, monkeypatch, tmp_path, passed):
-    from auto_designer.evaluation import service
+    from ahe_beta.evaluation import service
 
     run, payload, request, plan = sealed
     calls = []
@@ -106,7 +106,7 @@ def test_sealed_session_uses_common_verified_result_service(sealed, monkeypatch,
 
 
 def test_changed_sealed_bytes_fail_before_any_evaluator(sealed, tmp_path):
-    from auto_designer.experiment.config import ConfigError
+    from ahe_beta.experiment.config import ConfigError
 
     _, payload, request, plan = sealed
     with pytest.raises(ConfigError, match="digest"):
@@ -117,7 +117,7 @@ def test_changed_sealed_bytes_fail_before_any_evaluator(sealed, tmp_path):
 
 
 def test_changed_user_sha_or_task_identity_cannot_be_resigned_as_same_source(sealed, tmp_path):
-    from auto_designer.experiment.config import ConfigError
+    from ahe_beta.experiment.config import ConfigError
 
     _, payload, request, plan = sealed
     request["identity"]["user_sha"] = "f" * 40
@@ -157,7 +157,7 @@ def test_live_docker_sealed_actor_artifact(sealed, tmp_path, expected, passed):
     import os
     import subprocess
 
-    from auto_designer.experiment.grading_inputs import load_grading_plan
+    from ahe_beta.experiment.grading_inputs import load_grading_plan
 
     if os.environ.get("RUN_SPEC_0084_DOCKER") != "1":
         pytest.skip("set RUN_SPEC_0084_DOCKER=1 for real Docker grading")
@@ -206,7 +206,7 @@ def test_live_docker_sealed_actor_artifact(sealed, tmp_path, expected, passed):
     assert result["status"] == "completed", result
     assert result["passed"] is passed
     assert result["execution"]["verified"] is True
-    from auto_designer.experiment.assessment_worker import safe_summary
+    from ahe_beta.experiment.assessment_worker import safe_summary
 
     public = safe_summary(result=result, request=request)
     assert "HIDDEN-ONLY" not in str(public)
@@ -220,9 +220,9 @@ def assessed_round(sealed):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-    from auto_designer.experiment.assessment_worker import safe_summary, sign
-    from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
-    from auto_designer.loop.round_assessment import RoundAssessment, exchange
+    from ahe_beta.experiment.assessment_worker import safe_summary, sign
+    from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore
+    from ahe_beta.loop.round_assessment import RoundAssessment, exchange
 
     run, _, request, plan = sealed
     root = run["directory"]
@@ -293,8 +293,8 @@ def assessed_round(sealed):
 def test_round_projection_recovery_keeps_sealed_source_and_does_not_regrade(
     assessed_round, monkeypatch, crash_after
 ):
-    from auto_designer.loop import round_assessment
-    from auto_designer.loop.recovery import RecoveryStore
+    from ahe_beta.loop import round_assessment
+    from ahe_beta.loop.recovery import RecoveryStore
 
     run, assessor, recovery, identity, arguments, summary = assessed_round
     root = run["directory"]
@@ -348,7 +348,7 @@ def test_round_projection_recovery_keeps_sealed_source_and_does_not_regrade(
 def test_not_configured_writes_unknown_assessment_without_reviewer_substitution(
     assessed_round, monkeypatch
 ):
-    from auto_designer.loop.round_assessment import RoundAssessment
+    from ahe_beta.loop.round_assessment import RoundAssessment
 
     run, assessor, recovery, _, arguments, _ = assessed_round
     manifest = {
@@ -371,7 +371,7 @@ def test_not_configured_writes_unknown_assessment_without_reviewer_substitution(
 def test_worker_unavailable_keeps_pending_and_never_invents_failed_score(
     assessed_round, monkeypatch
 ):
-    from auto_designer.loop import round_assessment
+    from ahe_beta.loop import round_assessment
 
     run, assessor, recovery, _, arguments, _ = assessed_round
     for path in (run["directory"] / "assessment/completed").glob("*.json"):
@@ -397,7 +397,7 @@ def test_worker_unavailable_keeps_pending_and_never_invents_failed_score(
 def test_final_trial_round_runs_assessment_before_seal_and_not_delivery(
     assessed_round, monkeypatch
 ):
-    from auto_designer.loop.orchestrator import Orchestrator
+    from ahe_beta.loop.orchestrator import Orchestrator
 
     run, assessor, recovery, _, arguments, _ = assessed_round
     events = []
@@ -430,7 +430,7 @@ def test_final_trial_round_runs_assessment_before_seal_and_not_delivery(
 
 def test_controller_poll_recovers_worker_crash_after_durable_result(assessed_round, monkeypatch):
     """No second worker RPC is required to repair a completed measurement."""
-    from auto_designer.loop import round_assessment
+    from ahe_beta.loop import round_assessment
 
     run, assessor, recovery, _, arguments, summary = assessed_round
     root = run["directory"]

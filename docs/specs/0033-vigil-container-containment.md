@@ -31,9 +31,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/test_run_vigil.py
-    scope: VIGIL_MODE env（container 缺省 / subprocess 显式 opt-in 且打醒目告警「无围堵，仅限盯屏联调」）。container 模式：start_vigil 改为 docker run -d --rm --name auto-designer-vigil --network vigil-net、只读挂载 staging 配置目录到 /config、env 注入 GITEA_TOKEN + claude 凭证三选一（ANTHROPIC_API_KEY（API 计费）/ ANTHROPIC_AUTH_TOKEN（网关 Bearer，配 ANTHROPIC_BASE_URL——须为 Anthropic 协议端点，网关域加进 egress 白名单）/ CLAUDE_CODE_OAUTH_TOKEN（订阅计费，宿主 claude setup-token 生成的长效 headless token））+ HTTPS_PROXY=egress-proxy + 并发 K + 内网仓地址；全缺时预检 fail-loud；日志经 docker logs -f 子进程落 data/vigil.log；stop_vigil = docker rm -f（--rm 兜底自清理）。write_openagents_config 改写到 staging 目录（不再写进 HARNESS_REPO——容器内自 clone，宿主仓与交付面脱钩），gitea.base_url 用内网地址（VIGIL_GITEA_INTERNAL_URL 缺省 http gitea 3000），host 侧 .env 的 localhost 地址仅编排面自用。预检从「PATH 有 openagents」按模式分叉：container 模式改查 docker 可用 + 镜像存在（缺镜像给 build.sh 提示）。subprocess 模式保留既有行为（含写配置进 HARNESS_REPO）。
+    scope: VIGIL_MODE env（container 缺省 / subprocess 显式 opt-in 且打醒目告警「无围堵，仅限盯屏联调」）。container 模式：start_vigil 改为 docker run -d --rm --name ahe-beta-vigil --network vigil-net、只读挂载 staging 配置目录到 /config、env 注入 GITEA_TOKEN + claude 凭证三选一（ANTHROPIC_API_KEY（API 计费）/ ANTHROPIC_AUTH_TOKEN（网关 Bearer，配 ANTHROPIC_BASE_URL——须为 Anthropic 协议端点，网关域加进 egress 白名单）/ CLAUDE_CODE_OAUTH_TOKEN（订阅计费，宿主 claude setup-token 生成的长效 headless token））+ HTTPS_PROXY=egress-proxy + 并发 K + 内网仓地址；全缺时预检 fail-loud；日志经 docker logs -f 子进程落 data/vigil.log；stop_vigil = docker rm -f（--rm 兜底自清理）。write_openagents_config 改写到 staging 目录（不再写进 HARNESS_REPO——容器内自 clone，宿主仓与交付面脱钩），gitea.base_url 用内网地址（VIGIL_GITEA_INTERNAL_URL 缺省 http gitea 3000），host 侧 .env 的 localhost 地址仅编排面自用。预检从「PATH 有 openagents」按模式分叉：container 模式改查 docker 可用 + 镜像存在（缺镜像给 build.sh 提示）。subprocess 模式保留既有行为（含写配置进 HARNESS_REPO）。
     acceptance: 两模式的 start/stop/config 落点/预检各有单测（mock subprocess/docker，不触真容器）；container 模式下 HARNESS_REPO 内不再出现 .openagents/；token/key 只经 env 不落盘断言保留；生产机容器模式端到端跑通一轮（承接 spec-0032/T5 的冒烟验收）。
   - id: T3
     title: 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地）
@@ -44,7 +44,7 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/loop/orchestrator.py
+      - backend/ahe_beta/loop/orchestrator.py
       - backend/tests/loop/test_orchestrator.py
     scope: 修 spec-0032 引入的现存 bug——推进 main 的是 Gitea server-side merge，本地 harness 仓的 main 停在 seed，c 步游标与 launcher 的会话快照永远解析到 v0（老模型 dev 在本地仓 commit+push、本地即真身，故无此问题；换轨后真身在 Gitea）。_resolve_head：先 git fetch origin <ref>（把远端对象与游标取回本地，launcher 按 SHA checkout 因此可解析），解析优先 refs/remotes/origin/<ref>、无 origin/fetch 失败时退化本地 <ref>（容忍离线/Fake/单仓测试场景，行为与今天等价）。fetch 失败不抛——观测游标宁可停滞也不废轮，失败打印告警。
     acceptance: 新增测试：本地仓 + bare origin，外部向 origin 推进 main（模拟 vigil merge）→ run_round 回灌 SHA 前进且 launcher 收到的 launch ref 为新 SHA；无 origin 的既有测试全部不回归（退化路径）；fetch 失败（origin 不可达）不抛、返回本地 SHA。
@@ -111,7 +111,7 @@ vigil 需要的只是「一个 harness 仓的 git 工作目录」——容器 en
 - **镜像**（T1）：python 3.12 bookworm（自带 git）+ claude CLI（native 安装器）+ openagents（以本地 OpenAgents checkout 为 build context 安装，版本 pin 由 checkout 决定，与「uv tool 钉版本」同一纪律）。构建入口 `build.sh <openagents-path>`。
 - **配置注入**（T2）：`write_openagents_config` 改写到宿主 staging 目录、只读挂载到容器 `/config`，entrypoint clone 后拷入 `.openagents/`；`gitea.base_url` 用容器内网地址（`VIGIL_GITEA_INTERNAL_URL` 缺省 `http://gitea:3000`），宿主 `.env` 的 localhost 地址仅编排面自用。这是「同一份配置、两个可达性域」的唯一分叉点。
 - **出口 allowlist**（T1）：vigil-net 置 `internal: true`（无 NAT，直连外网物理不通）；egress-proxy 双网络（vigil-net + 可出网默认网络），allowlist 仅 Anthropic API 域；vigil 容器经 `HTTPS_PROXY` 走代理（claude CLI 尊重代理变量）。自定义 `ANTHROPIC_BASE_URL` 时 allowlist 需同步（配置文件注释给出指引）。
-- **生命周期**（T2）：`docker run -d --rm --name auto-designer-vigil` 随 run 起、`docker rm -f` 随 run 收，日志经 `docker logs -f` 落 `data/vigil.log`（观测面不变）。
+- **生命周期**（T2）：`docker run -d --rm --name ahe-beta-vigil` 随 run 起、`docker rm -f` 随 run 收，日志经 `docker logs -f` 落 `data/vigil.log`（观测面不变）。
 - **游标修复**（T3）：`_resolve_head` 先 `git fetch origin <ref>`（同时取回对象，launcher 按 SHA checkout 得以解析），解析优先 `origin/<ref>`、失败退化本地（离线/Fake/单仓测试等价于今天）。fetch 失败告警不抛——游标宁可停滞不废轮。
 
 ## Drawbacks

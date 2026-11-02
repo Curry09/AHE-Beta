@@ -14,13 +14,13 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/models.py
-      - backend/auto_designer/execution_contract.py
-      - backend/auto_designer/user/session_store.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/execution_contract.py
+      - backend/ahe_beta/user/session_store.py
       - backend/tests/web/test_api.py
-      - backend/auto_designer/web/api.py
-      - backend/auto_designer/loop/metrics.py
-      - backend/auto_designer/evaluation/acceptance.py
+      - backend/ahe_beta/web/api.py
+      - backend/ahe_beta/loop/metrics.py
+      - backend/ahe_beta/evaluation/acceptance.py
       - backend/tests/user/test_session_store.py
       - backend/tests/loop/test_metrics.py
       - backend/tests/evaluation/test_grading_contracts.py
@@ -42,13 +42,13 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/user/sim/loop.py
-      - backend/auto_designer/user/sim/feeling.py
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/user/sim/persona_client.py
-      - backend/auto_designer/user/sim/clauses.py
-      - backend/auto_designer/user/sim/runtime.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/user/sim/loop.py
+      - backend/ahe_beta/user/sim/feeling.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/persona_client.py
+      - backend/ahe_beta/user/sim/clauses.py
+      - backend/ahe_beta/user/sim/runtime.py
       - backend/tests/user/test_direct_session.py
       - backend/tests/loop/test_sim_user.py
       - backend/tests/user/sim/test_feeling.py
@@ -62,9 +62,9 @@ tasks:
       - backend/tests/test_feedback_runtime_integrity.py
       - backend/tests/test_experiment_grading_artifact_lifecycle.py
       - backend/tests/user/test_prediction_artifacts.py
-      - backend/auto_designer/user/sim/tools.py
-      - backend/auto_designer/user/sim/sandbox.py
-      - backend/auto_designer/user/sim/sources/docker_seed.py
+      - backend/ahe_beta/user/sim/tools.py
+      - backend/ahe_beta/user/sim/sandbox.py
+      - backend/ahe_beta/user/sim/sources/docker_seed.py
       - backend/tests/user/sim/test_docker_seed_source.py
     scope: 保留交互用户按persona核实、运行测试与写入的能力；共用量表与规范反馈，终态先冻结产物再只读评阅；按冻结报告计划幂等发布0到多票。
     acceptance: 交互judge/final-check可按能力读跑写且保留用户贡献轨迹；仅终态Reviewer禁写与shell；成功零票、归因不明不造结论，恢复不重复Actor/Reviewer及Issue，冻结后评分字节不变。
@@ -78,19 +78,19 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/budget.py
-      - backend/auto_designer/harness/launcher.py
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/context.py
-      - backend/auto_designer/experiment/workload.py
-      - backend/auto_designer/experiment/model_limits.py
-      - backend/auto_designer/experiment/schemas/experiment-v2.json
-      - backend/auto_designer/experiment/schemas/task-package-v2.json
+      - backend/ahe_beta/harness/budget.py
+      - backend/ahe_beta/harness/launcher.py
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/context.py
+      - backend/ahe_beta/experiment/workload.py
+      - backend/ahe_beta/experiment/model_limits.py
+      - backend/ahe_beta/experiment/schemas/experiment-v2.json
+      - backend/ahe_beta/experiment/schemas/task-package-v2.json
       - backend/harness_template/entry.py
       - backend/harness_template/agent.yaml
       - backend/harness_template/agents/main.md
       - backend/harness_template/META_SPEC.md
-      - backend/auto_designer/harness/INTERFACE.md
+      - backend/ahe_beta/harness/INTERFACE.md
       - backend/tests/harness/test_seed_terminal_status.py
       - backend/tests/harness/test_seed_execution_contract.py
       - backend/tests/harness/test_launcher_budget.py
@@ -116,26 +116,26 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/evidence_contract.py
-      - backend/auto_designer/demand/session_timeline.py
-      - backend/auto_designer/demand/agent_runtime.py
-      - backend/auto_designer/demand/triage.py
-      - backend/auto_designer/demand/divergent.py
-      - backend/auto_designer/demand/synthesizer.py
-      - backend/auto_designer/demand/grouped_synthesizer.py
-      - backend/auto_designer/demand/owner.py
-      - backend/auto_designer/demand/proposal_view.py
-      - backend/auto_designer/demand/delivery_evidence.py
+      - backend/ahe_beta/demand/evidence_contract.py
+      - backend/ahe_beta/demand/session_timeline.py
+      - backend/ahe_beta/demand/agent_runtime.py
+      - backend/ahe_beta/demand/triage.py
+      - backend/ahe_beta/demand/divergent.py
+      - backend/ahe_beta/demand/architect.py
+      - backend/ahe_beta/demand/grouped_architect.py
+      - backend/ahe_beta/demand/owner.py
+      - backend/ahe_beta/demand/proposal_view.py
+      - backend/ahe_beta/demand/delivery_evidence.py
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/divergent_pm/systemprompt.md
-      - backend/agent_defs/synthesizer/systemprompt.md
+      - backend/agent_defs/architect/systemprompt.md
       - backend/agent_defs/owner/systemprompt.md
       - backend/tests/demand/test_evidence_contract.py
       - backend/tests/demand/test_proposal_view.py
       - backend/tests/demand/test_triage.py
       - backend/tests/demand/test_divergent_gate.py
       - backend/tests/demand/test_owner.py
-      - backend/tests/demand/test_grouped_synthesizer.py
+      - backend/tests/demand/test_grouped_architect.py
       - backend/tests/demand/test_delivery_evidence.py
     scope: 使用现有grants关联执行合同与安全验收摘要，贯穿角色投影、提案聚合、准入及交付发布，不靠模型复述。
     acceptance: 裁剪和合并不丢输入条件；多个来源保留适用范围；归因不明不抹去未交付；无隐藏grader泄露，新旧reader不静默错配。
@@ -149,31 +149,31 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/evaluation/service.py
-      - backend/auto_designer/evaluation/contracts.py
-      - backend/auto_designer/evaluation/adapters/custom.py
-      - backend/auto_designer/evaluation/adapters/swebench.py
-      - backend/auto_designer/evaluation/adapters/terminal_bench.py
-      - backend/auto_designer/evaluation/adapters/tua_bench.py
-      - backend/auto_designer/evaluation/adapters/nl2repo.py
-      - backend/auto_designer/evaluation/artifacts.py
-      - backend/auto_designer/experiment/assessment_worker.py
-      - backend/auto_designer/loop/round_assessment.py
-      - backend/auto_designer/experiment/grading.py
-      - backend/auto_designer/experiment/continuation/evidence.py
-      - backend/auto_designer/experiment/grading_inputs.py
-      - backend/auto_designer/experiment/materials.py
-      - backend/auto_designer/experiment/runtime.py
-      - backend/auto_designer/experiment/cli.py
-      - backend/auto_designer/experiment/controllers/unified.py
-      - backend/auto_designer/experiment/collection.py
-      - backend/auto_designer/experiment/manifest.py
-      - backend/auto_designer/experiment/backends/base.py
-      - backend/auto_designer/experiment/backends/local.py
-      - backend/auto_designer/experiment/backends/e2b.py
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/loop/feedback_pipeline.py
-      - backend/auto_designer/loop/recovery.py
+      - backend/ahe_beta/evaluation/service.py
+      - backend/ahe_beta/evaluation/contracts.py
+      - backend/ahe_beta/evaluation/adapters/custom.py
+      - backend/ahe_beta/evaluation/adapters/swebench.py
+      - backend/ahe_beta/evaluation/adapters/terminal_bench.py
+      - backend/ahe_beta/evaluation/adapters/tua_bench.py
+      - backend/ahe_beta/evaluation/adapters/nl2repo.py
+      - backend/ahe_beta/evaluation/artifacts.py
+      - backend/ahe_beta/experiment/assessment_worker.py
+      - backend/ahe_beta/loop/round_assessment.py
+      - backend/ahe_beta/experiment/grading.py
+      - backend/ahe_beta/experiment/continuation/evidence.py
+      - backend/ahe_beta/experiment/grading_inputs.py
+      - backend/ahe_beta/experiment/materials.py
+      - backend/ahe_beta/experiment/runtime.py
+      - backend/ahe_beta/experiment/cli.py
+      - backend/ahe_beta/experiment/controllers/unified.py
+      - backend/ahe_beta/experiment/collection.py
+      - backend/ahe_beta/experiment/manifest.py
+      - backend/ahe_beta/experiment/backends/base.py
+      - backend/ahe_beta/experiment/backends/local.py
+      - backend/ahe_beta/experiment/backends/e2b.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/loop/feedback_pipeline.py
+      - backend/ahe_beta/loop/recovery.py
       - backend/tests/test_experiment_round_grading.py
       - backend/tests/test_assessment_plan_preflight.py
       - backend/tests/test_experiment_continuation_evidence.py
@@ -225,7 +225,7 @@ tasks:
       - tools/dev/delivery/__init__.py
       - tools/dev/delivery/run_openagents_validation.py
       - backend/tests/test_run_openagents_validation.py
-      - backend/auto_designer/experiment/controllers/runtime.py
+      - backend/ahe_beta/experiment/controllers/runtime.py
       - tools/dev/delivery/prepare_openagents_from_summary.py
       - tools/dev/delivery/prepare_openagents_validation.py
       - backend/tests/test_prepare_openagents_from_summary.py
@@ -251,7 +251,7 @@ tasks:
 
 保留“用户试用 → 反馈 → 需求与交付 → 下一轮纠错”的流程。任务不通过仍允许进入后续轮次发现和修复；本组不增加候选淘汰、自动回滚或发布前能力门禁，不给最终演化产物打评测专用补丁，不预先实现完整自动续跑、上下文压缩或看门狗策略。
 
-设计基线为 auto-designer `5cccb3642c04bf278ae44e5dba9691dfb68ddf11`。本文及配套 OpenAgents 合同设计已获审阅批准，按任务验收记录更新实施状态；仅运行开发验收 canary，不重启已归档或暂停的大规模实验。
+设计基线为 AHE-Beta `5cccb3642c04bf278ae44e5dba9691dfb68ddf11`。本文及配套 OpenAgents 合同设计已获审阅批准，按任务验收记录更新实施状态；仅运行开发验收 canary，不重启已归档或暂停的大规模实验。
 
 ## Motivation
 
@@ -371,7 +371,7 @@ Session 可另存实验交互模式作分析标签，但给 Harness 的运行上
 
 合同作为 L1 固定区保留；普通事件裁剪不能将其删除。Direct 的目标摘要从真实 SeedScenario 与执行收据构建，不伪造 SimTrace 或模拟用户 goal ledger。原始目标过长时使用有 hash 的引用与有界摘要，不让大合同突破既有证据访问边界。
 
-Triage 原报告、规范化提案、PM `evidence_sessions`、Synthesizer `source_proposals/covers`、Owner 合并及准入沿用现有可信 grants 取来源并集。由框架生成独立机器合同段和有界摘要，不让模型手写来源或从正文尾部重新解析。`ProposalView` 将合同置于独立字段，不受 3000 字正文裁剪或 direct 标签过滤影响。Mixed 来源同时保留各自适用条件，不能概括成“用户可以继续”。
+Triage 原报告、规范化提案、PM `evidence_sessions`、Architect `source_proposals/covers`、Owner 合并及准入沿用现有可信 grants 取来源并集。由框架生成独立机器合同段和有界摘要，不让模型手写来源或从正文尾部重新解析。`ProposalView` 将合同置于独立字段，不受 3000 字正文裁剪或 direct 标签过滤影响。Mixed 来源同时保留各自适用条件，不能概括成“用户可以继续”。
 
 角色仍各司其职：PM 读取用户层目标、体验和使用条件；Triage/Owner 等按原授权读取客观证据。向全角色暴露执行前提不等于放开全部验证日志。安全评分摘要通过明确证据通道提供；具体隐藏断言、expected output、标准答案与原始 verifier 日志不进入需求模型。
 
@@ -415,7 +415,7 @@ Seed 主提示与 META_SPEC 改为“收到明确目标后自主推进，用户�
 users（含冻结产物和主观评阅）
   → objective_grading（请求 → 外部 worker → 验证结果收据）
   → 安全反馈投影
-  → triage ∥ PM → synth → owner → 交付 → 下一轮
+  → triage ∥ PM → architect → owner → 交付 → 下一轮
 ```
 
 恢复操作身份至少绑定 run、round、slot/session、实际试用 user_sha、task_digest、artifact_digest、plan_digest、adapter 版本与评分实现摘要。先落结果和 hash，再完成单元；重复领取复用已验证的结果，不重跑 Actor，不改旧 Session，不用交付后的 sealed_sha 替换试用 SHA。
@@ -453,7 +453,7 @@ worker 身份由 prepare 注册的验签公钥校验，私钥仅留在可信评�
 
 1. 正常交付零 Issue；建议与未知归因失败分别报告；缺失、布尔、字符串、非法评分不制造分数；前端不空引用。
 2. Reviewer 写入和 shell 工具不可达，评阅前后用于评分的字节/hash 相同；Reviewer API 失败仍可验收有效 Actor 产物。
-3. Direct 从首次消息到最终协议回复没有第二条用户消息；交互控制可用；合同经过 triage、PM、synth、合并准入和实际 OpenAgents 角色上下文后仍保留输入不可用条件。
+3. Direct 从首次消息到最终协议回复没有第二条用户消息；交互控制可用；合同经过 triage、PM、architect、合并准入和实际 OpenAgents 角色上下文后仍保留输入不可用条件。
 4. “停止后请用户继续”的无人恢复验收被架构/代码审查指出；“符合旧 Spec”不得被当作完成证据。测试不向评测任务提供隐藏答案。
 5. 注入时钟验证 7200 秒、排队、控制、预算到期及独立收尾余量；不真的耗时两小时。缺终态不计成功，内置命令不误判。
 6. 静态容量冲突被拒、未知容量如实呈现、确定性超限不追加同规模外层 attempt；保持原生异步取消和真实 SDK 构造回归。

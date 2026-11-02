@@ -17,14 +17,14 @@ from urllib.parse import urlsplit
 import httpx
 import pytest
 
-from auto_designer.experiment import context, materials, workload
-from auto_designer.experiment.backends import e2b_bootstrap, e2b_template
-from auto_designer.experiment.backends.base import BackendError
-from auto_designer.experiment.collection import (
+from ahe_beta.experiment import context, materials, workload
+from ahe_beta.experiment.backends import e2b_bootstrap, e2b_template
+from ahe_beta.experiment.backends.base import BackendError
+from ahe_beta.experiment.collection import (
     collect_archive,
     verify_management_evidence,
 )
-from auto_designer.experiment.config import ConfigError
+from ahe_beta.experiment.config import ConfigError
 from test_experiment_environment_materials import archive, task
 from test_experiment_materials import prepared_inputs as prepared_inputs
 
@@ -294,9 +294,9 @@ def test_probe_cleanup_refuses_foreign_label_and_never_scans_all_containers(tmp_
     registry = tmp_path / "registry"
     (registry / "probes").mkdir(parents=True)
     labels = {
-        "io.auto-designer.preflight.run_id": "owned",
-        "io.auto-designer.preflight.config_hash": "hash",
-        "io.auto-designer.preflight.nonce": "nonce",
+        "io.ahe-beta.preflight.run_id": "owned",
+        "io.ahe-beta.preflight.config_hash": "hash",
+        "io.ahe-beta.preflight.nonce": "nonce",
     }
     intent = {
         "run_id": "owned",
@@ -462,7 +462,7 @@ def test_lost_previously_collected_optional_log_keeps_sidecar_incomplete(tmp_pat
 
 @pytest.fixture
 def transport_run(tmp_path):
-    from auto_designer.experiment.config import config_hash
+    from ahe_beta.experiment.config import config_hash
 
     root = tmp_path / "transport-run"
     (root / "materials").mkdir(parents=True)
@@ -596,8 +596,8 @@ def test_frozen_upload_timeout_closes_stream_and_does_not_finish_setup(
 def test_failed_input_upload_retains_owned_resource_without_bootstrap_completion(
     transport_run, upload_transport, monkeypatch
 ):
-    from auto_designer.experiment.backends.e2b import E2BBackend, _write
-    from auto_designer.experiment.config import config_hash
+    from ahe_beta.experiment.backends.e2b import E2BBackend, _write
+    from ahe_beta.experiment.config import config_hash
 
     root, manifest, _ = transport_run
     manifest.update(run_id="transport-only", task_package={"id": "example"})

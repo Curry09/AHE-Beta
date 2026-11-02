@@ -334,12 +334,12 @@ tasks:
       - research/archives/harness-suite-20260920/tests/test_vps_proposals.py
       - evaluation/tests/test_vps_status.py
       - research/archives/harness-suite-20260920/tests/test_vps_status.py
-      - examples/experiments/synthesizer-ordinary-five-rounds.json
-      - research/archives/public-templates/synthesizer-ordinary-five-rounds.json
-      - examples/experiments/synthesizer-mixed-scaling.json
-      - research/archives/public-templates/synthesizer-mixed-scaling.json
-      - examples/experiments/synthesizer-scaling-e2b.json
-      - research/archives/public-templates/synthesizer-scaling-e2b.json
+      - examples/experiments/architect-ordinary-five-rounds.json
+      - research/archives/public-templates/architect-ordinary-five-rounds.json
+      - examples/experiments/architect-mixed-scaling.json
+      - research/archives/public-templates/architect-mixed-scaling.json
+      - examples/experiments/architect-scaling-e2b.json
+      - research/archives/public-templates/architect-scaling-e2b.json
       - backend/persona_library.json
       - examples/personas/library.json
       - backend/persona_library_github.json
@@ -372,15 +372,15 @@ tasks:
     files:
       - backend/run.py
       - backend/scripts/run_swebench_closed_loop.py
-      - backend/auto_designer/experiment/controllers/__init__.py
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/experiment/controllers/swebench.py
-      - backend/auto_designer/experiment/engine.py
-      - backend/auto_designer/experiment/context.py
-      - backend/auto_designer/experiment/materials.py
-      - backend/auto_designer/experiment/backends/local.py
-      - backend/auto_designer/experiment/backends/e2b.py
-      - backend/auto_designer/experiment/backends/e2b_bootstrap.py
+      - backend/ahe_beta/experiment/controllers/__init__.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
+      - backend/ahe_beta/experiment/engine.py
+      - backend/ahe_beta/experiment/context.py
+      - backend/ahe_beta/experiment/materials.py
+      - backend/ahe_beta/experiment/backends/local.py
+      - backend/ahe_beta/experiment/backends/e2b.py
+      - backend/ahe_beta/experiment/backends/e2b_bootstrap.py
       - backend/tests/test_run_swebench_closed_loop.py
       - backend/tests/test_run_git_isolation.py
       - backend/tests/test_run_vigil.py
@@ -415,11 +415,11 @@ tasks:
     files:
       - run.sh
       - backend/scripts/experiment.py
-      - backend/auto_designer/experiment/__init__.py
-      - backend/auto_designer/experiment/cli.py
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/runtime.py
-      - backend/auto_designer/experiment/manifest.py
+      - backend/ahe_beta/experiment/__init__.py
+      - backend/ahe_beta/experiment/cli.py
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/runtime.py
+      - backend/ahe_beta/experiment/manifest.py
       - backend/tests/test_experiment_cli_v2.py
       - backend/tests/test_experiment_config_v2.py
       - backend/tests/test_experiment_lifecycle_v2.py
@@ -429,10 +429,10 @@ tasks:
       - research/archives/legacy-runtime/backend/scripts/run_mixed_closed_loop.py
       - backend/scripts/migrate_trunk_main.py
       - research/archives/legacy-runtime/backend/scripts/migrate_trunk_main.py
-      - backend/auto_designer/experiment/capacity.py
-      - research/archives/legacy-runtime/backend/auto_designer/experiment/capacity.py
-      - backend/auto_designer/experiment/health.py
-      - research/archives/legacy-runtime/backend/auto_designer/experiment/health.py
+      - backend/ahe_beta/experiment/capacity.py
+      - research/archives/legacy-runtime/backend/ahe_beta/experiment/capacity.py
+      - backend/ahe_beta/experiment/health.py
+      - research/archives/legacy-runtime/backend/ahe_beta/experiment/health.py
       - backend/tests/test_run_auditable_experiment.py
       - research/archives/legacy-runtime/backend/tests/test_run_auditable_experiment.py
       - backend/tests/test_migrate_trunk_main.py
@@ -499,8 +499,8 @@ tasks:
       - tools/dev/probes/probe_persona_wait_matrix.py
       - backend/scripts/probe_swebench_persona.py
       - tools/dev/probes/probe_swebench_persona.py
-      - backend/scripts/probe_timeout_to_synthesizer.py
-      - tools/dev/probes/probe_timeout_to_synthesizer.py
+      - backend/scripts/probe_timeout_to_architect.py
+      - tools/dev/probes/probe_timeout_to_architect.py
       - backend/scripts/probe_wait_progress.py
       - tools/dev/probes/probe_wait_progress.py
       - backend/scripts/replay_observation_lifecycle.py
@@ -509,16 +509,16 @@ tasks:
       - tools/dev/replay/replay_observation_synthesis.py
       - backend/scripts/replay_owner_from_repo.py
       - tools/dev/replay/replay_owner_from_repo.py
-      - backend/scripts/replay_pm_synthesizer_owner_offline.py
-      - tools/dev/replay/replay_pm_synthesizer_owner_offline.py
+      - backend/scripts/replay_pm_architect_owner_offline.py
+      - tools/dev/replay/replay_pm_architect_owner_offline.py
       - backend/scripts/replay_role_invocations.py
       - tools/dev/replay/replay_role_invocations.py
       - backend/scripts/replay_roles_from_sessions.py
       - tools/dev/replay/replay_roles_from_sessions.py
       - backend/scripts/replay_roles_offline.py
       - tools/dev/replay/replay_roles_offline.py
-      - backend/scripts/replay_synthesizer_owner_from_repo.py
-      - tools/dev/replay/replay_synthesizer_owner_from_repo.py
+      - backend/scripts/replay_architect_owner_from_repo.py
+      - tools/dev/replay/replay_architect_owner_from_repo.py
       - backend/scripts/run_openagents_validation.py
       - tools/dev/delivery/run_openagents_validation.py
       - backend/tests/test_prepare_openagents_validation.py
@@ -589,7 +589,7 @@ tasks:
       - examples/experiment.env.example
       - examples/experiments/u1-local.json
       - examples/experiments/u1-e2b.json
-      - backend/scripts/e2e-synthesizer-naming.sh
+      - backend/scripts/e2e-architect-naming.sh
       - docs/specs/0001-user-agent-harness-usage.md
       - docs/specs/0002-gitea-tracker-and-infra.md
       - docs/specs/0003-dev-side-and-loop.md
@@ -605,15 +605,15 @@ tasks:
       - docs/specs/0013-harness-present-protocol.md
       - docs/specs/0014-dev-commit-discipline.md
       - docs/specs/0015-dev-overfit-isolation.md
-      - docs/specs/0016-synthesizer-rootcause-signal.md
+      - docs/specs/0016-architect-rootcause-signal.md
       - docs/specs/0017-user-parallel-sessions.md
-      - docs/specs/0018-synthesizer-proposal-envelope.md
+      - docs/specs/0018-architect-proposal-envelope.md
       - docs/specs/0019-control-sideband-peek-wait.md
       - docs/specs/0020-issue-covers-dispatch-budget.md
       - docs/specs/0021-dev-escape-containment.md
       - docs/specs/0022-user-harness-io-boundary.md
       - docs/specs/0023-event-driven-wait-cleanup.md
-      - docs/specs/0024-synthesizer-godview-timeline-tool.md
+      - docs/specs/0024-architect-godview-timeline-tool.md
       - docs/specs/0025-issue-triage-funnel.md
       - docs/specs/0026-frontend-observability-redesign.md
       - docs/specs/0027-unified-agent-output-contract.md
@@ -641,7 +641,7 @@ tasks:
       - docs/specs/0049-role-invocation-io-store.md
       - docs/specs/0050-round-delivery-gate.md
       - docs/specs/0051-session-container-objective-evidence.md
-      - docs/specs/0052-synthesizer-covers-consolidation.md
+      - docs/specs/0052-architect-covers-consolidation.md
       - docs/specs/0053-persona-semantic-action-lifecycle.md
       - docs/specs/0054-user-goal-driven-simulation.md
       - docs/specs/0055-goal-aware-demand-evidence-boundaries.md
@@ -656,14 +656,14 @@ tasks:
       - docs/specs/0065-standardized-harness-evaluation.md
       - docs/specs/0066-provider-latency-isolated-timeout.md
       - docs/specs/0067-mixed-e2b-scaling-runtime.md
-      - docs/specs/0068-synthesizer-clean-rename.md
+      - docs/specs/0068-architect-clean-rename.md
       - docs/specs/0069-selectable-experiment-backends.md
       - docs/specs/0070-gitea-com-evidence-transport.md
       - docs/specs/ARCHITECTURE.md
       - docs/specs/OVERVIEW.md
       - docs/specs/0071-experiment-repository-cleanup.md
-      - backend/auto_designer/distill/seed_library.py
-      - docs/synthesizer-grouping.md
+      - backend/ahe_beta/distill/seed_library.py
+      - docs/architect-grouping.md
       - backend/scripts/e2e-spec-0047-parallel-experiment-runtime.sh
       - backend/deploy/gitea/bootstrap.sh
     scope: 完成逐文件 inventory、当前文档和 spec 活代码映射，新增目录契约检查接入 CI，完成回归与重构后验证报告
@@ -719,7 +719,7 @@ N1 示例的任务、persona、轮次、角色、模型映射和末轮只试用�
 | `examples/experiments/` | 当前 schema 的可校验实验定义，仅保留两份 N1 示例 |
 | `examples/tasks/`、`examples/personas/` | 公开示例所需的任务包与 persona 材料 |
 | `examples/experiment.env.example` | 公开实验唯一推荐的凭证模板 |
-| `backend/auto_designer/experiment/controllers/` | 包内 ordinary/SWE 控制器，供监督器启动 |
+| `backend/ahe_beta/experiment/controllers/` | 包内 ordinary/SWE 控制器，供监督器启动 |
 | `backend/scripts/` | 当前公开入口、offline demo、静态导出及 CI/构建检查 |
 | `tools/dev/` | 当前可维护的探针、角色回放和交付验证工具，不是实验入口 |
 | `evaluation/harness_bench/`、`evaluation/adapters/`、`evaluation/tests/` | 当前独立评分、共享适配器与相应测试 |
@@ -774,7 +774,7 @@ pytest 的默认 testpaths/pythonpath 不再包含 dated research。Ruff 排除 
 
 控制器迁移同步修正基于 `__file__` 的 backend/repo 根定位、repo guard 和镜像中的执行路径，不能只改 import 名字。维护的 SWE seed 构建辅助改为显式指定 manifest、源材料和镜像，不再默认引用已归档的 medium-hard-16 pool 或 sibling NexAU checkout；实际被 COPY 的运行辅助与其有效测试保留。
 
-监督器为新运行启动 `auto_designer.experiment.controllers.ordinary` 或 `.swebench` 模块，使用 prepare 冻结并注入的 context，不继续接受无 context 的隐式 backend/.env、默认 seed 或个人 SWE parquet 路径。当前 task/package/schema、角色配置和模型变量保持，不引入第三个公开 runner 或第二套轮次调度。
+监督器为新运行启动 `ahe_beta.experiment.controllers.ordinary` 或 `.swebench` 模块，使用 prepare 冻结并注入的 context，不继续接受无 context 的隐式 backend/.env、默认 seed 或个人 SWE parquet 路径。当前 task/package/schema、角色配置和模型变量保持，不引入第三个公开 runner 或第二套轮次调度。
 
 源码冻结白名单按执行需要重新确认：保留 controller 包、角色定义、Harness、后端/构建配方、依赖锁与兼容版本；task/persona 已作为独立 materials 冻结，不再整包带入所有 examples；`tools/dev/`、research、历史配置和个人启动器不得出现在新运行的 controller source archive。白名单改变后重新验证 local Docker build context 与 E2B bootstrap，不能漏掉实际被读取或 COPY 的文件。
 

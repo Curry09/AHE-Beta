@@ -12,7 +12,7 @@ description: >-
 Coordinate the batch without performing candidate discovery, extraction, or verification yourself.
 Keep those roles independent so one agent cannot admit its own work.
 
-When operating inside auto-designer, read the shared card contract at
+When operating inside ahe-beta, read the shared card contract at
 [`../seed-card-schema.md`](../seed-card-schema.md). User instructions override the default quotas below.
 
 ## Invariants

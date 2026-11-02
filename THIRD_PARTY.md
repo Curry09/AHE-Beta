@@ -2,7 +2,7 @@
 
 English | [简体中文](THIRD_PARTY.zh-CN.md)
 
-The root [MIT License](LICENSE) applies to auto-designer's original code and contributions licensed under those terms. Third-party code, dependencies and research materials retain their own licenses, copyright notices and attribution. This document identifies their sources and explains how they relate to the project's license.
+The root [MIT License](LICENSE) applies to AHE-Beta's original code and contributions licensed under those terms. Third-party code, dependencies and research materials retain their own licenses, copyright notices and attribution. This document identifies their sources and explains how they relate to the project's license.
 
 ## Code and dependencies
 
@@ -35,7 +35,7 @@ Availability through a public repository, registry or Release does not by itself
 
 [Persona examples](examples/personas/) and the [persona extraction tools](tools/persona-distill/) contain descriptions derived from public developer profiles, writings and other referenced sources. Original quotations, code and other source material retain their respective rights. References identify the basis for a simulated persona; they do not imply that the person participated in or endorsed an experiment.
 
-The [offline demo](backend/auto_designer/user/sim/demo.py) uses synthetic personas and scripted responses.
+The [offline demo](backend/ahe_beta/user/sim/demo.py) uses synthetic personas and scripted responses.
 
 ## Experiment records and model output
 

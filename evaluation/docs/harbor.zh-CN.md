@@ -7,7 +7,7 @@
 ```text
 workspace/
 ├── harnesses/                  # 已单独发布的 Harness 源码包
-└── auto-designer/
+└── ahe-beta/
     ├── evaluation.yaml         # 唯一手动编辑的评测配置
     ├── .env.example            # 复制为 .env 后填写密钥
     ├── evaluation/             # 调度、适配器、用户模拟和评分实现
@@ -23,7 +23,7 @@ workspace/
 
 ## 安装和运行
 
-在仓库根目录执行。先从本仓库的 [框架 Release](https://github.com/Curry09/auto-designer/releases/tag/harbor-evaluation-framework-v1.0.0) 下载 `harbor-evaluation-runtime-v1.0.0.zip` 并解压到仓库根目录（得到 `runtime/`）。从 [Harness Release](https://github.com/Curry09/auto-designer/releases/tag/harbor-evaluation-results-20261030) 下载 `harnesses.zip`，解压到仓库的上一级目录，或修改 `paths.harnesses`。
+在仓库根目录执行。先从本仓库的 [框架 Release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) 下载 `harbor-evaluation-runtime-v1.0.0.zip` 并解压到仓库根目录（得到 `runtime/`）。从 [Harness Release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-results-20261030) 下载 `harnesses.zip`，解压到仓库的上一级目录，或修改 `paths.harnesses`。
 
 ```bash
 uv venv --python 3.12.13 --managed-python --seed .venv-evaluation

@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.context import (
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.context import (
     build_controller_environment,
     frozen_scenario,
     load_controller_context,
 )
-from auto_designer.experiment.engine import (
+from ahe_beta.experiment.engine import (
     _completion,
     _process_identity,
     controller_command,
@@ -60,7 +60,7 @@ def prepared(tmp_path):
         "runtime": {"backend": "local"},
         "workload": {"kind": "ordinary"},
         "rounds": {"count": 2, "sessions_per_round": 1, "max_parallel_users": 1},
-        "roles": {"triager": 1, "synthesizer": 2, "divergent": 0, "developer": 1},
+        "roles": {"triager": 1, "architect": 2, "divergent": 0, "developer": 1},
         "models": {
             role: {
                 "model": f"{role}-model",
@@ -113,14 +113,14 @@ def test_complete_model_mapping_and_context_excludes_tokens(prepared, monkeypatc
     assert env["ANTHROPIC_AUTH_TOKEN"] == "delivery-secret"
     assert env["ANTHROPIC_SMALL_FAST_MODEL"] == env["ANTHROPIC_MODEL"]
     assert "ANTHROPIC_API_KEY" not in env
-    assert env["N_SYNTHESIZERS"] == "2"
+    assert env["N_ARCHITECTS"] == "2"
     assert env["N_OWNERS"] == "0"
     assert env["TOTAL_ROUNDS"] == "2"
-    assert "AUTO_DESIGNER_OBJECTIVE_EVALUATION" not in env
+    assert "AHE_BETA_OBJECTIVE_EVALUATION" not in env
     assert env["VIGIL_KEEP_ALIVE"] == "0"
-    document = Path(env["AUTO_DESIGNER_EXPERIMENT_CONTEXT"]).read_text()
+    document = Path(env["AHE_BETA_EXPERIMENT_CONTEXT"]).read_text()
     assert "secret" not in document
-    context = load_controller_context(env["AUTO_DESIGNER_EXPERIMENT_CONTEXT"])
+    context = load_controller_context(env["AHE_BETA_EXPERIMENT_CONTEXT"])
     assert context.gitea_host == "http://127.0.0.1:12345"
     private = root / "secrets/demand-gitea.env"
     assert private.stat().st_mode & 0o777 == 0o600
@@ -146,22 +146,22 @@ def test_request_limits_use_frozen_runtime_and_ignore_host(prepared, monkeypatch
         resources["sandbox_id"] = "owned-sandbox"
         resources["workspace"] = {"kind": "prebuilt", "params": {"source": "/workspace"}}
     for key in (
-        "AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS",
-        "AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS",
+        "AHE_BETA_HARNESS_REQUEST_BUDGET_SECONDS",
+        "AHE_BETA_HARNESS_TERMINATION_GRACE_SECONDS",
         "HARNESS_CALL_TIMEOUT",
     ):
         monkeypatch.setenv(key, "9000")
     kwargs = dict(run_dir=root, manifest=manifest, credentials=credentials, resources=resources)
     env = build_controller_environment(**kwargs)
     assert "HARNESS_CALL_TIMEOUT" not in env
-    assert "AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS" not in env
+    assert "AHE_BETA_HARNESS_REQUEST_BUDGET_SECONDS" not in env
     manifest["config"]["runtime"]["harness"] = {
         "request_budget_seconds": 3600,
         "termination_grace_seconds": 60,
     }
     env = build_controller_environment(**kwargs)
-    assert env["AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS"] == "3600"
-    assert env["AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS"] == "60"
+    assert env["AHE_BETA_HARNESS_REQUEST_BUDGET_SECONDS"] == "3600"
+    assert env["AHE_BETA_HARNESS_TERMINATION_GRACE_SECONDS"] == "60"
 
 
 def test_e2b_swe_context_and_explicit_workspace(prepared, monkeypatch):
@@ -174,9 +174,9 @@ def test_e2b_swe_context_and_explicit_workspace(prepared, monkeypatch):
         run_dir=root, manifest=manifest, credentials=credentials, resources=resources
     )
     assert env["VIGIL_MODE"] == "subprocess"
-    assert env["AUTO_DESIGNER_SANDBOX_ID"] == "sandbox-actual"
+    assert env["AHE_BETA_SANDBOX_ID"] == "sandbox-actual"
     assert env["SWEBENCH_PARQUET"].endswith("/materials/dataset")
-    assert env["SWEBENCH_INTERACTION_PLAN"] == env["AUTO_DESIGNER_INTERACTION_PLAN"]
+    assert env["SWEBENCH_INTERACTION_PLAN"] == env["AHE_BETA_INTERACTION_PLAN"]
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     scenario = frozen_scenario()
@@ -202,8 +202,8 @@ def test_context_rejects_wrong_backend_workspace_or_missing_keys(prepared):
 
 # Spec-0073/T5: the shared runtime accepts original context paths, without host defaults.
 def test_shared_runtime_reads_explicit_context_without_repository_env(prepared, monkeypatch):
-    from auto_designer.experiment.context import load_controller_context
-    from auto_designer.experiment.controllers import runtime as run_mod
+    from ahe_beta.experiment.context import load_controller_context
+    from ahe_beta.experiment.controllers import runtime as run_mod
 
     root, manifest, credentials, resources = prepared
     env = build_controller_environment(
@@ -219,10 +219,10 @@ def test_shared_runtime_reads_explicit_context_without_repository_env(prepared, 
         "GITEA_ENV_FILE",
     ):
         monkeypatch.setattr(run_mod, name, getattr(run_mod, name))
-    for name in ("AUTO_DESIGNER_EXPERIMENT_ID", "AUTO_DESIGNER_VIGIL_CONTAINER"):
+    for name in ("AHE_BETA_EXPERIMENT_ID", "AHE_BETA_VIGIL_CONTAINER"):
         monkeypatch.setenv(name, os.environ.get(name, ""))
     run_mod.apply_experiment_context(
-        ctx=load_controller_context(Path(env["AUTO_DESIGNER_EXPERIMENT_CONTEXT"]))
+        ctx=load_controller_context(Path(env["AHE_BETA_EXPERIMENT_CONTEXT"]))
     )
     assert run_mod.DATA == root / "data"
     assert run_mod.GITEA_ENV_FILE == root / "secrets/demand-gitea.env"
@@ -406,7 +406,7 @@ def test_hard_stop_kills_detached_attempt_children_and_preserves_other_nonce(tmp
     sleeper = "import signal,time;signal.signal(signal.SIGINT,signal.SIG_IGN);signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(30)"
     foreign = subprocess.Popen(
         [sys.executable, "-c", sleeper],
-        env={**os.environ, "AUTO_DESIGNER_CONTROLLER_NONCE": "another-attempt"},
+        env={**os.environ, "AHE_BETA_CONTROLLER_NONCE": "another-attempt"},
         start_new_session=True,
     )
     detached = (
@@ -449,7 +449,7 @@ def test_hard_stop_kills_detached_attempt_children_and_preserves_other_nonce(tmp
 def test_attempt_signalling_does_not_signal_reused_process_identity(monkeypatch):
     from unittest.mock import Mock
 
-    from auto_designer.experiment import engine
+    from ahe_beta.experiment import engine
 
     monkeypatch.setattr(engine, "_owned_attempt_processes", lambda nonce: [(123456, "old-start")])
     monkeypatch.setattr(engine, "_process_identity", lambda pid: "replacement-start")
@@ -469,7 +469,7 @@ def test_frozen_module_launch_uses_source_recipe_and_keeps_manifest_identity(
     tmp_path, kind, controller
 ):
     source = tmp_path / "frozen"
-    module = f"auto_designer.experiment.controllers.{controller}"
+    module = f"ahe_beta.experiment.controllers.{controller}"
     relative = "backend/" + module.replace(".", "/") + ".py"
     path = source / relative
     path.parent.mkdir(parents=True)
@@ -531,7 +531,7 @@ def test_module_recipe_cannot_launch_unfrozen_or_unrelated_module(tmp_path):
             "files": {},
             "entrypoint": {
                 "kind": "module",
-                "module": "auto_designer.experiment.controllers.ordinary",
+                "module": "ahe_beta.experiment.controllers.ordinary",
             },
         },
     }
@@ -543,8 +543,8 @@ def test_module_recipe_cannot_launch_unfrozen_or_unrelated_module(tmp_path):
 
 
 def test_internal_controller_refuses_implicit_repository_configuration(monkeypatch):
-    monkeypatch.delenv("AUTO_DESIGNER_EXPERIMENT_CONTEXT", raising=False)
-    from auto_designer.experiment.controllers import unified
+    monkeypatch.delenv("AHE_BETA_EXPERIMENT_CONTEXT", raising=False)
+    from ahe_beta.experiment.controllers import unified
 
     with pytest.raises(ConfigError, match="frozen inputs"):
         unified.main()
@@ -559,7 +559,7 @@ def test_frozen_policy_environment_overrides_host_settings(prepared, monkeypatch
         resources["sandbox_id"] = "owned-sandbox"
         resources["workspace"] = {"kind": "prebuilt", "params": {"source": "/workspace"}}
     manifest["config"]["policies"] = {
-        "synthesizer_grouping": True,
+        "architect_grouping": True,
         "timing": {"latency_isolated": True, "wall_guard_seconds": 4000},
         "delivery": {
             "timeout_seconds": 1800,
@@ -574,9 +574,9 @@ def test_frozen_policy_environment_overrides_host_settings(prepared, monkeypatch
     manifest["config"]["models"]["user"]["reasoning_effort"] = "high"
     manifest["config"]["models"]["demand"]["reasoning_effort"] = "medium"
     expected = {
-        "SYNTHESIZER_GROUPING": "1",
-        "AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT": "1",
-        "AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS": "4000",
+        "ARCHITECT_GROUPING": "1",
+        "AHE_BETA_LATENCY_ISOLATED_TIMEOUT": "1",
+        "AHE_BETA_LATENCY_WALL_GUARD_SECONDS": "4000",
         "ROUND_DELIVERY_TIMEOUT_SEC": "1800",
         "ROUND_DELIVERY_POLL_SEC": "0.5",
         "VIGIL_COORDINATION": "dependencies",
@@ -637,7 +637,7 @@ def test_old_frozen_config_does_not_silently_enable_bypass_permissions(prepared)
 
 # Spec-0073/T5: new launch contracts coexist with immutable legacy recipes.
 def test_new_controller_launch_uses_frozen_unified_module_without_global_kind(tmp_path):
-    module = "auto_designer.experiment.controllers.unified"
+    module = "ahe_beta.experiment.controllers.unified"
     relative = "backend/" + module.replace(".", "/") + ".py"
     source = tmp_path / "frozen"
     path = source / relative
@@ -681,10 +681,10 @@ def test_new_contract_refuses_legacy_recipe_even_if_source_contains_it(tmp_path)
         "workload_contract_version": 1,
         "config": {"workload": {"task_packages": ["task-a"]}},
         "source_snapshot": {
-            "files": {"backend/auto_designer/experiment/controllers/ordinary.py": "frozen"},
+            "files": {"backend/ahe_beta/experiment/controllers/ordinary.py": "frozen"},
             "entrypoint": {
                 "kind": "module",
-                "module": "auto_designer.experiment.controllers.ordinary",
+                "module": "ahe_beta.experiment.controllers.ordinary",
             },
         },
     }

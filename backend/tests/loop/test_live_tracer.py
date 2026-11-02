@@ -4,8 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from nexau import SpanType
 
-from auto_designer.loop import live_tracer as module
-from auto_designer.usage import bind_usage_context, current_usage_context
+from ahe_beta.loop import live_tracer as module
+from ahe_beta.usage import bind_usage_context, current_usage_context
 
 
 def test_llm_span_records_usage_with_execution_and_outer_context(monkeypatch) -> None:
@@ -19,7 +19,7 @@ def test_llm_span_records_usage_with_execution_and_outer_context(monkeypatch) ->
     tracer.set_session_id("agent-run-1")
     span = tracer.start_span("chat", SpanType.LLM, inputs={})
 
-    with bind_usage_context(round_no=3, role="synthesizer"):
+    with bind_usage_context(round_no=3, role="architect"):
         tracer.end_span(
             span,
             outputs={
@@ -35,7 +35,7 @@ def test_llm_span_records_usage_with_execution_and_outer_context(monkeypatch) ->
     assert event["model"] == "model-a"
     assert event["request_id"] == "req-1"
     assert context.round_no == 3
-    assert context.role == "synthesizer"
+    assert context.role == "architect"
     assert context.agent_id == "agent-run-1"
 
 

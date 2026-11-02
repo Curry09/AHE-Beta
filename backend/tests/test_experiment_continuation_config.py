@@ -5,13 +5,13 @@ import json
 
 import pytest
 
-from auto_designer.experiment.config import (
+from ahe_beta.experiment.config import (
     ConfigError,
     config_hash,
     delivery_required,
     load_config_v2,
 )
-from auto_designer.experiment.materials import check_materials
+from ahe_beta.experiment.materials import check_materials
 from test_experiment_config_v2 import definition, package, write
 from test_experiment_continuation_source import archive
 from test_experiment_continuation_source import parent_files as parent_files_fixture

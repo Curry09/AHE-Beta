@@ -1,5 +1,5 @@
 [project]
-name = "auto-designer"
+name = "ahe-beta"
 version = "0.0.0"
 description = "自进化 harness：模拟用户→开发者闭环，体感驱动、benchmark held-out"
 requires-python = ">=3.12"
@@ -58,7 +58,7 @@ dev = [
 package = false
 
 [tool.pytest.ini_options]
-# 后端在 backend/（前后端分目录）：暴露 backend 让测试 import auto_designer，
+# 后端在 backend/（前后端分目录）：暴露 backend 让测试 import ahe_beta，
 # backend/scripts 暴露以便测试 import bootstrap_harness 等脚本
 pythonpath = [".", "backend", "backend/scripts"]
 testpaths = ["backend/tests", "evaluation/tests"]
@@ -67,7 +67,7 @@ testpaths = ["backend/tests", "evaluation/tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# 首方包根：后端在 backend/，使 import 排序把 auto_designer / bootstrap_harness / 同目录测试模块识别为 first-party
+# 首方包根：后端在 backend/，使 import 排序把 ahe_beta / bootstrap_harness / 同目录测试模块识别为 first-party
 src = ["backend", "backend/scripts", "backend/tests", "evaluation"]
 # 外来代码、原始任务指令及 M04 固定配方保持发布字节，由材料哈希校验，不自动格式化。
 extend-exclude = ["tools/spec-driven-development/vendor", "research/archives", "evaluation/harness/meta_artifact", "evaluation/harness/user_engine", "examples/tasks/evolution32/*/instruction.md", "examples/tasks/evolution32/M04/recipes"]

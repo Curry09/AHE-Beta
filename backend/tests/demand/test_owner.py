@@ -1,4 +1,4 @@
-"""Delivery Router 单测：无损交接、精确去重、Synthesizer covers 不由 Owner 重复处理、遗漏项 fail-open。"""
+"""Delivery Router 单测：无损交接、精确去重、Architect covers 不由 Owner 重复处理、遗漏项 fail-open。"""
 
 from __future__ import annotations
 
@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.demand import issue_schema as sc
-from auto_designer.demand.owner import AdmitOutcome, Owner
-from auto_designer.loop.recovery import (
+from ahe_beta.demand import issue_schema as sc
+from ahe_beta.demand.owner import AdmitOutcome, Owner
+from ahe_beta.loop.recovery import (
     RecoveryConflictError,
     RecoveryIdentity,
     RecoveryStore,
     operation_key,
 )
-from auto_designer.models import (
+from ahe_beta.models import (
     FeelingScore,
     IssueDraft,
     Persona,
@@ -23,9 +23,9 @@ from auto_designer.models import (
     Session,
     Transcript,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
 
 
 class _StubOwner(Owner):
@@ -68,13 +68,13 @@ def _triage_proposal(tracker: FakeTracker, title: str, *, prio: str = "P2") -> i
     ).number
 
 
-def _synth_proposal(tracker: FakeTracker, title: str, covers: list[int] | None = None) -> int:
+def _architect_proposal(tracker: FakeTracker, title: str, covers: list[int] | None = None) -> int:
     body = "### 问题\n\nx"
     line = sc.format_covers_line(covers or [])
     if line:
         body = f"{body}\n\n{line}"
     return tracker.create_issue(
-        IssueDraft(title=title, body=body, labels=[sc.PROPOSAL, sc.FROM_SYNTHESIZE])
+        IssueDraft(title=title, body=body, labels=[sc.PROPOSAL, sc.FROM_ARCHITECT])
     ).number
 
 
@@ -87,14 +87,14 @@ def _submit(decisions: list) -> str:
 
 
 def _owner_recovery(
-    tmp_path: Path, *, synthesizer_proposals: list[int] | None = None
+    tmp_path: Path, *, architect_proposals: list[int] | None = None
 ) -> RecoveryStore:
     store = RecoveryStore.initialize(
         root=tmp_path / "recovery",
         identity=RecoveryIdentity("exp", "run", "config", "controller", "plan"),
     )
     store.freeze_round(round_no=1, user_sha="user", plan=[])
-    for stage in ("divergent", "synthesizer"):
+    for stage in ("divergent", "architect"):
         key = operation_key(stage, "complete")
         store.begin_unit(
             round_no=1,
@@ -109,7 +109,7 @@ def _owner_recovery(
             key=key,
             observed_postconditions={
                 "completed": True,
-                **({"proposal_numbers": synthesizer_proposals} if stage == "synthesizer" else {}),
+                **({"proposal_numbers": architect_proposals} if stage == "architect" else {}),
             },
         )
         store.complete_stage(round_no=1, stage=stage)
@@ -120,7 +120,7 @@ def test_submit_admission_yaml_matches_contract() -> None:
     """drift-guard：submit_admission.tool.yaml 的 input_schema 与 admission_input_schema() 深度相等。"""
     import yaml
 
-    from auto_designer.demand.agent_contract import admission_input_schema
+    from ahe_beta.demand.agent_contract import admission_input_schema
 
     p = (
         Path(__file__).resolve().parents[2]
@@ -167,7 +167,7 @@ def test_clean_triage_singleton_requires_explicit_model_admission(tmp_path: Path
     assert sc.OPENAGENTS in snap["labels"] and sc.PROPOSAL not in snap["labels"]  # 交接令牌落库
     assert "P2" in snap["labels"]  # 建议优先级沿用为终值
     assert snap["comments"]
-    assert all("<!-- openagents:agent=auto-designer -->" in body for body in snap["comments"])
+    assert all("<!-- openagents:agent=ahe-beta -->" in body for body in snap["comments"])
 
 
 def test_similar_but_nonidentical_proposals_are_preserved(tmp_path: Path) -> None:
@@ -208,22 +208,24 @@ def test_cross_route_overlap_preserves_independent_handoffs(tmp_path, bad_overla
     pm = tracker.create_issue(
         IssueDraft("用户能随时纠偏", "product outcome", [sc.PROPOSAL, sc.FROM_DIVERGENT])
     ).number
-    synth = _synth_proposal(tracker, "控制生命周期")
+    architect = _architect_proposal(tracker, "控制生命周期")
     rows = [
         {
             "issue": pm,
             "decision": "admit",
-            "delivery_overlaps": [synth],
+            "delivery_overlaps": [architect],
             "handoff_summary": "共享控制实现，但 PM 独立验收用户可及时纠偏",
         },
-        {"issue": synth, "decision": "admit", "delivery_overlaps": bad_overlap},
+        {"issue": architect, "decision": "admit", "delivery_overlaps": bad_overlap},
     ]
     owner = _owner(tmp_path, tracker, _submit(rows))
     out = owner.admit_once()
-    assert set(out.admitted) == {pm, synth}
+    assert set(out.admitted) == {pm, architect}
     assert not out.merged and not out.failed
-    assert synth in out.invalid
-    assert any(f"交付重叠（关联，不合并）：#{synth}" in c for c in tracker.issue(pm)["comments"])
+    assert architect in out.invalid
+    assert any(
+        f"交付重叠（关联，不合并）：#{architect}" in c for c in tracker.issue(pm)["comments"]
+    )
     assert "product outcome" == tracker.issue(pm)["body"]
 
 
@@ -250,7 +252,7 @@ def test_overlap_can_reference_ready_but_not_self_or_report(tmp_path):
 
 def test_review_admit_with_priority_override(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    s = _synth_proposal(tracker, "结构：预算感知")
+    s = _architect_proposal(tracker, "结构：预算感知")
     o = _owner(tmp_path, tracker, _submit([{"issue": s, "decision": "admit", "priority": "P0"}]))
     out = o.admit_once()
     assert out.admitted == [s]
@@ -262,8 +264,8 @@ def test_review_admit_with_priority_override(tmp_path: Path) -> None:
 
 def test_explicit_incomplete_hold_and_unlisted_default_handoff(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    bad = _synth_proposal(tracker, "过拟合提案")
-    quiet = _synth_proposal(tracker, "没被提到的提案")
+    bad = _architect_proposal(tracker, "过拟合提案")
+    quiet = _architect_proposal(tracker, "没被提到的提案")
     o = _owner(
         tmp_path,
         tracker,
@@ -277,7 +279,7 @@ def test_explicit_incomplete_hold_and_unlisted_default_handoff(tmp_path: Path) -
 
 def test_invalid_explicit_decision_is_held_not_default_admitted(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    proposal = _synth_proposal(tracker, "缺少 hold 理由")
+    proposal = _architect_proposal(tracker, "缺少 hold 理由")
     o = _owner(tmp_path, tracker, _submit([{"issue": proposal, "decision": "hold"}]))
 
     out = o.admit_once()
@@ -287,11 +289,11 @@ def test_invalid_explicit_decision_is_held_not_default_admitted(tmp_path: Path) 
     assert sc.PROPOSAL in tracker.issue(proposal)["labels"]
 
 
-def test_owner_does_not_process_synthesizer_covers(tmp_path: Path) -> None:
+def test_owner_does_not_process_architect_covers(tmp_path: Path) -> None:
     tracker = FakeTracker()
     p1 = _triage_proposal(tracker, "症状甲：状态丢失")
     p2 = _triage_proposal(tracker, "急修乙：崩溃闪退", prio="P0")
-    s = _synth_proposal(tracker, "结构：状态契约重构", covers=[p1, p2])
+    s = _architect_proposal(tracker, "结构：状态契约重构", covers=[p1, p2])
     o = _owner(
         tmp_path,
         tracker,
@@ -299,14 +301,14 @@ def test_owner_does_not_process_synthesizer_covers(tmp_path: Path) -> None:
     )
     out = o.admit_once()
     assert set(out.admitted) == {p1, p2, s}
-    assert out.merged == []  # Synthesizer 已在创建阶段处理 covers；Owner 不重复处理
+    assert out.merged == []  # Architect 已在创建阶段处理 covers；Owner 不重复处理
     assert all(sc.is_ready(labels=tracker.issue(n)["labels"], state="open") for n in (p1, p2, s))
 
 
 def test_covers_untouched_when_structural_held(tmp_path: Path) -> None:
     tracker = FakeTracker()
     p1 = _triage_proposal(tracker, "症状甲：交接断裂")
-    s = _synth_proposal(tracker, "结构：交接重构", covers=[p1])
+    s = _architect_proposal(tracker, "结构：交接重构", covers=[p1])
     o = _owner(
         tmp_path,
         tracker,
@@ -324,7 +326,7 @@ def test_covers_untouched_when_structural_held(tmp_path: Path) -> None:
 
 def test_invalid_merge_target_is_preserved_as_handoff(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    p = _synth_proposal(tracker, "并进不存在的票")
+    p = _architect_proposal(tracker, "并进不存在的票")
     o = _owner(tmp_path, tracker, _submit([{"issue": p, "decision": "merge", "into": 999}]))
     out = o.admit_once()
     assert p in out.admitted and p in out.invalid and out.merged == []
@@ -332,8 +334,8 @@ def test_invalid_merge_target_is_preserved_as_handoff(tmp_path: Path) -> None:
 
 def test_merge_target_cannot_be_held_proposal(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    source = _synth_proposal(tracker, "待合并")
-    held = _synth_proposal(tracker, "暂缓目标")
+    source = _architect_proposal(tracker, "待合并")
+    held = _architect_proposal(tracker, "暂缓目标")
     o = _owner(
         tmp_path,
         tracker,
@@ -356,7 +358,7 @@ def test_owner_core_write_failure_is_reported(tmp_path: Path) -> None:
             raise RuntimeError("set labels failed")
 
     tracker = BrokenSetLabelsTracker()
-    p = _synth_proposal(tracker, "交接时写入失败")
+    p = _architect_proposal(tracker, "交接时写入失败")
     o = _owner(tmp_path, tracker, _submit([]))
     out = o.admit_once()
     assert p in out.failed and p in out.held
@@ -367,7 +369,7 @@ def test_review_disabled_mechanically_handoffs_every_proposal(tmp_path: Path) ->
     """review=False（roster owner=0）：纯机制交接，全部 admit、零 LLM。"""
     tracker = FakeTracker()
     clean = _triage_proposal(tracker, "干净单条案")
-    s = _synth_proposal(tracker, "结构提案")
+    s = _architect_proposal(tracker, "结构提案")
     o = _owner(tmp_path, tracker, _submit([{"issue": s, "decision": "admit"}]), review=False)
     out = o.admit_once()
     assert set(out.admitted) == {clean, s} and out.mechanical == []
@@ -375,14 +377,14 @@ def test_review_disabled_mechanically_handoffs_every_proposal(tmp_path: Path) ->
     assert o.agent_calls == 0
 
 
-def test_recovery_owner_only_admits_pm_and_synthesizer_processed_proposals(tmp_path: Path) -> None:
+def test_recovery_owner_only_admits_pm_and_architect_processed_proposals(tmp_path: Path) -> None:
     tracker = FakeTracker()
 
     def create(title: str, labels: list[str]) -> int:
         return tracker.create_issue(IssueDraft(title=title, body="summary", labels=labels)).number
 
     pm = create("PM", [sc.PROPOSAL, sc.FROM_DIVERGENT])
-    synthesized = create("Synthesizer", [sc.PROPOSAL, sc.FROM_SYNTHESIZE])
+    architect_proposal = create("Architect", [sc.PROPOSAL, sc.FROM_ARCHITECT])
     triage = create("retained triage", [sc.PROPOSAL, sc.FROM_TRIAGE, "round-1"])
     gap = create("retained gap", [sc.PROPOSAL, sc.OBSERVATION_GAP])
     merged = create("merged source", [sc.PROPOSAL, sc.FROM_TRIAGE, "round-1"])
@@ -402,26 +404,29 @@ def test_recovery_owner_only_admits_pm_and_synthesizer_processed_proposals(tmp_p
         observed_postconditions={"proposal_numbers": [pm]},
     )
     recovery.complete_stage(round_no=1, stage="divergent")
-    synthesizer_key = operation_key("synthesizer", "grouping")
+    architect_key = operation_key("architect", "grouping")
     seen = [i.to_dict() for i in tracker.list_open_issues() if i.number in {triage, gap, merged}]
     recovery.begin_unit(
-        round_no=1, stage="synthesizer", key=synthesizer_key, input_value={"issues": seen}
+        round_no=1, stage="architect", key=architect_key, input_value={"issues": seen}
     )
-    recovery.complete_unit(round_no=1, stage="synthesizer", key=synthesizer_key)
-    worker_key = operation_key("synthesizer", "batch")
-    recovery.begin_unit(round_no=1, stage="synthesizer", key=worker_key, input_value={})
+    recovery.complete_unit(round_no=1, stage="architect", key=architect_key)
+    worker_key = operation_key("architect", "batch")
+    recovery.begin_unit(round_no=1, stage="architect", key=worker_key, input_value={})
     recovery.complete_unit(
         round_no=1,
-        stage="synthesizer",
+        stage="architect",
         key=worker_key,
-        observed_postconditions={"merged_numbers": [merged], "proposal_numbers": [synthesized]},
+        observed_postconditions={
+            "merged_numbers": [merged],
+            "proposal_numbers": [architect_proposal],
+        },
     )
-    recovery.complete_stage(round_no=1, stage="synthesizer")
+    recovery.complete_stage(round_no=1, stage="architect")
 
     owner = _owner(tmp_path, tracker, _submit([]), review=False, recovery=recovery)
     with bind_usage_context(round_no=1, operation="owner-stage"):
         outcome = owner.admit_once()
-    assert set(outcome.admitted) == {pm, synthesized, triage, gap}
+    assert set(outcome.admitted) == {pm, architect_proposal, triage, gap}
     assert owner.agent_calls == 0
     for number in (merged, late_gap, stray):
         assert sc.PROPOSAL in tracker.issue(number)["labels"]
@@ -436,7 +441,7 @@ def test_review_prompt_is_handoff_only(tmp_path: Path) -> None:
     assert "Delivery Router" in msg
     assert "无损打包交接" in msg
     assert "不审核上游方案" in msg
-    assert "Synthesizer 已在结构提案创建阶段处理 `covers` 来源" in msg
+    assert "Architect 已在结构提案创建阶段处理 `covers` 来源" in msg
     assert "必须使用仓库工具核验" not in msg
     assert f"#{p}" in msg
 
@@ -463,7 +468,7 @@ def test_owner_receives_normalized_body_for_every_proposal_source(tmp_path: Path
 
 def test_no_submit_defaults_to_direct_handoff(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    s = _synth_proposal(tracker, "结构提案")
+    s = _architect_proposal(tracker, "结构提案")
     o = _owner(tmp_path, tracker, "散文没调 submit")
     out = o.admit_once()
     assert s in out.admitted and out.held == []
@@ -482,8 +487,8 @@ def test_recovery_replays_owner_decisions_after_partial_admission(tmp_path: Path
                 raise RuntimeError("injected after admission labels")
 
     tracker = CrashAfterLabelsTracker()
-    proposal = _synth_proposal(tracker, "resume owner")
-    recovery = _owner_recovery(tmp_path, synthesizer_proposals=[proposal])
+    proposal = _architect_proposal(tracker, "resume owner")
+    recovery = _owner_recovery(tmp_path, architect_proposals=[proposal])
     owner = _owner(
         tmp_path,
         tracker,

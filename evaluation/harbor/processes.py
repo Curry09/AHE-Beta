@@ -29,7 +29,7 @@ def prepare_process_runtime() -> dict:
     identity = hashlib.sha256(
         (sys.version + platform.machine() + str(base)).encode() + executable.read_bytes()
     ).hexdigest()
-    directory = user_cache_path("auto-designer-evaluation") / "native-runtime" / identity
+    directory = user_cache_path("ahe-beta-evaluation") / "native-runtime" / identity
     directory.mkdir(parents=True, exist_ok=True)
     with (directory / "runtime.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -125,7 +125,7 @@ class NativeProcessOwner(CommandProcessOwner):
         self.sha = runtime["python_sha256"]
         if hashlib.sha256(self.archive.read_bytes()).hexdigest() != self.sha:
             raise ValueError("Native process runtime checksum mismatch")
-        root = "/opt/auto-designer-native-owner"
+        root = "/opt/ahe-beta-native-owner"
         super().__init__(root, root + "/python312/bin/python3.12", logs_dir)
 
     async def setup(self, environment) -> None:

@@ -5,8 +5,8 @@ import json
 
 import pytest
 
-from auto_designer.experiment.batch_config import load_batch_config, verify_entry_inputs
-from auto_designer.experiment.config import ConfigError
+from ahe_beta.experiment.batch_config import load_batch_config, verify_entry_inputs
+from ahe_beta.experiment.config import ConfigError
 from test_experiment_config_v2 import write
 from test_experiment_materials import prepared_inputs as material_inputs
 
@@ -32,7 +32,7 @@ def batch_path(prepared_inputs, tmp_path):
 
 
 def test_offline_load_does_not_fetch_or_create_paths(batch_path, tmp_path, monkeypatch):
-    from auto_designer.experiment import runtime
+    from ahe_beta.experiment import runtime
 
     def forbidden(*args, **kwargs):
         raise AssertionError("provider called")

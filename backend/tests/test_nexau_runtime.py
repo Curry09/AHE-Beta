@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.nexau_runtime import Agent, load
+from ahe_beta.nexau_runtime import Agent, load
 
 
 def test_agent_run_passes_through_to_backend() -> None:

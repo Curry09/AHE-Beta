@@ -6,8 +6,8 @@ import dataclasses
 
 import pytest
 
-from auto_designer.user.sim.clauses import compile_block_p
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.user.sim.clauses import compile_block_p
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D2Domain,

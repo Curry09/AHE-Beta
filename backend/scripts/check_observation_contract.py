@@ -26,14 +26,14 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from auto_designer.demand.delivery_evidence import publish_delivery_evidence
-from auto_designer.execution_contract import (
+from ahe_beta.demand.delivery_evidence import publish_delivery_evidence
+from ahe_beta.execution_contract import (
     build_execution_evidence,
     canonical_bytes,
     canonical_sha256,
     make_execution_contract,
 )
-from auto_designer.models import (
+from ahe_beta.models import (
     IssueDraft,
     Persona,
     SeedScenario,
@@ -41,15 +41,15 @@ from auto_designer.models import (
     Transcript,
     WorkspaceSpec,
 )
-from auto_designer.observations.grants import grant
-from auto_designer.observations.publication import publish
-from auto_designer.observations.transport import (
+from ahe_beta.observations.grants import grant
+from ahe_beta.observations.publication import publish
+from ahe_beta.observations.transport import (
     freeze_transport_profile,
     load_transport_profile,
     make_transport_profile,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
 
 
 def load_reader(checkout: Path):
@@ -127,7 +127,7 @@ def check_contract(checkout: Path) -> dict:
         tempfile.TemporaryDirectory(prefix="observation-contract-") as name,
         patch.dict(os.environ, {}, clear=False),
     ):
-        os.environ.pop("AUTO_DESIGNER_OBSERVATION_ROOT", None)
+        os.environ.pop("AHE_BETA_OBSERVATION_ROOT", None)
         root = Path(name)
         tracker = MemoryAssets()
         issue = tracker.create_issue(

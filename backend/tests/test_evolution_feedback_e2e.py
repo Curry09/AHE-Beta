@@ -17,10 +17,10 @@ from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives import serialization
 
-from auto_designer.experiment.assessment_worker import public_key_bytes, registration
-from auto_designer.experiment.config import ConfigError, load_config_v2, load_task_package
-from auto_designer.experiment.grading_inputs import load_grading_plan
-from auto_designer.experiment.runtime import check_v2
+from ahe_beta.experiment.assessment_worker import public_key_bytes, registration
+from ahe_beta.experiment.config import ConfigError, load_config_v2, load_task_package
+from ahe_beta.experiment.grading_inputs import load_grading_plan
+from ahe_beta.experiment.runtime import check_v2
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "backend/scripts/e2e-spec-0084-evolution-feedback.sh"

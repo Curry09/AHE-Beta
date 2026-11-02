@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment.backends.e2b_bootstrap import (
+from ahe_beta.experiment.backends.e2b_bootstrap import (
     BOOTSTRAP_PROGRAM,
     CLAUDE_SHA256,
     UV_SHA256,
@@ -50,18 +50,18 @@ def test_bootstrap_installs_run_local_python_and_transfers_only_owned_tree(
 
     controller_entries = [("README", b"controller", 0o644)]
     if multitask:
-        package_root = Path(__file__).parents[1] / "auto_designer"
+        package_root = Path(__file__).parents[1] / "ahe_beta"
         controller_entries.extend(
             (
-                "backend/auto_designer/" + str(path.relative_to(package_root)),
+                "backend/ahe_beta/" + str(path.relative_to(package_root)),
                 path.read_bytes(),
                 0o644,
             )
             for path in sorted(package_root.rglob("*.py"))
         )
         # A poisonous ambient source proves bootstrap selects only its frozen
-        # controller tree, even when uv sync has not installed auto_designer.
-        ambient = tmp_path / "ambient/auto_designer"
+        # controller tree, even when uv sync has not installed ahe_beta.
+        ambient = tmp_path / "ambient/ahe_beta"
         ambient.mkdir(parents=True)
         (ambient / "__init__.py").write_text(
             "raise AssertionError('ambient controller imported')\n"
@@ -164,7 +164,7 @@ elif sys.argv[1]=='sync':
     program = (
         BOOTSTRAP_PROGRAM.replace(UV_SHA256, hashlib.sha256(uv_archive).hexdigest())
         .replace(CLAUDE_SHA256, hashlib.sha256(claude).hexdigest())
-        .replace("'/etc/profile.d/auto-designer-task.sh'", repr(str(profile)))
+        .replace("'/etc/profile.d/ahe-beta-task.sh'", repr(str(profile)))
     )
     # Test runtimes may differ from the production pinned Python; the fake uv
     # supplies this test interpreter while checking the same installation layout.
@@ -198,7 +198,7 @@ elif sys.argv[1]=='sync':
     )
     if multitask:
         assert worker_calls == [(os.getuid(), os.getgid(), [])] * 2
-        assert list((root / "source/controller/backend/auto_designer").rglob("prebuilt.*.pyc"))
+        assert list((root / "source/controller/backend/ahe_beta").rglob("prebuilt.*.pyc"))
         assert set(receipt["task_workspaces"]) == {"ordinary", "swe"}
         for task_id, record in receipt["task_workspaces"].items():
             baseline = root / "workspace/tasks" / task_id / "source"

@@ -1,11 +1,11 @@
-// 数据契约：字段名与 backend/auto_designer/web/api.py 的响应一一对应，两侧须同步修改。
+// 数据契约：字段名与 backend/ahe_beta/web/api.py 的响应一一对应，两侧须同步修改。
 
-export type AgentRole = "user" | "triager" | "divergent" | "synthesizer" | "owner" | "developer";
+export type AgentRole = "user" | "triager" | "divergent" | "architect" | "owner" | "developer";
 export type ViewMode = "dashboard" | "building" | "openagents";
 
 // Spec-0029：三平面投影与提案来源（后端 /api/issues 附带；老后端缺省由 issueMeta 按 labels 兜底）。
 export type Plane = "report" | "proposal" | "ready";
-export type Provenance = "from-triage" | "from-synthesize" | "from-divergent";
+export type Provenance = "from-triage" | "from-architect" | "from-divergent";
 
 // Spec-0026/T1：用户 agent 活动槽可带的 persona 摘要（只读展示，缺省 null）。
 export interface PersonaMeta {
@@ -26,7 +26,7 @@ export interface Turn {
 }
 
 // 过程流条目：status(状态变化) / assistant(模型发言) / tool(工具调用) / tool_result / tool_error
-// t 可选：dev/synthesizer 的 live log 带时间戳；harness 内层 steps 无时间戳。
+// t 可选：dev/architect 的 live log 带时间戳；harness 内层 steps 无时间戳。
 export interface LogEntry {
   t?: string;
   kind: string;
@@ -123,7 +123,7 @@ export interface RunState {
 export type HistoryKind =
   | "user_session"
   | "triager_run"
-  | "synthesizer_run"
+  | "architect_run"
   | "divergent_run"
   | "owner_run"
   | "dev_run";
@@ -149,7 +149,7 @@ export interface HistoryItem {
   issue_number?: number | null;
   tag?: string | null;
   committed?: boolean;
-  // synthesizer_run
+  // architect_run
   proposals?: number[];
 }
 
@@ -181,7 +181,7 @@ export interface Issue {
   priority?: string | null; // P0-P3
   reject_reason?: string | null; // 驳回/decline 原因（权威原因见详情评论）
   plane?: Plane | null; // Spec-0029：三平面投影（report/proposal/ready；终态为 null）
-  provenance?: Provenance | null; // Spec-0029：提案来源（from-triage/from-synthesize/from-divergent）
+  provenance?: Provenance | null; // Spec-0029：提案来源（from-triage/from-architect/from-divergent）
   // 覆盖关系：covers = RFC 声明覆盖的 triaged 票号；covered_by = 被哪张 open RFC 覆盖。
   covers?: number[];
   covered_by?: number | null;
@@ -359,7 +359,7 @@ export interface SessionDetail {
 export interface Roster {
   user: number;
   triager: number;
-  synthesizer: number;
+  architect: number;
   developer: number;
   divergent?: number; // Spec-0028+：discovery 轨生成器（默认 0）
   owner?: number; // Spec-0029：唯一准入（0=纯机械）

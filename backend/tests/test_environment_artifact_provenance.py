@@ -6,10 +6,10 @@ import json
 
 import pytest
 
-from auto_designer.evaluation.artifacts import collect_session_artifacts
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.grading_inputs import archived_artifacts
-from auto_designer.experiment.task_environments.contract import environment_identity
+from ahe_beta.evaluation.artifacts import collect_session_artifacts
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.grading_inputs import archived_artifacts
+from ahe_beta.experiment.task_environments.contract import environment_identity
 
 
 def identity():

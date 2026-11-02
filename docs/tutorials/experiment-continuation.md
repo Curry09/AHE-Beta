@@ -84,7 +84,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py check -
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$WORK_DIR/child-e2b.json" --offline
 ```
 
-The three input selectors must appear together: `harness.source=continuation`, `workload={"source":"parent"}`, and `continuation={"archive":...,"sha256":...}`. Do not add task packages, a persona library, persona IDs or an interaction plan to the inherited workload. Every new round repeats the parent's final pairs in their original order; task content, persona content and `direct`/`simulated_user` interaction remain fixed. `sessions_per_round` must match that boundary. Reduce `max_parallel_users` if desired. Pending reports require at least one Triage and one Synthesizer.
+The three input selectors must appear together: `harness.source=continuation`, `workload={"source":"parent"}`, and `continuation={"archive":...,"sha256":...}`. Do not add task packages, a persona library, persona IDs or an interaction plan to the inherited workload. Every new round repeats the parent's final pairs in their original order; task content, persona content and `direct`/`simulated_user` interaction remain fixed. `sessions_per_round` must match that boundary. Reduce `max_parallel_users` if desired. Pending reports require at least one Triage and one Architect.
 
 Offline check reports the parent identity, boundary, pairs, reports and evidence gaps. It does not start models or providers, prepare task environments, or prove task success. The generated local and E2B files are alternative child configurations; choose one to run.
 

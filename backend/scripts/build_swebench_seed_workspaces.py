@@ -44,8 +44,8 @@ except ModuleNotFoundError:  # pragma: no cover - exercised by dependency-free u
 
     pq = _MissingPyarrow()
 
-from auto_designer.models import WorkspaceSpec
-from auto_designer.user.sim.seed_source import provision
+from ahe_beta.models import WorkspaceSpec
+from ahe_beta.user.sim.seed_source import provision
 
 BACKEND = Path(__file__).resolve().parents[1]
 STATE_NAME = "build-state.json"

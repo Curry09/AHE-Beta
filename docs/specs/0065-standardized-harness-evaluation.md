@@ -478,7 +478,7 @@ Harbor/Terminal-Bench 的 `task.toml` 已提供 agent、verifier、build 预算�
 evaluation harness 提供 patch 级 F2P/P2P 验证；TUA 采用任务环境与 verifier；tau3 提供原生模拟用户、
 工具轨迹和 reward。本框架复用这些权威内容，不重写题目或评分器。
 
-仓库现有 `auto_designer.user.sim.loop` 已实现 `write_message/poll/interrupt` 心跳监督、迟到 reply 竞态
+仓库现有 `ahe_beta.user.sim.loop` 已实现 `write_message/poll/interrupt` 心跳监督、迟到 reply 竞态
 和 persona 动作日志；0064 的可恢复实验运行提供原子状态、operation key 和外部状态对账思路。当前
 public-bench pilot 的 agent/grader 隔离、Daytona async command 和 prepared 数据边界是可迁移的验证
 资产，但临时 runner 和手工汇总不作为新框架 API。

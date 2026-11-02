@@ -1,5 +1,5 @@
 // Spec-0025/T8 + 0029/T10：issue 的 plane / provenance / kind / 优先级 / 轮号 派生（前端展示用）。
-// 与后端 backend/auto_designer/demand/issue_schema.py 的标签投影同构：优先用后端已附的字段，
+// 与后端 backend/ahe_beta/demand/issue_schema.py 的标签投影同构：优先用后端已附的字段，
 // 缺省（老后端只给 labels）时按 labels 客户端兜底——保证「字段缺省退化不崩」。
 
 import type { Issue, Plane, Provenance, TriageStatus } from "../types";
@@ -65,11 +65,11 @@ export function planeOf(issue: Issue): Plane | null {
   return null;
 }
 
-// Spec-0029：提案来源（from-triage/from-synthesize/from-divergent）。
+// Spec-0029：提案来源（from-triage/from-architect/from-divergent）。
 export function provenanceOf(issue: Issue): Provenance | null {
   if (issue.provenance !== undefined) return issue.provenance ?? null;
   const ls = issue.labels ?? [];
-  for (const p of ["from-triage", "from-synthesize", "from-divergent"] as Provenance[]) {
+  for (const p of ["from-triage", "from-architect", "from-divergent"] as Provenance[]) {
     if (ls.includes(p)) return p;
   }
   return null;

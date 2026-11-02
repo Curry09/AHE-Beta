@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.guards.repo_guard import (
+from ahe_beta.guards.repo_guard import (
     RepoIntegrityError,
     snapshot_repo,
     verify_unchanged,

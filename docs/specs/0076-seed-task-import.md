@@ -14,7 +14,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/task_import.py
+      - backend/ahe_beta/experiment/task_import.py
       - backend/tests/test_experiment_task_import.py
     scope: 严格转换输入，阶段式无覆盖发布既有任务包与来源摘要
     acceptance: 真实七卡可导入；Git pin与setup语义正确；隐藏字段不输出；错误与覆盖不产生成功产物
@@ -27,7 +27,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/cli.py
+      - backend/ahe_beta/experiment/cli.py
       - backend/tests/test_experiment_cli_v2.py
       - backend/scripts/check_experiment_repository.py
       - backend/tests/test_experiment_repository.py

@@ -36,19 +36,19 @@ Container task packages freeze their declared input hashes, image digests, envir
 | `workload` | Task packages with persona inputs/optional interaction_plan, or exactly `{"source":"parent"}` for continuation |
 | `rounds` | `count`, `sessions_per_round`, `max_parallel_users`; continuation count means added user rounds |
 | `continuation` | Optional current parent `archive` path and expected `sha256`; requires both parent input selectors |
-| `roles` | Triage/Synthesizer/divergent/developer counts; `owner_mode: mechanical` / `llm` |
+| `roles` | Triage/Architect/divergent/developer counts; `owner_mode: mechanical` / `llm` |
 | `models` | User, Harness, shared demand and Claude Code delivery settings |
 | `evaluation.official_grading` | Must be `false`; configure per-round assessment through `session_grading` |
 | `evaluation.session_grading` | Optional external per-round assessment; frozen plan/key digests and `runner: external` |
 | `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
 
-Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The U1 examples select one persona, one Triage, one Synthesizer, zero divergent PMs, one delivery worker, and five rounds. The last round runs users and any configured independent assessment, with no requirements or delivery stage.
+Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The U1 examples select one persona, one Triage, one Architect, zero divergent PMs, one delivery worker, and five rounds. The last round runs users and any configured independent assessment, with no requirements or delivery stage.
 
 `builtin` freezes `backend/harness_template/` from the current checkout. To use a specific Harness version, select `archive` and provide its path and SHA-256.
 
 ### Six-round study configurations
 
-The [E2B tutorial](tutorials/evolution32.md) provides U8 mixed/direct, U16 mixed and U32 mixed configurations using the first eight, first sixteen or all thirty-two tasks in [evolution32](../examples/tasks/evolution32/README.md). All use experiment schema 2, the current builtin seed, six rounds, 4 CPU/8192 MiB and explicit user/Developer concurrency four. Their Triager counts are 4/4/8/16; Synthesizer and Divergent are one each, Owner is mechanical and grouping is false. R6 only runs users and any configured assessment; these examples leave official grading unconfigured.
+The [E2B tutorial](tutorials/evolution32.md) provides U8 mixed/direct, U16 mixed and U32 mixed configurations using the first eight, first sixteen or all thirty-two tasks in [evolution32](../examples/tasks/evolution32/README.md). All use experiment schema 2, the current builtin seed, six rounds, 4 CPU/8192 MiB and explicit user/Developer concurrency four. Their Triager counts are 4/4/8/16; Architect and Divergent are one each, Owner is mechanical and grouping is false. R6 only runs users and any configured assessment; these examples leave official grading unconfigured.
 
 Original task/persona bindings remain fixed while each round rotates the execution list by one slot within its selected subset. `persona_ids` contains unique IDs, but the six round arrays in `interaction_plan` reuse them across separate slots. Original direct tasks use `sr-15-swyx` for terminal feedback, not simulated interaction. U8 direct overrides only the six original simulated tasks by their actual task IDs in `workload.interaction_overrides`; it does not edit shared task files or change persona assignments. Unknown override IDs are rejected. Models are public replaceable IDs: User/Harness `glm-5.3-flash`, demand/delivery `glm-5.3`; credentials remain env references.
 
@@ -102,7 +102,7 @@ Merge the following input selectors into a complete v2 definition; the [continua
 
 All three selectors are required together. `continuation` accepts only `archive` and `sha256`; paths resolve relative to the child JSON. The parent must have collection `COMPLETE`, `controller.experiment_complete=true` and `continuation_ready=true`, including the versioned final-tree export. Unsupported or missing exports are rejected before provisioning; old frozen controllers are not upgraded.
 
-Every added round inherits the parent's final task/persona/interaction pairs, including `direct` sessions. `sessions_per_round` equals that boundary's size; `max_parallel_users` may be smaller. Workload overrides are forbidden. Pending reports require Triage and Synthesizer counts of at least one. Models, runtime, roles, policies and credentials are explicit child choices; optional CI uses the child's normal local-only contract.
+Every added round inherits the parent's final task/persona/interaction pairs, including `direct` sessions. `sessions_per_round` equals that boundary's size; `max_parallel_users` may be smaller. Workload overrides are forbidden. Pending reports require Triage and Architect counts of at least one. Models, runtime, roles, policies and credentials are explicit child choices; optional CI uses the child's normal local-only contract.
 
 The child first runs an independent feedback initialization and waits for delivery, even when count is one. `count` then counts new users; the final new round remains users-only. Parent logical R5 plus count two gives child local R1/R2 at logical R6/R7; another one-round child starts logical R8. Stop/resume targets the new run. Parent evidence and ratings stay outside new-user metrics; grade and batch use local round numbers. See the [verification guide](VERIFICATION.md) for current checks.
 
@@ -114,7 +114,7 @@ Each model setting contains a model name, `base_url_env` and `api_key_env`. Thes
 | --- | --- | --- |
 | Simulated user | `USER_LLM_BASE_URL`, `USER_LLM_API_KEY` | OpenAI-compatible Chat Completions |
 | Harness | `HARNESS_LLM_BASE_URL`, `HARNESS_LLM_API_KEY` | OpenAI-compatible Chat Completions |
-| Triage, Synthesizer, PM | `DEMAND_LLM_BASE_URL`, `DEMAND_LLM_API_KEY` | OpenAI-compatible Chat Completions |
+| Triage, Architect, PM | `DEMAND_LLM_BASE_URL`, `DEMAND_LLM_API_KEY` | OpenAI-compatible Chat Completions |
 | OpenAgents delivery | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` | Anthropic-compatible Claude Code |
 | E2B infrastructure | `E2B_API_KEY` | E2B API |
 | Gitea.com | `GITEA_TOKEN`; optional `GITEA_USER` | Account resolved by API |
@@ -217,7 +217,7 @@ Optional `policies` control execution. `prepare` fills defaults and freezes them
 
 | Field | Default and behavior |
 | --- | --- |
-| `policies.synthesizer_grouping` | `false`; `true` enables existing grouped scheduling, including U1 |
+| `policies.architect_grouping` | `false`; `true` enables existing grouped scheduling, including U1 |
 | `models.user.reasoning_effort`, `models.demand.reasoning_effort` | Optional, e.g. `high`; passed to the user client/shared demand roles. The provider must support the chosen value |
 | `policies.timing.latency_isolated` | `false`; excludes instrumented provider waits from demand role execution budgets |
 | `policies.timing.wall_guard_seconds` | Additional grace seconds; `0` retains the existing 600-second default. With isolation, the wall cap is role budget plus grace; positive values override the grace |
@@ -233,7 +233,7 @@ An optional fragment to merge into your complete experiment JSON:
 ```json
 {
   "policies": {
-    "synthesizer_grouping": true,
+    "architect_grouping": true,
     "timing": {"latency_isolated": true, "wall_guard_seconds": 7200},
     "delivery": {"timeout_seconds": 3600, "poll_seconds": 5, "coordination": "dependencies"}
   }

@@ -11,8 +11,8 @@ Run the checks in the [verification guide](../VERIFICATION.md) against this chec
 Use Linux or WSL2, Git, Python 3.12 and uv. Local requires a running Docker daemon with Compose; E2B requires your API key and capacity to create a repository on your Gitea.com account. Both use the same lifecycle commands.
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
@@ -35,7 +35,7 @@ Simulated personas are derived from public material in `examples/personas/librar
 | `sr-07-baldur` | `order-service` | `pvlib__pvlib-python-1478` |
 | `sr-15-swyx` | `order-service` | `pvlib__pvlib-python-1478` |
 
-Each round has four sessions, with `max_parallel_users: 2`. R1 waits for all terminal user sessions, runs Triage/Synthesizer/Owner, and waits for admitted delivery tickets to reach terminal state before sealing. R2 only tries the sealed Harness; it does not generate another delivery batch. Outcomes, user satisfaction and infrastructure failures remain distinct.
+Each round has four sessions, with `max_parallel_users: 2`. R1 waits for all terminal user sessions, runs Triage/Architect/Owner, and waits for admitted delivery tickets to reach terminal state before sealing. R2 only tries the sealed Harness; it does not generate another delivery batch. Outcomes, user satisfaction and infrastructure failures remain distinct.
 
 For another experiment, select existing persona IDs and unique task-package IDs. `task_packages` is mutually exclusive with the old `kind` + `task_package` input. If omitting interaction_plan, global slot k=(round_no-1)*sessions_per_round+slot chooses persona k % P and task k % T. This simple rotation does not guarantee all persona × task pairs; write an explicit plan for coverage or fixed groups. The selected persona IDs remain unique; the execution list may reuse a card or complete persona/task pair. sessions_per_round counts slots, not distinct cards. Each slot has independent conversation, client, workspace and recovery identity. Repeated cards do not represent independent human samples.
 

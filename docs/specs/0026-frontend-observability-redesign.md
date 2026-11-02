@@ -3,7 +3,7 @@ number: "0026"
 title: 观测看板前端全面重构：浅/深主题可切换 + 分诊(triager)可见 + persona 展示 + 设计 token 化
 issue: 0
 slug: frontend-observability-redesign
-summary: 观测看板前端从「纯黑底+白字、四栏、只显 SR-001 标识」全面重构为一套有设计系统的界面：① 引入设计 token 层（颜色/间距/字阶/圆角/阴影/层级）+ 浅/深主题可切换（跟随系统、localStorage 持久）；② 看板补齐 triager（分诊）房间——闭环 a→d1(triage)→d2(synthesize)→b 五角色都可见，各角色一致的强调色；③ 用户卡展示 persona（identity + 水平/领域/目标），不只 SR-001；issue/commit 卡在 0025 徽标基础上排版收敛；④ 详情面板信息架构刷新 + persona 块；⑤ 体感/backlog 曲线可视化（消费既有 /api/overview）；⑥ 响应式（页面不横向滚动、宽内容内部滚动）+ 两主题对比度/焦点态。后端仅小改：live 补 triager 排序、用户 agent 活动载荷带 persona 摘要。纯只读观测，不改闭环语义、不引 benchmark。
+summary: 观测看板前端从「纯黑底+白字、四栏、只显 SR-001 标识」全面重构为一套有设计系统的界面：① 引入设计 token 层（颜色/间距/字阶/圆角/阴影/层级）+ 浅/深主题可切换（跟随系统、localStorage 持久）；② 看板补齐 triager（分诊）房间——闭环 a→d1(triage)→d2(architect)→b 五角色都可见，各角色一致的强调色；③ 用户卡展示 persona（identity + 水平/领域/目标），不只 SR-001；issue/commit 卡在 0025 徽标基础上排版收敛；④ 详情面板信息架构刷新 + persona 块；⑤ 体感/backlog 曲线可视化（消费既有 /api/overview）；⑥ 响应式（页面不横向滚动、宽内容内部滚动）+ 两主题对比度/焦点态。后端仅小改：live 补 triager 排序、用户 agent 活动载荷带 persona 摘要。纯只读观测，不改闭环语义、不引 benchmark。
 tasks:
   - id: T1
     title: 后端：live 补 triager 排序 + 用户 agent 活动载荷带 persona 摘要
@@ -14,11 +14,11 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/loop/live.py
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/loop/live.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/loop/test_live.py
-    scope: live.py 的 _ROLE_ORDER 加 triager（排在 user 之后、synthesizer 之前）；update_agent 增可选 meta(dict)——只读透传，前端展示用，不参与任何决策；run.py 用户 status 回调传 persona 摘要（identity/level/domain/goal）进 meta；read_agents 排序含 triager。纯观测数据补齐，不动闭环。
-    acceptance: read_agents 里 triager 排在 user 与 synthesizer 之间；用户 agent 槽带 persona 摘要 meta；老调用不传 meta 时退化为 None 不崩；test_live 覆盖排序与 meta 透传。
+    scope: live.py 的 _ROLE_ORDER 加 triager（排在 user 之后、architect 之前）；update_agent 增可选 meta(dict)——只读透传，前端展示用，不参与任何决策；run.py 用户 status 回调传 persona 摘要（identity/level/domain/goal）进 meta；read_agents 排序含 triager。纯观测数据补齐，不动闭环。
+    acceptance: read_agents 里 triager 排在 user 与 architect 之间；用户 agent 槽带 persona 摘要 meta；老调用不传 meta 时退化为 None 不崩；test_live 覆盖排序与 meta 透传。
   - id: T2
     title: 设计 token 层 + 浅/深主题（跟随系统 + localStorage 持久）+ 全局 CSS
     status: done
@@ -97,7 +97,7 @@ tasks:
 现状三个体感/可用性问题，都在只读看板这一层：
 
 1. **纯黑底 + 白字太生硬**，没有层次与强调，长时间盯着累；配色是逐组件写死的 hex，无设计 token，改主题、加浅色无从下手。
-2. **分诊 agent（triager）在前端完全不可见**：闭环已是 a→d1(triage)→d2(synthesize)→b，但前端 ROLES 只有 用户/设计师/开发者三个房间，triager 发的 `role="triager"` 活动被直接过滤掉——用户既看不到分诊在做什么，也就无从判断「issue 一直 needs-triage」是分诊没跑、跑崩、还是没产出（本次线上正遇到）。
+2. **分诊 agent（triager）在前端完全不可见**：闭环已是 a→d1(triage)→d2(architect)→b，但前端 ROLES 只有 用户/设计师/开发者三个房间，triager 发的 `role="triager"` 活动被直接过滤掉——用户既看不到分诊在做什么，也就无从判断「issue 一直 needs-triage」是分诊没跑、跑崩、还是没产出（本次线上正遇到）。
 3. **agent 卡只显 identity 标识（SR-001 这种）**，看不到该 persona 是谁（水平/领域/目标），交互时缺上下文。
 
 这些不是闭环逻辑问题，而是观测界面的表达问题；单独立一个前端 spec 重构，和后端进化解耦。
@@ -117,7 +117,7 @@ tasks:
 
 ## Reference-level explanation
 
-**后端（T1，最小改动）**：`loop/live.py` 的 `_ROLE_ORDER` 增 `triager`（介于 user 与 synthesizer 之间）；`update_agent` 增一个可选 `meta: dict | None`（只读透传、默认 None、老调用不受影响），落进 agent 槽；`run.py` 的用户 status 回调把 persona 摘要（identity/level/domain/goal）放进 meta。纯观测字段，不进任何决策、不碰 tracker/git。
+**后端（T1，最小改动）**：`loop/live.py` 的 `_ROLE_ORDER` 增 `triager`（介于 user 与 architect 之间）；`update_agent` 增一个可选 `meta: dict | None`（只读透传、默认 None、老调用不受影响），落进 agent 槽；`run.py` 的用户 status 回调把 persona 摘要（identity/level/domain/goal）放进 meta。纯观测字段，不进任何决策、不碰 tracker/git。
 
 **前端设计系统（T2，地基）**：`styles.css` 重构为 CSS 变量 token——色板（bg/surface/surface-raised/border/text/text-dim/text-faint/accent + 四角色强调色）、间距阶、字阶、圆角、阴影、层级。`:root` 定义浅色为基准，`:root[data-theme="dark"]` 覆盖深色；`useTheme` hook 读/写 localStorage、首屏读 `prefers-color-scheme`、在 `<html>` 打 `data-theme`；`ThemeToggle` 挂 TopBar。组件层不再写死颜色，全部走 token。
 
@@ -128,7 +128,7 @@ tasks:
 
 **DAG**：T1、T2 无依赖（可并行起步）；T3←T2；T4←T1+T3；T5←T2+T3。**文件按 task 单一归属、互不重叠**：T1=live/run/test_live，T2=styles.css/useTheme/ThemeToggle，T3=types/App/TopBar/Charts，T4=AgentColumn/Card，T5=detail/*+SidePanel。跨组重叠（types.ts 与 0020/0025）仅为观测性警告，不阻塞。
 
-**Non-goal**：不改闭环 a/d/b/c 语义；不新增后端观测端点（曲线用既有 /api/overview，详情用既有 /api/*）；不引 benchmark；不做鉴权/多用户；不改 issue schema 与 triage/synthesize/dev 逻辑（那是 0025）。
+**Non-goal**：不改闭环 a/d/b/c 语义；不新增后端观测端点（曲线用既有 /api/overview，详情用既有 /api/*）；不引 benchmark；不做鉴权/多用户；不改 issue schema 与 triage/architect/dev 逻辑（那是 0025）。
 
 ## Drawbacks
 

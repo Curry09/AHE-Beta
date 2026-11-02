@@ -7,19 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.demand import issue_schema as sc
-from auto_designer.demand.divergent import Divergent
-from auto_designer.demand.owner import Owner
-from auto_designer.demand.proposal_view import format_proposal_list
-from auto_designer.demand.role_contract import (
+from ahe_beta.demand import issue_schema as sc
+from ahe_beta.demand.architect import Architect
+from ahe_beta.demand.divergent import Divergent
+from ahe_beta.demand.owner import Owner
+from ahe_beta.demand.proposal_view import format_proposal_list
+from ahe_beta.demand.role_contract import (
     validate_owner,
     validate_pm,
     validate_synthesis,
     validate_triage,
 )
-from auto_designer.demand.synthesizer import Synthesizer
-from auto_designer.demand.triage import Triager
-from auto_designer.models import (
+from ahe_beta.demand.triage import Triager
+from ahe_beta.models import (
     FeelingScore,
     IssueDraft,
     Persona,
@@ -27,8 +27,8 @@ from auto_designer.models import (
     Session,
     Transcript,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
 
 
 class _Triage(Triager):
@@ -62,7 +62,7 @@ class _Divergent(Divergent):
         return self._result
 
 
-class _Synthesizer(Synthesizer):
+class _Architect(Architect):
     def __init__(self, *args, result: str, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._result = result
@@ -222,7 +222,7 @@ def test_report_is_normalized_once_and_raw_case_stays_out_of_downstream_context(
     assert sc.is_ready(labels=admitted_issue["labels"], state=admitted_issue["state"])
 
 
-def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
+def test_exact_proposal_set_flows_through_divergent_architect_and_owner(
     tmp_path: Path,
 ) -> None:
     tracker = FakeTracker()
@@ -301,42 +301,42 @@ def test_exact_proposal_set_flows_through_divergent_synthesize_and_owner(
             labels=[sc.PROPOSAL, sc.FROM_TRIAGE],
         )
     ).number
-    expected_for_synthesize = {report, second_report}
-    synthesizer = _Synthesizer(
+    expected_for_architect = {report, second_report}
+    architect = _Architect(
         tracker,
         store,
         str(tmp_path / "harness"),
-        str(tmp_path / "synthesizer"),
+        str(tmp_path / "architect"),
         result=json.dumps(
             {
                 "proposals": [
                     {
                         "title": "统一约束生命周期",
-                        "source_proposals": sorted(expected_for_synthesize),
+                        "source_proposals": sorted(expected_for_architect),
                         "relationship": "互补",
                         "common_tension": "反馈边界不一致",
                         "structural_direction": "统一约束表达与反馈边界",
                         "expected_leverage": "覆盖多个体验问题",
                         "solution_level": "structural_mechanism",
                         "abstraction_rationale": "跨提案机制层",
-                        "covers": sorted({*expected_for_synthesize, divergent_number}),
+                        "covers": sorted({*expected_for_architect, divergent_number}),
                     }
                 ]
             },
             ensure_ascii=False,
         ),
     )
-    synthesis_outcome = synthesizer.propose_once()
-    synthesize_number = synthesis_outcome.proposal_numbers[0]
-    assert set(synthesizer.proposal_numbers) == expected_for_synthesize
+    synthesis_outcome = architect.propose_once()
+    architect_number = synthesis_outcome.proposal_numbers[0]
+    assert set(architect.proposal_numbers) == expected_for_architect
     assert synthesis_outcome.merged_numbers == sorted({report, second_report})
     assert all(tracker.issue(number)["state"] == "closed" for number in (report, second_report))
     assert tracker.issue(divergent_number)["state"] == "open"
     assert sc.PROPOSAL in tracker.issue(divergent_number)["labels"]
-    assert sc.parse_covers_line(tracker.issue(synthesize_number)["body"]) == [report, second_report]
+    assert sc.parse_covers_line(tracker.issue(architect_number)["body"]) == [report, second_report]
 
-    # PM independent route survives even an explicit Synthesizer attempt to cover it.
-    expected_for_owner = {synthesize_number, divergent_number}
+    # PM independent route survives even an explicit Architect attempt to cover it.
+    expected_for_owner = {architect_number, divergent_number}
     owner = _Owner(
         tracker,
         store,
@@ -375,16 +375,16 @@ def test_pm_is_not_visible_and_cannot_be_cited(tmp_path, labels):
         "abstraction_rationale": "shared",
         "covers": [a, b],
     }
-    synthesizer = _Synthesizer(
+    architect = _Architect(
         tracker,
         SessionStore(tmp_path / "sessions"),
         str(tmp_path),
         str(tmp_path),
         result=json.dumps({"proposals": [artifact]}),
     )
-    outcome = synthesizer.propose_once()
+    outcome = architect.propose_once()
     assert outcome.proposal_numbers == outcome.merged_numbers == []
-    assert synthesizer.proposal_numbers == [a]
+    assert architect.proposal_numbers == [a]
     assert outcome.rejected_proposals[0]["reasons"] == ["foreign-source"]
     assert {i.number for i in tracker.list_open_issues()} == {a, b}
 
@@ -408,7 +408,7 @@ def test_pm_only_synthesis_is_rejected_but_owner_receives_products(tmp_path, lab
         "covers": nums,
     }
     store = SessionStore(tmp_path / "sessions")
-    out = _Synthesizer(
+    out = _Architect(
         tracker, store, str(tmp_path), str(tmp_path), result=json.dumps({"proposals": [artifact]})
     ).propose_once()
     assert not out.proposal_numbers and out.rejected_proposals

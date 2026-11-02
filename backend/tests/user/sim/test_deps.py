@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.models import WorkspaceSpec
-from auto_designer.user.sim.deps import SetupError, ensure_deps
-from auto_designer.user.sim.sandbox import Sandbox
+from ahe_beta.models import WorkspaceSpec
+from ahe_beta.user.sim.deps import SetupError, ensure_deps
+from ahe_beta.user.sim.sandbox import Sandbox
 
 
 def test_empty_setup_is_noop(tmp_path: Path) -> None:

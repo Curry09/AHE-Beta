@@ -9,11 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.loop.orchestrator import Orchestrator
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
-from auto_designer.loop.round_gate import RoundDeliveryBlocked
-from auto_designer.models import Persona, SeedScenario
-from auto_designer.usage import current_usage_context
+from ahe_beta.loop.orchestrator import Orchestrator
+from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
+from ahe_beta.loop.round_gate import RoundDeliveryBlocked
+from ahe_beta.models import Persona, SeedScenario
+from ahe_beta.usage import current_usage_context
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -56,7 +56,7 @@ def _run_case(root: Path, failure_stage: str | None) -> dict[str, object]:
     identity = RecoveryIdentity("exp", "run", "config", "controller", "plan")
     recovery = RecoveryStore.initialize(root=root / "checkpoints", identity=identity)
     calls = {
-        stage: 0 for stage in ("users", "triage", "divergent", "synthesizer", "owner", "delivery")
+        stage: 0 for stage in ("users", "triage", "divergent", "architect", "owner", "delivery")
     }
     effects: set[str] = set()
     sessions: dict[str, dict[str, str]] = {}
@@ -133,7 +133,7 @@ def _run_case(root: Path, failure_stage: str | None) -> dict[str, object]:
             initial_ref="main",
             triagers=[Role("triage")],
             divergents=[Role("divergent")],
-            synthesizers=[Role("synthesizer")],
+            architects=[Role("architect")],
             owner=Owner(),
             fetch_issue=fetch_issue,
             wait_delivery=wait_delivery,
@@ -164,7 +164,7 @@ def _run_case(root: Path, failure_stage: str | None) -> dict[str, object]:
 
 
 @pytest.mark.parametrize(
-    "failure_stage", ["users", "triage", "divergent", "synthesizer", "owner", "delivery"]
+    "failure_stage", ["users", "triage", "divergent", "architect", "owner", "delivery"]
 )
 def test_every_stage_resumes_to_the_same_authoritative_result(
     tmp_path: Path, failure_stage: str

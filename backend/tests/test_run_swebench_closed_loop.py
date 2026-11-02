@@ -5,19 +5,19 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.controllers import runtime
+from ahe_beta.experiment.controllers import runtime
 
 
 def test_shared_recovery_loader_reuses_identity_and_rejects_missing_state(
     tmp_path: Path, monkeypatch
 ) -> None:
     values = {
-        "AUTO_DESIGNER_EXPERIMENT_ID": "exp",
-        "AUTO_DESIGNER_RUN_ID": "run",
-        "AUTO_DESIGNER_CONFIG_HASH": "config",
-        "AUTO_DESIGNER_CONTROLLER_SHA": "controller",
-        "AUTO_DESIGNER_PLAN_HASH": "plan",
-        "AUTO_DESIGNER_RECOVERY_ROOT": str(tmp_path / "checkpoints"),
+        "AHE_BETA_EXPERIMENT_ID": "exp",
+        "AHE_BETA_RUN_ID": "run",
+        "AHE_BETA_CONFIG_HASH": "config",
+        "AHE_BETA_CONTROLLER_SHA": "controller",
+        "AHE_BETA_PLAN_HASH": "plan",
+        "AHE_BETA_RECOVERY_ROOT": str(tmp_path / "checkpoints"),
     }
     for key, value in values.items():
         monkeypatch.setenv(key, value)

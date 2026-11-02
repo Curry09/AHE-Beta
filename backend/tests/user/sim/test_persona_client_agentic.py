@@ -11,8 +11,8 @@ import json
 
 import pytest
 
-from auto_designer.models import WorkspaceSpec
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.models import WorkspaceSpec
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Domain,
     D5Autonomy,
@@ -22,14 +22,14 @@ from auto_designer.user.sim.dimensions import (
     Persona,
     finalize_persona,
 )
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.loop import run_session
-from auto_designer.user.sim.persona_client import (
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.loop import run_session
+from ahe_beta.user.sim.persona_client import (
     AgenticPersonaClient,
     PersonaProtocolError,
     ScriptedPersonaClient,
 )
-from auto_designer.user.sim.workspace import materialize
+from ahe_beta.user.sim.workspace import materialize
 
 
 def _persona(d1: D1Eval) -> Persona:
@@ -116,7 +116,7 @@ def test_tool_call_then_final_contract() -> None:
     assert sb.runs and sb.runs[0][0] == "python billing/core.py"
     assert out["verdict"] == "satisfied" and out["action"] == "accept"
     assert len(llm.calls) == 2 and sb.cleaned
-    from auto_designer.user.sim.persona_client import drain_call_traces
+    from ahe_beta.user.sim.persona_client import drain_call_traces
 
     traces = drain_call_traces(c)
     assert len(traces) == 1

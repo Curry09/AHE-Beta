@@ -5,9 +5,9 @@ import json
 
 import pytest
 
-from auto_designer.experiment import materials, workload
-from auto_designer.experiment.config import ConfigError
-from auto_designer.loop.recovery import operation_key
+from ahe_beta.experiment import materials, workload
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.loop.recovery import operation_key
 from test_experiment_config_v2 import write
 
 
@@ -185,7 +185,7 @@ def test_inherited_plan_preserves_repeated_pairs_and_distinct_slot_keys():
 def test_existing_n1_n4_plan_hashes_and_session_keys_unchanged(
     count, expected_config, expected_plan
 ):
-    from auto_designer.experiment.config import config_hash
+    from ahe_beta.experiment.config import config_hash
 
     config = {
         "workload": {"persona_ids": [f"p-{i}" for i in range(count)]},

@@ -11,14 +11,14 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import materials
-from auto_designer.experiment.task_environments.materials import (
+from ahe_beta.experiment import materials
+from ahe_beta.experiment.task_environments.materials import (
     MaterialError,
     execution_environment,
     fetch_material,
     materialize_input,
 )
-from auto_designer.experiment.workload import read_task_catalog
+from ahe_beta.experiment.workload import read_task_catalog
 from test_experiment_materials import prepared_inputs as prepared_inputs
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.distill.seed_library import (
+from ahe_beta.distill.seed_library import (
     CAPABILITY_TAXONOMY,
     DOMAIN_VOCAB,
     SeedLibrary,

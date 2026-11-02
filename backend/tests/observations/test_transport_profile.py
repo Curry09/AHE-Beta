@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from auto_designer.observations.transport import (
+from ahe_beta.observations.transport import (
     freeze_transport_profile,
     load_transport_profile,
     make_transport_profile,

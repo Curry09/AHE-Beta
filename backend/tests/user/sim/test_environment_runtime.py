@@ -8,23 +8,23 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment.task_environments.contract import (
+from ahe_beta.experiment.task_environments.contract import (
     container_environment,
     environment_identity,
 )
-from auto_designer.experiment.task_environments.docker import (
+from ahe_beta.experiment.task_environments.docker import (
     ContainerTaskRuntime,
     TaskEnvironmentError,
 )
-from auto_designer.loop.sim_user import _export_prediction
-from auto_designer.models import WorkspaceSpec
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.sim.runtime import (
+from ahe_beta.loop.sim_user import _export_prediction
+from ahe_beta.models import WorkspaceSpec
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.sim.runtime import (
     capture_review_snapshot,
     list_review_files,
     read_bounded_file,
 )
-from auto_designer.user.sim.sources.container import ContainerSource
+from ahe_beta.user.sim.sources.container import ContainerSource
 
 
 def runtime():
@@ -159,7 +159,7 @@ def test_source_uses_current_bound_attempt_not_caller_supplied_ids(monkeypatch):
             return "owned-runtime"
 
     monkeypatch.setattr(
-        "auto_designer.experiment.task_environments.docker.DockerTaskEnvironmentManager", Manager
+        "ahe_beta.experiment.task_environments.docker.DockerTaskEnvironmentManager", Manager
     )
     with bind_usage_context(
         run_id="run",
@@ -192,16 +192,16 @@ def test_source_rejects_usage_task_mismatch_before_provision():
 def test_completed_actor_capture_retry_never_reexecutes_actor_or_publishes_infra_feedback(
     tmp_path, monkeypatch, mode
 ):
-    from auto_designer.loop.sim_user import (
+    from ahe_beta.loop.sim_user import (
         EnvironmentInfrastructureError,
         make_mixed_run_session_fn,
     )
-    from auto_designer.models import Persona, SeedScenario
-    from auto_designer.tracker.fake import FakeTracker
-    from auto_designer.user.session_store import SessionStore
-    from auto_designer.user.sim.harness_adapter import ScriptedHarness
-    from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-    from auto_designer.user.sim.run_live import expert
+    from ahe_beta.models import Persona, SeedScenario
+    from ahe_beta.tracker.fake import FakeTracker
+    from ahe_beta.user.session_store import SessionStore
+    from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+    from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+    from ahe_beta.user.sim.run_live import expert
 
     context = dict(
         run_id="run",
@@ -336,11 +336,9 @@ def test_completed_actor_capture_retry_never_reexecutes_actor_or_publishes_infra
         assert binding["identity"]["attempt"] == 1
         return environment
 
+    monkeypatch.setattr("ahe_beta.experiment.task_environments.docker.resume_collection", adopt)
     monkeypatch.setattr(
-        "auto_designer.experiment.task_environments.docker.resume_collection", adopt
-    )
-    monkeypatch.setattr(
-        "auto_designer.experiment.task_environments.docker.release_collection",
+        "ahe_beta.experiment.task_environments.docker.release_collection",
         lambda **values: released.append(values),
     )
     with bind_usage_context(**context):
@@ -372,14 +370,14 @@ def test_crash_after_observation_publish_and_source_cleanup_reuses_verified_bund
     import json
     import shutil
 
-    from auto_designer.loop.sim_user import make_mixed_run_session_fn
-    from auto_designer.models import Persona, SeedScenario
-    from auto_designer.observations.publication import ObservationSource
-    from auto_designer.tracker.fake import FakeTracker
-    from auto_designer.user.session_store import SessionStore
-    from auto_designer.user.sim.harness_adapter import ScriptedHarness
-    from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-    from auto_designer.user.sim.run_live import expert
+    from ahe_beta.loop.sim_user import make_mixed_run_session_fn
+    from ahe_beta.models import Persona, SeedScenario
+    from ahe_beta.observations.publication import ObservationSource
+    from ahe_beta.tracker.fake import FakeTracker
+    from ahe_beta.user.session_store import SessionStore
+    from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+    from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+    from ahe_beta.user.sim.run_live import expert
 
     sp = expert()
     context = dict(
@@ -454,11 +452,9 @@ def test_crash_after_observation_publish_and_source_cleanup_reuses_verified_bund
         released.append(values)
         shutil.rmtree(producer, ignore_errors=True)
 
+    monkeypatch.setattr("ahe_beta.experiment.task_environments.docker.release_collection", release)
     monkeypatch.setattr(
-        "auto_designer.experiment.task_environments.docker.release_collection", release
-    )
-    monkeypatch.setattr(
-        "auto_designer.experiment.task_environments.docker.resume_collection",
+        "ahe_beta.experiment.task_environments.docker.resume_collection",
         lambda **values: (_ for _ in ()).throw(
             AssertionError("frozen capture must not touch resources")
         ),
@@ -528,7 +524,7 @@ def test_crash_after_observation_publish_and_source_cleanup_reuses_verified_bund
 
 
 def test_conversational_scratch_has_explicit_no_git_and_bounded_safe_review(tmp_path):
-    from auto_designer.user.sim.runtime import make_empty_runtime
+    from ahe_beta.user.sim.runtime import make_empty_runtime
 
     workspace = make_empty_runtime()
     try:
@@ -560,7 +556,7 @@ def test_conversational_scratch_has_explicit_no_git_and_bounded_safe_review(tmp_
 
 
 def test_collection_recovery_registry_rejects_sources_without_frozen_capability():
-    from auto_designer.user.sim.seed_source import release_collection, resume_collection
+    from ahe_beta.user.sim.seed_source import release_collection, resume_collection
 
     for operation in (release_collection, resume_collection):
         with pytest.raises(ValueError, match="collection"):
@@ -575,7 +571,7 @@ def test_fixture_source_preserves_real_git_metadata_and_local_path_api(tmp_path,
     import os
     import subprocess
 
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     fixtures = tmp_path / "fixtures"
     project = fixtures / "tracked/project"
@@ -599,7 +595,7 @@ def test_fixture_source_preserves_real_git_metadata_and_local_path_api(tmp_path,
     ):
         subprocess.run(argv, check=True, capture_output=True)
     monkeypatch.setattr(
-        "auto_designer.user.sim.sources.local_fixture.seed_workspaces_root", lambda: fixtures
+        "ahe_beta.user.sim.sources.local_fixture.seed_workspaces_root", lambda: fixtures
     )
     runtime = seed_source.provision(WorkspaceSpec(fixture="tracked"))
     try:

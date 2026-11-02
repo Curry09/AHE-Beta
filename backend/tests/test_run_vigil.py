@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
-run = importlib.import_module("auto_designer.experiment.controllers.runtime")
+run = importlib.import_module("ahe_beta.experiment.controllers.runtime")
 
 _GITEA = {
     "GITEA_URL": "http://localhost:3000",
@@ -116,7 +116,7 @@ def test_vigil_keep_alive_defaults_off(monkeypatch) -> None:
 
 
 def test_stop_vigil_model_processes_is_scoped_to_run(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "target-run")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "target-run")
     monkeypatch.setattr(run.os, "getpgrp", lambda: 900)
     killed_groups: list[int] = []
     killed_pids: list[int] = []
@@ -128,7 +128,7 @@ def test_stop_vigil_model_processes_is_scoped_to_run(tmp_path: Path, monkeypatch
         directory.mkdir()
         (directory / "stat").write_text(f"{pid} (process) S {parent} {group} 0\n")
         (directory / "cmdline").write_bytes(cmd.encode() + b"\0")
-        (directory / "environ").write_bytes(f"AUTO_DESIGNER_RUN_ID={run_id}".encode() + b"\0")
+        (directory / "environ").write_bytes(f"AHE_BETA_RUN_ID={run_id}".encode() + b"\0")
 
     process(101, 77, 101, "claude -p --verbose", "target-run")
     process(102, 101, 102, "python -m unittest", "target-run")
@@ -208,7 +208,7 @@ def _container_rig(monkeypatch, tmp_path: Path) -> dict:
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     monkeypatch.delenv("OPENAGENTS_PERMISSION_MODE", raising=False)
-    monkeypatch.delenv("AUTO_DESIGNER_RUN_ID", raising=False)
+    monkeypatch.delenv("AHE_BETA_RUN_ID", raising=False)
     monkeypatch.delenv("ROLE_RUNS_DIR", raising=False)
     for key in run._CLAUDE_CONFIG_ENVS:  # 清宿主可能设的 base_url/模型，避免污染断言
         monkeypatch.delenv(key, raising=False)
@@ -385,7 +385,7 @@ def test_container_mounts_only_delivery_role_runs(tmp_path: Path, monkeypatch) -
     (run_root / "sessions").mkdir(parents=True)
     (run_root / "demand").mkdir(parents=True)
     monkeypatch.setenv("ROLE_RUNS_DIR", str(run_root))
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-a")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "run-a")
     run.start_vigil(
         repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
     )
@@ -396,7 +396,8 @@ def test_container_mounts_only_delivery_role_runs(tmp_path: Path, monkeypatch) -
     assert "--user root" in joined
     assert f"VIGIL_EXEC_UID={os.getuid() or 1000}" in docker_run
     assert f"VIGIL_EXEC_GID={os.getgid() or 1000}" in docker_run
-    assert "io.auto-designer.run_id=run-a" in joined
+    assert "io.ahe-beta.run_id=run-a" in joined
+    assert "AUTO_DESIGNER_RUN_ID=run-a" in docker_run
     assert "sessions" not in joined
     assert "/demand" not in joined
 
@@ -437,7 +438,7 @@ def test_container_passes_explicit_claude_idle_timeout_and_permissions(
 
 def test_container_rebuilds_when_run_id_changes(tmp_path: Path, monkeypatch) -> None:
     calls = _container_rig(monkeypatch, tmp_path)
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-b")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "run-b")
 
     def _fake_run(argv, **kw):
         calls["runs"].append(list(argv))
@@ -455,7 +456,7 @@ def test_container_rebuilds_when_run_id_changes(tmp_path: Path, monkeypatch) -> 
 
 def test_container_refuses_foreign_experiment_attach(tmp_path: Path, monkeypatch) -> None:
     calls = _container_rig(monkeypatch, tmp_path)
-    monkeypatch.delenv("AUTO_DESIGNER_EXPERIMENT_ID", raising=False)
+    monkeypatch.delenv("AHE_BETA_EXPERIMENT_ID", raising=False)
 
     def _fake_run(argv, **kw):
         calls["runs"].append(list(argv))
@@ -489,14 +490,14 @@ def test_apply_experiment_context_overrides_singleton(tmp_path: Path, monkeypatc
     run.apply_experiment_context(ctx=_Ctx())
     assert run.DATA == _Ctx.data_root
     assert run._VIGIL_CONTAINER == _Ctx.vigil_container
-    assert os.environ["AUTO_DESIGNER_EXPERIMENT_ID"] == "exp-z"
+    assert os.environ["AHE_BETA_EXPERIMENT_ID"] == "exp-z"
 
 
 def test_install_role_runs_does_not_delete_prior_slice(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("AUTO_DESIGNER_RUN_ID", raising=False)
+    monkeypatch.delenv("AHE_BETA_RUN_ID", raising=False)
     first = run.install_role_runs(data_root=tmp_path)
     (first / "sessions" / "old.json").write_text("{}", encoding="utf-8")
-    monkeypatch.delenv("AUTO_DESIGNER_RUN_ID", raising=False)
+    monkeypatch.delenv("AHE_BETA_RUN_ID", raising=False)
     second = run.install_role_runs(data_root=tmp_path)
     assert first != second
     assert (first / "sessions" / "old.json").is_file()
@@ -537,6 +538,9 @@ def test_subprocess_start_spawns_with_token_env_and_cwd(tmp_path: Path, monkeypa
     monkeypatch.setenv("ANTHROPIC_MODEL", "vendor/Model-Pro")
     monkeypatch.setenv("CLAUDE_CODE_SUBAGENT_MODEL", "anthropic/claude-sonnet-5")
     monkeypatch.setenv("CLAUDE_CODE_SUBAGENT_MODEL_FORCE", "0")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "current-run")
+    monkeypatch.setenv("AHE_BETA_ROUND", "3")
+    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "unrelated-old-run")
     monkeypatch.setattr(run.shutil, "which", lambda name: "/usr/bin/openagents")
 
     def _fake_popen(argv, *, cwd, env, stdout, stderr):
@@ -555,6 +559,8 @@ def test_subprocess_start_spawns_with_token_env_and_cwd(tmp_path: Path, monkeypa
     assert calls["env"]["GITEA_TOKEN"] == "secret-token"  # token 只经子进程 env，不落配置
     assert calls["env"]["CLAUDE_CODE_SUBAGENT_MODEL"] == "vendor/Model-Pro"
     assert calls["env"]["CLAUDE_CODE_SUBAGENT_MODEL_FORCE"] == "1"
+    assert calls["env"]["AUTO_DESIGNER_RUN_ID"] == "current-run"
+    assert calls["env"]["AUTO_DESIGNER_ROUND"] == "3"
     assert (repo / ".openagents" / "openagents.yml").is_file()  # 联调模式配置写进宿主仓（既有行为）
 
     run.stop_vigil(handle)
@@ -609,13 +615,13 @@ def test_stop_vigil_kills_on_timeout(tmp_path: Path) -> None:
 
 # Spec-0070/T3: the checked runtime is the runtime used for actual delivery.
 def _hosted_profile(tmp_path, monkeypatch):
-    from auto_designer.observations.transport import (
+    from ahe_beta.observations.transport import (
         freeze_transport_profile,
         make_transport_profile,
     )
 
     root = tmp_path / "observations"
-    monkeypatch.setenv("AUTO_DESIGNER_OBSERVATION_ROOT", str(root))
+    monkeypatch.setenv("AHE_BETA_OBSERVATION_ROOT", str(root))
     hosted = {**_GITEA, "GITEA_URL": "https://gitea.com"}
     profile = make_transport_profile(
         repository="https://gitea.com/api/v1/repos/harness/harness",
@@ -639,7 +645,7 @@ def _reader_capabilities():
 
 
 def test_hosted_container_uses_checked_image_public_url_and_no_updates(tmp_path, monkeypatch):
-    from auto_designer.observations import preflight
+    from ahe_beta.observations import preflight
 
     calls = _container_rig(monkeypatch, tmp_path)
     hosted, _ = _hosted_profile(tmp_path, monkeypatch)
@@ -656,14 +662,14 @@ def test_hosted_container_uses_checked_image_public_url_and_no_updates(tmp_path,
     argv = next(a for a in calls["runs"] if a[:2] == ["docker", "run"])
     assert identity in argv and run._VIGIL_IMAGE not in argv
     assert "OPENAGENTS_NO_SELF_UPDATE=1" in argv
-    assert "AUTO_DESIGNER_OBSERVATION_DOWNLOAD_POLICY=gitea-com-r2-v1" in argv
+    assert "AHE_BETA_OBSERVATION_DOWNLOAD_POLICY=gitea-com-r2-v1" in argv
     data = _load_yaml(tmp_path / "staging/.openagents/openagents.yml")
     assert data["gitea"]["base_url"] == "https://gitea.com"
     assert any("@gitea.com/" in a for a in argv)
 
 
 def test_hosted_subprocess_uses_exact_checked_executable(tmp_path, monkeypatch):
-    from auto_designer.observations import preflight
+    from ahe_beta.observations import preflight
 
     hosted, _ = _hosted_profile(tmp_path, monkeypatch)
     monkeypatch.setenv("VIGIL_MODE", "subprocess")
@@ -689,7 +695,7 @@ def test_hosted_subprocess_uses_exact_checked_executable(tmp_path, monkeypatch):
 
 
 def test_bad_hosted_reader_cannot_start_vigil_or_write_config(tmp_path, monkeypatch):
-    from auto_designer.observations import preflight
+    from ahe_beta.observations import preflight
 
     calls = _container_rig(monkeypatch, tmp_path)
     hosted, _ = _hosted_profile(tmp_path, monkeypatch)
@@ -703,12 +709,12 @@ def test_bad_hosted_reader_cannot_start_vigil_or_write_config(tmp_path, monkeypa
 
 
 def test_hosted_reuse_probes_actual_container(tmp_path, monkeypatch):
-    from auto_designer.observations import preflight
+    from ahe_beta.observations import preflight
 
     _container_rig(monkeypatch, tmp_path)
     hosted, _ = _hosted_profile(tmp_path, monkeypatch)
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "our-run")
-    monkeypatch.delenv("AUTO_DESIGNER_EXPERIMENT_ID", raising=False)
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "our-run")
+    monkeypatch.delenv("AHE_BETA_EXPERIMENT_ID", raising=False)
     monkeypatch.setattr(run, "_container_state", lambda **kw: (True, "our-run", ""))
     seen = []
 
@@ -734,7 +740,7 @@ def test_hosted_public_url_keeps_explicit_override(monkeypatch):
 
 def test_reused_container_prereqs_do_not_require_old_local_image_tag(tmp_path, monkeypatch):
     calls = _container_rig(monkeypatch, tmp_path)
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "our-run")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "our-run")
     monkeypatch.setattr(run, "_container_state", lambda **kw: (True, "our-run", ""))
     run._ensure_vigil_container_prereqs()
     assert not any(a[:3] == ["docker", "image", "inspect"] for a in calls["runs"])

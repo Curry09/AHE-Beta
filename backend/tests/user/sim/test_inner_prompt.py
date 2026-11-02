@@ -6,8 +6,8 @@ skill 占位（senior 才挂、片段为通用方法）、build_inner_system 端
 
 from __future__ import annotations
 
-from auto_designer.user.sim.clauses import clause_capability, clause_verification_policy
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.user.sim.clauses import clause_capability, clause_verification_policy
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D2Domain,
@@ -20,10 +20,10 @@ from auto_designer.user.sim.dimensions import (
     TrustStance,
     finalize_persona,
 )
-from auto_designer.user.sim.prompt import build_inner_system
-from auto_designer.user.sim.skills import Skill, select_skills
-from auto_designer.user.sim.state import State
-from auto_designer.user.sim.tools import tool_stack
+from ahe_beta.user.sim.prompt import build_inner_system
+from ahe_beta.user.sim.skills import Skill, select_skills
+from ahe_beta.user.sim.state import State
+from ahe_beta.user.sim.tools import tool_stack
 
 
 def _persona(d1: D1Eval, depth: D2Depth = D2Depth.PROFICIENT, d3=None) -> Persona:

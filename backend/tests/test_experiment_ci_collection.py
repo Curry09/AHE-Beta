@@ -5,7 +5,7 @@ import tarfile
 
 import pytest
 
-from auto_designer.experiment.collection import collect_archive, export_gitea_snapshot
+from ahe_beta.experiment.collection import collect_archive, export_gitea_snapshot
 
 OLD = "a" * 40
 NEW = "b" * 40

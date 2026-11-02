@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import cli, runtime
-from auto_designer.experiment.config import ConfigError
+from ahe_beta.experiment import cli, runtime
+from ahe_beta.experiment.config import ConfigError
 
 
 @pytest.mark.parametrize("interaction", ["direct", "simulated_user"])
@@ -14,7 +14,7 @@ def test_task_text_emits_existing_package_without_credentials(
     tmp_path, monkeypatch, capsys, interaction
 ):
     # Spec-0076/T2: material preparation must never enter the provider lifecycle.
-    from auto_designer.experiment.config import load_task_package
+    from ahe_beta.experiment.config import load_task_package
 
     monkeypatch.setattr(
         runtime, "credentials_v2", lambda **kwargs: pytest.fail("no credentials for task import")
@@ -106,7 +106,7 @@ def test_task_seeds_respects_selection_order_and_reports_existing_output(tmp_pat
 @pytest.mark.parametrize("offline", [False, True])
 def test_grade_routes_pinned_dataset_without_credentials(monkeypatch, capsys, tmp_path, offline):
     # Spec-0075/T3: global credentials are deliberately absent from the grading API.
-    from auto_designer.experiment import grading
+    from ahe_beta.experiment import grading
 
     seen = {}
 
@@ -142,7 +142,7 @@ def test_grade_routes_pinned_dataset_without_credentials(monkeypatch, capsys, tm
 
 
 def test_grade_incomplete_evidence_returns_business_failure(monkeypatch, capsys):
-    from auto_designer.experiment import grading
+    from ahe_beta.experiment import grading
 
     monkeypatch.setattr(
         grading, "grade_run", lambda **kwargs: {"ok": False, "entries": [{"status": "ungradable"}]}
@@ -152,7 +152,7 @@ def test_grade_incomplete_evidence_returns_business_failure(monkeypatch, capsys)
 
 
 def test_grade_defaults_to_last_round(monkeypatch):
-    from auto_designer.experiment import grading
+    from ahe_beta.experiment import grading
 
     seen = {}
     monkeypatch.setattr(grading, "grade_run", lambda **kwargs: seen.update(kwargs) or {"ok": True})
@@ -269,7 +269,7 @@ def test_destroy_discard_is_explicit(monkeypatch):
 
 
 def test_dashboard_routes_explicit_run_and_server_options(monkeypatch):
-    from auto_designer.experiment import dashboard
+    from ahe_beta.experiment import dashboard
 
     seen = {}
     monkeypatch.setattr(dashboard, "serve_dashboard", lambda **kwargs: seen.update(kwargs))
@@ -300,7 +300,7 @@ def test_dashboard_routes_explicit_run_and_server_options(monkeypatch):
 
 
 def test_dashboard_uncollected_error_is_actionable(monkeypatch, capsys):
-    from auto_designer.experiment import dashboard
+    from ahe_beta.experiment import dashboard
 
     def fail(**kwargs):
         raise ConfigError(
@@ -317,7 +317,7 @@ def test_dashboard_uncollected_error_is_actionable(monkeypatch, capsys):
 )
 def test_batch_verbs_preserve_explicit_root_and_credentials(command, monkeypatch, capsys):
     # Spec-0074/T3: all management verbs accept credentials after the verb.
-    from auto_designer.experiment import batch
+    from ahe_beta.experiment import batch
 
     seen = {}
 
@@ -360,7 +360,7 @@ def test_batch_verbs_preserve_explicit_root_and_credentials(command, monkeypatch
 def test_batch_exit_codes_distinguish_completion_blocking_and_detach(
     state, ok, exit_code, monkeypatch, capsys
 ):
-    from auto_designer.experiment import batch
+    from ahe_beta.experiment import batch
 
     monkeypatch.setattr(batch, "run_batch", lambda **kwargs: {"batch_state": state, "ok": ok})
     monkeypatch.setattr(runtime, "stop_v2", lambda **kwargs: pytest.fail("detach must not stop"))
@@ -369,7 +369,7 @@ def test_batch_exit_codes_distinguish_completion_blocking_and_detach(
 
 
 def test_batch_check_offline_routes_without_loading_credentials(monkeypatch, capsys):
-    from auto_designer.experiment import batch
+    from ahe_beta.experiment import batch
 
     seen = {}
 
@@ -384,7 +384,7 @@ def test_batch_check_offline_routes_without_loading_credentials(monkeypatch, cap
 
 
 def test_batch_provider_exception_cannot_leak_credential_text(monkeypatch, capsys):
-    from auto_designer.experiment import batch
+    from ahe_beta.experiment import batch
 
     def fail(**kwargs):
         raise OSError("sensitive-provider-value")

@@ -14,8 +14,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/session_store.py
-      - backend/auto_designer/loop/live.py
+      - backend/ahe_beta/user/session_store.py
+      - backend/ahe_beta/loop/live.py
       - backend/tests/user/test_session_store.py
       - backend/tests/loop/test_live.py
     scope: SessionStore 挂实例级 threading.Lock，save 全程持锁（先写全量后追加索引的顺序不变，锁只消并发丢条目竞态）；live.py 加模块级一把锁，包住 update_agent/append_agent_log/archive_agent/update_live_run/clear_live 的读-改-写全程——mkstemp 原子写只防撕裂写，不防两个写者基于同一旧快照互相覆盖（丢更新）。锁粒度=单文件操作全程，持锁期内无网络/子进程等待，无死锁面。
@@ -29,7 +29,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/sim_user.py
+      - backend/ahe_beta/loop/sim_user.py
       - backend/tests/loop/test_sim_user.py
       - backend/tests/user/sim/test_workspace.py
     scope: 'make_sim_run_session_fn 的 client 参数改为 client_factory: Callable[[], PersonaClient]（破坏性改签名，调用方为 run.py 与 test_sim_user/test_workspace 两个测试）；run() 内每局 client = client_factory() 后再守卫式 bind_session（仅具 bind_session 的实现调用）。底层 ApiPersonaClient 无会话态可全局共享，工厂只新建 AgenticPersonaClient 外壳。杜绝并发下后 bind 覆盖先 bind 的串台。'
@@ -45,8 +45,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/loop/test_orchestrator.py
     scope: run_round a 段拆两阶段：阶段一串行 prepare（materialize_workspace + ensure_deps / mkdtemp，规避 git clone 缓存并发竞争）；阶段二 ThreadPoolExecutor(max_workers=min(n, max_parallel_users)) 并行 launch + run_session_fn，as_completed 收割，单会话异常记日志跳过不废整轮。Orchestrator 构造新增 max_parallel_users 参数；run.py 读 MAX_PARALLEL_USERS 环境变量（默认 roster 用户数）传入，并把 client 侧接成 T2 工厂。a 段全部汇齐后才进 d/b 段（维持串行）。
     acceptance: FakeHarness+Scripted 下 max_workers=4 跑 8 局：全部落盘、d/b 段在 a 汇齐后才执行；单会话 launch 抛异常时其余会话正常完成、轮不中断；max_parallel_users=1 与旧串行行为等价（回归基线）；现有 orchestrator 测试全绿。
@@ -72,7 +72,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/harness/launcher.py
       - backend/tests/harness/test_launcher.py
     scope: 生产实跑踩中的审计漏项：并行会话同轮同 SHA → 同一 checkout dest，_checkout 的 check-then-extract 无锁——多线程同时通过存在性检查后并发 extractall 同一目录（params.yaml 被两条 tar 流叠写出重复 entry 键/乱字节），或 A 半解压时 B 见「目录非空」复用残缺副本。修法双保险：① launcher 实例级 threading.Lock 包住存在性检查+归档+解压全程（进程内互斥，首线程干活其余命中缓存）；② 解压到 runs_root 下唯一临时目录（mkdtemp）后原子 rename 占位——半解压目录绝不可能以 dest 之名存在，进程崩溃只留无害 tmp 孤儿不污染缓存；rename 因 dest 已就位而失败（跨进程输者）则弃 tmp 复用 dest。生产第二轮追加：模块级共享 ruamel YAML 单例（_yaml）非线程安全，并行 launch 并发 _read_params 会搅乱解析器内部状态 → 删单例、每次解析新建 YAML 实例（构造开销微不足道）。
     acceptance: 屏障齐射 8 线程并发 _checkout 同一 ref：全部返回同一目录、runs_root 无 tmp 残留、params.yaml 可被 safe YAML 整洁解析（重复键即 DuplicateKeyError 回归）；现有 launcher 全部测试不回归（复用 marker / 内容变更失效缓存语义不变）。追加：屏障齐射并发 _read_params 同一 params.yaml，全部结果完好一致；模块级不再存在共享 YAML 实例。
@@ -85,7 +85,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/tracker/gitea.py
+      - backend/ahe_beta/tracker/gitea.py
       - backend/tests/tracker/test_gitea.py
     scope: 全仓共享实例线程安全审计（生产第二轮发现）落点之一：GiteaTracker 单 requests.Session 被所有会话线程共享，requests 官方不承诺 Session 线程安全，且 Gitea 会回 Set-Cookie（cookiejar 并发变异真实存在）。改为 thread-local Session：_session 变 property，每线程惰性新建带全 header 的独立 Session；setter 保留整体注入口（override 覆盖所有线程，单线程测试语义不变）。_label_ids 缓存不加锁——_create_label 已内置 409/422 竞态回退（他处已建则 refresh 复用），且 run.py 开跑前已预热 bug/feature。openai 客户端（httpx 底座）官方线程安全，共享保持不动。
     acceptance: 不同线程取 _session 得到不同 Session 实例且各自带全 Authorization header；同线程复用同一实例；测试注入 override 后所有线程读到注入对象；现有 GiteaTracker 全部单测不回归。
@@ -103,7 +103,7 @@ tasks:
 （工厂注入，根治 `bind_session` 串台）；② 工作区供给（materialize + ensure_deps）**前移到并行段
 之前串行完成**（规避 git clone 缓存并发竞争）；③ 共享状态加锁（`SessionStore.save` 的
 index.json 读-改-写、`live.py` 观测投影的读-改-写）。N 个用户的 a 段 wall-clock 从 ~ΣTᵢ 降到
-~max(Tᵢ)，且**并发不改变任何信号语义**。d（synthesizer）/ b（developer）段维持串行，是明确的
+~max(Tᵢ)，且**并发不改变任何信号语义**。d（architect）/ b（developer）段维持串行，是明确的
 Non-goal（多 dev 直推同一 main 必然 push 冲突 + `SANDBOX_WORK_DIR` 全局 env 变异，串行是纯
 trunk 模型的固有约束）。
 
@@ -141,7 +141,7 @@ round K:
   │  user2: launch → run_session → 落盘      │
   │  user3: launch → run_session → 落盘      │
   └───────── as_completed 全部汇齐 ──────────┘
-  d 段（synthesizer，串行）→ b 段（developer，串行）→ c 段（回灌 main HEAD SHA）
+  d 段（architect，串行）→ b 段（developer，串行）→ c 段（回灌 main HEAD SHA）
 ```
 
 对信号消费者（设计师/metrics/看板）：**并发只改 wall-clock，不改信号语义**——体感分布、issue
@@ -217,7 +217,7 @@ with ThreadPoolExecutor(max_workers=min(len(prepared), self._max_parallel_users)
 | `GiteaTracker`（共享 `requests.Session`） | requests 官方不承诺 Session 线程安全，且 Gitea 会回 Set-Cookie（cookiejar 并发变异）——初判「留观察」被生产第二轮推翻 | **T6 thread-local Session**（每线程一个，setter 保测试注入口）；`_label_ids` 缓存靠既有 409/422 竞态回退，不加锁 |
 | `launcher._yaml`（模块级共享 ruamel YAML 实例） | ruamel YAML 实例非线程安全（解析器内部状态跨调用共享），并行 launch 并发 load 互相搅乱——生产第二轮发现 | **T5 追加：每次解析新建实例**（构造开销微不足道） |
 | `ApiPersonaClient.client`（共享 openai 客户端） | httpx 底座，官方文档承诺线程安全 | 无需改 |
-| `os.environ` | 用户段不碰（launcher 显式传 env dict 给 Popen）；dev/synthesizer 段才设全局 env | d/b 串行，天然无冲突（Non-goal 的依据之一） |
+| `os.environ` | 用户段不碰（launcher 显式传 env dict 给 Popen）；dev/architect 段才设全局 env | d/b 串行，天然无冲突（Non-goal 的依据之一） |
 | run.py `current["round"]` | a 段内只读（round 游标只在轮边界写） | 无需改 |
 
 ### Task DAG 与文件分配
@@ -231,11 +231,11 @@ T5（checkout 并发安全，无依赖——生产实跑踩中审计漏项后补
 
 | Task | files（互斥） |
 |---|---|
-| T1 | `backend/auto_designer/user/session_store.py`, `backend/auto_designer/loop/live.py`, `backend/tests/user/test_session_store.py`, `backend/tests/loop/test_live.py` |
-| T2 | `backend/auto_designer/loop/sim_user.py`, `backend/tests/loop/test_sim_user.py` |
-| T3 | `backend/auto_designer/loop/orchestrator.py`, `backend/auto_designer/experiment/controllers/ordinary.py`, `backend/tests/loop/test_orchestrator.py` |
+| T1 | `backend/ahe_beta/user/session_store.py`, `backend/ahe_beta/loop/live.py`, `backend/tests/user/test_session_store.py`, `backend/tests/loop/test_live.py` |
+| T2 | `backend/ahe_beta/loop/sim_user.py`, `backend/tests/loop/test_sim_user.py` |
+| T3 | `backend/ahe_beta/loop/orchestrator.py`, `backend/ahe_beta/experiment/controllers/ordinary.py`, `backend/tests/loop/test_orchestrator.py` |
 | T4 | `backend/tests/loop/test_parallel_sessions.py`（新增，本组 e2e） |
-| T5 | `backend/auto_designer/harness/launcher.py`, `backend/tests/harness/test_launcher.py` |
+| T5 | `backend/ahe_beta/harness/launcher.py`, `backend/tests/harness/test_launcher.py` |
 
 e2e 验证路径：`backend/tests/loop/test_parallel_sessions.py`（全 Fake，不依赖真 LLM/Gitea）。
 另有一项**不进 CI 的真实小规模验证**：3 用户 × 1 轮，并行 vs 串行基线对比体感分布与 issue

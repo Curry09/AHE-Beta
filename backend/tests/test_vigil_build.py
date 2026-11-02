@@ -60,7 +60,7 @@ def test_build_validates_checkouts_and_shapes_named_context(tmp_path: Path) -> N
 
 
 def test_hosted_build_requires_an_explicit_non_latest_tag(tmp_path: Path) -> None:
-    for tag in ("", "auto-designer-vigil", "auto-designer-vigil:latest"):
+    for tag in ("", "ahe-beta-vigil", "ahe-beta-vigil:latest"):
         result = subprocess.run(
             ["bash", str(_script()), str(tmp_path), str(tmp_path)],
             env={

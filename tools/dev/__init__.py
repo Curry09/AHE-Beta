@@ -44,7 +44,7 @@ def load_secrets(path: Path | None) -> None:
 
 def role_environment(*roles: str, model: str | None = None) -> None:
     """Require each requested role; optionally use an explicitly supplied common profile."""
-    selected_run = bool(os.environ.get("AUTO_DESIGNER_DEV_RUN_PROFILE"))
+    selected_run = bool(os.environ.get("AHE_BETA_DEV_RUN_PROFILE"))
     for role in roles:
         for suffix in ("MODEL", "BASE_URL", "API_KEY"):
             key = f"{role}_LLM_{suffix}"
@@ -71,7 +71,7 @@ def run_inputs(
         values.update(read_secrets(private))
     values.update(read_secrets(secrets_file))
     model_settings = manifest.get("config", {}).get("models", {})
-    os.environ["AUTO_DESIGNER_DEV_RUN_PROFILE"] = str(root)
+    os.environ["AHE_BETA_DEV_RUN_PROFILE"] = str(root)
     for role in ("user", "harness", "demand"):
         model = model_settings.get(role) or {}
         for suffix, value in (

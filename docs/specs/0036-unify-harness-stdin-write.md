@@ -27,7 +27,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/harness/launcher.py
       - backend/tests/harness/test_launcher.py
     scope: 用户消息统一 write_message（或等价单一 API）：始终写 stdin message 帧，不区分 begin/emit；去掉「必须/禁止 in_flight 才能写」的分叉。poll(timeout) 只读 stdout 等下一条 type=reply（progress/status 照记并继续等），不要求写旗标；超时返回 pending。保留 interrupt/shutdown 外通道。阻塞 send() 改为「写 + poll 直到 reply」。删除实验性平行等待 API（若有）。
     acceptance: 单测：连续两次写 message 无需中间虚构轮次锁；reply 后再 poll 能拿到后续 reply；空闲 poll 超时 pending；progress/status 在等 reply 期间被记录；interrupt 路径不回归。
@@ -42,7 +42,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/user/sim/test_heartbeat.py
     scope: 主 loop 与心跳的 send_message 都走统一写入口；等待环以 reply 软唤醒（写后 poll 直到 reply 或心跳定时）。主 loop keep_waiting：poll 等下一条 reply，超时 None，无 reply 时仍 drain 旁路事件。不把 utterance FIFO 账本当唤醒/写路径前提。heartbeat 菜单本轮不强制加 accept（可列 Unresolved）。
@@ -57,8 +57,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/connector.py
-      - backend/auto_designer/harness/INTERFACE.md
+      - backend/ahe_beta/harness/connector.py
+      - backend/ahe_beta/harness/INTERFACE.md
       - backend/tests/harness/test_connector.py
     scope: connector 暴露统一写与 poll/drain；文档写明：stdin 消息统一、reply 为软唤醒标签、interrupt 外通道；兼容层可保留旧方法名作别名但语义指向统一写。
     acceptance: connector 单测覆盖统一写与 poll；INTERFACE.md 与实现一致；无 begin/emit 语义分叉描述残留（或明确标为 deprecated 别名）。

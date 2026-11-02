@@ -2,13 +2,13 @@ name: Unified experiment contract
 on:
   pull_request:
     paths:
-      - 'backend/auto_designer/experiment/**'
-      - 'backend/auto_designer/loop/**'
-      - 'backend/auto_designer/demand/**'
-      - 'backend/auto_designer/observations/**'
-      - 'backend/auto_designer/user/session_store.py'
+      - 'backend/ahe_beta/experiment/**'
+      - 'backend/ahe_beta/loop/**'
+      - 'backend/ahe_beta/demand/**'
+      - 'backend/ahe_beta/observations/**'
+      - 'backend/ahe_beta/user/session_store.py'
       - 'backend/scripts/experiment.py'
-      - 'backend/auto_designer/user/sim/sources/docker_seed.py'
+      - 'backend/ahe_beta/user/sim/sources/docker_seed.py'
       - 'backend/deploy/**'
       - 'backend/scripts/e2e-spec-0069-experiment-entry.sh'
       - 'backend/tests/test_experiment_*.py'

@@ -6,12 +6,12 @@ import shutil
 import pytest
 from fastapi.testclient import TestClient
 
-from auto_designer.experiment import dashboard, runtime
-from auto_designer.experiment.config import ConfigError, config_hash
-from auto_designer.experiment.materials import sha256_file
-from auto_designer.models import FeelingScore, Persona, SeedScenario, Session, Transcript
-from auto_designer.usage import UsageStore
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.experiment import dashboard, runtime
+from ahe_beta.experiment.config import ConfigError, config_hash
+from ahe_beta.experiment.materials import sha256_file
+from ahe_beta.models import FeelingScore, Persona, SeedScenario, Session, Transcript
+from ahe_beta.usage import UsageStore
+from ahe_beta.user.session_store import SessionStore
 from test_experiment_config_v2 import definition, write
 
 
@@ -94,7 +94,7 @@ def test_local_api_reads_only_selected_run_and_frozen_roster(tmp_path, monkeypat
     (data / "sessions").symlink_to(other / "data/role_runs/other/sessions")
     monkeypatch.setenv("N_USERS", "99")
     monkeypatch.setattr(
-        "auto_designer.web.api.default_usage_store", lambda: pytest.fail("default usage")
+        "ahe_beta.web.api.default_usage_store", lambda: pytest.fail("default usage")
     )
     client = TestClient(dashboard.dashboard_app(run_id=run.name, root=tmp_path))
     assert [s["session_id"] for s in client.get("/api/sessions").json()] == ["current-session"]

@@ -21,7 +21,7 @@ tasks:
       - tools/seed-distill/seed-card-schema.md
       - tools/seed-distill/extract-harness-seed/SKILL.md
       - tools/seed-distill/extract-harness-seed/reference.md
-      - backend/auto_designer/distill/seed_library.py
+      - backend/ahe_beta/distill/seed_library.py
       - backend/tests/distill/test_seed_library.py
     scope: "按轮辐式落地采集侧并定义种子卡库格式。本步范围：① seed-card-schema.md（唯一公共契约：种子卡 schema + 枚举\n+ 两道门原则 + held-out 字段存放约定，source-agnostic）；② extract-harness-seed（薄 skill，从 closed\nissue+merged fix PR 等真实源 harvest，引用契约）；③ seed_library.py 读写。不接具体数据源拉取实现、不做\n卡→SeedScenario 注入映射（归 T2）。日志/SO/未来源作同契约的后续薄 skill，留待补入（见 open-questions）。\n智能配对（persona×seed）、容器/私有仓鉴权、oracle 客观判分运行时均为 out-of-scope（见 open-questions）。"
     acceptance: "seed-card-schema.md 为唯一 source-agnostic 公共契约（种子卡 schema + 枚举 + 两道门原则 + held-out 字段存放\n约定）；extract-harness-seed 为薄 skill，只引用契约、无 skill→skill 依赖、无悬空引用，且不把 NexAU 的 skill\n文件实际拷入本仓（spec 仅描述交付物）；seed_library 按契约读写多条卡库、可按 id 取、对未知键前向兼容；卡记录\n`source.not_in_benchmark` 恒为真（契约级断言）；domain ∈ 受控词表、capability_probed ⊆ 能力分类法。"
@@ -43,7 +43,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/distill/seed_adapter.py
+      - backend/ahe_beta/distill/seed_adapter.py
       - backend/tests/distill/test_seed_adapter.py
     scope: "把种子卡（0010/T1）注入 SeedScenario：card_to_seed 做字段映射（见 design 映射表），输出 `{version, seeds}`\n信封；对无 repo 的纯文本场景产 `workspace: null` 或 `kind=\"empty\"`；对 git 型场景产 `WorkspaceSpec{kind=\"git\",\nparams={repo, commit}, setup}`（setup 按 0009/T3 venv 前缀化）。不改卡格式（归 T1）；不改 SeedScenario/\nWorkspaceSpec/SeedSource（0009，消费侧零改，本组只读其契约）。**不做**智能配对（persona×seed，见\nopen-questions）、不做容器/私有仓鉴权、不做 oracle 判分运行时。"
     acceptance: "card_to_seed 对合法卡产出可被 0009 SeedSource 物化的 SeedScenario：git 型卡产 `WorkspaceSpec{kind=\"git\",\nparams={repo=https://github.com/…git, commit=已解析 SHA}}` 且 setup 已 venv 前缀化；纯文本卡产 workspace=null\n或 kind=\"empty\"。**held-out 红线**：产出的 SeedScenario（及 to_dict/信封 JSON）**绝不含** oracle/test_cmd/\ngates，这些经 extract_sidecar 单独取出。card_to_seeds 产 `{version, seeds}` 信封，可直接喂 run.py 的\n_load_seeds 而消费侧零改。缺 repo_at / 占位未解析 / 非法枚举 → 显式报错。"
@@ -216,9 +216,9 @@ git 源用本地临时仓、离线，物化出工作区目录）。
 | T1 | `tools/seed-distill/seed-card-schema.md` |
 | T1 | `tools/seed-distill/extract-harness-seed/SKILL.md` |
 | T1 | `tools/seed-distill/extract-harness-seed/reference.md` |
-| T1 | `backend/auto_designer/distill/seed_library.py` |
+| T1 | `backend/ahe_beta/distill/seed_library.py` |
 | T1 | `backend/tests/distill/test_seed_library.py` |
-| T2 | `backend/auto_designer/distill/seed_adapter.py` |
+| T2 | `backend/ahe_beta/distill/seed_adapter.py` |
 | T2 | `backend/tests/distill/test_seed_adapter.py` |
 
 依赖 DAG：`T1 → T2`

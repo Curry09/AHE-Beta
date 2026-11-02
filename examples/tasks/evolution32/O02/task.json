@@ -24,7 +24,7 @@
           "files": {
             "input": "b84219bee45274c3c0e8cca689e58eb9d0f1cbfc5edd2f155ab0250904c2a480"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/o02-initial-v1.bundle"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/o02-initial-v1.bundle"
         },
         "target": "/opt/task-inputs/initial.bundle",
         "placement": "task"
@@ -38,7 +38,7 @@
             "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
             "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
         },
         "target": "/opt/task-inputs/recipes",
         "placement": "task"

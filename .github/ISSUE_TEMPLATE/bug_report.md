@@ -5,7 +5,7 @@ about: Report a reproducible problem
 
 ## Version and environment
 
-auto-designer commit/tag, companion repository commit (if used), OS, Python/Node, backend/model (no keys).
+AHE-Beta commit/tag, companion repository commit (if used), OS, Python/Node, backend/model (no keys).
 
 ## Reproduction
 

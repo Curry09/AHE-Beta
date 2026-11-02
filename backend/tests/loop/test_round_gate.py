@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.loop.round_gate import (
+from ahe_beta.loop.round_gate import (
     RoundDeliveryBlocked,
     classify_issue,
     inspect_round_delivery,

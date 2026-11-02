@@ -13,19 +13,19 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.loop.sim_user import (
+from ahe_beta.loop.sim_user import (
     EnvironmentInfrastructureError,
     make_direct_run_session_fn,
     make_sim_run_session_fn,
 )
-from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.run_live import expert
-from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+from ahe_beta.models import Persona, SeedScenario, WorkspaceSpec
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+from ahe_beta.user.sim.run_live import expert
+from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 
 BINARY_OUTPUT = b"PK\x03\x04\x00\xff\xfe\x80finalized workbook\x00"
 USER_SHA = "a" * 40
@@ -103,7 +103,7 @@ class RecordingDirectClient:
 
 @pytest.fixture
 def session_setup(tmp_path, monkeypatch):
-    monkeypatch.delenv("AUTO_DESIGNER_OBSERVATION_ROOT", raising=False)
+    monkeypatch.delenv("AHE_BETA_OBSERVATION_ROOT", raising=False)
     root = tmp_path / "workspace"
     root.mkdir()
     (root / "main.py").write_text('print("baseline")\n')
@@ -271,7 +271,7 @@ def test_recovery_reads_completed_session_without_recapturing_missing_evidence(s
 
 
 def test_public_generic_task_delivers_only_frozen_collection_contract(tmp_path, monkeypatch):
-    from auto_designer.experiment import context, materials, workload
+    from ahe_beta.experiment import context, materials, workload
     from test_experiment_config_v2 import write
     from test_experiment_grading_task_config import benchmark_package
     from test_experiment_materials import prepared_inputs
@@ -323,9 +323,9 @@ def test_public_generic_task_delivers_only_frozen_collection_contract(tmp_path, 
 def test_session_ignores_retired_inline_grading_configuration(
     session_setup, mode, monkeypatch, tmp_path
 ):
-    from auto_designer.evaluation.adapters.swebench import _SWEbenchRunner
+    from ahe_beta.evaluation.adapters.swebench import _SWEbenchRunner
 
-    monkeypatch.setenv("AUTO_DESIGNER_OBJECTIVE_EVALUATION", "1")
+    monkeypatch.setenv("AHE_BETA_OBJECTIVE_EVALUATION", "1")
     monkeypatch.setenv("SWEBENCH_PARQUET", str(tmp_path / "hidden-dataset.parquet"))
     results = tmp_path / "inline-results"
     monkeypatch.setenv("SWEBENCH_EVAL_RESULTS_ROOT", str(results))

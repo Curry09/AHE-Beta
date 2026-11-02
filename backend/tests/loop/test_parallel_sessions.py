@@ -15,16 +15,16 @@ import subprocess
 import time
 from pathlib import Path
 
-from auto_designer.loop.live import archive_agent as live_archive_agent
-from auto_designer.loop.live import read_agents, read_history, update_agent
-from auto_designer.loop.orchestrator import Orchestrator
-from auto_designer.loop.sim_user import make_sim_run_session_fn
-from auto_designer.models import Persona, SeedScenario
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.run_live import expert
+from ahe_beta.loop.live import archive_agent as live_archive_agent
+from ahe_beta.loop.live import read_agents, read_history, update_agent
+from ahe_beta.loop.orchestrator import Orchestrator
+from ahe_beta.loop.sim_user import make_sim_run_session_fn
+from ahe_beta.models import Persona, SeedScenario
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+from ahe_beta.user.sim.run_live import expert
 
 
 def _seed_repo(tmp_path: Path) -> Path:

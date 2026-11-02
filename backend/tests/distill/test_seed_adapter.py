@@ -6,12 +6,12 @@ import json
 
 import pytest
 
-from auto_designer.distill.seed_adapter import (
+from ahe_beta.distill.seed_adapter import (
     card_to_seed,
     card_to_seeds,
     extract_sidecar,
 )
-from auto_designer.distill.seed_library import SeedLibrary
+from ahe_beta.distill.seed_library import SeedLibrary
 
 # 已解析的真实 40 位 commit SHA（占位符的反例）。
 _SHA = "0e322af87745eff34caffe4df68456ebc20d9068"

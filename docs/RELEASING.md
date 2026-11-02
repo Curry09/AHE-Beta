@@ -1,6 +1,6 @@
 # 联合发布指南
 
-auto-designer 与 OpenAgents 分别维护版本，通过[兼容清单](../release/compatibility.json)记录配套关系。联合发布应固定双方源码版本、依赖和运行材料，使用户能安装并运行同一组组件；两仓版本号无需相同。
+AHE-Beta 与 OpenAgents 分别维护版本，通过[兼容清单](../release/compatibility.json)记录配套关系。联合发布应固定双方源码版本、依赖和运行材料，使用户能安装并运行同一组组件；两仓版本号无需相同。
 
 ## 固定配套版本
 
@@ -35,7 +35,7 @@ auto-designer 与 OpenAgents 分别维护版本，通过[兼容清单](../releas
 ## 发布顺序
 
 1. 合并并验证 OpenAgents 的配套改动，固定可供安装的源码提交或发行版本。
-2. 更新 auto-designer 的兼容清单和锁文件，在候选发布提交上完成两仓联调。
+2. 更新 AHE-Beta 的兼容清单和锁文件，在候选发布提交上完成两仓联调。
 3. 构建所需运行时、任务材料和镜像，生成校验和及材料清单。为发行包保留第三方许可证、版权和来源声明。
 4. 创建草稿或预发布版本，从干净环境按文档验证下载、安装和运行。
 5. 发布正式 tag 和 Release。双方发行说明互相链接，并注明兼容版本、验证范围与已知限制。
@@ -44,7 +44,7 @@ auto-designer 与 OpenAgents 分别维护版本，通过[兼容清单](../releas
 
 ## CI 与仓库访问
 
-跨仓 CI 需要读取 OpenAgents。公开仓库可以使用工作流自带的凭证；若配套仓库仍为私有，则在 auto-designer 的 Actions secrets 中配置只读 `OPENAGENTS_READ_TOKEN`。凭证不写入源码或工作流正文。
+跨仓 CI 需要读取 OpenAgents。公开仓库可以使用工作流自带的凭证；若配套仓库仍为私有，则在 AHE-Beta 的 Actions secrets 中配置只读 `OPENAGENTS_READ_TOKEN`。凭证不写入源码或工作流正文。
 
 CI 的 `workflow_dispatch` 可传入完整的 `observation_reader_commit`，用于验证另一配套提交；正式发布仍需将验证通过的版本写回兼容清单。修改源码 pin 后，应确认实际运行材料已经重建，且预检读取的是同一版本。
 

@@ -3,7 +3,7 @@ number: "0008"
 title: 用户 agent 内层 tool-using（自有环境核实）
 issue: 8
 slug: user-agent-inner-tooluse
-summary: 本组把 spec-0005 用户侧的「单次 `respond()` 主观判断」升级为**可在自有环境核实的内层 tool-using agent**： 让模拟用户像真人一样，在起疑时用**自己的工具栈**（读码 / 跑命令 / 写脚本）在自有 sandbox **真执行**， 使 `verdict` grounded 在真实结果而非脑补。**外层控制信封（动作空间 / 状态机 / 体感 / 终止）原样不动**， 唯一接缝是 `PersonaClient.respond(system, user) -> dict`。落点 `backend/auto_designer/user/sim/`，是 0005/T3 的演进。
+summary: 本组把 spec-0005 用户侧的「单次 `respond()` 主观判断」升级为**可在自有环境核实的内层 tool-using agent**： 让模拟用户像真人一样，在起疑时用**自己的工具栈**（读码 / 跑命令 / 写脚本）在自有 sandbox **真执行**， 使 `verdict` grounded 在真实结果而非脑补。**外层控制信封（动作空间 / 状态机 / 体感 / 终止）原样不动**， 唯一接缝是 `PersonaClient.respond(system, user) -> dict`。落点 `backend/ahe_beta/user/sim/`，是 0005/T3 的演进。
 tasks:
   - id: T1
     title: seed 工作区扩展与共享注入（harness/用户 agent 同目录）
@@ -22,13 +22,13 @@ tasks:
         type: note
     parallel: true
     files:
-      - backend/auto_designer/user/sim/workspace.py
+      - backend/ahe_beta/user/sim/workspace.py
       - backend/seed_workspaces/billing-split/project/billing/core.py
       - backend/seed_workspaces/billing-split/manifest.yaml
-      - backend/auto_designer/models.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/harness/launcher.py
       - backend/tests/user/sim/test_workspace.py
       - backend/tests/harness/test_launcher.py
       - backend/tests/loop/test_orchestrator.py
@@ -46,8 +46,8 @@ tasks:
         type: extends
     parallel: false
     files:
-      - backend/auto_designer/user/sim/tools.py
-      - backend/auto_designer/user/sim/sandbox.py
+      - backend/ahe_beta/user/sim/tools.py
+      - backend/ahe_beta/user/sim/sandbox.py
       - backend/tests/user/sim/test_tools.py
     scope: '1) tools.py：实现 read_file / run_shell / write_file 三个原子工具（统一签名、统一返回 {ok, stdout/content, error}）；web_search 仅留函数/schema 占位、调用即返回未实现。定义 tool_stack(d1) -> list[tool]：按 D1 给出可用工具子集（复用 0005/T2 的 cap_mask 思路做门控）。2) sandbox.py：Sandbox(workspace: str | None = None)——workspace 给定时以其为 cwd（来自 T1 materialize），缺省时建一个空 tempdir；提供受限 run_shell（超时、捕获 stdout/stderr、工作目录隔离）与文件读写，约束在 workspace 子树内。非安全沙箱（不做 Docker/seccomp），仅最小隔离执行上下文。'
     acceptance: 三个原子工具在 Sandbox 内可用且路径不逃逸子树；run_shell 超时与非零退出码被正确捕获。Sandbox(workspace=dir) 以 dir 为 cwd、能跑 T1 的 billing-split fixture 里的代码；workspace=None 时退化为空 tempdir 仍可独立工作。tool_stack：blind 得空集、shallow 无 write_file、competent/expert 含 write_file；web_search 始终返回未实现。
@@ -66,9 +66,9 @@ tasks:
         type: note
     parallel: true
     files:
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/user/sim/clauses.py
-      - backend/auto_designer/user/sim/skills.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/clauses.py
+      - backend/ahe_beta/user/sim/skills.py
       - backend/tests/user/sim/test_inner_prompt.py
     scope: 1) prompt.py / clauses.py：改 BLOCK-G——声明可用工具（来自 T2 tool_stack）、把核实定性为「可选、有成本的角色内动作」，给出何时值得核实/何时直接主观判断的原则（不强制）。改 BLOCK-P——按 D1 渲染「你能做哪些核实/拿到哪些工具」，按 D3 与当前 trust/起疑状态渲染「你此刻的核实倾向」。2) skills.py：select_skills(persona) -> list[Skill] 占位（D2 驱动），Skill 仅含 name + prompt 片段；本轮返回内置极简集合或空，不接真实 playbook 库。3) 把工具清单与 skill 片段拼进内层 system 段的装配函数（供 T4 调用）。
     acceptance: build_inner_system 对不同 D1 渲染不同工具清单（blind 无工具、competent/expert 含 write_file）；对不同 D3/trust 渲染不同核实倾向句（低 trust/严 D3 更倾向核实）。BLOCK-G 明确「核实可选、有成本、默认主观判断」。select_skills 占位可调用、返回结构正确且片段不含任何 bug/答案特定内容。装配产物可被 T4 直接用作内层 system。
@@ -88,7 +88,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/user/sim/test_persona_client_agentic.py
     scope: 1) persona_client.py：新增 AgenticPersonaClient 实现 PersonaClient 协议。respond() 内部跑有界循环：构建内层 system（调 T3 build_inner_system）→ 喂 LLM → 解析 tool_call → 在 Sandbox（T2，cwd=T1 共享工作区）执行 → 回灌结果 → 直到 LLM 给出最终结构化输出或到步数上限。核实主路径（T1 v2 共享工作区）：harness 已把改动直接写进同一目录，内层 LLM 用 read_file/run_shell 当场读/跑 harness 的真实改动来核实——不需要从文本抠代码。仅当 harness 没写盘、只给了文本建议时（迫不得已），内层 LLM 才可用 write_file 把文本里的代码落进工作区再跑（兜底能力，非常态、非写死机制）。保留既有 ApiPersonaClient/ScriptedPersonaClient 不破坏。2) 输出契约与 0005 完全一致（perceive/verdict/action/message），交回外层 resolve_action/apply_verdict。
     acceptance: AgenticPersonaClient.respond 返回字段与现协议一致、可被外层 resolve_action/apply_verdict 直接消费。给定一个会触发工具调用的 FakeToolLLM 脚本：循环正确执行 tool_call→observe→最终输出；blind persona（空工具）退化为纯文本判断。超步数/非法输出/工具异常时退化为合法主观判断、外层不崩。端到端经 run_session + T1 billing-split fixture 跑通一局（FakeSandbox 或真 Sandbox），外层引擎无改动。
@@ -103,7 +103,7 @@ tasks:
 本组把 spec-0005 用户侧的「单次 `respond()` 主观判断」升级为**可在自有环境核实的内层 tool-using agent**：
 让模拟用户像真人一样，在起疑时用**自己的工具栈**（读码 / 跑命令 / 写脚本）在自有 sandbox **真执行**，
 使 `verdict` grounded 在真实结果而非脑补。**外层控制信封（动作空间 / 状态机 / 体感 / 终止）原样不动**，
-唯一接缝是 `PersonaClient.respond(system, user) -> dict`。落点 `backend/auto_designer/user/sim/`，是 0005/T3 的演进。
+唯一接缝是 `PersonaClient.respond(system, user) -> dict`。落点 `backend/ahe_beta/user/sim/`，是 0005/T3 的演进。
 
 数据流脊柱（编号即执行序：先立工作区 T1，再内层执行 T2/T4，T3 并行）：
 
@@ -195,13 +195,13 @@ test_workspace.py：(a) materialize 落地后目录存在、含预期文件、�
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/workspace.py`
+  - `backend/ahe_beta/user/sim/workspace.py`
   - `backend/seed_workspaces/billing-split/project/billing/core.py`
   - `backend/seed_workspaces/billing-split/manifest.yaml`
-  - `backend/auto_designer/models.py`
-  - `backend/auto_designer/loop/sim_user.py`
-  - `backend/auto_designer/loop/orchestrator.py`
-  - `backend/auto_designer/harness/launcher.py`
+  - `backend/ahe_beta/models.py`
+  - `backend/ahe_beta/loop/sim_user.py`
+  - `backend/ahe_beta/loop/orchestrator.py`
+  - `backend/ahe_beta/harness/launcher.py`
   - `backend/tests/user/sim/test_workspace.py`
   - `backend/tests/harness/test_launcher.py`
   - `backend/tests/loop/test_orchestrator.py`
@@ -220,8 +220,8 @@ test_tools.py：(a) read/write/run 在 sandbox 内正常工作；(b) 路径逃�
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/tools.py`
-  - `backend/auto_designer/user/sim/sandbox.py`
+  - `backend/ahe_beta/user/sim/tools.py`
+  - `backend/ahe_beta/user/sim/sandbox.py`
   - `backend/tests/user/sim/test_tools.py`
 
 ### Prompt 行为框架与 skill 占位（T3）
@@ -238,9 +238,9 @@ test_inner_prompt.py：(a) 各 D1 档位工具清单文案正确；(b) clause_ve
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/prompt.py`
-  - `backend/auto_designer/user/sim/clauses.py`
-  - `backend/auto_designer/user/sim/skills.py`
+  - `backend/ahe_beta/user/sim/prompt.py`
+  - `backend/ahe_beta/user/sim/clauses.py`
+  - `backend/ahe_beta/user/sim/skills.py`
   - `backend/tests/user/sim/test_inner_prompt.py`
 
 ### 内层循环：AgenticPersonaClient（T4）
@@ -257,7 +257,7 @@ test_persona_client_agentic.py：(a) FakeToolLLM 多步 tool_call → FakeSandbo
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/persona_client.py`
+  - `backend/ahe_beta/user/sim/persona_client.py`
   - `backend/tests/user/sim/test_persona_client_agentic.py`
 
 依赖 DAG：`T1 → T2`，`T1 → T4`，`T2 → T4`，`T3 → T4`

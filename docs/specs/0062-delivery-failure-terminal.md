@@ -12,7 +12,7 @@ tasks:
     depends-on: []
     files:
       - CLAUDE.md
-      - backend/auto_designer/loop/round_gate.py
+      - backend/ahe_beta/loop/round_gate.py
       - backend/tests/loop/test_round_gate.py
       - backend/tests/loop/test_orchestrator.py
     scope: 代码修改完毕。automation-failed 与 needs-human 均优先于 closed，异常保留准确失败原因和票号。
@@ -55,7 +55,7 @@ classify_issue 在 closed 判断前检查两种失败标签。wait_round_deliver
 ## Prior art
 
 本仓 Spec-0050 终态闸；OpenAgents Spec-0081 机器失败投影和 Spec-0088 收敛修复。
-证据见 auto-designer-experiments/spec61-two-user-glm53-glm52-20260908 的归档和人工干预记录。
+证据见 ahe-beta-experiments/spec61-two-user-glm53-glm52-20260908 的归档和人工干预记录。
 
 ## Unresolved questions
 

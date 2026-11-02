@@ -7,18 +7,18 @@ from functools import partial
 
 import pytest
 
-from auto_designer.demand.evidence_contract import build_l1_summary
-from auto_designer.experiment.controllers import runtime, unified
-from auto_designer.loop import live
-from auto_designer.loop.orchestrator import Orchestrator
-from auto_designer.loop.recovery import RecoveryConflictError, operation_key
-from auto_designer.loop.round_gate import RoundDeliveryBlocked
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import current_usage_context
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.run_live import expert
-from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+from ahe_beta.demand.evidence_contract import build_l1_summary
+from ahe_beta.experiment.controllers import runtime, unified
+from ahe_beta.loop import live
+from ahe_beta.loop.orchestrator import Orchestrator
+from ahe_beta.loop.recovery import RecoveryConflictError, operation_key
+from ahe_beta.loop.round_gate import RoundDeliveryBlocked
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import current_usage_context
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.run_live import expert
+from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 from test_experiment_interactions import RecordingClient
 from test_experiment_multitask_controller import _binding, _recovery, _repo, _resolve
 
@@ -62,7 +62,7 @@ def test_repeated_pair_has_independent_clients_workspaces_feedback_and_recovery(
             directory, owns_tmp=True, evidence={"patch_capability": "not_applicable"}
         )
 
-    monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", provision)
+    monkeypatch.setattr("ahe_beta.loop.orchestrator.materialize_workspace", provision)
 
     class Harness(ScriptedHarness):
         def __init__(self, workspace):

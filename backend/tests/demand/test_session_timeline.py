@@ -5,14 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from auto_designer.demand.session_timeline import (
+from ahe_beta.demand.session_timeline import (
     bind_session_store,
     format_session_timeline,
     get_harness_beat,
     get_harness_step,
     get_session_timeline,
 )
-from auto_designer.models import (
+from ahe_beta.models import (
     FeelingScore,
     IssueRef,
     Persona,
@@ -23,8 +23,8 @@ from auto_designer.models import (
     SimTurn,
     Transcript,
 )
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.goals import GoalLedger, audit_goal_fields
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.goals import GoalLedger, audit_goal_fields
 
 
 def _persona() -> Persona:

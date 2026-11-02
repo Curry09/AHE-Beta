@@ -6,7 +6,7 @@ slug: lightweight-delivery-preflight
 summary: 对需求侧 proposal 先做一次分组并把交付侧共享机制、建议顺序与复用提示作为有界软信号，在不合票、不阻塞 worker 的前提下降低并行返工。
 tasks:
   - id: T1
-    title: 需求侧提案分组与并行 Synthesizer
+    title: 需求侧提案分组与并行 Architect
     status: done
     priority: P1
     tags: []
@@ -14,14 +14,14 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/demand/grouped_synthesizer.py
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/tracker/gitea.py
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/experiment/controllers/swebench.py
-      - backend/tests/demand/test_grouped_synthesizer.py
+      - backend/ahe_beta/demand/grouped_architect.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/tracker/gitea.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
+      - backend/tests/demand/test_grouped_architect.py
       - backend/tests/tracker/test_gitea.py
-      - docs/synthesizer-grouping.md
+      - docs/architect-grouping.md
     scope: '保留包内 ordinary/SWE controller 生成 coordination: soft 的交付配置、需求接线和共享 tracker 行为；旧 auditable wrapper 已归档，不作为交付入口。'
     acceptance: 当前 controller 的轻量前置参数生效，coordination 关闭可回普通队列；相关需求、tracker 与 controller 测试通过。
   - id: T2
@@ -53,16 +53,16 @@ tasks:
 ## Summary
 
 优化目标是“有效并行交付收益减去协调与返工成本”。需求侧在 Triage 后把同轮 proposal
-做一次有界分组，由已有 Synthesizer workers 按互斥组设计；交付侧在 Owner 独立准入后，对 ready
+做一次有界分组，由已有 Architect workers 按互斥组设计；交付侧在 Owner 独立准入后，对 ready
 队列生成共享机制、建议顺序和复用提示。两次前置都只购买便宜信息，不合并独立需求、不改变验收、
 不把建议变成硬依赖，失败时恢复原有处理路径。
 
-本组已经实现并验证。交付侧实现对应 OpenAgents 的轻量前置版本；Auto Synthesizer 负责启用配置、
+本组已经实现并验证。交付侧实现对应 OpenAgents 的轻量前置版本；Auto Architect 负责启用配置、
 需求侧分组和跨边界接线。
 
 ## Motivation
 
-大量 issue 同轮进入时，完全无协调的多个 Synthesizer 会各自读取整池 proposal，重复分类并可能同时
+大量 issue 同轮进入时，完全无协调的多个 Architect 会各自读取整池 proposal，重复分类并可能同时
 设计重叠机制；交付 worker 也可能并行实现相同底层能力，直到冲突或评审阶段才发现复用机会。
 将所有票先做完整规划或建立强依赖又会产生另一类成本：模型漏判、建议成环或一张慢票会阻塞本可
 独立交付的工作，规划本身还可能比实现更昂贵。
@@ -74,9 +74,9 @@ Owner 保留每张票的独立交接；worker 开始工作后仍须核实当前�
 ## Guide-level explanation
 
 用户先在本轮冻结 main SHA 上交互。非末轮产生的普通报告经 Triage 变成 proposal，PM proposal
-独立到 Owner。启用 `SYNTHESIZER_GROUPING` 时，协调器只读取本轮可见 proposal 的编号、标题和摘要，
+独立到 Owner。启用 `ARCHITECT_GROUPING` 时，协调器只读取本轮可见 proposal 的编号、标题和摘要，
 调用一次无工具分类；每个 ID 必须恰好出现一次。组内超过六张时切成连续 batch，同一组固定由一个
-Synthesizer 顺序处理，不同组由现有 Synthesizer 并行领取。分类超时、截断或非法时，按票号切成最多
+Architect 顺序处理，不同组由现有 Architect 并行领取。分类超时、截断或非法时，按票号切成最多
 六张的 batch 串行执行，所有票继续保留。
 
 Owner 对各 proposal 独立准入并打 `openagents`。Vigil 发现后打 ready，soft 模式读取最多 64 张
@@ -87,19 +87,19 @@ Owner 对各 proposal 独立准入并打 `openagents`。Vigil 发现后打 ready
 有空槽就继续派发，同热点或建议成环不阻塞。等待 15 分钟后 FIFO 老化抵消建议偏好。每张票仍走
 独立 worktree、设计、实现、CI/e2e 配置闸、评审、合并与关闭；worker 完成即领下一张，不等整批。
 
-Auto Synthesizer 等本轮全部准入票终态后才开始下一轮用户。任何 `automation-failed`、历史
+Auto Architect 等本轮全部准入票终态后才开始下一轮用户。任何 `automation-failed`、历史
 `needs-human` 或超时仍停止本轮；末轮只做用户观察。
 
 ## Reference-level explanation
 
 ### 配置与预算
 
-`backend/auto_designer/experiment/controllers/ordinary.py` 生成 `coordination: soft`，同一份 `openagents.yml` 用于 subprocess 和 vigil
+`backend/ahe_beta/experiment/controllers/ordinary.py` 生成 `coordination: soft`，同一份 `openagents.yml` 用于 subprocess 和 vigil
 容器。`VIGIL_COORDINATION=off` 关闭前置并恢复普通优先级/FIFO；`dependencies` 显式选择强依赖
 模式。模式在下次启动生效，不修改正在运行的实验。运行镜像必须包含认识 `coordination` 字段的
 OpenAgents 版本。
 
-Synthesizer grouping 使用单次 completion、无工具、16,384 输出 token 上限和 300 秒墙钟预算。
+Architect grouping 使用单次 completion、无工具、16,384 输出 token 上限和 300 秒墙钟预算。
 交付前置使用单轮、无执行工具、8,192 输出 token 上限和 90 秒墙钟预算，不追加协议修复调用。
 交付结果按 issue 内容指纹缓存，失败也缓存；Owner 密集准入时有 120 秒冷却，单纯闭票不触发重算。
 截断、漏判、非法输出和超时均回普通调度，不设置 `automation-failed` 或 `blocked_by`。
@@ -110,11 +110,11 @@ triage/ci/e2e=skip，rfc/conflict/review/merge=agent，CI 可由 `VIGIL_CI_STAGE
 
 ### 任务与验证
 
-T1 与 T2 可独立实现，最终在 Auto Synthesizer 入口和固定 OpenAgents 镜像处汇合：
+T1 与 T2 可独立实现，最终在 Auto Architect 入口和固定 OpenAgents 镜像处汇合：
 
 ```mermaid
 flowchart LR
-    T1[0063/T1 proposal grouping] --> I[Auto Synthesizer integration]
+    T1[0063/T1 proposal grouping] --> I[Auto Architect integration]
     T2[0063/T2 delivery preflight] --> I
 ```
 

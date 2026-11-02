@@ -14,10 +14,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/schemas/experiment-v2.json
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/materials.py
-      - backend/auto_designer/experiment/context.py
+      - backend/ahe_beta/experiment/schemas/experiment-v2.json
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/materials.py
+      - backend/ahe_beta/experiment/context.py
       - backend/tests/test_experiment_ci_config.py
     scope: 可选本地CI配置、工作流预检查、只接受核验收据的CI环境
     acceptance: 默认关闭兼容旧哈希；E2B拒绝；缺工作流或错收据不能启动CI门
@@ -30,9 +30,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/backends/local_ci.py
-      - backend/auto_designer/experiment/backends/local.py
-      - backend/auto_designer/experiment/infrastructure.py
+      - backend/ahe_beta/experiment/backends/local_ci.py
+      - backend/ahe_beta/experiment/backends/local.py
+      - backend/ahe_beta/experiment/infrastructure.py
       - backend/deploy/experiment/docker-compose.yml
       - backend/tests/test_experiment_local_ci.py
     scope: 固定镜像、Compose、注册、真实PR探针、身份校验及停止恢复清理
@@ -69,9 +69,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/collection.py
+      - backend/ahe_beta/experiment/collection.py
       - backend/tests/test_experiment_ci_collection.py
-      - backend/auto_designer/user/sim/runtime.py
+      - backend/ahe_beta/user/sim/runtime.py
       - backend/tests/user/sim/test_process_cleanup.py
       - backend/scripts/e2e-spec-0077-local-engineering-ci.sh
       - .github/workflows/experiment-contract.yml

@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import batch, materials, runtime
-from auto_designer.experiment.batch_config import load_batch_config
-from auto_designer.experiment.batch_store import BatchStore
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.manifest import read_runtime, update_runtime
+from ahe_beta.experiment import batch, materials, runtime
+from ahe_beta.experiment.batch_config import load_batch_config
+from ahe_beta.experiment.batch_store import BatchStore
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.manifest import read_runtime, update_runtime
 from test_experiment_batch_config import batch_path as batch_inputs
 from test_experiment_materials import prepared_inputs as material_inputs
 

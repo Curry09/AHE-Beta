@@ -10,14 +10,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from auto_designer.loop.sim_user import make_sim_run_session_fn
-from auto_designer.models import Persona, SeedScenario, Session, WorkspaceSpec
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.run_live import expert
-from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
-from auto_designer.user.sim.workspace import materialize
+from ahe_beta.loop.sim_user import make_sim_run_session_fn
+from ahe_beta.models import Persona, SeedScenario, Session, WorkspaceSpec
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.run_live import expert
+from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
+from ahe_beta.user.sim.workspace import materialize
 
 
 # --------------------------------------------------------------------------
@@ -58,7 +58,7 @@ def test_materialize_is_isolated() -> None:
 
 def test_materialize_delegates_to_provision() -> None:
     # spec-0009/T1：materialize 退化为 SeedSource 注册表 provision 的兼容壳。
-    from auto_designer.user.sim.seed_source import provision
+    from ahe_beta.user.sim.seed_source import provision
 
     spec = WorkspaceSpec(fixture="billing-split")
     m, p = materialize(spec), provision(spec)
@@ -199,7 +199,7 @@ def test_bridge_uses_passed_workspace_dir_and_skips_materialize(tmp_path, monkey
     sp, client = expert(), _RecordingClient()
     mp = _model_persona(sp)
     monkeypatch.setattr(  # 传入 workspace_dir 后绝不该再 materialize
-        "auto_designer.loop.sim_user.materialize_workspace",
+        "ahe_beta.loop.sim_user.materialize_workspace",
         lambda spec: (_ for _ in ()).throw(AssertionError("不应 materialize")),
     )
     fn = _make_fn(client, tmp_path, sp, mp)

@@ -10,18 +10,18 @@ from types import SimpleNamespace
 import pytest
 from nexau.archs.main_sub.execution.hooks import ToolCallParams
 
-from auto_designer.demand.divergent import Divergent
-from auto_designer.demand.observation_provider import (
+from ahe_beta.demand.architect import Architect
+from ahe_beta.demand.divergent import Divergent
+from ahe_beta.demand.observation_provider import (
     ObservationProvider,
     bind_observation_provider,
     bind_observation_scope,
     current_observation_provider,
 )
-from auto_designer.demand.proposal_view import evidence_session_ids, format_proposal_view
-from auto_designer.demand.session_timeline import bind_session_store, get_session_timeline
-from auto_designer.demand.synthesizer import Synthesizer
-from auto_designer.guards.workspace_jail import WorkspaceJailMiddleware
-from auto_designer.models import (
+from ahe_beta.demand.proposal_view import evidence_session_ids, format_proposal_view
+from ahe_beta.demand.session_timeline import bind_session_store, get_session_timeline
+from ahe_beta.guards.workspace_jail import WorkspaceJailMiddleware
+from ahe_beta.models import (
     FeelingScore,
     IssueDraft,
     OpenIssue,
@@ -30,9 +30,9 @@ from auto_designer.models import (
     Session,
     Transcript,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
 
 
 def bundle(root: Path, sid: str, filename: str = "engine.log") -> Path:
@@ -232,11 +232,11 @@ def test_reference_chain_survives_body_clipping_and_legacy_raw_is_excluded():
     assert "private" not in format_proposal_view(issue)
 
 
-def test_synthesizer_tools_are_available_only_for_cited_sessions(tmp_path):
+def test_architect_tools_are_available_only_for_cited_sessions(tmp_path):
     store = SessionStore(tmp_path / "sessions")
     store.save(session("s1"))
     store.save(session("s2"))
-    with bind_session_store(store), bind_usage_context(role="synthesizer"):
+    with bind_session_store(store), bind_usage_context(role="architect"):
         assert not get_session_timeline(session_id="s1")["ok"]
         with bind_observation_scope(allowed_session_ids={"s1"}):
             assert get_session_timeline(session_id="s1", reason="compare two reports")["ok"]
@@ -254,7 +254,7 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(
     tracker = FakeTracker()
     a = tracker.create_issue(IssueDraft("one", "session_id: s1", ["proposal"]))
     b = tracker.create_issue(IssueDraft("two", "会话：s2", ["proposal"]))
-    from auto_designer.observations.grants import grant
+    from ahe_beta.observations.grants import grant
 
     grant(store=store, issue=a.number, sessions={"s1"})
     grant(store=store, issue=b.number, sessions={"s2"})
@@ -270,7 +270,7 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(
         seen.append(kwargs["allowed_session_ids"])
         return '{"proposals": []}'
 
-    monkeypatch.setattr("auto_designer.demand.divergent.run_agent_def", pm_run)
+    monkeypatch.setattr("ahe_beta.demand.divergent.run_agent_def", pm_run)
     Divergent(tracker, store, str(tmp_path), str(tmp_path)).propose_once()
     assert seen == [{"s1", "s2", "s3"}]
     product = {
@@ -285,10 +285,10 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(
         "covers": [a.number, b.number, pm.number],
     }
 
-    synthesizer_calls = []
+    architect_calls = []
 
-    def synthesizer_run(*args, **kwargs):
-        synthesizer_calls.append(args[1])
+    def architect_run(*args, **kwargs):
+        architect_calls.append(args[1])
         assert kwargs["allowed_session_ids"] == {"s1", "s2"}
         assert kwargs["evidence"]["source_proposals"] == [a.number, b.number]
         assert all(
@@ -296,15 +296,15 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(
             for marker in ("PM_TITLE_SENTINEL", "PM_BODY_SENTINEL", "PM_READY_SENTINEL")
         )
         assert "运行时行为聚合" not in args[1]
-        if needs_recovery and len(synthesizer_calls) == 1:
+        if needs_recovery and len(architect_calls) == 1:
             return "unfinished investigation without submit"
         return json.dumps({"proposals": [product]})
 
-    monkeypatch.setattr("auto_designer.demand.synthesizer.run_agent_def", synthesizer_run)
-    outcome = Synthesizer(tracker, store, str(tmp_path), str(tmp_path)).propose_once()
+    monkeypatch.setattr("ahe_beta.demand.architect.run_agent_def", architect_run)
+    outcome = Architect(tracker, store, str(tmp_path), str(tmp_path)).propose_once()
     assert len(outcome.proposal_numbers) == 1
     assert sorted(outcome.merged_numbers) == [a.number, b.number]
     assert tracker.issue(pm.number)["state"] == "open"
     structures = [i for i in tracker.list_open_issues() if i.number in outcome.proposal_numbers]
     assert evidence_session_ids(structures) == {"s1", "s2"}
-    assert len(synthesizer_calls) == (2 if needs_recovery else 1)
+    assert len(architect_calls) == (2 if needs_recovery else 1)

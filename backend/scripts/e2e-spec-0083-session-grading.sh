@@ -44,9 +44,9 @@ import json
 import sys
 from pathlib import Path
 
-from auto_designer.evaluation.contracts import ArtifactInput, GradingRequest, MaterialInput
-from auto_designer.evaluation.registry import get_adapter
-from auto_designer.experiment.grading_inputs import load_grading_plan, read_material
+from ahe_beta.evaluation.contracts import ArtifactInput, GradingRequest, MaterialInput
+from ahe_beta.evaluation.registry import get_adapter
+from ahe_beta.experiment.grading_inputs import load_grading_plan, read_material
 
 profile_path = Path(sys.argv[1]).absolute()
 profile_payload = profile_path.read_bytes()

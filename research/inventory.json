@@ -242,7 +242,7 @@
     {
       "original_path": "backend/run.py",
       "disposition": "moved",
-      "destination": "backend/auto_designer/experiment/controllers/unified.py",
+      "destination": "backend/ahe_beta/experiment/controllers/unified.py",
       "reason": "Historical entry was moved to the ordinary/SWE package controller in Spec0071; Spec0073 merges current execution into unified.py with shared runtime.py. Original source and prior migration hashes retain their historical meaning; neither asserts byte equality with the current controller.",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "66fe9f2e95febdc18ef804694f5b823803d1df513b3cc941ea26349b0c0041be",
@@ -417,7 +417,7 @@
     {
       "original_path": "backend/scripts/e2e-synthesizer-naming.sh",
       "disposition": "maintained",
-      "destination": "backend/scripts/e2e-synthesizer-naming.sh",
+      "destination": "backend/scripts/e2e-architect-naming.sh",
       "reason": "Current maintained input, helper or evaluation component",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "477fff8a786013c02c1edad60667ff732aea9f6a4543d6675bcf0562040e5b8f",
@@ -552,7 +552,7 @@
     {
       "original_path": "backend/scripts/probe_timeout_to_synthesizer.py",
       "disposition": "moved",
-      "destination": "tools/dev/probes/probe_timeout_to_synthesizer.py",
+      "destination": "tools/dev/probes/probe_timeout_to_architect.py",
       "reason": "Developer probe with explicit inputs",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "e867cc531d4b319983f924034d1ac053ee9e890cbc8c6babdf93fb96a4140e7a",
@@ -597,7 +597,7 @@
     {
       "original_path": "backend/scripts/replay_pm_synthesizer_owner_offline.py",
       "disposition": "moved",
-      "destination": "tools/dev/replay/replay_pm_synthesizer_owner_offline.py",
+      "destination": "tools/dev/replay/replay_pm_architect_owner_offline.py",
       "reason": "Developer replay with explicit inputs",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "621f6660875f754763c917a08416c5408376d1df08aaad89d7af30c6d553f4a7",
@@ -633,7 +633,7 @@
     {
       "original_path": "backend/scripts/replay_synthesizer_owner_from_repo.py",
       "disposition": "moved",
-      "destination": "tools/dev/replay/replay_synthesizer_owner_from_repo.py",
+      "destination": "tools/dev/replay/replay_architect_owner_from_repo.py",
       "reason": "Developer replay with explicit inputs",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "a397de25541069ea27c8500acae4821a46b2a76283e5a334f3c1dc9ebab12ed0",
@@ -693,7 +693,7 @@
     {
       "original_path": "backend/scripts/run_swebench_closed_loop.py",
       "disposition": "moved",
-      "destination": "backend/auto_designer/experiment/controllers/unified.py",
+      "destination": "backend/ahe_beta/experiment/controllers/unified.py",
       "reason": "Historical entry was moved to the ordinary/SWE package controller in Spec0071; Spec0073 merges current execution into unified.py with shared runtime.py. Original source and prior migration hashes retain their historical meaning; neither asserts byte equality with the current controller.",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "bd88086c3ddbe8786946c5c533149ade5a9877906b2830de814aa9242b0fb89a",

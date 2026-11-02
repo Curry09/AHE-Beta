@@ -15,10 +15,10 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/evaluation/contracts.py
-  - backend/auto_designer/evaluation/registry.py
-  - backend/auto_designer/evaluation/results.py
-  - backend/auto_designer/evaluation/acceptance.py
+  - backend/ahe_beta/evaluation/contracts.py
+  - backend/ahe_beta/evaluation/registry.py
+  - backend/ahe_beta/evaluation/results.py
+  - backend/ahe_beta/evaluation/acceptance.py
   - backend/tests/evaluation/test_grading_contracts.py
   scope: 定义只读评分请求、固定适配器注册、执行合同与公共结果；抽出接受关系，区分连续分数及基础设施故障。
   acceptance: 未知适配器或版本明确拒绝；completed 才可计技术成败；非 fresh 合同可严格核验；未验收或连续分数不自动成为
@@ -33,11 +33,11 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/experiment/config.py
-  - backend/auto_designer/experiment/schemas/task-package-v2.json
-  - backend/auto_designer/experiment/materials.py
-  - backend/auto_designer/experiment/workload.py
-  - backend/auto_designer/models.py
+  - backend/ahe_beta/experiment/config.py
+  - backend/ahe_beta/experiment/schemas/task-package-v2.json
+  - backend/ahe_beta/experiment/materials.py
+  - backend/ahe_beta/experiment/workload.py
+  - backend/ahe_beta/models.py
   - backend/tests/test_experiment_grading_task_config.py
   - backend/tests/test_experiment_grading_task_materials.py
   scope: 增加 task package v2 的通用 benchmark 来源与 artifact v1 声明；冻结内容、校验路径与后端能力，保留
@@ -56,19 +56,19 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/evaluation/artifacts.py
-  - backend/auto_designer/loop/sim_user.py
-  - backend/auto_designer/user/sim/runtime.py
-  - backend/auto_designer/experiment/context.py
-  - backend/auto_designer/experiment/controllers/unified.py
-  - backend/auto_designer/experiment/collection.py
-  - backend/auto_designer/experiment/continuation/source.py
-  - backend/auto_designer/experiment/continuation/export.py
+  - backend/ahe_beta/evaluation/artifacts.py
+  - backend/ahe_beta/loop/sim_user.py
+  - backend/ahe_beta/user/sim/runtime.py
+  - backend/ahe_beta/experiment/context.py
+  - backend/ahe_beta/experiment/controllers/unified.py
+  - backend/ahe_beta/experiment/collection.py
+  - backend/ahe_beta/experiment/continuation/source.py
+  - backend/ahe_beta/experiment/continuation/export.py
   - backend/tests/evaluation/test_session_artifacts.py
   - backend/tests/user/test_direct_session.py
   - backend/tests/loop/test_sim_user.py
   - backend/tests/test_experiment_grading_artifact_lifecycle.py
-  - backend/auto_designer/loop/orchestrator.py
+  - backend/ahe_beta/loop/orchestrator.py
   - backend/tests/test_experiment_engine.py
   - backend/tests/user/test_prediction_artifacts.py
   scope: 两种 runner 共用清理前采集，复用完整 prediction；保存 session/attempt
@@ -85,17 +85,17 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/evaluation/adapters/swebench.py
-  - backend/auto_designer/evaluation/adapters/__init__.py
-  - backend/auto_designer/evaluation/adapters/terminal_bench.py
-  - backend/auto_designer/evaluation/adapters/tua_bench.py
-  - backend/auto_designer/evaluation/adapters/nl2repo.py
-  - backend/auto_designer/evaluation/adapters/custom.py
+  - backend/ahe_beta/evaluation/adapters/swebench.py
+  - backend/ahe_beta/evaluation/adapters/__init__.py
+  - backend/ahe_beta/evaluation/adapters/terminal_bench.py
+  - backend/ahe_beta/evaluation/adapters/tua_bench.py
+  - backend/ahe_beta/evaluation/adapters/nl2repo.py
+  - backend/ahe_beta/evaluation/adapters/custom.py
   - backend/tests/evaluation/test_grading_adapters.py
   - backend/tests/evaluation/test_swebench_runner.py
-  - backend/auto_designer/evaluation/adapters/container.py
-  - backend/auto_designer/evaluation/adapters/profiles.py
-  - backend/auto_designer/evaluation/__init__.py
+  - backend/ahe_beta/evaluation/adapters/container.py
+  - backend/ahe_beta/evaluation/adapters/profiles.py
+  - backend/ahe_beta/evaluation/__init__.py
   scope: 包装现有 SWE evaluator；按锁定官方合同验收 Terminal/TUA/NL2Repo 产物，custom
     在独立容器执行固定脚本，移除旧在线评分入口与接受函数兼容导出。
   acceptance: 官方 grader 不重写；锁定任务、执行器、镜像及外部评分材料；SWE 官方报告保留；Terminal/TUA 读取正式
@@ -113,10 +113,10 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/experiment/grading.py
-  - backend/auto_designer/experiment/grading_inputs.py
-  - backend/auto_designer/experiment/cli.py
-  - backend/auto_designer/experiment/schemas/grading-plan-v1.json
+  - backend/ahe_beta/experiment/grading.py
+  - backend/ahe_beta/experiment/grading_inputs.py
+  - backend/ahe_beta/experiment/cli.py
+  - backend/ahe_beta/experiment/schemas/grading-plan-v1.json
   - backend/tests/test_experiment_grading.py
   - backend/tests/test_experiment_grading_e2e.py
   - backend/tests/test_experiment_grading_plan.py
@@ -270,7 +270,7 @@ task package schema 2 保留现有 `ordinary` 和 `swebench`，新增通用 `ben
                       操作者私有 grading plan/测试材料
 ```
 
-在 `auto_designer.evaluation` 内建立小型合同、注册表和结果模块。新增 adapter 只增加模块和显式注册项，不修改 direct、simulated-user、triage、OpenAgents 或 provider 的调度流程。注册表使用固定标识及合同版本；不允许配置文件任意 import Python 类，也不引入本组无需求的第三方 plugin 发现系统。
+在 `ahe_beta.evaluation` 内建立小型合同、注册表和结果模块。新增 adapter 只增加模块和显式注册项，不修改 direct、simulated-user、triage、OpenAgents 或 provider 的调度流程。注册表使用固定标识及合同版本；不允许配置文件任意 import Python 类，也不引入本组无需求的第三方 plugin 发现系统。
 
 适配器只提供 `validate_inputs(request)` 和 `evaluate(request, attempt_dir)`。输入包含已经验证的 task/session 身份、只读产物集合、冻结评分配置与评分资源位置。适配器不得从在线工作区重新猜测产物，也不负责实验恢复、Session 保存、Issue 操作或主观评阅。公共层拥有原 run 绑定、评分锁、attempt 生命周期、统一报告；适配器拥有官方材料校验、环境准备、验收命令和结果解析。
 

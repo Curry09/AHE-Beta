@@ -27,7 +27,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/sources/prebuilt.py
+      - backend/ahe_beta/user/sim/sources/prebuilt.py
       - backend/tests/user/sim/test_prebuilt_source.py
     scope: 从显式目录复制每局独立工作区，跳过陈旧虚拟环境备份，并将可安全识别的 venv 文本元数据从构建路径迁移到会话路径。
     acceptance: 源缺失显式失败；两次供给互不污染；原 workspace 不修改；venv 文本引用完成迁移；相关 pytest 与 ruff 通过。
@@ -42,7 +42,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/sources/docker_seed.py
+      - backend/ahe_beta/user/sim/sources/docker_seed.py
       - backend/deploy/swebench-seed/Dockerfile
       - backend/deploy/swebench-seed/build.sh
       - backend/tests/user/sim/test_docker_seed_source.py
@@ -77,8 +77,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/swebench.py
-      - backend/auto_designer/loop/sim_user.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
+      - backend/ahe_beta/loop/sim_user.py
       - backend/tests/loop/test_sim_user.py
       - backend/tests/test_run_swebench_closed_loop.py
     scope: 闭环支持 manifest、单题冒烟和每轮全题一次；按固定 seed 产生可复现计划；prebuilt/docker-seed/git 三种路径均把 instance_id 带入会话与 usage 上下文，缺 seed 时保留 git 供给。

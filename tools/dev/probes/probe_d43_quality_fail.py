@@ -30,7 +30,7 @@ TASK = (
 
 
 def _persona(d43_value: str):
-    from auto_designer.user.sim.dimensions import (
+    from ahe_beta.user.sim.dimensions import (
         D1Eval,
         D2Depth,
         D2Domain,
@@ -58,10 +58,10 @@ def _persona(d43_value: str):
 
 
 def _run_one(d43_value: str) -> int:
-    from auto_designer.user.sim.harness_adapter import ScriptedHarness
-    from auto_designer.user.sim.loop import run_session
-    from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
-    from auto_designer.user.sim.state import init_state, make_coef
+    from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+    from ahe_beta.user.sim.loop import run_session
+    from ahe_beta.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
+    from ahe_beta.user.sim.state import init_state, make_coef
 
     persona = _persona(d43_value)
     st0 = init_state(persona)

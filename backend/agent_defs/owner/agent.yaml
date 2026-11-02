@@ -11,10 +11,10 @@ max_iterations: 80
 middlewares:
   # 工作区 jail：owner 只能读 harness 仓，文件工具越界读一律拒——机制硬禁读 trace
   # （data/sessions 体感+会话、data/harness_runs 运行副本）。通用 jail 一并挡住仓外任何路径。
-  - import: auto_designer.guards.workspace_jail:WorkspaceJailMiddleware
+  - import: ahe_beta.guards.workspace_jail:WorkspaceJailMiddleware
 
 llm_config:
-  # 分角色配置：owner 与 triage/synthesize 共用 DEMAND_LLM_*。
+  # 分角色配置：owner 与 triage/architect 共用 DEMAND_LLM_*。
   model: ${env.DEMAND_LLM_MODEL}
   base_url: ${env.DEMAND_LLM_BASE_URL}
   api_key: ${env.DEMAND_LLM_API_KEY}
@@ -29,11 +29,11 @@ sandbox_config:
 tools:
   - name: submit_observation_gap
     yaml_path: ./tools/submit_observation_gap.tool.yaml
-    binding: auto_designer.observations.gaps:submit_observation_gap
+    binding: ahe_beta.observations.gaps:submit_observation_gap
   # 收尾工具：input_schema = agent_contract.admission_input_schema() 的生成副本（drift-guard 守护）；
   # nexau 在调用层强校验，stop tool 的返回值（decisions JSON）成为 agent.run 的返回。
   - name: submit_admission
     yaml_path: ./tools/submit_admission.tool.yaml
-    binding: auto_designer.demand.submit_tools:submit_admission
+    binding: ahe_beta.demand.submit_tools:submit_admission
 
 stop_tools: [submit_admission]

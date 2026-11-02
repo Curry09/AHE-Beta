@@ -257,7 +257,7 @@ function IssueGroup(props: {
 // 提案来源徽标文案（provenance → 短名）。
 const PROVENANCE_BADGE: Record<string, string> = {
   "from-triage": "分诊",
-  "from-synthesize": "结构",
+  "from-architect": "结构",
   "from-divergent": "发散",
 };
 

@@ -16,11 +16,11 @@ tasks:
         type: extends
     parallel: false
     files:
-      - backend/auto_designer/user/sim/seed_source.py
-      - backend/auto_designer/user/sim/sources/__init__.py
-      - backend/auto_designer/user/sim/sources/local_fixture.py
-      - backend/auto_designer/models.py
-      - backend/auto_designer/user/sim/workspace.py
+      - backend/ahe_beta/user/sim/seed_source.py
+      - backend/ahe_beta/user/sim/sources/__init__.py
+      - backend/ahe_beta/user/sim/sources/local_fixture.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/user/sim/workspace.py
       - backend/tests/user/sim/test_seed_source.py
       - backend/tests/user/sim/test_workspace.py
     scope: '1) `seed_source.py`：定义 `SeedSource` 协议、`kind → SeedSource` 注册表、`register` 装饰器、顶层 `provision` 分派，并在 import 期遍历 `sources/` 子包触发各源自注册。2) `sources/local_fixture.py`：把 0008/T1 的 copytree 逻辑迁来，作为 `kind="local-fixture"` 首实现。3) `models.py`：`WorkspaceSpec` 增 `kind: str = "local-fixture"` 与 `params: dict = {}`（向后兼容，缺字段→缺省）。4) `workspace.py`：`materialize` 改为委托 `provision` 的薄壳，调用点不动。不实现任何新源（empty 归 T2）、不碰消费侧（sim_user / Sandbox）。'
@@ -35,7 +35,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/sources/empty.py
+      - backend/ahe_beta/user/sim/sources/empty.py
       - backend/tests/user/sim/test_seed_source_empty.py
     scope: ''
     acceptance: '`provision(WorkspaceSpec(kind="empty"))` 返回一个存在的隔离空目录；带 `params={"doc": "..."}` 时目录下含对应说明文件且内容一致，`doc_name` 可覆盖文件名。两次 provision 目录隔离。**不修改 T1 任何文件**的前提下，import `seed_source` 后 `available_kinds()` 含 `empty`（自动发现注册生效）。该目录可作为 `Sandbox` 的 cwd 正常 run/读写（沿用 0008/T2 行为，不重测 Sandbox 内部）。'
@@ -53,11 +53,11 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/deps.py
+      - backend/ahe_beta/user/sim/deps.py
       - backend/tests/user/sim/test_deps.py
-      - backend/auto_designer/user/sim/sandbox.py
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/loop/sim_user.py
+      - backend/ahe_beta/user/sim/sandbox.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/loop/sim_user.py
     scope: '1) `deps.py`（新）：`ensure_deps(workspace_dir: str, spec: WorkspaceSpec) -> None`——`spec.setup` 非空时，在 `workspace_dir` 为 cwd 逐条执行 setup 命令（subprocess，带超时/输出捕获），失败即抛并附命令与 stderr。setup 命令可自建 per-workspace `.venv` 并把依赖装进去（如 `python -m venv .venv` → `.venv/bin/pip install -e .` / 装 pytest+whatever）；`ensure_deps` 本身不硬编码建 venv 逻辑，只忠实执行 setup（奥卡姆：机制留在数据里）。幂等：`.venv` 已就位可跳过重建（由 setup 命令或一个 marker 判定）。2) `sandbox.py`（0008/T2，跨组）：`run_shell` 只切换 cwd 并继承宿主 ambient env，不再自动探测/激活 `<workspace>/.venv/bin`；如果 harness 或用户要使用某个虚拟环境，必须显式运行 `.venv/bin/python ...` / `source .venv/bin/activate && ...`，从而两侧默认执行环境一致、环境选择由 harness/用户行为自然发生。3) `orchestrator.py`（0007/0008，跨组）：在共享工作区 materialize *之后、launch 之前* 调 `ensure_deps(workspace_dir, scenario.workspace)`，使依赖准备动作（若场景声明了 setup）发生在两侧共享目录中。4) `sim_user.py`（0005/0007，跨组）：其 `run()` 的直连回落路径（未收到 orchestrator 传入 `workspace_dir` 但 `scenario.workspace` 非空时自行 `materialize_workspace`）在 materialize *之后、bind_session 之前* 也对称调 `ensure_deps(ws, scenario.workspace)`，与 orchestrator 主路径同构。orchestrator 已传 `workspace_dir` 的主路径依赖已由 orchestrator 就位，sim_user 不重复调。**非目标**（留后续）：容器/hermetic 隔离与网络策略；跨会话 venv 缓存/复用（本轮每局现装）；lockfile/版本求解；从需求文档自动推导 setup 命令（本轮 setup 由场景作者/未来 adapter 显式给出）；替 harness 隐式选择/激活环境。'
     acceptance: "`spec.setup` 为空时 `ensure_deps` 空操作、不建 `.venv`、Sandbox 行为与今天一致（既有场景零回归）。给定一个 `setup` 会建 `.venv` 并 pip 装入某包的 spec：`ensure_deps` 后 `<workspace>/.venv` 存在且该包可被 `.venv/bin/python` 显式 import。`Sandbox(workspace=dir)` 在 `<dir>/.venv` 存在时，`run_shell(\"python ...\")` 不自动解析到 `.venv`，仍继承 ambient；显式 `run_shell(\".venv/bin/python ...\")` 才使用该 venv。orchestrator 在 materialize 之后、launch 之前调 `ensure_deps`（`scenario.workspace` 为 None 时不调）。不经 orchestrator 的 sim_user 直连回落路径（未传 `workspace_dir` 但 `scenario.workspace` 非空）在自行 materialize 之后、bind_session 之前也调 `ensure_deps`（且顺序：materialize 在前）；传入 `workspace_dir` 的主路径不在 sim_user 内重复调 `ensure_deps`。setup 命令失败时 `ensure_deps` 抛错并携带足够诊断（命令+stderr）。端到端（可选、需网络）：以 funcy 式 setup 备好 `pytest`+`whatever` 后，Sandbox 可通过显式 `.venv/bin/python` import `whatever`。"
   - id: T4
@@ -74,7 +74,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/sources/git.py
+      - backend/ahe_beta/user/sim/sources/git.py
       - backend/tests/user/sim/test_git_source.py
     scope: 1) `sources/git.py`（新）：定义 `GitSource`，`@register("git")` 自注册（T1 子包扫描 import 期自动发现，无中心登记）。`provision(spec, dest_root)`：从 `spec.params` 读 `repo`（必填）、`commit`（必填）、可选 `ref`/`depth`；在隔离目录里 `git clone` 该 repo、`git checkout <commit>` 恢复快照，返回该目录绝对路径。隔离/返回契约同另两源（每局全新目录、互不污染、返回绝对路径）。2) 复用既有 `WorkspaceSpec.params` 承载 `repo`/`commit`/`ref`/`depth`——**不新增/不修改 `WorkspaceSpec` 字段**（与 T1 给 empty 用 params 一致，不碰 T1 的 models.py）。**不改** `SeedSource` 协议/注册表/顶层 `provision`（T1）、`empty`（T2）、`materialize` 薄壳、消费侧 `orchestrator`/`sim_user`/`Sandbox`。非目标（留后续/单独）：具体 benchmark（SWE-bench 等）字段→`SeedScenario` 的适配层（adapter）；容器/hermetic 与版本 pin 的环境强度；私有仓鉴权。
     acceptance: 给定 `WorkspaceSpec(kind="git", params={repo, commit})`，`provision` 后返回目录是该 repo 在该 commit 的工作树：可校验 `git rev-parse HEAD` == `commit`、关键文件存在。隔离——每次 provision 落独立目录、互不污染。`commit` 缺失（或 `repo` 缺失）时抛错且消息含缺失字段名；clone/checkout 失败时抛错并携带失败命令 + stderr 诊断。注册表按 `kind="git"` 分派到 `GitSource`；**不修改 T1/T2/T3 任何文件**的前提下 import `seed_source` 后 `available_kinds()` 含 `git`（自动发现注册生效）。与既有源（local-fixture/empty）及消费侧（materialize 薄壳 / orchestrator / sim_user / Sandbox）零回归。该目录可作为 `Sandbox` 的 cwd 与 harness 的 `SANDBOX_WORK_DIR` 正常复用（沿用既有行为，不重测消费侧内部）。CI 约束：默认单测**不走真实网络**——用一个本地临时 git 仓当 `repo`（origin），或对 clone 命令做 spy/mock；真实远端 clone 的端到端标记为可选/手动。
@@ -199,10 +199,10 @@ Hook 落在 orchestrator 而非 provision 内：与 0008/T1v2 让 materialize �
 
 | Task | 内容 | 文件 |
 | --- | --- | --- |
-| T1 | 协议/注册表/local-fixture | `backend/auto_designer/user/sim/seed_source.py`、`backend/auto_designer/user/sim/sources/__init__.py`、`backend/auto_designer/user/sim/sources/local_fixture.py`、`backend/auto_designer/models.py`、`backend/auto_designer/user/sim/workspace.py`、`backend/tests/user/sim/test_seed_source.py`、`backend/tests/user/sim/test_workspace.py` |
-| T2 | empty 源 | `backend/auto_designer/user/sim/sources/empty.py`、`backend/tests/user/sim/test_seed_source_empty.py` |
-| T3 | 依赖供给 | `backend/auto_designer/user/sim/deps.py`、`backend/tests/user/sim/test_deps.py`、`backend/auto_designer/user/sim/sandbox.py`、`backend/auto_designer/loop/orchestrator.py`、`backend/auto_designer/loop/sim_user.py` |
-| T4 | git 源 | `backend/auto_designer/user/sim/sources/git.py`、`backend/tests/user/sim/test_git_source.py` |
+| T1 | 协议/注册表/local-fixture | `backend/ahe_beta/user/sim/seed_source.py`、`backend/ahe_beta/user/sim/sources/__init__.py`、`backend/ahe_beta/user/sim/sources/local_fixture.py`、`backend/ahe_beta/models.py`、`backend/ahe_beta/user/sim/workspace.py`、`backend/tests/user/sim/test_seed_source.py`、`backend/tests/user/sim/test_workspace.py` |
+| T2 | empty 源 | `backend/ahe_beta/user/sim/sources/empty.py`、`backend/tests/user/sim/test_seed_source_empty.py` |
+| T3 | 依赖供给 | `backend/ahe_beta/user/sim/deps.py`、`backend/tests/user/sim/test_deps.py`、`backend/ahe_beta/user/sim/sandbox.py`、`backend/ahe_beta/loop/orchestrator.py`、`backend/ahe_beta/loop/sim_user.py` |
+| T4 | git 源 | `backend/ahe_beta/user/sim/sources/git.py`、`backend/tests/user/sim/test_git_source.py` |
 
 依赖 DAG：`T1 → T2`，`T1 → T3`，`T1 → T4`（T2/T3/T4 彼此独立、并列依赖 T1 立的接缝）。
 

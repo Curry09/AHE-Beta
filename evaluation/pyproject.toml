@@ -1,5 +1,5 @@
 [project]
-name = "auto-designer-evaluation"
+name = "ahe-beta-evaluation"
 version = "1.0.0"
 description = "Single-configuration Harbor evaluation with task-source profiles and frozen harnesses"
 requires-python = ">=3.12"

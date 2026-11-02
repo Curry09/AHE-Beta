@@ -103,7 +103,7 @@ def test_only_explicit_versioned_policy_is_accepted():
 
 
 def test_reply_only_space_excludes_inflight_actions():
-    from auto_designer.user.sim.actions import Phase
+    from ahe_beta.user.sim.actions import Phase
     from evaluation.harness.sim_worker import _reply_only_space
 
     assert _reply_only_space(Phase.ACTIVE, None, None) == [
@@ -231,7 +231,7 @@ def test_blocking_wait_is_counted_once_in_user_history(monkeypatch):
     import importlib.util
     import sys
 
-    from auto_designer.user.sim.dimensions import (
+    from ahe_beta.user.sim.dimensions import (
         D1Eval,
         D2Domain,
         D5Autonomy,
@@ -241,11 +241,11 @@ def test_blocking_wait_is_counted_once_in_user_history(monkeypatch):
         Persona,
         finalize_persona,
     )
-    from auto_designer.user.sim.persona_client import ScriptedPersonaClient
+    from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
     from evaluation.harness import agent
 
-    module_name = "auto_designer.user.sim._frozen_evaluation_loop"
-    path = agent.PACKAGE / "user_engine/auto_designer/user/sim/loop.py"
+    module_name = "ahe_beta.user.sim._frozen_evaluation_loop"
+    path = agent.PACKAGE / "user_engine/ahe_beta/user/sim/loop.py"
     spec = importlib.util.spec_from_file_location(module_name, path)
     sim_loop = importlib.util.module_from_spec(spec)
     monkeypatch.setitem(sys.modules, module_name, sim_loop)

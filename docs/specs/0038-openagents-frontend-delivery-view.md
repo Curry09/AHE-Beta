@@ -114,15 +114,15 @@ tasks:
 
 ## Summary
 
-本组为 auto-designer 增加一个只读 OpenAgents 交付观测面，并把原 Agent Company 大楼扩展为「需求面主楼 + OpenAgents 交付厂房」园区。独立页使用现有 Gitea-derived API 展示 `openagents → ready → PR → needs-human/conflict → main`，支持轮次过滤与 SidePanel 证据查看；园区以共享 2.5D 沙盘、可点击厂房、双停机坪、拱形航线和原生 SVG 运输机表达跨边界交接。它不新增后端 API，不读取 OpenAgents 内部运行态，不提供写操作，也不把视觉隐喻写成新的产品术语。
+本组为 AHE-Beta 增加一个只读 OpenAgents 交付观测面，并把原 Agent Company 大楼扩展为「需求面主楼 + OpenAgents 交付厂房」园区。独立页使用现有 Gitea-derived API 展示 `openagents → ready → PR → needs-human/conflict → main`，支持轮次过滤与 SidePanel 证据查看；园区以共享 2.5D 沙盘、可点击厂房、双停机坪、拱形航线和原生 SVG 运输机表达跨边界交接。它不新增后端 API，不读取 OpenAgents 内部运行态，不提供写操作，也不把视觉隐喻写成新的产品术语。
 
 ## Motivation
 
-需求面由用户、分诊、发散、设计和 Owner 组成；Owner 准入后给 issue 加 `openagents` 交接令牌。进程外 OpenAgents vigil 发现该票，intake 后加 `ready`，随后创建分支和 PR，经 conflict、CI、review、needs-human 等工程闸推进，最终 merge 到 main。两面只通过 Gitea issue/PR 标签和 main SHA 交互，auto-designer 不拥有 vigil 的内部队列。
+需求面由用户、分诊、发散、设计和 Owner 组成；Owner 准入后给 issue 加 `openagents` 交接令牌。进程外 OpenAgents vigil 发现该票，intake 后加 `ready`，随后创建分支和 PR，经 conflict、CI、review、needs-human 等工程闸推进，最终 merge 到 main。两面只通过 Gitea issue/PR 标签和 main SHA 交互，ahe-beta 不拥有 vigil 的内部队列。
 
 原前端把证据分散在 Issues、DeliveryPanel 和 Main commits：用户需要自行拼出「准入 → 接管 → PR → 卡点 → main」链路。原大楼又保留一个历史 `developer` 楼层，容易让人误以为交付仍是主楼内部角色。需要同时解决两个问题：用独立页面讲清真实交付状态；用园区空间关系说明 OpenAgents 是外部交付系统，而不是需求面中的另一个 agent。
 
-独立页必须保持只读和低耦合，只使用 auto-designer 已有 API。园区视觉只能帮助理解边界：正式文案继续使用 `openagents`、`ready`、PR、needs-human、main、Owner、vigil 等真实术语，不用「入库、出货、红牌、航站台」替代产品语义。厂房不展开 OpenAgents 内部角色，沙盘首版也不增加树木、路灯等无证据环境装饰。
+独立页必须保持只读和低耦合，只使用 AHE-Beta 已有 API。园区视觉只能帮助理解边界：正式文案继续使用 `openagents`、`ready`、PR、needs-human、main、Owner、vigil 等真实术语，不用「入库、出货、红牌、航站台」替代产品语义。厂房不展开 OpenAgents 内部角色，沙盘首版也不增加树木、路灯等无证据环境装饰。
 
 ## Guide-level explanation
 
@@ -390,11 +390,11 @@ npm --prefix frontend run build
 
 ### 为什么只读 Gitea-derived API
 
-auto-designer 已拥有 issues、open PR、main commits 和 run state。复用这些接口可以稳定表达跨系统结果，不需要耦合 OpenAgents daemon、进程内 ring buffer 或私有数据库。代价是看不到 worker 与阶段耗时，但符合当前只读观测边界。
+AHE-Beta 已拥有 issues、open PR、main commits 和 run state。复用这些接口可以稳定表达跨系统结果，不需要耦合 OpenAgents daemon、进程内 ring buffer 或私有数据库。代价是看不到 worker 与阶段耗时，但符合当前只读观测边界。
 
 ### 为什么厂房不是第二栋角色楼
 
-OpenAgents 内部如何分工属于其自身实现，不是 auto-designer 的需求面 roster。厂房因此只显示系统名、连接/阻塞状态和少量真实聚合；点击后进入独立页，不在外立面枚举虚构角色或流程。
+OpenAgents 内部如何分工属于其自身实现，不是 AHE-Beta 的需求面 roster。厂房因此只显示系统名、连接/阻塞状态和少量真实聚合；点击后进入独立页，不在外立面枚举虚构角色或流程。
 
 ### 为什么使用沙盘与 SVG，而不是 emoji 拼贴
 
@@ -417,7 +417,7 @@ OpenAgents 内部如何分工属于其自身实现，不是 auto-designer 的需
 1. 厂房聚合是否应跟随大楼 replay round，还是始终保持 live 状态。
 2. PR 历史与吞吐指标是否需要 `/api/delivery?state=all` 或 PR detail API。
 3. 轮次归属是否应由后端提供显式字段，避免前端用 labels 与 closing keywords 推断。
-4. 如果需要 OpenAgents 内部执行态，应由 auto-designer 暴露新只读 API，还是复用 OpenAgents board 契约。
+4. 如果需要 OpenAgents 内部执行态，应由 AHE-Beta 暴露新只读 API，还是复用 OpenAgents board 契约。
 5. 是否补一个仓内 `scripts/*.sh` E2E 冒烟，自动验证 URL 保留、厂房键盘入口与 reduced-motion。
 
 ## Future possibilities

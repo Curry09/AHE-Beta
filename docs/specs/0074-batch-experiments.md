@@ -14,9 +14,9 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/experiment/batch_config.py
-  - backend/auto_designer/experiment/batch_store.py
-  - backend/auto_designer/experiment/schemas/batch-v1.json
+  - backend/ahe_beta/experiment/batch_config.py
+  - backend/ahe_beta/experiment/batch_store.py
+  - backend/ahe_beta/experiment/schemas/batch-v1.json
   - backend/tests/test_experiment_batch_config.py
   - backend/tests/test_experiment_batch_store.py
   scope: 严格校验批次列表并冻结配置身份，分离不可变intent/manifest与可变receipt，独立entry根与prepare中断恢复。
@@ -32,7 +32,7 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/experiment/batch.py
+  - backend/ahe_beta/experiment/batch.py
   - backend/tests/test_experiment_batch.py
   scope: 有限并发前台监督，持久launch 
     lease，先reconcile再dispatch，终态collect及stop/resume、UNKNOWN/LOST与失败阻塞。
@@ -48,7 +48,7 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/experiment/cli.py
+  - backend/ahe_beta/experiment/cli.py
   - backend/tests/test_experiment_cli_v2.py
   - backend/scripts/check_experiment_repository.py
   - backend/tests/test_experiment_repository.py
@@ -176,9 +176,9 @@ uv run --locked --extra experiments python backend/scripts/experiment.py batch c
 
 | Task | depends-on | 独占 files | scope / acceptance |
 | --- | --- | --- | --- |
-| T1 批次输入、冻结身份与 receipt | 无 | `backend/auto_designer/experiment/batch_config.py`; `backend/auto_designer/experiment/schemas/batch-v1.json`; `backend/auto_designer/experiment/batch_store.py`; `backend/tests/test_experiment_batch_config.py`; `backend/tests/test_experiment_batch_store.py` | 严格公开字段、独立 entry root、无凭证 manifest、atomic revision/locking、篡改和越界拒绝、prepare intent恢复；不加载provider或运行模型。 |
-| T2 生命周期 scheduler | T1 | `backend/auto_designer/experiment/batch.py`; `backend/tests/test_experiment_batch.py` | 只调用现有runtime API；真 active lease上限，启动返回不释放；中断前后不重复建仓/run；UNKNOWN/LOST/collection失败/stop-resume和quota分类。若接口审计证明必须扩展runtime，正式spec需将`runtime.py`及其相应test一并归此Task，不能平行抢写。 |
-| T3 统一 CLI 接线与仓库契约 | T1 | `backend/auto_designer/experiment/cli.py`; `backend/tests/test_experiment_cli_v2.py`; `backend/scripts/check_experiment_repository.py`; `backend/tests/test_experiment_repository.py` | batch子命令解析、--runs-dir/--secrets-file对齐、已有单run命令不变、JSON输出退出码、未collect/unknown不能宣称完成。 |
+| T1 批次输入、冻结身份与 receipt | 无 | `backend/ahe_beta/experiment/batch_config.py`; `backend/ahe_beta/experiment/schemas/batch-v1.json`; `backend/ahe_beta/experiment/batch_store.py`; `backend/tests/test_experiment_batch_config.py`; `backend/tests/test_experiment_batch_store.py` | 严格公开字段、独立 entry root、无凭证 manifest、atomic revision/locking、篡改和越界拒绝、prepare intent恢复；不加载provider或运行模型。 |
+| T2 生命周期 scheduler | T1 | `backend/ahe_beta/experiment/batch.py`; `backend/tests/test_experiment_batch.py` | 只调用现有runtime API；真 active lease上限，启动返回不释放；中断前后不重复建仓/run；UNKNOWN/LOST/collection失败/stop-resume和quota分类。若接口审计证明必须扩展runtime，正式spec需将`runtime.py`及其相应test一并归此Task，不能平行抢写。 |
+| T3 统一 CLI 接线与仓库契约 | T1 | `backend/ahe_beta/experiment/cli.py`; `backend/tests/test_experiment_cli_v2.py`; `backend/scripts/check_experiment_repository.py`; `backend/tests/test_experiment_repository.py` | batch子命令解析、--runs-dir/--secrets-file对齐、已有单run命令不变、JSON输出退出码、未collect/unknown不能宣称完成。 |
 | T4 公开示例与双语文档 | T1 | `examples/batches/u1-u4-local.json`; `examples/batches/u1-u4-e2b.json`; `README.md`; `README.zh-CN.md`; `docs/QUICKSTART.md`; `docs/QUICKSTART.zh-CN.md`; `docs/CONFIGURATION.md`; `docs/CONFIGURATION.zh-CN.md`; `docs/tutorials/batch-experiment.md`; `docs/tutorials/batch-experiment.zh-CN.md`; `backend/tests/test_experiment_batch_examples.py` | 两backend同计划、真配置路径/credential refs、中英文命令一致；明确并发/费用/仓限/retain资源与 Ctrl+C/stop差异，无私人路径。 |
 | T5 故障恢复闭环与验证报告 | T2、T3、T4 | `backend/tests/test_experiment_batch_e2e.py`; `backend/scripts/e2e-spec-0074-batch-experiments.sh` | 真实batch store/scheduler接实际single-run runtime，provider/model边界替身；非空交付至少一项，两run完整terminalcollect；crash/restart、UNKNOWN占槽、quota、重复操作；真实local/E2B可用时再记录实际provider证据，不能将mock当live。 |
 

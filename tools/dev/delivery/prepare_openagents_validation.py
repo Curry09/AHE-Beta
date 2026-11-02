@@ -121,9 +121,9 @@ def main() -> int:
     selected = set(args.deliver)
     _, _, gitea = run_inputs(args.run_dir, args.secrets_file)
 
-    from auto_designer.demand.issue_schema import OPENAGENTS  # noqa: PLC0415
-    from auto_designer.models import IssueDraft  # noqa: PLC0415
-    from auto_designer.tracker.gitea import GiteaTracker  # noqa: PLC0415
+    from ahe_beta.demand.issue_schema import OPENAGENTS  # noqa: PLC0415
+    from ahe_beta.models import IssueDraft  # noqa: PLC0415
+    from ahe_beta.tracker.gitea import GiteaTracker  # noqa: PLC0415
 
     def tracker(repo: str) -> GiteaTracker:
         return GiteaTracker(

@@ -24,7 +24,7 @@
           "files": {
             "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-readiness-recipes-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/task-readiness-recipes-v1.tar.gz"
         },
         "target": "/opt/task-inputs/recipes",
         "placement": "task"
@@ -38,7 +38,7 @@
             "public/TASK.md": "85c383e2021119a1b8b9eb75fd1c2c32df491978da04d5f71f9a471dd02a4079",
             "public/ci.py": "727490bd8666a6267c155e71501301efe758332c610b1a6193047de46316bde7"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m02-public-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/m02-public-v1.tar.gz"
         },
         "target": "/workspace",
         "placement": "task"

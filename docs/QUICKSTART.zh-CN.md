@@ -18,8 +18,8 @@ U8 mixed/direct、U16 和 U32 的六轮实验使用容器任务包，材料和�
 使用 Linux 或 WSL2，安装 Git、Python 3.12 和 [uv](https://docs.astral.sh/uv/getting-started/installation/)。本地运行还需要已启动的 Docker Engine 和 Compose，也可使用开启 WSL 集成的 Docker Desktop。
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv sync --locked --extra experiments
 ```
 
@@ -40,7 +40,7 @@ chmod 600 .env.experiment
 
 在 `.env.experiment` 中填写模拟用户、Harness 和需求角色的 OpenAI 兼容接口地址与密钥，以及交付角色的 Anthropic 兼容接口地址与凭证。OpenAgents 通过 Claude Code 交付，需要支持 Anthropic 协议的接口。
 
-U1/U4 默认选择 `claude-opus-5-5`；六轮示例的用户与 Harness 使用 `glm-5.3-flash`，需求与交付使用 `glm-5.3`。根据供应商支持的名称，在准备前修改 JSON 中的四个 `models.*.model` 字段。Triage、Synthesizer 和 PM 共用需求模型，示例中的 Owner 使用规则准入。
+U1/U4 默认选择 `claude-opus-5-5`；六轮示例的用户与 Harness 使用 `glm-5.3-flash`，需求与交付使用 `glm-5.3`。根据供应商支持的名称，在准备前修改 JSON 中的四个 `models.*.model` 字段。Triage、Architect 和 PM 共用需求模型，示例中的 Owner 使用规则准入。
 
 E2B 还需要沙箱 API 密钥，以及有权创建和读写本人仓库、Issue、评论及附件的 Gitea.com Token。可选 `GITEA_USER` 用于校验 Token 所属账户。本地 Gitea 凭证自动生成，网页登录信息保存在 run 目录的 `secrets/local-gitea-login.env`。完整字段见[配置说明](CONFIGURATION.zh-CN.md)。
 

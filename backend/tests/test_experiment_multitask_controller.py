@@ -13,15 +13,15 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer import invocation
-from auto_designer.demand.evidence_contract import build_l1_summary
-from auto_designer.experiment import context, materials, workload
-from auto_designer.experiment.controllers import runtime, unified
-from auto_designer.loop import live
-from auto_designer.loop.orchestrator import Orchestrator
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
-from auto_designer.loop.round_gate import RoundDeliveryBlocked
-from auto_designer.models import (
+from ahe_beta import invocation
+from ahe_beta.demand.evidence_contract import build_l1_summary
+from ahe_beta.experiment import context, materials, workload
+from ahe_beta.experiment.controllers import runtime, unified
+from ahe_beta.loop import live
+from ahe_beta.loop.orchestrator import Orchestrator
+from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
+from ahe_beta.loop.round_gate import RoundDeliveryBlocked
+from ahe_beta.models import (
     FeelingScore,
     Persona,
     SeedScenario,
@@ -30,13 +30,13 @@ from auto_designer.models import (
     WorkspaceSpec,
     bound_session_provenance,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context, current_usage_context
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.run_live import expert
-from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context, current_usage_context
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+from ahe_beta.user.sim.run_live import expert
+from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 from test_experiment_interactions import RecordingClient
 from test_experiment_materials import aabb_inputs as aabb_inputs
 from test_experiment_materials import prepared_inputs as prepared_inputs
@@ -144,7 +144,7 @@ def test_same_task_many_users_have_independent_workspaces_and_bounded_fanout(
             destination, owns_tmp=True, evidence={"patch_capability": "not_applicable"}
         )
 
-    monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", materialize)
+    monkeypatch.setattr("ahe_beta.loop.orchestrator.materialize_workspace", materialize)
 
     class Harness(ScriptedHarness):
         def __init__(self, ws):
@@ -279,7 +279,7 @@ def test_partial_failure_recovery_keeps_keys_inputs_and_completed_sessions_when_
             destination, owns_tmp=True, evidence={"patch_capability": "not_applicable"}
         )
 
-    monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", materialize)
+    monkeypatch.setattr("ahe_beta.loop.orchestrator.materialize_workspace", materialize)
 
     class Launcher:
         def launch(self, ref, workspace_dir=None):
@@ -475,10 +475,10 @@ def test_controller_resolver_selects_each_actual_frozen_task(
         task["params"]["workload_contract_version"] = 1
     (root / "resources.json").write_text(json.dumps(resources))
     env = {
-        "AUTO_DESIGNER_WORKLOAD_CONTRACT_VERSION": "1",
-        "AUTO_DESIGNER_TASK_CATALOG": str(root / manifest["materials"]["task_catalog"]["path"]),
-        "AUTO_DESIGNER_TASK_WORKSPACES_FILE": str(root / "resources.json"),
-        "AUTO_DESIGNER_FROZEN_MANIFEST": str(root / "manifest.json"),
+        "AHE_BETA_WORKLOAD_CONTRACT_VERSION": "1",
+        "AHE_BETA_TASK_CATALOG": str(root / manifest["materials"]["task_catalog"]["path"]),
+        "AHE_BETA_TASK_WORKSPACES_FILE": str(root / "resources.json"),
+        "AHE_BETA_FROZEN_MANIFEST": str(root / "manifest.json"),
     }
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -526,11 +526,11 @@ def test_real_unified_main_uses_frozen_catalog_and_terminal_user_only_plan(
 ):
     from types import SimpleNamespace
 
-    from auto_designer.experiment.context import build_controller_environment
+    from ahe_beta.experiment.context import build_controller_environment
 
     config = json.loads(prepared_inputs.read_text())
     config["rounds"]["count"] = 1
-    config["roles"].update(triager=0, synthesizer=0)
+    config["roles"].update(triager=0, architect=0)
     if backend == "e2b":
         config["runtime"] = {
             "backend": "e2b",
@@ -563,7 +563,7 @@ def test_real_unified_main_uses_frozen_catalog_and_terminal_user_only_plan(
     )
     for key in (
         "ROLE_RUNS_DIR",
-        "AUTO_DESIGNER_USAGE_PATH",
+        "AHE_BETA_USAGE_PATH",
         "LLM_MODEL",
         "LLM_API_KEY",
         "LLM_BASE_URL",
@@ -596,19 +596,17 @@ def test_real_unified_main_uses_frozen_catalog_and_terminal_user_only_plan(
         "start_vigil",
         lambda **kwargs: pytest.fail("terminal round starts no delivery plane"),
     )
-    monkeypatch.setattr("auto_designer.tracker.gitea.GiteaTracker", lambda **kwargs: tracker)
+    monkeypatch.setattr("ahe_beta.tracker.gitea.GiteaTracker", lambda **kwargs: tracker)
     monkeypatch.setattr(
-        "auto_designer.user.sim.persona_client.ApiPersonaClient",
+        "ahe_beta.user.sim.persona_client.ApiPersonaClient",
         lambda: SimpleNamespace(complete=None),
     )
     monkeypatch.setattr(
-        "auto_designer.user.sim.persona_client.AgenticPersonaClient",
+        "ahe_beta.user.sim.persona_client.AgenticPersonaClient",
         lambda complete: RecordingClient(calls),
     )
-    monkeypatch.setattr(
-        "auto_designer.guards.repo_guard.snapshot_repo", lambda **kwargs: ("test", "")
-    )
-    monkeypatch.setattr("auto_designer.guards.repo_guard.verify_unchanged", lambda **kwargs: None)
+    monkeypatch.setattr("ahe_beta.guards.repo_guard.snapshot_repo", lambda **kwargs: ("test", ""))
+    monkeypatch.setattr("ahe_beta.guards.repo_guard.verify_unchanged", lambda **kwargs: None)
 
     def materialize(spec):
         ctx = current_usage_context()
@@ -619,7 +617,7 @@ def test_real_unified_main_uses_frozen_catalog_and_terminal_user_only_plan(
             directory, owns_tmp=True, evidence={"patch_capability": "not_applicable"}
         )
 
-    monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", materialize)
+    monkeypatch.setattr("ahe_beta.loop.orchestrator.materialize_workspace", materialize)
 
     class Launcher:
         def __init__(self, **kwargs):
@@ -628,7 +626,7 @@ def test_real_unified_main_uses_frozen_catalog_and_terminal_user_only_plan(
         def launch(self, ref, workspace_dir=None):
             return ScriptedHarness()
 
-    monkeypatch.setattr("auto_designer.harness.launcher.HarnessLauncher", Launcher)
+    monkeypatch.setattr("ahe_beta.harness.launcher.HarnessLauncher", Launcher)
     assert unified.main() == 0
     assert calls == ["review"]
     assert len(launches) == 1 and launches[0][3] == 1
@@ -642,7 +640,7 @@ def test_real_unified_main_uses_frozen_catalog_and_terminal_user_only_plan(
 
 @pytest.mark.parametrize("field,value", [("round_no", True), ("slot", False)])
 def test_internal_logical_plan_rejects_bool_round_and_slot(tmp_path, field, value):
-    from auto_designer.loop.recovery import RecoveryConflictError
+    from ahe_beta.loop.recovery import RecoveryConflictError
 
     repo = _repo(tmp_path / "harness")
     binding = _binding("p", "ordinary", 0, round_no=1, mode="direct")
@@ -673,8 +671,8 @@ def test_internal_logical_plan_rejects_bool_round_and_slot(tmp_path, field, valu
 def test_queued_sessions_stay_pending_until_they_acquire_a_worker(tmp_path):
     from concurrent.futures import ThreadPoolExecutor
 
-    from auto_designer.experiment.runtime import progress_v2
-    from auto_designer.loop.recovery import EVENT_FILE
+    from ahe_beta.experiment.runtime import progress_v2
+    from ahe_beta.loop.recovery import EVENT_FILE
 
     repo = _repo(tmp_path / "harness")
     recovery = _recovery(tmp_path / "checkpoints")

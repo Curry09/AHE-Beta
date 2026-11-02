@@ -8,13 +8,13 @@ import time
 
 import pytest
 
-from auto_designer.experiment.backends import local
-from auto_designer.experiment.backends.base import BackendError
-from auto_designer.experiment.infrastructure import LABEL_EXPERIMENT, LABEL_MANIFEST
+from ahe_beta.experiment.backends import local
+from ahe_beta.experiment.backends.base import BackendError
+from ahe_beta.experiment.infrastructure import LABEL_EXPERIMENT, LABEL_MANIFEST
 
 
 def test_transport_reader_alone_cannot_start_new_execution_contract_run():
-    from auto_designer.experiment.backends.base import require_execution_reader
+    from ahe_beta.experiment.backends.base import require_execution_reader
 
     with pytest.raises(BackendError, match="execution-evidence"):
         require_execution_reader(
@@ -179,7 +179,7 @@ def backend(tmp_path, monkeypatch):
     monkeypatch.setattr(local.requests, "get", lambda *args, **kwargs: Ready())
     monkeypatch.setattr(selected, "_api", api)
     monkeypatch.setattr(selected, "_probe", lambda: {"status": "verified"})
-    from auto_designer.experiment import collection
+    from ahe_beta.experiment import collection
 
     monkeypatch.setattr(
         collection, "export_gitea_snapshot", lambda **kwargs: {"applicable": True, "complete": True}
@@ -358,7 +358,7 @@ def test_existing_repository_requires_server_side_ownership(backend, monkeypatch
 
     monkeypatch.setattr(selected, "_api", api)
     monkeypatch.setattr(selected, "_probe", lambda: {"status": "verified"})
-    from auto_designer.experiment import collection
+    from ahe_beta.experiment import collection
 
     monkeypatch.setattr(
         collection, "export_gitea_snapshot", lambda **kwargs: {"applicable": True, "complete": True}
@@ -434,7 +434,7 @@ def test_stop_reaps_only_owned_vigil_and_sessions(backend, monkeypatch):
     facts["containers"].append(
         {
             "Id": "session-id",
-            "Config": {"Labels": {**labels, "auto-designer.session": "session"}},
+            "Config": {"Labels": {**labels, "ahe-beta.session": "session"}},
             "State": {"Running": True},
         }
     )
@@ -444,7 +444,7 @@ def test_stop_reaps_only_owned_vigil_and_sessions(backend, monkeypatch):
         {
             "Id": "vigil-id",
             "Name": "/" + selected.resources["vigil"]["container"],
-            "Config": {"Labels": {**labels, "io.auto-designer.run_id": selected.run_id}},
+            "Config": {"Labels": {**labels, "io.ahe-beta.run_id": selected.run_id}},
             "State": {"Running": True},
         }
     )
@@ -625,7 +625,7 @@ def test_real_transport_probe_cleanup_runs_after_reader_failure(backend, monkeyp
 
 
 def test_stop_retains_infrastructure_if_terminal_gitea_export_fails(backend, monkeypatch):
-    from auto_designer.experiment import collection
+    from ahe_beta.experiment import collection
 
     selected, calls, _, _ = backend
     selected.provision()
@@ -750,8 +750,8 @@ def test_prepare_builds_only_frozen_sources_and_never_passes_credentials(tmp_pat
 def test_harness_launcher_uses_controller_python_while_task_shell_is_separate(
     tmp_path, monkeypatch
 ):
-    from auto_designer.harness import launcher
-    from auto_designer.user.sim.runtime import DockerWorkspaceRuntime
+    from ahe_beta.harness import launcher
+    from ahe_beta.user.sim.runtime import DockerWorkspaceRuntime
 
     product = tmp_path / "harness"
     product.mkdir()
@@ -775,8 +775,8 @@ def test_harness_launcher_uses_controller_python_while_task_shell_is_separate(
     # The model destination remains valid even when its hostname also appeared
     # in the host's NO_PROXY. Only proxy routing is replaced inside Docker.
     monkeypatch.setenv("LLM_BASE_URL", "https://model.example/v1")
-    monkeypatch.setenv("AUTO_DESIGNER_HARNESS_REQUEST_BUDGET_SECONDS", "3600")
-    monkeypatch.setenv("AUTO_DESIGNER_HARNESS_TERMINATION_GRACE_SECONDS", "60")
+    monkeypatch.setenv("AHE_BETA_HARNESS_REQUEST_BUDGET_SECONDS", "3600")
+    monkeypatch.setenv("AHE_BETA_HARNESS_TERMINATION_GRACE_SECONDS", "60")
     selected = launcher.HarnessLauncher(str(tmp_path), tmp_path / "runs")
     monkeypatch.setattr(selected, "_resolve_sha", lambda **kwargs: "b" * 40)
     monkeypatch.setattr(selected, "_checkout", lambda **kwargs: product)
@@ -818,7 +818,7 @@ def test_vigil_ready_checks_actual_process_and_workspace_not_only_docker_state(
         {
             "Id": "vigil-id",
             "Name": "/" + selected.resources["vigil"]["container"],
-            "Config": {"Labels": {**labels, "io.auto-designer.run_id": selected.run_id}},
+            "Config": {"Labels": {**labels, "io.ahe-beta.run_id": selected.run_id}},
             "State": {"Running": True},
         }
     )
@@ -845,7 +845,7 @@ def test_vigil_ready_script_rejects_root_or_wrong_worker_uid(backend, tmp_path, 
         {
             "Id": "vigil-id",
             "Name": "/" + selected.resources["vigil"]["container"],
-            "Config": {"Labels": {**labels, "io.auto-designer.run_id": selected.run_id}},
+            "Config": {"Labels": {**labels, "io.ahe-beta.run_id": selected.run_id}},
             "State": {"Running": True},
         }
     )
@@ -879,8 +879,8 @@ def test_cloud_prebuilt_harness_inherits_task_shell_env_with_controller_interpre
 ):
     import sys
 
-    from auto_designer.harness import launcher
-    from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+    from ahe_beta.harness import launcher
+    from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 
     product = tmp_path / "harness"
     product.mkdir()
@@ -1010,7 +1010,7 @@ def test_stop_refuses_foreign_execution_container_before_any_removal(backend, mo
                 "Labels": {
                     **labels,
                     LABEL_EXPERIMENT: "foreign-run",
-                    "io.auto-designer.run_id": "foreign-run",
+                    "io.ahe-beta.run_id": "foreign-run",
                 }
             },
             "State": {"Running": True},
@@ -1091,7 +1091,7 @@ def test_prepare_failure_keeps_private_stderr_and_plain_commands_keep_stdout(tmp
 
 
 def test_default_egress_reference_matches_compose_and_is_immutable(tmp_path):
-    from auto_designer.experiment.infrastructure import COMPOSE_TEMPLATE
+    from ahe_beta.experiment.infrastructure import COMPOSE_TEMPLATE
 
     assert "@sha256:" in local.DEFAULT_EGRESS_IMAGE
     assert ":latest" not in local.DEFAULT_EGRESS_IMAGE
@@ -1121,7 +1121,7 @@ def test_resume_never_recreates_or_replaces_recorded_repository(backend, monkeyp
         return {
             "id": replacement,
             "owner": {"login": "experiment"},
-            "description": f"auto-designer experiment {selected.run_id} config {selected.digest}",
+            "description": f"ahe-beta experiment {selected.run_id} config {selected.digest}",
         }
 
     monkeypatch.setattr(selected, "_api", api)
@@ -1169,7 +1169,7 @@ def test_stop_and_resume_keep_first_observed_gitea_origin(backend, monkeypatch):
 
 
 def _frozen_local_profile(selected, url):
-    from auto_designer.observations.transport import make_transport_profile
+    from ahe_beta.observations.transport import make_transport_profile
 
     observations = selected.root / "data/role_runs" / selected.run_id / "observations"
     observations.mkdir(parents=True, exist_ok=True)
@@ -1265,7 +1265,7 @@ def test_occupied_canonical_port_fails_without_changing_identity_or_profile(back
 # Spec-0073/T2: compile actual multi-task materials and exercise the provider boundary.
 @pytest.fixture
 def local_multitask_bundle(tmp_path, monkeypatch):
-    from auto_designer.experiment.materials import prepare_materials
+    from ahe_beta.experiment.materials import prepare_materials
     from test_experiment_workload import multiple_inputs, prepared_inputs
 
     first = prepared_inputs.__wrapped__(tmp_path, monkeypatch)
@@ -1280,7 +1280,7 @@ def test_prepare_multitask_seeds_use_distinct_sources_and_one_shared_toolchain(
     import tarfile
     from pathlib import Path
 
-    from auto_designer.experiment import engine, workload
+    from ahe_beta.experiment import engine, workload
 
     manifest, root = local_multitask_bundle
     source = engine.materialize_controller_source(root, manifest)
@@ -1368,7 +1368,7 @@ def test_prepare_multitask_seeds_use_distinct_sources_and_one_shared_toolchain(
 def test_multitask_second_build_failure_never_publishes_ready_image_receipts(
     local_multitask_bundle, monkeypatch
 ):
-    from auto_designer.experiment import engine
+    from ahe_beta.experiment import engine
 
     manifest, root = local_multitask_bundle
     source = engine.materialize_controller_source(root, manifest)
@@ -1404,8 +1404,8 @@ def test_multitask_second_build_failure_never_publishes_ready_image_receipts(
 def test_multitask_bindings_refuse_task_digest_or_recipe_tampering(local_multitask_bundle):
     import copy
 
-    from auto_designer.experiment.config import ConfigError, config_hash
-    from auto_designer.experiment.workload import read_task_catalog
+    from ahe_beta.experiment.config import ConfigError, config_hash
+    from ahe_beta.experiment.workload import read_task_catalog
 
     manifest, root = local_multitask_bundle
     catalog = read_task_catalog(root, manifest)
@@ -1448,7 +1448,7 @@ def test_multitask_bindings_refuse_task_digest_or_recipe_tampering(local_multita
 def test_multitask_preflight_checks_every_selected_image_before_readiness(
     local_multitask_bundle, monkeypatch, corrupt
 ):
-    from auto_designer.experiment.workload import read_task_catalog
+    from ahe_beta.experiment.workload import read_task_catalog
     from test_experiment_workload import task_resources
 
     manifest, root = local_multitask_bundle

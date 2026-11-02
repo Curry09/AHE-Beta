@@ -27,7 +27,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/round_gate.py
+      - backend/ahe_beta/loop/round_gate.py
       - backend/tests/loop/test_round_gate.py
     scope: 新增 round_gate：轮询本轮 admitted 票直到全部终态；needs-human/超时/看门狗抛 RoundDeliveryBlocked；全关且无 needs-human 则成功；空名单立即成功。
     acceptance: Fake 票：全关成功；一张 needs-human 抛错；超时抛错；空名单不轮询；单测不打真 Gitea。
@@ -41,7 +41,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/orchestrator.py
+      - backend/ahe_beta/loop/orchestrator.py
       - backend/tests/loop/test_orchestrator.py
     scope: run(n) 每轮先用户；非末轮才生成+Owner；用 admit 的 admitted 调闸；闸成功后才解析 sealed SHA；闸抛错中止 run 不开下一轮；末轮不调生成/Owner/闸。
     acceptance: n=2 时仅第 1 轮走 Owner 与闸；第 2 轮只 launch 用户；闸抛错时第二轮用户次数为 0；既有 run_round 默认仍含需求段不回归。
@@ -55,9 +55,9 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/experiment/controllers/swebench.py
-      - backend/auto_designer/loop/live.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
+      - backend/ahe_beta/loop/live.py
       - backend/tests/loop/test_live.py
       - backend/tests/test_run_vigil.py
     scope: 捕获 RoundDeliveryBlocked：live 标 blocked、进程非 0 退出、vigil keep-alive。干净收官（含末轮用户结束后）停 vigil。TOTAL_ROUNDS=1 不启 vigil。run.json 增加 phase 与 user_sha/sealed_sha。
@@ -148,7 +148,7 @@ tasks:
 1. `i = 1 .. n_rounds`。
 2. 解析 `origin/main`（无 origin 则本地 `main`），本轮所有用户会话 `launch` 该 SHA（会话级快照，同轮用户并行仍允许）。记 `user_sha`。
 3. 跑用户会话（现有 a 段）。
-4. 若 `i == n_rounds`：跑完整性绊线，回灌当前 HEAD，`on_round_end`，结束。不调 triage / divergent / synthesize / Owner，不调交付闸。
+4. 若 `i == n_rounds`：跑完整性绊线，回灌当前 HEAD，`on_round_end`，结束。不调 triage / divergent / architect / Owner，不调交付闸。
 5. 否则：生成两拍 + `Owner.admit_once()`。等待集合 = 本次返回的 `AdmitOutcome.admitted`（仅本轮新打上 `openagents` 的票）。Owner 本轮 merge/decline/hold 的提案不进等待集：它们不是交付面工作项。
 6. `wait_round_delivery(numbers=admitted)`。空名单立即成功（本轮没有放进交付队列，下一轮用户仍测同一 SHA，体感差应接近 0，这是合法结论：「本轮无交付」）。
 7. 闸成功后再 `fetch` 解析 HEAD，记 `sealed_sha`，`on_round_end`。下一轮步骤 2 必须读到这个前进后的 `main`（或相同 SHA，若空等待集）。

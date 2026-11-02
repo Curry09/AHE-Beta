@@ -59,9 +59,9 @@ def _push_seed(template_dir: Path, remote: str, run_git: GitRun) -> None:
         run_git(
             [
                 "-c",
-                "user.email=bot@auto-designer",
+                "user.email=bot@ahe-beta",
                 "-c",
-                "user.name=auto-designer",
+                "user.name=ahe-beta",
                 "commit",
                 "-m",
                 _SEED_COMMIT_MSG,

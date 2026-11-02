@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "preparation-baseline-not-a-release",
-  "auto_designer": {
-    "repository": "https://github.com/Curry09/auto-designer",
+  "ahe_beta": {
+    "repository": "https://github.com/Curry09/AHE-Beta",
     "branch": "main",
     "baseline_commit": "4dd2561a7e3664e170fe7b2c602fc7c2ab93acaa",
     "release_branch": "main"

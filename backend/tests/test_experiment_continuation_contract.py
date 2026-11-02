@@ -11,13 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import materials, workload
-from auto_designer.experiment.collection import collect_archive
-from auto_designer.experiment.continuation.export import export_continuation
-from auto_designer.experiment.continuation.source import load_continuation_source
-from auto_designer.experiment.controllers import feedback, runtime
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
-from auto_designer.models import (
+from ahe_beta.experiment import materials, workload
+from ahe_beta.experiment.collection import collect_archive
+from ahe_beta.experiment.continuation.export import export_continuation
+from ahe_beta.experiment.continuation.source import load_continuation_source
+from ahe_beta.experiment.controllers import feedback, runtime
+from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
+from ahe_beta.models import (
     FeelingScore,
     Persona,
     SeedScenario,
@@ -25,8 +25,8 @@ from auto_designer.models import (
     Transcript,
     WorkspaceSpec,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
 from test_experiment_config_v2 import package, write
 from test_experiment_materials import prepared_inputs as prepared_inputs
 
@@ -206,21 +206,21 @@ def seed_child(manifest, monkeypatch):
     repo = root / "data/harness_sandbox/harness_repo"
     monkeypatch.setattr(runtime, "HARNESS_REPO", repo)
     monkeypatch.setenv(
-        "AUTO_DESIGNER_HARNESS_ARCHIVE",
+        "AHE_BETA_HARNESS_ARCHIVE",
         str(root / manifest["materials"]["harness_archive"]["path"]),
     )
     monkeypatch.setenv(
-        "AUTO_DESIGNER_CONTINUATION_INPUT",
+        "AHE_BETA_CONTINUATION_INPUT",
         str(root / manifest["materials"]["continuation_input"]["path"]),
     )
-    monkeypatch.delenv("AUTO_DESIGNER_OBSERVATION_ROOT", raising=False)
+    monkeypatch.delenv("AHE_BETA_OBSERVATION_ROOT", raising=False)
     runtime._seed_harness_repo()
     monkeypatch.setattr(
         feedback,
         "assemble_feedback_roles",
         lambda **k: {
             "triagers": [],
-            "synthesizers": [],
+            "architects": [],
             "divergents": [],
             "owner": None,
         },

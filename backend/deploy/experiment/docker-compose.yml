@@ -36,8 +36,8 @@ services:
       io.openagents.manifest_sha: "${MANIFEST_SHA}"
       io.openagents.role: egress
     volumes:
-      # Explicit opt-in: AUTO_DESIGNER_EGRESS_CONFIG=./egress-gitea-com.conf
-      - ${AUTO_DESIGNER_EGRESS_CONFIG:-./egress-proxy.conf}:/etc/squid/squid.conf:ro
+      # Explicit opt-in: AHE_BETA_EGRESS_CONFIG=./egress-gitea-com.conf
+      - ${AHE_BETA_EGRESS_CONFIG:-./egress-proxy.conf}:/etc/squid/squid.conf:ro
       - ./egress-proxy.conf:/etc/squid/egress-base.conf:ro
     networks:
       - ci

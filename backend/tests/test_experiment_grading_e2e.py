@@ -18,9 +18,9 @@ from pathlib import Path
 import pytest
 
 import test_experiment_multitask_e2e as mixed
-from auto_designer import invocation
-from auto_designer.experiment import collection, engine, materials, workload
-from auto_designer.experiment.manifest import run_lock, update_runtime
+from ahe_beta import invocation
+from ahe_beta.experiment import collection, engine, materials, workload
+from ahe_beta.experiment.manifest import run_lock, update_runtime
 from test_experiment_materials import prepared_inputs as base_prepared_inputs
 from test_experiment_workload import multiple_inputs as base_multiple_inputs
 
@@ -147,9 +147,9 @@ def _original_hashes(root):
 def test_sealed_production_sessions_grade_without_mutating_experiment(
     multiple_inputs, tmp_path, monkeypatch, backend
 ):
-    from auto_designer.evaluation.adapters import swebench as adapter
-    from auto_designer.evaluation.adapters.swebench import _SWEbenchRunner
-    from auto_designer.experiment import grading, workload
+    from ahe_beta.evaluation.adapters import swebench as adapter
+    from ahe_beta.evaluation.adapters.swebench import _SWEbenchRunner
+    from ahe_beta.experiment import grading, workload
 
     monkeypatch.setattr(adapter, "resolve_image", lambda *args, **kwargs: "sha256:" + "f" * 64)
     monkeypatch.setattr(adapter, "run_docker", lambda *args, **kwargs: "")
@@ -204,7 +204,7 @@ def test_sealed_production_sessions_grade_without_mutating_experiment(
         assert "hidden evaluator-only" not in record["model_patch"]
         run_id = command[command.index("--run_id") + 1]
         report_dir = Path(command[command.index("--report_dir") + 1])
-        (report_dir / f"auto-designer.{run_id}.json").write_text(
+        (report_dir / f"ahe-beta.{run_id}.json").write_text(
             json.dumps({"resolved_ids": [record["instance_id"]], "unresolved_ids": []})
         )
         return subprocess.CompletedProcess(command, 0, "scripted official boundary", "")

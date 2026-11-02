@@ -5,15 +5,15 @@ from __future__ import annotations
 
 import json
 
-from auto_designer.demand.agent_runtime import (
+from ahe_beta.demand.agent_runtime import (
     norm_label,
     read_submit,
     run_agent_def,
     run_with_timeout,
 )
-from auto_designer.demand.session_timeline import bind_session_store, get_session_timeline
-from auto_designer.usage import current_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.demand.session_timeline import bind_session_store, get_session_timeline
+from ahe_beta.usage import current_usage_context
+from ahe_beta.user.session_store import SessionStore
 
 
 def test_read_submit_normal() -> None:
@@ -109,7 +109,7 @@ def test_run_agent_def_records_demand_and_keeps_return(tmp_path, monkeypatch) ->
     import nexau
 
     monkeypatch.setenv("ROLE_RUNS_DIR", str(tmp_path))
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-x")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "run-x")
 
     class FakeConfig:
         max_iterations = 1

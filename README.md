@@ -1,4 +1,4 @@
-# auto-designer
+# AHE-Beta
 
 **Evolve coding-agent harnesses through simulated use and structured feedback.**
 
@@ -6,7 +6,7 @@
 
 Python 3.12+ · Linux / WSL2 · [MIT](LICENSE)
 
-auto-designer evolves coding-agent harnesses by simulating how users try a product, give feedback, and developers improve it. Simulated users work on tasks with the Harness and report problems. Requirements agents turn that feedback into proposals, and [OpenAgents](https://github.com/Curry09/OpenAgents) implements the code changes. The updated Harness enters the next round of use, continuing the feedback and improvement cycle.
+AHE-Beta evolves coding-agent harnesses by simulating how users try a product, give feedback, and developers improve it. Simulated users work on tasks with the Harness and report problems. Triage and Architect turn that feedback into proposals, and [OpenAgents](https://github.com/Curry09/OpenAgents) implements the code changes. The updated Harness enters the next round of use, continuing the feedback and improvement cycle.
 
 <p align="center">
   <picture>
@@ -22,8 +22,8 @@ This repository orchestrates experiments, while OpenAgents implements code chang
 The offline demo uses scripted simulated users and a scripted Harness to demonstrate an interaction and its feedback. It requires no model API or experiment infrastructure. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) before running:
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv run --locked python backend/scripts/offline_demo.py
 ```
 

@@ -6,7 +6,7 @@ const issue: Issue = {
   number: 7,
   title: "test",
   body: "",
-  labels: ["ready", "from-synthesize", "P1", "round-1", "openagents", "needs-human", "bug"],
+  labels: ["ready", "from-architect", "P1", "round-1", "openagents", "needs-human", "bug"],
   state: "open",
   created_at: "2026-08-09T10:00:00Z",
   closed_at: null,
@@ -17,7 +17,7 @@ function state(overrides = {}) {
   return {
     labels: [],
     plane: "ready" as const,
-    provenance: "from-synthesize" as const,
+    provenance: "from-architect" as const,
     priority: "P1",
     round: 1,
     handoff: false,
@@ -32,7 +32,7 @@ function state(overrides = {}) {
 it("groups orthogonal labels instead of rendering one pile", () => {
   expect(groupIssueLabels(issue.labels).map((group) => [group.key, group.labels])).toEqual([
     ["plane", ["ready"]],
-    ["source", ["from-synthesize"]],
+    ["source", ["from-architect"]],
     ["priority", ["P1"]],
     ["round", ["round-1"]],
     ["delivery", ["openagents", "needs-human"]],
@@ -57,7 +57,7 @@ describe("buildIssueTimelineView", () => {
         blocked: true,
       }),
       historical: null,
-      last_known: { plane: "ready", provenance: "from-synthesize", priority: "P1", round: 1 },
+      last_known: { plane: "ready", provenance: "from-architect", priority: "P1", round: 1 },
       anomalies: [
         {
           id: "blocking-destroyed-metadata:transition-1",
@@ -75,7 +75,7 @@ describe("buildIssueTimelineView", () => {
           actor: "designer",
           title: "标签完整性异常",
           added: ["needs-human"],
-          removed: ["ready", "from-synthesize", "P1", "round-1"],
+          removed: ["ready", "from-architect", "P1", "round-1"],
           before: state(),
           after: state({
             plane: null,
@@ -91,7 +91,7 @@ describe("buildIssueTimelineView", () => {
 
     const view = buildIssueTimelineView(issue, timeline);
     expect(view.transitions[0].severity).toBe("critical");
-    expect(view.transitions[0].from).toContain("from-synthesize");
+    expect(view.transitions[0].from).toContain("from-architect");
     expect(view.transitions[0].to).toBe("needs-human");
     expect(view.lastKnown.round).toBe(1);
   });

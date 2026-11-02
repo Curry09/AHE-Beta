@@ -9,8 +9,8 @@ This tutorial runs one simulated-user session per round (`rounds.sessions_per_ro
 ## 1. Start from the repository
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv sync --locked --extra experiments
 ```
 
@@ -37,7 +37,7 @@ Fill the model endpoint/key fields in the env file; E2B additionally needs its t
 | Task environment | Checked-in setup script and dependency lock with hashes |
 | Persona | `examples/personas/u1.json`, selected ID `sr-15-swyx` |
 | Initial Harness | Current `backend/harness_template/`, frozen by preparation |
-| Roles | One Triage, one Synthesizer, mechanical Owner, one developer; no divergent PM |
+| Roles | One Triage, one Architect, mechanical Owner, one developer; no divergent PM |
 
 Only task text and initial code are exposed for the user workload. No gold patch or hidden test bundle is provided to optimization roles. The user can accept a result subjectively; that is distinct from official SWE-bench success, which this example does not grade.
 
@@ -77,7 +77,7 @@ Find the Gitea connection under `gitea` in `.experiments/<run_id>/resources.json
 
 | Round | User interaction | Requirements and delivery | Result |
 | --- | --- | --- | --- |
-| R1 | Tries the seed Harness | Triage/Synthesizer → mechanical Owner → OpenAgents | First sealed Harness SHA |
+| R1 | Tries the seed Harness | Triage/Architect → mechanical Owner → OpenAgents | First sealed Harness SHA |
 | R2 | Tries R1's sealed version | Same pipeline | R2 seal |
 | R3 | Tries R2's sealed version | Same pipeline | R3 seal |
 | R4 | Tries R3's sealed version | Same pipeline | R4 seal |

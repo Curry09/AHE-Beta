@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment.context import build_controller_environment
-from auto_designer.experiment.materials import prepare_materials, verify_materials
+from ahe_beta.experiment.context import build_controller_environment
+from ahe_beta.experiment.materials import prepare_materials, verify_materials
 from test_experiment_materials import prepared_inputs as material_fixture  # noqa: F401
 
 
@@ -25,7 +25,7 @@ def frozen_policy_environment(request, tmp_path, monkeypatch):
             "e2b": {"cpu_count": 2, "memory_mb": 2048, "timeout_seconds": 3600},
         }
     config["policies"] = {
-        "synthesizer_grouping": True,
+        "architect_grouping": True,
         "timing": {"latency_isolated": True, "wall_guard_seconds": 120},
         "delivery": {
             "coordination": "dependencies",
@@ -42,7 +42,7 @@ def frozen_policy_environment(request, tmp_path, monkeypatch):
     prepared_inputs.write_text(json.dumps(config))
     manifest = prepare_materials(prepared_inputs, tmp_path / "runs")
     root = Path(manifest["run_dir"])
-    from auto_designer.experiment.workload import read_task_catalog
+    from ahe_beta.experiment.workload import read_task_catalog
     from test_experiment_workload import task_resources
 
     resources = {
@@ -66,7 +66,7 @@ def frozen_policy_environment(request, tmp_path, monkeypatch):
     )
     # Changing host/original files cannot redefine this prepared experiment.
     prepared_inputs.write_text("{}")
-    monkeypatch.setenv("SYNTHESIZER_GROUPING", "0")
+    monkeypatch.setenv("ARCHITECT_GROUPING", "0")
     verify_materials(manifest)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -74,17 +74,17 @@ def frozen_policy_environment(request, tmp_path, monkeypatch):
 
 
 def test_grouping_and_round_gate_use_frozen_public_options(frozen_policy_environment):
-    from auto_designer.demand.grouped_synthesizer import GroupedSynthesizer, group_synthesizer_stage
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked, wait_round_delivery
+    from ahe_beta.demand.grouped_architect import GroupedArchitect, group_architect_stage
+    from ahe_beta.loop.round_gate import RoundDeliveryBlocked, wait_round_delivery
 
     root, manifest, env = frozen_policy_environment
     tracker = object()
     workers = [
         SimpleNamespace(_tracker=tracker, _round_provider=None, _on_event=None) for _ in range(2)
     ]
-    stage = group_synthesizer_stage(workers, artifact_root=root / "grouping")
-    assert len(stage) == 1 and isinstance(stage[0], GroupedSynthesizer)
-    assert stage[0].synthesizers == workers
+    stage = group_architect_stage(workers, artifact_root=root / "grouping")
+    assert len(stage) == 1 and isinstance(stage[0], GroupedArchitect)
+    assert stage[0].architects == workers
     now, sleeps, reads = [0.0], [], []
 
     def sleep(seconds):
@@ -100,14 +100,14 @@ def test_grouping_and_round_gate_use_frozen_public_options(frozen_policy_environ
     assert sleeps and set(sleeps) == {0.25}
     assert now[0] == 2
     assert len(reads) < 20
-    assert manifest["config"]["policies"]["synthesizer_grouping"] is True
+    assert manifest["config"]["policies"]["architect_grouping"] is True
     assert env["N_OWNERS"] == "1"
 
 
 def test_user_reasoning_reaches_actual_chat_request(frozen_policy_environment, monkeypatch):
     import openai
 
-    from auto_designer.user.sim.persona_client import ApiPersonaClient
+    from ahe_beta.user.sim.persona_client import ApiPersonaClient
 
     requests = []
 
@@ -133,8 +133,8 @@ def test_demand_reasoning_and_timing_reach_agent_runtime(
 ):
     import nexau
 
-    from auto_designer.demand import agent_runtime
-    from auto_designer.user.session_store import SessionStore
+    from ahe_beta.demand import agent_runtime
+    from ahe_beta.user.session_store import SessionStore
 
     observed = {}
     cfg = SimpleNamespace(
@@ -174,7 +174,7 @@ def test_demand_reasoning_and_timing_reach_agent_runtime(
 
 
 def test_coordination_reaches_delivery_configuration(frozen_policy_environment, tmp_path):
-    from auto_designer.experiment.controllers.runtime import write_openagents_config
+    from ahe_beta.experiment.controllers.runtime import write_openagents_config
 
     root, manifest, env = frozen_policy_environment
     target = write_openagents_config(
@@ -196,8 +196,8 @@ def test_latency_wall_guard_retains_existing_budget_plus_grace(
     configured, expected_grace, monkeypatch
 ):
     """Spec-0072/T5: zero is legacy automatic grace, never a disabled wall cap."""
-    from auto_designer.demand import agent_runtime
-    from auto_designer.experiment.config import runtime_policies
+    from ahe_beta.demand import agent_runtime
+    from ahe_beta.experiment.config import runtime_policies
 
     cancelled = []
     budget = 5

@@ -6,10 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment import materials, workload
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.continuation import source
-from auto_designer.experiment.task_environments.contract import environment_identity
+from ahe_beta.experiment import materials, workload
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.continuation import source
+from ahe_beta.experiment.task_environments.contract import environment_identity
 from test_experiment_environment_lifecycle import container_run as container_run
 from test_experiment_materials import prepared_inputs as prepared_inputs
 

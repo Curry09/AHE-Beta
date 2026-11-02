@@ -14,10 +14,10 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/user/patches.py
-  - backend/auto_designer/loop/sim_user.py
+  - backend/ahe_beta/user/patches.py
+  - backend/ahe_beta/loop/sim_user.py
   - backend/tests/user/test_prediction_artifacts.py
-  - backend/auto_designer/user/sim/runtime.py
+  - backend/ahe_beta/user/sim/runtime.py
   scope: 两条生产runner原子保留完整补丁与相对receipt，兼容旧Session与错误导出
   acceptance: 长补丁与空补丁保真，冲突/非法路径拒绝，direct和simulated均保存，恢复不覆盖
 - id: T2
@@ -30,8 +30,8 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/experiment/grading.py
-  - backend/auto_designer/evaluation/adapters/swebench.py
+  - backend/ahe_beta/experiment/grading.py
+  - backend/ahe_beta/evaluation/adapters/swebench.py
   - backend/tests/test_experiment_grading.py
   - backend/tests/evaluation/test_swebench_runner.py
   scope: 严格读终态归档，匹配计划/恢复/预测与官方dataset，复用evaluator并独立保留每次评分
@@ -67,7 +67,7 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/experiment/cli.py
+  - backend/ahe_beta/experiment/cli.py
   - backend/tests/test_experiment_cli_v2.py
   - backend/tests/test_experiment_grading_e2e.py
   - backend/scripts/e2e-spec-0075-post-run-grading.sh

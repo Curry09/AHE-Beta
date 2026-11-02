@@ -20,7 +20,7 @@ tasks:
       - tools/persona-distill/extract-selfreport-persona/SKILL.md
       - tools/persona-distill/extract-selfreport-persona/reference.md
       - tools/persona-distill/extract-selfreport-persona/recruitment/seeds.md
-      - backend/auto_designer/distill/library.py
+      - backend/ahe_beta/distill/library.py
       - backend/tests/distill/test_library.py
     scope: 按轮辐式落地采集侧并定义 persona 卡库格式。本步范围：① card-schema.md（唯一公共契约：卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则，source-agnostic）；② extract-selfreport-persona（薄 skill，从第一人称自述提取，引用契约）；③ library.py 读写。不接具体数据源、不做卡→sim 注入映射（归 T2）。cc/so/未来源作同契约的后续薄 skill，留待补入（见 open-questions）。
     acceptance: card-schema.md 为唯一 source-agnostic 公共契约（卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则）；extract-selfreport-persona 为薄 skill，只引用契约、无 skill→skill 依赖、无悬空引用；library 按契约读写多条卡库、可按 id 取、对未知键前向兼容；卡记录不含任何 benchmark/轨迹派生字段；D5.area 为受控词表单 token。
@@ -39,7 +39,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/persona_io.py
+      - backend/ahe_beta/user/sim/persona_io.py
       - backend/tests/user/sim/test_persona_io.py
     scope: 把 persona 卡（0006/T1）注入 sim：card_to_persona 映射卡 → dimensions.Persona，grounded 轴透传、finalize_persona 只填卡未 ground 的派生维度（覆盖派生）；处理 6 维卡↔9 维的字段对齐、枚举并轨（surface↔shallow 等）、缺省与校验。不改卡格式（归 T1）；sim 维度模型仅做「finalize 降为 fallback-only」的配套修正（契约见 0005/T1，本组依赖）。不构造 harness/client（0005/T6）。
     acceptance: card_to_persona 对合法卡产出完整不可变 Persona：grounded 的 d3(卡 D2)/trust(卡 D4) 原样保留、卡未 ground 的派生维（d3/trust/d6 中缺的）经 finalize_persona 填齐；expert×over-trust 卡注入后 trust 仍为 over-trust 映射值（不被 derive_trust 改写成 skeptical）；缺字段/非法枚举显式报错；注入结果可直接喂 0005/T5 run_session 跑通一局。
@@ -226,7 +226,7 @@ T1：
   - `tools/persona-distill/extract-selfreport-persona/SKILL.md`
   - `tools/persona-distill/extract-selfreport-persona/reference.md`
   - `tools/persona-distill/extract-selfreport-persona/recruitment/seeds.md`
-  - `backend/auto_designer/distill/library.py`
+  - `backend/ahe_beta/distill/library.py`
   - `backend/tests/distill/test_library.py`
 
 T3：
@@ -281,7 +281,7 @@ card_to_personas(library: PersonaLibrary) -> list[Persona]
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/persona_io.py`
+  - `backend/ahe_beta/user/sim/persona_io.py`
   - `backend/tests/user/sim/test_persona_io.py`
 
 依赖 DAG：`T1 → T2`，`0005/T1 → T2`，`T1 → T3`
@@ -335,7 +335,7 @@ T2 覆盖派生设计的直接依据）。T1 以 extract-selfreport-persona 的�
 basis 四元 + 铁律：grounded 须有 evidence_quote、injected confidence=low）；T3 将 vendored 改造版进本仓、
 不改动原件，把另两个方法收编为遵循同一契约的观测型 spoke。T2 的注入层依赖 spec-0005/T1
 dimensions.Persona 与 finalize_persona（fallback-only 契约，本组依赖其降级）、spec-0005/T5 run_session
-入口；消费侧确认可消费、不改的还有 backend/auto_designer/distill/library.py（PersonaLibrary/
+入口；消费侧确认可消费、不改的还有 backend/ahe_beta/distill/library.py（PersonaLibrary/
 validate_card）。整体对应 CLAUDE.md「蒸馏模块」与「persona 来自真实数据、不依据 benchmark 或轨迹构造」的
 约束，以及 spec-0001/T1 的 Persona 字段约定。
 

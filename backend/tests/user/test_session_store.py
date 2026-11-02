@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.models import (
+from ahe_beta.models import (
     FeelingScore,
     IssueRef,
     Persona,
@@ -14,7 +14,7 @@ from auto_designer.models import (
     Transcript,
     Turn,
 )
-from auto_designer.user.session_store import SessionConflictError, SessionStore
+from ahe_beta.user.session_store import SessionConflictError, SessionStore
 
 
 def _session(n_issues: int = 1) -> Session:

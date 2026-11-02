@@ -118,7 +118,7 @@ ON_TRACK: list[list[str]] = [
 
 
 def _run_one(*, d1: object) -> None:
-    from auto_designer.user.sim.dimensions import (
+    from ahe_beta.user.sim.dimensions import (
         D2Depth,
         D2Domain,
         D5Autonomy,
@@ -128,8 +128,8 @@ def _run_one(*, d1: object) -> None:
         Persona,
         finalize_persona,
     )
-    from auto_designer.user.sim.loop import run_session
-    from auto_designer.user.sim.persona_client import ApiPersonaClient
+    from ahe_beta.user.sim.loop import run_session
+    from ahe_beta.user.sim.persona_client import ApiPersonaClient
 
     persona = finalize_persona(
         Persona(
@@ -186,7 +186,7 @@ def main() -> int:
     EVOLVED_MANUAL = args.manual
     load_secrets(args.secrets_file)
     role_environment("USER")
-    from auto_designer.user.sim.dimensions import D1Eval
+    from ahe_beta.user.sim.dimensions import D1Eval
 
     print(f"manual_source={'evolved' if EVOLVED_MANUAL is not None else 'fallback'}")
     print(f"manual_has_/status={'/status' in _manual().lower()}")

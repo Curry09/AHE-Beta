@@ -3,14 +3,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.observations.transport import make_transport_profile
-from auto_designer.tracker.attachment_transport import (
+from ahe_beta.observations.transport import make_transport_profile
+from ahe_beta.tracker.attachment_transport import (
     allows_encoding,
     anonymous_session,
     download_policy,
     validate_r2_location,
 )
-from auto_designer.tracker.gitea import GiteaError, GiteaTracker
+from ahe_beta.tracker.gitea import GiteaError, GiteaTracker
 
 R2 = "https://" + "a" * 32 + ".r2.cloudflarestorage.com/object?signature=secret"
 
@@ -110,7 +110,7 @@ def test_hosted_selection_does_not_enable_publication():
 
 
 def test_signed_download_and_no_second_hop(monkeypatch):
-    from auto_designer.tracker import gitea
+    from ahe_beta.tracker import gitea
 
     obj = tracker()
     obj._session = SimpleNamespace(get=lambda *a, **kw: Response(303, location=R2))
@@ -181,7 +181,7 @@ def test_direct_download_enforces_actual_transfer_size():
 def test_redirect_shares_deadline_and_does_not_echo_signature(monkeypatch):
     import requests
 
-    from auto_designer.tracker import gitea
+    from ahe_beta.tracker import gitea
 
     obj = tracker()
     obj._session = SimpleNamespace(get=lambda *a, **kw: Response(303, location=R2))

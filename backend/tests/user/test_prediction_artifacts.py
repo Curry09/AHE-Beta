@@ -10,20 +10,20 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.loop.sim_user import (
+from ahe_beta.loop.sim_user import (
     EnvironmentInfrastructureError,
     make_direct_run_session_fn,
     make_sim_run_session_fn,
 )
-from auto_designer.models import Persona, SeedScenario
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.patches import PredictionArtifactError, preserve_prediction
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.run_live import expert
-from auto_designer.user.sim.runtime import DockerWorkspaceRuntime, LocalWorkspaceRuntime
+from ahe_beta.models import Persona, SeedScenario
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.patches import PredictionArtifactError, preserve_prediction
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+from ahe_beta.user.sim.run_live import expert
+from ahe_beta.user.sim.runtime import DockerWorkspaceRuntime, LocalWorkspaceRuntime
 
 
 class _ReviewClient:
@@ -299,7 +299,7 @@ def test_write_failure_does_not_fabricate_receipt_and_retains_session(
     def fail(**kwargs):
         raise OSError("private-host-path: disk full")
 
-    monkeypatch.setattr("auto_designer.loop.sim_user.preserve_prediction", fail)
+    monkeypatch.setattr("ahe_beta.loop.sim_user.preserve_prediction", fail)
     sid = f"write-failure-{mode}"
     with bind_usage_context(session_id=sid):
         with pytest.raises(EnvironmentInfrastructureError, match="patch preservation"):

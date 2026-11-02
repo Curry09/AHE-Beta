@@ -15,12 +15,12 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/workload.py
-      - backend/auto_designer/experiment/schemas/task-package-v3.json
-      - backend/auto_designer/experiment/task_environments/contract.py
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/workload.py
+      - backend/ahe_beta/experiment/schemas/task-package-v3.json
+      - backend/ahe_beta/experiment/task_environments/contract.py
       - backend/tests/test_experiment_environment_config.py
-      - backend/auto_designer/experiment/schemas/experiment-v2.json
+      - backend/ahe_beta/experiment/schemas/experiment-v2.json
       - backend/tests/test_experiment_grading_task_materials.py
     scope: 增加 container 任务包 v3，在解析层归一化能力、来源、输入、服务和既有 artifact 声明；保留旧任务身份。
     acceptance: 未知字段/版本/能力及目标冲突可拒绝；非 Python 任务无需伪造 setup/venv；v1/v2 原文、默认值和 digest 不变，无 task ID 或 benchmark 特判。
@@ -34,8 +34,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/materials.py
-      - backend/auto_designer/experiment/task_environments/materials.py
+      - backend/ahe_beta/experiment/materials.py
+      - backend/ahe_beta/experiment/task_environments/materials.py
       - tools/dev/export-evolution-task-materials.py
       - tools/dev/README.md
       - backend/tests/test_experiment_environment_materials.py
@@ -56,34 +56,34 @@ tasks:
         type: extends
     parallel: false
     files:
-      - backend/auto_designer/experiment/task_environments/__init__.py
-      - backend/auto_designer/experiment/task_environments/docker.py
-      - backend/auto_designer/user/sim/sources/container.py
-      - backend/auto_designer/user/sim/runtime.py
-      - backend/auto_designer/harness/launcher.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/observations/publication.py
-      - backend/auto_designer/evaluation/artifacts.py
+      - backend/ahe_beta/experiment/task_environments/__init__.py
+      - backend/ahe_beta/experiment/task_environments/docker.py
+      - backend/ahe_beta/user/sim/sources/container.py
+      - backend/ahe_beta/user/sim/runtime.py
+      - backend/ahe_beta/harness/launcher.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/observations/publication.py
+      - backend/ahe_beta/evaluation/artifacts.py
       - backend/tests/user/sim/test_environment_runtime.py
       - backend/tests/test_environment_services.py
       - backend/tests/observations/test_environment_collection.py
-      - backend/auto_designer/experiment/grading_inputs.py
-      - backend/auto_designer/experiment/grading.py
-      - backend/auto_designer/experiment/assessment_worker.py
+      - backend/ahe_beta/experiment/grading_inputs.py
+      - backend/ahe_beta/experiment/grading.py
+      - backend/ahe_beta/experiment/assessment_worker.py
       - backend/tests/test_environment_artifact_provenance.py
-      - backend/auto_designer/user/session_store.py
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/user/session_store.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/test_session_store.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/loop/test_sim_user.py
       - backend/tests/test_experiment_grading_artifact_lifecycle.py
       - backend/tests/user/test_prediction_artifacts.py
-      - backend/auto_designer/user/sim/seed_source.py
+      - backend/ahe_beta/user/sim/seed_source.py
       - backend/tests/loop/test_parallel_sessions.py
-      - backend/auto_designer/user/sim/sources/empty.py
+      - backend/ahe_beta/user/sim/sources/empty.py
       - backend/tests/user/sim/test_seed_source_empty.py
       - backend/tests/test_experiment_multitask_controller.py
-      - backend/auto_designer/user/sim/sources/local_fixture.py
+      - backend/ahe_beta/user/sim/sources/local_fixture.py
       - backend/tests/user/sim/test_tools.py
       - backend/tests/user/sim/test_workspace.py
       - backend/tests/test_reusable_persona_sessions.py
@@ -100,21 +100,21 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/backends/e2b.py
-      - backend/auto_designer/experiment/backends/e2b_bootstrap.py
-      - backend/auto_designer/experiment/backends/e2b_template.py
-      - backend/auto_designer/experiment/backends/local.py
-      - backend/auto_designer/experiment/context.py
-      - backend/auto_designer/experiment/runtime.py
-      - backend/auto_designer/experiment/collection.py
-      - backend/auto_designer/experiment/controllers/unified.py
-      - backend/auto_designer/experiment/continuation/source.py
-      - backend/auto_designer/experiment/continuation/export.py
+      - backend/ahe_beta/experiment/backends/e2b.py
+      - backend/ahe_beta/experiment/backends/e2b_bootstrap.py
+      - backend/ahe_beta/experiment/backends/e2b_template.py
+      - backend/ahe_beta/experiment/backends/local.py
+      - backend/ahe_beta/experiment/context.py
+      - backend/ahe_beta/experiment/runtime.py
+      - backend/ahe_beta/experiment/collection.py
+      - backend/ahe_beta/experiment/controllers/unified.py
+      - backend/ahe_beta/experiment/continuation/source.py
+      - backend/ahe_beta/experiment/continuation/export.py
       - backend/tests/test_experiment_environment_lifecycle.py
       - backend/tests/test_experiment_e2b_backend.py
       - backend/tests/test_experiment_environment_continuation.py
-      - backend/auto_designer/experiment/batch_config.py
-      - backend/auto_designer/experiment/batch_store.py
+      - backend/ahe_beta/experiment/batch_config.py
+      - backend/ahe_beta/experiment/batch_store.py
       - backend/tests/test_experiment_environment_batch.py
     scope: backend 提供 Docker/资源能力，controller 只装配环境；接通 check/prepare/run、持久归属、stop/resume/collect/destroy 与 continuation。
     acceptance: 仅所属资源可回收；丢失/初始化/收尾/收集失败不污染反馈或推进下一轮；完成 Session 不重复，公共归档可继承配方，旧路径和已有冻结 run 保持合同。
@@ -303,7 +303,7 @@ run --config 仍是 prepare 后启动；也可分别 prepare、核对冻结结�
 | --- | --- | --- | --- | --- |
 | 轮数 / 每轮会话 | 6 / 8 | 6 / 8 | 6 / 16 | 6 / 32 |
 | simulated_user / direct | 6 / 2 | 0 / 8 | 12 / 4 | 25 / 7 |
-| Triager / Synthesizer / Divergent | 4 / 1 / 1 | 4 / 1 / 1 | 8 / 1 / 1 | 16 / 1 / 1 |
+| Triager / Architect / Divergent | 4 / 1 / 1 | 4 / 1 / 1 | 8 / 1 / 1 | 16 / 1 / 1 |
 | Developer 并发 | 4 | 4 | 4 | 4 |
 | Owner / grouping | mechanical / false | mechanical / false | mechanical / false | mechanical / false |
 | 用户与 Harness / 需求与交付模型 | Flash / 完整版 | Flash / 完整版 | Flash / 完整版 | Flash / 完整版 |
@@ -349,7 +349,7 @@ examples/
 
 contract 不依赖 Docker/E2B SDK、角色或评分器；Docker 实现依赖基础 workspace/runtime 能力，基础 user/sim/runtime 不反向导入 experiment 的具体管理器。backend/controller 通过明确的工厂/上下文装配 container source，不靠 import 时覆盖全局实例。共用 artifact collector 只调用 runtime 的有界文件/服务导出能力，不导入 Docker 管理器；环境能力的实现与评分消费分开。
 
-环境模块不导入 Triager、Synthesizer、Divergent、Owner、OpenAgents 调度或 Harbor Index profile；controller 不解释 KV/Excel/某 benchmark 的准备命令。既有 evaluation/Harbor 留出评测独立，环境模块不绑定 Harbor 版本、任务名单或评分器。Gitea 证据 publisher/reader 及 OpenAgents 交付合同继续沿用。
+环境模块不导入 Triager、Architect、Divergent、Owner、OpenAgents 调度或 Harbor Index profile；controller 不解释 KV/Excel/某 benchmark 的准备命令。既有 evaluation/Harbor 留出评测独立，环境模块不绑定 Harbor 版本、任务名单或评分器。Gitea 证据 publisher/reader 及 OpenAgents 交付合同继续沿用。
 
 ### 2. 任务包版本和规范化
 

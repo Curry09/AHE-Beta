@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from auto_designer.user.sim.feeling import FeelingScore, derive_feeling, parse_feeling_llm
+from ahe_beta.user.sim.feeling import FeelingScore, derive_feeling, parse_feeling_llm
 
 
 @dataclass

@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[3] / "backend"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from auto_designer.user.sim.clauses import compile_block_p  # noqa: E402
-from auto_designer.user.sim.dimensions import (  # noqa: E402
+from ahe_beta.user.sim.clauses import compile_block_p  # noqa: E402
+from ahe_beta.user.sim.dimensions import (  # noqa: E402
     D1Eval,
     D2Depth,
     D2Domain,
@@ -31,11 +31,11 @@ from auto_designer.user.sim.dimensions import (  # noqa: E402
     TimeTemperament,
     finalize_persona,
 )
-from auto_designer.user.sim.harness_adapter import ScriptedHarness  # noqa: E402
-from auto_designer.user.sim.loop import run_session  # noqa: E402
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient  # noqa: E402
-from auto_designer.user.sim.persona_io import card_to_persona  # noqa: E402
-from auto_designer.user.sim.state import apply_verdict, init_state, make_coef  # noqa: E402
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness  # noqa: E402
+from ahe_beta.user.sim.loop import run_session  # noqa: E402
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient  # noqa: E402
+from ahe_beta.user.sim.persona_io import card_to_persona  # noqa: E402
+from ahe_beta.user.sim.state import apply_verdict, init_state, make_coef  # noqa: E402
 
 
 def _p(

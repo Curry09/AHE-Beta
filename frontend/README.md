@@ -1,10 +1,10 @@
-# auto-designer 观测看板（前端）
+# AHE-Beta 观测看板（前端）
 
 > 交互与视觉参考 [vibe-kanban](https://github.com/BloopAI/vibe-kanban)（BloopAI）——多列同屏、极简看板风格。
 
-实时 API 模式的只读看板展示用户 / 分诊 / 发散 PM / Synthesizer（结构综合）/ Owner 的运行中状态 +
+实时 API 模式的只读看板展示用户 / 分诊 / 发散 PM / Architect（架构师）/ Owner 的运行中状态 +
 Issues·Main 栏。顶部可切「运行中 / +已完成」，已完成按轮分组；点任意方块，详情栏展示
-该对象的完整信息（用户会话完整对话、dev/synthesizer 完整过程流与最终报告、issue 正文+评论、
+该对象的完整信息（用户会话完整对话、dev/architect 完整过程流与最终报告、issue 正文+评论、
 commit 全文+diff），支持 issue/tag/commit 交叉跳转。
 
 ## 开发默认看板
@@ -13,7 +13,7 @@ commit 全文+diff），支持 issue/tag/commit 交叉跳转。
 
 ```bash
 # 后端（数据源，:8000）
-PYTHONPATH=backend .venv/bin/uvicorn auto_designer.web.api:app --port 8000
+PYTHONPATH=backend .venv/bin/uvicorn ahe_beta.web.api:app --port 8000
 
 # 前端 dev（:5173，/api 代理到 :8000）
 cd frontend && npm ci && npm run dev
@@ -22,8 +22,8 @@ cd frontend && npm ci && npm run dev
 npm run build
 ```
 
-数据契约见 `src/types.ts`，与 `backend/auto_designer/web/api.py` 一一对应，两侧须同步改。
-结构综合角色使用 `synthesizer`、`synthesizer_run` 和 `roster.synthesizer`。
+数据契约见 `src/types.ts`，与 `backend/ahe_beta/web/api.py` 一一对应，两侧须同步改。
+结构综合角色使用 `architect`、`architect_run` 和 `roster.architect`。
 
 ## GitHub Pages 历史快照
 

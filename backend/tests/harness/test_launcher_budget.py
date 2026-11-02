@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 from test_launcher import _COUNTER_ENTRY, _launcher
 
-from auto_designer.execution_contract import make_execution_contract
-from auto_designer.harness import launcher
-from auto_designer.harness.budget import TaskBudget
+from ahe_beta.execution_contract import make_execution_contract
+from ahe_beta.harness import launcher
+from ahe_beta.harness.budget import TaskBudget
 
 
 def contract(seconds=7200):

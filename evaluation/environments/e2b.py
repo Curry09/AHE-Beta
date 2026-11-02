@@ -105,7 +105,7 @@ class HarnessE2BEnvironment(TaskEnvironmentMixin, E2BEnvironment):
         super()._validate_definition()
 
     async def _create_template(self):
-        directory = user_cache_path("auto-designer-evaluation") / "template-locks"
+        directory = user_cache_path("ahe-beta-evaluation") / "template-locks"
         directory.mkdir(parents=True, exist_ok=True)
         with (directory / (self._template_name + ".lock")).open("w") as lock:
             while True:
@@ -124,7 +124,7 @@ class HarnessE2BEnvironment(TaskEnvironmentMixin, E2BEnvironment):
         self._sandbox = await AsyncSandbox.create(
             template=self._template_name,
             metadata={
-                "application": "auto-designer-evaluation",
+                "application": "ahe-beta-evaluation",
                 "environment_name": self.environment_name,
                 "session_id": self.session_id,
             },

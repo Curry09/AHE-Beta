@@ -1,14 +1,14 @@
 # Spec-0029/T8（Spec-0032/T4 调整）：roster 编制解析——developer 语义改为交付面并发 K。
-"""验证 load_roster：默认 user3/triager1/synthesizer1/divergent0/owner0/developer1；各 N_* 覆盖。"""
+"""验证 load_roster：默认 user3/triager1/architect1/divergent0/owner0/developer1；各 N_* 覆盖。"""
 
 from __future__ import annotations
 
-from auto_designer.loop.roster import DEFAULT_ROSTER, load_roster
+from ahe_beta.loop.roster import DEFAULT_ROSTER, load_roster
 
 _ALL_ENVS = (
     "N_USERS",
     "N_TRIAGERS",
-    "N_SYNTHESIZERS",
+    "N_ARCHITECTS",
     "N_DIVERGENTS",
     "N_OWNERS",
     "N_DEVELOPERS",
@@ -21,7 +21,7 @@ def test_defaults(monkeypatch) -> None:
     assert load_roster() == {
         "user": 3,
         "triager": 1,
-        "synthesizer": 1,
+        "architect": 1,
         "divergent": 0,
         "owner": 0,
         "developer": 1,  # Spec-0032：交付面并发 K（vigil --parallel），保守默认串行
@@ -52,8 +52,8 @@ def test_invalid_falls_back(monkeypatch) -> None:
 
 def test_all_roles_overridable(monkeypatch) -> None:
     monkeypatch.setenv("N_USERS", "6")
-    monkeypatch.setenv("N_SYNTHESIZERS", "2")
+    monkeypatch.setenv("N_ARCHITECTS", "2")
     monkeypatch.setenv("N_DIVERGENTS", "1")
     monkeypatch.setenv("N_DEVELOPERS", "4")
     r = load_roster()
-    assert (r["user"], r["synthesizer"], r["divergent"], r["developer"]) == (6, 2, 1, 4)
+    assert (r["user"], r["architect"], r["divergent"], r["developer"]) == (6, 2, 1, 4)

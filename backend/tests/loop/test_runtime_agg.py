@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from auto_designer.demand.runtime_agg import aggregate_runtime, format_runtime_agg
-from auto_designer.models import (
+from ahe_beta.demand.runtime_agg import aggregate_runtime, format_runtime_agg
+from ahe_beta.models import (
     FeelingScore,
     Persona,
     SeedScenario,
@@ -20,7 +20,7 @@ from auto_designer.models import (
     Transcript,
     Turn,
 )
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.user.session_store import SessionStore
 
 
 def _persona() -> Persona:

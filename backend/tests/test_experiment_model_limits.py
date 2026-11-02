@@ -2,8 +2,8 @@
 
 import pytest
 
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.model_limits import model_limit_report
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.model_limits import model_limit_report
 
 
 def test_unknown_model_capacity_is_not_guessed():

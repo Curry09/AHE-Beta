@@ -18,7 +18,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/user/sim/test_heartbeat.py
     scope: run_session/_main_decide/_heartbeat_once 删除 one|two 分支与 mode 参数（或恒 three 且拒非 three）；gap 一律 WAIT_GAP；删 _TURN_WAIT_BUDGET_SEC 与 stalled 别名；保留 AwaitEvent+try_reply abort 与单测（含 abort give_up/interrupt）。
@@ -35,7 +35,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/prompt.py
       - backend/tests/user/sim/test_prompt.py
     scope: 删除 build_user_turn、build_main_judge_intent_turn、build_waiting_judge_intent_turn；确认无 wait_cost/wait_sec；test_prompt 改为断言 build_main_* / build_waiting_* 契约。
     acceptance: 上述三个 builder 符号不存在；test_prompt 覆盖 main/waiting three 跳关键标签；无 wait_cost 字符串。
@@ -70,7 +70,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/harness/launcher.py
     scope: HarnessLauncher.try_reply：非阻塞取出已缓冲终态 reply；供心跳动作执行前确认。用户 sim 经此避免 give_up 丢回复。
     acceptance: try_reply 存在且无 reply 时返回 None；有 reply 时返回正文且不阻塞；与 poll 共享队列排空约定。
 ---

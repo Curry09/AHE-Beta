@@ -12,18 +12,18 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.models import WorkspaceSpec
+from ahe_beta.models import WorkspaceSpec
 
 
 def test_local_fixture_auto_registered() -> None:
     # 不手动 import sources.local_fixture，仅 import seed_source 即应触发自动发现注册。
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     assert "local-fixture" in seed_source.available_kinds()
 
 
 def test_provision_dispatch_and_unknown_kind() -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     ws = seed_source.provision(WorkspaceSpec(fixture="billing-split"))
     assert Path(ws).is_dir()
@@ -36,7 +36,7 @@ def test_provision_dispatch_and_unknown_kind() -> None:
 
 
 def test_local_fixture_runnable_and_isolated() -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     spec = WorkspaceSpec(fixture="billing-split")
     a = seed_source.provision(spec)
@@ -52,7 +52,7 @@ def test_local_fixture_runnable_and_isolated() -> None:
 
 
 def test_local_fixture_errors() -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     with pytest.raises(FileNotFoundError):
         seed_source.provision(WorkspaceSpec(fixture="no-such-fixture"))

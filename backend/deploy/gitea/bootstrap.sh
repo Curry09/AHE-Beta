@@ -13,8 +13,8 @@ GITEA_URL="${GITEA_URL:-http://localhost:3000}"
 OWNER="${GITEA_ADMIN_USER:-designer}"
 ADMIN_PASS="${GITEA_ADMIN_PASS:?Set GITEA_ADMIN_PASS before bootstrapping Gitea}"
 ADMIN_EMAIL="${GITEA_ADMIN_EMAIL:-designer@example.com}"
-REPO="${GITEA_WORK_REPO:-auto-designer-work}"
-TOKEN_NAME="${GITEA_TOKEN_NAME:-auto-designer}"
+REPO="${GITEA_WORK_REPO:-ahe-beta-work}"
+TOKEN_NAME="${GITEA_TOKEN_NAME:-ahe-beta}"
 LABELS=(bug feature)
 
 GITEA_URL="${GITEA_URL%/}"   # 去尾斜杠：契约要求 GITEA_URL 无尾斜杠、无 /api/v1 后缀

@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment.backends import local_ci
-from auto_designer.experiment.backends.base import BackendError
-from auto_designer.experiment.infrastructure import render_stack
+from ahe_beta.experiment.backends import local_ci
+from ahe_beta.experiment.backends.base import BackendError
+from ahe_beta.experiment.infrastructure import render_stack
 
 
 @pytest.fixture

@@ -14,9 +14,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/test_run_vigil.py
-      - backend/auto_designer/experiment/controllers/swebench.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
     scope: run.py 的 _VIGIL_STAGES 把 rfc 从 skip 改为 agent（drafter 先落 docs/specs，再 implement；spec CLI 在 vigil 镜像内，不进 harness 仓依赖）。打开 RFC 拉长 solve，需求面 TOTAL_ROUNDS 收尾时交付面往往还在跑：VIGIL_KEEP_ALIVE 缺省常驻，仅显式 0/false/no/off 才在需求面收尾拆 vigil。write_openagents_config 与单测断言 stages 定稿一致；swebench 闭环脚本随 start_vigil 同源 keep-alive。
     acceptance: test_run_vigil 断言 yml stages.rfc=agent；VIGIL_KEEP_ALIVE 缺省 True、显式关闭才 docker rm / 杀 subprocess；容器复用已在跑实例不重复 docker run。pytest backend/tests/test_run_vigil.py 绿。
   - id: T2
@@ -28,7 +28,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/guards/harness_boundary.py
+      - backend/ahe_beta/guards/harness_boundary.py
       - backend/tests/guards/test_harness_boundary.py
     scope: harness_boundary 不再用顶层白名单锁死产品形状。DENIED_TOP 只含 .openagents；另拒 .env / .env.*（.env.example 除外）。docs/specs、新目录、pyproject、README、.gitea 一律放行。钩子模板与 violations() 同源。容器围堵后过拟合信道（编排仓 / data/sessions）vigil 看不见，白名单已无必要。
     acceptance: violations 对 docs/specs、pyproject.toml、新顶层目录返回空；对 .env、.env.local、.openagents/* 返回这些路径；.env.example 放行。装钩子的临时仓可 commit docs/specs，不可 commit .env。pytest backend/tests/guards/test_harness_boundary.py 绿。
@@ -70,7 +70,7 @@ tasks:
     files:
       - OpenAgents/openagents/recipes/vigil.py
       - OpenAgents/openagents/agents/implementer.py
-    scope: 本任务在 OpenAgents 仓按其 spec 流程另立落地，此处为镜像描述，不把 OA 源码拷进本仓。契约：rfc:agent 且 worktree 已有 docs/specs 下对本 issue 的组时，implement 首轮 context 必须按 Task 实现并引用 Spec-NNNN，而不是只啃 issue 正文；无 spec 时仍按 issue 正文。本仓 pin 仍是镜像 auto-designer-vigil:latest。
+    scope: 本任务在 OpenAgents 仓按其 spec 流程另立落地，此处为镜像描述，不把 OA 源码拷进本仓。契约：rfc:agent 且 worktree 已有 docs/specs 下对本 issue 的组时，implement 首轮 context 必须按 Task 实现并引用 Spec-NNNN，而不是只啃 issue 正文；无 spec 时仍按 issue 正文。本仓 pin 仍是镜像 ahe-beta-vigil:latest。
     acceptance: OpenAgents 仓：rfc:agent + worktree 含对应 spec 时 _first_round_context_text / implementer 提示词要求跟 Task；rfc:skip 或无 docs/specs 时不空转找 Spec-NNNN。本仓不 vendor OA、不新增 import。
 ---
 
@@ -86,7 +86,7 @@ tasks:
 
 容器出网只经 egress 代理。凡 `ANTHROPIC_BASE_URL` 指向非官方 Anthropic 域的协议网关，其域名必须写入 `egress-proxy.conf` 的 `allowed_egress`，否则 drafter/implementer 全部失败。当前部署实例放行 `.pjlab.org.cn`；抽象需求是「自定义网关域进 allowlist」，不是把某一家网关写进制度。
 
-OpenAgents 侧契约（本仓镜像描述，不 vendor 其源码）：rfc:agent 且 worktree 已有对本 issue 的 `docs/specs` 组时，implement 首轮 context 必须按 Task 实现并引用 `Spec-NNNN`，而不是只啃 issue 正文；无 spec 时仍按 issue 正文。本仓 pin 仍是镜像 `auto-designer-vigil:latest`。打开 RFC 拉长 solve，需求面 `TOTAL_ROUNDS` 收尾时交付面往往还在跑：`VIGIL_KEEP_ALIVE` 缺省常驻，仅显式关闭才在需求面收尾拆 vigil。
+OpenAgents 侧契约（本仓镜像描述，不 vendor 其源码）：rfc:agent 且 worktree 已有对本 issue 的 `docs/specs` 组时，implement 首轮 context 必须按 Task 实现并引用 `Spec-NNNN`，而不是只啃 issue 正文；无 spec 时仍按 issue 正文。本仓 pin 仍是镜像 `ahe-beta-vigil:latest`。打开 RFC 拉长 solve，需求面 `TOTAL_ROUNDS` 收尾时交付面往往还在跑：`VIGIL_KEEP_ALIVE` 缺省常驻，仅显式关闭才在需求面收尾拆 vigil。
 
 本组不覆盖：harness 仓内具体产品改动（心跳、stall 文案等——那是被进化对象，held-out）；需求面编制/超时调参；OpenAgents 内部函数体实现细节。
 
@@ -105,7 +105,7 @@ OpenAgents 侧契约（本仓镜像描述，不 vendor 其源码）：rfc:agent 
 
 因此本组同时改四件事：打开 RFC、改拒绝清单（钩子 + smoke 同步）、egress 放行自定义网关域、钉死 implement 首轮跟 spec 的跨仓契约。四者缺一，RFC 在闭环里都走不通。
 
-本组明确不写进 Task 的事实（避免把运行操作和被进化对象焊进编排仓设计）：harness 仓产品向 PR（心跳、stall、`[unverified]` 文案等）是进化结果，施工规格应落在 harness 仓自己的 `docs/specs/`；需求面 GLM overlay、用户 LLM 超时、`N_DIVERGENTS` 默认值、synthesize 超时是编制/运行调参。
+本组明确不写进 Task 的事实（避免把运行操作和被进化对象焊进编排仓设计）：harness 仓产品向 PR（心跳、stall、`[unverified]` 文案等）是进化结果，施工规格应落在 harness 仓自己的 `docs/specs/`；需求面 GLM overlay、用户 LLM 超时、`N_DIVERGENTS` 默认值、architect 超时是编制/运行调参。
 
 ## Guide-level explanation
 
@@ -118,7 +118,7 @@ OpenAgents 侧契约（本仓镜像描述，不 vendor 其源码）：rfc:agent 
 5. smoke 绿、review/merge 闸过，合进 main。需求面 c 步仍只读 `origin/main` SHA 作观测游标。
 6. 需求面这一轮已经结束也不拆 vigil 容器（缺省 keep-alive），交付面继续把票做完。
 
-开发者改提交边界时必须同时改两处：`backend/auto_designer/guards/harness_boundary.py`（钩子生成源）和 `backend/harness_template/.gitea/workflows/smoke.yml`（服务端内联脚本，harness 仓独立、无法 import 编排包）。只改一处会在「钩子绿、CI 红」或「钩子红、CI 绿」上分叉。
+开发者改提交边界时必须同时改两处：`backend/ahe_beta/guards/harness_boundary.py`（钩子生成源）和 `backend/harness_template/.gitea/workflows/smoke.yml`（服务端内联脚本，harness 仓独立、无法 import 编排包）。只改一处会在「钩子绿、CI 红」或「钩子红、CI 绿」上分叉。
 
 接非官方 Anthropic 协议网关时：把网关域名加进 `backend/deploy/gitea/egress-proxy.conf` 的 `allowed_egress` 并重启 egress-proxy，同时设置 `ANTHROPIC_BASE_URL`（及网关所需的模型名覆盖）。漏加域名时，打开 RFC 只表现为容器内 LLM 调用被代理 403，日志在 `data/vigil.log`。
 
@@ -128,12 +128,12 @@ OpenAgents 侧契约（本仓镜像描述，不 vendor 其源码）：rfc:agent 
 
 - **需求面 / 交付面二分不变。** Owner 唯一准入、交接令牌 `openagents`、vigil 盖 `ready`、观测游标跟 `origin/main`，本组不改。
 - **held-out 不变。** smoke 仍是结构冒烟（`compileall` + 关键制品在位 + 拒绝清单），不跑 benchmark、不调 LLM。RFC 文档是施工计划，不是测试信号。
-- **零代码耦合不变。** 本仓不 vendor、不 import OpenAgents。T5 的 `files` 列出 `OpenAgents/...` 路径，语义与换轨时相同：在 OpenAgents 仓按其 spec 另立落地，此处钉契约。本仓 pin = `auto-designer-vigil:latest`（`backend/deploy/vigil/build.sh`）。
+- **零代码耦合不变。** 本仓不 vendor、不 import OpenAgents。T5 的 `files` 列出 `OpenAgents/...` 路径，语义与换轨时相同：在 OpenAgents 仓按其 spec 另立落地，此处钉契约。本仓 pin = `ahe-beta-vigil:latest`（`backend/deploy/vigil/build.sh`）。
 - **spec CLI 的位置。** 在 vigil 镜像内，不进 harness `pyproject` / 种子依赖。harness 仓只拥有 `docs/specs/` 文本产物。
 
 ### T1：`stages.rfc=agent` 与 vigil keep-alive
 
-`backend/auto_designer/experiment/controllers/ordinary.py` 的 `_VIGIL_STAGES` 是写入 `.openagents/openagents.yml` 的单一出处（每次 run 生成，勿手改 yml）。定稿：
+`backend/ahe_beta/experiment/controllers/ordinary.py` 的 `_VIGIL_STAGES` 是写入 `.openagents/openagents.yml` 的单一出处（每次 run 生成，勿手改 yml）。定稿：
 
 ```text
 triage: skip      # 准入已由 Owner 完成
@@ -147,7 +147,7 @@ merge: agent
 
 `rfc:skip` 起步时的注释（harness 无 spec 工具链、显式告警可接受）作废，改为「spec CLI 在镜像内」。
 
-`VIGIL_KEEP_ALIVE`：缺省常驻。仅环境变量显式 `0` / `false` / `no` / `off` 时，需求面 `finally` 才 `docker rm` / 杀 subprocess。keep-alive 时 `stop_vigil` 只拆日志跟随器（`docker logs -f`），不拆 vigil 容器；再次 `start_vigil` 复用已在跑实例，不重复 `docker run`。`backend/auto_designer/experiment/controllers/swebench.py` 经同一 `start_vigil`，行为同源。
+`VIGIL_KEEP_ALIVE`：缺省常驻。仅环境变量显式 `0` / `false` / `no` / `off` 时，需求面 `finally` 才 `docker rm` / 杀 subprocess。keep-alive 时 `stop_vigil` 只拆日志跟随器（`docker logs -f`），不拆 vigil 容器；再次 `start_vigil` 复用已在跑实例，不重复 `docker run`。`backend/ahe_beta/experiment/controllers/swebench.py` 经同一 `start_vigil`，行为同源。
 
 单测：`backend/tests/test_run_vigil.py` 断言 yml `stages.rfc == agent`、keep-alive 缺省/关闭、容器复用。
 
@@ -164,7 +164,7 @@ merge: agent
 
 ### T3：smoke 同步 + 种子落点
 
-`backend/harness_template/.gitea/workflows/smoke.yml` 的「边界检查」步骤内联同一拒绝清单（仓独立、无法 `import auto_designer`）。改 T2 必须改 T3，字面规则一致。smoke 其余步骤不变：`python3 -m compileall`、`entry.py` / `params.yaml` / `agents/` 在位。
+`backend/harness_template/.gitea/workflows/smoke.yml` 的「边界检查」步骤内联同一拒绝清单（仓独立、无法 `import ahe_beta`）。改 T2 必须改 T3，字面规则一致。smoke 其余步骤不变：`python3 -m compileall`、`entry.py` / `params.yaml` / `agents/` 在位。
 
 种子增加 `backend/harness_template/docs/specs/README.md`：drafter 落点；spec CLI 由 vigil 镜像提供。初始化 harness 仓时该文件随模板进入 Gitea，避免 drafter 面对空目录无约定。
 
@@ -198,8 +198,8 @@ T1 / T2 / T4 无互依赖，可并行。T3 依赖 T2（先定拒绝清单再抄�
 
 | Task | 本仓 files | 备注 |
 |---|---|---|
-| T1 | `backend/auto_designer/experiment/controllers/ordinary.py`、`backend/tests/test_run_vigil.py`、`backend/auto_designer/experiment/controllers/swebench.py` | stages 单一出处 |
-| T2 | `backend/auto_designer/guards/harness_boundary.py`、`backend/tests/guards/test_harness_boundary.py` | 钩子生成源 |
+| T1 | `backend/ahe_beta/experiment/controllers/ordinary.py`、`backend/tests/test_run_vigil.py`、`backend/ahe_beta/experiment/controllers/swebench.py` | stages 单一出处 |
+| T2 | `backend/ahe_beta/guards/harness_boundary.py`、`backend/tests/guards/test_harness_boundary.py` | 钩子生成源 |
 | T3 | `backend/harness_template/.gitea/workflows/smoke.yml`、`backend/harness_template/docs/specs/README.md` | 与 T2 字面同步 |
 | T4 | `backend/deploy/gitea/egress-proxy.conf` | 部署实例域可换 |
 | T5 | `OpenAgents/openagents/recipes/vigil.py`、`OpenAgents/openagents/agents/implementer.py` | 镜像；OA 仓另立 |
@@ -212,7 +212,7 @@ T1 / T2 / T4 无互依赖，可并行。T3 依赖 T2（先定拒绝清单再抄�
 pytest backend/tests/test_run_vigil.py backend/tests/guards/test_harness_boundary.py
 ./tools/spec-driven-development/spec validate
 ./tools/spec-driven-development/spec render
-./tools/spec-driven-development/spec graph --package-root backend/auto_designer
+./tools/spec-driven-development/spec graph --package-root backend/ahe_beta
 ```
 
 闭环手工：Owner admit → vigil drafter 在 PR 中出现 `docs/specs/` → implement 按 Task 改产品 → smoke 绿（含 `docs/`）→ merge → c 步 `origin/main` 前进。需求面结束后 vigil 容器仍在。自定义网关：代理 allowlist 外的域 403，allowlist 内的域可达。

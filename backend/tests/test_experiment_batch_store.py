@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import materials
-from auto_designer.experiment.batch_config import load_batch_config
-from auto_designer.experiment.batch_store import BatchStore
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.manifest import update_runtime
+from ahe_beta.experiment import materials
+from ahe_beta.experiment.batch_config import load_batch_config
+from ahe_beta.experiment.batch_store import BatchStore
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.manifest import update_runtime
 from test_experiment_batch_config import batch_path as batch_inputs
 from test_experiment_materials import prepared_inputs as material_inputs
 
@@ -149,7 +149,7 @@ def test_paths_cannot_escape_or_use_symlinks(store, tmp_path):
 
 
 def test_create_never_publishes_only_intent(batch_path, tmp_path, monkeypatch):
-    from auto_designer.experiment import batch_store
+    from ahe_beta.experiment import batch_store
 
     original = batch_store._atomic
     root = tmp_path / "atomic-runs"
@@ -173,7 +173,7 @@ def test_missing_runtime_of_published_batch_is_corruption(store, tmp_path):
 
 
 def test_stale_derived_state_cannot_overwrite_pause(store):
-    from auto_designer.experiment.batch_store import BatchRevisionConflict
+    from ahe_beta.experiment.batch_store import BatchRevisionConflict
 
     original = store.state()
     store.update("pause", {"paused": True, "batch_state": "PAUSING"})

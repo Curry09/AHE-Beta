@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from auto_designer.experiment.cli import main  # noqa: E402
+from ahe_beta.experiment.cli import main  # noqa: E402
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -1,4 +1,4 @@
-from auto_designer.user.sim.goals import (
+from ahe_beta.user.sim.goals import (
     GoalLedger,
     GoalStatus,
     audit_acceptance_basis,

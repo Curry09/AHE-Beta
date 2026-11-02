@@ -14,7 +14,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/dev/agentic_developer.py
+      - backend/ahe_beta/dev/agentic_developer.py
       - backend/agent_defs/developer_agent/systemprompt.md
       - backend/tests/dev/test_agentic_developer.py
     scope: 把 dev agent 的 git 流程从「fix/issue-N 分支 + --no-ff 合 release + 打 tag + push branch/release/tag」改为直推 main：work_one 注入的流程与 systemprompt.md 文案统一为 `git checkout main → 改 agents/main.md → commit → git tag vK → git push origin main vK`，去掉 branch、merge、release 全部字样。DevOutcome.released 语义改为「committed（已推 main）」（字段名可保留或重命名，二选一在实现时定）；ground-truth 判定仍为「新 vK tag 出现」，成功即 close 该 issue（沿用 tracker.set_state）。不分 bug/feature，单 dev agent 串行领 issue 不变。不动 launcher、orchestrator。
@@ -29,8 +29,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/loop/run_state.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/loop/run_state.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_run_state.py
     scope: 保留 main SHA 观测游标与按 SHA 启动会话的快照语义；当前闭环在轮次交付屏障后解析 sealed SHA，不再依赖内置 dev 直推或 vK tag。具体阶段恢复和封口由当前 round gate 契约约束。
@@ -46,7 +46,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/scripts/bootstrap_harness.py
       - backend/tests/test_bootstrap_harness.py
     scope: 包内 ordinary controller 与 bootstrap 工具初始化 main 作为 Harness 主干，保留固定起点和 main SHA 观测；不创建旧 release 主干或要求 vK tag，正式实验由统一 v2 入口初始化。
@@ -141,7 +141,7 @@ T3（一次性迁移）与 T1 无代码依赖，可并行；T4 总装 e2e，依�
 
 ### e2e 脚本
 
-`backend/auto_designer/experiment/controllers/ordinary.py` —— 真实端到端跑一轮闭环（a→b→c，真 nexau + 真 Gitea + 本地 git 仓）。T4 改其种子（只种 `main`）、`initial_ref="main"` 与结果打印（「main SHA / 分支」取代「release_ref 链」）。
+`backend/ahe_beta/experiment/controllers/ordinary.py` —— 真实端到端跑一轮闭环（a→b→c，真 nexau + 真 Gitea + 本地 git 仓）。T4 改其种子（只种 `main`）、`initial_ref="main"` 与结果打印（「main SHA / 分支」取代「release_ref 链」）。
 
 ## Drawbacks
 

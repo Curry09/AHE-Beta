@@ -253,7 +253,7 @@ wheels = [
 ]
 
 [[package]]
-name = "auto-designer"
+name = "ahe-beta"
 version = "0.0.0"
 source = { virtual = "." }
 dependencies = [

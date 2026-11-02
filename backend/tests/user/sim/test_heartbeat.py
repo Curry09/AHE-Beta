@@ -5,7 +5,7 @@ Spec-0037/T2: 耐心跟 tempo；过程卷入可加 stuck_extra；不把产品键
 
 from __future__ import annotations
 
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D2Domain,
@@ -17,7 +17,7 @@ from auto_designer.user.sim.dimensions import (
     TimeTemperament,
     finalize_persona,
 )
-from auto_designer.user.sim.loop import (
+from ahe_beta.user.sim.loop import (
     _MAX_HEARTBEATS,
     WAITING_ACTIONS,
     _resolve_intent,

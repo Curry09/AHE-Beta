@@ -8,10 +8,10 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from auto_designer.execution_contract import canonical_sha256
-from auto_designer.experiment.assessment_worker import safe_summary, sign
-from auto_designer.experiment.config import ConfigError
-from auto_designer.loop.round_assessment import exchange, read_json, write_json
+from ahe_beta.execution_contract import canonical_sha256
+from ahe_beta.experiment.assessment_worker import safe_summary, sign
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.loop.round_assessment import exchange, read_json, write_json
 
 
 @pytest.fixture
@@ -95,7 +95,7 @@ def test_signed_negative_is_accepted_once_and_no_hidden_details_return(queue):
 
 
 def test_completed_measurement_survives_controller_restart(queue):
-    from auto_designer.loop.round_assessment import completed_summary
+    from ahe_beta.loop.round_assessment import completed_summary
 
     root, key, request, directory = queue
     payload = result(queue, claim(queue), False)
@@ -110,8 +110,8 @@ def test_completed_measurement_survives_controller_restart(queue):
 
 
 def test_private_completed_cache_is_signed_and_cannot_change_measurement(queue):
-    from auto_designer.experiment.assessment_worker import cached_result
-    from auto_designer.loop.round_assessment import stable_request_id
+    from ahe_beta.experiment.assessment_worker import cached_result
+    from ahe_beta.loop.round_assessment import stable_request_id
 
     root, key, request, directory = queue
     value = {"status": "completed", "passed": False, "raw_report": {"assertion": "private"}}
@@ -228,10 +228,10 @@ def test_worker_crash_before_submit_reuses_signed_result_without_regrading(
 
     from cryptography.hazmat.primitives import serialization
 
-    from auto_designer.experiment import assessment_worker as worker
-    from auto_designer.experiment import runtime
-    from auto_designer.experiment.grading_inputs import GradingPlan
-    from auto_designer.loop.round_assessment import stable_request_id
+    from ahe_beta.experiment import assessment_worker as worker
+    from ahe_beta.experiment import runtime
+    from ahe_beta.experiment.grading_inputs import GradingPlan
+    from ahe_beta.loop.round_assessment import stable_request_id
 
     root, key, request, directory = queue
     manifest = read_json(root / "manifest.json")
@@ -343,9 +343,9 @@ def _exercise_worker_exit(
 ):
     from types import SimpleNamespace
 
-    from auto_designer.experiment import assessment_worker as worker
-    from auto_designer.experiment import runtime
-    from auto_designer.experiment.grading_inputs import GradingPlan
+    from ahe_beta.experiment import assessment_worker as worker
+    from ahe_beta.experiment import runtime
+    from ahe_beta.experiment.grading_inputs import GradingPlan
 
     root, key, _, _ = queue
     manifest = read_json(root / "manifest.json")

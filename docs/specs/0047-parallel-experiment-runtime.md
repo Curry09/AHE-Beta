@@ -27,9 +27,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/__init__.py
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/manifest.py
+      - backend/ahe_beta/experiment/__init__.py
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/manifest.py
       - backend/tests/experiment/test_manifest.py
       - backend/tests/test_experiment_config_v2.py
     scope: 保留实验 ID、config hash、Compose project 派生与不可变 manifest/journal 原语，供当前 v2 生命周期调用；旧 v1 配置解析器已退出。
@@ -46,7 +46,7 @@ tasks:
     files:
       - backend/deploy/experiment/docker-compose.yml
       - backend/deploy/experiment/egress-proxy.conf
-      - backend/auto_designer/experiment/infrastructure.py
+      - backend/ahe_beta/experiment/infrastructure.py
       - backend/tests/experiment/test_infrastructure.py
     scope: 保留 Compose 项目、Gitea/egress 网络和卷的所有权检查，供 v2 local 后端使用；当前流程不启动未注册的 CI runner。
     acceptance: 本地资源按实验隔离，错误 label 拒绝；stop 保留数据，destroy 仅作用所属资源；基础设施测试通过。
@@ -61,11 +61,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/runtime.py
-      - backend/auto_designer/experiment/cli.py
+      - backend/ahe_beta/experiment/runtime.py
+      - backend/ahe_beta/experiment/cli.py
       - backend/scripts/experiment.py
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/experiment/controllers/swebench.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
       - backend/tests/test_run_vigil.py
       - backend/tests/test_run_swebench_closed_loop.py
       - backend/tests/test_experiment_cli_v2.py
@@ -98,7 +98,7 @@ image 可以按 digest 共享。
 
 当前闭环实现按“机器上同时只有一个实验”设计：运行数据固定落在 `backend/data`，Harness 固定落在
 `data/harness_sandbox/harness_repo`，Vigil 配置固定落在 `data/vigil_config`，默认 Vigil 容器名固定为
-`auto-designer-vigil`。启动逻辑发现同名容器正在运行时会直接复用它。Gitea Compose 也固定容器名、网络、
+`ahe-beta-vigil`。启动逻辑发现同名容器正在运行时会直接复用它。Gitea Compose 也固定容器名、网络、
 卷和宿主端口。单次运行时这些约定简单有效；两个实验并发时，它们会产生配置覆盖、日志混写、错误容器
 attach、共享 OpenAgents runtime state、误领另一个仓库 issue，以及停止一个实验时影响另一个实验的风险。
 
@@ -126,7 +126,7 @@ schema_version: 1
 experiment_id: glm-evolution-e0
 mode: full-evolution
 source:
-  auto_designer_sha: <verified-controller-sha>
+  ahe_beta_sha: <verified-controller-sha>
   openagents_sha: <verified-openagents-sha>
   nexau_sha: <verified-nexau-sha>
   harness:
@@ -139,7 +139,7 @@ models:
   profile: glm-5.2-fp8-local
   user: glm-5-2-fp8-wangyiding-mlcoding
   harness: glm-5-2-fp8-wangyiding-mlcoding
-  synthesizer: glm-5-2-fp8-wangyiding-mlcoding
+  architect: glm-5-2-fp8-wangyiding-mlcoding
   delivery: glm-5-2-fp8-wangyiding-mlcoding
 capacity:
   endpoint: glm-local
@@ -180,7 +180,7 @@ Compose project、容器、网络、卷、端口策略、模型容量和认证�
 | 资源 | 并行实验策略 |
 |---|---|
 | 实验根、session、telemetry、checkpoint | 每实验独立目录 |
-| Auto Synthesizer/OpenAgents/NexAU | 精确 SHA 的只读 worktree 或镜像 |
+| Auto Architect/OpenAgents/NexAU | 精确 SHA 的只读 worktree 或镜像 |
 | Harness 仓与每题 workspace | 每实验、每题独立 |
 | Gitea 数据、用户、token、repo | 每实验独立实例与 volume |
 | Runner 数据与 job 容器 | 每实验独立 Runner 和网络 |
@@ -221,7 +221,7 @@ T3 的独立代理在默认拒绝之外保留已有模型服务域名，以及�
 
 `ExperimentConfig` 是用户输入，`ExperimentManifest` 是系统冻结结果，二者分离。`experiment_id` 仅允许
 小写字母、数字和单连字符，规范化后仍须保留一个配置 hash 短后缀，避免 Docker 长度截断造成碰撞。
-默认实验根由 `EXPERIMENTS_ROOT` 指定，缺省为仓外的 `../auto-designer-experiments`。任何解析后的可写路径
+默认实验根由 `EXPERIMENTS_ROOT` 指定，缺省为仓外的 `../ahe-beta-experiments`。任何解析后的可写路径
 必须位于该实验根内；符号链接、`..`、空路径、workspace root 和其他实验根均 fail closed。
 
 ```text
@@ -235,7 +235,7 @@ T3 的独立代理在默认拒绝之外保留已有模型服务域名，以及�
 ├── sessions/
 ├── workspaces/
 ├── source/
-│   ├── auto-designer/
+│   ├── ahe-beta/
 │   ├── harness/
 │   └── pins.json
 ├── infrastructure/

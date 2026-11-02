@@ -6,14 +6,14 @@ This tutorial covers the six-round U8 mixed, U8 direct, U16 mixed and U32 mixed 
 
 The [task catalog](../../examples/tasks/evolution32/README.md) records task content, provenance, pinned versions and material locations. Preparation freezes these inputs together with the configuration, controller and seed Harness to create an independent run.
 
-| Configuration | Sessions per round | simulated_user / direct | Distinct personas | Triager / Synthesizer / Divergent | User / Developer concurrency |
+| Configuration | Sessions per round | simulated_user / direct | Distinct personas | Triager / Architect / Divergent | User / Developer concurrency |
 | --- | --- | --- | --- | --- | --- |
 | u8-mixed-e2b.json | 8 | 6 / 2 | 5 | 4 / 1 / 1 | 4 / 4 |
 | u8-direct-e2b.json | 8 | 0 / 8 | 5 | 4 / 1 / 1 | 4 / 4 |
 | u16-mixed-e2b.json | 16 | 12 / 4 | 8 | 8 / 1 / 1 | 4 / 4 |
 | u32-mixed-e2b.json | 32 | 25 / 7 | 15 | 16 / 1 / 1 | 4 / 4 |
 
-Each configuration starts from the builtin seed frozen during preparation and runs six rounds. R1–R5 include trials, feedback and delivery; R6 only tries the final Harness. Six rounds therefore contain five between-round delivery batches. Owner is mechanical, `synthesizer_grouping` is false and per-round official grading is disabled. Disabling official grading does not disable persona feedback or terminal review; user acceptance is not an official benchmark pass.
+Each configuration starts from the builtin seed frozen during preparation and runs six rounds. R1–R5 include trials, feedback and delivery; R6 only tries the final Harness. Six rounds therefore contain five between-round delivery batches. Owner is mechanical, `architect_grouping` is false and per-round official grading is disabled. Disabling official grading does not disable persona feedback or terminal review; user acceptance is not an official benchmark pass.
 
 Each experiment uses one 4 CPU / 8192 MiB E2B sandbox, separate Docker task environments per session attempt, and user concurrency four. Choose concurrency with task memory and service requirements in mind. Sessions and environments are separate, but personas may be reused: U32 means 32 sessions per round, with the distinct persona count shown above.
 
@@ -26,8 +26,8 @@ Use Linux or WSL2, Git, Python 3.12 and uv on the management machine. The E2B ru
 Task materials come from the versioned Release recorded in the manifest. Confirm that the management host can access those download URLs. Preparation verifies material hashes; offline checks list uncached remote materials as pending.
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
@@ -39,7 +39,7 @@ Fill `.env.experiment`; do not put keys in JSON:
 | --- | --- |
 | USER_LLM_BASE_URL / USER_LLM_API_KEY | Simulated users and terminal review, OpenAI-compatible Chat Completions |
 | HARNESS_LLM_BASE_URL / HARNESS_LLM_API_KEY | The evolving Harness, OpenAI-compatible Chat Completions |
-| DEMAND_LLM_BASE_URL / DEMAND_LLM_API_KEY | Triage, Synthesizer and Divergent, OpenAI-compatible Chat Completions |
+| DEMAND_LLM_BASE_URL / DEMAND_LLM_API_KEY | Triage, Architect and Divergent, OpenAI-compatible Chat Completions |
 | ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN | OpenAgents Claude Code delivery, Anthropic-compatible protocol with bearer authentication |
 | E2B_API_KEY | E2B access that can create the required sandbox resources and templates |
 | GITEA_TOKEN | Your own Gitea.com token, allowing creation and read/write access to experiment private repositories, issues, comments and attachments |

@@ -31,7 +31,7 @@ uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
 ```bash
 tools/spec-driven-development/spec validate
 tools/spec-driven-development/spec render
-tools/spec-driven-development/spec graph --package-root backend/auto_designer
+tools/spec-driven-development/spec graph --package-root backend/ahe_beta
 ```
 
 生成的 `docs/specs/OVERVIEW.md` 和 `docs/specs/ARCHITECTURE.md` 应与原始 Spec 一并提交。这两个文件由 CLI 生成，请通过修改原始 Spec 更新它们。

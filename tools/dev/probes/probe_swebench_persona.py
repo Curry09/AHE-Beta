@@ -81,7 +81,7 @@ def _apply_overrides(
 ):
     from dataclasses import replace
 
-    from auto_designer.user.sim.dimensions import (
+    from ahe_beta.user.sim.dimensions import (
         D42Supervise,
         D43Correct,
         TimeTemperament,
@@ -109,18 +109,18 @@ def _run_one(
     d43_override: str | None,
     harness_repo: Path,
 ) -> int:
-    from auto_designer.harness.connector import HarnessConnector
-    from auto_designer.harness.launcher import HarnessLauncher
-    from auto_designer.loop.sim_user import result_to_sim_trace, result_to_turns
-    from auto_designer.models import FeelingScore, SeedScenario, Session, Transcript, WorkspaceSpec
-    from auto_designer.models import Persona as DisplayPersona
-    from auto_designer.user.session_store import SessionStore
-    from auto_designer.user.sim.deps import ensure_deps
-    from auto_designer.user.sim.loop import run_session as sim_run_session
-    from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
-    from auto_designer.user.sim.persona_io import card_to_persona
-    from auto_designer.user.sim.state import init_state, make_coef
-    from auto_designer.user.sim.workspace import materialize as materialize_workspace
+    from ahe_beta.harness.connector import HarnessConnector
+    from ahe_beta.harness.launcher import HarnessLauncher
+    from ahe_beta.loop.sim_user import result_to_sim_trace, result_to_turns
+    from ahe_beta.models import FeelingScore, SeedScenario, Session, Transcript, WorkspaceSpec
+    from ahe_beta.models import Persona as DisplayPersona
+    from ahe_beta.user.session_store import SessionStore
+    from ahe_beta.user.sim.deps import ensure_deps
+    from ahe_beta.user.sim.loop import run_session as sim_run_session
+    from ahe_beta.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
+    from ahe_beta.user.sim.persona_io import card_to_persona
+    from ahe_beta.user.sim.state import init_state, make_coef
+    from ahe_beta.user.sim.workspace import materialize as materialize_workspace
 
     sim_persona = _apply_overrides(
         card_to_persona(persona_card),

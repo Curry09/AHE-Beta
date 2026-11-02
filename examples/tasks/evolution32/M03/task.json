@@ -24,7 +24,7 @@
           "files": {
             "input": "6133e2d634e424756bbec8b4dac4537ea0dc2a1e27cf5d0f2796ce61ea8126b7"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m03-initial-v1.bundle"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/m03-initial-v1.bundle"
         },
         "target": "/opt/task-inputs/initial.bundle",
         "placement": "task"
@@ -38,7 +38,7 @@
             "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
             "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
         },
         "target": "/opt/task-inputs/recipes",
         "placement": "task"
@@ -55,7 +55,7 @@
             "public/case/requests.csv": "a41ac6649f43f87d552b425adff71c59004d37c804e3d0b68fd9118f27876ed6",
             "public/case/stakeholders.md": "c76e18daf209fffd8bcd304f5d245de19a2296fd3319d2c8938d9a7dcc184b50"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m03-public-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/m03-public-v1.tar.gz"
         },
         "target": "/opt/task-inputs/public-overlay",
         "placement": "task"
@@ -69,7 +69,7 @@
             "collect_directory.py": "85154f316e093105ce087d510cbef121fcfbd8b3a13db8e1565af57988e1b2d7",
             "collect_epub.py": "a54b1e238a0212a1292e16559392fd497721bb4f09f2946c0b9fd292e2a139d6"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-collection-recipes-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/task-collection-recipes-v1.tar.gz"
         },
         "target": "/opt/task-inputs/collection"
       },
@@ -82,7 +82,7 @@
           "files": {
             "freeze_initial_git.py": "a6633dd13a92308eb13279da9356e1fc1dd5e21b194876ec11a4a238886b4f67"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-initial-git-recipes-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/task-initial-git-recipes-v1.tar.gz"
         }
       }
     ],

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.manifest import (
+from ahe_beta.experiment.manifest import (
     ManifestError,
     append_journal,
     assert_immutable,

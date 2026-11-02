@@ -14,7 +14,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/models.py
+      - backend/ahe_beta/models.py
       - backend/tests/test_models.py
     scope: "定义用户侧七个公共数据结构及其序列化契约，按在一局会话中的角色分层：\n- 给定输入：Persona（用户画像）、SeedScenario（种子场景）。\n- 过程产物：Transcript（多轮对话记录）。\n- 会话产出：FeelingScore（1–4 体感评分 + 理由）、IssueDraft（问题草稿 title/body/labels）、IssueRef（Gitea 回执 number/url/state）。\n- 顶层封装：Session（聚合上述六者的一局完整记录）。\n仅含数据定义与 to_dict/from_dict；对话驱动、评分、提交、落盘逻辑分属 T2–T6，不在本任务。"
     acceptance: "- 七个 dataclass 均可构造，且 to_dict→from_dict round-trip 后字段级一致。\n- FeelingScore.score 越界（0/5）在构造期断言失败；Transcript role 非法值同样被拒。\n- IssueDraft.labels 缺省空列表；Session 在 0 条 issue 时 issue_refs 为空列表。\n- datetime 字段序列化为 ISO-8601 且可逆。"
@@ -28,7 +28,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/interface.py
+      - backend/ahe_beta/harness/interface.py
       - backend/tests/harness/test_interface.py
     scope: "做什么：\n- 定义 HarnessInterface 多轮对话协议（typing.Protocol），方法集为 send / reset / close。\n- 提供测试后端 FakeHarness，支持以「回复脚本」或「回调」两种方式注入确定性回复，并记录收发序列供断言。\n- 定义协议的状态机语义与调用契约（生命周期、幂等性、异常约定），使 T3/T4 可仅依赖协议编程。\n不做什么：\n- 不实现任何真实后端；launcher 启动 harness 程序并适配成本协议归 spec-0003。\n- 协议不含流式输出、工具调用回执、token/用量统计、并发会话等扩展面（见 tradeoffs）。\n- 不负责会话内容的语义（用户话术、终止判定属 T3；编排与落盘属 T4/T6）。"
     acceptance: "- HarnessInterface 三方法均有完整类型标注，且 FakeHarness 通过 isinstance/结构匹配满足该 Protocol。\n- FakeHarness 以 script 注入时，多轮 send 按序返回脚本各条；以 callback 注入时，返回 callback(message)。\n- script 与 callback 同时传入时构造期报错（互斥校验）。\n- reset 后 sent 清空、脚本游标归零；可重新开局逐轮收发。\n- close 后调用 send 或 reset 抛 RuntimeError；重复 close 不报错（幂等）。\n- send 返回类型恒为 str，空回复以空串表达且不被判为错误。"
@@ -43,7 +43,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/user_agent.py
+      - backend/ahe_beta/user/user_agent.py
       - backend/tests/user/test_user_agent.py
     scope: "做什么：\n- 实现 persona 驱动的多轮对话循环：给定 Persona+SeedScenario，逐轮经 LLM 生成用户消息、调 harness.send 读回复、写入 Transcript。\n- 实现「用户自判终止」：解析 LLM 输出中的结束信号即停，并以 max_turns 硬上限兜底。\n- 会话结束后经 LLM 产出一条合法 FeelingScore（1–4 + reason）。\n- issue 产出实现最小桩：会话末由 LLM 产 0..n 条 IssueDraft（方案 a，见 open-questions），不锁死机制。\n不做什么：\n- 不实现具体 LLM 客户端（模型后端由调用方注入），不定义提示词工程细节之外的模型路由/重试。\n- 不提交 issue（提交归 T5/T4），不落盘（归 T6/T4），不构造 harness 后端（归 T2/T4）。\n- 不做逐轮体感打分（决定见 tradeoffs：会话末一次性产出）。"
     acceptance: "- 用 FakeHarness + mock LLM 可跑通一局多轮对话，Transcript 轮次与 harness 收发序列一致。\n- 自判终止生效：mock LLM 在第 k 轮发结束信号时，会话恰好进行 k 轮。\n- max_turns 兜底生效：mock LLM 永不发结束信号时，user 轮数恰为 max_turns。\n- 会话末产出合法 FeelingScore（score ∈ 1..4，含 reason）；越界分数在构造期失败。\n- issue 桩产出 0..n 条 IssueDraft，0 条时返回空列表。\n- max_turns <= 0 构造期断言失败。\n- run 全程不调用 harness.reset/close。"
@@ -61,7 +61,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/session.py
+      - backend/ahe_beta/user/session.py
       - backend/tests/user/test_session.py
     scope: "做什么：\n- 提供单一无状态入口函数 run_session，编排一局完整会话。\n- 负责 harness 的生命周期（开局 reset、收尾 close），调用 UserAgent.run 取 (Transcript, FeelingScore, drafts)。\n- 将每条 IssueDraft 经 IssueTracker 提交，收集 IssueRef；组装 Session 并经 SessionStore 落盘后返回。\n- 全部依赖经参数注入，runner 自身不构造任何后端。\n不做什么：\n- 不构造 harness / llm / tracker / store（由调用方注入）。\n- 不做跨会话并发/批量编排（归 loop/ 层），不做 issue 曲线统计（归 metrics/ 层）。\n- 不实现对话逻辑（T3）、提交逻辑（T5）、持久化逻辑（T6）本身，只做编排与生命周期管理。"
     acceptance: "- 用 Fake(harness/tracker/store) + mock LLM 端到端返回完整 Session（含 persona/scenario/transcript/feeling/issue_refs）。\n- harness.reset 与 harness.close 各恰调一次，且 reset 先于 user_agent.run、close 在其后（或异常时仍执行）。\n- 每条 draft 经 tracker.create_issue 得到带号 IssueRef，issue_refs 顺序与 drafts 对应。\n- 0 条 draft 时 issue_refs 为空列表且 store 仍落盘该局。\n- store 已写盘该 Session（可经 load 还原）。\n- 提前放弃的会话其 user 轮数 < max_turns，且仍返回完整 Session。\n- user_agent.run 抛异常时 harness.close 仍被调用，且不落盘、不提交。"
@@ -75,8 +75,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/tracker/base.py
-      - backend/auto_designer/tracker/fake.py
+      - backend/ahe_beta/tracker/base.py
+      - backend/ahe_beta/tracker/fake.py
       - backend/tests/tracker/test_fake.py
     scope: "做什么：\n- 定义 IssueTracker 协议（typing.Protocol），方法集为 ensure_labels / create_issue / add_comment / set_state。\n- 明确各方法的类型契约、发号与状态语义，使其与 Gitea 后端语义对齐（FakeTracker 与 GiteaTracker 对 run_session 等价）。\n- 提供内存实现 FakeTracker：自增发号、维护 issue 表与标签集，供单测与无 Gitea 环境端到端跑通。\n不做什么：\n- 不实现真实 GiteaTracker（HTTP 客户端、鉴权、重试）——归 spec-0002。\n- 不照搬 Gitea 全量 API（里程碑、指派、搜索、分页等不纳入）。\n- 不负责何时产 IssueDraft（归 T3）、何时调用提交（归 T4）。"
     acceptance: "- IssueTracker 四方法均有完整类型标注，FakeTracker 结构匹配满足该 Protocol。\n- create_issue 返回 IssueRef，number 从 1 起单调递增，初始 state 为 \"open\"，url 由 number 确定性合成。\n- add_comment 后该 issue 评论列表含该 body；set_state 后 state/reason 被更新。\n- ensure_labels 幂等：重复传入同名标签不重复创建；空列表为 no-op。\n- 对不存在 number 调用 add_comment/set_state 抛 KeyError；set_state 非法 state 抛 ValueError。\n- 同一 draft 两次 create_issue 得到两个不同 number（不去重）。"
@@ -90,7 +90,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/session_store.py
+      - backend/ahe_beta/user/session_store.py
       - backend/tests/user/test_session_store.py
     scope: "做什么：\n- 将一局 Session 全量持久化为 root/<session_id>.json（证据文件）。\n- 维护单一总索引 root/index.json，每局追加一条最小统计记录 {session_id, score, created_at, n_issues}。\n- 提供按 id 读回全量、读总索引的能力，供 loop/metrics 画体感与 issue 曲线、供 dev 侧取回归基线。\n不做什么：\n- 不做数据库/外部存储；不做查询引擎（按字段过滤/聚合归 metrics 层消费索引）。\n- 不处理并发写索引的竞态（单进程 MVP，并发归 loop 层并行时再解决）。\n- 不负责 Session 的产生（归 T4）与序列化契约本身（归 T1 的 to_dict/from_dict）。"
     acceptance: "- save(session) 写出 root/<session_id>.json 全量文件，并在 root/index.json 追加一条含 {session_id, score, created_at, n_issues}。\n- root 目录不存在时 save 自动创建。\n- load(session_id) 还原与原 Session 字段级等价（依赖 T1 round-trip）。\n- index() 返回的条目 score 等于 session.feeling.score、created_at 为 ISO-8601、n_issues 等于 issue_refs 长度。\n- load 不存在 id 抛 FileNotFoundError；首次 index()（无索引文件）返回空列表。\n- 同一 session 两次 save：全量文件被覆盖，索引出现两条（不去重）。"
@@ -202,12 +202,12 @@ reset 在 user_agent.run 之前调用，对应 T2「开局责任归编排层」�
 
 | Task | 文件 |
 | --- | --- |
-| T1 | `backend/auto_designer/models.py`、`backend/tests/test_models.py` |
-| T2 | `backend/auto_designer/harness/interface.py`、`backend/tests/harness/test_interface.py` |
-| T3 | `backend/auto_designer/user/user_agent.py`、`backend/tests/user/test_user_agent.py` |
-| T4 | `backend/auto_designer/user/session.py`、`backend/tests/user/test_session.py` |
-| T5 | `backend/auto_designer/tracker/base.py`、`backend/auto_designer/tracker/fake.py`、`backend/tests/tracker/test_fake.py` |
-| T6 | `backend/auto_designer/user/session_store.py`、`backend/tests/user/test_session_store.py` |
+| T1 | `backend/ahe_beta/models.py`、`backend/tests/test_models.py` |
+| T2 | `backend/ahe_beta/harness/interface.py`、`backend/tests/harness/test_interface.py` |
+| T3 | `backend/ahe_beta/user/user_agent.py`、`backend/tests/user/test_user_agent.py` |
+| T4 | `backend/ahe_beta/user/session.py`、`backend/tests/user/test_session.py` |
+| T5 | `backend/ahe_beta/tracker/base.py`、`backend/ahe_beta/tracker/fake.py`、`backend/tests/tracker/test_fake.py` |
+| T6 | `backend/ahe_beta/user/session_store.py`、`backend/tests/user/test_session_store.py` |
 
 依赖 DAG：`T1 → T2`，`T1 → T3`，`T2 → T3`，`T1 → T4`，`T2 → T4`，`T3 → T4`，`T5 → T4`，`T6 → T4`，`T1 → T5`，`T1 → T6`
 

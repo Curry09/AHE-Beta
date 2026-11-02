@@ -2,8 +2,8 @@
 
 import pytest
 
-from auto_designer.experiment.config import ConfigError, load_task_package
-from auto_designer.experiment.workload import task_artifact_declarations, task_provenance
+from ahe_beta.experiment.config import ConfigError, load_task_package
+from ahe_beta.experiment.workload import task_artifact_declarations, task_provenance
 from test_experiment_config_v2 import package, write
 
 
@@ -138,7 +138,7 @@ def test_managed_reference_is_handle_not_task_supplied_host_path(tmp_path):
 
 
 def test_benchmark_session_provenance_roundtrips_and_rejects_wrong_task():
-    from auto_designer.models import (
+    from ahe_beta.models import (
         FeelingScore,
         Persona,
         SeedScenario,

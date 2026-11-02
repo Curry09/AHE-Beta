@@ -84,7 +84,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py check -
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$WORK_DIR/child-e2b.json" --offline
 ```
 
-三个输入声明必须一起出现：`harness.source=continuation`、`workload={"source":"parent"}`、`continuation={"archive":...,"sha256":...}`。继承 workload 不再填写任务包、persona 库、persona ID 或 interaction_plan。每个新增轮按原顺序重复父末轮配对，任务内容、persona 内容和 `direct`/`simulated_user` 交互保持固定。`sessions_per_round` 必须等于父边界人数；可以降低 `max_parallel_users`。有 pending report 时至少需要一个 Triage 和一个 Synthesizer。
+三个输入声明必须一起出现：`harness.source=continuation`、`workload={"source":"parent"}`、`continuation={"archive":...,"sha256":...}`。继承 workload 不再填写任务包、persona 库、persona ID 或 interaction_plan。每个新增轮按原顺序重复父末轮配对，任务内容、persona 内容和 `direct`/`simulated_user` 交互保持固定。`sessions_per_round` 必须等于父边界人数；可以降低 `max_parallel_users`。有 pending report 时至少需要一个 Triage 和一个 Architect。
 
 离线 check 返回父身份、边界、配对、报告与证据缺口。它不启动模型/provider、不准备任务环境，也不证明任务通过。生成的 local 和 E2B 文件是两个可选子配置，选择其中一份运行。
 

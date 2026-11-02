@@ -5,14 +5,14 @@ import json
 
 import pytest
 
-from auto_designer.experiment import materials
-from auto_designer.experiment.batch_config import (
+from ahe_beta.experiment import materials
+from ahe_beta.experiment.batch_config import (
     load_batch_config,
     package_input_identity,
     verify_entry_inputs,
 )
-from auto_designer.experiment.batch_store import BatchStore
-from auto_designer.experiment.config import ConfigError
+from ahe_beta.experiment.batch_store import BatchStore
+from ahe_beta.experiment.config import ConfigError
 from test_experiment_environment_materials import archive, task
 from test_experiment_materials import prepared_inputs as prepared_inputs
 

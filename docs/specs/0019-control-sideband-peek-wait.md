@@ -16,7 +16,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/harness/launcher.py
       - backend/tests/harness/test_launcher.py
     scope: stdout 协议放宽：一轮内可有任意多行非 reply JSON 旁路（progress/其它字段），仅含 reply 的行结束本轮；未知旁路不报协议违例。poll 累积 last_sideband/last_progress。control(name) 等到 reply 或非纯 progress 旁路 ack；暴露 in_flight。用户 sim 主路径仅 interrupt；peek-via-control 不再由用户菜单调用（见 0022）。
     acceptance: poll 对仅含未知键的旁路 JSON 不抛协议违例、写入 last_sideband；progress 映入 last_progress；control('interrupt') 返回 reply 且 in_flight 为 False。单测覆盖未知旁路、interrupt 终结；wire 上 status 旁路仍可测但不作为用户侧现行能力。

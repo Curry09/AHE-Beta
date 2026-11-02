@@ -14,14 +14,14 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/demand/source.py
-  - backend/auto_designer/demand/agent_runtime.py
-  - backend/auto_designer/demand/evidence_contract.py
-  - backend/auto_designer/loop/feedback_pipeline.py
-  - backend/auto_designer/loop/orchestrator.py
-  - backend/auto_designer/experiment/controllers/feedback.py
+  - backend/ahe_beta/demand/source.py
+  - backend/ahe_beta/demand/agent_runtime.py
+  - backend/ahe_beta/demand/evidence_contract.py
+  - backend/ahe_beta/loop/feedback_pipeline.py
+  - backend/ahe_beta/loop/orchestrator.py
+  - backend/ahe_beta/experiment/controllers/feedback.py
   - backend/agent_defs/triage_agent/agent.yaml
-  - backend/agent_defs/synthesizer/agent.yaml
+  - backend/agent_defs/architect/agent.yaml
   - backend/agent_defs/divergent_pm/agent.yaml
   scope: 只读提交导出，跨线程传播；历史报告绑定来源 SHA。
   acceptance: seed 工作树不动；角色读取 full SHA；缺失提交不得回退。
@@ -34,10 +34,10 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/harness/budget.py
-  - backend/auto_designer/harness/launcher.py
-  - backend/auto_designer/experiment/context.py
-  - backend/auto_designer/experiment/schemas/experiment-v2.json
+  - backend/ahe_beta/harness/budget.py
+  - backend/ahe_beta/harness/launcher.py
+  - backend/ahe_beta/experiment/context.py
+  - backend/ahe_beta/experiment/schemas/experiment-v2.json
   - backend/tests/test_experiment_local_backend.py
   scope: schema 2 冻结预算与收尾余量，两后端共用传递路径。
   acceptance: 收尾回复可在余量内返回；强停来源可查；旧配置身份不变。
@@ -51,8 +51,8 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/loop/sim_user.py
-  - backend/auto_designer/demand/session_timeline.py
+  - backend/ahe_beta/loop/sim_user.py
+  - backend/ahe_beta/demand/session_timeline.py
   - backend/tests/user/test_direct_session.py
   scope: 在现有 sim_user 适配器保存收到的完整进度与回复步骤，查询阶段统一投影 timeline/beat/step。
   acceptance: direct 与模拟交互对收到的步骤同样完整落盘，长正文和中间索引不丢失；查询共用摘要/展开上限；不伪造 SimTrace 或用户中途评阅；保留授权边界。
@@ -68,7 +68,7 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/demand/triage.py
+  - backend/ahe_beta/demand/triage.py
   - backend/tests/test_feedback_runtime_integrity.py
   - backend/tests/test_experiment_config_v2.py
   - backend/tests/test_experiment_engine.py

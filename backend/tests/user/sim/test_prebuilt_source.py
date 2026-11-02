@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.models import WorkspaceSpec
+from ahe_beta.models import WorkspaceSpec
 
 
 def test_prebuilt_copies_and_relocates_text_metadata(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     source = tmp_path / "source"
     (source / ".venv" / "bin").mkdir(parents=True)
@@ -35,7 +35,7 @@ def test_prebuilt_copies_and_relocates_text_metadata(tmp_path: Path) -> None:
 
 
 def test_prebuilt_copies_are_isolated_and_skip_stale_venvs(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     source = tmp_path / "source"
     source.mkdir()
@@ -52,7 +52,7 @@ def test_prebuilt_copies_are_isolated_and_skip_stale_venvs(tmp_path: Path) -> No
 
 
 def test_prebuilt_requires_existing_source(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     with pytest.raises(ValueError, match="params.source"):
         seed_source.provision(WorkspaceSpec(kind="prebuilt"))
@@ -63,7 +63,7 @@ def test_prebuilt_requires_existing_source(tmp_path: Path) -> None:
 
 
 def test_real_venv_python_survives_copy_when_available(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     source = tmp_path / "source"
     subprocess.run([sys.executable, "-m", "venv", str(source / ".venv")], check=True)
@@ -82,8 +82,8 @@ def test_real_venv_python_survives_copy_when_available(tmp_path: Path) -> None:
 def test_unified_prebuilt_shell_and_script_use_copied_task_venv(tmp_path: Path) -> None:
     import json
 
-    from auto_designer.user.sim import seed_source
-    from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+    from ahe_beta.user.sim import seed_source
+    from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 
     source = tmp_path / "source"
     subprocess.run([sys.executable, "-m", "venv", str(source / ".venv")], check=True)
@@ -113,7 +113,7 @@ def test_unified_prebuilt_shell_and_script_use_copied_task_venv(tmp_path: Path) 
 
 
 def test_legacy_linked_metadata_is_copied_without_mutating_shared_targets(tmp_path):
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     source = tmp_path / "source"
     site = source / ".venv/lib/python3.12/site-packages"

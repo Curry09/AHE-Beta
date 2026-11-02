@@ -47,10 +47,10 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from auto_designer.evaluation.adapters.container import IMMUTABLE_IMAGE
-from auto_designer.evaluation.service import build_request, evaluate_request
-from auto_designer.experiment.config import load_config_v2, load_task_package
-from auto_designer.experiment.grading_inputs import load_grading_plan, read_material
+from ahe_beta.evaluation.adapters.container import IMMUTABLE_IMAGE
+from ahe_beta.evaluation.service import build_request, evaluate_request
+from ahe_beta.experiment.config import load_config_v2, load_task_package
+from ahe_beta.experiment.grading_inputs import load_grading_plan, read_material
 
 repo = Path(sys.argv[1])
 parser = argparse.ArgumentParser()

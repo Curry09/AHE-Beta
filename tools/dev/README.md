@@ -35,7 +35,7 @@ For each row, its safe help command is `PYTHONPATH=backend .venv/bin/python -m t
 | `probe_persona_reframe` | Check persona orthogonality and scripted state transitions | no credentials | no model/provider calls | stdout, nonzero on failure |
 | `probe_persona_wait_matrix` | Compare persona cards across scripted waiting scenarios | `--personas`, `--scenarios`, optional `--persona-library`, USER profile | USER model; no remote writes | stdout and `backend/data/probe_persona_wait_matrix.json` |
 | `probe_swebench_persona` | Run one real Harness/persona SWE scenario | required `--dataset`, `--harness-repo`, `--instance`; optional `--persona-library`/`--persona`; USER/HARNESS profiles | both models; Git clone/dependency setup and workspace changes | stdout, isolated workspace, `backend/data/sessions/_probe_swebench_persona` |
-| `probe_timeout_to_synthesizer` | Follow scripted timeout signals through real user and synthesizer | USER/DEMAND profiles | both models; fake tracker only | stdout and printed temporary evidence directory |
+| `probe_timeout_to_architect` | Follow scripted timeout signals through real user and architect | USER/DEMAND profiles | both models; fake tracker only | stdout and printed temporary evidence directory |
 | `probe_wait_progress` | Observe waiting decisions against scripted progress | USER profile | USER model; no remote writes | stdout |
 
 The three library-based probes default to `examples/personas/library.json` and
@@ -97,13 +97,13 @@ For each row, its safe help command is `PYTHONPATH=backend .venv/bin/python -m t
 | Module | Purpose | Inputs | Model / remote writes | Output |
 | --- | --- | --- | --- | --- |
 | `replay_observation_lifecycle` | Verify private evidence grants, version isolation and delivery reads | `--run-dir`, `--openagents-source`, optional images/credential file | no models; creates private Gitea test repo, Docker containers | retained temporary evidence, stdout; remote test repo retained |
-| `replay_observation_synthesis` | Replay PM/Synthesizer against fixed evidence | `--sessions`, `--observations`, `--proposals`, `--repo`, `--output`, DEMAND profile | DEMAND model; fake tracker | output directory with traces and summary |
+| `replay_observation_synthesis` | Replay PM/Architect against fixed evidence | `--sessions`, `--observations`, `--proposals`, `--repo`, `--output`, DEMAND profile | DEMAND model; fake tracker | output directory with traces and summary |
 | `replay_owner_from_repo` | Replay historical issues numbered ≤ 14 and rerun Owner; requires original issue numbers to match contiguously | `--run-dir`, source/target repo, sessions, Harness repo, output | DEMAND model; creates target repo/issues | output directory |
-| `replay_pm_synthesizer_owner_offline` | Continue a fixed triage summary locally | source summary, sessions, output, DEMAND profile | DEMAND model; fake tracker | output directory |
+| `replay_pm_architect_owner_offline` | Continue a fixed triage summary locally | source summary, sessions, output, DEMAND profile | DEMAND model; fake tracker | output directory |
 | `replay_role_invocations` | Diff frozen demand invocations using replacement agent definition | `--run-dir` (invocation evidence root), `--role`, `--agent-def`, optional repo/output, DEMAND profile | DEMAND model; never starts Gitea/delivery | stdout or explicit output |
 | `replay_roles_from_sessions` | Copy reports and replay the demand pipeline | prepared `--run-dir`, source/target repo, sessions, output | DEMAND model; creates target repo/issues | output directory |
 | `replay_roles_offline` | Replay saved sessions through four demand roles locally | sessions, output, DEMAND profile | DEMAND model; fake tracker | output directory |
-| `replay_synthesizer_owner_from_repo` | Restore selected proposals then rerun Synthesize/Owner | prepared `--run-dir`, repo, issue selections, sessions, Harness repo, output | DEMAND model; updates selected remote issues | output directory |
+| `replay_architect_owner_from_repo` | Restore selected proposals then rerun Architect/Owner | prepared `--run-dir`, repo, issue selections, sessions, Harness repo, output | DEMAND model; updates selected remote issues | output directory |
 
 `replay_role_invocations --run-dir` selects its existing invocation-store layout;
 it does not require a v2 provider manifest. All other Gitea tools require a prepared

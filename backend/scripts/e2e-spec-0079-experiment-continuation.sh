@@ -14,4 +14,4 @@ uv run --locked --extra experiments --extra dev pytest -q \
   backend/tests/loop/test_orchestrator.py \
   backend/tests/demand/test_triage.py \
   backend/tests/demand/test_divergent_gate.py \
-  backend/tests/demand/test_grouped_synthesizer.py
+  backend/tests/demand/test_grouped_architect.py

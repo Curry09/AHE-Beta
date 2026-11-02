@@ -18,8 +18,8 @@ The six-round U8 mixed/direct, U16 and U32 experiments use container task packag
 Use Linux or WSL2 with Git, Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/). Local execution also requires a running Docker Engine with Compose; Docker Desktop with WSL integration works.
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv sync --locked --extra experiments
 ```
 
@@ -40,7 +40,7 @@ chmod 600 .env.experiment
 
 Fill `.env.experiment` with OpenAI-compatible endpoint URLs and keys for the simulated user, Harness and requirements agents, plus an Anthropic-compatible endpoint and credential for delivery. OpenAgents uses Claude Code for delivery and requires an endpoint supporting the Anthropic protocol.
 
-U1/U4 select `claude-opus-5-5` by default. The six-round examples use `glm-5.3-flash` for users/Harness and `glm-5.3` for requirements/delivery. Before preparation, update the four `models.*.model` fields in JSON to names supported by your provider. Triage, Synthesizer and PM share the requirements model; the examples use rule-based Owner admission.
+U1/U4 select `claude-opus-5-5` by default. The six-round examples use `glm-5.3-flash` for users/Harness and `glm-5.3` for requirements/delivery. Before preparation, update the four `models.*.model` fields in JSON to names supported by your provider. Triage, Architect and PM share the requirements model; the examples use rule-based Owner admission.
 
 E2B also requires a sandbox API key and a Gitea.com token permitted to create and read/write your repositories, issues, comments and attachments. Optional `GITEA_USER` checks the token's account. Local Gitea credentials are generated automatically; browser login details are saved in the run's `secrets/local-gitea-login.env`. See [configuration](CONFIGURATION.md) for the full set of fields.
 

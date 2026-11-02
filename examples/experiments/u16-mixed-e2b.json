@@ -451,7 +451,7 @@
   },
   "roles": {
     "triager": 8,
-    "synthesizer": 1,
+    "architect": 1,
     "divergent": 1,
     "owner_mode": "mechanical",
     "developer": 4
@@ -484,7 +484,7 @@
     "official_grading": false
   },
   "policies": {
-    "synthesizer_grouping": false,
+    "architect_grouping": false,
     "timing": {
       "latency_isolated": false,
       "wall_guard_seconds": 0

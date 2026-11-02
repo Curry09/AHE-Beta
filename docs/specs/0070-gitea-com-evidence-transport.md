@@ -14,8 +14,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/tracker/gitea.py
-      - backend/auto_designer/tracker/attachment_transport.py
+      - backend/ahe_beta/tracker/gitea.py
+      - backend/ahe_beta/tracker/attachment_transport.py
       - backend/tests/tracker/test_gitea_evidence_transport.py
       - backend/tests/tracker/test_gitea.py
       - backend/tests/tracker/test_gitea_observe.py
@@ -32,8 +32,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/delivery_evidence.py
-      - backend/auto_designer/observations/transport.py
+      - backend/ahe_beta/demand/delivery_evidence.py
+      - backend/ahe_beta/observations/transport.py
       - backend/tests/demand/test_delivery_evidence.py
       - backend/tests/observations/test_transport_profile.py
     scope: 默认 gzip 字节/句柄保持，增加确定性单文件 ZIP 和独立 profile；旧目录按 gzip 恢复，不改 framework contract。
@@ -49,9 +49,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/observations/preflight.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/observations/preflight.py
       - backend/tests/test_run_vigil.py
       - backend/tests/loop/test_sim_user.py
       - backend/tests/observations/test_transport_preflight.py
@@ -113,7 +113,7 @@ tasks:
 
 状态：用户已批准，两仓候选实现及离线/真实传输验收完成，正式发行尚未执行。任务 done 表示本版实现和候选验证完成；正式 reader SHA/digest 必须在 reader 先行合并、构建和复测后填写，不能将本地 dirty 工作树构建的候选镜像当作已发布版本。
 
-为 auto-designer 增加 Gitea.com 的证据发布支持，同时保留自建 Gitea 的现有 gzip 行为、历史句柄和实验恢复。对应读取端为 OpenAgents `0092-gitea-com-evidence-reader.md`；两仓以本文件明确的传输契约和联合测试对齐，不互相 vendor 业务代码，不新增附件托管服务。
+为 AHE-Beta 增加 Gitea.com 的证据发布支持，同时保留自建 Gitea 的现有 gzip 行为、历史句柄和实验恢复。对应读取端为 OpenAgents `0092-gitea-com-evidence-reader.md`；两仓以本文件明确的传输契约和联合测试对齐，不互相 vendor 业务代码，不新增附件托管服务。
 
 本组交付范围是“授权证据能上传、回读校验、被实际 OpenAgents 读取”；不以实验进程继续运行为成功，不把新功能验收混入当前仍在运行的固定版本 N1 实验。
 
@@ -169,7 +169,7 @@ OpenAgents 旧读取端固定 gzip；即使发布端上传 ZIP 成功，读取�
 |---|---|---|---|
 | T1 | Gitea 能力解析、MIME、受限下载 | tracker/gitea.py、新附件传输模块及专门 tracker 测试 | 无 |
 | T2 | 双编码发布、profile 持久化与旧恢复 | demand/delivery_evidence.py、新 observations/transport.py、发布/profile 测试 | T1 |
-| T3 | 实际 reader 能力预检、生命周期接线 | backend/auto_designer/experiment/controllers/ordinary.py、loop/sim_user.py、新 observations/preflight.py、生命周期测试 | T1、T2 |
+| T3 | 实际 reader 能力预检、生命周期接线 | backend/ahe_beta/experiment/controllers/ordinary.py、loop/sim_user.py、新 observations/preflight.py、生命周期测试 | T1、T2 |
 | T4 | 容器公网接线与按需出口 | 两套部署代理/Compose、vigil 构建/入口/镜像记录、部署测试 | T3 |
 | T5 | 跨仓 CI、真实探针、联合版本与文档 | 联合检查脚本、集成测试、CI、release/compatibility.json、使用/发布文档 | T2、T3、T4 |
 
@@ -201,7 +201,7 @@ OpenAgents 旧读取端固定 gzip；即使发布端上传 ZIP 成功，读取�
 
 ## Prior art
 
-现有按 issue 授权的证据流程已经具备版本匹配、内容摘要、上传回读和 Owner 准入顺序；本组延续这些已验证行为。2026-09-29 的相关基线为 auto-designer 35 项、OpenAgents 64 项测试通过，真实函数跨仓 gzip 成功、相同 JSON 的 ZIP 被旧 reader 拒绝；这些仅是设计依据，不算新功能通过。
+现有按 issue 授权的证据流程已经具备版本匹配、内容摘要、上传回读和 Owner 准入顺序；本组延续这些已验证行为。2026-09-29 的相关基线为 AHE-Beta 35 项、OpenAgents 64 项测试通过，真实函数跨仓 gzip 成功、相同 JSON 的 ZIP 被旧 reader 拒绝；这些仅是设计依据，不算新功能通过。
 
 [Gitea 1.22 配置说明](https://docs.gitea.com/1.22/administration/config-cheat-sheet/) 描述附件 ALLOWED_TYPES、存储类型和 SERVE_DIRECT；[Python zipfile 文档](https://docs.python.org/3/library/zipfile.html) 描述 ZIP 成员与有界读取所需接口。两者用于说明外部能力，当前站点兼容性仍以真实附件探针为准。
 

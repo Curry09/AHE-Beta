@@ -14,7 +14,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/goals.py
+      - backend/ahe_beta/user/sim/goals.py
       - backend/tests/user/sim/test_goals.py
     scope: 定义 Goal、GoalLedger、GoalEvent、GoalStatus、GoalKind 以及 B0 初始化、add/status/focus/revise/relax/withdraw 操作；B0 不得删除或 withdraw，但允许带 reason 修订 text/done_if；每次修订保存 before/after、版本和 evidence_refs。
     acceptance: 任意任务初始化一个 B0；B0 的 initial_text/initial_done_if 永久保留；无 reason 或无实际变化的 revise 不生效；relax/withdraw 必须有 reason 且不能作用于 B0；事件 seq 连续；snapshot 与 audit 可独立还原当前状态和原始状态。
@@ -28,9 +28,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/loop.py
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/user/sim/loop.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/user/sim/test_persona_client_agentic.py
     scope: 将当前目标快照注入 judge/intent/act/waiting 决策上下文；各轮输出 goal_reading、target_goal_ids、expected_progress、goal_updates 和 goal_effect；目标改变时以结构化 revise 重新构造后续决策上下文，不用关键词推断用户是否应 accept。
@@ -46,8 +46,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/models.py
-      - backend/auto_designer/user/session_store.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/user/session_store.py
       - backend/tests/test_models.py
       - backend/tests/user/test_session_store.py
     scope: 在 Session/SimTrace/SimTurn 中保存 goal ledger、goal acceptance 和每轮目标字段；goal terminal check 只报告用户主观目标是否闭合，不覆盖 interaction_status、objective_status 或 lifecycle_status。
@@ -63,7 +63,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/session_timeline.py
+      - backend/ahe_beta/demand/session_timeline.py
       - backend/tests/demand/test_session_timeline.py
     scope: 将目标摘要、目标变更事件、每轮 target/effect 和 goal_audit 投影到设计面 timeline；保留完整 sim_trace 作为权威落盘，但默认投影只提供有界、可读、带来源的目标证据，不提供完整 persona raw。
     acceptance: timeline 能区分 B0 初始文本、当前文本和每次 revision reason；每轮目标指向与动作可追溯到 turn；goal audit 能报告未知目标、effect mismatch、缺 reason 等问题；旧 timeline 无目标字段时保持兼容并标记 unavailable。

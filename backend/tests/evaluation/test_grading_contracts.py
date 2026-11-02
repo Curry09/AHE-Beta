@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.evaluation.acceptance import derive_acceptance_assessment
-from auto_designer.evaluation.contracts import GradingRequest
-from auto_designer.evaluation.registry import get_adapter
-from auto_designer.evaluation.results import ExecutionEvidence, GradingResult
+from ahe_beta.evaluation.acceptance import derive_acceptance_assessment
+from ahe_beta.evaluation.contracts import GradingRequest
+from ahe_beta.evaluation.registry import get_adapter
+from ahe_beta.evaluation.results import ExecutionEvidence, GradingResult
 
 
 def test_requests_freeze_nested_operator_configuration():

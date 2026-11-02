@@ -15,8 +15,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/checkpoint.py
-      - backend/auto_designer/loop/run_state.py
+      - backend/ahe_beta/loop/checkpoint.py
+      - backend/ahe_beta/loop/run_state.py
       - backend/tests/loop/test_checkpoint.py
       - backend/tests/loop/test_run_state.py
     scope: "做什么：\n- 定义 STATE_DIR 布局：聚合 Gitea data(sqlite+repos)、data/sessions/、data/metrics.jsonl、run_state.json 于单一目录，自包含、可整体打包。\n- 实现 checkpoint 存：原子打包 STATE_DIR → checkpoint artifact（可下载出沙盒）。\n- 实现 checkpoint 取：从 artifact 还原 STATE_DIR。\n- 定义并读写 run_state：编排游标 + 三侧中间态标记，作为「无法从产物直接观测」之外的兜底。\n不做什么：\n- 不驱动轮次循环、不调 orchestrator（属 0004/T2 runner）。\n- 不实现 harbor 任务调度与 artifact 通道（harbor 底座职责）。\n- 不快照 agent 进程内存 / 会话中途态（恢复按单元边界重跑，见 T2）。\n- 不与 Gitea/SessionStore 双写权威：checkpoint 是这些权威源的整体快照，不引入第二权威。"
@@ -32,7 +32,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/runner.py
+      - backend/ahe_beta/loop/runner.py
       - backend/tests/loop/test_runner.py
     scope: "做什么：\n- 实现 harbor task 入口（方案 A）：一个 task 包整条 run；输入 = pinned 初始 harness 版本 + persona/场景集 + 上次 checkpoint artifact（可空，首跑）。\n- 启动时：若有 checkpoint，load 还原 STATE_DIR；读 run_state 得断点（轮次/阶段/release_ref/已完成单元）。\n- 逐轮驱动 orchestrator.run_round；每轮边界：write_run_state → save_checkpoint → 经 harbor artifact 通道吐出沙盒（可下载）。\n- 幂等续跑：已完成单元跳过——用户侧整 session 重跑（按产物/done_session_keys）、开发者侧从候选分支 head 续作、release 见 tag 即跳过。\n不做什么：\n- 不实现 orchestrator/各部件（属 0003 与 0001）；runner 只在其外层加恢复与 checkpoint。\n- 不复用 harbor 批式 episode 接口承载逐轮真人对话——逐轮对话仍走 spec-0001 自立协议（与 0001/T2 决策一致）；harbor 只包外层 rollout 生命周期。\n- 不做沙盒内多容器 / Gitea 进程编排（部署形态），不做并发流水线（MVP 顺序单轮）。\n- 不快照 agent 进程内存 / 会话中途态。"
     acceptance: "- 首跑（checkpoint=None）：从 initial_release_ref 起跑 n 轮，每轮末产出一个 checkpoint artifact，最终返回最新 artifact。\n- 恢复跑（给定上次 checkpoint）：还原 STATE_DIR、从断点轮续跑，不重复已完成 session、不重复已发版 tag。\n- orchestrator 经注入可 mock：runner 只验证 restore→loop→emit 时序与幂等跳过，不验证编排内部。\n- 逐轮对话不经 harbor 批接口（仅外层 task/artifact 用 harbor）。"
@@ -117,11 +117,11 @@ T2 的类型契约：`run(initial_release_ref: str, fixed_set, checkpoint_artifa
 
 | 文件 | 归属 Task |
 | --- | --- |
-| `backend/auto_designer/loop/checkpoint.py` | T1 |
-| `backend/auto_designer/loop/run_state.py` | T1 |
+| `backend/ahe_beta/loop/checkpoint.py` | T1 |
+| `backend/ahe_beta/loop/run_state.py` | T1 |
 | `backend/tests/loop/test_checkpoint.py` | T1 |
 | `backend/tests/loop/test_run_state.py` | T1 |
-| `backend/auto_designer/loop/runner.py` | T2 |
+| `backend/ahe_beta/loop/runner.py` | T2 |
 | `backend/tests/loop/test_runner.py` | T2 |
 
 依赖 DAG：`0001/T6 → T1`，`T1 → T2`，`0003/T6 → T2`

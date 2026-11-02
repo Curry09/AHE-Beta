@@ -7,9 +7,9 @@ import tarfile
 
 import pytest
 
-from auto_designer.experiment.config import ConfigError, config_hash
-from auto_designer.experiment.continuation import source
-from auto_designer.experiment.workload import compile_session_plan, task_digest
+from ahe_beta.experiment.config import ConfigError, config_hash
+from ahe_beta.experiment.continuation import source
+from ahe_beta.experiment.workload import compile_session_plan, task_digest
 
 
 def encoded(value):

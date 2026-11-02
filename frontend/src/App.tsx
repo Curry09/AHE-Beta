@@ -27,7 +27,7 @@ import type { AgentRole, Selection, ViewMode } from "./types";
 
 const POLL_MS = 3000;
 
-// 顺序对齐需求面 a → 第一拍(triage∥divergent) → 第二拍(synthesize) → Owner 准入（Spec-0029/0032）。
+// 顺序对齐需求面 a → 第一拍(triage∥divergent) → 第二拍(architect) → Owner 准入（Spec-0029/0032）。
 // divergent 默认编制 0 → 该房间仅在有活动/归档时显示，避免常驻空列。
 // Spec-0032/T7：开发者列退役（交付面在进程外 vigil）——列位保留给历史归档回看（旧 run 的 dev_run），
 // 新交付进度看侧栏「交付面 · PR」面板。
@@ -35,7 +35,7 @@ const ROLES: { role: AgentRole; name: string }[] = [
   { role: "user", name: "用户" },
   { role: "triager", name: "分诊" },
   { role: "divergent", name: "发散" },
-  { role: "synthesizer", name: "结构综合" },
+  { role: "architect", name: "架构师" },
   { role: "owner", name: "准入" },
   { role: "developer", name: "交付面" },
 ];

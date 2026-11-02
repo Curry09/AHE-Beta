@@ -10,7 +10,7 @@ Configure Docker access, host tools, repository credentials and model endpoints 
 
 ## Report a vulnerability
 
-Please use [GitHub private vulnerability reporting](https://github.com/Curry09/auto-designer/security/advisories/new) to report a security issue. If that channel is unavailable, contact a maintainer through an existing private channel to arrange a way to share the report. Keep credentials, exploit details and raw user conversations out of public issues.
+Please use [GitHub private vulnerability reporting](https://github.com/Curry09/AHE-Beta/security/advisories/new) to report a security issue. If that channel is unavailable, contact a maintainer through an existing private channel to arrange a way to share the report. Keep credentials, exploit details and raw user conversations out of public issues.
 
 A useful report includes the affected version or commit, the component involved, reproduction steps and the potential impact. Remove secrets and unrelated private content from any supporting logs or examples.
 

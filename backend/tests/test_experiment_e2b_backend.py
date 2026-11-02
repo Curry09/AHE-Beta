@@ -20,10 +20,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from auto_designer.experiment.backends.base import BackendError
-from auto_designer.experiment.backends.e2b import COLLECTION_PROGRAM, E2BBackend, _write
-from auto_designer.experiment.backends.e2b_bootstrap import BOOTSTRAP_PROGRAM, bootstrap_command
-from auto_designer.experiment.backends.e2b_template import sandbox_facts
+from ahe_beta.experiment.backends.base import BackendError
+from ahe_beta.experiment.backends.e2b import COLLECTION_PROGRAM, E2BBackend, _write
+from ahe_beta.experiment.backends.e2b_bootstrap import BOOTSTRAP_PROGRAM, bootstrap_command
+from ahe_beta.experiment.backends.e2b_template import sandbox_facts
 
 
 @pytest.fixture
@@ -127,7 +127,7 @@ def test_paused_sandbox_not_implicitly_resumed(backend, monkeypatch):
 
 def test_creation_intent_survives_provider_ack_loss(backend, monkeypatch):
     monkeypatch.setattr(
-        "auto_designer.experiment.backends.e2b.resolve_template",
+        "ahe_beta.experiment.backends.e2b.resolve_template",
         lambda **kw: {"selection": "template", "template_id": "template"},
     )
     monkeypatch.setattr(backend, "_owned_sandboxes", lambda: [])
@@ -208,9 +208,9 @@ def test_portable_bootstrap_program_compiles_and_pins_downloads():
 
 
 def test_task_workspace_receipt_binds_complete_catalog_and_actual_owned_paths(backend):
-    from auto_designer.experiment.backends.e2b_bootstrap import task_workspace_record
-    from auto_designer.experiment.config import ConfigError
-    from auto_designer.experiment.workload import task_digest
+    from ahe_beta.experiment.backends.e2b_bootstrap import task_workspace_record
+    from ahe_beta.experiment.config import ConfigError
+    from ahe_beta.experiment.workload import task_digest
 
     backend.manifest["workload_contract_version"] = 1
     tasks, registry = [], {}
@@ -339,7 +339,7 @@ def test_tampered_download_preserves_previous_snapshot(backend, monkeypatch):
 def test_uploaded_frozen_manifest_is_not_relocated(backend, monkeypatch):
     import httpx
 
-    from auto_designer.experiment.backends.e2b_bootstrap import upload_frozen_inputs
+    from ahe_beta.experiment.backends.e2b_bootstrap import upload_frozen_inputs
 
     backend.manifest["materials"] = {"example": {"path": "materials/example.txt"}}
     original = json.dumps({**backend.manifest, "run_dir": "/host/original"})
@@ -347,9 +347,7 @@ def test_uploaded_frozen_manifest_is_not_relocated(backend, monkeypatch):
     material = backend.run_dir / "materials/example.txt"
     material.parent.mkdir()
     material.write_text("frozen")
-    monkeypatch.setattr(
-        "auto_designer.experiment.materials.verify_materials", lambda manifest: None
-    )
+    monkeypatch.setattr("ahe_beta.experiment.materials.verify_materials", lambda manifest: None)
     sandbox = Mock()
     sandbox.connection_config.proxy = None
     sandbox.upload_url.side_effect = lambda path, user: "https://upload.example" + path
@@ -534,7 +532,7 @@ def test_worker_launch_and_root_management_use_real_owned_process_and_files(
         ),
     )
     monkeypatch.setattr(backend, "_sandbox", lambda: sandbox)
-    from auto_designer.experiment import context, engine
+    from ahe_beta.experiment import context, engine
 
     monkeypatch.setattr(
         context,

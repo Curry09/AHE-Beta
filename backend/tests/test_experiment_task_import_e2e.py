@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import cli, materials, workload
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.task_import import import_seed_tasks, import_text_task
+from ahe_beta.experiment import cli, materials, workload
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.task_import import import_seed_tasks, import_text_task
 from test_experiment_materials import prepared_inputs as base_prepared_inputs
 
 ROOT = Path(__file__).resolve().parents[2]

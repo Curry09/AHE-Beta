@@ -51,7 +51,7 @@ def test_current_repository_has_only_supported_public_materials():
 
 def test_unpublished_task_subcommand_is_rejected(monkeypatch):
     # Spec-0076/T2: adapters cannot quietly turn into another experiment launcher.
-    from auto_designer.experiment import cli
+    from ahe_beta.experiment import cli
 
     build_parser = cli.build_parser
 
@@ -115,8 +115,8 @@ def test_archive_destination_cannot_escape_via_symlink(tmp_path):
     "code",
     [
         "import run",
-        "from auto_designer.experiment.controllers import ordinary",
-        "import auto_designer.experiment.controllers.swebench",
+        "from ahe_beta.experiment.controllers import ordinary",
+        "import ahe_beta.experiment.controllers.swebench",
         "from research.archives import old",
         "import importlib\nimportlib.import_module('run')",
     ],

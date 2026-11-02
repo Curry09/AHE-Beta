@@ -25,10 +25,10 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from auto_designer.demand.delivery_evidence import build_package, publish_delivery_evidence
-from auto_designer.models import IssueDraft
-from auto_designer.observations.transport import freeze_transport_profile
-from auto_designer.tracker.gitea import GiteaTracker
+from ahe_beta.demand.delivery_evidence import build_package, publish_delivery_evidence
+from ahe_beta.models import IssueDraft
+from ahe_beta.observations.transport import freeze_transport_profile
+from ahe_beta.tracker.gitea import GiteaTracker
 from check_observation_contract import load_reader, synthetic_store
 
 
@@ -126,7 +126,7 @@ def probe(
             tempfile.TemporaryDirectory(prefix="live-evidence-publisher-") as temporary,
             patch.dict(os.environ, {}, clear=False),
         ):
-            os.environ.pop("AUTO_DESIGNER_OBSERVATION_ROOT", None)
+            os.environ.pop("AHE_BETA_OBSERVATION_ROOT", None)
             root = Path(temporary)
             freeze_transport_profile(root=root / "observations", profile=profile)
             store = synthetic_store(root, issue=issue.number)

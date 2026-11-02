@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.experiment.controllers import runtime
-from auto_designer.models import IssueDraft, Persona, SeedScenario, WorkspaceSpec
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.run_live import expert
+from ahe_beta.experiment.controllers import runtime
+from ahe_beta.models import IssueDraft, Persona, SeedScenario, WorkspaceSpec
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+from ahe_beta.user.sim.run_live import expert
 from test_experiment_materials import aabb_inputs as aabb_inputs
 from test_experiment_materials import prepared_inputs as prepared_inputs
 

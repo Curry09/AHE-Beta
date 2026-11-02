@@ -18,10 +18,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment import batch, engine, runtime, workload
-from auto_designer.experiment.batch_store import BatchStore
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.manifest import read_manifest, read_runtime
+from ahe_beta.experiment import batch, engine, runtime, workload
+from ahe_beta.experiment.batch_store import BatchStore
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.manifest import read_manifest, read_runtime
 from test_experiment_materials import prepared_inputs as prepared_inputs
 
 
@@ -31,15 +31,15 @@ def _json(path):
 
 def _controller(root):
     """A real child process running production sessions, durable stages and seals."""
-    from auto_designer import invocation
-    from auto_designer.experiment.controllers import runtime as shared
-    from auto_designer.loop.orchestrator import Orchestrator
-    from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
-    from auto_designer.models import IssueDraft, Persona, SeedScenario, WorkspaceSpec
-    from auto_designer.tracker.fake import FakeTracker
-    from auto_designer.user.session_store import SessionStore
-    from auto_designer.user.sim.harness_adapter import ScriptedHarness
-    from auto_designer.user.sim.persona_client import ScriptedPersonaClient
+    from ahe_beta import invocation
+    from ahe_beta.experiment.controllers import runtime as shared
+    from ahe_beta.loop.orchestrator import Orchestrator
+    from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore
+    from ahe_beta.models import IssueDraft, Persona, SeedScenario, WorkspaceSpec
+    from ahe_beta.tracker.fake import FakeTracker
+    from ahe_beta.user.session_store import SessionStore
+    from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+    from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
 
     manifest = read_manifest(path=root / "manifest.json")
     catalog = workload.read_task_catalog(root, manifest)
@@ -166,7 +166,7 @@ def _controller(root):
         on_round_end=round_end,
     )
     orchestrator.run(manifest["config"]["rounds"]["count"])
-    (root / "runtime/import-location").write_text(__import__("auto_designer").__file__)
+    (root / "runtime/import-location").write_text(__import__("ahe_beta").__file__)
 
 
 class LostSupervisor(BaseException):
@@ -241,7 +241,7 @@ class Adapter:
         env = {
             "PYTHONPATH": str(source),
             "ROLE_RUNS_DIR": str(self.root / "data/role_runs" / self.id),
-            "AUTO_DESIGNER_RUN_ID": self.id,
+            "AHE_BETA_RUN_ID": self.id,
         }
         receipt = engine.launch_controller(
             run_dir=self.root,
@@ -309,9 +309,7 @@ def setup_batch(prepared_inputs, tmp_path, monkeypatch):
         return real_run(command, *args, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", provider_command)
-    monkeypatch.setattr(
-        "auto_designer.experiment.backends.local.prepare_images", lambda **kwargs: None
-    )
+    monkeypatch.setattr("ahe_beta.experiment.backends.local.prepare_images", lambda **kwargs: None)
     provider = OfflineProvider()
     monkeypatch.setattr(runtime, "backend_v2", provider.adapter)
     path = tmp_path / "batch.json"

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.models import WorkspaceSpec
+from ahe_beta.models import WorkspaceSpec
 
 
 def _git(*, args: list[str], cwd: Path) -> None:
@@ -53,19 +53,19 @@ def _make_repo(*, root: Path) -> tuple[str, str]:
 
 def test_git_auto_registered_without_importing_module() -> None:
     # 可加性硬证据：本测试不 import sources.git，仅 import seed_source，git 即在注册表。
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     assert "git" in seed_source.available_kinds()
 
 
 def test_git_dispatch_to_git_source() -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     assert type(seed_source.get_source("git")).__name__ == "GitSource"
 
 
 def test_git_provisions_snapshot_at_commit(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     repo = tmp_path / "origin"
     c1, c2 = _make_repo(root=repo)
@@ -85,7 +85,7 @@ def test_git_provisions_snapshot_at_commit(tmp_path: Path) -> None:
 
 
 def test_git_dirs_isolated(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     repo = tmp_path / "origin"
     c1, _ = _make_repo(root=repo)
@@ -100,7 +100,7 @@ def test_git_dirs_isolated(tmp_path: Path) -> None:
 
 
 def test_git_missing_repo_or_commit_raises(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     repo = tmp_path / "origin"
     c1, _ = _make_repo(root=repo)
@@ -115,7 +115,7 @@ def test_git_missing_repo_or_commit_raises(tmp_path: Path) -> None:
 
 
 def test_git_clone_failure_raises_with_diagnostics(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     bad = tmp_path / "does-not-exist"
     with pytest.raises(RuntimeError) as ei:
@@ -129,7 +129,7 @@ def test_git_clone_failure_raises_with_diagnostics(tmp_path: Path) -> None:
 
 
 def test_git_checkout_failure_raises_with_diagnostics(tmp_path: Path) -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     repo = tmp_path / "origin"
     _make_repo(root=repo)

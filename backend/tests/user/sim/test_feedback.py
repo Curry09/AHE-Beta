@@ -4,14 +4,14 @@ from dataclasses import replace
 
 import pytest
 
-from auto_designer.loop.sim_user import make_sim_run_session_fn
-from auto_designer.models import Persona, SeedScenario
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.dimensions import D1Eval
-from auto_designer.user.sim.loop import run_session
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient, _validate_stage_output
-from auto_designer.user.sim.run_live import expert
+from ahe_beta.loop.sim_user import make_sim_run_session_fn
+from ahe_beta.models import Persona, SeedScenario
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.dimensions import D1Eval
+from ahe_beta.user.sim.loop import run_session
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient, _validate_stage_output
+from ahe_beta.user.sim.run_live import expert
 
 NOTE = "The result now works, but I had to repeat my request before the tool followed it."
 

@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
-from auto_designer.experiment.task_environments.materials import (  # noqa: E402
+from ahe_beta.experiment.task_environments.materials import (  # noqa: E402
     MaterialError,
     materialize_input,
     sha256_file,

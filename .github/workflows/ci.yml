@@ -154,7 +154,7 @@ jobs:
       - name: Render & graph drift check
         run: |
           PYTHONPATH=$SPEC_PYTHONPATH .venv/bin/python -m openagents.spec.cli render
-          PYTHONPATH=$SPEC_PYTHONPATH .venv/bin/python -m openagents.spec.cli graph --package-root backend/auto_designer
+          PYTHONPATH=$SPEC_PYTHONPATH .venv/bin/python -m openagents.spec.cli graph --package-root backend/ahe_beta
           git diff --exit-code docs/specs
 
   spec-conflicts:

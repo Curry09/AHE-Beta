@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D2Domain,
@@ -17,7 +17,7 @@ from auto_designer.user.sim.dimensions import (
     TrustStance,
     finalize_persona,
 )
-from auto_designer.user.sim.state import (
+from ahe_beta.user.sim.state import (
     TASK_LOAD_DELTA,
     apply_task_load,
     apply_verdict,

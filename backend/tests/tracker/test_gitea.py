@@ -7,9 +7,9 @@ from typing import Any
 import pytest
 import requests
 
-from auto_designer.models import IssueDraft
-from auto_designer.tracker.base import IdempotencyConflictError, IssueTracker
-from auto_designer.tracker.gitea import GiteaError, GiteaTracker, IssueMigrationError
+from ahe_beta.models import IssueDraft
+from ahe_beta.tracker.base import IdempotencyConflictError, IssueTracker
+from ahe_beta.tracker.gitea import GiteaError, GiteaTracker, IssueMigrationError
 
 
 class _Resp:
@@ -498,7 +498,7 @@ def test_non_2xx_raises_with_status() -> None:
 
 
 def test_transient_get_server_error_retries_without_replaying_writes(monkeypatch) -> None:
-    monkeypatch.setattr("auto_designer.tracker.gitea.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("ahe_beta.tracker.gitea.time.sleep", lambda _seconds: None)
     calls: list[str] = []
 
     def handler(method: str, url: str, json: Any) -> _Resp:

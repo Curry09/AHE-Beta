@@ -10,15 +10,15 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import materials
-from auto_designer.experiment.config import (
+from ahe_beta.experiment import materials
+from ahe_beta.experiment.config import (
     ConfigError,
     compose_project,
     config_hash,
     load_config_v2,
     local_ci_enabled,
 )
-from auto_designer.experiment.context import build_controller_environment
+from ahe_beta.experiment.context import build_controller_environment
 from test_experiment_config_v2 import definition, load_fixture_config, write
 from test_experiment_engine import prepared as prepared
 from test_experiment_materials import prepared_inputs as prepared_inputs

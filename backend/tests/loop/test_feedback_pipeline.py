@@ -5,15 +5,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.loop.feedback_pipeline import FeedbackPipeline
-from auto_designer.loop.recovery import (
+from ahe_beta.loop.feedback_pipeline import FeedbackPipeline
+from ahe_beta.loop.recovery import (
     RecoveryConflictError,
     RecoveryIdentity,
     RecoveryStore,
     operation_key,
 )
-from auto_designer.loop.round_gate import RoundDeliveryBlocked
-from auto_designer.usage import current_usage_context
+from ahe_beta.loop.round_gate import RoundDeliveryBlocked
+from ahe_beta.usage import current_usage_context
 
 
 def _store(tmp_path, name="ordinary"):
@@ -107,7 +107,7 @@ def test_bootstrap_and_ordinary_operations_cannot_deduplicate_each_other(tmp_pat
             prerequisite=prerequisite,
             operation_namespace=namespace,
             divergents=[role],
-            synthesizers=[role],
+            architects=[role],
             owner=role,
         )
         _complete_prerequisite(pipeline, prerequisite)
@@ -116,7 +116,7 @@ def test_bootstrap_and_ordinary_operations_cannot_deduplicate_each_other(tmp_pat
         assert role.stores == [store] * 6
     assert operations["ordinary"] == [
         operation_key(1, "divergent", 0),
-        operation_key(1, "synthesizer", 0),
+        operation_key(1, "architect", 0),
         "owner",
     ]
     assert set(operations["ordinary"]).isdisjoint(operations["bootstrap"])
@@ -221,10 +221,10 @@ def test_real_triager_saved_output_retries_failed_side_effect(
     tmp_path, prerequisite, failure_reporting
 ):
     """A failed inner item cannot leave its outer worker falsely completed."""
-    from auto_designer.demand.triage import TriageOutcome, Triager
-    from auto_designer.models import IssueDraft
-    from auto_designer.tracker.fake import FakeTracker
-    from auto_designer.user.session_store import SessionStore
+    from ahe_beta.demand.triage import TriageOutcome, Triager
+    from ahe_beta.models import IssueDraft
+    from ahe_beta.tracker.fake import FakeTracker
+    from ahe_beta.user.session_store import SessionStore
 
     tracker = FakeTracker()
     number = tracker.create_issue(
@@ -291,10 +291,10 @@ def test_real_triager_saved_output_retries_failed_side_effect(
 
 
 def test_objective_feedback_binds_real_roles_at_pipeline_construction(tmp_path):
-    from auto_designer.demand.divergent import Divergent
-    from auto_designer.demand.triage import Triager
-    from auto_designer.tracker.fake import FakeTracker
-    from auto_designer.user.session_store import SessionStore
+    from ahe_beta.demand.divergent import Divergent
+    from ahe_beta.demand.triage import Triager
+    from ahe_beta.tracker.fake import FakeTracker
+    from ahe_beta.user.session_store import SessionStore
 
     store = _store(tmp_path)
     args = (FakeTracker(), SessionStore(tmp_path / "sessions"), str(tmp_path), str(tmp_path))

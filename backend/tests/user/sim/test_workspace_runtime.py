@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from auto_designer.user.sim.runtime import DockerWorkspaceRuntime, LocalWorkspaceRuntime
+from ahe_beta.user.sim.runtime import DockerWorkspaceRuntime, LocalWorkspaceRuntime
 
 
 def test_local_runtime_rejects_escape_and_round_trips_text(tmp_path) -> None:
@@ -24,7 +24,7 @@ def test_docker_command_timeout_invalidates_whole_container(monkeypatch) -> None
             raise subprocess.TimeoutExpired(args, kwargs.get("timeout", 1))
         return subprocess.CompletedProcess(args, 0, "", "")
 
-    monkeypatch.setattr("auto_designer.user.sim.runtime.subprocess.run", fake_run)
+    monkeypatch.setattr("ahe_beta.user.sim.runtime.subprocess.run", fake_run)
     runtime = DockerWorkspaceRuntime(
         container_id="c1",
         container_name="session-1",

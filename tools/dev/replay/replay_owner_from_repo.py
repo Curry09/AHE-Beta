@@ -21,7 +21,7 @@ from tools.dev import add_inputs, role_environment, run_inputs
 ROOT = Path(__file__).resolve().parents[3] / "backend"
 sys.path.insert(0, str(ROOT))
 
-from auto_designer.experiment.controllers import runtime as run_mod  # noqa: E402
+from ahe_beta.experiment.controllers import runtime as run_mod  # noqa: E402
 
 
 def main() -> int:
@@ -58,7 +58,7 @@ def main() -> int:
 
     run_mod._isolate_git_credentials()
 
-    from auto_designer.demand.issue_schema import (  # noqa: PLC0415
+    from ahe_beta.demand.issue_schema import (  # noqa: PLC0415
         DECLINED,
         MERGED,
         OPENAGENTS,
@@ -66,10 +66,10 @@ def main() -> int:
         READY,
         plane,
     )
-    from auto_designer.demand.owner import Owner  # noqa: PLC0415
-    from auto_designer.models import IssueDraft  # noqa: PLC0415
-    from auto_designer.tracker.gitea import GiteaTracker  # noqa: PLC0415
-    from auto_designer.user.session_store import SessionStore  # noqa: PLC0415
+    from ahe_beta.demand.owner import Owner  # noqa: PLC0415
+    from ahe_beta.models import IssueDraft  # noqa: PLC0415
+    from ahe_beta.tracker.gitea import GiteaTracker  # noqa: PLC0415
+    from ahe_beta.user.session_store import SessionStore  # noqa: PLC0415
 
     def tracker(repo: str) -> GiteaTracker:
         return GiteaTracker(base_url=base, owner=gitea["OWNER"], repo=repo, token=gitea["TOKEN"])

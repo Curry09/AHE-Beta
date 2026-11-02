@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.task_environments.contract import (
+from ahe_beta.experiment.task_environments.contract import (
     container_environment,
     environment_identity,
 )
-from auto_designer.experiment.task_environments.docker import (
+from ahe_beta.experiment.task_environments.docker import (
     _START_NATIVE_SERVICE,
     _START_SERVICE,
     LABEL,
@@ -375,7 +375,7 @@ def test_verified_input_staging_is_once_and_interrupted_copy_is_not_replayed(tmp
         return {"input": "f" * 64}
 
     monkeypatch.setattr(
-        "auto_designer.experiment.task_environments.materials.materialize_input", materialize
+        "ahe_beta.experiment.task_environments.materials.materialize_input", materialize
     )
     monkeypatch.setattr(m, "_docker", lambda **kwargs: copies.append(kwargs["argv"]))
     m.open()
@@ -413,7 +413,7 @@ def test_task_service_readiness_and_relative_finalizer_share_task_workdir(tmp_pa
 
 
 def test_incomplete_finalization_cannot_be_adopted_as_collection_or_restart_actor(tmp_path):
-    from auto_designer.experiment.task_environments.docker import resume_collection
+    from ahe_beta.experiment.task_environments.docker import resume_collection
 
     m = manager(tmp_path)
     runtime = m.open()

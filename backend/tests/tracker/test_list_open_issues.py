@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from test_gitea import _FakeSession, _Resp
 
-from auto_designer.models import IssueDraft
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.tracker.gitea import GiteaTracker
+from ahe_beta.models import IssueDraft
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.tracker.gitea import GiteaTracker
 
 
 def test_fake_lists_only_open() -> None:

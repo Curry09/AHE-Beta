@@ -13,9 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from auto_designer.experiment.batch_config import load_batch_config  # noqa: E402
-from auto_designer.experiment.config import ConfigError  # noqa: E402
-from auto_designer.experiment.materials import check_materials  # noqa: E402
+from ahe_beta.experiment.batch_config import load_batch_config  # noqa: E402
+from ahe_beta.experiment.config import ConfigError  # noqa: E402
+from ahe_beta.experiment.materials import check_materials  # noqa: E402
 
 PUBLIC_COMMANDS = {
     "check",
@@ -38,8 +38,8 @@ TASK_COMMANDS = {"import-seeds", "from-text"}
 RETIRED_PATHS = (
     "run.sh",
     "backend/run.py",
-    "backend/auto_designer/experiment/controllers/ordinary.py",
-    "backend/auto_designer/experiment/controllers/swebench.py",
+    "backend/ahe_beta/experiment/controllers/ordinary.py",
+    "backend/ahe_beta/experiment/controllers/swebench.py",
     "backend/scripts/run_auditable_experiment.py",
     "backend/scripts/run_mixed_closed_loop.py",
     "backend/scripts/run_swebench_closed_loop.py",
@@ -115,7 +115,7 @@ def inventory_errors(root: Path) -> list[str]:
 
 def maintained_import_errors(root: Path) -> list[str]:
     errors: list[str] = []
-    for prefix in ["backend/auto_designer", "backend/scripts", "tools/dev", "evaluation"]:
+    for prefix in ["backend/ahe_beta", "backend/scripts", "tools/dev", "evaluation"]:
         for path in (root / prefix).rglob("*.py"):
             if "__pycache__" in path.parts:
                 continue
@@ -131,7 +131,7 @@ def maintained_import_errors(root: Path) -> list[str]:
                     modules = [x.name for x in node.names]
                 elif isinstance(node, ast.ImportFrom):
                     modules = [node.module or ""]
-                    if node.module == "auto_designer.experiment.controllers":
+                    if node.module == "ahe_beta.experiment.controllers":
                         modules.extend(f"{node.module}.{name.name}" for name in node.names)
                 for module in modules:
                     if (
@@ -140,8 +140,8 @@ def maintained_import_errors(root: Path) -> list[str]:
                         or module == "run_auditable_experiment"
                         or module
                         in {
-                            "auto_designer.experiment.controllers.ordinary",
-                            "auto_designer.experiment.controllers.swebench",
+                            "ahe_beta.experiment.controllers.ordinary",
+                            "ahe_beta.experiment.controllers.swebench",
                         }
                         or module.startswith("research.")
                     ):
@@ -192,8 +192,8 @@ def check_repository(root: Path) -> dict:
         except (ConfigError, OSError, ValueError) as exc:
             errors.append(f"{path.relative_to(root)}: {exc}")
     errors.extend(maintained_import_errors(root))
-    from auto_designer.experiment.cli import build_parser
-    from auto_designer.experiment.materials import _SOURCE_ROOTS
+    from ahe_beta.experiment.cli import build_parser
+    from ahe_beta.experiment.materials import _SOURCE_ROOTS
 
     parser = build_parser()
     command_actions = [a for a in parser._actions if isinstance(a, argparse._SubParsersAction)]

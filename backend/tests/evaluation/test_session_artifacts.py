@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.evaluation.artifacts import collect_session_artifacts
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.grading_inputs import archived_artifacts
-from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+from ahe_beta.evaluation.artifacts import collect_session_artifacts
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.grading_inputs import archived_artifacts
+from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 
 
 def declaration(path="output.xlsx", **values):

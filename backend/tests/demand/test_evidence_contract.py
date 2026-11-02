@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from auto_designer.demand import issue_schema as sc
-from auto_designer.demand.divergent import Divergent
-from auto_designer.demand.evidence_contract import (
+from ahe_beta.demand import issue_schema as sc
+from ahe_beta.demand.divergent import Divergent
+from ahe_beta.demand.evidence_contract import (
     EvidenceLevel,
     build_evidence_envelope,
     build_l1_summary,
@@ -14,14 +14,14 @@ from auto_designer.demand.evidence_contract import (
     validate_envelope,
     validate_role_access,
 )
-from auto_designer.demand.owner import Owner
-from auto_designer.demand.session_timeline import (
+from ahe_beta.demand.owner import Owner
+from ahe_beta.demand.session_timeline import (
     bind_session_store,
     get_harness_beat,
     get_session_timeline,
 )
-from auto_designer.demand.triage import Triager
-from auto_designer.models import (
+from ahe_beta.demand.triage import Triager
+from ahe_beta.models import (
     FeelingScore,
     IssueDraft,
     IssueRef,
@@ -33,9 +33,9 @@ from auto_designer.models import (
     SimTurn,
     Transcript,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
 
 
 def _session(tmp_path: Path | None = None) -> Session:
@@ -125,13 +125,13 @@ def test_envelope_separates_user_and_objective_lanes() -> None:
     assert validate_envelope(envelope) == []
     triage = project_for_role(envelope, "triager")
     pm = project_for_role(envelope, "divergent")
-    synth = project_for_role(envelope, "synthesizer")
+    architect = project_for_role(envelope, "architect")
     owner = project_for_role(envelope, "owner")
     assert triage["source_report"]["issue_id"] == 7
     assert "goal_summary" in triage["user_evidence"]
     assert triage["objective_evidence"]["status"] == "failed"
     assert "source_report" not in pm and "user_evidence" in pm
-    assert set(synth) <= {"level", "session_id", "evidence_refs"}
+    assert set(architect) <= {"level", "session_id", "evidence_refs"}
     assert set(owner) <= {"level", "session_id", "evidence_refs"}
 
 
@@ -147,7 +147,7 @@ def test_legacy_session_is_explicitly_unavailable() -> None:
 
 def test_role_access_fails_closed_for_forbidden_levels() -> None:
     assert validate_role_access(role="owner", level="L3")[0] is False
-    assert validate_role_access(role="synthesizer", level="L4")[0] is False
+    assert validate_role_access(role="architect", level="L4")[0] is False
     assert validate_role_access(role="pm", level="L3")[0] is True
     assert (
         validate_role_access(role="triager", level="L2", session_id="s2", source_session_id="s1")[0]
@@ -179,7 +179,7 @@ def test_session_store_persists_and_triage_consumes_handoff(tmp_path, monkeypatc
         captured.append(kwargs.get("message") or (args[1] if len(args) > 1 else ""))
         return '{"dispositions": []}'
 
-    monkeypatch.setattr("auto_designer.demand.triage.run_agent_def", fake_run)
+    monkeypatch.setattr("ahe_beta.demand.triage.run_agent_def", fake_run)
     triager = Triager(tracker, store, str(tmp_path / "harness"), str(tmp_path / "agent"))
     triager.triage_once()
     assert captured and "目标感知用户证据" in captured[0]
@@ -226,7 +226,7 @@ def test_timeline_tools_enforce_role_visibility_and_audit_reason(tmp_path, monke
 
 def contract_session(*, sid="session-current", followup="unavailable"):
     """Current immutable public declaration with an ungraded/missing experience axis."""
-    from auto_designer.execution_contract import canonical_sha256, make_execution_contract
+    from ahe_beta.execution_contract import canonical_sha256, make_execution_contract
 
     scenario = SeedScenario(description="Complete the original public goal without extra input.")
     declaration = make_execution_contract(
@@ -274,7 +274,7 @@ def test_direct_goal_and_missing_rating_remain_distinct_from_execution_outcome()
     assert l1["feedback_events"][0]["status"] == "missing"
     envelope = build_evidence_envelope(session)
     assert envelope.user_evidence["task_assessment"]["status"] == "unfulfilled"
-    for role in ("triage", "pm", "synthesizer", "owner"):
+    for role in ("triage", "pm", "architect", "owner"):
         projection = project_for_role(envelope, role)
         assert projection["execution_contracts"] == [session.execution_contract]
         if role == "pm":
@@ -306,8 +306,8 @@ def test_actual_role_runtime_receives_granted_contracts_even_for_owner(tmp_path,
 
     import nexau
 
-    from auto_designer.demand.agent_runtime import run_agent_def
-    from auto_designer.observations.grants import grant
+    from ahe_beta.demand.agent_runtime import run_agent_def
+    from ahe_beta.observations.grants import grant
 
     session = contract_session()
     store = SessionStore(tmp_path / "sessions")
@@ -333,7 +333,7 @@ def test_actual_role_runtime_receives_granted_contracts_even_for_owner(tmp_path,
     agent_dir = tmp_path / "agent"
     agent_dir.mkdir()
     (agent_dir / "agent.yaml").write_text("test")
-    for role in ("owner", "synthesizer", "divergent", "triager"):
+    for role in ("owner", "architect", "divergent", "triager"):
         with bind_usage_context(session_id=session.session_id):
             run_agent_def(
                 agent_dir,

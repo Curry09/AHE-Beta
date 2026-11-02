@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.distill.library import (
+from ahe_beta.distill.library import (
     D5_AREA_VOCAB,
     PersonaLibrary,
     validate_card,

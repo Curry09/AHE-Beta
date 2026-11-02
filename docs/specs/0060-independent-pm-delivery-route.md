@@ -3,7 +3,7 @@ number: "0060"
 title: 独立 PM 路线与双轨交付协调
 issue: 0
 slug: independent-pm-delivery-route
-summary: PM 独立交给 Owner，不进入 Synthesizer 的输入和证据授权；Synthesizer 综合交付路线提案；Owner 显式关联共享工作并保留独立验收。
+summary: PM 独立交给 Owner，不进入 Architect 的输入和证据授权；Architect 综合交付路线提案；Owner 显式关联共享工作并保留独立验收。
 tasks:
   - id: T1
     title: 双轨角色边界与协调契约
@@ -14,18 +14,18 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/synthesizer.py
-      - backend/auto_designer/demand/owner.py
-      - backend/auto_designer/demand/agent_contract.py
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/agent_defs/synthesizer/systemprompt.md
+      - backend/ahe_beta/demand/architect.py
+      - backend/ahe_beta/demand/owner.py
+      - backend/ahe_beta/demand/agent_contract.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/agent_defs/architect/systemprompt.md
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/owner/systemprompt.md
       - backend/agent_defs/owner/tools/submit_admission.tool.yaml
-      - backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml
+      - backend/agent_defs/architect/tools/submit_rfcs.tool.yaml
       - CLAUDE.md
-    scope: 从 Synthesizer 输入及证据授权排除 PM；Owner 标注 delivery_overlaps 但不吞并独立目标。
-    acceptance: PM proposal/ready 不进入 Synthesizer 输入；引用 PM 被按不可见来源拒绝，covers 不能关闭 PM；Owner 保持独立交接。
+    scope: 从 Architect 输入及证据授权排除 PM；Owner 标注 delivery_overlaps 但不吞并独立目标。
+    acceptance: PM proposal/ready 不进入 Architect 输入；引用 PM 被按不可见来源拒绝，covers 不能关闭 PM；Owner 保持独立交接。
   - id: T2
     title: 角色与跨轮观测回归和实验审计
     status: done
@@ -49,7 +49,7 @@ tasks:
 
 ## Summary
 
-恢复独立产品路线：PM → Owner，与 Triage → Synthesizer → Owner 汇合。Synthesizer 不读取
+恢复独立产品路线：PM → Owner，与 Triage → Architect → Owner 汇合。Architect 不读取
 PM 提案，不能引用或关闭 PM，也不能将 PM 的产品洞察重写为结构提案。Owner 识别
 跨路线共享工作，用关联和独立验收表达，不恢复产品价值审核或随意的语义合并。
 
@@ -61,11 +61,11 @@ PM 产品目标只能以结构方案的形式进入交付。例如“随时纠�
 
 ## Guide-level explanation
 
-第一拍仍并行运行 Triage 与 PM，第二拍运行 Synthesizer，随后 Owner 批量接收两条路线。
+第一拍仍并行运行 Triage 与 PM，第二拍运行 Architect，随后 Owner 批量接收两条路线。
 这里的独立是语义路由和交付资格，不承诺 PM 完成后立即提前调用 Owner。
 
-Synthesizer 只看到交付路线的开放提案和 ready 工作项。PM 的 provenance 为 `from-divergent`，
-历史 `divergent` 同样被筛除，包括已准入的 PM 工作项。没有结构产物、Synthesizer 失败或
+Architect 只看到交付路线的开放提案和 ready 工作项。PM 的 provenance 为 `from-divergent`，
+历史 `divergent` 同样被筛除，包括已准入的 PM 工作项。没有结构产物、Architect 失败或
 模型越权，都不会消除 PM。保留原有跨提案综合要求，不再额外计算“非 PM 来源数量”。
 
 Owner 通过可选 `delivery_overlaps` 引用可见 proposal/ready，在 handoff 中说明共享工作
@@ -74,11 +74,11 @@ Owner 通过可选 `delivery_overlaps` 引用可见 proposal/ready，在 handoff
 
 ## Reference-level explanation
 
-Synthesizer driver 在组装任何输入前按 provenance 筛除 PM，正常调用与协议恢复调用复用
+Architect driver 在组装任何输入前按 provenance 筛除 PM，正常调用与协议恢复调用复用
 同一筛选结果。ProposalView、ready、可引用来源、covers 集合及 session 授权均由该
 结果生成。若模型自行引用 PM 票号，既有来源检查返回 `foreign-source` 并记录
 `rejected_proposals`；不增加 PM 特有的来源计数规则。有效结构票只继承其引用的可见
-来源 session。PM-only session 不因存在一张 PM 票就获得 Synthesizer 的取证授权。
+来源 session。PM-only session 不因存在一张 PM 票就获得 Architect 的取证授权。
 
 Owner 的 schema 新增可选整数数组 `delivery_overlaps`，driver 过滤自身、report、未知票
 和非整数，并记录 invalid 元数据，不因协调字段非法而丢掉交接。关联随交接注释保存，
@@ -94,15 +94,15 @@ T1 修改职责 prompt、schema、driver 与架构说明；T2 验证越权保护
 
 ## Rationale and alternatives
 
-拒绝继续让 Synthesizer 整体吸收 PM，因为这会把两种认知视角最终压成一种结构语言。
-本组初版采用“可参考、不可吞并”，后按用户澄清改为输入隔离：Synthesizer 不需要先看 PM
+拒绝继续让 Architect 整体吸收 PM，因为这会把两种认知视角最终压成一种结构语言。
+本组初版采用“可参考、不可吞并”，后按用户澄清改为输入隔离：Architect 不需要先看 PM
 再遵守一组使用例外。产品与结构视角只在 Owner 汇合，不恢复额外价值评审或实现层裁决。
 
 ## Prior art
 
-0029 区分 discovery/delivery，0043 保留 PM 产品视角。0052 将开放来源吸收交给 Synthesizer；
+0029 区分 discovery/delivery，0043 保留 PM 产品视角。0052 将开放来源吸收交给 Architect；
 本组收窄其输入与权限，排除 PM，并补充 Owner 的跨路线交付关联。0059 取证工具不变，
-Synthesizer 的授权仍由可见提案引用派生，因此随输入筛选收窄。
+Architect 的授权仍由可见提案引用派生，因此随输入筛选收窄。
 
 ## Unresolved questions
 

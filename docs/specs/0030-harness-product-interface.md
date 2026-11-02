@@ -3,7 +3,7 @@ number: "0030"
 title: harness 产品化边界：/help 用户说明、平台侧接口与 connector 适配
 issue: 0
 slug: harness-product-interface
-summary: 把 harness 收敛为真人可运行产品：harness 模板内只保留 HELP.md 作为 /help 内容源、RUNTIME.md 作为维护说明；README/USER/MANUAL 不再作为模板文档，INTERFACE 归 auto-designer 平台侧；connector 适配 sim-user 到真人接口；launcher/template 支持 stdio-jsonl-v1 并兼容 legacy。
+summary: 把 harness 收敛为真人可运行产品：harness 模板内只保留 HELP.md 作为 /help 内容源、RUNTIME.md 作为维护说明；README/USER/MANUAL 不再作为模板文档，INTERFACE 归 AHE-Beta 平台侧；connector 适配 sim-user 到真人接口；launcher/template 支持 stdio-jsonl-v1 并兼容 legacy。
 tasks:
   - id: T1
     title: 写 0030 活快照
@@ -15,7 +15,7 @@ tasks:
     parallel: false
     files:
       - docs/specs/0030-harness-product-interface.md
-    scope: 明确 harness=真人可运行产品、auto-designer=训练/观测平台、connector=sim-user 到 human-facing interface adapter；用户帮助由 /help 读取 HELP.md；平台接口文档归 auto-designer；不把 persona/feeling/issue/round/triage/sim_trace/user simulator 放进 harness。
+    scope: 明确 harness=真人可运行产品、ahe-beta=训练/观测平台、connector=sim-user 到 human-facing interface adapter；用户帮助由 /help 读取 HELP.md；平台接口文档归 ahe-beta；不把 persona/feeling/issue/round/triage/sim_trace/user simulator 放进 harness。
     acceptance: spec validate 通过；正文含 Summary/Motivation/Reference-level explanation/Rationale and alternatives；任务按 HELP/RUNTIME、平台侧接口、connector/protocol、边界分配清楚。
   - id: T2
     title: harness_template 精简为 HELP/RUNTIME/scripts/deps
@@ -61,7 +61,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/guards/harness_boundary.py
+      - backend/ahe_beta/guards/harness_boundary.py
       - backend/tests/guards/test_harness_boundary.py
     scope: guards/harness_boundary 使用产品提交拒绝清单：拒绝 .env、.env.*（.env.example 例外）和顶层 .openagents；正常产品代码、文档与配置可提交。
     acceptance: HELP/RUNTIME/docs/src 与 .env.example 可提交；.env、.env.local 和 .openagents 被拒；本地钩子与 seed smoke 规则一致。
@@ -75,16 +75,16 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/connector.py
+      - backend/ahe_beta/harness/connector.py
       - backend/tests/harness/test_connector.py
-      - backend/auto_designer/loop/sim_user.py
+      - backend/ahe_beta/loop/sim_user.py
       - backend/tests/loop/test_sim_user.py
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_heartbeat.py
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/harness/launcher.py
       - backend/tests/harness/test_launcher.py
       - backend/harness_template/params.yaml
-      - backend/auto_designer/harness/INTERFACE.md
+      - backend/ahe_beta/harness/INTERFACE.md
     scope: connector 作为平台侧 adapter，把 sim-user 的 send/interrupt/shutdown 映射到真人接口；launcher 根据 params.yaml protocol/interface 选择 stdio-jsonl-v1 或 legacy wire；模板声明 v1 并双读 legacy/v1；平台侧 INTERFACE.md 记录 connector/launcher 协议。
     acceptance: connector 满足 HarnessInterface；interrupt/give_up 走 connector 命名 API；launcher v1 fake entry 的 message/progress/reply/error/interrupt 测试通过且 legacy 继续通过；sim_user 离线跑通；平台侧 INTERFACE.md 存在并记录 v1/legacy。
 ---
@@ -97,20 +97,20 @@ tasks:
 
 旧内置 Developer 收尾中间件及其配置接线（原 T5）已退役；HELP.md 的平台读取行为仍由 T6 的 launcher 与接口测试覆盖。
 
-本组把 harness 从“auto-designer 闭环里的被测对象片段”收敛为“真人可运行产品”的种子：harness 模板内只保留 `HELP.md` 作为 `/help` 内容源、`RUNTIME.md` 作为维护者说明，配合 `.env.example` / `requirements.txt` / `scripts/` / `tests/` 支撑独立运行和自测；`README.md`、`USER.md`、`MANUAL.md` 不再作为模板文档，`INTERFACE.md` 归 auto-designer 平台侧。
+本组把 harness 从“ahe-beta 闭环里的被测对象片段”收敛为“真人可运行产品”的种子：harness 模板内只保留 `HELP.md` 作为 `/help` 内容源、`RUNTIME.md` 作为维护者说明，配合 `.env.example` / `requirements.txt` / `scripts/` / `tests/` 支撑独立运行和自测；`README.md`、`USER.md`、`MANUAL.md` 不再作为模板文档，`INTERFACE.md` 归 AHE-Beta 平台侧。
 
 同时，平台侧新增 `HarnessConnector` 作为 sim-user 到真人接口的 adapter，并让 launcher/template 支持 `stdio-jsonl-v1`：新模板通过 `params.yaml` 声明 v1，旧 wire 仍兼容。harness 不接收 persona、feeling、issue、round、triage、sim_trace 等训练/观测概念。
 
 ## Motivation
 
-“自包含 harness”的重点不是堆文档，而是让真人或维护者只看 harness 仓就知道如何使用和维护这个产品，同时让 auto-designer 平台通过 connector 适配它。此前 README / USER / MANUAL / INTERFACE 同时存在，职责重叠且容易把平台接缝文档塞进 harness 本体；这会让被进化目标混入训练平台概念，削弱边界。
+“自包含 harness”的重点不是堆文档，而是让真人或维护者只看 harness 仓就知道如何使用和维护这个产品，同时让 AHE-Beta 平台通过 connector 适配它。此前 README / USER / MANUAL / INTERFACE 同时存在，职责重叠且容易把平台接缝文档塞进 harness 本体；这会让被进化目标混入训练平台概念，削弱边界。
 
-本组将用户帮助收敛到产品内 `/help`，将协议说明移到平台侧，并用 connector 把模拟用户动作适配成人类会对 harness 做的动作。这样 harness 是产品，auto-designer 是训练/观测平台，connector/launcher 是接缝。
+本组将用户帮助收敛到产品内 `/help`，将协议说明移到平台侧，并用 connector 把模拟用户动作适配成人类会对 harness 做的动作。这样 harness 是产品，ahe-beta 是训练/观测平台，connector/launcher 是接缝。
 
 ## Guide-level explanation
 
 ```text
-auto-designer
+AHE-Beta
   user simulator / feeling / issue / triage / metrics / orchestrator
           │
           ▼
@@ -126,7 +126,7 @@ harness repo 内只有两类文字说明：
 - `HELP.md`：给真人用户看的 `/help` 内容源，说明能做什么、怎么退出、怎么打断、工作区语义。
 - `RUNTIME.md`：给维护者看的运行边界，说明 harness 仓、workspace、NexAU、session/timeout/interrupt 等维护约束。
 
-程序接口说明不放在 harness 模板内，放在 `backend/auto_designer/harness/INTERFACE.md`，因为它服务 connector/launcher 维护者。
+程序接口说明不放在 harness 模板内，放在 `backend/ahe_beta/harness/INTERFACE.md`，因为它服务 connector/launcher 维护者。
 
 ## Reference-level explanation
 
@@ -214,7 +214,7 @@ uv run pytest backend/tests/user/sim/test_heartbeat.py backend/tests/harness/tes
 
 ### 为什么 INTERFACE 不在 harness_template
 
-协议细节服务 auto-designer connector/launcher 维护者，不是给真人用户看的能力说明。把它放在平台侧能避免 harness 模板承担接缝文档职责。
+协议细节服务 AHE-Beta connector/launcher 维护者，不是给真人用户看的能力说明。把它放在平台侧能避免 harness 模板承担接缝文档职责。
 
 ### 为什么不保留 README
 

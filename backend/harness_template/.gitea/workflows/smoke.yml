@@ -23,7 +23,7 @@ jobs:
       - name: 边界检查（服务端硬化——pre-commit 可被 --no-verify 绕，此处绕不开）
         run: |
           python3 - <<'EOF'
-          # Spec-0040/T3：拒绝清单与 auto-designer 的 dev/harness_boundary.py 同源（仓独立、无法 import，改动须两处同步）。
+          # Spec-0040/T3：拒绝清单与 AHE-Beta 的 dev/harness_boundary.py 同源（仓独立、无法 import，改动须两处同步）。
           # 容器围堵后不再用顶层白名单：docs/specs、新目录、pyproject 都是合法演进；只拦密钥和 vigil 运行态。
           import os
           import sys

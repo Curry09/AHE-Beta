@@ -117,7 +117,7 @@ def _run_one(
     activities: list[list[str]],
     d1: object | None = None,
 ) -> None:
-    from auto_designer.user.sim.dimensions import (
+    from ahe_beta.user.sim.dimensions import (
         D1Eval,
         D2Depth,
         D2Domain,
@@ -128,8 +128,8 @@ def _run_one(
         Persona,
         finalize_persona,
     )
-    from auto_designer.user.sim.loop import run_session
-    from auto_designer.user.sim.persona_client import ApiPersonaClient
+    from ahe_beta.user.sim.loop import run_session
+    from ahe_beta.user.sim.persona_client import ApiPersonaClient
 
     eval_d1 = d1 if d1 is not None else D1Eval.EXPERT
     persona = finalize_persona(

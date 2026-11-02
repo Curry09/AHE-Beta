@@ -12,7 +12,7 @@ description: >-
 Turn a Scout candidate into artifacts that another agent can verify independently. You may inspect the
 resolution, but resolution-derived information must never leak into the user-visible prompt.
 
-When operating inside auto-designer, read [`../seed-card-schema.md`](../seed-card-schema.md) and the source
+When operating inside ahe-beta, read [`../seed-card-schema.md`](../seed-card-schema.md) and the source
 mechanics in [`../extract-harness-seed/reference.md`](../extract-harness-seed/reference.md).
 
 ## Inputs

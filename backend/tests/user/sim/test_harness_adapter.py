@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.harness.interface import HarnessInterface
-from auto_designer.user.sim import demo
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.scenarios import SplitBillHarness
+from ahe_beta.harness.interface import HarnessInterface
+from ahe_beta.user.sim import demo
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.scenarios import SplitBillHarness
 
 
 def test_stubs_satisfy_repo_harness_interface() -> None:

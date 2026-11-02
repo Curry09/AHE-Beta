@@ -41,6 +41,8 @@ backend/.env
 .e2b
 .boyue
 .profiles/
+ahe-beta-experiments/
+# Keep historical experiment outputs private.
 auto-designer-experiments/
 
 # Spec-0069/T6: frozen runs, credentials and private experiment artifacts.

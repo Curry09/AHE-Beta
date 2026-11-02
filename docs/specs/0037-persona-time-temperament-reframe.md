@@ -27,10 +27,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/dimensions.py
-      - backend/auto_designer/user/sim/state.py
-      - backend/auto_designer/user/sim/clauses.py
-      - backend/auto_designer/user/sim/demo.py
+      - backend/ahe_beta/user/sim/dimensions.py
+      - backend/ahe_beta/user/sim/state.py
+      - backend/ahe_beta/user/sim/clauses.py
+      - backend/ahe_beta/user/sim/demo.py
       - backend/tests/user/sim/test_dimensions.py
       - backend/tests/user/sim/test_state.py
       - backend/tests/user/sim/test_heartbeat.py
@@ -61,7 +61,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/persona_io.py
+      - backend/ahe_beta/user/sim/persona_io.py
       - backend/tests/user/sim/test_persona_io.py
     scope: card_to_persona 映射 D7_time_temperament → Persona.tempo；缺字段回落 steady（旧卡兼容，不报错）；非法枚举仍报错。D6Authz 仍不从卡读。配套单测。
     acceptance: 有 D7 的卡注入 tempo 正确；无 D7 卡 tempo=steady；非法 D7 报错；既有 grounded 覆盖派生（D2/D4）不回归。

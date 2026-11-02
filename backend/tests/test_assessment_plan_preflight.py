@@ -11,13 +11,13 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from auto_designer.evaluation.adapters import container, profiles
-from auto_designer.evaluation.adapters.custom import CustomAdapter
-from auto_designer.evaluation.contracts import InputValidationError
-from auto_designer.evaluation.service import build_request
-from auto_designer.experiment.assessment_worker import registration
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.grading_inputs import load_grading_plan
+from ahe_beta.evaluation.adapters import container, profiles
+from ahe_beta.evaluation.adapters.custom import CustomAdapter
+from ahe_beta.evaluation.contracts import InputValidationError
+from ahe_beta.evaluation.service import build_request
+from ahe_beta.experiment.assessment_worker import registration
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.grading_inputs import load_grading_plan
 
 REVISION = "a" * 40
 

@@ -152,7 +152,7 @@ health(a, now)（异常>卡顿>运行>完成）与 fmtDur、STALE_MS，供复用
 既有实现：frontend/src/components/AgentsPanel.tsx（health/fmtDur/STALE_MS 原逻辑出处，本 Task 抽出后删除）、
 frontend/src/types.ts（Agent DTO 契约）、frontend/src/hooks/useLiveData.ts、frontend/src/api.ts
 （getAgents/getSessions）、frontend/src/pages/SessionDetail.tsx（点击跳转目标）、frontend/src/index.css
-（既有 ok/warn/err/idle 色板与 dot/badge 样式）。后端 backend/auto_designer/web/api.py（/api/agents、
+（既有 ok/warn/err/idle 色板与 dot/badge 样式）。后端 backend/ahe_beta/web/api.py（/api/agents、
 /api/sessions）、loop/live.py（agents.json 写入）、run.py（agent_id/label 约定）。
 
 ## Unresolved questions

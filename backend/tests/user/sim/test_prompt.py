@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D2Domain,
@@ -13,8 +13,8 @@ from auto_designer.user.sim.dimensions import (
     Persona,
     finalize_persona,
 )
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient, _parse_json
-from auto_designer.user.sim.prompt import (
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient, _parse_json
+from ahe_beta.user.sim.prompt import (
     build_issue_turn,
     build_main_act_turn,
     build_main_final_check_turn,
@@ -28,7 +28,7 @@ from auto_designer.user.sim.prompt import (
     build_waiting_intent_turn,
     build_waiting_judge_turn,
 )
-from auto_designer.user.sim.state import State, init_state
+from ahe_beta.user.sim.state import State, init_state
 
 
 def _persona(d1: D1Eval = D1Eval.EXPERT, d43: D43Correct = D43Correct.FILE_ISSUE) -> Persona:

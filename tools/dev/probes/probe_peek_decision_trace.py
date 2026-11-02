@@ -89,7 +89,7 @@ class TracingClient:
     """包一层 ApiPersonaClient，只把 waiting 三跳的关键字段打出来。"""
 
     def __init__(self) -> None:
-        from auto_designer.user.sim.persona_client import ApiPersonaClient
+        from ahe_beta.user.sim.persona_client import ApiPersonaClient
 
         self._inner = ApiPersonaClient()
         self.n = 0
@@ -155,8 +155,8 @@ def main() -> int:
     add_inputs(parser)
     args = parser.parse_args()
     sys.path.insert(0, str(ROOT))
-    from auto_designer.user.sim.loop import run_session
-    from auto_designer.user.sim.persona_io import card_to_persona
+    from ahe_beta.user.sim.loop import run_session
+    from ahe_beta.user.sim.persona_io import card_to_persona
 
     cards = load_persona_cards(args.persona_library)
     card = selected_personas(cards, [args.persona])[0]

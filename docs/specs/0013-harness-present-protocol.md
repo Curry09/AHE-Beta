@@ -15,10 +15,10 @@ tasks:
     parallel: false
     files:
       - backend/harness_template/entry.py
-      - backend/auto_designer/harness/launcher.py
-      - backend/auto_designer/harness/interface.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/models.py
+      - backend/ahe_beta/harness/launcher.py
+      - backend/ahe_beta/harness/interface.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/models.py
       - backend/tests/harness/test_template_entry.py
       - backend/tests/harness/test_launcher.py
     scope: entry.py：stdin 逐行 JSON（message/control）；一轮内可先吐零或多行 {"progress":{kind,text}} 活动条（_emit_progress，与终态 reply 共用 _stdout_lock 防交错），终态一行 {"reply", "steps"?}。拆信封 _unwrap_reply；steps 只给观测；interrupt→[interrupted]。预算钮注释。launcher begin/poll/control：进程活着返回 pending；last_steps/last_progress 旁路（progress 接收与未知旁路放宽见 0019）。models/sim_user 落 steps。

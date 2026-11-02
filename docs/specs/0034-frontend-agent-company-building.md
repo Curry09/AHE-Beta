@@ -34,7 +34,7 @@ tasks:
       - frontend/src/components/building/FloorWorkspace.tsx
       - frontend/src/components/building/buildingModel.ts
       - frontend/src/types.ts
-    scope: 保留默认列式看板；新增 view=building URL 状态与 TopBar「看板/大楼」切换；接入历史 BuildingView 的 2.5D 公司楼体与楼层工作区；适配当前 AgentRole（user/triager/divergent/synthesizer/owner/developer）与 roster；developer 楼层改语义为「交付面 · OpenAgents PR/main 推进」而非当前进程内 dev agent；在 types.ts 补充 ViewMode 与 SimTrace/SimTurn/PersonaCallTrace DTO，供大楼和 T4 消费。
+    scope: 保留默认列式看板；新增 view=building URL 状态与 TopBar「看板/大楼」切换；接入历史 BuildingView 的 2.5D 公司楼体与楼层工作区；适配当前 AgentRole（user/triager/divergent/architect/owner/developer）与 roster；developer 楼层改语义为「交付面 · OpenAgents PR/main 推进」而非当前进程内 dev agent；在 types.ts 补充 ViewMode 与 SimTrace/SimTurn/PersonaCallTrace DTO，供大楼和 T4 消费。
     acceptance: http://localhost:5173/?view=building 可打开大楼；默认 / 仍是列式看板；大楼楼层可切换；用户/分诊/发散/设计/准入/交付面都有楼层；无 running agent 时自动展示最近归档轮次；summary 模式也能点归档工位。
   - id: T3
     title: 大楼样式与角色色：发散/准入可读性修复

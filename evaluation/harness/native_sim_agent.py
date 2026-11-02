@@ -279,7 +279,7 @@ class SimulatedUserNativeAgent(BaseAgent):
             USER_LLM_MAX_OUTPUT_TOKENS=os.environ.get("USER_LLM_MAX_OUTPUT_TOKENS", "65536"),
             FULL_TRACE_DIR=str(self.logs_dir / "full-call-traces/simulated-user"),
             PYTHONUNBUFFERED="1",
-            AUTO_DESIGNER_USAGE_PATH=str(self.logs_dir / "user-llm-usage.jsonl"),
+            AHE_BETA_USAGE_PATH=str(self.logs_dir / "user-llm-usage.jsonl"),
         )
         latest, final, requests, reason = None, None, 0, None
         errors = (self.logs_dir / "user-worker-stderr.log").open("wb")

@@ -103,7 +103,7 @@ def resolve_dataset(dataset, source):
         cache = Path(_text(dataset["cache_dir"], "dataset.cache_dir")).expanduser()
         cache = (source.parent / cache).resolve()
     else:
-        cache = user_cache_path("auto-designer-evaluation") / revision
+        cache = user_cache_path("ahe-beta-evaluation") / revision
     cases = tuple(
         CaseRef("Harbor Index", n, revision, task_digest(n), str(cache / "tasks" / n))
         for n in names

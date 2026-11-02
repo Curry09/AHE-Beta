@@ -1,13 +1,13 @@
-from auto_designer.demand import issue_schema as sc
-from auto_designer.demand.proposal_view import (
+from ahe_beta.demand import issue_schema as sc
+from ahe_beta.demand.proposal_view import (
     format_proposal_list,
     format_proposal_reference,
     format_proposal_view,
     normalized_proposal_body,
     proposal_view,
 )
-from auto_designer.models import IssueDraft
-from auto_designer.tracker.fake import FakeTracker
+from ahe_beta.models import IssueDraft
+from ahe_beta.tracker.fake import FakeTracker
 
 
 def test_projection_contains_canonical_metadata_and_normalized_body() -> None:
@@ -66,8 +66,8 @@ def test_projection_hides_legacy_workflow_labels_and_reference_body() -> None:
 def test_long_or_forged_prose_cannot_clip_or_expand_trusted_conditions(tmp_path):
     from test_evidence_contract import contract_session
 
-    from auto_designer.observations.grants import grant
-    from auto_designer.user.session_store import SessionStore
+    from ahe_beta.observations.grants import grant
+    from ahe_beta.user.session_store import SessionStore
 
     store = SessionStore(tmp_path / "sessions")
     allowed = contract_session(sid="source-one")

@@ -27,7 +27,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/user/sim/test_persona_client_agentic.py
     scope: 为每个 persona 阶段建立显式 schema 与工具能力矩阵；重试结果重新进入同一 dispatcher；仅 judge/final-check 可调用本阶段允许的工具，intent/re-judge/re-intent/act 禁用工具。
     acceptance: 合法 JSON 但缺少阶段必填字段会重试而非成功；重试返回 tool 时在允许阶段执行、禁止阶段拒绝；连续无效抛 PersonaProtocolError；scripted 与 agentic 路径及 trace 回归测试通过。
@@ -42,11 +42,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/user/sim/loop.py
-      - backend/auto_designer/models.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/user/session_store.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/loop.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/user/session_store.py
       - backend/tests/user/sim/test_prompt.py
       - backend/tests/user/sim/test_inner_prompt.py
       - backend/tests/user/sim/test_loop.py
@@ -64,7 +64,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/action_space.py
+      - backend/ahe_beta/user/sim/action_space.py
       - backend/tests/user/sim/test_action_space.py
     scope: 删除 missing/unknown/out-of-phase action 到 space[0] 或同 Effect 的隐式投影；保留 free 的显式安全归类，但归类结果仍须合法，否则抛 typed error。
     acceptance: 动作空间排列变化不影响 fallback；缺失 action、tool dict、工具结果 dict、未知 id、越阶段 id 均不产生任何 terminal action；free 仅能落合法非终止动作；动作空间测试通过。
@@ -354,8 +354,8 @@ PYTHONPATH=backend .venv/bin/pytest backend/tests/user/sim/test_action_space.py 
 PYTHONPATH=backend .venv/bin/pytest backend/tests/user/sim/test_prompt.py backend/tests/user/sim/test_loop.py backend/tests/user/sim/test_heartbeat.py -v
 PYTHONPATH=backend .venv/bin/pytest backend/tests/scripts/test_audit_sim_action_integrity.py -v
 backend/scripts/e2e-spec-0048-final-check-convergence.sh
-.venv/bin/ruff check backend/auto_designer/user/sim backend/scripts tools/dev/audit backend/tests/user/sim backend/tests/scripts
-.venv/bin/ruff format --check backend/auto_designer/user/sim backend/scripts tools/dev/audit backend/tests/user/sim backend/tests/scripts
+.venv/bin/ruff check backend/ahe_beta/user/sim backend/scripts tools/dev/audit backend/tests/user/sim backend/tests/scripts
+.venv/bin/ruff format --check backend/ahe_beta/user/sim backend/scripts tools/dev/audit backend/tests/user/sim backend/tests/scripts
 ```
 
 ## Drawbacks

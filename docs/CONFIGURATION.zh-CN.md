@@ -36,19 +36,19 @@ U1 示例使用 `examples/personas/u1.json`；U4 从 `examples/personas/library.
 | `workload` | 任务包与 persona 输入及可选 interaction_plan，或继承时仅填 `{"source":"parent"}` |
 | `rounds` | 轮数、每轮 session 数、最大用户并发数；继承时轮数表示新增用户轮 |
 | `continuation` | 可选的当前父 `archive` 路径和预期 `sha256`；须同时声明两个父输入来源 |
-| `roles` | Triage/Synthesizer/divergent/developer 数量；`owner_mode: mechanical` / `llm` |
+| `roles` | Triage/Architect/divergent/developer 数量；`owner_mode: mechanical` / `llm` |
 | `models` | User、Harness、共享需求面、Claude Code 交付模型 |
 | `evaluation.official_grading` | 固定为 `false`；逐轮验收另用 `session_grading` 配置 |
 | `evaluation.session_grading` | 可选的外部逐轮验收：冻结计划、公钥摘要及 `runner: external` |
 | `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
 
-可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。U1 示例选一位 persona、一个 Triage、一个 Synthesizer、零个 divergent PM、一个交付 worker，共五轮；最后一轮运行用户及已配置的独立验收，不再需求或交付。
+可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。U1 示例选一位 persona、一个 Triage、一个 Architect、零个 divergent PM、一个交付 worker，共五轮；最后一轮运行用户及已配置的独立验收，不再需求或交付。
 
 `builtin` 固定当前 checkout 中 `backend/harness_template/` 的内容。需要使用指定版本的 Harness 时，选择 `archive` 并提供归档路径及 SHA-256。
 
 ### 六轮研究任务配置
 
-[E2B 教程](tutorials/evolution32.zh-CN.md)提供 U8 mixed/direct、U16 mixed、U32 mixed 四份配置，分别选择 [evolution32](../examples/tasks/evolution32/README.zh-CN.md) 的前八项、前十六项或全部三十二项。实验仍是 schema 2，均从当前 builtin seed 开始，共六轮，4 CPU/8192 MiB，用户和 Developer 并发显式为四。Triager 数为 4/4/8/16，Synthesizer 和 Divergent 各一，Owner 为 mechanical，grouping 为 false。R6 仅运行用户及已配置的验收；本组示例不配置官方评分。
+[E2B 教程](tutorials/evolution32.zh-CN.md)提供 U8 mixed/direct、U16 mixed、U32 mixed 四份配置，分别选择 [evolution32](../examples/tasks/evolution32/README.zh-CN.md) 的前八项、前十六项或全部三十二项。实验仍是 schema 2，均从当前 builtin seed 开始，共六轮，4 CPU/8192 MiB，用户和 Developer 并发显式为四。Triager 数为 4/4/8/16，Architect 和 Divergent 各一，Owner 为 mechanical，grouping 为 false。R6 仅运行用户及已配置的验收；本组示例不配置官方评分。
 
 任务与 persona 的原配对固定，每轮只在所选子集内将执行顺序旋转一个槽位。`persona_ids` 是唯一 ID 集合，显式 `interaction_plan` 中的六轮数组则允许同一画像用于独立槽位。原 direct 任务用 `sr-15-swyx` 做终态反馈，不会因此变成模拟交互。U8 direct 仅通过 `workload.interaction_overrides` 按真实 task ID 覆盖原先六个模拟任务，不编辑共享任务文件，也不改画像；未知覆盖 ID 会报错。公开可替换模型 ID 为 User/Harness 的 `glm-5.3-flash`、需求/交付的 `glm-5.3`，凭证仍由 env 引用提供。
 
@@ -102,7 +102,7 @@ U1 示例使用 `examples/personas/u1.json`；U4 从 `examples/personas/library.
 
 三项来源声明必须同时出现。`continuation` 只接受 `archive` 与 `sha256`，路径按子 JSON 所在目录解析。父来源必须是 collection `COMPLETE`、`controller.experiment_complete=true`、`continuation_ready=true`，并具有版本化最终 tree export。缺失或不支持的 export 在资源创建前拒绝，旧冻结 controller 不升级。
 
-每个新增轮继承父末轮 task/persona/interaction 配对，包括 `direct` 会话。`sessions_per_round` 等于该边界人数，`max_parallel_users` 可降低；workload 不能混入覆盖项。有 pending report 时 Triage 和 Synthesizer 各至少一个。模型、runtime、角色、策略和凭证由子配置显式决定；可选 CI 沿用子实验的本地契约。
+每个新增轮继承父末轮 task/persona/interaction 配对，包括 `direct` 会话。`sessions_per_round` 等于该边界人数，`max_parallel_users` 可降低；workload 不能混入覆盖项。有 pending report 时 Triage 和 Architect 各至少一个。模型、runtime、角色、策略和凭证由子配置显式决定；可选 CI 沿用子实验的本地契约。
 
 子实验先在独立恢复域处理父反馈并等待交付，即使 count 为一也执行初始化。随后 `count` 只计新增用户轮，最后一个新增轮仍只试用。父逻辑 R5 加两轮，对应子本地 R1/R2 和逻辑 R6/R7；再追加一轮从逻辑 R8 开始。stop/resume 操作新 run，父证据与评分不混入新增用户指标；grade 和 batch 使用本地轮号。当前检查命令见[验证方法](VERIFICATION.zh-CN.md)。
 
@@ -114,7 +114,7 @@ U1 示例使用 `examples/personas/u1.json`；U4 从 `examples/personas/library.
 | --- | --- | --- |
 | 模拟用户 | `USER_LLM_BASE_URL`、`USER_LLM_API_KEY` | OpenAI-compatible Chat Completions |
 | Harness | `HARNESS_LLM_BASE_URL`、`HARNESS_LLM_API_KEY` | OpenAI-compatible Chat Completions |
-| Triage、Synthesizer、PM | `DEMAND_LLM_BASE_URL`、`DEMAND_LLM_API_KEY` | OpenAI-compatible Chat Completions |
+| Triage、Architect、PM | `DEMAND_LLM_BASE_URL`、`DEMAND_LLM_API_KEY` | OpenAI-compatible Chat Completions |
 | OpenAgents 交付 | `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` | Anthropic-compatible Claude Code |
 | E2B 基础设施 | `E2B_API_KEY` | E2B API |
 | Gitea.com | `GITEA_TOKEN`；可选 `GITEA_USER` | 通过 API 解析账户 |
@@ -217,7 +217,7 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 | 字段 | 默认值与行为 |
 | --- | --- |
-| `policies.synthesizer_grouping` | `false`；`true` 启用已有分组调度，U1 也可使用 |
+| `policies.architect_grouping` | `false`；`true` 启用已有分组调度，U1 也可使用 |
 | `models.user.reasoning_effort`、`models.demand.reasoning_effort` | 可选，例如 `high`；分别交给用户客户端及共享需求角色，供应商须支持该值 |
 | `policies.timing.latency_isolated` | `false`；启用后需求角色计时排除已标记的 provider 等待 |
 | `policies.timing.wall_guard_seconds` | 额外宽限秒数；`0` 使用已有默认 600 秒。开启隔离时，总墙钟上限 = 角色预算 + 宽限；正整数覆盖宽限 |
@@ -233,7 +233,7 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 ```json
 {
   "policies": {
-    "synthesizer_grouping": true,
+    "architect_grouping": true,
     "timing": {"latency_isolated": true, "wall_guard_seconds": 7200},
     "delivery": {"timeout_seconds": 3600, "poll_seconds": 5, "coordination": "dependencies"}
   }

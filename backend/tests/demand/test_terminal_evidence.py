@@ -2,9 +2,9 @@
 
 import json
 
-from auto_designer.demand.evidence_contract import _goal_acceptance
-from auto_designer.demand.session_timeline import _project_sim_trace
-from auto_designer.models import SimTrace, SimTurn
+from ahe_beta.demand.evidence_contract import _goal_acceptance
+from ahe_beta.demand.session_timeline import _project_sim_trace
+from ahe_beta.models import SimTrace, SimTurn
 
 
 def test_terminal_fields_roundtrip_and_legacy_defaults() -> None:

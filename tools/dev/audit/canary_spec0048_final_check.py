@@ -12,7 +12,7 @@ from pathlib import Path
 
 from tools.dev import add_inputs, load_secrets, role_environment
 
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Domain,
     D5Autonomy,
@@ -22,15 +22,15 @@ from auto_designer.user.sim.dimensions import (
     Persona,
     finalize_persona,
 )
-from auto_designer.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
-from auto_designer.user.sim.prompt import (
+from ahe_beta.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
+from ahe_beta.user.sim.prompt import (
     build_main_act_turn,
     build_main_final_check_turn,
     build_main_reintent_turn,
     build_main_rejudge_turn,
     build_system,
 )
-from auto_designer.user.sim.state import init_state
+from ahe_beta.user.sim.state import init_state
 
 
 def _source_pin() -> str:

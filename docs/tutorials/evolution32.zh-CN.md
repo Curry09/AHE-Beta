@@ -6,14 +6,14 @@
 
 任务内容、来源、固定版本与材料获取方式见[任务清单](../../examples/tasks/evolution32/README.zh-CN.md)。准备阶段将这些材料与当前配置、控制器和初始 Harness 一并固定，生成一次独立实验。
 
-| 配置 | 每轮会话 | simulated_user / direct | 独立画像数 | Triager / Synthesizer / Divergent | 用户 / Developer 并发 |
+| 配置 | 每轮会话 | simulated_user / direct | 独立画像数 | Triager / Architect / Divergent | 用户 / Developer 并发 |
 | --- | --- | --- | --- | --- | --- |
 | u8-mixed-e2b.json | 8 | 6 / 2 | 5 | 4 / 1 / 1 | 4 / 4 |
 | u8-direct-e2b.json | 8 | 0 / 8 | 5 | 4 / 1 / 1 | 4 / 4 |
 | u16-mixed-e2b.json | 16 | 12 / 4 | 8 | 8 / 1 / 1 | 4 / 4 |
 | u32-mixed-e2b.json | 32 | 25 / 7 | 15 | 16 / 1 / 1 | 4 / 4 |
 
-每份配置均从准备时的当前 builtin seed 开始，共六轮。R1–R5 运行试用、反馈和交付，R6 仅试用最终 Harness。六轮对应五次轮间交付批次，不是六次交付。Owner 为 mechanical，synthesizer_grouping 为 false，逐轮官方评分关闭。后者不关闭 persona 的会话反馈或终态评阅；体感接受不等于官方基准通过。
+每份配置均从准备时的当前 builtin seed 开始，共六轮。R1–R5 运行试用、反馈和交付，R6 仅试用最终 Harness。六轮对应五次轮间交付批次，不是六次交付。Owner 为 mechanical，architect_grouping 为 false，逐轮官方评分关闭。后者不关闭 persona 的会话反馈或终态评阅；体感接受不等于官方基准通过。
 
 每个实验使用一个 4 CPU / 8192 MiB 的 E2B 沙箱，各会话尝试使用独立 Docker 任务环境，用户并发为 4。实际并发应结合任务的内存与服务需求选择。会话和环境相互独立，但画像可以复用，因此 U32 表示每轮 32 个会话，使用的独立画像数见上表。
 
@@ -26,8 +26,8 @@ U8 两组保持任务、初态、persona 配对、六轮轮序、seed、模型�
 任务材料来自清单中固定版本的 Release，运行前请确认管理主机能够访问相应下载地址。准备阶段验证材料哈希；离线检查会将尚未缓存的远端材料标为待下载。
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
@@ -39,7 +39,7 @@ chmod 600 .env.experiment
 | --- | --- |
 | USER_LLM_BASE_URL / USER_LLM_API_KEY | 用户模拟及终态评阅，OpenAI 兼容 Chat Completions |
 | HARNESS_LLM_BASE_URL / HARNESS_LLM_API_KEY | 被迭代 Harness，OpenAI 兼容 Chat Completions |
-| DEMAND_LLM_BASE_URL / DEMAND_LLM_API_KEY | Triager、Synthesizer、Divergent 等需求角色，OpenAI 兼容 Chat Completions |
+| DEMAND_LLM_BASE_URL / DEMAND_LLM_API_KEY | Triager、Architect、Divergent 等需求角色，OpenAI 兼容 Chat Completions |
 | ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN | OpenAgents 的 Claude Code 交付，Anthropic 兼容协议，bearer 认证 |
 | E2B_API_KEY | 有权限创建所需资源及模板的 E2B API key |
 | GITEA_TOKEN | 自己 Gitea.com 账户的 token，可创建、读写实验私有仓库、Issue、评论和附件 |

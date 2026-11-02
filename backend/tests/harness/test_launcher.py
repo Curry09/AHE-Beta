@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.harness.launcher import HarnessLauncher
+from ahe_beta.harness.launcher import HarnessLauncher
 
 # 计数器式假 entry：逐行回 "<count>:<message>"，count 随进程重启归零（验证 reset）。
 _COUNTER_ENTRY = """\
@@ -174,17 +174,17 @@ def test_multi_turn_send(tmp_path) -> None:
 def test_managed_local_launcher_and_real_tools_inherit_independent_session_env(
     tmp_path, monkeypatch
 ):
-    from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+    from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 
     # Exercise Git checkout, native Harness startup and its real Python tool;
     # no launcher/Popen mocks or process-global task environment switching.
     entry = """import json,os,pathlib,subprocess,sys
 for line in sys.stdin:
     json.loads(line)
-    keys=['HOME','VIRTUAL_ENV','AUTO_DESIGNER_ATTEMPT_NONCE','UV_LINK_MODE','UV_CACHE_DIR','HARNESS_ONLY']
+    keys=['HOME','VIRTUAL_ENV','AHE_BETA_ATTEMPT_NONCE','UV_LINK_MODE','UV_CACHE_DIR','HARNESS_ONLY']
     values={key:os.environ.get(key) for key in keys}
     values['entry_interpreter']=sys.executable
-    tool="import json,os,pathlib,sys;pathlib.Path(os.environ['HOME'],'tool-written').write_text(os.environ['AUTO_DESIGNER_ATTEMPT_NONCE']);print(json.dumps({'home':os.environ['HOME'],'prefix':sys.prefix,'nonce':os.environ['AUTO_DESIGNER_ATTEMPT_NONCE'],'cache':os.environ['UV_CACHE_DIR'],'link_mode':os.environ['UV_LINK_MODE']}))"
+    tool="import json,os,pathlib,sys;pathlib.Path(os.environ['HOME'],'tool-written').write_text(os.environ['AHE_BETA_ATTEMPT_NONCE']);print(json.dumps({'home':os.environ['HOME'],'prefix':sys.prefix,'nonce':os.environ['AHE_BETA_ATTEMPT_NONCE'],'cache':os.environ['UV_CACHE_DIR'],'link_mode':os.environ['UV_LINK_MODE']}))"
     values['tool']=json.loads(subprocess.check_output(['python','-c',tool],cwd=os.environ['SANDBOX_WORK_DIR'],text=True))
     print(json.dumps({'type':'reply','text':json.dumps(values)}),flush=True)
 """
@@ -192,7 +192,7 @@ for line in sys.stdin:
     defaults = {
         "HOME": "/shared-harness-home",
         "UV_CACHE_DIR": "/shared-harness-cache",
-        "AUTO_DESIGNER_ATTEMPT_NONCE": "wrong-harness-nonce",
+        "AHE_BETA_ATTEMPT_NONCE": "wrong-harness-nonce",
         "UV_LINK_MODE": "hardlink",
         "HARNESS_ONLY": "kept",
     }
@@ -203,7 +203,7 @@ for line in sys.stdin:
     controller_home = tmp_path / "controller-home"
     controller_home.mkdir()
     monkeypatch.setenv("HOME", str(controller_home))
-    monkeypatch.setenv("AUTO_DESIGNER_ATTEMPT_NONCE", "controller-nonce")
+    monkeypatch.setenv("AHE_BETA_ATTEMPT_NONCE", "controller-nonce")
     before = dict(os.environ)
     launcher = HarnessLauncher(harness_repo=repo, runs_root=tmp_path / "runs")
     handles = []
@@ -223,7 +223,7 @@ for line in sys.stdin:
                     "VIRTUAL_ENV": str(venv),
                     "UV_CACHE_DIR": str(cache),
                     "UV_LINK_MODE": "copy",
-                    "AUTO_DESIGNER_ATTEMPT_NONCE": "attempt-" + user,
+                    "AHE_BETA_ATTEMPT_NONCE": "attempt-" + user,
                     "PATH": "/usr/bin:/bin",
                 },
                 evidence={"task_virtual_env": str(venv), "harness_python": sys.executable},
@@ -236,7 +236,7 @@ for line in sys.stdin:
             for key in (
                 "HOME",
                 "VIRTUAL_ENV",
-                "AUTO_DESIGNER_ATTEMPT_NONCE",
+                "AHE_BETA_ATTEMPT_NONCE",
                 "UV_LINK_MODE",
                 "UV_CACHE_DIR",
             ):
@@ -244,13 +244,13 @@ for line in sys.stdin:
             assert observed["tool"] == {
                 "home": runtime.environment["HOME"],
                 "prefix": runtime.evidence["task_virtual_env"],
-                "nonce": runtime.environment["AUTO_DESIGNER_ATTEMPT_NONCE"],
+                "nonce": runtime.environment["AHE_BETA_ATTEMPT_NONCE"],
                 "cache": runtime.environment["UV_CACHE_DIR"],
                 "link_mode": "copy",
             }
             assert (
                 Path(runtime.environment["HOME"], "tool-written").read_text()
-                == runtime.environment["AUTO_DESIGNER_ATTEMPT_NONCE"]
+                == runtime.environment["AHE_BETA_ATTEMPT_NONCE"]
             )
         assert not (controller_home / "tool-written").exists()
         assert dict(os.environ) == before

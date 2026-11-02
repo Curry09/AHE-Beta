@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import materials
-from auto_designer.experiment.config import ConfigError
+from ahe_beta.experiment import materials
+from ahe_beta.experiment.config import ConfigError
 from test_experiment_config_v2 import definition, package, write
 
 
@@ -173,14 +173,14 @@ def test_freeze_generates_plan_archives_and_records_dirty_tree(prepared_inputs, 
     manifest = materials.prepare_materials(prepared_inputs, tmp_path / "runs")
     assert manifest["experiment_id"] == manifest["run_id"]
     assert len(manifest["controller_sha"]) == 40
-    assert manifest["source_snapshot"]["files"]["backend/auto_designer/experiment/materials.py"]
+    assert manifest["source_snapshot"]["files"]["backend/ahe_beta/experiment/materials.py"]
     assert isinstance(manifest["source_snapshot"]["dirty"], bool)
     files = manifest["source_snapshot"]["files"]
     assert manifest["source_snapshot"]["entrypoint"] == {
         "kind": "module",
-        "module": "auto_designer.experiment.controllers.unified",
+        "module": "ahe_beta.experiment.controllers.unified",
     }
-    assert "backend/auto_designer/experiment/controllers/unified.py" in files
+    assert "backend/ahe_beta/experiment/controllers/unified.py" in files
     assert "backend/deploy/vigil/Dockerfile" in files
     assert "backend/deploy/vigil/entrypoint.sh" in files
     assert "backend/scripts/prepare_swebench_runtime_tree.py" in files

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D2Domain,
@@ -14,17 +14,17 @@ from auto_designer.user.sim.dimensions import (
     TimeTemperament,
     finalize_persona,
 )
-from auto_designer.user.sim.feeling import FeelingScore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.loop import (
+from ahe_beta.user.sim.feeling import FeelingScore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.loop import (
     MAX_TURNS,
     SessionResult,
     _record_private_evidence,
     route,
     run_session,
 )
-from auto_designer.user.sim.persona_client import PersonaProtocolError, ScriptedPersonaClient
-from auto_designer.user.sim.state import State, init_state
+from ahe_beta.user.sim.persona_client import PersonaProtocolError, ScriptedPersonaClient
+from ahe_beta.user.sim.state import State, init_state
 
 
 def _persona(

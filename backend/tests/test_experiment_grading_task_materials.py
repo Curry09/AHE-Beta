@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import materials, workload
-from auto_designer.experiment.config import ConfigError
+from ahe_beta.experiment import materials, workload
+from ahe_beta.experiment.config import ConfigError
 from test_experiment_config_v2 import write
 from test_experiment_grading_task_config import artifact, benchmark_package
 from test_experiment_materials import prepared_inputs as base_prepared_inputs

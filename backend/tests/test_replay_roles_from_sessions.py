@@ -10,7 +10,7 @@ from tools.dev.replay import replay_roles_from_sessions as module
 @pytest.fixture(autouse=True)
 def isolate_role_profiles(monkeypatch):
     monkeypatch.setattr(os, "environ", os.environ.copy())
-    os.environ.pop("AUTO_DESIGNER_DEV_RUN_PROFILE", None)
+    os.environ.pop("AHE_BETA_DEV_RUN_PROFILE", None)
 
 
 def prepared_run(tmp_path: Path, *, backend: str = "e2b") -> Path:

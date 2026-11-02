@@ -26,8 +26,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/actions.py
-      - backend/auto_designer/user/sim/action_space.py
+      - backend/ahe_beta/user/sim/actions.py
+      - backend/ahe_beta/user/sim/action_space.py
       - backend/tests/user/sim/test_action_space.py
     scope: 将 channel 与消息必填关系解耦，引入动作级 message_policy；按阶段和动作校验字段，终止动作允许无附加消息，静默动作拒绝外发消息，外部沟通统一为 send_message；保留越权动作 fail-closed。
     acceptance: 所有动作契约有矩阵测试；空 message 的 accept 合法且不生成 harness turn；file_issue/send_message 缺消息仍拒绝；keep_waiting/interrupt 带消息仍拒绝；gap 不再作为无关终止动作的全局必填；action_space 不暴露私有查验动作。
@@ -41,11 +41,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/user/sim/test_persona_client_agentic.py
-      - backend/auto_designer/models.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/user/session_store.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/user/session_store.py
       - backend/tests/test_models.py
     scope: 先落地动作级协议校验的轻量路径：accept/give_up 的可选正文不再触发 missing_message，缺省 gap 按 False 解释，send_message/file_issue 等必需正文动作继续严格校验；同时为结果增加 interaction_status 分轨，保留旧 evaluation_status 兼容读取。完整的 raw/parsed/normalized 事件链与 protocol_repaired 统计留待后续增量。
     acceptance: 空 message/缺省 gap 的 accept 可通过；静默动作带消息、必需正文动作缺消息仍拒绝；协议错误设置 interaction_status=protocol_unrecoverable 并保留原始 evaluation_error；旧 session JSON 可读取，新增字段可往返序列化。
@@ -60,8 +60,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/loop.py
-      - backend/auto_designer/user/sim/state.py
+      - backend/ahe_beta/user/sim/loop.py
+      - backend/ahe_beta/user/sim/state.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/user/sim/test_heartbeat.py
     scope: 把用户 verdict、交互协议、客观 evaluator 与容器生命周期拆成独立状态；终止采用 TERMINAL_REQUESTED→FLUSHING→OBJECTIVE_SNAPSHOT→AUDIT_COMMIT→CONTAINER_STOPPING→STOPPED；正常 accept/give_up/file_issue 先落最后决策和客观证据再关闭；强停走 finally/watchdog 收尾而不删除容器或日志。
@@ -77,9 +77,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/runtime.py
-      - backend/auto_designer/experiment/cli.py
-      - backend/auto_designer/loop/live.py
+      - backend/ahe_beta/experiment/runtime.py
+      - backend/ahe_beta/experiment/cli.py
+      - backend/ahe_beta/loop/live.py
       - backend/tests/test_experiment_cli_v2.py
       - backend/tests/test_experiment_lifecycle_v2.py
     scope: 在当前 v2 runtime/CLI、live 记录中规划结果状态与事件溯源审计，保留八会话离线回归目标；不再扩展已经退出的 v1 生命周期。
@@ -285,4 +285,4 @@ SWE-bench 官方 harness 仍是客观执行的唯一来源：persona 交互结�
 
 ## Future possibilities
 
-同一语义契约可推广到 triage、synthesizer 和 delivery agent，统一“结构化产出状态”和“业务结果状态”的分离。事件链稳定后，可增加 UI 对原始响应、规范化动作、修复记录和客观结果的逐层展开；若需要合规级防篡改，可在现有事件字段上追加签名链。任何新增动作都必须先声明 executor、channel、effect、message_policy 和字段契约，再接入 action space 与回归矩阵。
+同一语义契约可推广到 triage、architect 和 delivery agent，统一“结构化产出状态”和“业务结果状态”的分离。事件链稳定后，可增加 UI 对原始响应、规范化动作、修复记录和客观结果的逐层展开；若需要合规级防篡改，可在现有事件字段上追加签名链。任何新增动作都必须先声明 executor、channel、effect、message_policy 和字段契约，再接入 action space 与回归矩阵。

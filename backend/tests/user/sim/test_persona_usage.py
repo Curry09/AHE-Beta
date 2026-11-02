@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.user.sim import persona_client as module
+from ahe_beta.user.sim import persona_client as module
 
 
 class _Completions:

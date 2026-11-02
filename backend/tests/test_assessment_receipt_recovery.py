@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment.assessment_worker import sign
-from auto_designer.experiment.config import ConfigError
-from auto_designer.loop import round_assessment as module
+from ahe_beta.experiment.assessment_worker import sign
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.loop import round_assessment as module
 from test_experiment_assessment_worker import claim, queue, result  # noqa: F401
 
 
@@ -149,7 +149,7 @@ def test_readiness_wait_clears_runtime_phase_only_after_valid_current_worker(
     retained,
 ):
     """Use signed readiness + real exchange + real runtime.status_v2 projection."""
-    from auto_designer.experiment import runtime
+    from ahe_beta.experiment import runtime
 
     root, key, _, _ = queue
     manifest = module.read_json(root / "manifest.json")

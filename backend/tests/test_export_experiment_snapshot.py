@@ -63,7 +63,7 @@ def test_export_preserves_coarse_progress_and_explicit_public_metadata(tmp_path)
         "worker_alive": True,
         "sessions_saved": 4,
         "active_roles": {"user": 1},
-        "agents": [{"role": "synthesizer", "running": True}],
+        "agents": [{"role": "architect", "running": True}],
     }
     (telemetry / "monitor-latest.json").write_text(json.dumps(row))
     output = tmp_path / "public"
@@ -76,7 +76,7 @@ def test_export_preserves_coarse_progress_and_explicit_public_metadata(tmp_path)
     assert summary["sessions_saved"] == 4
     assert summary["worker_alive"] is True
     roster = json.loads((output / "demo/api/config.json").read_text())["roster"]
-    assert roster["synthesizer"] == 1
+    assert roster["architect"] == 1
     assert roster["user"] == 0
     with pytest.raises(ValueError, match="slug"):
         export(source, output, None, public_id="../escape")

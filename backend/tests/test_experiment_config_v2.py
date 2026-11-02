@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from auto_designer.experiment.config import ConfigError, load_config_v2, load_task_package
+from ahe_beta.experiment.config import ConfigError, load_config_v2, load_task_package
 
 
 def definition():
@@ -31,7 +31,7 @@ def definition():
         "rounds": {"count": 5, "sessions_per_round": 1, "max_parallel_users": 1},
         "roles": {
             "triager": 1,
-            "synthesizer": 1,
+            "architect": 1,
             "divergent": 0,
             "owner_mode": "mechanical",
             "developer": 1,
@@ -182,14 +182,14 @@ def test_git_task_rejects_credential_url(tmp_path):
 
 # Spec-0072/T1: accepted policies must survive normalization and become hashable inputs.
 def test_policy_defaults_and_explicit_auth_protocol_are_frozen(tmp_path):
-    from auto_designer.experiment.config import config_hash
+    from ahe_beta.experiment.config import config_hash
 
     document = definition()
     document["models"]["delivery"].update(auth_type="api-key", api_key_env="MY_PRIVATE_KEY")
-    document["policies"] = {"synthesizer_grouping": True, "delivery": {"poll_seconds": 0.25}}
+    document["policies"] = {"architect_grouping": True, "delivery": {"poll_seconds": 0.25}}
     document["roles"]["owner_mode"] = "llm"
     loaded = load_fixture_config(write(tmp_path / "config.json", document))
-    assert loaded["policies"]["synthesizer_grouping"] is True
+    assert loaded["policies"]["architect_grouping"] is True
     assert loaded["policies"]["delivery"]["poll_seconds"] == 0.25
     assert loaded["policies"]["delivery"]["timeout_seconds"] == 86400
     assert loaded["policies"]["timing"]["latency_isolated"] is False
@@ -202,7 +202,7 @@ def test_policy_defaults_and_explicit_auth_protocol_are_frozen(tmp_path):
 @pytest.mark.parametrize(
     "policies",
     [
-        {"synthesizer_grouping": "1"},
+        {"architect_grouping": "1"},
         {"timing": {"wall_guard_seconds": -1}},
         {"delivery": {"timeout_seconds": 0}},
         {"delivery": {"poll_seconds": 0}},

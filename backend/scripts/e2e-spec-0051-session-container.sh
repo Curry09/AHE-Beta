@@ -20,20 +20,20 @@ export PYTHONPATH=backend
   backend/tests/user/test_session_store.py \
   backend/tests/test_models.py
 
-runtime_image="${SWEBENCH_RUNTIME_SEED_IMAGE:-auto-designer-seed:swebench-medium-hard-16-runtime-v1}"
+runtime_image="${SWEBENCH_RUNTIME_SEED_IMAGE:-ahe-beta-seed:swebench-medium-hard-16-runtime-v1}"
 label="$(docker image inspect \
   --format '{{ index .Config.Labels "org.auto-designer.seed-runtime" }}' \
   "$runtime_image")"
 test "$label" = 1
 
-before="$(docker ps -aq --filter label=auto-designer.session | sort)"
+before="$(docker ps -aq --filter label=ahe-beta.session | sort)"
 PYTHONPATH=backend .venv/bin/python - "$runtime_image" <<'PY'
 import json
 import subprocess
 import sys
 
-from auto_designer.models import WorkspaceSpec
-from auto_designer.user.sim.seed_source import provision
+from ahe_beta.models import WorkspaceSpec
+from ahe_beta.user.sim.seed_source import provision
 
 image = sys.argv[1]
 probe = subprocess.run(
@@ -57,9 +57,9 @@ finally:
     runtime.close()
 assert runtime.evidence.get("closed_at")
 PY
-after="$(docker ps -aq --filter label=auto-designer.session | sort)"
+after="$(docker ps -aq --filter label=ahe-beta.session | sort)"
 test "$before" = "$after"
 
 ./tools/spec-driven-development/spec validate
 ./tools/spec-driven-development/spec render
-./tools/spec-driven-development/spec graph --package-root backend/auto_designer
+./tools/spec-driven-development/spec graph --package-root backend/ahe_beta

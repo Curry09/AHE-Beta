@@ -4,7 +4,7 @@ validate 拒未知 kind / 缺必填 / 空值；render 布局稳定、缺字段�
 
 from __future__ import annotations
 
-from auto_designer.demand import issue_schema as sc
+from ahe_beta.demand import issue_schema as sc
 
 
 def test_bug_fields_are_normalized_only() -> None:
@@ -159,6 +159,6 @@ def test_merged_into_roundtrip() -> None:
 
 def test_provenance_of() -> None:
     assert sc.provenance_of([sc.PROPOSAL, sc.FROM_TRIAGE]) == sc.FROM_TRIAGE
-    assert sc.provenance_of([sc.PROPOSAL, sc.FROM_SYNTHESIZE]) == sc.FROM_SYNTHESIZE
+    assert sc.provenance_of([sc.PROPOSAL, sc.FROM_ARCHITECT]) == sc.FROM_ARCHITECT
     assert sc.provenance_of([sc.PROPOSAL, sc.FROM_DIVERGENT]) == sc.FROM_DIVERGENT
     assert sc.provenance_of(["bug"]) is None

@@ -1,6 +1,6 @@
 """Spec-0081/T3: frozen public outputs cannot leak private service exports."""
 
-from auto_designer.evaluation.artifacts import collect_session_artifacts
+from ahe_beta.evaluation.artifacts import collect_session_artifacts
 
 
 def identity():
@@ -100,7 +100,7 @@ def test_managed_output_without_ownership_capability_is_incomplete(tmp_path):
 
 
 def test_actor_wrong_workspace_type_is_task_failure_but_transport_is_infrastructure(tmp_path):
-    from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+    from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 
     root = tmp_path / "workspace"
     root.mkdir()
@@ -125,7 +125,7 @@ def test_published_observation_recovery_verifies_version_and_retained_bytes(tmp_
 
     import pytest
 
-    from auto_designer.observations.publication import publish, verify_published
+    from ahe_beta.observations.publication import publish, verify_published
 
     version = {"harness_sha": "a" * 40, "image_digest": "sha256:" + "b" * 64}
     files = {

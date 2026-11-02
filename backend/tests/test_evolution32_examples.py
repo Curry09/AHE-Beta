@@ -11,16 +11,16 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from auto_designer.experiment.config import (
+from ahe_beta.experiment.config import (
     config_hash,
     load_config_v2,
     load_task_package,
     load_task_packages,
     validate_schema,
 )
-from auto_designer.experiment.materials import check_materials
-from auto_designer.experiment.workload import execution_declaration
-from auto_designer.loop.recovery import operation_key
+from ahe_beta.experiment.materials import check_materials
+from ahe_beta.experiment.workload import execution_declaration
+from ahe_beta.loop.recovery import operation_key
 
 ROOT = Path(__file__).resolve().parents[2]
 TASKS = ROOT / "examples/tasks/evolution32"
@@ -149,7 +149,7 @@ def test_six_round_examples_keep_original_pairing_and_declared_conditions(
     assert config["rounds"] == {"count": 6, "sessions_per_round": n, "max_parallel_users": 4}
     assert config["roles"] == {
         "triager": triagers,
-        "synthesizer": 1,
+        "architect": 1,
         "divergent": 1,
         "owner_mode": "mechanical",
         "developer": 4,
@@ -161,7 +161,7 @@ def test_six_round_examples_keep_original_pairing_and_declared_conditions(
         "memory_mb": 8192,
     }
     assert config["harness"] == {"source": "builtin"}
-    assert config["policies"]["synthesizer_grouping"] is False
+    assert config["policies"]["architect_grouping"] is False
     assert config["evaluation"] == {"official_grading": False}
     pairs = [[persona or "sr-15-swyx", task_id] for _, task_id, persona in ORIGINAL[:n]]
     expected = [pairs[i:] + pairs[:i] for i in range(6)]
@@ -300,7 +300,7 @@ def test_four_group_batch_reuses_complete_run_configs():
 
 
 def test_bilingual_study_tutorial_commands_match_current_entry():
-    from auto_designer.experiment.cli import build_parser
+    from ahe_beta.experiment.cli import build_parser
 
     def commands(name):
         return [

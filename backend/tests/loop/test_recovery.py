@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from auto_designer.loop.recovery import (
+from ahe_beta.loop.recovery import (
     EVENT_FILE,
     STATE_FILE,
     RecoveryConflictError,

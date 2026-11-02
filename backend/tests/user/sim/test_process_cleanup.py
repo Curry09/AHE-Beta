@@ -9,14 +9,14 @@ import uuid
 
 import pytest
 
-from auto_designer.user.sim import runtime
+from ahe_beta.user.sim import runtime
 
 
 def test_missing_python_pidfd_apis_still_stop_owned_child_and_leave_foreign(monkeypatch):
     nonce = uuid.uuid4().hex
     owned = subprocess.Popen(
         [sys.executable, "-c", "import time;time.sleep(60)"],
-        env={**os.environ, "AUTO_DESIGNER_ATTEMPT_NONCE": nonce},
+        env={**os.environ, "AHE_BETA_ATTEMPT_NONCE": nonce},
     )
     foreign = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(60)"])
     monkeypatch.delattr(os, "pidfd_open", raising=False)

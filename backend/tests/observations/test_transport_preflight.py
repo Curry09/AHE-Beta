@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.observations import preflight as module
-from auto_designer.observations.transport import make_transport_profile
+from ahe_beta.observations import preflight as module
+from ahe_beta.observations.transport import make_transport_profile
 
 
 def profile(*, encoding="zip", policy="gitea-com-r2-v1"):
@@ -204,10 +204,10 @@ def test_timed_out_capability_command_reports_stage_not_stdout(monkeypatch):
 def test_both_session_factories_block_before_constructing_model(
     tmp_path, monkeypatch, factory_name
 ):
-    from auto_designer.loop import sim_user
-    from auto_designer.user.session_store import SessionStore
+    from ahe_beta.loop import sim_user
+    from ahe_beta.user.session_store import SessionStore
 
-    monkeypatch.setenv("AUTO_DESIGNER_OBSERVATION_ROOT", str(tmp_path / "observations"))
+    monkeypatch.setenv("AHE_BETA_OBSERVATION_ROOT", str(tmp_path / "observations"))
     monkeypatch.setattr(module, "probe_reader_from_environment", lambda: {"capabilities": {}})
     with pytest.raises(ValueError, match="capability"):
         getattr(sim_user, factory_name)(
@@ -244,10 +244,10 @@ def test_timed_out_image_probe_cleans_its_own_container(monkeypatch):
 
 def test_early_preflight_prefers_reusable_container_over_missing_image_tag(monkeypatch):
     monkeypatch.setenv("VIGIL_MODE", "container")
-    monkeypatch.setenv("AUTO_DESIGNER_VIGIL_CONTAINER", "experiment-vigil")
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-1")
-    monkeypatch.setenv("AUTO_DESIGNER_EXPERIMENT_ID", "exp-1")
-    monkeypatch.setenv("AUTO_DESIGNER_VIGIL_IMAGE", "deleted:tag")
+    monkeypatch.setenv("AHE_BETA_VIGIL_CONTAINER", "experiment-vigil")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "run-1")
+    monkeypatch.setenv("AHE_BETA_EXPERIMENT_ID", "exp-1")
+    monkeypatch.setenv("AHE_BETA_VIGIL_IMAGE", "deleted:tag")
     calls = []
 
     def command(argv, **kw):
@@ -278,14 +278,14 @@ def test_early_preflight_prefers_reusable_container_over_missing_image_tag(monke
     ],
 )
 def test_reuse_respects_running_state_and_frozen_identity(monkeypatch, state, expected):
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-1")
-    monkeypatch.setenv("AUTO_DESIGNER_EXPERIMENT_ID", "exp-1")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "run-1")
+    monkeypatch.setenv("AHE_BETA_EXPERIMENT_ID", "exp-1")
     monkeypatch.setattr(module, "bounded_command", lambda *a, **kw: state)
     assert module.reusable_container(name="vigil") == expected
 
 
 def test_early_reuse_rejects_foreign_experiment(monkeypatch):
-    monkeypatch.setenv("AUTO_DESIGNER_EXPERIMENT_ID", "exp-1")
+    monkeypatch.setenv("AHE_BETA_EXPERIMENT_ID", "exp-1")
     monkeypatch.setattr(module, "bounded_command", lambda *a, **kw: b"true|run-1|foreign")
     with pytest.raises(ValueError, match="another experiment"):
         module.reusable_container(name="vigil")

@@ -2,6 +2,8 @@
 
 ## Unreleased — open-source preparation
 
+- Align the project name with AHE-Beta and the architecture role with Architect across code, configuration, documentation and the dashboard.
+
 - Add MIT licensing, contributor/security guidance and joint-release documentation.
 - Declare the pinned NexAU runtime and compatibility dependencies.
 - Align CI and local dependency installation with committed lockfiles.

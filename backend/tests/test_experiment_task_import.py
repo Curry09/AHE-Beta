@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import task_import
-from auto_designer.experiment.config import ConfigError, load_task_package
-from auto_designer.experiment.task_import import import_seed_tasks, import_text_task
+from ahe_beta.experiment import task_import
+from ahe_beta.experiment.config import ConfigError, load_task_package
+from ahe_beta.experiment.task_import import import_seed_tasks, import_text_task
 
 ROOT = Path(__file__).resolve().parents[2]
 SHA = "a" * 40

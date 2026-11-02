@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from auto_designer.loop.metrics import Metrics
-from auto_designer.models import (
+from ahe_beta.loop.metrics import Metrics
+from ahe_beta.models import (
     FeelingScore,
     IssueDraft,
     IssueRef,
@@ -14,8 +14,8 @@ from auto_designer.models import (
     Session,
     Transcript,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
 
 
 def _session(score: int, n_issues: int, day: int) -> Session:
@@ -100,7 +100,7 @@ def test_empty_store(tmp_path) -> None:
 
 def test_funnel_counts_by_plane(tmp_path) -> None:
     """Spec-0029/T9：三平面漏斗——open 票按 plane 计数（新旧标签统一经 plane 投影）。"""
-    from auto_designer.demand import issue_schema as sc
+    from ahe_beta.demand import issue_schema as sc
 
     tracker = FakeTracker()
     tracker.create_issue(IssueDraft(title="r1", body="x", labels=[sc.REPORT]))

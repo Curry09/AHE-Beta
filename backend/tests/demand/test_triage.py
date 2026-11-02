@@ -10,19 +10,19 @@ from pathlib import Path
 import pytest
 import requests
 
-from auto_designer.demand import issue_schema as sc
-from auto_designer.demand.triage import TriageOutcome, Triager, _proposal_labels, _proposal_title
-from auto_designer.loop.recovery import (
+from ahe_beta.demand import issue_schema as sc
+from ahe_beta.demand.triage import TriageOutcome, Triager, _proposal_labels, _proposal_title
+from ahe_beta.loop.recovery import (
     RecoveryConflictError,
     RecoveryIdentity,
     RecoveryStore,
     operation_key,
 )
-from auto_designer.models import IssueDraft
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.tracker.gitea import GiteaError, IssueMigrationError
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.models import IssueDraft
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.tracker.gitea import GiteaError, IssueMigrationError
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
 
 
 class _StubTriager(Triager):
@@ -116,7 +116,7 @@ def test_submit_triage_yaml_matches_contract() -> None:
     """drift-guard：submit_triage.tool.yaml 的 input_schema 与 dispositions_input_schema() 深度相等。"""
     import yaml
 
-    from auto_designer.demand.agent_contract import dispositions_input_schema
+    from ahe_beta.demand.agent_contract import dispositions_input_schema
 
     p = (
         Path(__file__).resolve().parents[2]
@@ -127,7 +127,7 @@ def test_submit_triage_yaml_matches_contract() -> None:
     )
     tool_def = yaml.safe_load(p.read_text(encoding="utf-8"))
     assert tool_def["input_schema"] == dispositions_input_schema()
-    # 三值 enum：duplicate 已退役（跨提案吸收归 Synthesizer）
+    # 三值 enum：duplicate 已退役（跨提案吸收归 Architect）
     enum = tool_def["input_schema"]["properties"]["dispositions"]["items"]["properties"][
         "disposition"
     ]["enum"]
@@ -335,7 +335,7 @@ def test_finalizer_is_bounded_and_report_histories_do_not_mix(tmp_path, monkeypa
             assert kwargs["history"] == [{"role": "tool", "content": f"evidence for {report}"}]
         return "no submit"
 
-    monkeypatch.setattr("auto_designer.demand.triage.run_agent_def", invoke)
+    monkeypatch.setattr("ahe_beta.demand.triage.run_agent_def", invoke)
     triager = Triager(
         tracker,
         SessionStore(tmp_path / "sessions"),
@@ -547,7 +547,7 @@ def test_recovery_reconciles_partial_proposal_only_if_content_is_ours(
 
 
 def test_recovery_retries_transient_read_without_rerunning_model(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr("auto_designer.demand.triage.time.sleep", lambda _: None)
+    monkeypatch.setattr("ahe_beta.demand.triage.time.sleep", lambda _: None)
 
     class FlakyReadTracker(FakeTracker):
         reads = 0
@@ -587,7 +587,7 @@ def test_recovery_retries_transient_read_without_rerunning_model(tmp_path, monke
 def test_recovery_reconciles_lost_update_response_without_second_write(
     tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.setattr("auto_designer.demand.triage.time.sleep", lambda _: None)
+    monkeypatch.setattr("ahe_beta.demand.triage.time.sleep", lambda _: None)
 
     class LostResponseTracker(FakeTracker):
         writes = 0
@@ -620,7 +620,7 @@ def test_recovery_reconciles_lost_update_response_without_second_write(
 def test_recovery_reconciles_lost_decline_response_without_second_write(
     tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.setattr("auto_designer.demand.triage.time.sleep", lambda _: None)
+    monkeypatch.setattr("ahe_beta.demand.triage.time.sleep", lambda _: None)
 
     class LostResponseTracker(FakeTracker):
         writes = 0
@@ -653,7 +653,7 @@ def test_recovery_reconciles_lost_decline_response_without_second_write(
 
 
 def test_recovery_stops_after_bounded_transient_retries(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr("auto_designer.demand.triage.time.sleep", lambda _: None)
+    monkeypatch.setattr("ahe_beta.demand.triage.time.sleep", lambda _: None)
 
     class UnavailableTracker(FakeTracker):
         reads = 0
@@ -688,7 +688,7 @@ def test_recovery_stops_after_bounded_transient_retries(tmp_path, monkeypatch) -
 
 
 def test_recovery_replays_only_our_partial_migration(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr("auto_designer.demand.triage.time.sleep", lambda _: None)
+    monkeypatch.setattr("ahe_beta.demand.triage.time.sleep", lambda _: None)
 
     class PartialMigrationTracker(FakeTracker):
         writes = 0
@@ -729,7 +729,7 @@ def test_recovery_replays_only_our_partial_migration(tmp_path, monkeypatch) -> N
 def test_recovery_does_not_overwrite_external_edit_after_lost_response(
     tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.setattr("auto_designer.demand.triage.time.sleep", lambda _: None)
+    monkeypatch.setattr("ahe_beta.demand.triage.time.sleep", lambda _: None)
 
     class ConcurrentEditTracker(FakeTracker):
         writes = 0
@@ -758,7 +758,7 @@ def test_recovery_does_not_overwrite_external_edit_after_lost_response(
 
 
 def test_recovery_retries_temporary_server_error(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr("auto_designer.demand.triage.time.sleep", lambda _: None)
+    monkeypatch.setattr("ahe_beta.demand.triage.time.sleep", lambda _: None)
 
     class TemporaryServerErrorTracker(FakeTracker):
         reads = 0
@@ -786,7 +786,7 @@ def test_recovery_retries_temporary_server_error(tmp_path, monkeypatch) -> None:
 
 
 def test_recovery_reuses_saved_output_after_previous_tracker_outage(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr("auto_designer.demand.triage.time.sleep", lambda _: None)
+    monkeypatch.setattr("ahe_beta.demand.triage.time.sleep", lambda _: None)
 
     class RecoveredTracker(FakeTracker):
         unavailable = True

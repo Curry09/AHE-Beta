@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from auto_designer.tracker.gitea import GiteaError, GiteaTracker
+from ahe_beta.tracker.gitea import GiteaError, GiteaTracker
 
 
 class _Resp:

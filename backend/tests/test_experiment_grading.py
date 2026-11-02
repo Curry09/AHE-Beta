@@ -10,13 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.evaluation.adapters.swebench import _SWEbenchRunner
-from auto_designer.experiment import grading, materials, workload
-from auto_designer.experiment.collection import collect_archive
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.manifest import recovery_identity, run_lock, update_runtime
-from auto_designer.loop.recovery import digest_value, operation_key
-from auto_designer.models import (
+from ahe_beta.evaluation.adapters.swebench import _SWEbenchRunner
+from ahe_beta.experiment import grading, materials, workload
+from ahe_beta.experiment.collection import collect_archive
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.manifest import recovery_identity, run_lock, update_runtime
+from ahe_beta.loop.recovery import digest_value, operation_key
+from ahe_beta.models import (
     FeelingScore,
     Persona,
     SeedScenario,
@@ -24,8 +24,8 @@ from auto_designer.models import (
     Transcript,
     WorkspaceSpec,
 )
-from auto_designer.user.patches import preserve_prediction
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.user.patches import preserve_prediction
+from ahe_beta.user.session_store import SessionStore
 from test_experiment_config_v2 import write
 from test_experiment_materials import prepared_inputs as base_prepared_inputs
 
@@ -41,7 +41,7 @@ def prepared_inputs(tmp_path, monkeypatch):
 
 @pytest.fixture
 def archived_run(prepared_inputs, tmp_path, monkeypatch, request):
-    from auto_designer.evaluation.adapters import swebench as adapter
+    from ahe_beta.evaluation.adapters import swebench as adapter
 
     monkeypatch.setattr(adapter, "resolve_image", lambda *args, **kwargs: "sha256:" + "f" * 64)
     monkeypatch.setattr(adapter, "run_docker", lambda *args, **kwargs: "")
@@ -114,8 +114,8 @@ def archived_run(prepared_inputs, tmp_path, monkeypatch, request):
         },
     )
     if task.get("artifacts"):
-        from auto_designer.evaluation.artifacts import collect_session_artifacts
-        from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+        from ahe_beta.evaluation.artifacts import collect_session_artifacts
+        from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 
         workspace = tmp_path / "trial-workspace"
         workspace.mkdir()
@@ -910,7 +910,7 @@ def test_trace_default_omissions_normalize_like_real_dataclass_receipt(archived_
 def test_custom_plan_uses_frozen_original_output_and_keeps_original_session(
     archived_run, monkeypatch
 ):
-    from auto_designer.evaluation.results import ExecutionEvidence, GradingResult
+    from ahe_beta.evaluation.results import ExecutionEvidence, GradingResult
 
     run = archived_run
     plan = run["dataset"].parent / "custom-plan.json"
@@ -945,7 +945,7 @@ def test_custom_plan_uses_frozen_original_output_and_keeps_original_session(
                 execution=ExecutionEvidence("isolated_custom_verifier", True, "sha256:" + "f" * 64),
             )
 
-    from auto_designer.evaluation import service
+    from ahe_beta.evaluation import service
 
     monkeypatch.setattr(grading, "get_adapter", lambda *args: Adapter())
     monkeypatch.setattr(service, "get_adapter", lambda *args: Adapter())

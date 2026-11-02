@@ -6,16 +6,16 @@ import json
 
 import pytest
 
-from auto_designer.demand.delivery_evidence import build_package
-from auto_designer.demand.observation_provider import ObservationProvider
-from auto_designer.execution_contract import canonical_sha256, make_execution_contract
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.continuation.evidence import (
+from ahe_beta.demand.delivery_evidence import build_package
+from ahe_beta.demand.observation_provider import ObservationProvider
+from ahe_beta.execution_contract import canonical_sha256, make_execution_contract
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.continuation.evidence import (
     ContinuationEvidenceView,
     install_parent_observations,
     verify_installed_parent_observations,
 )
-from auto_designer.models import (
+from ahe_beta.models import (
     FeelingScore,
     IssueRef,
     Persona,
@@ -24,8 +24,8 @@ from auto_designer.models import (
     SimTrace,
     Transcript,
 )
-from auto_designer.observations.grants import authorized_sessions
-from auto_designer.user.session_store import SessionConflictError, SessionStore
+from ahe_beta.observations.grants import authorized_sessions
+from ahe_beta.user.session_store import SessionConflictError, SessionStore
 
 
 @pytest.fixture
@@ -216,7 +216,7 @@ def test_native_bundle_copy_preserves_bytes_or_marks_unavailable(evidence, monke
         child_store=child, parent_root=parent, export=exported, issue_map=issue_map
     )
     destination = child.root.parent / "observations"
-    monkeypatch.delenv("AUTO_DESIGNER_OBSERVATION_ROOT", raising=False)
+    monkeypatch.delenv("AHE_BETA_OBSERVATION_ROOT", raising=False)
     args = {
         "parent_root": parent,
         "export": exported,

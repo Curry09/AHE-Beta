@@ -6,8 +6,8 @@ import copy
 
 import pytest
 
-from auto_designer.distill.library import PersonaLibrary
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.distill.library import PersonaLibrary
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D3Accept,
@@ -20,10 +20,10 @@ from auto_designer.user.sim.dimensions import (
     derive_d3,
     derive_trust,
 )
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.loop import SessionResult, run_session
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.persona_io import card_to_persona, card_to_personas
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.loop import SessionResult, run_session
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+from ahe_beta.user.sim.persona_io import card_to_persona, card_to_personas
 
 TASK = "Add to_user_tz(dt, tz_name); handle DST."
 

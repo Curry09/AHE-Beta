@@ -16,7 +16,7 @@ def test_hosted_config_preserves_default_policy(deployment: str) -> None:
     compose = (root / "docker-compose.yml").read_text()
     default = (root / "egress-proxy.conf").read_text()
     hosted = (root / "egress-gitea-com.conf").read_text()
-    assert "${AUTO_DESIGNER_EGRESS_CONFIG:-./egress-proxy.conf}:/etc/squid/squid.conf:ro" in compose
+    assert "${AHE_BETA_EGRESS_CONFIG:-./egress-proxy.conf}:/etc/squid/squid.conf:ro" in compose
     assert "./egress-proxy.conf:/etc/squid/egress-base.conf:ro" in compose
     assert "include /etc/squid/egress-base.conf" in hosted
     assert "http_access deny all" in default

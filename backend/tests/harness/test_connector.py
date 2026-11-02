@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.harness.connector import HarnessConnector
-from auto_designer.harness.interface import FakeHarness, HarnessInterface
-from auto_designer.usage import bind_usage_context, current_usage_context
+from ahe_beta.harness.connector import HarnessConnector
+from ahe_beta.harness.interface import FakeHarness, HarnessInterface
+from ahe_beta.usage import bind_usage_context, current_usage_context
 
 
 class _ShutdownHarness(FakeHarness):
@@ -95,7 +95,7 @@ def test_connector_keeps_platform_metadata_out_of_harness_message() -> None:
 def test_connector_attributes_harness_usage_without_exposing_it(monkeypatch) -> None:
     recorded = []
     monkeypatch.setattr(
-        "auto_designer.harness.connector.record_usage", lambda **event: recorded.append(event)
+        "ahe_beta.harness.connector.record_usage", lambda **event: recorded.append(event)
     )
     connector = HarnessConnector(_UsageHarness())
     with bind_usage_context(session_id="s", instance_id="i", interaction_id="turn-0"):
@@ -125,7 +125,7 @@ def test_connector_close_attributes_late_usage_to_explicit_session_context(monke
     def capture(**event):
         recorded.append((event, current_usage_context()))
 
-    monkeypatch.setattr("auto_designer.harness.connector.record_usage", capture)
+    monkeypatch.setattr("ahe_beta.harness.connector.record_usage", capture)
     connector = HarnessConnector(LateUsageHarness())
     with bind_usage_context(
         session_id="session-1",
@@ -163,7 +163,7 @@ def test_connector_interrupt_drains_usage_immediately(monkeypatch) -> None:
 
     recorded = []
     monkeypatch.setattr(
-        "auto_designer.harness.connector.record_usage", lambda **event: recorded.append(event)
+        "ahe_beta.harness.connector.record_usage", lambda **event: recorded.append(event)
     )
     connector = HarnessConnector(InterruptUsageHarness())
 
@@ -187,7 +187,7 @@ def test_connector_poll_wrapper_drains_usage_immediately(monkeypatch) -> None:
 
     recorded = []
     monkeypatch.setattr(
-        "auto_designer.harness.connector.record_usage", lambda **event: recorded.append(event)
+        "ahe_beta.harness.connector.record_usage", lambda **event: recorded.append(event)
     )
     connector = HarnessConnector(PollUsageHarness())
 

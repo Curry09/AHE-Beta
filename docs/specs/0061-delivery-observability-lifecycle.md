@@ -32,12 +32,12 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/runtime.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/harness/launcher.py
-      - backend/auto_designer/observations/publication.py
-      - backend/auto_designer/observations/__main__.py
-      - backend/auto_designer/demand/observation_provider.py
+      - backend/ahe_beta/user/sim/runtime.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/harness/launcher.py
+      - backend/ahe_beta/observations/publication.py
+      - backend/ahe_beta/observations/__main__.py
+      - backend/ahe_beta/demand/observation_provider.py
       - backend/tests/observations/test_publication.py
     scope: 启动时约定观测输出目录，清理容器前按受限清单收集，平台绑定真实 session 和制品版本，校验发布完整性并保留旧包。
     acceptance: 正常或放弃会话均尝试收集；崩溃留下明确缺失状态；路径、大小、版本摘要校验，旧轮不被覆盖。
@@ -51,10 +51,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/owner.py
-      - backend/auto_designer/demand/delivery_evidence.py
-      - backend/auto_designer/observations/grants.py
-      - backend/auto_designer/tracker/gitea.py
+      - backend/ahe_beta/demand/owner.py
+      - backend/ahe_beta/demand/delivery_evidence.py
+      - backend/ahe_beta/observations/grants.py
+      - backend/ahe_beta/tracker/gitea.py
       - backend/tests/demand/test_delivery_evidence.py
     scope: 从准入票的授权引用发布审计过的交付证据包；通过现有 Gitea 边界提供可解析句柄，避免宿主路径和全量 session 挂载。平台范围的缺口不得误投 harness 队列。
     acceptance: 开发容器能定位对应版本包；引用在合并和截断后保留；权限失败明确降级，禁止外链下载与扩权。
@@ -90,23 +90,23 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/observations/gaps.py
-      - backend/auto_designer/observations/delivery_gaps.py
-      - backend/auto_designer/demand/agent_runtime.py
-      - backend/auto_designer/demand/triage.py
-      - backend/auto_designer/demand/divergent.py
-      - backend/auto_designer/demand/synthesizer.py
+      - backend/ahe_beta/observations/gaps.py
+      - backend/ahe_beta/observations/delivery_gaps.py
+      - backend/ahe_beta/demand/agent_runtime.py
+      - backend/ahe_beta/demand/triage.py
+      - backend/ahe_beta/demand/divergent.py
+      - backend/ahe_beta/demand/architect.py
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/triage_agent/agent.yaml
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/divergent_pm/agent.yaml
-      - backend/agent_defs/synthesizer/systemprompt.md
-      - backend/agent_defs/synthesizer/agent.yaml
+      - backend/agent_defs/architect/systemprompt.md
+      - backend/agent_defs/architect/agent.yaml
       - backend/agent_defs/owner/systemprompt.md
       - backend/agent_defs/owner/agent.yaml
       - backend/agent_defs/triage_agent/tools/submit_observation_gap.tool.yaml
       - backend/agent_defs/divergent_pm/tools/submit_observation_gap.tool.yaml
-      - backend/agent_defs/synthesizer/tools/submit_observation_gap.tool.yaml
+      - backend/agent_defs/architect/tools/submit_observation_gap.tool.yaml
       - backend/agent_defs/owner/tools/submit_observation_gap.tool.yaml
       - backend/tests/observations/test_gaps.py
       - OpenAgents/openagents/observations/gaps.py
@@ -226,7 +226,7 @@ tracer 生成观测文件与说明，换其他 harness 起点时替换制品侧�
 |---|---|---|
 | Triage | 单条报告查证时，无法区分失败、等待或中断后的状态 | 只使用当前 report 的授权证据 |
 | PM | 用户行为与内部证据无法对照，不能判断某种体验差异 | 独立 PM 路线到 Owner，不把产品机会写成固定事件方案 |
-| Synthesizer | 对多条交付路线提案验证共同机制时缺少区分证据 | 只查可见来源的 session；不借补强入口读取 PM 或发现无关需求 |
+| Architect | 对多条交付路线提案验证共同机制时缺少区分证据 | 只查可见来源的 session；不借补强入口读取 PM 或发现无关需求 |
 | Owner | 上游交接材料缺少可解析引用、版本或完成判断所需信息 | 不新增原始会话/日志读取权；缺口依据是交接材料本身 |
 | 开发、架构、评审与验证角色 | 无法复现、区分假设、确认改动效果或验证恢复边界 | 只用当前 issue 授权证据与自己产生的测试证据 |
 
@@ -251,7 +251,7 @@ tracer 生成观测文件与说明，换其他 harness 起点时替换制品侧�
 期望诊断能力及验证场景。根因未知也能成立；目标是补足辨别能力，不是宣称原问题根因。
 
 发现者提交一个独立缺口请求，平台落普通提案并返回票号。PM 来源保留 from-divergent，
-不进入 Synthesizer；其他来源保留来源角色和原 issue 关系。缺口提案不受 Synthesizer
+不进入 Architect；其他来源保留来源角色和原 issue 关系。缺口提案不受 Architect
 “综合多个 proposal”的提交契约限制，因为它是对一次受限取证失败的能力请求，不是
 新的结构综合产物，也不授予额外取证范围。
 
@@ -318,7 +318,7 @@ proposal 和归档，下一次普通准入重试同一附件，不自动绕过�
 补充取证只从既有授权清单选择，不因为 Developer 好奇就开放同仓全部用户记录。
 
 本设计扩展的是既有 Gitea 交接边界，不新增公网日志服务。相关 OpenAgents 改动单独
-提交其仓库并更新构建 pin；auto-designer 的 spec 不等于已修改了部署中的 OpenAgents。
+提交其仓库并更新构建 pin；ahe-beta 的 spec 不等于已修改了部署中的 OpenAgents。
 
 ### C. 缺口提案的提交、路由与恢复
 
@@ -342,7 +342,7 @@ proposal 和归档，下一次普通准入重试同一附件，不自动绕过�
 影响与验证必要性决定优先级。提案进入工作队列后仍经过正常工程质量与范围约束。
 
 设计侧 schema 位于 observations.gaps，四角色 YAML 有 drift guard。PM 来源及其后续
-Owner/开发补强按可信来源保留 from-divergent，不能借补强绕回 Synthesizer。Synthesizer 的原始
+Owner/开发补强按可信来源保留 from-divergent，不能借补强绕回 Architect。Architect 的原始
 证据权限来自框架保存的来源授权，而非模型正文里新增的 session_id。没有可信授权的历史
 票不从文字补权限；这类迁移必须从可信会话/调用来源重建授权。
 
@@ -359,7 +359,7 @@ Owner/开发补强按可信来源保留 from-divergent，不能借补强绕回 S
 
 T1 实现制品起点；T2 实现平台收集；T3 实现跨容器交接；T4 接入开发角色与制品开发规范；
 T5 接入两侧提案；T6 验证完整闭环。任务 files 是预期控制点，不冻结未来 harness 文件布局。
-OpenAgents/ 前缀表示独立仓交付范围，不应在 auto-designer 中创建一个同名 vendor 副本。
+OpenAgents/ 前缀表示独立仓交付范围，不应在 AHE-Beta 中创建一个同名 vendor 副本。
 
 验证分层：
 
@@ -400,7 +400,7 @@ CI 只验证工程行为与安全契约；benchmark 全程 held-out，不作为�
 
 ## Prior art
 
-0059 提供制品文件按需读取，平台不解释事件字段；0060 保留 PM 独立路线且 Synthesizer
+0059 提供制品文件按需读取，平台不解释事件字段；0060 保留 PM 独立路线且 Architect
 不读取 PM。0032/0033 分离需求与容器交付；0045 固定工具链 pin；0050 在交付封口后
 才进入下一轮。当前 Meta-Spec 已要求基于 ownership/delivery/control_effect 与
 行为证据开发，本组把观测能力明确纳入这套职责，不替换目标契约。

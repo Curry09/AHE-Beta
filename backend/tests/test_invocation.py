@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.invocation import InvocationStore, record_invocation
-from auto_designer.usage import bind_usage_context
+from ahe_beta.invocation import InvocationStore, record_invocation
+from ahe_beta.usage import bind_usage_context
 
 
 def test_record_round_trip(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("ROLE_RUNS_DIR", str(tmp_path))
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-a")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "run-a")
     with bind_usage_context(round_no=2):
         record_invocation(
             side="demand",
@@ -143,7 +143,7 @@ def test_concurrent_records_do_not_tear_index(tmp_path: Path, monkeypatch) -> No
 
 
 def test_shared_demand_model_secret_is_redacted(monkeypatch):
-    from auto_designer.invocation import _redact
+    from ahe_beta.invocation import _redact
 
     monkeypatch.setenv("DEMAND_LLM_API_KEY", "private-model-key-sentinel")
     assert _redact(text="key=private-model-key-sentinel") == "key=${DEMAND_LLM_API_KEY}"

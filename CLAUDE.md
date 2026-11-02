@@ -9,7 +9,7 @@
 ### 项目文档
 用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 U1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；支持冻结任务列表、同任务多用户与 ordinary/SWE 混合计划；U1/U4 公开示例涵盖两后端。带当前 continuation export 的完整归档可通过同入口继承到新 run 追加轮次，双语教程见 docs/tutorials/experiment-continuation.md / .zh-CN.md。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
 
-Spec-0081 的 examples/experiments/u8-mixed-e2b.json、u8-direct-e2b.json、u16-mixed-e2b.json、u32-mixed-e2b.json 使用原32任务集的前8/前16/全32项，实验仍是schema 2，容器任务包是schema 3。四组从当前builtin seed跑六轮，R1–R5反馈交付、R6只试用；模拟/direct为6/2、0/8、12/4、25/7，Triager为4/4/8/16，Synthesizer/Divergent各1，mechanical Owner、grouping=false，用户与Developer并发分别4，E2B4CPU/8192MiB，逐轮官方评分默认关闭。原persona直接复用，独立画像数5/5/8/15；interaction_plan逐轮在所选子集内整体轮转1，不能截取轮转后的32项。U8对照仅六个interaction覆盖与派生名称/身份不同，其他条件深比较一致。模型公开ID为用户/Harness的glm-5.3-flash、需求/交付的glm-5.3；User/builtin Harness/需求角色的初始输出额度为32768，Claude Code交付由其客户端控制输出；不注入128k预算或内网endpoint。任务材料由examples/tasks/evolution32/manifest.json和各task.json绑定公开镜像digest、输入hash及配方；不从完成态补造初态。双语教程见docs/tutorials/evolution32.md/.zh-CN.md，批次为examples/batches/evolution-four-e2b.json。材料、真实环境工具检查、两轮模型链路、正式四组六轮必须分开记录。
+Spec-0081 的 examples/experiments/u8-mixed-e2b.json、u8-direct-e2b.json、u16-mixed-e2b.json、u32-mixed-e2b.json 使用原32任务集的前8/前16/全32项，实验仍是schema 2，容器任务包是schema 3。四组从当前builtin seed跑六轮，R1–R5反馈交付、R6只试用；模拟/direct为6/2、0/8、12/4、25/7，Triager为4/4/8/16，Architect/Divergent各1，mechanical Owner、grouping=false，用户与Developer并发分别4，E2B4CPU/8192MiB，逐轮官方评分默认关闭。原persona直接复用，独立画像数5/5/8/15；interaction_plan逐轮在所选子集内整体轮转1，不能截取轮转后的32项。U8对照仅六个interaction覆盖与派生名称/身份不同，其他条件深比较一致。模型公开ID为用户/Harness的glm-5.3-flash、需求/交付的glm-5.3；User/builtin Harness/需求角色的初始输出额度为32768，Claude Code交付由其客户端控制输出；不注入128k预算或内网endpoint。任务材料由examples/tasks/evolution32/manifest.json和各task.json绑定公开镜像digest、输入hash及配方；不从完成态补造初态。双语教程见docs/tutorials/evolution32.md/.zh-CN.md，批次为examples/batches/evolution-four-e2b.json。材料、真实环境工具检查、两轮模型链路、正式四组六轮必须分开记录。
 
 单run启动后云内supervisor/controller独立运行，本机另起后台collector；collector只负责状态/收集/成功终态清理，当前无E2B租期刷新。86400秒是创建租期，不是无限生命周期；CLI resume要求原VM仍running，paused需显式provider恢复，expired/deleted是LOST，不能悄悄换机称无损续跑。batch用前台监督器而非每个成员的detached monitor。模型limits是静态容量声明，reserved_output_tokens不改实际max_tokens；User/Harness输入阈值可覆盖，需求角色当前仍用固定YAML阈值，不能把静态检查描述成所有角色的动态token保证。
 
@@ -64,15 +64,15 @@ local + localhost 的工程 CI 由 runtime.local.ci_enabled=true 可选开启，
 ### 运行时：需求面 nexau + 交付面 OpenAgents（spec-0032）
 需求面角色为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」，固定角色定义置于 `agent_defs/`：
 - **用户 agent**：扮演用户，多轮使用 harness，产出体感与 issue（report 平面）。
-- **triager / synthesizer / divergent**：生成器，产不可领 proposal（spec-0029 三平面）。
-- **双轨（spec-0060）**：PM 独立到 Owner；Triage 经 Synthesizer 到 Owner。Synthesizer 的 proposal/ready 输入排除 PM，证据授权只来自筛选后的可见提案；两路线仅在 Owner 汇合。
+- **triager / architect / divergent**：生成器，产不可领 proposal（spec-0029 三平面）。
+- **双轨（spec-0060）**：PM 独立到 Owner；Triage 经 Architect 到 Owner。Architect 的 proposal/ready 输入排除 PM，证据授权只来自筛选后的可见提案；两路线仅在 Owner 汇合。
 - **Owner / Delivery Router**：默认 admit 并打 `openagents` 令牌；用 `delivery_overlaps` 协调双轨共享工作，双方仍独立交接与验收，交付侧决定实现复用。仅保留历史精确去重兼容，不选择实现层、不压缩独立能力与验收目标。
 
 交付面 = OpenAgents vigil：以独立 CLI 接入（不 vendor 不 import），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。运行形态（spec-0033）：**容器围堵为缺省**——vigil 跑在专用容器（deploy/vigil 镜像，容器内自 clone harness 仓、零宿主挂载），网络只挂 internal vigil-net、外网经 egress 代理 allowlist（仅 Anthropic API），claude 凭证（ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN）与 Gitea token 只经容器 env；`VIGIL_MODE=subprocess` 只适用于盯屏宿主联调，或经统一入口验证身份的 E2B 整实验沙箱；后者的交付 worker 使用沙箱内进程；Spec-0081 的容器型用户任务另按 attempt 创建独立 Docker 容器/服务网络，不能将交付进程与任务环境混为一谈。
 
 > 无体感门禁角色；体验及逐轮验收可供后续轮次纠错，不自动淘汰或回退候选。独立 held-out 评估不进入演化。
 
-独立 held-out 评测使用 `evaluation.yaml` 和 `python -m evaluation`，支持 Harbor Index 任务、direct 与 simulated_user，以及冻结 Harness 或原生 Agent。环境集中在 evaluation/environments/，Harness 接入集中在 evaluation/harness/，Index 专用辅助集中在 evaluation/benchmarks/harbor_index/。安装与运行见 evaluation/README.zh-CN.md；后台会话产物评分 backend/auto_designer/evaluation/ 保持独立。
+独立 held-out 评测使用 `evaluation.yaml` 和 `python -m evaluation`，支持 Harbor Index 任务、direct 与 simulated_user，以及冻结 Harness 或原生 Agent。环境集中在 evaluation/environments/，Harness 接入集中在 evaluation/harness/，Index 专用辅助集中在 evaluation/benchmarks/harbor_index/。安装与运行见 evaluation/README.zh-CN.md；后台会话产物评分 backend/ahe_beta/evaluation/ 保持独立。
 
 ### 被进化对象：harness 作为可启动程序
 harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对话契约」：启动后接收用户消息、返回回复；内部为 1 个或 N 个 nexau、如何编排，由其自身入口脚本决定（支持多 agent harness）。
@@ -85,13 +85,13 @@ harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对�
 - **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
 
 ### 闭环
-`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 已配置的独立验收 → 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮运行用户及已配置的独立验收，不再需求或交付。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；普通 `TOTAL_ROUNDS=1` 不启 vigil；continuation 初始化按统一 delivery_required 语义启用交付，即使只追加一个用户轮。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。新 workload contract 1 由监督器启动 `auto_designer.experiment.controllers.unified`；旧 schema-2 module/script run 从原 archive 配方执行；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
+`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 已配置的独立验收 → 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮运行用户及已配置的独立验收，不再需求或交付。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；普通 `TOTAL_ROUNDS=1` 不启 vigil；continuation 初始化按统一 delivery_required 语义启用交付，即使只追加一个用户轮。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。新 workload contract 1 由监督器启动 `ahe_beta.experiment.controllers.unified`；旧 schema-2 module/script run 从原 archive 配方执行；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
 
 ### 目录结构
 前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 提供只读观测看板，项目级文档/工具与配置留根。
 ```
 backend/                 # 后端（编排框架）
-  auto_designer/         # 包（编排框架本体）
+  ahe_beta/         # 包（编排框架本体）
     experiment/          # v2 配置、材料冻结、local/E2B 生命周期与监督器
       controllers/       # unified.py + feedback.py + runtime.py：统一装配与共享设施，不是公开入口
     models.py            # 共享数据结构（两侧共用）
@@ -100,12 +100,12 @@ backend/                 # 后端（编排框架）
     user/                # user_agent + sim/WorkspaceRuntime（本地 fixture / 每会话 Docker）+ session_store
     evaluation/          # 共用产物采集、独立评分合同、benchmark/custom adapters 与接受关系
     tracker/             # base.py(IssueTracker接口) + gitea.py(含 PR 观测读路径) + fake.py
-    demand/              # Triage / Synthesizer / PM / Owner 及共享需求处理
+    demand/              # Triage / Architect / PM / Owner 及共享需求处理
     guards/              # workspace_jail + repo_guard + harness_boundary；不含内置开发角色
     loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
     web/                 # 只读观测看板 FastAPI（/api/overview /api/delivery /api/sessions ...）
   tests/                 # 后端测试；根 pyproject 同时包含 evaluation/tests
-  agent_defs/            # 需求面角色 nexau 定义（数据）：user_agent/ triage_agent/ synthesizer/ divergent_pm/ owner/
+  agent_defs/            # 需求面角色 nexau 定义（数据）：user_agent/ triage_agent/ architect/ divergent_pm/ owner/
   harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml + .gitea/workflows/smoke.yml
   deploy/gitea/          # 基建：docker-compose.yml(Gitea+act_runner+egress-proxy+双网络) + bootstrap.sh
   deploy/vigil/          # 交付面围堵盒（spec-0033）：Dockerfile + entrypoint.sh(自 clone) + build.sh

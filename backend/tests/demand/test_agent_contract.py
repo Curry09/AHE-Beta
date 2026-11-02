@@ -7,8 +7,8 @@ from __future__ import annotations
 import jsonschema
 import pytest
 
-from auto_designer.demand import agent_contract as ac
-from auto_designer.demand import issue_schema as sc
+from ahe_beta.demand import agent_contract as ac
+from ahe_beta.demand import issue_schema as sc
 
 
 @pytest.mark.parametrize("count", [0, 2])
@@ -37,7 +37,7 @@ def test_dispositions_schema_shape_and_enums() -> None:
     assert schema["additionalProperties"] is False
     item = schema["properties"]["dispositions"]["items"]
     props = item["properties"]
-    # disposition 三值（Spec-0029：duplicate 退役、跨提案吸收归 Synthesizer）、kind∈USER_KINDS、priority∈P0-P3
+    # disposition 三值（Spec-0029：duplicate 退役、跨提案吸收归 Architect）、kind∈USER_KINDS、priority∈P0-P3
     assert props["disposition"]["enum"] == ["accept", "reject", "needs_info"]
     assert props["kind"]["enum"] == list(sc.USER_KINDS)
     assert props["priority"]["enum"] == list(sc.PRIORITIES)

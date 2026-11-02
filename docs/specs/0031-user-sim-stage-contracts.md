@@ -27,7 +27,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/prompt.py
       - backend/tests/user/sim/test_prompt.py
       - backend/tests/user/sim/test_inner_prompt.py
     scope: 将全局 BLOCK_G 拆成薄 base system（角色、persona、感知边界、禁止隐藏真相）与各阶段 user prompt contract；main/waiting judge 与 intent 不继承动作/终止/issue/rating/菜单语义；main judge 在依据不足且低成本可查时可用私有工具自查；main act 只暴露外部动作 schema（send_message + 终止）和菜单；issue/rating 规则仅在对应 builder 中出现；build_inner_system 不再拼入全局动作 contract，只加入 private tool-use 协议、工具、persona 能力与可选核实倾向。
@@ -42,7 +42,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/user/sim/test_heartbeat.py
     scope: 保持主 loop 与心跳 loop 的 judge→intent→act 时序不变，按新的 prompt 分层补集成 guard：judge/intent 的实际 LLM user prompt 不出现动作 schema、菜单、terminal 指导；act prompt 才出现动作 contract；主流程动作空间移除 legacy verify_self，并把所有 harness-facing 外部交互收敛为 send_message；将任意阶段 private tool-use 摘要为 private_evidence，作为用户自己的跨轮记忆同时喂给 main/waiting 的 judge/intent/act。若 prompt contract 拆分需要调整 _main_decide/_heartbeat_once 的传参或历史筛选，集中在本 Task 处理。
@@ -57,7 +57,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/user/sim/test_persona_client_agentic.py
     scope: 适配 ScriptedPersonaClient 和 AgenticPersonaClient 到新的阶段契约：scripted judge/intent 不依赖动作 contract 仍能返回 perceive/verdict/intent；agentic 内层 LLM 的 trace.user 在 judge/intent 阶段不含动作/终止/issue/rating contract，act/issue/rating 阶段按需包含；保持 report_issue 工具行为不变（阶段过滤另议）。
     acceptance: test_persona_client_agentic 覆盖 agentic trace.user 的阶段边界；ScriptedPersonaClient 离线 demo 与 capability fork 不回归；report_issue 现有测试继续通过；不检查 trace.system 中 mood 人话化或等待历史人话化，因为本组不处理。
@@ -79,7 +79,7 @@ tasks:
 
 ## Motivation
 
-当前 `backend/auto_designer/user/sim/prompt.py` 的旧 `BLOCK_G` 同时承担多个职责：用户角色、感知边界、动作空间约束、动作语义、终止时机、输出 JSON schema、verdict 解释、issue/accept 行为暗示等。即使主流程 `<action_space>` 只在 act 阶段出现，若共享 system prompt 或 action catalog 仍把 `verify_self` 暴露为“private action”，模型会把本该发生在 judge 内层的私有查验误投影成外层 act 按钮，造成 silent/no-op 验证循环。
+当前 `backend/ahe_beta/user/sim/prompt.py` 的旧 `BLOCK_G` 同时承担多个职责：用户角色、感知边界、动作空间约束、动作语义、终止时机、输出 JSON schema、verdict 解释、issue/accept 行为暗示等。即使主流程 `<action_space>` 只在 act 阶段出现，若共享 system prompt 或 action catalog 仍把 `verify_self` 暴露为“private action”，模型会把本该发生在 judge 内层的私有查验误投影成外层 act 按钮，造成 silent/no-op 验证循环。
 
 这会削弱用户模拟作为训练信号的多样性：模型不是先像真人一样判断现状、表达开放意愿，再被框架收敛为动作；而是全程带着平台操作手册思考，容易按可用出口倒推判断、意图和体感。长期看，用户行为会向固定状态机坍塌，发散不出新的能力缺口与产品信号。
 
@@ -237,8 +237,8 @@ PYTHONPATH=backend .venv/bin/pytest backend/tests/user/sim/test_prompt.py backen
 PYTHONPATH=backend .venv/bin/pytest backend/tests/user/sim/test_loop.py backend/tests/user/sim/test_heartbeat.py -v
 PYTHONPATH=backend .venv/bin/pytest backend/tests/user/sim/test_persona_client_agentic.py -v
 PYTHONPATH=backend .venv/bin/pytest backend/tests/user/sim -v
-.venv/bin/ruff check backend/auto_designer/user/sim backend/tests/user/sim
-.venv/bin/ruff format --check backend/auto_designer/user/sim backend/tests/user/sim
+.venv/bin/ruff check backend/ahe_beta/user/sim backend/tests/user/sim
+.venv/bin/ruff format --check backend/ahe_beta/user/sim backend/tests/user/sim
 ```
 
 ### Out of scope
@@ -280,7 +280,7 @@ issue 与 rating 是会话末专属任务。如果它们出现在 base system，
 - 0022：定义用户与 harness 的内外窗口、等待菜单与开放 intent，强调 message 是内通道、interrupt 是外通道。
 - 0023：把主 loop 与心跳 loop 钉成 judge → intent → act 三跳，为本组的阶段 contract 下沉提供结构基础。
 - 0024：Session.sim_trace 与设计师取证投影，强调用户可见 transcript 与 god-view trace 分离。
-- 0027：triage/synthesizer 通过 submit-tool 统一结构化输出，说明结构化 contract 可以按角色/阶段局部化，而不必全局注入。
+- 0027：triage/architect 通过 submit-tool 统一结构化输出，说明结构化 contract 可以按角色/阶段局部化，而不必全局注入。
 - 0030：harness 产品化边界，要求平台概念不进入 harness；本组把同样边界原则用于用户模拟 prompt。
 
 ## Unresolved questions

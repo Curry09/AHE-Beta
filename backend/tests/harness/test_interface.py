@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.harness.interface import FakeHarness, HarnessInterface
+from ahe_beta.harness.interface import FakeHarness, HarnessInterface
 
 
 def test_satisfies_protocol() -> None:

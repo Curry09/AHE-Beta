@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.config import load_config_v2, load_task_package
-from auto_designer.experiment.materials import check_materials
+from ahe_beta.experiment.config import load_config_v2, load_task_package
+from ahe_beta.experiment.materials import check_materials
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -147,7 +147,7 @@ def test_compatibility_and_experiment_extras_are_pinned():
     ],
 )
 def test_bilingual_cli_commands_match_and_parse(english, chinese):
-    from auto_designer.experiment.cli import build_parser
+    from ahe_beta.experiment.cli import build_parser
 
     def commands(path):
         return [

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment import context, materials, workload
-from auto_designer.experiment.config import ConfigError, config_hash
+from ahe_beta.experiment import context, materials, workload
+from ahe_beta.experiment.config import ConfigError, config_hash
 from test_experiment_config_v2 import package, write
 from test_experiment_materials import prepared_inputs as base_prepared_inputs
 

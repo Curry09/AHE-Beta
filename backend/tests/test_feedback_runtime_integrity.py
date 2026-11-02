@@ -9,20 +9,20 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.loop.sim_user import make_direct_run_session_fn, make_sim_run_session_fn
-from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.dimensions import D1Eval
-from auto_designer.user.sim.persona_client import (
+from ahe_beta.loop.sim_user import make_direct_run_session_fn, make_sim_run_session_fn
+from ahe_beta.models import Persona, SeedScenario, WorkspaceSpec
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.dimensions import D1Eval
+from ahe_beta.user.sim.persona_client import (
     AgenticPersonaClient,
     ApiPersonaClient,
     PersonaContextLimitError,
     ScriptedPersonaClient,
 )
-from auto_designer.user.sim.run_live import expert
-from auto_designer.user.sim.runtime import LocalWorkspaceRuntime, ReviewSnapshot
+from ahe_beta.user.sim.run_live import expert
+from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime, ReviewSnapshot
 
 PERSONA = Persona("reviewer", "expert", "python", "finish", "plain")
 

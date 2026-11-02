@@ -8,18 +8,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from auto_designer.models import WorkspaceSpec
+from ahe_beta.models import WorkspaceSpec
 
 
 def test_empty_auto_registered_without_importing_module() -> None:
     # 可加性硬证据：本测试不 import sources.empty，仅 import seed_source，empty 即在注册表。
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     assert "empty" in seed_source.available_kinds()
 
 
 def test_empty_provisions_empty_isolated_dir() -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     a = seed_source.provision(WorkspaceSpec(kind="empty"))
     b = seed_source.provision(WorkspaceSpec(kind="empty"))
@@ -32,7 +32,7 @@ def test_empty_provisions_empty_isolated_dir() -> None:
 
 
 def test_empty_writes_doc_and_doc_name_override() -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     ws = seed_source.provision(WorkspaceSpec(kind="empty", params={"doc": "build X"}))
     assert (Path(ws.cwd) / "SPEC.md").read_text() == "build X"

@@ -3,7 +3,7 @@ number: "0042"
 title: 需求面角色契约治理：统一术语、规范化提案投影与可靠状态迁移
 issue: 0
 slug: role-contract-governance
-summary: 消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Synthesizer/Owner 状态迁移与交接边界，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
+summary: 消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Architect/Owner 状态迁移与交接边界，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
 tasks:
   - id: T1
     title: 权威术语表、角色职责矩阵与现行流程基线
@@ -16,7 +16,7 @@ tasks:
     files:
       - docs/specs/0042-role-contract-governance.md
       - docs/specs/OVERVIEW.md
-    scope: 定义 report/proposal/ready item、Triage/Divergent/Synthesize/Owner、渐进式证据检索、merge target、covers 等正式术语；明确各角色输入、输出、权限和禁止事项；本 Spec 显式取代 0029 中机械准入、旧 Triage 落库、旧 Owner 输入和 dev 阶段描述，不改写历史决策记录。0052 进一步规定 Synthesizer 的 covers 吸收权。
+    scope: 定义 report/proposal/ready item、Triage/Divergent/Architect/Owner、渐进式证据检索、merge target、covers 等正式术语；明确各角色输入、输出、权限和禁止事项；本 Spec 显式取代 0029 中机械准入、旧 Triage 落库、旧 Owner 输入和 dev 阶段描述，不改写历史决策记录。0052 进一步规定 Architect 的 covers 吸收权。
     acceptance: 每个活动概念只有一个正式名称与机器标识；角色矩阵覆盖五个需求面角色；列出被取代的 0029 条款；OVERVIEW 指向本 Spec 作为现行补充规范。
   - id: T2
     title: Canonical ProposalView 与规范化提案版本
@@ -27,12 +27,12 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/proposal_view.py
-      - backend/auto_designer/demand/synthesizer.py
-      - backend/auto_designer/demand/divergent.py
+      - backend/ahe_beta/demand/proposal_view.py
+      - backend/ahe_beta/demand/architect.py
+      - backend/ahe_beta/demand/divergent.py
       - backend/tests/demand/test_proposal_view.py
-    scope: 建立任务无关的规范化提案投影单一真源，统一标题、字段、标签、优先级、来源和 covers 格式；Synthesizer、Divergent、Owner 不再分别拼接和截断正文；原始 report 与执行细节仅经评论审计或 timeline/beat/step 渐进检索。
-    acceptance: 三角色基于同一 ProposalView 数据模型生成职责适配的显式投影；Divergent 参照不含正文，Synthesize 与 Owner 获得规范化正文；默认投影不含原始报告和旧工作流标签；截断策略只有一处；相关单测通过。
+    scope: 建立任务无关的规范化提案投影单一真源，统一标题、字段、标签、优先级、来源和 covers 格式；Architect、Divergent、Owner 不再分别拼接和截断正文；原始 report 与执行细节仅经评论审计或 timeline/beat/step 渐进检索。
+    acceptance: 三角色基于同一 ProposalView 数据模型生成职责适配的显式投影；Divergent 参照不含正文，Architect 与 Owner 获得规范化正文；默认投影不含原始报告和旧工作流标签；截断策略只有一处；相关单测通过。
   - id: T3
     title: Triage 可靠规范化迁移与结构化失败结果
     status: done
@@ -42,10 +42,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/triage.py
-      - backend/auto_designer/tracker/base.py
-      - backend/auto_designer/tracker/fake.py
-      - backend/auto_designer/tracker/gitea.py
+      - backend/ahe_beta/demand/triage.py
+      - backend/ahe_beta/tracker/base.py
+      - backend/ahe_beta/tracker/fake.py
+      - backend/ahe_beta/tracker/gitea.py
       - backend/tests/demand/test_triage.py
       - backend/tests/tracker/test_fake.py
       - backend/tests/tracker/test_gitea.py
@@ -60,10 +60,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/owner.py
+      - backend/ahe_beta/demand/owner.py
       - backend/tests/demand/test_owner.py
     scope: Owner 保持轻量交付路由；执行既有交接状态迁移，历史 exact duplicate 兼容路径不得扩展为语义去重；核心落库失败进入 failed/held 并可观测，不得静默丢失交接。
-    acceptance: 所有开放 proposal 默认进入交接；非法/失败的交接动作可观测；Synthesizer 已处理的 covers 来源不由 Owner 再次关闭；相关测试通过。
+    acceptance: 所有开放 proposal 默认进入交接；非法/失败的交接动作可观测；Architect 已处理的 covers 来源不由 Owner 再次关闭；相关测试通过。
   - id: T5
     title: 五角色专业化 Prompt 与 Tool 契约统一
     status: done
@@ -76,11 +76,11 @@ tasks:
       - backend/agent_defs/user_agent/prompt.md
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/divergent_pm/systemprompt.md
-      - backend/agent_defs/synthesizer/systemprompt.md
+      - backend/agent_defs/architect/systemprompt.md
       - backend/agent_defs/owner/systemprompt.md
       - backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml
       - backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml
-      - backend/agent_defs/synthesizer/tools/submit_rfcs.tool.yaml
+      - backend/agent_defs/architect/tools/submit_rfcs.tool.yaml
       - backend/agent_defs/owner/tools/submit_admission.tool.yaml
     scope: System Prompt 只声明角色不变量，运行时消息只携带本轮上下文，Tool description 只描述调用契约；统一正式术语并清除退役工作流语义；机器枚举保留英文，首次出现给出固定中文定义。user_agent 文件定义与生产 simulator 的运行时组装分别审查，不宣称两者是同一活动路径。
     acceptance: 需求面角色定义只表达现行职责、输入边界和输出契约；System Prompt、运行时消息与 Tool description 不改变彼此的工作流状态；tool schema drift-guard 与跨角色行为测试通过。
@@ -95,8 +95,8 @@ tasks:
     files:
       - backend/tests/demand/test_role_contract_flow.py
       - tools/dev/replay/replay_roles_from_sessions.py
-    scope: 新增 report→Triage→Synthesize/Divergent 投影→Owner 的跨角色行为测试；运行设计/loop/tracker 回归，并以既有16份会话回放到 Owner 后停止，不启动 OpenAgents。
-    acceptance: 无 API 测试验证 Triage 产生的精确票号集合经 Divergent 参照、Synthesize 输入到达 Owner；原始题面不进入默认下游上下文；非法状态图不可落库；相关测试、ruff、diff-check 全部通过；真实回放冻结模型、裁决、产物校验和与未启动 OpenAgents，并明确其只验证需求方向而非实现就绪度。
+    scope: 新增 report→Triage→Architect/Divergent 投影→Owner 的跨角色行为测试；运行设计/loop/tracker 回归，并以既有16份会话回放到 Owner 后停止，不启动 OpenAgents。
+    acceptance: 无 API 测试验证 Triage 产生的精确票号集合经 Divergent 参照、Architect 输入到达 Owner；原始题面不进入默认下游上下文；非法状态图不可落库；相关测试、ruff、diff-check 全部通过；真实回放冻结模型、裁决、产物校验和与未启动 OpenAgents，并明确其只验证需求方向而非实现就绪度。
 ---
 
 # 0042 · 需求面角色契约治理
@@ -105,7 +105,7 @@ tasks:
 
 将需求面从多个历史版本叠加的 Prompt 与状态语义，收敛为一个可测试的角色契约体系。正式流程为：
 `report（原始报告） → proposal（规范化提案） → Owner → ready item（已准入工作项）`。Triage 负责单条
-规范化，Divergent 负责基于会话行为的能力发现，Synthesize 负责跨提案结构综合及 covers 吸收决定，
+规范化，Divergent 负责基于会话行为的能力发现，Architect 负责跨提案结构综合及 covers 吸收决定，
 Owner 只负责批量交接与优先级整理。所有角色默认读取统一 ProposalView，具体案例通过渐进式证据检索获取；
 覆盖合并的细化语义以 Spec-0052 为准。
 
@@ -125,7 +125,7 @@ superseded 或开发完成后 covers 级联等语义重新进入活动 Prompt。
 | 已准入工作项 | `ready` / `openagents` | 已通过 Owner 裁决，可进入交付面 |
 | 报告规范化 | Triage | 单条 report 的分类、定位、标题与字段规范化 |
 | 能力发现 | Divergent | 从未显式形成 report 的会话行为中识别产品能力缺口 |
-| 结构综合 | Synthesize | 在规范化 backlog 上识别跨提案结构性根因 |
+| 结构综合 | Architect | 在规范化 backlog 上识别跨提案结构性根因 |
 | 交付路由 | Owner | 批量 admit/hold 与优先级整理；保留 exact duplicate 兼容 |
 | 渐进式证据检索 | timeline→beat→step | 从摘要到执行细节的按需证据访问 |
 
@@ -136,13 +136,13 @@ superseded 或开发完成后 covers 级联等语义重新进入活动 Prompt。
 | User Simulator | 场景、persona、harness 响应 | 原始报告与体验评价 | 产品抽象和准入 |
 | Triage | 单条 report、对应会话证据、只读 harness | 规范化 proposal 或 reject/needs_info | 跨提案判重 |
 | Divergent | 体验索引、按需会话证据、ProposalView 参照 | 能力类 proposal | 结构性机制综合和准入 |
-| Synthesize | 全量 ProposalView、ready 参照、体验与运行聚合 | 结构类 proposal 与 covers 吸收决定 | 实现设计和下游交接 |
+| Architect | 全量 ProposalView、ready 参照、体验与运行聚合 | 结构类 proposal 与 covers 吸收决定 | 实现设计和下游交接 |
 | Owner | ProposalView、ready queue、体验索引 | admit/hold 交接（及 exact duplicate 兼容） | 语义去重、重新诊断、架构设计和代码实现 |
 
 ## Superseded behavior
 
 本 Spec 取代 0029 中以下现行描述：Owner 机械准入、`owner=0` 机械降级、Triage 规范化字段只写评论、
-Owner 不读取规范化正文、Synthesizer 使用旧 triaged/superseded 生命周期、进程内 dev 阶段。0052 进一步
+Owner 不读取规范化正文、Architect 使用旧 triaged/superseded 生命周期、进程内 dev 阶段。0052 进一步
 取代本 Spec 中“covers 仅为关系/Owner 负责语义合并”的旧描述。0029 保留为历史决策记录；活动实现与
 Overview 以 0032、0042 和 0052 为准。
 
@@ -155,10 +155,10 @@ Overview 以 0032、0042 和 0052 为准。
 ## Reference-level explanation
 
 规范化边界位于 Triage：report 保留为审计证据，活动 backlog 只暴露 ProposalView。ProposalView 是
-Synthesizer、Divergent 与 Owner 的共同只读数据模型，负责统一正文提取、规范化元数据和长度限制；Divergent 使用不含正文的紧凑判重投影，Synthesize 与 Owner 使用规范化正文投影。写入边界由 tracker
+Architect、Divergent 与 Owner 的共同只读数据模型，负责统一正文提取、规范化元数据和长度限制；Divergent 使用不含正文的紧凑判重投影，Architect 与 Owner 使用规范化正文投影。写入边界由 tracker
 提供两类语义操作：`update_issue` 迁移 title/body/labels，`transition_issue` 迁移 state/labels。Fake 后端
 可原子完成；Gitea 1.22 分别调用 EditIssue 与 labels 端点，校验最终状态，并在可观测的后续步骤失败时恢复操作前快照。Gitea 不提供覆盖两个端点的事务，故进程终止窗口由幂等重试处理。
-Synthesizer 创建结构提案后，driver 按 `covers` 将仍开放的 report/proposal 来源合并关闭并写入
+Architect 创建结构提案后，driver 按 `covers` 将仍开放的 report/proposal 来源合并关闭并写入
 `merged-into`。Owner 只处理合并后仍开放的 proposal；其自身的 exact duplicate 兼容操作不改变
 `covers` 已完成的状态。
 

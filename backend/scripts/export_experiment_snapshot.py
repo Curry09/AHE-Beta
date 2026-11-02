@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-ROLES = ("user", "triager", "synthesizer", "divergent", "owner", "developer", "harness")
+ROLES = ("user", "triager", "architect", "divergent", "owner", "developer", "harness")
 STATES = {
     "CREATED",
     "PROVISIONED",

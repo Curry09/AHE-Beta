@@ -7,7 +7,7 @@ seed_image="${SWEBENCH_STORAGE_SEED_IMAGE:?Set the immutable storage seed image}
 runtime_image="${SWEBENCH_RUNTIME_SEED_IMAGE:?Set the output runtime image}"
 nexau_source="${NEXAU_SOURCE:?Set NEXAU_SOURCE to a checkout of the locked hzhua/nexau commit}"
 builder_python="${NEXAU_BUILD_PYTHON:-$repo_root/.venv/bin/python}"
-build_context="$(mktemp -d /tmp/auto-designer-runtime-image.XXXXXX)"
+build_context="$(mktemp -d /tmp/ahe-beta-runtime-image.XXXXXX)"
 cleanup() { rm -rf -- "$build_context"; }
 trap cleanup EXIT
 

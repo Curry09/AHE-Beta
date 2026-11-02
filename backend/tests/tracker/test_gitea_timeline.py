@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from auto_designer.tracker import gitea as gitea_module
-from auto_designer.tracker.gitea import GiteaTracker
-from auto_designer.web.issue_timeline import build_issue_timeline
+from ahe_beta.tracker import gitea as gitea_module
+from ahe_beta.tracker.gitea import GiteaTracker
+from ahe_beta.web.issue_timeline import build_issue_timeline
 
 
 class _Resp:
@@ -44,7 +44,7 @@ def test_list_timeline_pages_and_normalizes_label_direction(monkeypatch):
                     "type": "label",
                     "body": "1",
                     "label": {"name": "ready"},
-                    "user": {"login": "synthesizer"},
+                    "user": {"login": "architect"},
                     "created_at": "2026-08-09T10:00:00Z",
                 },
                 {
@@ -52,7 +52,7 @@ def test_list_timeline_pages_and_normalizes_label_direction(monkeypatch):
                     "type": "label",
                     "body": "",
                     "label": {"name": "proposal"},
-                    "user": {"login": "synthesizer"},
+                    "user": {"login": "architect"},
                     "created_at": "2026-08-09T10:00:00Z",
                 },
             ],
@@ -61,7 +61,7 @@ def test_list_timeline_pages_and_normalizes_label_direction(monkeypatch):
                     "id": 3,
                     "type": "comment",
                     "body": "admit",
-                    "user": {"login": "synthesizer"},
+                    "user": {"login": "architect"},
                     "created_at": "2026-08-09T10:00:01Z",
                 }
             ],
@@ -72,13 +72,13 @@ def test_list_timeline_pages_and_normalizes_label_direction(monkeypatch):
     events = tracker.list_timeline(number=7)
 
     assert [event["operation"] for event in events] == ["add", "remove", "unknown"]
-    assert events[0]["label"] == "ready" and events[0]["actor"] == "synthesizer"
+    assert events[0]["label"] == "ready" and events[0]["actor"] == "architect"
     assert "page=1&limit=2" in session.calls[0]
     assert "page=2&limit=2" in session.calls[1]
 
 
 def _event(
-    label: str, operation: str, created_at: str, *, actor: str = "synthesizer"
+    label: str, operation: str, created_at: str, *, actor: str = "architect"
 ) -> dict[str, Any]:
     return {
         "id": f"{created_at}:{label}:{operation}",
@@ -94,7 +94,7 @@ def _event(
 def test_replay_normal_needs_human_is_additive_and_preserves_dimensions():
     events = [
         _event("proposal", "add", "2026-08-09T10:00:00Z"),
-        _event("from-synthesize", "add", "2026-08-09T10:00:00Z"),
+        _event("from-architect", "add", "2026-08-09T10:00:00Z"),
         _event("round-1", "add", "2026-08-09T10:00:00Z"),
         _event("proposal", "remove", "2026-08-09T10:01:00Z"),
         _event("openagents", "add", "2026-08-09T10:01:00Z"),
@@ -104,7 +104,7 @@ def test_replay_normal_needs_human_is_additive_and_preserves_dimensions():
     ]
     result = build_issue_timeline(
         issue={
-            "labels": ["from-synthesize", "round-1", "openagents", "P1", "ready", "needs-human"],
+            "labels": ["from-architect", "round-1", "openagents", "P1", "ready", "needs-human"],
             "created_at": "2026-08-09T10:00:00Z",
         },
         events=events,
@@ -113,7 +113,7 @@ def test_replay_normal_needs_human_is_additive_and_preserves_dimensions():
     assert result["complete"] is True
     assert result["current"]["plane"] == "ready"
     assert result["current"]["blocked"] is True
-    assert result["current"]["provenance"] == "from-synthesize"
+    assert result["current"]["provenance"] == "from-architect"
     assert result["current"]["round"] == 1
     assert result["anomalies"] == []
 
@@ -121,7 +121,7 @@ def test_replay_normal_needs_human_is_additive_and_preserves_dimensions():
 def test_replay_put_replacement_exposes_metadata_loss_without_backfilling_current():
     events = [
         _event("proposal", "add", "2026-08-09T10:00:00Z"),
-        _event("from-synthesize", "add", "2026-08-09T10:00:00Z"),
+        _event("from-architect", "add", "2026-08-09T10:00:00Z"),
         _event("round-1", "add", "2026-08-09T10:00:00Z"),
         _event("proposal", "remove", "2026-08-09T10:01:00Z"),
         _event("openagents", "add", "2026-08-09T10:01:00Z"),
@@ -131,7 +131,7 @@ def test_replay_put_replacement_exposes_metadata_loss_without_backfilling_curren
         _event("openagents", "remove", "2026-08-09T10:02:00Z"),
         _event("ready", "remove", "2026-08-09T10:02:00Z"),
         _event("P1", "remove", "2026-08-09T10:02:00Z"),
-        _event("from-synthesize", "remove", "2026-08-09T10:02:00Z"),
+        _event("from-architect", "remove", "2026-08-09T10:02:00Z"),
         _event("round-1", "remove", "2026-08-09T10:02:00Z"),
     ]
     result = build_issue_timeline(
@@ -143,7 +143,7 @@ def test_replay_put_replacement_exposes_metadata_loss_without_backfilling_curren
     assert result["current"]["provenance"] is None
     assert result["last_known"] == {
         "plane": "ready",
-        "provenance": "from-synthesize",
+        "provenance": "from-architect",
         "priority": "P1",
         "round": 1,
     }
@@ -161,7 +161,7 @@ def test_replay_put_replacement_exposes_metadata_loss_without_backfilling_curren
 def test_replay_reports_exclusive_conflict_incomplete_history_and_current_drift():
     events = [
         _event("proposal", "add", "2026-08-09T10:05:00Z"),
-        _event("from-synthesize", "add", "2026-08-09T10:05:00Z"),
+        _event("from-architect", "add", "2026-08-09T10:05:00Z"),
         _event("from-triage", "add", "2026-08-09T10:05:00Z"),
     ]
     result = build_issue_timeline(

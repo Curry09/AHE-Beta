@@ -1,5 +1,5 @@
 # Spec-0032/T6（实证修复连带）：act_runner 配置——只声明必须离开默认值的项。
-# job 容器必须挂进 compose 的命名网络（auto-designer-ci），否则容器内解析不到 `gitea` 主机名，
+# job 容器必须挂进 compose 的命名网络（ahe-beta-ci），否则容器内解析不到 `gitea` 主机名，
 # actions/checkout / git clone 在拉代码一步失败（宿主 localhost:3000 在容器里也不可达）。
 container:
-  network: auto-designer-ci
+  network: ahe-beta-ci

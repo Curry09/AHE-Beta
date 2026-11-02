@@ -3,7 +3,7 @@ number: "0005"
 title: 用户侧重型实现：控制信封模拟器与体感评分
 issue: 0
 slug: user-sim-and-feeling
-summary: 本组实现进化闭环 **a｜用户侧** 的重型版：以「控制信封」架构替代 spec-0001/T3 的最小桩，让 user agent 更拟真地多轮使用 harness（能力分叉、追问、绕路、放弃），并补齐 spec-0001 的训练信号 **FeelingScore（1–4 体感分）**。落点 `backend/auto_designer/user/sim/`，与 0001 最小实现**并存、不覆盖**。
+summary: 本组实现进化闭环 **a｜用户侧** 的重型版：以「控制信封」架构替代 spec-0001/T3 的最小桩，让 user agent 更拟真地多轮使用 harness（能力分叉、追问、绕路、放弃），并补齐 spec-0001 的训练信号 **FeelingScore（1–4 体感分）**。落点 `backend/ahe_beta/user/sim/`，与 0001 最小实现**并存、不覆盖**。
 tasks:
   - id: T1
     title: Persona 维度模型与文案
@@ -16,8 +16,8 @@ tasks:
         type: extends
     parallel: false
     files:
-      - backend/auto_designer/user/sim/dimensions.py
-      - backend/auto_designer/user/sim/clauses.py
+      - backend/ahe_beta/user/sim/dimensions.py
+      - backend/ahe_beta/user/sim/clauses.py
       - backend/tests/user/sim/test_dimensions.py
     scope: 定义 9 维结构化 persona（D1 评估能力/D2 领域深度/D3 验收阈值/D4.1-4.3 交互/D5 自主性/D6 授权 + trust）及其确定性派生（derive_d3/derive_trust/derive_d6/finalize_persona），与维度→英文注入文案的查表（clauses）。persona 为会话级静态系数，不在循环中变化。
     acceptance: finalize_persona 对仅给自由采样维度的 persona 产出完整不可变 persona，派生映射确定性可复现；对已显式提供 d3/trust/d6 的 persona，三者原样保留不被改写（fallback-only）；compile_block_p 对每个维度取值产出对应文案，无缺漏键。
@@ -31,9 +31,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/actions.py
-      - backend/auto_designer/user/sim/action_space.py
-      - backend/auto_designer/user/sim/state.py
+      - backend/ahe_beta/user/sim/actions.py
+      - backend/ahe_beta/user/sim/action_space.py
+      - backend/ahe_beta/user/sim/state.py
       - backend/tests/user/sim/test_action_space.py
       - backend/tests/user/sim/test_state.py
     scope: 动作目录（executor×channel×effect 五属性钉死）+ 动作空间派生（phase ∩ 能力掩码D1 ∩ 授权D6 ∪ 耐心门终止 ∪ accept）+ 自由产出归类/越权投影/channel 校验 + patience/trust 状态机（只吃主观 verdict）。本轮不实现客观真值线（objective/gold/GAP/control-plane），状态只由主观 verdict 驱动。
@@ -49,8 +49,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/user/sim/test_prompt.py
     scope: system（BLOCK-G 固定 + BLOCK-P persona 实例，KV-cache 友好）+ 每轮 user 消息 + 会话末自评请求 build_rating_turn。PersonaClient 协议双后端：ApiPersonaClient（OpenAI 兼容网关）/ ScriptedPersonaClient（离线脚本，含自评分支）。后续可收敛到 0003/T2 nexau_runtime。
     acceptance: build_system 前缀稳定；build_rating_turn 产出要求 {score,reason} 的 JSON 指令；ScriptedPersonaClient 对 <rate_experience> 返回 1–4 自评；_parse_json 容错（剥 fence/抽首个 {}）解析失败不崩。
@@ -68,7 +68,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/feeling.py
+      - backend/ahe_beta/user/sim/feeling.py
       - backend/tests/user/sim/test_feeling.py
     scope: 把控制信封会话末态产出对齐 spec-0001 的训练信号 FeelingScore（1–4 + reason，构造期断言越界、可双向序列化）。两路并出：① parse_feeling_llm 解析 persona LLM 会话末自评（spec-0001/T3 产出方式）；② derive_feeling 从主观末态（end_reason/failed_blame_harness 次数/trust）确定性聚合，作交叉校验与 LLM 解析失败兜底。全程不读客观真值（gold held-out）。
     acceptance: FeelingScore 越界(0/5)构造期断言失败、to_dict/from_dict round-trip 一致；parse_feeling_llm 对合法 {score,reason} 产出 FeelingScore，缺字段/非整数/越界返回 None；derive_feeling 对 accepted→4(摩擦多降3)/max_turns,issue_filed→2/abandoned→1；两路均不依赖 gold。
@@ -89,7 +89,7 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_loop.py
     scope: 控制信封主循环（≈ spec-0001/T3 UserAgent.run 的重型实现）：每轮 派生动作空间→persona 三层决策(perceive/verdict/action/message)→resolve→状态写回→终止判定；SessionResult 聚合 turns/signals/issue_artifact + 会话末两路体感（feeling=LLM自评 主信号 / feeling_derived=框架派生）。本轮不实现客观真值线（无 gold/GAP/control-plane 硬覆盖）；harness 回复只取文本。逐轮真人对话自立协议（不走 harbor 批接口）。
     acceptance: 给定 persona+client+harness+task 跑出 SessionResult；自判终止与 MAX_TURNS 兜底均生效；会话末 feeling 与 feeling_derived 均为合法 FeelingScore（LLM 解析失败时 feeling 回落 derived）；体感与状态全程只依赖主观信号，不读客观真值。
@@ -103,10 +103,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/harness_adapter.py
-      - backend/auto_designer/user/sim/scenarios.py
-      - backend/auto_designer/user/sim/demo.py
-      - backend/auto_designer/user/sim/run_live.py
+      - backend/ahe_beta/user/sim/harness_adapter.py
+      - backend/ahe_beta/user/sim/scenarios.py
+      - backend/ahe_beta/user/sim/demo.py
+      - backend/ahe_beta/user/sim/run_live.py
       - backend/tests/user/sim/test_harness_adapter.py
     scope: "脚本化 harness（ScriptedHarness/SplitBillHarness）直接实现 HarnessInterface（send/reset/close）：send→str\n按预设轨迹演示能力分叉场景，bug 仅以回复文本体现（send 不回 gold/exit_code，对齐本轮无客观线、harness 只输出\ntext）；reset 重置脚本步进、close 幂等空操作。demo（离线脚本后端，无 key 可跑）与 run_live（真实 NexAU 网关）\n两个运行入口，并排打印两路体感分与行为信号。生产中此适配层替换为真实 CLI harness（同样实现 HarnessInterface，\n归 0003/T1 launcher）。"
     acceptance: ScriptedHarness/SplitBillHarness 满足 HarnessInterface（isinstance 通过、send/reset/close 齐备）；与 FakeHarness 行为一致：close 后再 send/reset 抛 RuntimeError、重复 close 幂等不抛；demo 无 key 用 ScriptedPersonaClient 跑通两 persona 并打印 llm-rated/derived 两路体感；run_live 在配好网关时可对真实 user-agent 跑；harness 桩对'要求运行/探边界'分支产出预期文本轨迹。
@@ -120,7 +120,7 @@ tasks:
 
 本组实现进化闭环 **a｜用户侧** 的重型版：以「控制信封」架构替代 spec-0001/T3 的最小桩，让 user agent
 更拟真地多轮使用 harness（能力分叉、追问、绕路、放弃），并补齐 spec-0001 的训练信号
-**FeelingScore（1–4 体感分）**。落点 `backend/auto_designer/user/sim/`，与 0001 最小实现**并存、不覆盖**。
+**FeelingScore（1–4 体感分）**。落点 `backend/ahe_beta/user/sim/`，与 0001 最小实现**并存、不覆盖**。
 
 数据流脊柱（贯穿 T1…T6）：
 
@@ -264,8 +264,8 @@ apply_verdict(state, verdict, coef) -> State
 
 | Task | 文件 |
 |---|---|
-| T1 | `backend/auto_designer/user/sim/dimensions.py`、`backend/auto_designer/user/sim/clauses.py`、`backend/tests/user/sim/test_dimensions.py` |
-| T2 | `backend/auto_designer/user/sim/actions.py`、`backend/auto_designer/user/sim/action_space.py`、`backend/auto_designer/user/sim/state.py`、`backend/tests/user/sim/test_action_space.py`、`backend/tests/user/sim/test_state.py` |
+| T1 | `backend/ahe_beta/user/sim/dimensions.py`、`backend/ahe_beta/user/sim/clauses.py`、`backend/tests/user/sim/test_dimensions.py` |
+| T2 | `backend/ahe_beta/user/sim/actions.py`、`backend/ahe_beta/user/sim/action_space.py`、`backend/ahe_beta/user/sim/state.py`、`backend/tests/user/sim/test_action_space.py`、`backend/tests/user/sim/test_state.py` |
 
 ### 提示装配与 persona LLM 后端（T3）
 
@@ -298,8 +298,8 @@ make_client() -> PersonaClient
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/prompt.py`
-  - `backend/auto_designer/user/sim/persona_client.py`
+  - `backend/ahe_beta/user/sim/prompt.py`
+  - `backend/ahe_beta/user/sim/persona_client.py`
   - `backend/tests/user/sim/test_prompt.py`
 
 ### 体感评分：两路并出（T4）
@@ -341,7 +341,7 @@ derive_feeling(end_reason: str, turns: list) -> FeelingScore  # turns 仅 duck-t
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/feeling.py`
+  - `backend/ahe_beta/user/sim/feeling.py`
   - `backend/tests/user/sim/test_feeling.py`
 
 ### 会话主循环引擎（T5）
@@ -404,7 +404,7 @@ tracker, store) 的契约对齐留待接入闭环时做（见 Unresolved questio
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/loop.py`
+  - `backend/ahe_beta/user/sim/loop.py`
   - `backend/tests/user/sim/test_loop.py`
 
 ### harness 桩与运行入口（T6）
@@ -437,10 +437,10 @@ demo.main() / run_live.main()   # 两个 __main__ 运行入口
 
 **文件（单一 writer 所有权）**
 
-  - `backend/auto_designer/user/sim/harness_adapter.py`
-  - `backend/auto_designer/user/sim/scenarios.py`
-  - `backend/auto_designer/user/sim/demo.py`
-  - `backend/auto_designer/user/sim/run_live.py`
+  - `backend/ahe_beta/user/sim/harness_adapter.py`
+  - `backend/ahe_beta/user/sim/scenarios.py`
+  - `backend/ahe_beta/user/sim/demo.py`
+  - `backend/ahe_beta/user/sim/run_live.py`
   - `backend/tests/user/sim/test_harness_adapter.py`
 
 依赖 DAG：`T1 → T2`，`T1 → T3`，`T2 → T3`，`0001/T1 → T4`，`T1 → T5`，`T2 → T5`，`T3 → T5`，`T4 → T5`，`T5 → T6`

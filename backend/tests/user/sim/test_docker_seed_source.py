@@ -9,11 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.models import WorkspaceSpec
+from ahe_beta.models import WorkspaceSpec
 
 
 def test_docker_seed_requires_image_and_instance() -> None:
-    from auto_designer.user.sim import seed_source
+    from ahe_beta.user.sim import seed_source
 
     with pytest.raises(ValueError, match="params.image"):
         seed_source.provision(WorkspaceSpec(kind="docker-seed"))
@@ -29,8 +29,8 @@ def test_docker_seed_requires_image_and_instance() -> None:
 
 
 def test_docker_seed_reports_create_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    from auto_designer.user.sim import seed_source
-    from auto_designer.user.sim.sources import docker_seed
+    from ahe_beta.user.sim import seed_source
+    from ahe_beta.user.sim.sources import docker_seed
 
     monkeypatch.setattr(
         docker_seed.subprocess,
@@ -49,8 +49,8 @@ def test_docker_seed_reports_create_failure(monkeypatch: pytest.MonkeyPatch) -> 
 def test_docker_seed_starts_runnable_session_without_copying_repo_to_host(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from auto_designer.user.sim import seed_source
-    from auto_designer.user.sim.sources import docker_seed
+    from ahe_beta.user.sim import seed_source
+    from ahe_beta.user.sim.sources import docker_seed
 
     calls: list[list[str]] = []
 
@@ -111,8 +111,8 @@ def test_docker_seed_starts_runnable_session_without_copying_repo_to_host(
 
 
 def test_docker_seed_rejects_storage_only_image(monkeypatch: pytest.MonkeyPatch) -> None:
-    from auto_designer.user.sim import seed_source
-    from auto_designer.user.sim.sources import docker_seed
+    from ahe_beta.user.sim import seed_source
+    from ahe_beta.user.sim.sources import docker_seed
 
     monkeypatch.setattr(
         docker_seed,
@@ -132,7 +132,7 @@ def test_docker_seed_rejects_storage_only_image(monkeypatch: pytest.MonkeyPatch)
 
 def test_unified_seed_binds_task_environment_and_owned_harness_interpreter(monkeypatch):
     """Spec-0069/T3: plain task python cannot take over Harness's NexAU interpreter."""
-    from auto_designer.user.sim.sources import docker_seed
+    from ahe_beta.user.sim.sources import docker_seed
 
     calls = []
 
@@ -162,9 +162,9 @@ def test_unified_seed_binds_task_environment_and_owned_harness_interpreter(monke
         return subprocess.CompletedProcess(args, 0, "", "")
 
     monkeypatch.setattr(docker_seed, "_docker", docker)
-    monkeypatch.setenv("AUTO_DESIGNER_RUN_ID", "run-123")
-    monkeypatch.setenv("AUTO_DESIGNER_EXPERIMENT_ID", "run-123")
-    monkeypatch.setenv("AUTO_DESIGNER_CONFIG_HASH", "fixed-config")
+    monkeypatch.setenv("AHE_BETA_RUN_ID", "run-123")
+    monkeypatch.setenv("AHE_BETA_EXPERIMENT_ID", "run-123")
+    monkeypatch.setenv("AHE_BETA_CONFIG_HASH", "fixed-config")
     result = docker_seed.DockerSeedSource().provision(
         WorkspaceSpec(
             kind="docker-seed",
@@ -184,7 +184,7 @@ def test_unified_seed_binds_task_environment_and_owned_harness_interpreter(monke
     started = next(argv for argv in calls if argv[0] == "run")
     assert "PATH=/workspace/task/repo/.venv/bin:/opt/controller/.venv/bin:/usr/bin:/bin" in started
     assert "VIRTUAL_ENV=/workspace/task/repo/.venv" in started
-    assert "io.auto-designer.run_id=run-123" in started
+    assert "io.ahe-beta.run_id=run-123" in started
     assert "io.openagents.manifest_sha=fixed-config" in started
     assert result.evidence["harness_python"] == "/opt/controller/.venv/bin/python"
     assert started[started.index("--network") + 1] == "owned_vigil_net"
@@ -196,8 +196,8 @@ def test_unified_seed_binds_task_environment_and_owned_harness_interpreter(monke
 
 # Spec-0073/T2: the runtime receipt and Docker labels share the logical session identity.
 def test_docker_session_carries_bound_task_round_and_stable_session(monkeypatch):
-    from auto_designer.usage import bind_usage_context
-    from auto_designer.user.sim.sources import docker_seed
+    from ahe_beta.usage import bind_usage_context
+    from ahe_beta.user.sim.sources import docker_seed
 
     calls = []
 
@@ -241,9 +241,9 @@ def test_docker_session_carries_bound_task_round_and_stable_session(monkeypatch)
     with bind_usage_context(session_id="stable-session", round_no=2):
         runtime = docker_seed.DockerSeedSource().provision(spec)
     run = next(args for args in calls if args[0] == "run")
-    assert "io.auto-designer.session_id=stable-session" in run
-    assert "io.auto-designer.task_id=one" in run
-    assert "io.auto-designer.round_no=2" in run
+    assert "io.ahe-beta.session_id=stable-session" in run
+    assert "io.ahe-beta.task_id=one" in run
+    assert "io.ahe-beta.round_no=2" in run
     assert runtime.evidence["session_id"] == "stable-session"
     assert runtime.evidence["task_digest"] == "a" * 64
     runtime.close()
@@ -253,9 +253,9 @@ def test_real_docker_seed_quiesce_kills_descendants_and_keeps_frozen_export(tmp_
     """Spec-0084/T2: no actor writer survives, while controller export remains usable."""
     if os.environ.get("RUN_SPEC_0084_DOCKER") != "1":
         pytest.skip("set RUN_SPEC_0084_DOCKER=1 for real Docker lifecycle verification")
-    from auto_designer.user.sim.sources.docker_seed import DockerSeedSource
+    from ahe_beta.user.sim.sources.docker_seed import DockerSeedSource
 
-    image = f"auto-designer-quiesce-test:{uuid.uuid4().hex}"
+    image = f"ahe-beta-quiesce-test:{uuid.uuid4().hex}"
     # Use an installed image; the opt-in regression never pulls an unpinned remote tag.
     base = subprocess.run(
         ["docker", "image", "inspect", "python:3.13-slim-bookworm", "--format", "{{.Id}}"],

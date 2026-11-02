@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from auto_designer.models import (
+from ahe_beta.models import (
     FeelingScore,
     IssueDraft,
     IssueRef,
@@ -16,10 +16,10 @@ from auto_designer.models import (
     Transcript,
     Turn,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import UsageStore
-from auto_designer.user.session_store import SessionStore
-from auto_designer.web.api import create_app
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import UsageStore
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.web.api import create_app
 
 
 def _persona() -> Persona:
@@ -168,7 +168,7 @@ def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
         {
             "session_id": "s2",
             "instance_id": "i2",
-            "role": "synthesizer",
+            "role": "architect",
             "round_no": 2,
             "input_tokens": 7,
             "output_tokens": 3,
@@ -182,7 +182,7 @@ def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
         {
             "session_id": "s2",
             "instance_id": "i2",
-            "role": "synthesizer",
+            "role": "architect",
             "round_no": 2,
             "input_tokens": None,
             "output_tokens": None,
@@ -197,11 +197,11 @@ def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
     assert summary["by_instance"]["i1"]["total_tokens"] == 6
     assert summary["by_interaction"]["turn-0"]["total_tokens"] == 6
     events = client.get("/api/usage/events?round_no=2&session_id=s2").json()["events"]
-    assert len(events) == 2 and all(event["role"] == "synthesizer" for event in events)
+    assert len(events) == 2 and all(event["role"] == "architect" for event in events)
     assert summary["by_instance"]["i1"]["unavailable_count"] == 0
-    synthesizer = client.get("/api/usage/summary?role=synthesizer").json()
-    assert synthesizer["unavailable_count"] == 1
-    assert synthesizer["by_role"]["synthesizer"]["unavailable_count"] == 1
+    architect = client.get("/api/usage/summary?role=architect").json()
+    assert architect["unavailable_count"] == 1
+    assert architect["by_role"]["architect"]["unavailable_count"] == 1
     assert client.get("/api/usage/sessions/s1").json()["event_count"] == 1
 
 
@@ -226,7 +226,7 @@ def test_issues_connected(tmp_path: Path) -> None:
 
 
 def test_agents_empty_then_populated(tmp_path: Path) -> None:
-    from auto_designer.loop.live import update_agent
+    from ahe_beta.loop.live import update_agent
 
     store = SessionStore(tmp_path / "sessions")
     client = TestClient(create_app(store=store, tracker=FakeTracker()))
@@ -511,7 +511,7 @@ def test_issue_detail_timeline_connected_and_failure_isolated(tmp_path: Path) ->
                     "body": "1",
                     "label": "ready",
                     "operation": "add",
-                    "actor": "synthesizer",
+                    "actor": "architect",
                     "created_at": "2026-06-01T00:00:00Z",
                 }
             ]
@@ -563,7 +563,7 @@ def test_commit_detail_no_capability_degrades(tmp_path: Path) -> None:
 
 
 def test_state_defaults_then_running(tmp_path: Path) -> None:
-    from auto_designer.loop.live import update_live_run
+    from ahe_beta.loop.live import update_live_run
 
     client = _client(tmp_path, tracker=FakeTracker())
     body = client.get("/api/state").json()
@@ -575,7 +575,7 @@ def test_state_defaults_then_running(tmp_path: Path) -> None:
 
 
 def test_history_grouped_source(tmp_path: Path) -> None:
-    from auto_designer.loop.live import archive_agent, update_agent
+    from ahe_beta.loop.live import archive_agent, update_agent
 
     client = _client(tmp_path, tracker=FakeTracker())
     assert client.get("/api/history").json() == {"items": []}
@@ -604,7 +604,7 @@ def test_history_grouped_source(tmp_path: Path) -> None:
 
 def test_issues_plane_and_provenance_fields(tmp_path: Path) -> None:
     """Spec-0029/T9：每条 issue 附 plane（三平面投影，旧标签映射）与 provenance。"""
-    from auto_designer.demand import issue_schema as sc
+    from ahe_beta.demand import issue_schema as sc
 
     tracker = FakeTracker()
     r = tracker.create_issue(IssueDraft(title="报告", body="x", labels=["bug", sc.REPORT])).number
@@ -613,7 +613,7 @@ def test_issues_plane_and_provenance_fields(tmp_path: Path) -> None:
     ).number
     s = tracker.create_issue(
         IssueDraft(
-            title="结构案", body=f"x\n\ncovers: #{p}", labels=[sc.PROPOSAL, sc.FROM_SYNTHESIZE]
+            title="结构案", body=f"x\n\ncovers: #{p}", labels=[sc.PROPOSAL, sc.FROM_ARCHITECT]
         )
     ).number
     w = tracker.create_issue(
@@ -625,7 +625,7 @@ def test_issues_plane_and_provenance_fields(tmp_path: Path) -> None:
 
     assert issues[r]["plane"] == sc.REPORT and issues[r]["provenance"] is None
     assert issues[p]["plane"] == sc.PROPOSAL and issues[p]["provenance"] == sc.FROM_TRIAGE
-    assert issues[s]["provenance"] == sc.FROM_SYNTHESIZE and issues[s]["covers"] == [p]
+    assert issues[s]["provenance"] == sc.FROM_ARCHITECT and issues[s]["covers"] == [p]
     assert issues[p]["covered_by"] == s  # 被 open 结构案覆盖
     assert issues[w]["plane"] == sc.READY  # 旧标签读侧映射
 
@@ -691,15 +691,15 @@ def test_delivery_no_tracker(tmp_path: Path) -> None:
     assert client.get("/api/delivery").json()["connected"] is False
 
 
-def test_config_exposes_synthesizer_roster(monkeypatch, tmp_path):
-    monkeypatch.setenv("N_SYNTHESIZERS", "3")
+def test_config_exposes_architect_roster(monkeypatch, tmp_path):
+    monkeypatch.setenv("N_ARCHITECTS", "3")
     data = _client(tmp_path, tracker=None).get("/api/config").json()
-    assert data["roster"]["synthesizer"] == 3
+    assert data["roster"]["architect"] == 3
 
 
 # Spec-0073/T5: summaries and detail expose the same authoritative frozen identity.
 def test_multitask_api_keeps_persona_task_session_and_harness_attribution(tmp_path):
-    from auto_designer.models import WorkspaceSpec
+    from ahe_beta.models import WorkspaceSpec
 
     store = SessionStore(tmp_path / "sessions")
     expected = {}

@@ -26,7 +26,7 @@ export function TopBar(props: {
   return (
     <header className="topbar">
       <div className="title">
-        auto-designer <span>{props.historical ? "历史快照" : "观测看板"}</span>
+        AHE-Beta <span>{props.historical ? "历史快照" : "观测看板"}</span>
       </div>
       <div className="run-chip">
         {/* Spec-0071/T5: preserve the observed state without suggesting a live run. */}

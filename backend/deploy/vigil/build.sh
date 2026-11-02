@@ -8,7 +8,7 @@ OPENAGENTS_PATH="${1:?用法: build.sh <OpenAgents 仓路径> <NexAU 仓路径>}
 NEXAU_PATH="${2:?用法: build.sh <OpenAgents 仓路径> <NexAU 仓路径>}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIP_INDEX_URL="${VIGIL_PIP_INDEX_URL:-https://pypi.org/simple}"
-IMAGE_TAG="${VIGIL_IMAGE_TAG:-auto-designer-vigil:latest}"
+IMAGE_TAG="${VIGIL_IMAGE_TAG:-ahe-beta-vigil:latest}"
 CLAUDE_CODE_VERSION="${VIGIL_CLAUDE_CODE_VERSION:-2.1.261}"
 OBSERVATION_PROFILE="${VIGIL_OBSERVATION_PROFILE:-}"
 if [[ -n "$OBSERVATION_PROFILE" ]]; then

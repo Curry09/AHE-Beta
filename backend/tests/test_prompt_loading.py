@@ -13,13 +13,13 @@ import nexau
 import openai
 import pytest
 
-from auto_designer.demand.agent_runtime import read_submit, run_agent_def
-from auto_designer.demand.triage import Triager
-from auto_designer.models import IssueDraft
-from auto_designer.nexau_runtime import _default_nexau_backend
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.persona_client import ApiPersonaClient
+from ahe_beta.demand.agent_runtime import read_submit, run_agent_def
+from ahe_beta.demand.triage import Triager
+from ahe_beta.models import IssueDraft
+from ahe_beta.nexau_runtime import _default_nexau_backend
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.persona_client import ApiPersonaClient
 
 BACKEND = Path(__file__).resolve().parents[1]
 
@@ -161,7 +161,7 @@ def _tool_reply(*, name, arguments):
                 ]
             },
         ),
-        ("synthesizer", "synthesizer", "submit_rfcs", {"proposals": []}),
+        ("architect", "architect", "submit_rfcs", {"proposals": []}),
         ("divergent", "divergent_pm", "submit_divergent", {"proposals": []}),
         ("owner", "owner", "submit_admission", {"decisions": []}),
     ],

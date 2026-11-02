@@ -54,9 +54,9 @@ def prepare(agent, settings):
     engine = str(Path(__file__).parent / "harness/user_engine")
     if engine not in sys.path:
         sys.path.insert(0, engine)
-    from auto_designer.user.sim.dimensions import TrustStance
-    from auto_designer.user.sim.prompt import build_rating_turn
-    from auto_designer.user.sim.state import State
+    from ahe_beta.user.sim.dimensions import TrustStance
+    from ahe_beta.user.sim.prompt import build_rating_turn
+    from ahe_beta.user.sim.state import State
 
     history = []
     replies = 0

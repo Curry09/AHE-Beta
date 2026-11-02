@@ -29,7 +29,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/tracker/gitea.py
+      - backend/ahe_beta/tracker/gitea.py
       - backend/tests/tracker/test_gitea.py
     scope: "做什么：\n- 实现 spec-0001/T5 的 IssueTracker 接口四方法：ensure_labels / create_issue / add_comment / set_state。\n- 薄 REST 客户端(requests)打 `/api/v1`，鉴权 `Authorization: token <token>`。\n- ensure_labels：建/查 label 并维护 name→id 映射缓存；create_issue 返回解析后的 IssueRef。\n- 配置(base_url/owner/repo/token)由构造注入，来源是 T1 产出的 .env。\n不做什么：\n- 不读环境变量、不读 .env、不起服务（注入由调用方负责，保持纯客户端）。\n- 不实现 issue 列表/搜索/里程碑/指派等接口外端点（奥卡姆，dev 侧需要再扩）。\n- 不做本地缓存 issue 内容、不做离线队列/重试编排（失败即抛，由调用方决定）。\n- 不负责标签的语义定义（标签集 {bug,feature} 由 T1 预置）。"
     acceptance: "- 实现 IssueTracker 协议四方法且带类型标注，可作为 GiteaTracker 注入 run_session 替换 FakeTracker。\n- create_issue 向 `/repos/{owner}/{repo}/issues` 发出含 title/body/label-id 的 POST，解析响应回带号 IssueRef(number/url/state)。\n- ensure_labels 对已存在 label 复用 id、对缺失 label 新建，并幂等（重复调不重复建）。\n- add_comment、set_state 命中对应端点；token 进 `Authorization: token <token>` 头。\n- 非 2xx 响应（401/403/404/422）抛出含状态码与端点的异常，不返回空回执。\n- 单测全程 mock HTTP，不依赖运行中的 Gitea。"
@@ -83,7 +83,7 @@ issue 与 harness 仓都需要落地于 Gitea，而在 0001 阶段两者都只�
 
 T2 在此之上实现 GiteaTracker：spec-0001/T5 IssueTracker 接口的真实后端，是一个打 Gitea `/api/v1` 的薄 REST 客户端。运行时把它注入 run_session，用户 agent 产出的 issue 草稿就能真正提交到 Gitea 并拿到带号 IssueRef；对 run_session 而言它与 FakeTracker 行为等价、可互换，替换不影响上层逻辑。
 
-T3 则把 `backend/harness_template/` 作为 v0 种子推送到 Gitea，建立一个独立的 harness 仓，供 dev 侧（spec-0003）开发者 agent 在其上走真实分支与合并；harness 自身的演化历史从此存在于该仓，不污染 auto-designer 本仓。三者共同完成后，a 段的 issue 落地与 harness 演化载体便都脱离 Fake，可以真实运行。
+T3 则把 `backend/harness_template/` 作为 v0 种子推送到 Gitea，建立一个独立的 harness 仓，供 dev 侧（spec-0003）开发者 agent 在其上走真实分支与合并；harness 自身的演化历史从此存在于该仓，不污染 AHE-Beta 本仓。三者共同完成后，a 段的 issue 落地与 harness 演化载体便都脱离 Fake，可以真实运行。
 
 ## Reference-level explanation
 
@@ -160,7 +160,7 @@ T3 单测 mock Gitea API + 临时 git：建仓调用命中 `POST /user/repos`、
 | Task | 文件（单一 writer 所有权） |
 | --- | --- |
 | T1 | `backend/deploy/gitea/docker-compose.yml`、`backend/deploy/gitea/README.md`、`backend/deploy/gitea/bootstrap.sh` |
-| T2 | `backend/auto_designer/tracker/gitea.py`、`backend/tests/tracker/test_gitea.py` |
+| T2 | `backend/ahe_beta/tracker/gitea.py`、`backend/tests/tracker/test_gitea.py` |
 | T3 | `backend/scripts/bootstrap_harness.py`、`backend/tests/test_bootstrap_harness.py` |
 
 依赖 DAG：`T1 → T2`，`T1 → T3`（T2 与 T3 互不依赖，可并行）。

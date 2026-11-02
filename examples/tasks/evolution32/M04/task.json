@@ -34,7 +34,7 @@
           "files": {
             "input": "1cf9f684b33cc5f677f13b8f47654ab4a88fc9768ca69b2729ff5290fef234db"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m04-initial-v1.bundle"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/m04-initial-v1.bundle"
         }
       },
       {
@@ -49,7 +49,7 @@
             "M04/public/case/repository-inventory.json": "131eac0beccea3c30eb2ab5583ada6651bc303e324ce0717d6fa82d6fdf288d0",
             "M04/public/case/team-constraints.md": "0f89dc77e0ebb1c860a0358fe2b04140c8eab60784d5678c7a3058f8a4e7099c"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m04-public-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/m04-public-v1.tar.gz"
         }
       },
       {
@@ -71,7 +71,7 @@
             "M04/reference/docs/source/configuration/templating/placeholder.rst": "6a8d19851a9e1e8864d36c67f5e1882481726b5b1ae921a22bc6eaef7b454bcb",
             "M04/reference/docs/source/configuration/templating/python.rst": "6b79b071e1215c95c41d9476989f595380207735c8a48ec12ce7556020adf291"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m04-reference-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/m04-reference-v1.tar.gz"
         }
       },
       {
@@ -86,7 +86,7 @@
             "prepare.py": "c5d4b1bd936d7fec01f33f1828fd1ac4b24a66b4c3b9aa5f998ee7cc6741d2ec",
             "readiness.py": "a26344fe947ea2bcb65166a68eeebae78415d4ec15e8d4ccc7e4910d75f748bd"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/m04-recipes-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/m04-recipes-v1.tar.gz"
         }
       }
     ],

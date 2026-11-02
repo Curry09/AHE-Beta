@@ -13,10 +13,10 @@ middlewares:
   # 工作区 jail：triage 只能读自己的 harness 仓，文件工具越界读一律拒——机制硬禁读 trace
   # （data/sessions 体感+会话、data/harness_runs 运行副本）。逐行看某任务轨迹会把该任务专属产物
   # 带进结论 = 过拟合的源头。通用 jail 一并挡住仓外任何路径（data/live 等），不止点名 trace。
-  - import: auto_designer.guards.workspace_jail:WorkspaceJailMiddleware
+  - import: ahe_beta.guards.workspace_jail:WorkspaceJailMiddleware
 
 llm_config:
-  # 分角色配置：triage 与 synthesize（synthesizer）共用 DEMAND_LLM_*。
+  # 分角色配置：triage 与 architect（architect）共用 DEMAND_LLM_*。
   model: ${env.DEMAND_LLM_MODEL}
   base_url: ${env.DEMAND_LLM_BASE_URL}
   api_key: ${env.DEMAND_LLM_API_KEY}
@@ -33,7 +33,7 @@ sandbox_config:
 tools:
   - name: submit_observation_gap
     yaml_path: ./tools/submit_observation_gap.tool.yaml
-    binding: auto_designer.observations.gaps:submit_observation_gap
+    binding: ahe_beta.observations.gaps:submit_observation_gap
   - name: read_file
     yaml_path: ./tools/read_file.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:read_file
@@ -49,20 +49,20 @@ tools:
   # 避免一次拉整包撑爆上下文。
   - name: get_session_timeline
     yaml_path: ./tools/get_session_timeline.tool.yaml
-    binding: auto_designer.demand.session_timeline:get_session_timeline
+    binding: ahe_beta.demand.session_timeline:get_session_timeline
   # 下钻某一拍：harness 内层 tool 序列（截断）+ stop_kind；timeline 不够细时再用。
   - name: get_harness_beat
     yaml_path: ./tools/get_harness_beat.tool.yaml
-    binding: auto_designer.demand.session_timeline:get_harness_beat
+    binding: ahe_beta.demand.session_timeline:get_harness_beat
   # 再展开某一步正文（硬顶字符）；beat 里 truncated=true 且确需细看时才调。
   - name: get_harness_step
     yaml_path: ./tools/get_harness_step.tool.yaml
-    binding: auto_designer.demand.session_timeline:get_harness_step
+    binding: ahe_beta.demand.session_timeline:get_harness_step
   # Spec-0027/T2：收尾 = submit_triage（原生结构化 stop tool）。input_schema 由 issue_schema 生成、
   # nexau 在调用层强校验（漂移字段/非法 enum 吐不出 → 重试）；binding 回显参数成为 agent.run 返回，
   # driver 直接读。取代旧 complete_task + 第二次 LLM 重排 + 别名归一。
   - name: submit_triage
     yaml_path: ./tools/submit_triage.tool.yaml
-    binding: auto_designer.demand.submit_tools:submit_triage
+    binding: ahe_beta.demand.submit_tools:submit_triage
 
 stop_tools: [submit_triage]

@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.demand import issue_schema as sc
-from auto_designer.demand.divergent import Divergent, DivergentOutcome
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
-from auto_designer.models import (
+from ahe_beta.demand import issue_schema as sc
+from ahe_beta.demand.divergent import Divergent, DivergentOutcome
+from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore, operation_key
+from ahe_beta.models import (
     FeelingScore,
     IssueDraft,
     Persona,
@@ -21,9 +21,9 @@ from auto_designer.models import (
     Session,
     Transcript,
 )
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
 
 
 def _persona() -> Persona:
@@ -116,7 +116,7 @@ def test_submit_divergent_yaml_matches_contract() -> None:
     """drift-guard：submit_divergent.tool.yaml 的 input_schema = rfc_input_schema()（同 RFC shape）。"""
     import yaml
 
-    from auto_designer.demand.agent_contract import pm_input_schema
+    from ahe_beta.demand.agent_contract import pm_input_schema
 
     p = (
         Path(__file__).resolve().parents[2]

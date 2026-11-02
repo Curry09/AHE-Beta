@@ -1,6 +1,6 @@
 # 系统架构
 
-auto-designer 负责模拟使用、反馈处理、轮次管理和实验记录；OpenAgents 负责根据已准入的需求修改 Harness。被迭代的 Harness、用于试用的任务代码与实验控制器分别管理。
+AHE-Beta 负责模拟使用、反馈处理、轮次管理和实验记录；OpenAgents 负责根据已准入的需求修改 Harness。被迭代的 Harness、用于试用的任务代码与实验控制器分别管理。
 
 ## 迭代流程
 
@@ -8,7 +8,7 @@ auto-designer 负责模拟使用、反馈处理、轮次管理和实验记录；
 flowchart LR
     U[模拟用户或 direct 任务] --> H[本轮 Harness]
     H --> R[执行轨迹与反馈]
-    R --> T[Triage → Synthesizer]
+    R --> T[Triage → Architect]
     R --> P[Divergent PM]
     T --> O[Owner 准入]
     P --> O
@@ -19,9 +19,11 @@ flowchart LR
     M --> N[下一轮试用]
 ```
 
-Triage 对用户报告进行核查，Synthesizer 综合相关提案；Divergent PM 从使用证据中提出独立的改进方向。两条需求路径在 Owner 汇合，经准入后交给 OpenAgents。报告、提案和已准入需求分别保存，便于追溯一项修改的来源。
+Triage 对用户报告进行核查，Architect 综合相关提案；Divergent PM 从使用证据中提出独立的改进方向。两条需求路径在 Owner 汇合，经准入后交给 OpenAgents。报告、提案和已准入需求分别保存，便于追溯一项修改的来源。
 
-需求角色及共享逻辑位于 `backend/auto_designer/demand/`，角色定义位于 `backend/agent_defs/`。OpenAgents 作为独立 CLI 运行，通过 Gitea Issue、标签、PR 和 Harness 提交版本与控制器交互。NexAU 提供用户和需求角色的模型运行能力；实验示例使用 Claude Code 作为 OpenAgents 的交付后端。
+需求角色及共享逻辑位于 `backend/ahe_beta/demand/`，角色定义位于 `backend/agent_defs/`。OpenAgents 作为独立 CLI 运行，通过 Gitea Issue、标签、PR 和 Harness 提交版本与控制器交互。NexAU 提供用户和需求角色的模型运行能力；实验示例使用 Claude Code 作为 OpenAgents 的交付后端。
+
+项目 Python 包名为 `ahe_beta`，架构角色使用 `architect`，其配置、分组策略和运行记录采用同一名称。OpenAgents 固定版本要求的证据协议标识与日志关联字段仅在交付边界保持原协议名称；已发布任务镜像继续使用实际可拉取的仓库地址。
 
 每个非末轮在用户试用结束后处理反馈，并等待本轮准入需求交付完成，再固定该轮的 Harness 提交。交付失败、超时或需要人工处理时，实验停留在当前轮。末轮只试用最终版本及执行已配置的客观验收，不再启动需求和交付阶段。
 
@@ -40,7 +42,7 @@ Triage 对用户报告进行核查，Synthesizer 综合相关提案；Divergent 
 | `local` | 本地专属运行容器 | 每个会话使用独立任务容器 | 自动启动的本地 Gitea |
 | `e2b` | 同一 E2B 沙箱内的进程 | 源码任务使用独立目录与虚拟环境；v3 容器任务使用沙箱内 Docker | 用户自己的 Gitea.com |
 
-任务环境由任务包声明。v1/v2 包提供源码与安装配方；v3 包可声明容器镜像、输入、服务、初始化与收尾命令及产物。容器型任务按每次尝试创建独立容器和服务网络；代码位于 `backend/auto_designer/experiment/task_environments/`。源码目录模式共享沙箱的 Unix 用户，其访问隔离能力与容器模式不同。
+任务环境由任务包声明。v1/v2 包提供源码与安装配方；v3 包可声明容器镜像、输入、服务、初始化与收尾命令及产物。容器型任务按每次尝试创建独立容器和服务网络；代码位于 `backend/ahe_beta/experiment/task_environments/`。源码目录模式共享沙箱的 Unix 用户，其访问隔离能力与容器模式不同。
 
 管理主机负责启动、查看状态和收集产物。E2B 控制器可以在本地 CLI 退出后继续运行，但后台收集依赖管理主机在线，且当前不会自动延长沙箱租期。生命周期和资源清理见[快速开始](QUICKSTART.zh-CN.md)。
 
@@ -58,8 +60,8 @@ Triage 对用户报告进行核查，Synthesizer 综合相关提案；Divergent 
 | --- | --- |
 | `examples/experiments/`、`examples/batches/` | 单实验与批次配置 |
 | `examples/tasks/`、`examples/personas/` | 任务包与用户画像 |
-| `backend/auto_designer/experiment/` | 准备、调度、运行后端、收集与恢复 |
-| `backend/auto_designer/demand/` | 反馈处理、提案综合与需求准入 |
+| `backend/ahe_beta/experiment/` | 准备、调度、运行后端、收集与恢复 |
+| `backend/ahe_beta/demand/` | 反馈处理、提案综合与需求准入 |
 | `backend/harness_template/` | 初始 Harness 源码 |
 | `backend/scripts/` | 公开命令入口及检查脚本 |
 | `evaluation/` | 独立 Harness 评测 |

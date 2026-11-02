@@ -28,7 +28,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/state.py
+      - backend/ahe_beta/user/sim/state.py
       - backend/tests/user/sim/test_state.py
     scope: 把跨轮耐心从固定基线升级为「性格档位 + 任务量微浮动」两级：init_state 由 D4.3 给耐心基线；开局 OPENING 据 task_load 经 apply_task_load 叠加 TASK_LOAD_DELTA，钳到 >=1。Coef.patience_decay 由性格派生，供 apply_verdict 与心跳 keep_waiting 共用。
     acceptance: 同一 persona 面对 quick 的起始耐心严格低于 epic；浮动只在 OPENING 一次、钳位 >=1；patience_decay 急躁=2 否则 1；apply_verdict 规则单测覆盖。

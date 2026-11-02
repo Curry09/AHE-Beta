@@ -11,10 +11,10 @@ description: >
   Supports multi-agent parallelism via Task DAG + file allocation.
 ---
 
-> **auto-designer 适配说明（vendored from OpenAgents，单 markdown 文件形态）**
+> **ahe-beta 适配说明（vendored from OpenAgents，单 markdown 文件形态）**
 > - spec 形态与 OpenAgents 对齐：一个组 = 单文件 `docs/specs/NNNN-slug.md`（frontmatter 结构化源 + rust-RFC 9 段正文）。旧的目录式 `NNNN-slug/{metadata.yaml,tasks/T*.yaml,summary.md}` 与仓级 `glossary.yaml` 已迁移退役——下文 Disk Layout / 正文里凡出现目录式措辞，一律按顶部两个「格式更新」注记块映射为单-md 理解。
 > - `spec` CLI 未作为 console_script 安装；本仓用启动器调用：`./tools/spec-driven-development/spec <子命令>`。源码 vendored 在 `tools/spec-driven-development/vendor/openagents/spec/`（整包同步自 OpenAgents `openagents/spec/`），依赖装在 `.venv`（ruamel.yaml + jsonschema）。
-> - `spec graph` 用 `--package-root backend/auto_designer` 扫本仓包生成 `ARCHITECTURE.md`。
+> - `spec graph` 用 `--package-root backend/ahe_beta` 扫本仓包生成 `ARCHITECTURE.md`。
 > - CI（`spec-validate` job）跑 `validate` + `render` + `graph` 后 `git diff --exit-code docs/specs`；改 spec 后须重跑 `render`/`graph` 再提交。
 
 # Spec-Driven Development

@@ -14,9 +14,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/loop.py
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/user/sim/clauses.py
+      - backend/ahe_beta/user/sim/loop.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/clauses.py
     scope: 意图区分当前任务与产品反馈接收者；main_act 和 waiting_act 支持可选 report_issue，正文精确去重并在既有收尾阶段创建 issue。
     acceptance: 合法反馈不替换主动作，不新增模型调用；缺省或非法反馈不自动提单；correct persona 可自愿反馈且无需自行接管任务。
   - id: T2

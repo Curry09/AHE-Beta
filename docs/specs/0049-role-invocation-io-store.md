@@ -27,7 +27,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/invocation.py
+      - backend/ahe_beta/invocation.py
       - backend/tests/test_invocation.py
     scope: 新增与 usage.py 同级的 fail-open 存储：一调用一 JSON、按 run_id 分子目录、原子写、index 追加；同目录写最小 manifest（模型名、agent_def pin、roster、轮次 SHA 占位）；缺 env 则 no-op。
     acceptance: 合法记录 round-trip；并发写不撕裂；写失败不影响调用方返回值；manifest 不含密钥；缺目录/缺 env 静默跳过；pytest 绿。
@@ -41,11 +41,11 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/demand/agent_runtime.py
-      - backend/auto_designer/demand/triage.py
-      - backend/auto_designer/demand/synthesizer.py
-      - backend/auto_designer/demand/divergent.py
-      - backend/auto_designer/demand/owner.py
+      - backend/ahe_beta/demand/agent_runtime.py
+      - backend/ahe_beta/demand/triage.py
+      - backend/ahe_beta/demand/architect.py
+      - backend/ahe_beta/demand/divergent.py
+      - backend/ahe_beta/demand/owner.py
       - backend/tests/demand/test_agent_runtime.py
     scope: 在唯一 nexau 派发入口记录填好的 message 与 submit 原文/状态；四 driver 传入 subject；round/run_id 读 usage 上下文；超时与未 submit 仍落盘。
     acceptance: 四角色经 run_agent_def 各产生 demand 记录且 subject 非 unknown（triage 为 report 号，其余为 round 或票号）；超时与未 submit 可区分；存储故障不改变 agent.run 返回与异常；既有 read_submit 测试不回归。
@@ -59,12 +59,12 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/deploy/vigil/entrypoint.sh
       - backend/tests/test_run_vigil.py
-      - backend/auto_designer/guards/workspace_jail.py
+      - backend/ahe_beta/guards/workspace_jail.py
       - backend/tests/guards/test_workspace_jail.py
-    scope: 进程启动钉死 AUTO_DESIGNER_RUN_ID 与 ROLE_RUNS_DIR；SessionStore 与用量 JSONL 写进该 run 目录；实验内 round 之间不得调用 _reset_to_initial；不得删除 role_runs（含其中 sessions）；容器只 rw 挂载本 run 的 delivery 子目录，并在任何 agent/clone 前以短暂 root 入口修正跨 UID owner 后永久降权；配置了 ROLE_RUNS_DIR 却不可写时 fail-closed；jail 把 role_runs 列入禁读目录名。
+    scope: 进程启动钉死 AHE_BETA_RUN_ID 与 ROLE_RUNS_DIR；SessionStore 与用量 JSONL 写进该 run 目录；实验内 round 之间不得调用 _reset_to_initial；不得删除 role_runs（含其中 sessions）；容器只 rw 挂载本 run 的 delivery 子目录，并在任何 agent/clone 前以短暂 root 入口修正跨 UID owner 后永久降权；配置了 ROLE_RUNS_DIR 却不可写时 fail-closed；jail 把 role_runs 列入禁读目录名。
     acceptance: 同一进程内多 round 后 Gitea main 可前进且 role_runs 仍在；连续两次旧入口启动后上一 run_id 的 sessions/demand/delivery 仍在；看板经当前 run 的 sessions 别名可读；container 挂载不含 sessions/demand；入口把 delivery 交给 UID/GID 1000 后以 setpriv 降权，降权写入探针失败则非零退出；keep-alive 且 run_id 变化时重建容器；读 role_runs 被 jail 拒绝；相关单测绿。
   - id: T5
     title: 冻结调用离线重放
@@ -96,7 +96,7 @@ tasks:
       - OpenAgents/tests/test_runtime_engine.py
       - backend/tests/test_delivery_invocation_contract.py
       - backend/tests/fixtures/delivery_invocation.v1.json
-    scope: OpenAgents auto-designer/v0.1 在 run_agent 的 finally 按 ROLE_RUNS_DIR 写 v1 JSON（填好的 prompt/context/placeholders 与 structured）；auto-designer 用黄金夹具锁定跨仓契约。
+    scope: OpenAgents ahe-beta/v0.1 在 run_agent 的 finally 按 ROLE_RUNS_DIR 写 v1 JSON（填好的 prompt/context/placeholders 与 structured）；ahe-beta 用黄金夹具锁定跨仓契约。
     acceptance: env 未设时零文件、行为与现网一致；成功与 protocol_error/backend_error 均落盘（后二者沿用 engine 既有 status 字面量）；不写工具参数与 transcript；黄金夹具通过 AD 契约测试；engine 单测 fail-open。
 ---
 
@@ -129,15 +129,15 @@ tasks:
 
 用户模拟今天已经把 persona 各阶段的 system/user/raw/parsed 和与 harness 的过程摘要写入 `data/sessions/<id>.json`。**同一次** `./run.sh` 进程里多 round 不会删这些文件（`_reset_to_initial` 只在进程开头调一次，不在 `run_round` 之间调）。但当前仍是全机一份 `backend/data` 加一份 Gitea：再开一个 `./run.sh` 进程会强推 v0、关遗留 issue、删除 `sessions/*.json` 并 `clear_live`。这把「新实验」做成了「毁掉上一实验」。并行实验运行时规定每实验独立 Gitea 与 `sessions/`、`stop` 不删、`destroy` 才删，但尚未实现。需求面/交付面则连本实验进程内都几乎没有对等文件。
 
-需求面现状（auto-designer，2026-09-01 代码）：
+需求面现状（ahe-beta，2026-09-01 代码）：
 
-1. **唯一派发入口**是 `synthesizer/agent_runtime.py` 的 `run_agent_def`。四个 driver（`triage.py` / `synthesizer.py` / `divergent.py` / `owner.py`）各自拼好 `message` 后调用它，再 `read_submit` 取结构化数组写 Gitea。`message` 就是当时的完整输入；submit 回显就是当时的结构化产出。二者都只活在该次函数栈里。
+1. **唯一派发入口**是 `architect/agent_runtime.py` 的 `run_agent_def`。四个 driver（`triage.py` / `architect.py` / `divergent.py` / `owner.py`）各自拼好 `message` 后调用它，再 `read_submit` 取结构化数组写 Gitea。`message` 就是当时的完整输入；submit 回显就是当时的结构化产出。二者都只活在该次函数栈里。
 2. **看板过程流不是实验记录。** `loop/live_tracer.py` 把工具入参截到约 200 字、工具结果约 500 字；`loop/live.py` 的 agent log 上限 500 条。`archive_agent` 写入 `data/live/history.json` 的仍是这份截断投影。每次 `./run.sh` 开头 `clear_live`。
 3. **Token 用量 JSONL 只含计量。** `usage.py` 逐次记录 tokens 与 role/round，fail-open，不含 prompt 与产出。一次用量事件对应一次 LLM HTTP；一次角色调用内部可以有多次用量事件。
 4. **Gitea 只留产品。** proposal body、Owner 评论、标签是治理结果，不是填好的 `message`，也不是被 driver 丢掉的非法 submit。
 5. **现有重放脚本重建输入，而不是重放冻结输入。** `scripts/replay_roles_offline.py` 等从 sessions + FakeTracker 再跑一遍 driver。agent 定义或 tracker 视图一变，拼出的 `message` 就变。
 
-交付面现状（OpenAgents `auto-designer/v0.1`，由 auto-designer `start_vigil` 拉起）：
+交付面现状（OpenAgents `ahe-beta/v0.1`，由 AHE-Beta `start_vigil` 拉起）：
 
 1. **唯一派发入口**是 `openagents/runtime/engine.py` 的 `run_agent`。`task`、`context`、校验后的 dict 在此次调用内完整存在。
 2. **既有遥测明确不以 transcript 为分析对象。** 工具名 jsonl、token jsonl 留在 worktree；机器可读全文在 `protocol_output`（OpenAgents 字段名，本组 schema 不沿用该键），容器缺省零宿主挂载，`--rm` 后宿主拿不到。
@@ -149,13 +149,13 @@ tasks:
 
 ## Guide-level explanation
 
-一次闭环进程开始时，`run.py` 生成 `run_id`，设置 `AUTO_DESIGNER_RUN_ID` 与 `ROLE_RUNS_DIR=backend/data/role_runs/<run_id>`。`SessionStore` 写 `ROLE_RUNS_DIR/sessions/`。用量 JSONL 写 `ROLE_RUNS_DIR/usage.jsonl`。看板若仍读 `data/sessions`，则该路径只是指向**当前** `run_id` 的 sessions 的别名（符号链接或同等），换 `run_id` 只改别名，不删上一包。
+一次闭环进程开始时，`run.py` 生成 `run_id`，设置 `AHE_BETA_RUN_ID` 与 `ROLE_RUNS_DIR=backend/data/role_runs/<run_id>`。`SessionStore` 写 `ROLE_RUNS_DIR/sessions/`。用量 JSONL 写 `ROLE_RUNS_DIR/usage.jsonl`。看板若仍读 `data/sessions`，则该路径只是指向**当前** `run_id` 的 sessions 的别名（符号链接或同等），换 `run_id` 只改别名，不删上一包。
 
 实验内各 round 接着进化后的 main，不复位。**禁止**删除 `role_runs/` 下任何已有 `run_id`。旧单例入口若仍在启动时对共享 Gitea 强推 v0，那是给**新的实验进程**腾仓，不得写成「每一轮从种子起」；且该路径仍不得删记录目录。看板 live 只服务当前进程，换实验进程时清空 live 可以，清空上一实验的 `role_runs` 不可以。
 
 需求面每调用一次 `run_agent_def`，往 `demand/` 写一条 JSON。交付面 vigil 只 rw 挂载 `delivery/` 到容器内 `/role_runs`。用户局结束仍走既有 `SessionStore.save`，只是根目录换到本包内，不双写两份 persona_trace。
 
-审计者打开一个 `run_id` 目录应能回答：用户在各局如何判断与动作、harness 过程摘要是什么、triage/synthesize/owner/drafter/… 各自吃了什么输入、交出了什么 structured。把某条 demand 记录的 `input.prompt` 喂给改写后的 agent 定义，diff `output.structured`，即环节消融。实现者记录 `replayable=false`，脚本跳过。
+审计者打开一个 `run_id` 目录应能回答：用户在各局如何判断与动作、harness 过程摘要是什么、triage/architect/owner/drafter/… 各自吃了什么输入、交出了什么 structured。把某条 demand 记录的 `input.prompt` 喂给改写后的 agent 定义，diff `output.structured`，即环节消融。实现者记录 `replayable=false`，脚本跳过。
 
 示例（需求面角色调用；会话 JSON 仍是 SessionStore 既有形状）：
 
@@ -201,7 +201,7 @@ v1 **不能**还原：实现者改过的文件树、完整工具环、被截断�
 | 本组 | 本组含义 | 不得当成 |
 |---|---|---|
 | 角色调用 / invocation | 一次 `run_agent_def` 或一次 `run_agent` | 一次 LLM HTTP（usage 事件）；一次工具步 |
-| `run_id` | `AUTO_DESIGNER_RUN_ID`，一次闭环进程 | `docker run`；`agent.run`；`data/live/run.json` |
+| `run_id` | `AHE_BETA_RUN_ID`，一次闭环进程 | `docker run`；`agent.run`；`data/live/run.json` |
 | `side` | `demand` \| `delivery` | issue `plane` → `report`/`proposal`/`ready` |
 | `input.prompt` | 需求面 = 填好的 `message`；交付面 = substitute 后的 `task` | 单独再存 `systemprompt.md` |
 | `output.structured` | 需求面 submit 或回显；交付面 `OUTPUT_SCHEMA` dict | OpenAgents 键名 `protocol_output`；0043 artifact |
@@ -224,7 +224,7 @@ v1 **不记录**：完整 chat transcript、工具参数/命令正文/文件内�
 backend/data/role_runs/
   <run_id>/
     manifest.json        # 模型名、roster、agent_def pin、round SHA 列表；不含密钥
-    usage.jsonl          # 本 run 的用量事件（AUTO_DESIGNER_USAGE_PATH）
+    usage.jsonl          # 本 run 的用量事件（AHE_BETA_USAGE_PATH）
     sessions/            # SessionStore（index.json + <session_id>.json）
     index.jsonl          # 角色调用索引 {invocation_id, side, role, status, path}
     demand/
@@ -233,13 +233,13 @@ backend/data/role_runs/
       <utc>_<role>_<invocation_id>.json
 ```
 
-`InvocationStore` 在 `auto_designer/invocation.py`：fail-open、原子写 JSON、index 追加。未设置 `ROLE_RUNS_DIR` 时角色调用 API no-op；会话路径仍必须由 `run.py` 显式传入本包，避免再落到会被删的旧根。
+`InvocationStore` 在 `ahe_beta/invocation.py`：fail-open、原子写 JSON、index 追加。未设置 `ROLE_RUNS_DIR` 时角色调用 API no-op；会话路径仍必须由 `run.py` 显式传入本包，避免再落到会被删的旧根。
 
 `run.py` 在导入用量模块之前（或 `main` 最早处）设置：
 
-- `AUTO_DESIGNER_RUN_ID`
+- `AHE_BETA_RUN_ID`
 - `ROLE_RUNS_DIR=<DATA>/role_runs/<run_id>`
-- `AUTO_DESIGNER_USAGE_PATH=<ROLE_RUNS_DIR>/usage.jsonl`
+- `AHE_BETA_USAGE_PATH=<ROLE_RUNS_DIR>/usage.jsonl`
 
 `SessionStore` 构造为 `ROLE_RUNS_DIR/sessions`。`data/sessions` 若被看板硬编码，只允许作为指向当前 sessions 的别名，换 run 时改别名。SWE-bench 等同样调用 `_reset_to_initial` / `SessionStore(DATA/sessions)` 的入口必须同一约定（与 `run.py` 同改或共用 helper）；不得再写会被复位清空的共享根。
 
@@ -249,7 +249,7 @@ backend/data/role_runs/
 
 ### 需求面挂钩
 
-只改 `run_agent_def` 一处写存储；四个 driver 只增加 `subject=`（及可选 `replayable=True`）。triage 的 subject 为当前 report 号；synthesize/divergent/owner 若是整批则 `kind=round` 且 `id=str(round_no)`。不要从 `message` 启发式抽票号。超时写 `status=timeout` 再抛；未调 submit 写 `status=no_submit`。离线重放判断角色只喂 `input.prompt`。
+只改 `run_agent_def` 一处写存储；四个 driver 只增加 `subject=`（及可选 `replayable=True`）。triage 的 subject 为当前 report 号；architect/divergent/owner 若是整批则 `kind=round` 且 `id=str(round_no)`。不要从 `message` 启发式抽票号。超时写 `status=timeout` 再抛；未调 submit 写 `status=no_submit`。离线重放判断角色只喂 `input.prompt`。
 
 ### 交付面挂钩与围堵例外
 
@@ -281,7 +281,7 @@ flowchart TD
   T4 --> T6
 ```
 
-T3 与 T4 可并行。T6 在 OpenAgents `auto-designer/v0.1` 实现写出；本仓黄金夹具与契约测试。
+T3 与 T4 可并行。T6 在 OpenAgents `ahe-beta/v0.1` 实现写出；本仓黄金夹具与契约测试。
 
 ## Drawbacks
 
@@ -321,7 +321,7 @@ T3 与 T4 可并行。T6 在 OpenAgents `auto-designer/v0.1` 实现写出；本�
 
 ## Unresolved questions
 
-无。操作者已拍板：日志必须能还原实验；用户会话与角色调用同包持久；存 structured 而非工具环；权威目录在 auto-designer。keep-alive 与 run_id 变化时重建容器。0047 未落地不构成推迟保存的理由。
+无。操作者已拍板：日志必须能还原实验；用户会话与角色调用同包持久；存 structured 而非工具环；权威目录在 ahe-beta。keep-alive 与 run_id 变化时重建容器。0047 未落地不构成推迟保存的理由。
 
 ## Future possibilities
 

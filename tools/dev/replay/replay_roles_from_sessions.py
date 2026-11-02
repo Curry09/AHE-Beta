@@ -3,7 +3,7 @@
 
 The source conversations are never rerun. Their report issues are copied from a source
 Gitea repository into a fresh target repository, session issue references are remapped,
-then triage + divergent PM -> synthesize -> Owner admission execute once.
+then triage + divergent PM -> architect -> Owner admission execute once.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from tools.dev.delivery import git_remote_url, run_git
 ROOT = Path(__file__).resolve().parents[3] / "backend"
 sys.path.insert(0, str(ROOT))
 
-from auto_designer.experiment.controllers import runtime as run_mod  # noqa: E402
+from ahe_beta.experiment.controllers import runtime as run_mod  # noqa: E402
 
 
 def _args() -> argparse.Namespace:
@@ -123,7 +123,7 @@ def _source_issue_numbers(*, sessions: Path) -> list[int]:
 
 
 def _validate_source_reports(*, source_tracker, sessions: Path) -> list[dict]:
-    from auto_designer.demand.issue_schema import REPORT, plane
+    from ahe_beta.demand.issue_schema import REPORT, plane
 
     snapshots = [
         source_tracker.get_issue(number=number)
@@ -148,7 +148,7 @@ def _prompt_hashes() -> dict[str, str]:
 def _copy_reports_and_remap(
     *, source_tracker, target_tracker, sessions: Path, target_repo: str, gitea: dict[str, str]
 ) -> dict[int, int]:
-    from auto_designer.models import IssueDraft
+    from ahe_beta.models import IssueDraft
 
     index_path = sessions / "index.json"
     index = json.loads(index_path.read_text(encoding="utf-8"))
@@ -218,14 +218,14 @@ def main() -> int:
     os.environ["no_proxy"] = os.environ["NO_PROXY"]
     run_mod._isolate_git_credentials()
 
-    from auto_designer.demand.divergent import Divergent
-    from auto_designer.demand.issue_schema import plane
-    from auto_designer.demand.owner import Owner
-    from auto_designer.demand.synthesizer import Synthesizer
-    from auto_designer.demand.triage import Triager
-    from auto_designer.tracker.gitea import GiteaTracker
-    from auto_designer.usage import bind_usage_context, default_usage_store
-    from auto_designer.user.session_store import SessionStore
+    from ahe_beta.demand.architect import Architect
+    from ahe_beta.demand.divergent import Divergent
+    from ahe_beta.demand.issue_schema import plane
+    from ahe_beta.demand.owner import Owner
+    from ahe_beta.demand.triage import Triager
+    from ahe_beta.tracker.gitea import GiteaTracker
+    from ahe_beta.usage import bind_usage_context, default_usage_store
+    from ahe_beta.user.session_store import SessionStore
 
     source_tracker = GiteaTracker(
         base_url=source_gitea["GITEA_URL"],
@@ -284,12 +284,12 @@ def main() -> int:
         on_event=event("divergent"),
         round_provider=lambda: 1,
     )
-    synthesizer = Synthesizer(
+    architect = Architect(
         tracker,
         store,
         str(harness_repo),
-        str(ROOT / "agent_defs" / "synthesizer"),
-        on_event=event("synthesizer"),
+        str(ROOT / "agent_defs" / "architect"),
+        on_event=event("architect"),
         round_provider=lambda: 1,
     )
     owner = Owner(
@@ -310,7 +310,7 @@ def main() -> int:
         divergent_future = pool.submit(invoke, "divergent", divergent.propose_once)
         triage_out = triage_future.result()
         divergent_out = divergent_future.result()
-    design_out = invoke("synthesizer", synthesizer.propose_once)
+    design_out = invoke("architect", architect.propose_once)
     owner_out = invoke("owner", owner.admit_once)
 
     issues = tracker.list_issues(state="all", limit=100)
@@ -330,7 +330,7 @@ def main() -> int:
         "source_report_mapping": mapping,
         "triage": triage_out.__dict__,
         "divergent": divergent_out.__dict__,
-        "synthesizer": design_out.__dict__,
+        "architect": design_out.__dict__,
         "owner": owner_out.__dict__,
         "issues": [
             {

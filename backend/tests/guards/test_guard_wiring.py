@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.guards import harness_boundary
-from auto_designer.guards.workspace_jail import WorkspaceJailMiddleware
+from ahe_beta.guards import harness_boundary
+from ahe_beta.guards.workspace_jail import WorkspaceJailMiddleware
 
 
 def test_seed_entrypoint_installs_guard_after_initial_commit(monkeypatch, tmp_path):
-    run = importlib.import_module("auto_designer.experiment.controllers.runtime")
+    run = importlib.import_module("ahe_beta.experiment.controllers.runtime")
     backend = tmp_path / "backend"
     template = backend / "harness_template"
     template.mkdir(parents=True)
@@ -19,7 +19,7 @@ def test_seed_entrypoint_installs_guard_after_initial_commit(monkeypatch, tmp_pa
     repo = tmp_path / "new-harness"
     monkeypatch.setattr(run, "ROOT", backend)
     monkeypatch.setattr(run, "HARNESS_REPO", repo)
-    monkeypatch.delenv("AUTO_DESIGNER_HARNESS_ARCHIVE", raising=False)
+    monkeypatch.delenv("AHE_BETA_HARNESS_ARCHIVE", raising=False)
     for name in ("GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME"):
         monkeypatch.setenv(name, "Offline Test")
     for name in ("GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"):
@@ -47,7 +47,7 @@ def test_seed_entrypoint_installs_guard_after_initial_commit(monkeypatch, tmp_pa
     assert "harness-boundary" in result.stderr
 
 
-@pytest.mark.parametrize("role", ["triage_agent", "synthesizer", "divergent_pm", "owner"])
+@pytest.mark.parametrize("role", ["triage_agent", "architect", "divergent_pm", "owner"])
 def test_real_agent_yaml_resolves_middleware_and_tool_bindings(role, monkeypatch, tmp_path):
     from nexau import AgentConfig
 

@@ -3,7 +3,7 @@ number: "0055"
 title: 目标感知的需求面证据分层与角色可见性
 issue: 0
 slug: goal-aware-demand-evidence-boundaries
-summary: 在不把完整用户 trace 灌入需求面角色的前提下，将用户目标演化、关键交互行为和客观执行结果编成有来源的分层证据；Triage 默认获得当前 report 的有界目标感知证据，产品 PM 保持全局体验视野，Synthesize 只沿 proposal 关系下钻，避免额外延迟、跨题过拟合和主观 accept 冒充客观通过。
+summary: 在不把完整用户 trace 灌入需求面角色的前提下，将用户目标演化、关键交互行为和客观执行结果编成有来源的分层证据；Triage 默认获得当前 report 的有界目标感知证据，产品 PM 保持全局体验视野，Architect 只沿 proposal 关系下钻，避免额外延迟、跨题过拟合和主观 accept 冒充客观通过。
 tasks:
   - id: T1
     title: 定义目标感知证据包与分层读取契约
@@ -15,7 +15,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/evidence_contract.py
+      - backend/ahe_beta/demand/evidence_contract.py
       - backend/tests/demand/test_evidence_contract.py
     scope: 定义 report、user_goal、interaction、objective、harness_source 五类证据及 provenance；定义 L0 report、L1 compact goal-aware summary、L2 timeline、L3 targeted beat、L4 step/objective detail 的字段、字符上限、调用条件和角色权限。L1 必须由落盘数据确定性生成，不新增 LLM 调用。
     acceptance: 每个证据字段有来源、用途和最大大小；L1 不含完整 raw persona prompt、全量 stdout、目标项目源码或 benchmark oracle；缺失字段显式为 unavailable；契约单测覆盖旧 session 兼容、空 goal ledger 和超长截断。
@@ -30,8 +30,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/triage.py
-      - backend/auto_designer/demand/role_contract.py
+      - backend/ahe_beta/demand/triage.py
+      - backend/ahe_beta/demand/role_contract.py
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/triage_agent/tools/get_session_timeline.tool.yaml
       - backend/tests/demand/test_triage.py
@@ -48,14 +48,14 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/divergent.py
+      - backend/ahe_beta/demand/divergent.py
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/divergent_pm/tools/get_session_timeline.tool.yaml
       - backend/tests/demand/test_divergent_gate.py
     scope: PM 保留跨 session 的体验索引和全局观察权，但默认消费 L1/L2 摘要；可引用有 report 或无 report 的 session，比较用户目标、行为、体验矛盾和期望结果。PM 的 artifact 不得携带代码位置、协议字段、固定阈值或实施步骤；重复与否由 Owner 决定。
     acceptance: PM 输入能表达目标变化和用户反馈而非只有 feeling 分数；PM 可以引用多个 session 但每个引用有证据来源；产物字段只包含 user_goal、observed_behaviors、experience_tension、product_opportunity、desired_outcome、evidence_sessions；未报告 session 不因 novelty 规则被拒；PM 不因 trace 过大而默认读取 L3/L4。
   - id: T4
-    title: Synthesize 提案关系输入与证据下钻约束
+    title: Architect 提案关系输入与证据下钻约束
     status: done
     priority: P0
     tags: []
@@ -67,12 +67,12 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/synthesizer.py
-      - backend/agent_defs/synthesizer/systemprompt.md
-      - backend/auto_designer/demand/session_timeline.py
-      - backend/tests/loop/test_synthesizer.py
-    scope: Synthesize 默认以 ProposalView 和 proposal artifact 关系为输入，仅对已引用 proposal 的 session evidence 做 L2/L3 验证；禁止从无来源 raw session 重新发掘单票需求。目标 ledger 作为引用 proposal 的用户意图证据，不作为实现规格或客观验收。
-    acceptance: 每个结构提案至少引用两条本轮可见 proposal 并解释关系；下钻调用包含来源 proposal 和理由；越权 session、无来源需求和具体实现处方被拒或转为可观测 revise；Synthesize 的默认 token 和工具调用量不因全量 trace 线性膨胀。
+      - backend/ahe_beta/demand/architect.py
+      - backend/agent_defs/architect/systemprompt.md
+      - backend/ahe_beta/demand/session_timeline.py
+      - backend/tests/loop/test_architect.py
+    scope: Architect 默认以 ProposalView 和 proposal artifact 关系为输入，仅对已引用 proposal 的 session evidence 做 L2/L3 验证；禁止从无来源 raw session 重新发掘单票需求。目标 ledger 作为引用 proposal 的用户意图证据，不作为实现规格或客观验收。
+    acceptance: 每个结构提案至少引用两条本轮可见 proposal 并解释关系；下钻调用包含来源 proposal 和理由；越权 session、无来源需求和具体实现处方被拒或转为可观测 revise；Architect 的默认 token 和工具调用量不因全量 trace 线性膨胀。
   - id: T5
     title: 角色可见性、过拟合和延迟回归评测
     status: done
@@ -88,7 +88,7 @@ tasks:
       - tools/dev/audit/evaluate_role_traces.py
       - backend/tests/demand/test_role_contract_flow.py
     scope: 增加同一批 session 的旧输入/新分层输入对照回放，分别记录每角色输入 token、工具调用数、墙钟时间、证据引用、跨题专有名词泄漏和 artifact 语义违规；用户主观结论与 objective evaluator 结果独立评分。
-    acceptance: 对照报告能证明 Triage 只消费单 report 证据、PM 保持全局产品视角、Synthesize 只做 proposal 关系综合；L1 默认路径不新增模型调用；L2/L3 超预算或越权读取可观测并降级；trace 中的目标项目文件名/答案不能进入通用 proposal 字段；`accept` 与 objective failed/unverified 的组合不被评为整体成功。
+    acceptance: 对照报告能证明 Triage 只消费单 report 证据、PM 保持全局产品视角、Architect 只做 proposal 关系综合；L1 默认路径不新增模型调用；L2/L3 超预算或越权读取可观测并降级；trace 中的目标项目文件名/答案不能进入通用 proposal 字段；`accept` 与 objective failed/unverified 的组合不被评为整体成功。
 ---
 
 # 0055 · 目标感知的需求面证据分层与角色可见性
@@ -111,7 +111,7 @@ raw report
   + L4 单步/客观细节（严格按需）
 ```
 
-Triage、产品 PM 和 Synthesize 使用不同的层级和视野。这样目标机制进入需求面，但不会把三个角色重新变成同一
+Triage、产品 PM 和 Architect 使用不同的层级和视野。这样目标机制进入需求面，但不会把三个角色重新变成同一
 个“读全量日志再给技术方案”的 Agent。
 
 ## First principles
@@ -141,14 +141,14 @@ PM 需要比 Triage 更宽的观察面：它必须能比较多个 session，也�
 PM 的边界不是“看不到 trace”，而是“看到了 trace 也只能用产品语言表达”：用户目标、观察行为、体验矛盾、
 产品机会和期望结果。文件名、协议、固定超时、关键词阈值和实现步骤不属于 PM artifact。
 
-### 3. Synthesize 的问题是“已有 proposal 之间有什么共同机制”
+### 3. Architect 的问题是“已有 proposal 之间有什么共同机制”
 
-Synthesize 不是第二个 PM，也不是更大的 Triage。它应先以 ProposalView 为认知对象，再沿 proposal 已声明的
+Architect 不是第二个 PM，也不是更大的 Triage。它应先以 ProposalView 为认知对象，再沿 proposal 已声明的
 证据引用下钻 session。若它可以任意读取所有 raw session，就会绕过 Triage/PM 的中间产物，重新发现一批没有
 来源的需求，角色分工和审计链都会失效。
 
-所以 Synthesize 保持跨 proposal 视野，但 raw trace 采用引用门控：没有来源 proposal 的 session 只能作为
-不可见对象，不能直接成为 from-synthesize 提案的依据。
+所以 Architect 保持跨 proposal 视野，但 raw trace 采用引用门控：没有来源 proposal 的 session 只能作为
+不可见对象，不能直接成为 from-architect 提案的依据。
 
 ## Motivation
 
@@ -233,7 +233,7 @@ L1 有固定字符和事件数量上限，去掉完整 persona prompt、raw LLM 
 ### L2 · projected timeline
 
 当前 report 对应 session 的用户可见交互、harness 回复和活动摘要。Triage 需要确认事实边界时可以读取；
-PM 用于解释跨 session 体验；Synthesize 仅沿已引用 proposal 下钻。
+PM 用于解释跨 session 体验；Architect 仅沿已引用 proposal 下钻。
 
 ### L3 · targeted beat
 
@@ -251,7 +251,7 @@ PM 用于解释跨 session 体验；Synthesize 仅沿已引用 proposal 下钻�
 |---|---|---|---|---|
 | Triage | 当前 report + 当前 session 的 L1 + feeling/终止原因 | 当前 session L2/L3；必要的 L4 objective 摘要 | 其他 report、全局聚合、目标项目完整源码、无理由 raw step | 事实、用户影响、边界、证据、不确定性 |
 | 产品 PM / Divergent | 全局体验索引 + 多 session L1/L2 + report/proposal 索引 | 相关 session L3；必要时 L4 结果 | 代码位置、协议处方、固定阈值、实施步骤 | 用户目标、行为、体验矛盾、产品机会、期望结果 |
-| Synthesize | ProposalView + proposal artifact 关系 | 已引用 proposal 的 session L2/L3/L4 | 无来源 raw session、单票改写、脱离 proposal 发掘新需求 | 来源关系、共同矛盾、结构方向、预期杠杆 |
+| Architect | ProposalView + proposal artifact 关系 | 已引用 proposal 的 session L2/L3/L4 | 无来源 raw session、单票改写、脱离 proposal 发掘新需求 | 来源关系、共同矛盾、结构方向、预期杠杆 |
 | Owner | 角色 artifact、ready queue、证据引用和体验摘要 | 不自由搜索源码或 raw session | 重新诊断、替角色补事实、把 accept 当通过 | 用户价值、证据强度、范围内聚、风险、裁决 |
 
 “默认输入”不是把数据拼成一段无限长的 prompt，而是把 envelope 中允许的字段投影到角色专属 schema。工具调用
@@ -259,7 +259,7 @@ PM 用于解释跨 session 体验；Synthesize 仅沿已引用 proposal 下钻�
 
 ## Reference-level explanation
 
-### Synthesize 的单次协议收尾
+### Architect 的单次协议收尾
 
 若模型返回文本但没有结构化提交 proposals，驱动器最多再次调用一次相同角色，复用本轮的
 ready、proposal、trend 和 runtime 输入，并追加只调用 `submit_rfcs` 提交 0..n 条结果的收尾提示。
@@ -280,12 +280,12 @@ Triage 的运行仍然一次只处理一条 report。它的初始消息只包含
 或未引用 proposal，工具返回越权 violation，而不是静默提供数据。
 
 PM 的全景不等于全量原文：全局索引使用 L1，比较体验时才取相关 session 的 L2；它不能把目标项目的具体
-文件、命令写进产品 artifact。Synthesize 的输入先是 ProposalView；证据下钻必须携带来源 proposal，这样
+文件、命令写进产品 artifact。Architect 的输入先是 ProposalView；证据下钻必须携带来源 proposal，这样
 “看得广”与“能凭空发新需求”被分开。
 
 ### 产物与状态投影
 
-Triage、PM 和 Synthesize 继续使用 Spec-0043 的专属 artifact schema。本 spec 不增加一个“目标已满足所以
+Triage、PM 和 Architect 继续使用 Spec-0043 的专属 artifact schema。本 spec 不增加一个“目标已满足所以
 proposal 合格”的快捷字段：目标字段只作为证据引用或用户目标上下文。用户 handoff 的 `user_outcome`、
 `goal_acceptance` 和 objective evaluator 结果分别投影，任何角色都不能覆写它们。
 
@@ -342,7 +342,7 @@ L0/L1 → 判断证据缺口 → L2 → 必要时 L3 → 极少数情况下 L4
 - L2/L3/L4 每次调用写入 `evidence_access` 事件，记录层级、turn、reason、字符数和耗时；
 - 每角色设置输入 token、工具调用数和墙钟预算，达到上限后返回已有证据或 `needs_info`；
 - PM 的跨 session 索引使用短摘要，不把所有 session 的 L2 拼成一段；
-- Synthesize 的证据下钻按 proposal 引用集合去重，避免随 proposal 数量重复拉同一 trace。
+- Architect 的证据下钻按 proposal 引用集合去重，避免随 proposal 数量重复拉同一 trace。
 
 ### 过拟合控制
 
@@ -350,7 +350,7 @@ L0/L1 → 判断证据缺口 → L2 → 必要时 L3 → 极少数情况下 L4
 - 目标项目源码不是需求面角色的实现工作区；harness 源码仍是独立、只读的进化对象；
 - 通用 proposal 字段禁止目标项目名、票号、专有文件名、答案、固定超时和关键词阈值；
 - 具体案例只保留在原始报告和带来源的 evidence 中；
-- Triage 必须显式记录 uncertainties；PM/Synthesize 的语义产物由角色专属 contract 检查，不由事故关键词黑名单判断；
+- Triage 必须显式记录 uncertainties；PM/Architect 的语义产物由角色专属 contract 检查，不由事故关键词黑名单判断；
 - `user accept`、`goal met`、私有 pytest 和 evaluator 结果永远分开记录。
 
 ## Rationale and alternatives
@@ -367,10 +367,10 @@ Triage 不负责跨任务架构设计。完整工具正文、目标项目路径�
 它把案例修复写成 harness 的通用 proposal。L1/L2/L3/L4 的渐进层级让它先拿到足够解释行为的证据，再在有理由时
 下钻；这比在 prompt 中重复一份大日志更可审计。
 
-### 为什么 PM 和 Synthesize 不能共享同一输入
+### 为什么 PM 和 Architect 不能共享同一输入
 
-PM 的价值来自全局体验比较和未报告行为观察，它需要比 Triage 更宽的视野；Synthesize 的价值来自已有 proposal
-之间的结构关系，它必须受来源 proposal 约束。让二者共享全量 trace 会让 PM 变成技术调查器，也会让 Synthesize
+PM 的价值来自全局体验比较和未报告行为观察，它需要比 Triage 更宽的视野；Architect 的价值来自已有 proposal
+之间的结构关系，它必须受来源 proposal 约束。让二者共享全量 trace 会让 PM 变成技术调查器，也会让 Architect
 绕过 Triage/PM 重新发掘需求。角色差异必须体现在输入范围和 artifact，而不只写在 system prompt 中。
 
 ### 备选方案
@@ -384,8 +384,8 @@ PM 的价值来自全局体验比较和未报告行为观察，它需要比 Tria
 ## Interaction with existing specs
 
 - Spec-0024 提供 god-view 落盘和 timeline/beat/step 渐进下钻，本 spec 为其增加目标感知 L1 和角色权限矩阵；
-- Spec-0025 定义 raw report → Triage → Synthesize 的漏斗，本 spec 增加 user feedback handoff，不改变角色职责；
-- Spec-0029 保留 Triage 单 report、PM/Synthesize 的不同视野和 Owner 唯一准入，本 spec 把“不同视野”落实为可机检的输入层级；
+- Spec-0025 定义 raw report → Triage → Architect 的漏斗，本 spec 增加 user feedback handoff，不改变角色职责；
+- Spec-0029 保留 Triage 单 report、PM/Architect 的不同视野和 Owner 唯一准入，本 spec 把“不同视野”落实为可机检的输入层级；
 - Spec-0043 定义角色专属 artifact，本 spec 不重写 artifact 语义，只规定其证据来源和可见性；
 - Spec-0053 定义用户动作、目标和客观结果的独立生命周期，本 spec 将这些结果投影到需求面证据包，不让需求面重新判定生命周期。
 
@@ -393,7 +393,7 @@ PM 的价值来自全局体验比较和未报告行为观察，它需要比 Tria
 
 验证不是“JSON 合法就算成功”，而是至少比较以下结果：
 
-1. **输入边界**：Triage 不串 report；PM 可引用未报告 session；Synthesize 不接受无来源 session；Owner 不自由读码。
+1. **输入边界**：Triage 不串 report；PM 可引用未报告 session；Architect 不接受无来源 session；Owner 不自由读码。
 2. **目标利用**：目标 revision 能解释 interrupt、等待和明确反馈；角色不会把 goal status 当客观验收。
 3. **延迟**：L1 默认路径不新增模型调用；L2/L3 调用数和字符量有界；同批 session 的墙钟和 token 不出现线性爆炸。
 4. **泛化**：任务专有文件、命令、答案只能落在 evidence 引用，不能出现在通用 proposal 字段。

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.config import compose_project, config_hash
-from auto_designer.experiment.infrastructure import (
+from ahe_beta.experiment.config import compose_project, config_hash
+from ahe_beta.experiment.infrastructure import (
     InfrastructureError,
     destroy_stack,
     parse_compose_template,
@@ -20,7 +20,7 @@ from auto_designer.experiment.infrastructure import (
 def test_compose_template_has_no_global_names() -> None:
     text = parse_compose_template()
     assert "container_name:" not in text
-    assert "name: auto-designer-" not in text
+    assert "name: ahe-beta-" not in text
     assert "127.0.0.1:${GITEA_HOST_PORT:-0}:3000" in text
     assert "io.openagents.experiment_id" in text
 

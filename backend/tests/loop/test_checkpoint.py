@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.loop.checkpoint import (
+from ahe_beta.loop.checkpoint import (
     RECOVERY_MEMBERS,
     REQUIRED_MEMBERS,
     load_checkpoint,

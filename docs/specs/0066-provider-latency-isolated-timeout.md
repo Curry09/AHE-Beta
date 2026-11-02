@@ -14,9 +14,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/usage.py
-      - backend/auto_designer/loop/live_tracer.py
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/usage.py
+      - backend/ahe_beta/loop/live_tracer.py
+      - backend/ahe_beta/user/sim/persona_client.py
     scope: 记录 wall、active、provider wait、unknown 时间及模型调用事件，重叠 provider 区间按 union 计数。
     acceptance: 每次调用有可关联 call_id；记录可重放且不含凭证；旧 usage 记录保持兼容。
   - id: T2
@@ -30,9 +30,9 @@ tasks:
         type: extends
     parallel: false
     files:
-      - backend/auto_designer/demand/agent_runtime.py
-      - backend/auto_designer/demand/grouped_synthesizer.py
-      - backend/auto_designer/loop/sim_user.py
+      - backend/ahe_beta/demand/agent_runtime.py
+      - backend/ahe_beta/demand/grouped_architect.py
+      - backend/ahe_beta/loop/sim_user.py
     scope: 区分 mechanism、provider、infrastructure、controller timeout，并在恢复账本中保存截止证据。
     acceptance: provider 等待不被误报为机制失败；外层 wall guard 仍有限；完成的 operation 不被 resume 重放。
   - id: T4
@@ -79,7 +79,7 @@ manifest/receipt 中标记来源。该规则适用于 direct 和 simulated-user 
 
 ## Verification
 
-变更必须通过 time-accounting、direct-session、grouped-synthesizer、infrastructure 和
+变更必须通过 time-accounting、direct-session、grouped-architect、infrastructure 和
 closed-loop 回归测试；启动前 receipt 还必须绑定 config/task/template/payload SHA、
 canary evidence 和 timeout policy。详细实现约束见
 `evaluation/harness-suite-20260920/SPEC-time-accounting-provider-latency.md`。

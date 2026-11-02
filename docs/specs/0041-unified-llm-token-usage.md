@@ -3,7 +3,7 @@ number: "0041"
 title: 统一 LLM Token 用量监测与全链路归属
 issue: 0
 slug: unified-llm-token-usage
-summary: 为 user、triager、synthesizer、divergent、owner、harness 与 developer/vigil 建立统一逐调用 Token 原始事件、并发上下文归属、按题与按轮聚合及看板；上游缺失时显式 unavailable，绝不伪造精确值。
+summary: 为 user、triager、architect、divergent、owner、harness 与 developer/vigil 建立统一逐调用 Token 原始事件、并发上下文归属、按题与按轮聚合及看板；上游缺失时显式 unavailable，绝不伪造精确值。
 tasks:
   - id: T1
     title: 统一事件模型、上下文与 user 精确采集
@@ -14,8 +14,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/usage.py
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/usage.py
+      - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/test_usage.py
       - backend/tests/user/sim/test_persona_usage.py
     scope: 定义统一 UsageEvent/UsageContext/UsageStore：逐调用 JSONL 原始事件、线程安全追加、容错读取、确定性聚合与 contextvars 覆盖，预留 interaction_id/turn_no；ApiPersonaClient 在真实 OpenAI-compatible create 边界读取 response.usage，记录每个成功、失败、flag 降级、空 content 扩 max_tokens 重试。只保存安全元数据；无 usage 写 null+unavailable，不按文本估算。写入异常绝不影响主调用。
@@ -30,13 +30,13 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/agent_runtime.py
-      - backend/auto_designer/loop/live_tracer.py
-      - backend/auto_designer/loop/orchestrator.py
+      - backend/ahe_beta/demand/agent_runtime.py
+      - backend/ahe_beta/loop/live_tracer.py
+      - backend/ahe_beta/loop/orchestrator.py
       - backend/tests/demand/test_agent_runtime.py
       - backend/tests/loop/test_live_tracer.py
       - backend/tests/loop/test_orchestrator.py
-    scope: 复用 NexAU LLM span 完整 outputs 中的 usage/usageMetadata，为 triager/synthesizer/divergent/owner 每次 provider 调用写统一事件；agent_runtime 按 agent definition 绑定 role，NexAU canonical session 作为 agent execution id；orchestrator 在每轮外层绑定 round_no，使线程池 copy_context 后保持归属。错误 span 与缺 usage 仍记录。
+    scope: 复用 NexAU LLM span 完整 outputs 中的 usage/usageMetadata，为 triager/architect/divergent/owner 每次 provider 调用写统一事件；agent_runtime 按 agent definition 绑定 role，NexAU canonical session 作为 agent execution id；orchestrator 在每轮外层绑定 round_no，使线程池 copy_context 后保持归属。错误 span 与缺 usage 仍记录。
     acceptance: 四类角色均能按 round/role/agent 查询；两次模型调用两条事件而非 run 累计快照；两个并发生成器不串 role/agent；round 上下文进入所有 worker；tracer/存储失败不影响 agent.run；上游 reported 时精确、缺失时 unavailable；相关 pytest 绿。
   - id: T3
     title: Harness tracer 输出逐调用 usage 旁路
@@ -63,10 +63,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/launcher.py
-      - backend/auto_designer/harness/connector.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/harness/launcher.py
+      - backend/ahe_beta/harness/connector.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/harness/test_launcher.py
       - backend/tests/harness/test_connector.py
       - backend/tests/loop/test_sim_user.py
@@ -85,7 +85,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/web/api.py
+      - backend/ahe_beta/web/api.py
       - backend/tests/web/test_api.py
       - frontend/src/api.ts
       - frontend/src/types.ts
@@ -104,11 +104,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/deploy/vigil/entrypoint.sh
       - backend/tests/test_run_vigil.py
       - docs/usage-monitoring.md
-    scope: 审计 auto-designer-vigil 镜像内 OpenAgents/Claude 链路是否暴露逐调用 usage、请求 id 与可注入的 run/round/instance/agent 上下文。若上游已有稳定事件钩子，则以只读挂载/sidecar 或 stdout 机器事件接入同一 UsageEvent；若缺任一关键归属，不解析普通文本日志，记录 role=developer 的 unavailable 能力状态并保留明确扩展协议。凭证只经 env，不写事件或文档。
+    scope: 审计 ahe-beta-vigil 镜像内 OpenAgents/Claude 链路是否暴露逐调用 usage、请求 id 与可注入的 run/round/instance/agent 上下文。若上游已有稳定事件钩子，则以只读挂载/sidecar 或 stdout 机器事件接入同一 UsageEvent；若缺任一关键归属，不解析普通文本日志，记录 role=developer 的 unavailable 能力状态并保留明确扩展协议。凭证只经 env，不写事件或文档。
     acceptance: 设计说明给出精确度矩阵和实证调用点；若可接入，逐调用 reported 事件能按 developer agent/run 查询且容器并发不串线；若不可接入，代码/看板明确 unavailable 且无字符估算；启动、复用、keep-alive、停止行为不变；test_run_vigil 绿。
 ---
 
@@ -118,8 +118,8 @@ tasks:
 
 ## Summary
 
-建立覆盖整个 auto-designer 闭环的统一 LLM Token 账本，采集对象包括 user persona、
-triager/synthesizer/divergent/owner、每道题的 harness NexAU，以及技术上可观测时的 developer/vigil。每次真实
+建立覆盖整个 AHE-Beta 闭环的统一 LLM Token 账本，采集对象包括 user persona、
+triager/architect/divergent/owner、每道题的 harness NexAU，以及技术上可观测时的 developer/vigil。每次真实
 provider 请求写一条原始事件，绑定 `run_id / round_no / session_id / instance_id / interaction_id /
 turn_no / agent_id / role / operation`，再由 API 从原始事件按调用、交互、session、题目、agent、角色、轮
 和 run 分层聚合。
@@ -132,7 +132,7 @@ user persona 在 OpenAI-compatible `response.usage` 边界直接采集；后端�
 原始逐调用事件仍是唯一事实源。空回复、网关降级和其它重试分别记账；缺 usage 时保留
 `usage_source=unavailable`，不以字符长度估算。usage 旁路不得进入用户可见 reply、等待进度、session
 timeline 或 prompt，也不得携带请求正文、system prompt、工具参数及凭证。最终 API 能按轮、题、session、
-role 汇总 user persona 与 harness 的分项和合计；triager/synthesizer/divergent/owner 继续作为轮级角色成本，
+role 汇总 user persona 与 harness 的分项和合计；triager/architect/divergent/owner 继续作为轮级角色成本，
 developer/vigil 在其独立容器尚无结构化协议时仍明确 unavailable。监测写入永远是 best effort，失败
 不能改变闭环控制流。
 
@@ -150,12 +150,12 @@ harness 为回答用户而运行的 NexAU agent 是另一条，且通常后者�
 reasoning、cache 和 total Token，并在每次模型调用后保留 `ModelResponse.usage`。harness 模板的
 `_StepCollector` 也已经接在相同 LLM span 上，完整 outputs 对它可见。真正缺失的是跨进程桥接和宿主归属：
 
-1. harness 子进程不知道 auto-designer 的 round/session/instance 上下文；
+1. harness 子进程不知道 AHE-Beta 的 round/session/instance 上下文；
 2. 宿主知道题目上下文，却看不到子进程内部每次 LLM usage；
 3. stdout 同时承载 reply、progress、status，usage 若沿普通旁路处理会污染用户可见轨迹；
 4. 空回复和错误会触发多次真实计费请求，只在终态 reply 记一次会漏账；
 5. 并发最多两个用户 session，全局累计数无法可靠拆回每道题。
-6. triager/synthesizer/divergent/owner 运行在后端 NexAU 中，适合按轮和 agent 归属，但综合多题时不能伪造
+6. triager/architect/divergent/owner 运行在后端 NexAU 中，适合按轮和 agent 归属，但综合多题时不能伪造
    单题分摊。
 7. developer/vigil 跨容器、跨 OpenAgents/Claude 协议；若只有 stdout 文本，就不具备可信的精确统计条件。
 
@@ -173,7 +173,7 @@ round N
   │    └─ harness 子进程 NexAU LLM span
   │         └─ stdout type=usage → launcher → UsageStore(role=harness)
   ├─ triager NexAU tracer ─────────────────→ UsageStore(role=triager)
-  ├─ synthesizer/divergent/owner tracer ──────→ UsageStore(对应 role)
+  ├─ architect/divergent/owner tracer ──────→ UsageStore(对应 role)
   └─ vigil/OpenAgents/Claude
        ├─ 有结构化逐调用接口 → UsageStore(role=developer)
        └─ 无可靠接口         → capability unavailable
@@ -196,7 +196,7 @@ instance django__django-123
   合计       60,230
 ```
 
-同一区域另列该轮 triager/synthesizer/divergent/owner 总量。这些后处理角色可能综合多题，除非调用上下文本身
+同一区域另列该轮 triager/architect/divergent/owner 总量。这些后处理角色可能综合多题，除非调用上下文本身
 有 instance_id，否则不强行摊派到单题。developer/vigil 也不与 harness 合并：二者是不同执行面。
 
 使用者可从原始事件逐层钻取：一次 provider 调用是最小单位；同一 `operation/interaction` 的调用组成一次
@@ -235,7 +235,7 @@ drain。run_id 可由启动环境显式提供，未提供时每个新进程生�
 `enable_thinking=False` 被拒后的裸请求、退避重试、空 content 后扩大 max_tokens 均是独立计费尝试，必须
 逐次入账。`respond/complete/classify_action` 不再承担计数，避免分支漏记。
 
-triager/synthesizer/divergent/owner 共用 `run_agent_def + StepTracer`。role 由明确 agent definition/调用参数绑定，
+triager/architect/divergent/owner 共用 `run_agent_def + StepTracer`。role 由明确 agent definition/调用参数绑定，
 不可从输出文本猜测；NexAU canonical session id 作为一次 agent execution 的 agent_id。LLM span outputs 中
 `usage` / `usageMetadata` 是逐调用事实，assistant 文本投影与 usage 投影相互独立。
 
@@ -272,7 +272,7 @@ triager/synthesizer/divergent/owner 共用 `run_agent_def + StepTracer`。role �
 
 ### Harness 发端
 
-`backend/harness_template/entry.py` 保持自包含，不 import 编排仓的 `auto_designer.usage`。`_StepCollector`
+`backend/harness_template/entry.py` 保持自包含，不 import 编排仓的 `ahe_beta.usage`。`_StepCollector`
 在 `SpanType.LLM` 的 `end_span` 中做小型防御式抽取，通过既有 `_stdout_lock` 立即写完整 JSON 行。立即发而
 不是塞进最终 reply，确保 timeout、interrupt、进程异常和无终态 reply 时已完成调用仍可观测。
 
@@ -315,7 +315,7 @@ UsageStore 写失败继续遵守观测不拖垮主流程的不变量。
 ### 聚合语义
 
 API 只从原始 JSONL 求和，新增 `instance_id` 过滤与 `by_session / by_instance / by_role`。某题合计默认只
-含明确带该 instance_id 的事件，即 user + harness；不把综合多题的 synthesizer 或轮级 owner 按比例摊派。
+含明确带该 instance_id 的事件，即 user + harness；不把综合多题的 architect 或轮级 owner 按比例摊派。
 unavailable 事件计入调用次数与不可用数，但其 null Token 不计入数值总和，界面必须同时显示缺失数量，
 避免“0 Token”误读。
 
@@ -333,7 +333,7 @@ model 过滤。单次用户交互由控制信封在外层拍开始时分配 inte
 ### Developer/vigil 判定门
 
 vigil 与 harness 不同：harness 的 NexAU tracer 在本仓模板内可改，vigil 则运行
-`auto-designer-vigil:latest`，经 OpenAgents/Claude 链路调用。T6 必须实际检查镜像/CLI/上游事件对象，不以
+`ahe-beta-vigil:latest`，经 OpenAgents/Claude 链路调用。T6 必须实际检查镜像/CLI/上游事件对象，不以
 “Claude 通常有 usage”代替证据。reported 接入需同时满足：逐 provider 调用 usage、稳定 agent/request id、
 以及 run/round/工作项归属可注入。缺一项即保持 unavailable，并在设计说明记录技术阻点和预留事件协议。
 
@@ -346,7 +346,7 @@ vigil 与 harness 不同：harness 的 NexAU tracer 在本仓模板内可改，v
 | 链路 | 目标粒度 | 精确来源 | 缺失策略 |
 |---|---|---|---|
 | user persona | 调用/session/instance/round | OpenAI-compatible response.usage | unavailable |
-| triager/synthesizer/divergent/owner | 调用/agent/role/round | NexAU LLM span usage | unavailable |
+| triager/architect/divergent/owner | 调用/agent/role/round | NexAU LLM span usage | unavailable |
 | harness | 调用/session/instance/round | 子进程 NexAU usage 旁路 | 旧 harness/unreported 为 unavailable |
 | developer/vigil | 调用/agent/work item/run | 经审计确认的 OpenAgents/Claude 结构化 usage | 无可靠接口则能力 unavailable |
 
@@ -400,7 +400,7 @@ T2、T3、T6 在 T1 事件契约确定后可并行；T4 等 T3，T5 等所有可
 - **只读 NexAU run 累计 Token。** 无法可靠处理重试和单次调用审计，累计快照重复求和风险高，拒绝。
 - **按字符数或 tokenizer 本地估算。** 与 provider 的 reasoning/cache 计费语义不一致；精确 usage 已可得，
   不应降级冒充，拒绝。
-- **把 triager/synthesizer/developer 平摊给每道题。** 综合角色跨题工作，没有因果归属依据；只展示轮级成本，
+- **把 triager/architect/developer 平摊给每道题。** 综合角色跨题工作，没有因果归属依据；只展示轮级成本，
   拒绝伪精确分摊。
 - **新增 HTTP collector。** 可扩展到多进程，但当前单宿主 stdio 已足够；服务生命周期、认证和故障模式不
   值得为这一接缝引入，留作未来方案。

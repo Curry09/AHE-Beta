@@ -4,11 +4,11 @@ import json
 
 import pytest
 
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.continuation.forge import project_reports, verify_report_projection
-from auto_designer.loop.recovery import digest_value
-from auto_designer.models import IssueDraft
-from auto_designer.tracker.fake import FakeTracker
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.continuation.forge import project_reports, verify_report_projection
+from ahe_beta.loop.recovery import digest_value
+from ahe_beta.models import IssueDraft
+from ahe_beta.tracker.fake import FakeTracker
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def test_crash_after_remote_creation_reuses_actual_number(tmp_path, parent, monk
         "child_seed": "f" * 40,
         "receipt_path": path,
     }
-    from auto_designer.experiment.continuation import forge
+    from ahe_beta.experiment.continuation import forge
 
     original = forge._write_receipt
     calls = 0
@@ -161,7 +161,7 @@ def test_verify_imported_projection_is_read_only_and_rejects_remote_tampering(
     monkeypatch.setattr(
         tracker, "create_issue_once", lambda *a, **k: pytest.fail("created on resume")
     )
-    from auto_designer.experiment.continuation import forge
+    from ahe_beta.experiment.continuation import forge
 
     monkeypatch.setattr(forge, "_write_receipt", lambda *a, **k: pytest.fail("rewrote receipt"))
     verify_report_projection(**args, projection=projected)

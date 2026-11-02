@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.experiment.controllers import unified
-from auto_designer.loop.recovery import RecoveryStore
-from auto_designer.loop.round_assessment import read_json, write_json
-from auto_designer.tracker.fake import FakeTracker
+from ahe_beta.experiment.controllers import unified
+from ahe_beta.loop.recovery import RecoveryStore
+from ahe_beta.loop.round_assessment import read_json, write_json
+from ahe_beta.tracker.fake import FakeTracker
 from test_experiment_grading import archived_run, prepared_inputs  # noqa: F401
 from test_experiment_round_grading import assessed_round, sealed  # noqa: F401
 
@@ -15,7 +15,7 @@ from test_experiment_round_grading import assessed_round, sealed  # noqa: F401
 @pytest.fixture
 def wired_main(assessed_round, monkeypatch):  # noqa: F811
     """Replace external provisioning, but keep controller, sessions, ledger and grader real."""
-    from auto_designer.experiment import workload
+    from ahe_beta.experiment import workload
 
     run, assessor, recovery, identity, arguments, _ = assessed_round
     root = run["directory"]
@@ -33,7 +33,7 @@ def wired_main(assessed_round, monkeypatch):  # noqa: F811
     write_json(root / "runtime/controller.json", {"nonce": "resumed-generation"})
 
     monkeypatch.setenv("TOTAL_ROUNDS", "1")
-    monkeypatch.setenv("AUTO_DESIGNER_FROZEN_MANIFEST", str(root / "manifest.json"))
+    monkeypatch.setenv("AHE_BETA_FROZEN_MANIFEST", str(root / "manifest.json"))
     monkeypatch.setenv("PERSONA_LIBRARY", str(root / "personas"))
     for key in ("MODEL", "BASE_URL", "API_KEY"):
         monkeypatch.setenv(f"HARNESS_LLM_{key}", "unused-local-test")
@@ -60,29 +60,27 @@ def wired_main(assessed_round, monkeypatch):  # noqa: F811
     }
     for name, function in runtime_functions.items():
         monkeypatch.setattr(unified.runtime, name, function)
-    monkeypatch.setattr("auto_designer.experiment.context.require_controller_context", lambda: {})
+    monkeypatch.setattr("ahe_beta.experiment.context.require_controller_context", lambda: {})
     catalog = workload.read_task_catalog(root, run["manifest"])
     plan = workload.read_session_plan(root, run["manifest"])
+    monkeypatch.setattr("ahe_beta.experiment.context.frozen_workload", lambda: (catalog, plan, {}))
     monkeypatch.setattr(
-        "auto_designer.experiment.context.frozen_workload", lambda: (catalog, plan, {})
+        "ahe_beta.experiment.context.frozen_scenario", lambda **kw: original_session.scenario
     )
     monkeypatch.setattr(
-        "auto_designer.experiment.context.frozen_scenario", lambda **kw: original_session.scenario
-    )
-    monkeypatch.setattr(
-        "auto_designer.loop.roster.load_roster",
+        "ahe_beta.loop.roster.load_roster",
         lambda: {
             "user": 1,
             "triager": 0,
-            "synthesizer": 0,
+            "architect": 0,
             "divergent": 0,
             "owner": 0,
             "developer": 0,
         },
     )
     tracker = FakeTracker()
-    monkeypatch.setattr("auto_designer.tracker.gitea.GiteaTracker", lambda **kw: tracker)
-    monkeypatch.setattr("auto_designer.distill.library.PersonaLibrary", lambda path: None)
+    monkeypatch.setattr("ahe_beta.tracker.gitea.GiteaTracker", lambda **kw: tracker)
+    monkeypatch.setattr("ahe_beta.distill.library.PersonaLibrary", lambda path: None)
     persona = SimpleNamespace(
         persona_id=run["binding"]["persona_id"],
         d1=SimpleNamespace(value="expert"),
@@ -90,48 +88,46 @@ def wired_main(assessed_round, monkeypatch):  # noqa: F811
         d41=SimpleNamespace(value="delegation"),
         d5=SimpleNamespace(value="autonomous"),
     )
+    monkeypatch.setattr("ahe_beta.user.sim.persona_io.card_to_personas", lambda library: [persona])
     monkeypatch.setattr(
-        "auto_designer.user.sim.persona_io.card_to_personas", lambda library: [persona]
-    )
-    monkeypatch.setattr(
-        "auto_designer.user.sim.persona_client.ApiPersonaClient",
+        "ahe_beta.user.sim.persona_client.ApiPersonaClient",
         lambda: SimpleNamespace(complete=lambda *a, **kw: pytest.fail("no model call")),
     )
     monkeypatch.setattr(
-        "auto_designer.experiment.controllers.feedback.assemble_feedback_roles",
+        "ahe_beta.experiment.controllers.feedback.assemble_feedback_roles",
         lambda **kw: {
             "triagers": [],
-            "synthesizers": [],
+            "architects": [],
             "divergents": [],
             "owner": None,
         },
     )
-    monkeypatch.setattr("auto_designer.guards.repo_guard.snapshot_repo", lambda **kw: {})
-    monkeypatch.setattr("auto_designer.guards.repo_guard.verify_unchanged", lambda **kw: None)
+    monkeypatch.setattr("ahe_beta.guards.repo_guard.snapshot_repo", lambda **kw: {})
+    monkeypatch.setattr("ahe_beta.guards.repo_guard.verify_unchanged", lambda **kw: None)
     monkeypatch.setattr(
-        "auto_designer.loop.orchestrator.Orchestrator._assert_commit_available", lambda *a: None
+        "ahe_beta.loop.orchestrator.Orchestrator._assert_commit_available", lambda *a: None
     )
     monkeypatch.setattr(
-        "auto_designer.loop.orchestrator.Orchestrator._assert_descendant", lambda *a, **kw: None
+        "ahe_beta.loop.orchestrator.Orchestrator._assert_descendant", lambda *a, **kw: None
     )
     monkeypatch.setattr(
-        "auto_designer.loop.orchestrator.Orchestrator._resolve_head",
+        "ahe_beta.loop.orchestrator.Orchestrator._resolve_head",
         lambda *a, **kw: arguments["user_sha"],
     )
     events = []
     monkeypatch.setattr(
-        "auto_designer.experiment.collection.export_gitea_snapshot",
+        "ahe_beta.experiment.collection.export_gitea_snapshot",
         lambda **kw: events.append("export gitea"),
     )
     monkeypatch.setattr(
-        "auto_designer.experiment.continuation.export.export_continuation",
+        "ahe_beta.experiment.continuation.export.export_continuation",
         lambda **kw: events.append("export continuation"),
     )
     monkeypatch.setattr(
         unified.subprocess, "run", lambda *a, **kw: SimpleNamespace(returncode=0, stdout="")
     )
     monkeypatch.setattr(
-        "auto_designer.harness.launcher.HarnessLauncher.launch",
+        "ahe_beta.harness.launcher.HarnessLauncher.launch",
         lambda *a, **kw: pytest.fail("Actor must not launch"),
     )
     return root, run, recovery.root, identity, events
@@ -150,7 +146,7 @@ def test_unified_main_seals_resumed_final_round_without_live_worker(wired_main, 
     projection = root / "assessment/feedback/round-1.json"
     projection_before = projection.read_bytes()
     monkeypatch.setattr(
-        "auto_designer.loop.round_assessment.RoundAssessment.await_worker",
+        "ahe_beta.loop.round_assessment.RoundAssessment.await_worker",
         lambda self: pytest.fail("completed Actors and measurement need no live worker"),
     )
     assert unified.main() == 0
@@ -163,7 +159,7 @@ def test_unified_main_seals_resumed_final_round_without_live_worker(wired_main, 
 
 
 def test_unified_main_still_blocks_unfinished_actor_until_worker_ready(wired_main, monkeypatch):
-    from auto_designer.user.sim.runtime import make_empty_runtime
+    from ahe_beta.user.sim.runtime import make_empty_runtime
 
     root, run, checkpoint_root, identity, events = wired_main
     state = read_json(checkpoint_root / "recovery.json")
@@ -178,16 +174,16 @@ def test_unified_main_still_blocks_unfinished_actor_until_worker_ready(wired_mai
         / f"{run['session_id']}.json"
     ).unlink()
     monkeypatch.setattr(
-        "auto_designer.loop.orchestrator.materialize_workspace", lambda spec: make_empty_runtime()
+        "ahe_beta.loop.orchestrator.materialize_workspace", lambda spec: make_empty_runtime()
     )
-    monkeypatch.setattr("auto_designer.loop.orchestrator.ensure_deps", lambda *args: None)
+    monkeypatch.setattr("ahe_beta.loop.orchestrator.ensure_deps", lambda *args: None)
     waits = []
 
     def bound_wait(seconds):
         waits.append(seconds)
         raise RuntimeError("bounded observation: worker unavailable")
 
-    monkeypatch.setattr("auto_designer.loop.round_assessment.time.sleep", bound_wait)
+    monkeypatch.setattr("ahe_beta.loop.round_assessment.time.sleep", bound_wait)
     assert unified.main() == 1
     assert waits == [5]
     assert read_json(root / "assessment/status.json")["reason"] == "worker_not_ready"

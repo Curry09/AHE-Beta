@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.batch_config import load_batch_config
+from ahe_beta.experiment.batch_config import load_batch_config
 
 ROOT = Path(__file__).resolve().parents[2]
 PAIRS = [
@@ -66,7 +66,7 @@ def test_batch_bilingual_cli_commands_are_identical(english, chinese):
 
 
 def test_documented_batch_and_child_commands_parse_through_the_unified_cli():
-    from auto_designer.experiment.cli import build_parser
+    from ahe_beta.experiment.cli import build_parser
 
     commands = _commands("docs/tutorials/batch-experiment.md")
     assert commands

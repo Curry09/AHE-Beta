@@ -3,7 +3,7 @@
 
 - 每局 launch 的 ref 解析自 harness 仓 main 当前 HEAD SHA；
 - 交付面（进程外 vigil）推进 main 由「会话中直接 commit 模拟」——c 步回灌读到前进的 live SHA；
-- 生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入 → 绊线，无 b 段 dev 拍。
+- 生成段两拍（triage 分片∥divergent → architect）→ Owner 准入 → 绊线，无 b 段 dev 拍。
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.loop.orchestrator import Orchestrator
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
-from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
-from auto_designer.usage import current_usage_context
+from ahe_beta.loop.orchestrator import Orchestrator
+from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore
+from ahe_beta.models import Persona, SeedScenario, WorkspaceSpec
+from ahe_beta.usage import current_usage_context
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -273,7 +273,7 @@ def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
 
 def test_all_user_sessions_failed_blocks_round(tmp_path) -> None:
     """所有会话都失败时，不能继续进入生成/准入并推进下一轮。"""
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+    from ahe_beta.loop.round_gate import RoundDeliveryBlocked
 
     repo = _seed_repo(tmp_path)
 
@@ -321,7 +321,7 @@ def test_round_materializes_shared_workspace_before_launch(tmp_path, monkeypatch
     repo = _seed_repo(tmp_path)
     events: list = []
     monkeypatch.setattr(
-        "auto_designer.loop.orchestrator.materialize_workspace",
+        "ahe_beta.loop.orchestrator.materialize_workspace",
         lambda spec: events.append(("materialize", spec.fixture)) or f"/ws/{spec.fixture}",
     )
 
@@ -353,11 +353,11 @@ def test_round_ensures_deps_after_materialize_before_launch(tmp_path, monkeypatc
     repo = _seed_repo(tmp_path)
     events: list = []
     monkeypatch.setattr(
-        "auto_designer.loop.orchestrator.materialize_workspace",
+        "ahe_beta.loop.orchestrator.materialize_workspace",
         lambda spec: events.append(("materialize", spec.fixture)) or f"/ws/{spec.fixture}",
     )
     monkeypatch.setattr(
-        "auto_designer.loop.orchestrator.ensure_deps",
+        "ahe_beta.loop.orchestrator.ensure_deps",
         lambda ws, spec: events.append(("ensure_deps", ws)),
     )
 
@@ -384,7 +384,7 @@ def test_round_no_workspace_skips_ensure_deps(tmp_path, monkeypatch) -> None:
     # 无工作区 → materialize 与 ensure_deps 都不该被调用。
     repo = _seed_repo(tmp_path)
     monkeypatch.setattr(
-        "auto_designer.loop.orchestrator.ensure_deps",
+        "ahe_beta.loop.orchestrator.ensure_deps",
         lambda ws, spec: (_ for _ in ()).throw(AssertionError("不应 ensure_deps")),
     )
     orch = _orch(repo, [])  # fixed_set 场景无 workspace
@@ -398,7 +398,7 @@ def test_round_no_workspace_uses_shared_scratch(tmp_path, monkeypatch) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []
     monkeypatch.setattr(  # 无 fixture 工作区时绝不该调 materialize
-        "auto_designer.loop.orchestrator.materialize_workspace",
+        "ahe_beta.loop.orchestrator.materialize_workspace",
         lambda spec: (_ for _ in ()).throw(AssertionError("不应 materialize")),
     )
 
@@ -438,7 +438,7 @@ def test_integrity_guard_called_once_at_round_end(tmp_path) -> None:
 
 
 def test_integrity_guard_raise_aborts_round(tmp_path) -> None:
-    from auto_designer.guards.repo_guard import RepoIntegrityError
+    from ahe_beta.guards.repo_guard import RepoIntegrityError
 
     repo = _seed_repo(tmp_path)
 
@@ -457,7 +457,7 @@ def test_no_guard_is_backward_compatible(tmp_path) -> None:
     assert _orch(repo, []).run_round("c") == head
 
 
-# Spec-0029/T8（Spec-0032/T4 调整）：生成段两拍（triage 分片∥divergent → synthesize）→ Owner 准入收尾。
+# Spec-0029/T8（Spec-0032/T4 调整）：生成段两拍（triage 分片∥divergent → architect）→ Owner 准入收尾。
 
 
 class _Phase:
@@ -477,13 +477,13 @@ class _Phase:
         self._events.append(("d", self._name, None))
 
 
-def test_beats_order_triage_divergent_then_synth_then_owner(tmp_path) -> None:
+def test_beats_order_triage_divergent_then_architect_then_owner(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     events: list = []
     t0 = _Phase(events, "triage0")
     t1 = _Phase(events, "triage1")
     div = _Phase(events, "divergent")
-    synth = _Phase(events, "synth")
+    architect = _Phase(events, "architect")
     owner = _Phase(events, "owner")
 
     def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
@@ -496,17 +496,17 @@ def test_beats_order_triage_divergent_then_synth_then_owner(tmp_path) -> None:
         run_session_fn=run_session_fn,
         initial_ref="main",
         triagers=[t0, t1],
-        synthesizers=[synth],
+        architects=[architect],
         divergents=[div],
         owner=owner,
     )
     orch.run_round("c")
 
     kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d")]
-    # a → 第一拍（triage×2∥divergent，组内顺序不定）→ 第二拍 synth → owner 收尾（无 dev 拍）
+    # a → 第一拍（triage×2∥divergent，组内顺序不定）→ 第二拍 architect → owner 收尾（无 dev 拍）
     assert kinds[0] == "session"
     assert set(kinds[1:4]) == {"triage0", "triage1", "divergent"}
-    assert kinds[4:] == ["synth", "owner"]
+    assert kinds[4:] == ["architect", "owner"]
     # 分片参数：第 k 个 triager 拿 (k, n)
     shards = {e[1]: e[2] for e in events if e[0] == "d" and e[1].startswith("triage")}
     assert shards == {"triage0": (0, 2), "triage1": (1, 2)}
@@ -557,7 +557,7 @@ def test_no_owner_skips_admission(tmp_path) -> None:
 
 
 def test_owner_failure_blocks_round_instead_of_advancing(tmp_path) -> None:
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+    from ahe_beta.loop.round_gate import RoundDeliveryBlocked
 
     repo = _seed_repo(tmp_path)
 
@@ -663,7 +663,7 @@ def test_run_skips_demand_on_last_round(tmp_path) -> None:
 @pytest.mark.parametrize("failure_label", ["needs-human", "automation-failed"])
 def test_blocked_delivery_does_not_start_next_user_round(tmp_path, failure_label) -> None:
     # Spec-0062/T1: exercise the real gate, not a preconstructed exception.
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked, wait_round_delivery
+    from ahe_beta.loop.round_gate import RoundDeliveryBlocked, wait_round_delivery
 
     repo = _seed_repo(tmp_path)
     events: list = []
@@ -694,7 +694,7 @@ def test_blocked_delivery_does_not_start_next_user_round(tmp_path, failure_label
 
 
 def test_recovery_resumes_only_failed_stage_unit_and_keeps_frozen_plan(tmp_path) -> None:
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+    from ahe_beta.loop.round_gate import RoundDeliveryBlocked
 
     repo = _seed_repo(tmp_path)
     events: list[str] = []
@@ -739,7 +739,7 @@ def test_recovery_resumes_only_failed_stage_unit_and_keeps_frozen_plan(tmp_path)
 
 
 def test_recovery_reattaches_delivery_without_rerunning_owner_or_users(tmp_path) -> None:
-    from auto_designer.loop.round_gate import RoundDeliveryBlocked
+    from ahe_beta.loop.round_gate import RoundDeliveryBlocked
 
     repo = _seed_repo(tmp_path)
     calls = {"user": 0, "owner": 0, "wait": 0}

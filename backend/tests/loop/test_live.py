@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.loop.live import (
+from ahe_beta.loop.live import (
     append_agent_log,
     archive_agent,
     clear_live,
@@ -225,7 +225,7 @@ def test_step_tracer_emits_process_stream() -> None:
     pytest.importorskip("nexau")
     from nexau import SpanType
 
-    from auto_designer.loop.live_tracer import StepTracer
+    from ahe_beta.loop.live_tracer import StepTracer
 
     events: list[tuple[str, str]] = []
     tracer = StepTracer(lambda kind, text: events.append((kind, text)))
@@ -365,22 +365,22 @@ def test_prepare_resume_preserves_history_and_marks_stale_slots(tmp_path: Path) 
     )
     update_live_run(data_dir=tmp_path, running=True, round_no=2, total_rounds=3)
 
-    prepare_live_resume(data_dir=tmp_path, phase="synthesizer")
+    prepare_live_resume(data_dir=tmp_path, phase="architect")
 
     assert read_history(data_dir=tmp_path)[0]["session_id"] == "done"
     assert read_agents(data_dir=tmp_path)[0]["running"] is False
     assert "等待恢复" in read_agents(data_dir=tmp_path)[0]["status"]
-    assert read_live_run(data_dir=tmp_path)["phase"] == "recovering:synthesizer"
+    assert read_live_run(data_dir=tmp_path)["phase"] == "recovering:architect"
 
 
-def test_triager_sorts_between_user_and_synthesizer(tmp_path: Path) -> None:
-    # Spec-0026/T1：read_agents 按 _ROLE_ORDER 排序，triager 介于 user 与 synthesizer 之间。
-    for role in ("developer", "synthesizer", "triager", "user"):
+def test_triager_sorts_between_user_and_architect(tmp_path: Path) -> None:
+    # Spec-0026/T1：read_agents 按 _ROLE_ORDER 排序，triager 介于 user 与 architect 之间。
+    for role in ("developer", "architect", "triager", "user"):
         update_agent(
             data_dir=tmp_path, agent_id=role, role=role, label=role, running=True, status="x"
         )
     order = [a["role"] for a in read_agents(data_dir=tmp_path)]
-    assert order == ["user", "triager", "synthesizer", "developer"]
+    assert order == ["user", "triager", "architect", "developer"]
 
 
 def test_meta_passthrough_and_sticky(tmp_path: Path) -> None:

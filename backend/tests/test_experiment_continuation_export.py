@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.collection import collect_archive
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.continuation.export import export_continuation, export_git_tree
-from auto_designer.experiment.continuation.forge import project_reports
-from auto_designer.experiment.continuation.source import load_continuation_source
-from auto_designer.loop.recovery import digest_value
-from auto_designer.loop.sim_user import _issue_draft_from_body
-from auto_designer.tracker.fake import FakeTracker
+from ahe_beta.experiment.collection import collect_archive
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.continuation.export import export_continuation, export_git_tree
+from ahe_beta.experiment.continuation.forge import project_reports
+from ahe_beta.experiment.continuation.source import load_continuation_source
+from ahe_beta.loop.recovery import digest_value
+from ahe_beta.loop.sim_user import _issue_draft_from_body
+from ahe_beta.tracker.fake import FakeTracker
 from test_experiment_continuation_source import parent_files as parent_files
 
 

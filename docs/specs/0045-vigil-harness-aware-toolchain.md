@@ -54,7 +54,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/test_run_vigil.py
     scope: 缺镜像提示包含双 checkout 用法；容器同时注入大小写 HTTP(S)_PROXY/NO_PROXY；命令环境显式配置优先于仓内 .env；既有 keep-alive、复用、停止与凭证隔离不变。
     acceptance: docker run 参数完整且不泄露凭证；显式环境不被 .env 覆盖；镜像缺失提示可执行；test_run_vigil、ruff 与真实容器 smoke 通过。
@@ -97,7 +97,7 @@ build.sh <OpenAgents checkout> <NexAU checkout>
              │ docker context     │ named context: nexau
              └─────────┬──────────┘
                        ▼
-           auto-designer-vigil:latest
+           ahe-beta-vigil:latest
              ├─ openagents CLI
              ├─ claude (fixed version)
              ├─ nexau package + /opt/nexau-src (read-only)
@@ -140,7 +140,7 @@ checkout 保留在 `/opt/nexau-src`，安装后移除所有写权限；运行用
 需要核对源码；只读 checkout 比允许 Agent 修改 NexAU 更符合仓库边界。选择 Docker named context，而不是
 复制两个仓到临时聚合目录，避免额外资产与来源不清。
 
-未将 NexAU vendor 进 OpenAgents 或 Auto Synthesizer；三仓仍独立演进。未允许运行时 pip 安装，因为 egress
+未将 NexAU vendor 进 OpenAgents 或 Auto Architect；三仓仍独立演进。未允许运行时 pip 安装，因为 egress
 通常只放行模型与 forge 服务，且会破坏复现性。未将宿主代理写进 Dockerfile：代理只作为 build/run 参数。
 
 ## Prior art

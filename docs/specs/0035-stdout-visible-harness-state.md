@@ -27,10 +27,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/user/sim/actions.py
-      - backend/auto_designer/user/sim/action_space.py
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/user/sim/actions.py
+      - backend/ahe_beta/user/sim/action_space.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_action_space.py
       - backend/tests/user/sim/test_heartbeat.py
     scope: ACTIVE 主 loop 动作空间常驻 keep_waiting/interrupt；prompt 区分 send_message 可能排队、keep_waiting 等下一条 harness 输出、interrupt 立即停止 ongoing work；route 支持主 loop keep_waiting/interrupt，interrupt ack 回到主 loop 可见。
@@ -45,9 +45,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/harness/launcher.py
-      - backend/auto_designer/harness/connector.py
-      - backend/auto_designer/models.py
+      - backend/ahe_beta/harness/launcher.py
+      - backend/ahe_beta/harness/connector.py
+      - backend/ahe_beta/models.py
       - backend/tests/harness/test_launcher.py
       - backend/tests/harness/test_connector.py
     scope: 接缝层不推断 request/reply 配对；持续收集 harness stdout 的 reply/progress/status/ack/error 等用户可见事件，并暴露给用户 sim/观测层作为按观察顺序排列的事件流；保留现有 last_progress/last_sideband 兼容。
@@ -80,7 +80,7 @@ tasks:
     files:
       - backend/agent_defs/divergent_pm/systemprompt.md
     scope: 给 divergent PM 增加中性分层分析框架：先区分上下文、证据、解释与候选；用户可见契约作为观察 lens，不预设问题或方案；优先跨会话/跨 persona 或强证据模式，避免换名重复候选。
-    acceptance: 相关 synthesizer/PM 测试通过；对同一批 user-only sessions 的自然 PM 回放能产出可追溯 session 证据的候选；不直接喂 soft gap evidence。
+    acceptance: 相关 architect/PM 测试通过；对同一批 user-only sessions 的自然 PM 回放能产出可追溯 session 证据的候选；不直接喂 soft gap evidence。
 ---
 
 # 0035 · stdout 可见 harness 状态与主 loop 等待/打断动作
@@ -218,7 +218,7 @@ error
 type / text / observed_at / source=harness_stdout / raw payload
 ```
 
-接缝层不新增 `answers_utterance_id`、`reply_to`、`pending_user_messages` 等配对推断字段。已有 TurnLog 的 utterance 观测字段可保留作历史兼容，但用户感知与 synthesizer 机制信号不依赖接缝层配对。
+接缝层不新增 `answers_utterance_id`、`reply_to`、`pending_user_messages` 等配对推断字段。已有 TurnLog 的 utterance 观测字段可保留作历史兼容，但用户感知与 architect 机制信号不依赖接缝层配对。
 
 收到 terminal reply 后，接缝层可以短暂 drain 已经到达的旁路 stdout 事件，以捕捉紧邻的 status/progress，例如：
 
@@ -307,11 +307,11 @@ graph LR
 
 ### 为什么不在接缝层配对 reply
 
-配对方案能短期提升用户感知，但会把平台绑定到当前 harness 的 FIFO 假设。auto-designer 的被进化对象是 harness 产品本身，未来它应能自由进化 busy 输入、旁路问答、并发、ack/status/final 分层等交互。接缝层若抢先解释「这条 reply 回答 #N」，会成为新的错误来源。
+配对方案能短期提升用户感知，但会把平台绑定到当前 harness 的 FIFO 假设。ahe-beta 的被进化对象是 harness 产品本身，未来它应能自由进化 busy 输入、旁路问答、并发、ack/status/final 分层等交互。接缝层若抢先解释「这条 reply 回答 #N」，会成为新的错误来源。
 
 ### 为什么选择 stdout 可见事件
 
-stdout 是 harness 对用户的真实界面。真实 CLI 用户不是只看到 final reply，还会看到 progress、queued ack、status、正在运行的命令等流式状态。把这些事件提供给用户模拟，能让用户自然判断是等待、打断还是追问，也能让 synthesizer 从用户行为中看到状态可知性问题。
+stdout 是 harness 对用户的真实界面。真实 CLI 用户不是只看到 final reply，还会看到 progress、queued ack、status、正在运行的命令等流式状态。把这些事件提供给用户模拟，能让用户自然判断是等待、打断还是追问，也能让 architect 从用户行为中看到状态可知性问题。
 
 ### 为什么主 loop 也需要 keep_waiting/interrupt
 

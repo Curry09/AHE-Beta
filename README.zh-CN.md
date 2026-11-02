@@ -1,4 +1,4 @@
-# auto-designer
+# AHE-Beta
 
 **通过模拟使用和结构化反馈，迭代改进编码 Agent 的 Harness。**
 
@@ -6,7 +6,7 @@
 
 Python 3.12+ · Linux / WSL2 · [MIT](LICENSE)
 
-auto-designer 通过模拟“用户使用、反馈、开发者改进”的过程，推动编码 Agent Harness 持续迭代。模拟用户在任务中使用 Harness 并反馈问题，需求角色据此形成改进提案，再由 [OpenAgents](https://github.com/Curry09/OpenAgents) 完成代码修改。更新后的 Harness 进入下一轮试用，形成持续的反馈与改进循环。
+AHE-Beta 通过模拟“用户使用、反馈、开发者改进”的过程，推动编码 Agent Harness 持续迭代。模拟用户在任务中使用 Harness 并反馈问题，Triage 与 Architect 据此形成改进提案，再由 [OpenAgents](https://github.com/Curry09/OpenAgents) 完成代码修改。更新后的 Harness 进入下一轮试用，形成持续的反馈与改进循环。
 
 <p align="center">
   <picture>
@@ -22,8 +22,8 @@ auto-designer 通过模拟“用户使用、反馈、开发者改进”的过程
 离线演示使用预设的模拟用户和 Harness，展示一次交互及其反馈，无需配置模型接口或启动实验环境。运行前请安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)。
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv run --locked python backend/scripts/offline_demo.py
 ```
 

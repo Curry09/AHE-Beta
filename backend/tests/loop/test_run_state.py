@@ -6,7 +6,7 @@ Spec-0007/T2：`current_release_ref` 字段名保留、语义改为「当前 mai
 
 from __future__ import annotations
 
-from auto_designer.loop.run_state import RunState, read_run_state, write_run_state
+from ahe_beta.loop.run_state import RunState, read_run_state, write_run_state
 
 
 def test_round_trip_in_memory() -> None:

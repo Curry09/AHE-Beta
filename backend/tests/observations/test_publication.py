@@ -8,15 +8,15 @@ import tarfile
 
 import pytest
 
-from auto_designer.demand.observation_provider import ObservationProvider
-from auto_designer.observations.publication import (
+from ahe_beta.demand.observation_provider import ObservationProvider
+from ahe_beta.observations.publication import (
     ObservationSource,
     archive_files,
     bounded_command,
     local_files,
     publish,
 )
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.user.session_store import SessionStore
 
 
 def bundle(name="events.log", text="request started"):
@@ -137,7 +137,7 @@ def test_publication_redacts_credentials_before_storage(tmp_path, monkeypatch):
 
 
 def test_recovery_reuses_identity_and_keeps_source(tmp_path):
-    from auto_designer.observations.publication import recover
+    from ahe_beta.observations.publication import recover
 
     root = tmp_path / "published"
     directory = tmp_path / "source"
@@ -157,11 +157,11 @@ def test_recovery_reuses_identity_and_keeps_source(tmp_path):
 def test_failed_collection_retains_stopped_container_without_removing_it(monkeypatch):
     from types import SimpleNamespace
 
-    from auto_designer.user.sim.runtime import DockerWorkspaceRuntime
+    from ahe_beta.user.sim.runtime import DockerWorkspaceRuntime
 
     calls = []
     monkeypatch.setattr(
-        "auto_designer.user.sim.runtime.subprocess.run",
+        "ahe_beta.user.sim.runtime.subprocess.run",
         lambda argv, **kw: calls.append(argv) or SimpleNamespace(returncode=0),
     )
     ws = DockerWorkspaceRuntime(

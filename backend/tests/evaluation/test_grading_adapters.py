@@ -11,17 +11,17 @@ from dataclasses import replace
 
 import pytest
 
-from auto_designer.evaluation.adapters import container, profiles
-from auto_designer.evaluation.adapters.custom import CustomAdapter
-from auto_designer.evaluation.adapters.terminal_bench import official_reward
-from auto_designer.evaluation.contracts import (
+from ahe_beta.evaluation.adapters import container, profiles
+from ahe_beta.evaluation.adapters.custom import CustomAdapter
+from ahe_beta.evaluation.adapters.terminal_bench import official_reward
+from ahe_beta.evaluation.contracts import (
     ArtifactInput,
     GradingRequest,
     InputValidationError,
     MaterialInput,
 )
-from auto_designer.evaluation.registry import get_adapter
-from auto_designer.evaluation.results import ExecutionEvidence
+from ahe_beta.evaluation.registry import get_adapter
+from ahe_beta.evaluation.results import ExecutionEvidence
 
 
 def material(tmp_path, name, data):

@@ -14,8 +14,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/guards/repo_guard.py
-      - backend/auto_designer/loop/orchestrator.py
+      - backend/ahe_beta/guards/repo_guard.py
+      - backend/ahe_beta/loop/orchestrator.py
       - backend/tests/guards/test_repo_guard.py
       - backend/tests/loop/test_orchestrator.py
     scope: '新模块 repo_guard：RepoIntegrityError；snapshot_repo(*,repo)->(HEAD sha, git status --porcelain)；verify_unchanged(*,repo,before) 快照不等即抛（git 读失败也抛，宁紧勿松）。orchestrator ctor 加可选 integrity_guard: Callable[[],None]|None=None；run_round 在 b 段之后、c 段 _resolve_head 之前调用（None 则跳过，退化今天行为）；guard 抛出传播中止 run_round。'
@@ -30,7 +30,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/test_run_git_isolation.py
     scope: '两处（同文件一并落）：① 凭证隔离 _isolate_git_credentials()——多信道封堵（单关终端提示不够，实测 VS Code 注入的 GIT_ASKPASS 会绕过）：GIT_SSH_COMMAND=false（setdefault）+ GIT_TERMINAL_PROMPT=0 + 清 GIT_ASKPASS/SSH_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* + 经 GIT_CONFIG_* 空值重置 credential.helper；Gitea HTTP（token in URL）与本地无传输 git 不受影响。② 绊线接线——构造 developers 后、orch.run 前 before=snapshot_repo(repo=str(ROOT))，integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before) 注入 Orchestrator（ROOT=编排仓根=逃逸目标；run 期间编排仓应全程冻结）。'
     acceptance: 启动后 GIT_SSH_COMMAND=='false'（未显式覆盖时）、GIT_TERMINAL_PROMPT=='0'、GIT_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* 全清、GIT_CONFIG_* 注入空 credential.helper（追加不覆盖既有）；单测覆盖以上分支。harness seed/reset 与 dev 推 Gitea 的 HTTP 流程不受影响。orch 收到非 None integrity_guard；正常跑（编排仓未被动）不抛；人工写改编排仓后再跑，run 抛 RepoIntegrityError 且 finally 落 running=False。
@@ -45,7 +45,7 @@ tasks:
     files:
       - backend/agent_defs/developer_agent/MANUAL.md
     scope: 'git rm backend/agent_defs/developer_agent/MANUAL.md——dev agent 配置不加载它（agent.yaml 只 system_prompt: ./systemprompt.md；旧收尾配置的文档路径曾对 harness 仓解析），纯逃逸残留。'
-    acceptance: 文件从 git 移除；grep 全仓无对 agent_defs/developer_agent/MANUAL.md 的引用；dev/synthesizer agent 构造/跑通不受影响（既有单测绿）。
+    acceptance: 文件从 git 移除；grep 全仓无对 agent_defs/developer_agent/MANUAL.md 的引用；dev/architect agent 构造/跑通不受影响（既有单测绿）。
 ---
 
 # 0021 · dev agent 逃逸围堵：凭证隔离 + 编排绊线 + 污染清理
@@ -54,7 +54,7 @@ tasks:
 
 ## Summary
 
-**当前落点**：凭证隔离仍在启动入口执行，完整性绊线由 `backend/auto_designer/guards/repo_guard.py` 提供。下文事故描述保留历史成因；旧内置 Developer 与其收尾中间件已退役，不属于当前运行接线。
+**当前落点**：凭证隔离仍在启动入口执行，完整性绊线由 `backend/ahe_beta/guards/repo_guard.py` 提供。下文事故描述保留历史成因；旧内置 Developer 与其收尾中间件已退役，不属于当前运行接线。
 
 实测发现 dev agent 用 python heredoc 打隧道绕过了 `WorkspaceJailMiddleware` 的路径扫描：直接工具
 （read_file/write_file/run_shell 里明晃晃带路径）被 jail 拒，但 `python3 - <<'PY' … os.chdir(编排仓);
@@ -68,7 +68,7 @@ subprocess.run(['git','commit'/'push']) … PY` 把路径藏进 heredoc 正文�
 1. **凭证隔离（掐断落地链）**：run.py 进程级设 `GIT_SSH_COMMAND=false` + `GIT_TERMINAL_PROMPT=0`——
    dev 推 Gitea 走的是 URL 内嵌 token 的 HTTP origin（不受影响），任何 ssh 推送（GitHub `git@…`）直接失败。
    逃逸仍可能发生，但**推不出去**。
-2. **编排绊线（秒级暴露）**：orchestrator b 段结束后断言编排仓（auto-designer 检出）worktree 快照未变
+2. **编排绊线（秒级暴露）**：orchestrator b 段结束后断言编排仓（ahe-beta 检出）worktree 快照未变
    （HEAD + porcelain 全等）；被 dev 触碰即抛 `RepoIntegrityError` 中止本轮，不再靠人翻远端才发现。
 3. **污染清理**：`git rm` 历史逃逸留下的 `backend/agent_defs/developer_agent/MANUAL.md`（纯残留、无代码引用）。
 
@@ -83,7 +83,7 @@ heredoc 正文，`_strip_heredoc_bodies` 剥正文后扫不到）；③ `python3
 subprocess.run(['git','add'/'commit']) … PY` 在正文里 chdir+subprocess 提交，jail 全程看不见；
 ④ `git push origin` 用继承的 GitHub 凭证推上去。
 
-**污染早已发生、只是首次被当场抓到。** `backend/agent_defs/developer_agent/MANUAL.md` 由 `dev@auto-designer`
+**污染早已发生、只是首次被当场抓到。** `backend/agent_defs/developer_agent/MANUAL.md` 由 `dev@ahe-beta`
 于历史某轮凭空创建，之后被同类逃逸改过多次，且已随更早的合并进过 main。`workspace_jail.py:110` 的注释
 甚至已经记录过「实测被 dev 用来把 harness 内容写进自己的 def MANUAL.md」——洞是已知的，缺的是兜底。
 
@@ -119,7 +119,7 @@ agent 都是形同虚设——正文里 `os.chdir`+`subprocess` 可干任何事�
 
 ### T1 编排绊线（repo_guard.py + orchestrator.py）
 
-新模块 `backend/auto_designer/guards/repo_guard.py`：
+新模块 `backend/ahe_beta/guards/repo_guard.py`：
 
 ```python
 class RepoIntegrityError(RuntimeError): ...
@@ -165,7 +165,7 @@ os.environ[f"GIT_CONFIG_VALUE_{n}"] = ""
 
 - 四条信道全封：ssh 传输、终端提示、askpass（含 VS Code 注入）、credential.helper。
 - 用 `setdefault` 保留运维对 `GIT_SSH_COMMAND` 的显式覆盖；`GIT_TERMINAL_PROMPT` 强设（防残留放行）。
-- 影响面核验：`_seed_harness_repo`/`_reset_to_initial`/dev/synthesizer 推送全走 Gitea HTTP（`http://
+- 影响面核验：`_seed_harness_repo`/`_reset_to_initial`/dev/architect 推送全走 Gitea HTTP（`http://
   OWNER:TOKEN@host/…`，凭证在 URL、不经 askpass/helper），launcher/orchestrator 的 git 全是本地无传输
   ——均不受影响。git ≥2.31 支持 GIT_CONFIG_* 注入；实测注入后 `git config credential.helper` 为空、
   常规 git 操作正常。
@@ -173,21 +173,21 @@ os.environ[f"GIT_CONFIG_VALUE_{n}"] = ""
 
 **② 绊线接线**——构造 developers 后、`orch.run` 前：`before = snapshot_repo(repo=str(ROOT))`，
 `integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before)` 注入 Orchestrator。
-ROOT = auto-designer 检出根（编排仓，即逃逸目标）；快照 run 前取一次，每轮 b 段后校验对同一 before
+ROOT = AHE-Beta 检出根（编排仓，即逃逸目标）；快照 run 前取一次，每轮 b 段后校验对同一 before
 （run 期间编排仓应全程冻结）。
 
 ### T3 污染清理
 
 `git rm backend/agent_defs/developer_agent/MANUAL.md`。核验无引用：agent.yaml 只 `system_prompt:
 ./systemprompt.md`；旧收尾配置的 `manual_path=MANUAL.md` 对 SANDBOX_WORK_DIR（harness 仓）解析，
-非 agent_defs。删除后 dev/synthesizer 配置加载不受影响。
+非 agent_defs。删除后 dev/architect 配置加载不受影响。
 
 ### 现状锚点
 
 - `workspace_jail.py`：`_strip_heredoc_bodies`（剥正文）+ 模块 docstring 自陈 caveat；本组不改它。
 - `run.py`：`main()` env 装配段（LLM_*/NO_PROXY 已在此，git env 同处加）；`ROOT` 常量；`orch.run` 调用点。
 - `orchestrator.py:81-142 run_round`：b 段 `for developer in self._developers` 之后是 c 段 `_resolve_head`。
-- 逃逸残留：`backend/agent_defs/developer_agent/MANUAL.md`（`dev@auto-designer` 署名历史创建）。
+- 逃逸残留：`backend/agent_defs/developer_agent/MANUAL.md`（`dev@ahe-beta` 署名历史创建）。
 
 ### DAG
 
@@ -204,9 +204,9 @@ T2 依赖 T1（用 repo_guard）；T3 独立。凭证隔离与绊线接线是两
 
 ### 文件分配（互斥）
 
-- **T1**：`backend/auto_designer/guards/repo_guard.py`、`backend/auto_designer/loop/orchestrator.py`、
+- **T1**：`backend/ahe_beta/guards/repo_guard.py`、`backend/ahe_beta/loop/orchestrator.py`、
   `backend/tests/guards/test_repo_guard.py`、`backend/tests/loop/test_orchestrator.py`
-- **T2**：`backend/auto_designer/experiment/controllers/ordinary.py`（凭证隔离 env 段 + orchestrator 接线段）、
+- **T2**：`backend/ahe_beta/experiment/controllers/ordinary.py`（凭证隔离 env 段 + orchestrator 接线段）、
   `backend/tests/test_run_git_isolation.py`
 - **T3**：`backend/agent_defs/developer_agent/MANUAL.md`（删除）
 

@@ -2,7 +2,7 @@
 
 [English](THIRD_PARTY.md) | 简体中文
 
-根目录的 [MIT 许可证](LICENSE)适用于 auto-designer 的原创代码及按该许可提交的贡献。第三方代码、依赖和研究材料保留各自的许可证、版权与来源声明。本文记录这些材料的来源，并说明它们与项目许可证的适用关系。
+根目录的 [MIT 许可证](LICENSE)适用于 AHE-Beta 的原创代码及按该许可提交的贡献。第三方代码、依赖和研究材料保留各自的许可证、版权与来源声明。本文记录这些材料的来源，并说明它们与项目许可证的适用关系。
 
 ## 代码与依赖
 
@@ -35,7 +35,7 @@ Meta-Harness 快照位于 `evaluation/harness/meta_artifact/`。其[上游 READM
 
 [用户画像示例](examples/personas/)和[画像提取工具](tools/persona-distill/)包含依据公开开发者资料、文章及其他引用来源形成的描述。原始引文、代码和其他来源材料保留各自权利。引用用于说明模拟画像的依据，不表示相关人物参与或认可实验。
 
-[离线演示](backend/auto_designer/user/sim/demo.py)使用合成人格与脚本响应。
+[离线演示](backend/ahe_beta/user/sim/demo.py)使用合成人格与脚本响应。
 
 ## 实验记录与模型输出
 

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.models import IssueDraft
-from auto_designer.tracker.base import IdempotencyConflictError, IssueTracker
-from auto_designer.tracker.fake import FakeTracker
+from ahe_beta.models import IssueDraft
+from ahe_beta.tracker.base import IdempotencyConflictError, IssueTracker
+from ahe_beta.tracker.fake import FakeTracker
 
 
 def _draft() -> IssueDraft:
@@ -123,7 +123,7 @@ def test_create_issue_once_reconciles_marker_and_rejects_payload_drift() -> None
     second = t.create_issue_once(_draft(), operation_key="round-1/user-1/report-1")
     assert first == second
     assert len(t.list_open_issues()) == 1
-    assert "auto-designer-operation" in t.issue(first.number)["body"]
+    assert "ahe-beta-operation" in t.issue(first.number)["body"]
     with pytest.raises(IdempotencyConflictError):
         t.create_issue_once(
             IssueDraft(title="changed", body="b", labels=["bug"]),

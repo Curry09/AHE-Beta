@@ -14,9 +14,9 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/continuation/__init__.py
-      - backend/auto_designer/experiment/continuation/source.py
-      - backend/auto_designer/experiment/schemas/continuation-export-v1.json
+      - backend/ahe_beta/experiment/continuation/__init__.py
+      - backend/ahe_beta/experiment/continuation/source.py
+      - backend/ahe_beta/experiment/schemas/continuation-export-v1.json
       - backend/tests/test_experiment_continuation_source.py
     scope: 只读解析当前归档、末轮边界、输入与文件身份；不支持历史格式
     acceptance: 只接收完整当前export；损坏/partial/身份矛盾/越界包拒绝；父配对按权威plan核验
@@ -30,10 +30,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/continuation/export.py
-      - backend/auto_designer/experiment/continuation/evidence.py
-      - backend/auto_designer/experiment/continuation/forge.py
-      - backend/auto_designer/experiment/collection.py
+      - backend/ahe_beta/experiment/continuation/export.py
+      - backend/ahe_beta/experiment/continuation/evidence.py
+      - backend/ahe_beta/experiment/continuation/forge.py
+      - backend/ahe_beta/experiment/collection.py
       - backend/tests/test_experiment_continuation_export.py
       - backend/tests/test_experiment_continuation_evidence.py
       - backend/tests/test_experiment_continuation_forge.py
@@ -48,16 +48,16 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/feedback_pipeline.py
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/demand/triage.py
-      - backend/auto_designer/demand/divergent.py
-      - backend/auto_designer/demand/grouped_synthesizer.py
+      - backend/ahe_beta/loop/feedback_pipeline.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/demand/triage.py
+      - backend/ahe_beta/demand/divergent.py
+      - backend/ahe_beta/demand/grouped_architect.py
       - backend/tests/loop/test_feedback_pipeline.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/demand/test_triage.py
       - backend/tests/demand/test_divergent_gate.py
-      - backend/tests/demand/test_grouped_synthesizer.py
+      - backend/tests/demand/test_grouped_architect.py
     scope: 提取具体反馈pipeline；外层和角色内层共享显式前置依赖
     acceptance: 两起点依赖一致且bootstrap外部操作域不冲突；交付卡死不开用户；普通轮序/恢复/grade封口合同不变
   - id: T4
@@ -72,17 +72,17 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/schemas/experiment-v2.json
-      - backend/auto_designer/experiment/materials.py
-      - backend/auto_designer/experiment/context.py
-      - backend/auto_designer/experiment/workload.py
-      - backend/auto_designer/experiment/controllers/unified.py
-      - backend/auto_designer/experiment/controllers/feedback.py
-      - backend/auto_designer/experiment/controllers/runtime.py
-      - backend/auto_designer/experiment/engine.py
-      - backend/auto_designer/experiment/runtime.py
-      - backend/auto_designer/experiment/backends/local.py
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/schemas/experiment-v2.json
+      - backend/ahe_beta/experiment/materials.py
+      - backend/ahe_beta/experiment/context.py
+      - backend/ahe_beta/experiment/workload.py
+      - backend/ahe_beta/experiment/controllers/unified.py
+      - backend/ahe_beta/experiment/controllers/feedback.py
+      - backend/ahe_beta/experiment/controllers/runtime.py
+      - backend/ahe_beta/experiment/engine.py
+      - backend/ahe_beta/experiment/runtime.py
+      - backend/ahe_beta/experiment/backends/local.py
       - backend/tests/test_experiment_continuation_config.py
       - backend/tests/test_experiment_continuation_lifecycle.py
       - backend/tests/test_experiment_continuation_workload.py
@@ -220,7 +220,7 @@ continuation 是可选对象，仅 archive/sha256 两字段。存在时要求 ha
 
 父边界是全部预期用户完成且已 sealed 的最后一轮；其 user_sha/sealed_sha 必须相同，用户集合由冻结 plan 与 recovery units 决定，不由文件数或可修改标签推断。完成判据读取 collection 的 controller receipt、nonce、invocation 与 recovery，不要求不可变 manifest 的初始状态字段更新为 COMPLETED。外层 archive SHA 取子配置提供的 expected SHA；包内 collection.files 验证内容，不要求归档记录自身的 hash。
 
-需要完整 session payload、对应 task_digest/persona 以及明确报告关联。没有报告也可继承，但必须明确为零，不能生成虚构反馈。有 pending report 时要求子 triager/synthesizer 数量至少为一，不能因为角色设为零而悄悄跳过父反馈。父本身是 continuation run 时，还要核验其 bootstrap 完成且首个用户 SHA 等于 bootstrap sealed SHA，再接受它的末轮。
+需要完整 session payload、对应 task_digest/persona 以及明确报告关联。没有报告也可继承，但必须明确为零，不能生成虚构反馈。有 pending report 时要求子 triager/architect 数量至少为一，不能因为角色设为零而悄悄跳过父反馈。父本身是 continuation run 时，还要核验其 bootstrap 完成且首个用户 SHA 等于 bootstrap sealed SHA，再接受它的末轮。
 
 prepare 从父 manifest 的 material registry 复制任务原始 source archive、instruction、setup/requirements lock、persona 卡等经过核验的输入，复用正常 task catalog 与工作区准备，不依赖父宿主路径或父活沙箱。task record 与 package 保持原样，包括 source/tasks/ID 的逻辑路径；source 目录虽不在父收集包中，也能从 registry 指向的 source_archive 重建。不得重新 _freeze_task、猜宿主源目录或改 package 路径导致 task_digest 变化。
 
@@ -256,7 +256,7 @@ ContinuationEvidenceView 包装 child SessionStore与只读父材料。load/find
 
 抽出 recoverable demand、owner、delivery wait及seal为一个具体 FeedbackPipeline。普通轮 prerequisite=users；继承初始化 prerequisite=feedback_imported。依赖角色、recovery、fetch/wait、integrity_guard与SHA解析/检查，不接收 archive或provider对象。保留原有封口前检查编排仓完整性的时序，bootstrap同样适用，不能先记成功seal再发现越界修改。
 
-Triager和Divergent内层unit现有 users硬编码依赖要与同一显式 feedback_dependency绑定一致；正常路径仍为 users。Synthesizer/grouped/Owner复用现有恢复绑定，顺序保持 triage∥divergent→synthesizer→owner→delivery_wait→seal。不扩展 RecoveryStore为任意工作流。
+Triager和Divergent内层unit现有 users硬编码依赖要与同一显式 feedback_dependency绑定一致；正常路径仍为 users。Architect/grouped/Owner复用现有恢复绑定，顺序保持 triage∥divergent→architect→owner→delivery_wait→seal。不扩展 RecoveryStore为任意工作流。
 
 bootstrap使用 checkpoints/continuation-bootstrap 的独立 RecoveryStore。身份来自子 run/config/controller及冻结初始化输入摘要；内部正 round=1只是该命名空间，不是父轮或子用户轮。起始stage为 feedback_imported，禁止伪造 users成功；receipt明确 phase、source边界、映射及input hash。
 

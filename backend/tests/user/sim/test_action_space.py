@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.user.sim.action_space import (
+from ahe_beta.user.sim.action_space import (
     ActionResolutionError,
     derive_action_space,
     resolve_action,
 )
-from auto_designer.user.sim.actions import CATALOG, MessagePolicy, Phase
-from auto_designer.user.sim.dimensions import (
+from ahe_beta.user.sim.actions import CATALOG, MessagePolicy, Phase
+from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
     D2Domain,
@@ -21,7 +21,7 @@ from auto_designer.user.sim.dimensions import (
     Persona,
     finalize_persona,
 )
-from auto_designer.user.sim.state import init_state
+from ahe_beta.user.sim.state import init_state
 
 
 def _persona(

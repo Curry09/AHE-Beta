@@ -8,9 +8,9 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from auto_designer.evaluation.acceptance import derive_acceptance_assessment
-from auto_designer.experiment.cli import build_parser
-from auto_designer.models import FeelingScore, Persona, SeedScenario, Session, Transcript
+from ahe_beta.evaluation.acceptance import derive_acceptance_assessment
+from ahe_beta.experiment.cli import build_parser
+from ahe_beta.models import FeelingScore, Persona, SeedScenario, Session, Transcript
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 @pytest.mark.parametrize("name", ["swebench", "mixed-benchmarks", "custom"])
 def test_public_grading_templates_use_current_plan_schema(name):
     schema = json.loads(
-        (ROOT / "backend/auto_designer/experiment/schemas/grading-plan-v1.json").read_text()
+        (ROOT / "backend/ahe_beta/experiment/schemas/grading-plan-v1.json").read_text()
     )
     document = json.loads((ROOT / "examples/grading" / f"{name}.json").read_text())
     jsonschema.Draft202012Validator(schema).validate(document)

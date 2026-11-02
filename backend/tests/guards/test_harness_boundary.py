@@ -8,7 +8,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from auto_designer.guards.harness_boundary import (
+from ahe_beta.guards.harness_boundary import (
     DENIED_TOP,
     install_pre_commit,
     render_hook,

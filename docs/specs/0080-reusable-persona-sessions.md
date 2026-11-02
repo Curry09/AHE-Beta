@@ -14,8 +14,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/workload.py
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/workload.py
       - backend/tests/test_experiment_config_v2.py
       - backend/tests/test_experiment_workload.py
     scope: 放开会话数量和配对中的 persona 唯一限制，保留选择集合唯一及原序列化、哈希算法。
@@ -30,7 +30,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/loop/orchestrator.py
+      - backend/ahe_beta/loop/orchestrator.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_recovery.py
       - backend/tests/test_reusable_persona_sessions.py
@@ -47,7 +47,7 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/materials.py
+      - backend/ahe_beta/experiment/materials.py
       - backend/tests/test_experiment_continuation_workload.py
       - backend/tests/test_experiment_continuation_contract.py
       - backend/tests/test_experiment_continuation_export.py
@@ -128,7 +128,7 @@ Orchestrator `_logical_plan` 同步取消 persona 唯一检查，保留其他结
 
 每个 slot 建独立 client、工作区和 attempt；线程之间只共享不可变画像。失败恢复只重跑未完成的 session unit；不因同 persona 另一个 slot 已完成而跳过，也不把它的 Issue 或文件作为本 slot 的结果。
 
-SessionStore 与 live 按 session ID 保存；角色证据授权和 grouped synthesizer 按来源 session/报告处理。不对 persona 计数重新解释 Metrics，也不添加画像级执行去重。
+SessionStore 与 live 按 session ID 保存；角色证据授权和 grouped architect 按来源 session/报告处理。不对 persona 计数重新解释 Metrics，也不添加画像级执行去重。
 
 continuation export 按 slot 保留全部末轮配对，source 以 session ID 验证完成用户集；画像材料只冻结有序唯一的卡片集合。继承 preview 的 `persona_ids` 改为从 `source.personas` 获取，而非从每个 pair 重复列出。父重复配对按原顺序编入每个新增轮，禁止通过画像去重缩短边界或改变 session 数。
 

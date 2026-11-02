@@ -6,7 +6,7 @@
 
 默认 `task_source: harbor_index` 使用固定版本的官方任务；也可选择 `task_source: harbor`，传入已准备好的标准 Harbor 任务包路径。任务名单、下载和裁判规则由对应 profile 解释，配置及执行层不套用 Index 规则；示例见完整教程。
 
-请按完整教程在独立虚拟环境安装 `evaluation/requirements.lock` 和本目录；运行材料从 [Release](https://github.com/Curry09/auto-designer/releases/tag/harbor-evaluation-framework-v1.0.0) 下载。
+请按完整教程在独立虚拟环境安装 `evaluation/requirements.lock` 和本目录；运行材料从 [Release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) 下载。
 
 ```bash
 python -m evaluation validate

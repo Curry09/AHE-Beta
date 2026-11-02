@@ -13,8 +13,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from auto_designer.models import WorkspaceSpec  # noqa: E402
-from auto_designer.user.sim.seed_source import provision  # noqa: E402
+from ahe_beta.models import WorkspaceSpec  # noqa: E402
+from ahe_beta.user.sim.seed_source import provision  # noqa: E402
 
 IMPORT_NAMES = {
     "astropy/astropy": "astropy",

@@ -24,7 +24,7 @@
           "files": {
             "input": "9a96566c6e62fa9941647d72fddd00c7720791ffc2ff84184116894b560d18bc"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/astroid-1030-initial-v1.bundle"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/astroid-1030-initial-v1.bundle"
         },
         "target": "/opt/task-inputs/initial.bundle",
         "placement": "task"
@@ -38,7 +38,7 @@
             "initialize.py": "f0fb034562accd29b241c8545cd92eb046738563dbff5da9d155050c1cd93774",
             "verify.py": "05cb160bd9616d0bc345b2161ff824adcb327c062ee7c0eeaec9ca9a48ef0b7e"
           },
-          "url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
+          "url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/task-source-recipes-v1.tar.gz"
         },
         "target": "/opt/task-inputs/recipes",
         "placement": "task"

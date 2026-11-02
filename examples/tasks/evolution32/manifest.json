@@ -39,13 +39,13 @@
   "publication": {
     "status": "materials_published_definitions_validated",
     "release": {
-      "repository": "Curry09/auto-designer",
+      "repository": "Curry09/AHE-Beta",
       "tag": "evolution32-task-materials-v1",
-      "url": "https://github.com/Curry09/auto-designer/releases/tag/evolution32-task-materials-v1",
+      "url": "https://github.com/Curry09/AHE-Beta/releases/tag/evolution32-task-materials-v1",
       "status": "published",
-      "asset_manifest_url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/materials.lock.json",
+      "asset_manifest_url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/materials.lock.json",
       "asset_manifest_sha256": "ff4e8388b531b400d1570c09f37ea168acf4e5c8655dc5f8aa34d21f8e632447",
-      "checksum_url": "https://github.com/Curry09/auto-designer/releases/download/evolution32-task-materials-v1/SHA256SUMS",
+      "checksum_url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/SHA256SUMS",
       "checksum_sha256": "08793156cabd924185939965e52a57f7dc05a15a00333cb758a14ec7b47db620",
       "input_asset_count": 37,
       "release_id": 430367618,
@@ -2251,7 +2251,7 @@
         "verification": "offline local restoration, exact checkout, full strict fsck",
         "original_source_archive_sha256": "3f4b50d007943c5a2cd90a93f11821a9a5ca7f8b64ab2ba27db89a8f358539ed"
       },
-      "task_definition_sha256": "0a162d635d487dbe8fa21c5adb185bff956edfc1b0cd16c0bfc06ce7e0cb6091",
+      "task_definition_sha256": "5aa0b4429571c0aa4c07c1b7d54b04ba27fa4f502dca95c5cbb4a19f077605bd",
       "package_file": "O03/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2276,7 +2276,7 @@
       "original_tar_sha256": "8938213291862779f99f683fe023564f5e2a6f04455d33e921e182f25c9fd8c6",
       "original_instruction_sha256": "1418451612d0b0ab078027b31a53e3a7866f9afafbdc454679e5fc0879706124",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "5bbb0ea4ce02db4d2e165b0488665135f76b2dfb632ca388b6c0534b2991b51b",
+      "task_definition_sha256": "afda05581b56005ae84bcca36fde948e1c16b4dd17609a386ef11e7cdcceefef",
       "package_file": "O09/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2301,7 +2301,7 @@
       "original_tar_sha256": "69723ae782bf6fb2b413518cd777035bf55d28a6cb2ac766c8bfbda9efa5d5bf",
       "original_instruction_sha256": "6d348eed309149da76605a2fd75cb481d7fb1de3008f1a3ed768187913474bd2",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "54d400281be069bd5ca9fcd45a0809237cdc192839684ca5d46b748c92c387ab",
+      "task_definition_sha256": "83ee9b48f03bf21c9f6845f49d622aaa4eee61555f42850a4b42d1b5a0c3f68c",
       "package_file": "O14/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2390,7 +2390,7 @@
           "actor_task_execution_performed": false
         }
       },
-      "task_definition_sha256": "f7312dacbe738f7dc7bedaf6f4fc056bdf5c69122cd6a0b3af30f970f7a6bab1",
+      "task_definition_sha256": "e96f088eb60facb7d6171ade5ac54b47d12123dc274b73ed512432350df8c123",
       "package_file": "M03/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2430,7 +2430,7 @@
           "astroid.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "45cb912721660dea76916dc34e2b5e52c2dbd67fb0a756b71fdd6e7bfbd73d10",
+      "task_definition_sha256": "0b39139dee540243f06b30c008d78c6dc996a10a0ff7cd7bf9068b575969beae",
       "package_file": "O01/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2455,7 +2455,7 @@
       "original_tar_sha256": "fb9c0bd4d2764792bf735e215c33d4484463d6fa3f3b9adb1625c7c26d798e6a",
       "original_instruction_sha256": "808aaf91b765febd4c86258b38aa28482bcb7388e6dd60536841d77221c69291",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "fcd69068f0aa9e1e590b05f645c4efd6572097699c32a6d5195c56b12c97badd",
+      "task_definition_sha256": "98a9a4f19cdd4cd74868d30c15b02ba8942e651d7883038f48c61b3b684ecfa7",
       "package_file": "kv-live-surgery/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2488,7 +2488,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "6c8756689eee8df8f36716e8eb757e4691d6cb77563cc2dcadb7dcdd1653a087",
+      "task_definition_sha256": "dcb4d26c56f84cbb81b8da2e968ecf8e0a498c3c801ffdebbb4f0d0f0a20d203",
       "package_file": "tinydb/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2585,7 +2585,7 @@
           "actor_task_execution_performed": false
         }
       },
-      "task_definition_sha256": "8c44647d441e4dc6444c9ed95df8c4530c1524fefdd4c923f351b731e77c1a4b",
+      "task_definition_sha256": "72cf6134a891979b65a589718939eba99c666d8d388ec7e3f83b1832f1f73f9e",
       "package_file": "M01/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2621,7 +2621,7 @@
         "verification": "offline local restoration, exact checkout, full strict fsck",
         "original_source_archive_sha256": "2d86227de217371015df70ea4719c431aa873072c8040ec0dd723f9b43959682"
       },
-      "task_definition_sha256": "2db16a2eebac39f0fb7232e53d3618b8d9edf90b0c22589c9c32555c0c718e9e",
+      "task_definition_sha256": "1f259592d97d0b642d44a6e95a4df46bdb843a8a025142bcea0330a3c1c01e7f",
       "package_file": "O05/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2662,7 +2662,7 @@
           "src/sqlfluff.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "f75a22daa8723c8c18a0077c1bdea8335296ea1553b4ead25f43ce326a116694",
+      "task_definition_sha256": "515c670d001ad6a4b0ab1f040ad38ccf43ea56bf972cecde04a66670eb8769ac",
       "package_file": "O06/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2687,7 +2687,7 @@
       "original_tar_sha256": "98771f5113a5670e531a11b8c618879e82b0dc86a13e24e2337710cf8d244fb7",
       "original_instruction_sha256": "e5ea9c8393ac826e18ff241397b77fe3a59c2560e646cae34484db0a6eaf4a99",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "94cb0386cbbc95815fe232aebfa63e70b393ed88ee5c4edb4d43e9c71988849c",
+      "task_definition_sha256": "ffd711ab5ac8ce86ec17ead12485b08e18e606449c209742dcacf04b61a1fb82",
       "package_file": "vf2-speedup-networkx/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2869,7 +2869,7 @@
           "actor_task_execution_performed": false
         }
       },
-      "task_definition_sha256": "f2204f64868cba9953bd63c0403d3ef07ca117667beb3969ba5dcc74df11673d",
+      "task_definition_sha256": "f292fa038f04b3abfaec30e0a6d0396eb4ac1c15ecc4acbd2dc258090200e726",
       "package_file": "pretrain-shard-corruption/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2894,7 +2894,7 @@
       "original_tar_sha256": "682c04b2e195cdcee827a6e322104696fef0d46b52f7b6fcc1e1631cf4a88e50",
       "original_instruction_sha256": "ea296e95055091cb9678fcdb19ca61f8cb6a721342e68b6b842f40f831249d75",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "346bcf80d4718dc7f7a570e820b6f149cc5683639c96bbac722fba8bf348d128",
+      "task_definition_sha256": "371cf448720e041269c8014493187546375b71a8e3407878c475e86e11cf3d04",
       "package_file": "091-add-receipts-bookkeeping/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2927,7 +2927,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "46904ed4cea6a2385ba75306e2323e3cc4cf79200caa3fd9dee404035f610f88",
+      "task_definition_sha256": "47030550010ad2585cc2c95dcc1f541d4e02dfd0ff360b24bb6f5f7ebd8465d3",
       "package_file": "flask-restful/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2960,7 +2960,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "4c738b8a4acd750196c6bfe0c1476ecc45394ec32ce8938e1f04d1e94f3c7319",
+      "task_definition_sha256": "31236c0a687d390c966e181ad6601606babf339ac74457f42c73fd5de9050568",
       "package_file": "M05/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2993,7 +2993,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "029c8c30f5cd056d8d149034f00f74425bb69da338c9e8d0ac186b049b353a8a",
+      "task_definition_sha256": "f960f45efe81fcf33a34b777ca6961626f86b0e1f6006e8104dcf5f89034bee2",
       "package_file": "M09/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3034,7 +3034,7 @@
           "pydicom.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "8b78bf06b7203e3b0a066c2e3caf7e39d6d4214b937d1651190b57f5e42b85df",
+      "task_definition_sha256": "b1749cb4763152dc92369c650020067f2fc8476838dbdeddebb6187a3e0734d8",
       "package_file": "O02/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3074,7 +3074,7 @@
           "pyvista.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "d9a7b6bfe329a67064c26d821b5736407c5250447991270c643054b83c6727c1",
+      "task_definition_sha256": "652daf56ffa2a67a55094f75f161fc9cd60cd8e31f5c1ebf28f487f83049141a",
       "package_file": "O04/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3107,7 +3107,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "cb76bb789907072ca1f84aa409fe579b8935961ba56c1001632f29357bfe7f3a",
+      "task_definition_sha256": "2d0b6212a6c1d923829069df8bb7276e51ccd84b84324a0db07a57b413d33354",
       "package_file": "astroid-1030/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3148,7 +3148,7 @@
           "src/sqlfluff.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "37923b3de7c75bb6634c4987b62c1a86c46868dd619fd123c58369bb4b114c5c",
+      "task_definition_sha256": "11bd8ceb7939731b8d100e85c17e1372d36e7c013cfa0ee757b53c53299cb7c1",
       "package_file": "sqlfluff-3608/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3189,7 +3189,7 @@
           "src/marshmallow.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "fa52abd45a8d89e95cf22c156c62acbd8a66968e01fb55d45d00bab017b11f09",
+      "task_definition_sha256": "6986a75c0052714b5aaf9037192441e7ad0f991f030ef663bc1267ce5ee8fdf5",
       "package_file": "marshmallow-2123/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3214,7 +3214,7 @@
       "original_tar_sha256": "1152c3d3415d26ed6ac0ae3a3d57abf4ff2648feaf3c92d743b92d58b063eba0",
       "original_instruction_sha256": "84dc2f6a5a94013c90706ca393aef6c026881b7ae8331258d4c8bb7226f3099f",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "228a25dd9d98a2800898d67f022fedd1ca8e4689d258f6eb24a2934974b3bbcd",
+      "task_definition_sha256": "a6fb1996a729a07f15c5ee3dd1b7d928b8bb1f779610c5d40494089eb4dd15aa",
       "package_file": "payments-pipeline-fix/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3239,7 +3239,7 @@
       "original_tar_sha256": "ed72a0065addf11bf531c07674756e0c713ec1677a3a4206890752087f4f5e53",
       "original_instruction_sha256": "9630da6851926f7aada9229e4e39a2759f9efe88973b2bdeab57b59d7a05d8f6",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "96a6467f094561383da9a80f57e23706fced056f6ca57c47f4937c8a1a7d63f6",
+      "task_definition_sha256": "dcb91d21513e94e7c2b406112af8be6d8af8b63df6cda62a2c8c083a45e67160",
       "package_file": "wal-recovery-ordering/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3264,7 +3264,7 @@
       "original_tar_sha256": "4f4b0486525706c9fea22d249364a5f7bff9b4782cbfd1eedce0a57ee75459ce",
       "original_instruction_sha256": "c9bee6dd42ab974c99f1d02a3bd069c14686c5ddaf7cbfd503f4c6e337f92c25",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "23ab5cb0ac3c5db241dc73bf134e31b93c2b4fcf416dcb2ebad9d866f8c0cd4a",
+      "task_definition_sha256": "9cc8a13db4d36a4fcb3aaa9c22e39e9abc0153201dc34e73bbc8d2fc4faf8ffb",
       "package_file": "vba-userform-port/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3289,7 +3289,7 @@
       "original_tar_sha256": "e8588431e5cc121aa170a60c559ed544a342a436980970b0abbf30b9a952c44f",
       "original_instruction_sha256": "6e16c343f85a840bd2ef3369a0f1bde2dc1c6da7e56fa2f0bb4743bd8fba12d0",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "123ce2bf02f7f41fe894271dfec19768ecd719f8dceea39fd2d87a74565349cb",
+      "task_definition_sha256": "a7f2ca138437c6c127ede5c6228c44978653640f29b463a3274cee08b389d9b9",
       "package_file": "react-lead-form/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3314,7 +3314,7 @@
       "original_tar_sha256": "3a554e817ca4cc6561a86f740ac1c3dee026a3ab3b111a68a797ef484b145298",
       "original_instruction_sha256": "2b1db343ef603a6ffa64ef95ade2a6c86ffe851ba7b883c10470a801b1bfae19",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "f598b489cd30cbf966da3fc590f878c6a308c85ba64edaa9b0ea6ad6d05a73cd",
+      "task_definition_sha256": "d8d845c9edb07672e9bb2362b373bd7c6a2250a7490c6775da5b599143923427",
       "package_file": "080-convert-novel-epub/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3347,7 +3347,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "c76be10cba7114bd1a620552d3fe61f00148672ca684cae4a5a24d070a867a9b",
+      "task_definition_sha256": "2b509294e6fe3534269d3a1089271c876934ee07b0dadae36f5c398cc08d4b0c",
       "package_file": "cookiecutter/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3380,7 +3380,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "9e0dee7b10f89245b0a4ac95fca86b119571a82ab8187fe3307f5b0109b10774",
+      "task_definition_sha256": "935c676aa84d4c0984e803e0a7f5aed23877f132c802a894ce03c90e960f3cbf",
       "package_file": "tqdm/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3422,7 +3422,7 @@
         "preparation_boundary": "Verify the declared original files and runtime; absence of the candidate described by the commission is intentionally retained, not an archive-loss or source-recovery blocker.",
         "publication_boundary": "Original two-file input published in the fixed material Release; intentionally incomplete scenario retained."
       },
-      "task_definition_sha256": "c67b7829d7e95d47fe968402b2b44373bc6d7c321aa93657a77ea37c4e3a523e",
+      "task_definition_sha256": "2c36cb5cdf2f4307e03a98ce6d3ffba17b0752f3b8c3877e4ac3eb34032325a8",
       "package_file": "M02/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3506,7 +3506,7 @@
         "origin": "Pinned upstream source restored from the original commission, with complete history",
         "verification": "fresh offline restoration, exact checkout, full strict fsck, every file compared to its Git blob"
       },
-      "task_definition_sha256": "e824206cb1bc8d6f14db3066c3cce563117a169bf6abac19130183bd717bfd0f",
+      "task_definition_sha256": "0a3923ff8b1d8f24cf4a4cfebfb337cdc6164d1a9f90e527a2b76fe6b58f6e3a",
       "package_file": "M04/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3539,7 +3539,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "c50e1c1c9052a51c1d19325616377473e7dd1ec5a98d93d7a948291e94d2cb64",
+      "task_definition_sha256": "8ed7584a5f5c8f2df314d191e71a871bf53225173949191c7c49088eb9007a30",
       "package_file": "M07/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3572,7 +3572,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "2026e1a0d9a2d3d17c6aac2b4af7d77c7e95e701dcced613cdd8a67d42919298",
+      "task_definition_sha256": "52f17ac1ff6be854633bfb321a0e0cb53d41724b383f6d21180596c225885a72",
       "package_file": "M10/task.json",
       "package_schema_version": 3,
       "environment_validation": {

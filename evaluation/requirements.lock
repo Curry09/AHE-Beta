@@ -184,7 +184,7 @@ annotated-types==0.8.0 \
 anthropic==0.125.0 \
     --hash=sha256:3486013602eca76d8b12540764e53654f02cf4951110bca86cf06e67428a9f21 \
     --hash=sha256:e0cdd336580cb7411c1cdab69f80973e9bf4bff7f8e08141811d46307d45c682
-    # via auto-designer-evaluation (evaluation/pyproject.toml)
+    # via ahe-beta-evaluation (evaluation/pyproject.toml)
 anyio==4.15.1 \
     --hash=sha256:6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101 \
     --hash=sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94
@@ -599,7 +599,7 @@ e2b==2.55.0 \
     --hash=sha256:abecb2644e959e7da257af49fb5f42a90b77b755c33f32f7292b2398762eec09 \
     --hash=sha256:f993f8c0c55827e3d0865ceb04c01da897594df20e21b474639bc02a9e543537
     # via
-    #   auto-designer-evaluation (evaluation/pyproject.toml)
+    #   ahe-beta-evaluation (evaluation/pyproject.toml)
     #   harbor
 e2b-dockerfile-utils==0.1.1 \
     --hash=sha256:c1d4179bae6f3131fe0bbb1e6787ffb07c6c6dca8bdb3399abb3de9056b2a08f \
@@ -849,7 +849,7 @@ h2==4.4.1 \
 harbor==0.24.0 \
     --hash=sha256:23b7ba616a3aae4eff561ced5e2c51c7186f2981e53a770dea9c689d3969877c \
     --hash=sha256:6c5185e6a76abc677ed3f95e688dc0dbf8597e4fa50847cb9a37a4448c91b1e5
-    # via auto-designer-evaluation (evaluation/pyproject.toml)
+    # via ahe-beta-evaluation (evaluation/pyproject.toml)
 hf-xet==1.8.0 \
     --hash=sha256:07a06d7481702616726c2d8578cfb00052a5b3f21beed6a674592bc837a10330 \
     --hash=sha256:10ed23b51dacf7917d64f335c25048deb470efa755e9989b218fc0531386138e \
@@ -881,7 +881,7 @@ httpx==0.28.1 \
     --hash=sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc \
     --hash=sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad
     # via
-    #   auto-designer-evaluation (evaluation/pyproject.toml)
+    #   ahe-beta-evaluation (evaluation/pyproject.toml)
     #   anthropic
     #   e2b
     #   harbor
@@ -1070,7 +1070,7 @@ litellm==1.104.2 \
     --hash=sha256:f6b8550508b9e0f67b3d64bafad245641fa3049d4c5b85c26a6b8e175e00a3cd \
     --hash=sha256:f766de3dd38b977ca70f17f409df04c0a9a3e90aed82582a965d348b6e2fe399
     # via
-    #   auto-designer-evaluation (evaluation/pyproject.toml)
+    #   ahe-beta-evaluation (evaluation/pyproject.toml)
     #   harbor
 markdown-it-py==4.2.0 \
     --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49 \
@@ -1392,7 +1392,7 @@ openai==2.54.0 \
     --hash=sha256:89089789197ccdb87f173a03145ed1598d00795220c93e96cf712b1cbf5e5f2b \
     --hash=sha256:e3e6f8bc1ba30ddf381ace1a14340eed381cb984a1a59bd0f34b5be3b5d49cfa
     # via
-    #   auto-designer-evaluation (evaluation/pyproject.toml)
+    #   ahe-beta-evaluation (evaluation/pyproject.toml)
     #   litellm
 opentelemetry-api==1.45.2 \
     --hash=sha256:2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34 \
@@ -1419,7 +1419,7 @@ platformdirs==4.14.0 \
     --hash=sha256:1dadfc59a8a5d7565b3d9270ae8fa71c065595352c4277b41c11ee6c222c4b91 \
     --hash=sha256:83f009c1e8c5fc36869b5171755b291887bd2cade7965233cdfabd23d754720b
     # via
-    #   auto-designer-evaluation (evaluation/pyproject.toml)
+    #   ahe-beta-evaluation (evaluation/pyproject.toml)
     #   harbor
 postgrest==2.33.0 \
     --hash=sha256:802bb30028b897f929e8b0b64db20d949b0c1c58e5804bcc7da02faebf2c03ae \
@@ -1835,7 +1835,7 @@ python-dotenv==1.2.3 \
     --hash=sha256:904552145e8bfed22162c09dab1c2b9b54fefa7b23ba780f4f26ca0316b0f0d9 \
     --hash=sha256:a20a594dabeaa385725aa239d5244871c143ecb356add8a20fcf23773a6c3a35
     # via
-    #   auto-designer-evaluation (evaluation/pyproject.toml)
+    #   ahe-beta-evaluation (evaluation/pyproject.toml)
     #   harbor
     #   litellm
     #   pydantic-settings
@@ -1914,7 +1914,7 @@ pyyaml==6.0.3 \
     --hash=sha256:fa160448684b4e94d80416c0fa4aac48967a969efe22931448d853ada8baf926 \
     --hash=sha256:fc09d0aa354569bc501d4e787133afc08552722d3ab34836a80547331bb5d4a0
     # via
-    #   auto-designer-evaluation (evaluation/pyproject.toml)
+    #   ahe-beta-evaluation (evaluation/pyproject.toml)
     #   harbor
     #   huggingface-hub
     #   litellm
@@ -2208,7 +2208,7 @@ rpds-py==2026.9.1 \
 ruamel-yaml==0.19.1 \
     --hash=sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93 \
     --hash=sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993
-    # via auto-designer-evaluation (evaluation/pyproject.toml)
+    # via ahe-beta-evaluation (evaluation/pyproject.toml)
 s3transfer==0.19.3 \
     --hash=sha256:24eb7535804306355e31c952a90022bf5b2f9d760f9a11062c7493a217c08553 \
     --hash=sha256:8326acc3d056d7f7b8a37110c7d2aea41f67e83f6ae79cd3b5fbcca34c726406

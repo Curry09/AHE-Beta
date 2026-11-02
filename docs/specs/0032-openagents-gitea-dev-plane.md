@@ -3,7 +3,7 @@ number: "0032"
 title: 开发者侧换轨 OpenAgents：需求面/交付面二分 + Gitea forge 适配
 issue: 0
 slug: openagents-gitea-dev-plane
-summary: 现行开发者侧是过渡实现（spec-0025/T5 自述）：nexau dev 领 ready 票后直推 main，无分支/PR/评审/CI，坏 commit 只能靠后续多轮迭代回正；且多 dev 因同仓 push 互斥只能串行。OpenAgents（RFC 驱动多 agent 交付框架，独立仓）已把「issue→分支/worktree→spec→PR→CI→评审→合并」的交付闭环打磨成一个 level-triggered 守夜人（vigil），其执行面入口恰好与我方三平面（spec-0029）的终点同名同义——双方都以 `ready` label 为唯一工作队列白名单。本 spec 把接缝切在准入这一刀上：auto-designer 保留需求面（用户模拟→证据→提案→Owner 唯一准入），OpenAgents 接管交付面（ready→PR→合并），两系统仅通过 issue 标签与 main SHA 交互、零代码耦合。职责裁决：OpenAgents 的 triager/admitter 停用（准入职责已归 Owner，`stages.triage=skip`）、curator/drafter/implementer/reviewer/deliver/merger/replier 接管交付面；我方 AgenticDeveloper + developer_agent 整体退役，orchestrator 删 dev 拍（c 步回灌 main SHA 语义不变，天然兼容 PR 合并模型）。平台约束：本仓基建在本地 Gitea（spec-0002），而 OpenAgents 的 utils/github.py 全绑 gh CLI——故 OpenAgents 仓新增 forge 分发层（alias-import 零 call-site 改动）+ Gitea REST driver（checks→commit status、blocked_by→issue dependencies、draft→WIP 前缀、merge/update→Gitea pulls API 等语义映射）。直推 trunk 升级为 PR 门禁不违反 held-out 约束：CI/评审是工程质量闸（harness 仓冒烟，绝不跑 benchmark），体感仍纯观测、benchmark 全程 held-out。vK tag 体系退役，观测锚点=merge commit。
+summary: 现行开发者侧是过渡实现（spec-0025/T5 自述）：nexau dev 领 ready 票后直推 main，无分支/PR/评审/CI，坏 commit 只能靠后续多轮迭代回正；且多 dev 因同仓 push 互斥只能串行。OpenAgents（RFC 驱动多 agent 交付框架，独立仓）已把「issue→分支/worktree→spec→PR→CI→评审→合并」的交付闭环打磨成一个 level-triggered 守夜人（vigil），其执行面入口恰好与我方三平面（spec-0029）的终点同名同义——双方都以 `ready` label 为唯一工作队列白名单。本 spec 把接缝切在准入这一刀上：ahe-beta 保留需求面（用户模拟→证据→提案→Owner 唯一准入），OpenAgents 接管交付面（ready→PR→合并），两系统仅通过 issue 标签与 main SHA 交互、零代码耦合。职责裁决：OpenAgents 的 triager/admitter 停用（准入职责已归 Owner，`stages.triage=skip`）、curator/drafter/implementer/reviewer/deliver/merger/replier 接管交付面；我方 AgenticDeveloper + developer_agent 整体退役，orchestrator 删 dev 拍（c 步回灌 main SHA 语义不变，天然兼容 PR 合并模型）。平台约束：本仓基建在本地 Gitea（spec-0002），而 OpenAgents 的 utils/github.py 全绑 gh CLI——故 OpenAgents 仓新增 forge 分发层（alias-import 零 call-site 改动）+ Gitea REST driver（checks→commit status、blocked_by→issue dependencies、draft→WIP 前缀、merge/update→Gitea pulls API 等语义映射）。直推 trunk 升级为 PR 门禁不违反 held-out 约束：CI/评审是工程质量闸（harness 仓冒烟，绝不跑 benchmark），体感仍纯观测、benchmark 全程 held-out。vK tag 体系退役，观测锚点=merge commit。
 tasks:
   - id: T1
     title: OpenAgents 仓：forge 分发层——alias-import 接缝 + 配置段 + merger 提示词参数化
@@ -51,8 +51,8 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/demand/issue_schema.py
-      - backend/auto_designer/demand/owner.py
+      - backend/ahe_beta/demand/issue_schema.py
+      - backend/ahe_beta/demand/owner.py
       - backend/tests/demand/test_issue_schema.py
       - backend/tests/demand/test_owner.py
     scope: issue_schema 新增 `OPENAGENTS = "openagents"`（交付面发现标签，Owner 准入的交接令牌）；plane() 的 READY 平面判定收编为 `ready | openagents`（准入已定、交付面接手中/已接手都算工作队列）；is_ready 随 plane 自动生效（本方案后仅剩 metrics/web 读侧消费）。owner.py `_ready_labels` 改产出 OPENAGENTS（不再直接打 READY）——原因：vigil `_intake` 对已带 ready 的票直接跳过，curator 依赖排序只在「本轮有新准入」时触发，Owner 直打 ready 会让 curator 永不运行、多 worker 并行失去 blocked_by 保护。covers 级联合并/decline/hold 语义全部不动（Owner 仍是唯一准入点）。背压 READY_DEPTH_ALARM 经 plane 自动覆盖两标签。
@@ -67,12 +67,12 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/dev/agentic_developer.py
+      - backend/ahe_beta/dev/agentic_developer.py
       - backend/agent_defs/developer_agent/agent.yaml
       - backend/agent_defs/developer_agent/systemprompt.md
-      - backend/auto_designer/loop/orchestrator.py
-      - backend/auto_designer/loop/roster.py
-      - backend/auto_designer/loop/live_tracer.py
+      - backend/ahe_beta/loop/orchestrator.py
+      - backend/ahe_beta/loop/roster.py
+      - backend/ahe_beta/loop/live_tracer.py
       - backend/tests/dev/test_agentic_developer.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_parallel_sessions.py
@@ -90,8 +90,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/experiment/controllers/swebench.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
       - backend/tests/test_run_vigil.py
     scope: run.py：种子推送后在 HARNESS_REPO 写 `.openagents/openagents.yml`（forge=gitea + deploy/gitea 的 base_url/owner/repo/token_env、stages 定稿 triage=skip / rfc=skip(起步，显式告警可接受) / conflict=agent / ci=skip(T6 就位后改 agent) / e2e=skip / review=agent / merge=agent、labels=[openagents]、interval=30、release=manual）；以 subprocess.Popen 启动 `openagents vigil --parallel K`（cwd=HARNESS_REPO，K=roster developer 数，stdout/stderr 落 data/vigil.log），run 退出时 terminate+wait 兜底 kill。openagents 以独立 CLI 接入（uv tool install 钉版本，不 vendor 不 import，见正文 §4.3 部署形态），run.py 启动前预检 `openagents` 命令存在。vigil 的本地状态（.openagents/ 下 sqlite 队列、claims flock、runtime-state）随 _seed_harness_repo 的 rmtree 每次 run 自然重置，无跨 run 脏状态。退役 vK tag 全链路：dev 预算 env（DEV_BUDGET_*）、_next_version/ls-remote tags 逻辑、banner 文案更新。平台注记：vigil 依赖 fcntl.flock，交付面仅 Linux/macOS 可跑（生产环境 Linux 满足）；Windows 本地只跑单测。凭证注记：交付面 coding 后端是 claude CLI（OpenAgents claude_code backend），DEV_LLM_* 不再消费，宿主需登录 claude CLI；Gitea token 经 GITEA_TOKEN env 传给 vigil 子进程。
     acceptance: 单测（mock Popen）断言 yml 内容与 stages 定稿一致、vigil 启停与日志路径正确、异常退出有兜底；banner/预算 env 无 vK 残留；Linux 生产环境手工冒烟一轮闭环（Owner admit → vigil 开 PR → merge → c 步游标前移）。
@@ -120,8 +120,8 @@ tasks:
     relates-to: []
     parallel: true
     files:
-      - backend/auto_designer/tracker/gitea.py
-      - backend/auto_designer/web/api.py
+      - backend/ahe_beta/tracker/gitea.py
+      - backend/ahe_beta/web/api.py
       - backend/tests/web/test_api.py
       - frontend/src/types.ts
       - frontend/src/api.ts
@@ -150,7 +150,7 @@ tasks:
 
 ## Summary
 
-把闭环切成**需求面**与**交付面**两半：auto-designer 保留需求面（用户模拟 → 证据 → 提案 → Owner 唯一准入），OpenAgents 接管交付面（ready issue → 分支/worktree → PR → CI → 评审 → 合并）。两个系统**只通过 issue 标签和 main SHA 交互**，零代码耦合。平台保持本地 Gitea：OpenAgents 仓新增 forge 分发层与 Gitea REST driver（alias-import 零 call-site 改动）。我方 nexau 开发者（AgenticDeveloper + developer_agent）整体退役，直推 main 升级为 PR 门禁交付；orchestrator 的 c 步回灌（main 最新 SHA 纯观测游标）语义不变。
+把闭环切成**需求面**与**交付面**两半：ahe-beta 保留需求面（用户模拟 → 证据 → 提案 → Owner 唯一准入），OpenAgents 接管交付面（ready issue → 分支/worktree → PR → CI → 评审 → 合并）。两个系统**只通过 issue 标签和 main SHA 交互**，零代码耦合。平台保持本地 Gitea：OpenAgents 仓新增 forge 分发层与 Gitea REST driver（alias-import 零 call-site 改动）。我方 nexau 开发者（AgenticDeveloper + developer_agent）整体退役，直推 main 升级为 PR 门禁交付；orchestrator 的 c 步回灌（main 最新 SHA 纯观测游标）语义不变。
 
 ## Motivation
 
@@ -172,9 +172,9 @@ OpenAgents（独立仓，RFC 驱动多 agent 交付框架）已把这条交付�
 ### 二分模型
 
 ```
-┌─ 需求面（auto-designer，round-based）────────────────┐
+┌─ 需求面（ahe-beta，round-based）────────────────┐
 │ user sim ──报告──▶ report 平面                        │
-│ triager/synthesize/divergent ──提案──▶ proposal 平面  │
+│ triager/architect/divergent ──提案──▶ proposal 平面  │
 │ Owner 唯一准入（admit/merge/decline/hold + covers 级联）│
 │        │ admit = 打 `openagents` 发现标签              │
 └────────┼─────────────────────────────────────────────┘
@@ -194,7 +194,7 @@ OpenAgents（独立仓，RFC 驱动多 agent 交付框架）已把这条交付�
 
 | 角色 | 归属 | 裁决 |
 |---|---|---|
-| user sim / triager / synthesize / divergent / **Owner** | 需求面（我方） | 原样保留，spec-0029 不动 |
+| user sim / triager / architect / divergent / **Owner** | 需求面（我方） | 原样保留，spec-0029 不动 |
 | OpenAgents triager（单票矛盾自检） | 交付面准入 | **停用**（`triage: skip`）——准入已由 Owner 在上游完成，双重把关收益趋零 |
 | OpenAgents admitter（读人是否点头） | 交付面准入 | 仅 `triage: human` 时启用，无人值守环里**自然闲置** |
 | OpenAgents curator（ready 票依赖排序） | 交付面准入 | **采纳**——我方没有的能力，多 worker 并行的 blocked_by 保护 |
@@ -260,7 +260,7 @@ issue 侧 `ensure_label / create_issue / get_issue / list_issues / issue_comment
 
 **平台/凭证约束**：vigil 用 `fcntl.flock` 判死回收——交付面仅 Linux/macOS 可跑（生产 Linux 满足；Windows 本地只跑单测）。coding 后端是 claude CLI（OpenAgents claude_code backend，nexau backend 未实现、二期补），宿主需登录 claude CLI；`DEV_LLM_*` 退役。Gitea token 经 env 传入 vigil 子进程。
 
-**部署形态**：OpenAgents 以**独立 CLI 工具**接入（`uv tool install --from <OpenAgents 仓>@<pin> openagents`，钉在含 forge/Gitea driver 的 commit/tag），不 vendor 源码进本仓、不作为 Python 包 import——auto-designer 对它的全部依赖 = 宿主 PATH 上的 `openagents` 命令 + Gitea 标签契约，进程边界天然隔离两侧崩溃。run.py 启动前对 `openagents --help` 做存在性预检、缺失即报错（与 claude CLI 预检并列）。本仓工作区内的 OpenAgents/ 目录只是本地开发副本（T1/T2 在其中按该仓 spec 流程落地），保持 untracked；开发迭代用 `uv tool install --force --from ./OpenAgents` 即时生效（uv tool 为快照，不重装跑旧码）。
+**部署形态**：OpenAgents 以**独立 CLI 工具**接入（`uv tool install --from <OpenAgents 仓>@<pin> openagents`，钉在含 forge/Gitea driver 的 commit/tag），不 vendor 源码进本仓、不作为 Python 包 import——ahe-beta 对它的全部依赖 = 宿主 PATH 上的 `openagents` 命令 + Gitea 标签契约，进程边界天然隔离两侧崩溃。run.py 启动前对 `openagents --help` 做存在性预检、缺失即报错（与 claude CLI 预检并列）。本仓工作区内的 OpenAgents/ 目录只是本地开发副本（T1/T2 在其中按该仓 spec 流程落地），保持 untracked；开发迭代用 `uv tool install --force --from ./OpenAgents` 即时生效（uv tool 为快照，不重装跑旧码）。
 
 ### §4.4 stages 定稿与门禁语义
 

@@ -78,7 +78,7 @@ describe("historical snapshot presentation", () => {
 describe("API routing", () => {
   it("reads frozen records and state from the selected static snapshot", async () => {
     vi.stubEnv("VITE_STATIC_SITE", "1");
-    vi.stubEnv("BASE_URL", "/auto-designer/");
+    vi.stubEnv("BASE_URL", "/ahe-beta/");
     vi.stubGlobal("window", { location: { search: `?experiment=${snapshot.id}`, pathname: "/" } });
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true, json: async () => ({ experiments: [snapshot] }),
@@ -86,9 +86,9 @@ describe("API routing", () => {
     vi.stubGlobal("fetch", fetchMock);
     const api = await import("./api");
     expect(await api.getExperiments()).toEqual([snapshot]);
-    expect(fetchMock).toHaveBeenLastCalledWith("/auto-designer/experiments/index.json");
+    expect(fetchMock).toHaveBeenLastCalledWith("/ahe-beta/experiments/index.json");
     await api.getState();
-    expect(fetchMock).toHaveBeenLastCalledWith(`/auto-designer/experiments/${snapshot.id}/api/state`);
+    expect(fetchMock).toHaveBeenLastCalledWith(`/ahe-beta/experiments/${snapshot.id}/api/state`);
   });
 
   it("uses the same selection for path-based snapshot views", async () => {

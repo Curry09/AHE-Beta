@@ -6,10 +6,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from auto_designer.user.sim.demo import TASK, make_personas, print_result  # noqa: E402
-from auto_designer.user.sim.harness_adapter import ScriptedHarness  # noqa: E402
-from auto_designer.user.sim.loop import run_session  # noqa: E402
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient  # noqa: E402
+from ahe_beta.user.sim.demo import TASK, make_personas, print_result  # noqa: E402
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness  # noqa: E402
+from ahe_beta.user.sim.loop import run_session  # noqa: E402
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient  # noqa: E402
 
 
 def main() -> None:

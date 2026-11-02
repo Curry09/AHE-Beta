@@ -3,7 +3,7 @@
 services:
   gitea:
     image: gitea/gitea:1.22
-    container_name: auto-designer-gitea
+    container_name: ahe-beta-gitea
     restart: unless-stopped
     environment:
       - USER_UID=1000
@@ -37,21 +37,21 @@ services:
   # 后须 `docker volume rm gitea_runner_data`（或 down -v）重注册才生效。
   act-runner:
     image: gitea/act_runner:0.2.11
-    container_name: auto-designer-act-runner
+    container_name: ahe-beta-act-runner
     restart: unless-stopped
     depends_on:
       - gitea
     environment:
       - GITEA_INSTANCE_URL=http://gitea:3000
       - GITEA_RUNNER_REGISTRATION_TOKEN=${RUNNER_TOKEN:-}
-      - GITEA_RUNNER_NAME=auto-designer-runner
+      - GITEA_RUNNER_NAME=ahe-beta-runner
       - GITEA_RUNNER_LABELS=ubuntu-latest:docker://catthehacker/ubuntu:act-latest
       - CONFIG_FILE=/runner-config.yaml
     volumes:
       - runner_data:/data
       # 实证修复连带：job 容器由 runner 经宿主 docker 起，**默认不在本 compose 网络**——容器里
       # 解析不到 `gitea` 主机名，checkout/clone 会在下一步挂。经 runner-config.yaml 把 job 容器钉进
-      # 下方命名网络（auto-designer-ci）。
+      # 下方命名网络（ahe-beta-ci）。
       - ./runner-config.yaml:/runner-config.yaml:ro
       # 任务容器由 runner 起在宿主 docker 上（docker-in-docker 之外的标准做法）。
       - /var/run/docker.sock:/var/run/docker.sock
@@ -63,11 +63,11 @@ services:
   # 镜像 tag 生产实证后钉具体版本（与 gitea/act_runner 同一钉版纪律）。
   egress-proxy:
     image: ubuntu/squid:latest
-    container_name: auto-designer-egress-proxy
+    container_name: ahe-beta-egress-proxy
     restart: unless-stopped
     volumes:
-      # Explicit opt-in: AUTO_DESIGNER_EGRESS_CONFIG=./egress-gitea-com.conf
-      - ${AUTO_DESIGNER_EGRESS_CONFIG:-./egress-proxy.conf}:/etc/squid/squid.conf:ro
+      # Explicit opt-in: AHE_BETA_EGRESS_CONFIG=./egress-gitea-com.conf
+      - ${AHE_BETA_EGRESS_CONFIG:-./egress-proxy.conf}:/etc/squid/squid.conf:ro
       - ./egress-proxy.conf:/etc/squid/egress-base.conf:ro
     networks:
       - ci
@@ -76,11 +76,11 @@ services:
 networks:
   # 显式命名（不吃 compose 项目名前缀）：runner-config.yaml 里 container.network 要按名引用。
   ci:
-    name: auto-designer-ci
+    name: ahe-beta-ci
   # Spec-0033/T1：交付面 internal 网络——无 NAT，vigil 容器直连外网物理不通（出口只剩 egress-proxy）；
-  # run.py 起 vigil 容器时按名（auto-designer-vigil-net）挂入。
+  # run.py 起 vigil 容器时按名（ahe-beta-vigil-net）挂入。
   vigil_net:
-    name: auto-designer-vigil-net
+    name: ahe-beta-vigil-net
     internal: true
 
 volumes:

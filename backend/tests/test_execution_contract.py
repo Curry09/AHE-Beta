@@ -2,16 +2,16 @@
 
 import pytest
 
-from auto_designer.execution_contract import (
+from ahe_beta.execution_contract import (
     build_execution_evidence,
     canonical_sha256,
     make_execution_contract,
     validate_execution_contract,
 )
-from auto_designer.loop.metrics import Metrics
-from auto_designer.models import FeelingScore, Persona, SeedScenario, Session, Transcript
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.loop.metrics import Metrics
+from ahe_beta.models import FeelingScore, Persona, SeedScenario, Session, Transcript
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
 
 
 def feedback(status="missing", score=None):

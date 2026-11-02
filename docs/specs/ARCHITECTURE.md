@@ -1,23 +1,23 @@
 # 架构现状（ARCHITECTURE）
 
-> 本文件由 `spec graph` 自动生成，请勿手工编辑。源 = `backend/auto_designer/` 的代码与 docstring。
+> 本文件由 `spec graph` 自动生成，请勿手工编辑。源 = `backend/ahe_beta/` 的代码与 docstring。
 
 ## 子系统与组件
 
-### auto_designer
+### ahe_beta
 
-_auto-designer: 自进化 harness（用户侧 a）。_
+_ahe-beta: 自进化 harness（用户侧 a）。_
 
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
-| `__init__.py` | auto-designer: 自进化 harness（用户侧 a）。 |
+| `__init__.py` | ahe-beta: 自进化 harness（用户侧 a）。 |
 | `execution_contract.py` | Immutable execution declarations and public evidence wire (Spec-0084/T1). |
 | `invocation.py` | Persist one JSON file per role invocation under ROLE_RUNS_DIR. |
 | `models.py` | 用户侧最小链路的公共数据结构（spec-0001/T1）。 |
 | `nexau_runtime.py` | 单一 nexau 适配层（spec-0003/T2）：把一份角色定义(prompt+工具)加载成可调用 Agent。 |
 | `usage.py` | Best-effort, per-call LLM usage telemetry. |
 
-### auto_designer.demand
+### ahe_beta.demand
 
 _Product discovery, proposal synthesis, and admission decision roles._
 
@@ -25,11 +25,12 @@ _Product discovery, proposal synthesis, and admission decision roles._
 |----|----|
 | `__init__.py` | Product discovery, proposal synthesis, and admission decision roles. |
 | `agent_contract.py` | 由 issue_schema.SCHEMAS 生成各 producer 的 submit 工具 input_schema——契约与 schema 同源， |
-| `agent_runtime.py` | 四个 driver（triage / synthesize / divergent / owner）此前各抄一份的公共逻辑收拢于此： |
+| `agent_runtime.py` | 四个 driver（triage / architect / divergent / owner）此前各抄一份的公共逻辑收拢于此： |
+| `architect.py` | Architect 驱动器。 |
 | `delivery_evidence.py` | Publish issue-scoped opaque evidence through the existing forge boundary. |
 | `divergent.py` | Divergent（能力发现）驱动器。 |
 | `evidence_contract.py` | Goal-aware evidence contracts for demand-side roles. |
-| `grouped_synthesizer.py` | Group a proposal snapshot once, then give each group to one existing Synthesizer. |
+| `grouped_architect.py` | Group a proposal snapshot once, then give each group to one existing Architect. |
 | `issue_schema.py` | 标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。 |
 | `observation_provider.py` | Spec-0059: discover and read artifact-owned diagnostic files with ordinary tools. |
 | `owner.py` | Owner 驱动器：把 proposal 无损打包并交接给 OpenAgents。 |
@@ -39,10 +40,9 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `session_timeline.py` | 结构综合按需取用：从落盘 Session 投影「使用事件时间线」。 |
 | `source.py` | Spec-0082/T1: demand reads a commit snapshot rather than a moving checkout. |
 | `submit_tools.py` | submit 工具的 binding。 |
-| `synthesizer.py` | Synthesizer 驱动器。 |
 | `triage.py` | Triage（报告规范化）驱动器。 |
 
-### auto_designer.distill
+### ahe_beta.distill
 
 _蒸馏侧（spec-0006）：persona 卡库读写 + 契约约束校验。_
 
@@ -53,7 +53,7 @@ _蒸馏侧（spec-0006）：persona 卡库读写 + 契约约束校验。_
 | `seed_adapter.py` | seed_adapter.py（spec-0010/T2）：把种子卡注入 0009 的 SeedSource 供给。 |
 | `seed_library.py` | SeedLibrary（spec-0010/T1）：种子卡库的最小读写 + 契约约束校验。 |
 
-### auto_designer.evaluation
+### ahe_beta.evaluation
 
 _Spec-0083: session artifact collection and independent post-run grading._
 
@@ -67,7 +67,7 @@ _Spec-0083: session artifact collection and independent post-run grading._
 | `results.py` | Normalized grading results, separate from official reports (Spec-0083/T1). |
 | `service.py` | Shared request construction and verified result normalization (Spec-0084/T5). |
 
-### auto_designer.evaluation.adapters
+### ahe_beta.evaluation.adapters
 
 _Fixed official and custom grading adapters (Spec-0083/T4)._
 
@@ -82,7 +82,7 @@ _Fixed official and custom grading adapters (Spec-0083/T4)._
 | `terminal_bench.py` | Run exact pinned separate Terminal-Bench verifiers (Spec-0083/T4). |
 | `tua_bench.py` | Reconstruct the first pinned Excel verifier without altering it (Spec-0083/T4). |
 
-### auto_designer.experiment
+### ahe_beta.experiment
 
 _Frozen materials, controllers and local/E2B resource lifecycles._
 
@@ -109,7 +109,7 @@ _Frozen materials, controllers and local/E2B resource lifecycles._
 | `task_import.py` | Spec-0076/T1: offline conversion into the existing ordinary task package contract. |
 | `workload.py` | Spec-0073/T1: logical task catalog and session plan, independent of providers. |
 
-### auto_designer.experiment.backends
+### ahe_beta.experiment.backends
 
 _Spec-0069/T2: execution adapters implement the same experiment lifecycle._
 
@@ -123,7 +123,7 @@ _Spec-0069/T2: execution adapters implement the same experiment lifecycle._
 | `local.py` | Spec-0069/T3: frozen local toolchains and an experiment-owned Docker stack. |
 | `local_ci.py` | Spec-0077/T2: private registration and real PR readiness for an owned runner. |
 
-### auto_designer.experiment.continuation
+### ahe_beta.experiment.continuation
 
 _Current, frozen experiment archive continuation contracts._
 
@@ -135,7 +135,7 @@ _Current, frozen experiment archive continuation contracts._
 | `forge.py` | Spec-0079/T2: project only selected pending reports into the child's fresh forge. |
 | `source.py` | Read and validate current collect archives without executing their contents. |
 
-### auto_designer.experiment.controllers
+### ahe_beta.experiment.controllers
 
 _Spec-0073/T4: one unified controller backed by shared experiment runtime._
 
@@ -146,7 +146,7 @@ _Spec-0073/T4: one unified controller backed by shared experiment runtime._
 | `runtime.py` | Spec-0073/T4: shared experiment runtime: repository, delivery process and round receipts. |
 | `unified.py` | Spec-0073/T4: unified frozen-task experiment controller. Start through the experiment CLI. |
 
-### auto_designer.experiment.task_environments
+### ahe_beta.experiment.task_environments
 
 _Spec-0081: frozen task material and Docker execution capabilities._
 
@@ -157,7 +157,7 @@ _Spec-0081: frozen task material and Docker execution capabilities._
 | `docker.py` | Spec-0081/T3: owned Docker task containers and finite companion services. |
 | `materials.py` | Spec-0081/T2: verified task inputs; no provider or experiment orchestration. |
 
-### auto_designer.guards
+### ahe_beta.guards
 
 _Spec-0068/T1: repository integrity, commit boundaries and tool path checks._
 
@@ -166,9 +166,9 @@ _Spec-0068/T1: repository integrity, commit boundaries and tool path checks._
 | `__init__.py` | Spec-0068/T1: repository integrity, commit boundaries and tool path checks. |
 | `harness_boundary.py` | harness 提交边界闸：拦住密钥和 vigil 运行态，不再用顶层白名单锁死产品形状。 |
 | `repo_guard.py` | repo_guard：编排仓完整性快照与校验。 |
-| `workspace_jail.py` | WorkspaceJailMiddleware：dev/synthesizer 以 harness 仓为可写工作区；NexAU 源码与运行时产物只读放行。 |
+| `workspace_jail.py` | WorkspaceJailMiddleware：dev/architect 以 harness 仓为可写工作区；NexAU 源码与运行时产物只读放行。 |
 
-### auto_designer.harness
+### ahe_beta.harness
 
 _Evaluation harness integration and execution support._
 
@@ -180,7 +180,7 @@ _Evaluation harness integration and execution support._
 | `interface.py` | harness 多轮对话契约 HarnessInterface + 测试后端 FakeHarness（spec-0001/T2）。 |
 | `launcher.py` | harness launcher（spec-0003/T1）：把某版 harness 程序接成 spec-0001 的 HarnessInterface。 |
 
-### auto_designer.loop
+### ahe_beta.loop
 
 _Conversation-loop coordination, tracing, and lifecycle management._
 
@@ -201,14 +201,14 @@ _Conversation-loop coordination, tracing, and lifecycle management._
 | `runner.py` | 可恢复 Harbor runner（Spec-0004/T2, Spec-0064/T2）。 |
 | `sim_user.py` | 把 spec-0005 控制信封 sim 用户 agent 接进 spec-0003/0007 闭环。 |
 
-### auto_designer.observations
+### ahe_beta.observations
 
 _Artifact-owned observations with platform-owned collection and authorization._
 
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
 | `__init__.py` | Artifact-owned observations with platform-owned collection and authorization. |
-| `__main__.py` | Explicit recovery: python -m auto_designer.observations --root ROOT --receipt FILE. |
+| `__main__.py` | Explicit recovery: python -m ahe_beta.observations --root ROOT --receipt FILE. |
 | `delivery_gaps.py` | Ingest only authenticated delivery requests, never arbitrary comments or logs. |
 | `gaps.py` | Spec-0061: scoped maintainer diagnostic gaps with a durable outbox. |
 | `grants.py` | Persist evidence authority separately from model-authored issue text. |
@@ -216,7 +216,7 @@ _Artifact-owned observations with platform-owned collection and authorization._
 | `publication.py` | Collect bounded opaque artifact files and publish immutable session evidence. |
 | `transport.py` | Spec-0070/T2: freeze transport separately from the historical framework contract. |
 
-### auto_designer.tracker
+### ahe_beta.tracker
 
 _Issue-tracker integration and proposal state management._
 
@@ -228,7 +228,7 @@ _Issue-tracker integration and proposal state management._
 | `fake.py` | FakeTracker（spec-0001/T5）：IssueTracker 的内存实现，供单测与无 Gitea 环境端到端跑通。 |
 | `gitea.py` | GiteaTracker（spec-0002/T2）：spec-0001/T5 IssueTracker 接口的真后端。 |
 
-### auto_designer.user
+### ahe_beta.user
 
 _User simulation, personas, and interaction evidence collection._
 
@@ -238,13 +238,13 @@ _User simulation, personas, and interaction evidence collection._
 | `patches.py` | Immutable full session predictions for post-run grading (Spec-0075/T1). |
 | `session_store.py` | 本地 SessionStore（spec-0001/T6）：一局 Session 全量落盘 + 单一总索引。 |
 
-### auto_designer.user.sim
+### ahe_beta.user.sim
 
-_auto_designer.user.sim —— persona 驱动的 harness 用户模拟器(控制信封架构, 纯主观)。_
+_ahe_beta.user.sim —— persona 驱动的 harness 用户模拟器(控制信封架构, 纯主观)。_
 
 | 组件 | 职责（文件级 docstring 首行） |
 |----|----|
-| `__init__.py` | auto_designer.user.sim —— persona 驱动的 harness 用户模拟器(控制信封架构, 纯主观)。 |
+| `__init__.py` | ahe_beta.user.sim —— persona 驱动的 harness 用户模拟器(控制信封架构, 纯主观)。 |
 | `action_space.py` | action_space.py |
 | `actions.py` | actions.py |
 | `clauses.py` | clauses.py |
@@ -269,7 +269,7 @@ _auto_designer.user.sim —— persona 驱动的 harness 用户模拟器(控制�
 | `tools.py` | 内层用户 agent 的原子工具 + D1 能力门控（spec-0008/T2）。 |
 | `workspace.py` | seed 工作区落地（spec-0008/T1 → spec-0009/T1）。 |
 
-### auto_designer.user.sim.sources
+### ahe_beta.user.sim.sources
 
 _SeedSource 实现子包（spec-0009/T1）。_
 
@@ -283,7 +283,7 @@ _SeedSource 实现子包（spec-0009/T1）。_
 | `local_fixture.py` | local-fixture SeedSource（spec-0009/T1）。 |
 | `prebuilt.py` | Spec-0073/T3: copy pure task source and rebuild each managed session's venv. |
 
-### auto_designer.web
+### ahe_beta.web
 
 _Web application endpoints and runtime composition._
 
@@ -297,671 +297,671 @@ _Web application endpoints and runtime composition._
 
 ```mermaid
 graph LR
-    nauto_designer["auto_designer"]
-    nauto_designer_demand["auto_designer.demand"]
-    nauto_designer_demand_agent_contract["demand.agent_contract"]
-    nauto_designer_demand_agent_runtime["demand.agent_runtime"]
-    nauto_designer_demand_delivery_evidence["demand.delivery_evidence"]
-    nauto_designer_demand_divergent["demand.divergent"]
-    nauto_designer_demand_evidence_contract["demand.evidence_contract"]
-    nauto_designer_demand_grouped_synthesizer["demand.grouped_synthesizer"]
-    nauto_designer_demand_issue_schema["demand.issue_schema"]
-    nauto_designer_demand_observation_provider["demand.observation_provider"]
-    nauto_designer_demand_owner["demand.owner"]
-    nauto_designer_demand_proposal_view["demand.proposal_view"]
-    nauto_designer_demand_role_contract["demand.role_contract"]
-    nauto_designer_demand_runtime_agg["demand.runtime_agg"]
-    nauto_designer_demand_session_timeline["demand.session_timeline"]
-    nauto_designer_demand_source["demand.source"]
-    nauto_designer_demand_submit_tools["demand.submit_tools"]
-    nauto_designer_demand_synthesizer["demand.synthesizer"]
-    nauto_designer_demand_triage["demand.triage"]
-    nauto_designer_distill["auto_designer.distill"]
-    nauto_designer_distill_library["distill.library"]
-    nauto_designer_distill_seed_adapter["distill.seed_adapter"]
-    nauto_designer_distill_seed_library["distill.seed_library"]
-    nauto_designer_evaluation["auto_designer.evaluation"]
-    nauto_designer_evaluation_acceptance["evaluation.acceptance"]
-    nauto_designer_evaluation_adapters["evaluation.adapters"]
-    nauto_designer_evaluation_adapters_container["adapters.container"]
-    nauto_designer_evaluation_adapters_custom["adapters.custom"]
-    nauto_designer_evaluation_adapters_nl2repo["adapters.nl2repo"]
-    nauto_designer_evaluation_adapters_profiles["adapters.profiles"]
-    nauto_designer_evaluation_adapters_swebench["adapters.swebench"]
-    nauto_designer_evaluation_adapters_terminal_bench["adapters.terminal_bench"]
-    nauto_designer_evaluation_adapters_tua_bench["adapters.tua_bench"]
-    nauto_designer_evaluation_artifacts["evaluation.artifacts"]
-    nauto_designer_evaluation_contracts["evaluation.contracts"]
-    nauto_designer_evaluation_registry["evaluation.registry"]
-    nauto_designer_evaluation_results["evaluation.results"]
-    nauto_designer_evaluation_service["evaluation.service"]
-    nauto_designer_execution_contract["auto_designer.execution_contract"]
-    nauto_designer_experiment["auto_designer.experiment"]
-    nauto_designer_experiment_assessment_worker["experiment.assessment_worker"]
-    nauto_designer_experiment_backends["experiment.backends"]
-    nauto_designer_experiment_backends_base["backends.base"]
-    nauto_designer_experiment_backends_e2b["backends.e2b"]
-    nauto_designer_experiment_backends_e2b_bootstrap["backends.e2b_bootstrap"]
-    nauto_designer_experiment_backends_e2b_template["backends.e2b_template"]
-    nauto_designer_experiment_backends_local["backends.local"]
-    nauto_designer_experiment_backends_local_ci["backends.local_ci"]
-    nauto_designer_experiment_batch["experiment.batch"]
-    nauto_designer_experiment_batch_config["experiment.batch_config"]
-    nauto_designer_experiment_batch_store["experiment.batch_store"]
-    nauto_designer_experiment_cli["experiment.cli"]
-    nauto_designer_experiment_collection["experiment.collection"]
-    nauto_designer_experiment_config["experiment.config"]
-    nauto_designer_experiment_context["experiment.context"]
-    nauto_designer_experiment_continuation["experiment.continuation"]
-    nauto_designer_experiment_continuation_evidence["continuation.evidence"]
-    nauto_designer_experiment_continuation_export["continuation.export"]
-    nauto_designer_experiment_continuation_forge["continuation.forge"]
-    nauto_designer_experiment_continuation_source["continuation.source"]
-    nauto_designer_experiment_controllers["experiment.controllers"]
-    nauto_designer_experiment_controllers_feedback["controllers.feedback"]
-    nauto_designer_experiment_controllers_runtime["controllers.runtime"]
-    nauto_designer_experiment_controllers_unified["controllers.unified"]
-    nauto_designer_experiment_dashboard["experiment.dashboard"]
-    nauto_designer_experiment_engine["experiment.engine"]
-    nauto_designer_experiment_grading["experiment.grading"]
-    nauto_designer_experiment_grading_inputs["experiment.grading_inputs"]
-    nauto_designer_experiment_infrastructure["experiment.infrastructure"]
-    nauto_designer_experiment_manifest["experiment.manifest"]
-    nauto_designer_experiment_materials["experiment.materials"]
-    nauto_designer_experiment_model_limits["experiment.model_limits"]
-    nauto_designer_experiment_runtime["experiment.runtime"]
-    nauto_designer_experiment_task_environments["experiment.task_environments"]
-    nauto_designer_experiment_task_environments_contract["task_environments.contract"]
-    nauto_designer_experiment_task_environments_docker["task_environments.docker"]
-    nauto_designer_experiment_task_environments_materials["task_environments.materials"]
-    nauto_designer_experiment_task_import["experiment.task_import"]
-    nauto_designer_experiment_workload["experiment.workload"]
-    nauto_designer_guards["auto_designer.guards"]
-    nauto_designer_guards_harness_boundary["guards.harness_boundary"]
-    nauto_designer_guards_repo_guard["guards.repo_guard"]
-    nauto_designer_guards_workspace_jail["guards.workspace_jail"]
-    nauto_designer_harness["auto_designer.harness"]
-    nauto_designer_harness_budget["harness.budget"]
-    nauto_designer_harness_connector["harness.connector"]
-    nauto_designer_harness_interface["harness.interface"]
-    nauto_designer_harness_launcher["harness.launcher"]
-    nauto_designer_invocation["auto_designer.invocation"]
-    nauto_designer_loop["auto_designer.loop"]
-    nauto_designer_loop_checkpoint["loop.checkpoint"]
-    nauto_designer_loop_feedback_pipeline["loop.feedback_pipeline"]
-    nauto_designer_loop_live["loop.live"]
-    nauto_designer_loop_live_tracer["loop.live_tracer"]
-    nauto_designer_loop_metrics["loop.metrics"]
-    nauto_designer_loop_orchestrator["loop.orchestrator"]
-    nauto_designer_loop_recovery["loop.recovery"]
-    nauto_designer_loop_roster["loop.roster"]
-    nauto_designer_loop_round_assessment["loop.round_assessment"]
-    nauto_designer_loop_round_gate["loop.round_gate"]
-    nauto_designer_loop_run_state["loop.run_state"]
-    nauto_designer_loop_runner["loop.runner"]
-    nauto_designer_loop_sim_user["loop.sim_user"]
-    nauto_designer_models["auto_designer.models"]
-    nauto_designer_nexau_runtime["auto_designer.nexau_runtime"]
-    nauto_designer_observations["auto_designer.observations"]
-    nauto_designer_observations___main__["observations.__main__"]
-    nauto_designer_observations_delivery_gaps["observations.delivery_gaps"]
-    nauto_designer_observations_gaps["observations.gaps"]
-    nauto_designer_observations_grants["observations.grants"]
-    nauto_designer_observations_preflight["observations.preflight"]
-    nauto_designer_observations_publication["observations.publication"]
-    nauto_designer_observations_transport["observations.transport"]
-    nauto_designer_tracker["auto_designer.tracker"]
-    nauto_designer_tracker_attachment_transport["tracker.attachment_transport"]
-    nauto_designer_tracker_base["tracker.base"]
-    nauto_designer_tracker_fake["tracker.fake"]
-    nauto_designer_tracker_gitea["tracker.gitea"]
-    nauto_designer_usage["auto_designer.usage"]
-    nauto_designer_user["auto_designer.user"]
-    nauto_designer_user_patches["user.patches"]
-    nauto_designer_user_session_store["user.session_store"]
-    nauto_designer_user_sim["user.sim"]
-    nauto_designer_user_sim_action_space["sim.action_space"]
-    nauto_designer_user_sim_actions["sim.actions"]
-    nauto_designer_user_sim_clauses["sim.clauses"]
-    nauto_designer_user_sim_demo["sim.demo"]
-    nauto_designer_user_sim_deps["sim.deps"]
-    nauto_designer_user_sim_dimensions["sim.dimensions"]
-    nauto_designer_user_sim_feeling["sim.feeling"]
-    nauto_designer_user_sim_goals["sim.goals"]
-    nauto_designer_user_sim_harness_adapter["sim.harness_adapter"]
-    nauto_designer_user_sim_loop["sim.loop"]
-    nauto_designer_user_sim_persona_client["sim.persona_client"]
-    nauto_designer_user_sim_persona_io["sim.persona_io"]
-    nauto_designer_user_sim_prompt["sim.prompt"]
-    nauto_designer_user_sim_run_agentic["sim.run_agentic"]
-    nauto_designer_user_sim_run_live["sim.run_live"]
-    nauto_designer_user_sim_runtime["sim.runtime"]
-    nauto_designer_user_sim_sandbox["sim.sandbox"]
-    nauto_designer_user_sim_scenarios["sim.scenarios"]
-    nauto_designer_user_sim_seed_source["sim.seed_source"]
-    nauto_designer_user_sim_skills["sim.skills"]
-    nauto_designer_user_sim_sources["sim.sources"]
-    nauto_designer_user_sim_sources_container["sources.container"]
-    nauto_designer_user_sim_sources_docker_seed["sources.docker_seed"]
-    nauto_designer_user_sim_sources_empty["sources.empty"]
-    nauto_designer_user_sim_sources_git["sources.git"]
-    nauto_designer_user_sim_sources_local_fixture["sources.local_fixture"]
-    nauto_designer_user_sim_sources_prebuilt["sources.prebuilt"]
-    nauto_designer_user_sim_state["sim.state"]
-    nauto_designer_user_sim_tools["sim.tools"]
-    nauto_designer_user_sim_workspace["sim.workspace"]
-    nauto_designer_web["auto_designer.web"]
-    nauto_designer_web_api["web.api"]
-    nauto_designer_web_issue_timeline["web.issue_timeline"]
-    nauto_designer_demand_agent_contract --> nauto_designer_demand_issue_schema
-    nauto_designer_demand_agent_runtime --> nauto_designer_demand_evidence_contract
-    nauto_designer_demand_agent_runtime --> nauto_designer_demand_observation_provider
-    nauto_designer_demand_agent_runtime --> nauto_designer_demand_session_timeline
-    nauto_designer_demand_agent_runtime --> nauto_designer_demand_source
-    nauto_designer_demand_agent_runtime --> nauto_designer_invocation
-    nauto_designer_demand_agent_runtime --> nauto_designer_loop_live_tracer
-    nauto_designer_demand_agent_runtime --> nauto_designer_observations_gaps
-    nauto_designer_demand_agent_runtime --> nauto_designer_observations_grants
-    nauto_designer_demand_agent_runtime --> nauto_designer_usage
-    nauto_designer_demand_agent_runtime --> nauto_designer_user_session_store
-    nauto_designer_demand_delivery_evidence --> nauto_designer_demand_evidence_contract
-    nauto_designer_demand_delivery_evidence --> nauto_designer_execution_contract
-    nauto_designer_demand_delivery_evidence --> nauto_designer_observations_grants
-    nauto_designer_demand_delivery_evidence --> nauto_designer_observations_publication
-    nauto_designer_demand_delivery_evidence --> nauto_designer_observations_transport
-    nauto_designer_demand_divergent --> nauto_designer_demand_agent_runtime
-    nauto_designer_demand_divergent --> nauto_designer_demand_evidence_contract
-    nauto_designer_demand_divergent --> nauto_designer_demand_issue_schema
-    nauto_designer_demand_divergent --> nauto_designer_demand_proposal_view
-    nauto_designer_demand_divergent --> nauto_designer_demand_role_contract
-    nauto_designer_demand_divergent --> nauto_designer_loop_recovery
-    nauto_designer_demand_divergent --> nauto_designer_models
-    nauto_designer_demand_divergent --> nauto_designer_observations_grants
-    nauto_designer_demand_divergent --> nauto_designer_tracker_base
-    nauto_designer_demand_divergent --> nauto_designer_usage
-    nauto_designer_demand_divergent --> nauto_designer_user_session_store
-    nauto_designer_demand_evidence_contract --> nauto_designer_execution_contract
-    nauto_designer_demand_evidence_contract --> nauto_designer_models
-    nauto_designer_demand_evidence_contract --> nauto_designer_usage
-    nauto_designer_demand_grouped_synthesizer --> nauto_designer_demand_issue_schema
-    nauto_designer_demand_grouped_synthesizer --> nauto_designer_demand_proposal_view
-    nauto_designer_demand_grouped_synthesizer --> nauto_designer_demand_synthesizer
-    nauto_designer_demand_grouped_synthesizer --> nauto_designer_loop_recovery
-    nauto_designer_demand_grouped_synthesizer --> nauto_designer_models
-    nauto_designer_demand_grouped_synthesizer --> nauto_designer_observations_delivery_gaps
-    nauto_designer_demand_grouped_synthesizer --> nauto_designer_usage
-    nauto_designer_demand_observation_provider --> nauto_designer_demand_evidence_contract
-    nauto_designer_demand_observation_provider --> nauto_designer_invocation
-    nauto_designer_demand_observation_provider --> nauto_designer_user_session_store
-    nauto_designer_demand_owner --> nauto_designer_demand_agent_runtime
-    nauto_designer_demand_owner --> nauto_designer_demand_delivery_evidence
-    nauto_designer_demand_owner --> nauto_designer_demand_issue_schema
-    nauto_designer_demand_owner --> nauto_designer_demand_proposal_view
-    nauto_designer_demand_owner --> nauto_designer_demand_role_contract
-    nauto_designer_demand_owner --> nauto_designer_loop_recovery
-    nauto_designer_demand_owner --> nauto_designer_models
-    nauto_designer_demand_owner --> nauto_designer_observations_grants
-    nauto_designer_demand_owner --> nauto_designer_tracker_base
-    nauto_designer_demand_owner --> nauto_designer_usage
-    nauto_designer_demand_owner --> nauto_designer_user_session_store
-    nauto_designer_demand_proposal_view --> nauto_designer_demand_evidence_contract
-    nauto_designer_demand_proposal_view --> nauto_designer_demand_issue_schema
-    nauto_designer_demand_proposal_view --> nauto_designer_observations_grants
-    nauto_designer_demand_runtime_agg --> nauto_designer_models
-    nauto_designer_demand_runtime_agg --> nauto_designer_user_session_store
-    nauto_designer_demand_session_timeline --> nauto_designer_demand_evidence_contract
-    nauto_designer_demand_session_timeline --> nauto_designer_demand_observation_provider
-    nauto_designer_demand_session_timeline --> nauto_designer_models
-    nauto_designer_demand_session_timeline --> nauto_designer_usage
-    nauto_designer_demand_session_timeline --> nauto_designer_user_session_store
-    nauto_designer_demand_synthesizer --> nauto_designer_demand_agent_runtime
-    nauto_designer_demand_synthesizer --> nauto_designer_demand_issue_schema
-    nauto_designer_demand_synthesizer --> nauto_designer_demand_proposal_view
-    nauto_designer_demand_synthesizer --> nauto_designer_demand_role_contract
-    nauto_designer_demand_synthesizer --> nauto_designer_loop_recovery
-    nauto_designer_demand_synthesizer --> nauto_designer_models
-    nauto_designer_demand_synthesizer --> nauto_designer_observations_delivery_gaps
-    nauto_designer_demand_synthesizer --> nauto_designer_observations_grants
-    nauto_designer_demand_synthesizer --> nauto_designer_tracker_base
-    nauto_designer_demand_synthesizer --> nauto_designer_usage
-    nauto_designer_demand_synthesizer --> nauto_designer_user_session_store
-    nauto_designer_demand_triage --> nauto_designer_demand_agent_runtime
-    nauto_designer_demand_triage --> nauto_designer_demand_evidence_contract
-    nauto_designer_demand_triage --> nauto_designer_demand_issue_schema
-    nauto_designer_demand_triage --> nauto_designer_demand_role_contract
-    nauto_designer_demand_triage --> nauto_designer_demand_source
-    nauto_designer_demand_triage --> nauto_designer_loop_recovery
-    nauto_designer_demand_triage --> nauto_designer_observations_grants
-    nauto_designer_demand_triage --> nauto_designer_tracker_base
-    nauto_designer_demand_triage --> nauto_designer_tracker_gitea
-    nauto_designer_demand_triage --> nauto_designer_usage
-    nauto_designer_demand_triage --> nauto_designer_user_session_store
-    nauto_designer_distill --> nauto_designer_distill_library
-    nauto_designer_distill_seed_adapter --> nauto_designer_distill_seed_library
-    nauto_designer_distill_seed_adapter --> nauto_designer_models
-    nauto_designer_evaluation_acceptance --> nauto_designer_evaluation_results
-    nauto_designer_evaluation_adapters_container --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_adapters_container
-    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_adapters_terminal_bench
-    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_adapters_custom --> nauto_designer_evaluation_results
-    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_adapters_container
-    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_adapters_terminal_bench
-    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_adapters_nl2repo --> nauto_designer_evaluation_results
-    nauto_designer_evaluation_adapters_profiles --> nauto_designer_evaluation_adapters_container
-    nauto_designer_evaluation_adapters_profiles --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_adapters_container
-    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_adapters_swebench --> nauto_designer_evaluation_results
-    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_adapters_container
-    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_adapters_profiles
-    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_adapters_terminal_bench --> nauto_designer_evaluation_results
-    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_container
-    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_profiles
-    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_adapters_terminal_bench
-    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_adapters_tua_bench --> nauto_designer_evaluation_results
-    nauto_designer_evaluation_artifacts --> nauto_designer_user_sim_runtime
-    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_custom
-    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_nl2repo
-    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_swebench
-    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_terminal_bench
-    nauto_designer_evaluation_registry --> nauto_designer_evaluation_adapters_tua_bench
-    nauto_designer_evaluation_registry --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_results --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_service --> nauto_designer_evaluation_contracts
-    nauto_designer_evaluation_service --> nauto_designer_evaluation_registry
-    nauto_designer_evaluation_service --> nauto_designer_evaluation_results
-    nauto_designer_evaluation_service --> nauto_designer_execution_contract
-    nauto_designer_evaluation_service --> nauto_designer_experiment_config
-    nauto_designer_experiment_assessment_worker --> nauto_designer_evaluation_contracts
-    nauto_designer_experiment_assessment_worker --> nauto_designer_evaluation_service
-    nauto_designer_experiment_assessment_worker --> nauto_designer_execution_contract
-    nauto_designer_experiment_assessment_worker --> nauto_designer_experiment_config
-    nauto_designer_experiment_assessment_worker --> nauto_designer_experiment_grading
-    nauto_designer_experiment_assessment_worker --> nauto_designer_experiment_grading_inputs
-    nauto_designer_experiment_assessment_worker --> nauto_designer_experiment_runtime
-    nauto_designer_experiment_assessment_worker --> nauto_designer_loop_round_assessment
-    nauto_designer_experiment_backends --> nauto_designer_experiment_backends_base
-    nauto_designer_experiment_backends_base --> nauto_designer_experiment_config
-    nauto_designer_experiment_backends_e2b --> nauto_designer_demand_delivery_evidence
-    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_base
-    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_bootstrap
-    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_backends_e2b_template
-    nauto_designer_experiment_backends_e2b --> nauto_designer_experiment_workload
-    nauto_designer_experiment_backends_e2b --> nauto_designer_loop_round_assessment
-    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_backends_base
-    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_config
-    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_materials
-    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_task_environments_docker
-    nauto_designer_experiment_backends_e2b_bootstrap --> nauto_designer_experiment_task_environments_materials
-    nauto_designer_experiment_backends_e2b_template --> nauto_designer_experiment_backends_base
-    nauto_designer_experiment_backends_e2b_template --> nauto_designer_experiment_workload
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_base
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_e2b_bootstrap
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_backends_local_ci
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_collection
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_config
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_context
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_engine
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_infrastructure
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_materials
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_task_environments
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_task_environments_docker
-    nauto_designer_experiment_backends_local --> nauto_designer_experiment_workload
-    nauto_designer_experiment_backends_local --> nauto_designer_loop_round_assessment
-    nauto_designer_experiment_backends_local --> nauto_designer_observations_transport
-    nauto_designer_experiment_backends_local_ci --> nauto_designer_experiment_backends_base
-    nauto_designer_experiment_backends_local_ci --> nauto_designer_experiment_infrastructure
-    nauto_designer_experiment_batch --> nauto_designer_experiment
-    nauto_designer_experiment_batch --> nauto_designer_experiment_batch_config
-    nauto_designer_experiment_batch --> nauto_designer_experiment_batch_store
-    nauto_designer_experiment_batch --> nauto_designer_experiment_config
-    nauto_designer_experiment_batch --> nauto_designer_experiment_manifest
-    nauto_designer_experiment_batch --> nauto_designer_experiment_runtime
-    nauto_designer_experiment_batch_config --> nauto_designer_experiment
-    nauto_designer_experiment_batch_config --> nauto_designer_experiment_config
-    nauto_designer_experiment_batch_config --> nauto_designer_experiment_materials
-    nauto_designer_experiment_batch_config --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_experiment_batch_store --> nauto_designer_experiment
-    nauto_designer_experiment_batch_store --> nauto_designer_experiment_batch_config
-    nauto_designer_experiment_batch_store --> nauto_designer_experiment_config
-    nauto_designer_experiment_batch_store --> nauto_designer_experiment_manifest
-    nauto_designer_experiment_batch_store --> nauto_designer_experiment_materials
-    nauto_designer_experiment_batch_store --> nauto_designer_experiment_runtime
-    nauto_designer_experiment_batch_store --> nauto_designer_experiment_workload
-    nauto_designer_experiment_cli --> nauto_designer_experiment
-    nauto_designer_experiment_cli --> nauto_designer_experiment_assessment_worker
-    nauto_designer_experiment_cli --> nauto_designer_experiment_batch
-    nauto_designer_experiment_cli --> nauto_designer_experiment_config
-    nauto_designer_experiment_cli --> nauto_designer_experiment_dashboard
-    nauto_designer_experiment_cli --> nauto_designer_experiment_grading
-    nauto_designer_experiment_cli --> nauto_designer_experiment_runtime
-    nauto_designer_experiment_cli --> nauto_designer_experiment_task_import
-    nauto_designer_experiment_collection --> nauto_designer_experiment_config
-    nauto_designer_experiment_collection --> nauto_designer_experiment_continuation_export
-    nauto_designer_experiment_collection --> nauto_designer_experiment_materials
-    nauto_designer_experiment_config --> nauto_designer_experiment_model_limits
-    nauto_designer_experiment_config --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_experiment_config --> nauto_designer_experiment_workload
-    nauto_designer_experiment_context --> nauto_designer_execution_contract
-    nauto_designer_experiment_context --> nauto_designer_experiment_config
-    nauto_designer_experiment_context --> nauto_designer_experiment_workload
-    nauto_designer_experiment_context --> nauto_designer_models
-    nauto_designer_experiment_continuation_evidence --> nauto_designer_demand_evidence_contract
-    nauto_designer_experiment_continuation_evidence --> nauto_designer_experiment_config
-    nauto_designer_experiment_continuation_evidence --> nauto_designer_models
-    nauto_designer_experiment_continuation_evidence --> nauto_designer_observations_grants
-    nauto_designer_experiment_continuation_evidence --> nauto_designer_observations_publication
-    nauto_designer_experiment_continuation_evidence --> nauto_designer_user_session_store
-    nauto_designer_experiment_continuation_export --> nauto_designer_demand_issue_schema
-    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_config
-    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_materials
-    nauto_designer_experiment_continuation_export --> nauto_designer_experiment_workload
-    nauto_designer_experiment_continuation_export --> nauto_designer_loop_recovery
-    nauto_designer_experiment_continuation_forge --> nauto_designer_demand_issue_schema
-    nauto_designer_experiment_continuation_forge --> nauto_designer_experiment_config
-    nauto_designer_experiment_continuation_forge --> nauto_designer_loop_recovery
-    nauto_designer_experiment_continuation_forge --> nauto_designer_models
-    nauto_designer_experiment_continuation_forge --> nauto_designer_tracker_base
-    nauto_designer_experiment_continuation_source --> nauto_designer_demand_issue_schema
-    nauto_designer_experiment_continuation_source --> nauto_designer_experiment_config
-    nauto_designer_experiment_continuation_source --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_experiment_continuation_source --> nauto_designer_experiment_workload
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_divergent
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_grouped_synthesizer
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_owner
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_synthesizer
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_demand_triage
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_config
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_context
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_continuation_evidence
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_continuation_forge
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_experiment_materials
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_loop_feedback_pipeline
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_loop_recovery
-    nauto_designer_experiment_controllers_feedback --> nauto_designer_observations_grants
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_demand_issue_schema
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_guards_harness_boundary
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_invocation
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_live
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_recovery
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_loop_sim_user
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_observations_preflight
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_observations_transport
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_tracker_attachment_transport
-    nauto_designer_experiment_controllers_runtime --> nauto_designer_tracker_gitea
-    nauto_designer_experiment_controllers_unified --> nauto_designer_distill_library
-    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_collection
-    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_config
-    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_context
-    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_continuation_export
-    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers
-    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers_feedback
-    nauto_designer_experiment_controllers_unified --> nauto_designer_experiment_controllers_runtime
-    nauto_designer_experiment_controllers_unified --> nauto_designer_guards_repo_guard
-    nauto_designer_experiment_controllers_unified --> nauto_designer_harness_launcher
-    nauto_designer_experiment_controllers_unified --> nauto_designer_invocation
-    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_live
-    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_metrics
-    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_orchestrator
-    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_roster
-    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_round_assessment
-    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_round_gate
-    nauto_designer_experiment_controllers_unified --> nauto_designer_loop_sim_user
-    nauto_designer_experiment_controllers_unified --> nauto_designer_models
-    nauto_designer_experiment_controllers_unified --> nauto_designer_tracker_gitea
-    nauto_designer_experiment_controllers_unified --> nauto_designer_usage
-    nauto_designer_experiment_controllers_unified --> nauto_designer_user_session_store
-    nauto_designer_experiment_controllers_unified --> nauto_designer_user_sim_persona_client
-    nauto_designer_experiment_controllers_unified --> nauto_designer_user_sim_persona_io
-    nauto_designer_experiment_dashboard --> nauto_designer_experiment_config
-    nauto_designer_experiment_dashboard --> nauto_designer_experiment_manifest
-    nauto_designer_experiment_dashboard --> nauto_designer_experiment_materials
-    nauto_designer_experiment_dashboard --> nauto_designer_experiment_runtime
-    nauto_designer_experiment_dashboard --> nauto_designer_tracker_gitea
-    nauto_designer_experiment_dashboard --> nauto_designer_usage
-    nauto_designer_experiment_dashboard --> nauto_designer_user_session_store
-    nauto_designer_experiment_dashboard --> nauto_designer_web_api
-    nauto_designer_experiment_engine --> nauto_designer_experiment_config
-    nauto_designer_experiment_engine --> nauto_designer_experiment_context
-    nauto_designer_experiment_engine --> nauto_designer_experiment_materials
-    nauto_designer_experiment_grading --> nauto_designer_evaluation_acceptance
-    nauto_designer_experiment_grading --> nauto_designer_evaluation_contracts
-    nauto_designer_experiment_grading --> nauto_designer_evaluation_registry
-    nauto_designer_experiment_grading --> nauto_designer_evaluation_service
-    nauto_designer_experiment_grading --> nauto_designer_experiment_config
-    nauto_designer_experiment_grading --> nauto_designer_experiment_grading_inputs
-    nauto_designer_experiment_grading --> nauto_designer_experiment_manifest
-    nauto_designer_experiment_grading --> nauto_designer_experiment_materials
-    nauto_designer_experiment_grading --> nauto_designer_experiment_runtime
-    nauto_designer_experiment_grading --> nauto_designer_experiment_workload
-    nauto_designer_experiment_grading --> nauto_designer_loop_recovery
-    nauto_designer_experiment_grading --> nauto_designer_models
-    nauto_designer_experiment_grading_inputs --> nauto_designer_evaluation_contracts
-    nauto_designer_experiment_grading_inputs --> nauto_designer_experiment_config
-    nauto_designer_experiment_grading_inputs --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_experiment_infrastructure --> nauto_designer_experiment_backends_local_ci
-    nauto_designer_experiment_infrastructure --> nauto_designer_experiment_config
-    nauto_designer_experiment_manifest --> nauto_designer_experiment_config
-    nauto_designer_experiment_materials --> nauto_designer_distill_library
-    nauto_designer_experiment_materials --> nauto_designer_experiment_assessment_worker
-    nauto_designer_experiment_materials --> nauto_designer_experiment_config
-    nauto_designer_experiment_materials --> nauto_designer_experiment_continuation_forge
-    nauto_designer_experiment_materials --> nauto_designer_experiment_continuation_source
-    nauto_designer_experiment_materials --> nauto_designer_experiment_task_environments_materials
-    nauto_designer_experiment_materials --> nauto_designer_experiment_workload
-    nauto_designer_experiment_materials --> nauto_designer_user_sim_persona_io
-    nauto_designer_experiment_model_limits --> nauto_designer_experiment_config
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_assessment_worker
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_e2b
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_backends_local
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_collection
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_config
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_engine
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_manifest
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_materials
-    nauto_designer_experiment_runtime --> nauto_designer_experiment_workload
-    nauto_designer_experiment_task_environments_docker --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_experiment_task_environments_docker --> nauto_designer_experiment_task_environments_materials
-    nauto_designer_experiment_task_environments_docker --> nauto_designer_observations_publication
-    nauto_designer_experiment_task_environments_docker --> nauto_designer_user_sim_runtime
-    nauto_designer_experiment_task_environments_materials --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_experiment_task_import --> nauto_designer_distill_seed_library
-    nauto_designer_experiment_task_import --> nauto_designer_experiment_config
-    nauto_designer_experiment_task_import --> nauto_designer_experiment_workload
-    nauto_designer_experiment_workload --> nauto_designer_experiment_config
-    nauto_designer_experiment_workload --> nauto_designer_experiment_context
-    nauto_designer_experiment_workload --> nauto_designer_experiment_materials
-    nauto_designer_experiment_workload --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_guards_workspace_jail --> nauto_designer_demand_observation_provider
-    nauto_designer_guards_workspace_jail --> nauto_designer_usage
-    nauto_designer_harness_connector --> nauto_designer_harness_interface
-    nauto_designer_harness_connector --> nauto_designer_usage
-    nauto_designer_harness_launcher --> nauto_designer_execution_contract
-    nauto_designer_harness_launcher --> nauto_designer_harness_budget
-    nauto_designer_harness_launcher --> nauto_designer_harness_interface
-    nauto_designer_harness_launcher --> nauto_designer_observations_publication
-    nauto_designer_harness_launcher --> nauto_designer_user_sim_runtime
-    nauto_designer_invocation --> nauto_designer_usage
-    nauto_designer_loop_feedback_pipeline --> nauto_designer_demand_source
-    nauto_designer_loop_feedback_pipeline --> nauto_designer_loop_recovery
-    nauto_designer_loop_feedback_pipeline --> nauto_designer_loop_round_gate
-    nauto_designer_loop_feedback_pipeline --> nauto_designer_models
-    nauto_designer_loop_feedback_pipeline --> nauto_designer_usage
-    nauto_designer_loop_live_tracer --> nauto_designer_usage
-    nauto_designer_loop_metrics --> nauto_designer_demand_issue_schema
-    nauto_designer_loop_metrics --> nauto_designer_tracker_base
-    nauto_designer_loop_metrics --> nauto_designer_user_session_store
-    nauto_designer_loop_orchestrator --> nauto_designer_demand_divergent
-    nauto_designer_loop_orchestrator --> nauto_designer_demand_source
-    nauto_designer_loop_orchestrator --> nauto_designer_demand_synthesizer
-    nauto_designer_loop_orchestrator --> nauto_designer_harness_interface
-    nauto_designer_loop_orchestrator --> nauto_designer_harness_launcher
-    nauto_designer_loop_orchestrator --> nauto_designer_loop_feedback_pipeline
-    nauto_designer_loop_orchestrator --> nauto_designer_loop_recovery
-    nauto_designer_loop_orchestrator --> nauto_designer_loop_round_gate
-    nauto_designer_loop_orchestrator --> nauto_designer_models
-    nauto_designer_loop_orchestrator --> nauto_designer_usage
-    nauto_designer_loop_orchestrator --> nauto_designer_user_sim_deps
-    nauto_designer_loop_orchestrator --> nauto_designer_user_sim_runtime
-    nauto_designer_loop_orchestrator --> nauto_designer_user_sim_workspace
-    nauto_designer_loop_round_assessment --> nauto_designer_execution_contract
-    nauto_designer_loop_round_assessment --> nauto_designer_experiment_config
-    nauto_designer_loop_round_assessment --> nauto_designer_experiment_workload
-    nauto_designer_loop_round_assessment --> nauto_designer_loop_recovery
-    nauto_designer_loop_runner --> nauto_designer_loop_checkpoint
-    nauto_designer_loop_runner --> nauto_designer_loop_orchestrator
-    nauto_designer_loop_runner --> nauto_designer_loop_run_state
-    nauto_designer_loop_sim_user --> nauto_designer_demand_evidence_contract
-    nauto_designer_loop_sim_user --> nauto_designer_demand_issue_schema
-    nauto_designer_loop_sim_user --> nauto_designer_evaluation_artifacts
-    nauto_designer_loop_sim_user --> nauto_designer_execution_contract
-    nauto_designer_loop_sim_user --> nauto_designer_harness_connector
-    nauto_designer_loop_sim_user --> nauto_designer_harness_interface
-    nauto_designer_loop_sim_user --> nauto_designer_loop_recovery
-    nauto_designer_loop_sim_user --> nauto_designer_models
-    nauto_designer_loop_sim_user --> nauto_designer_observations_preflight
-    nauto_designer_loop_sim_user --> nauto_designer_observations_publication
-    nauto_designer_loop_sim_user --> nauto_designer_tracker_base
-    nauto_designer_loop_sim_user --> nauto_designer_usage
-    nauto_designer_loop_sim_user --> nauto_designer_user_patches
-    nauto_designer_loop_sim_user --> nauto_designer_user_session_store
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_deps
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_dimensions
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_feeling
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_loop
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_persona_client
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_prompt
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_runtime
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_seed_source
-    nauto_designer_loop_sim_user --> nauto_designer_user_sim_workspace
-    nauto_designer_models --> nauto_designer_execution_contract
-    nauto_designer_models --> nauto_designer_usage
-    nauto_designer_observations___main__ --> nauto_designer_observations_publication
-    nauto_designer_observations_delivery_gaps --> nauto_designer_observations_gaps
-    nauto_designer_observations_delivery_gaps --> nauto_designer_observations_grants
-    nauto_designer_observations_gaps --> nauto_designer_demand_issue_schema
-    nauto_designer_observations_gaps --> nauto_designer_invocation
-    nauto_designer_observations_gaps --> nauto_designer_models
-    nauto_designer_observations_gaps --> nauto_designer_observations_grants
-    nauto_designer_observations_gaps --> nauto_designer_usage
-    nauto_designer_observations_grants --> nauto_designer_observations_publication
-    nauto_designer_observations_preflight --> nauto_designer_observations_publication
-    nauto_designer_observations_preflight --> nauto_designer_observations_transport
-    nauto_designer_observations_publication --> nauto_designer_invocation
-    nauto_designer_tracker_base --> nauto_designer_models
-    nauto_designer_tracker_fake --> nauto_designer_models
-    nauto_designer_tracker_fake --> nauto_designer_tracker_base
-    nauto_designer_tracker_gitea --> nauto_designer_models
-    nauto_designer_tracker_gitea --> nauto_designer_observations_transport
-    nauto_designer_tracker_gitea --> nauto_designer_tracker_attachment_transport
-    nauto_designer_tracker_gitea --> nauto_designer_tracker_base
-    nauto_designer_user_session_store --> nauto_designer_demand_evidence_contract
-    nauto_designer_user_session_store --> nauto_designer_execution_contract
-    nauto_designer_user_session_store --> nauto_designer_models
-    nauto_designer_user_sim --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim --> nauto_designer_user_sim_feeling
-    nauto_designer_user_sim --> nauto_designer_user_sim_harness_adapter
-    nauto_designer_user_sim --> nauto_designer_user_sim_loop
-    nauto_designer_user_sim --> nauto_designer_user_sim_persona_client
-    nauto_designer_user_sim --> nauto_designer_user_sim_persona_io
-    nauto_designer_user_sim_action_space --> nauto_designer_user_sim_actions
-    nauto_designer_user_sim_action_space --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_action_space --> nauto_designer_user_sim_state
-    nauto_designer_user_sim_clauses --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_demo --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_demo --> nauto_designer_user_sim_harness_adapter
-    nauto_designer_user_sim_demo --> nauto_designer_user_sim_loop
-    nauto_designer_user_sim_demo --> nauto_designer_user_sim_persona_client
-    nauto_designer_user_sim_demo --> nauto_designer_user_sim_state
-    nauto_designer_user_sim_deps --> nauto_designer_models
-    nauto_designer_user_sim_deps --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_loop --> nauto_designer_usage
-    nauto_designer_user_sim_loop --> nauto_designer_user_sim_action_space
-    nauto_designer_user_sim_loop --> nauto_designer_user_sim_actions
-    nauto_designer_user_sim_loop --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_loop --> nauto_designer_user_sim_feeling
-    nauto_designer_user_sim_loop --> nauto_designer_user_sim_goals
-    nauto_designer_user_sim_loop --> nauto_designer_user_sim_persona_client
-    nauto_designer_user_sim_loop --> nauto_designer_user_sim_prompt
-    nauto_designer_user_sim_loop --> nauto_designer_user_sim_state
-    nauto_designer_user_sim_persona_client --> nauto_designer_usage
-    nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_actions
-    nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_prompt
-    nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_sandbox
-    nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_skills
-    nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_state
-    nauto_designer_user_sim_persona_client --> nauto_designer_user_sim_tools
-    nauto_designer_user_sim_persona_io --> nauto_designer_distill_library
-    nauto_designer_user_sim_persona_io --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_prompt --> nauto_designer_user_sim_clauses
-    nauto_designer_user_sim_prompt --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_prompt --> nauto_designer_user_sim_skills
-    nauto_designer_user_sim_prompt --> nauto_designer_user_sim_state
-    nauto_designer_user_sim_prompt --> nauto_designer_user_sim_tools
-    nauto_designer_user_sim_run_agentic --> nauto_designer_models
-    nauto_designer_user_sim_run_agentic --> nauto_designer_user_sim_demo
-    nauto_designer_user_sim_run_agentic --> nauto_designer_user_sim_loop
-    nauto_designer_user_sim_run_agentic --> nauto_designer_user_sim_persona_client
-    nauto_designer_user_sim_run_agentic --> nauto_designer_user_sim_run_live
-    nauto_designer_user_sim_run_agentic --> nauto_designer_user_sim_sandbox
-    nauto_designer_user_sim_run_agentic --> nauto_designer_user_sim_scenarios
-    nauto_designer_user_sim_run_agentic --> nauto_designer_user_sim_workspace
-    nauto_designer_user_sim_run_live --> nauto_designer_user_sim_demo
-    nauto_designer_user_sim_run_live --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_run_live --> nauto_designer_user_sim_loop
-    nauto_designer_user_sim_run_live --> nauto_designer_user_sim_persona_client
-    nauto_designer_user_sim_run_live --> nauto_designer_user_sim_scenarios
-    nauto_designer_user_sim_sandbox --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_seed_source --> nauto_designer_models
-    nauto_designer_user_sim_seed_source --> nauto_designer_user_sim
-    nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_seed_source --> nauto_designer_user_sim_sources
-    nauto_designer_user_sim_skills --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_sources_container --> nauto_designer_experiment_task_environments_contract
-    nauto_designer_user_sim_sources_container --> nauto_designer_experiment_task_environments_docker
-    nauto_designer_user_sim_sources_container --> nauto_designer_models
-    nauto_designer_user_sim_sources_container --> nauto_designer_usage
-    nauto_designer_user_sim_sources_container --> nauto_designer_user_sim_seed_source
-    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_models
-    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_usage
-    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_sources_docker_seed --> nauto_designer_user_sim_seed_source
-    nauto_designer_user_sim_sources_empty --> nauto_designer_models
-    nauto_designer_user_sim_sources_empty --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_sources_empty --> nauto_designer_user_sim_seed_source
-    nauto_designer_user_sim_sources_git --> nauto_designer_models
-    nauto_designer_user_sim_sources_git --> nauto_designer_user_sim_seed_source
-    nauto_designer_user_sim_sources_local_fixture --> nauto_designer_models
-    nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_seed_source
-    nauto_designer_user_sim_sources_local_fixture --> nauto_designer_user_sim_workspace
-    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_models
-    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_usage
-    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_deps
-    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_sources_prebuilt --> nauto_designer_user_sim_seed_source
-    nauto_designer_user_sim_state --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_tools --> nauto_designer_user_sim_dimensions
-    nauto_designer_user_sim_tools --> nauto_designer_user_sim_sandbox
-    nauto_designer_user_sim_workspace --> nauto_designer_models
-    nauto_designer_user_sim_workspace --> nauto_designer_user_sim_runtime
-    nauto_designer_user_sim_workspace --> nauto_designer_user_sim_seed_source
-    nauto_designer_web_api --> nauto_designer_demand_issue_schema
-    nauto_designer_web_api --> nauto_designer_loop_live
-    nauto_designer_web_api --> nauto_designer_loop_metrics
-    nauto_designer_web_api --> nauto_designer_loop_roster
-    nauto_designer_web_api --> nauto_designer_tracker_base
-    nauto_designer_web_api --> nauto_designer_tracker_gitea
-    nauto_designer_web_api --> nauto_designer_usage
-    nauto_designer_web_api --> nauto_designer_user_session_store
-    nauto_designer_web_api --> nauto_designer_web_issue_timeline
-    nauto_designer_web_issue_timeline --> nauto_designer_demand_issue_schema
+    nahe_beta["ahe_beta"]
+    nahe_beta_demand["ahe_beta.demand"]
+    nahe_beta_demand_agent_contract["demand.agent_contract"]
+    nahe_beta_demand_agent_runtime["demand.agent_runtime"]
+    nahe_beta_demand_architect["demand.architect"]
+    nahe_beta_demand_delivery_evidence["demand.delivery_evidence"]
+    nahe_beta_demand_divergent["demand.divergent"]
+    nahe_beta_demand_evidence_contract["demand.evidence_contract"]
+    nahe_beta_demand_grouped_architect["demand.grouped_architect"]
+    nahe_beta_demand_issue_schema["demand.issue_schema"]
+    nahe_beta_demand_observation_provider["demand.observation_provider"]
+    nahe_beta_demand_owner["demand.owner"]
+    nahe_beta_demand_proposal_view["demand.proposal_view"]
+    nahe_beta_demand_role_contract["demand.role_contract"]
+    nahe_beta_demand_runtime_agg["demand.runtime_agg"]
+    nahe_beta_demand_session_timeline["demand.session_timeline"]
+    nahe_beta_demand_source["demand.source"]
+    nahe_beta_demand_submit_tools["demand.submit_tools"]
+    nahe_beta_demand_triage["demand.triage"]
+    nahe_beta_distill["ahe_beta.distill"]
+    nahe_beta_distill_library["distill.library"]
+    nahe_beta_distill_seed_adapter["distill.seed_adapter"]
+    nahe_beta_distill_seed_library["distill.seed_library"]
+    nahe_beta_evaluation["ahe_beta.evaluation"]
+    nahe_beta_evaluation_acceptance["evaluation.acceptance"]
+    nahe_beta_evaluation_adapters["evaluation.adapters"]
+    nahe_beta_evaluation_adapters_container["adapters.container"]
+    nahe_beta_evaluation_adapters_custom["adapters.custom"]
+    nahe_beta_evaluation_adapters_nl2repo["adapters.nl2repo"]
+    nahe_beta_evaluation_adapters_profiles["adapters.profiles"]
+    nahe_beta_evaluation_adapters_swebench["adapters.swebench"]
+    nahe_beta_evaluation_adapters_terminal_bench["adapters.terminal_bench"]
+    nahe_beta_evaluation_adapters_tua_bench["adapters.tua_bench"]
+    nahe_beta_evaluation_artifacts["evaluation.artifacts"]
+    nahe_beta_evaluation_contracts["evaluation.contracts"]
+    nahe_beta_evaluation_registry["evaluation.registry"]
+    nahe_beta_evaluation_results["evaluation.results"]
+    nahe_beta_evaluation_service["evaluation.service"]
+    nahe_beta_execution_contract["ahe_beta.execution_contract"]
+    nahe_beta_experiment["ahe_beta.experiment"]
+    nahe_beta_experiment_assessment_worker["experiment.assessment_worker"]
+    nahe_beta_experiment_backends["experiment.backends"]
+    nahe_beta_experiment_backends_base["backends.base"]
+    nahe_beta_experiment_backends_e2b["backends.e2b"]
+    nahe_beta_experiment_backends_e2b_bootstrap["backends.e2b_bootstrap"]
+    nahe_beta_experiment_backends_e2b_template["backends.e2b_template"]
+    nahe_beta_experiment_backends_local["backends.local"]
+    nahe_beta_experiment_backends_local_ci["backends.local_ci"]
+    nahe_beta_experiment_batch["experiment.batch"]
+    nahe_beta_experiment_batch_config["experiment.batch_config"]
+    nahe_beta_experiment_batch_store["experiment.batch_store"]
+    nahe_beta_experiment_cli["experiment.cli"]
+    nahe_beta_experiment_collection["experiment.collection"]
+    nahe_beta_experiment_config["experiment.config"]
+    nahe_beta_experiment_context["experiment.context"]
+    nahe_beta_experiment_continuation["experiment.continuation"]
+    nahe_beta_experiment_continuation_evidence["continuation.evidence"]
+    nahe_beta_experiment_continuation_export["continuation.export"]
+    nahe_beta_experiment_continuation_forge["continuation.forge"]
+    nahe_beta_experiment_continuation_source["continuation.source"]
+    nahe_beta_experiment_controllers["experiment.controllers"]
+    nahe_beta_experiment_controllers_feedback["controllers.feedback"]
+    nahe_beta_experiment_controllers_runtime["controllers.runtime"]
+    nahe_beta_experiment_controllers_unified["controllers.unified"]
+    nahe_beta_experiment_dashboard["experiment.dashboard"]
+    nahe_beta_experiment_engine["experiment.engine"]
+    nahe_beta_experiment_grading["experiment.grading"]
+    nahe_beta_experiment_grading_inputs["experiment.grading_inputs"]
+    nahe_beta_experiment_infrastructure["experiment.infrastructure"]
+    nahe_beta_experiment_manifest["experiment.manifest"]
+    nahe_beta_experiment_materials["experiment.materials"]
+    nahe_beta_experiment_model_limits["experiment.model_limits"]
+    nahe_beta_experiment_runtime["experiment.runtime"]
+    nahe_beta_experiment_task_environments["experiment.task_environments"]
+    nahe_beta_experiment_task_environments_contract["task_environments.contract"]
+    nahe_beta_experiment_task_environments_docker["task_environments.docker"]
+    nahe_beta_experiment_task_environments_materials["task_environments.materials"]
+    nahe_beta_experiment_task_import["experiment.task_import"]
+    nahe_beta_experiment_workload["experiment.workload"]
+    nahe_beta_guards["ahe_beta.guards"]
+    nahe_beta_guards_harness_boundary["guards.harness_boundary"]
+    nahe_beta_guards_repo_guard["guards.repo_guard"]
+    nahe_beta_guards_workspace_jail["guards.workspace_jail"]
+    nahe_beta_harness["ahe_beta.harness"]
+    nahe_beta_harness_budget["harness.budget"]
+    nahe_beta_harness_connector["harness.connector"]
+    nahe_beta_harness_interface["harness.interface"]
+    nahe_beta_harness_launcher["harness.launcher"]
+    nahe_beta_invocation["ahe_beta.invocation"]
+    nahe_beta_loop["ahe_beta.loop"]
+    nahe_beta_loop_checkpoint["loop.checkpoint"]
+    nahe_beta_loop_feedback_pipeline["loop.feedback_pipeline"]
+    nahe_beta_loop_live["loop.live"]
+    nahe_beta_loop_live_tracer["loop.live_tracer"]
+    nahe_beta_loop_metrics["loop.metrics"]
+    nahe_beta_loop_orchestrator["loop.orchestrator"]
+    nahe_beta_loop_recovery["loop.recovery"]
+    nahe_beta_loop_roster["loop.roster"]
+    nahe_beta_loop_round_assessment["loop.round_assessment"]
+    nahe_beta_loop_round_gate["loop.round_gate"]
+    nahe_beta_loop_run_state["loop.run_state"]
+    nahe_beta_loop_runner["loop.runner"]
+    nahe_beta_loop_sim_user["loop.sim_user"]
+    nahe_beta_models["ahe_beta.models"]
+    nahe_beta_nexau_runtime["ahe_beta.nexau_runtime"]
+    nahe_beta_observations["ahe_beta.observations"]
+    nahe_beta_observations___main__["observations.__main__"]
+    nahe_beta_observations_delivery_gaps["observations.delivery_gaps"]
+    nahe_beta_observations_gaps["observations.gaps"]
+    nahe_beta_observations_grants["observations.grants"]
+    nahe_beta_observations_preflight["observations.preflight"]
+    nahe_beta_observations_publication["observations.publication"]
+    nahe_beta_observations_transport["observations.transport"]
+    nahe_beta_tracker["ahe_beta.tracker"]
+    nahe_beta_tracker_attachment_transport["tracker.attachment_transport"]
+    nahe_beta_tracker_base["tracker.base"]
+    nahe_beta_tracker_fake["tracker.fake"]
+    nahe_beta_tracker_gitea["tracker.gitea"]
+    nahe_beta_usage["ahe_beta.usage"]
+    nahe_beta_user["ahe_beta.user"]
+    nahe_beta_user_patches["user.patches"]
+    nahe_beta_user_session_store["user.session_store"]
+    nahe_beta_user_sim["user.sim"]
+    nahe_beta_user_sim_action_space["sim.action_space"]
+    nahe_beta_user_sim_actions["sim.actions"]
+    nahe_beta_user_sim_clauses["sim.clauses"]
+    nahe_beta_user_sim_demo["sim.demo"]
+    nahe_beta_user_sim_deps["sim.deps"]
+    nahe_beta_user_sim_dimensions["sim.dimensions"]
+    nahe_beta_user_sim_feeling["sim.feeling"]
+    nahe_beta_user_sim_goals["sim.goals"]
+    nahe_beta_user_sim_harness_adapter["sim.harness_adapter"]
+    nahe_beta_user_sim_loop["sim.loop"]
+    nahe_beta_user_sim_persona_client["sim.persona_client"]
+    nahe_beta_user_sim_persona_io["sim.persona_io"]
+    nahe_beta_user_sim_prompt["sim.prompt"]
+    nahe_beta_user_sim_run_agentic["sim.run_agentic"]
+    nahe_beta_user_sim_run_live["sim.run_live"]
+    nahe_beta_user_sim_runtime["sim.runtime"]
+    nahe_beta_user_sim_sandbox["sim.sandbox"]
+    nahe_beta_user_sim_scenarios["sim.scenarios"]
+    nahe_beta_user_sim_seed_source["sim.seed_source"]
+    nahe_beta_user_sim_skills["sim.skills"]
+    nahe_beta_user_sim_sources["sim.sources"]
+    nahe_beta_user_sim_sources_container["sources.container"]
+    nahe_beta_user_sim_sources_docker_seed["sources.docker_seed"]
+    nahe_beta_user_sim_sources_empty["sources.empty"]
+    nahe_beta_user_sim_sources_git["sources.git"]
+    nahe_beta_user_sim_sources_local_fixture["sources.local_fixture"]
+    nahe_beta_user_sim_sources_prebuilt["sources.prebuilt"]
+    nahe_beta_user_sim_state["sim.state"]
+    nahe_beta_user_sim_tools["sim.tools"]
+    nahe_beta_user_sim_workspace["sim.workspace"]
+    nahe_beta_web["ahe_beta.web"]
+    nahe_beta_web_api["web.api"]
+    nahe_beta_web_issue_timeline["web.issue_timeline"]
+    nahe_beta_demand_agent_contract --> nahe_beta_demand_issue_schema
+    nahe_beta_demand_agent_runtime --> nahe_beta_demand_evidence_contract
+    nahe_beta_demand_agent_runtime --> nahe_beta_demand_observation_provider
+    nahe_beta_demand_agent_runtime --> nahe_beta_demand_session_timeline
+    nahe_beta_demand_agent_runtime --> nahe_beta_demand_source
+    nahe_beta_demand_agent_runtime --> nahe_beta_invocation
+    nahe_beta_demand_agent_runtime --> nahe_beta_loop_live_tracer
+    nahe_beta_demand_agent_runtime --> nahe_beta_observations_gaps
+    nahe_beta_demand_agent_runtime --> nahe_beta_observations_grants
+    nahe_beta_demand_agent_runtime --> nahe_beta_usage
+    nahe_beta_demand_agent_runtime --> nahe_beta_user_session_store
+    nahe_beta_demand_architect --> nahe_beta_demand_agent_runtime
+    nahe_beta_demand_architect --> nahe_beta_demand_issue_schema
+    nahe_beta_demand_architect --> nahe_beta_demand_proposal_view
+    nahe_beta_demand_architect --> nahe_beta_demand_role_contract
+    nahe_beta_demand_architect --> nahe_beta_loop_recovery
+    nahe_beta_demand_architect --> nahe_beta_models
+    nahe_beta_demand_architect --> nahe_beta_observations_delivery_gaps
+    nahe_beta_demand_architect --> nahe_beta_observations_grants
+    nahe_beta_demand_architect --> nahe_beta_tracker_base
+    nahe_beta_demand_architect --> nahe_beta_usage
+    nahe_beta_demand_architect --> nahe_beta_user_session_store
+    nahe_beta_demand_delivery_evidence --> nahe_beta_demand_evidence_contract
+    nahe_beta_demand_delivery_evidence --> nahe_beta_execution_contract
+    nahe_beta_demand_delivery_evidence --> nahe_beta_observations_grants
+    nahe_beta_demand_delivery_evidence --> nahe_beta_observations_publication
+    nahe_beta_demand_delivery_evidence --> nahe_beta_observations_transport
+    nahe_beta_demand_divergent --> nahe_beta_demand_agent_runtime
+    nahe_beta_demand_divergent --> nahe_beta_demand_evidence_contract
+    nahe_beta_demand_divergent --> nahe_beta_demand_issue_schema
+    nahe_beta_demand_divergent --> nahe_beta_demand_proposal_view
+    nahe_beta_demand_divergent --> nahe_beta_demand_role_contract
+    nahe_beta_demand_divergent --> nahe_beta_loop_recovery
+    nahe_beta_demand_divergent --> nahe_beta_models
+    nahe_beta_demand_divergent --> nahe_beta_observations_grants
+    nahe_beta_demand_divergent --> nahe_beta_tracker_base
+    nahe_beta_demand_divergent --> nahe_beta_usage
+    nahe_beta_demand_divergent --> nahe_beta_user_session_store
+    nahe_beta_demand_evidence_contract --> nahe_beta_execution_contract
+    nahe_beta_demand_evidence_contract --> nahe_beta_models
+    nahe_beta_demand_evidence_contract --> nahe_beta_usage
+    nahe_beta_demand_grouped_architect --> nahe_beta_demand_architect
+    nahe_beta_demand_grouped_architect --> nahe_beta_demand_issue_schema
+    nahe_beta_demand_grouped_architect --> nahe_beta_demand_proposal_view
+    nahe_beta_demand_grouped_architect --> nahe_beta_loop_recovery
+    nahe_beta_demand_grouped_architect --> nahe_beta_models
+    nahe_beta_demand_grouped_architect --> nahe_beta_observations_delivery_gaps
+    nahe_beta_demand_grouped_architect --> nahe_beta_usage
+    nahe_beta_demand_observation_provider --> nahe_beta_demand_evidence_contract
+    nahe_beta_demand_observation_provider --> nahe_beta_invocation
+    nahe_beta_demand_observation_provider --> nahe_beta_user_session_store
+    nahe_beta_demand_owner --> nahe_beta_demand_agent_runtime
+    nahe_beta_demand_owner --> nahe_beta_demand_delivery_evidence
+    nahe_beta_demand_owner --> nahe_beta_demand_issue_schema
+    nahe_beta_demand_owner --> nahe_beta_demand_proposal_view
+    nahe_beta_demand_owner --> nahe_beta_demand_role_contract
+    nahe_beta_demand_owner --> nahe_beta_loop_recovery
+    nahe_beta_demand_owner --> nahe_beta_models
+    nahe_beta_demand_owner --> nahe_beta_observations_grants
+    nahe_beta_demand_owner --> nahe_beta_tracker_base
+    nahe_beta_demand_owner --> nahe_beta_usage
+    nahe_beta_demand_owner --> nahe_beta_user_session_store
+    nahe_beta_demand_proposal_view --> nahe_beta_demand_evidence_contract
+    nahe_beta_demand_proposal_view --> nahe_beta_demand_issue_schema
+    nahe_beta_demand_proposal_view --> nahe_beta_observations_grants
+    nahe_beta_demand_runtime_agg --> nahe_beta_models
+    nahe_beta_demand_runtime_agg --> nahe_beta_user_session_store
+    nahe_beta_demand_session_timeline --> nahe_beta_demand_evidence_contract
+    nahe_beta_demand_session_timeline --> nahe_beta_demand_observation_provider
+    nahe_beta_demand_session_timeline --> nahe_beta_models
+    nahe_beta_demand_session_timeline --> nahe_beta_usage
+    nahe_beta_demand_session_timeline --> nahe_beta_user_session_store
+    nahe_beta_demand_triage --> nahe_beta_demand_agent_runtime
+    nahe_beta_demand_triage --> nahe_beta_demand_evidence_contract
+    nahe_beta_demand_triage --> nahe_beta_demand_issue_schema
+    nahe_beta_demand_triage --> nahe_beta_demand_role_contract
+    nahe_beta_demand_triage --> nahe_beta_demand_source
+    nahe_beta_demand_triage --> nahe_beta_loop_recovery
+    nahe_beta_demand_triage --> nahe_beta_observations_grants
+    nahe_beta_demand_triage --> nahe_beta_tracker_base
+    nahe_beta_demand_triage --> nahe_beta_tracker_gitea
+    nahe_beta_demand_triage --> nahe_beta_usage
+    nahe_beta_demand_triage --> nahe_beta_user_session_store
+    nahe_beta_distill --> nahe_beta_distill_library
+    nahe_beta_distill_seed_adapter --> nahe_beta_distill_seed_library
+    nahe_beta_distill_seed_adapter --> nahe_beta_models
+    nahe_beta_evaluation_acceptance --> nahe_beta_evaluation_results
+    nahe_beta_evaluation_adapters_container --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_adapters_custom --> nahe_beta_evaluation_adapters_container
+    nahe_beta_evaluation_adapters_custom --> nahe_beta_evaluation_adapters_terminal_bench
+    nahe_beta_evaluation_adapters_custom --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_adapters_custom --> nahe_beta_evaluation_results
+    nahe_beta_evaluation_adapters_nl2repo --> nahe_beta_evaluation_adapters_container
+    nahe_beta_evaluation_adapters_nl2repo --> nahe_beta_evaluation_adapters_terminal_bench
+    nahe_beta_evaluation_adapters_nl2repo --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_adapters_nl2repo --> nahe_beta_evaluation_results
+    nahe_beta_evaluation_adapters_profiles --> nahe_beta_evaluation_adapters_container
+    nahe_beta_evaluation_adapters_profiles --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_adapters_swebench --> nahe_beta_evaluation_adapters_container
+    nahe_beta_evaluation_adapters_swebench --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_adapters_swebench --> nahe_beta_evaluation_results
+    nahe_beta_evaluation_adapters_terminal_bench --> nahe_beta_evaluation_adapters_container
+    nahe_beta_evaluation_adapters_terminal_bench --> nahe_beta_evaluation_adapters_profiles
+    nahe_beta_evaluation_adapters_terminal_bench --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_adapters_terminal_bench --> nahe_beta_evaluation_results
+    nahe_beta_evaluation_adapters_tua_bench --> nahe_beta_evaluation_adapters_container
+    nahe_beta_evaluation_adapters_tua_bench --> nahe_beta_evaluation_adapters_profiles
+    nahe_beta_evaluation_adapters_tua_bench --> nahe_beta_evaluation_adapters_terminal_bench
+    nahe_beta_evaluation_adapters_tua_bench --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_adapters_tua_bench --> nahe_beta_evaluation_results
+    nahe_beta_evaluation_artifacts --> nahe_beta_user_sim_runtime
+    nahe_beta_evaluation_registry --> nahe_beta_evaluation_adapters_custom
+    nahe_beta_evaluation_registry --> nahe_beta_evaluation_adapters_nl2repo
+    nahe_beta_evaluation_registry --> nahe_beta_evaluation_adapters_swebench
+    nahe_beta_evaluation_registry --> nahe_beta_evaluation_adapters_terminal_bench
+    nahe_beta_evaluation_registry --> nahe_beta_evaluation_adapters_tua_bench
+    nahe_beta_evaluation_registry --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_results --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_service --> nahe_beta_evaluation_contracts
+    nahe_beta_evaluation_service --> nahe_beta_evaluation_registry
+    nahe_beta_evaluation_service --> nahe_beta_evaluation_results
+    nahe_beta_evaluation_service --> nahe_beta_execution_contract
+    nahe_beta_evaluation_service --> nahe_beta_experiment_config
+    nahe_beta_experiment_assessment_worker --> nahe_beta_evaluation_contracts
+    nahe_beta_experiment_assessment_worker --> nahe_beta_evaluation_service
+    nahe_beta_experiment_assessment_worker --> nahe_beta_execution_contract
+    nahe_beta_experiment_assessment_worker --> nahe_beta_experiment_config
+    nahe_beta_experiment_assessment_worker --> nahe_beta_experiment_grading
+    nahe_beta_experiment_assessment_worker --> nahe_beta_experiment_grading_inputs
+    nahe_beta_experiment_assessment_worker --> nahe_beta_experiment_runtime
+    nahe_beta_experiment_assessment_worker --> nahe_beta_loop_round_assessment
+    nahe_beta_experiment_backends --> nahe_beta_experiment_backends_base
+    nahe_beta_experiment_backends_base --> nahe_beta_experiment_config
+    nahe_beta_experiment_backends_e2b --> nahe_beta_demand_delivery_evidence
+    nahe_beta_experiment_backends_e2b --> nahe_beta_experiment_backends_base
+    nahe_beta_experiment_backends_e2b --> nahe_beta_experiment_backends_e2b_bootstrap
+    nahe_beta_experiment_backends_e2b --> nahe_beta_experiment_backends_e2b_template
+    nahe_beta_experiment_backends_e2b --> nahe_beta_experiment_workload
+    nahe_beta_experiment_backends_e2b --> nahe_beta_loop_round_assessment
+    nahe_beta_experiment_backends_e2b_bootstrap --> nahe_beta_experiment_backends_base
+    nahe_beta_experiment_backends_e2b_bootstrap --> nahe_beta_experiment_config
+    nahe_beta_experiment_backends_e2b_bootstrap --> nahe_beta_experiment_materials
+    nahe_beta_experiment_backends_e2b_bootstrap --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_experiment_backends_e2b_bootstrap --> nahe_beta_experiment_task_environments_docker
+    nahe_beta_experiment_backends_e2b_bootstrap --> nahe_beta_experiment_task_environments_materials
+    nahe_beta_experiment_backends_e2b_template --> nahe_beta_experiment_backends_base
+    nahe_beta_experiment_backends_e2b_template --> nahe_beta_experiment_workload
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_backends
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_backends_base
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_backends_e2b_bootstrap
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_backends_local_ci
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_collection
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_config
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_context
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_engine
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_infrastructure
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_materials
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_task_environments
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_task_environments_docker
+    nahe_beta_experiment_backends_local --> nahe_beta_experiment_workload
+    nahe_beta_experiment_backends_local --> nahe_beta_loop_round_assessment
+    nahe_beta_experiment_backends_local --> nahe_beta_observations_transport
+    nahe_beta_experiment_backends_local_ci --> nahe_beta_experiment_backends_base
+    nahe_beta_experiment_backends_local_ci --> nahe_beta_experiment_infrastructure
+    nahe_beta_experiment_batch --> nahe_beta_experiment
+    nahe_beta_experiment_batch --> nahe_beta_experiment_batch_config
+    nahe_beta_experiment_batch --> nahe_beta_experiment_batch_store
+    nahe_beta_experiment_batch --> nahe_beta_experiment_config
+    nahe_beta_experiment_batch --> nahe_beta_experiment_manifest
+    nahe_beta_experiment_batch --> nahe_beta_experiment_runtime
+    nahe_beta_experiment_batch_config --> nahe_beta_experiment
+    nahe_beta_experiment_batch_config --> nahe_beta_experiment_config
+    nahe_beta_experiment_batch_config --> nahe_beta_experiment_materials
+    nahe_beta_experiment_batch_config --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_experiment_batch_store --> nahe_beta_experiment
+    nahe_beta_experiment_batch_store --> nahe_beta_experiment_batch_config
+    nahe_beta_experiment_batch_store --> nahe_beta_experiment_config
+    nahe_beta_experiment_batch_store --> nahe_beta_experiment_manifest
+    nahe_beta_experiment_batch_store --> nahe_beta_experiment_materials
+    nahe_beta_experiment_batch_store --> nahe_beta_experiment_runtime
+    nahe_beta_experiment_batch_store --> nahe_beta_experiment_workload
+    nahe_beta_experiment_cli --> nahe_beta_experiment
+    nahe_beta_experiment_cli --> nahe_beta_experiment_assessment_worker
+    nahe_beta_experiment_cli --> nahe_beta_experiment_batch
+    nahe_beta_experiment_cli --> nahe_beta_experiment_config
+    nahe_beta_experiment_cli --> nahe_beta_experiment_dashboard
+    nahe_beta_experiment_cli --> nahe_beta_experiment_grading
+    nahe_beta_experiment_cli --> nahe_beta_experiment_runtime
+    nahe_beta_experiment_cli --> nahe_beta_experiment_task_import
+    nahe_beta_experiment_collection --> nahe_beta_experiment_config
+    nahe_beta_experiment_collection --> nahe_beta_experiment_continuation_export
+    nahe_beta_experiment_collection --> nahe_beta_experiment_materials
+    nahe_beta_experiment_config --> nahe_beta_experiment_model_limits
+    nahe_beta_experiment_config --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_experiment_config --> nahe_beta_experiment_workload
+    nahe_beta_experiment_context --> nahe_beta_execution_contract
+    nahe_beta_experiment_context --> nahe_beta_experiment_config
+    nahe_beta_experiment_context --> nahe_beta_experiment_workload
+    nahe_beta_experiment_context --> nahe_beta_models
+    nahe_beta_experiment_continuation_evidence --> nahe_beta_demand_evidence_contract
+    nahe_beta_experiment_continuation_evidence --> nahe_beta_experiment_config
+    nahe_beta_experiment_continuation_evidence --> nahe_beta_models
+    nahe_beta_experiment_continuation_evidence --> nahe_beta_observations_grants
+    nahe_beta_experiment_continuation_evidence --> nahe_beta_observations_publication
+    nahe_beta_experiment_continuation_evidence --> nahe_beta_user_session_store
+    nahe_beta_experiment_continuation_export --> nahe_beta_demand_issue_schema
+    nahe_beta_experiment_continuation_export --> nahe_beta_experiment_config
+    nahe_beta_experiment_continuation_export --> nahe_beta_experiment_materials
+    nahe_beta_experiment_continuation_export --> nahe_beta_experiment_workload
+    nahe_beta_experiment_continuation_export --> nahe_beta_loop_recovery
+    nahe_beta_experiment_continuation_forge --> nahe_beta_demand_issue_schema
+    nahe_beta_experiment_continuation_forge --> nahe_beta_experiment_config
+    nahe_beta_experiment_continuation_forge --> nahe_beta_loop_recovery
+    nahe_beta_experiment_continuation_forge --> nahe_beta_models
+    nahe_beta_experiment_continuation_forge --> nahe_beta_tracker_base
+    nahe_beta_experiment_continuation_source --> nahe_beta_demand_issue_schema
+    nahe_beta_experiment_continuation_source --> nahe_beta_experiment_config
+    nahe_beta_experiment_continuation_source --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_experiment_continuation_source --> nahe_beta_experiment_workload
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_demand_architect
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_demand_divergent
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_demand_grouped_architect
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_demand_owner
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_demand_triage
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_experiment_config
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_experiment_context
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_experiment_continuation_evidence
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_experiment_continuation_forge
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_experiment_materials
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_loop_feedback_pipeline
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_loop_recovery
+    nahe_beta_experiment_controllers_feedback --> nahe_beta_observations_grants
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_demand_issue_schema
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_guards_harness_boundary
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_invocation
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_loop_live
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_loop_recovery
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_loop_sim_user
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_observations_preflight
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_observations_transport
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_tracker_attachment_transport
+    nahe_beta_experiment_controllers_runtime --> nahe_beta_tracker_gitea
+    nahe_beta_experiment_controllers_unified --> nahe_beta_distill_library
+    nahe_beta_experiment_controllers_unified --> nahe_beta_experiment_collection
+    nahe_beta_experiment_controllers_unified --> nahe_beta_experiment_config
+    nahe_beta_experiment_controllers_unified --> nahe_beta_experiment_context
+    nahe_beta_experiment_controllers_unified --> nahe_beta_experiment_continuation_export
+    nahe_beta_experiment_controllers_unified --> nahe_beta_experiment_controllers
+    nahe_beta_experiment_controllers_unified --> nahe_beta_experiment_controllers_feedback
+    nahe_beta_experiment_controllers_unified --> nahe_beta_experiment_controllers_runtime
+    nahe_beta_experiment_controllers_unified --> nahe_beta_guards_repo_guard
+    nahe_beta_experiment_controllers_unified --> nahe_beta_harness_launcher
+    nahe_beta_experiment_controllers_unified --> nahe_beta_invocation
+    nahe_beta_experiment_controllers_unified --> nahe_beta_loop_live
+    nahe_beta_experiment_controllers_unified --> nahe_beta_loop_metrics
+    nahe_beta_experiment_controllers_unified --> nahe_beta_loop_orchestrator
+    nahe_beta_experiment_controllers_unified --> nahe_beta_loop_roster
+    nahe_beta_experiment_controllers_unified --> nahe_beta_loop_round_assessment
+    nahe_beta_experiment_controllers_unified --> nahe_beta_loop_round_gate
+    nahe_beta_experiment_controllers_unified --> nahe_beta_loop_sim_user
+    nahe_beta_experiment_controllers_unified --> nahe_beta_models
+    nahe_beta_experiment_controllers_unified --> nahe_beta_tracker_gitea
+    nahe_beta_experiment_controllers_unified --> nahe_beta_usage
+    nahe_beta_experiment_controllers_unified --> nahe_beta_user_session_store
+    nahe_beta_experiment_controllers_unified --> nahe_beta_user_sim_persona_client
+    nahe_beta_experiment_controllers_unified --> nahe_beta_user_sim_persona_io
+    nahe_beta_experiment_dashboard --> nahe_beta_experiment_config
+    nahe_beta_experiment_dashboard --> nahe_beta_experiment_manifest
+    nahe_beta_experiment_dashboard --> nahe_beta_experiment_materials
+    nahe_beta_experiment_dashboard --> nahe_beta_experiment_runtime
+    nahe_beta_experiment_dashboard --> nahe_beta_tracker_gitea
+    nahe_beta_experiment_dashboard --> nahe_beta_usage
+    nahe_beta_experiment_dashboard --> nahe_beta_user_session_store
+    nahe_beta_experiment_dashboard --> nahe_beta_web_api
+    nahe_beta_experiment_engine --> nahe_beta_experiment_config
+    nahe_beta_experiment_engine --> nahe_beta_experiment_context
+    nahe_beta_experiment_engine --> nahe_beta_experiment_materials
+    nahe_beta_experiment_grading --> nahe_beta_evaluation_acceptance
+    nahe_beta_experiment_grading --> nahe_beta_evaluation_contracts
+    nahe_beta_experiment_grading --> nahe_beta_evaluation_registry
+    nahe_beta_experiment_grading --> nahe_beta_evaluation_service
+    nahe_beta_experiment_grading --> nahe_beta_experiment_config
+    nahe_beta_experiment_grading --> nahe_beta_experiment_grading_inputs
+    nahe_beta_experiment_grading --> nahe_beta_experiment_manifest
+    nahe_beta_experiment_grading --> nahe_beta_experiment_materials
+    nahe_beta_experiment_grading --> nahe_beta_experiment_runtime
+    nahe_beta_experiment_grading --> nahe_beta_experiment_workload
+    nahe_beta_experiment_grading --> nahe_beta_loop_recovery
+    nahe_beta_experiment_grading --> nahe_beta_models
+    nahe_beta_experiment_grading_inputs --> nahe_beta_evaluation_contracts
+    nahe_beta_experiment_grading_inputs --> nahe_beta_experiment_config
+    nahe_beta_experiment_grading_inputs --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_experiment_infrastructure --> nahe_beta_experiment_backends_local_ci
+    nahe_beta_experiment_infrastructure --> nahe_beta_experiment_config
+    nahe_beta_experiment_manifest --> nahe_beta_experiment_config
+    nahe_beta_experiment_materials --> nahe_beta_distill_library
+    nahe_beta_experiment_materials --> nahe_beta_experiment_assessment_worker
+    nahe_beta_experiment_materials --> nahe_beta_experiment_config
+    nahe_beta_experiment_materials --> nahe_beta_experiment_continuation_forge
+    nahe_beta_experiment_materials --> nahe_beta_experiment_continuation_source
+    nahe_beta_experiment_materials --> nahe_beta_experiment_task_environments_materials
+    nahe_beta_experiment_materials --> nahe_beta_experiment_workload
+    nahe_beta_experiment_materials --> nahe_beta_user_sim_persona_io
+    nahe_beta_experiment_model_limits --> nahe_beta_experiment_config
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_assessment_worker
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_backends_e2b
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_backends_local
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_collection
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_config
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_engine
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_manifest
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_materials
+    nahe_beta_experiment_runtime --> nahe_beta_experiment_workload
+    nahe_beta_experiment_task_environments_docker --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_experiment_task_environments_docker --> nahe_beta_experiment_task_environments_materials
+    nahe_beta_experiment_task_environments_docker --> nahe_beta_observations_publication
+    nahe_beta_experiment_task_environments_docker --> nahe_beta_user_sim_runtime
+    nahe_beta_experiment_task_environments_materials --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_experiment_task_import --> nahe_beta_distill_seed_library
+    nahe_beta_experiment_task_import --> nahe_beta_experiment_config
+    nahe_beta_experiment_task_import --> nahe_beta_experiment_workload
+    nahe_beta_experiment_workload --> nahe_beta_experiment_config
+    nahe_beta_experiment_workload --> nahe_beta_experiment_context
+    nahe_beta_experiment_workload --> nahe_beta_experiment_materials
+    nahe_beta_experiment_workload --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_guards_workspace_jail --> nahe_beta_demand_observation_provider
+    nahe_beta_guards_workspace_jail --> nahe_beta_usage
+    nahe_beta_harness_connector --> nahe_beta_harness_interface
+    nahe_beta_harness_connector --> nahe_beta_usage
+    nahe_beta_harness_launcher --> nahe_beta_execution_contract
+    nahe_beta_harness_launcher --> nahe_beta_harness_budget
+    nahe_beta_harness_launcher --> nahe_beta_harness_interface
+    nahe_beta_harness_launcher --> nahe_beta_observations_publication
+    nahe_beta_harness_launcher --> nahe_beta_user_sim_runtime
+    nahe_beta_invocation --> nahe_beta_usage
+    nahe_beta_loop_feedback_pipeline --> nahe_beta_demand_source
+    nahe_beta_loop_feedback_pipeline --> nahe_beta_loop_recovery
+    nahe_beta_loop_feedback_pipeline --> nahe_beta_loop_round_gate
+    nahe_beta_loop_feedback_pipeline --> nahe_beta_models
+    nahe_beta_loop_feedback_pipeline --> nahe_beta_usage
+    nahe_beta_loop_live_tracer --> nahe_beta_usage
+    nahe_beta_loop_metrics --> nahe_beta_demand_issue_schema
+    nahe_beta_loop_metrics --> nahe_beta_tracker_base
+    nahe_beta_loop_metrics --> nahe_beta_user_session_store
+    nahe_beta_loop_orchestrator --> nahe_beta_demand_architect
+    nahe_beta_loop_orchestrator --> nahe_beta_demand_divergent
+    nahe_beta_loop_orchestrator --> nahe_beta_demand_source
+    nahe_beta_loop_orchestrator --> nahe_beta_harness_interface
+    nahe_beta_loop_orchestrator --> nahe_beta_harness_launcher
+    nahe_beta_loop_orchestrator --> nahe_beta_loop_feedback_pipeline
+    nahe_beta_loop_orchestrator --> nahe_beta_loop_recovery
+    nahe_beta_loop_orchestrator --> nahe_beta_loop_round_gate
+    nahe_beta_loop_orchestrator --> nahe_beta_models
+    nahe_beta_loop_orchestrator --> nahe_beta_usage
+    nahe_beta_loop_orchestrator --> nahe_beta_user_sim_deps
+    nahe_beta_loop_orchestrator --> nahe_beta_user_sim_runtime
+    nahe_beta_loop_orchestrator --> nahe_beta_user_sim_workspace
+    nahe_beta_loop_round_assessment --> nahe_beta_execution_contract
+    nahe_beta_loop_round_assessment --> nahe_beta_experiment_config
+    nahe_beta_loop_round_assessment --> nahe_beta_experiment_workload
+    nahe_beta_loop_round_assessment --> nahe_beta_loop_recovery
+    nahe_beta_loop_runner --> nahe_beta_loop_checkpoint
+    nahe_beta_loop_runner --> nahe_beta_loop_orchestrator
+    nahe_beta_loop_runner --> nahe_beta_loop_run_state
+    nahe_beta_loop_sim_user --> nahe_beta_demand_evidence_contract
+    nahe_beta_loop_sim_user --> nahe_beta_demand_issue_schema
+    nahe_beta_loop_sim_user --> nahe_beta_evaluation_artifacts
+    nahe_beta_loop_sim_user --> nahe_beta_execution_contract
+    nahe_beta_loop_sim_user --> nahe_beta_harness_connector
+    nahe_beta_loop_sim_user --> nahe_beta_harness_interface
+    nahe_beta_loop_sim_user --> nahe_beta_loop_recovery
+    nahe_beta_loop_sim_user --> nahe_beta_models
+    nahe_beta_loop_sim_user --> nahe_beta_observations_preflight
+    nahe_beta_loop_sim_user --> nahe_beta_observations_publication
+    nahe_beta_loop_sim_user --> nahe_beta_tracker_base
+    nahe_beta_loop_sim_user --> nahe_beta_usage
+    nahe_beta_loop_sim_user --> nahe_beta_user_patches
+    nahe_beta_loop_sim_user --> nahe_beta_user_session_store
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_deps
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_dimensions
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_feeling
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_loop
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_persona_client
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_prompt
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_runtime
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_seed_source
+    nahe_beta_loop_sim_user --> nahe_beta_user_sim_workspace
+    nahe_beta_models --> nahe_beta_execution_contract
+    nahe_beta_models --> nahe_beta_usage
+    nahe_beta_observations___main__ --> nahe_beta_observations_publication
+    nahe_beta_observations_delivery_gaps --> nahe_beta_observations_gaps
+    nahe_beta_observations_delivery_gaps --> nahe_beta_observations_grants
+    nahe_beta_observations_gaps --> nahe_beta_demand_issue_schema
+    nahe_beta_observations_gaps --> nahe_beta_invocation
+    nahe_beta_observations_gaps --> nahe_beta_models
+    nahe_beta_observations_gaps --> nahe_beta_observations_grants
+    nahe_beta_observations_gaps --> nahe_beta_usage
+    nahe_beta_observations_grants --> nahe_beta_observations_publication
+    nahe_beta_observations_preflight --> nahe_beta_observations_publication
+    nahe_beta_observations_preflight --> nahe_beta_observations_transport
+    nahe_beta_observations_publication --> nahe_beta_invocation
+    nahe_beta_tracker_base --> nahe_beta_models
+    nahe_beta_tracker_fake --> nahe_beta_models
+    nahe_beta_tracker_fake --> nahe_beta_tracker_base
+    nahe_beta_tracker_gitea --> nahe_beta_models
+    nahe_beta_tracker_gitea --> nahe_beta_observations_transport
+    nahe_beta_tracker_gitea --> nahe_beta_tracker_attachment_transport
+    nahe_beta_tracker_gitea --> nahe_beta_tracker_base
+    nahe_beta_user_session_store --> nahe_beta_demand_evidence_contract
+    nahe_beta_user_session_store --> nahe_beta_execution_contract
+    nahe_beta_user_session_store --> nahe_beta_models
+    nahe_beta_user_sim --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim --> nahe_beta_user_sim_feeling
+    nahe_beta_user_sim --> nahe_beta_user_sim_harness_adapter
+    nahe_beta_user_sim --> nahe_beta_user_sim_loop
+    nahe_beta_user_sim --> nahe_beta_user_sim_persona_client
+    nahe_beta_user_sim --> nahe_beta_user_sim_persona_io
+    nahe_beta_user_sim_action_space --> nahe_beta_user_sim_actions
+    nahe_beta_user_sim_action_space --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_action_space --> nahe_beta_user_sim_state
+    nahe_beta_user_sim_clauses --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_demo --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_demo --> nahe_beta_user_sim_harness_adapter
+    nahe_beta_user_sim_demo --> nahe_beta_user_sim_loop
+    nahe_beta_user_sim_demo --> nahe_beta_user_sim_persona_client
+    nahe_beta_user_sim_demo --> nahe_beta_user_sim_state
+    nahe_beta_user_sim_deps --> nahe_beta_models
+    nahe_beta_user_sim_deps --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_loop --> nahe_beta_usage
+    nahe_beta_user_sim_loop --> nahe_beta_user_sim_action_space
+    nahe_beta_user_sim_loop --> nahe_beta_user_sim_actions
+    nahe_beta_user_sim_loop --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_loop --> nahe_beta_user_sim_feeling
+    nahe_beta_user_sim_loop --> nahe_beta_user_sim_goals
+    nahe_beta_user_sim_loop --> nahe_beta_user_sim_persona_client
+    nahe_beta_user_sim_loop --> nahe_beta_user_sim_prompt
+    nahe_beta_user_sim_loop --> nahe_beta_user_sim_state
+    nahe_beta_user_sim_persona_client --> nahe_beta_usage
+    nahe_beta_user_sim_persona_client --> nahe_beta_user_sim_actions
+    nahe_beta_user_sim_persona_client --> nahe_beta_user_sim_prompt
+    nahe_beta_user_sim_persona_client --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_persona_client --> nahe_beta_user_sim_sandbox
+    nahe_beta_user_sim_persona_client --> nahe_beta_user_sim_skills
+    nahe_beta_user_sim_persona_client --> nahe_beta_user_sim_state
+    nahe_beta_user_sim_persona_client --> nahe_beta_user_sim_tools
+    nahe_beta_user_sim_persona_io --> nahe_beta_distill_library
+    nahe_beta_user_sim_persona_io --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_prompt --> nahe_beta_user_sim_clauses
+    nahe_beta_user_sim_prompt --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_prompt --> nahe_beta_user_sim_skills
+    nahe_beta_user_sim_prompt --> nahe_beta_user_sim_state
+    nahe_beta_user_sim_prompt --> nahe_beta_user_sim_tools
+    nahe_beta_user_sim_run_agentic --> nahe_beta_models
+    nahe_beta_user_sim_run_agentic --> nahe_beta_user_sim_demo
+    nahe_beta_user_sim_run_agentic --> nahe_beta_user_sim_loop
+    nahe_beta_user_sim_run_agentic --> nahe_beta_user_sim_persona_client
+    nahe_beta_user_sim_run_agentic --> nahe_beta_user_sim_run_live
+    nahe_beta_user_sim_run_agentic --> nahe_beta_user_sim_sandbox
+    nahe_beta_user_sim_run_agentic --> nahe_beta_user_sim_scenarios
+    nahe_beta_user_sim_run_agentic --> nahe_beta_user_sim_workspace
+    nahe_beta_user_sim_run_live --> nahe_beta_user_sim_demo
+    nahe_beta_user_sim_run_live --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_run_live --> nahe_beta_user_sim_loop
+    nahe_beta_user_sim_run_live --> nahe_beta_user_sim_persona_client
+    nahe_beta_user_sim_run_live --> nahe_beta_user_sim_scenarios
+    nahe_beta_user_sim_sandbox --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_seed_source --> nahe_beta_models
+    nahe_beta_user_sim_seed_source --> nahe_beta_user_sim
+    nahe_beta_user_sim_seed_source --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_seed_source --> nahe_beta_user_sim_sources
+    nahe_beta_user_sim_skills --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_sources_container --> nahe_beta_experiment_task_environments_contract
+    nahe_beta_user_sim_sources_container --> nahe_beta_experiment_task_environments_docker
+    nahe_beta_user_sim_sources_container --> nahe_beta_models
+    nahe_beta_user_sim_sources_container --> nahe_beta_usage
+    nahe_beta_user_sim_sources_container --> nahe_beta_user_sim_seed_source
+    nahe_beta_user_sim_sources_docker_seed --> nahe_beta_models
+    nahe_beta_user_sim_sources_docker_seed --> nahe_beta_usage
+    nahe_beta_user_sim_sources_docker_seed --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_sources_docker_seed --> nahe_beta_user_sim_seed_source
+    nahe_beta_user_sim_sources_empty --> nahe_beta_models
+    nahe_beta_user_sim_sources_empty --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_sources_empty --> nahe_beta_user_sim_seed_source
+    nahe_beta_user_sim_sources_git --> nahe_beta_models
+    nahe_beta_user_sim_sources_git --> nahe_beta_user_sim_seed_source
+    nahe_beta_user_sim_sources_local_fixture --> nahe_beta_models
+    nahe_beta_user_sim_sources_local_fixture --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_sources_local_fixture --> nahe_beta_user_sim_seed_source
+    nahe_beta_user_sim_sources_local_fixture --> nahe_beta_user_sim_workspace
+    nahe_beta_user_sim_sources_prebuilt --> nahe_beta_models
+    nahe_beta_user_sim_sources_prebuilt --> nahe_beta_usage
+    nahe_beta_user_sim_sources_prebuilt --> nahe_beta_user_sim_deps
+    nahe_beta_user_sim_sources_prebuilt --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_sources_prebuilt --> nahe_beta_user_sim_seed_source
+    nahe_beta_user_sim_state --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_tools --> nahe_beta_user_sim_dimensions
+    nahe_beta_user_sim_tools --> nahe_beta_user_sim_sandbox
+    nahe_beta_user_sim_workspace --> nahe_beta_models
+    nahe_beta_user_sim_workspace --> nahe_beta_user_sim_runtime
+    nahe_beta_user_sim_workspace --> nahe_beta_user_sim_seed_source
+    nahe_beta_web_api --> nahe_beta_demand_issue_schema
+    nahe_beta_web_api --> nahe_beta_loop_live
+    nahe_beta_web_api --> nahe_beta_loop_metrics
+    nahe_beta_web_api --> nahe_beta_loop_roster
+    nahe_beta_web_api --> nahe_beta_tracker_base
+    nahe_beta_web_api --> nahe_beta_tracker_gitea
+    nahe_beta_web_api --> nahe_beta_usage
+    nahe_beta_web_api --> nahe_beta_user_session_store
+    nahe_beta_web_api --> nahe_beta_web_issue_timeline
+    nahe_beta_web_issue_timeline --> nahe_beta_demand_issue_schema
 ```

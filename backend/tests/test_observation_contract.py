@@ -9,14 +9,14 @@ from pathlib import Path
 import pytest
 
 import check_gitea_evidence_transport as live
-from auto_designer.demand.delivery_evidence import build_package
+from ahe_beta.demand.delivery_evidence import build_package
 from check_observation_contract import load_reader, synthetic_store
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_synthetic_probe_preserves_history_without_granting_other_session(tmp_path, monkeypatch):
-    monkeypatch.delenv("AUTO_DESIGNER_OBSERVATION_ROOT", raising=False)
+    monkeypatch.delenv("AHE_BETA_OBSERVATION_ROOT", raising=False)
     store = synthetic_store(tmp_path, issue=7)
     value = json.loads(gzip.decompress(build_package(store=store, issue=7)))
     assert [row["session_id"] for row in value["sessions"]] == ["authorized-session"]

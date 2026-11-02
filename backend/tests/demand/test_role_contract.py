@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.demand.role_contract import (
+from ahe_beta.demand.role_contract import (
     render_pm_artifact,
     render_synthesis_artifact,
     validate_owner,

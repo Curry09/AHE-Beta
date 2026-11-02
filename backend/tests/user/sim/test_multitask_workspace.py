@@ -17,15 +17,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_designer.models import WorkspaceSpec
-from auto_designer.user.sim.sources.prebuilt import PrebuiltSource
+from ahe_beta.models import WorkspaceSpec
+from ahe_beta.user.sim.sources.prebuilt import PrebuiltSource
 
 _USAGE = contextvars.ContextVar("test_task_workspace_usage")
 
 
 @pytest.fixture
 def cloud_task(tmp_path, monkeypatch):
-    monkeypatch.setattr("auto_designer.usage.current_usage_context", lambda: _USAGE.get())
+    monkeypatch.setattr("ahe_beta.usage.current_usage_context", lambda: _USAGE.get())
     uv = shutil.which("uv")
     assert uv, "Pinned project uv must be available for offline environment validation"
     root = tmp_path / "run"

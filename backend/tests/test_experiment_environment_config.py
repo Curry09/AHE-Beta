@@ -6,19 +6,19 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.experiment.config import (
+from ahe_beta.experiment.config import (
     ConfigError,
     load_task_package,
     validate_task_package_document,
 )
-from auto_designer.experiment.task_environments.contract import (
+from ahe_beta.experiment.task_environments.contract import (
     EnvironmentContractError,
     container_environment,
     environment_identity,
     environment_materials,
     resolve_container_paths,
 )
-from auto_designer.experiment.workload import (
+from ahe_beta.experiment.workload import (
     catalog_tasks,
     task_artifact_declarations,
     task_digest,
@@ -398,7 +398,7 @@ def test_pure_contract_rejects_unknown_driver_without_a_config_import():
 
 @pytest.mark.parametrize("version", [1, 2, 3])
 def test_interaction_override_reuses_materials_without_rewriting_source_package(tmp_path, version):
-    from auto_designer.experiment.config import load_config_v2, load_task_packages
+    from ahe_beta.experiment.config import load_config_v2, load_task_packages
     from test_experiment_config_v2 import definition, write
     from test_experiment_config_v2 import package as python_package
 
@@ -421,7 +421,7 @@ def test_interaction_override_reuses_materials_without_rewriting_source_package(
 
 
 def test_absent_interaction_override_preserves_old_loaded_document(tmp_path):
-    from auto_designer.experiment.config import load_config_v2, load_task_packages
+    from ahe_beta.experiment.config import load_config_v2, load_task_packages
     from test_experiment_config_v2 import definition, package, write
 
     path = write(tmp_path / "task.json", package())
@@ -440,7 +440,7 @@ def test_absent_interaction_override_preserves_old_loaded_document(tmp_path):
     ],
 )
 def test_invalid_interaction_overrides_fail_before_material_preparation(tmp_path, overrides):
-    from auto_designer.experiment.config import load_config_v2
+    from ahe_beta.experiment.config import load_config_v2
     from test_experiment_config_v2 import definition, package, write
 
     write(tmp_path / "task.json", package())
@@ -452,7 +452,7 @@ def test_invalid_interaction_overrides_fail_before_material_preparation(tmp_path
 
 
 def test_parent_continuation_cannot_override_inherited_interaction(tmp_path):
-    from auto_designer.experiment.config import load_config_v2
+    from ahe_beta.experiment.config import load_config_v2
     from test_experiment_config_v2 import definition, write
 
     config = definition()
@@ -464,7 +464,7 @@ def test_parent_continuation_cannot_override_inherited_interaction(tmp_path):
 
 
 def test_task_named_tokenizer_can_have_an_interaction_choice(tmp_path):
-    from auto_designer.experiment.config import load_config_v2, load_task_packages
+    from ahe_beta.experiment.config import load_config_v2, load_task_packages
     from test_experiment_config_v2 import definition, package, write
 
     task = package()

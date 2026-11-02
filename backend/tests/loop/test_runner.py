@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from auto_designer.loop.run_state import RunState, read_run_state, write_run_state
-from auto_designer.loop.runner import HarborRunner
+from ahe_beta.loop.run_state import RunState, read_run_state, write_run_state
+from ahe_beta.loop.runner import HarborRunner
 
 
 class _FakeOrch:
@@ -135,7 +135,7 @@ def test_recoverable_runner_archives_incomplete_stage_before_raising(tmp_path) -
             raise RuntimeError("injected")
 
         def recovery_phase(self, *, round_no):
-            return "synthesizer"
+            return "architect"
 
     save = _SaveSpy()
     runner = HarborRunner(
@@ -148,5 +148,5 @@ def test_recoverable_runner_archives_incomplete_stage_before_raising(tmp_path) -
     with pytest.raises(RuntimeError, match="injected"):
         runner.run(initial_release_ref="v1", n_rounds=2)
     state = read_run_state(tmp_path / "state")
-    assert (state.round, state.phase, state.recovery_revision) == (0, "synthesizer", 4)
+    assert (state.round, state.phase, state.recovery_revision) == (0, "architect", 4)
     assert save.calls[-1].name == "checkpoint-round-1-incomplete.tar.gz"

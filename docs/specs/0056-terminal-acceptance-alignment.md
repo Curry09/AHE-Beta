@@ -10,7 +10,7 @@ tasks:
     status: done
     priority: P0
     files:
-      - backend/auto_designer/user/sim/goals.py
+      - backend/ahe_beta/user/sim/goals.py
       - backend/tests/user/sim/test_goals.py
     depends-on:
       - 0054/T4
@@ -21,8 +21,8 @@ tasks:
     status: done
     priority: P0
     files:
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/user/sim/persona_client.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/user/sim/persona_client.py
     depends-on:
       - 0053/T4
     scope: terminal act 可输出 acceptance_basis(mode, evidence_refs, reason)。mode 表达 subjective、independent、delegated 或 waived；框架根据 D1/D3 生成 expected/alignment 观察字段。该检查不阻止用户接受，不把强 Persona 强行变成测试机器人。
@@ -32,10 +32,10 @@ tasks:
     status: done
     priority: P0
     files:
-      - backend/auto_designer/models.py
-      - backend/auto_designer/loop/sim_user.py
-      - backend/auto_designer/demand/evidence_contract.py
-      - backend/auto_designer/demand/session_timeline.py
+      - backend/ahe_beta/models.py
+      - backend/ahe_beta/loop/sim_user.py
+      - backend/ahe_beta/demand/evidence_contract.py
+      - backend/ahe_beta/demand/session_timeline.py
       - backend/tests/demand/test_terminal_evidence.py
     depends-on:
       - 0051/T4
@@ -47,7 +47,7 @@ tasks:
     status: done
     priority: P0
     files:
-      - backend/auto_designer/user/sim/loop.py
+      - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_loop.py
       - backend/scripts/e2e-spec-0056-0057-user-semantics.sh
     depends-on:

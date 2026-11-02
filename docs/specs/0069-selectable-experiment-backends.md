@@ -14,10 +14,10 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/config.py
-      - backend/auto_designer/experiment/materials.py
-      - backend/auto_designer/experiment/schemas/experiment-v2.json
-      - backend/auto_designer/experiment/schemas/task-package-v1.json
+      - backend/ahe_beta/experiment/config.py
+      - backend/ahe_beta/experiment/materials.py
+      - backend/ahe_beta/experiment/schemas/experiment-v2.json
+      - backend/ahe_beta/experiment/schemas/task-package-v1.json
       - backend/tests/test_experiment_config_v2.py
       - backend/tests/test_experiment_materials.py
     scope: 实现严格 v2 配置与任务包解析、自动生成计划及冻结输入；旧 schema 显式拒绝，不启用兼容运行链路
@@ -32,12 +32,12 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/engine.py
-      - backend/auto_designer/experiment/context.py
-      - backend/auto_designer/experiment/backends/__init__.py
-      - backend/auto_designer/experiment/backends/base.py
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/experiment/controllers/swebench.py
+      - backend/ahe_beta/experiment/engine.py
+      - backend/ahe_beta/experiment/context.py
+      - backend/ahe_beta/experiment/backends/__init__.py
+      - backend/ahe_beta/experiment/backends/base.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
       - backend/tests/test_experiment_engine.py
     scope: 共用现有闭环、注入全部受支持模型参数和材料，定义生命周期后端接口
     acceptance: ordinary 与 SWE 路径均读取冻结 context，不再依赖隐式 backend/.env；参数生效且末轮语义保持
@@ -51,15 +51,15 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/backends/local.py
-      - backend/auto_designer/experiment/infrastructure.py
+      - backend/ahe_beta/experiment/backends/local.py
+      - backend/ahe_beta/experiment/infrastructure.py
       - backend/deploy/experiment/docker-compose.yml
       - backend/deploy/vigil/Dockerfile
       - backend/deploy/vigil/entrypoint.sh
       - backend/tests/test_experiment_local_backend.py
       - backend/tests/experiment/test_infrastructure.py
-      - backend/auto_designer/harness/launcher.py
-      - backend/auto_designer/user/sim/sources/docker_seed.py
+      - backend/ahe_beta/harness/launcher.py
+      - backend/ahe_beta/user/sim/sources/docker_seed.py
       - backend/tests/user/sim/test_docker_seed_source.py
     scope: 自动准备本地基础设施、Gitea 身份、动态地址和隔离执行环境；健康观察由当前 local backend 完成，旧 health 模块已退出。
     acceptance: 真实 controller 与 vigil 健康才可运行；动态端口可达、无空注册 runner，停止及清理只作用所属资源
@@ -73,11 +73,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/experiment/backends/e2b.py
-      - backend/auto_designer/experiment/backends/e2b_bootstrap.py
-      - backend/auto_designer/experiment/backends/e2b_template.py
-      - backend/auto_designer/user/sim/sources/prebuilt.py
-      - backend/auto_designer/user/sim/runtime.py
+      - backend/ahe_beta/experiment/backends/e2b.py
+      - backend/ahe_beta/experiment/backends/e2b_bootstrap.py
+      - backend/ahe_beta/experiment/backends/e2b_template.py
+      - backend/ahe_beta/user/sim/sources/prebuilt.py
+      - backend/ahe_beta/user/sim/runtime.py
       - backend/tests/user/sim/test_prebuilt_source.py
       - backend/tests/user/sim/test_workspace_runtime.py
       - backend/tests/test_experiment_e2b_backend.py
@@ -94,10 +94,10 @@ tasks:
     parallel: false
     files:
       - backend/scripts/experiment.py
-      - backend/auto_designer/experiment/cli.py
-      - backend/auto_designer/experiment/runtime.py
-      - backend/auto_designer/experiment/manifest.py
-      - backend/auto_designer/experiment/collection.py
+      - backend/ahe_beta/experiment/cli.py
+      - backend/ahe_beta/experiment/runtime.py
+      - backend/ahe_beta/experiment/manifest.py
+      - backend/ahe_beta/experiment/collection.py
       - backend/tests/test_experiment_cli_v2.py
       - backend/tests/test_experiment_lifecycle_v2.py
     scope: 接通 check/prepare/run 与统一管理，分离状态；旧 v1 生命周期、转发 wrapper 和历史 launcher 已退出，现行命令仅服务 v2。
@@ -180,7 +180,7 @@ tasks:
 | 模型 | User、Harness、共享需求面及 Claude Code 交付模型 | 相同模型配置结构 |
 | 管理 | 同一组 run/status/logs/stop/resume/collect/destroy 命令 | 同左；显示云资源到期时间与最后观察时间 |
 
-三个 Git 仓库要明确区分：auto-designer 是控制器；新建的 Gitea 仓库保存被进化的 Harness；pvlib 等任务仓库是 User/Harness 的试用工作区，按任务 revision 重置，不是 OpenAgents 要进化的仓库。
+三个 Git 仓库要明确区分：ahe-beta 是控制器；新建的 Gitea 仓库保存被进化的 Harness；pvlib 等任务仓库是 User/Harness 的试用工作区，按任务 revision 重置，不是 OpenAgents 要进化的仓库。
 
 以下为仓库根目录执行的目标界面；实施前不能把它作为当前可用教程：
 
@@ -249,7 +249,7 @@ QuickStart 先给两路径选择表、依赖和凭证表、最短启动命令，
     "persona_ids": ["sr-15-swyx"]
   },
   "rounds": {"count": 5, "sessions_per_round": 1, "max_parallel_users": 1},
-  "roles": {"triager": 1, "synthesizer": 1, "divergent": 0, "owner_mode": "mechanical", "developer": 1},
+  "roles": {"triager": 1, "architect": 1, "divergent": 0, "owner_mode": "mechanical", "developer": 1},
   "models": {
     "user": {"model": "YOUR_MODEL", "base_url_env": "USER_LLM_BASE_URL", "api_key_env": "USER_LLM_API_KEY"},
     "harness": {"model": "YOUR_MODEL", "base_url_env": "HARNESS_LLM_BASE_URL", "api_key_env": "HARNESS_LLM_API_KEY"},
@@ -260,7 +260,7 @@ QuickStart 先给两路径选择表、依赖和凭证表、最短启动命令，
 }
 ```
 
-上述具体文件由实施阶段补齐，不能让示例引用不存在的材料。local runtime 使用 `backend: local`、`gitea.provider: localhost`，不允许同时包含 e2b 配置。共享模型运行时对应 `models.demand`，明确 triager/synthesizer/divergent 使用同一需求面配置，不暴露当前无法独立生效的逐角色模型假选项。机械 Owner 不占 LLM 角色槽位，不再让 owner=0 与“缺失 Owner”混淆。上下文长度、输出长度、重试、超时等只暴露能接通底层并测试生效的选项。
+上述具体文件由实施阶段补齐，不能让示例引用不存在的材料。local runtime 使用 `backend: local`、`gitea.provider: localhost`，不允许同时包含 e2b 配置。共享模型运行时对应 `models.demand`，明确 triager/architect/divergent 使用同一需求面配置，不暴露当前无法独立生效的逐角色模型假选项。机械 Owner 不占 LLM 角色槽位，不再让 owner=0 与“缺失 Owner”混淆。上下文长度、输出长度、重试、超时等只暴露能接通底层并测试生效的选项。
 
 模型 key/base URL 仅从显式 secrets-file 或显式进程环境读取（文件覆盖同名进程变量），不隐式读取开发者 backend/.env、~/.claude 或其他试跑目录。CLI 校验缺失时只输出变量名。管理命令读取凭证来源引用或允许 `--secrets-file` 覆盖，仅加载该操作必需凭证；status/collect/destroy 不要求模型 key。
 

@@ -10,7 +10,7 @@
 
 ## 报告安全漏洞
 
-发现安全问题时，请通过 [GitHub 私密漏洞报告](https://github.com/Curry09/auto-designer/security/advisories/new)提交。如果该入口不可用，请通过已有的私密渠道联系维护者，协商报告方式。请勿在公开 Issue 中发布凭证、漏洞利用细节或原始用户会话。
+发现安全问题时，请通过 [GitHub 私密漏洞报告](https://github.com/Curry09/AHE-Beta/security/advisories/new)提交。如果该入口不可用，请通过已有的私密渠道联系维护者，协商报告方式。请勿在公开 Issue 中发布凭证、漏洞利用细节或原始用户会话。
 
 报告应包含受影响的版本或提交、相关组件、复现步骤和潜在影响。提供日志或示例时，请移除密钥及与问题无关的私密内容。
 

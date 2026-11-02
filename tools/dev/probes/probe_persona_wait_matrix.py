@@ -243,8 +243,8 @@ def _parse_wait_head(perceive: str) -> tuple[str, str, str]:
 
 
 def _run_one(persona, scenario: Scenario) -> Row:
-    from auto_designer.user.sim.loop import run_session
-    from auto_designer.user.sim.persona_client import ApiPersonaClient
+    from ahe_beta.user.sim.loop import run_session
+    from ahe_beta.user.sim.persona_client import ApiPersonaClient
 
     client = ApiPersonaClient()
     harness = MatrixHarness(scenario)
@@ -363,7 +363,7 @@ def main() -> int:
     want_p = {x.strip() for x in args.personas.split(",") if x.strip()}
     want_s = {x.strip() for x in args.scenarios.split(",") if x.strip()}
 
-    from auto_designer.user.sim.persona_io import card_to_persona
+    from ahe_beta.user.sim.persona_io import card_to_persona
 
     cards = selected_personas(load_persona_cards(args.persona_library), sorted(want_p))
     personas = []

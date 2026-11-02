@@ -5,9 +5,9 @@ import json
 
 import pytest
 
-from auto_designer.experiment.cli import build_parser
-from auto_designer.experiment.config import ConfigError
-from auto_designer.experiment.grading_inputs import load_grading_plan
+from ahe_beta.experiment.cli import build_parser
+from ahe_beta.experiment.config import ConfigError
+from ahe_beta.experiment.grading_inputs import load_grading_plan
 
 
 def write_plan(tmp_path):
@@ -106,7 +106,7 @@ def test_plan_symlink_and_duplicate_keys_rejected(tmp_path):
 def test_private_grading_attempts_are_excluded_from_experiment_collection():
     from pathlib import Path
 
-    from auto_designer.experiment.collection import _public_file
+    from ahe_beta.experiment.collection import _public_file
 
     assert not _public_file(Path("evaluation/grade-attempt/materials/hidden-tests.tar"))
     assert not _public_file(Path("evaluation/grade-attempt/plan.json"))

@@ -14,11 +14,11 @@ tasks:
   relates-to: []
   parallel: false
   files:
-  - backend/auto_designer/experiment/config.py
-  - backend/auto_designer/experiment/context.py
-  - backend/auto_designer/experiment/runtime.py
-  - backend/auto_designer/experiment/schemas/experiment-v2.json
-  - backend/auto_designer/experiment/schemas/task-package-v1.json
+  - backend/ahe_beta/experiment/config.py
+  - backend/ahe_beta/experiment/context.py
+  - backend/ahe_beta/experiment/runtime.py
+  - backend/ahe_beta/experiment/schemas/experiment-v2.json
+  - backend/ahe_beta/experiment/schemas/task-package-v1.json
   - backend/tests/test_experiment_config_v2.py
   - backend/tests/test_experiment_engine.py
   - backend/tests/test_experiment_lifecycle_v2.py
@@ -34,9 +34,9 @@ tasks:
   relates-to: []
   parallel: true
   files:
-  - backend/auto_designer/experiment/materials.py
-  - backend/auto_designer/experiment/controllers/ordinary.py
-  - backend/auto_designer/experiment/controllers/swebench.py
+  - backend/ahe_beta/experiment/materials.py
+  - backend/ahe_beta/experiment/controllers/ordinary.py
+  - backend/ahe_beta/experiment/controllers/swebench.py
   - backend/tests/test_experiment_materials.py
   - backend/tests/test_run_swebench_closed_loop.py
   - backend/tests/test_run_vigil.py
@@ -53,9 +53,9 @@ tasks:
   relates-to: []
   parallel: true
   files:
-  - backend/auto_designer/experiment/backends/local.py
-  - backend/auto_designer/experiment/backends/e2b.py
-  - backend/auto_designer/experiment/backends/e2b_bootstrap.py
+  - backend/ahe_beta/experiment/backends/local.py
+  - backend/ahe_beta/experiment/backends/e2b.py
+  - backend/ahe_beta/experiment/backends/e2b_bootstrap.py
   - backend/deploy/vigil/entrypoint.sh
   - backend/tests/test_experiment_local_backend.py
   - backend/tests/test_experiment_e2b_backend.py
@@ -72,9 +72,9 @@ tasks:
   relates-to: []
   parallel: true
   files:
-  - backend/auto_designer/experiment/dashboard.py
-  - backend/auto_designer/experiment/cli.py
-  - backend/auto_designer/web/api.py
+  - backend/ahe_beta/experiment/dashboard.py
+  - backend/ahe_beta/experiment/cli.py
+  - backend/ahe_beta/web/api.py
   - backend/tests/test_experiment_dashboard.py
   - backend/tests/test_experiment_cli_v2.py
   scope: 统一命令启动显式 run 观测，避免读取旧默认数据
@@ -103,7 +103,7 @@ tasks:
   - docs/QUICKSTART.zh-CN.md
   - docs/tutorials/u1-experiment.md
   - docs/tutorials/u1-experiment.zh-CN.md
-  - docs/synthesizer-grouping.md
+  - docs/architect-grouping.md
   - README.md
   - README.zh-CN.md
   - frontend/README.md
@@ -132,7 +132,7 @@ tasks:
 
 保留 schema_version=2，新增可选 policies，各字段默认值进入 prepare 的冻结配置；env 文件只存凭证/地址，宿主同名变量仍不隐式影响实验。
 
-- policies.synthesizer_grouping：false；models.user/demand.reasoning_effort：可选非空字符串。
+- policies.architect_grouping：false；models.user/demand.reasoning_effort：可选非空字符串。
 - policies.timing.latency_isolated：false；wall_guard_seconds：0（采用已有默认 600 秒宽限；总墙钟上限为角色预算加宽限）。
 - policies.delivery.timeout_seconds：86400；poll_seconds：15；coordination：soft/off/dependencies，默认 soft；permission_mode：bypassPermissions/acceptEdits/default，默认 bypassPermissions，执行交付的进程必须为非 root；idle_timeout_seconds：300，0 表示关闭。
 - policies.alarms.proposal_depth/ready_depth：20；roles.owner_mode：mechanical/llm，默认保持现有 mechanical。
@@ -148,7 +148,7 @@ check --offline 在任何 provider 操作前拒绝非法配置/计划；prepare 
 
 在严格 JSON schema 中添加 policies，角色推理参数、auth_type、owner_mode 和 task interaction/plan。配置加载规范化新增默认值；模型认证 helper 分离源变量名和导出的协议变量；保持读取旧 manifest 的执行默认值，不能改写旧 manifest/hash。公共 API key、Bearer、OAuth 三种分支各只导出一种凭证，模型预检使用同一认证决策。
 
-build_controller_environment 从冻结配置导出 SYNTHESIZER_GROUPING、USER/DEMAND_LLM_REASONING_EFFORT、AUTO_DESIGNER_LATENCY_ISOLATED_TIMEOUT、AUTO_DESIGNER_LATENCY_WALL_GUARD_SECONDS、ROUND_DELIVERY_TIMEOUT_SEC/POLL_SEC、VIGIL_COORDINATION、OPENAGENTS_PERMISSION_MODE、OPENAGENTS_CLAUDE_IDLE_TIMEOUT、PROPOSAL/READY_DEPTH_ALARM、N_OWNERS。Docker 交付必须额外透传 idle timeout；禁止从凭证字典补运行策略。告警阈值必须为正整数，ordinary/SWE 共用实际背压检查；延迟墙钟保护保持旧消费者的“角色预算加宽限”语义，0 采用默认 600 秒。
+build_controller_environment 从冻结配置导出 ARCHITECT_GROUPING、USER/DEMAND_LLM_REASONING_EFFORT、AHE_BETA_LATENCY_ISOLATED_TIMEOUT、AHE_BETA_LATENCY_WALL_GUARD_SECONDS、ROUND_DELIVERY_TIMEOUT_SEC/POLL_SEC、VIGIL_COORDINATION、OPENAGENTS_PERMISSION_MODE、OPENAGENTS_CLAUDE_IDLE_TIMEOUT、PROPOSAL/READY_DEPTH_ALARM、N_OWNERS。Docker 交付必须额外透传 idle timeout；禁止从凭证字典补运行策略。告警阈值必须为正整数，ordinary/SWE 共用实际背压检查；延迟墙钟保护保持旧消费者的“角色预算加宽限”语义，0 采用默认 600 秒。
 
 计划统一校验轮数、每轮会话数、persona 是否选中、task 是否匹配与重复；规范化计划注册为冻结 material，并实际被 ordinary/SWE 消费。task interaction 写入实际 workspace，使用现有 mixed dispatcher 保留两种会话行为及恢复加载。
 
@@ -174,7 +174,7 @@ e2e 脚本：backend/scripts/e2e-spec-0072-capability-migration.sh。必须覆�
 
 ## Prior art
 
-旧 ordinary/SWE、auditable/mixed 以及 N1/scaling 实际运行路径分别提供策略导出与消费者。现有 grouped_synthesizer、agent_runtime、round_gate、Owner、mixed dispatcher 和 OpenAgents Claude backend 是本组复用的实现。能力审计日期 2026-10-03，包含单轮误判、凭证映射和 AABB 计划的离线复现，必要背景已在本组就地说明。
+旧 ordinary/SWE、auditable/mixed 以及 N1/scaling 实际运行路径分别提供策略导出与消费者。现有 grouped_architect、agent_runtime、round_gate、Owner、mixed dispatcher 和 OpenAgents Claude backend 是本组复用的实现。能力审计日期 2026-10-03，包含单轮误判、凭证映射和 AABB 计划的离线复现，必要背景已在本组就地说明。
 
 ## Unresolved questions
 

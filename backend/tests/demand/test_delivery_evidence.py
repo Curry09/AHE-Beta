@@ -4,13 +4,13 @@ import json
 
 import pytest
 
-from auto_designer.demand.delivery_evidence import build_package, publish_delivery_evidence
-from auto_designer.demand.owner import Owner
-from auto_designer.models import IssueDraft
-from auto_designer.observations.grants import grant
-from auto_designer.observations.publication import publish
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.demand.delivery_evidence import build_package, publish_delivery_evidence
+from ahe_beta.demand.owner import Owner
+from ahe_beta.models import IssueDraft
+from ahe_beta.observations.grants import grant
+from ahe_beta.observations.publication import publish
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
 
 
 class AssetTracker(FakeTracker):
@@ -132,7 +132,7 @@ def test_corrupt_history_is_reported_unavailable_not_sent(tmp_path):
 def test_attachment_read_has_an_absolute_deadline_even_if_bytes_keep_arriving(monkeypatch):
     from types import SimpleNamespace
 
-    from auto_designer.tracker import gitea
+    from ahe_beta.tracker import gitea
 
     tracker = gitea.GiteaTracker("http://trusted", "o", "r", "test-only-token")
     calls = []
@@ -159,7 +159,7 @@ def test_zip_is_deterministic_single_file_and_reuses_verified_asset(tmp_path):
     import io
     import zipfile
 
-    from auto_designer.observations.transport import make_transport_profile
+    from ahe_beta.observations.transport import make_transport_profile
 
     store, tracker, issue = setup(tmp_path)
     tracker.observation_transport = make_transport_profile(
@@ -209,7 +209,7 @@ def test_gzip_original_bytes_and_footer_remain_unchanged(tmp_path):
 
 
 def test_failed_zip_readback_preserves_issue_and_retry_reuses_asset(tmp_path, monkeypatch):
-    from auto_designer.observations.transport import make_transport_profile
+    from ahe_beta.observations.transport import make_transport_profile
 
     store, tracker, issue = setup(tmp_path)
     tracker.observation_transport = make_transport_profile(
@@ -228,7 +228,7 @@ def test_failed_zip_readback_preserves_issue_and_retry_reuses_asset(tmp_path, mo
 
 @pytest.mark.parametrize("encoding", ["gzip", "zip"])
 def test_final_serialized_package_expanded_limit_enforced(tmp_path, monkeypatch, encoding):
-    from auto_designer.demand import delivery_evidence as module
+    from ahe_beta.demand import delivery_evidence as module
 
     store, tracker, issue = setup(tmp_path)
     monkeypatch.setattr(module, "MAX_EXPANDED", 100)
@@ -245,7 +245,7 @@ def test_unknown_encoding_is_not_guessed(tmp_path):
 def test_current_execution_contract_and_public_material_survive_missing_logs(tmp_path):
     from test_evidence_contract import contract_session
 
-    from auto_designer.execution_contract import canonical_bytes
+    from ahe_beta.execution_contract import canonical_bytes
 
     store = SessionStore(tmp_path / "sessions")
     session = contract_session()

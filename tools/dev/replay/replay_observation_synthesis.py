@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay PM/Synthesizer against fixed evidence, without writing a remote tracker.
+"""Replay PM/Architect against fixed evidence, without writing a remote tracker.
 
 Uses the production prompt builders and tool definitions. The only run overrides
 are bounded timeout/iterations. Inputs are copied to the output for reproducibility;
@@ -20,13 +20,13 @@ from unittest.mock import patch
 
 from tools.dev import add_inputs, load_secrets, role_environment
 
-from auto_designer.demand.agent_runtime import run_agent_def
-from auto_designer.demand.divergent import Divergent
-from auto_designer.demand.synthesizer import Synthesizer
-from auto_designer.models import OpenIssue
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import bind_usage_context
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.demand.agent_runtime import run_agent_def
+from ahe_beta.demand.architect import Architect
+from ahe_beta.demand.divergent import Divergent
+from ahe_beta.models import OpenIssue
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import bind_usage_context
+from ahe_beta.user.session_store import SessionStore
 
 
 class ReplayTracker(FakeTracker):
@@ -44,7 +44,7 @@ def main() -> int:
     parser.add_argument("--proposals", type=Path, required=True)
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--role", choices=["pm", "synthesizer", "both"], default="both")
+    parser.add_argument("--role", choices=["pm", "architect", "both"], default="both")
     parser.add_argument("--timeout", type=int, default=360)
     parser.add_argument("--max-iterations", type=int, default=16)
     add_inputs(parser)
@@ -53,8 +53,8 @@ def main() -> int:
     load_secrets(args.secrets_file)
     role_environment("DEMAND")
     os.environ["ROLE_RUNS_DIR"] = str(args.output / "role-runs")
-    os.environ["AUTO_DESIGNER_USAGE_PATH"] = str(args.output / "usage.jsonl")
-    os.environ["AUTO_DESIGNER_OBSERVATION_ROOT"] = str(args.observations.resolve())
+    os.environ["AHE_BETA_USAGE_PATH"] = str(args.output / "usage.jsonl")
+    os.environ["AHE_BETA_OBSERVATION_ROOT"] = str(args.observations.resolve())
     shutil.copytree(args.sessions, args.output / "sessions")
     shutil.copyfile(args.proposals, args.output / "input-proposals.json")
     store = SessionStore(args.output / "sessions")
@@ -68,7 +68,7 @@ def main() -> int:
         "max_iterations": args.max_iterations,
         "roles": {},
     }
-    roles = ["pm", "synthesizer"] if args.role == "both" else [args.role]
+    roles = ["pm", "architect"] if args.role == "both" else [args.role]
     for role in roles:
         trace_path = args.output / f"{role}-trace.jsonl"
 
@@ -90,16 +90,16 @@ def main() -> int:
         driver = (
             Divergent(tracker, store, str(args.repo), str(agents / "divergent_pm"), on_event=event)
             if role == "pm"
-            else Synthesizer(
-                tracker, store, str(args.repo), str(agents / "synthesizer"), on_event=event
+            else Architect(
+                tracker, store, str(args.repo), str(agents / "architect"), on_event=event
             )
         )
-        module = "divergent" if role == "pm" else "synthesizer"
+        module = "divergent" if role == "pm" else "architect"
         started = time.monotonic()
         try:
             with (
                 bind_usage_context(run_id=args.output.name, round_no=1),
-                patch(f"auto_designer.demand.{module}.run_agent_def", bounded_run),
+                patch(f"ahe_beta.demand.{module}.run_agent_def", bounded_run),
             ):
                 outcome = driver.propose_once()
             row = {

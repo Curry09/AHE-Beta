@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from auto_designer.loop.sim_user import make_direct_run_session_fn, make_mixed_run_session_fn
-from auto_designer.models import Persona, SeedScenario, WorkspaceSpec
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.user.session_store import SessionStore
+from ahe_beta.loop.sim_user import make_direct_run_session_fn, make_mixed_run_session_fn
+from ahe_beta.models import Persona, SeedScenario, WorkspaceSpec
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.user.session_store import SessionStore
 
 
 class _Harness:

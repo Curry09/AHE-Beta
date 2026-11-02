@@ -24,7 +24,7 @@ def main() -> None:
     config_module = importlib.import_module("openagents.utils.agent_config")
     if not Path(config_module.__file__).resolve().is_relative_to(checkout):
         raise RuntimeError("configuration parser came from a different checkout")
-    controller = importlib.import_module("auto_designer.experiment.controllers.runtime")
+    controller = importlib.import_module("ahe_beta.experiment.controllers.runtime")
     # Ensure local backend/.env and the caller's environment cannot change this check.
     os.environ["VIGIL_COORDINATION"] = "soft"
     os.environ.pop("VIGIL_CI_STAGE", None)

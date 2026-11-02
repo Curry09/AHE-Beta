@@ -9,8 +9,8 @@
 ## 1. 从仓库开始
 
 ```bash
-git clone https://github.com/Curry09/auto-designer.git
-cd auto-designer
+git clone https://github.com/Curry09/AHE-Beta.git
+cd AHE-Beta
 uv sync --locked --extra experiments
 ```
 
@@ -37,7 +37,7 @@ chmod 600 .env.experiment
 | 任务环境 | 仓内安装脚本、包含完整 hash 的依赖锁 |
 | Persona | `examples/personas/u1.json`，选择 ID `sr-15-swyx` |
 | 初始 Harness | 当前 `backend/harness_template/`，prepare 时冻结 |
-| 角色 | 一个 Triage、一个 Synthesizer、机械 Owner、一个 developer；无 divergent PM |
+| 角色 | 一个 Triage、一个 Architect、机械 Owner、一个 developer；无 divergent PM |
 
 任务只提供文本和初始代码，不给优化角色标准答案或隐藏测试。用户可以主观接受结果，但不等于官方 SWE-bench 通过，本示例不运行官方评分。
 
@@ -77,7 +77,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py logs "$
 
 | 轮次 | 用户交互 | 需求与交付 | 结果 |
 | --- | --- | --- | --- |
-| R1 | 试用 seed Harness | Triage/Synthesizer → 机械 Owner → OpenAgents | 首个 sealed Harness SHA |
+| R1 | 试用 seed Harness | Triage/Architect → 机械 Owner → OpenAgents | 首个 sealed Harness SHA |
 | R2 | 试用 R1 封口版本 | 同一流程 | R2 封口 |
 | R3 | 试用 R2 封口版本 | 同一流程 | R3 封口 |
 | R4 | 试用 R3 封口版本 | 同一流程 | R4 封口 |

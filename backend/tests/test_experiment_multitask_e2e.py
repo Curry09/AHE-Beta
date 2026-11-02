@@ -19,23 +19,23 @@ from pathlib import Path
 
 import pytest
 
-from auto_designer.demand.owner import Owner
-from auto_designer.demand.synthesizer import Synthesizer
-from auto_designer.demand.triage import Triager
-from auto_designer.distill.library import PersonaLibrary
-from auto_designer.experiment import context, materials, workload
-from auto_designer.experiment.config import config_hash
-from auto_designer.experiment.controllers import runtime, unified
-from auto_designer.loop.orchestrator import Orchestrator
-from auto_designer.loop.recovery import RecoveryIdentity, RecoveryStore
-from auto_designer.loop.round_gate import RoundDeliveryBlocked
-from auto_designer.tracker.fake import FakeTracker
-from auto_designer.usage import current_usage_context
-from auto_designer.user.session_store import SessionStore
-from auto_designer.user.sim.harness_adapter import ScriptedHarness
-from auto_designer.user.sim.persona_client import ScriptedPersonaClient
-from auto_designer.user.sim.persona_io import card_to_personas
-from auto_designer.user.sim.runtime import LocalWorkspaceRuntime
+from ahe_beta.demand.architect import Architect
+from ahe_beta.demand.owner import Owner
+from ahe_beta.demand.triage import Triager
+from ahe_beta.distill.library import PersonaLibrary
+from ahe_beta.experiment import context, materials, workload
+from ahe_beta.experiment.config import config_hash
+from ahe_beta.experiment.controllers import runtime, unified
+from ahe_beta.loop.orchestrator import Orchestrator
+from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore
+from ahe_beta.loop.round_gate import RoundDeliveryBlocked
+from ahe_beta.tracker.fake import FakeTracker
+from ahe_beta.usage import current_usage_context
+from ahe_beta.user.session_store import SessionStore
+from ahe_beta.user.sim.harness_adapter import ScriptedHarness
+from ahe_beta.user.sim.persona_client import ScriptedPersonaClient
+from ahe_beta.user.sim.persona_io import card_to_personas
+from ahe_beta.user.sim.runtime import LocalWorkspaceRuntime
 from test_experiment_config_v2 import write
 from test_experiment_workload import multiple_inputs as base_multiple_inputs
 from test_experiment_workload import prepared_inputs as base_prepared_inputs
@@ -256,7 +256,7 @@ def test_two_round_mixed_workload_stops_resumes_and_delivers_nonempty(
         provisioned.append((ctx.session_id, ctx.task_id, spec.params["provider_coordinate"]))
         return LocalWorkspaceRuntime(str(directory))
 
-    monkeypatch.setattr("auto_designer.loop.orchestrator.materialize_workspace", materialize)
+    monkeypatch.setattr("ahe_beta.loop.orchestrator.materialize_workspace", materialize)
     repo = root / "data/harness-repo"
     repo.mkdir(parents=True)
     subprocess.run(["git", "init", "--quiet", "-b", "main", str(repo)], check=True)
@@ -296,13 +296,13 @@ def test_two_round_mixed_workload_stops_resumes_and_delivers_nonempty(
         )
 
     monkeypatch.setattr(triager, "_run_agent", triage_model)
-    synthesizer = Synthesizer(tracker, store, str(repo), str(tmp_path / "unused-agent"))
-    synthesized = []
+    architect = Architect(tracker, store, str(repo), str(tmp_path / "unused-agent"))
+    architect_sources = []
 
     def synthesis_model(*, ready, proposals, trend, runtime):
         source_ids = [proposal.number for proposal in proposals]
         assert len(source_ids) >= 2
-        synthesized.extend(source_ids)
+        architect_sources.extend(source_ids)
         return json.dumps(
             {
                 "proposals": [
@@ -321,7 +321,7 @@ def test_two_round_mixed_workload_stops_resumes_and_delivers_nonempty(
             }
         )
 
-    monkeypatch.setattr(synthesizer, "_run_agent", synthesis_model)
+    monkeypatch.setattr(architect, "_run_agent", synthesis_model)
     owner = Owner(tracker, store, str(repo), str(tmp_path / "unused-agent"), review=False)
     delivery_numbers = []
 
@@ -357,7 +357,7 @@ def test_two_round_mixed_workload_stops_resumes_and_delivers_nonempty(
             run_session_fn=run_user,
             initial_ref="main",
             triagers=[triager],
-            synthesizers=[synthesizer],
+            architects=[architect],
             owner=owner,
             max_parallel_users=2,
             fetch_issue=lambda number: tracker.get_issue(number=number),
@@ -389,7 +389,7 @@ def test_two_round_mixed_workload_stops_resumes_and_delivers_nonempty(
     refs = orch.run(2)
     sealed = refs[0]
     assert refs[1] == sealed
-    assert sealed != initial_sha and synthesized and delivery_numbers
+    assert sealed != initial_sha and architect_sources and delivery_numbers
     assert all(tracker.get_issue(number=number)["state"] == "closed" for number in delivery_numbers)
     assert all(
         (store.root / f"{sid}.json").read_bytes() == body for sid, body in saved_before.items()

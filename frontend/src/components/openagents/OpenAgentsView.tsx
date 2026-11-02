@@ -37,7 +37,7 @@ export function OpenAgentsView(props: {
           <h2>OpenAgents</h2>
           <p>
             openagents → ready → PR → needs-human / conflict → main。这里保持只读，展示
-            auto-designer 已暴露的 Gitea 观测数据。
+            AHE-Beta 已暴露的 Gitea 观测数据。
           </p>
         </div>
         <div className="openagents-source-grid" aria-label="数据源状态">

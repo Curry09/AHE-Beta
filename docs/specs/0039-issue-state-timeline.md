@@ -27,8 +27,8 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/tracker/gitea.py
-      - backend/auto_designer/web/issue_timeline.py
+      - backend/ahe_beta/tracker/gitea.py
+      - backend/ahe_beta/web/issue_timeline.py
       - backend/tests/tracker/test_gitea_timeline.py
     scope: 实现 timeline 分页与 label 事件归一，纯函数重放状态、last-known 和确定性完整性异常。
     acceptance: 覆盖正常迁移、PUT 型同批增删、未知事件、分页、不完整历史和 current drift；不以历史值回填当前状态。
@@ -42,12 +42,12 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/web/api.py
+      - backend/ahe_beta/web/api.py
       - backend/tests/web/test_api.py
     scope: 把 timeline DTO 接入 issue 详情，保持旧字段与 tracker 能力降级兼容。
     acceptance: 成功、tracker 不支持、timeline 单独失败和 issue 不存在路径均有测试；timeline 失败不使正文与评论断连。
   - id: T4
-    title: 为 Synthesizer 综合票写入轮次标签
+    title: 为 Architect 综合票写入轮次标签
     status: done
     priority: P1
     tags: []
@@ -56,11 +56,11 @@ tasks:
     relates-to: []
     parallel: false
     files:
-      - backend/auto_designer/demand/synthesizer.py
-      - backend/auto_designer/experiment/controllers/ordinary.py
-      - backend/auto_designer/experiment/controllers/swebench.py
-      - backend/tests/loop/test_synthesizer.py
-    scope: 为 Synthesizer 注入 live round_provider，创建 from-synthesize proposal 时追加合法 round-N；主入口与 SWE-bench 专用入口保持同一接线，专用入口同时保留 Owner 准入链。
+      - backend/ahe_beta/demand/architect.py
+      - backend/ahe_beta/experiment/controllers/ordinary.py
+      - backend/ahe_beta/experiment/controllers/swebench.py
+      - backend/tests/loop/test_architect.py
+    scope: 为 Architect 注入 live round_provider，创建 from-architect proposal 时追加合法 round-N；主入口与 SWE-bench 专用入口保持同一接线，专用入口同时保留 Owner 准入链。
     acceptance: 正整数轮次被写入；空值与非法值保持兼容且不猜测；既有来源标签不变；SWE-bench 专用入口产出轮次标签并经 Owner 进入交付面。
   - id: T5
     title: 建立前端标签维度与时间线展示模型
@@ -102,14 +102,14 @@ tasks:
 
 ## Summary
 
-把 issue 的“当前标签集合”与“标签如何演进到这里”拆成两个观察面。后端读取 Gitea 原生 timeline，按时间顺序归一 label add/remove 事件并折叠成状态快照；前端在 issue 详情中按平面、来源、优先级、轮次、交付/阻塞、终态分维展示当前状态，再以可展开时间线呈现每次语义迁移和原始标签事件。系统对来源/轮次丢失、open issue 从有效平面坠为无平面、`needs-human` 同批清除业务元数据等异常显式告警，但不以历史值冒充当前真值、也不从看板写回 Gitea。同时让 Synthesizer 结构综合票与既有 Divergent 票一样在创建时携带 `round-N`，补齐新数据的轮次来源。
+把 issue 的“当前标签集合”与“标签如何演进到这里”拆成两个观察面。后端读取 Gitea 原生 timeline，按时间顺序归一 label add/remove 事件并折叠成状态快照；前端在 issue 详情中按平面、来源、优先级、轮次、交付/阻塞、终态分维展示当前状态，再以可展开时间线呈现每次语义迁移和原始标签事件。系统对来源/轮次丢失、open issue 从有效平面坠为无平面、`needs-human` 同批清除业务元数据等异常显式告警，但不以历史值冒充当前真值、也不从看板写回 Gitea。同时让 Architect 结构综合票与既有 Divergent 票一样在创建时携带 `round-N`，补齐新数据的轮次来源。
 
 ## Motivation
 
-auto-designer 以 Gitea issue 作为需求面与外接交付面的共享总线。当前标签同时承载多种正交语义：
+AHE-Beta 以 Gitea issue 作为需求面与外接交付面的共享总线。当前标签同时承载多种正交语义：
 
 - `report / proposal / ready` 表达需求平面；
-- `from-triage / from-synthesize / from-divergent` 表达不可变来源；
+- `from-triage / from-architect / from-divergent` 表达不可变来源；
 - `P0..P3` 表达优先级；
 - `round-N` 表达产生轮次；
 - `openagents` 表达 Owner 向交付面的交接令牌；
@@ -118,11 +118,11 @@ auto-designer 以 Gitea issue 作为需求面与外接交付面的共享总线�
 
 列表 API 和前端目前只看**当前** labels，再用纯函数投影 `plane/provenance/priority/round`。这对调度是正确的，却不适合调试：所有维度平铺成一排 chip，用户看不出哪些互斥、哪些可共存、哪个标签由谁在何时添加；一旦当前标签被错误替换，投影只能得到 `null`，历史来源也随之从 UI 消失。
 
-真实运行已经给出完整反例。某张由 Synthesizer 综合、Owner 准入、Vigil 接管的票原先依次拥有 `proposal + from-synthesize`、`openagents + P1`、`ready`；交付 Agent 在请求人工介入时直接向 Gitea 发 `PUT /issues/{n}/labels`，把整组标签替换成单独的 `needs-human`。当前列表因而诚实显示 `plane=null / provenance=null / priority=null`，但用户无法从看板判断这是“从未分诊/从未准入”还是“历史元数据被破坏”。
+真实运行已经给出完整反例。某张由 Architect 综合、Owner 准入、Vigil 接管的票原先依次拥有 `proposal + from-architect`、`openagents + P1`、`ready`；交付 Agent 在请求人工介入时直接向 Gitea 发 `PUT /issues/{n}/labels`，把整组标签替换成单独的 `needs-human`。当前列表因而诚实显示 `plane=null / provenance=null / priority=null`，但用户无法从看板判断这是“从未分诊/从未准入”还是“历史元数据被破坏”。
 
-Gitea 1.22.6 已在 `/api/v1/repos/{owner}/{repo}/issues/{index}/timeline` 保存每次标签增删：`type=label`、label 对象、时间、操作者，以及 add/remove 方向。上述破坏可被完整回放为同一批次的 `+needs-human` 与 `-openagents/-ready/-P1/-from-synthesize`。因此无需另建事件数据库；需要的是稳定的 Gitea 适配、语义折叠和清晰 UI。
+Gitea 1.22.6 已在 `/api/v1/repos/{owner}/{repo}/issues/{index}/timeline` 保存每次标签增删：`type=label`、label 对象、时间、操作者，以及 add/remove 方向。上述破坏可被完整回放为同一批次的 `+needs-human` 与 `-openagents/-ready/-P1/-from-architect`。因此无需另建事件数据库；需要的是稳定的 Gitea 适配、语义折叠和清晰 UI。
 
-另一个独立缺口是 Synthesizer 结构综合票创建时只写 `proposal + from-synthesize`，没有 `round-N`。即使标签从未污染，这类票的轮次仍不可知；按轮过滤 OpenAgents 页面也无法可靠关联它们。Divergent 已通过 `round_provider` 写入轮次，Synthesizer 应收敛到同一生产契约。
+另一个独立缺口是 Architect 结构综合票创建时只写 `proposal + from-architect`，没有 `round-N`。即使标签从未污染，这类票的轮次仍不可知；按轮过滤 OpenAgents 页面也无法可靠关联它们。Divergent 已通过 `round_provider` 写入轮次，Architect 应收敛到同一生产契约。
 
 ## Guide-level explanation
 
@@ -131,7 +131,7 @@ Gitea 1.22.6 已在 `/api/v1/repos/{owner}/{repo}/issues/{index}/timeline` 保�
 | 维度 | 示例 |
 |---|---|
 | 当前平面 | Ready（可领） |
-| 来源 | Synthesizer 综合 |
+| 来源 | Architect 综合 |
 | 优先级 | P1 |
 | 产生轮次 | round-1 |
 | 交付 | OpenAgents 已接管 |
@@ -142,7 +142,7 @@ Gitea 1.22.6 已在 `/api/v1/repos/{owner}/{repo}/issues/{index}/timeline` 保�
 
 ```text
 plane=ready
-provenance=from-synthesize
+provenance=from-architect
 priority=P1
 delivery=blocked(needs-human)
 ```
@@ -153,20 +153,20 @@ delivery=blocked(needs-human)
 
 ```text
 17:45:18  创建提案
-          +proposal +from-synthesize +round-1
-          proposal / synthesize / round-1
+          +proposal +from-architect +round-1
+          proposal / architect / round-1
 
 17:45:50  Owner 准入（由标签组合与 admission 评论推断）
           -proposal +openagents +P1
-          ready / synthesize / P1 / handoff
+          ready / architect / P1 / handoff
 
 17:45:52  OpenAgents intake
           +ready
-          ready / synthesize / P1 / active
+          ready / architect / P1 / active
 
 18:23:14  交付阻塞
           +needs-human
-          ready / synthesize / P1 / blocked
+          ready / architect / P1 / blocked
 ```
 
 破坏性示例会保留真实结果并标红，而不是偷偷用历史值填充当前字段：
@@ -174,13 +174,13 @@ delivery=blocked(needs-human)
 ```text
 18:23:14  ⚠ 标签完整性异常
           +needs-human
-          -openagents -ready -P1 -from-synthesize
+          -openagents -ready -P1 -from-architect
           ready → 无平面；来源与优先级丢失
 ```
 
 异常卡给出“历史最后已知状态”和“当前 Gitea 状态”两栏，便于人工恢复，但页面保持只读，不提供自动修复/重试/改标签按钮。
 
-Synthesizer 从本组起创建结构综合票时写 `round-N`。旧票没有 round 时不按创建时间猜轮次；timeline 只能恢复曾经真实存在过的标签，不能发明从未落库的数据。
+Architect 从本组起创建结构综合票时写 `round-N`。旧票没有 round 时不按创建时间猜轮次；timeline 只能恢复曾经真实存在过的标签，不能发明从未落库的数据。
 
 ## Reference-level explanation
 
@@ -223,7 +223,7 @@ anomalies[]          确定性异常
 ```text
 labels
 plane                report | proposal | ready | null
-provenance           from-triage | from-synthesize | from-divergent | null
+provenance           from-triage | from-architect | from-divergent | null
 priority             P0..P3 | null
 round                positive integer | null
 handoff              bool（openagents 且未 ready）
@@ -279,9 +279,9 @@ terminal             merged | declined | ... | null
 
 列表页与 OpenAgents 总览仍使用当前 labels，不在本组引入历史回填。历史只在 issue 详情调试面出现。
 
-### 6. Synthesizer 轮次元数据
+### 6. Architect 轮次元数据
 
-Synthesizer 构造与 Divergent 相同的 `round_provider: Callable[[], int | None]`。run 编排层注入 live round provider；创建 `proposal + from-synthesize` 时，正整数轮次追加 `round-N`。无 provider、provider 返回空/非正数时保持兼容，不猜测轮次。既有 `from-synthesize` 继续保留，来源无需另建数据库。
+Architect 构造与 Divergent 相同的 `round_provider: Callable[[], int | None]`。run 编排层注入 live round provider；创建 `proposal + from-architect` 时，正整数轮次追加 `round-N`。无 provider、provider 返回空/非正数时保持兼容，不猜测轮次。既有 `from-architect` 继续保留，来源无需另建数据库。
 
 ### 7. 跨仓边界
 
@@ -294,7 +294,7 @@ graph LR
   T1[T1 规格活快照]
   T2[T2 Timeline 读取与折叠]
   T3[T3 Issue 详情 API]
-  T4[T4 Synthesizer 轮次元数据]
+  T4[T4 Architect 轮次元数据]
   T5[T5 前端时间线模型]
   T6[T6 详情 UI 与跨仓 E2E]
   T1 --> T2
@@ -310,7 +310,7 @@ graph LR
 | T1 | 0039 规格、边界与验收 | `docs/specs/0039-issue-state-timeline.md` |
 | T2 | Gitea timeline 分页、归一、状态折叠和异常规则 | `tracker/gitea.py`, `web/issue_timeline.py`, tracker/timeline tests |
 | T3 | 详情 DTO 接线与降级兼容 | `web/api.py`, web API tests |
-| T4 | Synthesizer 创建票补 `round-N` | `synthesizer/synthesizer.py`, `run.py`, synthesizer tests |
+| T4 | Architect 创建票补 `round-N` | `architect/architect.py`, `run.py`, architect tests |
 | T5 | TypeScript DTO 与纯展示模型 | `types.ts`, `issueMeta.ts`, `issueTimelineModel.ts` 及测试 |
 | T6 | Issue 详情时间线、样式与真实 Gitea E2E | `IssueDetail.tsx`, `styles.css`, e2e script |
 
@@ -330,7 +330,7 @@ backend/scripts/e2e-spec-0039-issue-state-timeline.sh
 
 - issue 详情每次多读一条分页 timeline；超长历史会增加 Gitea 请求和 DTO 体积。该读取只在用户打开详情时发生，不进入轮询列表端点。
 - Gitea timeline 没有稳定 request id；同时间、同 actor、连续 label event 的批次折叠是适配层规则。原始 events 始终保留，推断可信度可检查。
-- 所有自动化当前共用 `synthesizer` Gitea 账号，timeline 的 actor_login 不能区分 `synthesizer-0`、`owner-0` 与 Vigil。阶段名称只能依据标签组合和签名评论标为“推断”，不能冒充精确身份。
+- 所有自动化当前共用 `architect` Gitea 账号，timeline 的 actor_login 不能区分 `architect-0`、`owner-0` 与 Vigil。阶段名称只能依据标签组合和签名评论标为“推断”，不能冒充精确身份。
 - 新 UI 增加详情信息密度；通过维度卡、折叠 Debug 区和移动端纵向布局控制复杂度。
 - 本组故意不自动恢复历史标签；用户仍需在 Gitea 处理既有污染票。
 

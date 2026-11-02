@@ -132,7 +132,7 @@ summary 输入；这是为了可靠恢复原编号。复制完整仓库和全部
 抹掉前一次来源。未直接调用生产 `start_vigil`，因为验证需要独立 repo、模型、container name 和配置目录；
 但复用同一 env parser、镜像和 entrypoint，避免协议分叉。
 
-未把临时 owner/synthesize 恢复脚本纳入本组：它们会修改既有仓库且缺少完整前态快照，只适合保留为事故
+未把临时 owner/architect 恢复脚本纳入本组：它们会修改既有仓库且缺少完整前态快照，只适合保留为事故
 证据。未把密钥写入临时 env 文件或 manifest；subprocess env 是唯一凭证通道。
 
 ## Prior art

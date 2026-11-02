@@ -73,7 +73,7 @@ def main() -> int:
         raise SystemExit("Provide --network and --image when absent from the selected run")
     import yaml
 
-    from auto_designer.experiment.backends.base import require_execution_reader
+    from ahe_beta.experiment.backends.base import require_execution_reader
 
     settings_doc = yaml.safe_load((config / "openagents.yml").read_text())
     if settings_doc.get("execution_evidence", {}).get("required") is not True:

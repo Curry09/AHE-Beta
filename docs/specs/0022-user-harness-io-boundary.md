@@ -20,9 +20,9 @@ tasks:
         type: note
     parallel: false
     files:
-      - backend/auto_designer/user/sim/loop.py
-      - backend/auto_designer/user/sim/prompt.py
-      - backend/auto_designer/harness/launcher.py
+      - backend/ahe_beta/user/sim/loop.py
+      - backend/ahe_beta/user/sim/prompt.py
+      - backend/ahe_beta/harness/launcher.py
       - backend/tests/user/sim/test_heartbeat.py
       - backend/tests/harness/test_launcher.py
     scope: 等待菜单改为 keep_waiting/send_message/interrupt/give_up；launcher.emit_message 允许 in-flight 再塞 message；intent 自由文本，act 收敛并自报 gap→WAIT_GAP；interrupt 走 control；归因 YOU interrupted (Ctrl+C)。取代 invoke_control/peek-via-control 用户路径。
@@ -38,9 +38,9 @@ tasks:
         type: extends
     parallel: false
     files:
-      - backend/auto_designer/user/sim/tools.py
-      - backend/auto_designer/user/sim/persona_client.py
-      - backend/auto_designer/loop/sim_user.py
+      - backend/ahe_beta/user/sim/tools.py
+      - backend/ahe_beta/user/sim/persona_client.py
+      - backend/ahe_beta/loop/sim_user.py
       - backend/tests/user/sim/test_tools.py
       - backend/tests/user/sim/test_persona_client_agentic.py
       - backend/tests/loop/test_sim_user.py
