@@ -19,7 +19,7 @@
 
 发布和验证状态以 `manifest.json` 为准。[固定版本材料 Release](https://github.com/Curry09/AHE-Beta/releases/tag/evolution32-task-materials-v1) 包含 37 项输入资产，以及 `materials.lock.json`、`SHA256SUMS` 和 README。准备阶段只下载所选任务需要的资产，逐项检查哈希及文件清单。主仓当前仍为私有，带身份下载单独验证；匿名材料下载待主仓公开后再验证，通用材料下载器不加入 GitHub 身份认证逻辑。
 
-32 项任务镜像统一使用 `ghcr.io/mmjzmy/auto-designer-tasks:<任务 key 小写>-v<version>`，例如 `m04-v1`、`o03-v1`、`kv-live-surgery-v1`。实际任务定义锁定镜像 digest；源码、依赖版本与构建配方记录在清单中。
+32 项任务镜像统一使用 `ghcr.io/mmjzmy/ahe-beta-tasks:<任务 key 小写>-v<version>`，例如 `m04-v1`、`o03-v1`、`kv-live-surgery-v1`。实际任务定义锁定镜像 digest；源码、依赖版本与构建配方记录在清单中。
 
 32 项任务镜像和 4 项配套服务镜像均已公开，逐项通过干净 E2B 环境中的匿名下载、镜像身份校验和工具启动。32 项最终任务配方还通过了真实本地 Docker 初始化、就绪、收尾及收集检查，检查时未启动 Actor。[清单](manifest.json)记录材料身份与验证凭据；[验证方法](../../../docs/VERIFICATION.zh-CN.md)提供当前 checkout 可复现的检查命令。
 

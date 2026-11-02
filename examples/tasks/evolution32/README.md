@@ -19,7 +19,7 @@ The examples start a new run from the current seed. Input files, runtime recipes
 
 Publication and validation status are recorded in `manifest.json`. The [versioned material Release](https://github.com/Curry09/AHE-Beta/releases/tag/evolution32-task-materials-v1) contains 37 input assets plus `materials.lock.json`, `SHA256SUMS`, and a README. Preparation downloads only the selected tasks' assets and verifies their hashes and file inventories. The repository is currently private; authenticated download is checked separately, and anonymous material download will be verified after it becomes public. No GitHub authentication is added to the generic task-material loader.
 
-All 32 task images use `ghcr.io/mmjzmy/auto-designer-tasks:<lowercase-task-key>-v<version>`, such as `m04-v1`, `o03-v1`, and `kv-live-surgery-v1`. Executable task definitions pin the image digest; source revisions, dependency versions, and build recipes remain in the manifest.
+All 32 task images use `ghcr.io/mmjzmy/ahe-beta-tasks:<lowercase-task-key>-v<version>`, such as `m04-v1`, `o03-v1`, and `kv-live-surgery-v1`. Executable task definitions pin the image digest; source revisions, dependency versions, and build recipes remain in the manifest.
 
 All 32 task images and four companion service images are public. Each passed anonymous download, image identity checks, and tool startup in clean E2B environments. All 32 final task recipes also passed real local Docker initialization, readiness, finalization, and collection checks without an Actor. The [manifest](manifest.json) records material identities and validation receipts; the [verification guide](../../../docs/VERIFICATION.md) lists checks users can rerun on this checkout.
 

@@ -66,8 +66,8 @@
       "M04": {
         "title": "M04 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m04-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:dd714c8ff7d7431836e5c133c52691dff3fc996134fbfdc18a0782b38a2d27ee",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m04-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:dd714c8ff7d7431836e5c133c52691dff3fc996134fbfdc18a0782b38a2d27ee",
         "config_image_id": "sha256:10395f71dd71ee3577c24dbb12723a7acaf3c2678893cf988acc481f9eed6aaf",
         "visibility": "public",
         "anonymous_e2b_verification": {
@@ -85,8 +85,8 @@
         },
         "metadata_recipe": {
           "recipe": "M04/environment/Dockerfile",
-          "recipe_sha256": "b0dcf76de03908f17059315741da8c3c7a9de15157adb06dc2cd13faa18c8588",
-          "parent_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:78ef1a05bf3c05b714a2600217c53a75efeb8261ab1c5dfa2e7bd2e9302e24dd",
+          "recipe_sha256": "0ae14624dfc2f08d9cfc7a4a8a7f53200bbc2107a215b7331eb0141a1e9c65d9",
+          "parent_image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:78ef1a05bf3c05b714a2600217c53a75efeb8261ab1c5dfa2e7bd2e9302e24dd",
           "parent_retention": "retained untagged in the same public GHCR package",
           "change_scope": "configuration labels only; task tool filesystem unchanged",
           "original_build_receipt_preserved": true
@@ -95,8 +95,8 @@
       "M09": {
         "title": "M09 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m09-v2",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:845fdaa1966416b7a6c4e7eda1b619006f7a28c46dfb6441f4425e093c6fadcf",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m09-v2",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:845fdaa1966416b7a6c4e7eda1b619006f7a28c46dfb6441f4425e093c6fadcf",
         "config_image_id": "sha256:43e0c1c29fa2e9c777b9b5418fa812abc7afbf9040fd611b37632ac65f9a92d7",
         "visibility": "public",
         "platform": "linux/amd64",
@@ -114,10 +114,10 @@
         },
         "preparation": {
           "kind": "original_base_plus_original_task_python",
-          "base_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:af5dfe8cde78a328e8b317edf4114a85b79dcde654474a166c63b807454eb9ad",
-          "interpreter_source_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
+          "base_image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:af5dfe8cde78a328e8b317edf4114a85b79dcde654474a166c63b807454eb9ad",
+          "interpreter_source_image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
           "recipe": "M09/environment/Dockerfile",
-          "recipe_sha256": "d711e2cfda88d008aad6bdc90bc2ba6a2b147dd94f031ce79df211fd3dc34806",
+          "recipe_sha256": "dd1cd5bff33afc830a050fecea5b2f2f8ebb977ad7b2df296eeefc2713bab37c",
           "reason": "Restore the original task Python3.12 selection; M05 public commission requires Python3.11 or newer.",
           "change_scope": "original interpreter prefix and PATH selection; original task input bytes unchanged"
         },
@@ -133,8 +133,8 @@
           {
             "title": "M09 task environment",
             "status": "published_and_verified",
-            "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m09-v1",
-            "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:af5dfe8cde78a328e8b317edf4114a85b79dcde654474a166c63b807454eb9ad",
+            "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m09-v1",
+            "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:af5dfe8cde78a328e8b317edf4114a85b79dcde654474a166c63b807454eb9ad",
             "config_image_id": "sha256:dce58703e0b37db746dd6bd6cb3d66790215fbdcfc7de986c03acb32560b0af4",
             "visibility": "public",
             "anonymous_manifest_verified": true,
@@ -172,8 +172,8 @@
       "M10": {
         "title": "M10 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m10-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a5d0075fb128b3b368711c57e959cdd5ebaa96f4f5aea4589912ca8376b3cb16",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m10-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:a5d0075fb128b3b368711c57e959cdd5ebaa96f4f5aea4589912ca8376b3cb16",
         "config_image_id": "sha256:f1443f7833de92febc60bef4b535095739748933033da425a089f7767ce32da7",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -204,8 +204,8 @@
       "091-add-receipts-bookkeeping": {
         "title": "091-add-receipts-bookkeeping task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:091-add-receipts-bookkeeping-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:651de19e573e9af3df9f276c793f3133dbf93438d668bc3007954fbca20797a4",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:091-add-receipts-bookkeeping-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:651de19e573e9af3df9f276c793f3133dbf93438d668bc3007954fbca20797a4",
         "config_image_id": "sha256:bcec9cfc9fb22cfb13f68eb1d9cd4556393bf663555676d70e2115009ad619e0",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -234,8 +234,8 @@
       "O03": {
         "title": "O03 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o03-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:1841e6685c5ec7845dff02aed304dac10482143f4de33f5c7fd0474b062d8821",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:o03-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:1841e6685c5ec7845dff02aed304dac10482143f4de33f5c7fd0474b062d8821",
         "config_image_id": "sha256:75ece095b2f3403ed624244da5d86e091dea91b1fa0272190d2667273baed9e1",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -356,8 +356,8 @@
       "vba-userform-port": {
         "title": "vba-userform-port task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:vba-userform-port-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:61db6cfa15f71bf513952c8ae5135a90a72a97ccb0733ae467bd31b1a89c2e5a",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:vba-userform-port-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:61db6cfa15f71bf513952c8ae5135a90a72a97ccb0733ae467bd31b1a89c2e5a",
         "config_image_id": "sha256:d5e607e2ddf3ba6fda6cfa480709c40f904d3b2231850a3ad0ea00092ce03052",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -383,8 +383,8 @@
       "payments-pipeline-fix": {
         "title": "payments-pipeline-fix task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:payments-pipeline-fix-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:31bca97cc4d5cd9b6f304b935987064d4f84597149193e53cd4beb59e0f70674",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:payments-pipeline-fix-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:31bca97cc4d5cd9b6f304b935987064d4f84597149193e53cd4beb59e0f70674",
         "config_image_id": "sha256:dee1ebd240a672dfed44b8c6f32d3bf037ef103eb186838c41517cbbd7f18443",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -410,8 +410,8 @@
       "M07": {
         "title": "M07 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m07-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:b106e5c93b2e08bfeb73aa096971b075119670c257da3ebe2a19242b883ce92e",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m07-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:b106e5c93b2e08bfeb73aa096971b075119670c257da3ebe2a19242b883ce92e",
         "config_image_id": "sha256:d508a88bc01a5be4936e24431c8bfd5e0be7a308d811a4cdcdfda09937547814",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -442,8 +442,8 @@
       "cookiecutter": {
         "title": "cookiecutter task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:cookiecutter-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:d45a6b83c47a17b1b0b12a17493a22ce68513b7079d1ad51f3d2e26e5e796f9e",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:cookiecutter-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:d45a6b83c47a17b1b0b12a17493a22ce68513b7079d1ad51f3d2e26e5e796f9e",
         "config_image_id": "sha256:1d9665ec62cabcee51c6f16dc9b3eea09fd6b854d82aad48883c402fb20e1fa8",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -474,8 +474,8 @@
       "tqdm": {
         "title": "tqdm task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:tqdm-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:77e309a5a4663e3dbcc560e0225e29575fe3a94f3d68b1d2ca2993f3b308348a",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:tqdm-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:77e309a5a4663e3dbcc560e0225e29575fe3a94f3d68b1d2ca2993f3b308348a",
         "config_image_id": "sha256:d638ae5b8c3b18dd422726f7c39c96499346c7018644e134bed7cbdc9decf756",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -506,8 +506,8 @@
       "flask-restful": {
         "title": "flask-restful task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:flask-restful-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a93047a86e5ad139ebe1bd67fa2f125b731591df09c00394cd5733a5d3facd7e",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:flask-restful-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:a93047a86e5ad139ebe1bd67fa2f125b731591df09c00394cd5733a5d3facd7e",
         "config_image_id": "sha256:9e1832e62190db7b854388ad93de01a9326ebb6d48a1358727194fe8bbf0ef91",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -538,8 +538,8 @@
       "tinydb": {
         "title": "tinydb task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:tinydb-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:9617023e89ca5cfe016ab2e6cd26306a69f69cdf559314562cbcb1dc998dee60",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:tinydb-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:9617023e89ca5cfe016ab2e6cd26306a69f69cdf559314562cbcb1dc998dee60",
         "config_image_id": "sha256:f843d1cea2ae0c1e4dc33b6c528261a995155af7036dd6389a71cb68f2d57fd7",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -570,8 +570,8 @@
       "react-lead-form": {
         "title": "react-lead-form task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:react-lead-form-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:4cd341d8c3889c35c5d7442f8dd291c99524c429f910c3eb918f9e445a565424",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:react-lead-form-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:4cd341d8c3889c35c5d7442f8dd291c99524c429f910c3eb918f9e445a565424",
         "config_image_id": "sha256:79681ee7a6f0ee94d05be43d1f387bb98e7131a0441f62f0deae2589b5a6c3d5",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -597,8 +597,8 @@
       "M05": {
         "title": "M05 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m05-v2",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:48306e72f236b0979a3979b1b37af8373156affe2bf9a4ba7559c76faeba7410",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m05-v2",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:48306e72f236b0979a3979b1b37af8373156affe2bf9a4ba7559c76faeba7410",
         "config_image_id": "sha256:b5b6773a4f551337667aadd4b149c6b9bcc95dc856ab53bda7407d188fb85243",
         "visibility": "public",
         "platform": "linux/amd64",
@@ -616,10 +616,10 @@
         },
         "preparation": {
           "kind": "original_base_plus_original_task_python",
-          "base_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:e90095ce181e47a728407bbe4ecb39ebdeb54abb5aa598fc6efc7704d2570fd9",
-          "interpreter_source_image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
+          "base_image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:e90095ce181e47a728407bbe4ecb39ebdeb54abb5aa598fc6efc7704d2570fd9",
+          "interpreter_source_image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
           "recipe": "M05/environment/Dockerfile",
-          "recipe_sha256": "be3531ece0ca0fdbdeea5d534ace516e10344a94563ab703f74d71f6df1f2ff1",
+          "recipe_sha256": "c58b397ccb859cf243f5641153c4c47da95454327010a0d39a674c90940b67e2",
           "reason": "Restore the original task Python3.12 selection; M05 public commission requires Python3.11 or newer.",
           "change_scope": "original interpreter prefix and PATH selection; original task input bytes unchanged"
         },
@@ -635,8 +635,8 @@
           {
             "title": "M05 task environment",
             "status": "published_and_verified",
-            "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m05-v1",
-            "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:e90095ce181e47a728407bbe4ecb39ebdeb54abb5aa598fc6efc7704d2570fd9",
+            "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m05-v1",
+            "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:e90095ce181e47a728407bbe4ecb39ebdeb54abb5aa598fc6efc7704d2570fd9",
             "config_image_id": "sha256:52c91b13a49501463a804d655f2fbb4f9a73faff0378f255c45528c044682d6f",
             "visibility": "public",
             "anonymous_manifest_verified": true,
@@ -674,8 +674,8 @@
       "wal-recovery-ordering": {
         "title": "wal-recovery-ordering task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:wal-recovery-ordering-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:ca1ce80bb2aab25147921df74e55f74a50fb2bae2ac69f15985043f4cbbd91da",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:wal-recovery-ordering-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:ca1ce80bb2aab25147921df74e55f74a50fb2bae2ac69f15985043f4cbbd91da",
         "config_image_id": "sha256:276b381f57b3642cf86c62d3e2190673059484a119f3b404e8687e712e520d57",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -701,8 +701,8 @@
       "O09": {
         "title": "O09 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o09-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:54b85575736165727e754c88b7c64be0556ee73d782ee04ad8caf8a199fcf9c7",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:o09-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:54b85575736165727e754c88b7c64be0556ee73d782ee04ad8caf8a199fcf9c7",
         "config_image_id": "sha256:3a5de1701647a640c7aa84dffe3dfe8a305eda6935c72d639025da159e069c4d",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -728,8 +728,8 @@
       "kv-live-surgery": {
         "title": "kv-live-surgery task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:kv-live-surgery-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a4b54d32e44254d45ce21556e5f687fb4c566dd0c6d6a44cdf9e3f8f1e08a51b",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:kv-live-surgery-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:a4b54d32e44254d45ce21556e5f687fb4c566dd0c6d6a44cdf9e3f8f1e08a51b",
         "config_image_id": "sha256:a5ffc3ac1a9136187c2cbe812d32dbd460e1801f260d94ea9b275ff926fc6aa8",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -762,8 +762,8 @@
       "M02": {
         "title": "M02 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m02-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:c30e0d3b6a4773d52e3748759b64ae0ab41777b5b34793e7268bb707eb229ce2",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m02-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:c30e0d3b6a4773d52e3748759b64ae0ab41777b5b34793e7268bb707eb229ce2",
         "config_image_id": "sha256:04a577cb0c28ee070598b9ba889cd29e03fed15278072c10107431e88c6791a0",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -794,8 +794,8 @@
       "O01": {
         "title": "O01 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o01-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:9593cad462e5957a70ffc71714db590604633b56330909a6a0331f340fb83a17",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:o01-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:9593cad462e5957a70ffc71714db590604633b56330909a6a0331f340fb83a17",
         "config_image_id": "sha256:0810ccf20977fa0daaa6e173dc6f454c69ff3e8285a932392f4d2f4a1a1714b3",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -879,8 +879,8 @@
       "sqlfluff-3608": {
         "title": "sqlfluff-3608 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:sqlfluff-3608-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:c7f7127ea6e3ebb6e4657305041b7e8f9449511d3b1f1b1aa9eca47bdad4db52",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:sqlfluff-3608-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:c7f7127ea6e3ebb6e4657305041b7e8f9449511d3b1f1b1aa9eca47bdad4db52",
         "config_image_id": "sha256:d0b641d4f2aafa4d45a9684a4527eeb53866b62b95d2cd0df735a09712228ed4",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1008,8 +1008,8 @@
       "O05": {
         "title": "O05 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o05-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:8623cd618151fa0d826506064b5aede155a2d62100988b3d42203a8eadf44148",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:o05-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:8623cd618151fa0d826506064b5aede155a2d62100988b3d42203a8eadf44148",
         "config_image_id": "sha256:ce01572fa132abf9927b7274a7b359d515e61b7f0c46297c723711de86a9d0be",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1097,8 +1097,8 @@
       "O02": {
         "title": "O02 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o02-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:62b302e6d556e6f6ca89ac946858c2c8cb969359dab7e28505fdaa7231a919df",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:o02-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:62b302e6d556e6f6ca89ac946858c2c8cb969359dab7e28505fdaa7231a919df",
         "config_image_id": "sha256:a151d2654f805160570438549378776004cbc8737b47d89de2fbd68e8212282a",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1182,8 +1182,8 @@
       "O04": {
         "title": "O04 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o04-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:cf108af424ae37474dd7ede9a16c9999e3608a733418b4e0c38da8deb3a6e140",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:o04-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:cf108af424ae37474dd7ede9a16c9999e3608a733418b4e0c38da8deb3a6e140",
         "config_image_id": "sha256:8b15e1fbfc4ddfe72f5a3e730e1e0b7618213ac8d073f610ba2774bf26aabe77",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1325,8 +1325,8 @@
       "O06": {
         "title": "O06 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o06-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:997494f549f3870b1bef1045b0a6042ca2b8f2d1b6ce1423ac94b0b6f1c8c500",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:o06-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:997494f549f3870b1bef1045b0a6042ca2b8f2d1b6ce1423ac94b0b6f1c8c500",
         "config_image_id": "sha256:2544959977023305461fc3179cb3942803d348a7fb000fbb5e817b073f5a060b",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1454,8 +1454,8 @@
       "marshmallow-2123": {
         "title": "marshmallow-2123 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:marshmallow-2123-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:cc4be898552542f6e430283993f5e493999d2c3059aded5ff41d353030d13d18",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:marshmallow-2123-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:cc4be898552542f6e430283993f5e493999d2c3059aded5ff41d353030d13d18",
         "config_image_id": "sha256:e7eead97a7996debdc91ba76dd1d923d046d46922fcfea7f9bebaefe13deda61",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1543,8 +1543,8 @@
       "M01": {
         "title": "M01 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m01-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m01-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde",
         "config_image_id": "sha256:3ccfd33ee58eabe31b8de28f578b7178e63a4b4d892e9fdfb93eca0a44a1801f",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1621,8 +1621,8 @@
       "O14": {
         "title": "O14 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:o14-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:2bd80ebe6aabced68e7c9c2508d81574b86645fbc34a7411adc15c0f1aff90be",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:o14-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:2bd80ebe6aabced68e7c9c2508d81574b86645fbc34a7411adc15c0f1aff90be",
         "config_image_id": "sha256:d7aded463da16042e2e33304b01a9ebab21eddf60fb05a98a5a3615cd82df44c",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1648,8 +1648,8 @@
       "astroid-1030": {
         "title": "astroid-1030 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:astroid-1030-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:aa2074e9f14638dd33b6b23c79f039fe2f0d2337a28781ee8a2f3354cd0ff9d4",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:astroid-1030-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:aa2074e9f14638dd33b6b23c79f039fe2f0d2337a28781ee8a2f3354cd0ff9d4",
         "config_image_id": "sha256:e21041495c6b51e6cc818ad04a6e1159e1c85a2d0fab8ca07fc4d0305ff0932c",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1753,8 +1753,8 @@
       "M03": {
         "title": "M03 task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:m03-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:4bdc30f79123276996ebb5ca9cd966e559c5ceac9b616cb4ff7b9fa10bcabbd5",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:m03-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:4bdc30f79123276996ebb5ca9cd966e559c5ceac9b616cb4ff7b9fa10bcabbd5",
         "config_image_id": "sha256:67ccf57a5bb8127b94da9e433d2c1a48c633317fd760b3b60244c3966f1e791c",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1950,8 +1950,8 @@
       "pretrain-shard-corruption": {
         "title": "pretrain-shard-corruption task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:pretrain-shard-corruption-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:5d7c23e80aadd65c831f1b4df7a8e55ccd196d8d581f5af42b92dd9832fbb233",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:pretrain-shard-corruption-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:5d7c23e80aadd65c831f1b4df7a8e55ccd196d8d581f5af42b92dd9832fbb233",
         "config_image_id": "sha256:b88427e87b19831010ac5810ff3251ac052559ac2b1d5bb5addd21e426f17ba7",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -1984,8 +1984,8 @@
       "vf2-speedup-networkx": {
         "title": "vf2-speedup-networkx task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:vf2-speedup-networkx-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:0d4381357bd9451189f8ff33a30624a8c7023c438668c3d0f46b9d3915f09fdf",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:vf2-speedup-networkx-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:0d4381357bd9451189f8ff33a30624a8c7023c438668c3d0f46b9d3915f09fdf",
         "config_image_id": "sha256:4534e1cf6a657575872af16f8d5f342214091e3d44dc07c3c46fc913bd99b881",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -2011,8 +2011,8 @@
       "080-convert-novel-epub": {
         "title": "080-convert-novel-epub task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:080-convert-novel-epub-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a4cfa8a2ae5fd875d32fa58fef0e359c1a3f06b05cc8e9085bb9ef60448bb2fc",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:080-convert-novel-epub-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:a4cfa8a2ae5fd875d32fa58fef0e359c1a3f06b05cc8e9085bb9ef60448bb2fc",
         "config_image_id": "sha256:83dc71e9f5a6be8a8f9f1554afb6454f435e090d7d8de9294184c69b2cac8097",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -2065,14 +2065,14 @@
       "tag_role": "human-readable version alias; tags do not establish an immutable runtime identity",
       "runtime_identity": "Only use the actual registry manifest digest after publication and verification.",
       "provenance": "Dependency versions, build recipes, and source revisions belong in build and source manifests, not image names.",
-      "package": "ghcr.io/mmjzmy/auto-designer-tasks"
+      "package": "ghcr.io/mmjzmy/ahe-beta-tasks"
     },
     "companion_images": {
       "payments-pipeline-fix-kafka": {
         "title": "payments-pipeline-fix-kafka task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:payments-pipeline-fix-kafka-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:2a06248e4e626c3a99c0d9bcdf1461a0e30aeef5bd599330e85009e20b70b8ed",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:payments-pipeline-fix-kafka-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:2a06248e4e626c3a99c0d9bcdf1461a0e30aeef5bd599330e85009e20b70b8ed",
         "config_image_id": "sha256:9fed58ce43fea90f65aaa5552c341477f84181cb933c026054cf77b0a0179580",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -2098,8 +2098,8 @@
       "payments-pipeline-fix-customer": {
         "title": "payments-pipeline-fix-customer task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:payments-pipeline-fix-customer-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a2a31dd00f6553ed83338a27a7c87ef09c3b404ffa75986444ab029d7e9a82ae",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:payments-pipeline-fix-customer-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:a2a31dd00f6553ed83338a27a7c87ef09c3b404ffa75986444ab029d7e9a82ae",
         "config_image_id": "sha256:eb3b01e09078c62ceebc48261be6f2360a27479396610421eb3d55dc54174ec8",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -2125,8 +2125,8 @@
       "payments-pipeline-fix-seeder": {
         "title": "payments-pipeline-fix-seeder task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:payments-pipeline-fix-seeder-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:77af49d73ea723d1383b07f092817bea97a74add8438e6569f60ef3a9ea1be28",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:payments-pipeline-fix-seeder-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:77af49d73ea723d1383b07f092817bea97a74add8438e6569f60ef3a9ea1be28",
         "config_image_id": "sha256:83cf561668626908f23a26a7eb0d884b76ff276f3632e0df106388b7d94e3d4a",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -2152,8 +2152,8 @@
       "kv-live-surgery-loadgen": {
         "title": "kv-live-surgery-loadgen task environment",
         "status": "published_and_verified",
-        "tag": "ghcr.io/mmjzmy/auto-designer-tasks:kv-live-surgery-loadgen-v1",
-        "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:bba512daa9fd82205ad38d508817da2f84ad287a7d99d2bd5adffb3993ba3818",
+        "tag": "ghcr.io/mmjzmy/ahe-beta-tasks:kv-live-surgery-loadgen-v1",
+        "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:bba512daa9fd82205ad38d508817da2f84ad287a7d99d2bd5adffb3993ba3818",
         "config_image_id": "sha256:52118cb50bd4f9c98504dc5fac52643eef614554f3e35a7a010243540b0d227c",
         "visibility": "public",
         "anonymous_manifest_verified": true,
@@ -2251,7 +2251,7 @@
         "verification": "offline local restoration, exact checkout, full strict fsck",
         "original_source_archive_sha256": "3f4b50d007943c5a2cd90a93f11821a9a5ca7f8b64ab2ba27db89a8f358539ed"
       },
-      "task_definition_sha256": "5aa0b4429571c0aa4c07c1b7d54b04ba27fa4f502dca95c5cbb4a19f077605bd",
+      "task_definition_sha256": "7de6d9b88a7e5d77252f6375006da945c12043812987960f10212fdd34623c61",
       "package_file": "O03/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2276,7 +2276,7 @@
       "original_tar_sha256": "8938213291862779f99f683fe023564f5e2a6f04455d33e921e182f25c9fd8c6",
       "original_instruction_sha256": "1418451612d0b0ab078027b31a53e3a7866f9afafbdc454679e5fc0879706124",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "afda05581b56005ae84bcca36fde948e1c16b4dd17609a386ef11e7cdcceefef",
+      "task_definition_sha256": "1d40660e67af5f2092593fbab848238e9c8920d50e06aef2c00400939704b754",
       "package_file": "O09/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2301,7 +2301,7 @@
       "original_tar_sha256": "69723ae782bf6fb2b413518cd777035bf55d28a6cb2ac766c8bfbda9efa5d5bf",
       "original_instruction_sha256": "6d348eed309149da76605a2fd75cb481d7fb1de3008f1a3ed768187913474bd2",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "83ee9b48f03bf21c9f6845f49d622aaa4eee61555f42850a4b42d1b5a0c3f68c",
+      "task_definition_sha256": "d6349b9a535f1beac1de0775d59ef5f56a5974adaace07331d028f12e02b51b4",
       "package_file": "O14/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2390,7 +2390,7 @@
           "actor_task_execution_performed": false
         }
       },
-      "task_definition_sha256": "e96f088eb60facb7d6171ade5ac54b47d12123dc274b73ed512432350df8c123",
+      "task_definition_sha256": "3a01810812de4428479912bedbfb4c409877a68f601ca3d87ce913b6a42b14df",
       "package_file": "M03/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2430,7 +2430,7 @@
           "astroid.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "0b39139dee540243f06b30c008d78c6dc996a10a0ff7cd7bf9068b575969beae",
+      "task_definition_sha256": "651d711350c731049081b00d15189f545da903115fdc1196cd8c4503bc09f7a8",
       "package_file": "O01/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2455,7 +2455,7 @@
       "original_tar_sha256": "fb9c0bd4d2764792bf735e215c33d4484463d6fa3f3b9adb1625c7c26d798e6a",
       "original_instruction_sha256": "808aaf91b765febd4c86258b38aa28482bcb7388e6dd60536841d77221c69291",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "98a9a4f19cdd4cd74868d30c15b02ba8942e651d7883038f48c61b3b684ecfa7",
+      "task_definition_sha256": "0aca0bf9c61f0a1f6630bf329d7590840726dbe4535edaa4164282796bae6309",
       "package_file": "kv-live-surgery/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2488,7 +2488,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "dcb4d26c56f84cbb81b8da2e968ecf8e0a498c3c801ffdebbb4f0d0f0a20d203",
+      "task_definition_sha256": "309dba0647a51f57348c71836da2f02dfe6664a7a272887419af91bb58284196",
       "package_file": "tinydb/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2585,7 +2585,7 @@
           "actor_task_execution_performed": false
         }
       },
-      "task_definition_sha256": "72cf6134a891979b65a589718939eba99c666d8d388ec7e3f83b1832f1f73f9e",
+      "task_definition_sha256": "69c227e4936e02f36ccd4766f4f7a003e2a9f857b6732e79238163af4dcc2771",
       "package_file": "M01/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2621,7 +2621,7 @@
         "verification": "offline local restoration, exact checkout, full strict fsck",
         "original_source_archive_sha256": "2d86227de217371015df70ea4719c431aa873072c8040ec0dd723f9b43959682"
       },
-      "task_definition_sha256": "1f259592d97d0b642d44a6e95a4df46bdb843a8a025142bcea0330a3c1c01e7f",
+      "task_definition_sha256": "8df4cd53c3ad95401ebfe151080210be7b6d1ead616a0b4152d55b230d65c310",
       "package_file": "O05/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2662,7 +2662,7 @@
           "src/sqlfluff.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "515c670d001ad6a4b0ab1f040ad38ccf43ea56bf972cecde04a66670eb8769ac",
+      "task_definition_sha256": "25a34bd24dad54aafad1bd4ca6b19e503f0f1cd5a34564a3f4f2b8d532b22e27",
       "package_file": "O06/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2687,7 +2687,7 @@
       "original_tar_sha256": "98771f5113a5670e531a11b8c618879e82b0dc86a13e24e2337710cf8d244fb7",
       "original_instruction_sha256": "e5ea9c8393ac826e18ff241397b77fe3a59c2560e646cae34484db0a6eaf4a99",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "ffd711ab5ac8ce86ec17ead12485b08e18e606449c209742dcacf04b61a1fb82",
+      "task_definition_sha256": "4cb1ce1bb5745ed8593f1cb98646848e1d0c3f9207422503040cfd96db14dc0a",
       "package_file": "vf2-speedup-networkx/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2869,7 +2869,7 @@
           "actor_task_execution_performed": false
         }
       },
-      "task_definition_sha256": "f292fa038f04b3abfaec30e0a6d0396eb4ac1c15ecc4acbd2dc258090200e726",
+      "task_definition_sha256": "8b534bc78f706a11d2ac7e78c36759d1eba4402e1b440e81d70c94c2160ab63b",
       "package_file": "pretrain-shard-corruption/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2894,7 +2894,7 @@
       "original_tar_sha256": "682c04b2e195cdcee827a6e322104696fef0d46b52f7b6fcc1e1631cf4a88e50",
       "original_instruction_sha256": "ea296e95055091cb9678fcdb19ca61f8cb6a721342e68b6b842f40f831249d75",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "371cf448720e041269c8014493187546375b71a8e3407878c475e86e11cf3d04",
+      "task_definition_sha256": "aef6187c09d436f14f2d44a580cd691b77024e024ad56dbf325a68df0df562c2",
       "package_file": "091-add-receipts-bookkeeping/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2927,7 +2927,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "47030550010ad2585cc2c95dcc1f541d4e02dfd0ff360b24bb6f5f7ebd8465d3",
+      "task_definition_sha256": "3b7f479b97ecfa6df787c21043480fa5e2d654f5ba9a933887f876c0a5fd61d4",
       "package_file": "flask-restful/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2960,7 +2960,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "31236c0a687d390c966e181ad6601606babf339ac74457f42c73fd5de9050568",
+      "task_definition_sha256": "b969e8d66602209f7c0f20abd34a1e1210f2eb647afa982a39e93af33c440790",
       "package_file": "M05/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2993,7 +2993,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "f960f45efe81fcf33a34b777ca6961626f86b0e1f6006e8104dcf5f89034bee2",
+      "task_definition_sha256": "d850ca917d3258bd46de3b163e2ddcc9ed0cfa00e0597ae9b2057fcf4814f641",
       "package_file": "M09/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3034,7 +3034,7 @@
           "pydicom.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "b1749cb4763152dc92369c650020067f2fc8476838dbdeddebb6187a3e0734d8",
+      "task_definition_sha256": "af156935a0bda60b9a84d42c3b4137dcdb732c3f74e3cb3a12864c8736fe5af2",
       "package_file": "O02/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3074,7 +3074,7 @@
           "pyvista.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "652daf56ffa2a67a55094f75f161fc9cd60cd8e31f5c1ebf28f487f83049141a",
+      "task_definition_sha256": "5321a81d2b38003ed5424ca74809e9e9151f5c75cffd2637bbcc44f3a161a1db",
       "package_file": "O04/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3107,7 +3107,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "2d0b6212a6c1d923829069df8bb7276e51ccd84b84324a0db07a57b413d33354",
+      "task_definition_sha256": "179020f5819af36ac2d0d09024a488f45e273585dd456256f39db2a0ae9e919a",
       "package_file": "astroid-1030/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3148,7 +3148,7 @@
           "src/sqlfluff.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "11bd8ceb7939731b8d100e85c17e1372d36e7c013cfa0ee757b53c53299cb7c1",
+      "task_definition_sha256": "4462bca8920732eb26df84bb3660522dc34fe053e2afaa90e9434d19cd510c96",
       "package_file": "sqlfluff-3608/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3189,7 +3189,7 @@
           "src/marshmallow.egg-info/top_level.txt"
         ]
       },
-      "task_definition_sha256": "6986a75c0052714b5aaf9037192441e7ad0f991f030ef663bc1267ce5ee8fdf5",
+      "task_definition_sha256": "65b1286d84ae2e1f672e72da434ff7c3d418c2a5a27f503fe4c5e4d8d58672ea",
       "package_file": "marshmallow-2123/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3214,7 +3214,7 @@
       "original_tar_sha256": "1152c3d3415d26ed6ac0ae3a3d57abf4ff2648feaf3c92d743b92d58b063eba0",
       "original_instruction_sha256": "84dc2f6a5a94013c90706ca393aef6c026881b7ae8331258d4c8bb7226f3099f",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "a6fb1996a729a07f15c5ee3dd1b7d928b8bb1f779610c5d40494089eb4dd15aa",
+      "task_definition_sha256": "57caf566047430397667ae925bf6a32cbe6c9c8eca73fc64869c7d521b469c68",
       "package_file": "payments-pipeline-fix/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3239,7 +3239,7 @@
       "original_tar_sha256": "ed72a0065addf11bf531c07674756e0c713ec1677a3a4206890752087f4f5e53",
       "original_instruction_sha256": "9630da6851926f7aada9229e4e39a2759f9efe88973b2bdeab57b59d7a05d8f6",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "dcb91d21513e94e7c2b406112af8be6d8af8b63df6cda62a2c8c083a45e67160",
+      "task_definition_sha256": "fa5e66f85d94e76c13ee5b5c5df5d14d4cd32b48577d7d0a3c922c9c8866fac2",
       "package_file": "wal-recovery-ordering/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3264,7 +3264,7 @@
       "original_tar_sha256": "4f4b0486525706c9fea22d249364a5f7bff9b4782cbfd1eedce0a57ee75459ce",
       "original_instruction_sha256": "c9bee6dd42ab974c99f1d02a3bd069c14686c5ddaf7cbfd503f4c6e337f92c25",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "9cc8a13db4d36a4fcb3aaa9c22e39e9abc0153201dc34e73bbc8d2fc4faf8ffb",
+      "task_definition_sha256": "63e320932abf1d6cb1b0ba67f4d1643b9c0bb47cfe6e9b8faffbe5a02e4b3525",
       "package_file": "vba-userform-port/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3289,7 +3289,7 @@
       "original_tar_sha256": "e8588431e5cc121aa170a60c559ed544a342a436980970b0abbf30b9a952c44f",
       "original_instruction_sha256": "6e16c343f85a840bd2ef3369a0f1bde2dc1c6da7e56fa2f0bb4743bd8fba12d0",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "a7f2ca138437c6c127ede5c6228c44978653640f29b463a3274cee08b389d9b9",
+      "task_definition_sha256": "266e4bc9b8d9100e50c8b5541aac042f2ca0d44b9c9c2343c77fb2b59402ba06",
       "package_file": "react-lead-form/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3314,7 +3314,7 @@
       "original_tar_sha256": "3a554e817ca4cc6561a86f740ac1c3dee026a3ab3b111a68a797ef484b145298",
       "original_instruction_sha256": "2b1db343ef603a6ffa64ef95ade2a6c86ffe851ba7b883c10470a801b1bfae19",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "d8d845c9edb07672e9bb2362b373bd7c6a2250a7490c6775da5b599143923427",
+      "task_definition_sha256": "2e728bcb195c9e0b180f1acc5b828231690ff08a475449fb370eea75e98a8f66",
       "package_file": "080-convert-novel-epub/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3347,7 +3347,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "2b509294e6fe3534269d3a1089271c876934ee07b0dadae36f5c398cc08d4b0c",
+      "task_definition_sha256": "bb59e92f963b7ffd5a16c7f557866687dff7e07942338ed677bb02de8617ec14",
       "package_file": "cookiecutter/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3380,7 +3380,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "935c676aa84d4c0984e803e0a7f5aed23877f132c802a894ce03c90e960f3cbf",
+      "task_definition_sha256": "082d278163d7697242bb8e5c7e60676b570af980e0700bc59ec9f5462e80dd5b",
       "package_file": "tqdm/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3422,7 +3422,7 @@
         "preparation_boundary": "Verify the declared original files and runtime; absence of the candidate described by the commission is intentionally retained, not an archive-loss or source-recovery blocker.",
         "publication_boundary": "Original two-file input published in the fixed material Release; intentionally incomplete scenario retained."
       },
-      "task_definition_sha256": "2c36cb5cdf2f4307e03a98ce6d3ffba17b0752f3b8c3877e4ac3eb34032325a8",
+      "task_definition_sha256": "7131ad084ca80c5f1721f11ff9e5c4d549955716ba3794d53789c667d3332a20",
       "package_file": "M02/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3506,7 +3506,7 @@
         "origin": "Pinned upstream source restored from the original commission, with complete history",
         "verification": "fresh offline restoration, exact checkout, full strict fsck, every file compared to its Git blob"
       },
-      "task_definition_sha256": "0a3923ff8b1d8f24cf4a4cfebfb337cdc6164d1a9f90e527a2b76fe6b58f6e3a",
+      "task_definition_sha256": "830175c7e65fe6852ea0d7f4dd9f1102631a9fc14f2f6f100f57eed7576b15cb",
       "package_file": "M04/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3539,7 +3539,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "8ed7584a5f5c8f2df314d191e71a871bf53225173949191c7c49088eb9007a30",
+      "task_definition_sha256": "4c26e8c9f7c61d828723b928ad780f6e1b6acd1e90d62fa1ee6cb6e7fcf4e9b2",
       "package_file": "M07/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3572,7 +3572,7 @@
         "origin": "original research environment Git baseline",
         "verification": "offline local restoration, exact checkout, full strict fsck"
       },
-      "task_definition_sha256": "52f17ac1ff6be854633bfb321a0e0cb53d41724b383f6d21180596c225885a72",
+      "task_definition_sha256": "127bfa591f80e2a47a07d6debfdc189e8e2c91f6deca9b6240562cc2568dfcea",
       "package_file": "M10/task.json",
       "package_schema_version": 3,
       "environment_validation": {

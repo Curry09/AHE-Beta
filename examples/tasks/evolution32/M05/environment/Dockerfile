@@ -1,6 +1,6 @@
 # Spec-0081/T5: retain the original base and supply its declared task interpreter.
-ARG PYTHON_IMAGE=ghcr.io/mmjzmy/auto-designer-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde
-ARG TASK_IMAGE=ghcr.io/mmjzmy/auto-designer-tasks@sha256:e90095ce181e47a728407bbe4ecb39ebdeb54abb5aa598fc6efc7704d2570fd9
+ARG PYTHON_IMAGE=ghcr.io/mmjzmy/ahe-beta-tasks@sha256:aeb29bd7d63eb8220c87f768070bfdba8f5dee4d33c487fc2c3c545f9a0a7bde
+ARG TASK_IMAGE=ghcr.io/mmjzmy/ahe-beta-tasks@sha256:e90095ce181e47a728407bbe4ecb39ebdeb54abb5aa598fc6efc7704d2570fd9
 FROM ${PYTHON_IMAGE} AS task-python
 FROM ${TASK_IMAGE}
 COPY --from=task-python /opt/python/ /opt/python/

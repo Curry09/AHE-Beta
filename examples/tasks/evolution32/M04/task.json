@@ -17,7 +17,7 @@
   },
   "environment": {
     "kind": "container",
-    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:dd714c8ff7d7431836e5c133c52691dff3fc996134fbfdc18a0782b38a2d27ee",
+    "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:dd714c8ff7d7431836e5c133c52691dff3fc996134fbfdc18a0782b38a2d27ee",
     "workdir": "/app/repo",
     "patch": "git",
     "resources": {

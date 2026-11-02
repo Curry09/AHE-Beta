@@ -11,7 +11,7 @@
   },
   "environment": {
     "kind": "container",
-    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:1841e6685c5ec7845dff02aed304dac10482143f4de33f5c7fd0474b062d8821",
+    "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:1841e6685c5ec7845dff02aed304dac10482143f4de33f5c7fd0474b062d8821",
     "workdir": "/workspace",
     "patch": "git",
     "resources": {},

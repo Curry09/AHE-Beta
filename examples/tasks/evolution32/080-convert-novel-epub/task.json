@@ -11,7 +11,7 @@
   },
   "environment": {
     "kind": "container",
-    "image": "ghcr.io/mmjzmy/auto-designer-tasks@sha256:a4cfa8a2ae5fd875d32fa58fef0e359c1a3f06b05cc8e9085bb9ef60448bb2fc",
+    "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:a4cfa8a2ae5fd875d32fa58fef0e359c1a3f06b05cc8e9085bb9ef60448bb2fc",
     "workdir": "/app",
     "patch": "not_applicable",
     "resources": {},
