@@ -73,6 +73,41 @@ def test_archive_reused_and_original_untouched(tmp_path):
         assert t.extractfile("fulltrace.py").read()
 
 
+@pytest.mark.parametrize(
+    "private_path",
+    [
+        ".env",
+        ".env.local",
+        ".env.production",
+        ".envrc",
+        ".env.d/provider",
+        "provider.env",
+        "tls/provider.key",
+        "tls/provider.pem",
+        "secrets/provider.json",
+        "credentials.json",
+        "settings.local.json",
+        ".pytest_cache/v/cache/nodeids",
+        ".ruff_cache/index",
+    ],
+)
+def test_harness_archive_omits_private_configuration_and_caches(tmp_path, private_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "entry.py").write_text("def main(): pass\n")
+    (source / ".env.example").write_text("API_KEY=\n")
+    private = source / private_path
+    private.parent.mkdir(parents=True, exist_ok=True)
+    private.write_text("dummy-private-value-for-regression\n")
+    frozen = freeze_harness("v0", source, tmp_path / "cache", {})
+    assert private_path not in frozen["source_hashes"]
+    assert ".env.example" in frozen["source_hashes"]
+    with tarfile.open(frozen["archive"]) as archive:
+        assert private_path not in archive.getnames()
+        assert archive.extractfile(".env.example").read() == b"API_KEY=\n"
+    assert private.read_text() == "dummy-private-value-for-regression\n"
+
+
 def test_runtime_options_apply_to_nested_agents_and_actual_sdk(tmp_path, monkeypatch):
     p = tmp_path / "agent.yaml"
     p.write_text("llm_config:\n  timeout: 300\n  stream: true\nsystem_prompt: keep this\n")

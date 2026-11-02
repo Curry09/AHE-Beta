@@ -1,6 +1,7 @@
 # Spec-0047/T3：mock Docker 的双实验隔离与 destroy 确认。
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -25,21 +26,17 @@ def test_compose_template_has_no_global_names() -> None:
     assert "io.openagents.experiment_id" in text
 
 
-def test_experiment_egress_allows_configured_wis_gateway() -> None:
-    # Delivery runs inside the isolated vigil network; the host-side API probe
-    # is not sufficient to prove that the configured WIS gateway is reachable.
-    egress = Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "egress-proxy.conf"
-    assert "acl allowed_egress dstdomain .paperbypass.com" in egress.read_text(encoding="utf-8")
-
-
-def test_experiment_egress_scopes_boyue_gateway_to_exact_host_and_port() -> None:
-    egress = Path(__file__).resolve().parents[2] / "deploy" / "experiment" / "egress-proxy.conf"
+@pytest.mark.parametrize("deployment", ["experiment", "gitea"])
+def test_default_egress_has_no_operator_specific_destinations(deployment) -> None:
+    egress = Path(__file__).resolve().parents[2] / "deploy" / deployment / "egress-proxy.conf"
     rules = egress.read_text(encoding="utf-8")
-    assert "acl boyue_glm dst 35.220.164.252/32" in rules
-    assert "acl boyue_glm_port port 3888" in rules
-    rule = "http_access allow boyue_glm boyue_glm_port"
-    assert rule in rules
-    assert rules.index(rule) < rules.index("http_access deny all")
+    assert set(re.findall(r"^acl allowed_egress dstdomain (.+)$", rules, re.MULTILINE)) == {
+        ".anthropic.com",
+        ".claude.ai",
+    }
+    assert not re.search(r"^acl \S+ dst\s", rules, re.MULTILINE)
+    assert not re.search(r"^(cache_peer|never_direct)\s", rules, re.MULTILINE)
+    assert "http_access deny all" in rules.splitlines()
     assert "http_access allow all" not in rules.splitlines()
 
 

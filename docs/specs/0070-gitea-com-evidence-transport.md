@@ -100,7 +100,7 @@ tasks:
       - docs/QUICKSTART.md
       - docs/CONFIGURATION.md
       - docs/RELEASING.md
-      - backend/deploy/gitea/README.md
+      - backend/deploy/README.md
     scope: 增加真实 producer/reader 离线契约与显式现场探针，更新 reader 先行的配套 SHA/部署记录和使用说明。
     acceptance: 两仓固定版本离线契约通过；自建/Gitea.com、E2B/容器实际 prepare 得到只读授权证据；现场结果脱敏且无模型调用。
 ---

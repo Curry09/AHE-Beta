@@ -37,19 +37,33 @@ def json_write(path, value):
 def source_files(source):
     result = {}
     for p in sorted(source.rglob("*")):
+        relative = p.relative_to(source)
         if not p.is_file() or any(
-            s in p.parts for s in [".git", ".gitea", "__pycache__", ".venv", ".pytest_cache"]
+            s in relative.parts
+            for s in [
+                ".git",
+                ".gitea",
+                "__pycache__",
+                ".venv",
+                "venv",
+                ".pytest_cache",
+                ".ruff_cache",
+                "node_modules",
+                "secrets",
+            ]
         ):
             continue
         if (
-            "docs/evidence/" in p.relative_to(source).as_posix()
-            or p.name == ".env"
-            or p.suffix in {".pyc", ".pyo"}
+            "docs/evidence/" in relative.as_posix()
+            or any(part.startswith(".env") for part in relative.parts[:-1])
+            or (p.name.startswith(".env") and p.name != ".env.example")
+            or p.name in {"credentials.json", "hosts.yml", "settings.local.json"}
+            or p.suffix.lower() in {".env", ".pem", ".key", ".p12", ".pfx", ".pyc", ".pyo"}
         ):
             continue
         if p.is_symlink():
             raise ValueError("Harness source must not contain linked files")
-        result[p.relative_to(source).as_posix()] = p.read_bytes()
+        result[relative.as_posix()] = p.read_bytes()
     if "entry.py" not in result:
         raise ValueError("Harness entry.py missing")
     return result

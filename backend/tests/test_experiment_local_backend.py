@@ -72,7 +72,7 @@ def backend(tmp_path, monkeypatch):
     selected = local.LocalBackend(
         tmp_path,
         manifest,
-        {"GITEA_TOKEN": "private-provider-key", "MODEL_URL": "http://35.220.164.252:3888/v1"},
+        {"GITEA_TOKEN": "private-provider-key", "MODEL_URL": "http://203.0.113.42:3888/v1"},
     )
     calls = []
     labels = {
@@ -527,9 +527,9 @@ def test_egress_is_exact_and_accepts_nonstandard_model_ports():
     models = {role: {"base_url_env": role} for role in ("delivery", "harness")}
     rules = local.render_egress(
         {"models": models},
-        {"delivery": "https://model.example/v1", "harness": "http://35.220.164.252:3888/v1"},
+        {"delivery": "https://model.example/v1", "harness": "http://203.0.113.42:3888/v1"},
     )
-    assert "dst 35.220.164.252" in rules
+    assert "dst 203.0.113.42" in rules
     assert "dstdomain model.example" in rules
     assert "port 3888" in rules
     assert "http_access allow all" not in rules

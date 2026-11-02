@@ -88,12 +88,12 @@
     },
     {
       "original_path": "backend/deploy/gitea/README.md",
-      "disposition": "maintained",
-      "destination": "backend/deploy/gitea/README.md",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "moved",
+      "destination": "backend/deploy/README.md",
+      "reason": "Consolidated deployment directory guidance and manual Gitea maintenance instructions",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "59fdb9330cd8efe981cab408ce3d9d0c054f28d70a432b40f49b547d3ac0edb5",
-      "destination_sha256": "59fdb9330cd8efe981cab408ce3d9d0c054f28d70a432b40f49b547d3ac0edb5"
+      "destination_sha256": "6c9d31e83774566790c164a2fbc0f5358f57c30d77877889277844f22e6a83e0"
     },
     {
       "original_path": "backend/deploy/gitea/bootstrap.sh",

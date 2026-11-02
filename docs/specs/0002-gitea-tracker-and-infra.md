@@ -15,7 +15,7 @@ tasks:
     parallel: false
     files:
       - backend/deploy/gitea/docker-compose.yml
-      - backend/deploy/gitea/README.md
+      - backend/deploy/README.md
       - backend/deploy/gitea/bootstrap.sh
     scope: "做什么：\n- 提供 `docker-compose.yml`：单 Gitea 服务、sqlite 后端、数据挂命名卷、暴露固定 HTTP 端口。\n- 提供 `bootstrap.sh`：等待就绪 → 建 admin → 生成带 `write:issue,write:repository` scope 的 access token → 建工作仓 → ensure 标签集 {bug, feature}。\n- 产出 `backend/deploy/gitea/.env`(GITEA_URL/OWNER/REPO/TOKEN)，gitignore，作为 T2/T3 的配置契约。\n- 提供 `README.md`：启动、拿 token、重置数据卷的步骤。\n不做什么：\n- 不做生产化部署（无 TLS、无外部 DB、无反向代理、无高可用）。\n- 不实现 IssueTracker 客户端逻辑（归 T2）、不推 harness 种子内容（归 T3）。\n- 不管理 token 轮换/过期策略、不做多用户/多组织权限模型。\n- 不在脚本内编排 T2/T3；本任务仅产出连接信息，消费方自行读取。"
     acceptance: "- `docker compose up -d` 后 Gitea 在固定端口可访问，`GET /api/v1/version` 返回 200。\n- `bootstrap.sh` 首次运行产出 `backend/deploy/gitea/.env`，含 GITEA_URL/OWNER/REPO/TOKEN 四键且值非空。\n- `bootstrap.sh` 二次运行不报错、不重复建 admin/仓/标签（幂等），TOKEN 维持有效。\n- 工作仓存在，标签集含且仅初始含 {bug, feature}。\n- 用产出 TOKEN `curl` 调 `POST /repos/{OWNER}/{REPO}/issues` 建一条 issue 返回 201。\n- GITEA_URL 不含尾斜杠与 /api/v1 后缀；.env 被 gitignore 不入库。\n- README 记录启动、拿 token、重置数据卷三条路径。"
@@ -159,7 +159,7 @@ T3 单测 mock Gitea API + 临时 git：建仓调用命中 `POST /user/repos`、
 
 | Task | 文件（单一 writer 所有权） |
 | --- | --- |
-| T1 | `backend/deploy/gitea/docker-compose.yml`、`backend/deploy/gitea/README.md`、`backend/deploy/gitea/bootstrap.sh` |
+| T1 | `backend/deploy/gitea/docker-compose.yml`、`backend/deploy/README.md`、`backend/deploy/gitea/bootstrap.sh` |
 | T2 | `backend/ahe_beta/tracker/gitea.py`、`backend/tests/tracker/test_gitea.py` |
 | T3 | `backend/scripts/bootstrap_harness.py`、`backend/tests/test_bootstrap_harness.py` |
 
